@@ -4,6 +4,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
 #include "Game/GameState/CombatGameState.h"
+#include "Blueprint/UserWidget.h"
 
 APartyPlayerController::APartyPlayerController()
 {
@@ -37,6 +38,16 @@ void APartyPlayerController::BeginPlay()
             UE_LOG(LogTemp, Warning, TEXT("[APartyPlayerController] TurnManager is NULL"));
         }
     }
+
+    // HUD 생성
+    if (HUDWidgetClass)
+    {
+        HUDWidget = CreateWidget<UUserWidget>(this, HUDWidgetClass);
+        if (HUDWidget)
+        {
+            HUDWidget->AddToViewport();
+        }
+    }
 }
 
 AUnitBase* APartyPlayerController::GetActiveUnit() const
@@ -54,6 +65,9 @@ void APartyPlayerController::SelectNextUnit()
 
 void APartyPlayerController::RegisterPartyUnits(const TArray<AUnitBase*>& Units, const TArray<ACombatGridTile*>& StartTiles)
 {
+    //서버코드
+    if (!HasAuthority()) return;
+
     // 유닛이 없으면 아무 것도 하지 않음
     if (Units.Num() == 0) return;
 

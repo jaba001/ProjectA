@@ -17,6 +17,16 @@ AUnitBase::AUnitBase()
     AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystem"));
     AttributeSet = CreateDefaultSubobject<UAS_Unit>(TEXT("AttributeSet"));
 
+    // AbilitySystem 네트워크 복제 설정
+    AbilitySystem->SetIsReplicated(true);
+    AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
+
+    // 네트워크 복제 활성화
+    // - 서버에서 생성된 이 Actor를 클라이언트에도 자동 생성
+    // - 서버에서 위치 변경 시 클라이언트에 자동 동기화
+    bReplicates = true;
+    SetReplicateMovement(true);
+
 }
 
 void AUnitBase::BeginPlay()

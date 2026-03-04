@@ -36,6 +36,13 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     UTurnManager* TurnManager;
 
+private:
+    UPROPERTY(EditAnywhere, Category = "UI")
+    TSubclassOf<UUserWidget> HUDWidgetClass;
+
+    UPROPERTY()
+    UUserWidget* HUDWidget;
+
 public:
     // 현재 조종할 유닛을 반환
     UFUNCTION(BlueprintCallable, Category = "Party")
