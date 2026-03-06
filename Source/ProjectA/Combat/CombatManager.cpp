@@ -1,12 +1,11 @@
 #include "Combat/CombatManager.h"
 #include "Net/UnrealNetwork.h"
 #include "Game/Turn/TurnManager.h"
+#include "Unit/UnitBase.h"
 
 ACombatManager::ACombatManager()
 {
     PrimaryActorTick.bCanEverTick = false;
-
-    // 네트워크 복제 활성화
     bReplicates = true;
 }
 
@@ -28,10 +27,34 @@ void ACombatManager::StartCombat_Internal()
 
     TurnManager = NewObject<UTurnManager>(this);
 
-    // TODO: 유닛 배열 전달
-    // TurnManager->InitializeTurnOrder(Units);
+    if (TurnManager)
+    {
+        // 실제 유닛 전달
+        TurnManager->InitializeTurnOrder(CombatUnits);   
+        // 동기화
+        CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
+    }
+}
 
-    CurrentTurnIndex = 0;
+void ACombatManager::RegisterUnits(const TArray<AUnitBase*>& Units)
+{
+    // 서버 전용
+    if (!HasAuthority()) return;  
+
+    CombatUnits = Units;
+}
+
+void ACombatManager::AdvanceTurn()
+{
+    // 서버 전용
+    if (!HasAuthority()) return;  
+
+    if (TurnManager)
+    {
+        TurnManager->EndTurn();
+        // 클라 동기화
+        CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();  
+    }
 }
 
 void ACombatManager::GetLifetimeReplicatedProps(
@@ -40,4 +63,21 @@ void ACombatManager::GetLifetimeReplicatedProps(
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(ACombatManager, CurrentTurnIndex);
+}
+
+AUnitBase* ACombatManager::GetCurrentUnit() const
+{
+    if (!CombatUnits.IsValidIndex(CurrentTurnIndex))
+        return nullptr;
+
+    return CombatUnits[CurrentTurnIndex];
+}
+
+void ACombatManager::RequestEndTurn()
+{
+    if (TurnManager)
+    {
+        TurnManager->EndTurn();
+        //UE_LOG(LogTemp, Warning, TEXT("RequestEndTurn Called ComMan"));
+    }
 }

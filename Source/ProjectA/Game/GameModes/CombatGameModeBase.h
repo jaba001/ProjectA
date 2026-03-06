@@ -5,6 +5,8 @@
 #include "CombatGameModeBase.generated.h"
 
 class ACombatManager;
+class AUnitBase;
+class ACombatGridManager;
 
 UCLASS()
 class PROJECTA_API ACombatGameModeBase : public AGameModeBase
@@ -17,16 +19,27 @@ public:
 protected:
     virtual void BeginPlay() override;
 
-private:
-
-    // CombatManager 클래스 (에디터에서 지정 가능)
-    UPROPERTY(EditDefaultsOnly, Category = "Combat")
+public:
+    // CombatManager 클래스 지정
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatGameMode")
     TSubclassOf<ACombatManager> CombatManagerClass;
 
-    // 현재 전투 매니저 인스턴스 (서버 전용)
+    // 플레이어 유닛 클래스 목록
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatGameMode")
+    TArray<TSubclassOf<AUnitBase>> PlayerUnitClasses;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatGameMode")
+    TArray<TSubclassOf<AUnitBase>> EnemyUnitClasses;
+
+    // CombatManager 인스턴스
     UPROPERTY()
     ACombatManager* CombatManager;
 
-    // 전투 시작
-    void StartCombat();
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatGameMode")
+    TArray<FIntPoint> PlayerCoords;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatGameMode")
+    TArray<FIntPoint> EnemyCoords;
+
+    void SpawnCombat();
 };

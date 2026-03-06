@@ -15,6 +15,11 @@ class PROJECTA_API AEnemyUnit : public AUnitBase
 	GENERATED_BODY()
 
 public:
+	AEnemyUnit();
+
+public:
 	virtual void OnTurnStart() override;
 
+	void ExecuteEnemyTurn();
+	AUnitBase* FindPlayerTarget();
 };

@@ -4,8 +4,6 @@
 #include "GameFramework/GameStateBase.h"
 #include "CombatGameState.generated.h"
 
-class UTurnManager;
-
 UCLASS()
 class PROJECTA_API ACombatGameState : public AGameStateBase
 {
@@ -17,12 +15,5 @@ public:
 protected:
     virtual void BeginPlay() override;
 
-public:
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Turn")
-    UTurnManager* TurnManager;
-
-    // 필요시 TurnManager 재생성 가능
-    UFUNCTION(BlueprintCallable, Category = "Turn")
-    void CreateTurnManager();
 };

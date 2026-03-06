@@ -1,26 +1,26 @@
-#include "Grid/Combat/CombatGridGenerator.h"
+#include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Engine/World.h"
 
-ACombatGridGenerator::ACombatGridGenerator()
+ACombatGridManager::ACombatGridManager()
 {
     PrimaryActorTick.bCanEverTick = false;
 }
 
-void ACombatGridGenerator::BeginPlay()
+void ACombatGridManager::BeginPlay()
 {
     Super::BeginPlay();
 
     if (!TileClass)
     {
-        UE_LOG(LogTemp, Error, TEXT("CombatGridGenerator: TileClass not set."));
+        UE_LOG(LogTemp, Error, TEXT("CombatGridManager: TileClass not set."));
         return;
     }
 
     GenerateGrid();
 }
 
-void ACombatGridGenerator::GenerateGrid()
+void ACombatGridManager::GenerateGrid()
 {
     if (!TileClass) return;
 
@@ -57,7 +57,7 @@ void ACombatGridGenerator::GenerateGrid()
     }
 }
 
-TArray<ACombatGridTile*> ACombatGridGenerator::GetTilesByCoords(const TArray<FIntPoint>& Coords) const
+TArray<ACombatGridTile*> ACombatGridManager::GetTilesByCoords(const TArray<FIntPoint>& Coords) const
 {
     TArray<ACombatGridTile*> Result;
     Result.Reserve(Coords.Num());

@@ -60,8 +60,11 @@ public:
     FGameplayAttributeData HP;
     ATTRIBUTE_ACCESSORS(UAS_Unit, HP)
 
-        // 최대 체력
-        UPROPERTY(BlueprintReadOnly, Category = "Attribute")
+    // 최대 체력
+    UPROPERTY(BlueprintReadOnly, Category = "Attribute")
     FGameplayAttributeData MaxHP;
     ATTRIBUTE_ACCESSORS(UAS_Unit, MaxHP)
+
+public:
+    void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data);
 };

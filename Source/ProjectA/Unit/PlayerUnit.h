@@ -15,6 +15,9 @@ class PROJECTA_API APlayerUnit : public AUnitBase
 	GENERATED_BODY()
 
 public:
+	APlayerUnit();
+
+public:
 	virtual void OnTurnStart() override;
 	virtual void OnTurnEnd() override;
 

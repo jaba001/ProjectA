@@ -17,14 +17,26 @@ public:
 
 protected:
     virtual void BeginPlay() override;
-
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-private:
 
+private:
+    // 플레이어 유닛 클래스들
+    UPROPERTY(EditDefaultsOnly, Category = "Combat")
+    TArray<TSubclassOf<AUnitBase>> PlayerUnitClasses;
+
+    // 적 유닛 클래스들
+    UPROPERTY(EditDefaultsOnly, Category = "Combat")
+    TArray<TSubclassOf<AUnitBase>> EnemyUnitClasses;
+
+private:
     // 서버 전용 턴 매니저
     UPROPERTY()
     UTurnManager* TurnManager;
+
+    // 전투 유닛 목록 (서버 소유)
+    UPROPERTY()
+    TArray<AUnitBase*> CombatUnits;
 
     // 현재 턴 인덱스 (클라 동기화용)
     UPROPERTY(Replicated)
@@ -32,13 +44,22 @@ private:
 
 public:
 
-    // 전투 시작 요청 (클라 → 서버)
     UFUNCTION(Server, Reliable)
     void Server_StartCombat();
 
-    // 전투 시작 실제 실행 (서버 전용)
     void StartCombat_Internal();
 
-    // 현재 턴 인덱스 Getter
+    // 턴 진행 요청 (서버 전용)
+    void AdvanceTurn();
+
+    // 유닛 등록 (서버 전용)
+    void RegisterUnits(const TArray<AUnitBase*>& Units);
+
     int32 GetCurrentTurnIndex() const { return CurrentTurnIndex; }
+
+    UFUNCTION(BlueprintCallable)
+    AUnitBase* GetCurrentUnit() const;
+
+    UFUNCTION(BlueprintCallable)
+    void RequestEndTurn();
 };

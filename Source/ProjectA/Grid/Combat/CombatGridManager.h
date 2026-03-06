@@ -2,17 +2,17 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "CombatGridGenerator.generated.h"
+#include "CombatGridManager.generated.h"
 
 class ACombatGridTile;
 
 UCLASS()
-class PROJECTA_API ACombatGridGenerator : public AActor
+class PROJECTA_API ACombatGridManager : public AActor
 {
     GENERATED_BODY()
 
 public:
-    ACombatGridGenerator();
+    ACombatGridManager();
 
 protected:
     virtual void BeginPlay() override;

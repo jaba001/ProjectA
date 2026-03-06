@@ -41,8 +41,8 @@ void UGA_DefaultAttack::ActivateAbility(
         );
 
         //테스트코드
-        float CurrentHP = ASC->GetNumericAttribute(UAS_Unit::GetHPAttribute());
-        UE_LOG(LogTemp, Warning, TEXT("HP after damage: %f"), CurrentHP);
+        //float CurrentHP = ASC->GetNumericAttribute(UAS_Unit::GetHPAttribute());
+        //UE_LOG(LogTemp, Warning, TEXT("HP after damage: %f"), CurrentHP);
     }
 
 
