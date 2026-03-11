@@ -28,6 +28,7 @@ public:
 public:
     void SetOccupyingUnit(AUnitBase* NewUnit);
 
+    UFUNCTION(BlueprintCallable, Category = "CombatGridTile")
     AUnitBase* GetOccupyingUnit() const    {return OccupyingUnit;}
 
     void UpdateTileVisual();

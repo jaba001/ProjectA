@@ -23,11 +23,11 @@ void AEnemyUnit::ExecuteEnemyTurn()
         return;
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] %s attacks %s"), *GetName(), *Target->GetName());
-
-    DealDamage(Target, 20.f);
-
     APartyPlayerController* PC = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController());
+    
+    //UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] %s attacks %s"), *GetName(), *Target->GetName());
+
+    //DealDamage(Target, 20.f);
 
     if (PC)
     {

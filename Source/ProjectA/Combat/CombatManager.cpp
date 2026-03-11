@@ -75,9 +75,10 @@ AUnitBase* ACombatManager::GetCurrentUnit() const
 
 void ACombatManager::RequestEndTurn()
 {
-    if (TurnManager)
+    if (!HasAuthority())
     {
-        TurnManager->EndTurn();
-        //UE_LOG(LogTemp, Warning, TEXT("RequestEndTurn Called ComMan"));
+        return;
     }
+
+    AdvanceTurn();
 }

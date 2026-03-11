@@ -64,10 +64,10 @@ void ACombatGridTile::NotifyActorBeginCursorOver()
 {
     Super::NotifyActorBeginCursorOver();
 
-    if (OccupyingUnit)
-    {
-        return;
-    }
+    //if (OccupyingUnit)
+    //{
+    //    return;
+    //}
 
     if (TileSprite)
     {
@@ -79,10 +79,10 @@ void ACombatGridTile::NotifyActorEndCursorOver()
 {
     Super::NotifyActorEndCursorOver();
 
-    if (OccupyingUnit)
-    {
-        return;
-    }
+    //if (OccupyingUnit)
+    //{
+    //    return;
+    //}
 
     if (TileSprite)
     {

@@ -70,8 +70,14 @@ void APartyPlayerController::SetSelectedTile(ACombatGridTile* InTile)
 
     SelectedTile = InTile;
 
-    UE_LOG(LogTemp, Warning,
-        TEXT("[PC] Selected Tile (%d,%d)"),
-        InTile->GridCoord.X,
-        InTile->GridCoord.Y);
+    AUnitBase* OccupyingUnit = InTile->GetOccupyingUnit();
+
+    if (OccupyingUnit)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[PC] Selected Tile (%d,%d) | Unit=%s"), InTile->GridCoord.X, InTile->GridCoord.Y, *OccupyingUnit->GetName());
+    }
+    else
+    {
+        UE_LOG(LogTemp, Log, TEXT("[PC] Selected Tile (%d,%d) | Unit=None"), InTile->GridCoord.X, InTile->GridCoord.Y);
+    }
 }

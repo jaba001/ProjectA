@@ -1,10 +1,3 @@
-#pragma once
-
-#include "CoreMinimal.h"
-#include "AttributeSet.h"
-#include "AbilitySystemComponent.h"
-#include "AS_Unit.generated.h"
-
 // ============================================================================
 // ATTRIBUTE_ACCESSORS (GAS 핵심 개념)
 //
@@ -40,6 +33,13 @@
 // Attribute는 반드시 ATTRIBUTE_ACCESSORS로 생성된 함수들을 통해서만 다룬다.
 // ============================================================================
 
+#pragma once
+
+#include "CoreMinimal.h"
+#include "AttributeSet.h"
+#include "AbilitySystemComponent.h"
+#include "AS_Unit.generated.h"
+
 #define ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
 GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
 GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
@@ -52,19 +52,14 @@ class PROJECTA_API UAS_Unit : public UAttributeSet
     GENERATED_BODY()
 
 public:
-    UAS_Unit();
-
-public:
-    // 현재 체력
-    UPROPERTY(BlueprintReadOnly, Category = "Attribute")
+    UPROPERTY(BlueprintReadOnly, Category = "Attributes")
     FGameplayAttributeData HP;
     ATTRIBUTE_ACCESSORS(UAS_Unit, HP)
 
-    // 최대 체력
-    UPROPERTY(BlueprintReadOnly, Category = "Attribute")
+        UPROPERTY(BlueprintReadOnly, Category = "Attributes")
     FGameplayAttributeData MaxHP;
     ATTRIBUTE_ACCESSORS(UAS_Unit, MaxHP)
 
 public:
-    void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data);
+    virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
 };

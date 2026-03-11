@@ -8,14 +8,19 @@
 #include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "GAS/Ability/GA_DefaultAttack.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 
 AUnitBase::AUnitBase()
 {
     PrimaryActorTick.bCanEverTick = false;
+
     bIsActiveTurn = false;
     PendingTile = nullptr;
     PendingTargetUnit = nullptr;
     OriginalTileBeforeAction = nullptr;
+    bActionDamageApplied = false;
     MovePhase = EUnitMovePhase::None;
 
     GetCharacterMovement()->MaxWalkSpeed = 350.f;
@@ -51,18 +56,16 @@ void AUnitBase::BeginPlay()
     {
         AbilitySystem->InitAbilityActorInfo(this, this);
 
-        AbilitySystem->GiveAbility(FGameplayAbilitySpec(UGA_DefaultAttack::StaticClass(), 1, 0));
+        if (HasAuthority() && DefaultAttackAbilityClass)
+        {
+            AbilitySystem->GiveAbility(FGameplayAbilitySpec(DefaultAttackAbilityClass, 1, 0));
+        }
     }
 
     if (AttributeSet)
     {
         AttributeSet->InitMaxHP(InitMaxHP);
         AttributeSet->InitHP(InitMaxHP);
-    }
-
-    if (AbilitySystem)
-    {
-        AbilitySystem->TryActivateAbilityByClass(UGA_DefaultAttack::StaticClass());
     }
 
     DefaultBattleRotation = GetActorRotation();
@@ -102,6 +105,11 @@ void AUnitBase::SetTeam(ETeam NewTeam)
 
 void AUnitBase::SetCurrentTile(ACombatGridTile* NewTile)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (!NewTile || CurrentTile == NewTile)
         return;
 
@@ -139,7 +147,7 @@ void AUnitBase::MoveToTile(ACombatGridTile* TargetTile)
     FVector TargetLocation = TargetTile->GetActorLocation();
     TargetLocation.Z = GetActorLocation().Z;
 
-    AICon->MoveUnitToLocation(TargetLocation);
+    AICon->MoveUnitToLocation(TargetLocation, 1.f);
 }
 
 void AUnitBase::MoveToTarget(AUnitBase* TargetUnit)
@@ -156,7 +164,6 @@ void AUnitBase::MoveToTarget(AUnitBase* TargetUnit)
         return;
     }
 
-    OriginalTileBeforeAction = CurrentTile;
     PendingTargetUnit = TargetUnit;
     PendingTile = nullptr;
     MovePhase = EUnitMovePhase::MovingToTarget;
@@ -164,13 +171,14 @@ void AUnitBase::MoveToTarget(AUnitBase* TargetUnit)
     FVector TargetLocation = TargetUnit->GetActorLocation();
     TargetLocation.Z = GetActorLocation().Z;
 
-    AICon->MoveUnitToLocation(TargetLocation, 50.f);
+    AICon->MoveUnitToLocation(TargetLocation, 75.f);
 }
 
 void AUnitBase::ReturnToOriginalTile()
 {
     if (!OriginalTileBeforeAction)
     {
+        //UE_LOG(LogTemp, Log, TEXT("[Action] ReturnToOriginalTile failed: OriginalTileBeforeAction is null"));
         return;
     }
 
@@ -178,6 +186,7 @@ void AUnitBase::ReturnToOriginalTile()
 
     if (!AICon)
     {
+        //UE_LOG(LogTemp, Log, TEXT("[Action] ReturnToOriginalTile failed: AICon is null"));
         return;
     }
 
@@ -188,7 +197,9 @@ void AUnitBase::ReturnToOriginalTile()
     FVector TargetLocation = OriginalTileBeforeAction->GetActorLocation();
     TargetLocation.Z = GetActorLocation().Z;
 
-    AICon->MoveUnitToLocation(TargetLocation);
+    //UE_LOG(LogTemp, Log, TEXT("[Action] Returning to original tile"));
+
+    AICon->MoveUnitToLocation(TargetLocation, 2.f);
 }
 
 void AUnitBase::OnTurnStart()
@@ -214,8 +225,9 @@ void AUnitBase::Die()
     bIsDead = true;
     bIsActiveTurn = false;
 
-    UE_LOG(LogTemp, Warning, TEXT("[Death] %s died"), *GetName());
+    ClearActionContext();
 
+	// 죽음 처리: 이동 불가, 충돌 비활성화, 래그돌 적용
     GetCharacterMovement()->DisableMovement();
 
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -238,9 +250,7 @@ void AUnitBase::Die()
     }
     GetMesh()->AddImpulse(Impulse, NAME_None, true);
 
-    //SetLifeSpan(3.f);
-
-    UE_LOG(LogTemp, Warning, TEXT("[Death] %s died"), *GetName());
+    //UE_LOG(LogTemp, Log, TEXT("[Death] %s died"), *GetName());
 }
 
 AUnitAIController* AUnitBase::GetOrCreateAIController()
@@ -258,30 +268,36 @@ AUnitAIController* AUnitBase::GetOrCreateAIController()
 
 void AUnitBase::HandleMoveCompleted()
 {
+    //UE_LOG(LogTemp, Log, TEXT("[Move] HandleMoveCompleted Phase=%d"), static_cast<uint8>(MovePhase));
+
     switch (MovePhase)
     {
     case EUnitMovePhase::MovingToTile:
         if (PendingTile)
         {
             SetCurrentTile(PendingTile);
+            SnapToTile(PendingTile, DefaultBattleRotation);
             PendingTile = nullptr;
         }
+
         MovePhase = EUnitMovePhase::None;
         break;
 
     case EUnitMovePhase::MovingToTarget:
-        ReturnToOriginalTile();
+        MovePhase = EUnitMovePhase::WaitingForAction;
+        ExecuteActionAtTarget();
         break;
 
     case EUnitMovePhase::ReturningToOriginalTile:
         if (PendingTile)
         {
             SetCurrentTile(PendingTile);
+            SnapToTile(PendingTile, DefaultBattleRotation);
             PendingTile = nullptr;
         }
 
-        SetActorRotation(DefaultBattleRotation);
         MovePhase = EUnitMovePhase::None;
+        ClearActionContext();
         break;
 
     default:
@@ -289,28 +305,171 @@ void AUnitBase::HandleMoveCompleted()
     }
 }
 
-void AUnitBase::DealDamage(AUnitBase* TargetUnit, float Damage)
+void AUnitBase::SnapToTile(ACombatGridTile* Tile, const FRotator& TargetRotation)
 {
-    if (!TargetUnit || !TargetUnit->AttributeSet)
-        return;
-
-    float CurrentHP = TargetUnit->AttributeSet->GetHP();
-    float NewHP = CurrentHP - Damage;
-
-    TargetUnit->AttributeSet->SetHP(NewHP);
-
-    UE_LOG(LogTemp, Warning,
-        TEXT("[Combat] %s -> %s | Damage=%.1f | HP %.1f -> %.1f"),
-        *GetName(),
-        *TargetUnit->GetName(),
-        Damage,
-        CurrentHP,
-        NewHP
-    );
-
-    if (NewHP <= 0.f)
+    // 유효한 타일이 없으면 종료
+    if (!Tile)
     {
-        TargetUnit->Die();
+        return;
+    }
+
+    // 타일 중심 좌표를 구한다.
+    FVector Center = Tile->GetActorLocation();
+    Center.Z = GetActorLocation().Z;
+
+    // MoveComponentTo는 LatentAction이므로 완료 후 복귀할 함수명이 필요하다.
+    FLatentActionInfo LatentInfo;
+    LatentInfo.CallbackTarget = this;
+    LatentInfo.UUID = 1001;
+    LatentInfo.Linkage = 0;
+    LatentInfo.ExecutionFunction = FName(TEXT("OnSnapToTileFinished"));
+
+    // 캡슐을 타일 중심으로 부드럽게 보정 이동시킨다.
+    UKismetSystemLibrary::MoveComponentTo(
+        GetCapsuleComponent(),
+        Center,
+        TargetRotation,
+        false,
+        false,
+        0.5f,
+        false,
+        EMoveComponentAction::Move,
+        LatentInfo
+    );
+}
+
+void AUnitBase::OnSnapToTileFinished()
+{
+}
+
+void AUnitBase::ExecuteActionAtTarget()
+{
+    //UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteActionAtTarget Enter | Unit=%s | Target=%s | MovePhase=%d | AbilityClass=%s"), *GetName(), *GetNameSafe(PendingTargetUnit), static_cast<uint8>(MovePhase), *GetNameSafe(DefaultAttackAbilityClass));
+
+    // 행동 대기 상태가 아니면 공격 실행을 시작할 수 없다.
+    if (MovePhase != EUnitMovePhase::WaitingForAction)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteActionAtTarget Return | Reason=InvalidMovePhase"));
+        return;
+    }
+
+    // 유효한 타겟이 없으면 공격을 종료하고 복귀 흐름으로 넘긴다.
+    if (!PendingTargetUnit || !PendingTargetUnit->IsUnitAlive())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteActionAtTarget Return | Reason=InvalidTarget"));
+        OnActionFinished();
+        return;
+    }
+
+    // 공격 직전에 타겟을 바라보도록 회전한다.
+    FVector Direction = PendingTargetUnit->GetActorLocation() - GetActorLocation();
+    Direction.Z = 0.0f;
+
+    if (!Direction.IsNearlyZero())
+    {
+        SetActorRotation(Direction.Rotation());
+    }
+
+    // 실제 공격 실행은 GAS Ability가 담당한다.
+    if (!AbilitySystem || !DefaultAttackAbilityClass)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteActionAtTarget Return | Reason=NoASCOrAbilityClass | ASC=%d | AbilityClass=%s"),
+            AbilitySystem ? 1 : 0,
+            *GetNameSafe(DefaultAttackAbilityClass));
+        OnActionFinished();
+        return;
+    }
+
+    const bool bActivated = AbilitySystem->TryActivateAbilityByClass(DefaultAttackAbilityClass);
+
+    //UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteActionAtTarget Activate Result | Unit=%s | bActivated=%d | AbilityClass=%s"), *GetName(), bActivated ? 1 : 0,  *GetNameSafe(DefaultAttackAbilityClass));
+    
+    // Ability 활성화 실패 시 공격을 진행할 수 없으므로 종료한다.
+    if (!bActivated)
+    {
+        OnActionFinished();
     }
 }
 
+void AUnitBase::OnActionFinished()
+{
+    //UE_LOG(LogTemp, Log, TEXT("[Action] OnActionFinished: %s"), *GetName());
+
+    if (bIsDead)
+    {
+        return;
+    }
+
+    if (MovePhase != EUnitMovePhase::WaitingForAction)
+    {
+        return;
+    }
+
+    ReturnToOriginalTile();
+}
+
+void AUnitBase::ClearActionContext()
+{
+    PendingTile = nullptr;
+    PendingTargetUnit = nullptr;
+    OriginalTileBeforeAction = nullptr;
+    bActionDamageApplied = false;
+}
+
+void AUnitBase::StartAttack(AUnitBase* TargetUnit, bool bMoveToTarget)
+{
+    //UE_LOG(LogTemp, Warning, TEXT("[Attack] StartAttack Enter | Unit=%s | Target=%s | bMoveToTarget=%d | ActiveTurn=%d | MovePhase=%d"), *GetName(), *GetNameSafe(TargetUnit), bMoveToTarget ? 1 : 0, bIsActiveTurn ? 1 : 0, static_cast<uint8>(MovePhase));
+
+    // 서버 권한에서만 공격 시작
+    if (!HasAuthority())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartAttack Return | Reason=NoAuthority | Unit=%s"), *GetName());
+        return;
+    }
+
+    // 현재 턴이 아니면 공격할 수 없다.
+    if (!bIsActiveTurn)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartAttack Return | Reason=NotActiveTurn | Unit=%s"), *GetName());
+        return;
+    }
+
+    // 이미 다른 이동/행동 중이면 새 공격을 시작할 수 없다.
+    if (MovePhase != EUnitMovePhase::None)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartAttack Return | Reason=Busy | Unit=%s | MovePhase=%d"), *GetName(), static_cast<uint8>(MovePhase));
+        return;
+    }
+
+    // 유효한 타겟이 없거나 죽어 있으면 종료
+    if (!TargetUnit || !TargetUnit->IsUnitAlive())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartAttack Return | Reason=InvalidTarget | Unit=%s | Target=%s"), *GetName(), *GetNameSafe(TargetUnit));
+        return;
+    }
+
+    // 현재 타일 정보가 없으면 종료
+    if (!CurrentTile)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartAttack Return | Reason=NoCurrentTile | Unit=%s"), *GetName());
+        return;
+    }
+
+    // 이번 공격 컨텍스트를 저장한다.
+    PendingTargetUnit = TargetUnit;
+    OriginalTileBeforeAction = CurrentTile;
+    bActionDamageApplied = false;
+
+    // 근접공격은 이동 후 공격한다.
+    if (bMoveToTarget)
+    {
+        //UE_LOG(LogTemp, Log, TEXT("[Attack] StartAttack Branch | MoveToTarget"));
+        MoveToTarget(TargetUnit);
+        return;
+    }
+
+    // 원거리공격은 제자리에서 바로 공격을 실행한다.
+    //UE_LOG(LogTemp, Log, TEXT("[Attack] StartAttack Branch | InPlaceAttack"));
+    MovePhase = EUnitMovePhase::WaitingForAction;
+    ExecuteActionAtTarget();
+}

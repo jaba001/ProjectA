@@ -5,13 +5,12 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "GAS/Attribute/AS_Unit.h"
-//#include "AIController.h"
-
 #include "UnitBase.generated.h"
 
 class ACombatGridTile;
-class AAIController;
 class AUnitAIController;
+class UAnimMontage;
+class UGameplayAbility;
 
 UENUM(BlueprintType)
 enum class ETeam : uint8
@@ -26,6 +25,7 @@ enum class EUnitMovePhase : uint8
     None,
     MovingToTile,
     MovingToTarget,
+    WaitingForAction,
     ReturningToOriginalTile
 };
 
@@ -37,7 +37,6 @@ class PROJECTA_API AUnitBase
     GENERATED_BODY()
 
 public:
-
     // Constructor
     AUnitBase();
 
@@ -62,11 +61,17 @@ public:
     UPROPERTY(Replicated)
     ETeam Team = ETeam::Player;
 
+    UFUNCTION(BlueprintCallable, Category = "Unit")
     void SetTeam(ETeam NewTeam);
-    ETeam GetTeam() const { return Team; }
+
+    UFUNCTION(BlueprintCallable, Category = "Unit")
+    ETeam GetTeam() const
+    {
+        return Team;
+    }
 
 protected:
-	// player는 90 enemy는 -90이 기본값
+    // player는 90 enemy는 -90이 기본값
     UPROPERTY()
     FRotator DefaultBattleRotation;
 
@@ -74,7 +79,7 @@ public:
     // Turn state
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Turn")
     bool bIsActiveTurn = false;
-    
+
     // Turn events
     UFUNCTION(BlueprintCallable, Category = "Turn")
     virtual void OnTurnStart();
@@ -83,27 +88,27 @@ public:
     virtual void OnTurnEnd();
 
 public:
-
     // Grid system
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid")
     ACombatGridTile* CurrentTile = nullptr;
 
     UPROPERTY()
-	ACombatGridTile* PendingTile = nullptr;
-
-    UPROPERTY()
-    AUnitBase* PendingTargetUnit = nullptr;
+    ACombatGridTile* PendingTile = nullptr;
 
     UPROPERTY()
     ACombatGridTile* OriginalTileBeforeAction = nullptr;
 
     UPROPERTY()
+    AUnitBase* PendingTargetUnit = nullptr;
+
+    UPROPERTY()
     EUnitMovePhase MovePhase = EUnitMovePhase::None;
-    
+
     UFUNCTION(BlueprintCallable, Category = "Grid")
     void SetCurrentTile(ACombatGridTile* NewTile);
 
 public:
+    // Movement
     UFUNCTION(BlueprintCallable, Category = "Movement")
     void MoveToTile(ACombatGridTile* TargetTile);
 
@@ -113,17 +118,41 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Movement")
     void ReturnToOriginalTile();
 
-    AUnitAIController* GetOrCreateAIController();
+    UFUNCTION(BlueprintCallable, Category = "Movement")
+    void SnapToTile(ACombatGridTile* Tile, const FRotator& TargetRotation);
 
+    UFUNCTION(Category = "Movement")
+    void OnSnapToTileFinished();
+
+    UFUNCTION(BlueprintCallable, Category = "Movement")
     void HandleMoveCompleted();
 
+    AUnitAIController* GetOrCreateAIController();
+
 public:
-    UFUNCTION(BlueprintCallable, Category = "Combat")
-    void DealDamage(AUnitBase* TargetUnit, float Damage);
+    // Action
+    UFUNCTION(BlueprintCallable, Category = "Action")
+    void StartAttack(AUnitBase* TargetUnit, bool bMoveToTarget);
+
+    UFUNCTION(BlueprintCallable, Category = "Action")
+    void ExecuteActionAtTarget();
+
+    UFUNCTION(Category = "Action")
+    void OnActionFinished();
+
+    UFUNCTION(Category = "Action")
+    void ClearActionContext();
+
+protected:
+    UPROPERTY()
+    bool bActionDamageApplied = false;
 
 public:
     // Life state
+    UFUNCTION(BlueprintCallable, Category = "Combat")
     bool IsUnitAlive() const;
+
+    UFUNCTION(BlueprintCallable, Category = "Combat")
     virtual void Die();
 
     // Ragdoll impulse strength
@@ -141,10 +170,13 @@ protected:
 
     UPROPERTY()
     UAS_Unit* AttributeSet = nullptr;
+    
+    UPROPERTY(EditDefaultsOnly, Category = "GAS")
+    TSubclassOf<UGameplayAbility> DefaultAttackAbilityClass;
 
 protected:
     // Initial attributes
-    UPROPERTY(EditDefaultsOnly, Category = "Attribute")
+    UPROPERTY(EditDefaultsOnly, Category = "GAS_Attribute")
     float InitMaxHP = 100.f;
 
 };
