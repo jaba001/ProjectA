@@ -31,5 +31,5 @@ void UAN_CloseRangeAttackHit::Notify(USkeletalMeshComponent* MeshComp, UAnimSequ
         EventData
     );
 
-    UE_LOG(LogTemp, Warning, TEXT("[AnimNotify] CloseRangeAttackHit | Owner=%s | EventTag=%s"), *GetNameSafe(OwnerActor), *EventData.EventTag.ToString());
+    //UE_LOG(LogTemp, Log, TEXT("[AnimNotify] CloseRangeAttackHit | Owner=%s | EventTag=%s"), *GetNameSafe(OwnerActor), *EventData.EventTag.ToString());
 }

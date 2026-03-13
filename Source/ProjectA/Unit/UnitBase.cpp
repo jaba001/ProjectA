@@ -19,33 +19,32 @@ AUnitBase::AUnitBase()
     bIsActiveTurn = false;
     PendingTile = nullptr;
     PendingTargetUnit = nullptr;
-    OriginalTileBeforeAction = nullptr;
-    bActionDamageApplied = false;
+    OriginalTileBeforeSkill = nullptr;
+    bSkillDamageApplied = false;
     MovePhase = EUnitMovePhase::None;
 
-    GetCharacterMovement()->MaxWalkSpeed = 350.f;
+    GetCharacterMovement()->MaxWalkSpeed = 700.f;
 
 	// AI Controller 설정
     AIControllerClass = AUnitAIController::StaticClass();
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
-    // GAS 핵심 컴포넌트
-    // Ability / GameplayEffect / Attribute를 관리하는 시스템
-    // 모든 GAS 기능은 AbilitySystemComponent를 통해 동작한다.
+
+    // GAS 핵심 개체 생성
     AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystem"));
-    
-    // 유닛의 능력치 데이터를 보관하는 객체
-    // HP / MaxHP / Attack 등 모든 Attribute는 여기서 관리된다.
     AttributeSet = CreateDefaultSubobject<UAS_Unit>(TEXT("AttributeSet"));
 
-    // AbilitySystem 네트워크 복제 설정
+    // GAS 복제 설정
     AbilitySystem->SetIsReplicated(true);
     AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 
-    // 네트워크 복제 활성화
-    // - 서버에서 생성된 이 Actor를 클라이언트에도 자동 생성
-    // - 서버에서 위치 변경 시 클라이언트에 자동 동기화
+	// 네트워크 Actor 복제 설정
     bReplicates = true;
     SetReplicateMovement(true);
+}
+
+UAbilitySystemComponent* AUnitBase::GetAbilitySystemComponent() const
+{
+    return AbilitySystem;
 }
 
 void AUnitBase::BeginPlay()
@@ -56,9 +55,19 @@ void AUnitBase::BeginPlay()
     {
         AbilitySystem->InitAbilityActorInfo(this, this);
 
-        if (HasAuthority() && DefaultAttackAbilityClass)
+        if (HasAuthority())
         {
-            AbilitySystem->GiveAbility(FGameplayAbilitySpec(DefaultAttackAbilityClass, 1, 0));
+            const TArray<TSubclassOf<UGameplayAbility>> SkillClasses = GetAvailableSkillAbilityClasses();
+
+            for (const TSubclassOf<UGameplayAbility>& SkillClass : SkillClasses)
+            {
+                if (!SkillClass)
+                {
+                    continue;
+                }
+
+                AbilitySystem->GiveAbility(FGameplayAbilitySpec(SkillClass, 1, 0));
+            }
         }
     }
 
@@ -74,11 +83,6 @@ void AUnitBase::BeginPlay()
 void AUnitBase::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-}
-
-UAbilitySystemComponent* AUnitBase::GetAbilitySystemComponent() const
-{
-    return AbilitySystem;
 }
 
 void AUnitBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -101,6 +105,105 @@ void AUnitBase::SetTeam(ETeam NewTeam)
     {
         CurrentTile->UpdateTileVisual();
     }
+}
+
+void AUnitBase::OnTurnStart()
+{
+    bIsActiveTurn = true;
+    ResetActionPoint();
+    ResetSubActionPoint();
+    bTurnMustEndAfterCurrentAction = false;
+}
+
+void AUnitBase::OnTurnEnd()
+{
+    bIsActiveTurn = false;
+    bTurnMustEndAfterCurrentAction = false;
+}
+
+bool AUnitBase::HasEnoughActionPoint(int32 Cost) const
+{
+    return CurrentActionPoint >= Cost;
+}
+
+bool AUnitBase::ConsumeActionPoint(int32 Cost)
+{
+    if (!HasEnoughActionPoint(Cost))
+    {
+        return false;
+    }
+
+    CurrentActionPoint -= Cost;
+
+    if (CurrentActionPoint <= 0)
+    {
+        bTurnMustEndAfterCurrentAction = true;
+    }
+
+    return true;
+}
+
+bool AUnitBase::HasEnoughSubActionPoint(int32 Cost) const
+{
+    return CurrentSubActionPoint >= Cost;
+}
+
+bool AUnitBase::ConsumeSubActionPoint(int32 Cost)
+{
+    if (!HasEnoughSubActionPoint(Cost))
+    {
+        return false;
+    }
+
+    CurrentSubActionPoint -= Cost;
+
+    return true;
+}
+
+bool AUnitBase::IsUnitAlive() const
+{
+    return !bIsDead;
+}
+
+void AUnitBase::Die()
+{
+    if (bIsDead)
+        return;
+
+    bIsDead = true;
+    bIsActiveTurn = false;
+    bTurnMustEndAfterCurrentAction = false;
+
+    ClearSkillContext();
+    ClearMoveContext();
+    ClearItemContext();
+    CurrentActionType = EUnitActionType::None;
+    MovePhase = EUnitMovePhase::None;
+
+    // 죽음 처리: 이동 불가, 충돌 비활성화, 래그돌 적용
+    GetCharacterMovement()->DisableMovement();
+
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+    GetMesh()->SetAllBodiesSimulatePhysics(true);
+
+    FVector Impulse;
+
+    if (!DeathImpulse.IsNearlyZero())
+    {
+        // 블루프린트에서 지정된 값 사용
+        Impulse = DeathImpulse;
+    }
+    else
+    {
+        // 기본 랜덤 Impulse
+        Impulse = FMath::VRand() * 2000.0f;
+        Impulse.Z = FMath::Abs(Impulse.Z) + 500.0f;
+    }
+    GetMesh()->AddImpulse(Impulse, NAME_None, true);
+
+    //UE_LOG(LogTemp, Log, TEXT("[Death] %s died"), *GetName());
 }
 
 void AUnitBase::SetCurrentTile(ACombatGridTile* NewTile)
@@ -176,9 +279,9 @@ void AUnitBase::MoveToTarget(AUnitBase* TargetUnit)
 
 void AUnitBase::ReturnToOriginalTile()
 {
-    if (!OriginalTileBeforeAction)
+    if (!OriginalTileBeforeSkill)
     {
-        //UE_LOG(LogTemp, Log, TEXT("[Action] ReturnToOriginalTile failed: OriginalTileBeforeAction is null"));
+        //UE_LOG(LogTemp, Log, TEXT("[Skill] ReturnToOriginalTile failed: OriginalTileBeforeSkill is null"));
         return;
     }
 
@@ -186,123 +289,20 @@ void AUnitBase::ReturnToOriginalTile()
 
     if (!AICon)
     {
-        //UE_LOG(LogTemp, Log, TEXT("[Action] ReturnToOriginalTile failed: AICon is null"));
+        //UE_LOG(LogTemp, Log, TEXT("[Skill] ReturnToOriginalTile failed: AICon is null"));
         return;
     }
 
-    PendingTile = OriginalTileBeforeAction;
+    PendingTile = OriginalTileBeforeSkill;
     PendingTargetUnit = nullptr;
     MovePhase = EUnitMovePhase::ReturningToOriginalTile;
 
-    FVector TargetLocation = OriginalTileBeforeAction->GetActorLocation();
+    FVector TargetLocation = OriginalTileBeforeSkill->GetActorLocation();
     TargetLocation.Z = GetActorLocation().Z;
 
-    //UE_LOG(LogTemp, Log, TEXT("[Action] Returning to original tile"));
+    //UE_LOG(LogTemp, Log, TEXT("[Skill] Returning to original tile"));
 
     AICon->MoveUnitToLocation(TargetLocation, 2.f);
-}
-
-void AUnitBase::OnTurnStart()
-{
-    bIsActiveTurn = true;
-}
-
-void AUnitBase::OnTurnEnd()
-{
-    bIsActiveTurn = false;
-}
-
-bool AUnitBase::IsUnitAlive() const
-{
-    return !bIsDead;
-}
-
-void AUnitBase::Die()
-{
-    if (bIsDead)
-        return;
-
-    bIsDead = true;
-    bIsActiveTurn = false;
-
-    ClearActionContext();
-
-	// 죽음 처리: 이동 불가, 충돌 비활성화, 래그돌 적용
-    GetCharacterMovement()->DisableMovement();
-
-    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-    GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
-    GetMesh()->SetAllBodiesSimulatePhysics(true);
-
-    FVector Impulse;
-
-    if (!DeathImpulse.IsNearlyZero())
-    {
-        // 블루프린트에서 지정된 값 사용
-        Impulse = DeathImpulse;
-    }
-    else
-    {
-        // 기본 랜덤 Impulse
-        Impulse = FMath::VRand() * 2000.0f;
-        Impulse.Z = FMath::Abs(Impulse.Z) + 500.0f;
-    }
-    GetMesh()->AddImpulse(Impulse, NAME_None, true);
-
-    //UE_LOG(LogTemp, Log, TEXT("[Death] %s died"), *GetName());
-}
-
-AUnitAIController* AUnitBase::GetOrCreateAIController()
-{
-    AUnitAIController* AICon = Cast<AUnitAIController>(GetController());
-
-    if (!AICon)
-    {
-        SpawnDefaultController();
-        AICon = Cast<AUnitAIController>(GetController());
-    }
-
-    return AICon;
-}
-
-void AUnitBase::HandleMoveCompleted()
-{
-    //UE_LOG(LogTemp, Log, TEXT("[Move] HandleMoveCompleted Phase=%d"), static_cast<uint8>(MovePhase));
-
-    switch (MovePhase)
-    {
-    case EUnitMovePhase::MovingToTile:
-        if (PendingTile)
-        {
-            SetCurrentTile(PendingTile);
-            SnapToTile(PendingTile, DefaultBattleRotation);
-            PendingTile = nullptr;
-        }
-
-        MovePhase = EUnitMovePhase::None;
-        break;
-
-    case EUnitMovePhase::MovingToTarget:
-        MovePhase = EUnitMovePhase::WaitingForAction;
-        ExecuteActionAtTarget();
-        break;
-
-    case EUnitMovePhase::ReturningToOriginalTile:
-        if (PendingTile)
-        {
-            SetCurrentTile(PendingTile);
-            SnapToTile(PendingTile, DefaultBattleRotation);
-            PendingTile = nullptr;
-        }
-
-        MovePhase = EUnitMovePhase::None;
-        ClearActionContext();
-        break;
-
-    default:
-        break;
-    }
 }
 
 void AUnitBase::SnapToTile(ACombatGridTile* Tile, const FRotator& TargetRotation)
@@ -340,28 +340,184 @@ void AUnitBase::SnapToTile(ACombatGridTile* Tile, const FRotator& TargetRotation
 
 void AUnitBase::OnSnapToTileFinished()
 {
+    if (MovePhase == EUnitMovePhase::ReturningToOriginalTile)
+    {
+        MovePhase = EUnitMovePhase::None;
+        ClearSkillContext();
+        OnReturnToOriginalTileFinished();
+        return;
+    }
+
+    if (MovePhase == EUnitMovePhase::MovingToTile)
+    {
+        MovePhase = EUnitMovePhase::None;
+
+        if (CurrentActionType == EUnitActionType::Move)
+        {
+            OnMoveActionFinished();
+        }
+
+        return;
+    }
 }
 
-void AUnitBase::ExecuteActionAtTarget()
+void AUnitBase::OnReturnToOriginalTileFinished()
 {
-    //UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteActionAtTarget Enter | Unit=%s | Target=%s | MovePhase=%d | AbilityClass=%s"), *GetName(), *GetNameSafe(PendingTargetUnit), static_cast<uint8>(MovePhase), *GetNameSafe(DefaultAttackAbilityClass));
+}
 
-    // 행동 대기 상태가 아니면 공격 실행을 시작할 수 없다.
-    if (MovePhase != EUnitMovePhase::WaitingForAction)
+void AUnitBase::HandleMoveCompleted()
+{
+    switch (MovePhase)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteActionAtTarget Return | Reason=InvalidMovePhase"));
+    case EUnitMovePhase::MovingToTile:
+    {
+        // 일반 타일 이동
+        if (PendingTile)
+        {
+            SetCurrentTile(PendingTile);
+            SnapToTile(PendingTile, DefaultBattleRotation);
+            PendingTile = nullptr;
+        }
+
+        break;
+    }
+    case EUnitMovePhase::MovingToTarget:
+    {
+        // 스킬 대상 앞으로 접근
+        MovePhase = EUnitMovePhase::WaitingForSkill;
+        ExecuteSkillAtTarget();
+        break;
+    }
+    case EUnitMovePhase::ReturningToOriginalTile:
+    {
+        // 스킬 종료 후 원위치 복귀
+        if (PendingTile)
+        {
+            SetCurrentTile(PendingTile);
+            SnapToTile(PendingTile, DefaultBattleRotation);
+            PendingTile = nullptr;
+        }
+
+        break;
+    }
+    default:
+    {
+        break;
+    }
+    }
+}
+
+AUnitAIController* AUnitBase::GetOrCreateAIController()
+{
+    AUnitAIController* AICon = Cast<AUnitAIController>(GetController());
+
+    if (!AICon)
+    {
+        SpawnDefaultController();
+        AICon = Cast<AUnitAIController>(GetController());
+    }
+
+    return AICon;
+}
+
+void AUnitBase::StartSkill(TSubclassOf<UGameplayAbility> AbilityClass, AUnitBase* TargetUnit, bool bMoveToTarget)
+{
+    //UE_LOG(LogTemp, Warning, TEXT("[Attack] StartSkill Enter | Unit=%s | Target=%s | bMoveToTarget=%d | ActiveTurn=%d | MovePhase=%d"), *GetName(), *GetNameSafe(TargetUnit), bMoveToTarget ? 1 : 0, bIsActiveTurn ? 1 : 0, static_cast<uint8>(MovePhase));
+
+    CurrentActionType = EUnitActionType::Skill;
+
+    // 서버 권한에서만 스킬 시작
+    if (!HasAuthority())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartSkill Return | Reason=NoAuthority | Unit=%s"), *GetName());
         return;
     }
 
-    // 유효한 타겟이 없으면 공격을 종료하고 복귀 흐름으로 넘긴다.
+    // 현재 턴이 아니면 스킬을 사용할 수 없다.
+    if (!bIsActiveTurn)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartSkill Return | Reason=NotActiveTurn | Unit=%s"), *GetName());
+        return;
+    }
+
+    // 이미 다른 이동/행동 중이면 새 스킬을 시작할 수 없다.
+    if (MovePhase != EUnitMovePhase::None)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartSkill Return | Reason=Busy | Unit=%s | MovePhase=%d"), *GetName(), static_cast<uint8>(MovePhase));
+        return;
+    }
+
+	// 유효한 AbilityClass가 아니면 종료
+    if (!AbilityClass)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Skill] StartSkill Return | Reason=InvalidAbilityClass | Unit=%s"), *GetName());
+        return;
+    }
+
+    // 유효한 타겟이 없거나 죽어 있으면 종료
+    if (!TargetUnit || !TargetUnit->IsUnitAlive())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartSkill Return | Reason=InvalidTarget | Unit=%s | Target=%s"), *GetName(), *GetNameSafe(TargetUnit));
+        return;
+    }
+
+    // 현재 타일 정보가 없으면 종료
+    if (!CurrentTile)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartSkill Return | Reason=NoCurrentTile | Unit=%s"), *GetName());
+        return;
+    }
+
+    if (!HasEnoughActionPoint(1))
+    {
+        return;
+    }
+
+    if (!ConsumeActionPoint(1))
+    {
+        return;
+    }
+
+    // 이번 스킬 컨텍스트를 저장한다.
+    PendingTargetUnit = TargetUnit;
+    PendingSkillAbilityClass = AbilityClass;
+    OriginalTileBeforeSkill = CurrentTile;
+    bSkillDamageApplied = false;
+
+    // 근접스킬은 이동 후 스킬한다.
+    if (bMoveToTarget)
+    {
+        //UE_LOG(LogTemp, Log, TEXT("[Attack] StartSkill Branch | MoveToTarget"));
+        MoveToTarget(TargetUnit);
+        return;
+    }
+
+    // 원거리스킬은 제자리에서 바로 스킬을 실행한다.
+    //UE_LOG(LogTemp, Log, TEXT("[Attack] StartSkill Branch | InPlaceAttack"));
+    MovePhase = EUnitMovePhase::WaitingForSkill;
+    ExecuteSkillAtTarget();
+}
+
+void AUnitBase::ExecuteSkillAtTarget()
+{
+    //UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteSkillAtTarget Enter | Unit=%s | Target=%s | MovePhase=%d | AbilityClass=%s"), *GetName(), *GetNameSafe(PendingTargetUnit), static_cast<uint8>(MovePhase), *GetNameSafe(DefaultAttackAbilityClass));
+
+    // 행동 대기 상태가 아니면 스킬 실행을 시작할 수 없다.
+    if (MovePhase != EUnitMovePhase::WaitingForSkill)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteSkillAtTarget Return | Reason=InvalidMovePhase"));
+        return;
+    }
+
+    // 유효한 타겟이 없으면 스킬을 종료하고 복귀 흐름으로 넘긴다.
     if (!PendingTargetUnit || !PendingTargetUnit->IsUnitAlive())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteActionAtTarget Return | Reason=InvalidTarget"));
-        OnActionFinished();
+        UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteSkillAtTarget Return | Reason=InvalidTarget"));
+        OnSkillFinished();
         return;
     }
 
-    // 공격 직전에 타겟을 바라보도록 회전한다.
+    // 스킬 직전에 타겟을 바라보도록 회전한다.
     FVector Direction = PendingTargetUnit->GetActorLocation() - GetActorLocation();
     Direction.Z = 0.0f;
 
@@ -370,37 +526,35 @@ void AUnitBase::ExecuteActionAtTarget()
         SetActorRotation(Direction.Rotation());
     }
 
-    // 실제 공격 실행은 GAS Ability가 담당한다.
-    if (!AbilitySystem || !DefaultAttackAbilityClass)
+    // 실제 스킬 실행은 GAS Ability가 담당한다.
+    if (!AbilitySystem || !PendingSkillAbilityClass)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteActionAtTarget Return | Reason=NoASCOrAbilityClass | ASC=%d | AbilityClass=%s"),
-            AbilitySystem ? 1 : 0,
-            *GetNameSafe(DefaultAttackAbilityClass));
-        OnActionFinished();
+        UE_LOG(LogTemp, Warning, TEXT("[Skill] ExecuteSkillAtTarget Return | Reason=NoASCOrAbilityClass | ASC=%d | AbilityClass=%s"), AbilitySystem ? 1 : 0, *GetNameSafe(PendingSkillAbilityClass));
+        OnSkillFinished();
         return;
     }
 
-    const bool bActivated = AbilitySystem->TryActivateAbilityByClass(DefaultAttackAbilityClass);
+    const bool bActivated = AbilitySystem->TryActivateAbilityByClass(PendingSkillAbilityClass);
 
-    //UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteActionAtTarget Activate Result | Unit=%s | bActivated=%d | AbilityClass=%s"), *GetName(), bActivated ? 1 : 0,  *GetNameSafe(DefaultAttackAbilityClass));
+    //UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteSkillAtTarget Activate Result | Unit=%s | bActivated=%d | AbilityClass=%s"), *GetName(), bActivated ? 1 : 0,  *GetNameSafe(DefaultAttackAbilityClass));
     
-    // Ability 활성화 실패 시 공격을 진행할 수 없으므로 종료한다.
+    // Ability 활성화 실패 시 스킬을 진행할 수 없으므로 종료한다.
     if (!bActivated)
     {
-        OnActionFinished();
+        OnSkillFinished();
     }
 }
 
-void AUnitBase::OnActionFinished()
+void AUnitBase::OnSkillFinished()
 {
-    //UE_LOG(LogTemp, Log, TEXT("[Action] OnActionFinished: %s"), *GetName());
+    //UE_LOG(LogTemp, Log, TEXT("[Skill] OnSkillFinished: %s"), *GetName());
 
     if (bIsDead)
     {
         return;
     }
 
-    if (MovePhase != EUnitMovePhase::WaitingForAction)
+    if (MovePhase != EUnitMovePhase::WaitingForSkill)
     {
         return;
     }
@@ -408,68 +562,139 @@ void AUnitBase::OnActionFinished()
     ReturnToOriginalTile();
 }
 
-void AUnitBase::ClearActionContext()
+void AUnitBase::ClearSkillContext()
 {
     PendingTile = nullptr;
     PendingTargetUnit = nullptr;
-    OriginalTileBeforeAction = nullptr;
-    bActionDamageApplied = false;
+    PendingSkillAbilityClass = nullptr;
+    OriginalTileBeforeSkill = nullptr;
+    bSkillDamageApplied = false;
+    CurrentActionType = EUnitActionType::None;
 }
 
-void AUnitBase::StartAttack(AUnitBase* TargetUnit, bool bMoveToTarget)
+void AUnitBase::StartMoveAction(ACombatGridTile* TargetTile)
 {
-    //UE_LOG(LogTemp, Warning, TEXT("[Attack] StartAttack Enter | Unit=%s | Target=%s | bMoveToTarget=%d | ActiveTurn=%d | MovePhase=%d"), *GetName(), *GetNameSafe(TargetUnit), bMoveToTarget ? 1 : 0, bIsActiveTurn ? 1 : 0, static_cast<uint8>(MovePhase));
-
-    // 서버 권한에서만 공격 시작
     if (!HasAuthority())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartAttack Return | Reason=NoAuthority | Unit=%s"), *GetName());
         return;
     }
 
-    // 현재 턴이 아니면 공격할 수 없다.
     if (!bIsActiveTurn)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartAttack Return | Reason=NotActiveTurn | Unit=%s"), *GetName());
         return;
     }
 
-    // 이미 다른 이동/행동 중이면 새 공격을 시작할 수 없다.
     if (MovePhase != EUnitMovePhase::None)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartAttack Return | Reason=Busy | Unit=%s | MovePhase=%d"), *GetName(), static_cast<uint8>(MovePhase));
         return;
     }
 
-    // 유효한 타겟이 없거나 죽어 있으면 종료
-    if (!TargetUnit || !TargetUnit->IsUnitAlive())
+    if (!TargetTile)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartAttack Return | Reason=InvalidTarget | Unit=%s | Target=%s"), *GetName(), *GetNameSafe(TargetUnit));
         return;
     }
-
-    // 현재 타일 정보가 없으면 종료
-    if (!CurrentTile)
+    
+    //자기타일로 이동하려는 경우
+    if (TargetTile == CurrentTile)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartAttack Return | Reason=NoCurrentTile | Unit=%s"), *GetName());
         return;
     }
 
-    // 이번 공격 컨텍스트를 저장한다.
+    if (!HasEnoughSubActionPoint(1))
+    {
+        return;
+    }
+
+    if (!ConsumeSubActionPoint(1))
+    {
+        return;
+    }
+
+    
+    CurrentActionType = EUnitActionType::Move;
+
+    MoveToTile(TargetTile);
+}
+
+void AUnitBase::OnMoveActionFinished()
+{
+    CurrentActionType = EUnitActionType::None;
+}
+
+void AUnitBase::ClearMoveContext()
+{
+    PendingTile = nullptr;
+}
+
+void AUnitBase::StartItemAction(AUnitBase* TargetUnit)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (!bIsActiveTurn)
+    {
+        return;
+    }
+
+    if (MovePhase != EUnitMovePhase::None)
+    {
+        return;
+    }
+
+    if (!HasEnoughSubActionPoint(1))
+    {
+        return;
+    }
+
+    if (!ConsumeSubActionPoint(1))
+    {
+        return;
+    }
+
+    
+
+    CurrentActionType = EUnitActionType::Item;
     PendingTargetUnit = TargetUnit;
-    OriginalTileBeforeAction = CurrentTile;
-    bActionDamageApplied = false;
 
-    // 근접공격은 이동 후 공격한다.
-    if (bMoveToTarget)
+    ExecuteItemAtTarget();
+}
+
+void AUnitBase::ExecuteItemAtTarget()
+{
+    OnItemFinished();
+}
+
+void AUnitBase::OnItemFinished()
+{
+    CurrentActionType = EUnitActionType::None;
+    ClearItemContext();
+}
+
+void AUnitBase::ClearItemContext()
+{
+    PendingTargetUnit = nullptr;
+}
+
+TArray<TSubclassOf<UGameplayAbility>> AUnitBase::GetAvailableSkillAbilityClasses() const
+{
+    TArray<TSubclassOf<UGameplayAbility>> Result;
+
+    if (DefaultAttackAbilityClass)
     {
-        //UE_LOG(LogTemp, Log, TEXT("[Attack] StartAttack Branch | MoveToTarget"));
-        MoveToTarget(TargetUnit);
-        return;
+        Result.Add(DefaultAttackAbilityClass);
     }
 
-    // 원거리공격은 제자리에서 바로 공격을 실행한다.
-    //UE_LOG(LogTemp, Log, TEXT("[Attack] StartAttack Branch | InPlaceAttack"));
-    MovePhase = EUnitMovePhase::WaitingForAction;
-    ExecuteActionAtTarget();
+    for (const TSubclassOf<UGameplayAbility>& SkillClass : EquippedSkillAbilityClasses)
+    {
+        if (!SkillClass)
+        {
+            continue;
+        }
+
+        Result.Add(SkillClass);
+    }
+
+    return Result;
 }

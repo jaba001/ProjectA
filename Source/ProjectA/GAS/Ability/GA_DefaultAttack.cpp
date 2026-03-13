@@ -220,7 +220,7 @@ void UGA_DefaultAttack::FinishAttackAbility(bool bWasCancelled)
     // 공격이 끝났음을 UnitBase에 알리고 복귀를 시작한다.
     if (CachedOwnerUnit)
     {
-        CachedOwnerUnit->OnActionFinished();
+        CachedOwnerUnit->OnSkillFinished();
     }
 
     EndAbility(CachedHandle, CurrentActorInfo, CachedActivationInfo, false, bWasCancelled);

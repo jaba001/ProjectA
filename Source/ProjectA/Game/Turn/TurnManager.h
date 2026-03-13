@@ -33,6 +33,12 @@ public:
     // 현재 턴 인덱스 반환 (CombatManager가 복제용으로 사용)
     int32 GetCurrentTurnIndex() const { return CurrentTurnIndex; }
 
+	// 현재 턴 카운터 반환 (CombatManager가 복제용으로 사용)
+    int32 GetTurnCounter() const { return TurnCounter; }
+
+	// 현재 턴 유닛 이름 반환 (HUD 업데이트용)
+    FString GetCurrentUnitName() const;
+
 private:
 
     // 서버 전용 턴 순서 배열 ,서버 전용임을 명시

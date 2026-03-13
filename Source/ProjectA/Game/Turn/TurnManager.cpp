@@ -5,10 +5,9 @@ void UTurnManager::InitializeTurnOrder(const TArray<AUnitBase*>& Units)
 {
     TurnOrder = Units;
     CurrentTurnIndex = 0;
+    TurnCounter = 0;
 
-    UE_LOG(LogTemp, Warning,
-        TEXT("[TurnManager] InitializeTurnOrder Count=%d"),
-        TurnOrder.Num());
+    UE_LOG(LogTemp, Log, TEXT("[TurnManager] InitializeTurnOrder Count=%d"), TurnOrder.Num());
 
     // 모든 유닛 턴 상태 초기화
     for (AUnitBase* Unit : TurnOrder)
@@ -26,9 +25,7 @@ void UTurnManager::StartTurn()
 {
     if (!TurnOrder.IsValidIndex(CurrentTurnIndex))
     {
-        //UE_LOG(LogTemp, Warning,
-        //    TEXT("[TurnManager] INVALID INDEX | %d"),
-        //    CurrentTurnIndex);
+        UE_LOG(LogTemp, Warning, TEXT("[TurnManager] StartTurn Failed | Invalid Index=%d"), CurrentTurnIndex);
         return;
     }
 
@@ -36,21 +33,14 @@ void UTurnManager::StartTurn()
 
     if (!Unit || !Unit->IsUnitAlive())
     {
-        UE_LOG(LogTemp, Warning,
-            TEXT("[TurnManager] SKIP DEAD UNIT | Index=%d"),
-            CurrentTurnIndex);
-
+        UE_LOG(LogTemp, Warning, TEXT("[TurnManager] StartTurn Skip | Dead Or Null Unit | Index=%d"), CurrentTurnIndex);
         NextTurn();
         return;
     }
 
     TurnCounter++;
 
-    UE_LOG(LogTemp, Warning,
-        TEXT("[Turn %d] START | Index=%d | Unit=%s"),
-        TurnCounter,
-        CurrentTurnIndex,
-        *Unit->GetName());
+    UE_LOG(LogTemp, Log, TEXT("[Turn %d] START | Index=%d | Unit=%s"), TurnCounter, CurrentTurnIndex, *Unit->GetName());
 
     Unit->OnTurnStart();
 }
@@ -59,9 +49,7 @@ void UTurnManager::EndTurn()
 {
     if (!TurnOrder.IsValidIndex(CurrentTurnIndex))
     {
-        UE_LOG(LogTemp, Warning,
-            TEXT("[TurnManager] EndTurn Invalid Index=%d"),
-            CurrentTurnIndex);
+        UE_LOG(LogTemp, Warning, TEXT("[TurnManager] EndTurn Failed | Invalid Index=%d"), CurrentTurnIndex);
         return;
     }
 
@@ -69,26 +57,18 @@ void UTurnManager::EndTurn()
 
     if (!Unit)
     {
-        UE_LOG(LogTemp, Warning,
-            TEXT("[TurnManager] END | NULL UNIT | Index=%d"),
-            CurrentTurnIndex);
-
+        UE_LOG(LogTemp, Warning, TEXT("[TurnManager] EndTurn Failed | Null Unit | Index=%d"), CurrentTurnIndex);
         NextTurn();
         return;
     }
 
     Unit->OnTurnEnd();
 
-    UE_LOG(LogTemp, Warning,
-        TEXT("[Turn %d] END   | Index=%d | Unit=%s"),
-        TurnCounter,
-        CurrentTurnIndex,
-        *Unit->GetName());
-
+    UE_LOG(LogTemp, Log, TEXT("[Turn %d] END | Index=%d | Unit=%s"), TurnCounter, CurrentTurnIndex, *Unit->GetName());
 
     if (CheckCombatEnd())
     {
-        UE_LOG(LogTemp, Warning, TEXT("=== COMBAT END ==="));
+        UE_LOG(LogTemp, Log, TEXT("[TurnManager] Combat End"));
         return;
     }
 
@@ -98,9 +78,29 @@ void UTurnManager::EndTurn()
 void UTurnManager::NextTurn()
 {
     if (TurnOrder.Num() == 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[TurnManager] NextTurn Failed | TurnOrder is Empty"));
         return;
+    }
 
-    int32 StartIndex = CurrentTurnIndex;
+    int32 AliveUnitCount = 0;
+
+    for (AUnitBase* Unit : TurnOrder)
+    {
+        if (Unit && Unit->IsUnitAlive())
+        {
+            AliveUnitCount++;
+        }
+    }
+
+    if (AliveUnitCount == 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[TurnManager] NextTurn Failed | No Alive Units"));
+        return;
+    }
+
+    const int32 StartIndex = CurrentTurnIndex;
+    bool bFoundNextAliveUnit = false;
 
     do
     {
@@ -110,14 +110,19 @@ void UTurnManager::NextTurn()
 
         if (Unit && Unit->IsUnitAlive())
         {
+            bFoundNextAliveUnit = true;
             break;
         }
 
     } while (CurrentTurnIndex != StartIndex);
 
-    //UE_LOG(LogTemp, Warning,
-    //    TEXT("[TurnManager] NextTurn -> Index=%d"),
-    //    CurrentTurnIndex);
+    if (!bFoundNextAliveUnit)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[TurnManager] NextTurn Failed | Could Not Find Alive Unit"));
+        return;
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("[TurnManager] NextTurn Success | NewIndex=%d | Unit=%s"), CurrentTurnIndex, *GetNameSafe(TurnOrder[CurrentTurnIndex]));
 
     StartTurn();
 }
@@ -140,7 +145,9 @@ bool UTurnManager::CheckCombatEnd() const
     for (AUnitBase* Unit : TurnOrder)
     {
         if (!Unit || !Unit->IsUnitAlive())
+        {
             continue;
+        }
 
         if (Unit->GetTeam() == ETeam::Player)
         {
@@ -152,11 +159,22 @@ bool UTurnManager::CheckCombatEnd() const
         }
     }
 
-    // 한 팀만 남았으면 전투 종료
     if (!bPlayerAlive || !bEnemyAlive)
     {
         return true;
     }
 
     return false;
+}
+
+FString UTurnManager::GetCurrentUnitName() const
+{
+    AUnitBase* CurrentUnit = GetCurrentUnit();
+
+    if (!CurrentUnit)
+    {
+        return TEXT("None");
+    }
+
+    return CurrentUnit->GetName();
 }

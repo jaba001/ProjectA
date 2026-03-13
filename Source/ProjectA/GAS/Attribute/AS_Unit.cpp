@@ -20,7 +20,7 @@ void UAS_Unit::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& D
             SetHP(GetMaxHP());
         }
 
-        UE_LOG(LogTemp, Warning, TEXT("[AS_Unit] HP Changed | NewHP=%.1f / MaxHP=%.1f"), GetHP(), GetMaxHP());
+        //UE_LOG(LogTemp, Log, TEXT("[AS_Unit] HP Changed | NewHP=%.1f / MaxHP=%.1f"), GetHP(), GetMaxHP());
 
         // HP가 0 이하면 소유 유닛 사망 처리
         if (GetHP() <= 0.0f)
@@ -36,7 +36,7 @@ void UAS_Unit::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& D
 
             if (OwnerUnit)
             {
-                UE_LOG(LogTemp, Warning, TEXT("[AS_Unit] Die Triggered | Unit=%s"), *OwnerUnit->GetName());
+                //UE_LOG(LogTemp, Log, TEXT("[AS_Unit] Die Triggered | Unit=%s"), *OwnerUnit->GetName());
                 OwnerUnit->Die();
             }
         }

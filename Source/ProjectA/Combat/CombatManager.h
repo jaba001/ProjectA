@@ -43,6 +43,9 @@ private:
     int32 CurrentTurnIndex;
 
 public:
+	// 현재 턴 유닛
+    UFUNCTION(BlueprintCallable)
+    UTurnManager* GetTurnManager() const { return TurnManager; }
 
     UFUNCTION(Server, Reliable)
     void Server_StartCombat();
