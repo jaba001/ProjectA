@@ -4,6 +4,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Unit/UnitBase.h"
 #include "Grid/Combat/CombatGridTile.h"
+#include "Abilities/GameplayAbility.h"
 
 APartyPlayerController::APartyPlayerController()
 {
@@ -16,31 +17,41 @@ void APartyPlayerController::BeginPlay()
 {
     Super::BeginPlay();
 
-    FInputModeGameAndUI InputMode;
-    InputMode.SetHideCursorDuringCapture(false);
-    InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-    SetInputMode(InputMode);
+    InitializeCombatManager();
+    InitializeHUD();
+}
 
-    // HUD »ý¼º
-    if (HUDWidgetClass)
-    {
-        HUDWidget = CreateWidget<UUserWidget>(this, HUDWidgetClass);
-        if (HUDWidget)
-        {
-            HUDWidget->AddToViewport();
-        }
-    }
-
+void APartyPlayerController::InitializeCombatManager()
+{
     CombatManager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatManager::StaticClass()));
 
-    if (CombatManager)
+    if (!CombatManager)
     {
-        //UE_LOG(LogTemp, Warning, TEXT("CombatManager Found"));
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] CombatManager not found"));
+        return;
     }
-    else
+
+    UE_LOG(LogTemp, Log, TEXT("[PartyPlayerController] CombatManager initialized"));
+}
+
+void APartyPlayerController::InitializeHUD()
+{
+    if (!HUDWidgetClass)
     {
-        UE_LOG(LogTemp, Error, TEXT("CombatManager NOT Found"));
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] HUDWidgetClass is null"));
+        return;
     }
+
+    HUDWidget = CreateWidget<UUserWidget>(this, HUDWidgetClass);
+
+    if (!HUDWidget)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] HUDWidget creation failed"));
+        return;
+    }
+
+    HUDWidget->AddToViewport();
+    //UE_LOG(LogTemp, Log, TEXT("[PartyPlayerController] HUDWidget initialized"));
 }
 
 AUnitBase* APartyPlayerController::GetActiveUnit() const
@@ -53,31 +64,184 @@ AUnitBase* APartyPlayerController::GetActiveUnit() const
 
 void APartyPlayerController::RequestEndTurn()
 {
-    if (CombatManager)
+    if (!CombatManager)
     {
-        CombatManager->RequestEndTurn();
-        //UE_LOG(LogTemp, Warning, TEXT("RequestEndTurn Called PC"));
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] RequestEndTurn failed | CombatManager is null"));
+        return;
     }
+
+    CancelTileInputMode();
+    CombatManager->RequestEndTurn();
+}
+
+bool APartyPlayerController::CanUseActiveUnitAction() const
+{
+    AUnitBase* ActiveUnit = GetActiveUnit();
+
+    if (!ActiveUnit)
+    {
+        return false;
+    }
+
+    if (!ActiveUnit->IsUnitAlive())
+    {
+        return false;
+    }
+
+    if (!ActiveUnit->IsActiveTurn())
+    {
+        return false;
+    }
+
+    if (ActiveUnit->IsBusy())
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool APartyPlayerController::CanUseActiveUnitActionPoint(int32 Cost) const
+{
+    if (!CanUseActiveUnitAction())
+    {
+        return false;
+    }
+
+    AUnitBase* ActiveUnit = GetActiveUnit();
+
+    if (!ActiveUnit)
+    {
+        return false;
+    }
+
+    return ActiveUnit->HasEnoughActionPoint(Cost);
+}
+
+bool APartyPlayerController::CanUseActiveUnitSubActionPoint(int32 Cost) const
+{
+    if (!CanUseActiveUnitAction())
+    {
+        return false;
+    }
+
+    AUnitBase* ActiveUnit = GetActiveUnit();
+
+    if (!ActiveUnit)
+    {
+        return false;
+    }
+
+    return ActiveUnit->HasEnoughSubActionPoint(Cost);
 }
 
 void APartyPlayerController::SetSelectedTile(ACombatGridTile* InTile)
 {
+    SelectedTile = InTile;
+
     if (!InTile)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[PC] SetSelectedTile null"));
         return;
     }
-
-    SelectedTile = InTile;
 
     AUnitBase* OccupyingUnit = InTile->GetOccupyingUnit();
 
     if (OccupyingUnit)
     {
-        UE_LOG(LogTemp, Log, TEXT("[PC] Selected Tile (%d,%d) | Unit=%s"), InTile->GridCoord.X, InTile->GridCoord.Y, *OccupyingUnit->GetName());
+        //UE_LOG(LogTemp, Log, TEXT("[PC] Selected Tile (%d,%d) | Unit=%s"), InTile->GridCoord.X, InTile->GridCoord.Y, *OccupyingUnit->GetName());
     }
     else
     {
-        UE_LOG(LogTemp, Log, TEXT("[PC] Selected Tile (%d,%d) | Unit=None"), InTile->GridCoord.X, InTile->GridCoord.Y);
+        //UE_LOG(LogTemp, Log, TEXT("[PC] Selected Tile (%d,%d) | Unit=None"), InTile->GridCoord.X, InTile->GridCoord.Y);
     }
+}
+
+ACombatGridTile* APartyPlayerController::GetSelectedTile() const
+{
+    return SelectedTile;
+}
+
+void APartyPlayerController::ClearSelectedTile()
+{
+    SelectedTile = nullptr;
+    //UE_LOG(LogTemp, Log, TEXT("[PartyPlayerController] SelectedTile cleared by ClearSelectedTile"));
+}
+
+void APartyPlayerController::SetTileInputMode(ETileInputMode NewMode)
+{
+    CurrentTileInputMode = NewMode;
+    //UE_LOG(LogTemp, Log, TEXT("[PartyPlayerController] TileInputMode Changed | Mode=%d"), static_cast<uint8>(CurrentTileInputMode));
+}
+
+void APartyPlayerController::EnterMoveMode()
+{
+    if (!CombatManager)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] EnterMoveMode failed | CombatManager is null"));
+        return;
+    }
+
+    if (!CanUseActiveUnitSubActionPoint(1))
+    {
+        return;
+    }
+
+    CombatManager->ClearMovableTilesHighlight();
+    ClearSelectedTile();
+
+    SetTileInputMode(ETileInputMode::Move);
+    CombatManager->RefreshReachableMoveTiles();
+    CombatManager->HighlightMovableTiles();
+}
+
+void APartyPlayerController::EnterSkillMode(TSubclassOf<UGameplayAbility> AbilityClass, bool bMoveToTarget, int32 ActionPointCost)
+{
+    if (!CombatManager)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] EnterSkillMode failed | CombatManager is null"));
+        return;
+    }
+
+    if (!AbilityClass)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] EnterSkillMode failed | AbilityClass is null"));
+        return;
+    }
+
+    if (ActionPointCost <= 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] EnterSkillMode failed | Invalid ActionPointCost=%d"), ActionPointCost);
+        return;
+    }
+
+    if (!CanUseActiveUnitActionPoint(ActionPointCost))
+    {
+        return;
+    }
+
+    CombatManager->ClearMovableTilesHighlight();
+    CombatManager->ClearSkillTargetTilesHighlight();
+    ClearSelectedTile();
+
+    PendingSkillInputAbilityClass = AbilityClass;
+    bPendingSkillInputMoveToTarget = bMoveToTarget;
+
+    SetTileInputMode(ETileInputMode::Skill);
+    CombatManager->RefreshSkillTargetTiles();
+    CombatManager->HighlightSkillTargetTiles();
+}
+
+void APartyPlayerController::CancelTileInputMode()
+{
+    if (CombatManager)
+    {
+        CombatManager->ClearMovableTilesHighlight();
+        CombatManager->ClearSkillTargetTilesHighlight();
+    }
+
+    PendingSkillInputAbilityClass = nullptr;
+    bPendingSkillInputMoveToTarget = true;
+
+    SetTileInputMode(ETileInputMode::None);
+    ClearSelectedTile();
 }

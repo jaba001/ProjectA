@@ -6,6 +6,8 @@
 
 class UTurnManager;
 class AUnitBase;
+class ACombatGridManager;
+class ACombatGridTile;
 
 UCLASS()
 class PROJECTA_API ACombatManager : public AActor
@@ -29,6 +31,9 @@ private:
     UPROPERTY(EditDefaultsOnly, Category = "Combat")
     TArray<TSubclassOf<AUnitBase>> EnemyUnitClasses;
 
+    TArray<ACombatGridTile*> CalculateReachableMoveTiles(AUnitBase* Unit) const;
+    bool CanUnitEnterTile(AUnitBase* Unit, ACombatGridTile* Tile) const;
+
 private:
     // 서버 전용 턴 매니저
     UPROPERTY()
@@ -42,8 +47,14 @@ private:
     UPROPERTY(Replicated)
     int32 CurrentTurnIndex;
 
+    UPROPERTY()
+    ACombatGridManager* CombatGridManager;
+
+    UPROPERTY()
+    TArray<ACombatGridTile*> ReachableMoveTiles;
+
 public:
-	// 현재 턴 유닛
+    // 현재 턴 유닛
     UFUNCTION(BlueprintCallable)
     UTurnManager* GetTurnManager() const { return TurnManager; }
 
@@ -55,6 +66,10 @@ public:
     // 턴 진행 요청 (서버 전용)
     void AdvanceTurn();
 
+	// 턴 종료 요청 (서버 전용)
+    UFUNCTION(BlueprintCallable)
+    void RequestEndTurn();
+
     // 유닛 등록 (서버 전용)
     void RegisterUnits(const TArray<AUnitBase*>& Units);
 
@@ -63,6 +78,41 @@ public:
     UFUNCTION(BlueprintCallable)
     AUnitBase* GetCurrentUnit() const;
 
-    UFUNCTION(BlueprintCallable)
-    void RequestEndTurn();
+public:
+    //Move
+    UFUNCTION(BlueprintCallable, Category = "Move")
+    void RefreshReachableMoveTiles();
+
+    UFUNCTION(BlueprintCallable, Category = "Move")
+    bool IsReachableMoveTile(ACombatGridTile* Tile) const;
+
+    UFUNCTION(BlueprintCallable, Category = "Move")
+    void HighlightMovableTiles();
+
+    UFUNCTION(BlueprintCallable, Category = "Move")
+    void ClearMovableTilesHighlight();
+
+    UFUNCTION(BlueprintCallable, Category = "Move")
+    const TArray<ACombatGridTile*>& GetReachableMoveTiles() const { return ReachableMoveTiles; }
+
+    //Skill
+    UFUNCTION(BlueprintCallable, Category = "Skill")
+    void RefreshSkillTargetTiles();
+
+    UFUNCTION(BlueprintCallable, Category = "Skill")
+    bool IsSkillTargetTile(ACombatGridTile* Tile) const;
+
+    UFUNCTION(BlueprintCallable, Category = "Skill")
+    void HighlightSkillTargetTiles();
+
+    UFUNCTION(BlueprintCallable, Category = "Skill")
+    void ClearSkillTargetTilesHighlight();
+
+
+private:
+    TArray<ACombatGridTile*> CalculateSkillTargetTiles(AUnitBase* Unit) const;
+
+    UPROPERTY()
+    TArray<ACombatGridTile*> SkillTargetTiles;
+
 };

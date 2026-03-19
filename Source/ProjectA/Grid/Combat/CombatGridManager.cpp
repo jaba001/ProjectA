@@ -48,9 +48,20 @@ void ACombatGridManager::GenerateGrid()
             FVector SpawnLocation = GetActorLocation() + FVector(X, Y, 0.f);
 
             ACombatGridTile* Tile = World->SpawnActor<ACombatGridTile>(TileClass, SpawnLocation, FRotator::ZeroRotator);
+
             if (Tile)
             {
                 Tile->GridCoord = FIntPoint(Row, Col);
+
+                if (Col < ColCount/ 2)
+                {
+                    Tile->SetTerritory(ETileTerritory::Player);
+                }
+                else
+                {
+                    Tile->SetTerritory(ETileTerritory::Enemy);
+                }
+
                 TileMap.Add(Tile->GridCoord, Tile);
             }
         }
@@ -77,6 +88,53 @@ TArray<ACombatGridTile*> ACombatGridManager::GetTilesByCoords(const TArray<FIntP
             // 매핑에 없는 좌표는 nullptr을 넣어준다
             // (필요하면 스킵 방식으로 변경할 수 있다)
             Result.Add(nullptr);
+        }
+    }
+
+    return Result;
+}
+
+ACombatGridTile* ACombatGridManager::GetTileAtCoord(const FIntPoint& Coord) const
+{
+    if (ACombatGridTile* const* FoundTilePtr = TileMap.Find(Coord))
+    {
+        return *FoundTilePtr;
+    }
+
+    return nullptr;
+}
+
+TArray<ACombatGridTile*> ACombatGridManager::GetAdjacentTiles(ACombatGridTile* CenterTile) const
+{
+    TArray<ACombatGridTile*> Result;
+
+    if (!CenterTile)
+    {
+        return Result;
+    }
+
+    const FIntPoint CenterCoord = CenterTile->GridCoord;
+
+    const TArray<FIntPoint> AdjacentCoords =
+    {
+        FIntPoint(CenterCoord.X - 1, CenterCoord.Y),
+        FIntPoint(CenterCoord.X + 1, CenterCoord.Y),
+        FIntPoint(CenterCoord.X, CenterCoord.Y - 1),
+        FIntPoint(CenterCoord.X, CenterCoord.Y + 1),
+
+        FIntPoint(CenterCoord.X - 1, CenterCoord.Y - 1),
+        FIntPoint(CenterCoord.X - 1, CenterCoord.Y + 1),
+        FIntPoint(CenterCoord.X + 1, CenterCoord.Y - 1),
+        FIntPoint(CenterCoord.X + 1, CenterCoord.Y + 1)
+    };
+
+    Result.Reserve(AdjacentCoords.Num());
+
+    for (const FIntPoint& Coord : AdjacentCoords)
+    {
+        if (ACombatGridTile* AdjacentTile = GetTileAtCoord(Coord))
+        {
+            Result.Add(AdjacentTile);
         }
     }
 

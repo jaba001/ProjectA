@@ -8,6 +8,14 @@
 
 class AUnitBase;
 
+UENUM(BlueprintType)
+enum class ETileTerritory : uint8
+{
+    None,
+    Player,
+    Enemy
+};
+
 UCLASS()
 class PROJECTA_API ACombatGridTile : public AActor
 {
@@ -33,6 +41,12 @@ public:
 
     void UpdateTileVisual();
 
+    UFUNCTION(BlueprintCallable, Category = "CombatGridTile")
+	void ApplyMovableTileVisual();
+
+    UFUNCTION(BlueprintCallable, Category = "CombatGridTile")
+    void ApplySkillTargetTileVisual();
+
 private:
     FLinearColor OriginalColor;
 
@@ -52,6 +66,17 @@ private:
     UPROPERTY(EditAnywhere, Category = "TileSprite")
     UPaperSprite* EnemySprite;
 
+    UPROPERTY(EditAnywhere, Category = "TileSprite")
+    UPaperSprite* MovableSprite;
+
+    UPROPERTY(EditAnywhere, Category = "TileSprite")
+    UPaperSprite* ActiveSprite;
+public:
+    void SetTerritory(ETileTerritory NewTerritory) { Territory = NewTerritory; }
+
+    UFUNCTION(BlueprintCallable, Category = "CombatGridTile")
+    ETileTerritory GetTerritory() const { return Territory; }
+
 public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CombatGridTile")
     FIntPoint GridCoord;
@@ -59,4 +84,7 @@ public:
 private:
     UPROPERTY()
     AUnitBase* OccupyingUnit;
+
+    UPROPERTY(EditAnywhere, Category = "CombatGridTile")
+    ETileTerritory Territory = ETileTerritory::None;
 };

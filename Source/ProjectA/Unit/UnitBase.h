@@ -107,6 +107,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Turn")
     bool MustEndTurnAfterCurrentAction() const { return bTurnMustEndAfterCurrentAction; }
 
+    UFUNCTION(BlueprintCallable, Category = "Turn")
+    bool IsActiveTurn() const { return bIsActiveTurn; }
+
 public:
     // 행동 자원
     // 기본값은 MaxActionPoint 기준으로 턴 시작 시 리셋된다.
@@ -179,6 +182,7 @@ public:
     void SetCurrentTile(ACombatGridTile* NewTile);
 
 public:
+    // 실제 이동처리 로직 Movement
     // 지정 타일로 이동
     UFUNCTION(BlueprintCallable, Category = "Movement")
     virtual void MoveToTile(ACombatGridTile* TargetTile);
@@ -203,6 +207,10 @@ public:
 	// 원래 타일로 복귀 완료 콜백
     UFUNCTION(Category = "Movement")
     virtual void OnReturnToOriginalTileFinished();
+
+	// 현재 이동/행동 중인지 여부
+    UFUNCTION(BlueprintCallable, Category = "Movement")
+    bool IsBusy() const { return MovePhase != EUnitMovePhase::None; }
 
     // AIController 이동 완료 콜백 진입점
     UFUNCTION(BlueprintCallable, Category = "Movement")
@@ -248,7 +256,15 @@ public:
     UPROPERTY()
     bool bSkillDamageApplied = false;
 
+protected:
+    // 이동 액션 카태고리 Move
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Move")
+    int32 MoveRange = 1;
+
 public:
+    UFUNCTION(BlueprintCallable, Category = "Move")
+    int32 GetMoveRange() const { return MoveRange; }
+
     UFUNCTION(BlueprintCallable, Category = "Move")
     virtual void StartMoveAction(ACombatGridTile* TargetTile);
 
@@ -294,6 +310,9 @@ public:
     // AI가 평가 가능한 Skill Ability 목록 반환
     UFUNCTION(BlueprintCallable, Category = "Skill")
     virtual TArray<TSubclassOf<UGameplayAbility>> GetAvailableSkillAbilityClasses() const;
+
+    UFUNCTION(BlueprintCallable, Category = "Skill")
+    TSubclassOf<UGameplayAbility> GetDefaultAttackAbilityClass() const { return DefaultAttackAbilityClass; }
 
 protected:
     // 초기 능력치

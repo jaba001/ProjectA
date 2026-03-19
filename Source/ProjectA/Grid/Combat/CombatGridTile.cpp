@@ -1,5 +1,6 @@
 #include "Grid/Combat/CombatGridTile.h"
 #include "Controller/PartyPlayerController.h"
+#include "Combat/CombatManager.h"
 #include "Unit/UnitBase.h"
 #include "Engine/World.h"
 
@@ -57,6 +58,81 @@ void ACombatGridTile::NotifyActorOnClicked(FKey ButtonPressed)
         return;
     }
 
+    ACombatManager* CombatManager = PC->GetCombatManager();
+
+    if (!CombatManager)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GridTile] CombatManager null"));
+        return;
+    }
+
+    if (PC->IsSkillInputMode())
+    {
+        if (!CombatManager->IsSkillTargetTile(this))
+        {
+            return;
+        }
+
+        AUnitBase* ActiveUnit = PC->GetActiveUnit();
+
+        if (!ActiveUnit)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[GridTile] Skill click failed | ActiveUnit null"));
+            return;
+        }
+
+        AUnitBase* TargetUnit = GetOccupyingUnit();
+
+        if (!TargetUnit)
+        {
+            return;
+        }
+
+        if (TargetUnit->GetTeam() == ActiveUnit->GetTeam())
+        {
+            return;
+        }
+
+        TSubclassOf<UGameplayAbility> AbilityClass = PC->GetPendingSkillInputAbilityClass();
+        const bool bMoveToTarget = PC->GetPendingSkillInputMoveToTarget();
+
+        if (!AbilityClass)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[GridTile] Skill click failed | Pending AbilityClass is null"));
+            return;
+        }
+
+        PC->SetSelectedTile(this);
+        CombatManager->ClearSkillTargetTilesHighlight();
+        PC->SetTileInputMode(ETileInputMode::None);
+
+        ActiveUnit->StartSkill(AbilityClass, TargetUnit, bMoveToTarget);
+        return;
+    }
+
+    if (PC->IsMoveInputMode())
+    {
+        if (!CombatManager->IsReachableMoveTile(this))
+        {
+            return;
+        }
+
+        AUnitBase* ActiveUnit = PC->GetActiveUnit();
+
+        if (!ActiveUnit)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[GridTile] Move click failed | ActiveUnit null"));
+            return;
+        }
+
+        PC->SetSelectedTile(this);
+        CombatManager->ClearMovableTilesHighlight();
+        PC->SetTileInputMode(ETileInputMode::None);
+
+        ActiveUnit->StartMoveAction(this);
+        return;
+    }
+
     PC->SetSelectedTile(this);
 }
 
@@ -64,25 +140,27 @@ void ACombatGridTile::NotifyActorBeginCursorOver()
 {
     Super::NotifyActorBeginCursorOver();
 
-    //if (OccupyingUnit)
+    APartyPlayerController* PC = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController());
+
+    if (!PC)
+    {
+        return;
+    }
+
+    //if (PC->GetTileInputMode() != ETileInputMode::Move)
     //{
     //    return;
     //}
 
     if (TileSprite)
     {
-        TileSprite->SetSpriteColor(FLinearColor::Green);
+        TileSprite->SetSpriteColor(FLinearColor::Gray);
     }
 }
 
 void ACombatGridTile::NotifyActorEndCursorOver()
 {
     Super::NotifyActorEndCursorOver();
-
-    //if (OccupyingUnit)
-    //{
-    //    return;
-    //}
 
     if (TileSprite)
     {
@@ -124,4 +202,38 @@ void ACombatGridTile::UpdateTileVisual()
         TileSprite->SetSprite(EmptySprite);
         break;
     }
+}
+
+void ACombatGridTile::ApplyMovableTileVisual()
+{
+    if (!TileSprite)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GridTile] ApplyMovableTileVisual failed | TileSprite is null"));
+        return;
+    }
+
+    if (!MovableSprite)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GridTile] ApplyMovableTileVisual failed | MovableSprite is null | Coord=(%d,%d)"), GridCoord.X, GridCoord.Y);
+        return;
+    }
+
+    TileSprite->SetSprite(MovableSprite);
+
+    //UE_LOG(LogTemp, Log, TEXT("[GridTile] ApplyMovableTileVisual success | Coord=(%d,%d)"), GridCoord.X, GridCoord.Y);
+}
+
+void ACombatGridTile::ApplySkillTargetTileVisual()
+{
+    if (!TileSprite)
+    {
+        return;
+    }
+
+    if (!ActiveSprite)
+    {
+        return;
+    }
+
+    TileSprite->SetSprite(ActiveSprite);
 }

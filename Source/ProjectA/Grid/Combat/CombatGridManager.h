@@ -38,7 +38,6 @@ private:
     int32 GapStartIndex = 2; // Col 2부터 Gap 적용
 
 public:
-
     UFUNCTION(BlueprintCallable, Category = "CombatGrid")
     void GenerateGrid();
 
@@ -47,6 +46,12 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "CombatGrid")
     TArray<ACombatGridTile*> GetTilesByCoords(const TArray<FIntPoint>& Coords) const;
+
+    UFUNCTION(BlueprintCallable, Category = "CombatGrid")
+    ACombatGridTile* GetTileAtCoord(const FIntPoint& Coord) const;
+
+    UFUNCTION(BlueprintCallable, Category = "CombatGrid")
+    TArray<ACombatGridTile*> GetAdjacentTiles(ACombatGridTile* CenterTile) const;
 
 
 };
