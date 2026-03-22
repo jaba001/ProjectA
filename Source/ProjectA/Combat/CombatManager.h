@@ -79,7 +79,7 @@ public:
     AUnitBase* GetCurrentUnit() const;
 
 public:
-    //Move
+    // Move
     UFUNCTION(BlueprintCallable, Category = "Move")
     void RefreshReachableMoveTiles();
 
@@ -95,7 +95,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Move")
     const TArray<ACombatGridTile*>& GetReachableMoveTiles() const { return ReachableMoveTiles; }
 
-    //Skill
+    // Skill
     UFUNCTION(BlueprintCallable, Category = "Skill")
     void RefreshSkillTargetTiles();
 
@@ -108,6 +108,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Skill")
     void ClearSkillTargetTilesHighlight();
 
+	// Tile
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    ACombatGridTile* GetTileByCoord(FIntPoint Coord) const;
+
+    // 보호여부
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void RefreshTileProtectedByFront();
 
 private:
     TArray<ACombatGridTile*> CalculateSkillTargetTiles(AUnitBase* Unit) const;

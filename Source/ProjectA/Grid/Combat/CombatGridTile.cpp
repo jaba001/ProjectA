@@ -1,5 +1,6 @@
 #include "Grid/Combat/CombatGridTile.h"
 #include "Controller/PartyPlayerController.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Combat/CombatManager.h"
 #include "Unit/UnitBase.h"
 #include "Engine/World.h"
@@ -68,16 +69,30 @@ void ACombatGridTile::NotifyActorOnClicked(FKey ButtonPressed)
 
     if (PC->IsSkillInputMode())
     {
-        if (!CombatManager->IsSkillTargetTile(this))
-        {
-            return;
-        }
-
         AUnitBase* ActiveUnit = PC->GetActiveUnit();
 
         if (!ActiveUnit)
         {
             UE_LOG(LogTemp, Warning, TEXT("[GridTile] Skill click failed | ActiveUnit null"));
+            return;
+        }
+
+        USkillDefinitionDataAsset* SkillData = PC->GetPendingSkillData();
+
+        if (!SkillData)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[GridTile] Skill click failed | PendingSkillData is null"));
+            return;
+        }
+
+        if (!SkillData->AbilityClass)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[GridTile] Skill click failed | AbilityClass is null"));
+            return;
+        }
+
+        if (!PC->IsValidTileForPendingSkill(this))
+        {
             return;
         }
 
@@ -88,25 +103,11 @@ void ACombatGridTile::NotifyActorOnClicked(FKey ButtonPressed)
             return;
         }
 
-        if (TargetUnit->GetTeam() == ActiveUnit->GetTeam())
-        {
-            return;
-        }
-
-        TSubclassOf<UGameplayAbility> AbilityClass = PC->GetPendingSkillInputAbilityClass();
-        const bool bMoveToTarget = PC->GetPendingSkillInputMoveToTarget();
-
-        if (!AbilityClass)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[GridTile] Skill click failed | Pending AbilityClass is null"));
-            return;
-        }
-
         PC->SetSelectedTile(this);
         CombatManager->ClearSkillTargetTilesHighlight();
-        PC->SetTileInputMode(ETileInputMode::None);
+        PC->CancelTileInputMode();
 
-        ActiveUnit->StartSkill(AbilityClass, TargetUnit, bMoveToTarget);
+        ActiveUnit->StartSkill(SkillData->AbilityClass, TargetUnit, SkillData->bMoveToTarget);
         return;
     }
 
@@ -162,10 +163,12 @@ void ACombatGridTile::NotifyActorEndCursorOver()
 {
     Super::NotifyActorEndCursorOver();
 
-    if (TileSprite)
-    {
-        TileSprite->SetSpriteColor(OriginalColor);
-    }
+    //if (TileSprite)
+    //{
+    //    TileSprite->SetSpriteColor(OriginalColor);
+    //}
+
+    UpdateTileVisual();
 }
 
 void ACombatGridTile::SetOccupyingUnit(AUnitBase* NewUnit)
@@ -182,25 +185,43 @@ void ACombatGridTile::UpdateTileVisual()
         return;
     }
 
-    if (!OccupyingUnit)
+    if (bSkillTargetHighlighted && ActiveSprite)
+    {
+        TileSprite->SetSprite(ActiveSprite);
+    }
+    else if (bMovableHighlighted && MovableSprite)
+    {
+        TileSprite->SetSprite(MovableSprite);
+    }
+    else if (!OccupyingUnit)
     {
         TileSprite->SetSprite(EmptySprite);
-        return;
+    }
+    else
+    {
+        switch (OccupyingUnit->GetTeam())
+        {
+        case ETeam::Player:
+            TileSprite->SetSprite(PlayerSprite);
+            break;
+
+        case ETeam::Enemy:
+            TileSprite->SetSprite(EnemySprite);
+            break;
+
+        default:
+            TileSprite->SetSprite(EmptySprite);
+            break;
+        }
     }
 
-    switch (OccupyingUnit->GetTeam())
+    if (bProtectedByFront)
     {
-    case ETeam::Player:
-        TileSprite->SetSprite(PlayerSprite);
-        break;
-
-    case ETeam::Enemy:
-        TileSprite->SetSprite(EnemySprite);
-        break;
-
-    default:
-        TileSprite->SetSprite(EmptySprite);
-        break;
+        TileSprite->SetSpriteColor(ProtectedByFrontColor);
+    }
+    else
+    {
+        TileSprite->SetSpriteColor(OriginalColor);
     }
 }
 
@@ -218,9 +239,9 @@ void ACombatGridTile::ApplyMovableTileVisual()
         return;
     }
 
-    TileSprite->SetSprite(MovableSprite);
-
-    //UE_LOG(LogTemp, Log, TEXT("[GridTile] ApplyMovableTileVisual success | Coord=(%d,%d)"), GridCoord.X, GridCoord.Y);
+    bMovableHighlighted = true;
+    bSkillTargetHighlighted = false;
+    UpdateTileVisual();
 }
 
 void ACombatGridTile::ApplySkillTargetTileVisual()
@@ -235,5 +256,23 @@ void ACombatGridTile::ApplySkillTargetTileVisual()
         return;
     }
 
-    TileSprite->SetSprite(ActiveSprite);
+    bSkillTargetHighlighted = true;
+    bMovableHighlighted = false;
+    UpdateTileVisual();
+}
+
+void ACombatGridTile::ClearHighlightVisual()
+{
+    bMovableHighlighted = false;
+    bSkillTargetHighlighted = false;
+    UpdateTileVisual();
+}
+
+void ACombatGridTile::SetProtectedByFront(bool bInProtectedByFront)
+{
+    bProtectedByFront = bInProtectedByFront;
+    
+    //UE_LOG(LogTemp, Log, TEXT("[GridTile] SetProtectedByFront | Coord=(%d,%d) | Protected=%s"), GridCoord.X, GridCoord.Y, bProtectedByFront ? TEXT("true") : TEXT("false"));
+   
+    UpdateTileVisual();
 }

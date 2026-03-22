@@ -1,14 +1,16 @@
 #include "UnitBase.h"
-#include "Grid/Combat/CombatGridTile.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "Kismet/GameplayStatics.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Combat/CombatManager.h"
 #include "AIController.h"
+#include "Grid/Combat/CombatGridTile.h"
 #include "Controller/UnitAIController.h"
 #include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "GAS/Ability/GA_DefaultAttack.h"
-#include "Kismet/KismetSystemLibrary.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 
@@ -204,6 +206,14 @@ void AUnitBase::Die()
     GetMesh()->AddImpulse(Impulse, NAME_None, true);
 
     //UE_LOG(LogTemp, Log, TEXT("[Death] %s died"), *GetName());
+    // 
+    // 타일 점유 상태 변경 이후 전열 보호 상태를 다시 계산한다
+    ACombatManager* CombatManager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatManager::StaticClass()));
+
+    if (CombatManager)
+    {
+        CombatManager->RefreshTileProtectedByFront();
+    }
 }
 
 void AUnitBase::SetCurrentTile(ACombatGridTile* NewTile)
@@ -226,6 +236,14 @@ void AUnitBase::SetCurrentTile(ACombatGridTile* NewTile)
 
     // 새 타일 등록
     CurrentTile->SetOccupyingUnit(this);
+
+    // 타일 점유 상태 변경 이후 전열 보호 상태를 다시 계산한다
+    ACombatManager* CombatManager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatManager::StaticClass()));
+
+    if (CombatManager)
+    {
+        CombatManager->RefreshTileProtectedByFront();
+    }
 }
 
 

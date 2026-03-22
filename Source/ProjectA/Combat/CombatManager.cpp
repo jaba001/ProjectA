@@ -96,6 +96,7 @@ void ACombatManager::StartCombat_Internal()
 	//클라동기화
     CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
     RefreshReachableMoveTiles();
+    RefreshTileProtectedByFront();
 }
 
 void ACombatManager::RegisterUnits(const TArray<AUnitBase*>& Units)
@@ -122,6 +123,7 @@ void ACombatManager::AdvanceTurn()
     //클라동기화
     CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
     RefreshReachableMoveTiles();
+    RefreshTileProtectedByFront();
 }
 
 void ACombatManager::RequestEndTurn()
@@ -195,7 +197,7 @@ void ACombatManager::ClearMovableTilesHighlight()
             continue;
         }
 
-        Tile->UpdateTileVisual();
+        Tile->ClearHighlightVisual();
     }
 }
 
@@ -248,7 +250,106 @@ void ACombatManager::ClearSkillTargetTilesHighlight()
             continue;
         }
 
-        Tile->UpdateTileVisual();
+        Tile->ClearHighlightVisual();
+    }
+}
+
+ACombatGridTile* ACombatManager::GetTileByCoord(FIntPoint Coord) const
+{
+    if (!CombatGridManager)
+    {
+        return nullptr;
+    }
+
+    ACombatGridTile* const* FoundTile = CombatGridManager->TileMap.Find(Coord);
+
+    if (!FoundTile)
+    {
+        return nullptr;
+    }
+
+    return *FoundTile;
+}
+
+void ACombatManager::RefreshTileProtectedByFront()
+{
+    if (!CombatGridManager)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[CombatManager] RefreshTileProtectedByFront failed | CombatGridManager is null"));
+        return;
+    }
+
+    for (const TPair<FIntPoint, ACombatGridTile*>& TilePair : CombatGridManager->TileMap)
+    {
+        ACombatGridTile* Tile = TilePair.Value;
+
+        if (!Tile)
+        {
+            continue;
+        }
+
+        Tile->SetProtectedByFront(false);
+    }
+
+    for (const TPair<FIntPoint, ACombatGridTile*>& TilePair : CombatGridManager->TileMap)
+    {
+        ACombatGridTile* Tile = TilePair.Value;
+
+        if (!Tile)
+        {
+            continue;
+        }
+
+        const ETileTerritory Territory = Tile->GetTerritory();
+        const FIntPoint Coord = Tile->GridCoord;
+
+        ACombatGridTile* FrontTile = nullptr;
+
+        if (Territory == ETileTerritory::Player)
+        {
+            // 플레이어 후열은 Y == 0
+            if (Coord.Y != 0)
+            {
+                continue;
+            }
+
+            FrontTile = GetTileByCoord(FIntPoint(Coord.X, 1));
+        }
+        else if (Territory == ETileTerritory::Enemy)
+        {
+            // 적 후열은 Y == 3
+            if (Coord.Y != 3)
+            {
+                continue;
+            }
+
+            FrontTile = GetTileByCoord(FIntPoint(Coord.X, 2));
+        }
+        else
+        {
+            continue;
+        }
+
+        if (!FrontTile)
+        {
+            continue;
+        }
+
+        AUnitBase* FrontUnit = FrontTile->GetOccupyingUnit();
+
+        if (!FrontUnit)
+        {
+            continue;
+        }
+
+        if (!FrontUnit->IsUnitAlive())
+        {
+            continue;
+        }
+
+        Tile->SetProtectedByFront(true);
+
+        //UE_LOG(LogTemp, Warning, TEXT("[CombatManager] Tile Check | Coord=(%d,%d) | Territory=%d"), Coord.X, Coord.Y, static_cast<int32>(Territory));
     }
 }
 

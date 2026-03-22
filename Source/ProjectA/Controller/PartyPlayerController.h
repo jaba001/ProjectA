@@ -8,7 +8,7 @@ class AUnitBase;
 class ACombatManager;
 class ACombatGridTile;
 class UUserWidget;
-class UGameplayAbility;
+class USkillDefinitionDataAsset;
 
 UENUM(BlueprintType)
 enum class ETileInputMode : uint8
@@ -71,7 +71,7 @@ public:
     void EnterMoveMode();
 
     UFUNCTION(BlueprintCallable, Category = "Tile")
-    void EnterSkillMode(TSubclassOf<UGameplayAbility> AbilityClass, bool bMoveToTarget, int32 ActionPointCost);
+    void EnterSkillMode(USkillDefinitionDataAsset* SkillData);
 
     UFUNCTION(BlueprintCallable, Category = "Tile")
     void CancelTileInputMode();
@@ -86,10 +86,9 @@ public:
     bool IsSkillInputMode() const { return CurrentTileInputMode == ETileInputMode::Skill; }
 
     UFUNCTION(BlueprintCallable, Category = "Tile")
-    TSubclassOf<UGameplayAbility> GetPendingSkillInputAbilityClass() const { return PendingSkillInputAbilityClass; }
+    USkillDefinitionDataAsset* GetPendingSkillData() const { return PendingSkillData; }
 
-    UFUNCTION(BlueprintCallable, Category = "Tile")
-    bool GetPendingSkillInputMoveToTarget() const { return bPendingSkillInputMoveToTarget; }
+    bool IsValidTileForPendingSkill(ACombatGridTile* Tile) const;
 
 private:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tile", meta = (AllowPrivateAccess = "true"))
@@ -98,12 +97,9 @@ private:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tile", meta = (AllowPrivateAccess = "true"))
     ETileInputMode CurrentTileInputMode = ETileInputMode::None;
 
+    // 현재 Skill 입력 모드에서 대기 중인 스킬 정의 데이터
     UPROPERTY()
-    TSubclassOf<UGameplayAbility> PendingSkillInputAbilityClass = nullptr;
-
-    UPROPERTY()
-    bool bPendingSkillInputMoveToTarget = true;
-
+    TObjectPtr<USkillDefinitionDataAsset> PendingSkillData = nullptr;
 
 private:
     UPROPERTY(EditAnywhere, Category = "UI")

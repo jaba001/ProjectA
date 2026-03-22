@@ -1,4 +1,5 @@
 #include "PartyPlayerController.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Blueprint/UserWidget.h"
 #include "Combat/CombatManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -194,7 +195,7 @@ void APartyPlayerController::EnterMoveMode()
     CombatManager->HighlightMovableTiles();
 }
 
-void APartyPlayerController::EnterSkillMode(TSubclassOf<UGameplayAbility> AbilityClass, bool bMoveToTarget, int32 ActionPointCost)
+void APartyPlayerController::EnterSkillMode(USkillDefinitionDataAsset* SkillData)
 {
     if (!CombatManager)
     {
@@ -202,19 +203,25 @@ void APartyPlayerController::EnterSkillMode(TSubclassOf<UGameplayAbility> Abilit
         return;
     }
 
-    if (!AbilityClass)
+    if (!SkillData)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] EnterSkillMode failed | SkillData is null"));
+        return;
+    }
+
+    if (!SkillData->AbilityClass)
     {
         UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] EnterSkillMode failed | AbilityClass is null"));
         return;
     }
 
-    if (ActionPointCost <= 0)
+    if (SkillData->ActionPointCost <= 0)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] EnterSkillMode failed | Invalid ActionPointCost=%d"), ActionPointCost);
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] EnterSkillMode failed | Invalid ActionPointCost=%d"), SkillData->ActionPointCost);
         return;
     }
 
-    if (!CanUseActiveUnitActionPoint(ActionPointCost))
+    if (!CanUseActiveUnitActionPoint(SkillData->ActionPointCost))
     {
         return;
     }
@@ -223,8 +230,7 @@ void APartyPlayerController::EnterSkillMode(TSubclassOf<UGameplayAbility> Abilit
     CombatManager->ClearSkillTargetTilesHighlight();
     ClearSelectedTile();
 
-    PendingSkillInputAbilityClass = AbilityClass;
-    bPendingSkillInputMoveToTarget = bMoveToTarget;
+    PendingSkillData = SkillData;
 
     SetTileInputMode(ETileInputMode::Skill);
     CombatManager->RefreshSkillTargetTiles();
@@ -239,9 +245,78 @@ void APartyPlayerController::CancelTileInputMode()
         CombatManager->ClearSkillTargetTilesHighlight();
     }
 
-    PendingSkillInputAbilityClass = nullptr;
-    bPendingSkillInputMoveToTarget = true;
-
+    PendingSkillData = nullptr;
     SetTileInputMode(ETileInputMode::None);
     ClearSelectedTile();
+}
+
+bool APartyPlayerController::IsValidTileForPendingSkill(ACombatGridTile* Tile) const
+{
+    if (!PendingSkillData)
+    {
+        return false;
+    }
+
+    if (!Tile)
+    {
+        return false;
+    }
+
+    AUnitBase* ActiveUnit = GetActiveUnit();
+
+    if (!ActiveUnit)
+    {
+        return false;
+    }
+
+    // 이번 단계는 유닛 대상 스킬만 처리
+    if (PendingSkillData->TargetingType != ESkillTargetingType::Unit)
+    {
+        return false;
+    }
+
+    AUnitBase* TargetUnit = Tile->GetOccupyingUnit();
+
+    if (!TargetUnit)
+    {
+        return false;
+    }
+
+    if (!TargetUnit->IsUnitAlive())
+    {
+        return false;
+    }
+
+    switch (PendingSkillData->TargetTeamRule)
+    {
+    case ESkillTargetTeamRule::EnemyOnly:
+        if (TargetUnit->GetTeam() == ActiveUnit->GetTeam())
+        {
+            return false;
+        }
+        break;
+
+    case ESkillTargetTeamRule::AllyOnly:
+        if (TargetUnit->GetTeam() != ActiveUnit->GetTeam())
+        {
+            return false;
+        }
+        break;
+
+    case ESkillTargetTeamRule::AnyUnit:
+        break;
+
+    case ESkillTargetTeamRule::EmptyTileOnly:
+        return false;
+
+    default:
+        return false;
+    }
+
+    if (!PendingSkillData->bIgnoreFront && Tile->GetProtectedByFront())
+    {
+        return false;
+    }
+
+    return true;
 }
