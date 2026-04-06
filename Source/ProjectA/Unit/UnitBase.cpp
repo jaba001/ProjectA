@@ -1,11 +1,14 @@
 #include "UnitBase.h"
+
 #include "Kismet/KismetSystemLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Combat/CombatManager.h"
 #include "AIController.h"
+
+#include "Combat/CombatManager.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Controller/UnitAIController.h"
 #include "AbilitySystemComponent.h"
@@ -26,6 +29,9 @@ AUnitBase::AUnitBase()
     MovePhase = EUnitMovePhase::None;
 
     GetCharacterMovement()->MaxWalkSpeed = 700.f;
+
+    // 캡슐 콜리전을 CombatUnit 프리셋으로 초기화한다
+    GetCapsuleComponent()->SetCollisionProfileName(TEXT("CombatUnit"));
 
 	// AI Controller 설정
     AIControllerClass = AUnitAIController::StaticClass();
@@ -299,7 +305,7 @@ void AUnitBase::ReturnToOriginalTile()
 {
     if (!OriginalTileBeforeSkill)
     {
-        //UE_LOG(LogTemp, Log, TEXT("[Skill] ReturnToOriginalTile failed: OriginalTileBeforeSkill is null"));
+        UE_LOG(LogTemp, Warning, TEXT("[Skill] ReturnToOriginalTile failed: OriginalTileBeforeSkill is null"));
         return;
     }
 
@@ -307,7 +313,7 @@ void AUnitBase::ReturnToOriginalTile()
 
     if (!AICon)
     {
-        //UE_LOG(LogTemp, Log, TEXT("[Skill] ReturnToOriginalTile failed: AICon is null"));
+        UE_LOG(LogTemp, Warning, TEXT("[Skill] ReturnToOriginalTile failed: AICon is null"));
         return;
     }
 
@@ -423,6 +429,8 @@ void AUnitBase::HandleMoveCompleted()
         break;
     }
     }
+
+    //UE_LOG(LogTemp, Warning, TEXT("[UnitBase] HandleMoveCompleted | Unit=%s | MovePhase=%d | PendingSkillTargetTile=%s | PendingTargetUnit=%s"), *GetName(), static_cast<int32>(MovePhase), *GetNameSafe(PendingSkillTargetTile), *GetNameSafe(PendingTargetUnit));
 }
 
 AUnitAIController* AUnitBase::GetOrCreateAIController()
@@ -438,88 +446,66 @@ AUnitAIController* AUnitBase::GetOrCreateAIController()
     return AICon;
 }
 
-void AUnitBase::StartSkill(TSubclassOf<UGameplayAbility> AbilityClass, AUnitBase* TargetUnit, bool bMoveToTarget)
+void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile)
 {
-    //UE_LOG(LogTemp, Warning, TEXT("[Attack] StartSkill Enter | Unit=%s | Target=%s | bMoveToTarget=%d | ActiveTurn=%d | MovePhase=%d"), *GetName(), *GetNameSafe(TargetUnit), bMoveToTarget ? 1 : 0, bIsActiveTurn ? 1 : 0, static_cast<uint8>(MovePhase));
+    //UE_LOG(LogTemp, Log, TEXT("[UnitBase] StartSkill | Unit=%s | SkillData=%s | Ability=%s | TargetTile=%s | OccupyingUnit=%s | MoveToTarget=%s"), *GetName(), *GetNameSafe(SkillData), SkillData ? *GetNameSafe(SkillData->AbilityClass) : TEXT("None"), *GetNameSafe(TargetTile), TargetTile ? *GetNameSafe(TargetTile->GetOccupyingUnit()) : TEXT("None"), SkillData && SkillData->bMoveToTarget ? TEXT("true") : TEXT("false"));
 
+    if (!SkillData)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | SkillData is null"));
+        return;
+    }
+
+    if (!TargetTile)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | TargetTile is null"));
+        return;
+    }
+
+    if (!SkillData->AbilityClass)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | AbilityClass is null"));
+        return;
+    }
+
+    // 현재 실행 대기 중인 스킬 컨텍스트를 저장한다
+    PendingSkillData = SkillData;
+    PendingSkillAbilityClass = SkillData->AbilityClass;
+    PendingSkillTargetTile = TargetTile;
+    PendingTargetUnit = TargetTile->GetOccupyingUnit();
+
+    // 스킬 시작 전에 원래 타일을 저장한다
+    OriginalTileBeforeSkill = CurrentTile;
+
+    // 현재 행동 타입을 Skill로 설정한다
     CurrentActionType = EUnitActionType::Skill;
 
-    // 서버 권한에서만 스킬 시작
-    if (!HasAuthority())
+    if (SkillData->bMoveToTarget)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartSkill Return | Reason=NoAuthority | Unit=%s"), *GetName());
-        return;
-    }
+        AUnitBase* TargetUnit = TargetTile->GetOccupyingUnit();
 
-    // 현재 턴이 아니면 스킬을 사용할 수 없다.
-    if (!bIsActiveTurn)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartSkill Return | Reason=NotActiveTurn | Unit=%s"), *GetName());
-        return;
-    }
+        if (!TargetUnit)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | MoveToTarget requires occupied target tile"));
+            return;
+        }
 
-    // 이미 다른 이동/행동 중이면 새 스킬을 시작할 수 없다.
-    if (MovePhase != EUnitMovePhase::None)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartSkill Return | Reason=Busy | Unit=%s | MovePhase=%d"), *GetName(), static_cast<uint8>(MovePhase));
-        return;
-    }
-
-	// 유효한 AbilityClass가 아니면 종료
-    if (!AbilityClass)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[Skill] StartSkill Return | Reason=InvalidAbilityClass | Unit=%s"), *GetName());
-        return;
-    }
-
-    // 유효한 타겟이 없거나 죽어 있으면 종료
-    if (!TargetUnit || !TargetUnit->IsUnitAlive())
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartSkill Return | Reason=InvalidTarget | Unit=%s | Target=%s"), *GetName(), *GetNameSafe(TargetUnit));
-        return;
-    }
-
-    // 현재 타일 정보가 없으면 종료
-    if (!CurrentTile)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] StartSkill Return | Reason=NoCurrentTile | Unit=%s"), *GetName());
-        return;
-    }
-
-    if (!HasEnoughActionPoint(1))
-    {
-        return;
-    }
-
-    if (!ConsumeActionPoint(1))
-    {
-        return;
-    }
-
-    // 이번 스킬 컨텍스트를 저장한다.
-    PendingTargetUnit = TargetUnit;
-    PendingSkillAbilityClass = AbilityClass;
-    OriginalTileBeforeSkill = CurrentTile;
-    bSkillDamageApplied = false;
-
-    // 근접스킬은 이동 후 스킬한다.
-    if (bMoveToTarget)
-    {
-        //UE_LOG(LogTemp, Log, TEXT("[Attack] StartSkill Branch | MoveToTarget"));
         MoveToTarget(TargetUnit);
         return;
     }
 
-    // 원거리스킬은 제자리에서 바로 스킬을 실행한다.
-    //UE_LOG(LogTemp, Log, TEXT("[Attack] StartSkill Branch | InPlaceAttack"));
-    MovePhase = EUnitMovePhase::WaitingForSkill;
-    ExecuteSkillAtTarget();
+    if (!AbilitySystem)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | AbilitySystem is null"));
+        return;
+    }
+
+    AbilitySystem->TryActivateAbilityByClass(SkillData->AbilityClass);
 }
 
 void AUnitBase::ExecuteSkillAtTarget()
 {
-    //UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteSkillAtTarget Enter | Unit=%s | Target=%s | MovePhase=%d | AbilityClass=%s"), *GetName(), *GetNameSafe(PendingTargetUnit), static_cast<uint8>(MovePhase), *GetNameSafe(DefaultAttackAbilityClass));
-
+    
     // 행동 대기 상태가 아니면 스킬 실행을 시작할 수 없다.
     if (MovePhase != EUnitMovePhase::WaitingForSkill)
     {
@@ -545,16 +531,14 @@ void AUnitBase::ExecuteSkillAtTarget()
     }
 
     // 실제 스킬 실행은 GAS Ability가 담당한다.
-    if (!AbilitySystem || !PendingSkillAbilityClass)
+    if (!AbilitySystem || !PendingSkillData || !PendingSkillData->AbilityClass)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Skill] ExecuteSkillAtTarget Return | Reason=NoASCOrAbilityClass | ASC=%d | AbilityClass=%s"), AbilitySystem ? 1 : 0, *GetNameSafe(PendingSkillAbilityClass));
+        UE_LOG(LogTemp, Warning, TEXT("[Skill] ExecuteSkillAtTarget Return | Reason=NoASCOrAbilityClass | ASC=%d | SkillData=%s | AbilityClass=%s"), AbilitySystem ? 1 : 0, *GetNameSafe(PendingSkillData), PendingSkillData ? *GetNameSafe(PendingSkillData->AbilityClass) : TEXT("None"));
         OnSkillFinished();
         return;
     }
 
     const bool bActivated = AbilitySystem->TryActivateAbilityByClass(PendingSkillAbilityClass);
-
-    //UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteSkillAtTarget Activate Result | Unit=%s | bActivated=%d | AbilityClass=%s"), *GetName(), bActivated ? 1 : 0,  *GetNameSafe(DefaultAttackAbilityClass));
     
     // Ability 활성화 실패 시 스킬을 진행할 수 없으므로 종료한다.
     if (!bActivated)
@@ -584,6 +568,8 @@ void AUnitBase::ClearSkillContext()
 {
     PendingTile = nullptr;
     PendingTargetUnit = nullptr;
+    PendingSkillTargetTile = nullptr;
+    PendingSkillData = nullptr;
     PendingSkillAbilityClass = nullptr;
     OriginalTileBeforeSkill = nullptr;
     bSkillDamageApplied = false;
@@ -715,4 +701,27 @@ TArray<TSubclassOf<UGameplayAbility>> AUnitBase::GetAvailableSkillAbilityClasses
     }
 
     return Result;
+}
+
+USkillDefinitionDataAsset* AUnitBase::FindSkillDataByAbilityClass(TSubclassOf<UGameplayAbility> AbilityClass) const
+{
+    if (!AbilityClass)
+    {
+        return nullptr;
+    }
+
+    for (USkillDefinitionDataAsset* SkillData : EquippedSkillDataAssets)
+    {
+        if (!SkillData)
+        {
+            continue;
+        }
+
+        if (SkillData->AbilityClass == AbilityClass)
+        {
+            return SkillData;
+        }
+    }
+
+    return nullptr;
 }

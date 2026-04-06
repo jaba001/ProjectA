@@ -1,6 +1,10 @@
 #include "EnemyUnit.h"
-#include "Controller/PartyPlayerController.h"
+
 #include "EngineUtils.h"
+
+#include "Controller/PartyPlayerController.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Grid/Combat/CombatGridTile.h"
 
 AEnemyUnit::AEnemyUnit()
 {
@@ -142,7 +146,7 @@ void AEnemyUnit::EnterDecideActionState()
 
     CurrentDecision = DecideBestAction();
 
-    //UE_LOG(LogTemp, Log, TEXT("[EnemyAI] Decision | Unit=%s | ActionType=%d | Ability=%s | Target=%s | Score=%.2f"), *GetName(), static_cast<int32>(CurrentDecision.ActionType), *GetNameSafe(CurrentDecision.AbilityClass), *GetNameSafe(CurrentDecision.TargetUnit), CurrentDecision.Score);
+    //UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] Decision | Unit=%s | ActionType=%d | SkillData=%s | Ability=%s | Target=%s | Score=%.2f"), *GetName(), static_cast<int32>(CurrentDecision.ActionType), *GetNameSafe(CurrentDecision.SkillData), CurrentDecision.SkillData ? *GetNameSafe(CurrentDecision.SkillData->AbilityClass) : TEXT("None"), *GetNameSafe(CurrentDecision.TargetUnit), CurrentDecision.Score);
 
     ApplyDecision(CurrentDecision);
 }
@@ -167,7 +171,14 @@ void AEnemyUnit::EnterWaitMoveCompleteState()
 
 void AEnemyUnit::EnterSkillState()
 {
-    if (!CurrentDecision.AbilityClass)
+    if (!CurrentDecision.SkillData)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] EnterSkillState Failed | Reason=NoSkillData | Unit=%s"), *GetName());
+        SetTurnState(EEnemyTurnState::EndTurn);
+        return;
+    }
+
+    if (!CurrentDecision.SkillData->AbilityClass)
     {
         UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] EnterSkillState Failed | Reason=NoAbility | Unit=%s"), *GetName());
         SetTurnState(EEnemyTurnState::EndTurn);
@@ -181,17 +192,23 @@ void AEnemyUnit::EnterSkillState()
         return;
     }
 
-    if (!HasEnoughActionPoint(1))
+    if (!CurrentTargetTile)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] EnterSkillState Failed | Reason=NoTargetTile | Unit=%s"), *GetName());
+        SetTurnState(EEnemyTurnState::EndTurn);
+        return;
+    }
+
+    if (!HasEnoughActionPoint(CurrentDecision.SkillData->ActionPointCost))
     {
         UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] EnterSkillState Failed | Reason=NoAP | Unit=%s"), *GetName());
         SetTurnState(EEnemyTurnState::EndTurn);
         return;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[EnemyAI] ExecuteSkill | Unit=%s | Ability=%s | Target=%s"),
-        *GetName(), *GetNameSafe(CurrentDecision.AbilityClass), *GetNameSafe(CurrentTarget));
+    //UE_LOG(LogTemp, Log, TEXT("[EnemyAI] ExecuteSkill | Unit=%s | SkillData=%s | TargetTile=(%d,%d)"), *GetName(), *GetNameSafe(CurrentDecision.SkillData), CurrentTargetTile ? CurrentTargetTile->GridCoord.X : -1, CurrentTargetTile ? CurrentTargetTile->GridCoord.Y : -1);
 
-    StartSkill(CurrentDecision.AbilityClass, CurrentTarget, true);
+    StartSkill(CurrentDecision.SkillData, CurrentTargetTile);
     SetTurnState(EEnemyTurnState::WaitSkillComplete);
 }
 
@@ -243,11 +260,6 @@ FEnemyActionDecision AEnemyUnit::EvaluateSkillAction() const
     BestDecision.ActionType = EEnemyActionType::Skill;
     BestDecision.Score = -TNumericLimits<float>::Max();
 
-    if (!HasEnoughActionPoint(1))
-    {
-        return BestDecision;
-    }
-
     const TArray<TSubclassOf<UGameplayAbility>> SkillClasses = GetAvailableSkillAbilityClasses();
 
     for (const TSubclassOf<UGameplayAbility>& SkillClass : SkillClasses)
@@ -257,38 +269,58 @@ FEnemyActionDecision AEnemyUnit::EvaluateSkillAction() const
             continue;
         }
 
-        const FEnemyActionDecision CandidateDecision = EvaluateSkillCandidate(SkillClass);
+        USkillDefinitionDataAsset* SkillData = FindSkillDataByAbilityClass(SkillClass);
+
+        //UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] EvaluateSkillAction | SkillClass=%s | SkillData=%s"), *GetNameSafe(SkillClass), *GetNameSafe(SkillData));
+
+        if (!SkillData)
+        {
+            continue;
+        }
+
+        const FEnemyActionDecision CandidateDecision = EvaluateSkillCandidate(SkillData);
 
         if (CandidateDecision.Score > BestDecision.Score)
         {
             BestDecision = CandidateDecision;
         }
+
     }
 
     return BestDecision;
 }
 
-FEnemyActionDecision AEnemyUnit::EvaluateSkillCandidate(TSubclassOf<UGameplayAbility> AbilityClass) const
+FEnemyActionDecision AEnemyUnit::EvaluateSkillCandidate(USkillDefinitionDataAsset* SkillData) const
 {
     FEnemyActionDecision Decision;
     Decision.ActionType = EEnemyActionType::Skill;
-    Decision.AbilityClass = AbilityClass;
+    Decision.SkillData = SkillData;
     Decision.Score = -TNumericLimits<float>::Max();
 
-    if (!AbilityClass)
+    if (!SkillData)
     {
         return Decision;
     }
 
-    AUnitBase* BestTarget = FindBestSkillTarget(AbilityClass);
+    AUnitBase* BestTarget = FindBestSkillTarget(SkillData);
 
     if (!BestTarget)
     {
         return Decision;
     }
 
+    ACombatGridTile* TargetTile = BestTarget->GetCurrentTile();
+
+    if (!TargetTile)
+    {
+        return Decision;
+    }
+
     Decision.TargetUnit = BestTarget;
-    Decision.Score = SkillBaseScore + EvaluateSkillTargetScore(AbilityClass, BestTarget);
+    Decision.TargetTile = TargetTile;
+    Decision.Score = SkillBaseScore + EvaluateSkillTargetScore(SkillData, BestTarget);
+
+    //UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] EvaluateSkillCandidate | SkillData=%s | TargetUnit=%s | TargetTile=%s | Score=%.2f"), *GetNameSafe(Decision.SkillData), *GetNameSafe(Decision.TargetUnit), *GetNameSafe(Decision.TargetTile), Decision.Score);
 
     return Decision;
 }
@@ -302,23 +334,23 @@ FEnemyActionDecision AEnemyUnit::EvaluateWaitAction() const
     return Decision;
 }
 
-float AEnemyUnit::EvaluateSkillTargetScore(TSubclassOf<UGameplayAbility> AbilityClass, AUnitBase* Candidate) const
+float AEnemyUnit::EvaluateSkillTargetScore(USkillDefinitionDataAsset* SkillData, AUnitBase* Candidate) const
 {
-    if (!AbilityClass || !Candidate)
+    if (!SkillData || !Candidate)
     {
         return -TNumericLimits<float>::Max();
     }
 
-    if (AbilityClass == DefaultAttackAbilityClass)
+    if (SkillData->AbilityClass == DefaultAttackAbilityClass)
     {
-		//테스트용 기본공격 가중치, 추후 필요에 따라 조정
+		//TODO: 테스트용 기본공격 가중치, 추후 스킬 슬롯별 가중치로 대체 필요
         return EvaluateDefaultAttackScore(Candidate) + 100000.f;
     }
 
-    return EvaluateSkillSlotScore(AbilityClass, Candidate);
+    return EvaluateSkillSlotScore(SkillData, Candidate);
 }
 
-AUnitBase* AEnemyUnit::FindBestSkillTarget(TSubclassOf<UGameplayAbility> AbilityClass) const
+AUnitBase* AEnemyUnit::FindBestSkillTarget(USkillDefinitionDataAsset* SkillData) const
 {
     AUnitBase* BestTarget = nullptr;
     float BestScore = -TNumericLimits<float>::Max();
@@ -347,7 +379,7 @@ AUnitBase* AEnemyUnit::FindBestSkillTarget(TSubclassOf<UGameplayAbility> Ability
             continue;
         }
 
-        const float Score = EvaluateSkillTargetScore(AbilityClass, Candidate);
+        const float Score = EvaluateSkillTargetScore(SkillData, Candidate);
 
         if (Score > BestScore)
         {
@@ -371,9 +403,9 @@ float AEnemyUnit::EvaluateDefaultAttackScore(AUnitBase* Candidate) const
     return -(Distance * DistanceWeight);
 }
 
-float AEnemyUnit::EvaluateSkillSlotScore(TSubclassOf<UGameplayAbility> AbilityClass, AUnitBase* Candidate) const
+float AEnemyUnit::EvaluateSkillSlotScore(USkillDefinitionDataAsset* SkillData, AUnitBase* Candidate) const
 {
-    if (!AbilityClass || !Candidate)
+    if (!SkillData || !SkillData->AbilityClass || !Candidate)
     {
         return -TNumericLimits<float>::Max();
     }
@@ -381,7 +413,7 @@ float AEnemyUnit::EvaluateSkillSlotScore(TSubclassOf<UGameplayAbility> AbilityCl
     const float Distance = FVector::Dist(GetActorLocation(), Candidate->GetActorLocation());
     float Score = -(Distance * DistanceWeight);
 
-    const int32 SkillIndex = EquippedSkillAbilityClasses.IndexOfByKey(AbilityClass);
+    const int32 SkillIndex = EquippedSkillAbilityClasses.IndexOfByKey(SkillData->AbilityClass);
 
     switch (SkillIndex)
     {
@@ -477,8 +509,11 @@ float AEnemyUnit::EvaluateHighHPScore(AUnitBase* Candidate) const
 
 void AEnemyUnit::ApplyDecision(const FEnemyActionDecision& Decision)
 {
+    CurrentDecision = Decision;
     CurrentTarget = Decision.TargetUnit;
     CurrentTargetTile = Decision.TargetTile;
+
+    //UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] ApplyDecision | ActionType=%d | SkillData=%s | CurrentTarget=%s | CurrentTargetTile=%s"), static_cast<int32>(Decision.ActionType), *GetNameSafe(Decision.SkillData), *GetNameSafe(CurrentTarget), *GetNameSafe(CurrentTargetTile));
 
     switch (Decision.ActionType)
     {

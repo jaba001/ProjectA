@@ -1,10 +1,12 @@
 #include "GAS/Ability/GA_DefaultAttack.h"
-#include "Unit/UnitBase.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "GameplayEffect.h"
 #include "GameplayTagContainer.h"
+
+#include "GAS/Library/CombatEffectLibrary.h"
+#include "Unit/UnitBase.h"
 
 UGA_DefaultAttack::UGA_DefaultAttack()
 {
@@ -132,7 +134,6 @@ void UGA_DefaultAttack::OnHitEventReceived(FGameplayEventData Payload)
 {
     //UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] Hit Event Received | PayloadTag=%s | Owner=%s | Target=%s"), *Payload.EventTag.ToString(), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(CachedTargetUnit));
 
-    // 한 번의 기본공격에서 데미지는 한 번만 적용한다.
     if (bDamageAppliedThisActivation)
     {
         UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] Hit Event Ignored | Reason=AlreadyApplied"));
@@ -141,70 +142,12 @@ void UGA_DefaultAttack::OnHitEventReceived(FGameplayEventData Payload)
 
     bDamageAppliedThisActivation = true;
 
-    ApplyDamageEffectToTarget();
-}
-
-void UGA_DefaultAttack::ApplyDamageEffectToTarget()
-{
-    // 유효한 공격자/타겟이 없으면 종료
-    if (!CachedOwnerUnit || !CachedTargetUnit)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | Invalid Owner or Target"));
-        return;
-    }
-
-    if (!CachedTargetUnit->IsUnitAlive())
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | Target Dead | Target=%s"),
-            *GetNameSafe(CachedTargetUnit));
-        return;
-    }
-
-    UAbilitySystemComponent* SourceASC = CachedOwnerUnit->GetAbilitySystemComponent();
-    UAbilitySystemComponent* TargetASC = CachedTargetUnit->GetAbilitySystemComponent();
-
-    if (!SourceASC || !TargetASC)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | Invalid ASC | Source=%s | Target=%s"),
-            *GetNameSafe(CachedOwnerUnit),
-            *GetNameSafe(CachedTargetUnit));
-        return;
-    }
-
-    if (!DamageEffectClass)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | DamageEffectClass is null"));
-        return;
-    }
-
-    const float BeforeHP = TargetASC->GetNumericAttribute(UAS_Unit::GetHPAttribute());
-
-    //UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] Before Apply | Target=%s | HP=%.1f"), *GetNameSafe(CachedTargetUnit), BeforeHP);
-
-    FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
-    EffectContext.AddSourceObject(CachedOwnerUnit);
-
-    FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, EffectContext);
-
-    if (!SpecHandle.IsValid())
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | Invalid SpecHandle"));
-        return;
-    }
-
-    const FGameplayTag DamageTag = FGameplayTag::RequestGameplayTag(FName("Data.Damage"));
-
-    SpecHandle.Data->SetSetByCallerMagnitude(DamageTag, -DamageAmount);
-
-    //UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget | Source=%s | Target=%s | Damage=%.1f | Tag=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(CachedTargetUnit), DamageAmount, *DamageTag.ToString());
-
-    const FActiveGameplayEffectHandle AppliedHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
-
-    //UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] Apply Result | HandleValid=%d"), AppliedHandle.IsValid() ? 1 : 0);
-
-    const float AfterHP = TargetASC->GetNumericAttribute(UAS_Unit::GetHPAttribute());
-
-    //UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] After Apply | Target=%s | HP=%.1f"), *GetNameSafe(CachedTargetUnit), AfterHP);
+    UCombatEffectLibrary::ApplyDamageToUnit(
+        CachedOwnerUnit,
+        CachedTargetUnit,
+        DamageEffectClass,
+        DamageAmount
+    );
 }
 
 void UGA_DefaultAttack::FinishAttackAbility(bool bWasCancelled)

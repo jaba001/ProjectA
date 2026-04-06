@@ -66,9 +66,6 @@ protected:
     // 공통 종료 처리 함수
     void FinishAttackAbility(bool bWasCancelled);
 
-    // 실제 타겟 ASC에 데미지 GE를 적용한다.
-    void ApplyDamageEffectToTarget();
-
 protected:
     // 현재 공격을 수행하는 유닛
     UPROPERTY()

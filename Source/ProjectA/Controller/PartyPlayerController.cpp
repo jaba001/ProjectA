@@ -71,6 +71,20 @@ void APartyPlayerController::RequestEndTurn()
         return;
     }
 
+    AUnitBase* ActiveUnit = GetActiveUnit();
+
+    if (!ActiveUnit)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] RequestEndTurn failed | ActiveUnit is null"));
+        return;
+    }
+
+    if (ActiveUnit->IsBusy())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] RequestEndTurn blocked | ActiveUnit is busy"));
+        return;
+    }
+
     CancelTileInputMode();
     CombatManager->RequestEndTurn();
 }
@@ -269,54 +283,82 @@ bool APartyPlayerController::IsValidTileForPendingSkill(ACombatGridTile* Tile) c
         return false;
     }
 
-    // 이번 단계는 유닛 대상 스킬만 처리
-    if (PendingSkillData->TargetingType != ESkillTargetingType::Unit)
+    if (PendingSkillData->TargetingType == ESkillTargetingType::Unit)
     {
-        return false;
-    }
+        AUnitBase* TargetUnit = Tile->GetOccupyingUnit();
 
-    AUnitBase* TargetUnit = Tile->GetOccupyingUnit();
-
-    if (!TargetUnit)
-    {
-        return false;
-    }
-
-    if (!TargetUnit->IsUnitAlive())
-    {
-        return false;
-    }
-
-    switch (PendingSkillData->TargetTeamRule)
-    {
-    case ESkillTargetTeamRule::EnemyOnly:
-        if (TargetUnit->GetTeam() == ActiveUnit->GetTeam())
+        if (!TargetUnit)
         {
             return false;
         }
-        break;
 
-    case ESkillTargetTeamRule::AllyOnly:
-        if (TargetUnit->GetTeam() != ActiveUnit->GetTeam())
+        if (!TargetUnit->IsUnitAlive())
         {
             return false;
         }
-        break;
 
-    case ESkillTargetTeamRule::AnyUnit:
-        break;
+        switch (PendingSkillData->TargetTeamRule)
+        {
+        case ESkillTargetTeamRule::EnemyOnly:
+        {
+            if (TargetUnit->GetTeam() == ActiveUnit->GetTeam())
+            {
+                return false;
+            }
 
-    case ESkillTargetTeamRule::EmptyTileOnly:
-        return false;
+            break;
+        }
+        case ESkillTargetTeamRule::AllyOnly:
+        {
+            if (TargetUnit->GetTeam() != ActiveUnit->GetTeam())
+            {
+                return false;
+            }
 
-    default:
-        return false;
+            break;
+        }
+        case ESkillTargetTeamRule::AnyUnit:
+        {
+            break;
+        }
+        case ESkillTargetTeamRule::EmptyTileOnly:
+        {
+            return false;
+        }
+        default:
+        {
+            return false;
+        }
+        }
+
+        if (!PendingSkillData->bIgnoreFront && Tile->GetProtectedByFront())
+        {
+            return false;
+        }
+
+        return true;
     }
 
-    if (!PendingSkillData->bIgnoreFront && Tile->GetProtectedByFront())
+    if (PendingSkillData->TargetingType == ESkillTargetingType::Tile)
     {
-        return false;
+        switch (PendingSkillData->TargetTeamRule)
+        {
+        case ESkillTargetTeamRule::EmptyTileOnly:
+        {
+            return Tile->GetOccupyingUnit() == nullptr;
+        }
+        case ESkillTargetTeamRule::EnemyOnly:
+        case ESkillTargetTeamRule::AllyOnly:
+        case ESkillTargetTeamRule::AnyUnit:
+        {
+            return false;
+        }
+        default:
+        {
+            return false;
+        }
+        }
     }
 
-    return true;
+    return false;
 }

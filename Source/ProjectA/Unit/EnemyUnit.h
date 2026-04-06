@@ -6,6 +6,7 @@
 
 class ACombatGridTile;
 class UGameplayAbility;
+class USkillDefinitionDataAsset;
 
 UENUM(BlueprintType)
 enum class EEnemyTurnState : uint8
@@ -46,7 +47,7 @@ public:
     ACombatGridTile* TargetTile = nullptr;
 
     UPROPERTY()
-    TSubclassOf<UGameplayAbility> AbilityClass = nullptr;
+    TObjectPtr<USkillDefinitionDataAsset> SkillData = nullptr;
 
     UPROPERTY()
     float Score = -TNumericLimits<float>::Max();
@@ -88,16 +89,16 @@ protected:
     // 행동 후보 평가 및 적용
     FEnemyActionDecision DecideBestAction() const;
     FEnemyActionDecision EvaluateSkillAction() const;
-    FEnemyActionDecision EvaluateSkillCandidate(TSubclassOf<UGameplayAbility> AbilityClass) const;
+    FEnemyActionDecision EvaluateSkillCandidate(USkillDefinitionDataAsset* SkillData) const;
     FEnemyActionDecision EvaluateWaitAction() const;
     void ApplyDecision(const FEnemyActionDecision& Decision);
 
 protected:
     // 스킬 행동 전용 타겟 평가
-    float EvaluateSkillTargetScore(TSubclassOf<UGameplayAbility> AbilityClass, AUnitBase* Candidate) const;
-    AUnitBase* FindBestSkillTarget(TSubclassOf<UGameplayAbility> AbilityClass) const;
+    float EvaluateSkillTargetScore(USkillDefinitionDataAsset* SkillData, AUnitBase* Candidate) const;
+    AUnitBase* FindBestSkillTarget(USkillDefinitionDataAsset* SkillData) const;
     float EvaluateDefaultAttackScore(AUnitBase* Candidate) const;
-    float EvaluateSkillSlotScore(TSubclassOf<UGameplayAbility> AbilityClass, AUnitBase* Candidate) const;
+    float EvaluateSkillSlotScore(USkillDefinitionDataAsset* SkillData, AUnitBase* Candidate) const;
     float EvaluateLowHPScore(AUnitBase* Candidate) const;
     float EvaluateHighHPScore(AUnitBase* Candidate) const;
 

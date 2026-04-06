@@ -1,6 +1,7 @@
 #include "Combat/CombatManager.h"
 #include "Net/UnrealNetwork.h"
 #include "Game/Turn/TurnManager.h"
+#include "Controller/PartyPlayerController.h"
 #include "Unit/UnitBase.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
@@ -252,6 +253,8 @@ void ACombatManager::ClearSkillTargetTilesHighlight()
 
         Tile->ClearHighlightVisual();
     }
+
+    SkillTargetTiles.Empty();
 }
 
 ACombatGridTile* ACombatManager::GetTileByCoord(FIntPoint Coord) const
@@ -367,6 +370,13 @@ TArray<ACombatGridTile*> ACombatManager::CalculateSkillTargetTiles(AUnitBase* Un
         return Result;
     }
 
+    APartyPlayerController* PC = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController());
+
+    if (!PC)
+    {
+        return Result;
+    }
+
     for (const TPair<FIntPoint, ACombatGridTile*>& TilePair : CombatGridManager->TileMap)
     {
         ACombatGridTile* Tile = TilePair.Value;
@@ -376,24 +386,10 @@ TArray<ACombatGridTile*> ACombatManager::CalculateSkillTargetTiles(AUnitBase* Un
             continue;
         }
 
-        AUnitBase* OccupyingUnit = Tile->GetOccupyingUnit();
-
-        if (!OccupyingUnit)
+        if (PC->IsValidTileForPendingSkill(Tile))
         {
-            continue;
+            Result.Add(Tile);
         }
-
-        if (!OccupyingUnit->IsUnitAlive())
-        {
-            continue;
-        }
-
-        if (OccupyingUnit->GetTeam() == Unit->GetTeam())
-        {
-            continue;
-        }
-
-        Result.Add(Tile);
     }
 
     return Result;

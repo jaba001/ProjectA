@@ -10,6 +10,7 @@
 class ACombatGridTile;
 class AUnitAIController;
 class UGameplayAbility;
+class USkillDefinitionDataAsset;
 
 UENUM(BlueprintType)
 enum class ETeam : uint8
@@ -181,6 +182,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Grid")
     void SetCurrentTile(ACombatGridTile* NewTile);
 
+	ACombatGridTile* GetCurrentTile() const { return CurrentTile; }
+
 public:
     // 실제 이동처리 로직 Movement
     // 지정 타일로 이동
@@ -229,6 +232,14 @@ public:
     UPROPERTY()
     AUnitBase* PendingTargetUnit = nullptr;
 
+    // 현재 스킬 입력에서 선택된 타겟 타일
+    UPROPERTY()
+    ACombatGridTile* PendingSkillTargetTile = nullptr;
+
+    // 현재 실행 대기 중인 스킬 정의 데이터
+    UPROPERTY()
+    TObjectPtr<USkillDefinitionDataAsset> PendingSkillData = nullptr;
+
     // 현재 실행 예정인 Skill Ability 클래스
     UPROPERTY()
     TSubclassOf<UGameplayAbility> PendingSkillAbilityClass = nullptr;
@@ -236,7 +247,7 @@ public:
     // bMoveToTarget 이 true 이면 이동 후 스킬
     // false 이면 제자리에서 즉시 스킬
     UFUNCTION(BlueprintCallable, Category = "Skill")
-    virtual void StartSkill(TSubclassOf<UGameplayAbility> AbilityClass, AUnitBase* TargetUnit, bool bMoveToTarget = true);
+    virtual void StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile);
 
     // 현재 저장된 타겟에게 실제 스킬 실행
     // PendingSkillAbilityClass를 사용해 GAS Ability 활성화를 시도한다.
@@ -306,10 +317,17 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "GAS")
     TArray<TSubclassOf<UGameplayAbility>> EquippedSkillAbilityClasses;
 
+    // 현재 유닛이 장착한 스킬 정의 데이터 목록
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill", meta = (AllowPrivateAccess = "true"))
+    TArray<TObjectPtr<USkillDefinitionDataAsset>> EquippedSkillDataAssets;
+
 public:
     // AI가 평가 가능한 Skill Ability 목록 반환
     UFUNCTION(BlueprintCallable, Category = "Skill")
     virtual TArray<TSubclassOf<UGameplayAbility>> GetAvailableSkillAbilityClasses() const;
+
+    // 장착된 스킬 데이터 목록에서 AbilityClass 와 일치하는 SkillData 를 찾는다
+    USkillDefinitionDataAsset* FindSkillDataByAbilityClass(TSubclassOf<UGameplayAbility> AbilityClass) const;
 
     UFUNCTION(BlueprintCallable, Category = "Skill")
     TSubclassOf<UGameplayAbility> GetDefaultAttackAbilityClass() const { return DefaultAttackAbilityClass; }

@@ -1,9 +1,10 @@
-#include "Grid/Combat/CombatGridTile.h"
+#include "CombatGridTile.h"
+#include "Engine/World.h"
+
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Combat/CombatManager.h"
 #include "Unit/UnitBase.h"
-#include "Engine/World.h"
 
 // Sets default values
 ACombatGridTile::ACombatGridTile()
@@ -96,18 +97,11 @@ void ACombatGridTile::NotifyActorOnClicked(FKey ButtonPressed)
             return;
         }
 
-        AUnitBase* TargetUnit = GetOccupyingUnit();
-
-        if (!TargetUnit)
-        {
-            return;
-        }
+        UE_LOG(LogTemp, Warning, TEXT("[GridTile] PlayerSkillClick | Unit=%s | SkillData=%s | Ability=%s | TargetTile=(%d,%d) | OccupyingUnit=%s"), *GetNameSafe(ActiveUnit), *GetNameSafe(SkillData), *GetNameSafe(SkillData->AbilityClass), GridCoord.X, GridCoord.Y, *GetNameSafe(GetOccupyingUnit()));
 
         PC->SetSelectedTile(this);
-        CombatManager->ClearSkillTargetTilesHighlight();
         PC->CancelTileInputMode();
-
-        ActiveUnit->StartSkill(SkillData->AbilityClass, TargetUnit, SkillData->bMoveToTarget);
+        ActiveUnit->StartSkill(SkillData, this);
         return;
     }
 
