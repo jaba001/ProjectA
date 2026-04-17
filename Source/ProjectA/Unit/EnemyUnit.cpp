@@ -28,16 +28,16 @@ void AEnemyUnit::OnSkillFinished()
         return;
     }
 
-    // 현재 행동 종료 후에도 턴 지속 가능하면
-    // 복귀 완료 뒤 다음 행동 판단으로 넘어간다.
+    // If the turn can continue after the current action,
+    // proceed to the next decision after returning to the original tile
     if (!MustEndTurnAfterCurrentAction())
     {
         bPendingNextActionAfterReturn = true;
         return;
     }
 
-    // AP 고갈로 턴 종료가 예약된 상태면
-    // 복귀 완료 후 바로 종료한다.
+    // If turn end is already scheduled due to AP depletion,
+    // finish the turn after returning
     bPendingNextActionAfterReturn = false;
 }
 
@@ -153,8 +153,8 @@ void AEnemyUnit::EnterDecideActionState()
 
 void AEnemyUnit::EnterMoveState()
 {
-    // 이동 행동 평가는 아직 구현하지 않았으므로
-    // 현재 단계에서는 안전하게 턴 종료로 보낸다.
+    // Movement action evaluation is not implemented yet,
+    // so fallback safely to ending the turn
     if (!CurrentTargetTile)
     {
         SetTurnState(EEnemyTurnState::EndTurn);
@@ -271,8 +271,6 @@ FEnemyActionDecision AEnemyUnit::EvaluateSkillAction() const
 
         USkillDefinitionDataAsset* SkillData = FindSkillDataByAbilityClass(SkillClass);
 
-        //UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] EvaluateSkillAction | SkillClass=%s | SkillData=%s"), *GetNameSafe(SkillClass), *GetNameSafe(SkillData));
-
         if (!SkillData)
         {
             continue;
@@ -284,7 +282,6 @@ FEnemyActionDecision AEnemyUnit::EvaluateSkillAction() const
         {
             BestDecision = CandidateDecision;
         }
-
     }
 
     return BestDecision;
@@ -320,8 +317,6 @@ FEnemyActionDecision AEnemyUnit::EvaluateSkillCandidate(USkillDefinitionDataAsse
     Decision.TargetTile = TargetTile;
     Decision.Score = SkillBaseScore + EvaluateSkillTargetScore(SkillData, BestTarget);
 
-    //UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] EvaluateSkillCandidate | SkillData=%s | TargetUnit=%s | TargetTile=%s | Score=%.2f"), *GetNameSafe(Decision.SkillData), *GetNameSafe(Decision.TargetUnit), *GetNameSafe(Decision.TargetTile), Decision.Score);
-
     return Decision;
 }
 
@@ -343,7 +338,7 @@ float AEnemyUnit::EvaluateSkillTargetScore(USkillDefinitionDataAsset* SkillData,
 
     if (SkillData->AbilityClass == DefaultAttackAbilityClass)
     {
-		//TODO: 테스트용 기본공격 가중치, 추후 스킬 슬롯별 가중치로 대체 필요
+        // Temporary weight for default attack, to be replaced with slot-based weights
         return EvaluateDefaultAttackScore(Candidate) + 100000.f;
     }
 
@@ -420,32 +415,32 @@ float AEnemyUnit::EvaluateSkillSlotScore(USkillDefinitionDataAsset* SkillData, A
     case 0:
     {
         // Skill Slot 1:
-        // 저체력 적 우선
+        // Prefer low HP targets
         Score += EvaluateLowHPScore(Candidate);
         break;
     }
     case 1:
     {
         // Skill Slot 2:
-        // 고체력 적 우선
+        // Prefer high HP targets
         Score += EvaluateHighHPScore(Candidate);
         break;
     }
     case 2:
     {
         // Skill Slot 3:
-        // 현재는 거리만 사용
+        // Currently distance-only
         break;
     }
     case 3:
     {
         // Skill Slot 4:
-        // 현재는 거리만 사용
+        // Currently distance-only
         break;
     }
     default:
     {
-        // EquippedSkillAbilityClasses에 없는 스킬이면 기본 규칙만 사용
+        // Use default rule if not found in EquippedSkillAbilityClasses
         break;
     }
     }
@@ -512,8 +507,6 @@ void AEnemyUnit::ApplyDecision(const FEnemyActionDecision& Decision)
     CurrentDecision = Decision;
     CurrentTarget = Decision.TargetUnit;
     CurrentTargetTile = Decision.TargetTile;
-
-    //UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] ApplyDecision | ActionType=%d | SkillData=%s | CurrentTarget=%s | CurrentTargetTile=%s"), static_cast<int32>(Decision.ActionType), *GetNameSafe(Decision.SkillData), *GetNameSafe(CurrentTarget), *GetNameSafe(CurrentTargetTile));
 
     switch (Decision.ActionType)
     {

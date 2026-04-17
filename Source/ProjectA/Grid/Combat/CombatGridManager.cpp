@@ -33,15 +33,16 @@ void ACombatGridManager::GenerateGrid()
     {
         for (int32 Col = 0; Col < ColCount; ++Col)
         {
-            // 기본 Col 위치 (Spacing * Col)
+            // Base column position (Spacing * Col)
             float AdjustedY = Col * Spacing;
 
-            // Col 2 이상이면 GapSpacing 만큼 X축에 추가 공간 부여
+            // Add extra gap spacing when the column index reaches GapStartIndex or beyond
             if (Col >= GapStartIndex)
             {
                 AdjustedY += GapSpacing;
             }
-            // Col은 Y축으로 나감 (그대로 유지)
+
+            // Columns extend along the Y axis
             float X = -Row * Spacing;
             float Y = AdjustedY;
 
@@ -53,7 +54,7 @@ void ACombatGridManager::GenerateGrid()
             {
                 Tile->GridCoord = FIntPoint(Row, Col);
 
-                if (Col < ColCount/ 2)
+                if (Col < ColCount / 2)
                 {
                     Tile->SetTerritory(ETileTerritory::Player);
                 }
@@ -73,20 +74,19 @@ TArray<ACombatGridTile*> ACombatGridManager::GetTilesByCoords(const TArray<FIntP
     TArray<ACombatGridTile*> Result;
     Result.Reserve(Coords.Num());
 
-    // 입력된 좌표 배열(Coords)의 순서를 그대로 유지하면서
-    // 각 좌표에 해당하는 타일을 찾아 Result에 추가한다
+    // Preserve the input coordinate order and append the matching tile for each coordinate
     for (const FIntPoint& Coord : Coords)
     {
-        // TileMap.Find는 ACombatGridTile* const*를 반환하므로 아래와 같이 포인터로 받는다
+        // TileMap.Find returns ACombatGridTile* const*, so receive it as a pointer
         if (ACombatGridTile* const* FoundTilePtr = TileMap.Find(Coord))
         {
-            // 정상적으로 타일을 찾은 경우 해당 타일을 결과 배열에 추가
+            // Add the tile when the coordinate is mapped successfully
             Result.Add(*FoundTilePtr);
         }
         else
         {
-            // 매핑에 없는 좌표는 nullptr을 넣어준다
-            // (필요하면 스킵 방식으로 변경할 수 있다)
+            // Insert nullptr when the coordinate is not mapped
+            // This can be changed to a skip-based flow if needed
             Result.Add(nullptr);
         }
     }

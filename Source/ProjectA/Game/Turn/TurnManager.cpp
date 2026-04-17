@@ -9,7 +9,7 @@ void UTurnManager::InitializeTurnOrder(const TArray<AUnitBase*>& Units)
 
     UE_LOG(LogTemp, Log, TEXT("[TurnManager] InitializeTurnOrder Count=%d"), TurnOrder.Num());
 
-    // 모든 유닛 턴 상태 초기화
+    // Reset the turn state of all units
     for (AUnitBase* Unit : TurnOrder)
     {
         if (Unit)

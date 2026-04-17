@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "SkillTypes.generated.h"
 
-// 스킬이 최종적으로 무엇을 선택 대상으로 삼는지 정의
+// Defines what the skill ultimately targets
 UENUM(BlueprintType)
 enum class ESkillTargetingType : uint8
 {
@@ -11,7 +11,7 @@ enum class ESkillTargetingType : uint8
     Tile
 };
 
-// 스킬이 선택 가능한 대상의 팀 규칙을 정의
+// Defines the team filtering rule for valid targets
 UENUM(BlueprintType)
 enum class ESkillTargetTeamRule : uint8
 {
@@ -21,7 +21,7 @@ enum class ESkillTargetTeamRule : uint8
     EmptyTileOnly
 };
 
-// 스킬의 범위 적용 방식
+// Defines how the skill area is applied
 UENUM(BlueprintType)
 enum class ESkillAreaType : uint8
 {
@@ -29,7 +29,7 @@ enum class ESkillAreaType : uint8
     Row,
     Column,
     LeftAndTarget,
-	RightAndTarget,
+    RightAndTarget,
     DiagonalTarget,
     AroundTarget,
     AroundSelf,

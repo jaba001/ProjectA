@@ -46,7 +46,7 @@ class PROJECTA_API AUnitBase
     GENERATED_BODY()
 
 public:
-    // 생성 및 기본 인터페이스
+    // Construction and base interface
     AUnitBase();
 
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
@@ -54,19 +54,19 @@ public:
     UFUNCTION(BlueprintCallable, Category = "GAS")
     UAS_Unit* GetAttributeSet() const { return AttributeSet; }
 
-    // Actor 수명주기
+    // Actor lifecycle
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaTime) override;
 
-    // 네트워크 복제
+    // Network replication
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
-    // 유닛 식별자
+    // Unit identifier
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
     int32 UnitIndex = 0;
 
-    // 소속 팀
+    // Team affiliation
     UPROPERTY(Replicated)
     ETeam Team = ETeam::Player;
 
@@ -77,34 +77,34 @@ public:
     ETeam GetTeam() const { return Team; }
 
 protected:
-    // 전투 기준 기본 방향
-    // Player 는 Yaw 90
-    // Enemy 는 Yaw -90 을 사용하는 방향을 상정한다.
+    // Default battle orientation
+    // Player uses Yaw 90
+    // Enemy uses Yaw -90
     UPROPERTY()
     FRotator DefaultBattleRotation;
 
-    // 현재 행동 유형
+    // Current action type
     UPROPERTY()
     EUnitActionType CurrentActionType = EUnitActionType::None;
 
 public:
-    // 현재 턴 활성 여부
+    // Whether this unit is currently active in turn
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Turn")
     bool bIsActiveTurn = false;
 
-    // 턴 시작 시 활성화 및 AP 초기화
+    // Activate unit and reset AP at turn start
     UFUNCTION(BlueprintCallable, Category = "Turn")
     virtual void OnTurnStart();
 
-    // 턴 종료 시 비활성화
+    // Deactivate unit at turn end
     UFUNCTION(BlueprintCallable, Category = "Turn")
     virtual void OnTurnEnd();
 
-	// 턴 종료 예약 플래그
+    // Flag indicating turn must end after current action
     UPROPERTY()
     bool bTurnMustEndAfterCurrentAction = false;
 
-	// 현재 행동이 끝난 후 턴 종료 여부 확인
+    // Check if turn must end after current action
     UFUNCTION(BlueprintCallable, Category = "Turn")
     bool MustEndTurnAfterCurrentAction() const { return bTurnMustEndAfterCurrentAction; }
 
@@ -112,8 +112,8 @@ public:
     bool IsActiveTurn() const { return bIsActiveTurn; }
 
 public:
-    // 행동 자원
-    // 기본값은 MaxActionPoint 기준으로 턴 시작 시 리셋된다.
+    // Action resources
+    // Reset to MaxActionPoint at turn start
     UFUNCTION(BlueprintCallable, Category = "ActionPoint")
     int32 GetCurrentActionPoint() const { return CurrentActionPoint; }
 
@@ -128,10 +128,10 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "ActionPoint")
     void ResetActionPoint() { CurrentActionPoint = MaxActionPoint; }
-    
+
 public:
-	// 서브 행동 자원
-	// 기본값은　MaxSubActionPoint 기준으로 턴 시작 시 리셋된다.
+    // Sub-action resources
+    // Reset to MaxSubActionPoint at turn start
     UFUNCTION(BlueprintCallable, Category = "SubActionPoint")
     int32 GetCurrentSubActionPoint() const { return CurrentSubActionPoint; }
 
@@ -148,130 +148,129 @@ public:
     void ResetSubActionPoint() { CurrentSubActionPoint = MaxSubActionPoint; }
 
 public:
-    // 생존 여부 확인
+    // Check if unit is alive
     UFUNCTION(BlueprintCallable, Category = "Death")
     virtual bool IsUnitAlive() const;
 
-    // 사망 처리
+    // Handle unit death
     UFUNCTION(BlueprintCallable, Category = "Death")
     virtual void Die();
 
-    // 래그돌 임펄스
+    // Ragdoll impulse
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Death")
     FVector DeathImpulse;
 
 protected:
-    // 사망 플래그
+    // Death flag
     UPROPERTY()
     bool bIsDead = false;
 
 public:
-    // 현재 점유 중인 전투 타일
+    // Current occupied combat tile
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid")
     ACombatGridTile* CurrentTile = nullptr;
 
-    // 이동 중 도착 예정 타일
+    // Pending tile for movement
     UPROPERTY()
     ACombatGridTile* PendingTile = nullptr;
 
-    // 행동 시작 전 원래 위치
-    // 근접 공격 후 복귀 시 사용한다.
+    // Original tile before action (used for return after melee attack)
     UPROPERTY()
     ACombatGridTile* OriginalTileBeforeSkill = nullptr;
 
     UFUNCTION(BlueprintCallable, Category = "Grid")
     void SetCurrentTile(ACombatGridTile* NewTile);
 
-	ACombatGridTile* GetCurrentTile() const { return CurrentTile; }
+    ACombatGridTile* GetCurrentTile() const { return CurrentTile; }
 
 public:
-    // 실제 이동처리 로직 Movement
-    // 지정 타일로 이동
+    // Movement logic
+    // Move to target tile
     UFUNCTION(BlueprintCallable, Category = "Movement")
     virtual void MoveToTile(ACombatGridTile* TargetTile);
 
-    // 지정 유닛 앞으로 이동
-    // 현재는 근접 공격 접근용 흐름에서 사용한다.
+    // Move toward a target unit
+    // Currently used for melee attack approach
     UFUNCTION(BlueprintCallable, Category = "Movement")
     virtual void MoveToTarget(AUnitBase* TargetUnit);
 
-    // 행동 전 원래 타일로 복귀
+    // Return to original tile after action
     UFUNCTION(BlueprintCallable, Category = "Movement")
     virtual void ReturnToOriginalTile();
 
-    // 타일 중심으로 위치 보정
+    // Snap to tile center with interpolation
     UFUNCTION(BlueprintCallable, Category = "Movement")
     virtual void SnapToTile(ACombatGridTile* Tile, const FRotator& TargetRotation);
 
-    // MoveComponentTo 완료 콜백
+    // Callback after MoveComponentTo completes
     UFUNCTION(Category = "Movement")
     virtual void OnSnapToTileFinished();
 
-	// 원래 타일로 복귀 완료 콜백
+    // Callback after returning to original tile completes
     UFUNCTION(Category = "Movement")
     virtual void OnReturnToOriginalTileFinished();
 
-	// 현재 이동/행동 중인지 여부
+    // Check if unit is currently moving or acting
     UFUNCTION(BlueprintCallable, Category = "Movement")
     bool IsBusy() const { return MovePhase != EUnitMovePhase::None; }
 
-    // AIController 이동 완료 콜백 진입점
+    // Entry point for AIController movement completion callback
     UFUNCTION(BlueprintCallable, Category = "Movement")
     virtual void HandleMoveCompleted();
 
-    // AIController 확보
+    // Get or create AIController
     AUnitAIController* GetOrCreateAIController();
 
 protected:
-    // 현재 이동/행동 단계
+    // Current movement/action phase
     UPROPERTY()
     EUnitMovePhase MovePhase = EUnitMovePhase::None;
 
 public:
-    // 현재 스킬 행동 대상
+    // Current skill target unit
     UPROPERTY()
     AUnitBase* PendingTargetUnit = nullptr;
 
-    // 현재 스킬 입력에서 선택된 타겟 타일
+    // Selected target tile for current skill input
     UPROPERTY()
     ACombatGridTile* PendingSkillTargetTile = nullptr;
 
-    // 현재 실행 대기 중인 스킬 정의 데이터
+    // Skill definition data currently pending execution
     UPROPERTY()
     TObjectPtr<USkillDefinitionDataAsset> PendingSkillData = nullptr;
 
-    // 현재 실행 예정인 Skill Ability 클래스
+    // Ability class scheduled for execution
     UPROPERTY()
     TSubclassOf<UGameplayAbility> PendingSkillAbilityClass = nullptr;
 
-    // bMoveToTarget 이 true 이면 이동 후 스킬
-    // false 이면 제자리에서 즉시 스킬
+    // If true, move to target before executing skill
+    // If false, execute skill immediately in place
     UFUNCTION(BlueprintCallable, Category = "Skill")
     virtual void StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile);
 
-    // 현재 저장된 타겟에게 실제 스킬 실행
-    // PendingSkillAbilityClass를 사용해 GAS Ability 활성화를 시도한다.
+    // Execute skill on stored target using GAS Ability
     UFUNCTION(BlueprintCallable, Category = "Skill")
     virtual void ExecuteSkillAtTarget();
 
+    // Resolve actual target units affected by the skill
     UFUNCTION(BlueprintCallable, Category = "Skill")
     virtual TArray<AUnitBase*> ResolveSkillTargetUnits();
 
-    // 행동 종료 처리
-    // 기본 구현은 원래 타일로 복귀를 시작한다.
+    // Handle skill completion
+    // Default behavior is returning to original tile
     UFUNCTION(Category = "Skill")
     virtual void OnSkillFinished();
 
-    // 행동 컨텍스트 정리
+    // Clear skill context
     UFUNCTION(Category = "Skill")
     virtual void ClearSkillContext();
 
-    // 동일 행동 내 중복 데미지 적용 방지용 플래그
+    // Prevent duplicate damage application within a single action
     UPROPERTY()
     bool bSkillDamageApplied = false;
 
 protected:
-    // 이동 액션 카태고리 Move
+    // Movement action category
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Move")
     int32 MoveRange = 1;
 
@@ -299,60 +298,60 @@ public:
     virtual void OnItemFinished();
 
     UFUNCTION(Category = "Item")
-    virtual void ClearItemContext(); 
+    virtual void ClearItemContext();
 
 protected:
-    // GAS 핵심 컴포넌트
-    // Ability, Effect, Attribute 처리를 담당한다.
+    // GAS core component
+    // Handles Ability, Effect, and Attribute processing
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS")
     UAbilitySystemComponent* AbilitySystem = nullptr;
 
-    // 유닛 능력치 집합
+    // Attribute set
     UPROPERTY()
     UAS_Unit* AttributeSet = nullptr;
 
-    // 기본 공격 Ability 클래스
+    // Default attack Ability class
     UPROPERTY(EditDefaultsOnly, Category = "GAS_Ability")
     TSubclassOf<UGameplayAbility> DefaultAttackAbilityClass;
 
-    // AI 및 전투 로직에서 사용할 추가 Skill 슬롯
-    // 기본 공격 외에 최대 4개의 스킬을 장착하는 구조를 가정한다.
+    // Additional skill slots for AI and combat logic
+    // Assumes up to 4 skills equipped in addition to default attack
     UPROPERTY(EditDefaultsOnly, Category = "GAS_Ability")
     TArray<TSubclassOf<UGameplayAbility>> EquippedSkillAbilityClasses;
 
-    // 현재 유닛이 장착한 스킬 정의 데이터 목록
+    // Skill definition data currently equipped by this unit
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill", meta = (AllowPrivateAccess = "true"))
     TArray<TObjectPtr<USkillDefinitionDataAsset>> EquippedSkillDataAssets;
 
 public:
-    // AI가 평가 가능한 Skill Ability 목록 반환
+    // Get skill abilities available for AI evaluation
     UFUNCTION(BlueprintCallable, Category = "Skill")
     virtual TArray<TSubclassOf<UGameplayAbility>> GetAvailableSkillAbilityClasses() const;
 
-    // 장착된 스킬 데이터 목록에서 AbilityClass 와 일치하는 SkillData 를 찾는다
+    // Find SkillData matching a given AbilityClass
     USkillDefinitionDataAsset* FindSkillDataByAbilityClass(TSubclassOf<UGameplayAbility> AbilityClass) const;
 
     UFUNCTION(BlueprintCallable, Category = "Skill")
     TSubclassOf<UGameplayAbility> GetDefaultAttackAbilityClass() const { return DefaultAttackAbilityClass; }
 
 protected:
-    // 초기 능력치
+    // Initial attributes
     UPROPERTY(EditDefaultsOnly, Category = "GAS_Attribute")
     float InitMaxHP = 100.f;
 
-    // 유닛별 기본 AP 최대치
+    // Max Action Points per unit
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ActionPoint")
     int32 MaxActionPoint = 2;
 
-    // 현재 턴에서 남아 있는 AP
+    // Remaining Action Points for current turn
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ActionPoint")
     int32 CurrentActionPoint = 0;
 
-    // 유닛별 기본 SAP 최대치
+    // Max Sub Action Points per unit
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SubActionPoint")
     int32 MaxSubActionPoint = 1;
 
-    // 현재 턴에서 남아 있는 SAP
+    // Remaining Sub Action Points for current turn
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SubActionPoint")
     int32 CurrentSubActionPoint = 0;
 

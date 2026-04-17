@@ -103,11 +103,11 @@ private:
     bool bProtectedByFront = false;
 
 private:
-    // 현재 이 타일이 이동 가능 타일 하이라이트 상태인지 여부
+    // Whether this tile is currently highlighted as a reachable movement tile
     UPROPERTY()
     bool bMovableHighlighted = false;
 
-    // 현재 이 타일이 스킬 타겟 하이라이트 상태인지 여부
+    // Whether this tile is currently highlighted as a skill target tile
     UPROPERTY()
     bool bSkillTargetHighlighted = false;
 

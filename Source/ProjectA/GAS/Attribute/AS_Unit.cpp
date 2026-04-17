@@ -8,13 +8,13 @@ void UAS_Unit::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& D
 
     if (Data.EvaluatedData.Attribute == GetHPAttribute())
     {
-        // HP 하한 보정
+        // Clamp HP to the lower bound
         if (GetHP() < 0.0f)
         {
             SetHP(0.0f);
         }
 
-        // HP 상한 보정
+        // Clamp HP to the upper bound
         if (GetHP() > GetMaxHP())
         {
             SetHP(GetMaxHP());
@@ -22,7 +22,7 @@ void UAS_Unit::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& D
 
         //UE_LOG(LogTemp, Log, TEXT("[AS_Unit] HP Changed | NewHP=%.1f / MaxHP=%.1f"), GetHP(), GetMaxHP());
 
-        // HP가 0 이하면 소유 유닛 사망 처리
+        // Trigger unit death when HP reaches zero or below
         if (GetHP() <= 0.0f)
         {
             AActor* OwnerActor = nullptr;

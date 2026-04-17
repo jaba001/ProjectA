@@ -6,13 +6,13 @@
 
 void UAN_CloseRangeAttackHit::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation)
 {
-    // 유효한 메시 컴포넌트가 없으면 종료
+    // Exit if there is no valid mesh component
     if (!MeshComp)
     {
         return;
     }
 
-    // 몽타주를 재생 중인 소유 액터를 가져온다.
+    // Retrieve the owning actor that is currently playing the montage
     AActor* OwnerActor = MeshComp->GetOwner();
 
     if (!OwnerActor)
@@ -20,7 +20,7 @@ void UAN_CloseRangeAttackHit::Notify(USkeletalMeshComponent* MeshComp, UAnimSequ
         return;
     }
 
-    // 히트 이벤트를 GAS Ability로 전달한다.
+    // Forward the hit event to the GAS Ability
     FGameplayEventData EventData;
     EventData.Instigator = OwnerActor;
     EventData.EventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Hit"));

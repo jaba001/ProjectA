@@ -6,9 +6,9 @@
 
 class AUnitBase;
 
-// 단일 대상 기본공격 Ability
-// - 공격 공통 흐름은 UGA_AttackBase 가 담당한다.
-// - 이 클래스는 단일 타겟 캐싱/검증/데미지 적용만 담당한다.
+// Single-target default attack Ability
+// - The shared attack flow is handled by UGA_AttackBase
+// - This class is only responsible for single-target caching, validation, and damage application
 UCLASS()
 class PROJECTA_API UGA_DefaultAttack : public UGA_AttackBase
 {
@@ -18,23 +18,23 @@ public:
     UGA_DefaultAttack();
 
 protected:
-    // 현재 기본공격 대상 유닛을 캐싱한다.
+    // Cache the current default attack target unit
     virtual bool CacheAttackContext() override;
 
-    // 캐싱된 대상 유닛이 유효한지 검사한다.
+    // Validate whether the cached target unit is valid
     virtual bool ValidateAttackContext() const override;
 
-    // 단일 대상에게 실제 데미지를 적용한다.
+    // Apply actual damage to the single target
     virtual void ApplyAttackEffect() override;
 
-    // 단일 대상 캐시를 정리한다.
+    // Clear the single-target cache
     virtual void ClearCachedAttackContext() override;
 
-    // 실제 타겟 ASC 에 데미지 GE 를 적용한다.
+    // Apply the damage GE to the target ASC
     void ApplyDamageEffectToTarget();
 
 protected:
-    // 현재 공격 대상 유닛
+    // Current attack target unit
     UPROPERTY()
     AUnitBase* CachedTargetUnit = nullptr;
 };

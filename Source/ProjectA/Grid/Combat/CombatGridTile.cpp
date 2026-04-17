@@ -15,7 +15,7 @@ ACombatGridTile::ACombatGridTile()
 
     RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
-    // Collision Box (2배 확장)
+    // Collision box (scaled up by 2x)
     CollisionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionBox"));
     CollisionBox->SetupAttachment(RootComponent);
     CollisionBox->SetBoxExtent(FVector(90.f, 90.f, 10.f));
@@ -24,7 +24,7 @@ ACombatGridTile::ACombatGridTile()
     CollisionBox->SetCollisionResponseToAllChannels(ECR_Ignore);
     CollisionBox->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
-    // Sprite (2배 확대 + X축 90도 회전)
+    // Sprite (scaled up by 2x and rotated 90 degrees on X axis)
     TileSprite = CreateDefaultSubobject<UPaperSpriteComponent>(TEXT("TileSprite"));
     TileSprite->SetupAttachment(RootComponent);
     TileSprite->SetRelativeScale3D(FVector(2.f, 1.f, 2.f));
@@ -36,7 +36,8 @@ ACombatGridTile::ACombatGridTile()
 void ACombatGridTile::BeginPlay()
 {
     Super::BeginPlay();
-    // 초기 컬러 저장
+
+    // Cache original color
     if (TileSprite)
     {
         OriginalColor = TileSprite->GetSpriteColor();
@@ -265,8 +266,8 @@ void ACombatGridTile::ClearHighlightVisual()
 void ACombatGridTile::SetProtectedByFront(bool bInProtectedByFront)
 {
     bProtectedByFront = bInProtectedByFront;
-    
+
     //UE_LOG(LogTemp, Log, TEXT("[GridTile] SetProtectedByFront | Coord=(%d,%d) | Protected=%s"), GridCoord.X, GridCoord.Y, bProtectedByFront ? TEXT("true") : TEXT("false"));
-   
+
     UpdateTileVisual();
 }

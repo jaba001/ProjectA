@@ -97,7 +97,7 @@ private:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tile", meta = (AllowPrivateAccess = "true"))
     ETileInputMode CurrentTileInputMode = ETileInputMode::None;
 
-    // 현재 Skill 입력 모드에서 대기 중인 스킬 정의 데이터
+    // Skill definition data currently pending in skill input mode
     UPROPERTY()
     TObjectPtr<USkillDefinitionDataAsset> PendingSkillData = nullptr;
 

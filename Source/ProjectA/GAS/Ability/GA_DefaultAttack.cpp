@@ -16,7 +16,6 @@ bool UGA_DefaultAttack::CacheAttackContext()
         return false;
     }
 
-    // 현재 공격 대상 유닛을 가져온다.
     CachedTargetUnit = CachedOwnerUnit->PendingTargetUnit;
 
     return true;
@@ -49,7 +48,6 @@ void UGA_DefaultAttack::ClearCachedAttackContext()
 
 void UGA_DefaultAttack::ApplyDamageEffectToTarget()
 {
-    // 유효한 공격자/타겟이 없으면 종료
     if (!CachedOwnerUnit || !CachedTargetUnit)
     {
         UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | Invalid Owner or Target"));

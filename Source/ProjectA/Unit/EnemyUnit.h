@@ -62,18 +62,18 @@ public:
     AEnemyUnit();
 
 public:
-    // 턴 관련 이벤트
+    // Turn-related events
     virtual void OnTurnStart() override;
     virtual void OnSkillFinished() override;
     virtual void OnReturnToOriginalTileFinished() override;
 
 public:
-    // 현재 턴 상태 설정 및 조회
+    // Set and query the current turn state
     void SetTurnState(EEnemyTurnState NewState);
     EEnemyTurnState GetTurnState() const;
 
 protected:
-    // 상태 진입 처리
+    // State entry handlers
     void EnterStartTurnState();
     void EnterDecideActionState();
     void EnterMoveState();
@@ -82,11 +82,11 @@ protected:
     void EnterWaitMoveCompleteState();
     void EnterWaitSkillCompleteState();
 
-    // 턴 종료 처리
+    // Turn end handling
     void FinishEnemyTurn();
 
 protected:
-    // 행동 후보 평가 및 적용
+    // Evaluate and apply action candidates
     FEnemyActionDecision DecideBestAction() const;
     FEnemyActionDecision EvaluateSkillAction() const;
     FEnemyActionDecision EvaluateSkillCandidate(USkillDefinitionDataAsset* SkillData) const;
@@ -94,7 +94,7 @@ protected:
     void ApplyDecision(const FEnemyActionDecision& Decision);
 
 protected:
-    // 스킬 행동 전용 타겟 평가
+    // Target evaluation for skill actions
     float EvaluateSkillTargetScore(USkillDefinitionDataAsset* SkillData, AUnitBase* Candidate) const;
     AUnitBase* FindBestSkillTarget(USkillDefinitionDataAsset* SkillData) const;
     float EvaluateDefaultAttackScore(AUnitBase* Candidate) const;
@@ -103,7 +103,7 @@ protected:
     float EvaluateHighHPScore(AUnitBase* Candidate) const;
 
 protected:
-    // 현재 선택된 행동 컨텍스트
+    // Currently selected action context
     UPROPERTY()
     AUnitBase* CurrentTarget = nullptr;
 
@@ -117,34 +117,32 @@ protected:
     FEnemyActionDecision CurrentDecision;
 
 protected:
-    // 현재 FSM 상태
+    // Current FSM state
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
     EEnemyTurnState CurrentTurnState = EEnemyTurnState::None;
 
 protected:
-    // 행동 평가용 기본 점수
-    // 모든 Skill 행동 후보에 공통으로 더해지는 기본 점수
+    // Base score values used for action evaluation
+    // Base score added to all skill action candidates
     UPROPERTY(EditDefaultsOnly, Category = "AI|Score")
     float SkillBaseScore = 100.0f;
 
-    // 아무 행동도 하지 않고 턴을 종료하는 대기 행동의 기본 점수
+    // Base score for the wait action that ends the turn without doing anything
     UPROPERTY(EditDefaultsOnly, Category = "AI|Score")
     float WaitBaseScore = 0.0f;
 
-    // 거리 패널티 가중치
-    // 값이 클수록 가까운 타겟을 더 강하게 선호한다.
+    // Distance penalty weight
+    // Higher values make the AI prefer closer targets more strongly
     UPROPERTY(EditDefaultsOnly, Category = "AI|Score")
     float DistanceWeight = 10.0f;
 
-    // 저체력 대상 선호 가중치
-    // HP 비율이 낮을수록 더 높은 점수를 부여한다.
+    // Low HP target preference weight
+    // Lower HP ratios produce higher scores
     UPROPERTY(EditDefaultsOnly, Category = "AI|Score")
     float LowHPWeight = 50.0f;
 
-    // 고체력 대상 선호 가중치
-    // HP 비율이 높을수록 더 높은 점수를 부여한다.
+    // High HP target preference weight
+    // Higher HP ratios produce higher scores
     UPROPERTY(EditDefaultsOnly, Category = "AI|Score")
     float HighHPWeight = 30.0f;
-
-
 };

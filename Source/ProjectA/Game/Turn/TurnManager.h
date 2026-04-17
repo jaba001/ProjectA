@@ -12,42 +12,43 @@ class PROJECTA_API UTurnManager : public UObject
     GENERATED_BODY()
 
 public:
-    // 턴 순서 초기화
+    // Initialize turn order
     void InitializeTurnOrder(const TArray<AUnitBase*>& Units);
 
-    // 현재 턴 시작
+    // Start the current turn
     void StartTurn();
 
-    // 현재 턴 종료 후 다음 턴 진행
+    // End the current turn and proceed to the next turn
     void EndTurn();
 
-    // 다음 유닛 탐색
+    // Find and switch to the next unit
     void NextTurn();
 
-    // 현재 턴 유닛 반환
+    // Get the current turn unit
     AUnitBase* GetCurrentUnit() const;
 
-	// 전투 종료 조건 체크 (모든 유닛이 같은 팀에 속해있는지)
+    // Check combat end condition (whether all remaining units belong to the same team)
     bool CheckCombatEnd() const;
 
-    // 현재 턴 인덱스 반환 (CombatManager가 복제용으로 사용)
+    // Get current turn index (used by CombatManager for replication)
     int32 GetCurrentTurnIndex() const { return CurrentTurnIndex; }
 
-	// 현재 턴 카운터 반환 (CombatManager가 복제용으로 사용)
+    // Get current turn counter (used by CombatManager for replication)
     int32 GetTurnCounter() const { return TurnCounter; }
 
-	// 현재 턴 유닛 이름 반환 (HUD 업데이트용)
+    // Get current turn unit name (used for HUD update)
     FString GetCurrentUnitName() const;
 
 private:
 
-    // 서버 전용 턴 순서 배열 ,서버 전용임을 명시
+    // Server-only turn order array (explicitly server-only)
     UPROPERTY()
     TArray<AUnitBase*> TurnOrder;
 
-    // 서버 내부 턴 인덱스 ,외부 직접 수정 금지
+    // Internal turn index (do not modify externally)
     int32 CurrentTurnIndex = 0;
 
+    // Turn progression counter
     int32 TurnCounter = 0;
 
 };

@@ -5,19 +5,19 @@
 
 UGE_Damage::UGE_Damage()
 {
-    // 데미지 적용은 즉시 1회 처리한다.
+    // Apply damage immediately as a one-time effect
     DurationPolicy = EGameplayEffectDurationType::Instant;
 
-    // HP를 직접 감소시키는 Modifier를 추가한다.
+    // Add a modifier that directly reduces HP
     FGameplayModifierInfo DamageModifier;
     DamageModifier.Attribute = UAS_Unit::GetHPAttribute();
     DamageModifier.ModifierOp = EGameplayModOp::Additive;
 
-    // SetByCaller 구조체를 만든 뒤 DataTag를 지정한다.
+    // Create a SetByCaller struct and assign the data tag
     FSetByCallerFloat SetByCallerDamage;
     SetByCallerDamage.DataTag = FGameplayTag::RequestGameplayTag(FName("Data.Damage"));
 
-    // ModifierMagnitude에 SetByCaller 정보를 넣는다.
+    // Assign the SetByCaller data to ModifierMagnitude
     DamageModifier.ModifierMagnitude = SetByCallerDamage;
 
     Modifiers.Add(DamageModifier);

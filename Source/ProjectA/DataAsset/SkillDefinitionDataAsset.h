@@ -8,60 +8,60 @@
 class UGameplayAbility;
 class UTexture2D;
 
-// 스킬의 정적 정의 데이터를 보관하는 DataAsset
-// 입력 규칙, UI 정보, 연결할 AbilityClass를 정의한다
+// DataAsset that stores static skill definition data
+// Defines input rules, UI data, and the associated AbilityClass
 UCLASS(BlueprintType)
 class PROJECTA_API USkillDefinitionDataAsset : public UPrimaryDataAsset
 {
     GENERATED_BODY()
 
 public:
-    // 스킬 식별용 이름
+    // Skill identifier name
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
     FName SkillId = NAME_None;
 
-    // UI 표시용 스킬 이름
+    // Skill name for UI display
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
     FText SkillName;
 
-    // UI 표시용 스킬 설명
+    // Skill description for UI display
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
     FText SkillDescription;
 
-    // UI 표시용 스킬 아이콘
+    // Skill icon for UI display
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
     TObjectPtr<UTexture2D> SkillIcon = nullptr;
 
-    // 이 스킬이 실행할 GAS Ability 클래스
+    // GAS Ability class executed by this skill
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
     TSubclassOf<UGameplayAbility> AbilityClass = nullptr;
 
-    // 스킬 사용에 필요한 Action Point 비용
+    // Action Point cost required to use this skill
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Cost")
     int32 ActionPointCost = 1;
 
-    // 전열 보호를 무시하고 후열을 직접 타겟팅할 수 있는지 여부
+    // Whether this skill ignores front-line protection and can target back-line units directly
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Target")
     bool bIgnoreFront = false;
 
-    // 스킬 실행 전에 대상 위치까지 이동이 필요한지 여부
+    // Whether movement to the target position is required before executing the skill
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Target")
     bool bMoveToTarget = false;
 
-    // 스킬의 대상 선택 방식
+    // Target selection type of the skill
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Target")
     ESkillTargetingType TargetingType = ESkillTargetingType::Unit;
 
-    // 스킬의 대상 팀 판정 규칙
+    // Target team rule for the skill
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Target")
     ESkillTargetTeamRule TargetTeamRule = ESkillTargetTeamRule::EnemyOnly;
 
-    // 스킬의 범위 적용 방식
+    // Area application type of the skill
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Area")
     ESkillAreaType AreaType = ESkillAreaType::Single;
 
-    // AroundTarget / AroundSelf 계열에서 사용할 그리드 반경 값
-    // 범위 판정은 체비쇼프 거리 기준으로 계산한다
+    // Grid radius used for AroundTarget / AroundSelf types
+    // Range calculation is based on Chebyshev distance
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Area", meta = (ClampMin = "0"))
     int32 AreaRadius = 0;
 

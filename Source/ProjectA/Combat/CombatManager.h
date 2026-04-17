@@ -23,11 +23,11 @@ protected:
 
 
 private:
-    // 플레이어 유닛 클래스들
+    // Player unit classes
     UPROPERTY(EditDefaultsOnly, Category = "Combat")
     TArray<TSubclassOf<AUnitBase>> PlayerUnitClasses;
 
-    // 적 유닛 클래스들
+    // Enemy unit classes
     UPROPERTY(EditDefaultsOnly, Category = "Combat")
     TArray<TSubclassOf<AUnitBase>> EnemyUnitClasses;
 
@@ -35,15 +35,15 @@ private:
     bool CanUnitEnterTile(AUnitBase* Unit, ACombatGridTile* Tile) const;
 
 private:
-    // 서버 전용 턴 매니저
+    // Server-only turn manager
     UPROPERTY()
     UTurnManager* TurnManager;
 
-    // 전투 유닛 목록 (서버 소유)
+    // Combat unit list (owned by server)
     UPROPERTY()
     TArray<AUnitBase*> CombatUnits;
 
-    // 현재 턴 인덱스 (클라 동기화용)
+    // Current turn index (replicated to clients)
     UPROPERTY(Replicated)
     int32 CurrentTurnIndex;
 
@@ -54,7 +54,7 @@ private:
     TArray<ACombatGridTile*> ReachableMoveTiles;
 
 public:
-    // 현재 턴 유닛
+    // Current turn unit
     UFUNCTION(BlueprintCallable)
     UTurnManager* GetTurnManager() const { return TurnManager; }
 
@@ -63,14 +63,14 @@ public:
 
     void StartCombat_Internal();
 
-    // 턴 진행 요청 (서버 전용)
+    // Request to advance turn (server only)
     void AdvanceTurn();
 
-	// 턴 종료 요청 (서버 전용)
+    // Request to end turn (server only)
     UFUNCTION(BlueprintCallable)
     void RequestEndTurn();
 
-    // 유닛 등록 (서버 전용)
+    // Register units (server only)
     void RegisterUnits(const TArray<AUnitBase*>& Units);
 
     int32 GetCurrentTurnIndex() const { return CurrentTurnIndex; }
@@ -108,11 +108,11 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Skill")
     void ClearSkillTargetTilesHighlight();
 
-	// Tile
+    // Tile
     UFUNCTION(BlueprintCallable, Category = "Combat")
     ACombatGridTile* GetTileByCoord(FIntPoint Coord) const;
 
-    // 보호여부
+    // Refresh front-line protection state
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void RefreshTileProtectedByFront();
 

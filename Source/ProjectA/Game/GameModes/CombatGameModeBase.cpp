@@ -14,8 +14,8 @@ void ACombatGameModeBase::BeginPlay()
 {
     Super::BeginPlay();
 
-    // 서버 전용
-    if (!HasAuthority()) return;   
+    // Server only
+    if (!HasAuthority()) return;
 
     SpawnCombat();
 }
@@ -31,7 +31,7 @@ void ACombatGameModeBase::SpawnCombat()
         return;
     }
 
-    // Grid 찾기
+    // Find the grid
     ACombatGridManager* Grid =
         Cast<ACombatGridManager>(
             UGameplayStatics::GetActorOfClass(
@@ -46,7 +46,7 @@ void ACombatGameModeBase::SpawnCombat()
         return;
     }
 
-    // CombatManager Spawn
+    // Spawn CombatManager
     FActorSpawnParameters ManagerParams;
     ManagerParams.SpawnCollisionHandlingOverride =
         ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -67,9 +67,7 @@ void ACombatGameModeBase::SpawnCombat()
     UnitParams.SpawnCollisionHandlingOverride =
         ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-    // =========================
-    // Player Spawn
-    // =========================
+    // Player spawn
     TArray<ACombatGridTile*> PlayerTiles =
         Grid->GetTilesByCoords(PlayerCoords);
 
@@ -98,9 +96,7 @@ void ACombatGameModeBase::SpawnCombat()
         }
     }
 
-    // =========================
-    // Enemy Spawn
-    // =========================
+    // Enemy spawn
     TArray<ACombatGridTile*> EnemyTiles =
         Grid->GetTilesByCoords(EnemyCoords);
 
@@ -123,15 +119,15 @@ void ACombatGameModeBase::SpawnCombat()
 
         if (Unit)
         {
-            Unit->SetTeam(ETeam::Enemy);   
+            Unit->SetTeam(ETeam::Enemy);
             Unit->SetCurrentTile(EnemyTiles[i]);
             AllUnits.Add(Unit);
         }
     }
 
-    // CombatManager 등록
+    // Register units to CombatManager
     CombatManager->RegisterUnits(AllUnits);
 
-    // GameMode는 서버 전용 → 직접 호출
+    // GameMode is server-only, so call directly
     CombatManager->StartCombat_Internal();
 }

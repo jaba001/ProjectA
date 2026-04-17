@@ -8,29 +8,29 @@
 
 UGA_AttackBase::UGA_AttackBase()
 {
-    // 유닛 단위로 인스턴스를 유지한다.
+    // Keep an ability instance per unit
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 
-    // 히트 이벤트 태그 기본값
+    // Default hit event tag
     AttackHitEventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Hit"));
 }
 
 void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-    // 현재 활성화 정보를 캐싱한다.
+    // Cache the current activation info
     CachedHandle = Handle;
     CachedActivationInfo = ActivationInfo;
     bDamageAppliedThisActivation = false;
     bFinishRequested = false;
 
-    // 비용/쿨다운 등을 커밋한다.
+    // Commit cost, cooldown, and other requirements
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
 
-    // 현재 Ability 를 사용하는 유닛을 가져온다.
+    // Get the unit using this Ability
     CachedOwnerUnit = Cast<AUnitBase>(GetAvatarActorFromActorInfo());
 
     if (!CachedOwnerUnit)
@@ -39,28 +39,28 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
         return;
     }
 
-    // 몽타주와 데미지 GE 클래스가 없으면 공격을 진행할 수 없다.
+    // Attack cannot proceed without a montage and damage GE class
     if (!AttackMontage || !DamageEffectClass)
     {
         FinishAttackAbility(true);
         return;
     }
 
-    // 자식 Ability 가 필요한 공격 컨텍스트를 캐싱한다.
+    // Cache attack context required by child Ability
     if (!CacheAttackContext())
     {
         FinishAttackAbility(true);
         return;
     }
 
-    // 캐싱된 컨텍스트가 실제로 유효한지 검사한다.
+    // Validate the cached context
     if (!ValidateAttackContext())
     {
         FinishAttackAbility(true);
         return;
     }
 
-    // 히트 이벤트를 기다리는 태스크를 먼저 생성한다.
+    // Create the task that waits for the hit event first
     WaitHitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, AttackHitEventTag);
 
     if (WaitHitEventTask)
@@ -69,7 +69,7 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
         WaitHitEventTask->ReadyForActivation();
     }
 
-    // 공격 몽타주를 재생한다.
+    // Play the attack montage
     PlayMontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, AttackMontage);
 
     if (!PlayMontageTask)
@@ -78,7 +78,7 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
         return;
     }
 
-    // 몽타주 종료 관련 콜백을 연결한다.
+    // Bind montage end-related callbacks
     PlayMontageTask->OnCompleted.AddDynamic(this, &UGA_AttackBase::OnAttackMontageCompleted);
     PlayMontageTask->OnBlendOut.AddDynamic(this, &UGA_AttackBase::OnAttackMontageBlendOut);
     PlayMontageTask->OnInterrupted.AddDynamic(this, &UGA_AttackBase::OnAttackMontageInterrupted);
@@ -88,14 +88,14 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
 
 void UGA_AttackBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 태스크 캐시를 정리한다.
+    // Clear cached task references
     PlayMontageTask = nullptr;
     WaitHitEventTask = nullptr;
 
-    // 자식 Ability 캐시를 먼저 정리한다.
+    // Clear child Ability cache first
     ClearCachedAttackContext();
 
-    // 공통 캐시를 정리한다.
+    // Clear shared cache
     CachedOwnerUnit = nullptr;
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
@@ -122,7 +122,7 @@ void UGA_AttackBase::OnAttackMontageCancelled()
 
 void UGA_AttackBase::OnHitEventReceived(FGameplayEventData Payload)
 {
-    // 한 번의 공격 활성화에서 데미지는 한 번만 적용한다.
+    // Apply damage only once per attack activation
     if (bDamageAppliedThisActivation)
     {
         UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] Hit Event Ignored | Reason=AlreadyApplied"));
@@ -131,7 +131,7 @@ void UGA_AttackBase::OnHitEventReceived(FGameplayEventData Payload)
 
     bDamageAppliedThisActivation = true;
 
-    // 실제 효과 적용은 자식 Ability 가 담당한다.
+    // Child Ability is responsible for applying the actual effect
     ApplyAttackEffect();
 }
 
@@ -155,7 +155,7 @@ void UGA_AttackBase::ClearCachedAttackContext()
 
 void UGA_AttackBase::FinishAttackAbility(bool bWasCancelled)
 {
-    // 중복 종료 방지
+    // Prevent duplicate finish handling
     if (bFinishRequested)
     {
         return;
@@ -163,7 +163,7 @@ void UGA_AttackBase::FinishAttackAbility(bool bWasCancelled)
 
     bFinishRequested = true;
 
-    // 공격이 끝났음을 UnitBase 에 알리고 복귀를 시작한다.
+    // Notify UnitBase that the attack has finished and begin return flow
     if (CachedOwnerUnit)
     {
         CachedOwnerUnit->OnSkillFinished();

@@ -20,26 +20,30 @@ protected:
     virtual void BeginPlay() override;
 
 public:
-    // CombatManager 클래스 지정
+    // CombatManager class to spawn
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatGameMode")
     TSubclassOf<ACombatManager> CombatManagerClass;
 
-    // 플레이어 유닛 클래스 목록
+    // Player unit class list
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatGameMode")
     TArray<TSubclassOf<AUnitBase>> PlayerUnitClasses;
 
+    // Enemy unit class list
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatGameMode")
     TArray<TSubclassOf<AUnitBase>> EnemyUnitClasses;
 
-    // CombatManager 인스턴스
+    // CombatManager instance
     UPROPERTY()
     ACombatManager* CombatManager;
 
+    // Spawn coordinates for player units
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatGameMode")
     TArray<FIntPoint> PlayerCoords;
 
+    // Spawn coordinates for enemy units
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatGameMode")
     TArray<FIntPoint> EnemyCoords;
 
+    // Initialize and spawn combat setup
     void SpawnCombat();
 };

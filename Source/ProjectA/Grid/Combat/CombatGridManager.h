@@ -35,7 +35,7 @@ private:
     float GapSpacing = 200.f;
 
     UPROPERTY(EditAnywhere, Category = "CombatGrid")
-    int32 GapStartIndex = 2; // Col 2부터 Gap 적용
+    int32 GapStartIndex = 2;
 
 public:
     UFUNCTION(BlueprintCallable, Category = "CombatGrid")
