@@ -51,7 +51,10 @@ bool UCombatEffectLibrary::ApplyDamageToUnit(AUnitBase* SourceUnit, AUnitBase* T
 
     const FActiveGameplayEffectHandle AppliedHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 
-    if (!AppliedHandle.IsValid())
+    const UGameplayEffect* DamageEffectCDO = DamageEffectClass->GetDefaultObject<UGameplayEffect>();
+    const bool bIsInstantEffect = DamageEffectCDO && DamageEffectCDO->DurationPolicy == EGameplayEffectDurationType::Instant;
+
+    if (!AppliedHandle.IsValid() && !bIsInstantEffect)
     {
         UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Apply Result Invalid | Source=%s | Target=%s"), *GetNameSafe(SourceUnit), *GetNameSafe(TargetUnit));
         return false;

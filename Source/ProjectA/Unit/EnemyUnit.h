@@ -118,31 +118,31 @@ protected:
 
 protected:
     // Current FSM state
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UnitBase|EnemyUnit|AI")
     EEnemyTurnState CurrentTurnState = EEnemyTurnState::None;
 
 protected:
     // Base score values used for action evaluation
     // Base score added to all skill action candidates
-    UPROPERTY(EditDefaultsOnly, Category = "AI|Score")
+    UPROPERTY(EditDefaultsOnly, Category = "UnitBase|EnemyUnit|AI|Score")
     float SkillBaseScore = 100.0f;
 
     // Base score for the wait action that ends the turn without doing anything
-    UPROPERTY(EditDefaultsOnly, Category = "AI|Score")
+    UPROPERTY(EditDefaultsOnly, Category = "UnitBase|EnemyUnit|AI|Score")
     float WaitBaseScore = 0.0f;
 
     // Distance penalty weight
     // Higher values make the AI prefer closer targets more strongly
-    UPROPERTY(EditDefaultsOnly, Category = "AI|Score")
+    UPROPERTY(EditDefaultsOnly, Category = "UnitBase|EnemyUnit|AI|Score")
     float DistanceWeight = 10.0f;
 
     // Low HP target preference weight
     // Lower HP ratios produce higher scores
-    UPROPERTY(EditDefaultsOnly, Category = "AI|Score")
+    UPROPERTY(EditDefaultsOnly, Category = "UnitBase|EnemyUnit|AI|Score")
     float LowHPWeight = 50.0f;
 
     // High HP target preference weight
     // Higher HP ratios produce higher scores
-    UPROPERTY(EditDefaultsOnly, Category = "AI|Score")
+    UPROPERTY(EditDefaultsOnly, Category = "UnitBase|EnemyUnit|AI|Score")
     float HighHPWeight = 30.0f;
 };

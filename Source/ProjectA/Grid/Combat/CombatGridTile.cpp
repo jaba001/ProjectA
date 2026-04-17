@@ -95,6 +95,7 @@ void ACombatGridTile::NotifyActorOnClicked(FKey ButtonPressed)
 
         if (!PC->IsValidTileForPendingSkill(this))
         {
+            UE_LOG(LogTemp, Warning, TEXT("[GridTile] Skill click rejected | Invalid target tile | Coord=(%d,%d)"), GridCoord.X, GridCoord.Y);
             return;
         }
 

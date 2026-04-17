@@ -3,7 +3,6 @@
 #include "AbilitySystemComponent.h"
 #include "GameplayEffect.h"
 #include "GameplayTagContainer.h"
-#include "GAS/Attribute/AS_Unit.h"
 
 UGA_DefaultAttack::UGA_DefaultAttack()
 {
@@ -75,8 +74,6 @@ void UGA_DefaultAttack::ApplyDamageEffectToTarget()
         return;
     }
 
-    const float BeforeHP = TargetASC->GetNumericAttribute(UAS_Unit::GetHPAttribute());
-
     FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
     EffectContext.AddSourceObject(CachedOwnerUnit);
 
@@ -94,11 +91,14 @@ void UGA_DefaultAttack::ApplyDamageEffectToTarget()
 
     const FActiveGameplayEffectHandle AppliedHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 
-    const float AfterHP = TargetASC->GetNumericAttribute(UAS_Unit::GetHPAttribute());
+    const UGameplayEffect* DamageEffectCDO = DamageEffectClass->GetDefaultObject<UGameplayEffect>();
+    const bool bIsInstantEffect = DamageEffectCDO && DamageEffectCDO->DurationPolicy == EGameplayEffectDurationType::Instant;
 
-    if (!AppliedHandle.IsValid())
+    if (!AppliedHandle.IsValid() && !bIsInstantEffect)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | Invalid AppliedHandle | Source=%s | Target=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(CachedTargetUnit));
+        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | Invalid AppliedHandle | Source=%s | Target=%s"),
+            *GetNameSafe(CachedOwnerUnit),
+            *GetNameSafe(CachedTargetUnit));
         return;
     }
 }

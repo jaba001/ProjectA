@@ -155,17 +155,32 @@ bool UGA_AreaAttack::IsValidAreaTargetUnit(AUnitBase* TargetUnit) const
         return false;
     }
 
-    if (CachedSkillData->TargetTeamRule == ESkillTargetTeamRule::EnemyOnly)
+    if (CachedSkillData->TargetRule == ESkillTargetRule::EnemyUnit)
     {
         return CachedOwnerUnit->GetTeam() != TargetUnit->GetTeam();
     }
 
-    if (CachedSkillData->TargetTeamRule == ESkillTargetTeamRule::AllyOnly)
+    if (CachedSkillData->TargetRule == ESkillTargetRule::AllyUnit)
     {
         return CachedOwnerUnit->GetTeam() == TargetUnit->GetTeam();
     }
 
-    if (CachedSkillData->TargetTeamRule == ESkillTargetTeamRule::AnyUnit)
+    if (CachedSkillData->TargetRule == ESkillTargetRule::AnyUnit)
+    {
+        return true;
+    }
+
+    if (CachedSkillData->TargetRule == ESkillTargetRule::EnemyTile)
+    {
+        return CachedOwnerUnit->GetTeam() != TargetUnit->GetTeam();
+    }
+
+    if (CachedSkillData->TargetRule == ESkillTargetRule::AllyTile)
+    {
+        return CachedOwnerUnit->GetTeam() == TargetUnit->GetTeam();
+    }
+
+    if (CachedSkillData->TargetRule == ESkillTargetRule::AnyTile)
     {
         return true;
     }

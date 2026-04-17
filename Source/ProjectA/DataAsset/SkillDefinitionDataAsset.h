@@ -48,13 +48,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Target")
     bool bMoveToTarget = false;
 
-    // Target selection type of the skill
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Target")
-    ESkillTargetingType TargetingType = ESkillTargetingType::Unit;
-
     // Target team rule for the skill
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Target")
-    ESkillTargetTeamRule TargetTeamRule = ESkillTargetTeamRule::EnemyOnly;
+    ESkillTargetRule TargetRule = ESkillTargetRule::EnemyUnit;
 
     // Area application type of the skill
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Area")

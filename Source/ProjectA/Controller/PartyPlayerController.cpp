@@ -267,12 +267,7 @@ void APartyPlayerController::CancelTileInputMode()
 
 bool APartyPlayerController::IsValidTileForPendingSkill(ACombatGridTile* Tile) const
 {
-    if (!PendingSkillData)
-    {
-        return false;
-    }
-
-    if (!Tile)
+    if (!PendingSkillData || !Tile)
     {
         return false;
     }
@@ -284,82 +279,100 @@ bool APartyPlayerController::IsValidTileForPendingSkill(ACombatGridTile* Tile) c
         return false;
     }
 
-    if (PendingSkillData->TargetingType == ESkillTargetingType::Unit)
+    AUnitBase* TargetUnit = Tile->GetOccupyingUnit();
+    const ETeam ActiveTeam = ActiveUnit->GetTeam();
+    const ETileTerritory TileTerritory = Tile->GetTerritory();
+
+    // Check whether the tile belongs to enemy territory for the active unit.
+    // 현재 활성 유닛 기준으로 적 진영 타일인지 검사한다.
+    auto IsEnemyTileForActiveTeam = [&]() -> bool
+        {
+            return (ActiveTeam == ETeam::Player && TileTerritory == ETileTerritory::Enemy)
+                || (ActiveTeam == ETeam::Enemy && TileTerritory == ETileTerritory::Player);
+        };
+
+    // Check whether the tile belongs to ally territory for the active unit.
+    // 현재 활성 유닛 기준으로 아군 진영 타일인지 검사한다.
+    auto IsAllyTileForActiveTeam = [&]() -> bool
+        {
+            return (ActiveTeam == ETeam::Player && TileTerritory == ETileTerritory::Player)
+                || (ActiveTeam == ETeam::Enemy && TileTerritory == ETileTerritory::Enemy);
+        };
+
+    // Check whether the tile has a living target unit.
+    // 현재 타일에 살아있는 유닛이 있는지 검사한다.
+    auto HasAliveTargetUnit = [&]() -> bool
+        {
+            return TargetUnit && TargetUnit->IsUnitAlive();
+        };
+
+    // Check whether the target unit is an enemy of the active unit.
+    // 타겟 유닛이 활성 유닛 기준 적인지 검사한다.
+    auto IsEnemyTargetUnit = [&]() -> bool
+        {
+            return HasAliveTargetUnit() && TargetUnit->GetTeam() != ActiveTeam;
+        };
+
+    // Check whether the target unit is an ally of the active unit.
+    // 타겟 유닛이 활성 유닛 기준 아군인지 검사한다.
+    auto IsAllyTargetUnit = [&]() -> bool
+        {
+            return HasAliveTargetUnit() && TargetUnit->GetTeam() == ActiveTeam;
+        };
+
+    // Check whether front protection blocks this tile.
+    // 전열 보호 때문에 이 타일 선택이 막히는지 검사한다.
+    auto IsBlockedByFrontProtection = [&]() -> bool
+        {
+            return !PendingSkillData->bIgnoreFront && Tile->GetProtectedByFront();
+        };
+
+    // Dead units on a tile should never be treated as valid targets.
+    // 타일 위 죽은 유닛은 어떤 규칙에서도 유효 타겟으로 보지 않는다.
+    if (TargetUnit && !TargetUnit->IsUnitAlive())
     {
-        AUnitBase* TargetUnit = Tile->GetOccupyingUnit();
+        return false;
+    }
 
-        if (!TargetUnit)
+    switch (PendingSkillData->TargetRule)
+    {
+    case ESkillTargetRule::EnemyUnit:
+    {
+        if (!IsEnemyTargetUnit())
         {
             return false;
         }
 
-        if (!TargetUnit->IsUnitAlive())
-        {
-            return false;
-        }
-
-        switch (PendingSkillData->TargetTeamRule)
-        {
-        case ESkillTargetTeamRule::EnemyOnly:
-        {
-            if (TargetUnit->GetTeam() == ActiveUnit->GetTeam())
-            {
-                return false;
-            }
-
-            break;
-        }
-        case ESkillTargetTeamRule::AllyOnly:
-        {
-            if (TargetUnit->GetTeam() != ActiveUnit->GetTeam())
-            {
-                return false;
-            }
-
-            break;
-        }
-        case ESkillTargetTeamRule::AnyUnit:
-        {
-            break;
-        }
-        case ESkillTargetTeamRule::EmptyTileOnly:
-        {
-            return false;
-        }
-        default:
-        {
-            return false;
-        }
-        }
-
-        if (!PendingSkillData->bIgnoreFront && Tile->GetProtectedByFront())
+        if (IsBlockedByFrontProtection())
         {
             return false;
         }
 
         return true;
     }
-
-    if (PendingSkillData->TargetingType == ESkillTargetingType::Tile)
+    case ESkillTargetRule::AllyUnit:
     {
-        switch (PendingSkillData->TargetTeamRule)
-        {
-        case ESkillTargetTeamRule::EmptyTileOnly:
-        {
-            return Tile->GetOccupyingUnit() == nullptr;
-        }
-        case ESkillTargetTeamRule::EnemyOnly:
-        case ESkillTargetTeamRule::AllyOnly:
-        case ESkillTargetTeamRule::AnyUnit:
-        {
-            return false;
-        }
-        default:
-        {
-            return false;
-        }
-        }
+        return IsAllyTargetUnit();
     }
-
-    return false;
+    case ESkillTargetRule::AnyUnit:
+    {
+        return HasAliveTargetUnit();
+    }
+    case ESkillTargetRule::EnemyTile:
+    {
+        return IsEnemyTileForActiveTeam();
+    }
+    case ESkillTargetRule::AllyTile:
+    {
+        return IsAllyTileForActiveTeam();
+    }
+    case ESkillTargetRule::AnyTile:
+    {
+        return TileTerritory != ETileTerritory::None;
+    }
+    default:
+    {
+        return false;
+    }
+    }
 }

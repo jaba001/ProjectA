@@ -1,12 +1,3 @@
-// GAS PIPELINE SUMMARY 
-// 1. Unit (Actor)
-//    - GAS를 사용하는 주체 (AUnitBase)
-//    - AbilitySystemComponent(ASC)를 소유한다
-// 2. AbilitySystemComponent (ASC)  [Engine Provided] Ability / Effect / Attribute / Tag를 관리
-// 3. GameplayAbility (Ability) 행동
-// 4. GameplayEffect (Effect)   결과
-// 5. AttributeSet (Attribute)  숫자상태
-// 6. GameplayTag (Tag) 상태분류조건
 #pragma once
 
 #include "CoreMinimal.h"
@@ -69,8 +60,6 @@ protected:
     void OnHitEventReceived(FGameplayEventData Payload);
 
     // Child Ability caches its own attack context
-    // Example:
-    // - DefaultAttack: cache a single target unit
     virtual bool CacheAttackContext();
 
     // Child Ability validates whether the current context is valid
@@ -114,6 +103,15 @@ protected:
     // Event tag used for attack hit timing
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     FGameplayTag AttackHitEventTag;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
+    TSubclassOf<AActor> SpawnedAttackActorClass;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
+    FName SpawnSocketName = NAME_None;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
+    FGameplayTag AttackReleaseEventTag;
 
 protected:
     // Cached activation info

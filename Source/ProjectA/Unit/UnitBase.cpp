@@ -532,7 +532,7 @@ void AUnitBase::ExecuteSkillAtTarget()
         return;
     }
 
-    if (PendingSkillData->TargetingType == ESkillTargetingType::Unit)
+    if (PendingSkillData->TargetRule == ESkillTargetRule::EnemyUnit || PendingSkillData->TargetRule == ESkillTargetRule::AllyUnit || PendingSkillData->TargetRule == ESkillTargetRule::AnyUnit)
     {
         if (!PendingTargetUnit || !PendingTargetUnit->IsUnitAlive())
         {
@@ -541,7 +541,7 @@ void AUnitBase::ExecuteSkillAtTarget()
             return;
         }
     }
-    else if (PendingSkillData->TargetingType == ESkillTargetingType::Tile)
+    else if (PendingSkillData->TargetRule == ESkillTargetRule::EnemyTile || PendingSkillData->TargetRule == ESkillTargetRule::AllyTile || PendingSkillData->TargetRule == ESkillTargetRule::AnyTile)
     {
         if (!PendingSkillTargetTile)
         {

@@ -3,22 +3,15 @@
 #include "CoreMinimal.h"
 #include "SkillTypes.generated.h"
 
-// Defines what the skill ultimately targets
 UENUM(BlueprintType)
-enum class ESkillTargetingType : uint8
+enum class ESkillTargetRule : uint8
 {
-    Unit,
-    Tile
-};
-
-// Defines the team filtering rule for valid targets
-UENUM(BlueprintType)
-enum class ESkillTargetTeamRule : uint8
-{
-    EnemyOnly,
-    AllyOnly,
+    EnemyUnit,
+    AllyUnit,
     AnyUnit,
-    EmptyTileOnly
+    EnemyTile,
+    AllyTile,
+    AnyTile
 };
 
 // Defines how the skill area is applied
