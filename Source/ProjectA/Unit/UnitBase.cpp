@@ -450,8 +450,6 @@ AUnitAIController* AUnitBase::GetOrCreateAIController()
 
 void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile)
 {
-    //UE_LOG(LogTemp, Log, TEXT("[UnitBase] StartSkill_1 | Unit=%s | SkillData=%s | Ability=%s | TargetTile=%s | OccupyingUnit=%s | MoveToTarget=%s"), *GetName(), *GetNameSafe(SkillData), SkillData ? *GetNameSafe(SkillData->AbilityClass) : TEXT("None"), *GetNameSafe(TargetTile), TargetTile ? *GetNameSafe(TargetTile->GetOccupyingUnit()) : TEXT("None"), SkillData && SkillData->bMoveToTarget ? TEXT("true") : TEXT("false"));
-
     if (!SkillData)
     {
         UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | SkillData is null"));
@@ -505,13 +503,7 @@ void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile
     // Ability 활성화 성공 여부를 바로 확인한다.
     const bool bActivated = AbilitySystem->TryActivateAbilityByClass(SkillData->AbilityClass);
 
-    UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill Activate | Unit=%s | Ability=%s | Activated=%d | TargetTile=(%d,%d) | TargetUnit=%s"),
-        *GetNameSafe(this),
-        *GetNameSafe(SkillData->AbilityClass),
-        bActivated ? 1 : 0,
-        TargetTile->GridCoord.X,
-        TargetTile->GridCoord.Y,
-        *GetNameSafe(PendingTargetUnit));
+    //UE_LOG(LogTemp, Log, TEXT("[UnitBase] StartSkill Activate | Unit=%s | Ability=%s | Activated=%d | TargetTile=(%d,%d) | TargetUnit=%s"), *GetNameSafe(this), *GetNameSafe(SkillData->AbilityClass), bActivated ? 1 : 0, TargetTile->GridCoord.X, TargetTile->GridCoord.Y, *GetNameSafe(PendingTargetUnit));
 
 }
 

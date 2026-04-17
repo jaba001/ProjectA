@@ -5,6 +5,7 @@
 #include "GameplayTagContainer.h"
 #include "GA_AttackBase.generated.h"
 
+class AActor;
 class AUnitBase;
 class UAnimMontage;
 class UGameplayEffect;
@@ -30,7 +31,7 @@ public:
 
 protected:
     // Common attack activation entry point
-    // Handles commit, owner caching, context caching, and starting montage/hit event tasks
+    // Handles commit, owner caching, context caching, and release timing flow
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
     // Common attack end entry point
@@ -54,10 +55,9 @@ protected:
     UFUNCTION()
     void OnAttackMontageCancelled();
 
-    // Called when the attack hit event is received
-    // The default implementation prevents duplicate application and enters the actual attack effect function
+    // Called when the attack release event is received
     UFUNCTION()
-    void OnHitEventReceived(FGameplayEventData Payload);
+    void OnReleaseEventReceived(FGameplayEventData Payload);
 
     // Child Ability caches its own attack context
     virtual bool CacheAttackContext();
@@ -65,8 +65,16 @@ protected:
     // Child Ability validates whether the current context is valid
     virtual bool ValidateAttackContext() const;
 
+    // Release attack once per activation
+    // - Spawn actor if configured
+    // - Otherwise apply direct effect
+    virtual void ReleaseAttack();
+
     // Child Ability applies the actual attack effect
     virtual void ApplyAttackEffect();
+
+    // Child Ability spawns the attack actor if needed
+    virtual void SpawnAttackActor();
 
     // Child Ability clears its own cached context
     virtual void ClearCachedAttackContext();
@@ -79,9 +87,9 @@ protected:
     UPROPERTY()
     AUnitBase* CachedOwnerUnit = nullptr;
 
-    // Whether damage has already been applied during this activation
+    // Whether attack has already been released during this activation
     UPROPERTY()
-    bool bDamageAppliedThisActivation = false;
+    bool bAttackReleasedThisActivation = false;
 
     // Flag used to prevent duplicate finish handling
     UPROPERTY()
@@ -100,18 +108,17 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     float DamageAmount = 10.0f;
 
-    // Event tag used for attack hit timing
+    // Event tag used for attack release timing
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
-    FGameplayTag AttackHitEventTag;
+    FGameplayTag AttackReleaseEventTag;
 
+    // Optional spawned attack actor class
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     TSubclassOf<AActor> SpawnedAttackActorClass;
 
+    // Optional socket name used by spawned attack actor
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     FName SpawnSocketName = NAME_None;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
-    FGameplayTag AttackReleaseEventTag;
 
 protected:
     // Cached activation info
@@ -123,5 +130,5 @@ protected:
     UAbilityTask_PlayMontageAndWait* PlayMontageTask = nullptr;
 
     UPROPERTY()
-    UAbilityTask_WaitGameplayEvent* WaitHitEventTask = nullptr;
+    UAbilityTask_WaitGameplayEvent* WaitReleaseEventTask = nullptr;
 };

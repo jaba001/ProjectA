@@ -1,18 +1,21 @@
 #include "GAS/Ability/GA_AttackBase.h"
-#include "Unit/UnitBase.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "GameplayEffect.h"
 #include "GameplayTagContainer.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/World.h"
+
+#include "Unit/UnitBase.h"
 
 UGA_AttackBase::UGA_AttackBase()
 {
     // Keep an ability instance per unit
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 
-    // Default hit event tag
-    AttackHitEventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Hit"));
+    // Default release event tag
+    AttackReleaseEventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Release"));
 }
 
 void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -20,7 +23,7 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
     // Cache the current activation info
     CachedHandle = Handle;
     CachedActivationInfo = ActivationInfo;
-    bDamageAppliedThisActivation = false;
+    bAttackReleasedThisActivation = false;
     bFinishRequested = false;
 
     // Commit cost, cooldown, and other requirements
@@ -41,16 +44,6 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
         return;
     }
 
-    // Attack cannot proceed without a montage and damage GE class
-    if (!AttackMontage || !DamageEffectClass)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=MissingMontageOrDamageEffect | Montage=%d | DamageEffect=%d"),
-            AttackMontage ? 1 : 0,
-            DamageEffectClass ? 1 : 0);
-        FinishAttackAbility(true);
-        return;
-    }
-
     // Cache attack context required by child Ability
     if (!CacheAttackContext())
     {
@@ -67,24 +60,23 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
         return;
     }
 
-    // No-montage attacks (e.g., tile AoE) apply immediately without waiting hit event.
+    // No-montage attacks release immediately without waiting for notify.
+    // 노티 기반 타이밍을 기다리지 않고 즉시 릴리즈한다.
     if (!AttackMontage)
     {
-        UE_LOG(LogTemp, Log, TEXT("[GA_AttackBase] ActivateAbility | NoMontageImmediateApply | Ability=%s | Owner=%s"), *GetNameSafe(GetClass()), *GetNameSafe(CachedOwnerUnit));
-        bDamageAppliedThisActivation = true;
-        ApplyAttackEffect();
+        UE_LOG(LogTemp, Log, TEXT("[GA_AttackBase] ActivateAbility | NoMontageImmediateRelease | Ability=%s | Owner=%s"), *GetNameSafe(GetClass()), *GetNameSafe(CachedOwnerUnit));
+        ReleaseAttack();
         FinishAttackAbility(false);
         return;
     }
 
+    // Create the task that waits for the release event first
+    WaitReleaseEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, AttackReleaseEventTag);
 
-    // Create the task that waits for the hit event first
-    WaitHitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, AttackHitEventTag);
-
-    if (WaitHitEventTask)
+    if (WaitReleaseEventTask)
     {
-        WaitHitEventTask->EventReceived.AddDynamic(this, &UGA_AttackBase::OnHitEventReceived);
-        WaitHitEventTask->ReadyForActivation();
+        WaitReleaseEventTask->EventReceived.AddDynamic(this, &UGA_AttackBase::OnReleaseEventReceived);
+        WaitReleaseEventTask->ReadyForActivation();
     }
 
     // Play the attack montage
@@ -109,7 +101,7 @@ void UGA_AttackBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const F
 {
     // Clear cached task references
     PlayMontageTask = nullptr;
-    WaitHitEventTask = nullptr;
+    WaitReleaseEventTask = nullptr;
 
     // Clear child Ability cache first
     ClearCachedAttackContext();
@@ -122,15 +114,13 @@ void UGA_AttackBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const F
 
 void UGA_AttackBase::OnAttackMontageCompleted()
 {
-    // Fallback: if hit event was not received from montage notify,
-    // apply attack effect once at montage completion.
-    // 폴백: 몽타주 노티파이에서 히트 이벤트를 못 받으면
-    // 몽타주 완료 시점에 공격 효과를 1회 적용한다.
-    if (!bDamageAppliedThisActivation)
+    // Fallback: if release event was not received from montage notify,
+    // release once at montage completion.
+    // 폴백: 몽타주 노티에서 릴리즈 이벤트가 오지 않으면 완료 시점에 1회 릴리즈한다.
+    if (!bAttackReleasedThisActivation)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] Hit Event Missing | Applying fallback damage on montage complete | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
-        bDamageAppliedThisActivation = true;
-        ApplyAttackEffect();
+        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] Release Event Missing | Applying fallback release on montage complete | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
+        ReleaseAttack();
     }
 
     FinishAttackAbility(false);
@@ -139,14 +129,12 @@ void UGA_AttackBase::OnAttackMontageCompleted()
 void UGA_AttackBase::OnAttackMontageBlendOut()
 {
     // Some montages may only reach blend-out callback depending on task/event timing.
-    // Ensure attack effect is not lost when hit notify event is missing.
-    // 태스크/이벤트 타이밍에 따라 일부 몽타주는 블렌드아웃 콜백만 호출될 수 있다.
-    // 히트 노티파이 이벤트가 없을 때도 공격 효과가 누락되지 않도록 보장한다.
-    if (!bDamageAppliedThisActivation)
+    // Ensure release is not lost when notify event is missing.
+    // 일부 몽타주는 타이밍에 따라 블렌드아웃만 호출될 수 있어 릴리즈 누락을 방지한다.
+    if (!bAttackReleasedThisActivation)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] Hit Event Missing | Applying fallback damage on montage blend-out | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
-        bDamageAppliedThisActivation = true;
-        ApplyAttackEffect();
+        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] Release Event Missing | Applying fallback release on montage blend-out | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
+        ReleaseAttack();
     }
 }
 
@@ -160,19 +148,10 @@ void UGA_AttackBase::OnAttackMontageCancelled()
     FinishAttackAbility(true);
 }
 
-void UGA_AttackBase::OnHitEventReceived(FGameplayEventData Payload)
+void UGA_AttackBase::OnReleaseEventReceived(FGameplayEventData Payload)
 {
-    // Apply damage only once per attack activation
-    if (bDamageAppliedThisActivation)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] Hit Event Ignored | Reason=AlreadyApplied"));
-        return;
-    }
-
-    bDamageAppliedThisActivation = true;
-
-    // Child Ability is responsible for applying the actual effect
-    ApplyAttackEffect();
+    (void)Payload;
+    ReleaseAttack();
 }
 
 bool UGA_AttackBase::CacheAttackContext()
@@ -185,8 +164,76 @@ bool UGA_AttackBase::ValidateAttackContext() const
     return true;
 }
 
+void UGA_AttackBase::ReleaseAttack()
+{
+    // Apply attack release only once per activation
+    if (bAttackReleasedThisActivation)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ReleaseAttack Ignored | Reason=AlreadyReleased"));
+        return;
+    }
+
+    bAttackReleasedThisActivation = true;
+
+    if (SpawnedAttackActorClass)
+    {
+        SpawnAttackActor();
+        return;
+    }
+
+    ApplyAttackEffect();
+}
+
 void UGA_AttackBase::ApplyAttackEffect()
 {
+}
+
+void UGA_AttackBase::SpawnAttackActor()
+{
+    if (!CachedOwnerUnit)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] SpawnAttackActor Failed | Reason=OwnerNull"));
+        return;
+    }
+
+    if (!SpawnedAttackActorClass)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] SpawnAttackActor Failed | Reason=AttackActorClassNull | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
+        return;
+    }
+
+    UWorld* World = GetWorld();
+
+    if (!World)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] SpawnAttackActor Failed | Reason=WorldNull | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
+        return;
+    }
+
+    FTransform SpawnTransform = CachedOwnerUnit->GetActorTransform();
+
+    if (USkeletalMeshComponent* MeshComp = CachedOwnerUnit->GetMesh())
+    {
+        if (!SpawnSocketName.IsNone() && MeshComp->DoesSocketExist(SpawnSocketName))
+        {
+            SpawnTransform = MeshComp->GetSocketTransform(SpawnSocketName, RTS_World);
+        }
+    }
+
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.Owner = CachedOwnerUnit;
+    SpawnParams.Instigator = CachedOwnerUnit;
+    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+    AActor* SpawnedActor = World->SpawnActor<AActor>(SpawnedAttackActorClass, SpawnTransform, SpawnParams);
+
+    if (!SpawnedActor)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] SpawnAttackActor Failed | Reason=SpawnFailed | Owner=%s | AttackActorClass=%s | SpawnSocket=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(SpawnedAttackActorClass), *SpawnSocketName.ToString());
+        return;
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("[GA_AttackBase] SpawnAttackActor Success | Owner=%s | SpawnedActor=%s | SpawnSocket=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(SpawnedActor), *SpawnSocketName.ToString());
 }
 
 void UGA_AttackBase::ClearCachedAttackContext()
