@@ -1,170 +1,106 @@
 #include "GAS/Ability/GA_DefaultAttack.h"
+#include "Unit/UnitBase.h"
 #include "AbilitySystemComponent.h"
-#include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
-#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "GameplayEffect.h"
 #include "GameplayTagContainer.h"
-
-#include "GAS/Library/CombatEffectLibrary.h"
-#include "Unit/UnitBase.h"
+#include "GAS/Attribute/AS_Unit.h"
 
 UGA_DefaultAttack::UGA_DefaultAttack()
 {
-    // 유닛 단위로 인스턴스를 유지한다.
-    InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-
-    // 히트 이벤트 태그 기본값
-    AttackHitEventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Hit"));
 }
 
-void UGA_DefaultAttack::ActivateAbility(
-    const FGameplayAbilitySpecHandle Handle,
-    const FGameplayAbilityActorInfo* ActorInfo,
-    const FGameplayAbilityActivationInfo ActivationInfo,
-    const FGameplayEventData* TriggerEventData)
+bool UGA_DefaultAttack::CacheAttackContext()
 {
-    //UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ActivateAbility | Owner=%s | Target=%s | HitTag=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(CachedTargetUnit), *AttackHitEventTag.ToString());
-
-    // 현재 활성화 정보를 캐싱한다.
-    CachedHandle = Handle;
-    CachedActivationInfo = ActivationInfo;
-    bDamageAppliedThisActivation = false;
-    bFinishRequested = false;
-
-    // 비용/쿨다운 등을 커밋한다.
-    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-    {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-        return;
-    }
-
-    // 현재 Ability를 사용하는 유닛을 가져온다.
-    CachedOwnerUnit = Cast<AUnitBase>(GetAvatarActorFromActorInfo());
-
     if (!CachedOwnerUnit)
     {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-        return;
+        return false;
     }
 
     // 현재 공격 대상 유닛을 가져온다.
     CachedTargetUnit = CachedOwnerUnit->PendingTargetUnit;
 
-    //UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ActivateAbility | Owner=%s | Target=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(CachedTargetUnit));
-
-    if (!CachedTargetUnit || !CachedTargetUnit->IsUnitAlive())
-    {
-        FinishAttackAbility(true);
-        return;
-    }
-
-    // 몽타주와 데미지 GE 클래스가 없으면 공격을 진행할 수 없다.
-    if (!AttackMontage || !DamageEffectClass)
-    {
-        FinishAttackAbility(true);
-        return;
-    }
-
-    // 히트 이벤트를 기다리는 태스크를 먼저 생성한다.
-    WaitHitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, AttackHitEventTag);
-
-    if (WaitHitEventTask)
-    {
-        WaitHitEventTask->EventReceived.AddDynamic(this, &UGA_DefaultAttack::OnHitEventReceived);
-        WaitHitEventTask->ReadyForActivation();
-    }
-
-    // 공격 몽타주를 재생한다.
-    PlayMontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-        this,
-        NAME_None,
-        AttackMontage
-    );
-
-    if (!PlayMontageTask)
-    {
-        FinishAttackAbility(true);
-        return;
-    }
-
-    // 몽타주 종료 관련 콜백을 연결한다.
-    PlayMontageTask->OnCompleted.AddDynamic(this, &UGA_DefaultAttack::OnAttackMontageCompleted);
-    PlayMontageTask->OnBlendOut.AddDynamic(this, &UGA_DefaultAttack::OnAttackMontageBlendOut);
-    PlayMontageTask->OnInterrupted.AddDynamic(this, &UGA_DefaultAttack::OnAttackMontageInterrupted);
-    PlayMontageTask->OnCancelled.AddDynamic(this, &UGA_DefaultAttack::OnAttackMontageCancelled);
-    PlayMontageTask->ReadyForActivation();
+    return true;
 }
 
-void UGA_DefaultAttack::EndAbility(
-    const FGameplayAbilitySpecHandle Handle,
-    const FGameplayAbilityActorInfo* ActorInfo,
-    const FGameplayAbilityActivationInfo ActivationInfo,
-    bool bReplicateEndAbility,
-    bool bWasCancelled)
+bool UGA_DefaultAttack::ValidateAttackContext() const
 {
-    // 태스크 캐시를 정리한다.
-    PlayMontageTask = nullptr;
-    WaitHitEventTask = nullptr;
-    CachedOwnerUnit = nullptr;
+    if (!CachedTargetUnit)
+    {
+        return false;
+    }
+
+    if (!CachedTargetUnit->IsUnitAlive())
+    {
+        return false;
+    }
+
+    return true;
+}
+
+void UGA_DefaultAttack::ApplyAttackEffect()
+{
+    ApplyDamageEffectToTarget();
+}
+
+void UGA_DefaultAttack::ClearCachedAttackContext()
+{
     CachedTargetUnit = nullptr;
-
-    Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
-void UGA_DefaultAttack::OnAttackMontageCompleted()
+void UGA_DefaultAttack::ApplyDamageEffectToTarget()
 {
-    FinishAttackAbility(false);
-}
-
-void UGA_DefaultAttack::OnAttackMontageBlendOut()
-{
-}
-
-void UGA_DefaultAttack::OnAttackMontageInterrupted()
-{
-    FinishAttackAbility(true);
-}
-
-void UGA_DefaultAttack::OnAttackMontageCancelled()
-{
-    FinishAttackAbility(true);
-}
-
-void UGA_DefaultAttack::OnHitEventReceived(FGameplayEventData Payload)
-{
-    //UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] Hit Event Received | PayloadTag=%s | Owner=%s | Target=%s"), *Payload.EventTag.ToString(), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(CachedTargetUnit));
-
-    if (bDamageAppliedThisActivation)
+    // 유효한 공격자/타겟이 없으면 종료
+    if (!CachedOwnerUnit || !CachedTargetUnit)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] Hit Event Ignored | Reason=AlreadyApplied"));
+        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | Invalid Owner or Target"));
         return;
     }
 
-    bDamageAppliedThisActivation = true;
-
-    UCombatEffectLibrary::ApplyDamageToUnit(
-        CachedOwnerUnit,
-        CachedTargetUnit,
-        DamageEffectClass,
-        DamageAmount
-    );
-}
-
-void UGA_DefaultAttack::FinishAttackAbility(bool bWasCancelled)
-{
-    // 중복 종료 방지
-    if (bFinishRequested)
+    if (!CachedTargetUnit->IsUnitAlive())
     {
+        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | Target Dead | Target=%s"), *GetNameSafe(CachedTargetUnit));
         return;
     }
 
-    bFinishRequested = true;
+    UAbilitySystemComponent* SourceASC = CachedOwnerUnit->GetAbilitySystemComponent();
+    UAbilitySystemComponent* TargetASC = CachedTargetUnit->GetAbilitySystemComponent();
 
-    // 공격이 끝났음을 UnitBase에 알리고 복귀를 시작한다.
-    if (CachedOwnerUnit)
+    if (!SourceASC || !TargetASC)
     {
-        CachedOwnerUnit->OnSkillFinished();
+        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | Invalid ASC | Source=%s | Target=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(CachedTargetUnit));
+        return;
     }
 
-    EndAbility(CachedHandle, CurrentActorInfo, CachedActivationInfo, false, bWasCancelled);
+    if (!DamageEffectClass)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | DamageEffectClass is null"));
+        return;
+    }
+
+    const float BeforeHP = TargetASC->GetNumericAttribute(UAS_Unit::GetHPAttribute());
+
+    FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
+    EffectContext.AddSourceObject(CachedOwnerUnit);
+
+    FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, EffectContext);
+
+    if (!SpecHandle.IsValid())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | Invalid SpecHandle"));
+        return;
+    }
+
+    const FGameplayTag DamageTag = FGameplayTag::RequestGameplayTag(FName("Data.Damage"));
+
+    SpecHandle.Data->SetSetByCallerMagnitude(DamageTag, -DamageAmount);
+
+    const FActiveGameplayEffectHandle AppliedHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
+
+    const float AfterHP = TargetASC->GetNumericAttribute(UAS_Unit::GetHPAttribute());
+
+    if (!AppliedHandle.IsValid())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GA_DefaultAttack] ApplyDamageEffectToTarget Failed | Invalid AppliedHandle | Source=%s | Target=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(CachedTargetUnit));
+        return;
+    }
 }

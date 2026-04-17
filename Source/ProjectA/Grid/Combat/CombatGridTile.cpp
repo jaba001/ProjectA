@@ -97,7 +97,7 @@ void ACombatGridTile::NotifyActorOnClicked(FKey ButtonPressed)
             return;
         }
 
-        UE_LOG(LogTemp, Warning, TEXT("[GridTile] PlayerSkillClick | Unit=%s | SkillData=%s | Ability=%s | TargetTile=(%d,%d) | OccupyingUnit=%s"), *GetNameSafe(ActiveUnit), *GetNameSafe(SkillData), *GetNameSafe(SkillData->AbilityClass), GridCoord.X, GridCoord.Y, *GetNameSafe(GetOccupyingUnit()));
+        //UE_LOG(LogTemp, Log, TEXT("[GridTile] PlayerSkillClick | Unit=%s | SkillData=%s | Ability=%s | TargetTile=(%d,%d) | OccupyingUnit=%s"), *GetNameSafe(ActiveUnit), *GetNameSafe(SkillData), *GetNameSafe(SkillData->AbilityClass), GridCoord.X, GridCoord.Y, *GetNameSafe(GetOccupyingUnit()));
 
         PC->SetSelectedTile(this);
         PC->CancelTileInputMode();

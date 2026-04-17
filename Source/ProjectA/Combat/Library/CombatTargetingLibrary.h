@@ -14,7 +14,6 @@ class PROJECTA_API UCombatTargetingLibrary : public UBlueprintFunctionLibrary
 
 public:
     UFUNCTION(BlueprintCallable, Category = "Combat|Targeting")
-    static TArray<AUnitBase*> CollectUniqueAliveUnitsFromTiles(
-        const TArray<ACombatGridTile*>& TargetTiles,
-        AUnitBase* SourceUnit);
+    static TArray<AUnitBase*> CollectUniqueAliveUnitsFromTiles(const TArray<ACombatGridTile*>& TargetTiles, AUnitBase* SourceUnit);
+
 };

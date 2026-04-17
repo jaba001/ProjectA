@@ -2,9 +2,7 @@
 #include "Grid/Combat/CombatGridTile.h"
 #include "Unit/UnitBase.h"
 
-TArray<AUnitBase*> UCombatTargetingLibrary::CollectUniqueAliveUnitsFromTiles(
-    const TArray<ACombatGridTile*>& TargetTiles,
-    AUnitBase* SourceUnit)
+TArray<AUnitBase*> UCombatTargetingLibrary::CollectUniqueAliveUnitsFromTiles(const TArray<ACombatGridTile*>& TargetTiles, AUnitBase* SourceUnit)
 {
     TArray<AUnitBase*> ResultUnits;
     TSet<AUnitBase*> UniqueUnits;

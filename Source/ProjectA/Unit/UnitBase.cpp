@@ -8,8 +8,10 @@
 #include "AIController.h"
 
 #include "Combat/CombatManager.h"
-#include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Combat/Library/CombatTargetingLibrary.h"
+#include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Controller/UnitAIController.h"
 #include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -448,7 +450,7 @@ AUnitAIController* AUnitBase::GetOrCreateAIController()
 
 void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile)
 {
-    //UE_LOG(LogTemp, Log, TEXT("[UnitBase] StartSkill | Unit=%s | SkillData=%s | Ability=%s | TargetTile=%s | OccupyingUnit=%s | MoveToTarget=%s"), *GetName(), *GetNameSafe(SkillData), SkillData ? *GetNameSafe(SkillData->AbilityClass) : TEXT("None"), *GetNameSafe(TargetTile), TargetTile ? *GetNameSafe(TargetTile->GetOccupyingUnit()) : TEXT("None"), SkillData && SkillData->bMoveToTarget ? TEXT("true") : TEXT("false"));
+    //UE_LOG(LogTemp, Log, TEXT("[UnitBase] StartSkill_1 | Unit=%s | SkillData=%s | Ability=%s | TargetTile=%s | OccupyingUnit=%s | MoveToTarget=%s"), *GetName(), *GetNameSafe(SkillData), SkillData ? *GetNameSafe(SkillData->AbilityClass) : TEXT("None"), *GetNameSafe(TargetTile), TargetTile ? *GetNameSafe(TargetTile->GetOccupyingUnit()) : TEXT("None"), SkillData && SkillData->bMoveToTarget ? TEXT("true") : TEXT("false"));
 
     if (!SkillData)
     {
@@ -500,7 +502,17 @@ void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile
         return;
     }
 
-    AbilitySystem->TryActivateAbilityByClass(SkillData->AbilityClass);
+    // Ability 활성화 성공 여부를 바로 확인한다.
+    const bool bActivated = AbilitySystem->TryActivateAbilityByClass(SkillData->AbilityClass);
+
+    UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill Activate | Unit=%s | Ability=%s | Activated=%d | TargetTile=(%d,%d) | TargetUnit=%s"),
+        *GetNameSafe(this),
+        *GetNameSafe(SkillData->AbilityClass),
+        bActivated ? 1 : 0,
+        TargetTile->GridCoord.X,
+        TargetTile->GridCoord.Y,
+        *GetNameSafe(PendingTargetUnit));
+
 }
 
 void AUnitBase::ExecuteSkillAtTarget()
@@ -513,16 +525,45 @@ void AUnitBase::ExecuteSkillAtTarget()
         return;
     }
 
-    // 유효한 타겟이 없으면 스킬을 종료하고 복귀 흐름으로 넘긴다.
-    if (!PendingTargetUnit || !PendingTargetUnit->IsUnitAlive())
+    if (!PendingSkillData)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteSkillAtTarget Return | Reason=InvalidTarget"));
+        UE_LOG(LogTemp, Warning, TEXT("[Skill] ExecuteSkillAtTarget Return | Reason=PendingSkillDataNull"));
         OnSkillFinished();
         return;
     }
 
+    if (PendingSkillData->TargetingType == ESkillTargetingType::Unit)
+    {
+        if (!PendingTargetUnit || !PendingTargetUnit->IsUnitAlive())
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[Skill] ExecuteSkillAtTarget Return | Reason=InvalidTargetUnit"));
+            OnSkillFinished();
+            return;
+        }
+    }
+    else if (PendingSkillData->TargetingType == ESkillTargetingType::Tile)
+    {
+        if (!PendingSkillTargetTile)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[Skill] ExecuteSkillAtTarget Return | Reason=InvalidTargetTile"));
+            OnSkillFinished();
+            return;
+        }
+    }
+
     // 스킬 직전에 타겟을 바라보도록 회전한다.
-    FVector Direction = PendingTargetUnit->GetActorLocation() - GetActorLocation();
+    FVector LookTargetLocation = GetActorLocation();
+
+    if (PendingTargetUnit)
+    {
+        LookTargetLocation = PendingTargetUnit->GetActorLocation();
+    }
+    else if (PendingSkillTargetTile)
+    {
+        LookTargetLocation = PendingSkillTargetTile->GetActorLocation();
+    }
+
+    FVector Direction = LookTargetLocation - GetActorLocation();
     Direction.Z = 0.0f;
 
     if (!Direction.IsNearlyZero())
@@ -545,6 +586,75 @@ void AUnitBase::ExecuteSkillAtTarget()
     {
         OnSkillFinished();
     }
+}
+
+TArray<AUnitBase*> AUnitBase::ResolveSkillTargetUnits()
+{
+    TArray<AUnitBase*> Result;
+
+    if (!PendingSkillData)
+    {
+        return Result;
+    }
+
+    if (PendingSkillData->AreaType == ESkillAreaType::Single)
+    {
+        AUnitBase* TargetUnit = PendingTargetUnit;
+
+        if (!TargetUnit && PendingSkillTargetTile)
+        {
+            TargetUnit = PendingSkillTargetTile->GetOccupyingUnit();
+        }
+
+        if (!TargetUnit)
+        {
+            return Result;
+        }
+
+        if (TargetUnit == this)
+        {
+            return Result;
+        }
+
+        if (!TargetUnit->IsUnitAlive())
+        {
+            return Result;
+        }
+
+        Result.Add(TargetUnit);
+        return Result;
+    }
+
+    ACombatGridTile* CenterTile = nullptr;
+
+    if (PendingSkillData->AreaType == ESkillAreaType::AroundTarget)
+    {
+        CenterTile = PendingSkillTargetTile;
+    }
+    else if (PendingSkillData->AreaType == ESkillAreaType::AroundSelf)
+    {
+        CenterTile = CurrentTile;
+    }
+    else
+    {
+        return Result;
+    }
+
+    if (!CenterTile)
+    {
+        return Result;
+    }
+
+    ACombatGridManager* CombatGridManager = Cast<ACombatGridManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatGridManager::StaticClass()));
+
+    if (!CombatGridManager)
+    {
+        return Result;
+    }
+
+    const TArray<ACombatGridTile*> AreaTiles = CombatGridManager->GetTilesInChebyshevRange(CenterTile, PendingSkillData->AreaRadius);
+
+    return UCombatTargetingLibrary::CollectUniqueAliveUnitsFromTiles(AreaTiles, this);
 }
 
 void AUnitBase::OnSkillFinished()

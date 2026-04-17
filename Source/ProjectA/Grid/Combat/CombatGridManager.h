@@ -53,5 +53,6 @@ public:
     UFUNCTION(BlueprintCallable, Category = "CombatGrid")
     TArray<ACombatGridTile*> GetAdjacentTiles(ACombatGridTile* CenterTile) const;
 
-
+    UFUNCTION(BlueprintCallable, Category = "CombatGrid")
+    TArray<ACombatGridTile*> GetTilesInChebyshevRange(ACombatGridTile* CenterTile, int32 Range) const;
 };

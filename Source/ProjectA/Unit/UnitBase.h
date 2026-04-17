@@ -254,6 +254,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Skill")
     virtual void ExecuteSkillAtTarget();
 
+    UFUNCTION(BlueprintCallable, Category = "Skill")
+    virtual TArray<AUnitBase*> ResolveSkillTargetUnits();
+
     // 행동 종료 처리
     // 기본 구현은 원래 타일로 복귀를 시작한다.
     UFUNCTION(Category = "Skill")
@@ -309,12 +312,12 @@ protected:
     UAS_Unit* AttributeSet = nullptr;
 
     // 기본 공격 Ability 클래스
-    UPROPERTY(EditDefaultsOnly, Category = "GAS")
+    UPROPERTY(EditDefaultsOnly, Category = "GAS_Ability")
     TSubclassOf<UGameplayAbility> DefaultAttackAbilityClass;
 
     // AI 및 전투 로직에서 사용할 추가 Skill 슬롯
     // 기본 공격 외에 최대 4개의 스킬을 장착하는 구조를 가정한다.
-    UPROPERTY(EditDefaultsOnly, Category = "GAS")
+    UPROPERTY(EditDefaultsOnly, Category = "GAS_Ability")
     TArray<TSubclassOf<UGameplayAbility>> EquippedSkillAbilityClasses;
 
     // 현재 유닛이 장착한 스킬 정의 데이터 목록

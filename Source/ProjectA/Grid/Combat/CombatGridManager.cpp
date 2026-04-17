@@ -140,3 +140,43 @@ TArray<ACombatGridTile*> ACombatGridManager::GetAdjacentTiles(ACombatGridTile* C
 
     return Result;
 }
+
+TArray<ACombatGridTile*> ACombatGridManager::GetTilesInChebyshevRange(ACombatGridTile* CenterTile, int32 Range) const
+{
+    TArray<ACombatGridTile*> Result;
+
+    if (!CenterTile)
+    {
+        return Result;
+    }
+
+    if (Range < 0)
+    {
+        return Result;
+    }
+
+    const FIntPoint CenterCoord = CenterTile->GridCoord;
+
+    for (int32 RowOffset = -Range; RowOffset <= Range; ++RowOffset)
+    {
+        for (int32 ColOffset = -Range; ColOffset <= Range; ++ColOffset)
+        {
+            const FIntPoint TestCoord =
+            {
+                CenterCoord.X + RowOffset,
+                CenterCoord.Y + ColOffset
+            };
+
+            ACombatGridTile* FoundTile = GetTileAtCoord(TestCoord);
+
+            if (!FoundTile)
+            {
+                continue;
+            }
+
+            Result.Add(FoundTile);
+        }
+    }
+
+    return Result;
+}
