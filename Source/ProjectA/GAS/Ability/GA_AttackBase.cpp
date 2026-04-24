@@ -7,6 +7,8 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 
+#include "Combat/SkillActor/AttackSkillActorBase.h"
+#include "Combat/SkillActor/SkillActorBase.h"
 #include "Unit/UnitBase.h"
 
 UGA_AttackBase::UGA_AttackBase()
@@ -190,50 +192,56 @@ void UGA_AttackBase::ApplyAttackEffect()
 
 void UGA_AttackBase::SpawnAttackActor()
 {
-    if (!CachedOwnerUnit)
+    if (!CachedOwnerUnit || !SpawnedAttackActorClass)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] SpawnAttackActor Failed | Reason=OwnerNull"));
+        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] SpawnAttackActor Failed | OwnerOrClassNull | Owner=%s | ActorClass=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(SpawnedAttackActorClass));
         return;
     }
 
-    if (!SpawnedAttackActorClass)
+    FVector SpawnLocation = CachedOwnerUnit->GetActorLocation();
+    FRotator SpawnRotation = CachedOwnerUnit->GetActorRotation();
+
+    USkeletalMeshComponent* OwnerMesh = CachedOwnerUnit->GetMesh();
+
+    if (OwnerMesh && SpawnSocketName != NAME_None && OwnerMesh->DoesSocketExist(SpawnSocketName))
     {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] SpawnAttackActor Failed | Reason=AttackActorClassNull | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
-        return;
-    }
-
-    UWorld* World = GetWorld();
-
-    if (!World)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] SpawnAttackActor Failed | Reason=WorldNull | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
-        return;
-    }
-
-    FTransform SpawnTransform = CachedOwnerUnit->GetActorTransform();
-
-    if (USkeletalMeshComponent* MeshComp = CachedOwnerUnit->GetMesh())
-    {
-        if (!SpawnSocketName.IsNone() && MeshComp->DoesSocketExist(SpawnSocketName))
-        {
-            SpawnTransform = MeshComp->GetSocketTransform(SpawnSocketName, RTS_World);
-        }
+        SpawnLocation = OwnerMesh->GetSocketLocation(SpawnSocketName);
+        SpawnRotation = OwnerMesh->GetSocketRotation(SpawnSocketName);
     }
 
     FActorSpawnParameters SpawnParams;
     SpawnParams.Owner = CachedOwnerUnit;
     SpawnParams.Instigator = CachedOwnerUnit;
-    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-    AActor* SpawnedActor = World->SpawnActor<AActor>(SpawnedAttackActorClass, SpawnTransform, SpawnParams);
+    AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(SpawnedAttackActorClass, SpawnLocation, SpawnRotation, SpawnParams);
 
     if (!SpawnedActor)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] SpawnAttackActor Failed | Reason=SpawnFailed | Owner=%s | AttackActorClass=%s | SpawnSocket=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(SpawnedAttackActorClass), *SpawnSocketName.ToString());
+        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] SpawnAttackActor Failed | SpawnedActorNull | Owner=%s | ActorClass=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(SpawnedAttackActorClass));
         return;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[GA_AttackBase] SpawnAttackActor Success | Owner=%s | SpawnedActor=%s | SpawnSocket=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(SpawnedActor), *SpawnSocketName.ToString());
+    FSkillActorInitData InitData;
+    InitData.SourceUnit = CachedOwnerUnit;
+    InitData.SkillData = CachedOwnerUnit->PendingSkillData;
+    InitData.TargetTile = CachedOwnerUnit->PendingSkillTargetTile;
+    InitData.TargetWorldLocation = InitData.TargetTile ? InitData.TargetTile->GetActorLocation() : SpawnLocation;
+
+    if (AAttackSkillActorBase* AttackSkillActor = Cast<AAttackSkillActorBase>(SpawnedActor))
+    {
+        AttackSkillActor->InitializeAttackSkillActor(InitData, DamageEffectClass, DamageAmount);
+        UE_LOG(LogTemp, Log, TEXT("[GA_AttackBase] SpawnAttackActor InitializedAttackSkillActor | Actor=%s | Owner=%s"), *GetNameSafe(SpawnedActor), *GetNameSafe(CachedOwnerUnit));
+        return;
+    }
+
+    if (ASkillActorBase* SkillActor = Cast<ASkillActorBase>(SpawnedActor))
+    {
+        SkillActor->InitializeSkillActor(InitData);
+        UE_LOG(LogTemp, Log, TEXT("[GA_AttackBase] SpawnAttackActor InitializedSkillActor | Actor=%s | Owner=%s"), *GetNameSafe(SpawnedActor), *GetNameSafe(CachedOwnerUnit));
+        return;
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] SpawnAttackActor Warning | Spawned actor is not SkillActorBase | Actor=%s | ActorClass=%s"), *GetNameSafe(SpawnedActor), *GetNameSafe(SpawnedActor->GetClass()));
 }
 
 void UGA_AttackBase::ClearCachedAttackContext()
