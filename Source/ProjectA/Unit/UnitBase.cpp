@@ -32,22 +32,17 @@ AUnitBase::AUnitBase()
 
     GetCharacterMovement()->MaxWalkSpeed = 700.f;
 
-    // 캡슐 콜리전을 CombatUnit 프리셋으로 초기화한다
     GetCapsuleComponent()->SetCollisionProfileName(TEXT("CombatUnit"));
 
-	// AI Controller 설정
     AIControllerClass = AUnitAIController::StaticClass();
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
-    // GAS 핵심 개체 생성
     AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystem"));
     AttributeSet = CreateDefaultSubobject<UAS_Unit>(TEXT("AttributeSet"));
 
-    // GAS 복제 설정
     AbilitySystem->SetIsReplicated(true);
     AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 
-	// 네트워크 Actor 복제 설정
     bReplicates = true;
     SetReplicateMovement(true);
 }
@@ -99,13 +94,11 @@ void AUnitBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    //DOREPLIFETIME 는 서버값을 클라이언트로 복제
     DOREPLIFETIME(AUnitBase, Team);
 }
 
 void AUnitBase::SetTeam(ETeam NewTeam)
 {
-    // 서버 전용 변경
     if (!HasAuthority())
         return;  
 
@@ -190,7 +183,6 @@ void AUnitBase::Die()
     CurrentActionType = EUnitActionType::None;
     MovePhase = EUnitMovePhase::None;
 
-    // 죽음 처리: 이동 불가, 충돌 비활성화, 래그돌 적용
     GetCharacterMovement()->DisableMovement();
 
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -202,20 +194,16 @@ void AUnitBase::Die()
 
     if (!DeathImpulse.IsNearlyZero())
     {
-        // 블루프린트에서 지정된 값 사용
         Impulse = DeathImpulse;
     }
     else
     {
-        // 기본 랜덤 Impulse
         Impulse = FMath::VRand() * 2000.0f;
         Impulse.Z = FMath::Abs(Impulse.Z) + 500.0f;
     }
     GetMesh()->AddImpulse(Impulse, NAME_None, true);
 
     //UE_LOG(LogTemp, Log, TEXT("[Death] %s died"), *GetName());
-    // 
-    // 타일 점유 상태 변경 이후 전열 보호 상태를 다시 계산한다
     ACombatManager* CombatManager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatManager::StaticClass()));
 
     if (CombatManager)
@@ -234,7 +222,6 @@ void AUnitBase::SetCurrentTile(ACombatGridTile* NewTile)
     if (!NewTile || CurrentTile == NewTile)
         return;
 
-    // 이전 타일 정리
     if (CurrentTile)
     {
         CurrentTile->SetOccupyingUnit(nullptr);
@@ -242,10 +229,8 @@ void AUnitBase::SetCurrentTile(ACombatGridTile* NewTile)
 
     CurrentTile = NewTile;
 
-    // 새 타일 등록
     CurrentTile->SetOccupyingUnit(this);
 
-    // 타일 점유 상태 변경 이후 전열 보호 상태를 다시 계산한다
     ACombatManager* CombatManager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatManager::StaticClass()));
 
     if (CombatManager)
@@ -333,24 +318,20 @@ void AUnitBase::ReturnToOriginalTile()
 
 void AUnitBase::SnapToTile(ACombatGridTile* Tile, const FRotator& TargetRotation)
 {
-    // 유효한 타일이 없으면 종료
     if (!Tile)
     {
         return;
     }
 
-    // 타일 중심 좌표를 구한다.
     FVector Center = Tile->GetActorLocation();
     Center.Z = GetActorLocation().Z;
 
-    // MoveComponentTo는 LatentAction이므로 완료 후 복귀할 함수명이 필요하다.
     FLatentActionInfo LatentInfo;
     LatentInfo.CallbackTarget = this;
     LatentInfo.UUID = 1001;
     LatentInfo.Linkage = 0;
     LatentInfo.ExecutionFunction = FName(TEXT("OnSnapToTileFinished"));
 
-    // 캡슐을 타일 중심으로 부드럽게 보정 이동시킨다.
     UKismetSystemLibrary::MoveComponentTo(
         GetCapsuleComponent(),
         Center,
@@ -397,7 +378,6 @@ void AUnitBase::HandleMoveCompleted()
     {
     case EUnitMovePhase::MovingToTile:
     {
-        // 일반 타일 이동
         if (PendingTile)
         {
             SetCurrentTile(PendingTile);
@@ -409,14 +389,12 @@ void AUnitBase::HandleMoveCompleted()
     }
     case EUnitMovePhase::MovingToTarget:
     {
-        // 스킬 대상 앞으로 접근
         MovePhase = EUnitMovePhase::WaitingForSkill;
         ExecuteSkillAtTarget();
         break;
     }
     case EUnitMovePhase::ReturningToOriginalTile:
     {
-        // 스킬 종료 후 원위치 복귀
         if (PendingTile)
         {
             SetCurrentTile(PendingTile);
@@ -468,16 +446,13 @@ void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile
         return;
     }
 
-    // 현재 실행 대기 중인 스킬 컨텍스트를 저장한다
     PendingSkillData = SkillData;
     PendingSkillAbilityClass = SkillData->AbilityClass;
     PendingSkillTargetTile = TargetTile;
     PendingTargetUnit = TargetTile->GetOccupyingUnit();
 
-    // 스킬 시작 전에 원래 타일을 저장한다
     OriginalTileBeforeSkill = CurrentTile;
 
-    // 현재 행동 타입을 Skill로 설정한다
     CurrentActionType = EUnitActionType::Skill;
 
     if (SkillData->bMoveToTarget)
@@ -500,7 +475,6 @@ void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile
         return;
     }
 
-    // Ability 활성화 성공 여부를 바로 확인한다.
     const bool bActivated = AbilitySystem->TryActivateAbilityByClass(SkillData->AbilityClass);
 
     //UE_LOG(LogTemp, Log, TEXT("[UnitBase] StartSkill Activate | Unit=%s | Ability=%s | Activated=%d | TargetTile=(%d,%d) | TargetUnit=%s"), *GetNameSafe(this), *GetNameSafe(SkillData->AbilityClass), bActivated ? 1 : 0, TargetTile->GridCoord.X, TargetTile->GridCoord.Y, *GetNameSafe(PendingTargetUnit));
@@ -510,7 +484,6 @@ void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile
 void AUnitBase::ExecuteSkillAtTarget()
 {
     
-    // 행동 대기 상태가 아니면 스킬 실행을 시작할 수 없다.
     if (MovePhase != EUnitMovePhase::WaitingForSkill)
     {
         UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteSkillAtTarget Return | Reason=InvalidMovePhase"));
@@ -543,7 +516,6 @@ void AUnitBase::ExecuteSkillAtTarget()
         }
     }
 
-    // 스킬 직전에 타겟을 바라보도록 회전한다.
     FVector LookTargetLocation = GetActorLocation();
 
     if (PendingTargetUnit)
@@ -563,7 +535,6 @@ void AUnitBase::ExecuteSkillAtTarget()
         SetActorRotation(Direction.Rotation());
     }
 
-    // 실제 스킬 실행은 GAS Ability가 담당한다.
     if (!AbilitySystem || !PendingSkillData || !PendingSkillData->AbilityClass)
     {
         UE_LOG(LogTemp, Warning, TEXT("[Skill] ExecuteSkillAtTarget Return | Reason=NoASCOrAbilityClass | ASC=%d | SkillData=%s | AbilityClass=%s"), AbilitySystem ? 1 : 0, *GetNameSafe(PendingSkillData), PendingSkillData ? *GetNameSafe(PendingSkillData->AbilityClass) : TEXT("None"));
@@ -573,7 +544,6 @@ void AUnitBase::ExecuteSkillAtTarget()
 
     const bool bActivated = AbilitySystem->TryActivateAbilityByClass(PendingSkillAbilityClass);
     
-    // Ability 활성화 실패 시 스킬을 진행할 수 없으므로 종료한다.
     if (!bActivated)
     {
         OnSkillFinished();
@@ -700,7 +670,6 @@ void AUnitBase::StartMoveAction(ACombatGridTile* TargetTile)
         return;
     }
     
-    //자기타일로 이동하려는 경우
     if (TargetTile == CurrentTile)
     {
         return;

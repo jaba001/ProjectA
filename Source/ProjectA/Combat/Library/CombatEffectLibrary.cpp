@@ -1,4 +1,4 @@
-#include "GAS/Library/CombatEffectLibrary.h"
+#include "Combat/Library/CombatEffectLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayEffect.h"
 #include "GameplayTagContainer.h"

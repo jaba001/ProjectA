@@ -92,9 +92,7 @@ void ACombatManager::StartCombat_Internal()
         return;
     }
 
-    //실제 유닛 전달
     TurnManager->InitializeTurnOrder(CombatUnits);
-	//클라동기화
     CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
     RefreshReachableMoveTiles();
     RefreshTileProtectedByFront();
@@ -102,7 +100,6 @@ void ACombatManager::StartCombat_Internal()
 
 void ACombatManager::RegisterUnits(const TArray<AUnitBase*>& Units)
 {
-    // 서버 전용
     if (!HasAuthority()) return;  
 
     CombatUnits = Units;
@@ -121,7 +118,7 @@ void ACombatManager::AdvanceTurn()
     }
 
     TurnManager->EndTurn();
-    //클라동기화
+    //클占쏢동깍옙화
     CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
     RefreshReachableMoveTiles();
     RefreshTileProtectedByFront();
@@ -310,7 +307,6 @@ void ACombatManager::RefreshTileProtectedByFront()
 
         if (Territory == ETileTerritory::Player)
         {
-            // 플레이어 후열은 Y == 0
             if (Coord.Y != 0)
             {
                 continue;
@@ -320,7 +316,6 @@ void ACombatManager::RefreshTileProtectedByFront()
         }
         else if (Territory == ETileTerritory::Enemy)
         {
-            // 적 후열은 Y == 3
             if (Coord.Y != 3)
             {
                 continue;

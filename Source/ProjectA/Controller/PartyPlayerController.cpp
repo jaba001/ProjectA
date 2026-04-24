@@ -284,7 +284,6 @@ bool APartyPlayerController::IsValidTileForPendingSkill(ACombatGridTile* Tile) c
     const ETileTerritory TileTerritory = Tile->GetTerritory();
 
     // Check whether the tile belongs to enemy territory for the active unit.
-    // 현재 활성 유닛 기준으로 적 진영 타일인지 검사한다.
     auto IsEnemyTileForActiveTeam = [&]() -> bool
         {
             return (ActiveTeam == ETeam::Player && TileTerritory == ETileTerritory::Enemy)
@@ -292,7 +291,6 @@ bool APartyPlayerController::IsValidTileForPendingSkill(ACombatGridTile* Tile) c
         };
 
     // Check whether the tile belongs to ally territory for the active unit.
-    // 현재 활성 유닛 기준으로 아군 진영 타일인지 검사한다.
     auto IsAllyTileForActiveTeam = [&]() -> bool
         {
             return (ActiveTeam == ETeam::Player && TileTerritory == ETileTerritory::Player)
@@ -300,35 +298,30 @@ bool APartyPlayerController::IsValidTileForPendingSkill(ACombatGridTile* Tile) c
         };
 
     // Check whether the tile has a living target unit.
-    // 현재 타일에 살아있는 유닛이 있는지 검사한다.
     auto HasAliveTargetUnit = [&]() -> bool
         {
             return TargetUnit && TargetUnit->IsUnitAlive();
         };
 
     // Check whether the target unit is an enemy of the active unit.
-    // 타겟 유닛이 활성 유닛 기준 적인지 검사한다.
     auto IsEnemyTargetUnit = [&]() -> bool
         {
             return HasAliveTargetUnit() && TargetUnit->GetTeam() != ActiveTeam;
         };
 
     // Check whether the target unit is an ally of the active unit.
-    // 타겟 유닛이 활성 유닛 기준 아군인지 검사한다.
     auto IsAllyTargetUnit = [&]() -> bool
         {
             return HasAliveTargetUnit() && TargetUnit->GetTeam() == ActiveTeam;
         };
 
     // Check whether front protection blocks this tile.
-    // 전열 보호 때문에 이 타일 선택이 막히는지 검사한다.
     auto IsBlockedByFrontProtection = [&]() -> bool
         {
             return !PendingSkillData->bIgnoreFront && Tile->GetProtectedByFront();
         };
 
     // Dead units on a tile should never be treated as valid targets.
-    // 타일 위 죽은 유닛은 어떤 규칙에서도 유효 타겟으로 보지 않는다.
     if (TargetUnit && !TargetUnit->IsUnitAlive())
     {
         return false;

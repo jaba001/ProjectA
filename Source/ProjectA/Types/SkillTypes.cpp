@@ -1,5 +1,2 @@
-
-
-
 #include "Types/SkillTypes.h"
 

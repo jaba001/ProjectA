@@ -12,15 +12,6 @@ class UGameplayEffect;
 class UAbilityTask_PlayMontageAndWait;
 class UAbilityTask_WaitGameplayEvent;
 
-// 공격 Ability 공통 부모
-// - 공통 활성화 흐름
-// - 히트 이벤트 대기
-// - 몽타주 재생
-// - 공통 종료 처리
-// 를 담당한다.
-//
-// 실제 타겟 캐싱/검증/효과 적용은 자식 Ability 가 구현한다.
-
 UCLASS(Abstract)
 class PROJECTA_API UGA_AttackBase : public UGameplayAbility
 {

@@ -1,7 +1,7 @@
 #include "GAS/Ability/GA_AreaAttack.h"
 #include "Combat/Library/CombatTargetingLibrary.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
-#include "GAS/Library/CombatEffectLibrary.h"
+#include "Combat/Library/CombatEffectLibrary.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Kismet/GameplayStatics.h"
