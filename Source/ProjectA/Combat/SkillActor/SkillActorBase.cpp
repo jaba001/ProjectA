@@ -24,7 +24,7 @@ void ASkillActorBase::InitializeSkillActor(const FSkillActorInitData& InitData)
         TargetWorldLocation = TargetTile->GetActorLocation();
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[SkillActorBase] InitializeSkillActor | Actor=%s | Source=%s | Skill=%s | TargetTile=%s | TargetLocation=%s"), *GetNameSafe(this), *GetNameSafe(SourceUnit), *GetNameSafe(SkillData), *GetNameSafe(TargetTile), *TargetWorldLocation.ToString());
+    //UE_LOG(LogTemp, Log, TEXT("[SkillActorBase] InitializeSkillActor | Actor=%s | Source=%s | Skill=%s | TargetTile=%s | TargetLocation=%s"), *GetNameSafe(this), *GetNameSafe(SourceUnit), *GetNameSafe(SkillData), *GetNameSafe(TargetTile), *TargetWorldLocation.ToString());
 
     BeginSkillActor();
 }

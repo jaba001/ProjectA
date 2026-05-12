@@ -87,6 +87,11 @@ protected:
     bool bFinishRequested = false;
 
 protected:
+    // Base Action Point cost for attack abilities
+    // 공격 어빌리티 기본 행동력 비용
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Cost", meta = (ClampMin = "0"))
+    int32 ActionPointCost = 1;
+
     // Attack montage
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     UAnimMontage* AttackMontage = nullptr;

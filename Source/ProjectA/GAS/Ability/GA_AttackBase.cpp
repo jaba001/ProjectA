@@ -7,6 +7,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 
+#include "Grid/Combat/CombatGridTile.h"
 #include "Combat/SkillActor/AttackSkillActorBase.h"
 #include "Combat/SkillActor/SkillActorBase.h"
 #include "Unit/UnitBase.h"
@@ -46,6 +47,23 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
         return;
     }
 
+    if (ActionPointCost > 0)
+    {
+        if (!CachedOwnerUnit->HasEnoughActionPoint(ActionPointCost))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=NotEnoughActionPoint | Cost=%d | Owner=%s"), ActionPointCost, *GetNameSafe(CachedOwnerUnit));
+            EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+            return;
+        }
+
+        if (!CachedOwnerUnit->ConsumeActionPoint(ActionPointCost))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=ConsumeActionPointFailed | Cost=%d | Owner=%s"), ActionPointCost, *GetNameSafe(CachedOwnerUnit));
+            EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+            return;
+        }
+    }
+
     // Cache attack context required by child Ability
     if (!CacheAttackContext())
     {
@@ -63,7 +81,6 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
     }
 
     // No-montage attacks release immediately without waiting for notify.
-    // ��Ƽ ��� Ÿ�̹��� ��ٸ��� �ʰ� ��� �������Ѵ�.
     if (!AttackMontage)
     {
         UE_LOG(LogTemp, Log, TEXT("[GA_AttackBase] ActivateAbility | NoMontageImmediateRelease | Ability=%s | Owner=%s"), *GetNameSafe(GetClass()), *GetNameSafe(CachedOwnerUnit));
@@ -118,7 +135,6 @@ void UGA_AttackBase::OnAttackMontageCompleted()
 {
     // Fallback: if release event was not received from montage notify,
     // release once at montage completion.
-    // ����: ��Ÿ�� ��Ƽ���� ������ �̺�Ʈ�� ���� ������ �Ϸ� ������ 1ȸ �������Ѵ�.
     if (!bAttackReleasedThisActivation)
     {
         UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] Release Event Missing | Applying fallback release on montage complete | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
@@ -132,7 +148,6 @@ void UGA_AttackBase::OnAttackMontageBlendOut()
 {
     // Some montages may only reach blend-out callback depending on task/event timing.
     // Ensure release is not lost when notify event is missing.
-    // �Ϻ� ��Ÿ�ִ� Ÿ�ֿ̹� ���� �����ƿ�� ȣ��� �� �־� ������ ������ �����Ѵ�.
     if (!bAttackReleasedThisActivation)
     {
         UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] Release Event Missing | Applying fallback release on montage blend-out | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
@@ -225,7 +240,14 @@ void UGA_AttackBase::SpawnAttackActor()
     InitData.SourceUnit = CachedOwnerUnit;
     InitData.SkillData = CachedOwnerUnit->PendingSkillData;
     InitData.TargetTile = CachedOwnerUnit->PendingSkillTargetTile;
-    InitData.TargetWorldLocation = InitData.TargetTile ? InitData.TargetTile->GetActorLocation() : SpawnLocation;
+    if (InitData.TargetTile)
+    {
+        InitData.TargetWorldLocation = InitData.TargetTile->GetActorLocation();
+    }
+    else
+    {
+        InitData.TargetWorldLocation = SpawnLocation;
+    }
 
     if (AAttackSkillActorBase* AttackSkillActor = Cast<AAttackSkillActorBase>(SpawnedActor))
     {

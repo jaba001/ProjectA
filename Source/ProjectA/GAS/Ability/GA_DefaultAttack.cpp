@@ -17,6 +17,11 @@ bool UGA_DefaultAttack::CacheAttackContext()
 
     CachedTargetUnit = CachedOwnerUnit->PendingTargetUnit;
 
+    if (!CachedTargetUnit || !CachedTargetUnit->IsUnitAlive())
+    {
+        return false;
+    }
+
     return true;
 }
 

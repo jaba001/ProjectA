@@ -6,9 +6,6 @@
 
 class AUnitBase;
 
-// Single-target default attack Ability
-// - The shared attack flow is handled by UGA_AttackBase
-// - This class is only responsible for single-target caching, validation, and damage application
 UCLASS()
 class PROJECTA_API UGA_DefaultAttack : public UGA_AttackBase
 {

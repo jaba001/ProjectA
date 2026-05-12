@@ -190,6 +190,8 @@ void APartyPlayerController::SetTileInputMode(ETileInputMode NewMode)
 
 void APartyPlayerController::EnterMoveMode()
 {
+    CancelTileInputMode();
+
     if (!CombatManager)
     {
         UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] EnterMoveMode failed | CombatManager is null"));
@@ -211,6 +213,7 @@ void APartyPlayerController::EnterMoveMode()
 
 void APartyPlayerController::EnterSkillMode(USkillDefinitionDataAsset* SkillData)
 {
+    CancelTileInputMode();
 
     if (!CombatManager)
     {

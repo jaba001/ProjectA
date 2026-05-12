@@ -21,6 +21,11 @@ bool UGA_AreaAttack::CacheAttackContext()
     CachedTargetTile = CachedOwnerUnit->PendingSkillTargetTile;
     CachedSkillData = CachedOwnerUnit->PendingSkillData;
 
+    if (!CachedSkillData)
+    {
+        return false;
+    }
+
     return true;
 }
 
