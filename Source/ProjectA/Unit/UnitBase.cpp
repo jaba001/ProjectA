@@ -183,6 +183,13 @@ void AUnitBase::Die()
     CurrentActionType = EUnitActionType::None;
     MovePhase = EUnitMovePhase::None;
 
+    //사망 시 타일 점유 해제
+    if (CurrentTile)
+    {
+        CurrentTile->SetOccupyingUnit(nullptr);
+        CurrentTile = nullptr;
+    }
+
     GetCharacterMovement()->DisableMovement();
 
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);

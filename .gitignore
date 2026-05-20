@@ -1,9 +1,32 @@
-
-.gitattributes
+# IDE / 개인 IDE 설정
 .vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sdf
+*.opensdf
+
+# Unreal generated folders / 언리얼 자동 생성 폴더
 Binaries/
 DerivedDataCache/
 Intermediate/
 Saved/
-Content/
-DefaultGameplayTags.ini - 바로 가기.lnk
+
+# Unreal plugin generated folders / 언리얼 플러그인 자동 생성 폴더
+Plugins/**/Binaries/
+Plugins/**/Intermediate/
+
+# OS / shortcut files / OS 및 바로가기 파일
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
+
+# Ignore all Content assets by default / 기본적으로 Content 전체 무시
+Content/*
+
+# Keep user project content / User_JeHoon 콘텐츠만 추적
+!Content/User_JeHoon/
+!Content/User_JeHoon/**

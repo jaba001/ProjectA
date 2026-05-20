@@ -1,16 +1,16 @@
-#include "UI/BattleHUD_Widget.h"
+#include "UI/Battle/BattleHUDWidget.h"
 #include "Kismet/GameplayStatics.h"
 #include "Combat/CombatManager.h"
 #include "Game/Turn/TurnManager.h"
 
-void UBattleHUD_Widget::NativeConstruct()
+void UBattleHUDWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
     CachedCombatManager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatManager::StaticClass()));
 }
 
-FText UBattleHUD_Widget::GetTurnInfoText() const
+FText UBattleHUDWidget::GetTurnInfoText() const
 {
     if (!CachedCombatManager)
     {

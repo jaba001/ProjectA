@@ -2,12 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "BattleHUD_Widget.generated.h"
+#include "BattleHUDWidget.generated.h"
 
 class ACombatManager;
 
 UCLASS()
-class PROJECTA_API UBattleHUD_Widget : public UUserWidget
+class PROJECTA_API UBattleHUDWidget : public UUserWidget
 {
     GENERATED_BODY()
 
