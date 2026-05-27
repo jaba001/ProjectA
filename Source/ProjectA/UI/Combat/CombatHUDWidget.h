@@ -2,17 +2,17 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "BattleHUDWidget.generated.h"
+#include "CombatHUDWidget.generated.h"
 
 class ACombatManager;
 
 UCLASS()
-class PROJECTA_API UBattleHUDWidget : public UUserWidget
+class PROJECTA_API UCombatHUDWidget : public UUserWidget
 {
     GENERATED_BODY()
 
 public:
-    UFUNCTION(BlueprintPure, Category = "BattleHUD")
+    UFUNCTION(BlueprintCallable, Category = "BattleHUD")
     FText GetTurnInfoText() const;
 
 protected:
