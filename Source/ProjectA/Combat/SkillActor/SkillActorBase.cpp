@@ -44,6 +44,7 @@ void ASkillActorBase::RequestImpact()
 
 void ASkillActorBase::RequestFinish()
 {
+    // TODO: Decide whether spawned skill actors should drive SourceUnit skill completion after impact.
     FinishSkillActor();
 }
 

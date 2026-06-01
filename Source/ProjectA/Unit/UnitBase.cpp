@@ -420,6 +420,35 @@ void AUnitBase::HandleMoveCompleted()
     //UE_LOG(LogTemp, Warning, TEXT("[UnitBase] HandleMoveCompleted | Unit=%s | MovePhase=%d | PendingSkillTargetTile=%s | PendingTargetUnit=%s"), *GetName(), static_cast<int32>(MovePhase), *GetNameSafe(PendingSkillTargetTile), *GetNameSafe(PendingTargetUnit));
 }
 
+void AUnitBase::HandleMoveFailed()
+{
+    if (MovePhase == EUnitMovePhase::None)
+    {
+        return;
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("[UnitBase] HandleMoveFailed | Unit=%s | MovePhase=%d | ActionType=%d"), *GetNameSafe(this), static_cast<int32>(MovePhase), static_cast<int32>(CurrentActionType));
+
+    MovePhase = EUnitMovePhase::None;
+
+    if (CurrentActionType == EUnitActionType::Skill)
+    {
+        ClearSkillContext();
+        return;
+    }
+
+    if (CurrentActionType == EUnitActionType::Move)
+    {
+        ClearMoveContext();
+        OnMoveActionFinished();
+        return;
+    }
+
+    PendingTile = nullptr;
+    PendingTargetUnit = nullptr;
+    CurrentActionType = EUnitActionType::None;
+}
+
 AUnitAIController* AUnitBase::GetOrCreateAIController()
 {
     AUnitAIController* AICon = Cast<AUnitAIController>(GetController());
@@ -435,6 +464,26 @@ AUnitAIController* AUnitBase::GetOrCreateAIController()
 
 void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (!bIsActiveTurn)
+    {
+        return;
+    }
+
+    if (MovePhase != EUnitMovePhase::None)
+    {
+        return;
+    }
+
+    if (!IsUnitAlive())
+    {
+        return;
+    }
+
     if (!SkillData)
     {
         UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | SkillData is null"));
@@ -450,6 +499,12 @@ void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile
     if (!SkillData->AbilityClass)
     {
         UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | AbilityClass is null"));
+        return;
+    }
+
+    if (!HasEnoughActionPoint(SkillData->ActionPointCost))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | Not enough AP | Cost=%d | Unit=%s"), SkillData->ActionPointCost, *GetNameSafe(this));
         return;
     }
 
@@ -483,6 +538,11 @@ void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile
     }
 
     const bool bActivated = AbilitySystem->TryActivateAbilityByClass(SkillData->AbilityClass);
+
+    if (!bActivated)
+    {
+        ClearSkillContext();
+    }
 
     //UE_LOG(LogTemp, Log, TEXT("[UnitBase] StartSkill Activate | Unit=%s | Ability=%s | Activated=%d | TargetTile=(%d,%d) | TargetUnit=%s"), *GetNameSafe(this), *GetNameSafe(SkillData->AbilityClass), bActivated ? 1 : 0, TargetTile->GridCoord.X, TargetTile->GridCoord.Y, *GetNameSafe(PendingTargetUnit));
 

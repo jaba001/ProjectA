@@ -18,5 +18,12 @@ void AUnitAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollo
         return;
     }
 
+    if (!Result.IsSuccess())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[UnitAIController] Move failed | Unit=%s | Result=%d"), *GetNameSafe(Unit), static_cast<int32>(Result.Code));
+        Unit->HandleMoveFailed();
+        return;
+    }
+
     Unit->HandleMoveCompleted();
 }

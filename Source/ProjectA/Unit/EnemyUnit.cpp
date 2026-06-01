@@ -350,6 +350,7 @@ AUnitBase* AEnemyUnit::FindBestSkillTarget(USkillDefinitionDataAsset* SkillData)
     AUnitBase* BestTarget = nullptr;
     float BestScore = -TNumericLimits<float>::Max();
 
+    // TODO: Apply the same target-rule and front-protection validation used by player skill targeting.
     for (TActorIterator<AUnitBase> It(GetWorld()); It; ++It)
     {
         AUnitBase* Candidate = *It;

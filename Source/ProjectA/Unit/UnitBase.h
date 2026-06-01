@@ -218,6 +218,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement")
     virtual void HandleMoveCompleted();
 
+    // Entry point for AIController movement failure callback
+    virtual void HandleMoveFailed();
+
     // Get or create AIController
     AUnitAIController* GetOrCreateAIController();
 
