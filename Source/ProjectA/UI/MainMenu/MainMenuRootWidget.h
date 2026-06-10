@@ -41,22 +41,35 @@ public:
     void ClearModalStack();
 
 protected:
+    // Initializes fallback stack layout when the designer layout is empty.
+    // 디자이너 레이아웃이 비어 있을 때 대체 스택 레이아웃을 초기화합니다.
+    virtual void NativeOnInitialized() override;
+
     // Primary screen stack bound from WBP_MainMenuRootWidget.
     // WBP_MainMenuRootWidget에서 바인딩되는 기본 화면 스택입니다.
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UCommonActivatableWidgetStack> MainStack;
 
     // Menu flow stack bound from WBP_MainMenuRootWidget.
     // WBP_MainMenuRootWidget에서 바인딩되는 메뉴 흐름 스택입니다.
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UCommonActivatableWidgetStack> MenuStack;
 
     // Modal screen stack bound from WBP_MainMenuRootWidget.
     // WBP_MainMenuRootWidget에서 바인딩되는 모달 화면 스택입니다.
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UCommonActivatableWidgetStack> ModalStack;
 
+    // Creates CommonUI stacks in C++ when no bound designer stacks exist.
+    // 바인딩된 디자이너 스택이 없을 때 C++에서 CommonUI 스택을 생성합니다.
+    UPROPERTY(EditDefaultsOnly, Category = "Main Menu|Code UI")
+    bool bCreateStacksInCode = true;
+
 private:
+    // Ensures root overlay and stack widgets exist for native-only usage.
+    // 네이티브 전용 사용을 위해 루트 오버레이와 스택 위젯이 존재하도록 보장합니다.
+    void EnsureCodeGeneratedRootLayout();
+
     // Shared stack push helper used by public push functions.
     // 공개 Push 함수들이 사용하는 공용 스택 추가 헬퍼입니다.
     UCommonActivatableWidget* PushScreen(UCommonActivatableWidgetStack* Stack, TSubclassOf<UCommonActivatableWidget> WidgetClass, const TCHAR* StackName);

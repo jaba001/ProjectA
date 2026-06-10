@@ -9,29 +9,45 @@ class AUnitBase;
 class ACombatGridManager;
 class ACombatGridTile;
 
+// Actor that coordinates combat units, turns, movement, and target tiles.
+// 전투 유닛, 턴, 이동, 대상 타일을 조율하는 액터입니다.
 UCLASS()
 class PROJECTA_API ACombatManager : public AActor
 {
     GENERATED_BODY()
 
 public:
+    // Sets combat manager defaults.
+    // 전투 매니저 기본값을 설정합니다.
     ACombatManager();
 
 protected:
+    // Initializes combat references after actor startup.
+    // 액터 시작 후 전투 참조를 초기화합니다.
     virtual void BeginPlay() override;
+
+    // Registers replicated combat state.
+    // 복제되는 전투 상태를 등록합니다.
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 
 private:
     // Player unit classes
+    // 플레이어 유닛 클래스 목록입니다.
     UPROPERTY(EditDefaultsOnly, Category = "Combat")
     TArray<TSubclassOf<AUnitBase>> PlayerUnitClasses;
 
     // Enemy unit classes
+    // 적 유닛 클래스 목록입니다.
     UPROPERTY(EditDefaultsOnly, Category = "Combat")
     TArray<TSubclassOf<AUnitBase>> EnemyUnitClasses;
 
+    // Calculates tiles that the unit can reach with movement.
+    // 유닛이 이동으로 도달할 수 있는 타일을 계산합니다.
     TArray<ACombatGridTile*> CalculateReachableMoveTiles(AUnitBase* Unit) const;
+
+    // Checks whether the unit can enter the tile.
+    // 유닛이 해당 타일에 진입할 수 있는지 확인합니다.
     bool CanUnitEnterTile(AUnitBase* Unit, ACombatGridTile* Tile) const;
 
 private:

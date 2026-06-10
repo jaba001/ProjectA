@@ -22,8 +22,20 @@ void AMainMenuPlayerController::BeginPlay()
 
     if (!MainMenuRootWidgetClass)
     {
-        UE_LOG(LogTemp, Warning, TEXT("MainMenuRootWidgetClass is not set."));
-        return;
+        MainMenuRootWidgetClass = UMainMenuRootWidget::StaticClass();
+        UE_LOG(LogTemp, Warning, TEXT("[MainMenuPlayerController] MainMenuRootWidgetClass is not set. Using native fallback."));
+    }
+
+    if (!MainMenuScreenWidgetClass)
+    {
+        MainMenuScreenWidgetClass = UMainMenuScreenWidget::StaticClass();
+        UE_LOG(LogTemp, Warning, TEXT("[MainMenuPlayerController] MainMenuScreenWidgetClass is not set. Using native fallback."));
+    }
+
+    if (!CharacterCreationWidgetClass)
+    {
+        CharacterCreationWidgetClass = UCharacterCreationWidget::StaticClass();
+        UE_LOG(LogTemp, Warning, TEXT("[MainMenuPlayerController] CharacterCreationWidgetClass is not set. Using native fallback."));
     }
 
     MainMenuRootWidget = CreateWidget<UMainMenuRootWidget>(this, MainMenuRootWidgetClass);

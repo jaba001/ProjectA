@@ -1,7 +1,77 @@
 #include "UI/MainMenu/MainMenuRootWidget.h"
 
+#include "Blueprint/WidgetTree.h"
 #include "CommonActivatableWidget.h"
+#include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
+
+void UMainMenuRootWidget::NativeOnInitialized()
+{
+    Super::NativeOnInitialized();
+    EnsureCodeGeneratedRootLayout();
+}
+
+void UMainMenuRootWidget::EnsureCodeGeneratedRootLayout()
+{
+    if (MainStack && MenuStack && ModalStack)
+    {
+        return;
+    }
+
+    if (!bCreateStacksInCode)
+    {
+        return;
+    }
+
+    if (!WidgetTree)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[MainMenuRootWidget] WidgetTree is not available."));
+        return;
+    }
+
+    UOverlay* RootOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("CodeGeneratedRootOverlay"));
+
+    if (!RootOverlay)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[MainMenuRootWidget] Failed to create root overlay."));
+        return;
+    }
+
+    MainStack = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>(UCommonActivatableWidgetStack::StaticClass(), TEXT("MainStack"));
+    MenuStack = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>(UCommonActivatableWidgetStack::StaticClass(), TEXT("MenuStack"));
+    ModalStack = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>(UCommonActivatableWidgetStack::StaticClass(), TEXT("ModalStack"));
+
+    if (!MainStack || !MenuStack || !ModalStack)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[MainMenuRootWidget] Failed to create CommonUI stacks."));
+        return;
+    }
+
+    WidgetTree->RootWidget = RootOverlay;
+
+    UOverlaySlot* MainStackSlot = RootOverlay->AddChildToOverlay(MainStack);
+    UOverlaySlot* MenuStackSlot = RootOverlay->AddChildToOverlay(MenuStack);
+    UOverlaySlot* ModalStackSlot = RootOverlay->AddChildToOverlay(ModalStack);
+
+    if (MainStackSlot)
+    {
+        MainStackSlot->SetHorizontalAlignment(HAlign_Fill);
+        MainStackSlot->SetVerticalAlignment(VAlign_Fill);
+    }
+
+    if (MenuStackSlot)
+    {
+        MenuStackSlot->SetHorizontalAlignment(HAlign_Fill);
+        MenuStackSlot->SetVerticalAlignment(VAlign_Fill);
+    }
+
+    if (ModalStackSlot)
+    {
+        ModalStackSlot->SetHorizontalAlignment(HAlign_Fill);
+        ModalStackSlot->SetVerticalAlignment(VAlign_Fill);
+    }
+}
 
 UCommonActivatableWidget* UMainMenuRootWidget::PushMainScreen(TSubclassOf<UCommonActivatableWidget> WidgetClass)
 {

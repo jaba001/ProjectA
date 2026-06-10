@@ -12,6 +12,8 @@ class AUnitAIController;
 class UGameplayAbility;
 class USkillDefinitionDataAsset;
 
+// Team affiliation used by combat units.
+// 전투 유닛의 소속 팀을 나타냅니다.
 UENUM(BlueprintType)
 enum class ETeam : uint8
 {
@@ -19,6 +21,8 @@ enum class ETeam : uint8
     Enemy
 };
 
+// High-level action currently being performed by a unit.
+// 유닛이 현재 수행 중인 상위 행동 종류입니다.
 UENUM(BlueprintType)
 enum class EUnitActionType : uint8
 {
@@ -28,6 +32,8 @@ enum class EUnitActionType : uint8
     Item
 };
 
+// Movement and action phase used while a unit is busy.
+// 유닛이 바쁜 동안 사용하는 이동 및 행동 단계입니다.
 UENUM(BlueprintType)
 enum class EUnitMovePhase : uint8
 {
@@ -38,6 +44,8 @@ enum class EUnitMovePhase : uint8
     ReturningToOriginalTile
 };
 
+// Base character class for all combat units.
+// 모든 전투 유닛의 기본 캐릭터 클래스입니다.
 UCLASS()
 class PROJECTA_API AUnitBase
     : public ACharacter
@@ -47,32 +55,45 @@ class PROJECTA_API AUnitBase
 
 public:
     // Construction and base interface
+    // 생성과 기본 인터페이스 처리입니다.
     AUnitBase();
 
+    // Returns the ability system component for GAS integration.
+    // GAS 연동에 사용할 어빌리티 시스템 컴포넌트를 반환합니다.
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
+    // Returns the unit attribute set.
+    // 유닛 어트리뷰트 세트를 반환합니다.
     UFUNCTION(BlueprintCallable, Category = "UnitBase|GAS")
     UAS_Unit* GetAttributeSet() const { return AttributeSet; }
 
     // Actor lifecycle
+    // 액터 생명주기 처리입니다.
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaTime) override;
 
     // Network replication
+    // 네트워크 복제 속성을 등록합니다.
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
     // Unit identifier
+    // 유닛 식별 번호입니다.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UnitBase")
     int32 UnitIndex = 0;
 
     // Team affiliation
+    // 유닛의 팀 소속입니다.
     UPROPERTY(Replicated)
     ETeam Team = ETeam::Player;
 
+    // Changes this unit's team affiliation.
+    // 이 유닛의 팀 소속을 변경합니다.
     UFUNCTION(BlueprintCallable, Category = "UnitBase")
     void SetTeam(ETeam NewTeam);
 
+    // Returns this unit's team affiliation.
+    // 이 유닛의 팀 소속을 반환합니다.
     UFUNCTION(BlueprintCallable, Category = "UnitBase")
     ETeam GetTeam() const { return Team; }
 
@@ -89,14 +110,17 @@ protected:
 
 public:
     // Whether this unit is currently active in turn
+    // 현재 이 유닛의 턴이 활성화되어 있는지 여부입니다.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UnitBase|Turn")
     bool bIsActiveTurn = false;
 
     // Activate unit and reset AP at turn start
+    // 턴 시작 시 유닛을 활성화하고 행동력을 초기화합니다.
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Turn")
     virtual void OnTurnStart();
 
     // Deactivate unit at turn end
+    // 턴 종료 시 유닛을 비활성화합니다.
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Turn")
     virtual void OnTurnEnd();
 
