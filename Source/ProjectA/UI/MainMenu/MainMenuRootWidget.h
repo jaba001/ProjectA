@@ -47,16 +47,22 @@ protected:
 
     // Primary screen stack bound from WBP_MainMenuRootWidget.
     // WBP_MainMenuRootWidget에서 바인딩되는 기본 화면 스택입니다.
+    // TODO: Bind a UCommonActivatableWidgetStack named MainStack in WBP_MainMenuRootWidget when using designer layout.
+    // TODO: 디자이너 레이아웃을 사용할 때 WBP_MainMenuRootWidget에 MainStack 이름의 UCommonActivatableWidgetStack을 바인딩합니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UCommonActivatableWidgetStack> MainStack;
 
     // Menu flow stack bound from WBP_MainMenuRootWidget.
     // WBP_MainMenuRootWidget에서 바인딩되는 메뉴 흐름 스택입니다.
+    // TODO: Bind a UCommonActivatableWidgetStack named MenuStack in WBP_MainMenuRootWidget when using designer layout.
+    // TODO: 디자이너 레이아웃을 사용할 때 WBP_MainMenuRootWidget에 MenuStack 이름의 UCommonActivatableWidgetStack을 바인딩합니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UCommonActivatableWidgetStack> MenuStack;
 
     // Modal screen stack bound from WBP_MainMenuRootWidget.
     // WBP_MainMenuRootWidget에서 바인딩되는 모달 화면 스택입니다.
+    // TODO: Bind a UCommonActivatableWidgetStack named ModalStack in WBP_MainMenuRootWidget when using designer layout.
+    // TODO: 디자이너 레이아웃을 사용할 때 WBP_MainMenuRootWidget에 ModalStack 이름의 UCommonActivatableWidgetStack을 바인딩합니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UCommonActivatableWidgetStack> ModalStack;
 

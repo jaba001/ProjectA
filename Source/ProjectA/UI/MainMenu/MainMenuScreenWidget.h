@@ -5,6 +5,7 @@
 #include "MainMenuScreenWidget.generated.h"
 
 class UButton;
+class UImage;
 class UTextBlock;
 class UVerticalBox;
 
@@ -36,28 +37,45 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Main Menu|Code UI")
     bool bCreateLayoutInCode = true;
 
+    // Background image optionally bound from a designer widget.
+    // 디자이너 위젯에서 선택적으로 바인딩되는 배경 이미지입니다.
+    // TODO: Bind a UImage named Image_Background in WBP_MainMenuScreenWidget to edit the background in Blueprint.
+    // TODO: Blueprint에서 배경을 편집하려면 WBP_MainMenuScreenWidget에 Image_Background 이름의 UImage를 바인딩합니다.
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UImage> Image_Background;
+
     // Title text optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 제목 텍스트입니다.
+    // TODO: Bind a UTextBlock named Text_Title in WBP_MainMenuScreenWidget to edit the title in Blueprint.
+    // TODO: Blueprint에서 제목을 편집하려면 WBP_MainMenuScreenWidget에 Text_Title 이름의 UTextBlock을 바인딩합니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UTextBlock> Text_Title;
 
     // New Game button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 새 게임 버튼입니다.
+    // TODO: Bind a UButton named Button_NewGame in WBP_MainMenuScreenWidget to use a designer button.
+    // TODO: 디자이너 버튼을 사용하려면 WBP_MainMenuScreenWidget에 Button_NewGame 이름의 UButton을 바인딩합니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_NewGame;
 
     // Continue button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 이어하기 버튼입니다.
+    // TODO: Bind a UButton named Button_Continue in WBP_MainMenuScreenWidget to use a designer button.
+    // TODO: 디자이너 버튼을 사용하려면 WBP_MainMenuScreenWidget에 Button_Continue 이름의 UButton을 바인딩합니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_Continue;
 
     // Options button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 옵션 버튼입니다.
+    // TODO: Bind a UButton named Button_Options in WBP_MainMenuScreenWidget to use a designer button.
+    // TODO: 디자이너 버튼을 사용하려면 WBP_MainMenuScreenWidget에 Button_Options 이름의 UButton을 바인딩합니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_Options;
 
     // Quit button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 종료 버튼입니다.
+    // TODO: Bind a UButton named Button_Quit in WBP_MainMenuScreenWidget to use a designer button.
+    // TODO: 디자이너 버튼을 사용하려면 WBP_MainMenuScreenWidget에 Button_Quit 이름의 UButton을 바인딩합니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_Quit;
 
@@ -65,6 +83,10 @@ private:
     // Creates the fallback main menu layout in C++.
     // C++에서 대체 메인메뉴 레이아웃을 생성합니다.
     void EnsureCodeGeneratedLayout();
+
+    // Applies the default gray background color.
+    // 기본 회색 배경 색상을 적용합니다.
+    void ConfigureBackgroundImage();
 
     // Creates a menu button and attaches it to the parent box.
     // 메뉴 버튼을 생성하고 부모 박스에 추가합니다.

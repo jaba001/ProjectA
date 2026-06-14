@@ -2,6 +2,7 @@
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
+#include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/TextBlock.h"
@@ -16,6 +17,11 @@ void UMainMenuScreenWidget::NativeOnInitialized()
     if (bCreateLayoutInCode)
     {
         EnsureCodeGeneratedLayout();
+    }
+
+    if (Image_Background)
+    {
+        ConfigureBackgroundImage();
     }
 
     if (Button_NewGame)
@@ -53,15 +59,26 @@ void UMainMenuScreenWidget::EnsureCodeGeneratedLayout()
     }
 
     UOverlay* RootOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("CodeGeneratedMainMenuOverlay"));
+    Image_Background = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Image_Background"));
     UVerticalBox* MenuBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("CodeGeneratedMainMenuBox"));
 
-    if (!RootOverlay || !MenuBox)
+    if (!RootOverlay || !Image_Background || !MenuBox)
     {
         UE_LOG(LogTemp, Warning, TEXT("[MainMenuScreenWidget] Failed to create menu root layout."));
         return;
     }
 
     WidgetTree->RootWidget = RootOverlay;
+    RootOverlay->SetVisibility(ESlateVisibility::Visible);
+    ConfigureBackgroundImage();
+
+    UOverlaySlot* BackgroundSlot = RootOverlay->AddChildToOverlay(Image_Background);
+
+    if (BackgroundSlot)
+    {
+        BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
+        BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
+    }
 
     UOverlaySlot* MenuBoxSlot = RootOverlay->AddChildToOverlay(MenuBox);
 
@@ -89,6 +106,17 @@ void UMainMenuScreenWidget::EnsureCodeGeneratedLayout()
     Button_Continue = CreateMenuButton(MenuBox, FText::FromString(TEXT("Continue")));
     Button_Options = CreateMenuButton(MenuBox, FText::FromString(TEXT("Options")));
     Button_Quit = CreateMenuButton(MenuBox, FText::FromString(TEXT("Quit")));
+}
+
+void UMainMenuScreenWidget::ConfigureBackgroundImage()
+{
+    if (!Image_Background)
+    {
+        return;
+    }
+
+    Image_Background->SetVisibility(ESlateVisibility::Visible);
+    Image_Background->SetColorAndOpacity(FLinearColor(0.12f, 0.12f, 0.12f, 1.0f));
 }
 
 UButton* UMainMenuScreenWidget::CreateMenuButton(UVerticalBox* ParentBox, const FText& ButtonText)

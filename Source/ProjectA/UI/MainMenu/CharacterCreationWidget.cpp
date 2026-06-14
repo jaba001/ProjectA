@@ -1,6 +1,7 @@
 #include "UI/MainMenu/CharacterCreationWidget.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Components/Border.h"
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
 #include "Components/Overlay.h"
@@ -22,6 +23,20 @@ void UCharacterCreationWidget::NativeOnInitialized()
     if (bCreateLayoutInCode)
     {
         EnsureCodeGeneratedLayout();
+    }
+    else if (!BackgroundBlocker)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Background blocker is missing and code-generated layout is disabled."));
+    }
+
+    if (BackgroundBlocker)
+    {
+        ConfigureBackgroundBlocker();
+    }
+
+    if (CenterPanelBackground)
+    {
+        ConfigureCenterPanelBackground();
     }
 
     if (EditableTextBox_Name)
@@ -59,8 +74,18 @@ void UCharacterCreationWidget::NativeOnInitialized()
 
 void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
 {
+    if (BackgroundBlocker)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Using designer BackgroundBlocker."));
+    }
+
     if (EditableTextBox_Name || Button_Warrior || Button_Archer || Button_Mage || Button_Back || Button_StartGame)
     {
+        if (!BackgroundBlocker)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Background blocker is missing while designer character creation widgets are present."));
+        }
+
         return;
     }
 
@@ -71,9 +96,11 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
     }
 
     UOverlay* RootOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("CodeGeneratedCharacterCreationOverlay"));
+    BackgroundBlocker = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("BackgroundBlocker"));
+    CenterPanelBackground = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("CenterPanelBackground"));
     UVerticalBox* ContentBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("CodeGeneratedCharacterCreationBox"));
 
-    if (!RootOverlay || !ContentBox)
+    if (!RootOverlay || !BackgroundBlocker || !CenterPanelBackground || !ContentBox)
     {
         UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Failed to create character creation root layout."));
         return;
@@ -81,13 +108,29 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
 
     WidgetTree->RootWidget = RootOverlay;
 
-    UOverlaySlot* ContentBoxSlot = RootOverlay->AddChildToOverlay(ContentBox);
+    RootOverlay->SetVisibility(ESlateVisibility::Visible);
+    ConfigureBackgroundBlocker();
+    ConfigureCenterPanelBackground();
 
-    if (ContentBoxSlot)
+    UOverlaySlot* BackgroundSlot = RootOverlay->AddChildToOverlay(BackgroundBlocker);
+
+    if (BackgroundSlot)
     {
-        ContentBoxSlot->SetHorizontalAlignment(HAlign_Center);
-        ContentBoxSlot->SetVerticalAlignment(VAlign_Center);
+        BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
+        BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
     }
+
+    CenterPanelBackground->AddChild(ContentBox);
+
+    UOverlaySlot* CenterPanelSlot = RootOverlay->AddChildToOverlay(CenterPanelBackground);
+
+    if (CenterPanelSlot)
+    {
+        CenterPanelSlot->SetHorizontalAlignment(HAlign_Center);
+        CenterPanelSlot->SetVerticalAlignment(VAlign_Center);
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Background blocker was created in code."));
 
     UTextBlock* TitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_Title"));
 
@@ -159,6 +202,29 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
 
     Button_Back = CreateButton(ContentBox, FText::FromString(TEXT("Back")));
     Button_StartGame = CreateButton(ContentBox, FText::FromString(TEXT("Start Game")));
+}
+
+void UCharacterCreationWidget::ConfigureBackgroundBlocker()
+{
+    if (!BackgroundBlocker)
+    {
+        return;
+    }
+
+    BackgroundBlocker->SetVisibility(ESlateVisibility::Visible);
+    BackgroundBlocker->SetBrushColor(FLinearColor(0.12f, 0.12f, 0.12f, 0.85f));
+}
+
+void UCharacterCreationWidget::ConfigureCenterPanelBackground()
+{
+    if (!CenterPanelBackground)
+    {
+        return;
+    }
+
+    CenterPanelBackground->SetVisibility(ESlateVisibility::Visible);
+    CenterPanelBackground->SetBrushColor(FLinearColor(0.22f, 0.22f, 0.22f, 1.0f));
+    CenterPanelBackground->SetPadding(FMargin(24.0f, 20.0f, 24.0f, 20.0f));
 }
 
 void UCharacterCreationWidget::RefreshPreview()
