@@ -1,0 +1,101 @@
+{
+	"nativeClass": "UMainMenuScreenWidget",
+	"nativeHeaderPath": "Source/ProjectA/UI/MainMenu/MainMenuScreenWidget.h",
+	"nativeSourcePath": "Source/ProjectA/UI/MainMenu/MainMenuScreenWidget.cpp",
+	"blueprintName": "WBP_MainMenuScreenWidget",
+	"assetPath": "/Game/User_JeHoon/Blueprint/UI/MainMenu",
+	"parentClass": "UCommonActivatableWidget",
+	"generateNativeSource": false,
+	"widgets": [
+		{
+			"name": "RootOverlay",
+			"type": "Overlay",
+			"parent": ""
+		},
+		{
+			"name": "Image_Background",
+			"type": "Image",
+			"parent": "RootOverlay",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"verticalAlignment": "Fill",
+			"color": [0.12, 0.12, 0.12, 1.0]
+		},
+		{
+			"name": "MenuBox",
+			"type": "VerticalBox",
+			"parent": "RootOverlay",
+			"horizontalAlignment": "Center",
+			"verticalAlignment": "Center"
+		},
+		{
+			"name": "Text_Title",
+			"type": "TextBlock",
+			"parent": "MenuBox",
+			"bind": true,
+			"text": "PROJECT A",
+			"horizontalAlignment": "Center",
+			"padding": [0.0, 0.0, 0.0, 24.0]
+		},
+		{
+			"name": "Button_NewGame",
+			"type": "Button",
+			"parent": "MenuBox",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"padding": [0.0, 4.0, 0.0, 4.0]
+		},
+		{
+			"name": "Text_NewGame",
+			"type": "TextBlock",
+			"parent": "Button_NewGame",
+			"text": "New Game",
+			"padding": [24.0, 12.0, 24.0, 12.0]
+		},
+		{
+			"name": "Button_Continue",
+			"type": "Button",
+			"parent": "MenuBox",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"padding": [0.0, 4.0, 0.0, 4.0]
+		},
+		{
+			"name": "Text_Continue",
+			"type": "TextBlock",
+			"parent": "Button_Continue",
+			"text": "Continue",
+			"padding": [24.0, 12.0, 24.0, 12.0]
+		},
+		{
+			"name": "Button_Options",
+			"type": "Button",
+			"parent": "MenuBox",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"padding": [0.0, 4.0, 0.0, 4.0]
+		},
+		{
+			"name": "Text_Options",
+			"type": "TextBlock",
+			"parent": "Button_Options",
+			"text": "Options",
+			"padding": [24.0, 12.0, 24.0, 12.0]
+		},
+		{
+			"name": "Button_Quit",
+			"type": "Button",
+			"parent": "MenuBox",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"padding": [0.0, 4.0, 0.0, 4.0]
+		},
+		{
+			"name": "Text_Quit",
+			"type": "TextBlock",
+			"parent": "Button_Quit",
+			"text": "Quit",
+			"padding": [24.0, 12.0, 24.0, 12.0]
+		}
+	]
+}

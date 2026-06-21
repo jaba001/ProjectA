@@ -1,109 +1,266 @@
-ProjectA UI 작업 메모
+ProjectA UI Scaffold Generator 사용설명서
 
-작성 기준: editor tooling implementation step 4
-작성일: 2026-06-17
+1. 개요
 
-1. 작업 요약
+UI Scaffold Generator는 JSON 명세를 읽어서 Widget Blueprint의 Designer tree를 자동으로 구성하는 에디터 전용 시스템이다.
 
-ProjectA에 에디터 전용 UI Scaffold 생성기를 추가했다.
+이 시스템으로 생성된 Widget Blueprint는 Unreal Editor의 Widget Blueprint Designer에서 계층을 확인하고 직접 편집하거나 저장할 수 있다.
 
-이 생성기는 JSON 명세 파일을 읽어서 다음 항목을 생성한다.
+런타임에 NativeConstruct 또는 NativeOnInitialized에서 WidgetTree를 생성하는 방식과 다르게, 생성 결과가 WBP asset 내부에 저장된다.
 
-- Native C++ UUserWidget 클래스
-- BindWidget 속성이 포함된 .h / .cpp 파일
-- Widget Blueprint asset
-- Widget Blueprint Designer에서 실제로 보이는 Designer tree
+주요 기능:
 
-현재 기본 테스트 명세 파일은 다음 위치에 있다.
-
-Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScaffoldTest.json
-
-현재 기본 생성 대상은 다음과 같다.
-
-- Native class: UMainMenuScaffoldTestWidget
-- Header: Source/ProjectA/UI/Generated/MainMenuScaffoldTestWidget.h
-- Source: Source/ProjectA/UI/Generated/MainMenuScaffoldTestWidget.cpp
-- Widget Blueprint: /Game/User_JeHoon/UI/MainMenu/Generated/WBP_MainMenuScaffoldTest
-
-생성되는 기본 Designer tree는 다음 구조다.
-
-RootCanvas
-MainOverlay
-Button_Start
-Text_Start
-
-Text_Start에는 "Start" 텍스트가 적용된다.
+- JSON 기반 Widget Blueprint Designer tree 생성
+- 기존 native C++ widget class를 WBP parent class로 사용
+- bind=true widget을 Designer variable로 등록
+- TextBlock 텍스트, 색상, 패딩, 정렬 같은 기본 속성 적용
+- Widget Blueprint compile 및 package 저장
+- DryRun 검증
+- 명시적인 Overwrite 제어
+- 선택적인 native C++ UUserWidget source 생성
 
 
-2. 이 작업이 필요한 이유
+2. 주요 구성 파일
 
-기존 MainMenu와 CharacterCreation UI에는 C++ native fallback 흐름이 있다.
-이 방식은 Blueprint Designer 작업량을 줄이고, WBP가 비어 있어도 UI가 동작하게 만드는 데 유용하다.
+Commandlet:
 
-하지만 C++ 런타임에서 WidgetTree를 만드는 방식은 Blueprint Designer에서 실제 계층 구조가 보이지 않는다.
-그래서 Designer에서 이미지, 버튼 스타일, 배치 등을 직접 편집하고 저장하기 어렵다.
-
-이번 작업의 목적은 런타임 fallback은 그대로 유지하면서, 별도의 에디터 전용 도구로 편집 가능한 Widget Blueprint asset을 생성하는 것이다.
-
-즉, 런타임에서 UI를 만드는 것이 아니라 에디터 명령으로 WBP asset 내부에 실제 Designer tree를 저장한다.
-
-
-3. 기존 runtime UI와의 관계
-
-이번 생성기는 ProjectAEditor 모듈 안에서만 동작한다.
-
-기존 MainMenu / CharacterCreation runtime fallback 구현은 변경하지 않았다.
-기존 WBP_MainMenuScreenWidget, WBP_CharacterCreationWidget도 덮어쓰지 않는다.
-
-생성 대상은 테스트 전용 경로인 /Game/User_JeHoon/UI/MainMenu/Generated 아래로 분리되어 있다.
-
-
-4. 주요 파일
-
-Editor module:
-
-- Source/ProjectAEditor/ProjectAEditor.Build.cs
-- Source/ProjectAEditor/ProjectAEditor.h
-- Source/ProjectAEditor/ProjectAEditor.cpp
 - Source/ProjectAEditor/Commandlets/GenerateUiScaffoldCommandlet.h
 - Source/ProjectAEditor/Commandlets/GenerateUiScaffoldCommandlet.cpp
 
-JSON spec:
+JSON spec 폴더:
 
-- Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScaffoldTest.json
+- Source/ProjectAEditor/UiScaffoldSpecs
 
-Generated native sample:
+현재 ProjectA에서 사용하는 spec:
 
-- Source/ProjectA/UI/Generated/MainMenuScaffoldTestWidget.h
-- Source/ProjectA/UI/Generated/MainMenuScaffoldTestWidget.cpp
+- MainMenuRootWidget.json
+- MainMenuScreenWidget.json
+- CharacterCreationWidget.json
 
-Generated WBP sample:
+UI native class와 WBP:
 
-- Content/User_JeHoon/UI/MainMenu/Generated/WBP_MainMenuScaffoldTest.uasset
-
-
-5. JSON 명세 구조
-
-기본 JSON은 다음 정보를 가진다.
-
-- nativeClass: 생성할 C++ 클래스 이름
-- nativeHeaderPath: 생성할 header 경로
-- nativeSourcePath: 생성할 cpp 경로
-- blueprintName: 생성할 WBP asset 이름
-- assetPath: 생성할 WBP asset 폴더
-- parentClass: 현재 단계에서는 UUserWidget 지원
-- widgets: Designer tree에 들어갈 widget 목록
-
-widgets 항목의 주요 필드는 다음과 같다.
-
-- name: Designer tree와 BindWidget에 사용할 이름
-- type: widget 타입
-- parent: 부모 widget 이름
-- bind: true이면 C++에 UPROPERTY(meta = (BindWidget)) 생성
-- text: TextBlock에 적용할 텍스트
+- Source/ProjectA/UI
+- Content/User_JeHoon/Blueprint/UI
 
 
-6. 현재 지원하는 widget 타입
+3. 기본 사용 흐름
+
+1. 생성하거나 갱신할 WBP의 native parent class를 준비한다.
+2. UiScaffoldSpecs 폴더에 JSON spec을 작성한다.
+3. -DryRun으로 JSON 구조와 widget 계층을 검증한다.
+4. 기존 WBP를 수정할 때는 원본 .uasset을 백업한다.
+5. -Overwrite 옵션으로 WBP Designer tree를 생성한다.
+6. 로그에서 Blueprint compile과 asset save 성공 여부를 확인한다.
+7. Unreal Editor를 재시작하고 WBP Designer tree를 확인한다.
+
+
+4. Commandlet 실행 방법
+
+기본 실행 파일:
+
+"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
+
+프로젝트 파일:
+
+"C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject"
+
+JSON 검증만 실행:
+
+"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -DryRun -Spec="Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScreenWidget.json"
+
+신규 asset 생성:
+
+"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -Spec="Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScreenWidget.json"
+
+기존 asset 갱신:
+
+"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -Overwrite -Spec="Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScreenWidget.json"
+
+
+5. Commandlet 옵션
+
+-Spec="경로"
+
+사용할 JSON spec 파일을 지정한다.
+경로를 생략하면 MainMenuRootWidget.json을 기본 spec으로 사용한다.
+
+-DryRun
+
+JSON을 읽고 모든 검증을 수행하지만 C++ 파일과 WBP asset을 생성하거나 저장하지 않는다.
+새 spec을 작성한 뒤에는 항상 DryRun을 먼저 실행한다.
+
+-Overwrite
+
+기존 source 또는 WBP asset을 다시 생성할 수 있게 한다.
+옵션이 없으면 같은 이름의 WBP asset을 수정하지 않는다.
+
+기존 WBP parent class가 JSON의 nativeClass와 다르면 Overwrite를 중단한다.
+
+
+6. JSON top-level 구조
+
+예시:
+
+{
+    "nativeClass": "UMainMenuScreenWidget",
+    "nativeHeaderPath": "Source/ProjectA/UI/MainMenu/MainMenuScreenWidget.h",
+    "nativeSourcePath": "Source/ProjectA/UI/MainMenu/MainMenuScreenWidget.cpp",
+    "blueprintName": "WBP_MainMenuScreenWidget",
+    "assetPath": "/Game/User_JeHoon/Blueprint/UI/MainMenu",
+    "parentClass": "UCommonActivatableWidget",
+    "generateNativeSource": false,
+    "widgets": []
+}
+
+필드 설명:
+
+nativeClass
+
+- WBP parent로 사용할 native C++ class 이름
+- 반드시 U로 시작해야 한다.
+- Unreal Reflection에서는 앞의 U를 제외한 이름으로 검색한다.
+
+nativeHeaderPath
+
+- native header 경로
+- generateNativeSource=false인 기존 class 재사용 모드에서도 현재 구현상 필수 필드다.
+
+nativeSourcePath
+
+- native cpp 경로
+- generateNativeSource=false인 기존 class 재사용 모드에서도 현재 구현상 필수 필드다.
+
+blueprintName
+
+- 생성하거나 갱신할 Widget Blueprint asset 이름
+- 비어 있을 수 없다.
+
+assetPath
+
+- WBP를 저장할 Unreal asset 폴더
+- 반드시 /Game/으로 시작해야 한다.
+
+parentClass
+
+- nativeClass의 부모 class를 설명한다.
+- 지원 값은 UUserWidget, UCommonUserWidget, UCommonActivatableWidget이다.
+
+generateNativeSource
+
+- true: JSON을 기준으로 새로운 native .h/.cpp 파일 생성
+- false: 이미 존재하는 native class 재사용
+- 생략하면 true가 기본값이다.
+
+widgets
+
+- Designer tree에 생성할 widget 목록
+- 최소 한 개 이상의 widget이 필요하다.
+
+
+7. 기존 native class 재사용
+
+기존 C++ widget class에 Designer tree만 추가할 때는 generateNativeSource=false를 사용한다.
+
+이 모드에서는 다음 조건이 필요하다.
+
+- nativeClass가 현재 Editor binary에 컴파일되어 있어야 한다.
+- nativeClass가 UUserWidget 계열이어야 한다.
+- 기존 WBP를 갱신한다면 WBP parent class가 nativeClass와 일치해야 한다.
+- JSON의 bind=true widget 이름과 C++ BindWidget 또는 BindWidgetOptional property 이름이 정확히 같아야 한다.
+
+ProjectA의 MainMenu WBP들은 이 모드를 사용한다.
+
+
+8. 새로운 native C++ class 생성
+
+새 class를 생성할 때는 generateNativeSource=true를 사용한다.
+
+현재 source generator의 제한:
+
+- UUserWidget parent만 지원한다.
+- PROJECTA_API export macro를 사용한다.
+- BindWidget property는 bind=true widget만 생성한다.
+- NativeConstruct에는 생성 로그만 추가한다.
+- NativeConstruct에서 UI layout을 생성하지 않는다.
+
+새 class를 처음 생성할 때는 한 번의 commandlet 실행만으로 WBP까지 만들 수 없을 수 있다.
+
+권장 순서:
+
+1. commandlet로 .h/.cpp 생성
+2. Visual Studio 프로젝트 파일 재생성
+3. ProjectAEditor Development Editor 빌드
+4. commandlet 재실행
+5. 컴파일된 native class를 parent로 사용하는 WBP 생성
+
+
+9. Widget 항목 구조
+
+예시:
+
+{
+    "name": "Button_NewGame",
+    "type": "Button",
+    "parent": "MenuBox",
+    "bind": true,
+    "horizontalAlignment": "Fill",
+    "verticalAlignment": "Center",
+    "padding": [0.0, 4.0, 0.0, 4.0]
+}
+
+필드 설명:
+
+name
+
+- Designer tree에서 사용할 widget 이름
+- 같은 spec 안에서 중복될 수 없다.
+- C++ binding 대상이면 native property 이름과 정확히 일치해야 한다.
+
+type
+
+- 생성할 widget type
+- 지원 목록에 있는 값만 사용할 수 있다.
+
+parent
+
+- 부모 widget의 name
+- root widget은 빈 문자열을 사용한다.
+- spec에는 root widget이 정확히 한 개 있어야 한다.
+
+bind
+
+- true이면 Designer variable로 등록한다.
+- native C++ source 생성 모드에서는 BindWidget property도 생성한다.
+- layout 전용 widget은 일반적으로 false 또는 생략한다.
+
+text
+
+- TextBlock에 적용할 초기 텍스트
+- TextBlock이 아닌 widget에서는 현재 사용하지 않는다.
+
+horizontalAlignment
+
+- Fill, Left, Center, Right 지원
+- 생략하면 Center
+
+verticalAlignment
+
+- Fill, Top, Center, Bottom 지원
+- 생략하면 Center
+
+padding
+
+- [Left, Top, Right, Bottom] 순서의 숫자 배열
+- OverlaySlot, VerticalBoxSlot, ButtonSlot 또는 Border content padding에 적용한다.
+
+color
+
+- [Red, Green, Blue, Alpha] 순서의 숫자 배열
+- 현재 Image의 ColorAndOpacity와 Border의 BrushColor에 적용한다.
+- 각 값은 일반적으로 0.0에서 1.0 범위를 사용한다.
+
+
+10. 지원하는 widget type
 
 - CanvasPanel
 - Overlay
@@ -112,111 +269,169 @@ widgets 항목의 주요 필드는 다음과 같다.
 - VerticalBox
 - Border
 - EditableTextBox
+- Image
+- CommonActivatableWidgetStack
+
+Widget type mapping:
+
+- CanvasPanel -> UCanvasPanel
+- Overlay -> UOverlay
+- Button -> UButton
+- TextBlock -> UTextBlock
+- VerticalBox -> UVerticalBox
+- Border -> UBorder
+- EditableTextBox -> UEditableTextBox
+- Image -> UImage
+- CommonActivatableWidgetStack -> UCommonActivatableWidgetStack
 
 
-7. 검증 규칙
+11. Parent-child 규칙
 
-commandlet은 생성 전에 JSON 명세를 검증한다.
+여러 child를 가질 수 있는 parent:
 
-현재 검증하는 항목은 다음과 같다.
+- CanvasPanel
+- Overlay
+- VerticalBox
+
+한 개의 child만 가질 수 있는 parent:
+
+- Button
+- Border
+
+child를 가질 수 없는 widget:
+
+- TextBlock
+- EditableTextBox
+- Image
+- CommonActivatableWidgetStack
+
+Button 또는 Border에 두 개 이상의 child를 지정하면 validation이 실패한다.
+
+
+12. 자동 검증 항목
+
+Commandlet은 asset을 수정하기 전에 다음 항목을 검증한다.
 
 - 필수 top-level field 존재 여부
-- nativeClass가 U로 시작하는지 여부
-- blueprintName이 비어 있지 않은지 여부
+- nativeClass U prefix
+- 지원하는 parentClass인지 여부
 - assetPath가 /Game/으로 시작하는지 여부
 - widgets 배열 존재 여부
-- widget 이름 중복 여부
-- parent 참조 누락 여부
-- 지원하지 않는 widget type 여부
-- root widget이 정확히 1개인지 여부
-- 순환 parent 참조 여부
-- 자식을 가질 수 없는 widget에 child가 연결되었는지 여부
-- Button / Border처럼 단일 child만 허용하는 widget에 여러 child가 연결되었는지 여부
+- widget name 중복
+- 지원하지 않는 widget type
+- root widget 개수
+- 누락된 parent 참조
+- 순환 parent 참조
+- child를 가질 수 없는 parent
+- 단일 child parent의 child 개수
+- padding과 color 배열의 값 개수 및 숫자 여부
 
-검증 실패 시 파일과 asset을 생성하지 않고 중단한다.
-
-
-8. 사용법
-
-기본 spec으로 검증만 실행하려면 다음 명령을 사용한다.
-
-"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -DryRun
-
-기본 spec으로 실제 생성을 실행하려면 다음 명령을 사용한다.
-
-"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI
-
-이미 같은 WBP asset이 있을 때 다시 생성하려면 -Overwrite를 붙인다.
-
-"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -Overwrite
-
-다른 spec 파일을 사용하려면 -Spec 옵션을 사용한다.
-
-"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -Spec="Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScaffoldTest.json"
+Validation 실패 시 WBP 생성과 저장을 시작하지 않는다.
 
 
-9. DryRun 동작
+13. BindWidget 사용 규칙
 
-- JSON 파일을 읽는다.
-- 필수 필드와 widget tree 규칙을 검증한다.
-- 생성될 class, source path, asset path, widget count를 로그로 출력한다.
-- C++ 파일을 쓰지 않는다.
-- WBP asset을 만들지 않는다.
-- package를 저장하지 않는다.
+bind=true는 Designer variable 생성 여부를 결정한다.
+
+기존 class를 재사용할 때:
+
+- C++에 UPROPERTY(meta = (BindWidget)) 또는 BindWidgetOptional property가 있어야 한다.
+- JSON name과 C++ property 이름이 정확히 같아야 한다.
+- widget type이 C++ property type과 호환되어야 한다.
+
+예시:
+
+JSON:
+
+{
+    "name": "Button_NewGame",
+    "type": "Button",
+    "bind": true
+}
+
+C++:
+
+UPROPERTY(meta = (BindWidgetOptional))
+TObjectPtr<UButton> Button_NewGame;
 
 
-10. Overwrite 동작
+14. Overwrite 안전 규칙
 
-기본 동작은 안전을 위해 overwrite하지 않는 것이다.
+- 기존 WBP를 수정하기 전에 원본 .uasset을 백업한다.
+- 처음 작성한 spec은 반드시 DryRun으로 검증한다.
+- -Overwrite는 WidgetTree를 제거하고 JSON 기준으로 다시 구성한다.
+- Designer에서 수동으로 만든 기존 widget tree는 Overwrite 시 사라질 수 있다.
+- 기존 WBP parent class가 다르면 자동 reparent하지 않고 중단한다.
+- runtime C++ fallback 코드는 commandlet과 분리해서 유지한다.
+- editor-only API와 dependency는 ProjectAEditor 모듈에만 둔다.
 
-같은 WBP asset이 이미 있으면 -Overwrite가 없을 때 asset을 수정하지 않고 skip한다.
 
--Overwrite가 있으면 기존 WBP를 다시 로드해서 Designer tree를 재구성하고 저장한다.
-단, 기존 WBP parent class가 spec의 native class와 다르면 overwrite를 중단한다.
+15. 빌드와 프로젝트 파일 재생성
 
-
-11. 빌드와 프로젝트 파일
-
-C++ header/source 파일을 생성하거나 이름을 바꾼 뒤에는 Visual Studio 프로젝트 파일을 재생성해야 한다.
-
-프로젝트 파일 재생성 명령:
+C++ 파일을 생성, 삭제 또는 이름 변경한 뒤 프로젝트 파일을 재생성한다.
 
 "C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe" -ProjectFiles -Project="C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -Game -Engine
 
-Development Editor | Win64 빌드 명령:
+Development Editor | Win64 빌드:
 
 "C:\Program Files\Epic Games\UE_5.7\Engine\Build\BatchFiles\Build.bat" ProjectAEditor Win64 Development -Project="C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -WaitMutex -FromMsBuild -architecture=x64
 
 
-12. 수동 확인 방법
+16. 결과 확인
 
-Unreal Editor에서 다음 asset을 연다.
+Commandlet 로그에서 다음 항목을 확인한다.
 
-/Game/User_JeHoon/UI/MainMenu/Generated/WBP_MainMenuScaffoldTest
+- Designer tree populated from JSON spec.
+- Blueprint compile result: true
+- Asset save result: true
+- Success - 0 error(s), 0 warning(s)
 
-Widget Blueprint Designer에서 다음 hierarchy가 보이면 정상이다.
+그 다음 Unreal Editor에서 대상 WBP를 연다.
 
-RootCanvas
-MainOverlay
-Button_Start
-Text_Start
+확인 항목:
 
-Class Settings 또는 Details에서 parent class가 UMainMenuScaffoldTestWidget인지 확인한다.
+- WBP parent class가 nativeClass와 일치하는지 확인
+- Designer hierarchy가 JSON parent 관계와 같은지 확인
+- bind=true widget이 Variables로 표시되는지 확인
+- TextBlock text, color, padding, alignment가 적용됐는지 확인
+- PIE에서 기존 버튼 동작과 CommonUI 화면 전환이 유지되는지 확인
 
-Button_Start와 Text_Start가 C++ BindWidget으로 연결되는지 확인한다.
+
+17. 문제 해결
+
+WBP가 Content Browser에 보이지 않는 경우:
+
+- JSON assetPath를 확인한다.
+- Unreal Editor를 재시작한다.
+- Content Browser filter를 해제한다.
+
+Designer tree가 이전 상태로 보이는 경우:
+
+- 외부 commandlet 실행 전에 열어둔 WBP 탭을 저장하지 않는다.
+- Unreal Editor를 재시작해서 disk의 최신 asset을 다시 불러온다.
+
+Native class를 찾지 못하는 경우:
+
+- nativeClass 이름을 확인한다.
+- ProjectAEditor target을 다시 빌드한다.
+- 새 class라면 프로젝트 파일 재생성 후 commandlet을 다시 실행한다.
+
+BindWidget compile warning이 발생하는 경우:
+
+- JSON name과 C++ property 이름을 비교한다.
+- widget type과 C++ property type을 비교한다.
+- bind=true가 지정됐는지 확인한다.
+
+Overwrite가 중단되는 경우:
+
+- 기존 WBP parent class와 JSON nativeClass가 같은지 확인한다.
+- -Overwrite 옵션이 포함됐는지 확인한다.
 
 
-13. 주의사항
+18. 운영 원칙
 
-이 도구는 editor-only 작업용이다.
+UI Scaffold Generator는 Designer 초기 구조 생성과 반복 가능한 구조 갱신을 위한 도구다.
 
-UnrealEd, UMGEditor, AssetTools, BlueprintGraph, KismetCompiler 같은 editor dependency는 ProjectAEditor 모듈에만 있어야 한다.
-runtime ProjectA.Build.cs에는 editor-only dependency를 추가하면 안 된다.
+레이아웃 구조와 필수 widget 이름은 JSON으로 관리하고, 이미지 asset, brush, font, 세부 스타일은 생성 후 Widget Blueprint Designer에서 편집할 수 있다.
 
-Designer tree는 commandlet이 asset 생성 시점에 저장한다.
-NativeConstruct나 NativeOnInitialized에서 UI layout을 생성하는 방식으로 해결하면 안 된다.
-
-새 native class를 처음 생성한 직후에는 그 class가 아직 editor binary에 로드되어 있지 않을 수 있다.
-그 경우 프로젝트 파일 재생성 후 ProjectAEditor target을 빌드한 다음 commandlet을 다시 실행해야 한다.
-
-Visual Studio 자동 열기는 작업 후 기본으로 수행하지 않는다.
+반복해서 -Overwrite를 실행하면 Designer 수동 수정이 사라질 수 있으므로, spec을 구조의 기준으로 사용할지 초기 생성용으로만 사용할지 작업 전에 결정해야 한다.

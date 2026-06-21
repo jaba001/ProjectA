@@ -61,31 +61,34 @@ UI 관련 상세 메모는 아래 파일에 정리되어 있습니다.
 - `UMainMenuRootWidget`
 - `UMainMenuScreenWidget`
 - `UCharacterCreationWidget`
-- `UMainMenuScaffoldTestWidget`
 
 기존 MainMenu와 CharacterCreation은 런타임 fallback을 유지합니다.
-새로운 scaffold generator는 기존 WBP를 덮어쓰지 않고 테스트 전용 WBP를 생성합니다.
+Scaffold generator는 기존 native class를 부모로 사용하는 WBP의 Designer tree를 JSON spec 기준으로 생성합니다.
 
-기본 생성 asset:
+관리 대상 asset:
 
-`/Game/User_JeHoon/UI/MainMenu/Generated/WBP_MainMenuScaffoldTest`
+- `/Game/User_JeHoon/Blueprint/UI/MainMenu/WBP_MainMenuRootWidget`
+- `/Game/User_JeHoon/Blueprint/UI/MainMenu/WBP_MainMenuScreenWidget`
+- `/Game/User_JeHoon/Blueprint/UI/MainMenu/WBP_CharacterCreationWidget`
 
 ## UI Scaffold Generator
 
 JSON spec 위치:
 
-`Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScaffoldTest.json`
+- `Source/ProjectAEditor/UiScaffoldSpecs/MainMenuRootWidget.json`
+- `Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScreenWidget.json`
+- `Source/ProjectAEditor/UiScaffoldSpecs/CharacterCreationWidget.json`
 
 기본 commandlet:
 
 ```powershell
-"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -DryRun
+"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -DryRun -Spec="Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScreenWidget.json"
 ```
 
 실제 생성:
 
 ```powershell
-"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -Overwrite
+"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -Overwrite -Spec="Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScreenWidget.json"
 ```
 
 현재 지원하는 widget type:
@@ -97,6 +100,8 @@ JSON spec 위치:
 - VerticalBox
 - Border
 - EditableTextBox
+- Image
+- CommonActivatableWidgetStack
 
 ## Project Structure
 

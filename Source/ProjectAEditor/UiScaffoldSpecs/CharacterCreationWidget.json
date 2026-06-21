@@ -1,0 +1,161 @@
+{
+	"nativeClass": "UCharacterCreationWidget",
+	"nativeHeaderPath": "Source/ProjectA/UI/MainMenu/CharacterCreationWidget.h",
+	"nativeSourcePath": "Source/ProjectA/UI/MainMenu/CharacterCreationWidget.cpp",
+	"blueprintName": "WBP_CharacterCreationWidget",
+	"assetPath": "/Game/User_JeHoon/Blueprint/UI/MainMenu",
+	"parentClass": "UCommonActivatableWidget",
+	"generateNativeSource": false,
+	"widgets": [
+		{
+			"name": "RootOverlay",
+			"type": "Overlay",
+			"parent": ""
+		},
+		{
+			"name": "BackgroundBlocker",
+			"type": "Border",
+			"parent": "RootOverlay",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"verticalAlignment": "Fill",
+			"color": [0.12, 0.12, 0.12, 0.85]
+		},
+		{
+			"name": "CenterPanelBackground",
+			"type": "Border",
+			"parent": "RootOverlay",
+			"bind": true,
+			"horizontalAlignment": "Center",
+			"verticalAlignment": "Center",
+			"color": [0.22, 0.22, 0.22, 1.0]
+		},
+		{
+			"name": "ContentBox",
+			"type": "VerticalBox",
+			"parent": "CenterPanelBackground",
+			"padding": [24.0, 20.0, 24.0, 20.0]
+		},
+		{
+			"name": "Text_Title",
+			"type": "TextBlock",
+			"parent": "ContentBox",
+			"text": "Character Creation",
+			"horizontalAlignment": "Center",
+			"padding": [0.0, 0.0, 0.0, 16.0]
+		},
+		{
+			"name": "Text_NameLabel",
+			"type": "TextBlock",
+			"parent": "ContentBox",
+			"text": "Name",
+			"horizontalAlignment": "Left"
+		},
+		{
+			"name": "EditableTextBox_Name",
+			"type": "EditableTextBox",
+			"parent": "ContentBox",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"padding": [0.0, 4.0, 0.0, 12.0]
+		},
+		{
+			"name": "Text_ClassLabel",
+			"type": "TextBlock",
+			"parent": "ContentBox",
+			"text": "Class",
+			"horizontalAlignment": "Left"
+		},
+		{
+			"name": "Button_Warrior",
+			"type": "Button",
+			"parent": "ContentBox",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"padding": [0.0, 4.0, 0.0, 4.0]
+		},
+		{
+			"name": "Text_Warrior",
+			"type": "TextBlock",
+			"parent": "Button_Warrior",
+			"text": "Warrior",
+			"padding": [24.0, 12.0, 24.0, 12.0]
+		},
+		{
+			"name": "Button_Archer",
+			"type": "Button",
+			"parent": "ContentBox",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"padding": [0.0, 4.0, 0.0, 4.0]
+		},
+		{
+			"name": "Text_Archer",
+			"type": "TextBlock",
+			"parent": "Button_Archer",
+			"text": "Archer",
+			"padding": [24.0, 12.0, 24.0, 12.0]
+		},
+		{
+			"name": "Button_Mage",
+			"type": "Button",
+			"parent": "ContentBox",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"padding": [0.0, 4.0, 0.0, 4.0]
+		},
+		{
+			"name": "Text_Mage",
+			"type": "TextBlock",
+			"parent": "Button_Mage",
+			"text": "Mage",
+			"padding": [24.0, 12.0, 24.0, 12.0]
+		},
+		{
+			"name": "Text_SelectedClass",
+			"type": "TextBlock",
+			"parent": "ContentBox",
+			"bind": true,
+			"text": "Warrior",
+			"padding": [0.0, 12.0, 0.0, 4.0]
+		},
+		{
+			"name": "Text_StatPreview",
+			"type": "TextBlock",
+			"parent": "ContentBox",
+			"bind": true,
+			"text": "HP 120 / AP 4 / Move 3 / Range 1",
+			"padding": [0.0, 0.0, 0.0, 12.0]
+		},
+		{
+			"name": "Button_Back",
+			"type": "Button",
+			"parent": "ContentBox",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"padding": [0.0, 4.0, 0.0, 4.0]
+		},
+		{
+			"name": "Text_Back",
+			"type": "TextBlock",
+			"parent": "Button_Back",
+			"text": "Back",
+			"padding": [24.0, 12.0, 24.0, 12.0]
+		},
+		{
+			"name": "Button_StartGame",
+			"type": "Button",
+			"parent": "ContentBox",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"padding": [0.0, 4.0, 0.0, 4.0]
+		},
+		{
+			"name": "Text_StartGame",
+			"type": "TextBlock",
+			"parent": "Button_StartGame",
+			"text": "Start Game",
+			"padding": [24.0, 12.0, 24.0, 12.0]
+		}
+	]
+}

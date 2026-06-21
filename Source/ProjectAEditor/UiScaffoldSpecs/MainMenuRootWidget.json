@@ -1,0 +1,40 @@
+{
+	"nativeClass": "UMainMenuRootWidget",
+	"nativeHeaderPath": "Source/ProjectA/UI/MainMenu/MainMenuRootWidget.h",
+	"nativeSourcePath": "Source/ProjectA/UI/MainMenu/MainMenuRootWidget.cpp",
+	"blueprintName": "WBP_MainMenuRootWidget",
+	"assetPath": "/Game/User_JeHoon/Blueprint/UI/MainMenu",
+	"parentClass": "UCommonUserWidget",
+	"generateNativeSource": false,
+	"widgets": [
+		{
+			"name": "RootOverlay",
+			"type": "Overlay",
+			"parent": ""
+		},
+		{
+			"name": "MainStack",
+			"type": "CommonActivatableWidgetStack",
+			"parent": "RootOverlay",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"verticalAlignment": "Fill"
+		},
+		{
+			"name": "MenuStack",
+			"type": "CommonActivatableWidgetStack",
+			"parent": "RootOverlay",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"verticalAlignment": "Fill"
+		},
+		{
+			"name": "ModalStack",
+			"type": "CommonActivatableWidgetStack",
+			"parent": "RootOverlay",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"verticalAlignment": "Fill"
+		}
+	]
+}

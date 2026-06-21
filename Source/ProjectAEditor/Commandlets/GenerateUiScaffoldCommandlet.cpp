@@ -12,6 +12,7 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/EditableTextBox.h"
+#include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/TextBlock.h"
@@ -29,6 +30,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "WidgetBlueprint.h"
 #include "WidgetBlueprintFactory.h"
+#include "Widgets/CommonActivatableWidgetContainer.h"
 
 namespace
 {
@@ -38,7 +40,13 @@ struct FUiScaffoldWidgetSpec
 	FString Type;
 	FString Parent;
 	FString Text;
+	FString HorizontalAlignment = TEXT("Center");
+	FString VerticalAlignment = TEXT("Center");
+	FMargin Padding = FMargin(0.0f);
+	FLinearColor Color = FLinearColor::White;
 	bool bBind = false;
+	bool bHasPadding = false;
+	bool bHasColor = false;
 };
 
 struct FUiScaffoldSpec
@@ -49,10 +57,11 @@ struct FUiScaffoldSpec
 	FString BlueprintName;
 	FString AssetPath;
 	FString ParentClass;
+	bool bGenerateNativeSource = true;
 	TArray<FUiScaffoldWidgetSpec> Widgets;
 };
 
-const FString DefaultSpecPath = TEXT("Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScaffoldTest.json");
+const FString DefaultSpecPath = TEXT("Source/ProjectAEditor/UiScaffoldSpecs/MainMenuRootWidget.json");
 
 const TCHAR* BoolText(bool bValue)
 {
@@ -101,6 +110,83 @@ bool TryReadRequiredString(const TSharedPtr<FJsonObject>& JsonObject, const FStr
 	return true;
 }
 
+bool TryReadNumberArray(const TSharedPtr<FJsonObject>& JsonObject, const FString& FieldName, int32 ExpectedCount, TArray<double>& OutValues, bool& bOutFound)
+{
+	bOutFound = false;
+	const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+
+	if (!JsonObject->TryGetArrayField(FieldName, Values))
+	{
+		return true;
+	}
+
+	bOutFound = true;
+	if (!Values || Values->Num() != ExpectedCount)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] JSON field '%s' must contain exactly %d numbers."), *FieldName, ExpectedCount);
+		return false;
+	}
+
+	for (const TSharedPtr<FJsonValue>& Value : *Values)
+	{
+		double Number = 0.0;
+		if (!Value.IsValid() || !Value->TryGetNumber(Number))
+		{
+			UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] JSON field '%s' contains a non-number value."), *FieldName);
+			return false;
+		}
+
+		OutValues.Add(Number);
+	}
+
+	return true;
+}
+
+bool IsSupportedParentClass(const FString& ParentClass)
+{
+	return ParentClass == TEXT("UUserWidget") || ParentClass == TEXT("UCommonUserWidget") || ParentClass == TEXT("UCommonActivatableWidget");
+}
+
+EHorizontalAlignment GetHorizontalAlignment(const FString& Alignment)
+{
+	if (Alignment == TEXT("Fill"))
+	{
+		return HAlign_Fill;
+	}
+
+	if (Alignment == TEXT("Left"))
+	{
+		return HAlign_Left;
+	}
+
+	if (Alignment == TEXT("Right"))
+	{
+		return HAlign_Right;
+	}
+
+	return HAlign_Center;
+}
+
+EVerticalAlignment GetVerticalAlignment(const FString& Alignment)
+{
+	if (Alignment == TEXT("Fill"))
+	{
+		return VAlign_Fill;
+	}
+
+	if (Alignment == TEXT("Top"))
+	{
+		return VAlign_Top;
+	}
+
+	if (Alignment == TEXT("Bottom"))
+	{
+		return VAlign_Bottom;
+	}
+
+	return VAlign_Center;
+}
+
 bool IsSupportedWidgetType(const FString& Type)
 {
 	static const TSet<FString> SupportedTypes = {
@@ -110,7 +196,9 @@ bool IsSupportedWidgetType(const FString& Type)
 		TEXT("TextBlock"),
 		TEXT("VerticalBox"),
 		TEXT("Border"),
-		TEXT("EditableTextBox")
+		TEXT("EditableTextBox"),
+		TEXT("Image"),
+		TEXT("CommonActivatableWidgetStack")
 	};
 
 	return SupportedTypes.Contains(Type);
@@ -153,6 +241,16 @@ FString GetWidgetCppType(const FString& Type)
 		return TEXT("UEditableTextBox");
 	}
 
+	if (Type == TEXT("Image"))
+	{
+		return TEXT("UImage");
+	}
+
+	if (Type == TEXT("CommonActivatableWidgetStack"))
+	{
+		return TEXT("UCommonActivatableWidgetStack");
+	}
+
 	return FString();
 }
 
@@ -191,6 +289,16 @@ FString GetWidgetIncludePath(const FString& Type)
 	if (Type == TEXT("EditableTextBox"))
 	{
 		return TEXT("Components/EditableTextBox.h");
+	}
+
+	if (Type == TEXT("Image"))
+	{
+		return TEXT("Components/Image.h");
+	}
+
+	if (Type == TEXT("CommonActivatableWidgetStack"))
+	{
+		return TEXT("Widgets/CommonActivatableWidgetContainer.h");
 	}
 
 	return FString();
@@ -233,6 +341,16 @@ UClass* GetWidgetClass(const FString& Type)
 		return UEditableTextBox::StaticClass();
 	}
 
+	if (Type == TEXT("Image"))
+	{
+		return UImage::StaticClass();
+	}
+
+	if (Type == TEXT("CommonActivatableWidgetStack"))
+	{
+		return UCommonActivatableWidgetStack::StaticClass();
+	}
+
 	return nullptr;
 }
 
@@ -270,6 +388,7 @@ bool ParseSpecFile(const FString& SpecFullPath, FUiScaffoldSpec& OutSpec)
 	bValid &= TryReadRequiredString(RootObject, TEXT("blueprintName"), OutSpec.BlueprintName);
 	bValid &= TryReadRequiredString(RootObject, TEXT("assetPath"), OutSpec.AssetPath);
 	bValid &= TryReadRequiredString(RootObject, TEXT("parentClass"), OutSpec.ParentClass);
+	RootObject->TryGetBoolField(TEXT("generateNativeSource"), OutSpec.bGenerateNativeSource);
 
 	const TArray<TSharedPtr<FJsonValue>>* WidgetsArray = nullptr;
 	if (!RootObject->TryGetArrayField(TEXT("widgets"), WidgetsArray) || !WidgetsArray || WidgetsArray->Num() == 0)
@@ -299,6 +418,26 @@ bool ParseSpecFile(const FString& SpecFullPath, FUiScaffoldSpec& OutSpec)
 		WidgetObject->TryGetStringField(TEXT("parent"), WidgetSpec.Parent);
 		WidgetObject->TryGetBoolField(TEXT("bind"), WidgetSpec.bBind);
 		WidgetObject->TryGetStringField(TEXT("text"), WidgetSpec.Text);
+		WidgetObject->TryGetStringField(TEXT("horizontalAlignment"), WidgetSpec.HorizontalAlignment);
+		WidgetObject->TryGetStringField(TEXT("verticalAlignment"), WidgetSpec.VerticalAlignment);
+
+		TArray<double> PaddingValues;
+		bool bPaddingFound = false;
+		bWidgetValid &= TryReadNumberArray(WidgetObject, TEXT("padding"), 4, PaddingValues, bPaddingFound);
+		if (bPaddingFound && PaddingValues.Num() == 4)
+		{
+			WidgetSpec.Padding = FMargin(static_cast<float>(PaddingValues[0]), static_cast<float>(PaddingValues[1]), static_cast<float>(PaddingValues[2]), static_cast<float>(PaddingValues[3]));
+			WidgetSpec.bHasPadding = true;
+		}
+
+		TArray<double> ColorValues;
+		bool bColorFound = false;
+		bWidgetValid &= TryReadNumberArray(WidgetObject, TEXT("color"), 4, ColorValues, bColorFound);
+		if (bColorFound && ColorValues.Num() == 4)
+		{
+			WidgetSpec.Color = FLinearColor(static_cast<float>(ColorValues[0]), static_cast<float>(ColorValues[1]), static_cast<float>(ColorValues[2]), static_cast<float>(ColorValues[3]));
+			WidgetSpec.bHasColor = true;
+		}
 
 		if (!bWidgetValid)
 		{
@@ -327,9 +466,15 @@ bool ValidateSpec(const FUiScaffoldSpec& Spec)
 		bValid = false;
 	}
 
-	if (Spec.ParentClass != TEXT("UUserWidget"))
+	if (!IsSupportedParentClass(Spec.ParentClass))
 	{
-		UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] Unsupported parentClass for this step: %s"), *Spec.ParentClass);
+		UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] Unsupported parentClass: %s"), *Spec.ParentClass);
+		bValid = false;
+	}
+
+	if (Spec.bGenerateNativeSource && Spec.ParentClass != TEXT("UUserWidget"))
+	{
+		UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] Native source generation currently supports only UUserWidget as parentClass."));
 		bValid = false;
 	}
 
@@ -703,7 +848,7 @@ void RegisterDesignerWidget(UWidgetBlueprint* WidgetBlueprint, UWidget* Widget, 
 	WidgetBlueprint->OnVariableAdded(Widget->GetFName());
 }
 
-bool AddChildWidget(UWidget* Parent, UWidget* Child)
+bool AddChildWidget(UWidget* Parent, UWidget* Child, const FUiScaffoldWidgetSpec& ChildSpec)
 {
 	if (UCanvasPanel* CanvasPanel = Cast<UCanvasPanel>(Parent))
 	{
@@ -723,8 +868,12 @@ bool AddChildWidget(UWidget* Parent, UWidget* Child)
 		UOverlaySlot* OverlaySlot = Overlay->AddChildToOverlay(Child);
 		if (OverlaySlot)
 		{
-			OverlaySlot->SetHorizontalAlignment(HAlign_Center);
-			OverlaySlot->SetVerticalAlignment(VAlign_Center);
+			OverlaySlot->SetHorizontalAlignment(GetHorizontalAlignment(ChildSpec.HorizontalAlignment));
+			OverlaySlot->SetVerticalAlignment(GetVerticalAlignment(ChildSpec.VerticalAlignment));
+			if (ChildSpec.bHasPadding)
+			{
+				OverlaySlot->SetPadding(ChildSpec.Padding);
+			}
 		}
 
 		return true;
@@ -735,8 +884,12 @@ bool AddChildWidget(UWidget* Parent, UWidget* Child)
 		UVerticalBoxSlot* VerticalBoxSlot = VerticalBox->AddChildToVerticalBox(Child);
 		if (VerticalBoxSlot)
 		{
-			VerticalBoxSlot->SetHorizontalAlignment(HAlign_Center);
-			VerticalBoxSlot->SetVerticalAlignment(VAlign_Center);
+			VerticalBoxSlot->SetHorizontalAlignment(GetHorizontalAlignment(ChildSpec.HorizontalAlignment));
+			VerticalBoxSlot->SetVerticalAlignment(GetVerticalAlignment(ChildSpec.VerticalAlignment));
+			if (ChildSpec.bHasPadding)
+			{
+				VerticalBoxSlot->SetPadding(ChildSpec.Padding);
+			}
 		}
 
 		return true;
@@ -747,9 +900,12 @@ bool AddChildWidget(UWidget* Parent, UWidget* Child)
 		UButtonSlot* ButtonSlot = Cast<UButtonSlot>(Button->SetContent(Child));
 		if (ButtonSlot)
 		{
-			ButtonSlot->SetHorizontalAlignment(HAlign_Center);
-			ButtonSlot->SetVerticalAlignment(VAlign_Center);
-			ButtonSlot->SetPadding(FMargin(24.0f, 12.0f));
+			ButtonSlot->SetHorizontalAlignment(GetHorizontalAlignment(ChildSpec.HorizontalAlignment));
+			ButtonSlot->SetVerticalAlignment(GetVerticalAlignment(ChildSpec.VerticalAlignment));
+			if (ChildSpec.bHasPadding)
+			{
+				ButtonSlot->SetPadding(ChildSpec.Padding);
+			}
 		}
 
 		return true;
@@ -758,6 +914,11 @@ bool AddChildWidget(UWidget* Parent, UWidget* Child)
 	if (UBorder* Border = Cast<UBorder>(Parent))
 	{
 		Border->SetContent(Child);
+		if (ChildSpec.bHasPadding)
+		{
+			Border->SetPadding(ChildSpec.Padding);
+		}
+
 		return true;
 	}
 
@@ -767,6 +928,8 @@ bool AddChildWidget(UWidget* Parent, UWidget* Child)
 
 bool ApplyWidgetProperties(const FUiScaffoldWidgetSpec& WidgetSpec, UWidget* Widget)
 {
+	Widget->SetVisibility(ESlateVisibility::Visible);
+
 	if (WidgetSpec.Type == TEXT("TextBlock"))
 	{
 		UTextBlock* TextBlock = Cast<UTextBlock>(Widget);
@@ -779,6 +942,28 @@ bool ApplyWidgetProperties(const FUiScaffoldWidgetSpec& WidgetSpec, UWidget* Wid
 		{
 			TextBlock->SetText(FText::FromString(WidgetSpec.Text));
 		}
+	}
+
+	if (WidgetSpec.bHasColor && WidgetSpec.Type == TEXT("Image"))
+	{
+		UImage* Image = Cast<UImage>(Widget);
+		if (!Image)
+		{
+			return false;
+		}
+
+		Image->SetColorAndOpacity(WidgetSpec.Color);
+	}
+
+	if (WidgetSpec.bHasColor && WidgetSpec.Type == TEXT("Border"))
+	{
+		UBorder* Border = Cast<UBorder>(Widget);
+		if (!Border)
+		{
+			return false;
+		}
+
+		Border->SetBrushColor(WidgetSpec.Color);
 	}
 
 	return true;
@@ -863,7 +1048,7 @@ bool PopulateDesignerTree(const FUiScaffoldSpec& Spec, UWidgetBlueprint* WidgetB
 			return false;
 		}
 
-		if (!AddChildWidget(*ParentPtr, *ChildPtr))
+		if (!AddChildWidget(*ParentPtr, *ChildPtr, WidgetSpec))
 		{
 			return false;
 		}
@@ -916,7 +1101,7 @@ bool SaveGeneratedWidgetBlueprint(UWidgetBlueprint* WidgetBlueprint)
 void LogDryRunSummary(const FUiScaffoldSpec& Spec, bool bOverwrite)
 {
 	UE_LOG(LogTemp, Display, TEXT("[GenerateUiScaffoldCommandlet] DryRun validated spec."));
-	UE_LOG(LogTemp, Display, TEXT("[GenerateUiScaffoldCommandlet] DryRun nativeClass=%s parentClass=%s"), *Spec.NativeClass, *Spec.ParentClass);
+	UE_LOG(LogTemp, Display, TEXT("[GenerateUiScaffoldCommandlet] DryRun nativeClass=%s parentClass=%s generateNativeSource=%s"), *Spec.NativeClass, *Spec.ParentClass, BoolText(Spec.bGenerateNativeSource));
 	UE_LOG(LogTemp, Display, TEXT("[GenerateUiScaffoldCommandlet] DryRun header=%s source=%s"), *Spec.NativeHeaderPath, *Spec.NativeSourcePath);
 	UE_LOG(LogTemp, Display, TEXT("[GenerateUiScaffoldCommandlet] DryRun blueprint=%s assetPath=%s overwrite=%s"), *Spec.BlueprintName, *Spec.AssetPath, BoolText(bOverwrite));
 	UE_LOG(LogTemp, Display, TEXT("[GenerateUiScaffoldCommandlet] DryRun widgetCount=%d"), Spec.Widgets.Num());
@@ -958,9 +1143,14 @@ int32 UGenerateUiScaffoldCommandlet::Main(const FString& Params)
 		return 0;
 	}
 
-	if (!GenerateNativeSourceFiles(Spec, bOverwrite, bDryRun))
+	if (Spec.bGenerateNativeSource && !GenerateNativeSourceFiles(Spec, bOverwrite, bDryRun))
 	{
 		return 1;
+	}
+
+	if (!Spec.bGenerateNativeSource)
+	{
+		UE_LOG(LogTemp, Display, TEXT("[GenerateUiScaffoldCommandlet] Reusing existing native class without generating source files: %s"), *Spec.NativeClass);
 	}
 
 	UClass* NativeClass = FindGeneratedNativeClass(Spec);
