@@ -14,6 +14,8 @@ UI Scaffold Generator는 JSON 명세를 읽어서 Widget Blueprint의 Designer t
 - 기존 native C++ widget class를 WBP parent class로 사용
 - bind=true widget을 Designer variable로 등록
 - TextBlock 텍스트, 색상, 패딩, 정렬 같은 기본 속성 적용
+- HorizontalBox child의 Auto/Fill 크기 규칙 적용
+- CharacterCreation 슬롯의 빈 상태와 편집 패널을 Designer tree로 구성
 - Widget Blueprint compile 및 package 저장
 - DryRun 검증
 - 명시적인 Overwrite 제어
@@ -40,7 +42,7 @@ JSON spec 폴더:
 UI native class와 WBP:
 
 - Source/ProjectA/UI
-- Content/User_JeHoon/Blueprint/UI
+- Content/User_JeHoon/UI/MainMenu
 
 
 3. 기본 사용 흐름
@@ -106,7 +108,7 @@ JSON을 읽고 모든 검증을 수행하지만 C++ 파일과 WBP asset을 생�
     "nativeHeaderPath": "Source/ProjectA/UI/MainMenu/MainMenuScreenWidget.h",
     "nativeSourcePath": "Source/ProjectA/UI/MainMenu/MainMenuScreenWidget.cpp",
     "blueprintName": "WBP_MainMenuScreenWidget",
-    "assetPath": "/Game/User_JeHoon/Blueprint/UI/MainMenu",
+    "assetPath": "/Game/User_JeHoon/UI/MainMenu",
     "parentClass": "UCommonActivatableWidget",
     "generateNativeSource": false,
     "widgets": []
@@ -251,12 +253,24 @@ verticalAlignment
 padding
 
 - [Left, Top, Right, Bottom] 순서의 숫자 배열
-- OverlaySlot, VerticalBoxSlot, ButtonSlot 또는 Border content padding에 적용한다.
+- OverlaySlot, HorizontalBoxSlot, VerticalBoxSlot, ButtonSlot 또는 Border content padding에 적용한다.
+
+sizeRule
+
+- HorizontalBox child의 크기 규칙
+- Auto 또는 Fill을 지원한다.
+- 생략하면 Auto를 사용한다.
+
+fill
+
+- sizeRule이 Fill인 HorizontalBox child가 차지할 비율
+- 0보다 큰 숫자를 사용한다.
+- 생략하면 1.0을 사용한다.
 
 color
 
 - [Red, Green, Blue, Alpha] 순서의 숫자 배열
-- 현재 Image의 ColorAndOpacity와 Border의 BrushColor에 적용한다.
+- TextBlock의 ColorAndOpacity, Image의 ColorAndOpacity, Border의 BrushColor에 적용한다.
 - 각 값은 일반적으로 0.0에서 1.0 범위를 사용한다.
 
 
@@ -266,6 +280,7 @@ color
 - Overlay
 - Button
 - TextBlock
+- HorizontalBox
 - VerticalBox
 - Border
 - EditableTextBox
@@ -278,6 +293,7 @@ Widget type mapping:
 - Overlay -> UOverlay
 - Button -> UButton
 - TextBlock -> UTextBlock
+- HorizontalBox -> UHorizontalBox
 - VerticalBox -> UVerticalBox
 - Border -> UBorder
 - EditableTextBox -> UEditableTextBox
@@ -291,6 +307,7 @@ Widget type mapping:
 
 - CanvasPanel
 - Overlay
+- HorizontalBox
 - VerticalBox
 
 한 개의 child만 가질 수 있는 parent:
@@ -319,6 +336,8 @@ Commandlet은 asset을 수정하기 전에 다음 항목을 검증한다.
 - widgets 배열 존재 여부
 - widget name 중복
 - 지원하지 않는 widget type
+- 지원하지 않는 sizeRule
+- 0 이하인 fill 값
 - root widget 개수
 - 누락된 parent 참조
 - 순환 parent 참조
@@ -397,7 +416,42 @@ Commandlet 로그에서 다음 항목을 확인한다.
 - PIE에서 기존 버튼 동작과 CommonUI 화면 전환이 유지되는지 확인
 
 
-17. 문제 해결
+17. MainMenu 화면 전환 규칙
+
+MainMenuRootWidget은 MainStack, MenuStack, ModalStack을 Overlay에 겹쳐서 관리한다.
+
+MainStack은 기본 메인메뉴 화면을 표시하고, MenuStack은 CharacterCreation 같은 메뉴 흐름 화면을 표시한다.
+
+MenuStack에 화면을 Push하면 MainStack은 Hidden 상태가 되어 이전 메뉴 UI가 뒤에 보이지 않고 입력도 받지 않는다.
+
+MenuStack을 Clear하거나 CharacterCreation에서 Back을 누르면 MainStack은 다시 Visible 상태로 복원된다.
+
+CharacterCreation 우측 상단 X 버튼도 Back과 같은 RequestBack 흐름을 사용하므로 MainStack을 다시 Visible 상태로 복원한다.
+
+이 규칙은 stack 구조를 유지하면서 화면 전환 시 이전 UI를 시각적으로 숨기기 위한 것이다.
+
+
+18. MainMenu 3D PreviewStage 사용법
+
+CharacterCreation의 클래스 카드는 UI만 담당하고, 캐릭터 프리뷰는 L_MainMenu의 실제 월드 액터로 표시한다. SceneCapture2D와 RenderTarget은 사용하지 않는다.
+
+설정 순서:
+
+1. L_MainMenu에 AMainMenuPreviewStage 또는 이를 부모로 만든 Blueprint actor를 한 개 배치한다.
+2. 배치한 actor의 PreviewActorClasses 맵에 StableHand, Scholar, Herbalist, Hunter 키와 각 프리뷰 actor class를 연결한다.
+3. PreviewCamera가 네 캐릭터와 배경을 함께 담도록 PreviewStage actor와 카메라 transform을 조정한다.
+4. Slot0Anchor부터 Slot3Anchor까지 각 캐릭터가 카드 위에 정렬되도록 위치를 조정한다.
+5. MainMenuPlayerController를 사용하는 GameMode로 L_MainMenu를 실행한다.
+6. CharacterCreation 카드의 Prev 또는 Next 버튼을 눌러 해당 슬롯 actor가 교체되는지 확인한다.
+
+CharacterCreation 슬롯은 처음에는 캐릭터 생성하기 버튼만 표시한다. 버튼을 누르면 해당 슬롯의 SlotEditorBox가 열리고 PreviewStage에 프리뷰 actor가 생성된다. X 버튼을 누르면 SlotEditorBox가 닫히고 PreviewStage의 해당 슬롯 actor가 제거되며, 캐릭터 생성하기 버튼이 다시 표시된다.
+
+MainMenuPlayerController는 레벨에서 PreviewStage를 찾아 해당 actor를 카메라 ViewTarget으로 사용한다. PreviewStage가 없거나 ClassId에 대응하는 actor class가 없으면 경고 로그를 남기며, 카드 UI 자체는 계속 동작한다.
+
+프리뷰 actor class는 메뉴 표시 전용 Blueprint actor를 권장한다. 전투용 입력, AI, 충돌 또는 게임 진행 로직이 자동 실행되지 않도록 구성한다.
+
+
+19. 문제 해결
 
 WBP가 Content Browser에 보이지 않는 경우:
 
@@ -428,10 +482,23 @@ Overwrite가 중단되는 경우:
 - -Overwrite 옵션이 포함됐는지 확인한다.
 
 
-18. 운영 원칙
+20. 운영 원칙
 
 UI Scaffold Generator는 Designer 초기 구조 생성과 반복 가능한 구조 갱신을 위한 도구다.
 
 레이아웃 구조와 필수 widget 이름은 JSON으로 관리하고, 이미지 asset, brush, font, 세부 스타일은 생성 후 Widget Blueprint Designer에서 편집할 수 있다.
 
 반복해서 -Overwrite를 실행하면 Designer 수동 수정이 사라질 수 있으므로, spec을 구조의 기준으로 사용할지 초기 생성용으로만 사용할지 작업 전에 결정해야 한다.
+
+21. Persistent Gameplay UI (2026-09-08)
+
+MainMenu → CharacterCreation 4-slot data → Gameplay → Run Map → Encounter → Combat → Result → Run Map 흐름을 추가했다.
+GameplayRootWidget은 CommonUserWidget이며 RunLayer/CombatLayer/ModalLayer CommonActivatableWidgetStack을 관리한다.
+RunMapWidget, CombatHUDWidget, EncounterResultWidget은 CommonActivatableWidget이다. Run Map은 노드 선택만 요청하며 Unit spawn은 EncounterManager가 담당한다.
+GetDesiredInputConfig에서 CombatHUD는 All/CaptureDuringMouseDown, RunMap/Result는 Menu/NoCapture를 지정한다. 커서는 계속 표시한다.
+GameplayPlayerController는 화면별 SetInputMode를 호출하지 않는다. BeginPlay에서 MainMenu의 UIOnly travel 잔여 IgnoreInput을 해제하고 로컬 플레이어의 최초 뷰포트 포커스를 복원하며, CommonUI가 실제 입력 전달을 관리한다.
+새 Designer WBP 4종은 /Game/User_JeHoon/UI/Gameplay에 저장한다. 기존 /UI/Combat 에셋은 보존한다.
+새 JSON spec: GameplayRootWidget.json, RunMapWidget.json, CombatHUDWidget.json, EncounterResultWidget.json.
+Generator 기능을 추가하지 않고 실제 Designer tree 생성·Blueprint compile·save 및 별도 프로세스 재로드 검증을 수행한다.
+CharacterCreation의 Text_StartGameStatus는 선택 바인딩이며 기존 Designer 구조에 없으면 native가 표시 영역을 추가한다.
+정확한 클래스/변수/에디터 연결 순서는 Docs/VERTICAL_SLICE_SETUP.md, 실제 검증 결과는 Docs/VERTICAL_SLICE_REPORT.md를 참고한다.

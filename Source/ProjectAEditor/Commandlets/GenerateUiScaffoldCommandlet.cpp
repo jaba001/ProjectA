@@ -12,9 +12,13 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/EditableTextBox.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/SizeBox.h"
+#include "Components/SizeBoxSlot.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
@@ -42,11 +46,17 @@ struct FUiScaffoldWidgetSpec
 	FString Text;
 	FString HorizontalAlignment = TEXT("Center");
 	FString VerticalAlignment = TEXT("Center");
+	FString SizeRule = TEXT("Auto");
 	FMargin Padding = FMargin(0.0f);
 	FLinearColor Color = FLinearColor::White;
+	float FillValue = 1.0f;
+	float WidthOverride = 0.0f;
+	float HeightOverride = 0.0f;
 	bool bBind = false;
 	bool bHasPadding = false;
 	bool bHasColor = false;
+	bool bHasWidthOverride = false;
+	bool bHasHeightOverride = false;
 };
 
 struct FUiScaffoldSpec
@@ -197,7 +207,9 @@ bool IsSupportedWidgetType(const FString& Type)
 		TEXT("VerticalBox"),
 		TEXT("Border"),
 		TEXT("EditableTextBox"),
+		TEXT("HorizontalBox"),
 		TEXT("Image"),
+		TEXT("SizeBox"),
 		TEXT("CommonActivatableWidgetStack")
 	};
 
@@ -241,9 +253,19 @@ FString GetWidgetCppType(const FString& Type)
 		return TEXT("UEditableTextBox");
 	}
 
+	if (Type == TEXT("HorizontalBox"))
+	{
+		return TEXT("UHorizontalBox");
+	}
+
 	if (Type == TEXT("Image"))
 	{
 		return TEXT("UImage");
+	}
+
+	if (Type == TEXT("SizeBox"))
+	{
+		return TEXT("USizeBox");
 	}
 
 	if (Type == TEXT("CommonActivatableWidgetStack"))
@@ -291,9 +313,19 @@ FString GetWidgetIncludePath(const FString& Type)
 		return TEXT("Components/EditableTextBox.h");
 	}
 
+	if (Type == TEXT("HorizontalBox"))
+	{
+		return TEXT("Components/HorizontalBox.h");
+	}
+
 	if (Type == TEXT("Image"))
 	{
 		return TEXT("Components/Image.h");
+	}
+
+	if (Type == TEXT("SizeBox"))
+	{
+		return TEXT("Components/SizeBox.h");
 	}
 
 	if (Type == TEXT("CommonActivatableWidgetStack"))
@@ -341,9 +373,19 @@ UClass* GetWidgetClass(const FString& Type)
 		return UEditableTextBox::StaticClass();
 	}
 
+	if (Type == TEXT("HorizontalBox"))
+	{
+		return UHorizontalBox::StaticClass();
+	}
+
 	if (Type == TEXT("Image"))
 	{
 		return UImage::StaticClass();
+	}
+
+	if (Type == TEXT("SizeBox"))
+	{
+		return USizeBox::StaticClass();
 	}
 
 	if (Type == TEXT("CommonActivatableWidgetStack"))
@@ -356,12 +398,12 @@ UClass* GetWidgetClass(const FString& Type)
 
 bool CanParentHaveChildren(const FString& Type)
 {
-	return Type == TEXT("CanvasPanel") || Type == TEXT("Overlay") || Type == TEXT("VerticalBox") || Type == TEXT("Button") || Type == TEXT("Border");
+	return Type == TEXT("CanvasPanel") || Type == TEXT("Overlay") || Type == TEXT("VerticalBox") || Type == TEXT("HorizontalBox") || Type == TEXT("Button") || Type == TEXT("Border") || Type == TEXT("SizeBox");
 }
 
 bool IsSingleContentParent(const FString& Type)
 {
-	return Type == TEXT("Button") || Type == TEXT("Border");
+	return Type == TEXT("Button") || Type == TEXT("Border") || Type == TEXT("SizeBox");
 }
 
 bool ParseSpecFile(const FString& SpecFullPath, FUiScaffoldSpec& OutSpec)
@@ -420,6 +462,27 @@ bool ParseSpecFile(const FString& SpecFullPath, FUiScaffoldSpec& OutSpec)
 		WidgetObject->TryGetStringField(TEXT("text"), WidgetSpec.Text);
 		WidgetObject->TryGetStringField(TEXT("horizontalAlignment"), WidgetSpec.HorizontalAlignment);
 		WidgetObject->TryGetStringField(TEXT("verticalAlignment"), WidgetSpec.VerticalAlignment);
+		WidgetObject->TryGetStringField(TEXT("sizeRule"), WidgetSpec.SizeRule);
+
+		double FillValue = 1.0;
+		if (WidgetObject->TryGetNumberField(TEXT("fill"), FillValue))
+		{
+			WidgetSpec.FillValue = static_cast<float>(FillValue);
+		}
+
+		double WidthOverride = 0.0;
+		if (WidgetObject->TryGetNumberField(TEXT("widthOverride"), WidthOverride))
+		{
+			WidgetSpec.WidthOverride = static_cast<float>(WidthOverride);
+			WidgetSpec.bHasWidthOverride = true;
+		}
+
+		double HeightOverride = 0.0;
+		if (WidgetObject->TryGetNumberField(TEXT("heightOverride"), HeightOverride))
+		{
+			WidgetSpec.HeightOverride = static_cast<float>(HeightOverride);
+			WidgetSpec.bHasHeightOverride = true;
+		}
 
 		TArray<double> PaddingValues;
 		bool bPaddingFound = false;
@@ -500,6 +563,30 @@ bool ValidateSpec(const FUiScaffoldSpec& Spec)
 		if (!IsSupportedWidgetType(Widget.Type))
 		{
 			UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] Unsupported widget type for %s: %s"), *Widget.Name, *Widget.Type);
+			bValid = false;
+		}
+
+		if (Widget.SizeRule != TEXT("Auto") && Widget.SizeRule != TEXT("Fill"))
+		{
+			UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] Unsupported sizeRule for %s: %s"), *Widget.Name, *Widget.SizeRule);
+			bValid = false;
+		}
+
+		if (Widget.SizeRule == TEXT("Fill") && Widget.FillValue <= 0.0f)
+		{
+			UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] Fill value must be greater than zero for %s."), *Widget.Name);
+			bValid = false;
+		}
+
+		if (Widget.bHasWidthOverride && Widget.WidthOverride <= 0.0f)
+		{
+			UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] widthOverride must be greater than zero for %s."), *Widget.Name);
+			bValid = false;
+		}
+
+		if (Widget.bHasHeightOverride && Widget.HeightOverride <= 0.0f)
+		{
+			UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] heightOverride must be greater than zero for %s."), *Widget.Name);
 			bValid = false;
 		}
 
@@ -879,6 +966,35 @@ bool AddChildWidget(UWidget* Parent, UWidget* Child, const FUiScaffoldWidgetSpec
 		return true;
 	}
 
+	if (UHorizontalBox* HorizontalBox = Cast<UHorizontalBox>(Parent))
+	{
+		UHorizontalBoxSlot* HorizontalBoxSlot = HorizontalBox->AddChildToHorizontalBox(Child);
+		if (HorizontalBoxSlot)
+		{
+			HorizontalBoxSlot->SetHorizontalAlignment(GetHorizontalAlignment(ChildSpec.HorizontalAlignment));
+			HorizontalBoxSlot->SetVerticalAlignment(GetVerticalAlignment(ChildSpec.VerticalAlignment));
+			if (ChildSpec.bHasPadding)
+			{
+				HorizontalBoxSlot->SetPadding(ChildSpec.Padding);
+			}
+
+			FSlateChildSize ChildSize;
+			if (ChildSpec.SizeRule == TEXT("Auto"))
+			{
+				ChildSize.SizeRule = ESlateSizeRule::Automatic;
+			}
+			else
+			{
+				ChildSize.SizeRule = ESlateSizeRule::Fill;
+				ChildSize.Value = ChildSpec.FillValue;
+			}
+
+			HorizontalBoxSlot->SetSize(ChildSize);
+		}
+
+		return true;
+	}
+
 	if (UVerticalBox* VerticalBox = Cast<UVerticalBox>(Parent))
 	{
 		UVerticalBoxSlot* VerticalBoxSlot = VerticalBox->AddChildToVerticalBox(Child);
@@ -922,6 +1038,22 @@ bool AddChildWidget(UWidget* Parent, UWidget* Child, const FUiScaffoldWidgetSpec
 		return true;
 	}
 
+	if (USizeBox* SizeBox = Cast<USizeBox>(Parent))
+	{
+		USizeBoxSlot* SizeBoxSlot = Cast<USizeBoxSlot>(SizeBox->AddChild(Child));
+		if (SizeBoxSlot)
+		{
+			SizeBoxSlot->SetHorizontalAlignment(GetHorizontalAlignment(ChildSpec.HorizontalAlignment));
+			SizeBoxSlot->SetVerticalAlignment(GetVerticalAlignment(ChildSpec.VerticalAlignment));
+			if (ChildSpec.bHasPadding)
+			{
+				SizeBoxSlot->SetPadding(ChildSpec.Padding);
+			}
+		}
+
+		return true;
+	}
+
 	UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] Unsupported parent widget instance while attaching '%s' under '%s'."), *Child->GetName(), *Parent->GetName());
 	return false;
 }
@@ -941,6 +1073,11 @@ bool ApplyWidgetProperties(const FUiScaffoldWidgetSpec& WidgetSpec, UWidget* Wid
 		if (!WidgetSpec.Text.IsEmpty())
 		{
 			TextBlock->SetText(FText::FromString(WidgetSpec.Text));
+		}
+
+		if (WidgetSpec.bHasColor)
+		{
+			TextBlock->SetColorAndOpacity(FSlateColor(WidgetSpec.Color));
 		}
 	}
 
@@ -966,6 +1103,25 @@ bool ApplyWidgetProperties(const FUiScaffoldWidgetSpec& WidgetSpec, UWidget* Wid
 		Border->SetBrushColor(WidgetSpec.Color);
 	}
 
+	if (WidgetSpec.Type == TEXT("SizeBox"))
+	{
+		USizeBox* SizeBox = Cast<USizeBox>(Widget);
+		if (!SizeBox)
+		{
+			return false;
+		}
+
+		if (WidgetSpec.bHasWidthOverride)
+		{
+			SizeBox->SetWidthOverride(WidgetSpec.WidthOverride);
+		}
+
+		if (WidgetSpec.bHasHeightOverride)
+		{
+			SizeBox->SetHeightOverride(WidgetSpec.HeightOverride);
+		}
+	}
+
 	return true;
 }
 
@@ -977,17 +1133,26 @@ bool PopulateDesignerTree(const FUiScaffoldSpec& Spec, UWidgetBlueprint* WidgetB
 		return false;
 	}
 
-	UWidgetTree* WidgetTree = WidgetBlueprint->WidgetTree;
 	WidgetBlueprint->Modify();
-	WidgetTree->SetFlags(RF_Transactional);
-	WidgetTree->Modify();
 	WidgetBlueprint->WidgetVariableNameToGuidMap.Reset();
 
-	if (WidgetTree->RootWidget)
+	UWidgetTree* PreviousWidgetTree = WidgetBlueprint->WidgetTree;
+	PreviousWidgetTree->ClearFlags(RF_ArchetypeObject | RF_DefaultSubObject);
+	PreviousWidgetTree->SetFlags(RF_Transient);
+	if (!PreviousWidgetTree->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional | REN_DoNotDirty))
 	{
-		WidgetTree->RemoveWidget(WidgetTree->RootWidget);
-		WidgetTree->RootWidget = nullptr;
+		UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] Failed to detach the previous WidgetTree before overwrite."));
+		return false;
 	}
+
+	UWidgetTree* WidgetTree = NewObject<UWidgetTree>(WidgetBlueprint, TEXT("WidgetTree"), RF_Transactional | RF_ArchetypeObject);
+	if (!WidgetTree)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] Failed to create a replacement WidgetTree."));
+		return false;
+	}
+
+	WidgetBlueprint->WidgetTree = WidgetTree;
 
 	TMap<FString, UWidget*> CreatedWidgets;
 	FString RootWidgetName;

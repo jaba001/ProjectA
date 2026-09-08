@@ -7,6 +7,7 @@
 #include "Grid/Combat/CombatGridTile.h"
 #include "Kismet/GameplayStatics.h"
 #include "Containers/Queue.h"
+#include "TimerManager.h"
 
 ACombatManager::ACombatManager()
 {
@@ -80,11 +81,15 @@ void ACombatManager::Server_StartCombat_Implementation()
 
 void ACombatManager::StartCombat_Internal()
 {
-    if (!HasAuthority())
+    if (!HasAuthority() || IsCombatActive() || CombatUnits.IsEmpty())
     {
         return;
     }
 
+    if (TurnManager)
+    {
+        TurnManager->ResetCombat();
+    }
     TurnManager = NewObject<UTurnManager>(this);
 
     if (!TurnManager)
@@ -92,6 +97,7 @@ void ACombatManager::StartCombat_Internal()
         return;
     }
 
+    TurnManager->OnCombatResult.AddUObject(this, &ACombatManager::HandleCombatResult);
     TurnManager->InitializeTurnOrder(CombatUnits);
     CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
     RefreshReachableMoveTiles();
@@ -102,7 +108,15 @@ void ACombatManager::RegisterUnits(const TArray<AUnitBase*>& Units)
 {
     if (!HasAuthority()) return;  
 
-    CombatUnits = Units;
+    ResetCombat();
+    for (AUnitBase* Unit : Units)
+    {
+        if (IsValid(Unit))
+        {
+            CombatUnits.AddUnique(Unit);
+            Unit->OnUnitDied.AddUObject(this, &ACombatManager::HandleUnitDied);
+        }
+    }
 }
 
 void ACombatManager::AdvanceTurn()
@@ -112,7 +126,7 @@ void ACombatManager::AdvanceTurn()
         return;
     }
 
-    if (!TurnManager)
+    if (!IsCombatActive())
     {
         return;
     }
@@ -136,10 +150,90 @@ void ACombatManager::RequestEndTurn()
 
 AUnitBase* ACombatManager::GetCurrentUnit() const
 {
-    if (!CombatUnits.IsValidIndex(CurrentTurnIndex))
-        return nullptr;
+    if (IsCombatActive())
+    {
+        return TurnManager->GetCurrentUnit();
+    }
+    return nullptr;
+}
 
-    return CombatUnits[CurrentTurnIndex];
+bool ACombatManager::IsCombatActive() const
+{
+    return TurnManager && TurnManager->IsCombatActive();
+}
+
+void ACombatManager::HandleUnitDied(AUnitBase* Unit)
+{
+    if (IsCombatActive())
+    {
+        TurnManager->EvaluateCombatResult();
+        RefreshTileProtectedByFront();
+        if (IsCombatActive() && GetCurrentUnit() == Unit)
+        {
+            // A dead active unit cannot receive input; resume after its death callback returns.
+            // 사망한 현재 유닛은 입력을 받을 수 없으므로 사망 콜백 반환 후 다음 턴으로 진행합니다.
+            DeadTurnTimer = GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this, WeakUnit = TWeakObjectPtr<AUnitBase>(Unit)]()
+            {
+                if (IsCombatActive() && GetCurrentUnit() == WeakUnit.Get())
+                {
+                    AdvanceTurn();
+                }
+            }));
+        }
+    }
+}
+
+void ACombatManager::HandleCombatResult(ECombatResult Result)
+{
+    EndCombat();
+    OnCombatResult.Broadcast(Result);
+}
+
+void ACombatManager::EndCombat()
+{
+    GetWorldTimerManager().ClearTimer(DeadTurnTimer);
+    if (TurnManager)
+    {
+        TurnManager->StopCombat();
+    }
+    ClearMovableTilesHighlight();
+    ClearSkillTargetTilesHighlight();
+    ReachableMoveTiles.Reset();
+    SkillTargetTiles.Reset();
+    for (AUnitBase* Unit : CombatUnits)
+    {
+        if (IsValid(Unit))
+        {
+            Unit->OnTurnEnd();
+            Unit->CancelCurrentAction();
+        }
+    }
+}
+
+void ACombatManager::ResetCombat()
+{
+    EndCombat();
+    for (AUnitBase* Unit : CombatUnits)
+    {
+        if (IsValid(Unit))
+        {
+            Unit->OnUnitDied.RemoveAll(this);
+        }
+    }
+    CombatUnits.Reset();
+    if (TurnManager)
+    {
+        TurnManager->ResetCombat();
+        TurnManager = nullptr;
+    }
+    CurrentTurnIndex = INDEX_NONE;
+}
+
+void ACombatManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    ResetCombat();
+    OnCombatResult.Clear();
+    Super::EndPlay(EndPlayReason);
 }
 
 void ACombatManager::RefreshReachableMoveTiles()

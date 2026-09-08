@@ -1,0 +1,61 @@
+{
+	"nativeClass": "UEncounterResultWidget",
+	"nativeHeaderPath": "Source/ProjectA/UI/Gameplay/EncounterResultWidget.h",
+	"nativeSourcePath": "Source/ProjectA/UI/Gameplay/EncounterResultWidget.cpp",
+	"blueprintName": "WBP_EncounterResultWidget",
+	"assetPath": "/Game/User_JeHoon/UI/Gameplay",
+	"parentClass": "UCommonActivatableWidget",
+	"generateNativeSource": false,
+	"widgets": [
+		{
+			"name": "RootOverlay",
+			"type": "Overlay",
+			"parent": ""
+		},
+		{
+			"name": "Background",
+			"type": "Border",
+			"parent": "RootOverlay",
+			"color": [
+				0.025,
+				0.04,
+				0.06,
+				0.98
+			],
+			"horizontalAlignment": "Fill",
+			"verticalAlignment": "Fill"
+		},
+		{
+			"name": "ContentBox",
+			"type": "VerticalBox",
+			"parent": "RootOverlay",
+			"horizontalAlignment": "Center",
+			"verticalAlignment": "Center"
+		},
+		{
+			"name": "Text_Result",
+			"type": "TextBlock",
+			"parent": "ContentBox",
+			"bind": true,
+			"text": "Victory / 승리"
+		},
+		{
+			"name": "Button_Continue",
+			"type": "Button",
+			"parent": "ContentBox",
+			"bind": true
+		},
+		{
+			"name": "Text_Continue",
+			"type": "TextBlock",
+			"parent": "Button_Continue",
+			"text": "Continue / 계속",
+			"padding": [
+				24,
+				12,
+				24,
+				12
+			]
+		}
+	]
+}

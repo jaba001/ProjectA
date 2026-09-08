@@ -69,6 +69,11 @@ void ACombatGridTile::NotifyActorOnClicked(FKey ButtonPressed)
         return;
     }
 
+    if (!PC->CanUseActiveUnitAction())
+    {
+        return;
+    }
+
     if (PC->IsSkillInputMode())
     {
         AUnitBase* ActiveUnit = PC->GetActiveUnit();

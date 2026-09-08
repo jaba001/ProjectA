@@ -1,0 +1,116 @@
+{
+	"nativeClass": "UCombatHUDWidget",
+	"nativeHeaderPath": "Source/ProjectA/UI/Combat/CombatHUDWidget.h",
+	"nativeSourcePath": "Source/ProjectA/UI/Combat/CombatHUDWidget.cpp",
+	"blueprintName": "WBP_CombatHUDWidget",
+	"assetPath": "/Game/User_JeHoon/UI/Gameplay",
+	"parentClass": "UCommonActivatableWidget",
+	"generateNativeSource": false,
+	"widgets": [
+		{
+			"name": "RootOverlay",
+			"type": "Overlay",
+			"parent": ""
+		},
+		{
+			"name": "CommandPanelBackground",
+			"type": "Border",
+			"parent": "RootOverlay",
+			"bind": true,
+			"color": [0.015, 0.022, 0.035, 0.92],
+			"horizontalAlignment": "Center",
+			"verticalAlignment": "Bottom",
+			"padding": [
+				20,
+				20,
+				20,
+				20
+			]
+		},
+		{
+			"name": "ContentBox",
+			"type": "VerticalBox",
+			"parent": "CommandPanelBackground",
+			"padding": [16, 12, 16, 12]
+		},
+		{
+			"name": "Text_Turn",
+			"type": "TextBlock",
+			"parent": "ContentBox",
+			"bind": true,
+			"text": "Turn / 턴"
+		},
+		{
+			"name": "Text_Action",
+			"type": "TextBlock",
+			"parent": "ContentBox",
+			"bind": true,
+			"text": "Select an action, then a tile. / 행동 선택 후 타일 클릭"
+		},
+		{
+			"name": "SkillList",
+			"type": "HorizontalBox",
+			"parent": "ContentBox",
+			"bind": true
+		},
+		{
+			"name": "Actions",
+			"type": "HorizontalBox",
+			"parent": "ContentBox"
+		},
+		{
+			"name": "Button_Move",
+			"type": "Button",
+			"parent": "Actions",
+			"bind": true
+		},
+		{
+			"name": "Text_Move",
+			"type": "TextBlock",
+			"parent": "Button_Move",
+			"text": "Move / 이동",
+			"padding": [
+				20,
+				12,
+				20,
+				12
+			]
+		},
+		{
+			"name": "Button_EndTurn",
+			"type": "Button",
+			"parent": "Actions",
+			"bind": true
+		},
+		{
+			"name": "Text_EndTurn",
+			"type": "TextBlock",
+			"parent": "Button_EndTurn",
+			"text": "End Turn / 턴 종료",
+			"padding": [
+				20,
+				12,
+				20,
+				12
+			]
+		},
+		{
+			"name": "Button_Cancel",
+			"type": "Button",
+			"parent": "Actions",
+			"bind": true
+		},
+		{
+			"name": "Text_Cancel",
+			"type": "TextBlock",
+			"parent": "Button_Cancel",
+			"text": "Cancel / 취소",
+			"padding": [
+				20,
+				12,
+				20,
+				12
+			]
+		}
+	]
+}

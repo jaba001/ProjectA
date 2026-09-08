@@ -3,16 +3,38 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
 #include "Components/Button.h"
+#include "Components/ButtonSlot.h"
 #include "Components/EditableTextBox.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/SizeBox.h"
+#include "Components/SizeBoxSlot.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Components/Widget.h"
 #include "Controller/MainMenuPlayerController.h"
+#include "Engine/Texture2D.h"
+#include "UI/MainMenu/MainMenuPreviewStage.h"
+#include "UI/MainMenu/MainMenuRootWidget.h"
+
+namespace
+{
+const TArray<FName> AvailablePartyClassIds = {
+    TEXT("StableHand"),
+    TEXT("Scholar"),
+    TEXT("Herbalist"),
+    TEXT("Hunter")
+};
+
+constexpr float PartySlotsFixedHeight = 260.0f;
+}
 
 UCharacterCreationWidget::UCharacterCreationWidget()
-    : CurrentCharacterClassId(TEXT("Warrior"))
+    : CurrentCharacterClassId(TEXT("StableHand"))
 {
 }
 
@@ -24,10 +46,20 @@ void UCharacterCreationWidget::NativeOnInitialized()
     {
         EnsureCodeGeneratedLayout();
     }
-    else if (!BackgroundBlocker)
+    else if (!BackgroundBlocker && !FullscreenInputBlocker)
     {
         UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Background blocker is missing and code-generated layout is disabled."));
     }
+
+    InitializeClassSlotWidgetArrays();
+    InitializeClassSlots();
+
+    if (FullscreenInputBlocker)
+    {
+        ConfigureFullscreenInputBlocker();
+    }
+
+    ConfigurePartySlotsFixedHeight();
 
     if (BackgroundBlocker)
     {
@@ -64,22 +96,165 @@ void UCharacterCreationWidget::NativeOnInitialized()
         Button_Back->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleBackClicked);
     }
 
+    if (Button_Close)
+    {
+        Button_Close->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleCloseClicked);
+    }
+
     if (Button_StartGame)
     {
         Button_StartGame->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleStartGameClicked);
+
+        if (!Text_StartGameStatus && WidgetTree)
+        {
+            if (UOverlay* HeaderOverlay = Cast<UOverlay>(Button_StartGame->GetParent()))
+            {
+                Text_StartGameStatus = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_StartGameStatus"));
+                UOverlaySlot* StatusSlot = HeaderOverlay->AddChildToOverlay(Text_StartGameStatus);
+                StatusSlot->SetHorizontalAlignment(HAlign_Center);
+                StatusSlot->SetVerticalAlignment(VAlign_Top);
+                StatusSlot->SetPadding(FMargin(0.0f, 96.0f, 0.0f, 0.0f));
+            }
+        }
+    }
+
+    if (Button_Slot0_Create)
+    {
+        Button_Slot0_Create->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot0CreateClicked);
+    }
+
+    if (Button_Slot0_Prev)
+    {
+        Button_Slot0_Prev->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot0PrevClicked);
+    }
+
+    if (Button_Slot0_Next)
+    {
+        Button_Slot0_Next->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot0NextClicked);
+    }
+
+    if (Button_Slot0_Edit)
+    {
+        Button_Slot0_Edit->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot0EditClicked);
+    }
+
+    if (Button_Slot0_Delete)
+    {
+        Button_Slot0_Delete->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot0DeleteClicked);
+    }
+
+    if (Button_Slot0_ClassInfo)
+    {
+        Button_Slot0_ClassInfo->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot0ClassInfoClicked);
+    }
+
+    if (Button_Slot1_Create)
+    {
+        Button_Slot1_Create->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot1CreateClicked);
+    }
+
+    if (Button_Slot1_Prev)
+    {
+        Button_Slot1_Prev->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot1PrevClicked);
+    }
+
+    if (Button_Slot1_Next)
+    {
+        Button_Slot1_Next->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot1NextClicked);
+    }
+
+    if (Button_Slot1_Edit)
+    {
+        Button_Slot1_Edit->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot1EditClicked);
+    }
+
+    if (Button_Slot1_Delete)
+    {
+        Button_Slot1_Delete->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot1DeleteClicked);
+    }
+
+    if (Button_Slot1_ClassInfo)
+    {
+        Button_Slot1_ClassInfo->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot1ClassInfoClicked);
+    }
+
+    if (Button_Slot2_Create)
+    {
+        Button_Slot2_Create->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot2CreateClicked);
+    }
+
+    if (Button_Slot2_Prev)
+    {
+        Button_Slot2_Prev->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot2PrevClicked);
+    }
+
+    if (Button_Slot2_Next)
+    {
+        Button_Slot2_Next->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot2NextClicked);
+    }
+
+    if (Button_Slot2_Edit)
+    {
+        Button_Slot2_Edit->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot2EditClicked);
+    }
+
+    if (Button_Slot2_Delete)
+    {
+        Button_Slot2_Delete->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot2DeleteClicked);
+    }
+
+    if (Button_Slot2_ClassInfo)
+    {
+        Button_Slot2_ClassInfo->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot2ClassInfoClicked);
+    }
+
+    if (Button_Slot3_Create)
+    {
+        Button_Slot3_Create->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot3CreateClicked);
+    }
+
+    if (Button_Slot3_Prev)
+    {
+        Button_Slot3_Prev->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot3PrevClicked);
+    }
+
+    if (Button_Slot3_Next)
+    {
+        Button_Slot3_Next->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot3NextClicked);
+    }
+
+    if (Button_Slot3_Edit)
+    {
+        Button_Slot3_Edit->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot3EditClicked);
+    }
+
+    if (Button_Slot3_Delete)
+    {
+        Button_Slot3_Delete->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot3DeleteClicked);
+    }
+
+    if (Button_Slot3_ClassInfo)
+    {
+        Button_Slot3_ClassInfo->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot3ClassInfoClicked);
     }
 
     RefreshPreview();
+    RefreshClassSlotWidgets();
 }
 
 void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
 {
+    if (FullscreenInputBlocker || BottomPanel || BottomHorizontalBox)
+    {
+        return;
+    }
+
     if (BackgroundBlocker)
     {
         UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Using designer BackgroundBlocker."));
     }
 
-    if (EditableTextBox_Name || Button_Warrior || Button_Archer || Button_Mage || Button_Back || Button_StartGame)
+    if (EditableTextBox_Name || Button_Warrior || Button_Archer || Button_Mage || Button_Back || Button_Close || Button_StartGame)
     {
         if (!BackgroundBlocker)
         {
@@ -96,112 +271,369 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
     }
 
     UOverlay* RootOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("CodeGeneratedCharacterCreationOverlay"));
-    BackgroundBlocker = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("BackgroundBlocker"));
-    CenterPanelBackground = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("CenterPanelBackground"));
-    UVerticalBox* ContentBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("CodeGeneratedCharacterCreationBox"));
+    FullscreenInputBlocker = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("FullscreenInputBlocker"));
+    BottomPanel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("BottomPanel"));
+    PartySlotsFixedHeightBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("PartySlotsFixedHeightBox"));
+    BottomHorizontalBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("BottomHorizontalBox"));
+    Button_StartGame = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_StartGame"));
+    Button_Close = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_Close"));
 
-    if (!RootOverlay || !BackgroundBlocker || !CenterPanelBackground || !ContentBox)
+    if (!RootOverlay || !FullscreenInputBlocker || !BottomPanel || !PartySlotsFixedHeightBox || !BottomHorizontalBox || !Button_StartGame || !Button_Close)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Failed to create character creation root layout."));
+        UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Failed to create character creation party slot fallback layout."));
         return;
     }
 
     WidgetTree->RootWidget = RootOverlay;
 
     RootOverlay->SetVisibility(ESlateVisibility::Visible);
-    ConfigureBackgroundBlocker();
-    ConfigureCenterPanelBackground();
+    ConfigureFullscreenInputBlocker();
+    ConfigurePartySlotsFixedHeight();
 
-    UOverlaySlot* BackgroundSlot = RootOverlay->AddChildToOverlay(BackgroundBlocker);
+    BottomPanel->SetVisibility(ESlateVisibility::Visible);
+    BottomPanel->SetBrushColor(FLinearColor(0.02f, 0.025f, 0.03f, 0.75f));
 
-    if (BackgroundSlot)
+    UOverlaySlot* InputBlockerSlot = RootOverlay->AddChildToOverlay(FullscreenInputBlocker);
+
+    if (InputBlockerSlot)
     {
-        BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
-        BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
+        InputBlockerSlot->SetHorizontalAlignment(HAlign_Fill);
+        InputBlockerSlot->SetVerticalAlignment(VAlign_Fill);
     }
 
-    CenterPanelBackground->AddChild(ContentBox);
+    UOverlaySlot* BottomPanelSlot = RootOverlay->AddChildToOverlay(BottomPanel);
 
-    UOverlaySlot* CenterPanelSlot = RootOverlay->AddChildToOverlay(CenterPanelBackground);
-
-    if (CenterPanelSlot)
+    if (BottomPanelSlot)
     {
-        CenterPanelSlot->SetHorizontalAlignment(HAlign_Center);
-        CenterPanelSlot->SetVerticalAlignment(VAlign_Center);
+        BottomPanelSlot->SetHorizontalAlignment(HAlign_Fill);
+        BottomPanelSlot->SetVerticalAlignment(VAlign_Bottom);
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Background blocker was created in code."));
+    BottomPanel->SetContent(PartySlotsFixedHeightBox);
 
-    UTextBlock* TitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_Title"));
+    USizeBoxSlot* PartySlotsSlot = Cast<USizeBoxSlot>(PartySlotsFixedHeightBox->AddChild(BottomHorizontalBox));
 
-    if (TitleText)
+    if (PartySlotsSlot)
     {
-        TitleText->SetText(FText::FromString(TEXT("Character Creation")));
-        UVerticalBoxSlot* TitleSlot = ContentBox->AddChildToVerticalBox(TitleText);
+        PartySlotsSlot->SetHorizontalAlignment(HAlign_Fill);
+        PartySlotsSlot->SetVerticalAlignment(VAlign_Fill);
+        PartySlotsSlot->SetPadding(FMargin(24.0f, 16.0f, 24.0f, 20.0f));
+    }
 
-        if (TitleSlot)
+    UOverlaySlot* StartGameButtonSlot = RootOverlay->AddChildToOverlay(Button_StartGame);
+
+    if (StartGameButtonSlot)
+    {
+        StartGameButtonSlot->SetHorizontalAlignment(HAlign_Center);
+        StartGameButtonSlot->SetVerticalAlignment(VAlign_Top);
+        StartGameButtonSlot->SetPadding(FMargin(0.0f, 28.0f, 0.0f, 0.0f));
+    }
+
+    UTextBlock* StartGameText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_StartGame"));
+
+    if (StartGameText)
+    {
+        StartGameText->SetText(FText::FromString(TEXT("게임 시작")));
+        UButtonSlot* StartGameTextSlot = Cast<UButtonSlot>(Button_StartGame->AddChild(StartGameText));
+
+        if (StartGameTextSlot)
         {
-            TitleSlot->SetHorizontalAlignment(HAlign_Center);
-            TitleSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 16.0f));
+            StartGameTextSlot->SetHorizontalAlignment(HAlign_Center);
+            StartGameTextSlot->SetVerticalAlignment(VAlign_Center);
+            StartGameTextSlot->SetPadding(FMargin(36.0f, 12.0f, 36.0f, 12.0f));
         }
     }
 
-    UTextBlock* NameLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_NameLabel"));
+    UOverlaySlot* CloseButtonSlot = RootOverlay->AddChildToOverlay(Button_Close);
 
-    if (NameLabel)
+    if (CloseButtonSlot)
     {
-        NameLabel->SetText(FText::FromString(TEXT("Name")));
-        ContentBox->AddChildToVerticalBox(NameLabel);
+        CloseButtonSlot->SetHorizontalAlignment(HAlign_Right);
+        CloseButtonSlot->SetVerticalAlignment(VAlign_Top);
+        CloseButtonSlot->SetPadding(FMargin(0.0f, 22.0f, 26.0f, 0.0f));
     }
 
-    EditableTextBox_Name = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass(), TEXT("EditableTextBox_Name"));
+    CreateButtonText(Button_Close, FText::FromString(TEXT("X")));
 
-    if (EditableTextBox_Name)
+    auto AddTextToVerticalBox = [this](UVerticalBox* ParentBox, const FName& WidgetName, const FText& Text, const FMargin& SlotPadding, EHorizontalAlignment HorizontalAlignment) -> UTextBlock*
     {
-        UVerticalBoxSlot* NameInputSlot = ContentBox->AddChildToVerticalBox(EditableTextBox_Name);
-
-        if (NameInputSlot)
+        if (!WidgetTree || !ParentBox)
         {
-            NameInputSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 12.0f));
+            return nullptr;
+        }
+
+        UTextBlock* TextBlock = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), WidgetName);
+
+        if (!TextBlock)
+        {
+            return nullptr;
+        }
+
+        TextBlock->SetText(Text);
+        UVerticalBoxSlot* TextSlot = ParentBox->AddChildToVerticalBox(TextBlock);
+
+        if (TextSlot)
+        {
+            TextSlot->SetHorizontalAlignment(HorizontalAlignment);
+            TextSlot->SetPadding(SlotPadding);
+        }
+
+        return TextBlock;
+    };
+
+    auto AddButtonToHorizontalBox = [this](UHorizontalBox* ParentBox, const FName& WidgetName, const FText& Text) -> UButton*
+    {
+        if (!WidgetTree || !ParentBox)
+        {
+            return nullptr;
+        }
+
+        UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), WidgetName);
+
+        if (!Button)
+        {
+            return nullptr;
+        }
+
+        CreateButtonText(Button, Text);
+        UHorizontalBoxSlot* ButtonSlot = ParentBox->AddChildToHorizontalBox(Button);
+
+        if (ButtonSlot)
+        {
+            FSlateChildSize ButtonSize;
+            ButtonSize.SizeRule = ESlateSizeRule::Automatic;
+            ButtonSlot->SetSize(ButtonSize);
+            ButtonSlot->SetVerticalAlignment(VAlign_Center);
+            ButtonSlot->SetPadding(FMargin(2.0f, 0.0f, 2.0f, 0.0f));
+        }
+
+        return Button;
+    };
+
+    auto AddButtonToVerticalBox = [this](UVerticalBox* ParentBox, const FName& WidgetName, const FText& Text, const FMargin& SlotPadding) -> UButton*
+    {
+        if (!WidgetTree || !ParentBox)
+        {
+            return nullptr;
+        }
+
+        UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), WidgetName);
+
+        if (!Button)
+        {
+            return nullptr;
+        }
+
+        CreateButtonText(Button, Text);
+        UVerticalBoxSlot* ButtonSlot = ParentBox->AddChildToVerticalBox(Button);
+
+        if (ButtonSlot)
+        {
+            ButtonSlot->SetHorizontalAlignment(HAlign_Fill);
+            ButtonSlot->SetPadding(SlotPadding);
+        }
+
+        return Button;
+    };
+
+    auto AssignSlotWidgets = [this](int32 SlotIndex, UButton* CreateButton, UVerticalBox* EditorBox, UTextBlock* TitleText, UButton* PrevButton, UButton* NextButton, UImage* ClassIcon, UTextBlock* ClassNameText, UButton* EditButton, UButton* DeleteButton, UButton* ClassInfoButton)
+    {
+        if (SlotIndex == 0)
+        {
+            Button_Slot0_Create = CreateButton;
+            SlotEditorBox_0 = EditorBox;
+            Text_Slot0_Title = TitleText;
+            Button_Slot0_Prev = PrevButton;
+            Button_Slot0_Next = NextButton;
+            Image_Slot0_ClassIcon = ClassIcon;
+            Text_Slot0_ClassName = ClassNameText;
+            Button_Slot0_Edit = EditButton;
+            Button_Slot0_Delete = DeleteButton;
+            Button_Slot0_ClassInfo = ClassInfoButton;
+        }
+
+        if (SlotIndex == 1)
+        {
+            Button_Slot1_Create = CreateButton;
+            SlotEditorBox_1 = EditorBox;
+            Text_Slot1_Title = TitleText;
+            Button_Slot1_Prev = PrevButton;
+            Button_Slot1_Next = NextButton;
+            Image_Slot1_ClassIcon = ClassIcon;
+            Text_Slot1_ClassName = ClassNameText;
+            Button_Slot1_Edit = EditButton;
+            Button_Slot1_Delete = DeleteButton;
+            Button_Slot1_ClassInfo = ClassInfoButton;
+        }
+
+        if (SlotIndex == 2)
+        {
+            Button_Slot2_Create = CreateButton;
+            SlotEditorBox_2 = EditorBox;
+            Text_Slot2_Title = TitleText;
+            Button_Slot2_Prev = PrevButton;
+            Button_Slot2_Next = NextButton;
+            Image_Slot2_ClassIcon = ClassIcon;
+            Text_Slot2_ClassName = ClassNameText;
+            Button_Slot2_Edit = EditButton;
+            Button_Slot2_Delete = DeleteButton;
+            Button_Slot2_ClassInfo = ClassInfoButton;
+        }
+
+        if (SlotIndex == 3)
+        {
+            Button_Slot3_Create = CreateButton;
+            SlotEditorBox_3 = EditorBox;
+            Text_Slot3_Title = TitleText;
+            Button_Slot3_Prev = PrevButton;
+            Button_Slot3_Next = NextButton;
+            Image_Slot3_ClassIcon = ClassIcon;
+            Text_Slot3_ClassName = ClassNameText;
+            Button_Slot3_Edit = EditButton;
+            Button_Slot3_Delete = DeleteButton;
+            Button_Slot3_ClassInfo = ClassInfoButton;
+        }
+    };
+
+    for (int32 SlotIndex = 0; SlotIndex < AvailablePartyClassIds.Num(); ++SlotIndex)
+    {
+        const FText DisplayName = GetDisplayNameForClassId(AvailablePartyClassIds[SlotIndex]);
+        UBorder* SlotPanel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), FName(*FString::Printf(TEXT("SlotPanel_%d"), SlotIndex)));
+        UOverlay* SlotContentOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), FName(*FString::Printf(TEXT("SlotContentOverlay_%d"), SlotIndex)));
+        UButton* CreateSlotButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*FString::Printf(TEXT("Button_Slot%d_Create"), SlotIndex)));
+        UVerticalBox* SlotEditorBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), FName(*FString::Printf(TEXT("SlotEditorBox_%d"), SlotIndex)));
+
+        if (!SlotPanel || !SlotContentOverlay || !CreateSlotButton || !SlotEditorBox)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Failed to create fallback party slot widgets. SlotIndex: %d"), SlotIndex);
+            continue;
+        }
+
+        SlotPanel->SetVisibility(ESlateVisibility::Visible);
+        SlotPanel->SetBrushColor(FLinearColor(0.08f, 0.09f, 0.1f, 0.95f));
+        SlotPanel->SetPadding(FMargin(12.0f, 10.0f, 12.0f, 12.0f));
+
+        UHorizontalBoxSlot* SlotPanelSlot = BottomHorizontalBox->AddChildToHorizontalBox(SlotPanel);
+
+        if (SlotPanelSlot)
+        {
+            FSlateChildSize SlotSize;
+            SlotSize.SizeRule = ESlateSizeRule::Fill;
+            SlotSize.Value = 1.0f;
+            SlotPanelSlot->SetSize(SlotSize);
+            SlotPanelSlot->SetHorizontalAlignment(HAlign_Fill);
+            SlotPanelSlot->SetVerticalAlignment(VAlign_Fill);
+            SlotPanelSlot->SetPadding(FMargin(8.0f, 0.0f, 8.0f, 0.0f));
+        }
+
+        SlotPanel->SetContent(SlotContentOverlay);
+        CreateButtonText(CreateSlotButton, FText::FromString(TEXT("캐릭터 생성하기")));
+
+        UOverlaySlot* CreateButtonSlot = SlotContentOverlay->AddChildToOverlay(CreateSlotButton);
+
+        if (CreateButtonSlot)
+        {
+            CreateButtonSlot->SetHorizontalAlignment(HAlign_Center);
+            CreateButtonSlot->SetVerticalAlignment(VAlign_Center);
+        }
+
+        UOverlaySlot* EditorBoxSlot = SlotContentOverlay->AddChildToOverlay(SlotEditorBox);
+
+        if (EditorBoxSlot)
+        {
+            EditorBoxSlot->SetHorizontalAlignment(HAlign_Fill);
+            EditorBoxSlot->SetVerticalAlignment(VAlign_Center);
+        }
+
+        UTextBlock* TitleText = AddTextToVerticalBox(SlotEditorBox, FName(*FString::Printf(TEXT("Text_Slot%d_Title"), SlotIndex)), DisplayName, FMargin(0.0f, 0.0f, 0.0f, 8.0f), HAlign_Center);
+        UHorizontalBox* SelectorBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), FName(*FString::Printf(TEXT("SlotSelectorBox_%d"), SlotIndex)));
+
+        if (SelectorBox)
+        {
+            UVerticalBoxSlot* SelectorBoxSlot = SlotEditorBox->AddChildToVerticalBox(SelectorBox);
+
+            if (SelectorBoxSlot)
+            {
+                SelectorBoxSlot->SetHorizontalAlignment(HAlign_Fill);
+                SelectorBoxSlot->SetPadding(FMargin(0.0f, 2.0f, 0.0f, 4.0f));
+            }
+        }
+
+        UButton* PrevButton = AddButtonToHorizontalBox(SelectorBox, FName(*FString::Printf(TEXT("Button_Slot%d_Prev"), SlotIndex)), FText::FromString(TEXT("<")));
+        UImage* ClassIcon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), FName(*FString::Printf(TEXT("Image_Slot%d_ClassIcon"), SlotIndex)));
+
+        if (SelectorBox && ClassIcon)
+        {
+            UHorizontalBoxSlot* IconSlot = SelectorBox->AddChildToHorizontalBox(ClassIcon);
+
+            if (IconSlot)
+            {
+                FSlateChildSize IconSize;
+                IconSize.SizeRule = ESlateSizeRule::Fill;
+                IconSize.Value = 1.0f;
+                IconSlot->SetSize(IconSize);
+                IconSlot->SetHorizontalAlignment(HAlign_Fill);
+                IconSlot->SetVerticalAlignment(VAlign_Fill);
+                IconSlot->SetPadding(FMargin(8.0f, 0.0f, 8.0f, 0.0f));
+            }
+        }
+
+        UButton* NextButton = AddButtonToHorizontalBox(SelectorBox, FName(*FString::Printf(TEXT("Button_Slot%d_Next"), SlotIndex)), FText::FromString(TEXT(">")));
+        UTextBlock* ClassNameText = AddTextToVerticalBox(SlotEditorBox, FName(*FString::Printf(TEXT("Text_Slot%d_ClassName"), SlotIndex)), DisplayName, FMargin(0.0f, 4.0f, 0.0f, 8.0f), HAlign_Center);
+        UHorizontalBox* ActionBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), FName(*FString::Printf(TEXT("SlotActionBox_%d"), SlotIndex)));
+
+        if (ActionBox)
+        {
+            UVerticalBoxSlot* ActionBoxSlot = SlotEditorBox->AddChildToVerticalBox(ActionBox);
+
+            if (ActionBoxSlot)
+            {
+                ActionBoxSlot->SetHorizontalAlignment(HAlign_Center);
+                ActionBoxSlot->SetPadding(FMargin(0.0f, 2.0f, 0.0f, 6.0f));
+            }
+        }
+
+        UButton* EditButton = AddButtonToHorizontalBox(ActionBox, FName(*FString::Printf(TEXT("Button_Slot%d_Edit"), SlotIndex)), FText::FromString(TEXT("Edit")));
+        UButton* DeleteButton = AddButtonToHorizontalBox(ActionBox, FName(*FString::Printf(TEXT("Button_Slot%d_Delete"), SlotIndex)), FText::FromString(TEXT("X")));
+        UButton* ClassInfoButton = AddButtonToVerticalBox(SlotEditorBox, FName(*FString::Printf(TEXT("Button_Slot%d_ClassInfo"), SlotIndex)), FText::FromString(TEXT("클래스 정보")), FMargin(0.0f, 0.0f, 0.0f, 0.0f));
+
+        AssignSlotWidgets(SlotIndex, CreateSlotButton, SlotEditorBox, TitleText, PrevButton, NextButton, ClassIcon, ClassNameText, EditButton, DeleteButton, ClassInfoButton);
+
+        if (SlotIndex < AvailablePartyClassIds.Num() - 1)
+        {
+            USizeBox* DividerBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), FName(*FString::Printf(TEXT("SlotDividerBox_%d"), SlotIndex)));
+            UBorder* Divider = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), FName(*FString::Printf(TEXT("SlotDivider_%d"), SlotIndex)));
+
+            if (!DividerBox || !Divider)
+            {
+                continue;
+            }
+
+            DividerBox->SetWidthOverride(1.0f);
+            Divider->SetBrushColor(FLinearColor(0.35f, 0.33f, 0.25f, 0.65f));
+
+            UHorizontalBoxSlot* DividerBoxSlot = BottomHorizontalBox->AddChildToHorizontalBox(DividerBox);
+
+            if (DividerBoxSlot)
+            {
+                FSlateChildSize DividerSize;
+                DividerSize.SizeRule = ESlateSizeRule::Automatic;
+                DividerBoxSlot->SetSize(DividerSize);
+                DividerBoxSlot->SetHorizontalAlignment(HAlign_Center);
+                DividerBoxSlot->SetVerticalAlignment(VAlign_Fill);
+            }
+
+            USizeBoxSlot* DividerSlot = Cast<USizeBoxSlot>(DividerBox->AddChild(Divider));
+
+            if (DividerSlot)
+            {
+                DividerSlot->SetHorizontalAlignment(HAlign_Fill);
+                DividerSlot->SetVerticalAlignment(VAlign_Fill);
+            }
         }
     }
 
-    UTextBlock* ClassLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_ClassLabel"));
-
-    if (ClassLabel)
-    {
-        ClassLabel->SetText(FText::FromString(TEXT("Class")));
-        ContentBox->AddChildToVerticalBox(ClassLabel);
-    }
-
-    Button_Warrior = CreateButton(ContentBox, FText::FromString(TEXT("Warrior")));
-    Button_Archer = CreateButton(ContentBox, FText::FromString(TEXT("Archer")));
-    Button_Mage = CreateButton(ContentBox, FText::FromString(TEXT("Mage")));
-    Text_SelectedClass = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_SelectedClass"));
-    Text_StatPreview = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_StatPreview"));
-
-    if (Text_SelectedClass)
-    {
-        UVerticalBoxSlot* SelectedClassSlot = ContentBox->AddChildToVerticalBox(Text_SelectedClass);
-
-        if (SelectedClassSlot)
-        {
-            SelectedClassSlot->SetPadding(FMargin(0.0f, 12.0f, 0.0f, 4.0f));
-        }
-    }
-
-    if (Text_StatPreview)
-    {
-        UVerticalBoxSlot* StatPreviewSlot = ContentBox->AddChildToVerticalBox(Text_StatPreview);
-
-        if (StatPreviewSlot)
-        {
-            StatPreviewSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
-        }
-    }
-
-    Button_Back = CreateButton(ContentBox, FText::FromString(TEXT("Back")));
-    Button_StartGame = CreateButton(ContentBox, FText::FromString(TEXT("Start Game")));
+    UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Character creation party slot fallback layout was created in code."));
 }
 
 void UCharacterCreationWidget::ConfigureBackgroundBlocker()
@@ -225,6 +657,348 @@ void UCharacterCreationWidget::ConfigureCenterPanelBackground()
     CenterPanelBackground->SetVisibility(ESlateVisibility::Visible);
     CenterPanelBackground->SetBrushColor(FLinearColor(0.22f, 0.22f, 0.22f, 1.0f));
     CenterPanelBackground->SetPadding(FMargin(24.0f, 20.0f, 24.0f, 20.0f));
+}
+
+void UCharacterCreationWidget::ConfigureFullscreenInputBlocker()
+{
+    if (!FullscreenInputBlocker)
+    {
+        return;
+    }
+
+    FullscreenInputBlocker->SetVisibility(ESlateVisibility::Visible);
+    FullscreenInputBlocker->SetBrushColor(FLinearColor(0.0f, 0.0f, 0.0f, 0.01f));
+}
+
+void UCharacterCreationWidget::ConfigurePartySlotsFixedHeight()
+{
+    if (!PartySlotsFixedHeightBox)
+    {
+        if (BottomPanel && BottomHorizontalBox)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] PartySlotsFixedHeightBox is missing; regenerate WBP_CharacterCreationWidget to lock PartySlots height."));
+        }
+
+        return;
+    }
+
+    PartySlotsFixedHeightBox->SetHeightOverride(PartySlotsFixedHeight);
+}
+
+void UCharacterCreationWidget::InitializeClassSlotWidgetArrays()
+{
+    CreateSlotButtons = { Button_Slot0_Create, Button_Slot1_Create, Button_Slot2_Create, Button_Slot3_Create };
+    SlotEditorBoxes = { SlotEditorBox_0, SlotEditorBox_1, SlotEditorBox_2, SlotEditorBox_3 };
+    SlotTitleTexts = { Text_Slot0_Title, Text_Slot1_Title, Text_Slot2_Title, Text_Slot3_Title };
+    PreviousClassButtons = { Button_Slot0_Prev, Button_Slot1_Prev, Button_Slot2_Prev, Button_Slot3_Prev };
+    NextClassButtons = { Button_Slot0_Next, Button_Slot1_Next, Button_Slot2_Next, Button_Slot3_Next };
+    ClassIconImages = { Image_Slot0_ClassIcon, Image_Slot1_ClassIcon, Image_Slot2_ClassIcon, Image_Slot3_ClassIcon };
+    ClassNameTexts = { Text_Slot0_ClassName, Text_Slot1_ClassName, Text_Slot2_ClassName, Text_Slot3_ClassName };
+    EditButtons = { Button_Slot0_Edit, Button_Slot1_Edit, Button_Slot2_Edit, Button_Slot3_Edit };
+    DeleteButtons = { Button_Slot0_Delete, Button_Slot1_Delete, Button_Slot2_Delete, Button_Slot3_Delete };
+    ClassInfoButtons = { Button_Slot0_ClassInfo, Button_Slot1_ClassInfo, Button_Slot2_ClassInfo, Button_Slot3_ClassInfo };
+}
+
+void UCharacterCreationWidget::InitializeClassSlots()
+{
+    SlotClassIds = AvailablePartyClassIds;
+    SlotCharacterNames.SetNum(SlotClassIds.Num());
+    SlotCreationStates.Empty();
+    const bool bUseDeferredCreation = HasDeferredSlotCreationWidgets();
+
+    for (int32 SlotIndex = 0; SlotIndex < SlotClassIds.Num(); ++SlotIndex)
+    {
+        uint8 InitialState = 1;
+
+        if (bUseDeferredCreation)
+        {
+            InitialState = 0;
+        }
+
+        SlotCreationStates.Add(InitialState);
+    }
+
+    if (SlotClassIds.Num() > 0)
+    {
+        CurrentCharacterClassId = SlotClassIds[0];
+    }
+}
+
+void UCharacterCreationWidget::RefreshClassSlotWidgets()
+{
+    for (int32 SlotIndex = 0; SlotIndex < SlotClassIds.Num(); ++SlotIndex)
+    {
+        SetSlotClass(SlotIndex, SlotClassIds[SlotIndex]);
+        RefreshSlotVisibility(SlotIndex);
+    }
+}
+
+void UCharacterCreationWidget::ChangeSlotClass(int32 SlotIndex, int32 Direction)
+{
+    if (!SlotClassIds.IsValidIndex(SlotIndex) || AvailablePartyClassIds.IsEmpty() || !IsSlotCreated(SlotIndex))
+    {
+        return;
+    }
+
+    int32 CurrentIndex = AvailablePartyClassIds.IndexOfByKey(SlotClassIds[SlotIndex]);
+    if (CurrentIndex == INDEX_NONE)
+    {
+        CurrentIndex = 0;
+    }
+
+    int32 NextIndex = CurrentIndex + Direction;
+    while (NextIndex < 0)
+    {
+        NextIndex += AvailablePartyClassIds.Num();
+    }
+
+    NextIndex %= AvailablePartyClassIds.Num();
+    SetSlotClass(SlotIndex, AvailablePartyClassIds[NextIndex]);
+}
+
+void UCharacterCreationWidget::SetSlotClass(int32 SlotIndex, FName ClassId)
+{
+    if (!SlotClassIds.IsValidIndex(SlotIndex))
+    {
+        return;
+    }
+
+    SlotClassIds[SlotIndex] = ClassId;
+    const FText DisplayName = GetDisplayNameForClassId(ClassId);
+
+    if (SlotTitleTexts.IsValidIndex(SlotIndex) && SlotTitleTexts[SlotIndex])
+    {
+        SlotTitleTexts[SlotIndex]->SetText(DisplayName);
+    }
+
+    if (ClassNameTexts.IsValidIndex(SlotIndex) && ClassNameTexts[SlotIndex])
+    {
+        ClassNameTexts[SlotIndex]->SetText(DisplayName);
+    }
+
+    if (ClassIconImages.IsValidIndex(SlotIndex) && ClassIconImages[SlotIndex])
+    {
+        const TObjectPtr<UTexture2D>* IconTexture = ClassIconTextures.Find(ClassId);
+        if (IconTexture && IconTexture->Get())
+        {
+            ClassIconImages[SlotIndex]->SetBrushFromTexture(IconTexture->Get());
+        }
+    }
+
+    if (SlotIndex == 0)
+    {
+        CurrentCharacterClassId = ClassId;
+    }
+
+    RefreshSlotVisibility(SlotIndex);
+
+    if (IsSlotCreated(SlotIndex))
+    {
+        UpdatePreviewStageSlot(SlotIndex, ClassId);
+    }
+    else
+    {
+        ClearPreviewStageSlot(SlotIndex);
+    }
+}
+
+void UCharacterCreationWidget::CreateCharacterInSlot(int32 SlotIndex)
+{
+    if (!SlotClassIds.IsValidIndex(SlotIndex) || !SlotCreationStates.IsValidIndex(SlotIndex))
+    {
+        return;
+    }
+
+    SlotCreationStates[SlotIndex] = 1;
+    SetSlotClass(SlotIndex, SlotClassIds[SlotIndex]);
+    UE_LOG(LogTemp, Log, TEXT("[CharacterCreationWidget] Character creation panel opened. SlotIndex: %d, ClassId: %s"), SlotIndex, *SlotClassIds[SlotIndex].ToString());
+}
+
+void UCharacterCreationWidget::ClearCharacterSlot(int32 SlotIndex)
+{
+    if (!SlotCreationStates.IsValidIndex(SlotIndex))
+    {
+        return;
+    }
+
+    SlotCreationStates[SlotIndex] = 0;
+
+    if (SlotCharacterNames.IsValidIndex(SlotIndex))
+    {
+        SlotCharacterNames[SlotIndex] = FText::GetEmpty();
+    }
+
+    ClearPreviewStageSlot(SlotIndex);
+    RefreshSlotVisibility(SlotIndex);
+    UE_LOG(LogTemp, Log, TEXT("[CharacterCreationWidget] Character creation panel closed. SlotIndex: %d"), SlotIndex);
+}
+
+void UCharacterCreationWidget::RefreshSlotVisibility(int32 SlotIndex)
+{
+    const bool bCreated = IsSlotCreated(SlotIndex);
+
+    if (CreateSlotButtons.IsValidIndex(SlotIndex))
+    {
+        SetWidgetVisible(CreateSlotButtons[SlotIndex].Get(), !bCreated);
+    }
+
+    if (SlotEditorBoxes.IsValidIndex(SlotIndex) && SlotEditorBoxes[SlotIndex])
+    {
+        SetWidgetVisible(SlotEditorBoxes[SlotIndex].Get(), bCreated);
+        return;
+    }
+
+    if (PreviousClassButtons.IsValidIndex(SlotIndex))
+    {
+        SetWidgetVisible(PreviousClassButtons[SlotIndex].Get(), bCreated);
+    }
+
+    if (NextClassButtons.IsValidIndex(SlotIndex))
+    {
+        SetWidgetVisible(NextClassButtons[SlotIndex].Get(), bCreated);
+    }
+
+    if (ClassIconImages.IsValidIndex(SlotIndex))
+    {
+        SetWidgetVisible(ClassIconImages[SlotIndex].Get(), bCreated);
+    }
+
+    if (SlotTitleTexts.IsValidIndex(SlotIndex))
+    {
+        SetWidgetVisible(SlotTitleTexts[SlotIndex].Get(), bCreated);
+    }
+
+    if (ClassNameTexts.IsValidIndex(SlotIndex))
+    {
+        SetWidgetVisible(ClassNameTexts[SlotIndex].Get(), bCreated);
+    }
+
+    if (EditButtons.IsValidIndex(SlotIndex))
+    {
+        SetWidgetVisible(EditButtons[SlotIndex].Get(), bCreated);
+    }
+
+    if (DeleteButtons.IsValidIndex(SlotIndex))
+    {
+        SetWidgetVisible(DeleteButtons[SlotIndex].Get(), bCreated);
+    }
+
+    if (ClassInfoButtons.IsValidIndex(SlotIndex))
+    {
+        SetWidgetVisible(ClassInfoButtons[SlotIndex].Get(), bCreated);
+    }
+}
+
+void UCharacterCreationWidget::SetWidgetVisible(UWidget* Widget, bool bIsVisible) const
+{
+    if (!Widget)
+    {
+        return;
+    }
+
+    if (bIsVisible)
+    {
+        Widget->SetVisibility(ESlateVisibility::Visible);
+        return;
+    }
+
+    Widget->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+bool UCharacterCreationWidget::IsSlotCreated(int32 SlotIndex) const
+{
+    if (!SlotCreationStates.IsValidIndex(SlotIndex))
+    {
+        return false;
+    }
+
+    return SlotCreationStates[SlotIndex] != 0;
+}
+
+bool UCharacterCreationWidget::HasDeferredSlotCreationWidgets() const
+{
+    for (const TObjectPtr<UButton>& CreateSlotButton : CreateSlotButtons)
+    {
+        if (CreateSlotButton)
+        {
+            return true;
+        }
+    }
+
+    for (const TObjectPtr<UVerticalBox>& SlotEditorBox : SlotEditorBoxes)
+    {
+        if (SlotEditorBox)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+FText UCharacterCreationWidget::GetDisplayNameForClassId(FName ClassId) const
+{
+    if (ClassId == TEXT("StableHand"))
+    {
+        return FText::FromString(TEXT("마구간지기"));
+    }
+
+    if (ClassId == TEXT("Scholar"))
+    {
+        return FText::FromString(TEXT("학자"));
+    }
+
+    if (ClassId == TEXT("Herbalist"))
+    {
+        return FText::FromString(TEXT("약초상"));
+    }
+
+    if (ClassId == TEXT("Hunter"))
+    {
+        return FText::FromString(TEXT("사냥꾼"));
+    }
+
+    return FText::FromName(ClassId);
+}
+
+void UCharacterCreationWidget::UpdatePreviewStageSlot(int32 SlotIndex, FName ClassId)
+{
+    AMainMenuPlayerController* MainMenuPlayerController = Cast<AMainMenuPlayerController>(GetOwningPlayer());
+    if (!MainMenuPlayerController)
+    {
+        return;
+    }
+
+    AMainMenuPreviewStage* PreviewStage = MainMenuPlayerController->GetPreviewStage();
+    if (PreviewStage)
+    {
+        PreviewStage->SetPreviewActorForSlot(SlotIndex, ClassId);
+    }
+}
+
+void UCharacterCreationWidget::ClearPreviewStageSlot(int32 SlotIndex)
+{
+    AMainMenuPlayerController* MainMenuPlayerController = Cast<AMainMenuPlayerController>(GetOwningPlayer());
+    if (!MainMenuPlayerController)
+    {
+        return;
+    }
+
+    AMainMenuPreviewStage* PreviewStage = MainMenuPlayerController->GetPreviewStage();
+    if (PreviewStage)
+    {
+        PreviewStage->ClearPreviewActorForSlot(SlotIndex);
+    }
+}
+
+void UCharacterCreationWidget::LogSlotAction(int32 SlotIndex, const TCHAR* ActionName) const
+{
+    if (!SlotClassIds.IsValidIndex(SlotIndex))
+    {
+        return;
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("[CharacterCreationWidget] Slot action requested. SlotIndex: %d, ClassId: %s, Action: %s"), SlotIndex, *SlotClassIds[SlotIndex].ToString(), ActionName);
 }
 
 void UCharacterCreationWidget::RefreshPreview()
@@ -282,7 +1056,15 @@ UTextBlock* UCharacterCreationWidget::CreateButtonText(UButton* ParentButton, co
     }
 
     ButtonTextBlock->SetText(ButtonText);
-    ParentButton->AddChild(ButtonTextBlock);
+    UButtonSlot* ButtonSlot = Cast<UButtonSlot>(ParentButton->AddChild(ButtonTextBlock));
+
+    if (ButtonSlot)
+    {
+        ButtonSlot->SetHorizontalAlignment(HAlign_Center);
+        ButtonSlot->SetVerticalAlignment(VAlign_Center);
+        ButtonSlot->SetPadding(FMargin(12.0f, 8.0f, 12.0f, 8.0f));
+    }
+
     return ButtonTextBlock;
 }
 
@@ -314,14 +1096,175 @@ void UCharacterCreationWidget::HandleBackClicked()
     RequestBack();
 }
 
+void UCharacterCreationWidget::HandleCloseClicked()
+{
+    RequestBack();
+}
+
 void UCharacterCreationWidget::HandleStartGameClicked()
 {
     RequestStartGame();
 }
 
+void UCharacterCreationWidget::HandleSlot0CreateClicked()
+{
+    CreateCharacterInSlot(0);
+}
+
+void UCharacterCreationWidget::HandleSlot0PrevClicked()
+{
+    ChangeSlotClass(0, -1);
+}
+
+void UCharacterCreationWidget::HandleSlot0NextClicked()
+{
+    ChangeSlotClass(0, 1);
+}
+
+void UCharacterCreationWidget::HandleSlot0EditClicked()
+{
+    LogSlotAction(0, TEXT("Edit"));
+}
+
+void UCharacterCreationWidget::HandleSlot0DeleteClicked()
+{
+    ClearCharacterSlot(0);
+}
+
+void UCharacterCreationWidget::HandleSlot0ClassInfoClicked()
+{
+    LogSlotAction(0, TEXT("ClassInfo"));
+}
+
+void UCharacterCreationWidget::HandleSlot1CreateClicked()
+{
+    CreateCharacterInSlot(1);
+}
+
+void UCharacterCreationWidget::HandleSlot1PrevClicked()
+{
+    ChangeSlotClass(1, -1);
+}
+
+void UCharacterCreationWidget::HandleSlot1NextClicked()
+{
+    ChangeSlotClass(1, 1);
+}
+
+void UCharacterCreationWidget::HandleSlot1EditClicked()
+{
+    LogSlotAction(1, TEXT("Edit"));
+}
+
+void UCharacterCreationWidget::HandleSlot1DeleteClicked()
+{
+    ClearCharacterSlot(1);
+}
+
+void UCharacterCreationWidget::HandleSlot1ClassInfoClicked()
+{
+    LogSlotAction(1, TEXT("ClassInfo"));
+}
+
+void UCharacterCreationWidget::HandleSlot2CreateClicked()
+{
+    CreateCharacterInSlot(2);
+}
+
+void UCharacterCreationWidget::HandleSlot2PrevClicked()
+{
+    ChangeSlotClass(2, -1);
+}
+
+void UCharacterCreationWidget::HandleSlot2NextClicked()
+{
+    ChangeSlotClass(2, 1);
+}
+
+void UCharacterCreationWidget::HandleSlot2EditClicked()
+{
+    LogSlotAction(2, TEXT("Edit"));
+}
+
+void UCharacterCreationWidget::HandleSlot2DeleteClicked()
+{
+    ClearCharacterSlot(2);
+}
+
+void UCharacterCreationWidget::HandleSlot2ClassInfoClicked()
+{
+    LogSlotAction(2, TEXT("ClassInfo"));
+}
+
+void UCharacterCreationWidget::HandleSlot3CreateClicked()
+{
+    CreateCharacterInSlot(3);
+}
+
+void UCharacterCreationWidget::HandleSlot3PrevClicked()
+{
+    ChangeSlotClass(3, -1);
+}
+
+void UCharacterCreationWidget::HandleSlot3NextClicked()
+{
+    ChangeSlotClass(3, 1);
+}
+
+void UCharacterCreationWidget::HandleSlot3EditClicked()
+{
+    LogSlotAction(3, TEXT("Edit"));
+}
+
+void UCharacterCreationWidget::HandleSlot3DeleteClicked()
+{
+    ClearCharacterSlot(3);
+}
+
+void UCharacterCreationWidget::HandleSlot3ClassInfoClicked()
+{
+    LogSlotAction(3, TEXT("ClassInfo"));
+}
+
 void UCharacterCreationWidget::SetCharacterName(const FText& NewName)
 {
     CurrentCharacterName = NewName;
+    SetSlotCharacterName(0, NewName);
+}
+
+void UCharacterCreationWidget::SetSlotCharacterName(int32 SlotIndex, const FText& NewName)
+{
+    if (SlotCharacterNames.IsValidIndex(SlotIndex))
+    {
+        SlotCharacterNames[SlotIndex] = NewName;
+    }
+}
+
+TArray<FRunPartyMember> UCharacterCreationWidget::GetPartyMembers() const
+{
+    TArray<FRunPartyMember> PartyMembers;
+
+    for (int32 SlotIndex = 0; SlotIndex < SlotClassIds.Num(); ++SlotIndex)
+    {
+        FRunPartyMember& Member = PartyMembers.AddDefaulted_GetRef();
+        Member.SlotIndex = SlotIndex;
+        Member.ClassId = SlotClassIds[SlotIndex];
+        Member.bCreated = IsSlotCreated(SlotIndex);
+
+        if (SlotCharacterNames.IsValidIndex(SlotIndex))
+        {
+            Member.CharacterName = SlotCharacterNames[SlotIndex];
+        }
+
+        // Unedited slot names use a stable, readable default until the name editor is expanded.
+        // 이름 편집 확장 전에는 수정하지 않은 슬롯에 알아보기 쉬운 기본 이름을 사용합니다.
+        if (Member.bCreated && Member.CharacterName.ToString().TrimStartAndEnd().IsEmpty())
+        {
+            Member.CharacterName = FText::FromString(FString::Printf(TEXT("%s %d"), *GetDisplayNameForClassId(Member.ClassId).ToString(), SlotIndex + 1));
+        }
+    }
+
+    return PartyMembers;
 }
 
 void UCharacterCreationWidget::SelectCharacterClass(FName CharacterClassId)
@@ -367,6 +1310,12 @@ FText UCharacterCreationWidget::GetStatPreviewText() const
 
 void UCharacterCreationWidget::RequestBack()
 {
+    AMainMenuPlayerController* MainMenuPlayerController = Cast<AMainMenuPlayerController>(GetOwningPlayer());
+    if (MainMenuPlayerController && MainMenuPlayerController->GetMainMenuRootWidget())
+    {
+        MainMenuPlayerController->GetMainMenuRootWidget()->SetMainStackHiddenByMenu(false);
+    }
+
     DeactivateWidget();
 }
 
@@ -380,5 +1329,18 @@ void UCharacterCreationWidget::RequestStartGame()
         return;
     }
 
-    MainMenuPlayerController->StartNewGameFromCharacterCreation(CurrentCharacterName, CurrentCharacterClassId);
+    FText Error;
+
+    if (!MainMenuPlayerController->StartNewGameFromParty(GetPartyMembers(), Error))
+    {
+        if (Text_StartGameStatus)
+        {
+            Text_StartGameStatus->SetText(Error);
+        }
+
+        if (Button_StartGame)
+        {
+            Button_StartGame->SetToolTipText(Error);
+        }
+    }
 }

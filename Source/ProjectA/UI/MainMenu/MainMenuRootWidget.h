@@ -40,6 +40,11 @@ public:
     UFUNCTION(BlueprintCallable, Category = "MainMenu")
     void ClearModalStack();
 
+    // Hides or restores the main stack while a menu flow screen is active.
+    // 메뉴 흐름 화면이 활성화된 동안 메인 스택을 숨기거나 복원합니다.
+    UFUNCTION(BlueprintCallable, Category = "MainMenu")
+    void SetMainStackHiddenByMenu(bool bShouldHide);
+
 protected:
     // Initializes fallback stack layout when the designer layout is empty.
     // 디자이너 레이아웃이 비어 있을 때 대체 스택 레이아웃을 초기화합니다.
@@ -79,4 +84,11 @@ private:
     // Shared stack push helper used by public push functions.
     // 공개 Push 함수들이 사용하는 공용 스택 추가 헬퍼입니다.
     UCommonActivatableWidget* PushScreen(UCommonActivatableWidgetStack* Stack, TSubclassOf<UCommonActivatableWidget> WidgetClass, const TCHAR* StackName);
+
+    // Applies the stored main stack visibility state.
+    // 저장된 메인 스택 표시 상태를 적용합니다.
+    void ApplyMainStackVisibility();
+
+    UPROPERTY(Transient)
+    bool bMainStackHiddenByMenu = false;
 };

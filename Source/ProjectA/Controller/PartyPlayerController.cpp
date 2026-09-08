@@ -18,8 +18,18 @@ void APartyPlayerController::BeginPlay()
 {
     Super::BeginPlay();
 
-    InitializeCombatManager();
-    InitializeHUD();
+    if (ShouldCreateCombatHUD())
+    {
+        InitializeCombatManager();
+        InitializeHUD();
+    }
+}
+
+void APartyPlayerController::SetCombatContext(ACombatManager* InManager, bool bEnableInput)
+{
+    CancelTileInputMode();
+    CombatManager = InManager;
+    bCombatInputEnabled = bEnableInput;
 }
 
 void APartyPlayerController::InitializeCombatManager()
@@ -65,6 +75,11 @@ AUnitBase* APartyPlayerController::GetActiveUnit() const
 
 void APartyPlayerController::RequestEndTurn()
 {
+    if (!CanUseActiveUnitAction())
+    {
+        return;
+    }
+
     if (!CombatManager)
     {
         UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] RequestEndTurn failed | CombatManager is null"));
@@ -91,6 +106,11 @@ void APartyPlayerController::RequestEndTurn()
 
 bool APartyPlayerController::CanUseActiveUnitAction() const
 {
+    if (!bCombatInputEnabled || !CombatManager || !CombatManager->IsCombatActive())
+    {
+        return false;
+    }
+
     AUnitBase* ActiveUnit = GetActiveUnit();
 
     if (!ActiveUnit)
@@ -98,7 +118,7 @@ bool APartyPlayerController::CanUseActiveUnitAction() const
         return false;
     }
 
-    if (!ActiveUnit->IsUnitAlive())
+    if (!ActiveUnit->IsUnitAlive() || ActiveUnit->GetTeam() != ETeam::Player)
     {
         return false;
     }

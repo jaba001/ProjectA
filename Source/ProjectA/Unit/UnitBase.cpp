@@ -18,6 +18,7 @@
 #include "GAS/Ability/GA_DefaultAttack.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Engine/LatentActionManager.h"
 
 AUnitBase::AUnitBase()
 {
@@ -88,6 +89,22 @@ void AUnitBase::BeginPlay()
 void AUnitBase::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
+}
+
+void AUnitBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    bIsActiveTurn = false;
+    CancelCurrentAction();
+
+    if (IsValid(CurrentTile) && CurrentTile->GetOccupyingUnit() == this)
+    {
+        CurrentTile->SetOccupyingUnit(nullptr);
+    }
+
+    CurrentTile = nullptr;
+    OnActionCompleted.Clear();
+    OnUnitDied.Clear();
+    Super::EndPlay(EndPlayReason);
 }
 
 void AUnitBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -177,6 +194,7 @@ void AUnitBase::Die()
     bIsActiveTurn = false;
     bTurnMustEndAfterCurrentAction = false;
 
+    CancelCurrentAction();
     ClearSkillContext();
     ClearMoveContext();
     ClearItemContext();
@@ -217,6 +235,98 @@ void AUnitBase::Die()
     {
         CombatManager->RefreshTileProtectedByFront();
     }
+
+    OnUnitDied.Broadcast(this);
+}
+
+void AUnitBase::BeginCurrentAction(EUnitActionType ActionType)
+{
+    ++CurrentActionSerial;
+    CurrentActionType = ActionType;
+    ActionOriginTile = CurrentTile;
+    ActionOriginTransform = GetActorTransform();
+}
+
+void AUnitBase::CompleteCurrentAction(EUnitActionResult Result)
+{
+    if (CurrentActionType == EUnitActionType::None)
+    {
+        return;
+    }
+
+    const EUnitActionType CompletedType = CurrentActionType;
+    const FGameplayAbilitySpecHandle AbilityToCancel = ActiveSkillHandle;
+
+    // Clear ownership before cancellation can invoke synchronous callbacks.
+    // 취소가 동기 콜백을 호출하기 전에 행동 소유 상태를 해제합니다.
+    CurrentActionType = EUnitActionType::None;
+    MovePhase = EUnitMovePhase::None;
+    if (AbilitySystem && SkillAbilityEndedHandle.IsValid())
+    {
+        AbilitySystem->OnAbilityEnded.Remove(SkillAbilityEndedHandle);
+    }
+
+    SkillAbilityEndedHandle.Reset();
+    ActiveSkillHandle = FGameplayAbilitySpecHandle();
+
+    if (AUnitAIController* AIController = Cast<AUnitAIController>(GetController()))
+    {
+        AIController->StopMovement();
+    }
+
+    if (GetWorld())
+    {
+        GetWorld()->GetLatentActionManager().RemoveActionsForObject(this);
+    }
+
+    if (Result != EUnitActionResult::Succeeded && IsUnitAlive())
+    {
+        RestoreActionOrigin();
+    }
+
+    ClearSkillContext();
+    ClearMoveContext();
+    ClearItemContext();
+    ActionOriginTile = nullptr;
+    bSkillRequiresReturn = false;
+
+    if (AbilitySystem && AbilityToCancel.IsValid() && Result != EUnitActionResult::Succeeded)
+    {
+        AbilitySystem->CancelAbilityHandle(AbilityToCancel);
+    }
+
+    OnUnitActionCompleted(CompletedType, Result);
+    OnActionCompleted.Broadcast(this, CompletedType, Result);
+}
+
+void AUnitBase::OnUnitActionCompleted(EUnitActionType ActionType, EUnitActionResult Result)
+{
+}
+
+void AUnitBase::CancelCurrentAction()
+{
+    CompleteCurrentAction(EUnitActionResult::Cancelled);
+}
+
+void AUnitBase::RestoreActionOrigin()
+{
+    // The original tile stays reserved during a skill approach and return.
+    // 스킬 접근과 복귀 중에는 원래 타일의 점유를 유지합니다.
+    if (IsValid(ActionOriginTile))
+    {
+        AUnitBase* Occupant = ActionOriginTile->GetOccupyingUnit();
+        if (Occupant && Occupant != this)
+        {
+            UE_LOG(LogTemp, Error, TEXT("[UnitBase] Action origin reservation lost | Unit=%s | Tile=%s"), *GetNameSafe(this), *GetNameSafe(ActionOriginTile));
+            return;
+        }
+
+        SetCurrentTile(ActionOriginTile);
+        ActionOriginTile->SetOccupyingUnit(this);
+    }
+
+    GetCharacterMovement()->StopMovementImmediately();
+    SetActorLocationAndRotation(ActionOriginTransform.GetLocation(), ActionOriginTransform.Rotator(), false, nullptr, ETeleportType::TeleportPhysics);
 }
 
 void AUnitBase::SetCurrentTile(ACombatGridTile* NewTile)
@@ -249,8 +359,14 @@ void AUnitBase::SetCurrentTile(ACombatGridTile* NewTile)
 
 void AUnitBase::MoveToTile(ACombatGridTile* TargetTile)
 {
+    if (CurrentActionType == EUnitActionType::None)
+    {
+        BeginCurrentAction(EUnitActionType::Move);
+    }
+
     if (!TargetTile)
     {
+        HandleMoveFailed();
         return;
     }
 
@@ -258,6 +374,7 @@ void AUnitBase::MoveToTile(ACombatGridTile* TargetTile)
 
     if (!AICon)
     {
+        HandleMoveFailed();
         return;
     }
 
@@ -275,6 +392,7 @@ void AUnitBase::MoveToTarget(AUnitBase* TargetUnit)
 {
     if (!TargetUnit || !TargetUnit->IsUnitAlive())
     {
+        HandleMoveFailed();
         return;
     }
 
@@ -282,6 +400,7 @@ void AUnitBase::MoveToTarget(AUnitBase* TargetUnit)
 
     if (!AICon)
     {
+        HandleMoveFailed();
         return;
     }
 
@@ -300,6 +419,7 @@ void AUnitBase::ReturnToOriginalTile()
     if (!OriginalTileBeforeSkill)
     {
         UE_LOG(LogTemp, Warning, TEXT("[Skill] ReturnToOriginalTile failed: OriginalTileBeforeSkill is null"));
+        HandleMoveFailed();
         return;
     }
 
@@ -308,6 +428,7 @@ void AUnitBase::ReturnToOriginalTile()
     if (!AICon)
     {
         UE_LOG(LogTemp, Warning, TEXT("[Skill] ReturnToOriginalTile failed: AICon is null"));
+        HandleMoveFailed();
         return;
     }
 
@@ -327,6 +448,7 @@ void AUnitBase::SnapToTile(ACombatGridTile* Tile, const FRotator& TargetRotation
 {
     if (!Tile)
     {
+        HandleMoveFailed();
         return;
     }
 
@@ -335,42 +457,35 @@ void AUnitBase::SnapToTile(ACombatGridTile* Tile, const FRotator& TargetRotation
 
     FLatentActionInfo LatentInfo;
     LatentInfo.CallbackTarget = this;
-    LatentInfo.UUID = 1001;
-    LatentInfo.Linkage = 0;
-    LatentInfo.ExecutionFunction = FName(TEXT("OnSnapToTileFinished"));
+    LatentInfo.UUID = static_cast<int32>(CurrentActionSerial);
+    LatentInfo.Linkage = static_cast<int32>(CurrentActionSerial);
+    LatentInfo.ExecutionFunction = FName(TEXT("HandleActionSnapFinished"));
 
-    UKismetSystemLibrary::MoveComponentTo(
-        GetCapsuleComponent(),
-        Center,
-        TargetRotation,
-        false,
-        false,
-        0.5f,
-        false,
-        EMoveComponentAction::Move,
-        LatentInfo
-    );
+    UKismetSystemLibrary::MoveComponentTo(GetCapsuleComponent(), Center, TargetRotation, false, false, 0.5f, false, EMoveComponentAction::Move, LatentInfo);
+}
+
+void AUnitBase::HandleActionSnapFinished(int32 ActionSerial)
+{
+    // A delayed snap callback must not finish a newer action after cancellation.
+    // 취소 후 늦게 도착한 위치 보정 콜백이 새로운 행동을 완료하면 안 됩니다.
+    if (ActionSerial == static_cast<int32>(CurrentActionSerial))
+    {
+        OnSnapToTileFinished();
+    }
 }
 
 void AUnitBase::OnSnapToTileFinished()
 {
     if (MovePhase == EUnitMovePhase::ReturningToOriginalTile)
     {
-        MovePhase = EUnitMovePhase::None;
-        ClearSkillContext();
         OnReturnToOriginalTileFinished();
+        CompleteCurrentAction(EUnitActionResult::Succeeded);
         return;
     }
 
     if (MovePhase == EUnitMovePhase::MovingToTile)
     {
-        MovePhase = EUnitMovePhase::None;
-
-        if (CurrentActionType == EUnitActionType::Move)
-        {
-            OnMoveActionFinished();
-        }
-
+        OnMoveActionFinished();
         return;
     }
 }
@@ -420,33 +535,16 @@ void AUnitBase::HandleMoveCompleted()
     //UE_LOG(LogTemp, Warning, TEXT("[UnitBase] HandleMoveCompleted | Unit=%s | MovePhase=%d | PendingSkillTargetTile=%s | PendingTargetUnit=%s"), *GetName(), static_cast<int32>(MovePhase), *GetNameSafe(PendingSkillTargetTile), *GetNameSafe(PendingTargetUnit));
 }
 
-void AUnitBase::HandleMoveFailed()
+void AUnitBase::HandleMoveFailed(EUnitActionResult Result)
 {
-    if (MovePhase == EUnitMovePhase::None)
+    if (!IsBusy())
     {
         return;
     }
 
     UE_LOG(LogTemp, Warning, TEXT("[UnitBase] HandleMoveFailed | Unit=%s | MovePhase=%d | ActionType=%d"), *GetNameSafe(this), static_cast<int32>(MovePhase), static_cast<int32>(CurrentActionType));
 
-    MovePhase = EUnitMovePhase::None;
-
-    if (CurrentActionType == EUnitActionType::Skill)
-    {
-        ClearSkillContext();
-        return;
-    }
-
-    if (CurrentActionType == EUnitActionType::Move)
-    {
-        ClearMoveContext();
-        OnMoveActionFinished();
-        return;
-    }
-
-    PendingTile = nullptr;
-    PendingTargetUnit = nullptr;
-    CurrentActionType = EUnitActionType::None;
+    CompleteCurrentAction(Result);
 }
 
 AUnitAIController* AUnitBase::GetOrCreateAIController()
@@ -464,47 +562,16 @@ AUnitAIController* AUnitBase::GetOrCreateAIController()
 
 void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile)
 {
-    if (!HasAuthority())
+    if (!HasAuthority() || !bIsActiveTurn || IsBusy() || !IsUnitAlive())
     {
         return;
     }
 
-    if (!bIsActiveTurn)
-    {
-        return;
-    }
+    BeginCurrentAction(EUnitActionType::Skill);
 
-    if (MovePhase != EUnitMovePhase::None)
+    if (!SkillData || !TargetTile || !SkillData->AbilityClass || !AbilitySystem || !HasEnoughActionPoint(SkillData->ActionPointCost))
     {
-        return;
-    }
-
-    if (!IsUnitAlive())
-    {
-        return;
-    }
-
-    if (!SkillData)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | SkillData is null"));
-        return;
-    }
-
-    if (!TargetTile)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | TargetTile is null"));
-        return;
-    }
-
-    if (!SkillData->AbilityClass)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | AbilityClass is null"));
-        return;
-    }
-
-    if (!HasEnoughActionPoint(SkillData->ActionPointCost))
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | Not enough AP | Cost=%d | Unit=%s"), SkillData->ActionPointCost, *GetNameSafe(this));
+        CompleteCurrentAction(EUnitActionResult::Failed);
         return;
     }
 
@@ -512,79 +579,56 @@ void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile
     PendingSkillAbilityClass = SkillData->AbilityClass;
     PendingSkillTargetTile = TargetTile;
     PendingTargetUnit = TargetTile->GetOccupyingUnit();
-
     OriginalTileBeforeSkill = CurrentTile;
+    bSkillRequiresReturn = SkillData->bMoveToTarget;
 
-    CurrentActionType = EUnitActionType::Skill;
-
-    if (SkillData->bMoveToTarget)
+    if (bSkillRequiresReturn)
     {
-        AUnitBase* TargetUnit = TargetTile->GetOccupyingUnit();
-
-        if (!TargetUnit)
+        if (!IsValid(OriginalTileBeforeSkill) || !IsValid(PendingTargetUnit) || !PendingTargetUnit->IsUnitAlive())
         {
-            UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | MoveToTarget requires occupied target tile"));
+            CompleteCurrentAction(EUnitActionResult::Failed);
             return;
         }
 
-        MoveToTarget(TargetUnit);
+        MoveToTarget(PendingTargetUnit);
         return;
     }
 
-    if (!AbilitySystem)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[UnitBase] StartSkill failed | AbilitySystem is null"));
-        return;
-    }
-
-    const bool bActivated = AbilitySystem->TryActivateAbilityByClass(SkillData->AbilityClass);
-
-    if (!bActivated)
-    {
-        ClearSkillContext();
-    }
-
-    //UE_LOG(LogTemp, Log, TEXT("[UnitBase] StartSkill Activate | Unit=%s | Ability=%s | Activated=%d | TargetTile=(%d,%d) | TargetUnit=%s"), *GetNameSafe(this), *GetNameSafe(SkillData->AbilityClass), bActivated ? 1 : 0, TargetTile->GridCoord.X, TargetTile->GridCoord.Y, *GetNameSafe(PendingTargetUnit));
-
+    // In-place skills own a complete action without requiring a return move.
+    // 제자리 스킬은 복귀 이동 없이도 독립된 행동 수명을 가집니다.
+    MovePhase = EUnitMovePhase::WaitingForSkill;
+    ExecuteSkillAtTarget();
 }
 
 void AUnitBase::ExecuteSkillAtTarget()
 {
-    
-    if (MovePhase != EUnitMovePhase::WaitingForSkill)
+    if (CurrentActionType != EUnitActionType::Skill || MovePhase != EUnitMovePhase::WaitingForSkill)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Attack] ExecuteSkillAtTarget Return | Reason=InvalidMovePhase"));
         return;
     }
 
-    if (!PendingSkillData)
+    if (!PendingSkillData || !AbilitySystem || !PendingSkillAbilityClass)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Skill] ExecuteSkillAtTarget Return | Reason=PendingSkillDataNull"));
-        OnSkillFinished();
+        CompleteSkillExecution(EUnitActionResult::Failed);
         return;
     }
 
-    if (PendingSkillData->TargetRule == ESkillTargetRule::EnemyUnit || PendingSkillData->TargetRule == ESkillTargetRule::AllyUnit || PendingSkillData->TargetRule == ESkillTargetRule::AnyUnit)
+    const ESkillTargetRule TargetRule = PendingSkillData->TargetRule;
+    if (TargetRule == ESkillTargetRule::EnemyUnit || TargetRule == ESkillTargetRule::AllyUnit || TargetRule == ESkillTargetRule::AnyUnit)
     {
-        if (!PendingTargetUnit || !PendingTargetUnit->IsUnitAlive())
+        if (!IsValid(PendingTargetUnit) || !PendingTargetUnit->IsUnitAlive())
         {
-            UE_LOG(LogTemp, Warning, TEXT("[Skill] ExecuteSkillAtTarget Return | Reason=InvalidTargetUnit"));
-            OnSkillFinished();
+            CompleteSkillExecution(EUnitActionResult::Failed);
             return;
         }
     }
-    else if (PendingSkillData->TargetRule == ESkillTargetRule::EnemyTile || PendingSkillData->TargetRule == ESkillTargetRule::AllyTile || PendingSkillData->TargetRule == ESkillTargetRule::AnyTile)
+    else if (!IsValid(PendingSkillTargetTile))
     {
-        if (!PendingSkillTargetTile)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[Skill] ExecuteSkillAtTarget Return | Reason=InvalidTargetTile"));
-            OnSkillFinished();
-            return;
-        }
+        CompleteSkillExecution(EUnitActionResult::Failed);
+        return;
     }
 
     FVector LookTargetLocation = GetActorLocation();
-
     if (PendingTargetUnit)
     {
         LookTargetLocation = PendingTargetUnit->GetActorLocation();
@@ -596,25 +640,69 @@ void AUnitBase::ExecuteSkillAtTarget()
 
     FVector Direction = LookTargetLocation - GetActorLocation();
     Direction.Z = 0.0f;
-
     if (!Direction.IsNearlyZero())
     {
         SetActorRotation(Direction.Rotation());
     }
 
-    if (!AbilitySystem || !PendingSkillData || !PendingSkillData->AbilityClass)
+    FGameplayAbilitySpec* AbilitySpec = AbilitySystem->FindAbilitySpecFromClass(PendingSkillAbilityClass);
+    if (!AbilitySpec || AbilitySpec->IsActive())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Skill] ExecuteSkillAtTarget Return | Reason=NoASCOrAbilityClass | ASC=%d | SkillData=%s | AbilityClass=%s"), AbilitySystem ? 1 : 0, *GetNameSafe(PendingSkillData), PendingSkillData ? *GetNameSafe(PendingSkillData->AbilityClass) : TEXT("None"));
-        OnSkillFinished();
+        CompleteSkillExecution(EUnitActionResult::Failed);
         return;
     }
 
-    const bool bActivated = AbilitySystem->TryActivateAbilityByClass(PendingSkillAbilityClass);
-    
-    if (!bActivated)
+    // Bind before activation: GAS may end a no-montage ability synchronously.
+    // 몽타주가 없는 GAS 어빌리티는 동기로 끝날 수 있으므로 활성화 전에 연결합니다.
+    ActiveSkillHandle = AbilitySpec->Handle;
+    SkillAbilityEndedHandle = AbilitySystem->OnAbilityEnded.AddUObject(this, &AUnitBase::HandleSkillAbilityEnded);
+    const uint32 ActivatingActionSerial = CurrentActionSerial;
+    const bool bActivated = AbilitySystem->TryActivateAbility(ActiveSkillHandle);
+    if (!bActivated && CurrentActionSerial == ActivatingActionSerial && CurrentActionType == EUnitActionType::Skill)
     {
-        OnSkillFinished();
+        CompleteSkillExecution(EUnitActionResult::Failed);
     }
+}
+
+void AUnitBase::HandleSkillAbilityEnded(const FAbilityEndedData& EndedData)
+{
+    if (CurrentActionType != EUnitActionType::Skill || EndedData.AbilitySpecHandle != ActiveSkillHandle)
+    {
+        return;
+    }
+
+    EUnitActionResult Result = EUnitActionResult::Succeeded;
+    if (EndedData.bWasCancelled)
+    {
+        Result = EUnitActionResult::Cancelled;
+    }
+
+    if (const UGA_AttackBase* AttackAbility = Cast<UGA_AttackBase>(EndedData.AbilityThatEnded))
+    {
+        Result = AttackAbility->GetActionResult();
+    }
+
+    AbilitySystem->OnAbilityEnded.Remove(SkillAbilityEndedHandle);
+    SkillAbilityEndedHandle.Reset();
+    ActiveSkillHandle = FGameplayAbilitySpecHandle();
+    CompleteSkillExecution(Result);
+}
+
+void AUnitBase::CompleteSkillExecution(EUnitActionResult Result)
+{
+    if (CurrentActionType != EUnitActionType::Skill || MovePhase != EUnitMovePhase::WaitingForSkill)
+    {
+        return;
+    }
+
+    if (Result == EUnitActionResult::Succeeded && bSkillRequiresReturn)
+    {
+        ReturnToOriginalTile();
+        return;
+    }
+
+    SetActorRotation(DefaultBattleRotation);
+    CompleteCurrentAction(Result);
 }
 
 TArray<AUnitBase*> AUnitBase::ResolveSkillTargetUnits()
@@ -688,19 +776,14 @@ TArray<AUnitBase*> AUnitBase::ResolveSkillTargetUnits()
 
 void AUnitBase::OnSkillFinished()
 {
-    //UE_LOG(LogTemp, Log, TEXT("[Skill] OnSkillFinished: %s"), *GetName());
-
-    if (bIsDead)
+    // GAS owns completion while its bound ability is still active.
+    // 연결된 어빌리티가 활성 상태인 동안에는 GAS가 완료를 소유합니다.
+    if (ActiveSkillHandle.IsValid())
     {
         return;
     }
 
-    if (MovePhase != EUnitMovePhase::WaitingForSkill)
-    {
-        return;
-    }
-
-    ReturnToOriginalTile();
+    CompleteSkillExecution(EUnitActionResult::Succeeded);
 }
 
 void AUnitBase::ClearSkillContext()
@@ -727,7 +810,7 @@ void AUnitBase::StartMoveAction(ACombatGridTile* TargetTile)
         return;
     }
 
-    if (MovePhase != EUnitMovePhase::None)
+    if (IsBusy() || !IsUnitAlive())
     {
         return;
     }
@@ -753,14 +836,14 @@ void AUnitBase::StartMoveAction(ACombatGridTile* TargetTile)
     }
 
     
-    CurrentActionType = EUnitActionType::Move;
+    BeginCurrentAction(EUnitActionType::Move);
 
     MoveToTile(TargetTile);
 }
 
 void AUnitBase::OnMoveActionFinished()
 {
-    CurrentActionType = EUnitActionType::None;
+    CompleteCurrentAction(EUnitActionResult::Succeeded);
 }
 
 void AUnitBase::ClearMoveContext()
@@ -780,7 +863,7 @@ void AUnitBase::StartItemAction(AUnitBase* TargetUnit)
         return;
     }
 
-    if (MovePhase != EUnitMovePhase::None)
+    if (IsBusy() || !IsUnitAlive())
     {
         return;
     }
@@ -797,7 +880,7 @@ void AUnitBase::StartItemAction(AUnitBase* TargetUnit)
 
     
 
-    CurrentActionType = EUnitActionType::Item;
+    BeginCurrentAction(EUnitActionType::Item);
     PendingTargetUnit = TargetUnit;
 
     ExecuteItemAtTarget();
@@ -810,8 +893,7 @@ void AUnitBase::ExecuteItemAtTarget()
 
 void AUnitBase::OnItemFinished()
 {
-    CurrentActionType = EUnitActionType::None;
-    ClearItemContext();
+    CompleteCurrentAction(EUnitActionResult::Succeeded);
 }
 
 void AUnitBase::ClearItemContext()

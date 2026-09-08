@@ -83,8 +83,11 @@ public:
     // Turn-related events
     // 턴 관련 이벤트 처리입니다.
     virtual void OnTurnStart() override;
-    virtual void OnSkillFinished() override;
-    virtual void OnReturnToOriginalTileFinished() override;
+    virtual void OnTurnEnd() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+protected:
+    virtual void OnUnitActionCompleted(EUnitActionType ActionType, EUnitActionResult Result) override;
 
 public:
     // Set and query the current turn state
@@ -133,8 +136,7 @@ protected:
     UPROPERTY()
     ACombatGridTile* CurrentTargetTile = nullptr;
 
-    UPROPERTY()
-    bool bPendingNextActionAfterReturn = false;
+    FTimerHandle ActionContinuationTimer;
 
     UPROPERTY()
     FEnemyActionDecision CurrentDecision;

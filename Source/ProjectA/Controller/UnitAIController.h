@@ -24,4 +24,8 @@ protected:
     // Handles path following completion and failure callbacks.
     // 경로 이동 완료와 실패 콜백을 처리합니다.
     virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
+
+private:
+    FAIRequestID ActiveUnitMoveRequest = FAIRequestID::InvalidRequest;
+    bool bIssuingUnitMove = false;
 };

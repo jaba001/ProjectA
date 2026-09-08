@@ -10,6 +10,7 @@ void UMainMenuRootWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
     EnsureCodeGeneratedRootLayout();
+    ApplyMainStackVisibility();
 }
 
 void UMainMenuRootWidget::EnsureCodeGeneratedRootLayout()
@@ -75,12 +76,20 @@ void UMainMenuRootWidget::EnsureCodeGeneratedRootLayout()
 
 UCommonActivatableWidget* UMainMenuRootWidget::PushMainScreen(TSubclassOf<UCommonActivatableWidget> WidgetClass)
 {
+    SetMainStackHiddenByMenu(false);
     return PushScreen(MainStack, WidgetClass, TEXT("MainStack"));
 }
 
 UCommonActivatableWidget* UMainMenuRootWidget::PushMenuScreen(TSubclassOf<UCommonActivatableWidget> WidgetClass)
 {
-    return PushScreen(MenuStack, WidgetClass, TEXT("MenuStack"));
+    UCommonActivatableWidget* PushedWidget = PushScreen(MenuStack, WidgetClass, TEXT("MenuStack"));
+
+    if (PushedWidget)
+    {
+        SetMainStackHiddenByMenu(true);
+    }
+
+    return PushedWidget;
 }
 
 UCommonActivatableWidget* UMainMenuRootWidget::PushModalScreen(TSubclassOf<UCommonActivatableWidget> WidgetClass)
@@ -97,6 +106,7 @@ void UMainMenuRootWidget::ClearMenuStack()
     }
 
     MenuStack->ClearWidgets();
+    SetMainStackHiddenByMenu(false);
 }
 
 void UMainMenuRootWidget::ClearModalStack()
@@ -108,6 +118,12 @@ void UMainMenuRootWidget::ClearModalStack()
     }
 
     ModalStack->ClearWidgets();
+}
+
+void UMainMenuRootWidget::SetMainStackHiddenByMenu(bool bShouldHide)
+{
+    bMainStackHiddenByMenu = bShouldHide;
+    ApplyMainStackVisibility();
 }
 
 UCommonActivatableWidget* UMainMenuRootWidget::PushScreen(UCommonActivatableWidgetStack* Stack, TSubclassOf<UCommonActivatableWidget> WidgetClass, const TCHAR* StackName)
@@ -125,4 +141,20 @@ UCommonActivatableWidget* UMainMenuRootWidget::PushScreen(UCommonActivatableWidg
     }
 
     return Stack->AddWidget(WidgetClass);
+}
+
+void UMainMenuRootWidget::ApplyMainStackVisibility()
+{
+    if (!MainStack)
+    {
+        return;
+    }
+
+    if (bMainStackHiddenByMenu)
+    {
+        MainStack->SetVisibility(ESlateVisibility::Hidden);
+        return;
+    }
+
+    MainStack->SetVisibility(ESlateVisibility::Visible);
 }

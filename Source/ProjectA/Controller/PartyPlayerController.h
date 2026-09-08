@@ -38,6 +38,8 @@ protected:
     // 필요한 전투 액터를 찾고 HUD를 초기화합니다.
     virtual void BeginPlay() override;
 
+    virtual bool ShouldCreateCombatHUD() const { return true; }
+
 private:
     // Finds and caches the combat manager.
     // 전투 매니저를 찾아 캐시합니다.
@@ -48,6 +50,7 @@ private:
     void InitializeHUD();
 
 public:
+    void SetCombatContext(ACombatManager* InManager, bool bEnableInput);
     // Returns the currently active combat unit.
     // 현재 활성화된 전투 유닛을 반환합니다.
     UFUNCTION(BlueprintCallable, Category = "Combat")
@@ -108,6 +111,7 @@ public:
     bool IsValidTileForPendingSkill(ACombatGridTile* Tile) const;
 
 private:
+    bool bCombatInputEnabled = true;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tile", meta = (AllowPrivateAccess = "true"))
     ACombatGridTile* SelectedTile = nullptr;
 

@@ -1,7 +1,25 @@
 # ProjectA
 
 Unreal Engine 기반 Grid Turn-Based Combat System 프로젝트입니다.
-전투 구조는 grid, unit, turn, GAS 중심으로 구성되어 있고, 메인 메뉴와 캐릭터 생성 UI는 CommonUI 기반 흐름과 native fallback UI를 함께 사용합니다.
+전투 구조는 grid, unit, turn, GAS 중심으로 구성되어 있고, CommonUI 기반 메뉴와 노드 진행 UI를 하나의 persistent Gameplay 레벨의 전투에 연결합니다.
+
+```text
+MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
+→ Combat Node → Encounter → 기존 Grid Combat → Victory → Result Continue → Run Map UI
+                                             → Defeat → 종료 화면
+```
+
+`URunStateSubsystem`이 슬롯·이름·ClassId·HP·노드 진행을 레벨 전환 동안 보존합니다. `AEncounterManager`는 아레나 준비, 파티/적 스폰, 결과 추출과 정리를 맡고 기존 CombatManager/TurnManager/GAS를 재사용합니다. 두 개의 순차 전투 노드가 같은 Gameplay 레벨에서 실행됩니다. 디스크 저장은 포함하지 않습니다.
+
+실행/에셋 설정과 검증 경계는 [Vertical Slice 설정](Docs/VERTICAL_SLICE_SETUP.md)과 [작업 보고](Docs/VERTICAL_SLICE_REPORT.md)를 확인하세요. 네 직업은 현재 기존 `BP_PlayerUnit`을 공통 임시 전투 클래스로 사용합니다.
+
+## 작업 재개 문서
+
+- [TODO와 작업 기록](Docs/TODO.md): 다음 작업, 우선순위, 완료 조건, 중단 지점 기록
+- [기획 초안과 구현 현황](Docs/PROJECT_PLAN.md): 이미 작성된 기능, 현재 규칙, 결정할 기획, 단계별 목표
+- [코드 리뷰](Docs/CODE_REVIEW.md): P1/P2 문제의 근거와 검증 시나리오
+
+문서는 2026-09-08 현재 작업 트리를 기준으로 정리합니다. 코드 구현, 정식 빌드, 에셋 설정 확인, PIE 검증은 별도로 기록합니다.
 
 ## Engine
 
@@ -48,6 +66,9 @@ Editor-only dependency는 이 모듈에만 둡니다.
 - Unit AI Controller
 - Combat HUD Widget
 - MainMenu / CharacterCreation CommonUI 화면 흐름
+- Persistent Gameplay의 Run Map → Encounter → Result 진행과 파티 HP 이관
+- 전투 결과 1회 통지, 종료 후 입력/턴 잠금, 유닛·AI·스킬 액터·그리드 점유 정리
+- 제자리/접근 스킬의 공통 완료 결과와 실패·취소 후 적 AI 복구
 - Blueprint Designer 위젯이 부족해도 동작하는 native fallback UI
 
 ## UI
@@ -61,15 +82,24 @@ UI 관련 상세 메모는 아래 파일에 정리되어 있습니다.
 - `UMainMenuRootWidget`
 - `UMainMenuScreenWidget`
 - `UCharacterCreationWidget`
+- `AMainMenuPreviewStage`
+- `UGameplayRootWidget`: Run / Combat / Modal CommonUI 스택
+- `URunMapWidget`: 노드 정의 기반 진행과 선택 요청
+- `UCombatHUDWidget`: 기존 Move / Skill / End Turn 입력 연결
+- Gameplay 입력 모드는 CommonUI 화면이 관리한다. CombatHUD는 게임·UI 입력을 함께 허용하고, Run Map/Result는 월드 입력을 차단한다.
+- `UEncounterResultWidget`: Victory Continue / Defeat
 
 기존 MainMenu와 CharacterCreation은 런타임 fallback을 유지합니다.
 Scaffold generator는 기존 native class를 부모로 사용하는 WBP의 Designer tree를 JSON spec 기준으로 생성합니다.
 
 관리 대상 asset:
 
-- `/Game/User_JeHoon/Blueprint/UI/MainMenu/WBP_MainMenuRootWidget`
-- `/Game/User_JeHoon/Blueprint/UI/MainMenu/WBP_MainMenuScreenWidget`
-- `/Game/User_JeHoon/Blueprint/UI/MainMenu/WBP_CharacterCreationWidget`
+- `/Game/User_JeHoon/UI/MainMenu/WBP_MainMenuRootWidget`
+- `/Game/User_JeHoon/UI/MainMenu/WBP_MainMenuScreenWidget`
+- `/Game/User_JeHoon/UI/MainMenu/WBP_CharacterCreationWidget`
+
+CharacterCreation은 하단 4개 파티 슬롯과 L_MainMenu의 실제 월드 캐릭터 프리뷰를 함께 사용합니다. 각 슬롯은 캐릭터 생성하기 버튼으로 시작하고, 생성 중인 슬롯만 편집 패널과 프리뷰 actor를 표시합니다.
+`AMainMenuPreviewStage`는 메뉴 카메라, 4개 스폰 앵커, ClassId별 프리뷰 actor class 맵을 관리합니다.
 
 ## UI Scaffold Generator
 
@@ -78,6 +108,10 @@ JSON spec 위치:
 - `Source/ProjectAEditor/UiScaffoldSpecs/MainMenuRootWidget.json`
 - `Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScreenWidget.json`
 - `Source/ProjectAEditor/UiScaffoldSpecs/CharacterCreationWidget.json`
+- `Source/ProjectAEditor/UiScaffoldSpecs/GameplayRootWidget.json`
+- `Source/ProjectAEditor/UiScaffoldSpecs/RunMapWidget.json`
+- `Source/ProjectAEditor/UiScaffoldSpecs/EncounterResultWidget.json`
+- `Source/ProjectAEditor/UiScaffoldSpecs/CombatHUDWidget.json`
 
 기본 commandlet:
 
@@ -97,6 +131,7 @@ JSON spec 위치:
 - Overlay
 - Button
 - TextBlock
+- HorizontalBox
 - VerticalBox
 - Border
 - EditableTextBox
@@ -128,15 +163,15 @@ Source/
 Development Editor | Win64 빌드:
 
 ```powershell
-"C:\Program Files\Epic Games\UE_5.7\Engine\Build\BatchFiles\Build.bat" ProjectAEditor Win64 Development -Project="C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -WaitMutex -FromMsBuild -architecture=x64
+& "C:\Program Files\Epic Games\UE_5.7\Engine\Build\BatchFiles\Build.bat" ProjectAEditor Win64 Development -Project="C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -WaitMutex -FromMsBuild -architecture=x64
 ```
 
 C++ 파일을 생성, 삭제, 이름 변경한 뒤 프로젝트 파일 재생성:
 
 ```powershell
-"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe" -ProjectFiles -Project="C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -Game -Engine
+& "C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe" -ProjectFiles -Project="C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -Game -Engine
 ```
 
 ## Goal
 
-GAS를 활용한 확장 가능한 턴제 전투 아키텍처를 유지하면서, UI는 CommonUI runtime 안정성과 Blueprint Designer 편집 가능성을 함께 확보하는 것을 목표로 합니다.
+게임 한 판은 `Gameplay.umap`에 머물며 노드 UI와 전투 Arena를 전환합니다. `TestMap`은 원본 전투 테스트 환경으로 보존하며, `WorldMap.umap`과 `AWorldMapGameModeBase`는 기존 직렬화 참조 호환을 위한 deprecated/미사용 항목입니다. 새로운 월드 탐험이나 전투별 OpenLevel 경로로 사용하지 않습니다.

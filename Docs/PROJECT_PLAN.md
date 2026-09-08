@@ -1,0 +1,79 @@
+# ProjectA 기획과 구현 현황
+
+기준일: 2026-09-08. 기존 미커밋 메뉴·4슬롯 프리뷰 작업을 보존하며 첫 Vertical Slice를 연결한다. 코드·빌드·에셋·PIE의 실제 결과는 [작업 보고](VERTICAL_SLICE_REPORT.md)에 별도로 기록한다.
+
+## 1. 확정한 게임 흐름
+
+```mermaid
+flowchart LR
+    A[MainMenu] --> B[CharacterCreation 1~4명]
+    B -->|OpenLevel 1회| C[Gameplay persistent level]
+    C --> D[Run Map UI]
+    D --> E[Encounter 준비]
+    E --> F[Grid Combat]
+    F -->|Victory| G[정리 + Result]
+    G -->|Continue| D
+    F -->|Defeat| H[정리 + 패배 화면]
+```
+
+월드 진행은 CommonUI 노드 화면으로 구현한다. `WorldMap` 물리 탐험과 전투별 CombatMap 전환 계획은 폐기한다. 두 개의 순차 Combat 노드가 `DefaultEncounter` 정의를 재사용하며 두 번째 Victory 이후 Run Map에 완료 상태를 표시한다. 패배 후에는 입력과 턴이 잠긴 결과 화면을 유지한다.
+
+## 2. 책임과 수명
+
+| 구성 | 역할 / 수명 |
+|---|---|
+| `URunStateSubsystem` | GameInstance 수명. PartyMembers, CurrentNodeId, CompletedNodes, CurrentEncounterId, Phase, LastResult, HP만 보존. Actor 참조와 디스크 저장 없음 |
+| `AGameplayGameModeBase` | 레벨 BeginPlay 다음 틱에 Arena를 찾아 EncounterManager와 CombatManager 생성, Controller 연결 |
+| `AGameplayPlayerController` | PartyPlayerController 상속. Root UI와 전투 조작 허용 상태 관리, 노드/Continue 요청 전달 |
+| `UGameplayRootWidget` | CommonUI Run / Combat / Modal 스택 관리 |
+| `URunMapWidget` | 노드 정의 표시, 선택 요청. Spawn 수행 안 함 |
+| `AEncounterManager` | 준비/스폰/전투 연결/HP 추출/정리. RunState의 유효 전이를 요청 |
+| `ACombatArena` | Grid origin·슬롯별 좌표·카메라·타일 활성화. 향후 다른 Arena 구현으로 교체 가능 |
+| `ACombatManager` / `UTurnManager` | 기존 이동·타겟·턴 로직 재사용, 결과 이벤트 및 정지/등록 해제 추가 |
+| `UCombatHUDWidget` | CommonActivatableWidget, 기존 Move/Skill/End Turn 명령 연결 |
+| `UEncounterResultWidget` | Victory Continue / Defeat. 향후 보상 선택을 넣을 위치 |
+
+Streaming, Level Instance, SaveGame, 인벤토리와 장비, 여러 Act, 멀티플레이 리팩터링은 범위 밖이다. GameInstance에 전투/UI를 몰아넣지 않는다.
+
+## 3. 파티 규칙
+
+- CharacterCreation은 기존 네 슬롯을 사용하며 1명 이상 생성하면 시작한다. 반드시 4명 규칙은 없다.
+- 각 슬롯은 `SlotIndex`, `CharacterName`, `ClassId`, `bCreated`, `CurrentHP`를 전달한다. 빈 슬롯은 스폰하지 않고 슬롯 번호에 해당하는 PlayerCoords를 사용한다.
+- 생성 UI 이름 편집이 연결되지 않은 슬롯은 직업 표시명과 슬롯 번호로 기본 이름을 갖는다. `SetSlotCharacterName`으로 개별 이름을 지정할 수 있다.
+- `StableHand`, `Scholar`, `Herbalist`, `Hunter` → `UPartyDefinitionDataAsset::PlayerUnitClasses` 한 곳에서 전투 클래스를 찾는다. 누락 시 명시적인 `FallbackPlayerUnitClass`를 사용한다.
+- 네 직업 콘텐츠가 아직 없으므로 첫 데이터 에셋은 기존 `BP_PlayerUnit`을 공통 임시 클래스로 사용한다. 직업별 스킬/스탯 완성으로 취급하지 않는다.
+- 첫 스폰은 클래스 HP, 이후 스폰은 이전 결과 HP를 복원한다. HP 0인 파티 멤버는 다음 전투에서 스폰하지 않는다. 부활/회복 보상은 미구현이다.
+
+## 4. Encounter와 전투 규약
+
+Gameplay의 입력 모드는 활성 CommonUI 화면이 소유한다. CombatHUD는 `All / CaptureDuringMouseDown`으로 버튼과 타일 클릭을 함께 허용하고 커서를 유지한다. RunMap과 Result는 `Menu / NoCapture`로 월드 입력을 차단한다. GameplayController는 별도로 `SetInputMode`를 호출하지 않으며, MainMenu의 기존 UIOnly 설정에서 travel 후 남는 viewport `IgnoreInput`을 해제하고 해당 로컬 플레이어의 최초 뷰포트 포커스를 복원한다.
+
+`CanStartNode → BeginEncounter → PrepareArena → SpawnParty/Enemies → MarkCombatStarted → StartCombat` 순서다. 누락 클래스/잘못된 좌표/중복 점유/빈 편성은 부분 스폰을 정리하고 Run Map 오류 메시지로 돌아간다.
+
+`OnUnitDied → EvaluateCombatResult → StopCombat`에서 결과를 1회 확정한다. 먼저 모든 유닛의 활성 턴을 끄고 행동을 취소하며 추가 입력을 막는다. 사망 콜백이 반환된 다음 틱에 HP를 저장하고 TurnOrder·CombatUnits·ASC/AI 이동·타이머·컨트롤러·스킬 액터·Unit·타일 점유를 정리한다. Result Continue는 정리가 끝난 상태에서 다음 노드를 연다.
+
+전체 팀이 전멸하지 않은 상태에서 현재 턴 유닛이 죽으면 다음 틱에 다음 생존 유닛으로 진행한다. 같은 사망으로 중복 전이하지 않는다.
+
+R01/R02는 `EUnitActionResult`와 공통 행동 완료 경로로 수정한다. GAS 종료 델리게이트는 활성화 전에 연결하여 동기 완료도 받는다. 제자리 스킬은 복귀를 요구하지 않는다. 실패/취소는 원래 타일과 위치로 복구하며 AI는 다음 틱에 안전한 턴 종료로 전이한다. 이미 소비한 AP는 환불하지 않는다.
+
+## 5. 기존 기반과 남은 P2
+
+기존 4×4 grid, 타일 선택/이동·타겟 표시, GAS 피해/몽타주/스킬 액터, 적 스킬 판단, AP·보조 AP 규칙을 재사용한다. `TestMap`은 원본을 보존하고 그 geometry/NavMesh/Grid를 복제한 `Gameplay`를 기준 레벨로 사용한다.
+
+| 항목 | 현재 경계 |
+|---|---|
+| R03 / T03 AP 비용 | DataAsset/Ability 비용 이원화는 유지. 콘텐츠 비용을 일치시켜 사용 |
+| R04 / T04 타겟 | 적 AI와 플레이어의 전열/진영 타겟 규칙 통합은 후속 |
+| R05 / T05 입력 | persistent 전투 잠금을 위해 Player 팀 검사와 AI 내부 EndTurn 분리만 적용 |
+| R06 / T06 범위 | 직접 효과/스킬 액터의 범위 계산 통합은 후속 |
+| T07 발사체 완료 | 행동 완료는 GAS 종료 기준. 느린 발사체 impact까지 기다리는 규칙은 미완성 |
+| T09 직업/편집 | 전투 클래스 매핑만 연결. 직업별 콘텐츠와 상세 편집은 후속 |
+| T11 메뉴 기능 | SaveGame/Continue/Options/Quit 완성은 이번 범위 밖 |
+| T13 콘텐츠 | 아이템 효과, 적 이동 후보 점수, 추가 스킬은 후속 |
+| T14 네트워크 | 이번 slice는 싱글플레이. 기존 부분 복제만 유지 |
+
+## 6. 검증과 다음 단계
+
+검증 ID는 VERTICAL-01~10을 사용한다. 빌드 성공만으로 PIE 통과로 표시하지 않으며, 강제 GAS 피해를 이용한 종료 검증과 실제 스킬/이동/AI 검증도 구분한다. [설정 안내](VERTICAL_SLICE_SETUP.md), [리뷰](CODE_REVIEW.md), [작업 보드](TODO.md), [최종 보고](VERTICAL_SLICE_REPORT.md)를 함께 확인한다.
+
+다음 콘텐츠 작업은 공통 `BP_PlayerUnit` fallback을 실제 네 직업 정의로 교체하는 것이다.

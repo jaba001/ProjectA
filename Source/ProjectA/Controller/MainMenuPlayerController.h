@@ -2,11 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Game/Run/RunTypes.h"
 #include "MainMenuPlayerController.generated.h"
 
 class UCharacterCreationWidget;
 class UMainMenuRootWidget;
 class UMainMenuScreenWidget;
+class AMainMenuPreviewStage;
 
 // Player controller that creates and drives the CommonUI main menu.
 // CommonUI 메인메뉴를 생성하고 제어하는 플레이어 컨트롤러입니다.
@@ -29,6 +31,11 @@ public:
     UFUNCTION(BlueprintPure, Category = "MainMenu")
     UMainMenuRootWidget* GetMainMenuRootWidget() const;
 
+    // Returns the preview stage actor found in L_MainMenu.
+    // L_MainMenu에서 찾은 프리뷰 스테이지 액터를 반환합니다.
+    UFUNCTION(BlueprintPure, Category = "MainMenu|Preview")
+    AMainMenuPreviewStage* GetPreviewStage() const;
+
     // Pushes the main menu screen to the root main stack.
     // 메인메뉴 화면을 루트의 메인 스택에 추가합니다.
     UFUNCTION(BlueprintCallable, Category = "MainMenu")
@@ -39,10 +46,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "MainMenu")
     void ShowCharacterCreationScreen();
 
-    // Starts a new game from temporary character creation data.
-    // 임시 캐릭터 생성 데이터를 사용해 새 게임을 시작합니다.
-    UFUNCTION(BlueprintCallable, Category = "MainMenu")
+    // Keeps existing Blueprint calls valid while forwarding the active four-slot party.
+    // 기존 Blueprint 호출을 유지하면서 활성 화면의 4개 파티 슬롯을 전달합니다.
+    UFUNCTION(BlueprintCallable, Category = "MainMenu", meta = (DeprecatedFunction, DeprecationMessage = "Use StartNewGameFromParty with the character creation slots."))
     void StartNewGameFromCharacterCreation(const FText& CharacterName, FName CharacterClassId);
+
+    UFUNCTION(BlueprintCallable, Category = "MainMenu")
+    bool StartNewGameFromParty(const TArray<FRunPartyMember>& PartyMembers, FText& OutError);
 
 protected:
     // Root widget class assigned by the main menu player controller blueprint.
@@ -65,8 +75,16 @@ protected:
     UPROPERTY(Transient)
     TObjectPtr<UMainMenuRootWidget> MainMenuRootWidget;
 
+    // Runtime preview stage instance used for the menu camera and party previews.
+    // 메뉴 카메라와 파티 프리뷰에 사용하는 런타임 프리뷰 스테이지 인스턴스입니다.
+    UPROPERTY(Transient)
+    TObjectPtr<AMainMenuPreviewStage> MainMenuPreviewStage;
+
     // Level name opened after character creation starts the game.
     // 캐릭터 생성 후 게임 시작 시 열릴 레벨 이름입니다.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MainMenu")
-    FName StartGameLevelName;
+    FName GameplayLevelName;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UCharacterCreationWidget> ActiveCharacterCreationWidget;
 };

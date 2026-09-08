@@ -2,13 +2,19 @@
 
 #include "CoreMinimal.h"
 #include "CommonActivatableWidget.h"
+#include "Game/Run/RunTypes.h"
 #include "CharacterCreationWidget.generated.h"
 
 class UButton;
 class UBorder;
 class UEditableTextBox;
+class UHorizontalBox;
+class UImage;
+class USizeBox;
 class UTextBlock;
+class UTexture2D;
 class UVerticalBox;
+class UWidget;
 
 // Character creation screen widget base with temporary selection data.
 // 임시 선택 데이터를 관리하는 캐릭터 생성 화면 위젯 기반 클래스입니다.
@@ -61,6 +67,12 @@ public:
     // 현재 캐릭터 데이터로 게임 시작을 요청합니다.
     UFUNCTION(BlueprintCallable, Category = "CharacterCreation")
     void RequestStartGame();
+
+    UFUNCTION(BlueprintPure, Category = "CharacterCreation|Party Slots")
+    TArray<FRunPartyMember> GetPartyMembers() const;
+
+    UFUNCTION(BlueprintCallable, Category = "CharacterCreation|Party Slots")
+    void SetSlotCharacterName(int32 SlotIndex, const FText& NewName);
 
 protected:
     // Initializes fallback character creation layout and events.
@@ -135,12 +147,171 @@ protected:
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_Back;
 
+    // Top-right close button optionally bound from a designer widget.
+    // 디자이너 위젯에서 선택적으로 바인딩되는 우측 상단 닫기 버튼입니다.
+    // TODO: Bind a UButton named Button_Close in WBP_CharacterCreationWidget for returning to the main menu.
+    // TODO: 메인메뉴로 돌아가려면 WBP_CharacterCreationWidget에 Button_Close 이름의 UButton을 바인딩합니다.
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Close;
+
     // Start game button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 게임 시작 버튼입니다.
     // TODO: Bind a UButton named Button_StartGame in WBP_CharacterCreationWidget for starting the game.
     // TODO: 게임 시작을 위해 WBP_CharacterCreationWidget에 Button_StartGame 이름의 UButton을 바인딩합니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_StartGame;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UTextBlock> Text_StartGameStatus;
+
+    // Fullscreen hit-testable layer and bottom party card container bound from the designer.
+    // 디자이너에서 바인딩되는 전체 화면 입력 차단 레이어와 하단 파티 카드 컨테이너입니다.
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UBorder> FullscreenInputBlocker;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UBorder> BottomPanel;
+
+    // Fixed-height wrapper for the party slots area.
+    // 파티 슬롯 영역 높이를 고정하는 래퍼입니다.
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<USizeBox> PartySlotsFixedHeightBox;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UHorizontalBox> BottomHorizontalBox;
+
+    // Optional designer bindings for party slot zero.
+    // 파티 슬롯 0의 선택적 디자이너 바인딩입니다.
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot0_Create;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UVerticalBox> SlotEditorBox_0;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UTextBlock> Text_Slot0_Title;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot0_Prev;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot0_Next;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UImage> Image_Slot0_ClassIcon;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UTextBlock> Text_Slot0_ClassName;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot0_Edit;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot0_Delete;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot0_ClassInfo;
+
+    // Optional designer bindings for party slot one.
+    // 파티 슬롯 1의 선택적 디자이너 바인딩입니다.
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot1_Create;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UVerticalBox> SlotEditorBox_1;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UTextBlock> Text_Slot1_Title;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot1_Prev;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot1_Next;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UImage> Image_Slot1_ClassIcon;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UTextBlock> Text_Slot1_ClassName;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot1_Edit;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot1_Delete;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot1_ClassInfo;
+
+    // Optional designer bindings for party slot two.
+    // 파티 슬롯 2의 선택적 디자이너 바인딩입니다.
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot2_Create;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UVerticalBox> SlotEditorBox_2;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UTextBlock> Text_Slot2_Title;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot2_Prev;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot2_Next;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UImage> Image_Slot2_ClassIcon;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UTextBlock> Text_Slot2_ClassName;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot2_Edit;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot2_Delete;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot2_ClassInfo;
+
+    // Optional designer bindings for party slot three.
+    // 파티 슬롯 3의 선택적 디자이너 바인딩입니다.
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot3_Create;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UVerticalBox> SlotEditorBox_3;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UTextBlock> Text_Slot3_Title;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot3_Prev;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot3_Next;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UImage> Image_Slot3_ClassIcon;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UTextBlock> Text_Slot3_ClassName;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot3_Edit;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot3_Delete;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Slot3_ClassInfo;
+
+    // Optional class icon textures keyed by the same class ids used by the preview stage.
+    // 프리뷰 스테이지와 같은 클래스 ID를 키로 사용하는 선택적 클래스 아이콘 텍스처입니다.
+    UPROPERTY(EditDefaultsOnly, Category = "Character Creation|Party Slots")
+    TMap<FName, TObjectPtr<UTexture2D>> ClassIconTextures;
 
 private:
     // Creates the fallback character creation layout in C++.
@@ -154,6 +325,32 @@ private:
     // Applies visual settings for the center panel background.
     // 중앙 패널 배경의 시각 설정을 적용합니다.
     void ConfigureCenterPanelBackground();
+
+    // Applies hit-testable settings to the new fullscreen input blocker.
+    // 새 전체 화면 입력 차단기에 히트 테스트 가능한 설정을 적용합니다.
+    void ConfigureFullscreenInputBlocker();
+
+    // Applies the fixed logical height used by the party slot panel.
+    // 파티 슬롯 패널에 사용하는 고정 logical height를 적용합니다.
+    void ConfigurePartySlotsFixedHeight();
+
+    // Initializes party slot bindings, state, and displayed class data.
+    // 파티 슬롯 바인딩과 상태 및 표시 클래스 데이터를 초기화합니다.
+    void InitializeClassSlotWidgetArrays();
+    void InitializeClassSlots();
+    void RefreshClassSlotWidgets();
+    void ChangeSlotClass(int32 SlotIndex, int32 Direction);
+    void SetSlotClass(int32 SlotIndex, FName ClassId);
+    void CreateCharacterInSlot(int32 SlotIndex);
+    void ClearCharacterSlot(int32 SlotIndex);
+    void RefreshSlotVisibility(int32 SlotIndex);
+    void SetWidgetVisible(UWidget* Widget, bool bIsVisible) const;
+    bool IsSlotCreated(int32 SlotIndex) const;
+    bool HasDeferredSlotCreationWidgets() const;
+    FText GetDisplayNameForClassId(FName ClassId) const;
+    void UpdatePreviewStageSlot(int32 SlotIndex, FName ClassId);
+    void ClearPreviewStageSlot(int32 SlotIndex);
+    void LogSlotAction(int32 SlotIndex, const TCHAR* ActionName) const;
 
     // Updates selected class and stat preview text.
     // 선택 클래스와 스탯 미리보기 텍스트를 갱신합니다.
@@ -183,7 +380,82 @@ private:
     void HandleBackClicked();
 
     UFUNCTION()
+    void HandleCloseClicked();
+
+    UFUNCTION()
     void HandleStartGameClicked();
+
+    UFUNCTION()
+    void HandleSlot0CreateClicked();
+
+    UFUNCTION()
+    void HandleSlot0PrevClicked();
+
+    UFUNCTION()
+    void HandleSlot0NextClicked();
+
+    UFUNCTION()
+    void HandleSlot0EditClicked();
+
+    UFUNCTION()
+    void HandleSlot0DeleteClicked();
+
+    UFUNCTION()
+    void HandleSlot0ClassInfoClicked();
+
+    UFUNCTION()
+    void HandleSlot1CreateClicked();
+
+    UFUNCTION()
+    void HandleSlot1PrevClicked();
+
+    UFUNCTION()
+    void HandleSlot1NextClicked();
+
+    UFUNCTION()
+    void HandleSlot1EditClicked();
+
+    UFUNCTION()
+    void HandleSlot1DeleteClicked();
+
+    UFUNCTION()
+    void HandleSlot1ClassInfoClicked();
+
+    UFUNCTION()
+    void HandleSlot2CreateClicked();
+
+    UFUNCTION()
+    void HandleSlot2PrevClicked();
+
+    UFUNCTION()
+    void HandleSlot2NextClicked();
+
+    UFUNCTION()
+    void HandleSlot2EditClicked();
+
+    UFUNCTION()
+    void HandleSlot2DeleteClicked();
+
+    UFUNCTION()
+    void HandleSlot2ClassInfoClicked();
+
+    UFUNCTION()
+    void HandleSlot3CreateClicked();
+
+    UFUNCTION()
+    void HandleSlot3PrevClicked();
+
+    UFUNCTION()
+    void HandleSlot3NextClicked();
+
+    UFUNCTION()
+    void HandleSlot3EditClicked();
+
+    UFUNCTION()
+    void HandleSlot3DeleteClicked();
+
+    UFUNCTION()
+    void HandleSlot3ClassInfoClicked();
 
     // Current character name entered by the user.
     // 사용자가 입력한 현재 캐릭터 이름입니다.
@@ -194,4 +466,47 @@ private:
     // 사용자가 선택한 현재 캐릭터 클래스 ID입니다.
     UPROPERTY(BlueprintReadOnly, Category = "CharacterCreation", meta = (AllowPrivateAccess = "true"))
     FName CurrentCharacterClassId;
+
+    // Current class selection for each of the four party slots.
+    // 네 개 파티 슬롯 각각의 현재 클래스 선택입니다.
+    UPROPERTY(BlueprintReadOnly, Category = "CharacterCreation|Party Slots", meta = (AllowPrivateAccess = "true"))
+    TArray<FName> SlotClassIds;
+
+    UPROPERTY(BlueprintReadOnly, Category = "CharacterCreation|Party Slots", meta = (AllowPrivateAccess = "true"))
+    TArray<FText> SlotCharacterNames;
+
+    // Tracks whether each party slot currently has an active character editor.
+    // 각 파티 슬롯에 활성 캐릭터 생성 패널이 있는지 추적합니다.
+    UPROPERTY(BlueprintReadOnly, Category = "CharacterCreation|Party Slots", meta = (AllowPrivateAccess = "true"))
+    TArray<uint8> SlotCreationStates;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UButton>> CreateSlotButtons;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UVerticalBox>> SlotEditorBoxes;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UTextBlock>> SlotTitleTexts;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UButton>> PreviousClassButtons;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UButton>> NextClassButtons;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UImage>> ClassIconImages;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UTextBlock>> ClassNameTexts;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UButton>> EditButtons;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UButton>> DeleteButtons;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UButton>> ClassInfoButtons;
 };

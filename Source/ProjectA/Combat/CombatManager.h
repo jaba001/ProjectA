@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Game/Turn/TurnManager.h"
 #include "CombatManager.generated.h"
 
 class UTurnManager;
@@ -17,11 +18,19 @@ class PROJECTA_API ACombatManager : public AActor
     GENERATED_BODY()
 
 public:
+    FOnCombatResult OnCombatResult;
+    bool IsCombatActive() const;
+    void EndCombat();
+    void ResetCombat();
+    void SetCombatGrid(ACombatGridManager* Grid) { CombatGridManager = Grid; }
+    const TArray<AUnitBase*>& GetRegisteredUnits() const { return CombatUnits; }
+
     // Sets combat manager defaults.
     // 전투 매니저 기본값을 설정합니다.
     ACombatManager();
 
 protected:
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     // Initializes combat references after actor startup.
     // 액터 시작 후 전투 참조를 초기화합니다.
     virtual void BeginPlay() override;
@@ -32,6 +41,9 @@ protected:
 
 
 private:
+    void HandleUnitDied(AUnitBase* Unit);
+    void HandleCombatResult(ECombatResult Result);
+    FTimerHandle DeadTurnTimer;
     // Player unit classes
     // 플레이어 유닛 클래스 목록입니다.
     UPROPERTY(EditDefaultsOnly, Category = "Combat")

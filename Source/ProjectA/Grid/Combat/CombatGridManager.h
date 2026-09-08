@@ -22,6 +22,7 @@ protected:
     // Generates or prepares grid data at startup.
     // 시작 시 그리드 데이터를 생성하거나 준비합니다.
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 
@@ -48,6 +49,10 @@ public:
     // 설정된 그리드 크기에 맞춰 모든 타일을 생성합니다.
     UFUNCTION(BlueprintCallable, Category = "CombatGrid")
     void GenerateGrid();
+
+    void ClearOccupancy();
+    void SetGridActive(bool bActive);
+    void DestroyGrid();
 
     // Map from grid coordinate to tile actor.
     // 그리드 좌표에서 타일 액터로 이어지는 맵입니다.

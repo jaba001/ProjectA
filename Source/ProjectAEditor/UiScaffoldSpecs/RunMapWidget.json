@@ -1,0 +1,63 @@
+{
+	"nativeClass": "URunMapWidget",
+	"nativeHeaderPath": "Source/ProjectA/UI/Gameplay/RunMapWidget.h",
+	"nativeSourcePath": "Source/ProjectA/UI/Gameplay/RunMapWidget.cpp",
+	"blueprintName": "WBP_RunMapWidget",
+	"assetPath": "/Game/User_JeHoon/UI/Gameplay",
+	"parentClass": "UCommonActivatableWidget",
+	"generateNativeSource": false,
+	"widgets": [
+		{
+			"name": "RootOverlay",
+			"type": "Overlay",
+			"parent": ""
+		},
+		{
+			"name": "Background",
+			"type": "Border",
+			"parent": "RootOverlay",
+			"color": [
+				0.025,
+				0.04,
+				0.06,
+				0.98
+			],
+			"horizontalAlignment": "Fill",
+			"verticalAlignment": "Fill"
+		},
+		{
+			"name": "ContentBox",
+			"type": "VerticalBox",
+			"parent": "RootOverlay",
+			"horizontalAlignment": "Center",
+			"verticalAlignment": "Center"
+		},
+		{
+			"name": "Text_Progress",
+			"type": "TextBlock",
+			"parent": "ContentBox",
+			"bind": true,
+			"text": "RUN MAP / 진행 지도"
+		},
+		{
+			"name": "Text_Party",
+			"type": "TextBlock",
+			"parent": "ContentBox",
+			"bind": true,
+			"text": "Party / 파티"
+		},
+		{
+			"name": "NodeList",
+			"type": "VerticalBox",
+			"parent": "ContentBox",
+			"bind": true
+		},
+		{
+			"name": "Text_FlowMessage",
+			"type": "TextBlock",
+			"parent": "ContentBox",
+			"bind": true,
+			"text": "Select the next combat node. / 다음 전투를 선택하세요."
+		}
+	]
+}

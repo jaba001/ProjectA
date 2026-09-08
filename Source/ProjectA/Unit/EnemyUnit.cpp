@@ -2,7 +2,9 @@
 
 #include "EngineUtils.h"
 
-#include "Controller/PartyPlayerController.h"
+#include "Combat/CombatManager.h"
+#include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Grid/Combat/CombatGridTile.h"
 
@@ -19,50 +21,63 @@ void AEnemyUnit::OnTurnStart()
     SetTurnState(EEnemyTurnState::StartTurn);
 }
 
-void AEnemyUnit::OnSkillFinished()
+void AEnemyUnit::OnTurnEnd()
 {
-    Super::OnSkillFinished();
-
-    if (CurrentTurnState != EEnemyTurnState::WaitSkillComplete)
-    {
-        return;
-    }
-
-    // If the turn can continue after the current action,
-    // proceed to the next decision after returning to the original tile
-    if (!MustEndTurnAfterCurrentAction())
-    {
-        bPendingNextActionAfterReturn = true;
-        return;
-    }
-
-    // If turn end is already scheduled due to AP depletion,
-    // finish the turn after returning
-    bPendingNextActionAfterReturn = false;
+    Super::OnTurnEnd();
+    GetWorldTimerManager().ClearTimer(ActionContinuationTimer);
+    CurrentTurnState = EEnemyTurnState::None;
+    CurrentDecision = FEnemyActionDecision();
+    CurrentTarget = nullptr;
+    CurrentTargetTile = nullptr;
 }
 
-void AEnemyUnit::OnReturnToOriginalTileFinished()
+void AEnemyUnit::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    Super::OnReturnToOriginalTileFinished();
+    GetWorldTimerManager().ClearTimer(ActionContinuationTimer);
+    Super::EndPlay(EndPlayReason);
+}
 
-    if (CurrentTurnState != EEnemyTurnState::WaitSkillComplete)
+void AEnemyUnit::OnUnitActionCompleted(EUnitActionType ActionType, EUnitActionResult Result)
+{
+    Super::OnUnitActionCompleted(ActionType, Result);
+
+    if (!IsActiveTurn() || !IsUnitAlive())
     {
         return;
     }
 
-    if (bPendingNextActionAfterReturn && !MustEndTurnAfterCurrentAction())
+    if (CurrentTurnState != EEnemyTurnState::WaitSkillComplete && CurrentTurnState != EEnemyTurnState::WaitMoveComplete)
     {
-        bPendingNextActionAfterReturn = false;
+        return;
+    }
+
+    // Defer decisions so synchronous ability completion cannot reactivate GAS recursively.
+    // 동기 어빌리티 종료가 GAS를 재귀 활성화하지 않도록 다음 판단을 지연합니다.
+    GetWorldTimerManager().ClearTimer(ActionContinuationTimer);
+    ActionContinuationTimer = GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this, Result]()
+    {
+        if (!IsActiveTurn() || !IsUnitAlive() || IsBusy())
+        {
+            return;
+        }
+
+        if (Result != EUnitActionResult::Succeeded || MustEndTurnAfterCurrentAction())
+        {
+            SetTurnState(EEnemyTurnState::EndTurn);
+            return;
+        }
+
         SetTurnState(EEnemyTurnState::DecideAction);
-        return;
-    }
-
-    bPendingNextActionAfterReturn = false;
-    SetTurnState(EEnemyTurnState::EndTurn);
+    }));
 }
 
 void AEnemyUnit::SetTurnState(EEnemyTurnState NewState)
 {
+    if (CurrentTurnState == NewState)
+    {
+        return;
+    }
+
     CurrentTurnState = NewState;
 
     switch (CurrentTurnState)
@@ -118,7 +133,6 @@ void AEnemyUnit::EnterStartTurnState()
 {
     CurrentTarget = nullptr;
     CurrentTargetTile = nullptr;
-    bPendingNextActionAfterReturn = false;
     CurrentDecision = FEnemyActionDecision();
 
     SetTurnState(EEnemyTurnState::DecideAction);
@@ -161,8 +175,13 @@ void AEnemyUnit::EnterMoveState()
         return;
     }
 
-    StartMoveAction(CurrentTargetTile);
     SetTurnState(EEnemyTurnState::WaitMoveComplete);
+    const uint32 PreviousActionSerial = CurrentActionSerial;
+    StartMoveAction(CurrentTargetTile);
+    if (PreviousActionSerial == CurrentActionSerial)
+    {
+        OnUnitActionCompleted(EUnitActionType::Move, EUnitActionResult::Failed);
+    }
 }
 
 void AEnemyUnit::EnterWaitMoveCompleteState()
@@ -208,8 +227,13 @@ void AEnemyUnit::EnterSkillState()
 
     //UE_LOG(LogTemp, Log, TEXT("[EnemyAI] ExecuteSkill | Unit=%s | SkillData=%s | TargetTile=(%d,%d)"), *GetName(), *GetNameSafe(CurrentDecision.SkillData), CurrentTargetTile ? CurrentTargetTile->GridCoord.X : -1, CurrentTargetTile ? CurrentTargetTile->GridCoord.Y : -1);
 
-    StartSkill(CurrentDecision.SkillData, CurrentTargetTile);
     SetTurnState(EEnemyTurnState::WaitSkillComplete);
+    const uint32 PreviousActionSerial = CurrentActionSerial;
+    StartSkill(CurrentDecision.SkillData, CurrentTargetTile);
+    if (PreviousActionSerial == CurrentActionSerial)
+    {
+        OnUnitActionCompleted(EUnitActionType::Skill, EUnitActionResult::Failed);
+    }
 }
 
 void AEnemyUnit::EnterWaitSkillCompleteState()
@@ -223,14 +247,16 @@ void AEnemyUnit::EnterEndTurnState()
 
 void AEnemyUnit::FinishEnemyTurn()
 {
-    APartyPlayerController* PC = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController());
-
-    if (!PC)
+    if (!IsActiveTurn() || IsBusy())
     {
         return;
     }
 
-    PC->RequestEndTurn();
+    ACombatManager* CombatManager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatManager::StaticClass()));
+    if (CombatManager && CombatManager->GetCurrentUnit() == this)
+    {
+        CombatManager->RequestEndTurn();
+    }
 }
 
 FEnemyActionDecision AEnemyUnit::DecideBestAction() const

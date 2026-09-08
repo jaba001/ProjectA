@@ -5,12 +5,14 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "GAS/Attribute/AS_Unit.h"
+#include "Types/UnitActionTypes.h"
 #include "UnitBase.generated.h"
 
 class ACombatGridTile;
 class AUnitAIController;
 class UGameplayAbility;
 class USkillDefinitionDataAsset;
+class AUnitBase;
 
 // Team affiliation used by combat units.
 // 전투 유닛의 소속 팀을 나타냅니다.
@@ -31,6 +33,9 @@ enum class EUnitActionType : uint8
     Move,
     Item
 };
+
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FOnUnitActionCompleted, AUnitBase*, EUnitActionType, EUnitActionResult);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnUnitDied, AUnitBase*);
 
 // Movement and action phase used while a unit is busy.
 // 유닛이 바쁜 동안 사용하는 이동 및 행동 단계입니다.
@@ -70,6 +75,7 @@ public:
     // Actor lifecycle
     // 액터 생명주기 처리입니다.
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void Tick(float DeltaTime) override;
 
     // Network replication
@@ -81,6 +87,11 @@ public:
     // 유닛 식별 번호입니다.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UnitBase")
     int32 UnitIndex = 0;
+
+    // Display name copied from the run party without owning persistent state.
+    // 영구 상태를 소유하지 않고 런 파티에서 복사한 표시 이름입니다.
+    UPROPERTY(BlueprintReadOnly, Category = "UnitBase|Runtime")
+    FText RuntimeCharacterName;
 
     // Team affiliation
     // 유닛의 팀 소속입니다.
@@ -236,19 +247,48 @@ public:
 
     // Check if unit is currently moving or acting
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement")
-    bool IsBusy() const { return MovePhase != EUnitMovePhase::None; }
+    bool IsBusy() const { return CurrentActionType != EUnitActionType::None || MovePhase != EUnitMovePhase::None; }
+
+    // Cancels active abilities and movement before encounter cleanup.
+    // 인카운터 정리 전에 활성 어빌리티와 이동을 취소합니다.
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Action")
+    void CancelCurrentAction();
+
+    FOnUnitActionCompleted OnActionCompleted;
+    FOnUnitDied OnUnitDied;
 
     // Entry point for AIController movement completion callback
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement")
     virtual void HandleMoveCompleted();
 
     // Entry point for AIController movement failure callback
-    virtual void HandleMoveFailed();
+    virtual void HandleMoveFailed(EUnitActionResult Result = EUnitActionResult::Failed);
 
     // Get or create AIController
     AUnitAIController* GetOrCreateAIController();
 
 protected:
+    // Action lifetime is independent of whether the skill requires movement.
+    // 행동 수명은 스킬의 이동 필요 여부와 독립적입니다.
+    void BeginCurrentAction(EUnitActionType ActionType);
+    void CompleteCurrentAction(EUnitActionResult Result);
+    virtual void OnUnitActionCompleted(EUnitActionType ActionType, EUnitActionResult Result);
+    void RestoreActionOrigin();
+    void HandleSkillAbilityEnded(const FAbilityEndedData& EndedData);
+    void CompleteSkillExecution(EUnitActionResult Result);
+
+    UFUNCTION()
+    void HandleActionSnapFinished(int32 ActionSerial);
+
+    UPROPERTY()
+    TObjectPtr<ACombatGridTile> ActionOriginTile = nullptr;
+
+    FTransform ActionOriginTransform;
+    FDelegateHandle SkillAbilityEndedHandle;
+    FGameplayAbilitySpecHandle ActiveSkillHandle;
+    uint32 CurrentActionSerial = 0;
+    bool bSkillRequiresReturn = false;
+
     // Current movement/action phase
     UPROPERTY()
     EUnitMovePhase MovePhase = EUnitMovePhase::None;

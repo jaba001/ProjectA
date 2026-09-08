@@ -6,6 +6,8 @@ void UTurnManager::InitializeTurnOrder(const TArray<AUnitBase*>& Units)
     TurnOrder = Units;
     CurrentTurnIndex = 0;
     TurnCounter = 0;
+    CombatResult = ECombatResult::None;
+    bCombatActive = true;
 
     UE_LOG(LogTemp, Log, TEXT("[TurnManager] InitializeTurnOrder Count=%d"), TurnOrder.Num());
 
@@ -23,6 +25,12 @@ void UTurnManager::InitializeTurnOrder(const TArray<AUnitBase*>& Units)
 
 void UTurnManager::StartTurn()
 {
+    EvaluateCombatResult();
+    if (!bCombatActive)
+    {
+        return;
+    }
+
     if (!TurnOrder.IsValidIndex(CurrentTurnIndex))
     {
         UE_LOG(LogTemp, Warning, TEXT("[TurnManager] StartTurn Failed | Invalid Index=%d"), CurrentTurnIndex);
@@ -47,6 +55,11 @@ void UTurnManager::StartTurn()
 
 void UTurnManager::EndTurn()
 {
+    if (!bCombatActive)
+    {
+        return;
+    }
+
     if (!TurnOrder.IsValidIndex(CurrentTurnIndex))
     {
         UE_LOG(LogTemp, Warning, TEXT("[TurnManager] EndTurn Failed | Invalid Index=%d"), CurrentTurnIndex);
@@ -66,7 +79,8 @@ void UTurnManager::EndTurn()
 
     UE_LOG(LogTemp, Log, TEXT("[Turn %d] END | Index=%d | Unit=%s"), TurnCounter, CurrentTurnIndex, *Unit->GetName());
 
-    if (CheckCombatEnd())
+    EvaluateCombatResult();
+    if (!bCombatActive)
     {
         UE_LOG(LogTemp, Log, TEXT("[TurnManager] Combat End"));
         return;
@@ -77,6 +91,12 @@ void UTurnManager::EndTurn()
 
 void UTurnManager::NextTurn()
 {
+    EvaluateCombatResult();
+    if (!bCombatActive)
+    {
+        return;
+    }
+
     if (TurnOrder.Num() == 0)
     {
         UE_LOG(LogTemp, Warning, TEXT("[TurnManager] NextTurn Failed | TurnOrder is Empty"));
@@ -129,6 +149,11 @@ void UTurnManager::NextTurn()
 
 AUnitBase* UTurnManager::GetCurrentUnit() const
 {
+    if (!bCombatActive)
+    {
+        return nullptr;
+    }
+
     if (TurnOrder.IsValidIndex(CurrentTurnIndex))
     {
         return TurnOrder[CurrentTurnIndex];
@@ -176,5 +201,54 @@ FString UTurnManager::GetCurrentUnitName() const
         return TEXT("None");
     }
 
+    if (!CurrentUnit->RuntimeCharacterName.IsEmpty())
+    {
+        return CurrentUnit->RuntimeCharacterName.ToString();
+    }
     return CurrentUnit->GetName();
+}
+
+void UTurnManager::EvaluateCombatResult()
+{
+    if (!bCombatActive || !CheckCombatEnd())
+    {
+        return;
+    }
+
+    CombatResult = ECombatResult::Defeat;
+    for (AUnitBase* Unit : TurnOrder)
+    {
+        if (IsValid(Unit) && Unit->IsUnitAlive() && Unit->GetTeam() == ETeam::Player)
+        {
+            CombatResult = ECombatResult::Victory;
+            break;
+        }
+    }
+
+    // Lock turns before notifying listeners that may cancel abilities or destroy actors.
+    // 어빌리티 취소나 액터 정리를 수행하는 수신자에게 알리기 전에 턴을 잠급니다.
+    StopCombat();
+    OnCombatResult.Broadcast(CombatResult);
+}
+
+void UTurnManager::StopCombat()
+{
+    bCombatActive = false;
+    for (AUnitBase* Unit : TurnOrder)
+    {
+        if (IsValid(Unit))
+        {
+            Unit->OnTurnEnd();
+        }
+    }
+}
+
+void UTurnManager::ResetCombat()
+{
+    StopCombat();
+    TurnOrder.Reset();
+    CurrentTurnIndex = INDEX_NONE;
+    TurnCounter = 0;
+    CombatResult = ECombatResult::None;
+    OnCombatResult.Clear();
 }

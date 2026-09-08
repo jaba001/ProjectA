@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbility.h"
 #include "GameplayTagContainer.h"
+#include "Types/UnitActionTypes.h"
 #include "GA_AttackBase.generated.h"
 
 class AActor;
@@ -19,6 +20,8 @@ class PROJECTA_API UGA_AttackBase : public UGameplayAbility
 
 public:
     UGA_AttackBase();
+
+    EUnitActionResult GetActionResult() const { return ActionResult; }
 
 protected:
     // Common attack activation entry point
@@ -85,6 +88,10 @@ protected:
     // Flag used to prevent duplicate finish handling
     UPROPERTY()
     bool bFinishRequested = false;
+
+    // Setup rejection is a failure; interruptions after setup are cancellations.
+    // 준비 단계의 거절은 실패이며 준비 이후의 중단은 취소입니다.
+    EUnitActionResult ActionResult = EUnitActionResult::Failed;
 
 protected:
     // Base Action Point cost for attack abilities

@@ -28,6 +28,7 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
     CachedActivationInfo = ActivationInfo;
     bAttackReleasedThisActivation = false;
     bFinishRequested = false;
+    ActionResult = EUnitActionResult::Failed;
 
     // Commit cost, cooldown, and other requirements
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
@@ -80,7 +81,10 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
         return;
     }
 
+    ActionResult = EUnitActionResult::Succeeded;
+
     // No-montage attacks release immediately without waiting for notify.
+    // 몽타주가 없는 공격은 노티파이를 기다리지 않고 즉시 발사합니다.
     if (!AttackMontage)
     {
         UE_LOG(LogTemp, Log, TEXT("[GA_AttackBase] ActivateAbility | NoMontageImmediateRelease | Ability=%s | Owner=%s"), *GetNameSafe(GetClass()), *GetNameSafe(CachedOwnerUnit));
@@ -104,6 +108,7 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
     if (!PlayMontageTask)
     {
         UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=PlayMontageTaskNull | Ability=%s"), *GetNameSafe(GetClass()));
+        ActionResult = EUnitActionResult::Failed;
         FinishAttackAbility(true);
         return;
     }
@@ -118,6 +123,12 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
 
 void UGA_AttackBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+    bFinishRequested = true;
+    if (bWasCancelled && ActionResult == EUnitActionResult::Succeeded)
+    {
+        ActionResult = EUnitActionResult::Cancelled;
+    }
+
     // Clear cached task references
     PlayMontageTask = nullptr;
     WaitReleaseEventTask = nullptr;
@@ -133,6 +144,11 @@ void UGA_AttackBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const F
 
 void UGA_AttackBase::OnAttackMontageCompleted()
 {
+    if (bFinishRequested)
+    {
+        return;
+    }
+
     // Fallback: if release event was not received from montage notify,
     // release once at montage completion.
     if (!bAttackReleasedThisActivation)
@@ -146,6 +162,11 @@ void UGA_AttackBase::OnAttackMontageCompleted()
 
 void UGA_AttackBase::OnAttackMontageBlendOut()
 {
+    if (bFinishRequested)
+    {
+        return;
+    }
+
     // Some montages may only reach blend-out callback depending on task/event timing.
     // Ensure release is not lost when notify event is missing.
     if (!bAttackReleasedThisActivation)
@@ -184,7 +205,7 @@ bool UGA_AttackBase::ValidateAttackContext() const
 void UGA_AttackBase::ReleaseAttack()
 {
     // Apply attack release only once per activation
-    if (bAttackReleasedThisActivation)
+    if (bAttackReleasedThisActivation || bFinishRequested)
     {
         UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ReleaseAttack Ignored | Reason=AlreadyReleased"));
         return;
@@ -280,11 +301,7 @@ void UGA_AttackBase::FinishAttackAbility(bool bWasCancelled)
 
     bFinishRequested = true;
 
-    // Notify UnitBase that the attack has finished and begin return flow
-    if (CachedOwnerUnit)
-    {
-        CachedOwnerUnit->OnSkillFinished();
-    }
-
+    // Unit completion is observed through GAS after all ability cleanup.
+    // 어빌리티 정리가 끝난 뒤 GAS를 통해 유닛 완료를 관찰합니다.
     EndAbility(CachedHandle, CurrentActorInfo, CachedActivationInfo, false, bWasCancelled);
 }

@@ -2,9 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
+#include "Types/CombatResult.h"
 #include "TurnManager.generated.h"
 
 class AUnitBase;
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnCombatResult, ECombatResult);
 
 // Server-side object that manages combat turn order.
 // 전투 턴 순서를 관리하는 서버 측 오브젝트입니다.
@@ -14,6 +17,15 @@ class PROJECTA_API UTurnManager : public UObject
     GENERATED_BODY()
 
 public:
+    FOnCombatResult OnCombatResult;
+
+    bool IsCombatActive() const { return bCombatActive; }
+    ECombatResult GetCombatResult() const { return CombatResult; }
+    void EvaluateCombatResult();
+    void StopCombat();
+    void ResetCombat();
+    int32 GetRegisteredUnitCount() const { return TurnOrder.Num(); }
+
     // Initialize turn order.
     // 턴 순서를 초기화합니다.
     void InitializeTurnOrder(const TArray<AUnitBase*>& Units);
@@ -51,6 +63,8 @@ public:
     FString GetCurrentUnitName() const;
 
 private:
+    bool bCombatActive = false;
+    ECombatResult CombatResult = ECombatResult::None;
 
     // Server-only turn order array.
     // 서버에서만 사용하는 턴 순서 배열입니다.

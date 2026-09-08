@@ -27,7 +27,7 @@ void ACombatGridManager::GenerateGrid()
     UWorld* World = GetWorld();
     if (!World) return;
 
-    TileMap.Empty();
+    DestroyGrid();
 
     for (int32 Row = 0; Row < RowCount; ++Row)
     {
@@ -179,4 +179,47 @@ TArray<ACombatGridTile*> ACombatGridManager::GetTilesInChebyshevRange(ACombatGri
     }
 
     return Result;
+}
+
+void ACombatGridManager::ClearOccupancy()
+{
+    for (const TPair<FIntPoint, ACombatGridTile*>& Entry : TileMap)
+    {
+        if (IsValid(Entry.Value))
+        {
+            Entry.Value->SetOccupyingUnit(nullptr);
+            Entry.Value->SetProtectedByFront(false);
+            Entry.Value->ClearHighlightVisual();
+        }
+    }
+}
+
+void ACombatGridManager::SetGridActive(bool bActive)
+{
+    for (const TPair<FIntPoint, ACombatGridTile*>& Entry : TileMap)
+    {
+        if (IsValid(Entry.Value))
+        {
+            Entry.Value->SetActorHiddenInGame(!bActive);
+            Entry.Value->SetActorEnableCollision(bActive);
+        }
+    }
+}
+
+void ACombatGridManager::DestroyGrid()
+{
+    for (const TPair<FIntPoint, ACombatGridTile*>& Entry : TileMap)
+    {
+        if (IsValid(Entry.Value))
+        {
+            Entry.Value->Destroy();
+        }
+    }
+    TileMap.Reset();
+}
+
+void ACombatGridManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    DestroyGrid();
+    Super::EndPlay(EndPlayReason);
 }

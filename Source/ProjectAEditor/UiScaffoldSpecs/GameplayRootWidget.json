@@ -1,0 +1,40 @@
+{
+	"nativeClass": "UGameplayRootWidget",
+	"nativeHeaderPath": "Source/ProjectA/UI/Gameplay/GameplayRootWidget.h",
+	"nativeSourcePath": "Source/ProjectA/UI/Gameplay/GameplayRootWidget.cpp",
+	"blueprintName": "WBP_GameplayRootWidget",
+	"assetPath": "/Game/User_JeHoon/UI/Gameplay",
+	"parentClass": "UCommonUserWidget",
+	"generateNativeSource": false,
+	"widgets": [
+		{
+			"name": "RootOverlay",
+			"type": "Overlay",
+			"parent": ""
+		},
+		{
+			"name": "RunLayer",
+			"type": "CommonActivatableWidgetStack",
+			"parent": "RootOverlay",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"verticalAlignment": "Fill"
+		},
+		{
+			"name": "CombatLayer",
+			"type": "CommonActivatableWidgetStack",
+			"parent": "RootOverlay",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"verticalAlignment": "Fill"
+		},
+		{
+			"name": "ModalLayer",
+			"type": "CommonActivatableWidgetStack",
+			"parent": "RootOverlay",
+			"bind": true,
+			"horizontalAlignment": "Fill",
+			"verticalAlignment": "Fill"
+		}
+	]
+}

@@ -3,7 +3,7 @@
 	"nativeHeaderPath": "Source/ProjectA/UI/MainMenu/MainMenuScreenWidget.h",
 	"nativeSourcePath": "Source/ProjectA/UI/MainMenu/MainMenuScreenWidget.cpp",
 	"blueprintName": "WBP_MainMenuScreenWidget",
-	"assetPath": "/Game/User_JeHoon/Blueprint/UI/MainMenu",
+	"assetPath": "/Game/User_JeHoon/UI/MainMenu",
 	"parentClass": "UCommonActivatableWidget",
 	"generateNativeSource": false,
 	"widgets": [
