@@ -21,6 +21,10 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 
 문서는 2026-09-08 현재 작업 트리를 기준으로 정리합니다. 코드 구현, 정식 빌드, 에셋 설정 확인, PIE 검증은 별도로 기록합니다.
 
+## Codex 작업 완료 규칙
+
+[AGENTS.md](AGENTS.md)에 코드 스타일과 작업 완료 규칙을 정의합니다. Codex는 파일 수정 후 변경에 맞는 검증과 README 확인을 마치면 해당 작업의 변경을 한글 메시지로 로컬 커밋합니다. 원격 push는 별도 요청 시 실행합니다.
+
 ## Engine
 
 - Unreal Engine 5.7
