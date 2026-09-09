@@ -23,7 +23,7 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 
 ## Codex 작업 완료 규칙
 
-[AGENTS.md](AGENTS.md)에 코드 스타일과 작업 완료 규칙을 정의합니다. Codex는 파일 수정 후 변경에 맞는 검증과 README 확인을 마치면 해당 작업의 변경을 한글 메시지로 로컬 커밋합니다. 원격 push는 별도 요청 시 실행합니다.
+[AGENTS.md](AGENTS.md)에 코드 스타일과 작업 완료 규칙을 정의합니다. Codex는 파일 수정 후 변경에 맞는 검증과 README 확인을 마치면 해당 작업의 변경을 한글 메시지로 커밋하고 현재 브랜치의 upstream으로 push합니다.
 
 ## Engine
 
