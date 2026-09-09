@@ -25,6 +25,8 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 
 [AGENTS.md](AGENTS.md)에 코드 스타일과 작업 완료 규칙을 정의합니다. Codex는 파일 수정 후 변경에 맞는 검증과 README 확인을 마치면 해당 작업의 변경을 한글 메시지로 커밋하고 현재 브랜치의 upstream으로 push합니다.
 
+Codex가 만드는 커밋은 Summary(제목)에 `[codex] ` 접두사를 붙이고, Description(본문)에 변경 내용과 이유 및 검증 결과를 한글로 기록합니다.
+
 ## Engine
 
 - Unreal Engine 5.7
