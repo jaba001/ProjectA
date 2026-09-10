@@ -20,6 +20,7 @@
 #include "TimerManager.h"
 #include "Unit/EnemyUnit.h"
 #include "Unit/PlayerUnit.h"
+#include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Unit/UnitBase.h"
 #include "UObject/UnrealType.h"
 
@@ -1154,6 +1155,66 @@ bool FPlayerExhaustionTest::RunTest(const FString& Parameters)
             Combat->ResetCombat();
         }
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfessionLoadoutTest, "ProjectA.Party.ProfessionLoadout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    UPartyDefinitionDataAsset* Catalog = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+    if (!TestNotNull(TEXT("Shared party catalog exists"), Catalog))
+    {
+        return false;
+    }
+    FScopedWorld Scope;
+    for (FName Id : { FName(TEXT("StableHand")), FName(TEXT("Scholar")), FName(TEXT("Herbalist")), FName(TEXT("Hunter")) })
+    {
+        FProfessionDefinition Definition;
+        if (!TestTrue(TEXT("Profession resolves combat defaults"), Catalog->ResolveProfession(Id, Definition)))
+        {
+            return false;
+        }
+        TestFalse(TEXT("Profession has a readable name"), Definition.DisplayName.IsEmpty());
+        TestFalse(TEXT("Profession has a description"), Definition.Description.IsEmpty());
+        TestTrue(TEXT("Preview shows actual HP"), Catalog->GetProfessionDetails(Id).ToString().Contains(FString::Printf(TEXT("HP %.0f"), Definition.MaxHP)));
+        APlayerUnit* Unit = Scope.SpawnUnit<APlayerUnit>(FVector::ZeroVector);
+        Unit->bIsActiveTurn = false;
+        Unit->ConfigureProfession(Definition.MaxHP, Definition.ActionPoints, Definition.SubActionPoints, Definition.StartingSkills);
+        TestEqual(TEXT("Spawn HP equals preview"), Unit->GetAttributeSet()->GetHP(), Definition.MaxHP);
+        TestEqual(TEXT("Spawn AP equals preview"), Unit->GetMaxActionPoint(), Definition.ActionPoints);
+        TestEqual(TEXT("Spawn sub AP equals preview"), Unit->GetMaxSubActionPoint(), Definition.SubActionPoints);
+        for (USkillDefinitionDataAsset* Skill : Definition.StartingSkills)
+        {
+            TestNotNull(TEXT("Every displayed skill is granted"), Unit->GetAbilitySystemComponent()->FindAbilitySpecFromClass(Skill->AbilityClass));
+            TestEqual(TEXT("Granted skill uses catalog definition"), Unit->FindSkillDataByAbilityClass(Skill->AbilityClass), Skill);
+        }
+    }
+    UPartyDefinitionDataAsset* Custom = DuplicateObject<UPartyDefinitionDataAsset>(Catalog, GetTransientPackage());
+    FProfessionDefinition& Override = Custom->Professions.FindChecked(TEXT("Scholar"));
+    FProfessionDefinition Base;
+    Catalog->ResolveProfession(TEXT("Scholar"), Base);
+    Override.bUseUnitClassDefaults = false;
+    Override.StartingSkills = Base.StartingSkills;
+    Override.MaxHP = 137.0f;
+    Override.ActionPoints = 3;
+    Override.SubActionPoints = 2;
+    FProfessionDefinition Resolved;
+    TestTrue(TEXT("Explicit profession tuning resolves"), Custom->ResolveProfession(TEXT("Scholar"), Resolved));
+    APlayerUnit* Tuned = Scope.SpawnUnit<APlayerUnit>(FVector::ZeroVector);
+    Tuned->bIsActiveTurn = false;
+    Tuned->ConfigureProfession(Resolved.MaxHP, Resolved.ActionPoints, Resolved.SubActionPoints, Resolved.StartingSkills);
+    TestEqual(TEXT("Override applies HP"), Tuned->GetAttributeSet()->GetHP(), 137.0f);
+    TestEqual(TEXT("Override applies AP"), Tuned->GetMaxActionPoint(), 3);
+    TestTrue(TEXT("Override also changes preview"), Custom->GetProfessionDetails(TEXT("Scholar")).ToString().Contains(TEXT("HP 137")));
+    const TObjectPtr<USkillDefinitionDataAsset> DuplicateSkill = Override.StartingSkills[0];
+    Override.StartingSkills.Add(DuplicateSkill);
+    TestFalse(TEXT("Duplicate skill ability is rejected"), Custom->ResolveProfession(TEXT("Scholar"), Resolved));
+    Override.StartingSkills.Pop();
+    Override.MaxHP = -1.0f;
+    TestFalse(TEXT("Invalid tuning is rejected"), Custom->ResolveProfession(TEXT("Scholar"), Resolved));
+    TestFalse(TEXT("Unknown professions do not silently use fallback"), Custom->ResolveProfession(TEXT("Warrior"), Resolved));
     return true;
 }
 

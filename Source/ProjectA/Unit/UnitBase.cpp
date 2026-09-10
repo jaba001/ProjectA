@@ -880,3 +880,41 @@ USkillDefinitionDataAsset* AUnitBase::FindSkillDataByAbilityClass(TSubclassOf<UG
 
     return nullptr;
 }
+
+bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills)
+{
+    if (!HasAuthority() || IsBusy() || IsActiveTurn() || !AbilitySystem || !AttributeSet || !FMath::IsFinite(MaxHP) || MaxHP <= 0.0f || AP <= 0 || SubAP < 0 || Skills.IsEmpty())
+    {
+        return false;
+    }
+    for (USkillDefinitionDataAsset* Skill : Skills)
+    {
+        if (!UCombatTargetingLibrary::IsSupportedSkillArea(Skill) || !Skill->AbilityClass || Skill->ActionPointCost <= 0)
+        {
+            return false;
+        }
+    }
+    InitMaxHP = MaxHP;
+    MaxActionPoint = AP;
+    MaxSubActionPoint = SubAP;
+    ResetActionPoint();
+    ResetSubActionPoint();
+    EquippedSkillDataAssets = Skills;
+    EquippedSkillAbilityClasses.Reset();
+    DefaultAttackAbilityClass = Skills.IsEmpty() ? nullptr : Skills[0]->AbilityClass;
+    for (USkillDefinitionDataAsset* Skill : Skills)
+    {
+        if (Skill->AbilityClass != DefaultAttackAbilityClass)
+        {
+            EquippedSkillAbilityClasses.AddUnique(Skill->AbilityClass);
+        }
+    }
+    AbilitySystem->ClearAllAbilities();
+    for (TSubclassOf<UGameplayAbility> Ability : GetAvailableSkillAbilityClasses())
+    {
+        AbilitySystem->GiveAbility(FGameplayAbilitySpec(Ability, 1, 0));
+    }
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetMaxHPAttribute(), MaxHP);
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), MaxHP);
+    return true;
+}

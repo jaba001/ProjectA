@@ -401,6 +401,11 @@ public:
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill")
     TSubclassOf<UGameplayAbility> GetDefaultAttackAbilityClass() const { return DefaultAttackAbilityClass; }
 
+    float GetInitialMaxHP() const { return InitMaxHP; }
+    // Apply resolved profession data before the spawned unit enters combat.
+    // 스폰 유닛이 전투에 들어가기 전에 해석된 직업 데이터를 적용합니다.
+    bool ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills);
+
 protected:
     // Initial attributes
     UPROPERTY(EditDefaultsOnly, Category = "UnitBase|GAS|Attribute")

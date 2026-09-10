@@ -11,7 +11,7 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 
 `URunStateSubsystem`이 슬롯·이름·ClassId·HP·노드 진행을 레벨 전환 동안 보존합니다. `AEncounterManager`는 아레나 준비, 파티/적 스폰, 결과 추출과 정리를 맡고 기존 CombatManager/TurnManager/GAS를 재사용합니다. 두 개의 순차 전투 노드가 같은 Gameplay 레벨에서 실행됩니다. 디스크 저장은 포함하지 않습니다.
 
-실행/에셋 설정과 검증 경계는 [Vertical Slice 설정](Docs/VERTICAL_SLICE_SETUP.md)과 [작업 보고](Docs/VERTICAL_SLICE_REPORT.md)를 확인하세요. 네 직업은 현재 기존 `BP_PlayerUnit`을 공통 임시 전투 클래스로 사용합니다.
+실행/에셋 설정과 검증 경계는 [Vertical Slice 설정](Docs/VERTICAL_SLICE_SETUP.md)과 [작업 보고](Docs/VERTICAL_SLICE_REPORT.md)를 확인하세요. 네 직업의 표시명·설명·아이콘·전투 클래스·스탯·시작 스킬은 `DA_VerticalSliceParty.Professions`에서 관리합니다. 기본 설정은 기존 `BP_PlayerUnit`의 전투 밸런스를 유지하며, 직업별 수치는 데이터에서 별도로 지정할 수 있습니다.
 
 ## 작업 재개 문서
 
@@ -103,6 +103,10 @@ UI 관련 상세 메모는 아래 파일에 정리되어 있습니다.
 스킬 대상은 `CombatTargetingLibrary::IsValidSkillTarget`으로 검사합니다. 기존 플레이어 규칙대로 전열 보호는 `EnemyUnit` 선택에 적용하고 `bIgnoreFront`로 무시할 수 있습니다. 제자리 `AllyUnit`/`AnyUnit` 스킬은 자기 자신도 선택할 수 있으며, 타일 스킬은 영역에 맞는 빈 타일도 선택합니다. 접근 스킬은 다른 생존 유닛이 필요합니다. 실행 직전에 대상을 다시 검사하며, 유닛 대상이 이동하거나 다른 유닛으로 교체되면 실패 처리합니다. 범위 공격의 직접 효과와 스킬 액터는 `CombatTargetingLibrary::ResolveSkillAreaTargets`로 피해 대상을 계산합니다. `Single`은 대상 타일, `AroundTarget`은 대상 타일 중심, `AroundSelf`는 효과 적용 시점의 시전자 타일 중심 체비셰프 반경을 사용합니다. 범위 효과는 기존처럼 시전자 자신을 제외하고 진영·생존·점유 상태를 확인합니다. Row/Column/LeftAndTarget/RightAndTarget/DiagonalTarget/AllEnemies와 음수 반경은 미지원으로 에셋 검증 및 실행 전 검사에서 거절하며 AP를 소비하지 않습니다. 범위 스킬은 `GA_AreaAttack` 계열을 사용하고 기본 단일 공격의 별도 효과 구현은 유지합니다.
 
 타일 액터는 클릭을 `PartyPlayerController::HandleTileClicked`로 전달합니다. 플레이어 명령은 권한·전투 입력 잠금·Player 팀·활성 턴·생존·busy를 확인하며 클릭 시 비용과 타겟을 재검사합니다. UI의 턴 종료는 `PartyPlayerController::RequestEndTurn`, C++ AI의 내부 종료는 `CombatManager::RequestEndTurnForUnit(this)`를 사용합니다. 기존 CombatManager의 인자 없는 Blueprint 종료 함수는 deprecated 상태이며 플레이어 입력 검사를 거칩니다. 턴 전환과 전투 종료 시 이전 선택·하이라이트를 정리합니다.
+
+캐릭터 생성의 Edit는 선택한 슬롯의 이름(1~32자)과 직업을 편집합니다. 저장 전에는 파티 데이터가 바뀌지 않으며 취소하면 기존 값이 유지됩니다. ClassInfo는 같은 직업 정의의 실제 HP/AP/보조 AP와 시작 스킬을 읽기 전용으로 표시합니다. 저장한 이름·직업과 사용한 직업 목록은 Gameplay로 전달되고, Encounter 스폰은 동일한 설정을 적용한 뒤 이전 전투의 HP를 복원합니다.
+
+직업 설정의 `bUseUnitClassDefaults`가 켜져 있으면 기존 클래스의 스탯·스킬을 읽고, 끄면 `MaxHP/ActionPoints/SubActionPoints/StartingSkills`를 사용합니다. `CombatClass`가 없을 때만 기존 직업 클래스 매핑과 명시적 fallback을 사용합니다. 알 수 없는 직업, 잘못된 수치·스킬 및 중복 Ability 항목은 거절합니다. 아이콘은 각 정의의 `Icon`에 지정하며 새 직업 일러스트나 밸런스 차별화는 이번 변경에 포함하지 않습니다.
 
 스폰 공격은 몽타주 종료와 스킬 액터의 impact가 모두 끝난 뒤 GAS를 종료합니다. 몽타주가 없으면 impact까지 기다립니다. 스폰 클래스는 `SkillActorBase` 계열이어야 하며, `RequestFinish`를 impact 전에 호출하거나 액터가 파괴되면 실패로 종료합니다. 미충돌은 Ability의 `SpawnedActorTimeout`(기본 10초) 후 실패로 정리합니다. 취소·시전자 사망 시 대기 액터를 파괴해 늦은 피해를 차단하고 이미 소비한 AP는 환불하지 않습니다. 플레이어는 AP와 보조 AP가 모두 0이면 행동 완료 다음 틱에 자동으로 턴을 종료하며, 보조 AP가 남으면 이동/아이템을 계속 사용할 수 있습니다.
 

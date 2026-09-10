@@ -23,6 +23,7 @@ public class ProjectA : ModuleRules
 		    "CommonUI",
 			"CommonInput",
             "Slate",
+            "SlateCore",
             "Paper2D",
             "GameplayAbilities",
 		    "GameplayTags",

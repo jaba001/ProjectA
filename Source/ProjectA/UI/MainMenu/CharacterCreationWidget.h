@@ -3,8 +3,10 @@
 #include "CoreMinimal.h"
 #include "CommonActivatableWidget.h"
 #include "Game/Run/RunTypes.h"
+#include "Components/ComboBoxString.h"
 #include "CharacterCreationWidget.generated.h"
 
+class UPartyDefinitionDataAsset;
 class UButton;
 class UBorder;
 class UEditableTextBox;
@@ -24,6 +26,16 @@ class PROJECTA_API UCharacterCreationWidget : public UCommonActivatableWidget
     GENERATED_BODY()
 
 public:
+    UPROPERTY(EditDefaultsOnly, Category = "CharacterCreation")
+    TObjectPtr<UPartyDefinitionDataAsset> PartyDefinition;
+
+    UFUNCTION(BlueprintCallable, Category = "CharacterCreation")
+    void ShowSlotDetails(int32 SlotIndex, bool bEditable);
+    UFUNCTION()
+    void SaveSlotDetails();
+    UFUNCTION()
+    void CloseSlotDetails();
+
     // Sets the default selected character class.
     // 기본 선택 캐릭터 클래스를 설정합니다.
     UCharacterCreationWidget();
@@ -78,6 +90,7 @@ protected:
     // Initializes fallback character creation layout and events.
     // 대체 캐릭터 생성 레이아웃과 이벤트를 초기화합니다.
     virtual void NativeOnInitialized() override;
+    virtual void NativeOnDeactivated() override;
 
     // Enables native C++ layout creation when designer widgets are absent.
     // 디자이너 위젯이 없을 때 네이티브 C++ 레이아웃 생성을 활성화합니다.
@@ -509,4 +522,23 @@ private:
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UButton>> ClassInfoButtons;
+    void BuildDetailPanel();
+    UFUNCTION()
+    void HandleDetailClassChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+    UPROPERTY(Transient)
+    TObjectPtr<UBorder> DetailPanel;
+    UPROPERTY(Transient)
+    TObjectPtr<UWidget> DetailUnderlyingRoot;
+    UPROPERTY(Transient)
+    TObjectPtr<UEditableTextBox> DetailName;
+    UPROPERTY(Transient)
+    TObjectPtr<UComboBoxString> DetailClass;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> DetailText;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> DetailError;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> DetailSave;
+    int32 DetailSlot = INDEX_NONE;
+    bool bDetailEditable = false;
 };

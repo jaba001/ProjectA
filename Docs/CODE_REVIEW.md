@@ -83,8 +83,8 @@ P1은 전투 진행 정지 또는 행동 상태 훼손을 먼저 해결할 항�
 |---|---|---|
 | 파티 데이터 이관 | 4슬롯 runtime data → RunStateSubsystem → Gameplay/Encounter 스폰 연결 구현, 디스크 저장 없음 | T08 |
 | Continue / Options / Quit | MainMenuScreenWidget의 처리 함수가 로그만 출력 | T11 |
-| 캐릭터 편집/직업 설명 | 슬롯 Edit/ClassInfo가 `LogSlotAction`만 호출 | T09 |
-| 실제 스탯 미리보기 | Warrior/Archer/Mage 고정 문자열이 남아 있으며 현재 네 직업 정의와 연결되지 않음 | T09 |
+| 캐릭터 편집/직업 설명 | 슬롯 이름·직업 저장/취소와 읽기 전용 ClassInfo 연결 | T09 |
+| 실제 스탯 미리보기 | 공통 직업 정의의 HP/AP/보조 AP·시작 스킬을 UI와 스폰에 함께 적용 | T09 |
 | 아이템 효과 | `ExecuteItemAtTarget`이 효과 적용 없이 종료 | T13 |
 | 적 이동 의사결정 | 스킬/대기만 평가, 이동 완료 후 AI 전이도 보완 필요 | T13 |
 | 스킬 액터 완료 책임 | 몽타주+impact 완료 후 GAS 종료. 조기 종료/파괴/시간 초과 실패, 취소·사망 시 대기 액터 제거 및 1회 통지 검증 완료. 전체 자동화 20건 통과 | T07 |

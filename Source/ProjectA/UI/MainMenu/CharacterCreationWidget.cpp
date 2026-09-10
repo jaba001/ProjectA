@@ -1,6 +1,9 @@
 #include "UI/MainMenu/CharacterCreationWidget.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "DataAsset/PartyDefinitionDataAsset.h"
+#include "Game/Run/RunStateSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "Components/Border.h"
 #include "Components/Button.h"
 #include "Components/ButtonSlot.h"
@@ -41,6 +44,10 @@ UCharacterCreationWidget::UCharacterCreationWidget()
 void UCharacterCreationWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
+    if (!PartyDefinition)
+    {
+        PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+    }
 
     if (bCreateLayoutInCode)
     {
@@ -53,6 +60,7 @@ void UCharacterCreationWidget::NativeOnInitialized()
 
     InitializeClassSlotWidgetArrays();
     InitializeClassSlots();
+    BuildDetailPanel();
 
     if (FullscreenInputBlocker)
     {
@@ -78,16 +86,28 @@ void UCharacterCreationWidget::NativeOnInitialized()
 
     if (Button_Warrior)
     {
+        if (UTextBlock* Label = Cast<UTextBlock>(Button_Warrior->GetChildAt(0)))
+        {
+            Label->SetText(GetDisplayNameForClassId(TEXT("StableHand")));
+        }
         Button_Warrior->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleWarriorClicked);
     }
 
     if (Button_Archer)
     {
+        if (UTextBlock* Label = Cast<UTextBlock>(Button_Archer->GetChildAt(0)))
+        {
+            Label->SetText(GetDisplayNameForClassId(TEXT("Hunter")));
+        }
         Button_Archer->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleArcherClicked);
     }
 
     if (Button_Mage)
     {
+        if (UTextBlock* Label = Cast<UTextBlock>(Button_Mage->GetChildAt(0)))
+        {
+            Label->SetText(GetDisplayNameForClassId(TEXT("Scholar")));
+        }
         Button_Mage->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleMageClicked);
     }
 
@@ -768,7 +788,7 @@ void UCharacterCreationWidget::SetSlotClass(int32 SlotIndex, FName ClassId)
 
     if (SlotTitleTexts.IsValidIndex(SlotIndex) && SlotTitleTexts[SlotIndex])
     {
-        SlotTitleTexts[SlotIndex]->SetText(DisplayName);
+        SlotTitleTexts[SlotIndex]->SetText(SlotCharacterNames.IsValidIndex(SlotIndex) && !SlotCharacterNames[SlotIndex].IsEmpty() ? SlotCharacterNames[SlotIndex] : DisplayName);
     }
 
     if (ClassNameTexts.IsValidIndex(SlotIndex) && ClassNameTexts[SlotIndex])
@@ -778,13 +798,10 @@ void UCharacterCreationWidget::SetSlotClass(int32 SlotIndex, FName ClassId)
 
     if (ClassIconImages.IsValidIndex(SlotIndex) && ClassIconImages[SlotIndex])
     {
-        const TObjectPtr<UTexture2D>* IconTexture = ClassIconTextures.Find(ClassId);
-        if (IconTexture && IconTexture->Get())
-        {
-            ClassIconImages[SlotIndex]->SetBrushFromTexture(IconTexture->Get());
-        }
+        const FProfessionDefinition* Definition = PartyDefinition ? PartyDefinition->Professions.Find(ClassId) : nullptr;
+        ClassIconImages[SlotIndex]->SetBrushFromTexture(Definition ? Definition->Icon.Get() : nullptr);
+        ClassIconImages[SlotIndex]->SetToolTipText(DisplayName);
     }
-
     if (SlotIndex == 0)
     {
         CurrentCharacterClassId = ClassId;
@@ -938,27 +955,8 @@ bool UCharacterCreationWidget::HasDeferredSlotCreationWidgets() const
 
 FText UCharacterCreationWidget::GetDisplayNameForClassId(FName ClassId) const
 {
-    if (ClassId == TEXT("StableHand"))
-    {
-        return FText::FromString(TEXT("마구간지기"));
-    }
-
-    if (ClassId == TEXT("Scholar"))
-    {
-        return FText::FromString(TEXT("학자"));
-    }
-
-    if (ClassId == TEXT("Herbalist"))
-    {
-        return FText::FromString(TEXT("약초상"));
-    }
-
-    if (ClassId == TEXT("Hunter"))
-    {
-        return FText::FromString(TEXT("사냥꾼"));
-    }
-
-    return FText::FromName(ClassId);
+    const FProfessionDefinition* Definition = PartyDefinition ? PartyDefinition->Professions.Find(ClassId) : nullptr;
+    return Definition ? Definition->DisplayName : FText::FromName(ClassId);
 }
 
 void UCharacterCreationWidget::UpdatePreviewStageSlot(int32 SlotIndex, FName ClassId)
@@ -1075,19 +1073,19 @@ void UCharacterCreationWidget::HandleNameTextChanged(const FText& NewText)
 
 void UCharacterCreationWidget::HandleWarriorClicked()
 {
-    SelectCharacterClass(TEXT("Warrior"));
+    SelectCharacterClass(TEXT("StableHand"));
     RefreshPreview();
 }
 
 void UCharacterCreationWidget::HandleArcherClicked()
 {
-    SelectCharacterClass(TEXT("Archer"));
+    SelectCharacterClass(TEXT("Hunter"));
     RefreshPreview();
 }
 
 void UCharacterCreationWidget::HandleMageClicked()
 {
-    SelectCharacterClass(TEXT("Mage"));
+    SelectCharacterClass(TEXT("Scholar"));
     RefreshPreview();
 }
 
@@ -1123,7 +1121,7 @@ void UCharacterCreationWidget::HandleSlot0NextClicked()
 
 void UCharacterCreationWidget::HandleSlot0EditClicked()
 {
-    LogSlotAction(0, TEXT("Edit"));
+    ShowSlotDetails(0, true);
 }
 
 void UCharacterCreationWidget::HandleSlot0DeleteClicked()
@@ -1133,7 +1131,7 @@ void UCharacterCreationWidget::HandleSlot0DeleteClicked()
 
 void UCharacterCreationWidget::HandleSlot0ClassInfoClicked()
 {
-    LogSlotAction(0, TEXT("ClassInfo"));
+    ShowSlotDetails(0, false);
 }
 
 void UCharacterCreationWidget::HandleSlot1CreateClicked()
@@ -1153,7 +1151,7 @@ void UCharacterCreationWidget::HandleSlot1NextClicked()
 
 void UCharacterCreationWidget::HandleSlot1EditClicked()
 {
-    LogSlotAction(1, TEXT("Edit"));
+    ShowSlotDetails(1, true);
 }
 
 void UCharacterCreationWidget::HandleSlot1DeleteClicked()
@@ -1163,7 +1161,7 @@ void UCharacterCreationWidget::HandleSlot1DeleteClicked()
 
 void UCharacterCreationWidget::HandleSlot1ClassInfoClicked()
 {
-    LogSlotAction(1, TEXT("ClassInfo"));
+    ShowSlotDetails(1, false);
 }
 
 void UCharacterCreationWidget::HandleSlot2CreateClicked()
@@ -1183,7 +1181,7 @@ void UCharacterCreationWidget::HandleSlot2NextClicked()
 
 void UCharacterCreationWidget::HandleSlot2EditClicked()
 {
-    LogSlotAction(2, TEXT("Edit"));
+    ShowSlotDetails(2, true);
 }
 
 void UCharacterCreationWidget::HandleSlot2DeleteClicked()
@@ -1193,7 +1191,7 @@ void UCharacterCreationWidget::HandleSlot2DeleteClicked()
 
 void UCharacterCreationWidget::HandleSlot2ClassInfoClicked()
 {
-    LogSlotAction(2, TEXT("ClassInfo"));
+    ShowSlotDetails(2, false);
 }
 
 void UCharacterCreationWidget::HandleSlot3CreateClicked()
@@ -1213,7 +1211,7 @@ void UCharacterCreationWidget::HandleSlot3NextClicked()
 
 void UCharacterCreationWidget::HandleSlot3EditClicked()
 {
-    LogSlotAction(3, TEXT("Edit"));
+    ShowSlotDetails(3, true);
 }
 
 void UCharacterCreationWidget::HandleSlot3DeleteClicked()
@@ -1223,7 +1221,7 @@ void UCharacterCreationWidget::HandleSlot3DeleteClicked()
 
 void UCharacterCreationWidget::HandleSlot3ClassInfoClicked()
 {
-    LogSlotAction(3, TEXT("ClassInfo"));
+    ShowSlotDetails(3, false);
 }
 
 void UCharacterCreationWidget::SetCharacterName(const FText& NewName)
@@ -1285,31 +1283,21 @@ FName UCharacterCreationWidget::GetCharacterClassId() const
 
 FText UCharacterCreationWidget::GetSelectedClassText() const
 {
-    return FText::FromName(CurrentCharacterClassId);
+    return GetDisplayNameForClassId(CurrentCharacterClassId);
 }
 
 FText UCharacterCreationWidget::GetStatPreviewText() const
 {
-    if (CurrentCharacterClassId == TEXT("Warrior"))
-    {
-        return FText::FromString(TEXT("HP 120 / AP 4 / Move 3 / Range 1"));
-    }
-
-    if (CurrentCharacterClassId == TEXT("Archer"))
-    {
-        return FText::FromString(TEXT("HP 90 / AP 4 / Move 3 / Range 4"));
-    }
-
-    if (CurrentCharacterClassId == TEXT("Mage"))
-    {
-        return FText::FromString(TEXT("HP 80 / AP 5 / Move 3 / Range 3"));
-    }
-
-    return FText::FromString(TEXT("HP 100 / AP 4 / Move 3 / Range 1"));
+    return PartyDefinition ? PartyDefinition->GetProfessionDetails(CurrentCharacterClassId) : FText::FromString(TEXT("직업 데이터를 불러올 수 없습니다."));
 }
 
 void UCharacterCreationWidget::RequestBack()
 {
+    if (DetailSlot != INDEX_NONE)
+    {
+        CloseSlotDetails();
+        return;
+    }
     AMainMenuPlayerController* MainMenuPlayerController = Cast<AMainMenuPlayerController>(GetOwningPlayer());
     if (MainMenuPlayerController && MainMenuPlayerController->GetMainMenuRootWidget())
     {
@@ -1331,6 +1319,23 @@ void UCharacterCreationWidget::RequestStartGame()
 
     FText Error;
 
+    if (DetailSlot != INDEX_NONE || !PartyDefinition)
+    {
+        return;
+    }
+    for (const FRunPartyMember& Member : GetPartyMembers())
+    {
+        FProfessionDefinition Definition;
+        if (Member.bCreated && !PartyDefinition->ResolveProfession(Member.ClassId, Definition))
+        {
+            if (Text_StartGameStatus)
+            {
+                Text_StartGameStatus->SetText(FText::FromString(TEXT("직업 전투 설정을 확인해 주세요.")));
+            }
+            return;
+        }
+    }
+    GetGameInstance()->GetSubsystem<URunStateSubsystem>()->PartyDefinition = PartyDefinition;
     if (!MainMenuPlayerController->StartNewGameFromParty(GetPartyMembers(), Error))
     {
         if (Text_StartGameStatus)
@@ -1343,4 +1348,123 @@ void UCharacterCreationWidget::RequestStartGame()
             Button_StartGame->SetToolTipText(Error);
         }
     }
+}
+
+void UCharacterCreationWidget::BuildDetailPanel()
+{
+    if (!WidgetTree || !WidgetTree->RootWidget || DetailPanel)
+    {
+        return;
+    }
+    DetailUnderlyingRoot = WidgetTree->RootWidget;
+    UOverlay* Root = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("ProfessionOverlay"));
+    WidgetTree->RootWidget = Root;
+    UOverlaySlot* UnderlyingSlot = Root->AddChildToOverlay(DetailUnderlyingRoot);
+    UnderlyingSlot->SetHorizontalAlignment(HAlign_Fill);
+    UnderlyingSlot->SetVerticalAlignment(VAlign_Fill);
+    DetailPanel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("ProfessionDetailPanel"));
+    DetailPanel->SetBrushColor(FLinearColor(0.025f, 0.035f, 0.05f, 0.98f));
+    DetailPanel->SetPadding(FMargin(32.0f));
+    UOverlaySlot* DetailOverlaySlot = Root->AddChildToOverlay(DetailPanel);
+    DetailOverlaySlot->SetHorizontalAlignment(HAlign_Center);
+    DetailOverlaySlot->SetVerticalAlignment(VAlign_Center);
+    USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+    Size->SetWidthOverride(520.0f);
+    DetailPanel->SetContent(Size);
+    UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+    Size->SetContent(Content);
+    DetailName = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass(), TEXT("ProfessionNameInput"));
+    DetailName->SetHintText(FText::FromString(TEXT("캐릭터 이름")));
+    Content->AddChildToVerticalBox(DetailName)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
+    DetailClass = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass(), TEXT("ProfessionClassSelect"));
+    for (FName ClassId : AvailablePartyClassIds)
+    {
+        DetailClass->AddOption(GetDisplayNameForClassId(ClassId).ToString());
+    }
+    DetailClass->OnSelectionChanged.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleDetailClassChanged);
+    Content->AddChildToVerticalBox(DetailClass)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
+    DetailText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ProfessionDetailText"));
+    DetailText->SetAutoWrapText(true);
+    Content->AddChildToVerticalBox(DetailText)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 16.0f));
+    DetailError = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ProfessionDetailError"));
+    DetailError->SetColorAndOpacity(FLinearColor(1.0f, 0.45f, 0.35f));
+    Content->AddChildToVerticalBox(DetailError);
+    DetailSave = CreateButton(Content, FText::FromString(TEXT("저장")));
+    DetailSave->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::SaveSlotDetails);
+    UButton* Close = CreateButton(Content, FText::FromString(TEXT("닫기 / 취소")));
+    Close->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::CloseSlotDetails);
+    DetailPanel->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void UCharacterCreationWidget::ShowSlotDetails(int32 SlotIndex, bool bEditable)
+{
+    if (!DetailPanel || !IsSlotCreated(SlotIndex) || !SlotClassIds.IsValidIndex(SlotIndex))
+    {
+        return;
+    }
+    DetailSlot = SlotIndex;
+    bDetailEditable = bEditable;
+    DetailError->SetText(FText::GetEmpty());
+    DetailName->SetText(GetPartyMembers()[SlotIndex].CharacterName);
+    DetailName->SetIsReadOnly(!bEditable);
+    DetailClass->SetSelectedIndex(AvailablePartyClassIds.IndexOfByKey(SlotClassIds[SlotIndex]));
+    DetailClass->SetIsEnabled(bEditable);
+    DetailText->SetText(PartyDefinition ? PartyDefinition->GetProfessionDetails(SlotClassIds[SlotIndex]) : FText::GetEmpty());
+    DetailSave->SetVisibility(bEditable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    DetailUnderlyingRoot->SetIsEnabled(false);
+    DetailPanel->SetVisibility(ESlateVisibility::Visible);
+    if (bEditable)
+    {
+        DetailName->SetKeyboardFocus();
+    }
+}
+
+void UCharacterCreationWidget::HandleDetailClassChanged(FString SelectedItem, ESelectInfo::Type SelectionType)
+{
+    const int32 Index = DetailClass->GetSelectedIndex();
+    if (AvailablePartyClassIds.IsValidIndex(Index) && PartyDefinition)
+    {
+        DetailText->SetText(PartyDefinition->GetProfessionDetails(AvailablePartyClassIds[Index]));
+    }
+}
+
+void UCharacterCreationWidget::SaveSlotDetails()
+{
+    if (!bDetailEditable || DetailSlot == INDEX_NONE || !IsSlotCreated(DetailSlot))
+    {
+        return;
+    }
+    const FString Name = DetailName->GetText().ToString().TrimStartAndEnd();
+    const int32 Index = DetailClass->GetSelectedIndex();
+    FProfessionDefinition Definition;
+    if (Name.IsEmpty() || Name.Len() > 32)
+    {
+        DetailError->SetText(FText::FromString(TEXT("이름은 1~32자로 입력해 주세요.")));
+        return;
+    }
+    if (!AvailablePartyClassIds.IsValidIndex(Index) || !PartyDefinition || !PartyDefinition->ResolveProfession(AvailablePartyClassIds[Index], Definition))
+    {
+        DetailError->SetText(FText::FromString(TEXT("직업 전투 설정을 확인해 주세요.")));
+        return;
+    }
+    SetSlotCharacterName(DetailSlot, FText::FromString(Name));
+    SetSlotClass(DetailSlot, AvailablePartyClassIds[Index]);
+    CloseSlotDetails();
+}
+
+void UCharacterCreationWidget::CloseSlotDetails()
+{
+    DetailSlot = INDEX_NONE;
+    bDetailEditable = false;
+    if (DetailPanel)
+    {
+        DetailPanel->SetVisibility(ESlateVisibility::Collapsed);
+        DetailUnderlyingRoot->SetIsEnabled(true);
+    }
+}
+
+void UCharacterCreationWidget::NativeOnDeactivated()
+{
+    CloseSlotDetails();
+    Super::NativeOnDeactivated();
 }

@@ -9,6 +9,9 @@
 #include "Combat/Library/CombatEffectLibrary.h"
 #include "CommonGameViewportClient.h"
 #include "Components/Button.h"
+#include "Components/EditableTextBox.h"
+#include "Components/ComboBoxString.h"
+#include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Components/HorizontalBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -142,8 +145,51 @@ public:
             {
                 return true;
             }
-            CreateButton->OnClicked.Broadcast();
-            Creation->SetSlotCharacterName(0, FText::FromString(TEXT("Vertical Slice Hero")));
+            if (!bProfessionPanelTested)
+            {
+                CreateButton->OnClicked.Broadcast();
+                UButton* Edit = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_Edit")));
+                UButton* Info = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_ClassInfo")));
+                UEditableTextBox* NameInput = Cast<UEditableTextBox>(Creation->GetWidgetFromName(TEXT("ProfessionNameInput")));
+                UComboBoxString* ClassSelect = Cast<UComboBoxString>(Creation->GetWidgetFromName(TEXT("ProfessionClassSelect")));
+                if (!Require(Edit && Info && NameInput && ClassSelect, TEXT("Slot detail controls exist.")))
+                {
+                    return true;
+                }
+                Edit->OnClicked.Broadcast();
+                NameInput->SetText(FText::FromString(TEXT("   ")));
+                Creation->SaveSlotDetails();
+                Test->TestFalse(TEXT("Blank name cannot be saved."), Creation->GetPartyMembers()[0].CharacterName.ToString().TrimStartAndEnd().IsEmpty());
+                NameInput->SetText(FText::FromString(TEXT("Vertical Slice Hero")));
+                ClassSelect->SetSelectedIndex(3);
+                Creation->SaveSlotDetails();
+                Test->TestEqual(TEXT("Edited class is stored in slot zero."), Creation->GetPartyMembers()[0].ClassId, FName(TEXT("Hunter")));
+                Edit->OnClicked.Broadcast();
+                NameInput->SetText(FText::FromString(TEXT("Discard this name")));
+                ClassSelect->SetSelectedIndex(1);
+                Creation->CloseSlotDetails();
+                Test->TestEqual(TEXT("Cancel preserves the saved class."), Creation->GetPartyMembers()[0].ClassId, FName(TEXT("Hunter")));
+                Test->TestEqual(TEXT("Cancel preserves the saved name."), Creation->GetPartyMembers()[0].CharacterName.ToString(), FString(TEXT("Vertical Slice Hero")));
+                Info->OnClicked.Broadcast();
+                UTextBlock* Details = Cast<UTextBlock>(Creation->GetWidgetFromName(TEXT("ProfessionDetailText")));
+                Test->TestEqual(TEXT("ClassInfo uses the shared catalog."), Details->GetText().ToString(), Creation->PartyDefinition->GetProfessionDetails(TEXT("Hunter")).ToString());
+
+                bProfessionPanelTested = true;
+                ProfessionPanelTime = FPlatformTime::Seconds();
+                return false;
+            }
+            if (FPlatformTime::Seconds() - ProfessionPanelTime < 0.5)
+            {
+                return false;
+            }
+            if (!bProfessionCaptured)
+            {
+                Capture(TEXT("00-ProfessionDetails.png"));
+                bProfessionCaptured = true;
+                ProfessionPanelTime = FPlatformTime::Seconds();
+                return false;
+            }
+            Creation->CloseSlotDetails();
             const TArray<FRunPartyMember> Members = Creation->GetPartyMembers();
             if (!Require(Members.Num() == 4 && Members[0].bCreated && !Members[1].bCreated && !Members[2].bCreated && !Members[3].bCreated, TEXT("Character creation exports one created member and three empty slots.")))
             {
@@ -187,6 +233,7 @@ public:
                 return true;
             }
             InputViewport->OnInputKey().AddRaw(this, &FPlayVerticalSlice::HandleGameViewportInput);
+            Test->TestEqual(TEXT("Edited profession survives travel."), Run->GetPartyMembers()[0].ClassId, FName(TEXT("Hunter")));
             Test->TestEqual(TEXT("Party name survives travel."), Run->GetPartyMembers()[0].CharacterName.ToString(), FString(TEXT("Vertical Slice Hero")));
             GameplayWorld = World;
             Combat = Encounter->GetCombatManager();
@@ -252,6 +299,15 @@ public:
             {
                 return true;
             }
+            FProfessionDefinition SpawnDefinition;
+            if (!Require(Run->PartyDefinition && Run->PartyDefinition->ResolveProfession(Run->GetPartyMembers()[0].ClassId, SpawnDefinition), TEXT("Travel retains the exact profession catalog.")))
+            {
+                return true;
+            }
+            Test->TestEqual(TEXT("Spawned max HP matches detail preview."), Player->GetAttributeSet()->GetMaxHP(), SpawnDefinition.MaxHP);
+            Test->TestEqual(TEXT("Spawned AP matches detail preview."), Player->GetMaxActionPoint(), SpawnDefinition.ActionPoints);
+            Test->TestEqual(TEXT("Spawned sub AP matches detail preview."), Player->GetMaxSubActionPoint(), SpawnDefinition.SubActionPoints);
+            Test->TestEqual(TEXT("Spawned name matches edited slot."), Player->RuntimeCharacterName.ToString(), FString(TEXT("Vertical Slice Hero")));
             if (Stage == 9)
             {
                 Test->TestTrue(TEXT("The second encounter uses the same persistent world."), GameplayWorld.Get() == World);
@@ -766,6 +822,9 @@ private:
     uint64 PointerQueuedFrame = 0;
     float EnemyHPBeforeSkill = 0.0f;
     float PlayerHPBeforeAI = 0.0f;
+    bool bProfessionPanelTested = false;
+    bool bProfessionCaptured = false;
+    double ProfessionPanelTime = 0.0;
     bool bMapCaptured = false;
     bool bVictoryCaptured = false;
     bool bDefeatCaptured = false;

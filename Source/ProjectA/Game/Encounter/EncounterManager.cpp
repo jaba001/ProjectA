@@ -30,6 +30,10 @@ void AEncounterManager::InitializeEncounter(ACombatArena* InArena, ACombatManage
     PartyDefinition = InPartyDefinition;
     Definitions = InDefinitions;
     RunState = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+    if (RunState->PartyDefinition)
+    {
+        PartyDefinition = RunState->PartyDefinition;
+    }
     if (CombatManager)
     {
         CombatManager->OnCombatResult.AddUObject(this, &AEncounterManager::HandleCombatResult);
@@ -115,7 +119,12 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
             return false;
         }
         ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Arena->PlayerCoords[Member.SlotIndex]);
-        TSubclassOf<APlayerUnit> UnitClass = PartyDefinition->ResolvePlayerClass(Member.ClassId);
+        FProfessionDefinition Profession;
+        if (!PartyDefinition->ResolveProfession(Member.ClassId, Profession))
+        {
+            return false;
+        }
+        TSubclassOf<APlayerUnit> UnitClass = Profession.CombatClass;
         if (!Tile || Tile->GetOccupyingUnit() || Tile->GetTerritory() != ETileTerritory::Player || !UnitClass)
         {
             return false;
@@ -127,6 +136,10 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         }
         SpawnedUnits.Add(Unit);
         PartyActors.Add(Member.SlotIndex, Unit);
+        if (!Unit->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, Profession.StartingSkills))
+        {
+            return false;
+        }
         Unit->RuntimeCharacterName = Member.CharacterName;
         Unit->SetTeam(ETeam::Player);
         Unit->SetCurrentTile(Tile);

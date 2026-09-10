@@ -6,6 +6,8 @@
 #include "Types/CombatResult.h"
 #include "RunStateSubsystem.generated.h"
 
+class UPartyDefinitionDataAsset;
+
 DECLARE_MULTICAST_DELEGATE(FOnRunStateChanged);
 
 // Owns one in-memory run; encounter actors and UI remain world-scoped.
@@ -16,6 +18,11 @@ class PROJECTA_API URunStateSubsystem : public UGameInstanceSubsystem
     GENERATED_BODY()
 
 public:
+    // Keep the selected catalog across travel so previews and spawning use the same data.
+    // 미리보기와 스폰이 같은 데이터를 쓰도록 선택한 목록을 레벨 이동 동안 유지합니다.
+    UPROPERTY(Transient)
+    TObjectPtr<UPartyDefinitionDataAsset> PartyDefinition;
+
     UFUNCTION(BlueprintCallable, Category = "Run")
     bool InitializeRun(const TArray<FRunPartyMember>& Members, FText& OutError);
 
