@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Combat/Commands/CombatActionTypes.h"
 #include "PartyPlayerController.generated.h"
 
 class AUnitBase;
@@ -9,6 +10,8 @@ class ACombatManager;
 class ACombatGridTile;
 class UUserWidget;
 class USkillDefinitionDataAsset;
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnCombatActionResponse, const FCombatActionResponse&);
 
 // Tile input mode selected by the player controller.
 // 플레이어 컨트롤러에서 선택한 타일 입력 모드입니다.
@@ -60,6 +63,23 @@ public:
     // 활성 유닛의 턴 종료를 요청합니다.
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void RequestEndTurn();
+
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void RequestHealingItem();
+
+    // The owning connection sends intent only; server bindings determine the requesting participant.
+    // 소유 연결은 행동 의도만 전송하며 요청 참가자는 서버의 바인딩으로 결정합니다.
+    UFUNCTION(Server, Reliable)
+    void ServerRequestCombatAction(const FCombatActionRequest& Request);
+
+    UFUNCTION(Client, Reliable)
+    void ClientReceiveCombatActionResponse(const FCombatActionResponse& Response);
+
+    bool BuildCombatActionRequest(ECombatActionKind Kind, USkillDefinitionDataAsset* Skill, ACombatGridTile* TargetTile, FCombatActionRequest& OutRequest);
+    FCombatActionResponse SubmitCombatActionRequest(const FCombatActionRequest& Request);
+    const FCombatActionResponse& GetLastCombatActionResponse() const { return LastCombatActionResponse; }
+    bool IsCombatInputEnabled() const { return bCombatInputEnabled; }
+    FOnCombatActionResponse OnCombatActionResponse;
 
     // Own all player tile commands; tile actors only forward input.
     // 플레이어 타일 명령을 전담하며 타일 액터는 입력만 전달합니다.
@@ -115,6 +135,19 @@ public:
     bool IsValidTileForPendingSkill(ACombatGridTile* Tile) const;
 
 private:
+    void HandleCombatActionResponse(const FCombatActionResponse& Response);
+    bool IsEquippedInputSkill(USkillDefinitionDataAsset* Skill) const;
+    FGuid RequestCombatInstanceId;
+    int64 NextRequestSequence = 0;
+    FGuid LatestSubmittedCombatId;
+    int64 LatestSubmittedSequence = 0;
+    int64 LastHandledResponseSequence = 0;
+    uint64 SelectionRevision = 0;
+    uint64 SubmittedSelectionRevision = 0;
+
+    UPROPERTY(Transient)
+    FCombatActionResponse LastCombatActionResponse;
+
     bool bCombatInputEnabled = true;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tile", meta = (AllowPrivateAccess = "true"))
     ACombatGridTile* SelectedTile = nullptr;

@@ -2,6 +2,7 @@
 #include "AbilitySystemComponent.h"
 #include "AIController.h"
 #include "Combat/CombatManager.h"
+#include "Combat/Commands/CombatActionAuthority.h"
 #include "Combat/SkillActor/SkillActorBase.h"
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/EncounterDefinitionDataAsset.h"
@@ -83,6 +84,27 @@ bool AEncounterManager::RequestStartNode(FName NodeId)
         Units.Add(Unit);
     }
     CombatManager->RegisterUnits(Units);
+    UCombatActionAuthority* ActionAuthority = CombatManager->GetActionAuthority();
+    if (!ActionAuthority)
+    {
+        return FailPreparation(FText::FromString(TEXT("Combat action authority is unavailable. / 전투 행동 검증 객체가 없습니다.")));
+    }
+    FText AuthorityError;
+    const FRunIdentityData& Identity = RunState->GetRunIdentity();
+    if (!ActionAuthority->ConfigureRun(Identity, RunState->GetPartyMembers(), PartyActors, AuthorityError))
+    {
+        return FailPreparation(AuthorityError);
+    }
+    // Bind only the existing local solo participant; other connections require explicit server assignment.
+    // 기존 로컬 1인 참가자만 연결하며 다른 접속은 명시적인 서버 배정이 필요합니다.
+    APartyPlayerController* LocalController = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController());
+    if (GetNetMode() == NM_Standalone && LocalController && LocalController->IsLocalController() && Identity.Origin == ERunIdentityOrigin::LocalDevelopment && Identity.OriginalParticipants.Num() == 1)
+    {
+        if (!ActionAuthority->BindParticipant(LocalController, Identity.OriginalParticipants[0].AccountId))
+        {
+            return FailPreparation(FText::FromString(TEXT("The local participant could not be bound to combat. / 로컬 참가자를 전투에 연결하지 못했습니다.")));
+        }
+    }
     Arena->ActivateArena(GetWorld()->GetFirstPlayerController());
     RunState->MarkCombatStarted();
     bPreparing = false;

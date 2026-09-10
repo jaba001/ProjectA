@@ -73,7 +73,9 @@ AI 이어하기가 확정된 뒤에는 현재 인간 참여자에게만 MMR을 �
 
 ## 5. Action Request와 서버 실행
 
-Client는 이동·스킬·대상·턴 종료의 의도를 요청한다. 후보 Command에는 Run·Host 세대·요청 ID·행동 유닛 ID·스킬 ID·대상 유닛 ID 또는 Grid 좌표를 담는다. Actor reference는 실행 중 해석에만 사용한다.
+Client는 이동·스킬·대상·턴 종료의 의도를 요청한다. 순차 2번의 `FCombatActionRequest`에는 Run·Host 세대·전투 실행 ID·연결 바인딩 ID·턴 번호·요청 순번·행동 유닛 ID·스킬 PrimaryAssetId·대상 유닛 ID와 Grid 좌표를 담는다. Actor reference는 서버 실행 중 해석에만 사용하며 계정이나 비용을 요청 본문에서 받지 않는다. 회복약도 이 경로를 거친다.
+
+`UCombatActionAuthority`는 CombatManager의 서버 객체로 Run/파티 값과 실행 중 유닛 매핑을 보관한다. 신뢰된 서버 코드가 Controller에 원래 참가자를 바인딩하고, PlayerController Server Reliable RPC가 자신의 연결로 받은 명령을 전달한다. 새 연결은 별도 바인딩 ID를 받으며 같은 바인딩을 반복해도 순번을 초기화하지 않는다. 응답의 `Accepted`는 디스패치 승인이고 비동기 행동 성공과 구분한다. 현재 Standalone 자동 바인딩은 개발용 단일 참가자만 대상으로 하며 실제 로그인·2인 전송·Client 상태 복제는 3번 이후다.
 
 서버는 다음을 확인한 뒤 기존 행동 API를 실행한다.
 
@@ -146,7 +148,7 @@ Server RPC는 소유 연결을 고려해야 하며, 서버에 전달됐다는 �
 |---|---|
 | `FRunPartyMember`: 슬롯·이름·직업·생성 여부·HP·CharacterId·OwnerAccountId | 접속·AI 조작 상태 분리와 서버 행동 권한 검증 |
 | `RunSaveGame` v2: 전투 밖 HP·노드·결과와 Run/참가자/소유자/Host/동의, 기존 v1 호환 | revision 및 턴 경계 상태, 실제 인증·연결 기반 소유권 강제 |
-| `PartyPlayerController`의 로컬 권위 검사·현재 Player팀 유닛 조작 | 소유 연결의 요청과 서버 검증으로 분리하고 계정별 캐릭터 권한 추가 |
+| `PartyPlayerController`의 값 Command·소유 연결 RPC 진입점과 서버 바인딩·소유권 검증 | 실제 연결의 참가자 식별 연동, 2인 전송과 Client 전투/HUD 상태 복제 검증 |
 | `APlayerUnit`: 인간 행동과 자원 소진 턴 종료 | 인간 입력과 교체 가능한 서버 AI 판단 연결 |
 | `AEnemyUnit`: 적 AI 판단 FSM | 소유권·팀을 유지하는 아군 AI 실행 구조 검토 |
 | `UnitAIController`: 이동 처리 | AI 컨트롤러 존재만으로 전투 판단 지원을 가정하지 않음 |

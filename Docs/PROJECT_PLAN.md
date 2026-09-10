@@ -32,6 +32,7 @@ flowchart LR
 | `AEncounterManager` | 준비/스폰/전투 연결/HP 추출/정리. RunState의 유효 전이를 요청 |
 | `ACombatArena` | Grid origin·슬롯별 좌표·카메라·타일 활성화. 향후 다른 Arena 구현으로 교체 가능 |
 | `ACombatManager` / `UTurnManager` | 기존 이동·타겟·턴 로직 재사용, 결과 이벤트 및 정지/등록 해제 추가 |
+| `UCombatActionAuthority` | CombatManager 소유 서버 객체. 연결 참가자·원래 소유권·턴·요청 중복·장착 스킬·자원·대상을 검사한 뒤 기존 유닛 행동 실행 |
 | `UCombatHUDWidget` | CommonActivatableWidget, 기존 Move/Skill/End Turn 명령 연결 |
 | `UEncounterResultWidget` | Victory Continue / Defeat. 향후 보상 선택을 넣을 위치 |
 
@@ -46,6 +47,8 @@ T14의 첫 구현은 사용자 선택 1A+2B에 따라 로컬 Snapshot 전투와 
 상대 Snapshot은 AI가 조작하며 아군은 직접 Grid 전투를 조작한다. 향후 플레이어가 설정한 Tactics를 Snapshot에 포함할 수 있는 구조를 고려하되 전술 편집 기능은 후속 기획으로 둔다.
 
 Co-op은 Listen Server의 Host-authoritative 구조를 우선한다. 최대 4인으로 설계하고 첫 동기화는 2인으로 검증한다. 원래 캐릭터 소유자만 직접 조작하고 다른 사람이 같은 Run에 대체 참가하지 못한다. Host가 바뀌어도 타인 캐릭터의 인간 조작권은 얻지 않는다. Client의 Action Request는 서버가 검증·실행하며 CombatManager·TurnManager·Grid Occupancy·Unit State·HP/AP·사망·Combat Result의 최종 권위는 서버에 있다.
+
+순차 2번에서 이동·스킬·회복약·턴 종료를 값 Command와 PlayerController의 소유 연결 RPC 진입점으로 통합했다. 실제 로그인 대신 신뢰된 서버 코드가 참가자를 바인딩하며 현재 자동 연결은 Standalone의 개발용 단일 참가자다. 서버 검증과 싱글플레이 회귀 결과는 [대기열](T14_QUEUE.md)에 기록한다. Client 전투/HUD 상태 복제와 실제 2인 PIE 왕복은 순차 3번에서 구현·검증한다.
 
 정상 종료·갑작스러운 끊김만으로 Host를 자동 변경하지 않는다. 원래 파티가 다시 모일 수 없을 때 기존 참가자가 명시적으로 Host를 승계하고 불참자 캐릭터를 AI로 전환해 이어가는 버튼을 제공한다. AI 전환에는 각자의 Run 시작 시 사전 동의를 사용하며, 이후 MMR은 현재 인간 참가자에게만 반영하고 불참자에게 추가 변동을 주지 않는다. 마지막 확정 턴 경계에서 복구한다. 이는 구현 후속 기획이며 현재 전투 밖 체크포인트의 기능이 아니다.
 

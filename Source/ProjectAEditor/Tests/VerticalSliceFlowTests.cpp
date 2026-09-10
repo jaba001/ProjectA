@@ -6,6 +6,7 @@
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "Combat/CombatManager.h"
+#include "Combat/Commands/CombatActionAuthority.h"
 #include "Combat/Library/CombatEffectLibrary.h"
 #include "CommonGameViewportClient.h"
 #include "Components/Button.h"
@@ -353,6 +354,7 @@ public:
                 {
                     return true;
                 }
+                CheckAcceptedActionRequest(Controller, TEXT("Slate move"));
                 Advance();
                 return false;
             }
@@ -476,6 +478,7 @@ public:
             const float BeforePotionHP = Player->GetAttributeSet()->GetHP();
             Player->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), BeforePotionHP - 20.0f);
             PotionButton->OnClicked.Broadcast();
+            CheckAcceptedActionRequest(Controller, TEXT("HUD potion"));
             Test->TestEqual(TEXT("HUD potion applies healing."), Player->GetAttributeSet()->GetHP(), BeforePotionHP);
             Test->TestEqual(TEXT("HUD potion consumes stock."), Player->HealingItemCount, 0);
             Test->TestEqual(TEXT("HUD potion consumes SubAP."), Player->GetCurrentSubActionPoint(), SpawnDefinition.SubActionPoints - 1);
@@ -509,6 +512,7 @@ public:
                 {
                     return true;
                 }
+                CheckAcceptedActionRequest(Controller, TEXT("Slate skill"));
                 Advance();
                 return false;
             }
@@ -564,6 +568,7 @@ public:
             PlayerHPBeforeAI = Player->GetAttributeSet()->GetHP();
             TurnBeforeAI = Combat->GetTurnManager()->GetTurnCounter();
             Controller->RequestEndTurn();
+            CheckAcceptedActionRequest(Controller, TEXT("End turn"));
             Advance();
             return false;
         }
@@ -740,6 +745,19 @@ public:
     }
 
 private:
+    // These checks prove standalone request dispatch; existing assertions verify eventual action effects.
+    // 이 검사는 Standalone 요청 전달을 확인하며 최종 행동 효과는 기존 검사로 검증합니다.
+    void CheckAcceptedActionRequest(APartyPlayerController* Controller, const TCHAR* Action)
+    {
+        const FString Prefix = FString(Action) + TEXT(": ");
+        const FCombatActionResponse& Response = Controller->GetLastCombatActionResponse();
+        Test->TestTrue(Prefix + TEXT("the server action request is accepted."), Response.Result == ECombatRequestResult::Accepted);
+        Test->TestTrue(Prefix + TEXT("the response identifies the current combat."), Response.CombatInstanceId.IsValid() && Combat.IsValid() && Combat->GetActionAuthority() && Response.CombatInstanceId == Combat->GetActionAuthority()->GetCombatInstanceId());
+        Test->TestTrue(Prefix + TEXT("the request sequence advances within its combat."), Response.RequestSequence > 0 && (Response.CombatInstanceId != LastAcceptedCombatInstanceId || Response.RequestSequence > LastAcceptedRequestSequence));
+        LastAcceptedCombatInstanceId = Response.CombatInstanceId;
+        LastAcceptedRequestSequence = Response.RequestSequence;
+    }
+
     // Compare persistent identities across encounter actor replacement and the Continue transition.
     // 인카운터 액터 교체와 Continue 전환에서도 영속 식별자가 유지되는지 비교합니다.
     bool CaptureRunIdentity(const URunStateSubsystem* Run)
@@ -1109,6 +1127,8 @@ private:
     }
 
     FAutomationTestBase* Test;
+    FGuid LastAcceptedCombatInstanceId;
+    int64 LastAcceptedRequestSequence = 0;
     FRunIdentityData InitialRunIdentity;
     TArray<FRunPartyMember> InitialPartyMembers;
     int32 Stage = 0;

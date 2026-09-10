@@ -3,6 +3,8 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Blueprint/UserWidget.h"
 #include "Combat/CombatManager.h"
+#include "Combat/Commands/CombatActionAuthority.h"
+#include "AbilitySystemComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Unit/UnitBase.h"
 #include "Grid/Combat/CombatGridTile.h"
@@ -19,7 +21,7 @@ void APartyPlayerController::BeginPlay()
 {
     Super::BeginPlay();
 
-    if (ShouldCreateCombatHUD())
+    if (IsLocalController() && ShouldCreateCombatHUD())
     {
         InitializeCombatManager();
         InitializeHUD();
@@ -78,8 +80,162 @@ void APartyPlayerController::RequestEndTurn()
 {
     if (CanUseActiveUnitAction())
     {
-        CombatManager->RequestEndTurnForUnit(GetActiveUnit());
+        FCombatActionRequest Request;
+        if (BuildCombatActionRequest(ECombatActionKind::EndTurn, nullptr, nullptr, Request))
+        {
+            SubmitCombatActionRequest(Request);
+        }
     }
+}
+
+void APartyPlayerController::RequestHealingItem()
+{
+    AUnitBase* Unit = GetActiveUnit();
+    if (!CanUseActiveUnitAction() || !Unit->CanUseHealingItem(Unit))
+    {
+        return;
+    }
+    FCombatActionRequest Request;
+    if (BuildCombatActionRequest(ECombatActionKind::HealingItem, nullptr, Unit->CurrentTile, Request))
+    {
+        SubmitCombatActionRequest(Request);
+    }
+}
+
+bool APartyPlayerController::BuildCombatActionRequest(ECombatActionKind Kind, USkillDefinitionDataAsset* Skill, ACombatGridTile* TargetTile, FCombatActionRequest& OutRequest)
+{
+    if (!CombatManager || !CombatManager->IsCombatActive() || !CombatManager->GetTurnManager())
+    {
+        return false;
+    }
+    UCombatActionAuthority* Authority = CombatManager->GetActionAuthority();
+    if (!Authority || !Authority->GetCombatInstanceId().IsValid() || !Authority->GetUnitId(GetActiveUnit()).IsValid())
+    {
+        return false;
+    }
+    if (RequestCombatInstanceId != Authority->GetCombatInstanceId())
+    {
+        RequestCombatInstanceId = Authority->GetCombatInstanceId();
+        NextRequestSequence = 0;
+    }
+    if (NextRequestSequence == MAX_int64 || (TargetTile && (TargetTile->GetWorld() != GetWorld() || CombatManager->GetTileByCoord(TargetTile->GridCoord) != TargetTile)))
+    {
+        return false;
+    }
+    OutRequest = FCombatActionRequest();
+    OutRequest.RunId = Authority->GetRunIdentity().RunId;
+    OutRequest.HostEpoch = Authority->GetRunIdentity().HostEpoch;
+    OutRequest.CombatInstanceId = RequestCombatInstanceId;
+    OutRequest.ParticipantBindingId = Authority->GetParticipantBindingId(this);
+    OutRequest.TurnSerial = CombatManager->GetTurnManager()->GetTurnCounter();
+    OutRequest.RequestSequence = ++NextRequestSequence;
+    OutRequest.UnitId = Authority->GetUnitId(GetActiveUnit());
+    OutRequest.Kind = Kind;
+    if (TargetTile)
+    {
+        OutRequest.TargetCoord = TargetTile->GridCoord;
+    }
+    if (Kind == ECombatActionKind::Skill && IsValid(Skill))
+    {
+        OutRequest.SkillId = Skill->GetPrimaryAssetId();
+        const bool bUnitTarget = Skill->bMoveToTarget || Skill->TargetRule == ESkillTargetRule::EnemyUnit || Skill->TargetRule == ESkillTargetRule::AllyUnit || Skill->TargetRule == ESkillTargetRule::AnyUnit;
+        if (bUnitTarget && TargetTile)
+        {
+            OutRequest.TargetUnitId = Authority->GetUnitId(TargetTile->GetOccupyingUnit());
+        }
+    }
+    else if (Kind == ECombatActionKind::HealingItem && TargetTile)
+    {
+        OutRequest.TargetUnitId = Authority->GetUnitId(TargetTile->GetOccupyingUnit());
+    }
+    return true;
+}
+
+FCombatActionResponse APartyPlayerController::SubmitCombatActionRequest(const FCombatActionRequest& Request)
+{
+    if (LatestSubmittedCombatId != Request.CombatInstanceId)
+    {
+        LatestSubmittedCombatId = Request.CombatInstanceId;
+        LatestSubmittedSequence = 0;
+        LastHandledResponseSequence = 0;
+    }
+    if (Request.RequestSequence > LatestSubmittedSequence)
+    {
+        LatestSubmittedSequence = Request.RequestSequence;
+        SubmittedSelectionRevision = SelectionRevision;
+    }
+    FCombatActionResponse Response;
+    Response.CombatInstanceId = Request.CombatInstanceId;
+    Response.RequestSequence = Request.RequestSequence;
+    if (!HasAuthority())
+    {
+        Response.Result = ECombatRequestResult::Pending;
+        LastCombatActionResponse = Response;
+        ServerRequestCombatAction(Request);
+        return Response;
+    }
+    if (IsValid(CombatManager) && CombatManager->GetActionAuthority())
+    {
+        Response = CombatManager->GetActionAuthority()->Execute(this, Request);
+    }
+    else
+    {
+        Response.Result = ECombatRequestResult::InvalidContext;
+        Response.Message = FText::FromString(TEXT("요청을 처리할 전투가 없습니다."));
+    }
+    if (IsLocalController())
+    {
+        HandleCombatActionResponse(Response);
+    }
+    else
+    {
+        LastCombatActionResponse = Response;
+        ClientReceiveCombatActionResponse(Response);
+    }
+    return Response;
+}
+
+void APartyPlayerController::ServerRequestCombatAction_Implementation(const FCombatActionRequest& Request)
+{
+    SubmitCombatActionRequest(Request);
+}
+
+void APartyPlayerController::ClientReceiveCombatActionResponse_Implementation(const FCombatActionResponse& Response)
+{
+    HandleCombatActionResponse(Response);
+}
+
+void APartyPlayerController::HandleCombatActionResponse(const FCombatActionResponse& Response)
+{
+    // Only the latest request can update feedback, and a new selection survives a delayed acknowledgement.
+    // 최신 요청만 응답 상태를 갱신하며 응답이 늦어져도 새로 선택한 입력은 유지합니다.
+    if (!CombatManager || !CombatManager->GetActionAuthority() || Response.CombatInstanceId != CombatManager->GetActionAuthority()->GetCombatInstanceId() || Response.CombatInstanceId != LatestSubmittedCombatId || Response.RequestSequence != LatestSubmittedSequence || Response.RequestSequence <= LastHandledResponseSequence)
+    {
+        return;
+    }
+    LastHandledResponseSequence = Response.RequestSequence;
+    LastCombatActionResponse = Response;
+    if (Response.Result == ECombatRequestResult::Accepted && SelectionRevision == SubmittedSelectionRevision)
+    {
+        CancelTileInputMode();
+    }
+    OnCombatActionResponse.Broadcast(Response);
+}
+
+bool APartyPlayerController::IsEquippedInputSkill(USkillDefinitionDataAsset* Skill) const
+{
+    AUnitBase* Unit = GetActiveUnit();
+    if (!IsValid(Skill) || !Unit || !Unit->GetEquippedSkillDataAssets().Contains(Skill) || !Skill->GetPrimaryAssetId().IsValid() || !Unit->GetAbilitySystemComponent() || !Skill->AbilityClass)
+    {
+        return false;
+    }
+    int32 Matches = 0;
+    for (const USkillDefinitionDataAsset* Equipped : Unit->GetEquippedSkillDataAssets())
+    {
+        Matches += IsValid(Equipped) && Equipped->GetPrimaryAssetId() == Skill->GetPrimaryAssetId() ? 1 : 0;
+    }
+    const FGameplayAbilitySpec* Spec = Unit->GetAbilitySystemComponent()->FindAbilitySpecFromClass(Skill->AbilityClass);
+    return Matches == 1 && Spec && !Spec->IsActive();
 }
 
 void APartyPlayerController::HandleTileClicked(ACombatGridTile* Tile)
@@ -89,7 +245,6 @@ void APartyPlayerController::HandleTileClicked(ACombatGridTile* Tile)
         return;
     }
 
-    AUnitBase* ActiveUnit = GetActiveUnit();
     if (IsSkillInputMode())
     {
         USkillDefinitionDataAsset* SkillData = PendingSkillData;
@@ -97,8 +252,11 @@ void APartyPlayerController::HandleTileClicked(ACombatGridTile* Tile)
         {
             return;
         }
-        CancelTileInputMode();
-        ActiveUnit->StartSkill(SkillData, Tile);
+        FCombatActionRequest Request;
+        if (BuildCombatActionRequest(ECombatActionKind::Skill, SkillData, Tile, Request))
+        {
+            SubmitCombatActionRequest(Request);
+        }
         return;
     }
 
@@ -108,9 +266,11 @@ void APartyPlayerController::HandleTileClicked(ACombatGridTile* Tile)
         {
             return;
         }
-        CancelTileInputMode();
-        SetSelectedTile(Tile);
-        ActiveUnit->StartMoveAction(Tile);
+        FCombatActionRequest Request;
+        if (BuildCombatActionRequest(ECombatActionKind::Move, nullptr, Tile, Request) && SubmitCombatActionRequest(Request).Result == ECombatRequestResult::Accepted)
+        {
+            SetSelectedTile(Tile);
+        }
         return;
     }
 
@@ -146,7 +306,7 @@ bool APartyPlayerController::CanUseActiveUnitAction() const
         return false;
     }
 
-    return true;
+    return CombatManager->GetActionAuthority() && CombatManager->GetActionAuthority()->CanControllerControl(this, ActiveUnit);
 }
 
 bool APartyPlayerController::CanUseActiveUnitActionPoint(int32 Cost) const
@@ -217,6 +377,7 @@ void APartyPlayerController::ClearSelectedTile()
 
 void APartyPlayerController::SetTileInputMode(ETileInputMode NewMode)
 {
+    ++SelectionRevision;
     CurrentTileInputMode = NewMode;
     //UE_LOG(LogTemp, Log, TEXT("[PartyPlayerController] TileInputMode Changed | Mode=%d"), static_cast<uint8>(CurrentTileInputMode));
 }
@@ -273,6 +434,11 @@ void APartyPlayerController::EnterSkillMode(USkillDefinitionDataAsset* SkillData
     }
 
     if (!CanUseActiveUnitActionPoint(SkillData->ActionPointCost))
+    {
+        return;
+    }
+
+    if (!IsEquippedInputSkill(SkillData))
     {
         return;
     }

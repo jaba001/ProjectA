@@ -112,7 +112,11 @@ UI 관련 상세 메모는 아래 파일에 정리되어 있습니다.
 
 스킬 대상은 `CombatTargetingLibrary::IsValidSkillTarget`으로 검사합니다. 기존 플레이어 규칙대로 전열 보호는 `EnemyUnit` 선택에 적용하고 `bIgnoreFront`로 무시할 수 있습니다. 제자리 `AllyUnit`/`AnyUnit` 스킬은 자기 자신도 선택할 수 있으며, 타일 스킬은 영역에 맞는 빈 타일도 선택합니다. 접근 스킬은 다른 생존 유닛이 필요합니다. 실행 직전에 대상을 다시 검사하며, 유닛 대상이 이동하거나 다른 유닛으로 교체되면 실패 처리합니다. 범위 공격의 직접 효과와 스킬 액터는 `CombatTargetingLibrary::ResolveSkillAreaTargets`로 피해 대상을 계산합니다. `Single`은 대상 타일, `AroundTarget`은 대상 타일 중심, `AroundSelf`는 효과 적용 시점의 시전자 타일 중심 체비셰프 반경을 사용합니다. 범위 효과는 기존처럼 시전자 자신을 제외하고 진영·생존·점유 상태를 확인합니다. Row/Column/LeftAndTarget/RightAndTarget/DiagonalTarget/AllEnemies와 음수 반경은 미지원으로 에셋 검증 및 실행 전 검사에서 거절하며 AP를 소비하지 않습니다. 범위 스킬은 `GA_AreaAttack` 계열을 사용하고 기본 단일 공격의 별도 효과 구현은 유지합니다.
 
-타일 액터는 클릭을 `PartyPlayerController::HandleTileClicked`로 전달합니다. 플레이어 명령은 권한·전투 입력 잠금·Player 팀·활성 턴·생존·busy를 확인하며 클릭 시 비용과 타겟을 재검사합니다. UI의 턴 종료는 `PartyPlayerController::RequestEndTurn`, C++ AI의 내부 종료는 `CombatManager::RequestEndTurnForUnit(this)`를 사용합니다. 기존 CombatManager의 인자 없는 Blueprint 종료 함수는 deprecated 상태이며 플레이어 입력 검사를 거칩니다. 턴 전환과 전투 종료 시 이전 선택·하이라이트를 정리합니다.
+타일 액터는 클릭을 `PartyPlayerController::HandleTileClicked`로 전달합니다. 이동·스킬·회복약·턴 종료는 Actor 없는 `FCombatActionRequest`로 공통 서버 검증을 거칩니다. 서버는 연결에 바인딩한 원래 참가자, 캐릭터 소유권, Run·Host 세대·전투 실행 ID·연결 바인딩 ID·턴 번호·요청 순번을 검사합니다. Host도 타인 캐릭터를 조작할 수 없으며 이미 처리한 요청과 이전 전투/연결/턴의 명령을 거절합니다. 이동 범위는 서버에서 다시 계산하고, 스킬은 실제 장착 목록의 `FPrimaryAssetId`로 유일하게 해석해 서버의 비용·GAS·대상 규칙을 적용합니다.
+
+UI의 턴 종료는 `PartyPlayerController::RequestEndTurn`, 회복약은 `RequestHealingItem`, C++ AI의 내부 종료는 `CombatManager::RequestEndTurnForUnit(this)`를 사용합니다. 기존 CombatManager의 인자 없는 Blueprint 종료 함수는 deprecated 상태이며 플레이어 입력 검사를 거칩니다. `Accepted` 응답은 실행 진입을 뜻하고 이동·스킬의 최종 성공은 기존 행동 완료 이벤트로 확인합니다. 늦은 응답은 새 전투나 최신 요청·새 선택을 덮지 않습니다. 턴 전환과 전투 종료 시 이전 선택·하이라이트를 정리합니다.
+
+현재 이 요청 경로의 검증 대상은 Standalone Gameplay·Snapshot의 저장 맵 PIE와 TestMap 형태의 미식별 전투 테스트입니다. 소유 연결의 Server/Client Reliable RPC 진입점은 추가했지만 Client 전투/HUD 상태 복제와 실제 2인 PIE 왕복은 [대기열](Docs/T14_QUEUE.md)의 3번입니다. 서버의 C++ 참가자 바인딩은 인증 공급자 연동 지점이며 실제 인증은 8번입니다. 기존 미식별 Run/TestMap의 입력 호환은 Standalone에만 적용하고 손상된 식별 Run으로 우회하지 않습니다.
 
 캐릭터 생성의 Edit는 선택한 슬롯의 이름(1~32자)과 직업을 편집합니다. 저장 전에는 파티 데이터가 바뀌지 않으며 취소하면 기존 값이 유지됩니다. ClassInfo는 같은 직업 정의의 실제 HP/AP/보조 AP와 시작 스킬을 읽기 전용으로 표시합니다. 저장한 이름·직업과 사용한 직업 목록은 Gameplay로 전달되고, Encounter 스폰은 동일한 설정을 적용한 뒤 이전 전투의 HP를 복원합니다.
 

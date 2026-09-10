@@ -9,6 +9,7 @@ class UTurnManager;
 class AUnitBase;
 class ACombatGridManager;
 class ACombatGridTile;
+class UCombatActionAuthority;
 
 // Actor that coordinates combat units, turns, movement, and target tiles.
 // 전투 유닛, 턴, 이동, 대상 타일을 조율하는 액터입니다.
@@ -24,6 +25,7 @@ public:
     void ResetCombat();
     void SetCombatGrid(ACombatGridManager* Grid) { CombatGridManager = Grid; }
     const TArray<AUnitBase*>& GetRegisteredUnits() const { return CombatUnits; }
+    UCombatActionAuthority* GetActionAuthority() const { return ActionAuthority; }
 
     // Sets combat manager defaults.
     // 전투 매니저 기본값을 설정합니다.
@@ -41,6 +43,9 @@ protected:
 
 
 private:
+    UPROPERTY(VisibleAnywhere, Category = "Combat|Commands")
+    TObjectPtr<UCombatActionAuthority> ActionAuthority;
+
     void HandleUnitDied(AUnitBase* Unit);
     void HandleCombatResult(ECombatResult Result);
     FTimerHandle DeadTurnTimer;

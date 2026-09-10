@@ -1,4 +1,5 @@
 #include "Combat/CombatManager.h"
+#include "Combat/Commands/CombatActionAuthority.h"
 #include "Net/UnrealNetwork.h"
 #include "Game/Turn/TurnManager.h"
 #include "Controller/PartyPlayerController.h"
@@ -14,6 +15,7 @@ ACombatManager::ACombatManager()
     PrimaryActorTick.bCanEverTick = false;
     bReplicates = true;
     CombatGridManager = nullptr;
+    ActionAuthority = CreateDefaultSubobject<UCombatActionAuthority>(TEXT("ActionAuthority"));
 }
 
 void ACombatManager::BeginPlay()
@@ -97,6 +99,7 @@ void ACombatManager::StartCombat_Internal()
         return;
     }
 
+    ActionAuthority->BeginCombat();
     TurnManager->OnCombatResult.AddUObject(this, &ACombatManager::HandleCombatResult);
     TurnManager->InitializeTurnOrder(CombatUnits);
     CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
@@ -117,6 +120,7 @@ void ACombatManager::RegisterUnits(const TArray<AUnitBase*>& Units)
             Unit->OnUnitDied.AddUObject(this, &ACombatManager::HandleUnitDied);
         }
     }
+    ActionAuthority->RegisterUnits(CombatUnits);
 }
 
 void ACombatManager::AdvanceTurn()
@@ -160,10 +164,13 @@ bool ACombatManager::RequestEndTurnForUnit(AUnitBase* RequestingUnit)
 
 void ACombatManager::ClearPlayerSelection()
 {
-    APartyPlayerController* Controller = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController());
-    if (Controller && Controller->GetCombatManager() == this)
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
-        Controller->CancelTileInputMode();
+        APartyPlayerController* Controller = Cast<APartyPlayerController>(It->Get());
+        if (Controller && Controller->GetCombatManager() == this)
+        {
+            Controller->CancelTileInputMode();
+        }
     }
 }
 
@@ -241,6 +248,10 @@ void ACombatManager::ResetCombat()
         }
     }
     CombatUnits.Reset();
+    if (ActionAuthority)
+    {
+        ActionAuthority->Reset();
+    }
     if (TurnManager)
     {
         TurnManager->ResetCombat();

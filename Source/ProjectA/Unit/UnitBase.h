@@ -413,6 +413,8 @@ public:
     // Find SkillData matching a given AbilityClass
     USkillDefinitionDataAsset* FindSkillDataByAbilityClass(TSubclassOf<UGameplayAbility> AbilityClass) const;
 
+    const TArray<TObjectPtr<USkillDefinitionDataAsset>>& GetEquippedSkillDataAssets() const { return EquippedSkillDataAssets; }
+
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill")
     TSubclassOf<UGameplayAbility> GetDefaultAttackAbilityClass() const { return DefaultAttackAbilityClass; }
 

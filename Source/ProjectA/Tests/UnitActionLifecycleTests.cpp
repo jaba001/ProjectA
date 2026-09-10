@@ -359,6 +359,7 @@ bool FSkillDefinitionCostTest::RunTest(const FString& Parameters)
     Combat->RegisterUnits({ Unit, Target });
     Combat->StartCombat_Internal();
     APartyPlayerController* Controller = Scope.World->SpawnActor<APartyPlayerController>();
+    Controller->SetAsLocalPlayerController();
     Controller->SetCombatContext(Combat, true);
     int32 Completions = 0;
     EUnitActionResult LastResult = EUnitActionResult::Failed;
@@ -368,6 +369,8 @@ bool FSkillDefinitionCostTest::RunTest(const FString& Parameters)
         LastResult = Result;
     });
 
+    USkillDefinitionDataAsset* Skill = MakeSkill(Unit, UGA_DefaultAttack::StaticClass());
+    EquipSkill(Unit, Skill);
     for (int32 AvailableAP : { 2, 1 })
     {
         for (int32 Cost : { 1, 2, 3, 0, -1 })
@@ -377,7 +380,6 @@ bool FSkillDefinitionCostTest::RunTest(const FString& Parameters)
             {
                 Unit->ConsumeActionPoint(1);
             }
-            USkillDefinitionDataAsset* Skill = MakeSkill(Unit, UGA_DefaultAttack::StaticClass());
             Skill->ActionPointCost = Cost;
             const bool bExpectedUsable = Cost > 0 && Cost <= AvailableAP;
             const FString Context = FString::Printf(TEXT("AP=%d Cost=%d"), AvailableAP, Cost);
@@ -760,10 +762,13 @@ bool FPlayerEnemyInputIsolationTest::RunTest(const FString& Parameters)
     Combat->RegisterUnits({ Player, Enemy });
     Combat->StartCombat_Internal();
     APartyPlayerController* Controller = Scope.World->SpawnActor<APartyPlayerController>();
+    Controller->SetAsLocalPlayerController();
     Scope.World->AddController(Controller);
     TestEqual(TEXT("Tile input resolves the registered player controller"), Scope.World->GetFirstPlayerController(), static_cast<APlayerController*>(Controller));
     Controller->SetCombatContext(Combat, true);
     USkillDefinitionDataAsset* PlayerSkill = MakeSkill(Player, UGA_DefaultAttack::StaticClass());
+    EquipSkill(Player, PlayerSkill);
+    GrantAttack(Player);
     Controller->EnterSkillMode(PlayerSkill);
     TestTrue(TEXT("Player can select a skill on its turn"), Controller->IsSkillInputMode());
     TestTrue(TEXT("Internal transition accepts the active player"), Combat->RequestEndTurnForUnit(Player));
@@ -820,17 +825,27 @@ bool FPlayerCommandGuardTest::RunTest(const FString& Parameters)
     AUnitBase* Player = Scope.SpawnUnit<AUnitBase>(FVector::ZeroVector);
     AUnitBase* Enemy = Scope.SpawnUnit<AUnitBase>(FVector(100.0f, 0.0f, 0.0f));
     Enemy->SetTeam(ETeam::Enemy);
-    Scope.SpawnTile(Player);
+    ACombatGridTile* PlayerTile = Scope.SpawnTile(Player);
     ACombatGridTile* TargetTile = Scope.SpawnTile(Enemy);
+    ACombatGridManager* Grid = Scope.World->SpawnActor<ACombatGridManager>();
+    PlayerTile->GridCoord = FIntPoint(0, 0);
+    PlayerTile->SetTerritory(ETileTerritory::Player);
+    TargetTile->GridCoord = FIntPoint(0, 2);
+    TargetTile->SetTerritory(ETileTerritory::Enemy);
+    Grid->TileMap.Add(PlayerTile->GridCoord, PlayerTile);
+    Grid->TileMap.Add(TargetTile->GridCoord, TargetTile);
     GrantAttack(Player);
     ACombatManager* Combat = Scope.World->SpawnActor<ACombatManager>();
+    Combat->SetCombatGrid(Grid);
     Combat->RegisterUnits({ Player, Enemy });
     Combat->StartCombat_Internal();
     APartyPlayerController* Controller = Scope.World->SpawnActor<APartyPlayerController>();
+    Controller->SetAsLocalPlayerController();
     Scope.World->AddController(Controller);
     TestEqual(TEXT("Tile input resolves the registered player controller"), Scope.World->GetFirstPlayerController(), static_cast<APlayerController*>(Controller));
     Controller->SetCombatContext(Combat, true);
     USkillDefinitionDataAsset* Skill = MakeSkill(Player, UGA_DefaultAttack::StaticClass());
+    EquipSkill(Player, Skill);
     TestFalse(TEXT("Null turn requester is rejected"), Combat->RequestEndTurnForUnit(nullptr));
     TestFalse(TEXT("Inactive unit cannot end another turn"), Combat->RequestEndTurnForUnit(Enemy));
     Player->bIsActiveTurn = false;

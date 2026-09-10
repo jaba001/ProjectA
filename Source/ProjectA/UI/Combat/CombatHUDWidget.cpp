@@ -236,13 +236,8 @@ void UCombatHUDWidget::HandleCancelClicked()
 void UCombatHUDWidget::HandleItemClicked()
 {
     APartyPlayerController* Controller = Cast<APartyPlayerController>(GetOwningPlayer());
-    if (Controller && Controller->CanUseActiveUnitAction())
+    if (Controller)
     {
-        AUnitBase* Unit = Controller->GetActiveUnit();
-        if (Unit && Unit->CanUseHealingItem(Unit))
-        {
-            Controller->CancelTileInputMode();
-            Unit->StartItemAction(Unit);
-        }
+        Controller->RequestHealingItem();
     }
 }
