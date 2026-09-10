@@ -7,6 +7,8 @@ Unreal Engine 기반 Grid Turn-Based Combat System 프로젝트입니다.
 
 현재 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 최종적으로 상대 Party/Build Snapshot을 사용하는 Async PvP와 Listen Server 기반의 실시간 Co-op을 지원하도록 확장합니다. T14의 첫 단계로 Unreal `USaveGame` v1에 저장된 상대를 기존 전투에 연결했습니다. 로컬 전투 한 사이클 검증 후 Co-op 동기화를 진행하며, 다중 PIE와 온라인 서비스는 후속 범위입니다. Co-op에서는 할당된 Party Member의 Action Request를 서버가 검증·실행하고 전투 상태의 최종 권위를 가집니다. 새 데이터·명령은 직렬화 가능한 형태를 우선하고 강한 로컬 PlayerController 의존성을 피합니다. 구현·검증 상태와 미결정 항목은 [T14 작업 카드](Docs/TODO.md), 실행 방법은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)를 참고하세요.
 
+Co-op 확정 기획은 최대 4인과 원래 캐릭터 소유자만 직접 조작하는 방식입니다. 종료·끊김 시 기존 Host를 유지하고, 원래 인원이 다시 모일 수 없을 때 기존 참가자가 명시적으로 Host를 승계해 불참자 캐릭터를 AI로 전환하는 이어하기를 계획합니다. AI 전환에는 Run 시작 시 각자의 사전 동의가 필요하며, AI 전환 후 MMR은 현재 인간 참가자에게만 반영합니다. 복구 목표는 마지막 확정 턴 경계입니다. 이 소유권·승계·랭크·턴 복구 기능은 아직 미구현이며 [Co-op 확정 기획과 구현 순서](Docs/T14_COOP_DESIGN.md)에 정리합니다.
+
 ```text
 MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 → Combat Node → Encounter → 기존 Grid Combat → Victory → Result Continue → Run Map UI
@@ -22,6 +24,7 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 - [게임 기획 방향](Docs/GAME_DESIGN.md): 게임 정체성, 목표 Run Loop, 콘텐츠·전투·협동 방향, 개발 우선순위와 미결정 정책
 - [TODO와 작업 기록](Docs/TODO.md): 다음 작업, 우선순위, 완료 조건, 중단 지점 기록
 - [기획 초안과 구현 현황](Docs/PROJECT_PLAN.md): 이미 작성된 기능, 현재 규칙, 결정할 기획, 단계별 목표
+- [T14 Co-op 확정 기획](Docs/T14_COOP_DESIGN.md): 본인 캐릭터 조작권, 기존 참가자의 Host 승계·AI 이어하기, MMR과 턴 경계 복구
 - [코드 리뷰](Docs/CODE_REVIEW.md): P1/P2 문제의 근거와 검증 시나리오
 
 문서는 2026-09-10 현재 작업 트리를 기준으로 정리합니다. 코드 구현, 정식 빌드, 에셋 설정 확인, PIE 검증은 별도로 기록합니다.

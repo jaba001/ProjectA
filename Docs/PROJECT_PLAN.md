@@ -35,7 +35,7 @@ flowchart LR
 | `UCombatHUDWidget` | CommonActivatableWidget, 기존 Move/Skill/End Turn 명령 연결 |
 | `UEncounterResultWidget` | Victory Continue / Defeat. 향후 보상 선택을 넣을 위치 |
 
-Streaming, Level Instance, 전투 중 상태 저장, 인벤토리와 장비, 여러 Act, 즉시 전체 Replication 리팩터링은 현재 Vertical Slice 범위 밖이다. GameInstance에 전투/UI를 몰아넣지 않는다.
+Streaming, Level Instance, 인벤토리와 장비, 여러 Act, 즉시 전체 Replication 리팩터링은 현재 Vertical Slice 범위 밖이다. 전투 중 상태 저장도 아직 미구현이며, T14 Co-op 후속으로 확정 턴 경계 복구를 추가한다. GameInstance에 전투/UI를 몰아넣지 않는다.
 
 D01 / T14: ProjectA는 최종적으로 Async PvP와 실시간 Co-op을 지원한다. 첫 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 네트워크 기획 확정과 구현 완료를 구분한다. 상세 범위·미결정 항목·완료 조건은 [T14 작업 카드](TODO.md)를 기준으로 한다.
 
@@ -45,7 +45,11 @@ T14의 첫 구현은 사용자 선택 1A+2B에 따라 로컬 Snapshot 전투와 
 
 상대 Snapshot은 AI가 조작하며 아군은 직접 Grid 전투를 조작한다. 향후 플레이어가 설정한 Tactics를 Snapshot에 포함할 수 있는 구조를 고려하되 전술 편집 기능은 후속 기획으로 둔다.
 
-Co-op은 Listen Server의 Host-authoritative 구조를 우선한다. 각 플레이어는 할당된 Party Member만 조작하고 Client의 Action Request는 서버가 검증·실행한다. CombatManager·TurnManager·Grid Occupancy·Unit State·HP/AP·사망·Combat Result의 최종 권위는 서버에 있다. Steam/EOS 등의 P2P transport와 접속 인원 등은 아직 결정하지 않았다.
+Co-op은 Listen Server의 Host-authoritative 구조를 우선한다. 최대 4인으로 설계하고 첫 동기화는 2인으로 검증한다. 원래 캐릭터 소유자만 직접 조작하고 다른 사람이 같은 Run에 대체 참가하지 못한다. Host가 바뀌어도 타인 캐릭터의 인간 조작권은 얻지 않는다. Client의 Action Request는 서버가 검증·실행하며 CombatManager·TurnManager·Grid Occupancy·Unit State·HP/AP·사망·Combat Result의 최종 권위는 서버에 있다.
+
+정상 종료·갑작스러운 끊김만으로 Host를 자동 변경하지 않는다. 원래 파티가 다시 모일 수 없을 때 기존 참가자가 명시적으로 Host를 승계하고 불참자 캐릭터를 AI로 전환해 이어가는 버튼을 제공한다. AI 전환에는 각자의 Run 시작 시 사전 동의를 사용하며, 이후 MMR은 현재 인간 참가자에게만 반영하고 불참자에게 추가 변동을 주지 않는다. 마지막 확정 턴 경계에서 복구한다. 이는 구현 후속 기획이며 현재 전투 밖 체크포인트의 기능이 아니다.
+
+MMR 랭크를 목표로 하므로 원래 참가자·캐릭터 소유자·현재 Host를 구분하고, 동일 Run의 동시 승계·진행 분기·결과 중복 반영을 방지해야 한다. Unreal 기본 네트워크 기능을 사용하되 경쟁 콘텐츠의 계정 인증·권위 저장·MMR 검증은 별도 단계다. Steam/EOS, Backend와 불리한 전투에서의 고의 이탈 방지 정책은 아직 결정하지 않았다. 상세 합의와 순서는 [Co-op 확정 기획](T14_COOP_DESIGN.md)을 따른다.
 
 새 Run/Party/Encounter/Combat 기능은 직렬화 가능한 Runtime Data와 Command를 우선하고 Actor reference 및 로컬 PlayerController에 강하게 결합하지 않는다. 미결정 정책이 구현에 영향을 주면 사용자에게 선택지와 영향을 설명해 결정한다. 현재는 싱글플레이 루프·콘텐츠 개발을 계속하며 전체 Replication 리팩터링을 즉시 시작하지 않는다.
 

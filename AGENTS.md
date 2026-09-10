@@ -11,7 +11,9 @@
 - Unreal 기본 기능과 공식 확장 지점을 우선 활용한다. 저장·데이터·능력·네트워크 기능은 USaveGame·USTRUCT/DataAsset·GAS·Replication 등 기존 엔진 기능으로 해결할 수 있는지 먼저 확인한다.
 - [T14 기획](Docs/TODO.md)의 Async PvP와 Listen Server 기반 Co-op 방향을 따른다. 첫 Vertical Slice와 기본 Run은 싱글플레이를 유지하며 전체 Replication 리팩터링을 즉시 진행하지 않는다.
 - 새 Run/Party/Encounter/Combat 데이터는 직렬화 가능한 Runtime Data와 Command를 우선한다. Actor reference에 과도하게 의존하거나 향후 Snapshot·Replication 확장을 방해하는 강한 로컬 PlayerController 의존성을 만들지 않는다.
-- Co-op 구현 시 플레이어는 할당된 Party Member만 조작한다. 서버가 Action Request를 검증·실행하고 CombatManager·TurnManager·Grid Occupancy·Unit State·HP/AP·사망·Combat Result의 최종 권위를 가진다.
+- Co-op은 최대 4인, 첫 동기화 검증은 2인으로 진행한다. 캐릭터의 원래 소유자는 고정하며 다른 사람이 대신 조작하거나 같은 Run에 대체 참가할 수 없다. Host 권위의 승계와 캐릭터 소유권을 구분한다.
+- 서버가 Action Request를 검증·실행하고 CombatManager·TurnManager·Grid Occupancy·Unit State·HP/AP·사망·Combat Result의 최종 권위를 가진다. 새 Host도 타인 캐릭터의 인간 조작권을 얻지 않는다.
+- 정상 종료·돌발 끊김만으로 Host를 자동 변경하거나 캐릭터를 AI로 전환하지 않는다. 원래 참가자의 명시적 Host 승계·AI 이어하기, 시작 시 사전 동의, 인간 참가자만 MMR 반영, 확정 턴 경계 복구는 [Co-op 확정 기획](Docs/T14_COOP_DESIGN.md)을 따른다. 미결정 랭크 이탈 정책은 임의로 확정하지 않는다.
 - Async PvP의 초기 로컬 Snapshot 전투와 경쟁 콘텐츠의 서버 데이터·결과 검증을 구분한다. 일부 복제 선언이나 로컬 테스트만으로 네트워크 지원 완료로 기록하지 않는다.
 - 작업 중 애매하거나 결정이 필요한 정책은 구체적인 선택지와 영향을 사용자에게 피드백한다. 미결정 정책을 임의로 확정하지 않고, 해당 결정에 의존하지 않는 작업은 계속 진행한다.
 

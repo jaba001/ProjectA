@@ -57,7 +57,9 @@ Snapshot 모드의 Run 체크포인트는 기본 `ProjectA_SnapshotRun_<SlotId>`
 
 로컬에서 저장·불러오기, 상대 생성, 아군 직접 조작, 상대 AI의 실제 피해, 사망, 결과 1회, 유닛/턴/점유 정리와 다음 노드 진행을 검증한다. 이 사이클이 안정되면 같은 데이터·행동 검증 경계를 유지하며 Listen Server/Client로 확장한다.
 
-다음 단계에서는 플레이어와 파티원 조작권 매핑, 서버 Action Request, 턴·Grid·HP/AP·사망·결과 복제 및 클라이언트 HUD를 구현하고 최소 두 PIE 인스턴스로 확인한다. 최대 인원·할당 방식·Host disconnect 등 미결정 정책은 구현 전에 사용자와 정한다. Steam/EOS, Lobby, Backend, 매칭, 경쟁 결과 검증은 별도 작업이며 이번 로컬 Snapshot 검증에 포함하지 않는다. [T14 기획](TODO.md)
+다음 단계에서는 원래 소유자만 조작할 수 있는 계정·캐릭터 매핑, 서버 Action Request, 턴·Grid·HP/AP·사망·결과 복제 및 클라이언트 HUD를 구현하고 최소 두 PIE 인스턴스로 확인한다. 최대 4인, 본인 캐릭터 고정, 기존 Host 유지와 명시적 Host 승계·불참자 AI 이어하기, 시작 시 AI 전환 사전 동의, 이후 인간 참가자만 MMR 반영, 마지막 확정 턴 경계 복구로 기획을 확정했다. 상세 합의와 남은 정책은 [Co-op 확정 기획](T14_COOP_DESIGN.md)을 따른다. Steam/EOS, Lobby, Backend, 매칭, 경쟁 결과 검증은 별도 작업이며 이번 로컬 Snapshot 검증에 포함하지 않는다. [T14 기획](TODO.md)
+
+현재 `FPartySnapshot`은 상대 빌드 저장값이며 아군 계정 소유권·Run 참가자·Host 승계·턴 상태 복구를 구현하지 않는다. 기존 `URunSaveGame`도 전투 밖 체크포인트만 저장한다. Co-op 복구 데이터는 별도 후속 계약으로 설계하며 기존 Snapshot v1과 같은 기능으로 취급하지 않는다.
 
 Unreal은 멀티플레이를 염두에 둔 초기 설계를 권장한다. 따라서 Co-op 구현을 다음 단계로 두더라도 새 데이터와 명령의 검증을 로컬 UI에 강하게 결합하지 않는다. [Epic 네트워크 개요](https://dev.epicgames.com/documentation/en-us/unreal-engine/networking-overview-for-unreal-engine?application_version=5.7)
 
