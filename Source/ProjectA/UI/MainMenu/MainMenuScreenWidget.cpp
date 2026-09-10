@@ -68,7 +68,7 @@ void UMainMenuScreenWidget::NativeOnActivated()
 {
     Super::NativeOnActivated();
     FText Error;
-    const bool bCanContinue = GetGameInstance()->GetSubsystem<URunStateSubsystem>()->CanContinueSavedRun(Error);
+    const bool bCanContinue = GetGameInstance()->GetSubsystem<URunStateSubsystem>()->CanContinueStandaloneSavedRun(Error);
     if (Button_Continue)
     {
         Button_Continue->SetIsEnabled(bCanContinue);

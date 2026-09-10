@@ -35,6 +35,8 @@ UE 5.7 기본 `SaveGameToSlot`은 직접 덮어쓰고, `IFileManager::Move`의 �
 
 저장된 단일 개발용 Run은 기존 MainMenu Continue → Gameplay에서 자동 복원한다. 협동 복구는 신뢰된 서버 코드가 기존 Host의 로컬 연결과 원래 참가자 전원의 연결을 배정한 뒤 `AEncounterManager::RestoreSavedCombat`을 호출한다. 실제 로그인·Lobby/Invite를 제공하는 API가 아니며 다른 사람에게 캐릭터 소유권을 넘기지 않는다.
 
+메인 메뉴는 `CanContinueStandaloneSavedRun`으로 버튼 상태를 확인하고 `LoadStandaloneCheckpoint`로 클릭 시 로드한 본문을 다시 검증한다. 기존 v1 오프라인 저장과 참가자 한 명의 LocalDevelopment v2/v3만 허용한다. 유효한 협동·AccountProvider 저장도 이 메뉴에서는 세션이 필요하다는 안내와 함께 거절하며, 현재 Run이나 저장을 바꾸거나 Gameplay로 이동하지 않는다. 일반 `CanContinueSavedRun`·`LoadCheckpoint`의 협동 저장 지원은 유지한다.
+
 원래 참가자의 연결이 끊기면 전투를 멈춘다. 부분 실행 상태를 새 체크포인트로 저장하거나 Host·인간 조작권을 자동 변경하지 않는다. 기존 Host와 원래 참가자는 새 세션에서 마지막 확정 기록을 복원한다. 살아 있는 기존 세션에 즉시 재접속하는 UI와 Host 승계·AI 이어하기는 후속 범위다.
 
 현재 복구는 프로젝트의 유휴 Grid 전투를 대상으로 한다. 활성 Ability, 미완료 이동/스킬 액터, 지속/주기 효과, 쿨다운·상태 태그 등 현재 저장 계약이 표현하지 못하는 상태는 조용히 버리지 않고 거절한다. 장착 추첨 결과는 저장하지만 향후 전투 중 게임플레이 난수를 재현하는 범용 RandomStream 저장이나 임의 GAS 상태 복원까지 구현한 것은 아니다. 전열 보호는 복원한 진영·점유에서 재계산한다.

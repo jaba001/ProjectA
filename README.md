@@ -17,6 +17,8 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 
 `URunStateSubsystem`이 슬롯·이름·ClassId·HP·노드 진행을 레벨 전환 동안 보존합니다. `AEncounterManager`는 아레나 준비, 파티/적 스폰, 결과 추출과 정리를 맡고 기존 CombatManager/TurnManager/GAS를 재사용합니다. 두 개의 순차 전투 노드가 같은 Gameplay 레벨에서 실행됩니다. 진행은 전투 밖과 식별된 Run의 확정 턴 경계에서 디스크에 자동 저장합니다.
 
+메인 메뉴의 Continue는 기존 오프라인 저장과 원래 참가자가 한 명인 로컬 개발용 저장을 복구합니다. 협동·계정 기반 저장은 필요한 세션 연결을 안내하고 메뉴에 머무릅니다. 버튼 표시 이후 파일이 바뀌어도 클릭 시 다시 검증하며, 협동 서버의 저장 로드·기존 Host 복구 진입점은 유지합니다.
+
 실행/에셋 설정과 검증 경계는 [Vertical Slice 설정](Docs/VERTICAL_SLICE_SETUP.md)과 [작업 보고](Docs/VERTICAL_SLICE_REPORT.md)를 확인하세요. 네 직업의 표시명·설명·아이콘·전투 클래스·스탯·시작 스킬은 `DA_VerticalSliceParty.Professions`에서 관리합니다. 기본 설정은 기존 `BP_PlayerUnit`의 전투 밸런스를 유지하며, 직업별 수치는 데이터에서 별도로 지정할 수 있습니다.
 
 ## 작업 재개 문서

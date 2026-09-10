@@ -75,6 +75,10 @@ public:
     bool SaveCheckpoint(FText& OutError);
     bool LoadCheckpoint(FText& OutError);
     bool CanContinueSavedRun(FText& OutError) const;
+    // The menu opens Standalone and cannot bind accounts from a cooperative or authenticated session.
+    // 메뉴는 Standalone으로 열리며 협동 또는 인증 세션의 계정을 연결할 수 없습니다.
+    bool CanContinueStandaloneSavedRun(FText& OutError) const;
+    bool LoadStandaloneCheckpoint(FText& OutError);
     void EnableCheckpointSaving(const FString& Slot = FString());
     const FText& GetSaveError() const { return SaveError; }
     bool CommitCombatCheckpoint(const FCombatCheckpointData& Checkpoint, FText& OutError);
@@ -85,6 +89,9 @@ public:
 
 private:
     bool ValidateSave(const URunSaveGame* Save, FText& OutError) const;
+    bool ValidateContinuableSave(const URunSaveGame* Save, bool bStandaloneOnly, FText& OutError) const;
+    bool CanContinueSavedRunInternal(bool bStandaloneOnly, FText& OutError) const;
+    bool LoadCheckpointInternal(bool bStandaloneOnly, FText& OutError);
     URunSaveGame* CreateSaveData() const;
     void AutoSaveCheckpoint();
     FString SaveSlot = TEXT("ProjectA_Run");

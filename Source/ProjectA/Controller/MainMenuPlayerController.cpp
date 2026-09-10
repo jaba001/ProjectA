@@ -158,7 +158,7 @@ bool AMainMenuPlayerController::ContinueSavedGame(FText& OutError)
         return false;
     }
     URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
-    if (!Run || !Run->LoadCheckpoint(OutError))
+    if (!Run || !Run->LoadStandaloneCheckpoint(OutError))
     {
         return false;
     }

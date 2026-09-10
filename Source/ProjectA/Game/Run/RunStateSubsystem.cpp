@@ -235,19 +235,39 @@ bool URunStateSubsystem::ValidateCheckpointHost(const FRunAccountId& AccountId, 
 
 bool URunStateSubsystem::CanContinueSavedRun(FText& OutError) const
 {
+    return CanContinueSavedRunInternal(false, OutError);
+}
+
+bool URunStateSubsystem::CanContinueStandaloneSavedRun(FText& OutError) const
+{
+    return CanContinueSavedRunInternal(true, OutError);
+}
+
+bool URunStateSubsystem::CanContinueSavedRunInternal(bool bStandaloneOnly, FText& OutError) const
+{
     TStrongObjectPtr<URunSaveGame> Save(Cast<URunSaveGame>(FRunCheckpointStorage::Load(SaveSlot, OutError)));
-    if (!Save.IsValid())
+    return ValidateContinuableSave(Save.Get(), bStandaloneOnly, OutError);
+}
+
+bool URunStateSubsystem::ValidateContinuableSave(const URunSaveGame* Save, bool bStandaloneOnly, FText& OutError) const
+{
+    if (!Save)
     {
         OutError = NSLOCTEXT("RunCheckpoint", "InvalidSave", "이어할 저장이 없거나 Run 저장 파일이 아닙니다.");
         return false;
     }
-    if (!ValidateSave(Save.Get(), OutError))
+    if (!ValidateSave(Save, OutError))
     {
         return false;
     }
     if (Save->Phase == ERunPhase::Defeat || Save->Phase == ERunPhase::Complete)
     {
         OutError = FText::FromString(TEXT("종료된 진행입니다. 새 게임을 시작해 주세요."));
+        return false;
+    }
+    if (bStandaloneOnly && Save->Identity.Origin != ERunIdentityOrigin::LegacyOffline && (Save->Identity.Origin != ERunIdentityOrigin::LocalDevelopment || Save->Identity.OriginalParticipants.Num() != 1))
+    {
+        OutError = NSLOCTEXT("RunCheckpoint", "SessionRequired", "계정 연결 또는 협동 세션이 필요한 저장입니다. 현재 싱글플레이 이어하기 대신 기존 Host와 원래 참가자가 연결된 세션에서 복원해야 합니다.");
         return false;
     }
     return true;
@@ -255,19 +275,21 @@ bool URunStateSubsystem::CanContinueSavedRun(FText& OutError) const
 
 bool URunStateSubsystem::LoadCheckpoint(FText& OutError)
 {
+    return LoadCheckpointInternal(false, OutError);
+}
+
+bool URunStateSubsystem::LoadStandaloneCheckpoint(FText& OutError)
+{
+    return LoadCheckpointInternal(true, OutError);
+}
+
+bool URunStateSubsystem::LoadCheckpointInternal(bool bStandaloneOnly, FText& OutError)
+{
     TStrongObjectPtr<URunSaveGame> Save(Cast<URunSaveGame>(FRunCheckpointStorage::Load(SaveSlot, OutError)));
-    if (!Save.IsValid())
+    // Recheck the very same loaded object before changing memory, even if the menu checked an older file.
+    // 메뉴가 이전 파일을 검사했더라도 메모리를 바꾸기 전에 방금 읽은 동일 객체를 다시 검증합니다.
+    if (!ValidateContinuableSave(Save.Get(), bStandaloneOnly, OutError))
     {
-        OutError = NSLOCTEXT("RunCheckpoint", "InvalidSave", "이어할 저장이 없거나 Run 저장 파일이 아닙니다.");
-        return false;
-    }
-    if (!ValidateSave(Save.Get(), OutError))
-    {
-        return false;
-    }
-    if (Save->Phase == ERunPhase::Defeat || Save->Phase == ERunPhase::Complete)
-    {
-        OutError = FText::FromString(TEXT("종료된 진행입니다. 새 게임을 시작해 주세요."));
         return false;
     }
     RunIdentity = Save->Identity;
