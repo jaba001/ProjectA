@@ -90,6 +90,7 @@ void ACombatManager::PublishCombatView()
         NewView = CombatView;
     }
     NewView.ViewRevision = CombatView.ViewRevision + 1;
+    NewView.bSuspendedForRecovery = bSuspendedForRecovery;
     if (ActionAuthority && (TurnManager || !CombatUnits.IsEmpty() || CombatView.CombatResult == ECombatResult::None))
     {
         NewView.CombatInstanceId = ActionAuthority->GetCombatInstanceId();
@@ -101,6 +102,7 @@ void ACombatManager::PublishCombatView()
         NewView.TurnSerial = TurnManager->GetTurnCounter();
         NewView.CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
         NewView.bCombatActive = TurnManager->IsCombatActive();
+        NewView.bAwaitingTurnCheckpoint = TurnManager->IsAwaitingTurnCheckpoint();
         NewView.CombatResult = TurnManager->GetCombatResult();
         NewView.CurrentUnit = TurnManager->GetCurrentUnit();
         NewView.CurrentUnitName = TurnManager->GetCurrentUnitName();
@@ -127,6 +129,85 @@ void ACombatManager::PublishCombatView()
 
 void ACombatManager::HandleTurnChanged()
 {
+    PublishCombatView();
+}
+
+bool ACombatManager::HandleCommitTurnBoundary(int32 CompletedTurnSerial, int32 NextTurnIndex)
+{
+    return HasAuthority() && !bSuspendedForRecovery && CommitTurnBoundary.IsBound() && CommitTurnBoundary.Execute(CompletedTurnSerial, NextTurnIndex);
+}
+
+bool ACombatManager::IsAwaitingTurnCheckpoint() const
+{
+    return HasAuthority() ? TurnManager && TurnManager->IsAwaitingTurnCheckpoint() && !bSuspendedForRecovery : CombatView.bAwaitingTurnCheckpoint;
+}
+
+bool ACombatManager::RetryTurnCheckpoint()
+{
+    if (!HasAuthority() || bSuspendedForRecovery || !TurnManager)
+    {
+        return false;
+    }
+    const bool bResumed = TurnManager->RetryTurnCheckpoint();
+    PublishCombatView();
+    return bResumed;
+}
+
+bool ACombatManager::RestoreCombatFromBoundary(int32 CompletedTurnSerial, int32 NextTurnIndex)
+{
+    if (!HasAuthority() || IsCombatActive() || IsAwaitingTurnCheckpoint() || CombatUnits.IsEmpty() || !ActionAuthority)
+    {
+        return false;
+    }
+    if (TurnManager)
+    {
+        TurnManager->OnTurnChanged.RemoveAll(this);
+        TurnManager->ResetCombat();
+    }
+    TurnManager = NewObject<UTurnManager>(this);
+    TurnManager->OnCombatResult.AddUObject(this, &ACombatManager::HandleCombatResult);
+    TurnManager->OnTurnChanged.AddUObject(this, &ACombatManager::HandleTurnChanged);
+    if (CommitTurnBoundary.IsBound())
+    {
+        TurnManager->CommitTurnBoundary.BindUObject(this, &ACombatManager::HandleCommitTurnBoundary);
+    }
+    bSuspendedForRecovery = false;
+    ActionAuthority->BeginCombat();
+    if (!TurnManager->RestoreFromBoundary(CombatUnits, CompletedTurnSerial, NextTurnIndex))
+    {
+        SuspendCombatForRecovery();
+        return false;
+    }
+    RefreshTileProtectedByFront();
+    PublishCombatView();
+    return true;
+}
+
+void ACombatManager::SuspendCombatForRecovery()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+    // Suspension never creates a result or a new checkpoint from a partially completed action.
+    // 정지는 부분 완료 행동으로 결과나 새 체크포인트를 만들지 않습니다.
+    bSuspendedForRecovery = true;
+    ClearPlayerSelection();
+    GetWorldTimerManager().ClearTimer(DeadTurnTimer);
+    if (TurnManager)
+    {
+        TurnManager->SuspendForRecovery();
+    }
+    for (AUnitBase* Unit : CombatUnits)
+    {
+        if (IsValid(Unit))
+        {
+            Unit->OnTurnEnd();
+            Unit->CancelCurrentAction();
+        }
+    }
+    ClearMovableTilesHighlight();
+    ClearSkillTargetTilesHighlight();
     PublishCombatView();
 }
 
@@ -262,7 +343,7 @@ void ACombatManager::Server_StartCombat_Implementation()
 
 void ACombatManager::StartCombat_Internal()
 {
-    if (!HasAuthority() || IsCombatActive() || CombatUnits.IsEmpty())
+    if (!HasAuthority() || IsCombatActive() || IsAwaitingTurnCheckpoint() || bSuspendedForRecovery || CombatUnits.IsEmpty())
     {
         return;
     }
@@ -282,6 +363,10 @@ void ACombatManager::StartCombat_Internal()
     ActionAuthority->BeginCombat();
     TurnManager->OnCombatResult.AddUObject(this, &ACombatManager::HandleCombatResult);
     TurnManager->OnTurnChanged.AddUObject(this, &ACombatManager::HandleTurnChanged);
+    if (CommitTurnBoundary.IsBound())
+    {
+        TurnManager->CommitTurnBoundary.BindUObject(this, &ACombatManager::HandleCommitTurnBoundary);
+    }
     TurnManager->InitializeTurnOrder(CombatUnits);
     CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
     RefreshReachableMoveTiles();
@@ -372,7 +457,7 @@ AUnitBase* ACombatManager::GetCurrentUnit() const
 
 bool ACombatManager::IsCombatActive() const
 {
-    return HasAuthority() ? TurnManager && TurnManager->IsCombatActive() : CombatView.bCombatActive;
+    return HasAuthority() ? !bSuspendedForRecovery && TurnManager && TurnManager->IsCombatActive() : CombatView.bCombatActive;
 }
 
 void ACombatManager::HandleUnitDied(AUnitBase* Unit)
@@ -441,6 +526,7 @@ void ACombatManager::ResetCombat()
         return;
     }
     EndCombat();
+    bSuspendedForRecovery = false;
     for (AUnitBase* Unit : CombatUnits)
     {
         if (IsValid(Unit))

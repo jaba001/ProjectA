@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Game/Run/RunTypes.h"
+#include "Combat/Checkpoint/CombatCheckpointTypes.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Types/CombatResult.h"
 #include "RunStateSubsystem.generated.h"
@@ -76,13 +77,22 @@ public:
     bool CanContinueSavedRun(FText& OutError) const;
     void EnableCheckpointSaving(const FString& Slot = FString());
     const FText& GetSaveError() const { return SaveError; }
+    bool CommitCombatCheckpoint(const FCombatCheckpointData& Checkpoint, FText& OutError);
+    const FCombatCheckpointData& GetCombatCheckpoint() const { return CombatCheckpoint; }
+    bool HasCombatCheckpoint() const { return CombatCheckpoint.Revision > 0; }
+    bool IsCheckpointSavingEnabled() const { return bCheckpointSaving; }
+    bool ValidateCheckpointHost(const FRunAccountId& AccountId, FText& OutError) const;
 
 private:
     bool ValidateSave(const URunSaveGame* Save, FText& OutError) const;
+    URunSaveGame* CreateSaveData() const;
     void AutoSaveCheckpoint();
     FString SaveSlot = TEXT("ProjectA_Run");
     bool bCheckpointSaving = false;
     FText SaveError;
+
+    UPROPERTY(Transient)
+    FCombatCheckpointData CombatCheckpoint;
 
     UPROPERTY(Transient)
     FRunIdentityData RunIdentity;

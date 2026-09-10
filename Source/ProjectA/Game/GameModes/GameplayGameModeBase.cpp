@@ -95,6 +95,15 @@ void AGameplayGameModeBase::InitializeGameplay()
             Controller->InitializeGameplay(EncounterManager);
         }
     }
+    URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+    if (GetNetMode() == NM_Standalone && Run->HasCombatCheckpoint())
+    {
+        FText Error;
+        if (!EncounterManager->RestoreSavedCombat(Run->GetRunIdentity().HostAccountId, Error))
+        {
+            UE_LOG(LogTemp, Error, TEXT("[Gameplay] Combat checkpoint restore failed: %s"), *Error.ToString());
+        }
+    }
 }
 
 void AGameplayGameModeBase::PostLogin(APlayerController* NewPlayer)
@@ -168,6 +177,38 @@ bool AGameplayGameModeBase::ApplyCombatParticipantBindings(UCombatActionAuthorit
         }
     }
     return true;
+}
+
+bool AGameplayGameModeBase::HasOriginalHostConnection(const FRunAccountId& HostAccount) const
+{
+    if (!HasAuthority() || GetNetMode() != NM_ListenServer)
+    {
+        return false;
+    }
+    for (const TPair<TWeakObjectPtr<APartyPlayerController>, FRunAccountId>& Entry : RunParticipants)
+    {
+        if (Entry.Key.IsValid() && Entry.Key->IsLocalController() && Entry.Value == HostAccount)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void AGameplayGameModeBase::Logout(AController* Exiting)
+{
+    APartyPlayerController* Participant = Cast<APartyPlayerController>(Exiting);
+    if (Participant && RunParticipants.Contains(Participant))
+    {
+        // A lost original participant pauses combat without changing the host or assigning AI.
+        // 원래 참가자의 연결이 끊기면 Host 변경이나 AI 배정 없이 전투를 멈춥니다.
+        if (IsValid(EncounterManager))
+        {
+            EncounterManager->SuspendForDisconnectedParticipant();
+        }
+        RunParticipants.Remove(Participant);
+    }
+    Super::Logout(Exiting);
 }
 
 void AGameplayGameModeBase::EndPlay(const EEndPlayReason::Type EndPlayReason)

@@ -7,7 +7,7 @@ Unreal Engine 기반 Grid Turn-Based Combat System 프로젝트입니다.
 
 현재 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 최종적으로 상대 Party/Build Snapshot을 사용하는 Async PvP와 Listen Server 기반의 실시간 Co-op을 지원하도록 확장합니다. T14의 첫 단계로 Unreal `USaveGame` v1에 저장된 상대를 기존 전투에 연결하고 로컬 전투 한 사이클을 검증했습니다. 순차 3번에서 실제 2인 Listen Server 전투/HUD 동기화까지 검증했습니다. Co-op에서는 할당된 Party Member의 Action Request를 서버가 검증·실행하고 전투 상태의 최종 권위를 가집니다. 새 데이터·명령은 직렬화 가능한 형태를 우선하고 강한 로컬 PlayerController 의존성을 피합니다. 구현·검증 상태와 미결정 항목은 [T14 작업 카드](Docs/TODO.md), 실행 방법은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)와 [Listen Server 구현·검증 안내](Docs/T14_NETWORK.md)를 참고하세요.
 
-Co-op 확정 기획은 최대 4인과 원래 캐릭터 소유자만 직접 조작하는 방식입니다. 종료·끊김 시 기존 Host를 유지하고, 원래 인원이 다시 모일 수 없을 때 기존 참가자가 명시적으로 Host를 승계해 불참자 캐릭터를 AI로 전환하는 이어하기를 계획합니다. AI 전환에는 Run 시작 시 각자의 사전 동의가 필요하며, AI 전환 후 MMR은 현재 인간 참가자에게만 반영합니다. 복구 목표는 마지막 확정 턴 경계입니다. Run·참가자·캐릭터 소유권의 값 데이터와 저장·조회, 서버 명령 검증은 순차 1~2번에서 완료했습니다. 실제 연결의 조작권과 상태 복제는 3번에서 검증했으며, 턴 복구·아군 AI·승계·온라인 서비스의 4~8번은 대기 중입니다. [Co-op 확정 기획](Docs/T14_COOP_DESIGN.md)과 [1~8번 순차 작업 대기열](Docs/T14_QUEUE.md)에 구현 경계를 정리합니다.
+Co-op 확정 기획은 최대 4인과 원래 캐릭터 소유자만 직접 조작하는 방식입니다. 종료·끊김 시 기존 Host를 유지하며, 원래 인원이 다시 모일 수 없을 때 기존 참가자의 명시적 Host 승계와 불참자 AI 이어하기를 계획합니다. AI 전환에는 Run 시작 시 각자의 사전 동의가 필요하고, 이후 MMR은 현재 인간 참가자에게만 반영하는 기획입니다. 순차 1~3번의 소유권·서버 명령·2인 동기화에 이어 4번에서 확정 턴 저장과 기존 Host의 새 세션 복구를 검증했습니다. 아군 AI·승계·3~4인·온라인 서비스의 5~8번은 대기 중입니다. [Co-op 확정 기획](Docs/T14_COOP_DESIGN.md)과 [1~8번 순차 작업 대기열](Docs/T14_QUEUE.md)에 구현 경계를 정리합니다.
 
 ```text
 MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
@@ -15,7 +15,7 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
                                              → Defeat → 종료 화면
 ```
 
-`URunStateSubsystem`이 슬롯·이름·ClassId·HP·노드 진행을 레벨 전환 동안 보존합니다. `AEncounterManager`는 아레나 준비, 파티/적 스폰, 결과 추출과 정리를 맡고 기존 CombatManager/TurnManager/GAS를 재사용합니다. 두 개의 순차 전투 노드가 같은 Gameplay 레벨에서 실행됩니다. 진행은 전투 밖 체크포인트에서 디스크에 자동 저장합니다.
+`URunStateSubsystem`이 슬롯·이름·ClassId·HP·노드 진행을 레벨 전환 동안 보존합니다. `AEncounterManager`는 아레나 준비, 파티/적 스폰, 결과 추출과 정리를 맡고 기존 CombatManager/TurnManager/GAS를 재사용합니다. 두 개의 순차 전투 노드가 같은 Gameplay 레벨에서 실행됩니다. 진행은 전투 밖과 식별된 Run의 확정 턴 경계에서 디스크에 자동 저장합니다.
 
 실행/에셋 설정과 검증 경계는 [Vertical Slice 설정](Docs/VERTICAL_SLICE_SETUP.md)과 [작업 보고](Docs/VERTICAL_SLICE_REPORT.md)를 확인하세요. 네 직업의 표시명·설명·아이콘·전투 클래스·스탯·시작 스킬은 `DA_VerticalSliceParty.Professions`에서 관리합니다. 기본 설정은 기존 `BP_PlayerUnit`의 전투 밸런스를 유지하며, 직업별 수치는 데이터에서 별도로 지정할 수 있습니다.
 
@@ -27,6 +27,7 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 - [T14 Co-op 확정 기획](Docs/T14_COOP_DESIGN.md): 본인 캐릭터 조작권, 기존 참가자의 Host 승계·AI 이어하기, MMR과 턴 경계 복구
 - [T14 순차 작업 대기열](Docs/T14_QUEUE.md): 1~8번의 순서, 상태, 번호별 완료 기준
 - [T14 Listen Server 구현·검증](Docs/T14_NETWORK.md): 실제 2인 PIE RPC, 전투/HUD 복제, 참가자 배정과 미결정 진행 권한
+- [T14 확정 턴 저장·복구](Docs/T14_CHECKPOINT.md): v3 전투 저장, 저장 실패 재시도, 기존 Host의 새 세션 복구와 지원 경계
 - [코드 리뷰](Docs/CODE_REVIEW.md): P1/P2 문제의 근거와 검증 시나리오
 
 문서는 2026-09-10 현재 작업 트리를 기준으로 정리합니다. 코드 구현, 정식 빌드, 에셋 설정 확인, PIE 검증은 별도로 기록합니다.
@@ -222,11 +223,13 @@ C++ 파일을 생성, 삭제, 이름 변경한 뒤 프로젝트 파일 재생성
 
 ## 저장·이어하기와 옵션 (T11)
 
-새 게임 시작, 전투 결과 확정, Continue 시 기본 `ProjectA_Run` 슬롯에 파티 이름·직업·HP·노드 진행·결과와 직업 데이터 경로를 저장합니다. 전투 중 종료하면 해당 전투 시작 전 체크포인트로 돌아갑니다. 결과 화면에서 종료했다면 결과 화면으로 복원하며, 패배하거나 모든 노드를 완료한 기록은 이어할 수 없습니다. 새 파티로 게임을 시작하면 선택된 슬롯의 기존 저장을 교체합니다.
+새 게임 시작, 확정 턴 경계, 전투 결과 확정, Continue 시 기본 `ProjectA_Run` 슬롯에 진행을 저장합니다. 식별된 Run은 전투 중 종료해도 마지막 확정 턴부터 이어가며, 처리 중이던 행동은 저장하지 않습니다. 결과 화면에서 종료했다면 결과 화면으로 복원하며, 패배하거나 모든 노드를 완료한 기록은 이어할 수 없습니다. 새 파티로 게임을 시작하면 선택된 슬롯의 기존 저장을 교체합니다.
 
 T14 로컬 상대 검증은 [Snapshot 설정 스크립트](Source/ProjectAEditor/Scripts/ConfigureSnapshotContent.py) 실행 후 `-ProjectAOpponentSnapshot=SampleOpponent`로 선택합니다. 상대 데이터는 `ProjectA_Opponent_SampleOpponent`, Run 체크포인트는 `ProjectA_SnapshotRun_SampleOpponent`로 분리됩니다. 명시적인 `-ProjectASaveSlot=...`은 우선하며, 이어하기에는 같은 상대 실행 인자를 사용합니다. 저장값과 에셋 설정은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)를 참고하세요.
 
-메인메뉴 Continue는 저장이 없거나 손상/버전 불일치/직업 데이터 누락/종료된 진행이면 비활성화하고 이유를 표시합니다. 쓰기 실패는 시작 화면 또는 Gameplay의 지도/결과 화면에 표시하며 게임 중 쓰기 실패가 이전 체크포인트까지 갱신했다는 뜻은 아닙니다. 신규 Run은 v2로 Run ID·원래 참가자·캐릭터 ID/소유자·Host/세대·AI 동의 상태를 함께 저장합니다. 실제 식별 정보가 없는 기존 v1 기록은 소유권을 추정하지 않는 `LegacyOffline`으로 이어가며 다시 v1으로 저장합니다. 손상된 v2는 v1으로 우회하지 않고 거절합니다. 전투 도중 액터/AP/발사체 복원은 아직 지원하지 않습니다.
+메인메뉴 Continue는 저장이 없거나 손상/버전 불일치/직업 데이터 누락/종료된 진행이면 비활성화하고 이유를 표시합니다. 신규 Run의 전투 밖 저장은 v2, 확정 턴 저장은 v3이며 Run·원래 참가자·캐릭터 소유자·Host/세대를 유지합니다. 실제 식별 정보가 없는 v1은 `LegacyOffline`으로 이어가며 전투 밖 복구만 지원합니다. 손상된 v2/v3를 이전 형식으로 우회하지 않습니다.
+
+v3는 턴 순서·다음 유닛·HP/AP/SubAP·재고·사망·점유·실제 장착·고정된 상대 Snapshot을 저장합니다. 저장에 실패하면 이전 파일을 보존하고 다음 턴을 멈추며 Host의 **저장 다시 시도** 버튼으로 재시도합니다. 결과와 Continue도 저장 성공 후 확정합니다. 복구할 때 새 Actor와 명령 실행 ID를 만들며, 처리 중 이동/발사체·활성 GAS 능력·지속 효과·쿨다운 등 표현하지 못하는 상태는 거절합니다. 협동 복구는 기존 Host와 원래 참가자 전원의 서버 연결 배정 후 실행하며 실제 로그인·재접속 UI는 후속 범위입니다. 자세한 계약은 [확정 턴 저장·복구](Docs/T14_CHECKPOINT.md)를 참고하세요.
 
 현재 새 싱글플레이는 Run마다 임시 개발용 참가자 한 명을 생성하고 생성한 캐릭터들을 해당 참가자에게 연결합니다. 레벨 이동·다음 노드·저장/복원 동안 식별값을 유지하고 새 게임은 새 식별값을 만듭니다. 동의 UI가 없으므로 AI 동의는 자동 승인하지 않고 `Unknown`으로 저장합니다. 개발용 ID와 소유권 조회는 실제 계정 인증이나 Co-op 접속을 제공하지 않습니다.
 

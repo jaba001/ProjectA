@@ -24,6 +24,11 @@ class PROJECTA_API ACombatManager : public AActor
 public:
     FOnCombatResult OnCombatResult;
     FOnCombatViewChanged OnCombatViewChanged;
+    FCommitCombatTurnBoundary CommitTurnBoundary;
+    bool IsAwaitingTurnCheckpoint() const;
+    bool RetryTurnCheckpoint();
+    bool RestoreCombatFromBoundary(int32 CompletedTurnSerial, int32 NextTurnIndex);
+    void SuspendCombatForRecovery();
     bool IsCombatActive() const;
     void EndCombat();
     void ResetCombat();
@@ -71,6 +76,8 @@ private:
     void OnRep_CombatGrid();
 
     void HandleTurnChanged();
+    bool HandleCommitTurnBoundary(int32 CompletedTurnSerial, int32 NextTurnIndex);
+    bool bSuspendedForRecovery = false;
     UPROPERTY(VisibleAnywhere, Category = "Combat|Commands")
     TObjectPtr<UCombatActionAuthority> ActionAuthority;
 

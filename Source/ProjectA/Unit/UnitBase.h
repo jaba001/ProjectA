@@ -13,6 +13,7 @@ class AUnitAIController;
 class UGameplayAbility;
 class USkillDefinitionDataAsset;
 class AUnitBase;
+struct FCombatCheckpointUnit;
 
 // Team affiliation used by combat units.
 // 전투 유닛의 소속 팀을 나타냅니다.
@@ -439,6 +440,11 @@ public:
     // Apply resolved profession data before the spawned unit enters combat.
     // 스폰 유닛이 전투에 들어가기 전에 해석된 직업 데이터를 적용합니다.
     bool ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills);
+    bool CaptureCheckpointState(FCombatCheckpointUnit& OutState, FText& OutError) const;
+    bool RestoreCheckpointState(const FCombatCheckpointUnit& State, FText& OutError);
+
+private:
+    bool bCheckpointStateRestored = false;
 
 protected:
     // Initial attributes

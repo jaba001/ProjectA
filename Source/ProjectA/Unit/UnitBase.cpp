@@ -8,6 +8,7 @@
 #include "AIController.h"
 
 #include "Combat/CombatManager.h"
+#include "Combat/Checkpoint/CombatCheckpointTypes.h"
 #include "Combat/Library/CombatTargetingLibrary.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
@@ -20,6 +21,51 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Engine/LatentActionManager.h"
+#include "Navigation/PathFollowingComponent.h"
+#include "GameplayEffect.h"
+
+namespace
+{
+    bool IsCheckpointAssetPath(const FSoftObjectPath& Path)
+    {
+        const FString Value = Path.ToString();
+        return Path.IsValid() && Path.GetSubPathString().IsEmpty() && Value.Len() <= 512 && (Value.StartsWith(TEXT("/Game/")) || Value.StartsWith(TEXT("/Script/ProjectA.")));
+    }
+
+    bool ValidateCheckpointGAS(const UAbilitySystemComponent* ASC, FText& OutError)
+    {
+        if (!ASC)
+        {
+            OutError = FText::FromString(TEXT("체크포인트 유닛에 어빌리티 시스템이 없습니다."));
+            return false;
+        }
+        if (!ASC->GetActiveEffects(FGameplayEffectQuery()).IsEmpty() || !ASC->GetOwnedGameplayTags().IsEmpty())
+        {
+            OutError = FText::FromString(TEXT("지속 효과, 쿨다운 또는 상태 태그가 있는 전투의 턴 복구는 지원하지 않습니다."));
+            return false;
+        }
+        for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+        {
+            if (!Spec.Ability || Spec.IsActive())
+            {
+                OutError = FText::FromString(TEXT("어빌리티가 실행 중인 상태는 확정 턴 경계가 아닙니다."));
+                return false;
+            }
+            if (Spec.Ability && Spec.Ability->GetCooldownGameplayEffect())
+            {
+                OutError = FText::FromString(TEXT("쿨다운이 설정된 어빌리티의 턴 복구는 지원하지 않습니다."));
+                return false;
+            }
+            const UGameplayEffect* CostEffect = Spec.Ability->GetCostGameplayEffect();
+            if (Spec.Level != 1 || !Spec.GetDynamicSpecSourceTags().IsEmpty() || (CostEffect && CostEffect->DurationPolicy != EGameplayEffectDurationType::Instant))
+            {
+                OutError = FText::FromString(TEXT("변경된 어빌리티 레벨, 태그 또는 지속 비용 효과의 턴 복구는 지원하지 않습니다."));
+                return false;
+            }
+        }
+        return true;
+    }
+}
 
 AUnitBase::AUnitBase()
 {
@@ -1127,6 +1173,158 @@ bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TA
     }
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetMaxHPAttribute(), MaxHP);
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), MaxHP);
+    return true;
+}
+
+bool AUnitBase::CaptureCheckpointState(FCombatCheckpointUnit& OutState, FText& OutError) const
+{
+    if (!HasAuthority() || IsBusy() || IsActiveTurn() || !AttributeSet || ActiveSkillHandle.IsValid() || SkillAbilityEndedHandle.IsValid())
+    {
+        OutError = FText::FromString(TEXT("서버의 비활성 유휴 유닛만 턴 체크포인트로 저장할 수 있습니다."));
+        return false;
+    }
+    if (const AAIController* AI = Cast<AAIController>(GetController()); AI && AI->GetPathFollowingComponent() && AI->GetPathFollowingComponent()->GetStatus() != EPathFollowingStatus::Idle)
+    {
+        OutError = FText::FromString(TEXT("이동 요청이 끝나지 않은 유닛은 턴 체크포인트로 저장할 수 없습니다."));
+        return false;
+    }
+    if (!ValidateCheckpointGAS(AbilitySystem, OutError))
+    {
+        return false;
+    }
+    FCombatCheckpointUnit Captured = OutState;
+    Captured.UnitClass = FSoftObjectPath(GetClass());
+    Captured.DefaultAttackAbility = FSoftObjectPath(DefaultAttackAbilityClass.Get());
+    Captured.Skills.Reset();
+    if (!IsCheckpointAssetPath(Captured.UnitClass) || !IsCheckpointAssetPath(Captured.DefaultAttackAbility) || EquippedSkillDataAssets.IsEmpty())
+    {
+        OutError = FText::FromString(TEXT("저장 가능한 유닛 클래스와 기본 공격 및 장착 스킬 에셋이 필요합니다."));
+        return false;
+    }
+    TSet<UClass*> CapturedAbilities;
+    for (USkillDefinitionDataAsset* Skill : EquippedSkillDataAssets)
+    {
+        const FSoftObjectPath SkillPath(Skill);
+        if (!IsValid(Skill) || !IsCheckpointAssetPath(SkillPath) || !Skill->AbilityClass || CapturedAbilities.Contains(Skill->AbilityClass))
+        {
+            OutError = FText::FromString(TEXT("임시 또는 해석할 수 없는 장착 스킬은 체크포인트에 저장할 수 없습니다."));
+            return false;
+        }
+        Captured.Skills.Add(SkillPath);
+        CapturedAbilities.Add(Skill->AbilityClass);
+    }
+    if (CapturedAbilities.Num() != AbilitySystem->GetActivatableAbilities().Num())
+    {
+        OutError = FText::FromString(TEXT("장착 목록으로 표현할 수 없는 추가 어빌리티는 체크포인트에 저장할 수 없습니다."));
+        return false;
+    }
+    for (const FGameplayAbilitySpec& Spec : AbilitySystem->GetActivatableAbilities())
+    {
+        if (!CapturedAbilities.Contains(Spec.Ability->GetClass()))
+        {
+            OutError = FText::FromString(TEXT("실제 부여된 어빌리티와 체크포인트 장착 목록이 일치하지 않습니다."));
+            return false;
+        }
+    }
+    Captured.Team = Team;
+    Captured.CharacterName = RuntimeCharacterName.IsEmpty() ? FText::FromString(GetName()) : RuntimeCharacterName;
+    Captured.HP = AttributeSet->GetHP();
+    Captured.MaxHP = AttributeSet->GetMaxHP();
+    Captured.AP = CurrentActionPoint;
+    Captured.MaxAP = MaxActionPoint;
+    Captured.SubAP = CurrentSubActionPoint;
+    Captured.MaxSubAP = MaxSubActionPoint;
+    Captured.MoveRange = MoveRange;
+    Captured.HealingItemCount = HealingItemCount;
+    Captured.HealingItemAmount = HealingItemAmount;
+    Captured.bDead = bIsDead;
+    Captured.bHasTile = IsValid(CurrentTile);
+    Captured.GridCoord = CurrentTile ? CurrentTile->GridCoord : FIntPoint::ZeroValue;
+    Captured.Transform = GetActorTransform();
+    OutState = MoveTemp(Captured);
+    OutError = FText::GetEmpty();
+    return true;
+}
+
+bool AUnitBase::RestoreCheckpointState(const FCombatCheckpointUnit& State, FText& OutError)
+{
+    if (!HasAuthority() || bCheckpointStateRestored || CurrentActionSerial != 0 || IsActiveTurn() || IsBusy() || bIsDead || CurrentTile || !AttributeSet || State.UnitClass != FSoftObjectPath(GetClass()))
+    {
+        OutError = FText::FromString(TEXT("체크포인트와 같은 클래스의 새 비활성 유닛에만 상태를 복원할 수 있습니다."));
+        return false;
+    }
+    if (!ValidateCheckpointGAS(AbilitySystem, OutError))
+    {
+        return false;
+    }
+    if (!FMath::IsFinite(State.HP) || !FMath::IsFinite(State.MaxHP) || State.MaxHP <= 0.0f || State.MaxHP > 1000000.0f || State.HP < 0.0f || State.HP > State.MaxHP || State.bDead != (State.HP == 0.0f) || State.MaxAP < 1 || State.MaxAP > 100 || State.AP < 0 || State.AP > State.MaxAP || State.MaxSubAP < 0 || State.MaxSubAP > 100 || State.SubAP < 0 || State.SubAP > State.MaxSubAP || State.MoveRange < 0 || State.MoveRange > 32 || State.HealingItemCount < 0 || State.HealingItemCount > 1000 || !FMath::IsFinite(State.HealingItemAmount) || State.HealingItemAmount < 0.0f || State.HealingItemAmount > 1000000.0f || State.Transform.ContainsNaN() || State.Skills.IsEmpty() || State.Skills.Num() > 5 || (State.Team != ETeam::Player && State.Team != ETeam::Enemy))
+    {
+        OutError = FText::FromString(TEXT("체크포인트의 HP, 행동력, 이동 또는 회복약 상태가 유효하지 않습니다."));
+        return false;
+    }
+    UClass* DefaultAbility = IsCheckpointAssetPath(State.DefaultAttackAbility) ? Cast<UClass>(State.DefaultAttackAbility.TryLoad()) : nullptr;
+    if (!DefaultAbility || !DefaultAbility->IsChildOf(UGameplayAbility::StaticClass()))
+    {
+        OutError = FText::FromString(TEXT("체크포인트 기본 공격 어빌리티를 해석할 수 없습니다."));
+        return false;
+    }
+    TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
+    TSet<TSubclassOf<UGameplayAbility>> AbilityClasses;
+    for (const FSoftObjectPath& Path : State.Skills)
+    {
+        USkillDefinitionDataAsset* Skill = IsCheckpointAssetPath(Path) ? Cast<USkillDefinitionDataAsset>(Path.TryLoad()) : nullptr;
+        if (!UCombatTargetingLibrary::IsSupportedSkillArea(Skill) || !Skill->AbilityClass || Skill->ActionPointCost <= 0 || AbilityClasses.Contains(Skill->AbilityClass) || Skill->AbilityClass->GetDefaultObject<UGameplayAbility>()->GetCooldownGameplayEffect())
+        {
+            OutError = FText::FromString(TEXT("체크포인트 스킬이 없거나 중복되거나 지원하지 않는 쿨다운을 사용합니다."));
+            return false;
+        }
+        Skills.Add(Skill);
+        AbilityClasses.Add(Skill->AbilityClass);
+        const UGameplayEffect* CostEffect = Skill->AbilityClass->GetDefaultObject<UGameplayAbility>()->GetCostGameplayEffect();
+        if (CostEffect && CostEffect->DurationPolicy != EGameplayEffectDurationType::Instant)
+        {
+            OutError = FText::FromString(TEXT("지속 비용 효과를 사용하는 체크포인트 스킬은 복원할 수 없습니다."));
+            return false;
+        }
+    }
+    if (!AbilityClasses.Contains(DefaultAbility) || !ConfigureProfession(State.MaxHP, State.MaxAP, State.MaxSubAP, Skills))
+    {
+        OutError = FText::FromString(TEXT("체크포인트 장착 스킬과 기본 공격을 복원할 수 없습니다."));
+        return false;
+    }
+    // Restore values without replaying damage, death events, item use, or ability callbacks.
+    // 피해, 사망 이벤트, 아이템 사용 또는 어빌리티 콜백을 재실행하지 않고 값을 복원합니다.
+    DefaultAttackAbilityClass = DefaultAbility;
+    EquippedSkillAbilityClasses.Reset();
+    for (USkillDefinitionDataAsset* Skill : Skills)
+    {
+        if (Skill->AbilityClass != DefaultAttackAbilityClass)
+        {
+            EquippedSkillAbilityClasses.Add(Skill->AbilityClass);
+        }
+    }
+    RuntimeCharacterName = State.CharacterName;
+    Team = State.Team;
+    MoveRange = State.MoveRange;
+    CurrentActionPoint = State.AP;
+    CurrentSubActionPoint = State.SubAP;
+    HealingItemCount = State.HealingItemCount;
+    HealingItemAmount = State.HealingItemAmount;
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), State.HP);
+    bIsDead = State.bDead;
+    bIsActiveTurn = false;
+    bTurnMustEndAfterCurrentAction = false;
+    MovePhase = EUnitMovePhase::None;
+    CurrentActionType = EUnitActionType::None;
+    SetActorTransform(State.Transform, false, nullptr, ETeleportType::TeleportPhysics);
+    DefaultBattleRotation = State.Transform.Rotator();
+    if (bIsDead)
+    {
+        ApplyDeathPresentation();
+    }
+    bCheckpointStateRestored = true;
+    ForceNetUpdate();
+    OutError = FText::GetEmpty();
     return true;
 }
 

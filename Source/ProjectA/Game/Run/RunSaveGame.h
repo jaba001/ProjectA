@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
 #include "Game/Run/RunTypes.h"
+#include "Combat/Checkpoint/CombatCheckpointTypes.h"
 #include "Types/CombatResult.h"
 #include "RunSaveGame.generated.h"
 
@@ -32,4 +33,6 @@ public:
     ECombatResult Result = ECombatResult::None;
     UPROPERTY()
     FSoftObjectPath Catalog;
+    UPROPERTY()
+    FCombatCheckpointData CombatCheckpoint;
 };

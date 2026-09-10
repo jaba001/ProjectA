@@ -9,7 +9,7 @@
 | 1 | 완료 | Run·원래 참가자·캐릭터 소유권 데이터 | Actor 없는 식별·동의·Host 데이터, 신규 Run 생성과 저장 왕복, 기존 v1 호환, 소유권 조회 검증 |
 | 2 | 완료 | 서버 Action Request와 소유권 검증 | 서버 참가자 바인딩, 본인 캐릭터·턴·자원·대상 검증과 중복 거절, Standalone 실행 회귀 통과 |
 | 3 | 완료 | 2인 Listen Server 전투 동기화 | 실제 2개 PIE의 소유 연결 RPC, 본인 Unit 조작, Turn·Grid·HP/AP·사망·결과·HUD 일치 검증 |
-| 4 | 대기 | 확정 턴 체크포인트와 기존 Host 복구 | 3 완료 후 마지막 확정 턴의 상태를 저장·복원, 처리 중 행동·손상·저장 실패 검증 |
+| 4 | 완료 | 확정 턴 체크포인트와 기존 Host 복구 | v3 턴 저장·실패 재시도, 실제 2인 새 세션/별도 프로세스 복구, 고정 상대·손상·처리 중 행동 검증 |
 | 5 | 대기 | 아군 AI 판단과 행동 | 4 완료 후 소유권·아군 진영을 유지하는 서버 AI, 인간 입력과 동시 실행 차단 |
 | 6 | 대기 | 명시적 Host 승계와 AI 이어하기 | 5 완료 후 원래 참가자·사전 동의 검증, 승계/AI 버튼, 로컬 권위 저장소 대역을 통한 중복 재개 거절 |
 | 7 | 대기 | 3·4인 검증 | 6 완료 후 최대 인원 조작권·동기화·끊김·복구·승계/AI 통합 검증 |
@@ -85,3 +85,27 @@
 최종 검증 파일: `Saved/Automation/T14NetworkReadyBuild.log`, `T14NetworkPIE4/index.json`, `T14NetworkFull/index.json`, `T14NetworkSnapshotPIE/index.json`. 최초 실패·진단 로그는 `Saved/Logs/T14NetworkPIE1.log`~`T14NetworkPIE3.log`에 보존한다.
 
 커밋 제목: `[codex] 2인 Listen Server 전투와 HUD 동기화 추가`. 다음 번호는 4번 확정 턴 체크포인트와 기존 Host 복구다. 다음 실행은 해당 커밋의 upstream 반영까지 확인한 뒤 착수한다. 노드 선택·Continue 결정권 질문은 유지하며 답변이 오면 그 정책에 의존하는 진행 입력을 연결한다.
+
+## 4번 구현 범위
+
+3번 `da5aaf0`의 upstream 반영과 깨끗한 작업 트리를 확인하고 착수했다. `RunSaveGame` v3에 Actor 없는 전투 시도·revision·턴 순서·다음 유닛·HP/AP/SubAP·재고·사망·점유·실제 장착과 고정 상대 Snapshot을 저장한다. 기존 전투 밖 v1/v2와 LegacyOffline 호환을 유지한다.
+
+저장 경계는 이전 유닛 턴 종료 완료 → 다음 생존 유닛 선택 → 파일 교체 성공 → 다음 턴 시작이다. 저장 실패는 같은 후보와 이전 파일을 유지하며 다음 인간/AI 턴을 막는다. Host의 저장 재시도, 최종 결과 저장 재시도와 Continue 실패 rollback을 연결했다. 확정 v3를 준비 취소로 지우지 못하도록 검사한다.
+
+`USaveGame` 직렬화 후 같은 디렉터리의 임시 파일을 flush·재검증하고 Win64 파일 교체로 확정한다. 새 세션에서는 원래 Host·참가자·소유권을 확인해 새 Actor와 명령 실행 ID를 만들고 마지막 확정 경계를 한 번 활성화한다. 원래 참가자 끊김은 전투 중단으로 처리하며 자동 Host 승계나 AI 전환을 하지 않는다. 지원하지 않는 GAS 상태와 실제 XY/타일 불일치는 명시적으로 거절한다. 상세 계약은 [확정 턴 저장·복구](T14_CHECKPOINT.md)를 따른다.
+
+## 4번 검증 기록 — 2026-09-10
+
+- Development Editor / Win64 최종 빌드 통과. Visual Studio를 실행하지 않았다.
+- 전체 자동화 52건 통과: 성공 35건·경고 동반 성공 17건·실패 0건. 새 저장 테스트 5건, 런타임 테스트 3건과 실제 2인 체크포인트 PIE를 포함한다. 별도 프로세스용 테스트는 전용 인자 없는 전체 실행에서 안내만 출력하며 아래 Writer/Reader 실행으로 실제 재시작을 검증했다.
+- 실제 두 PIE 세션에서 회복약·이동·GAS 스킬·적 AI 뒤 경계를 저장했다. 파일 쓰기 실패 시 메모리/디스크 revision 보존과 입력 잠금, 같은 후보 재시도와 다음 턴 1회 시작, 처리 중 이동의 저장 거절을 확인했다.
+- 기존 세션을 닫은 뒤 새 Listen Server/Client에서 원래 Host·소유권·턴·HP/AP/SubAP·재고·사망·타일·장착을 비교했다. 실행 ID와 연결 바인딩은 새로 만들고 이전 RPC·Host의 타인 조작은 거절하며 새 소유자의 요청은 정상 실행했다.
+- 별도 Editor-Cmd 프로세스의 Writer와 Reader 각각 1건 통과. 상대 Snapshot을 다른 유효한 본문으로 교체한 경우와 삭제한 경우 각각 별도 PIE 1건 통과. 저장된 상대 본문과 실제 복구 빌드는 그대로 유지했다.
+- 사망 유닛은 HP 0으로 복원하고 사망/행동 콜백을 재실행하지 않았다. 활성 GAS 능력·지속 효과·쿨다운, 중복/손상/버전/Host/소유권/배치 예외와 결과·Continue 저장 실패 rollback, v1/v2 호환을 확인했다. 실제 XY와 점유 타일 불일치는 스폰 전 거절하며 오류를 HUD에 표시했다.
+- 별도 Snapshot 모드의 기존 저장 맵 PIE 1건 통과. 최초 전체 실행의 새 테스트 배열 자체 참조 오류를 수정했다. 다음 전체 실행에서 저장 안내 Overlay가 기존 루트의 클릭 통과 설정을 잃는 문제를 찾아 수정했고, 최종 전체 실행과 별도 Snapshot 실행에서 실제 Slate 타일·버튼 입력과 전투→승리→Continue→다음 전투→패배를 통과했다.
+- 경고는 기존 Spawn/GAS Cue 설정, 격리 월드·종료 중 Nav 조회, 의도한 거절/이동 취소 경로 등이다. 문서 로컬 링크와 diff 검사를 통과했다.
+- 3·4인, 손실/지연 조건, 기존 세션 재접속 UI, 임의 GAS 효과/게임플레이 난수 복원, Host 승계·AI 이어하기, 실제 인증·중앙 저장·MMR과 패키지 재빌드는 이번 번호에서 실행하지 않았다. 로컬 파일 교체를 온라인 위변조·단일 실행 보장으로 취급하지 않는다.
+
+최종 검증 파일: `Saved/Automation/T14CheckpointBuild7.log`, `T14CheckpointFull3/index.json`, `T14CheckpointRestartWrite/index.json`, `T14CheckpointRestartRead/index.json`, `T14CheckpointSnapshotReplace/index.json`, `T14CheckpointSnapshotDelete/index.json`, `T14CheckpointSnapshotPIE/index.json`. 최초 실패 로그는 `Saved/Logs/T14CheckpointFull1.log`, `T14CheckpointFull2.log`에 보존한다.
+
+커밋 제목: `[codex] 확정 턴 체크포인트와 기존 Host 복구 추가`. 다음 번호는 5번 아군 AI 판단과 행동이다. 다음 실행은 해당 커밋의 upstream 반영까지 확인한 뒤 착수한다. 6~8번과 노드 선택·Continue 결정권 질문은 대기 상태를 유지한다.

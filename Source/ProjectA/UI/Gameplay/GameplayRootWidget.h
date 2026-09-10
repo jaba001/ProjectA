@@ -10,6 +10,9 @@ class UCombatHUDWidget;
 class UEncounterResultWidget;
 class URunMapWidget;
 class URunStateSubsystem;
+class UBorder;
+class UButton;
+class UTextBlock;
 struct FGameplayViewState;
 
 UCLASS()
@@ -19,7 +22,7 @@ class PROJECTA_API UGameplayRootWidget : public UCommonUserWidget
 
 public:
     void RefreshFlow(const URunStateSubsystem* RunState, const FText& FlowMessage);
-    void RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands);
+    void RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands, bool bCanRetryCheckpoint = false);
 
 protected:
     virtual void NativeOnInitialized() override;
@@ -43,6 +46,18 @@ protected:
     TObjectPtr<UCommonActivatableWidgetStack> ModalLayer;
 
 private:
+    UFUNCTION()
+    void HandleRetryCheckpoint();
+
+    UPROPERTY(Transient)
+    TObjectPtr<UBorder> CheckpointNotice;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> CheckpointMessage;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> RetryCheckpointButton;
+
     ERunPhase DisplayedPhase = ERunPhase::None;
     bool bHasDisplayedPhase = false;
 

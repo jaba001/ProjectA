@@ -3,6 +3,11 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/Border.h"
+#include "Components/Button.h"
+#include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+#include "Controller/GameplayPlayerController.h"
 #include "Game/GameState/GameplayViewTypes.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "UI/Combat/CombatHUDWidget.h"
@@ -45,6 +50,32 @@ void UGameplayRootWidget::NativeOnInitialized()
         }
     }
 
+    UWidget* ExistingRoot = WidgetTree->RootWidget;
+    ExistingRoot->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+    UOverlay* NoticeRoot = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("CheckpointOverlay"));
+    WidgetTree->RootWidget = NoticeRoot;
+    UOverlaySlot* ContentSlot = NoticeRoot->AddChildToOverlay(ExistingRoot);
+    ContentSlot->SetHorizontalAlignment(HAlign_Fill);
+    ContentSlot->SetVerticalAlignment(VAlign_Fill);
+    CheckpointNotice = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("CheckpointNotice"));
+    UOverlaySlot* NoticeSlot = NoticeRoot->AddChildToOverlay(CheckpointNotice);
+    NoticeSlot->SetHorizontalAlignment(HAlign_Center);
+    NoticeSlot->SetVerticalAlignment(VAlign_Top);
+    CheckpointNotice->SetPadding(FMargin(16.f));
+    UVerticalBox* NoticeContent = WidgetTree->ConstructWidget<UVerticalBox>();
+    CheckpointNotice->SetContent(NoticeContent);
+    CheckpointMessage = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_CheckpointMessage"));
+    CheckpointMessage->SetAutoWrapText(true);
+    CheckpointMessage->SetWrapTextAt(680.f);
+    NoticeContent->AddChildToVerticalBox(CheckpointMessage);
+    RetryCheckpointButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_RetryCheckpoint"));
+    UTextBlock* RetryLabel = WidgetTree->ConstructWidget<UTextBlock>();
+    RetryLabel->SetText(FText::FromString(TEXT("저장 다시 시도")));
+    RetryCheckpointButton->SetContent(RetryLabel);
+    RetryCheckpointButton->OnClicked.AddDynamic(this, &UGameplayRootWidget::HandleRetryCheckpoint);
+    NoticeContent->AddChildToVerticalBox(RetryCheckpointButton);
+    CheckpointNotice->SetVisibility(ESlateVisibility::Collapsed);
+
     SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     WidgetTree->RootWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
@@ -59,9 +90,20 @@ void UGameplayRootWidget::RefreshFlow(const URunStateSubsystem* RunState, const 
     RefreshFlowView(FGameplayViewState::FromRun(RunState, FlowMessage), true);
 }
 
-void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands)
+void UGameplayRootWidget::HandleRetryCheckpoint()
+{
+    if (AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>())
+    {
+        Controller->RequestRetryCombatCheckpoint();
+    }
+}
+
+void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands, bool bCanRetryCheckpoint)
 {
     const ERunPhase Phase = View.Phase;
+    CheckpointNotice->SetVisibility(Phase == ERunPhase::Combat && !View.FlowMessage.IsEmpty() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    CheckpointMessage->SetText(View.FlowMessage);
+    RetryCheckpointButton->SetVisibility(bCanRetryCheckpoint ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 
     if (!bHasDisplayedPhase || DisplayedPhase != Phase)
     {

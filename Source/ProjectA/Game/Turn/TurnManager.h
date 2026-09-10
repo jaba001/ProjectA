@@ -9,6 +9,7 @@ class AUnitBase;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnCombatResult, ECombatResult);
 DECLARE_MULTICAST_DELEGATE(FOnTurnChanged);
+DECLARE_DELEGATE_RetVal_TwoParams(bool, FCommitCombatTurnBoundary, int32, int32);
 
 // Server-side object that manages combat turn order.
 // 전투 턴 순서를 관리하는 서버 측 오브젝트입니다.
@@ -20,8 +21,13 @@ class PROJECTA_API UTurnManager : public UObject
 public:
     FOnCombatResult OnCombatResult;
     FOnTurnChanged OnTurnChanged;
+    FCommitCombatTurnBoundary CommitTurnBoundary;
 
-    bool IsCombatActive() const { return bCombatActive; }
+    bool IsCombatActive() const { return bCombatActive && !bAwaitingCheckpoint && !bSuspended; }
+    bool IsAwaitingTurnCheckpoint() const { return bAwaitingCheckpoint && !bSuspended; }
+    bool RetryTurnCheckpoint();
+    bool RestoreFromBoundary(const TArray<AUnitBase*>& Units, int32 CompletedTurnSerial, int32 NextTurnIndex);
+    void SuspendForRecovery();
     ECombatResult GetCombatResult() const { return CombatResult; }
     void EvaluateCombatResult();
     void StopCombat();
@@ -66,6 +72,11 @@ public:
 
 private:
     bool bCombatActive = false;
+    bool bAwaitingCheckpoint = false;
+    bool bCommittingCheckpoint = false;
+    bool bSuspended = false;
+    bool bTurnStarted = false;
+    void ActivatePreparedTurn();
     ECombatResult CombatResult = ECombatResult::None;
 
     // Server-only turn order array.

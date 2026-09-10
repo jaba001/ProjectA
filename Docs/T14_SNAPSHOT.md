@@ -51,7 +51,7 @@
 
 Blueprint에서도 `Make PartySnapshot`으로 데이터를 구성해 `PartySnapshotLibrary.SaveSnapshot/LoadSnapshot`을 호출할 수 있다. `SlotId`는 영문·숫자·밑줄 1~64자이며 상대 데이터는 `ProjectA_Opponent_<SlotId>`에 저장된다. Windows 개발 환경에서는 `Saved/SaveGames/ProjectA_Opponent_SampleOpponent.sav`에서 확인할 수 있다. 샘플 `.sav`는 로컬 생성 데이터이며 Git·패키지에 포함하지 않는다. 패키지에서 샘플을 사용하려면 해당 실행 환경에서 저장 API로 먼저 생성해야 한다.
 
-Snapshot 모드의 Run 체크포인트는 기본 `ProjectA_SnapshotRun_<SlotId>`로 분리하며 PvE의 `ProjectA_Run`을 덮어쓰지 않는다. 명시적인 `-ProjectASaveSlot=...`은 기존처럼 우선한다. 이어하기에는 같은 상대 실행 인자가 필요하다. 상대 파일 자체의 내용은 체크포인트에 복사하지 않으므로, 진행 중인 Run에서 해당 상대 슬롯을 덮어쓰면 다음 전투는 새 저장값을 사용한다. 고정 상대 이력과 온라인 매칭은 후속 범위다.
+Snapshot 모드의 Run 체크포인트는 기본 `ProjectA_SnapshotRun_<SlotId>`로 분리하며 PvE의 `ProjectA_Run`을 덮어쓰지 않는다. 명시적인 `-ProjectASaveSlot=...`은 기존처럼 우선한다. 이어하기에는 같은 상대 실행 인자를 사용한다. T14 순차 4번의 v3 전투 체크포인트는 읽은 상대 본문과 해석한 장착을 고정하므로 원본 슬롯을 바꾸거나 지워도 해당 전투를 복구한다. 이후 새 전투를 시작할 때는 상대 슬롯을 다시 읽는다. Run 전체의 상대 이력과 온라인 매칭은 후속 범위다.
 
 ## Co-op으로 넘어가는 기준
 
@@ -59,7 +59,7 @@ Snapshot 모드의 Run 체크포인트는 기본 `ProjectA_SnapshotRun_<SlotId>`
 
 다음 단계에서는 원래 소유자만 조작할 수 있는 계정·캐릭터 매핑, 서버 Action Request, 턴·Grid·HP/AP·사망·결과 복제 및 클라이언트 HUD를 구현하고 최소 두 PIE 인스턴스로 확인한다. 최대 4인, 본인 캐릭터 고정, 기존 Host 유지와 명시적 Host 승계·불참자 AI 이어하기, 시작 시 AI 전환 사전 동의, 이후 인간 참가자만 MMR 반영, 마지막 확정 턴 경계 복구로 기획을 확정했다. 상세 합의와 남은 정책은 [Co-op 확정 기획](T14_COOP_DESIGN.md)을 따른다. Steam/EOS, Lobby, Backend, 매칭, 경쟁 결과 검증은 별도 작업이며 이번 로컬 Snapshot 검증에 포함하지 않는다. [T14 기획](TODO.md)
 
-현재 `FPartySnapshot`은 상대 빌드 저장값이며 아군 계정 소유권·Run 참가자·Host 승계·턴 상태 복구를 구현하지 않는다. 기존 `URunSaveGame`도 전투 밖 체크포인트만 저장한다. Co-op 복구 데이터는 별도 후속 계약으로 설계하며 기존 Snapshot v1과 같은 기능으로 취급하지 않는다.
+`FPartySnapshot`은 상대 빌드 저장값이며 아군 계정 소유권·Run 참가자·Host 승계·턴 상태 복구를 직접 구현하지 않는다. `URunSaveGame`의 v2 소유권과 v3 확정 턴 저장은 별도 계약이며 상대 Snapshot v1 형식을 유지한다. 복구 구조와 현재 지원 범위는 [확정 턴 저장·복구](T14_CHECKPOINT.md)를 따른다.
 
 Unreal은 멀티플레이를 염두에 둔 초기 설계를 권장한다. 따라서 Co-op 구현을 다음 단계로 두더라도 새 데이터와 명령의 검증을 로컬 UI에 강하게 결합하지 않는다. [Epic 네트워크 개요](https://dev.epicgames.com/documentation/en-us/unreal-engine/networking-overview-for-unreal-engine?application_version=5.7)
 

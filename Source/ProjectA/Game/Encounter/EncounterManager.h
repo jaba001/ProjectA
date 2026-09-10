@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Combat/Checkpoint/CombatCheckpointTypes.h"
 #include "Types/CombatResult.h"
 #include "EncounterManager.generated.h"
 
@@ -29,6 +30,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Run")
     bool ContinueRun();
 
+    // Restore only a validated idle boundary for the original host and original participants.
+    // 기존 Host와 원래 참가자에 대해 검증된 유휴 경계만 복원합니다.
+    bool RestoreSavedCombat(const FRunAccountId& HostAccount, FText& OutError);
+    bool RetryCombatCheckpoint(FText& OutError);
+    bool CanRetryCombatCheckpoint() const;
+    void SuspendForDisconnectedParticipant();
+
     FText GetFlowMessage() const { return FlowMessage; }
     ACombatManager* GetCombatManager() const { return CombatManager; }
     const TArray<TObjectPtr<AUnitBase>>& GetSpawnedUnits() const { return SpawnedUnits; }
@@ -44,6 +52,12 @@ private:
     void CleanupEncounter();
     bool FailPreparation(const FText& Message);
     void SetPlayerCombatInput(bool bEnabled);
+    bool ConfigureCombatParticipants(FText& OutError);
+    bool CommitTurnCheckpoint(int32 CompletedTurnSerial, int32 NextTurnIndex);
+    bool BuildTurnCheckpoint(int32 CompletedTurnSerial, int32 NextTurnIndex, FCombatCheckpointData& OutCheckpoint, FText& OutError);
+    void EnableCombatCheckpoints();
+    bool ValidateRestoreArena(const FCombatCheckpointData& Checkpoint, FText& OutError) const;
+    bool FailRestore(const FText& Error, FText& OutError);
 
     UPROPERTY(Transient)
     TObjectPtr<URunStateSubsystem> RunState;
@@ -70,4 +84,17 @@ private:
     ECombatResult PendingResult = ECombatResult::None;
     FTimerHandle FinishTimer;
     bool bPreparing = false;
+
+    UPROPERTY(Transient)
+    FCombatCheckpointData PendingTurnCheckpoint;
+
+    UPROPERTY(Transient)
+    FPartySnapshot FrozenOpponentSnapshot;
+
+    UPROPERTY(Transient)
+    FSoftObjectPath FrozenOpponentCatalog;
+
+    TMap<TWeakObjectPtr<AUnitBase>, FGuid> CheckpointUnitIds;
+    FGuid CombatAttemptId;
+    bool bHasFrozenOpponent = false;
 };

@@ -53,6 +53,12 @@ struct PROJECTA_API FCombatViewState
     bool bCombatActive = false;
 
     UPROPERTY(BlueprintReadOnly)
+    bool bAwaitingTurnCheckpoint = false;
+
+    UPROPERTY(BlueprintReadOnly)
+    bool bSuspendedForRecovery = false;
+
+    UPROPERTY(BlueprintReadOnly)
     ECombatResult CombatResult = ECombatResult::None;
 
     UPROPERTY(BlueprintReadOnly)

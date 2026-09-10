@@ -14,6 +14,7 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
     {
         View.Phase = Run->GetPhase();
         View.LastResult = Run->GetLastResult();
+        View.ConfirmedCombatRevision = Run->GetCombatCheckpoint().Revision;
         View.PartyMembers = Run->GetPartyMembers();
         View.Nodes = Run->GetNodes();
         View.CompletedNodes = Run->GetCompletedNodes();

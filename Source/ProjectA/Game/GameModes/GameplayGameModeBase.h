@@ -25,6 +25,7 @@ public:
     // 신뢰된 서버 연동 지점이며 클라이언트 계정 주장 RPC로 노출하지 않습니다.
     bool AssignRunParticipant(APartyPlayerController* Controller, const FRunAccountId& AccountId);
     bool ApplyCombatParticipantBindings(UCombatActionAuthority* Authority);
+    bool HasOriginalHostConnection(const FRunAccountId& HostAccount) const;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gameplay")
     TSubclassOf<ACombatManager> CombatManagerClass;
@@ -53,6 +54,7 @@ protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void PostLogin(APlayerController* NewPlayer) override;
+    virtual void Logout(AController* Exiting) override;
 
 private:
     void InitializeGameplay();

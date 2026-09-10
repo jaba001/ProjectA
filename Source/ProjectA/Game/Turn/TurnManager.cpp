@@ -8,6 +8,9 @@ void UTurnManager::InitializeTurnOrder(const TArray<AUnitBase*>& Units)
     TurnCounter = 0;
     CombatResult = ECombatResult::None;
     bCombatActive = true;
+    bAwaitingCheckpoint = false;
+    bSuspended = false;
+    bTurnStarted = false;
 
     UE_LOG(LogTemp, Log, TEXT("[TurnManager] InitializeTurnOrder Count=%d"), TurnOrder.Num());
 
@@ -25,6 +28,10 @@ void UTurnManager::InitializeTurnOrder(const TArray<AUnitBase*>& Units)
 
 void UTurnManager::StartTurn()
 {
+    if (!bCombatActive || bAwaitingCheckpoint || bSuspended || bTurnStarted || bCommittingCheckpoint)
+    {
+        return;
+    }
     EvaluateCombatResult();
     if (!bCombatActive)
     {
@@ -46,6 +53,27 @@ void UTurnManager::StartTurn()
         return;
     }
 
+    // Commit the inactive boundary before AP reset or synchronous enemy decisions can run.
+    // AP 초기화나 동기 적 판단이 실행되기 전에 비활성 턴 경계를 확정합니다.
+    if (CommitTurnBoundary.IsBound())
+    {
+        bAwaitingCheckpoint = true;
+        OnTurnChanged.Broadcast();
+        RetryTurnCheckpoint();
+        return;
+    }
+    ActivatePreparedTurn();
+}
+
+void UTurnManager::ActivatePreparedTurn()
+{
+    if (!bCombatActive || bSuspended || bTurnStarted || !TurnOrder.IsValidIndex(CurrentTurnIndex) || !IsValid(TurnOrder[CurrentTurnIndex]) || !TurnOrder[CurrentTurnIndex]->IsUnitAlive() || TurnCounter == MAX_int32)
+    {
+        return;
+    }
+    AUnitBase* Unit = TurnOrder[CurrentTurnIndex];
+    bAwaitingCheckpoint = false;
+    bTurnStarted = true;
     TurnCounter++;
 
     UE_LOG(LogTemp, Log, TEXT("[Turn %d] START | Index=%d | Unit=%s"), TurnCounter, CurrentTurnIndex, *Unit->GetName());
@@ -54,9 +82,75 @@ void UTurnManager::StartTurn()
     OnTurnChanged.Broadcast();
 }
 
+bool UTurnManager::RetryTurnCheckpoint()
+{
+    if (!bCombatActive || !bAwaitingCheckpoint || bSuspended || bCommittingCheckpoint || !CommitTurnBoundary.IsBound())
+    {
+        return false;
+    }
+    const int32 ExpectedCounter = TurnCounter;
+    const int32 ExpectedIndex = CurrentTurnIndex;
+    bool bSaved = false;
+    {
+        TGuardValue<bool> CommitGuard(bCommittingCheckpoint, true);
+        bSaved = CommitTurnBoundary.Execute(ExpectedCounter, ExpectedIndex);
+    }
+    if (!bSaved || !bCombatActive || bSuspended || !bAwaitingCheckpoint || TurnCounter != ExpectedCounter || CurrentTurnIndex != ExpectedIndex)
+    {
+        return false;
+    }
+    ActivatePreparedTurn();
+    return true;
+}
+
+bool UTurnManager::RestoreFromBoundary(const TArray<AUnitBase*>& Units, int32 CompletedTurnSerial, int32 NextTurnIndex)
+{
+    if (bCombatActive || bCommittingCheckpoint || CompletedTurnSerial < 0 || CompletedTurnSerial == MAX_int32 || !Units.IsValidIndex(NextTurnIndex) || !IsValid(Units[NextTurnIndex]) || !Units[NextTurnIndex]->IsUnitAlive())
+    {
+        return false;
+    }
+    TSet<AUnitBase*> UniqueUnits;
+    for (AUnitBase* Unit : Units)
+    {
+        if (!IsValid(Unit) || Unit->IsActiveTurn() || Unit->IsBusy() || UniqueUnits.Contains(Unit))
+        {
+            return false;
+        }
+        UniqueUnits.Add(Unit);
+    }
+    TurnOrder = Units;
+    CurrentTurnIndex = NextTurnIndex;
+    TurnCounter = CompletedTurnSerial;
+    CombatResult = ECombatResult::None;
+    bCombatActive = true;
+    bAwaitingCheckpoint = false;
+    bSuspended = false;
+    bTurnStarted = false;
+    // The imported boundary is already durable; activate it once without writing or rerolling it again.
+    // 가져온 경계는 이미 저장됐으므로 다시 저장하거나 추첨하지 않고 한 번 활성화합니다.
+    ActivatePreparedTurn();
+    return true;
+}
+
+void UTurnManager::SuspendForRecovery()
+{
+    bSuspended = true;
+    bAwaitingCheckpoint = false;
+    bTurnStarted = false;
+    bCombatActive = false;
+    for (AUnitBase* Unit : TurnOrder)
+    {
+        if (IsValid(Unit))
+        {
+            Unit->OnTurnEnd();
+        }
+    }
+    OnTurnChanged.Broadcast();
+}
+
 void UTurnManager::EndTurn()
 {
-    if (!bCombatActive)
+    if (!IsCombatActive() || !bTurnStarted || bCommittingCheckpoint)
     {
         return;
     }
@@ -72,11 +166,13 @@ void UTurnManager::EndTurn()
     if (!Unit)
     {
         UE_LOG(LogTemp, Warning, TEXT("[TurnManager] EndTurn Failed | Null Unit | Index=%d"), CurrentTurnIndex);
+        bTurnStarted = false;
         NextTurn();
         return;
     }
 
     Unit->OnTurnEnd();
+    bTurnStarted = false;
 
     UE_LOG(LogTemp, Log, TEXT("[Turn %d] END | Index=%d | Unit=%s"), TurnCounter, CurrentTurnIndex, *Unit->GetName());
 
@@ -92,6 +188,10 @@ void UTurnManager::EndTurn()
 
 void UTurnManager::NextTurn()
 {
+    if (!bCombatActive || bAwaitingCheckpoint || bSuspended || bTurnStarted || bCommittingCheckpoint)
+    {
+        return;
+    }
     EvaluateCombatResult();
     if (!bCombatActive)
     {
@@ -150,7 +250,7 @@ void UTurnManager::NextTurn()
 
 AUnitBase* UTurnManager::GetCurrentUnit() const
 {
-    if (!bCombatActive)
+    if (!IsCombatActive())
     {
         return nullptr;
     }
@@ -211,7 +311,7 @@ FString UTurnManager::GetCurrentUnitName() const
 
 void UTurnManager::EvaluateCombatResult()
 {
-    if (!bCombatActive || !CheckCombatEnd())
+    if (!bCombatActive || bAwaitingCheckpoint || bSuspended || bCommittingCheckpoint || !CheckCombatEnd())
     {
         return;
     }
@@ -235,6 +335,8 @@ void UTurnManager::EvaluateCombatResult()
 void UTurnManager::StopCombat()
 {
     bCombatActive = false;
+    bAwaitingCheckpoint = false;
+    bTurnStarted = false;
     for (AUnitBase* Unit : TurnOrder)
     {
         if (IsValid(Unit))
@@ -252,6 +354,8 @@ void UTurnManager::ResetCombat()
     CurrentTurnIndex = INDEX_NONE;
     TurnCounter = 0;
     CombatResult = ECombatResult::None;
+    bSuspended = false;
     OnCombatResult.Clear();
     OnTurnChanged.Clear();
+    CommitTurnBoundary.Unbind();
 }

@@ -24,6 +24,9 @@ struct PROJECTA_API FGameplayViewState
     FText FlowMessage;
 
     UPROPERTY()
+    int64 ConfirmedCombatRevision = 0;
+
+    UPROPERTY()
     TArray<FRunPartyMember> PartyMembers;
 
     UPROPERTY()

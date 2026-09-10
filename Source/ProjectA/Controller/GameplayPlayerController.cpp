@@ -149,6 +149,18 @@ void AGameplayPlayerController::RequestContinueRun()
     }
 }
 
+void AGameplayPlayerController::RequestRetryCombatCheckpoint()
+{
+    // The current local server retries its own storage; this is not a client progression command.
+    // 현재 로컬 서버가 자신의 저장을 재시도하며 클라이언트 진행 명령으로 사용하지 않습니다.
+    if (HasAuthority() && IsLocalController() && EncounterManager)
+    {
+        FText Error;
+        EncounterManager->RetryCombatCheckpoint(Error);
+        RefreshGameplayFlow();
+    }
+}
+
 void AGameplayPlayerController::RefreshGameplayFlow()
 {
     if (!HasAuthority())
@@ -188,7 +200,7 @@ void AGameplayPlayerController::RefreshGameplayFlow()
 
     if (GameplayRootWidget)
     {
-        GameplayRootWidget->RefreshFlowView(FGameplayViewState::FromRun(RunState, FlowMessage), GetNetMode() == NM_Standalone);
+        GameplayRootWidget->RefreshFlowView(FGameplayViewState::FromRun(RunState, FlowMessage), GetNetMode() == NM_Standalone, IsLocalController() && EncounterManager && EncounterManager->CanRetryCombatCheckpoint());
     }
 
     // Active CommonUI screens own the input config; the controller keeps combat authorization.

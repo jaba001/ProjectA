@@ -4,7 +4,7 @@
 
 [T14 작업 카드](TODO.md) · [게임 기획 방향](GAME_DESIGN.md) · [프로젝트 기획과 구현 현황](PROJECT_PLAN.md) · [프로젝트 안내](../README.md)
 
-이 문서는 사용자 확정안을 기록하고 후속 구현의 경계를 정한다. 순차 1~3번을 완료하고 실제 2인 Listen Server 전투/HUD 복제를 검증했다. 3~4인이나 T14 전체 완료를 의미하지 않는다. 기본 싱글플레이와 로컬 상대 Snapshot 전투를 유지하며 턴 경계 복구·Host 승계·AI 이어하기·3~4인·MMR의 4~8번은 대기한다. 현재 실행 경계는 [Listen Server 안내](T14_NETWORK.md)를 따른다.
+이 문서는 사용자 확정안을 기록하고 후속 구현의 경계를 정한다. 순차 1~4번에서 실제 2인 Listen Server 전투/HUD 복제와 확정 턴 저장·기존 Host 복구를 검증했다. 기본 싱글플레이와 로컬 상대 Snapshot 전투를 유지하며 아군 AI·Host 승계·3~4인·MMR의 5~8번은 대기한다. T14 전체 완료를 의미하지 않으며 현재 실행 경계는 [Listen Server 안내](T14_NETWORK.md)와 [확정 턴 저장·복구](T14_CHECKPOINT.md)를 따른다.
 
 ## 1. 확정한 플레이 규칙
 
@@ -55,7 +55,7 @@ AI 이어하기가 확정된 뒤에는 현재 인간 참여자에게만 MMR을 �
 
 ## 4. 필수 데이터 경계와 설계 후보
 
-1번 작업으로 `FRunIdentityData`·`FRunAccountId`·`FRunParticipantData`, `FRunPartyMember.CharacterId/OwnerAccountId`, 참가자·소유권 조회를 추가했다. 새 Run은 `RunSaveGame` v2에 식별 정보와 동의 상태를 저장한다. 기존 식별 정보 없는 v1은 `LegacyOffline`으로 읽고 v1으로 다시 저장하며 소유권을 추정해 이관하지 않는다. `PartySnapshot`은 v1을 유지한다. 참가·AI 실행 상태, revision, 전투 중 체크포인트와 결과 반영은 아직 설계 후보다. 구현 상태는 [순차 작업 대기열](T14_QUEUE.md)을 따른다.
+1번 작업으로 `FRunIdentityData`·`FRunAccountId`·`FRunParticipantData`, `FRunPartyMember.CharacterId/OwnerAccountId`, 참가자·소유권 조회를 추가했다. 새 Run의 전투 밖 저장은 v2, 4번의 확정 턴 저장은 v3다. 기존 식별 정보 없는 v1은 `LegacyOffline`으로 읽고 v1으로 다시 저장하며 소유권을 추정해 이관하지 않는다. `PartySnapshot`은 v1을 유지한다. v3는 로컬 revision·AttemptId·턴 순서·유닛/장착/고정 Snapshot 본문을 저장한다. 참가·AI 실행 상태, 중앙 revision과 MMR 결과 반영은 후속 범위다. 구현 상태는 [순차 작업 대기열](T14_QUEUE.md)을 따른다.
 
 | 데이터 경계 | 후보 정보 | 책임 |
 |---|---|---|
@@ -101,11 +101,11 @@ Client는 이동·스킬·대상·턴 종료의 의도를 요청한다. 순차 2
 - 모든 유닛의 HP/AP/SubAP, 사망, Grid 배치, 스킬·장비·상태 효과 등 실제 전투 상태
 - 계속되는 턴 효과·쿨다운·필요한 난수 상태와 이미 반영한 결과
 
-이동·발사체·GAS 콜백이 처리 중인 순간을 확정 경계로 저장하지 않는다. 미완료 연출과 비동기 동작은 복원할 확정 데이터와 분리하고, 선택한 경계에서 월드를 다시 구성한다. 어떤 턴 종료 처리까지 포함해야 확정 경계인지와 저장 실패 시 다음 턴 진행 처리는 구현 설계에서 정한다.
+이동·발사체·GAS 콜백이 처리 중인 순간을 확정 경계로 저장하지 않는다. 4번의 확정 경계는 이전 유닛 `OnTurnEnd` 완료 → 다음 생존 유닛 선택 → 저장 완료 → 다음 `OnTurnStart` 순서다. 저장 실패 시 다음 턴을 멈추고 같은 후보를 재시도한다. 복원할 때 다음 유닛의 AP/SubAP 초기화는 한 번만 실행한다.
 
 저장된 경계 이후 처리 중이던 턴의 부분 변경은 복구점에 포함되지 않을 수 있다. 이 되돌림을 행동 단위 복구와 혼동하지 않으며, 미확정 턴을 반복해 유리한 결과를 얻는 방식의 대응 정책은 별도로 확정한다. 상대 Snapshot 슬롯의 내용이 나중에 바뀌어도 복구할 전투의 상대 빌드는 바뀌지 않아야 한다.
 
-현재 `RunSaveGame`은 전투 밖 파티 HP와 노드 진행을 저장한다. 위 전투 중 턴 경계 복구는 현재 지원하지 않으며, 별도 상태 스키마와 실제 복구 테스트가 필요하다.
+4번의 `RunSaveGame` v3는 현재 콘텐츠의 턴 경계와 유닛·장착·고정 상대를 저장한다. 지원하지 않는 활성 GAS 능력·지속 효과·쿨다운·상태 태그는 거절하며 범용 상태 효과·게임플레이 난수 복구까지 구현한 것은 아니다. 협동 복구는 원래 참가자 전원과 기존 Host의 서버 연결 배정 후 새 세션에서 실행한다. 저장 실패·손상·복구 검증과 로컬 저장의 한계는 [확정 턴 저장·복구](T14_CHECKPOINT.md)에 기록한다.
 
 ## 7. 승계와 경쟁 결과의 단일 권위
 
@@ -149,14 +149,14 @@ Server RPC는 소유 연결을 고려해야 하며, 서버에 전달됐다는 �
 | 현재 구현 | 후속 작업 |
 |---|---|
 | `FRunPartyMember`: 슬롯·이름·직업·생성 여부·HP·CharacterId·OwnerAccountId와 서버 소유권 검사 | 접속·AI 조작 상태 분리와 전환 검증 |
-| `RunSaveGame` v2: 전투 밖 HP·노드·결과와 Run/참가자/소유자/Host/동의, 기존 v1 호환 | revision 및 턴 경계 상태, 실제 계정 인증 |
+| `RunSaveGame` v2의 전투 밖 진행, v3의 로컬 revision·확정 턴·유닛·장착·고정 상대, 기존 v1 호환 | 중앙 권위 revision, 실제 계정 인증 |
 | `PartyPlayerController` 값 Command·실제 소유 연결 RPC와 GameMode의 신뢰된 C++ 참가자 배정 | 2인 전송·소유권·Client 전투/HUD 동기화 검증 완료. 실제 로그인은 8번 |
 | `AGameplayGameState`의 읽기 전용 Run 표시 뷰, 클라이언트 RunState와 책임 분리 | 미결정인 노드/Continue 결정권 확정 후 네트워크 진행 명령 연결 |
 | `APlayerUnit`: 인간 행동과 자원 소진 턴 종료 | 인간 입력과 교체 가능한 서버 AI 판단 연결 |
 | `AEnemyUnit`: 적 AI 판단 FSM | 소유권·팀을 유지하는 아군 AI 실행 구조 검토 |
 | `UnitAIController`: 이동 처리 | AI 컨트롤러 존재만으로 전투 판단 지원을 가정하지 않음 |
-| 로컬 상대 Snapshot 저장·검증·기존 Encounter 생성 | 온라인 Snapshot 신뢰와 Co-op 복구 기록은 별도 구현 |
-| 서버 전용 턴·행동·GAS, Unit/Grid/전투 뷰 Replication·RepNotify | 2인 턴·Grid·HP/AP·사망·결과 일치 검증 완료. 3~4인·끊김/복구·승계는 4~7번 |
+| 로컬 상대 Snapshot 저장·검증·Encounter 생성과 확정 전투의 상대 고정 | 온라인 Snapshot 신뢰와 Run 전체 상대 이력 |
+| 서버 전용 턴·행동·GAS, Unit/Grid/전투 뷰 Replication·RepNotify와 새 세션 턴 복구 | 2인 상태 일치·기존 Host 복구 검증 완료. AI·승계·3~4인은 5~7번 |
 
 현재 Snapshot 스키마는 상대 빌드를 표현한다. 진행 중인 협동 전투의 턴 경계 체크포인트와 동일한 저장 본문으로 단정하지 않는다.
 
