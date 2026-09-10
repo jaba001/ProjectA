@@ -3,6 +3,8 @@
 Unreal Engine 기반 Grid Turn-Based Combat System 프로젝트입니다.
 전투 구조는 grid, unit, turn, GAS 중심으로 구성되어 있고, CommonUI 기반 메뉴와 노드 진행 UI를 하나의 persistent Gameplay 레벨의 전투에 연결합니다.
 
+현재 Vertical Slice는 싱글플레이를 지원합니다. T14 네트워크 구현은 기존 기획 범위에 따라 보류했습니다. 일부 복제 선언은 남아 있지만 멀티플레이 전투·진행·HUD 동기화와 다중 PIE 검증은 완료되지 않았습니다. 재개 조건은 [T14 작업 카드](Docs/TODO.md)를 참고하세요.
+
 ```text
 MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 → Combat Node → Encounter → 기존 Grid Combat → Victory → Result Continue → Run Map UI
