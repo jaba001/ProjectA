@@ -70,6 +70,7 @@ Editor-only dependency는 이 모듈에만 둡니다.
 - Gameplay Ability System 활용
 - 스킬 DataAsset의 AP 비용으로 HUD 표시·사용 가능 판정·실제 차감을 통합
 - 공통 스킬 타겟 검증으로 플레이어·적 AI·실행 진입의 진영·생존·전열 보호 규칙 통합
+- 플레이어 타일 명령과 AI 내부 턴 종료 분리, 턴 전환·전투 종료 시 입력 선택 정리
 - Tile 기반 이동 및 타겟 선택
 - Unit AI Controller
 - Combat HUD Widget
@@ -100,6 +101,8 @@ UI 관련 상세 메모는 아래 파일에 정리되어 있습니다.
 스킬 AP 비용은 `USkillDefinitionDataAsset::ActionPointCost`에서만 설정하며 1 이상이어야 합니다. HUD는 비용을 표시하고, 0·음수 비용 또는 AP 부족 시 선택과 실행을 거절합니다. 공격 컨텍스트 검증과 GAS 커밋이 성공한 뒤 AP를 한 번 차감하며, 실행 시작 후 소비한 AP는 취소 시 환불하지 않습니다. `GA_AttackBase`의 기존 비용 필드는 에셋 참조 호환용으로만 유지하고 실행에는 사용하지 않습니다.
 
 스킬 대상은 `CombatTargetingLibrary::IsValidSkillTarget`으로 검사합니다. 기존 플레이어 규칙대로 전열 보호는 `EnemyUnit` 선택에 적용하고 `bIgnoreFront`로 무시할 수 있습니다. 제자리 `AllyUnit`/`AnyUnit` 스킬은 자기 자신도 선택할 수 있으며, 타일 스킬은 영역에 맞는 빈 타일도 선택합니다. 접근 스킬은 다른 생존 유닛이 필요합니다. 실행 직전에 대상을 다시 검사하며, 유닛 대상이 이동하거나 다른 유닛으로 교체되면 실패 처리합니다. 범위 공격의 피해 대상 계산 통합은 T06에서 진행합니다.
+
+타일 액터는 클릭을 `PartyPlayerController::HandleTileClicked`로 전달합니다. 플레이어 명령은 권한·전투 입력 잠금·Player 팀·활성 턴·생존·busy를 확인하며 클릭 시 비용과 타겟을 재검사합니다. UI의 턴 종료는 `PartyPlayerController::RequestEndTurn`, C++ AI의 내부 종료는 `CombatManager::RequestEndTurnForUnit(this)`를 사용합니다. 기존 CombatManager의 인자 없는 Blueprint 종료 함수는 deprecated 상태이며 플레이어 입력 검사를 거칩니다. 턴 전환과 전투 종료 시 이전 선택·하이라이트를 정리합니다.
 
 기존 MainMenu와 CharacterCreation은 런타임 fallback을 유지합니다.
 Scaffold generator는 기존 native class를 부모로 사용하는 WBP의 Designer tree를 JSON spec 기준으로 생성합니다.

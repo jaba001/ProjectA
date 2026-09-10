@@ -76,38 +76,50 @@ AUnitBase* APartyPlayerController::GetActiveUnit() const
 
 void APartyPlayerController::RequestEndTurn()
 {
-    if (!CanUseActiveUnitAction())
+    if (CanUseActiveUnitAction())
     {
-        return;
+        CombatManager->RequestEndTurnForUnit(GetActiveUnit());
     }
+}
 
-    if (!CombatManager)
+void APartyPlayerController::HandleTileClicked(ACombatGridTile* Tile)
+{
+    if (!IsValid(Tile) || Tile->GetWorld() != GetWorld() || !CanUseActiveUnitAction())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] RequestEndTurn failed | CombatManager is null"));
         return;
     }
 
     AUnitBase* ActiveUnit = GetActiveUnit();
-
-    if (!ActiveUnit)
+    if (IsSkillInputMode())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] RequestEndTurn failed | ActiveUnit is null"));
+        USkillDefinitionDataAsset* SkillData = PendingSkillData;
+        if (!IsValid(SkillData) || !SkillData->AbilityClass || !CanUseActiveUnitActionPoint(SkillData->ActionPointCost) || !IsValidTileForPendingSkill(Tile))
+        {
+            return;
+        }
+        CancelTileInputMode();
+        ActiveUnit->StartSkill(SkillData, Tile);
         return;
     }
 
-    if (ActiveUnit->IsBusy())
+    if (IsMoveInputMode())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] RequestEndTurn blocked | ActiveUnit is busy"));
+        if (!CanUseActiveUnitSubActionPoint(1) || !CombatManager->IsReachableMoveTile(Tile))
+        {
+            return;
+        }
+        CancelTileInputMode();
+        SetSelectedTile(Tile);
+        ActiveUnit->StartMoveAction(Tile);
         return;
     }
 
-    CancelTileInputMode();
-    CombatManager->RequestEndTurn();
+    SetSelectedTile(Tile);
 }
 
 bool APartyPlayerController::CanUseActiveUnitAction() const
 {
-    if (!bCombatInputEnabled || !CombatManager || !CombatManager->IsCombatActive())
+    if (!HasAuthority() || !bCombatInputEnabled || !CombatManager || !CombatManager->IsCombatActive())
     {
         return false;
     }

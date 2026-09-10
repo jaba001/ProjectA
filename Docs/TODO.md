@@ -1,12 +1,12 @@
 # ProjectA 작업 보드와 재개 메모
 
-최근 정리: 2026-09-10 · `main` · T04 타겟 규칙 통합과 전체 자동화 14건 검증 완료.
+최근 정리: 2026-09-10 · `main` · T05 플레이어 입력/AI 턴 종료 분리와 전체 자동화 16건 검증 완료.
 
 [기획·구현 현황](PROJECT_PLAN.md) · [코드 리뷰와 검증 시나리오](CODE_REVIEW.md)
 
 ## 다음에 켜면 여기부터
 
-**Vertical Slice와 T03·T04 검증을 완료했다. 다음 전투 안정화 작업은 T05 입력/AI 턴 종료 분리 마무리와 T06 범위 계산 통합이다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다. 다음 콘텐츠 작업은 네 직업의 공통 전투 fallback 교체다.
+**Vertical Slice와 T03·T04·T05 검증을 완료했다. 다음 전투 안정화 작업은 T06 범위 계산 통합이다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다. 다음 콘텐츠 작업은 네 직업의 공통 전투 fallback 교체다.
 
 체크박스는 작업 완료를 뜻한다. 코드를 작성했어도 완료 조건을 검증하지 못했다면 체크하지 않고 `검증 대기`로 기록한다. P1/P2는 리뷰 결함의 심각도이고 M0~M3는 개발 순서이므로 서로 구분한다.
 
@@ -75,11 +75,16 @@
 - 검증 경계: 대상 상태 변경은 transient 테스트 월드와 실행 대기 phase 주입으로 재현한다. 첫 전체 실행의 저장 맵 PIE는 Move 버튼의 Slate hit-test에서 실패했으며, 창 위치·크기를 명시한 동일 빌드의 단독 PIE 및 최종 전체 실행은 통과했다. 실제 Slate Move/스킬 클릭·승리·Continue·두 번째 전투·패배 종료를 확인했다. 테스트 7건에 기존 환경/실패 주입/간소화된 월드 경고가 남는다. 사용자 수정 `BPGA_DefaultAttack.uasset`을 그대로 사용해 검증했으며 에셋 내용은 보존하고 이번 커밋에 포함하지 않는다.
 - 실행 근거: [빌드 로그](../Saved/Automation/T04TargetingBuild.log), [최종 결과](../Saved/Automation/T04TargetingFinal/index.json), [최종 로그](../Saved/Logs/T04TargetingFinal.log). Saved 산출물은 로컬 검증 자료다.
 
-### T05 · P2 · 플레이어 입력과 AI 턴 종료 분리 — slice 필수 범위 최소 적용
+### T05 · P2 · 플레이어 입력과 AI 턴 종료 분리 — 수정 및 자동화·PIE 검증 완료
 
-- [ ] 완료
-- 근거: 리뷰 R05. persistent 전투 입력 잠금을 위해 Player 팀/활성 전투 검사를 추가하고 AI는 CombatManager 내부 EndTurn을 호출하도록 변경했다. 전체 입력 리팩터링은 하지 않는다.
+- [x] 완료
+- 근거: 리뷰 R05. slice의 Player 팀/활성 전투 검사와 최소 AI 종료 분리를 확장해 타일 명령의 처리 주체 및 내부 종료 요청 검증을 명확히 한다.
 - 완료 조건: V03 중 적 턴 입력 검사 통과. 사용자가 적 행동을 조작하지 못하고 적은 계속 정상적으로 턴을 종료.
+- 구현: 타일 액터는 PlayerController에 입력만 전달한다. 컨트롤러가 권한·입력 잠금·팀·활성 턴·생존·busy 및 클릭 시 비용/타겟/이동 범위를 확인한다. AI는 요청 유닛을 명시한 `RequestEndTurnForUnit(this)`를 사용한다.
+- 종료 경계: 내부 요청도 현재 턴 유닛과의 일치·생존·비busy를 검사한다. 인자 없는 기존 Blueprint 종료 함수는 플레이어 컨트롤러로 위임하며 deprecated로 안내한다. `AdvanceTurn`은 private 내부 전환으로 제한하고, 사망 유닛을 건너뛰는 기존 경로는 유지한다. 턴 전환·전투 종료 시 선택과 하이라이트를 정리한다.
+- 검증: Development Editor / Win64 빌드 성공. `ProjectA.Combat.Input` 2건에 적의 비busy 구간 입력 차단, UI 잠금과 독립적인 실제 AI 종료, 오래된 요청·busy·사망·전투 종료 요청 거절, 타일 클릭의 AP 재검사 및 실제 피해 경로를 추가했다. 기존 행동·AP·타겟·Run·저장 맵 Slate PIE를 포함한 전체 자동화 16건 통과(9건 경고 포함, 실패 0). 경고에는 축소 테스트 월드의 Grid/NavMesh 미설정, 의도한 거절 경로, 기존 콘텐츠 설정 안내가 포함된다.
+
+- 실행 근거: [빌드 로그](../Saved/Automation/T05InputBuild.log), [전체 결과](../Saved/Automation/T05InputFinal2/index.json), [전체 로그](../Saved/Logs/T05InputFinal2.log). 첫 실행에서 새 테스트 월드의 컨트롤러 미등록을 수정했고, 중복 등록 정리 후 [입력 2건 재검증](../Saved/Automation/T05InputFocusedFinal/index.json)도 통과했다. 기존 사용자 변경 에셋을 유지한 로컬 검증이며 Saved 산출물은 커밋하지 않는다.
 
 ### T06 · P2 · 범위 계산 통합과 미지원 타입 검증 — 미착수
 
@@ -163,6 +168,7 @@
 
 | 날짜 | 작업 | 완료/검증 | 다음 시작점 |
 |---|---|---|---|
+| 2026-09-10 | T05 플레이어 입력과 AI 턴 종료 분리 | 정식 빌드 및 전체 자동화 16건 성공, 적 턴 입력 차단/AI 독립 종료/타일 명령/Slate PIE 검증 | T06 범위 계산 통합과 미지원 타입 검증 |
 | 2026-09-10 | T04 공통 타겟 규칙과 실행 직전 재검증 | 정식 빌드 및 전체 자동화 14건 성공, 576개 타겟 조합/실제 AI 선택/실행 거절·재시도/Slate PIE 검증 | T05 입력과 AI 턴 종료 분리 마무리 |
 | 2026-09-08 | P1 공통 행동 완료/AI 복구, Run State/Gameplay/Encounter/UI/결과/cleanup 연결 | 정식 빌드/에셋 29항목/자동화 8건/자연 Victory PIE 통과, HUD·결과·타일 캡처 검수, 세부 경계는 VERTICAL_SLICE_REPORT.md | 직업별 fallback 교체 |
 | 2026-09-07 | 현재 코드·설정·TODO 검토, 기획/작업 보드/리뷰 문서 작성 | 정적 리뷰: P1 2건, P2 4건. 런타임 수정 없음. 빌드·PIE 미실행 | T01의 제자리 스킬 완료 규약 |

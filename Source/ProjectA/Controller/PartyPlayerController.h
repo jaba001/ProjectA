@@ -61,6 +61,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void RequestEndTurn();
 
+    // Own all player tile commands; tile actors only forward input.
+    // 플레이어 타일 명령을 전담하며 타일 액터는 입력만 전달합니다.
+    void HandleTileClicked(ACombatGridTile* Tile);
+
     UFUNCTION(BlueprintCallable, Category = "Combat")
     ACombatManager* GetCombatManager() const { return CombatManager; }
 

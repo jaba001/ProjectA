@@ -131,6 +131,7 @@ void ACombatManager::AdvanceTurn()
         return;
     }
 
+    ClearPlayerSelection();
     TurnManager->EndTurn();
     //Ŭ�󵿱�ȭ
     CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
@@ -140,12 +141,30 @@ void ACombatManager::AdvanceTurn()
 
 void ACombatManager::RequestEndTurn()
 {
-    if (!HasAuthority())
+    APartyPlayerController* Controller = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController());
+    if (Controller && Controller->GetCombatManager() == this)
     {
-        return;
+        Controller->RequestEndTurn();
     }
+}
 
+bool ACombatManager::RequestEndTurnForUnit(AUnitBase* RequestingUnit)
+{
+    if (!HasAuthority() || !IsCombatActive() || !IsValid(RequestingUnit) || RequestingUnit != GetCurrentUnit() || !RequestingUnit->IsActiveTurn() || !RequestingUnit->IsUnitAlive() || RequestingUnit->IsBusy())
+    {
+        return false;
+    }
     AdvanceTurn();
+    return true;
+}
+
+void ACombatManager::ClearPlayerSelection()
+{
+    APartyPlayerController* Controller = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController());
+    if (Controller && Controller->GetCombatManager() == this)
+    {
+        Controller->CancelTileInputMode();
+    }
 }
 
 AUnitBase* ACombatManager::GetCurrentUnit() const
@@ -191,6 +210,7 @@ void ACombatManager::HandleCombatResult(ECombatResult Result)
 
 void ACombatManager::EndCombat()
 {
+    ClearPlayerSelection();
     GetWorldTimerManager().ClearTimer(DeadTurnTimer);
     if (TurnManager)
     {

@@ -53,89 +53,10 @@ void ACombatGridTile::NotifyActorOnClicked(FKey ButtonPressed)
 {
     Super::NotifyActorOnClicked(ButtonPressed);
 
-    APartyPlayerController* PC = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController());
-
-    if (!PC)
+    if (APartyPlayerController* Controller = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController()))
     {
-        UE_LOG(LogTemp, Warning, TEXT("[GridTile] PlayerController null"));
-        return;
+        Controller->HandleTileClicked(this);
     }
-
-    ACombatManager* CombatManager = PC->GetCombatManager();
-
-    if (!CombatManager)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[GridTile] CombatManager null"));
-        return;
-    }
-
-    if (!PC->CanUseActiveUnitAction())
-    {
-        return;
-    }
-
-    if (PC->IsSkillInputMode())
-    {
-        AUnitBase* ActiveUnit = PC->GetActiveUnit();
-
-        if (!ActiveUnit)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[GridTile] Skill click failed | ActiveUnit null"));
-            return;
-        }
-
-        USkillDefinitionDataAsset* SkillData = PC->GetPendingSkillData();
-
-        if (!SkillData)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[GridTile] Skill click failed | PendingSkillData is null"));
-            return;
-        }
-
-        if (!SkillData->AbilityClass)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[GridTile] Skill click failed | AbilityClass is null"));
-            return;
-        }
-
-        if (!PC->IsValidTileForPendingSkill(this))
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[GridTile] Skill click rejected | Invalid target tile | Coord=(%d,%d)"), GridCoord.X, GridCoord.Y);
-            return;
-        }
-
-        //UE_LOG(LogTemp, Log, TEXT("[GridTile] PlayerSkillClick | Unit=%s | SkillData=%s | Ability=%s | TargetTile=(%d,%d) | OccupyingUnit=%s"), *GetNameSafe(ActiveUnit), *GetNameSafe(SkillData), *GetNameSafe(SkillData->AbilityClass), GridCoord.X, GridCoord.Y, *GetNameSafe(GetOccupyingUnit()));
-
-        PC->SetSelectedTile(this);
-        PC->CancelTileInputMode();
-        ActiveUnit->StartSkill(SkillData, this);
-        return;
-    }
-
-    if (PC->IsMoveInputMode())
-    {
-        if (!CombatManager->IsReachableMoveTile(this))
-        {
-            return;
-        }
-
-        AUnitBase* ActiveUnit = PC->GetActiveUnit();
-
-        if (!ActiveUnit)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[GridTile] Move click failed | ActiveUnit null"));
-            return;
-        }
-
-        PC->SetSelectedTile(this);
-        CombatManager->ClearMovableTilesHighlight();
-        PC->SetTileInputMode(ETileInputMode::None);
-
-        ActiveUnit->StartMoveAction(this);
-        return;
-    }
-
-    PC->SetSelectedTile(this);
 }
 
 void ACombatGridTile::NotifyActorBeginCursorOver()

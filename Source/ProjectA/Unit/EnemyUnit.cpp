@@ -256,7 +256,7 @@ void AEnemyUnit::FinishEnemyTurn()
     ACombatManager* CombatManager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatManager::StaticClass()));
     if (CombatManager && CombatManager->GetCurrentUnit() == this)
     {
-        CombatManager->RequestEndTurn();
+        CombatManager->RequestEndTurnForUnit(this);
     }
 }
 

@@ -725,4 +725,130 @@ bool FSkillTargetExecutionTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPlayerEnemyInputIsolationTest, "ProjectA.Combat.Input.PlayerAndEnemyTurnIsolation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPlayerEnemyInputIsolationTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    FScopedWorld Scope;
+    AUnitBase* Player = Scope.SpawnUnit<AUnitBase>(FVector::ZeroVector);
+    AEnemyUnit* Enemy = Scope.SpawnUnit<AEnemyUnit>(FVector(100.0f, 0.0f, 0.0f));
+    ACombatGridTile* PlayerTile = Scope.SpawnTile(Player);
+    ACombatGridTile* EnemyTile = Scope.SpawnTile(Enemy);
+    USkillDefinitionDataAsset* EnemySkill = MakeSkill(Enemy, UGameplayAbility::StaticClass());
+    EquipSkill(Enemy, EnemySkill);
+    Enemy->GetAbilitySystemComponent()->GiveAbility(FGameplayAbilitySpec(UGameplayAbility::StaticClass(), 1));
+    FindFProperty<FClassProperty>(AUnitBase::StaticClass(), TEXT("DefaultAttackAbilityClass"))->SetObjectPropertyValue_InContainer(Enemy, UGameplayAbility::StaticClass());
+    ACombatManager* Combat = Scope.World->SpawnActor<ACombatManager>();
+    Combat->RegisterUnits({ Player, Enemy });
+    Combat->StartCombat_Internal();
+    APartyPlayerController* Controller = Scope.World->SpawnActor<APartyPlayerController>();
+    Scope.World->AddController(Controller);
+    TestEqual(TEXT("Tile input resolves the registered player controller"), Scope.World->GetFirstPlayerController(), static_cast<APlayerController*>(Controller));
+    Controller->SetCombatContext(Combat, true);
+    USkillDefinitionDataAsset* PlayerSkill = MakeSkill(Player, UGA_DefaultAttack::StaticClass());
+    Controller->EnterSkillMode(PlayerSkill);
+    TestTrue(TEXT("Player can select a skill on its turn"), Controller->IsSkillInputMode());
+    TestTrue(TEXT("Internal transition accepts the active player"), Combat->RequestEndTurnForUnit(Player));
+    TestFalse(TEXT("Turn transition clears pending input"), Controller->IsSkillInputMode());
+    TestNull(TEXT("Turn transition clears pending skill"), Controller->GetPendingSkillData());
+    TestTrue(TEXT("Enemy starts its own held ability"), Enemy->IsBusy());
+    Enemy->CancelCurrentAction();
+    TestTrue(TEXT("Enemy stays active until its scheduled continuation"), Enemy->IsActiveTurn());
+    TestFalse(TEXT("Enemy continuation gap is not busy"), Enemy->IsBusy());
+    const int32 TurnBefore = Combat->GetTurnManager()->GetTurnCounter();
+    const int32 APBefore = Enemy->GetCurrentActionPoint();
+    const int32 MoveAPBefore = Enemy->GetCurrentSubActionPoint();
+    const FVector PositionBefore = Enemy->GetActorLocation();
+    Controller->EnterMoveMode();
+    TestFalse(TEXT("Player cannot select enemy movement"), Controller->IsMoveInputMode());
+    Controller->EnterSkillMode(PlayerSkill);
+    TestFalse(TEXT("Player cannot select an enemy skill"), Controller->IsSkillInputMode());
+    // Even a stale externally set mode cannot bypass the player command guard.
+    // 외부에서 남긴 입력 모드도 플레이어 명령 검사를 우회할 수 없습니다.
+    Controller->SetTileInputMode(ETileInputMode::Move);
+    PlayerTile->NotifyActorOnClicked(EKeys::LeftMouseButton);
+    Controller->HandleTileClicked(EnemyTile);
+    Controller->RequestEndTurn();
+    Combat->RequestEndTurn();
+    TestEqual(TEXT("Player cannot end the idle enemy turn"), Combat->GetTurnManager()->GetTurnCounter(), TurnBefore);
+    TestEqual(TEXT("Enemy AP is unchanged by player input"), Enemy->GetCurrentActionPoint(), APBefore);
+    TestEqual(TEXT("Enemy movement AP is unchanged"), Enemy->GetCurrentSubActionPoint(), MoveAPBefore);
+    TestTrue(TEXT("Player input does not move the enemy"), Enemy->GetActorLocation().Equals(PositionBefore));
+    TestEqual(TEXT("Player input does not deal damage"), Player->GetAttributeSet()->GetHP(), 100.0f);
+    TestNull(TEXT("Enemy-turn clicks do not select a tile"), Controller->GetSelectedTile());
+    // Disabling UI must not disable the enemy's internal completion path.
+    // UI를 잠가도 적의 내부 완료 경로는 막히지 않아야 합니다.
+    Controller->SetCombatContext(Combat, false);
+    Scope.World->GetTimerManager().Tick(0.01f);
+    TestEqual(TEXT("Actual AI completion returns the turn to the player"), Combat->GetCurrentUnit(), Player);
+    TestEqual(TEXT("AI advances exactly one turn"), Combat->GetTurnManager()->GetTurnCounter(), TurnBefore + 1);
+    TestEqual(TEXT("Previous input mode is cleared"), Controller->GetTileInputMode(), ETileInputMode::None);
+    Controller->RequestEndTurn();
+    Combat->RequestEndTurn();
+    TestEqual(TEXT("Disabled UI cannot end even a player turn"), Combat->GetCurrentUnit(), Player);
+    TestFalse(TEXT("Stale enemy completion cannot end the player's turn"), Combat->RequestEndTurnForUnit(Enemy));
+    Controller->SetCombatContext(Combat, true);
+    TestTrue(TEXT("Player input resumes when enabled"), Controller->CanUseActiveUnitAction());
+    Combat->ResetCombat();
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPlayerCommandGuardTest, "ProjectA.Combat.Input.TileCommandsAndTurnGuards", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPlayerCommandGuardTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    FScopedWorld Scope;
+    AUnitBase* Player = Scope.SpawnUnit<AUnitBase>(FVector::ZeroVector);
+    AUnitBase* Enemy = Scope.SpawnUnit<AUnitBase>(FVector(100.0f, 0.0f, 0.0f));
+    Enemy->SetTeam(ETeam::Enemy);
+    Scope.SpawnTile(Player);
+    ACombatGridTile* TargetTile = Scope.SpawnTile(Enemy);
+    GrantAttack(Player);
+    ACombatManager* Combat = Scope.World->SpawnActor<ACombatManager>();
+    Combat->RegisterUnits({ Player, Enemy });
+    Combat->StartCombat_Internal();
+    APartyPlayerController* Controller = Scope.World->SpawnActor<APartyPlayerController>();
+    Scope.World->AddController(Controller);
+    TestEqual(TEXT("Tile input resolves the registered player controller"), Scope.World->GetFirstPlayerController(), static_cast<APlayerController*>(Controller));
+    Controller->SetCombatContext(Combat, true);
+    USkillDefinitionDataAsset* Skill = MakeSkill(Player, UGA_DefaultAttack::StaticClass());
+    TestFalse(TEXT("Null turn requester is rejected"), Combat->RequestEndTurnForUnit(nullptr));
+    TestFalse(TEXT("Inactive unit cannot end another turn"), Combat->RequestEndTurnForUnit(Enemy));
+    Player->bIsActiveTurn = false;
+    TestFalse(TEXT("Inactive flag prevents turn completion"), Combat->RequestEndTurnForUnit(Player));
+    Player->bIsActiveTurn = true;
+    SetMovementPhase(Player, EUnitMovePhase::WaitingForSkill);
+    Controller->RequestEndTurn();
+    Combat->RequestEndTurn();
+    TestFalse(TEXT("Busy unit cannot end its turn internally"), Combat->RequestEndTurnForUnit(Player));
+    TestEqual(TEXT("Busy end-turn requests do not advance"), Combat->GetCurrentUnit(), Player);
+    SetMovementPhase(Player, EUnitMovePhase::None);
+    FindFProperty<FBoolProperty>(AUnitBase::StaticClass(), TEXT("bIsDead"))->SetPropertyValue_InContainer(Player, true);
+    TestFalse(TEXT("Dead unit cannot request normal turn completion"), Combat->RequestEndTurnForUnit(Player));
+    FindFProperty<FBoolProperty>(AUnitBase::StaticClass(), TEXT("bIsDead"))->SetPropertyValue_InContainer(Player, false);
+
+    Controller->EnterSkillMode(Skill);
+    Player->ConsumeActionPoint(2);
+    TargetTile->NotifyActorOnClicked(EKeys::LeftMouseButton);
+    TestEqual(TEXT("Tile command rechecks AP after selection"), Enemy->GetAttributeSet()->GetHP(), 100.0f);
+    TestTrue(TEXT("Rejected tile command retains the selected skill"), Controller->IsSkillInputMode());
+    Player->OnTurnStart();
+    TargetTile->NotifyActorOnClicked(EKeys::LeftMouseButton);
+    TestEqual(TEXT("Tile delegates a valid attack to the controller"), Enemy->GetAttributeSet()->GetHP(), 90.0f);
+    TestEqual(TEXT("Valid tile command charges AP once"), Player->GetCurrentActionPoint(), 1);
+    TestEqual(TEXT("Valid tile command consumes selection"), Controller->GetTileInputMode(), ETileInputMode::None);
+    Controller->EnterSkillMode(Skill);
+    Combat->EndCombat();
+    TestEqual(TEXT("Combat end clears input mode"), Controller->GetTileInputMode(), ETileInputMode::None);
+    TestNull(TEXT("Combat end clears selected skill"), Controller->GetPendingSkillData());
+    Controller->HandleTileClicked(TargetTile);
+    Controller->RequestEndTurn();
+    TestFalse(TEXT("Ended combat rejects unit completion"), Combat->RequestEndTurnForUnit(Player));
+    TestEqual(TEXT("Ended combat rejects damage input"), Enemy->GetAttributeSet()->GetHP(), 90.0f);
+    Combat->ResetCombat();
+    return true;
+}
+
 #endif

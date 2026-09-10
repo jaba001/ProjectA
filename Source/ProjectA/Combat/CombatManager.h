@@ -91,12 +91,14 @@ public:
 
     void StartCombat_Internal();
 
-    // Request to advance turn (server only)
-    void AdvanceTurn();
-
-    // Request to end turn (server only)
-    UFUNCTION(BlueprintCallable)
+    // Legacy Blueprint requests follow the player controller's input restrictions.
+    // 기존 블루프린트 요청에도 플레이어 컨트롤러의 입력 제한을 적용합니다.
+    UFUNCTION(BlueprintCallable, meta = (DeprecatedFunction, DeprecationMessage = "Use PartyPlayerController.RequestEndTurn for player input."))
     void RequestEndTurn();
+
+    // Internal callers must identify the living, idle unit whose turn they are ending.
+    // 내부 호출자는 종료할 턴의 생존하고 행동 중이 아닌 유닛을 명시해야 합니다.
+    bool RequestEndTurnForUnit(AUnitBase* RequestingUnit);
 
     // Register units (server only)
     void RegisterUnits(const TArray<AUnitBase*>& Units);
@@ -105,6 +107,10 @@ public:
 
     UFUNCTION(BlueprintCallable)
     AUnitBase* GetCurrentUnit() const;
+
+private:
+    void AdvanceTurn();
+    void ClearPlayerSelection();
 
 public:
     // Move

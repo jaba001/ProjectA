@@ -58,14 +58,15 @@ P1은 전투 진행 정지 또는 행동 상태 훼손을 먼저 해결할 항�
 - **검증:** `RulesAndPlayerSelection`의 576개 조합, `EnemySelection`의 실제 AI 선택, `ExecutionRevalidation`의 직접 거절/대기 phase 주입/재시도 검증 통과. 정식 빌드와 기존 행동·AP·Run·Slate PIE를 포함한 최종 전체 자동화 14건이 통과했다. 첫 PIE hit-test 실패와 창 조건을 명시한 재실행 등 상세 근거는 [T04](TODO.md) 참조.
 - **연결 작업:** T04.
 
-### R05. 플레이어 입력의 행동 가능 검사에 소속 팀 제한이 없음 — slice 필수 최소 수정
+### R05. 플레이어 입력의 행동 가능 검사에 소속 팀 제한이 없음 — 처리 주체 분리 및 자동화·PIE 검증 완료
 
-- **현재 수정:** CanUseActiveUnitAction에 Player 팀 및 IsCombatActive 검사를 추가하고 tile click/EndTurn도 적용한다. AI는 CombatManager 직접 호출로 분리했다. 새 persistent HUD가 적 행동이나 종료된 전투를 제어하지 않도록 필요한 변경이며 R03/R04/R06 전체 리팩터링은 범위 밖이다.
+- **현재 수정:** 타일 클릭의 이동/스킬 실행을 PlayerController로 집중했다. 플레이어 진입은 권한·입력 잠금·Player 팀·활성 전투/턴·생존·busy를 검사한다. AI는 명시한 요청 유닛을 검증하는 `RequestEndTurnForUnit(this)`를 사용한다. 기존 인자 없는 Blueprint 종료 진입점도 플레이어 검사를 거치도록 변경했다. 내부 `AdvanceTurn`은 private이며 턴 전환/전투 종료에 선택 정리를 연결했다.
 
-- **근거:** [PartyPlayerController.cpp](../Source/ProjectA/Controller/PartyPlayerController.cpp) `CanUseActiveUnitAction`은 생존·활성 턴·busy만 검사한다. [CombatGridTile.cpp](../Source/ProjectA/Grid/Combat/CombatGridTile.cpp) 클릭 처리는 현재 턴 유닛에 행동을 전달한다. `RequestEndTurn`도 팀을 구분하지 않으며 적 AI가 같은 함수를 사용한다.
+- **수정 전 근거:** [PartyPlayerController.cpp](../Source/ProjectA/Controller/PartyPlayerController.cpp)의 초기 `CanUseActiveUnitAction`은 생존·활성 턴·busy만 검사했다. slice에서 팀 검사는 추가했지만 [CombatGridTile.cpp](../Source/ProjectA/Grid/Combat/CombatGridTile.cpp)에 명령 처리가 남아 있었고, CombatManager의 인자 없는 종료 요청은 호출 유닛·busy를 확인하지 않았다.
 - **발생 조건과 영향:** 적이 활성 턴이면서 busy가 아닌 구간에 HUD가 입력을 전달하면 플레이어가 적 이동/스킬/턴 종료를 요청할 수 있다. 특히 R01/R02의 대기 정지 상태에서 구간이 길어진다. Blueprint HUD가 별도로 차단하는지는 확인하지 못했다.
 - **검증/수정:** 적 턴의 비busy 상태에서 이동·스킬·종료 버튼을 실행한다. 플레이어 입력 진입점에서 조작 가능한 팀을 검사하고, AI의 턴 종료는 CombatManager 등 별도 내부 경로로 옮긴다. 공용 함수에 Player 제한만 추가하면 AI 종료가 깨질 수 있다.
 - **연결 작업:** T05.
+- **검증 범위:** `PlayerAndEnemyTurnIsolation`은 실제 AEnemyUnit의 취소 후 다음 틱 전 비busy 구간에 플레이어 이동/스킬/타일/종료 및 기존 Blueprint 진입점을 호출하고, UI가 잠겨도 AI가 정상 종료하는지 확인한다. `TileCommandsAndTurnGuards`는 요청자/활성 상태/busy/사망/전투 종료 검사와 실제 타일 클릭의 AP 재검사·피해를 확인한다. 정식 빌드와 저장 맵 Slate PIE를 포함한 전체 자동화 16건 통과. 상세 실행 근거는 [T05](TODO.md) 참조. 네트워크 다중 클라이언트 검증은 T14 범위다.
 
 ### R06. 스킬 범위 계산이 직접 효과와 스폰 액터 경로에서 다름
 
