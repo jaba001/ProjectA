@@ -3,6 +3,8 @@
 Unreal Engine 기반 Grid Turn-Based Combat System 프로젝트입니다.
 전투 구조는 grid, unit, turn, GAS 중심으로 구성되어 있고, CommonUI 기반 메뉴와 노드 진행 UI를 하나의 persistent Gameplay 레벨의 전투에 연결합니다.
 
+게임의 목표는 파티 전체를 성장시키는 협동 로그라이크에 Async PvP와 직접 조작 전술 전투를 결합하는 것입니다. 물리적인 월드맵 탐험을 제외하고 UI에서 선택·강화·전투·보상을 빠르게 이어가며, 단위 시간당 의미 있는 선택을 늘리는 것을 기준으로 삼습니다. 목표 Run 흐름과 개발 우선순위, 후속 결정 사항은 [게임 기획 방향](Docs/GAME_DESIGN.md)에 정리합니다.
+
 현재 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 최종적으로 상대 Party/Build Snapshot을 사용하는 Async PvP와 Listen Server 기반의 실시간 Co-op을 지원하도록 확장합니다. T14는 기획 확정 / 구현 후속 상태입니다. Co-op에서는 할당된 Party Member의 Action Request를 서버가 검증·실행하며 전투 상태의 최종 권위를 가집니다. 새 데이터·명령은 직렬화 가능한 형태를 우선하고 강한 로컬 PlayerController 의존성을 피합니다. 전체 Replication 리팩터링은 즉시 진행하지 않으며 Snapshot 전투와 다중 PIE 검증은 아직 완료되지 않았습니다. 상세 범위와 미결정 항목은 [T14 작업 카드](Docs/TODO.md)를 참고하세요.
 
 ```text
@@ -17,6 +19,7 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 
 ## 작업 재개 문서
 
+- [게임 기획 방향](Docs/GAME_DESIGN.md): 게임 정체성, 목표 Run Loop, 콘텐츠·전투·협동 방향, 개발 우선순위와 미결정 정책
 - [TODO와 작업 기록](Docs/TODO.md): 다음 작업, 우선순위, 완료 조건, 중단 지점 기록
 - [기획 초안과 구현 현황](Docs/PROJECT_PLAN.md): 이미 작성된 기능, 현재 규칙, 결정할 기획, 단계별 목표
 - [코드 리뷰](Docs/CODE_REVIEW.md): P1/P2 문제의 근거와 검증 시나리오

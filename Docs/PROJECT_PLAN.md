@@ -1,5 +1,7 @@
 # ProjectA 기획과 구현 현황
 
+게임의 목표와 이후 기능 판단 기준은 [게임 기획 방향](GAME_DESIGN.md)을 따른다. 이 문서는 현재 Vertical Slice의 구현 규약과 검증 경계를 기록하며, 목표 기능이나 후속 제안을 구현 완료로 취급하지 않는다.
+
 기준일: 2026-09-08. 기존 미커밋 메뉴·4슬롯 프리뷰 작업을 보존하며 첫 Vertical Slice를 연결한다. 코드·빌드·에셋·PIE의 실제 결과는 [작업 보고](VERTICAL_SLICE_REPORT.md)에 별도로 기록한다.
 
 ## 1. 확정한 게임 흐름
@@ -38,6 +40,8 @@ Streaming, Level Instance, 전투 중 상태 저장, 인벤토리와 장비, 여
 D01 / T14: ProjectA는 최종적으로 Async PvP와 실시간 Co-op을 지원한다. 첫 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 네트워크 기획 확정과 구현 완료를 구분한다. 상세 범위·미결정 항목·완료 조건은 [T14 작업 카드](TODO.md)를 기준으로 한다.
 
 Async PvP는 서버에 저장된 상대 Party/Build Snapshot으로 Encounter를 구성하고 기존 PvE Unit/Combat 흐름을 재사용한다. Snapshot은 파티 구성·Class·Stats·Skills·Equipment·Formation·데이터 버전을 표현해야 한다. 초기 로컬 Snapshot 전투와 경쟁 콘텐츠의 서버 결과 검증은 별도 단계다.
+
+상대 Snapshot은 AI가 조작하며 아군은 직접 Grid 전투를 조작한다. 향후 플레이어가 설정한 Tactics를 Snapshot에 포함할 수 있는 구조를 고려하되 전술 편집 기능은 후속 기획으로 둔다.
 
 Co-op은 Listen Server의 Host-authoritative 구조를 우선한다. 각 플레이어는 할당된 Party Member만 조작하고 Client의 Action Request는 서버가 검증·실행한다. CombatManager·TurnManager·Grid Occupancy·Unit State·HP/AP·사망·Combat Result의 최종 권위는 서버에 있다. Steam/EOS 등의 P2P transport와 접속 인원 등은 아직 결정하지 않았다.
 
