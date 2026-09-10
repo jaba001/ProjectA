@@ -124,7 +124,7 @@ bool FRunPersistenceTest::RunTest(const FString& Parameters)
     UGameplayStatics::SaveGameToSlot(Invalid, Slot, 0);
     TestFalse(TEXT("Unsupported version is rejected"), Restored->LoadCheckpoint(Error));
     TestTrue(TEXT("Rejected load preserves current run"), Restored->CanStartNode(TEXT("Combat_02")));
-    Invalid->Version = 1;
+    Invalid->Version = 2;
     Invalid->CompletedNodes.Add(TEXT("Combat_01"));
     UGameplayStatics::SaveGameToSlot(Invalid, Slot, 0);
     TestFalse(TEXT("Invalid progression is rejected"), Restored->LoadCheckpoint(Error));
@@ -161,19 +161,52 @@ bool FRunRestartTest::RunTest(const FString& Parameters)
         Member.CharacterName = FText::FromString(TEXT("Restart Scholar"));
         Member.ClassId = TEXT("Scholar");
         Member.bCreated = true;
-        Run->InitializeRun({ Member }, Error);
-        Run->BeginEncounter(TEXT("Combat_01"));
-        Run->MarkCombatStarted();
-        Run->UpdatePartyMemberHP(1, 61.0f);
-        Run->CompleteEncounter(ECombatResult::Victory);
-        TestTrue(TEXT("Restart fixture saved"), Run->GetSaveError().IsEmpty());
-    }
-    else
-    {
-        if (!TestTrue(TEXT("Independent process restores checkpoint"), Run->LoadCheckpoint(Error)))
+        if (!TestTrue(TEXT("Restart fixture initializes"), Run->InitializeRun({ Member }, Error)) || !TestTrue(TEXT("Initial restart checkpoint saves"), Run->GetSaveError().IsEmpty()))
+        {
+            AddError(Error.IsEmpty() ? Run->GetSaveError().ToString() : Error.ToString());
+            return false;
+        }
+        if (!TestTrue(TEXT("Restart fixture begins its encounter"), Run->BeginEncounter(TEXT("Combat_01"))) || !TestTrue(TEXT("Restart fixture starts combat"), Run->MarkCombatStarted()))
         {
             return false;
         }
+        Run->UpdatePartyMemberHP(1, 61.0f);
+        if (!TestTrue(TEXT("Restart fixture reaches its result"), Run->CompleteEncounter(ECombatResult::Victory)) || !TestTrue(TEXT("Restart fixture saved"), Run->GetSaveError().IsEmpty()))
+        {
+            if (!Run->GetSaveError().IsEmpty())
+            {
+                AddError(Run->GetSaveError().ToString());
+            }
+            return false;
+        }
+    }
+    else
+    {
+        const URunSaveGame* Saved = Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("T11_ProcessRestart"), 0));
+        if (!TestNotNull(TEXT("Independent process reads the writer's SaveGame"), Saved) || !TestEqual(TEXT("Restart fixture uses save version two"), Saved->Version, 2))
+        {
+            return false;
+        }
+        const FRunIdentityData SavedIdentity = Saved->Identity;
+        const TArray<FRunPartyMember> SavedParty = Saved->Party;
+        if (!TestTrue(TEXT("Independent process restores checkpoint"), Run->LoadCheckpoint(Error)))
+        {
+            AddError(Error.ToString());
+            return false;
+        }
+        if (!TestEqual(TEXT("Writer saved one party member"), SavedParty.Num(), 1) || !TestEqual(TEXT("Reader restores one party member"), Run->GetPartyMembers().Num(), 1))
+        {
+            return false;
+        }
+        const FRunIdentityData& RestoredIdentity = Run->GetRunIdentity();
+        const FRunPartyMember& RestoredMember = Run->GetPartyMembers()[0];
+        TestTrue(TEXT("Independent process retains every identity field"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&SavedIdentity, &RestoredIdentity, 0));
+        TestTrue(TEXT("Run ID survives process restart"), SavedIdentity.RunId.IsValid() && RestoredIdentity.RunId == SavedIdentity.RunId);
+        TestTrue(TEXT("Host account survives process restart"), RestoredIdentity.HostAccountId == SavedIdentity.HostAccountId);
+        TestEqual(TEXT("Host epoch survives process restart"), RestoredIdentity.HostEpoch, SavedIdentity.HostEpoch);
+        TestTrue(TEXT("Independent process retains every party field"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&SavedParty[0], &RestoredMember, 0));
+        TestTrue(TEXT("Character ID survives process restart"), SavedParty[0].CharacterId.IsValid() && RestoredMember.CharacterId == SavedParty[0].CharacterId);
+        TestTrue(TEXT("Original character owner survives process restart"), RestoredMember.OwnerAccountId == SavedParty[0].OwnerAccountId);
         TestEqual(TEXT("Restored name"), Run->GetPartyMembers()[0].CharacterName.ToString(), FString(TEXT("Restart Scholar")));
         TestEqual(TEXT("Restored HP"), Run->GetPartyMembers()[0].CurrentHP, 61.0f);
         TestEqual(TEXT("Restored profession"), Run->GetPartyMembers()[0].ClassId, FName(TEXT("Scholar")));

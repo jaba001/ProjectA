@@ -54,7 +54,7 @@ AI 이어하기가 확정된 뒤에는 현재 인간 참여자에게만 MMR을 �
 
 ## 4. 필수 데이터 경계와 설계 후보
 
-아래 이름과 필드는 설계 후보다. 기존 `RunSaveGame` v1과 `PartySnapshot` v1을 이 문서만으로 변경하지 않는다. 실제 구현 전 저장 버전·이전 저장 호환·마이그레이션 범위를 따로 검토한다.
+1번 작업으로 `FRunIdentityData`·`FRunAccountId`·`FRunParticipantData`, `FRunPartyMember.CharacterId/OwnerAccountId`, 참가자·소유권 조회를 추가했다. 새 Run은 `RunSaveGame` v2에 식별 정보와 동의 상태를 저장한다. 기존 식별 정보 없는 v1은 `LegacyOffline`으로 읽고 v1으로 다시 저장하며 소유권을 추정해 이관하지 않는다. `PartySnapshot`은 v1을 유지한다. 참가·AI 실행 상태, revision, 전투 중 체크포인트와 결과 반영은 아직 설계 후보다. 구현 상태는 [순차 작업 대기열](T14_QUEUE.md)을 따른다.
 
 | 데이터 경계 | 후보 정보 | 책임 |
 |---|---|---|
@@ -144,8 +144,8 @@ Server RPC는 소유 연결을 고려해야 하며, 서버에 전달됐다는 �
 
 | 현재 구현 | 후속 작업 |
 |---|---|
-| `FRunPartyMember`: 슬롯·이름·직업·생성 여부·HP | 장기 캐릭터 ID, 소유 계정, 원래 참가자와 조작 상태 분리 |
-| `RunSaveGame` v1: 전투 밖 HP·노드·결과 | Run 식별·Host 세대·revision 및 턴 경계 상태 설계 |
+| `FRunPartyMember`: 슬롯·이름·직업·생성 여부·HP·CharacterId·OwnerAccountId | 접속·AI 조작 상태 분리와 서버 행동 권한 검증 |
+| `RunSaveGame` v2: 전투 밖 HP·노드·결과와 Run/참가자/소유자/Host/동의, 기존 v1 호환 | revision 및 턴 경계 상태, 실제 인증·연결 기반 소유권 강제 |
 | `PartyPlayerController`의 로컬 권위 검사·현재 Player팀 유닛 조작 | 소유 연결의 요청과 서버 검증으로 분리하고 계정별 캐릭터 권한 추가 |
 | `APlayerUnit`: 인간 행동과 자원 소진 턴 종료 | 인간 입력과 교체 가능한 서버 AI 판단 연결 |
 | `AEnemyUnit`: 적 AI 판단 FSM | 소유권·팀을 유지하는 아군 AI 실행 구조 검토 |

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Game/Run/RunIdentityTypes.h"
 #include "RunTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -39,6 +40,14 @@ struct PROJECTA_API FRunPartyMember
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Run")
     bool bCreated = false;
+
+    // Ownership survives travel and does not change when a host or controller changes.
+    // 소유권은 레벨 이동 후에도 유지하며 Host나 조작 주체가 바뀌어도 변경하지 않습니다.
+    UPROPERTY(BlueprintReadOnly, Category = "Run|Identity")
+    FGuid CharacterId;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Run|Identity")
+    FRunAccountId OwnerAccountId;
 
     // Negative HP means that the first spawn uses the unit class default.
     // 음수 HP는 첫 스폰에서 유닛 클래스의 기본값을 사용함을 뜻합니다.

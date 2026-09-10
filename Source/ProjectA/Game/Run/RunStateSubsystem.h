@@ -31,6 +31,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Run")
     bool InitializeRun(const TArray<FRunPartyMember>& Members, FText& OutError);
 
+    // Accept validated data from a future authority layer; this API does not authenticate accounts.
+    // 향후 권위 계층의 데이터를 검증해 받으며 이 API 자체는 계정을 인증하지 않습니다.
+    bool InitializeRunWithIdentity(const TArray<FRunPartyMember>& Members, const FRunIdentityData& Identity, FText& OutError);
+
+    UFUNCTION(BlueprintPure, Category = "Run|Identity")
+    const FRunIdentityData& GetRunIdentity() const { return RunIdentity; }
+
     UFUNCTION(BlueprintPure, Category = "Run")
     const TArray<FRunPartyMember>& GetPartyMembers() const { return PartyMembers; }
 
@@ -76,6 +83,9 @@ private:
     FString SaveSlot = TEXT("ProjectA_Run");
     bool bCheckpointSaving = false;
     FText SaveError;
+
+    UPROPERTY(Transient)
+    FRunIdentityData RunIdentity;
 
     UPROPERTY(Transient)
     TArray<FRunPartyMember> PartyMembers;

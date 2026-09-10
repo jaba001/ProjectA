@@ -1,5 +1,6 @@
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunSaveGame.h"
+#include "Game/Run/RunIdentityLibrary.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Kismet/GameplayStatics.h"
@@ -53,8 +54,20 @@ void URunStateSubsystem::AutoSaveCheckpoint()
 bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError) const
 {
     OutError = FText::FromString(TEXT("저장 파일이 손상되었거나 현재 버전·직업 설정과 호환되지 않습니다."));
-    if (!Save || Save->Version != 1 || Save->Party.IsEmpty() || Save->Party.Num() > 4 || Save->Nodes.Num() != 2 || Save->CompletedNodes.Num() > 2)
+    if (!Save || (Save->Version != 1 && Save->Version != 2) || Save->Party.IsEmpty() || Save->Party.Num() > 4 || Save->Nodes.Num() != 2 || Save->CompletedNodes.Num() > 2)
     {
+        return false;
+    }
+    // Legacy saves remain offline; missing or damaged ownership must never downgrade a new save.
+    // 기존 저장은 오프라인으로 유지하며 새 저장의 누락·손상된 소유권을 구버전으로 우회하지 않습니다.
+    if ((Save->Version == 1) != (Save->Identity.Origin == ERunIdentityOrigin::LegacyOffline))
+    {
+        return false;
+    }
+    FText IdentityError;
+    if (!URunIdentityLibrary::ValidateIdentity(Save->Identity, Save->Party, IdentityError))
+    {
+        OutError = IdentityError;
         return false;
     }
     UPartyDefinitionDataAsset* Catalog = Cast<UPartyDefinitionDataAsset>(Save->Catalog.TryLoad());
@@ -110,6 +123,8 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
 bool URunStateSubsystem::SaveCheckpoint(FText& OutError)
 {
     URunSaveGame* Save = NewObject<URunSaveGame>();
+    Save->Version = RunIdentity.Origin == ERunIdentityOrigin::LegacyOffline ? 1 : 2;
+    Save->Identity = RunIdentity;
     Save->Party = PartyMembers;
     Save->Nodes = Nodes;
     Save->CompletedNodes = CompletedNodes;
@@ -152,8 +167,9 @@ bool URunStateSubsystem::CanContinueSavedRun(FText& OutError) const
 
 bool URunStateSubsystem::LoadCheckpoint(FText& OutError)
 {
-    if (!CanContinueSavedRun(OutError))
+    if (!UGameplayStatics::DoesSaveGameExist(SaveSlot, 0))
     {
+        OutError = FText::FromString(TEXT("이어할 저장 기록이 없습니다."));
         return false;
     }
     const URunSaveGame* Save = Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(SaveSlot, 0));
@@ -161,6 +177,12 @@ bool URunStateSubsystem::LoadCheckpoint(FText& OutError)
     {
         return false;
     }
+    if (Save->Phase == ERunPhase::Defeat || Save->Phase == ERunPhase::Complete)
+    {
+        OutError = FText::FromString(TEXT("종료된 진행입니다. 새 게임을 시작해 주세요."));
+        return false;
+    }
+    RunIdentity = Save->Identity;
     PartyMembers = Save->Party;
     Nodes = Save->Nodes;
     CompletedNodes = Save->CompletedNodes;
@@ -176,6 +198,27 @@ bool URunStateSubsystem::LoadCheckpoint(FText& OutError)
 }
 
 bool URunStateSubsystem::InitializeRun(const TArray<FRunPartyMember>& Members, FText& OutError)
+{
+    // Standalone runs use a per-run development identity until an authenticated provider is integrated.
+    // 인증 공급자 연동 전까지 싱글플레이는 Run마다 별도의 개발용 식별자를 사용합니다.
+    FRunIdentityData Identity;
+    Identity.Origin = ERunIdentityOrigin::LocalDevelopment;
+    Identity.RunId = FGuid::NewGuid();
+    Identity.HostEpoch = 1;
+    FRunParticipantData& Participant = Identity.OriginalParticipants.AddDefaulted_GetRef();
+    Participant.AccountId.Provider = TEXT("Development");
+    Participant.AccountId.Subject = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    Identity.HostAccountId = Participant.AccountId;
+    TArray<FRunPartyMember> OwnedMembers = Members;
+    for (FRunPartyMember& Member : OwnedMembers)
+    {
+        Member.CharacterId = Member.bCreated ? FGuid::NewGuid() : FGuid();
+        Member.OwnerAccountId = Member.bCreated ? Participant.AccountId : FRunAccountId();
+    }
+    return InitializeRunWithIdentity(OwnedMembers, Identity, OutError);
+}
+
+bool URunStateSubsystem::InitializeRunWithIdentity(const TArray<FRunPartyMember>& Members, const FRunIdentityData& Identity, FText& OutError)
 {
     OutError = FText::GetEmpty();
     TSet<int32> UsedSlots;
@@ -215,6 +258,22 @@ bool URunStateSubsystem::InitializeRun(const TArray<FRunPartyMember>& Members, F
         return false;
     }
 
+    if (Identity.Origin == ERunIdentityOrigin::LegacyOffline)
+    {
+        OutError = FText::FromString(TEXT("새 진행에는 Run·참가자·캐릭터 식별 정보가 필요합니다."));
+        return false;
+    }
+    if (!URunIdentityLibrary::ValidateIdentity(Identity, Members, OutError))
+    {
+        return false;
+    }
+    if (RunIdentity.RunId.IsValid() && RunIdentity.RunId == Identity.RunId)
+    {
+        OutError = FText::FromString(TEXT("현재 Run의 참가자와 소유권을 새 게임 생성으로 교체할 수 없습니다. 복원은 이어하기를 사용해 주세요."));
+        return false;
+    }
+
+    RunIdentity = Identity;
     PartyMembers = Members;
     PartyMembers.Sort([](const FRunPartyMember& Left, const FRunPartyMember& Right) { return Left.SlotIndex < Right.SlotIndex; });
 

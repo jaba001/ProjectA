@@ -24,7 +24,7 @@ flowchart LR
 
 | 구성 | 역할 / 수명 |
 |---|---|
-| `URunStateSubsystem` | GameInstance 수명. PartyMembers, CurrentNodeId, CompletedNodes, CurrentEncounterId, Phase, LastResult, HP만 보존. Actor 참조 없이 전투 밖 체크포인트를 SaveGame에 저장 |
+| `URunStateSubsystem` | GameInstance 수명. 파티·노드·결과·HP와 Run/참가자/캐릭터 소유권/Host/동의 보존. Actor 참조 없이 전투 밖 체크포인트를 SaveGame에 저장 |
 | `AGameplayGameModeBase` | 레벨 BeginPlay 다음 틱에 Arena를 찾아 EncounterManager와 CombatManager 생성, Controller 연결 |
 | `AGameplayPlayerController` | PartyPlayerController 상속. Root UI와 전투 조작 허용 상태 관리, 노드/Continue 요청 전달 |
 | `UGameplayRootWidget` | CommonUI Run / Combat / Modal 스택 관리 |
@@ -86,7 +86,7 @@ R01/R02는 `EUnitActionResult`와 공통 행동 완료 경로로 수정한다. G
 | R06 / T06 범위 | Single/AroundTarget/AroundSelf 공통 계산, 기존 시전자 제외 유지. 미지원 타입/음수 반경은 에셋 검증·실행 전 거절. 전체 자동화 18건 통과 |
 | T07 발사체 완료 | GAS가 몽타주+impact 완료를 기다림. 미충돌 시간 제한·취소/사망 정리 및 플레이어 AP·보조 AP 모두 소진 시 자동 종료 완료. 빌드 및 전체 자동화 20건 통과 |
 | T09 직업/편집 | 공통 직업 정의로 UI/스폰 연결, 이름·직업 편집과 읽기 전용 ClassInfo 구현. 기존 클래스 밸런스 유지, 직업별 신규 콘텐츠는 별도 |
-| T11 메뉴 기능 | 버전 1 체크포인트 자동 저장/이어하기, 품질·수직 동기화 옵션, 실제 Quit 연결. 빌드·자동화 23건 및 패키지 저장/Continue/Quit 검증 완료 |
+| T11 메뉴 기능 | 체크포인트 자동 저장/이어하기, 품질·수직 동기화 옵션, 실제 Quit 연결. T11 당시 v1 빌드·자동화 23건 및 패키지 저장/Continue/Quit 검증 완료. T14에서 새 Run은 v2 소유권 메타데이터, 기존 v1은 LegacyOffline 호환 |
 | T12 메뉴 에셋 | Designer 기준 유지, 표시 전용 프리뷰·재진입 정리, 누락 상태 안내 바인딩 보완. 빌드·전체 24건 및 최종 PIE·생성본 검증 완료 |
 | T13 콘텐츠 | 전투 한정 회복약·HUD, SkillPool 휩쓸기 획득/GAS 장착, 적 전진 후보와 AP당 대상 점수 구현. 빌드·자동화 26건 및 저장 맵 PIE 통과 |
 | T14 네트워크 | 로컬 USaveGame v1 Snapshot 저장·카탈로그 해석·Encounter 연결 구현. 검증 결과는 [작업 카드](TODO.md)에 기록하며 Co-op 다중 PIE는 후속 |

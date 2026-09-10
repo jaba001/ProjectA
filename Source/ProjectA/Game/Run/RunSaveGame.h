@@ -13,7 +13,9 @@ class PROJECTA_API URunSaveGame : public USaveGame
 
 public:
     UPROPERTY()
-    int32 Version = 1;
+    int32 Version = 2;
+    UPROPERTY()
+    FRunIdentityData Identity;
     UPROPERTY()
     TArray<FRunPartyMember> Party;
     UPROPERTY()

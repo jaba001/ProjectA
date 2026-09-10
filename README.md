@@ -7,7 +7,7 @@ Unreal Engine 기반 Grid Turn-Based Combat System 프로젝트입니다.
 
 현재 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 최종적으로 상대 Party/Build Snapshot을 사용하는 Async PvP와 Listen Server 기반의 실시간 Co-op을 지원하도록 확장합니다. T14의 첫 단계로 Unreal `USaveGame` v1에 저장된 상대를 기존 전투에 연결했습니다. 로컬 전투 한 사이클 검증 후 Co-op 동기화를 진행하며, 다중 PIE와 온라인 서비스는 후속 범위입니다. Co-op에서는 할당된 Party Member의 Action Request를 서버가 검증·실행하고 전투 상태의 최종 권위를 가집니다. 새 데이터·명령은 직렬화 가능한 형태를 우선하고 강한 로컬 PlayerController 의존성을 피합니다. 구현·검증 상태와 미결정 항목은 [T14 작업 카드](Docs/TODO.md), 실행 방법은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)를 참고하세요.
 
-Co-op 확정 기획은 최대 4인과 원래 캐릭터 소유자만 직접 조작하는 방식입니다. 종료·끊김 시 기존 Host를 유지하고, 원래 인원이 다시 모일 수 없을 때 기존 참가자가 명시적으로 Host를 승계해 불참자 캐릭터를 AI로 전환하는 이어하기를 계획합니다. AI 전환에는 Run 시작 시 각자의 사전 동의가 필요하며, AI 전환 후 MMR은 현재 인간 참가자에게만 반영합니다. 복구 목표는 마지막 확정 턴 경계입니다. 이 소유권·승계·랭크·턴 복구 기능은 아직 미구현이며 [Co-op 확정 기획과 구현 순서](Docs/T14_COOP_DESIGN.md)에 정리합니다.
+Co-op 확정 기획은 최대 4인과 원래 캐릭터 소유자만 직접 조작하는 방식입니다. 종료·끊김 시 기존 Host를 유지하고, 원래 인원이 다시 모일 수 없을 때 기존 참가자가 명시적으로 Host를 승계해 불참자 캐릭터를 AI로 전환하는 이어하기를 계획합니다. AI 전환에는 Run 시작 시 각자의 사전 동의가 필요하며, AI 전환 후 MMR은 현재 인간 참가자에게만 반영합니다. 복구 목표는 마지막 확정 턴 경계입니다. Run·참가자·캐릭터 소유권의 값 데이터와 저장·조회 기반을 추가했으며, 네트워크 조작권 강제·승계·랭크·턴 복구는 후속입니다. [Co-op 확정 기획](Docs/T14_COOP_DESIGN.md)과 [1~8번 순차 작업 대기열](Docs/T14_QUEUE.md)에 구현 경계를 정리합니다.
 
 ```text
 MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
@@ -25,6 +25,7 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 - [TODO와 작업 기록](Docs/TODO.md): 다음 작업, 우선순위, 완료 조건, 중단 지점 기록
 - [기획 초안과 구현 현황](Docs/PROJECT_PLAN.md): 이미 작성된 기능, 현재 규칙, 결정할 기획, 단계별 목표
 - [T14 Co-op 확정 기획](Docs/T14_COOP_DESIGN.md): 본인 캐릭터 조작권, 기존 참가자의 Host 승계·AI 이어하기, MMR과 턴 경계 복구
+- [T14 순차 작업 대기열](Docs/T14_QUEUE.md): 1~8번의 순서, 상태, 번호별 완료 기준
 - [코드 리뷰](Docs/CODE_REVIEW.md): P1/P2 문제의 근거와 검증 시나리오
 
 문서는 2026-09-10 현재 작업 트리를 기준으로 정리합니다. 코드 구현, 정식 빌드, 에셋 설정 확인, PIE 검증은 별도로 기록합니다.
@@ -218,7 +219,9 @@ C++ 파일을 생성, 삭제, 이름 변경한 뒤 프로젝트 파일 재생성
 
 T14 로컬 상대 검증은 [Snapshot 설정 스크립트](Source/ProjectAEditor/Scripts/ConfigureSnapshotContent.py) 실행 후 `-ProjectAOpponentSnapshot=SampleOpponent`로 선택합니다. 상대 데이터는 `ProjectA_Opponent_SampleOpponent`, Run 체크포인트는 `ProjectA_SnapshotRun_SampleOpponent`로 분리됩니다. 명시적인 `-ProjectASaveSlot=...`은 우선하며, 이어하기에는 같은 상대 실행 인자를 사용합니다. 저장값과 에셋 설정은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)를 참고하세요.
 
-메인메뉴 Continue는 저장이 없거나 손상/버전 불일치/직업 데이터 누락/종료된 진행이면 비활성화하고 이유를 표시합니다. 쓰기 실패는 시작 화면 또는 Gameplay의 지도/결과 화면에 표시하며 게임 중 쓰기 실패가 이전 체크포인트까지 갱신했다는 뜻은 아닙니다. 저장 형식은 버전 1이며 이전 버전 변환과 전투 도중 액터/AP/발사체 복원은 지원하지 않습니다.
+메인메뉴 Continue는 저장이 없거나 손상/버전 불일치/직업 데이터 누락/종료된 진행이면 비활성화하고 이유를 표시합니다. 쓰기 실패는 시작 화면 또는 Gameplay의 지도/결과 화면에 표시하며 게임 중 쓰기 실패가 이전 체크포인트까지 갱신했다는 뜻은 아닙니다. 신규 Run은 v2로 Run ID·원래 참가자·캐릭터 ID/소유자·Host/세대·AI 동의 상태를 함께 저장합니다. 실제 식별 정보가 없는 기존 v1 기록은 소유권을 추정하지 않는 `LegacyOffline`으로 이어가며 다시 v1으로 저장합니다. 손상된 v2는 v1으로 우회하지 않고 거절합니다. 전투 도중 액터/AP/발사체 복원은 아직 지원하지 않습니다.
+
+현재 새 싱글플레이는 Run마다 임시 개발용 참가자 한 명을 생성하고 생성한 캐릭터들을 해당 참가자에게 연결합니다. 레벨 이동·다음 노드·저장/복원 동안 식별값을 유지하고 새 게임은 새 식별값을 만듭니다. 동의 UI가 없으므로 AI 동의는 자동 승인하지 않고 `Unknown`으로 저장합니다. 개발용 ID와 소유권 조회는 실제 계정 인증이나 Co-op 접속을 제공하지 않습니다.
 
 Options에서 그래픽 품질과 수직 동기화를 선택하고 **적용 및 저장**으로 반영합니다. 적용 전 닫기는 변경을 버리며, 설정은 Unreal `GameUserSettings.ini`에 유지됩니다. Quit는 실제 게임 종료를 요청합니다. 테스트는 `-ProjectASaveSlot=T11_PIE`처럼 별도 슬롯을 지정해 플레이 저장을 보호합니다.
 

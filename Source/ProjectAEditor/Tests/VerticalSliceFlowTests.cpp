@@ -314,6 +314,10 @@ public:
             InputViewport->OnInputKey().AddRaw(this, &FPlayVerticalSlice::HandleGameViewportInput);
             Test->TestEqual(TEXT("Edited profession survives travel."), Run->GetPartyMembers()[0].ClassId, FName(TEXT("Hunter")));
             Test->TestEqual(TEXT("Party name survives travel."), Run->GetPartyMembers()[0].CharacterName.ToString(), FString(TEXT("Vertical Slice Hero")));
+            if (!CaptureRunIdentity(Run))
+            {
+                return true;
+            }
             GameplayWorld = World;
             Combat = Encounter->GetCombatManager();
             if (!Require(Combat.IsValid(), TEXT("Gameplay owns a combat manager.")))
@@ -353,6 +357,10 @@ public:
                 return false;
             }
             if (!CheckInputPolicy(Controller, true))
+            {
+                return true;
+            }
+            if (!CheckRunIdentity(Run, Stage == 3 ? TEXT("First encounter") : TEXT("Second encounter")))
             {
                 return true;
             }
@@ -711,6 +719,10 @@ public:
             }
             CheckCleanup(Encounter);
             Test->TestEqual(TEXT("Victory completes one node."), Run->GetCompletedNodes().Num(), 1);
+            if (!CheckRunIdentity(Run, TEXT("Victory Continue")))
+            {
+                return true;
+            }
             if (!ClickNode(MapWidget, 1))
             {
                 return true;
@@ -728,6 +740,68 @@ public:
     }
 
 private:
+    // Compare persistent identities across encounter actor replacement and the Continue transition.
+    // 인카운터 액터 교체와 Continue 전환에서도 영속 식별자가 유지되는지 비교합니다.
+    bool CaptureRunIdentity(const URunStateSubsystem* Run)
+    {
+        InitialRunIdentity = Run->GetRunIdentity();
+        InitialPartyMembers = Run->GetPartyMembers();
+        bool bValid = Test->TestTrue(TEXT("MainMenu creates a valid RunId before Gameplay begins."), InitialRunIdentity.RunId.IsValid());
+        bValid &= Test->TestTrue(TEXT("A new solo run records its local development origin."), InitialRunIdentity.Origin == ERunIdentityOrigin::LocalDevelopment);
+        bValid &= Test->TestFalse(TEXT("A new solo run has a host account identifier."), InitialRunIdentity.HostAccountId.IsEmpty());
+        bValid &= Test->TestEqual(TEXT("A new solo run records exactly one original participant."), InitialRunIdentity.OriginalParticipants.Num(), 1);
+        if (InitialRunIdentity.OriginalParticipants.Num() == 1)
+        {
+            const auto& Participant = InitialRunIdentity.OriginalParticipants[0];
+            bValid &= Test->TestTrue(TEXT("The solo host is the original participant."), Participant.AccountId == InitialRunIdentity.HostAccountId);
+            bValid &= Test->TestTrue(TEXT("A new solo participant has not supplied AI consent."), Participant.AIConsent == ERunAIConsent::Unknown);
+            bValid &= Test->TestEqual(TEXT("A new solo run has no accepted consent policy version."), Participant.ConsentPolicyVersion, 0);
+        }
+        TSet<FGuid> CharacterIds;
+        for (const FRunPartyMember& Member : InitialPartyMembers)
+        {
+            if (!Member.bCreated)
+            {
+                continue;
+            }
+            bValid &= Test->TestTrue(TEXT("Every created character has a valid persistent CharacterId."), Member.CharacterId.IsValid());
+            bValid &= Test->TestFalse(TEXT("Created characters have distinct CharacterIds."), CharacterIds.Contains(Member.CharacterId));
+            bValid &= Test->TestTrue(TEXT("The solo host owns every created party member."), Member.OwnerAccountId == InitialRunIdentity.HostAccountId);
+            CharacterIds.Add(Member.CharacterId);
+        }
+        return bValid;
+    }
+
+    bool CheckRunIdentity(const URunStateSubsystem* Run, const TCHAR* Transition)
+    {
+        const FString Prefix = FString(Transition) + TEXT(": ");
+        const FRunIdentityData& Identity = Run->GetRunIdentity();
+        bool bMatches = Test->TestEqual(Prefix + TEXT("RunId is preserved."), Identity.RunId, InitialRunIdentity.RunId);
+        bMatches &= Test->TestTrue(Prefix + TEXT("identity origin is preserved."), Identity.Origin == InitialRunIdentity.Origin);
+        bMatches &= Test->TestTrue(Prefix + TEXT("host account is preserved."), Identity.HostAccountId == InitialRunIdentity.HostAccountId);
+        bMatches &= Test->TestEqual(Prefix + TEXT("host epoch is preserved."), Identity.HostEpoch, InitialRunIdentity.HostEpoch);
+        bMatches &= Test->TestEqual(Prefix + TEXT("original participant count is preserved."), Identity.OriginalParticipants.Num(), InitialRunIdentity.OriginalParticipants.Num());
+        for (int32 Index = 0; Index < FMath::Min(Identity.OriginalParticipants.Num(), InitialRunIdentity.OriginalParticipants.Num()); ++Index)
+        {
+            const auto& Participant = Identity.OriginalParticipants[Index];
+            const auto& Original = InitialRunIdentity.OriginalParticipants[Index];
+            bMatches &= Test->TestTrue(Prefix + TEXT("original participant account is preserved."), Participant.AccountId == Original.AccountId);
+            bMatches &= Test->TestTrue(Prefix + TEXT("participant AI consent is preserved."), Participant.AIConsent == Original.AIConsent);
+            bMatches &= Test->TestEqual(Prefix + TEXT("participant consent policy version is preserved."), Participant.ConsentPolicyVersion, Original.ConsentPolicyVersion);
+        }
+        const TArray<FRunPartyMember>& Members = Run->GetPartyMembers();
+        bMatches &= Test->TestEqual(Prefix + TEXT("party slot count is preserved."), Members.Num(), InitialPartyMembers.Num());
+        for (int32 Index = 0; Index < FMath::Min(Members.Num(), InitialPartyMembers.Num()); ++Index)
+        {
+            const FRunPartyMember& Member = Members[Index];
+            const FRunPartyMember& Original = InitialPartyMembers[Index];
+            bMatches &= Test->TestEqual(Prefix + TEXT("party slot is preserved."), Member.SlotIndex, Original.SlotIndex);
+            bMatches &= Test->TestEqual(Prefix + TEXT("character identity is preserved."), Member.CharacterId, Original.CharacterId);
+            bMatches &= Test->TestTrue(Prefix + TEXT("character ownership is preserved."), Member.OwnerAccountId == Original.OwnerAccountId);
+        }
+        return bMatches;
+    }
+
     bool Require(bool bCondition, const TCHAR* Message)
     {
         return Test->TestTrue(Message, bCondition);
@@ -1035,6 +1109,8 @@ private:
     }
 
     FAutomationTestBase* Test;
+    FRunIdentityData InitialRunIdentity;
+    TArray<FRunPartyMember> InitialPartyMembers;
     int32 Stage = 0;
     FName SnapshotSlot;
     int32 SnapshotSkillsCompleted = 0;
