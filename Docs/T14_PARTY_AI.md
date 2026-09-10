@@ -14,23 +14,23 @@
 
 ## 조작권과 준비 API
 
-`UCombatActionAuthority::SetPartyControlMode`는 신뢰된 서버 C++의 전투 시작 전 준비 진입점이다. 등록된 원래 캐릭터와 소유자를 확인하고, `ServerAI`에는 그 소유자의 `Granted` 및 동의 정책 버전 1이 필요하다. 이미 턴 관리가 시작된 전투에서는 모드를 변경하지 않는다. 모드 변경은 인간 입력·AI 판단이 진행되는 중에 조작권을 바꾸는 기능이 아니다.
+`UCombatActionAuthority::SetPartyControlMode`는 신뢰된 서버 C++의 전투 시작 전 준비 진입점이다. 등록된 원래 캐릭터·소유자·서버 권위를 확인한다. 후속 확정 정책에 따라 개인 사전 동의는 요구하지 않으며 이전 저장의 `Unknown`·`Declined`도 AI 준비를 허용한다. 이미 턴 관리가 시작된 전투에서는 모드를 변경하지 않는다. 모드 변경은 인간 입력·AI 판단이 진행되는 중에 조작권을 바꾸는 기능이 아니다.
 
 AI 모드는 Unit과 전투 표시 뷰에 복제한다. AI 차례에는 HUD 이름에 `(AI)`를 표시하고 원래 소유자와 Host 모두 인간 조작 버튼을 사용할 수 없다. 서버도 인간 요청을 거절하며 그 요청의 순번을 소비해 나중의 재전송을 막는다. 원래 캐릭터 소유권과 Host 권위는 바뀌지 않는다.
 
-이 API는 실제 불참 판정·Host 승계 승인·AI 이어하기 UI를 대신하지 않는다. 기본 Run은 Human을 유지하며 끊김만으로 AI를 켜지 않는다. 현재 협동 복구의 원래 참가자 연결 배정 조건도 유지한다. 불참자 대신 AI로 이어가는 사용 흐름과 연결 배정 예외는 다음 6번에서 명시적인 승인·저장 계약과 함께 연결한다. 인간 복귀 시점·미결정 MMR 정책은 확정하지 않는다.
+이 API는 실제 불참 판정·Host 승계 승인·AI 이어하기 UI를 대신하지 않는다. 기본 Run은 Human을 유지하며 끊김만으로 AI를 켜지 않는다. 현재 협동 복구의 원래 참가자 연결 배정 조건도 유지한다. 불참자 대신 AI로 이어가는 사용 흐름과 연결 배정 예외는 6번에서 Host 단독 결정·영속 저장 계약과 함께 연결한다. 3C에 따라 실제 AI 전환 후 해당 Run에서는 인간 조작으로 복귀하지 않는다. 이 영구 규칙은 전투 준비 API만으로 보장되지 않으며 Run의 확정 참여 이력을 함께 검증해야 한다. MMR 세부 정책은 별도 미정이다.
 
 ## 저장 호환
 
 Run SaveGame의 외부 버전은 v3를 유지하고 전투 본문은 schema 2로 기록한다. 각 유닛의 `PartyControlMode`를 저장하며, 이 필드는 파티 유닛의 조작 방식이다. 적 유닛의 기존 AI는 변경하지 않는다.
 
-기존 schema 1은 파티 Human만 허용한다. 이전 v1/v2의 빈 전투 본문 기본값을 유지해 전투 밖 저장 호환을 보존한다. schema 2의 AI는 원래 소유자의 사전 동의를 다시 검증하고 새 Actor에 모드를 적용한 뒤 정상 턴 시작에서 판단을 실행한다. 실행 중 AI 세션 ID·순번·타이머·선택 중인 대상은 영구 저장하지 않는다. 복구 시 새 세션 ID로 이전 실행 요청을 거절한다.
+기존 schema 1은 파티 Human만 허용한다. 이전 v1/v2의 빈 전투 본문 기본값을 유지해 전투 밖 저장 호환을 보존한다. schema 2의 AI는 유효한 원래 소유권과 모드를 검증하고 새 Actor에 모드를 적용한 뒤 정상 턴 시작에서 판단을 실행한다. 개인 사전 동의는 복구 조건에서 제거했다. 기존 동의 필드의 구조 검사는 구버전 손상 검증용으로 유지한다. 실행 중 AI 세션 ID·순번·타이머·선택 중인 대상은 영구 저장하지 않는다. 복구 시 새 세션 ID로 이전 실행 요청을 거절한다.
 
 ## 검증과 재현
 
-2026-09-10 Development Editor / Win64 최종 빌드와 전체 자동화 56건(성공 36·경고 동반 성공 20·실패 0)을 통과했다. 새 런타임 테스트 3건은 동의·서버 준비 조건·인간 입력 거절·AI 명령 문맥과 순번·실제 GAS/자원·이동 실패·지연 완료 무효화·다음 AI 턴을 확인한다. 저장 테스트 1건은 schema 1 Human 호환, schema 2 AI·동의·유형 검증과 실제 SaveGame 왕복을 확인한다.
+최초 5번 구현은 2026-09-10 Development Editor / Win64 빌드와 전체 56건(성공 36·경고 동반 성공 20·실패 0)을 통과했다. 당시 테스트는 동의를 포함한 준비 조건을 검사했다. 후속 확정에 따라 현재는 동의 gate를 제거하고 `Unknown`·`Declined` AI 허용, 서버 준비·소유권·인간 입력 거절·명령 문맥/순번·실제 GAS/자원·이동 실패·지연 완료 무효화·저장 왕복을 검사한다. 변경 후 실행 결과는 [대기열](T14_QUEUE.md)에 별도 기록한다.
 
-`ProjectA.Coop.CheckpointSessionRestart -T14CheckpointAI`는 실제 두 PIE의 원래 소유자 RPC를 거절한 뒤 서버 AI의 자기 회복약 1회·공격·실제 이동·턴 종료와 Host 차례 복귀를 확인한다. 양쪽 AI 모드·원래 팀/소유권·HP/AP·Grid·HUD·새 확정 저장값을 비교한다. 전용 테스트 Writer가 사전 동의한 AI 모드를 디스크에 명시적으로 준비하며 실제 사용자 승인 UI나 부재 참가자 연결 예외를 검증하는 테스트는 아니다.
+`ProjectA.Coop.CheckpointSessionRestart -T14CheckpointAI`는 실제 두 PIE의 원래 소유자 RPC를 거절한 뒤 서버 AI의 자기 회복약 1회·공격·실제 이동·턴 종료와 Host 차례 복귀를 확인한다. 양쪽 AI 모드·원래 팀/소유권·HP/AP·Grid·HUD·새 확정 저장값을 비교한다. 전용 테스트 Writer가 개인 동의 없는 AI 모드를 디스크에 명시적으로 준비하며 실제 사용자 승인 UI나 부재 참가자 연결 예외를 검증하는 테스트는 아니다.
 
 ```powershell
 & 'C:/Program Files/Epic Games/UE_5.7/Engine/Binaries/Win64/UnrealEditor-Cmd.exe' 'C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject' -unattended -nop4 -RenderOffscreen -nosound -T14CheckpointAI '-ExecCmds=Automation RunTests ProjectA.Coop.CheckpointSessionRestart' '-TestExit=Automation Test Queue Empty'

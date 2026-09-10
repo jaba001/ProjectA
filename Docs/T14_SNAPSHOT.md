@@ -57,7 +57,7 @@ Snapshot 모드의 Run 체크포인트는 기본 `ProjectA_SnapshotRun_<SlotId>`
 
 로컬에서 저장·불러오기, 상대 생성, 아군 직접 조작, 상대 AI의 실제 피해, 사망, 결과 1회, 유닛/턴/점유 정리와 다음 노드 진행을 검증한다. 이 사이클이 안정되면 같은 데이터·행동 검증 경계를 유지하며 Listen Server/Client로 확장한다.
 
-다음 단계에서는 원래 소유자만 조작할 수 있는 계정·캐릭터 매핑, 서버 Action Request, 턴·Grid·HP/AP·사망·결과 복제 및 클라이언트 HUD를 구현하고 최소 두 PIE 인스턴스로 확인한다. 최대 4인, 본인 캐릭터 고정, 기존 Host 유지와 명시적 Host 승계·불참자 AI 이어하기, 시작 시 AI 전환 사전 동의, 이후 인간 참가자만 MMR 반영, 마지막 확정 턴 경계 복구로 기획을 확정했다. 상세 합의와 남은 정책은 [Co-op 확정 기획](T14_COOP_DESIGN.md)을 따른다. Steam/EOS, Lobby, Backend, 매칭, 경쟁 결과 검증은 별도 작업이며 이번 로컬 Snapshot 검증에 포함하지 않는다. [T14 기획](TODO.md)
+후속 순차 작업에서 원래 소유자만 조작하는 계정·캐릭터 매핑, 서버 Action Request, 턴·Grid·HP/AP·사망·결과 복제와 HUD를 실제 2·3·4인 PIE로 검증했다. 최신 기획은 최대 4인, 본인 캐릭터 고정, 최초 번호순 명시적 Host 승계, 개인 사전 동의 없는 Host 단독 AI 전환, 해당 Run의 AI 유지, 인간 참가자만 MMR 반영, 확정 턴 경계 복구다. [Co-op 기획](T14_COOP_DESIGN.md)을 따른다. 선택한 Steam P2P·PlayFab의 실제 연동과 비용·매칭·경쟁 결과 검증은 이번 로컬 Snapshot 검증에 포함하지 않는다. [T14 기획](TODO.md)
 
 `FPartySnapshot`은 상대 빌드 저장값이며 아군 계정 소유권·Run 참가자·Host 승계·턴 상태 복구를 직접 구현하지 않는다. `URunSaveGame`의 v2 소유권과 v3 확정 턴 저장은 별도 계약이며 상대 Snapshot v1 형식을 유지한다. 복구 구조와 현재 지원 범위는 [확정 턴 저장·복구](T14_CHECKPOINT.md)를 따른다.
 

@@ -9,6 +9,7 @@
 #include "Components/Button.h"
 #include "Components/HorizontalBox.h"
 #include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
 #include "Controller/GameplayPlayerController.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
@@ -127,6 +128,37 @@ public:
             Advance();
             return false;
         }
+        if (Stage == WaitingForMap)
+        {
+            if (!MapPermissionsReady(0, ObservedClients))
+            {
+                return false;
+            }
+            URunStateSubsystem* Run = ServerWorld->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+            CheckRejectedClientFlow(Run->GetNodes()[0].NodeId, ERunPhase::Map, ObservedClients);
+            if (!ClickNode(0) || !Test->TestTrue(TEXT("The trusted host controller starts the first encounter."), Run->GetPhase() == ERunPhase::Combat) || !CacheFixtureUnits())
+            {
+                return EndSession();
+            }
+            SetStage(2);
+            return false;
+        }
+        if (Stage == WaitingForWrongHostMap)
+        {
+            // CommonUI activation finishes after the synchronous Run change; inspect the visible screen afterward.
+            // 동기 Run 변경 뒤 CommonUI 활성화가 완료되므로 표시된 화면을 다음 단계에서 검사합니다.
+            UButton* WrongHostNode = GetNodeButton(Host.Get(), 0);
+            if (!WrongHostNode)
+            {
+                return false;
+            }
+            if (!Test->TestFalse(TEXT("The visible wrong-host map keeps node selection disabled."), WrongHostNode->GetIsEnabled()) || !Test->TestFalse(TEXT("The wrong-host map cannot authorize Run commands."), Host->CanIssueRunCommands()) || !InitializeActualRun())
+            {
+                return EndSession();
+            }
+            SetStage(WaitingForMap);
+            return false;
+        }
         if (Stage == 1)
         {
             if (!FindConnectedWorlds())
@@ -137,7 +169,7 @@ public:
             {
                 return EndSession();
             }
-            Advance();
+            SetStage(WaitingForWrongHostMap);
             return false;
         }
         if (!bClientBindingsReady)
@@ -413,7 +445,7 @@ public:
         }
         if (Stage == 11)
         {
-            if (ServerState->GetViewState().Phase != ERunPhase::Result || !AllClientsMatch() || !AllClientsShowResult() || !FindScreen<UEncounterResultWidget>(Host.Get()))
+            if (ServerState->GetViewState().Phase != ERunPhase::Result || !AllClientsMatch() || !AllClientsShowResult() || !ResultPermissionsReady())
             {
                 return false;
             }
@@ -427,9 +459,7 @@ public:
                 UTextBlock* ClientResult = Cast<UTextBlock>(FindScreen<UEncounterResultWidget>(RemoteClient.Get())->GetWidgetFromName(TEXT("Text_Result")));
                 Test->TestTrue(TEXT("Every result HUD displays the same final text."), HostResult && ClientResult && HostResult->GetText().ToString() == ClientResult->GetText().ToString());
             }
-            // The fixture invokes the server transition without defining a multiplayer node-voting policy.
-            // 멀티플레이 노드 선택 정책을 정하지 않고 테스트가 서버 전환을 직접 실행합니다.
-            if (!Test->TestTrue(TEXT("The server fixture continues after result inspection."), Encounter->ContinueRun()))
+            if (!ClickHostContinue(ERunPhase::Map))
             {
                 return EndSession();
             }
@@ -438,7 +468,7 @@ public:
         }
         if (Stage == 12)
         {
-            if (ServerState->GetViewState().Phase != ERunPhase::Map || !ServerCombat->GetRegisteredUnits().IsEmpty() || !AllClientsCleanedUp())
+            if (ServerState->GetViewState().Phase != ERunPhase::Map || !ServerCombat->GetRegisteredUnits().IsEmpty() || !AllClientsCleanedUp() || !MapPermissionsReady(1, RemoteClients))
             {
                 return false;
             }
@@ -451,12 +481,174 @@ public:
                     Test->TestNull(TEXT("Every client cleanup leaves no grid occupancy."), Entry.Value->GetOccupyingUnit());
                 }
             }
+            URunStateSubsystem* Run = ServerWorld->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+            Test->TestEqual(TEXT("Host Continue commits exactly the first completed node."), Run->GetCompletedNodes().Num(), 1);
+            FirstCombatId = SkillRequest.CombatInstanceId;
+            CheckRejectedClientFlow(Run->GetNodes()[1].NodeId, ERunPhase::Map, RemoteClients);
+            if (!ClickNode(1) || !Test->TestTrue(TEXT("The host map button starts the next encounter."), Run->GetPhase() == ERunPhase::Combat))
+            {
+                return EndSession();
+            }
+            bClientBindingsReady = false;
+            Advance();
+            return false;
+        }
+        if (Stage == 13)
+        {
+            if (!AllClientsMatch())
+            {
+                return false;
+            }
+            URunStateSubsystem* Run = ServerWorld->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+            Test->TestTrue(TEXT("The next encounter preserves the Run but creates a fresh combat instance."), Run->GetRunIdentity().RunId == Identity.RunId && ServerCombat->GetCombatInstanceId().IsValid() && ServerCombat->GetCombatInstanceId() != FirstCombatId && Run->GetCurrentNodeId() == Run->GetNodes()[1].NodeId);
+            TArray<AUnitBase*> Enemies;
+            for (AUnitBase* Unit : ServerCombat->GetRegisteredUnits())
+            {
+                if (Unit->GetTeam() == ETeam::Enemy)
+                {
+                    Enemies.Add(Unit);
+                }
+                else if (ServerCombat->GetOwnerAccountId(Unit) == Identity.HostAccountId)
+                {
+                    HostUnit = Unit;
+                    Test->TestTrue(TEXT("The surviving host keeps its original CharacterId in the next encounter."), ServerCombat->GetCharacterId(Unit) == Run->GetPartyMembers()[0].CharacterId);
+                }
+            }
+            if (!Test->TestTrue(TEXT("The next encounter contains the surviving host and authored enemies."), HostUnit.IsValid() && !Enemies.IsEmpty()))
+            {
+                return EndSession();
+            }
+            // Finish the second encounter with fixture damage after its replicated start has been verified.
+            // 두 번째 전투 시작의 복제를 확인한 뒤 테스트 피해로 종료하여 최종 진행을 검증합니다.
+            for (AUnitBase* Enemy : Enemies)
+            {
+                Test->TestTrue(TEXT("The server fixture defeats each final encounter enemy."), UCombatEffectLibrary::ApplyDamageToUnit(HostUnit.Get(), Enemy, UGE_Damage::StaticClass(), 100000.0f));
+            }
+            Advance();
+            return false;
+        }
+        if (Stage == 14)
+        {
+            if (ServerState->GetViewState().Phase != ERunPhase::Result || !AllClientsMatch() || !ResultPermissionsReady())
+            {
+                return false;
+            }
+            if (!ClickHostContinue(ERunPhase::Complete))
+            {
+                return EndSession();
+            }
+            Advance();
+            return false;
+        }
+        if (Stage == 15)
+        {
+            if (ServerState->GetViewState().Phase != ERunPhase::Complete || !ServerCombat->GetRegisteredUnits().IsEmpty() || !AllClientsCleanedUp(ERunPhase::Complete))
+            {
+                return false;
+            }
+            Test->TestTrue(TEXT("Final host Continue removes all encounter actors."), Encounter->GetSpawnedUnits().IsEmpty());
+            for (const TWeakObjectPtr<AGameplayPlayerController>& RemoteClient : RemoteClients)
+            {
+                Test->TestEqual(TEXT("Every client observes both completed nodes."), RemoteClient->GetWorld()->GetGameState<AGameplayGameState>()->GetViewState().CompletedNodes.Num(), 2);
+            }
             return EndSession();
         }
         return false;
     }
 
 private:
+    UButton* GetNodeButton(AGameplayPlayerController* Controller, int32 NodeIndex) const
+    {
+        URunMapWidget* Map = Controller ? FindScreen<URunMapWidget>(Controller) : nullptr;
+        UVerticalBox* Nodes = Map ? Cast<UVerticalBox>(Map->GetWidgetFromName(TEXT("NodeList"))) : nullptr;
+        return Nodes && NodeIndex < Nodes->GetChildrenCount() ? Cast<UButton>(Nodes->GetChildAt(NodeIndex)) : nullptr;
+    }
+
+    bool MapPermissionsReady(int32 NodeIndex, const TArray<TWeakObjectPtr<AGameplayPlayerController>>& Clients) const
+    {
+        UButton* HostNode = GetNodeButton(Host.Get(), NodeIndex);
+        if (!HostNode || !HostNode->GetIsEnabled() || !Host->CanIssueRunCommands())
+        {
+            return false;
+        }
+        for (const TWeakObjectPtr<AGameplayPlayerController>& RemoteClient : Clients)
+        {
+            UButton* ClientNode = GetNodeButton(RemoteClient.Get(), NodeIndex);
+            AGameplayGameState* State = RemoteClient.IsValid() ? RemoteClient->GetWorld()->GetGameState<AGameplayGameState>() : nullptr;
+            if (!ClientNode || ClientNode->GetIsEnabled() || !State || State->GetViewState().Phase != ERunPhase::Map || State->GetViewState().PartyMembers.Num() != ParticipantCount)
+            {
+                return false;
+            }
+        }
+        return Clients.Num() == ParticipantCount - 1;
+    }
+
+    void CheckRejectedClientFlow(FName NodeId, ERunPhase ExpectedPhase, const TArray<TWeakObjectPtr<AGameplayPlayerController>>& Clients)
+    {
+        URunStateSubsystem* Run = ServerWorld->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+        const int32 SpawnedBefore = Encounter->GetSpawnedUnits().Num();
+        const int32 CompletedBefore = Run->GetCompletedNodes().Num();
+        const FGuid CombatBefore = ServerCombat->GetCombatInstanceId();
+        for (const TWeakObjectPtr<AGameplayPlayerController>& RemoteClient : Clients)
+        {
+            Test->TestFalse(TEXT("A client cannot authorize node selection or Continue."), RemoteClient->CanIssueRunCommands());
+            RemoteClient->RequestStartNode(NodeId);
+            RemoteClient->RequestContinueRun();
+        }
+        for (const TWeakObjectPtr<AGameplayPlayerController>& Controller : ServerRemoteControllers)
+        {
+            Test->TestFalse(TEXT("A remote participant's server controller also lacks host flow authority."), Controller->CanIssueRunCommands());
+            Controller->RequestStartNode(NodeId);
+            Controller->RequestContinueRun();
+        }
+        Test->TestTrue(TEXT("Rejected non-host flow calls preserve phase, combat instance, completion and actors."), Run->GetPhase() == ExpectedPhase && ServerCombat->GetCombatInstanceId() == CombatBefore && Run->GetCompletedNodes().Num() == CompletedBefore && Encounter->GetSpawnedUnits().Num() == SpawnedBefore);
+    }
+
+    bool ClickNode(int32 NodeIndex)
+    {
+        UButton* Button = GetNodeButton(Host.Get(), NodeIndex);
+        if (!Test->TestTrue(TEXT("Only the trusted current host has an enabled map node button."), Button && Button->GetIsEnabled() && Host->CanIssueRunCommands()))
+        {
+            return false;
+        }
+        Button->OnClicked.Broadcast();
+        return true;
+    }
+
+    bool ResultPermissionsReady() const
+    {
+        UEncounterResultWidget* Result = FindScreen<UEncounterResultWidget>(Host.Get());
+        UButton* Continue = Result ? Cast<UButton>(Result->GetWidgetFromName(TEXT("Button_Continue"))) : nullptr;
+        if (!Continue || !Continue->GetIsEnabled())
+        {
+            return false;
+        }
+        for (const TWeakObjectPtr<AGameplayPlayerController>& RemoteClient : RemoteClients)
+        {
+            UEncounterResultWidget* ClientResult = RemoteClient.IsValid() ? FindScreen<UEncounterResultWidget>(RemoteClient.Get()) : nullptr;
+            UButton* ClientContinue = ClientResult ? Cast<UButton>(ClientResult->GetWidgetFromName(TEXT("Button_Continue"))) : nullptr;
+            if (!ClientContinue || ClientContinue->GetIsEnabled())
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool ClickHostContinue(ERunPhase ExpectedPhase)
+    {
+        URunStateSubsystem* Run = ServerWorld->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+        CheckRejectedClientFlow(Run->GetCurrentNodeId(), ERunPhase::Result, RemoteClients);
+        UEncounterResultWidget* Result = FindScreen<UEncounterResultWidget>(Host.Get());
+        UButton* Continue = Result ? Cast<UButton>(Result->GetWidgetFromName(TEXT("Button_Continue"))) : nullptr;
+        if (!Test->TestTrue(TEXT("Only the trusted host can confirm Victory through Continue."), Continue && Continue->GetIsEnabled() && Host->CanIssueRunCommands()))
+        {
+            return false;
+        }
+        Continue->OnClicked.Broadcast();
+        return Test->TestTrue(TEXT("The host result button commits the expected next Run phase."), Run->GetPhase() == ExpectedPhase);
+    }
+
     bool EditorNavigationReady()
     {
         UWorld* World = GEditor->GetEditorWorldContext().World();
@@ -666,7 +858,6 @@ private:
     bool InitializeRun()
     {
         AGameplayGameModeBase* Mode = ServerWorld->GetAuthGameMode<AGameplayGameModeBase>();
-        AGameplayGameState* State = ServerWorld->GetGameState<AGameplayGameState>();
         URunStateSubsystem* Run = ServerWorld->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
         Encounter = Mode->GetEncounterManager();
         ServerCombat = Encounter->GetCombatManager();
@@ -706,15 +897,41 @@ private:
         }
         Identity.HostAccountId = Identity.OriginalParticipants[0].AccountId;
         FText Error;
-        if (!Test->TestTrue(TEXT("The server initializes the Run with every explicit owner."), Run->InitializeRunWithIdentity(Party, Identity, Error)))
+        // A separate unsaved fixture Run checks that a local connection alone never grants host powers.
+        // 별도의 미저장 테스트 Run으로 로컬 연결만으로 Host 권한을 얻지 못함을 확인합니다.
+        FRunIdentityData OtherHostIdentity = Identity;
+        OtherHostIdentity.RunId = FGuid::NewGuid();
+        OtherHostIdentity.HostAccountId = Identity.OriginalParticipants[1].AccountId;
+        if (!Test->TestTrue(TEXT("The server creates an unsaved wrong-host permission fixture."), Run->InitializeRunWithIdentity(Party, OtherHostIdentity, Error)))
         {
             Test->AddError(Error.ToString());
             return false;
         }
+        Test->TestFalse(TEXT("An unassigned local server controller cannot issue Run commands."), Host->CanIssueRunCommands());
+        Host->RequestStartNode(Run->GetNodes()[0].NodeId);
+        Test->TestTrue(TEXT("An unassigned local host cannot spawn an encounter."), Run->GetPhase() == ERunPhase::Map && Encounter->GetSpawnedUnits().IsEmpty());
         // The fixture explicitly maps accounts to known connections; connection order is not persisted as identity.
         // 테스트가 알려진 연결에 계정을 명시적으로 배정하며 접속 순서를 영구 식별자로 저장하지 않습니다.
         if (!Test->TestTrue(TEXT("The server assigns the fixture host account."), Mode->AssignRunParticipant(Host.Get(), Identity.OriginalParticipants[0].AccountId)))
         {
+            return false;
+        }
+        Test->TestFalse(TEXT("A trusted local participant with the wrong HostAccount cannot progress the Run."), Host->CanIssueRunCommands());
+        Host->RequestStartNode(Run->GetNodes()[0].NodeId);
+        Test->TestTrue(TEXT("A mismatched current HostAccount leaves the map and actors untouched."), Run->GetPhase() == ERunPhase::Map && Encounter->GetSpawnedUnits().IsEmpty());
+        return true;
+    }
+
+    bool InitializeActualRun()
+    {
+        AGameplayGameModeBase* Mode = ServerWorld->GetAuthGameMode<AGameplayGameModeBase>();
+        AGameplayGameState* State = ServerWorld->GetGameState<AGameplayGameState>();
+        URunStateSubsystem* Run = ServerWorld->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+        const TArray<FRunPartyMember> Party = Run->GetPartyMembers();
+        FText Error;
+        if (!Test->TestTrue(TEXT("The server initializes the actual Run with every explicit owner."), Run->InitializeRunWithIdentity(Party, Identity, Error)))
+        {
+            Test->AddError(Error.ToString());
             return false;
         }
         for (int32 Index = 0; Index < ParticipantCount - 1; ++Index)
@@ -726,11 +943,12 @@ private:
         }
         ServerCombat->OnCombatResult.RemoveAll(Encounter.Get());
         Encounter->InitializeEncounter(State->GetArena(), ServerCombat.Get(), PartyCatalog.Get(), Mode->EncounterDefinitions);
-        if (!Test->TestTrue(TEXT("The server fixture starts the first saved Gameplay encounter."), Encounter->RequestStartNode(Run->GetNodes()[0].NodeId)))
-        {
-            Test->AddError(Encounter->GetFlowMessage().ToString());
-            return false;
-        }
+        return true;
+    }
+
+    bool CacheFixtureUnits()
+    {
+        const TArray<FRunPartyMember>& Party = ServerWorld->GetGameInstance()->GetSubsystem<URunStateSubsystem>()->GetPartyMembers();
         PartyUnits.SetNum(ParticipantCount);
         for (AUnitBase* Unit : Encounter->GetSpawnedUnits())
         {
@@ -834,14 +1052,14 @@ private:
         return true;
     }
 
-    bool AllClientsCleanedUp() const
+    bool AllClientsCleanedUp(ERunPhase ExpectedPhase = ERunPhase::Map) const
     {
         for (const TWeakObjectPtr<AGameplayPlayerController>& Controller : RemoteClients)
         {
             AGameplayGameState* State = Controller.IsValid() ? Controller->GetWorld()->GetGameState<AGameplayGameState>() : nullptr;
             ACombatManager* Combat = State ? State->GetCombatManager() : nullptr;
             ACombatArena* Arena = State ? State->GetArena() : nullptr;
-            if (!Combat || !Arena || !Arena->Grid || State->GetViewState().Phase != ERunPhase::Map || !Combat->GetRegisteredUnits().IsEmpty() || !FindScreen<URunMapWidget>(Controller.Get()))
+            if (!Combat || !Arena || !Arena->Grid || State->GetViewState().Phase != ExpectedPhase || !Combat->GetRegisteredUnits().IsEmpty() || !FindScreen<URunMapWidget>(Controller.Get()))
             {
                 return false;
             }
@@ -1028,6 +1246,8 @@ private:
 
     static constexpr int32 Ending = 100;
     static constexpr int32 Finished = 101;
+    static constexpr int32 WaitingForMap = 20;
+    static constexpr int32 WaitingForWrongHostMap = 21;
     FAutomationTestBase* Test;
     int32 ParticipantCount = 2;
     int32 ActiveRemoteIndex = 0;
@@ -1043,6 +1263,7 @@ private:
     FIntPoint MoveCoord = FIntPoint(2, 1);
     FGuid GuestUnitId;
     FGuid EnemyUnitId;
+    FGuid FirstCombatId;
     FCombatActionRequest SkillRequest;
     FDelegateHandle MoveObserver;
     TOptional<EUnitActionResult> MoveResult;

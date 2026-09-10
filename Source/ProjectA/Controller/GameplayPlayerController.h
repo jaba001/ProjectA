@@ -19,6 +19,8 @@ class PROJECTA_API AGameplayPlayerController : public APartyPlayerController
 public:
     AGameplayPlayerController();
     void InitializeGameplay(AEncounterManager* InEncounterManager);
+    bool CanIssueRunCommands() const;
+    void RefreshRunFlowPermissions();
 
     UFUNCTION(BlueprintCallable, Category = "Gameplay")
     void RequestStartNode(FName NodeId);

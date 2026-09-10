@@ -7,7 +7,9 @@ Unreal Engine 기반 Grid Turn-Based Combat System 프로젝트입니다.
 
 현재 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 최종적으로 상대 Party/Build Snapshot을 사용하는 Async PvP와 Listen Server 기반의 실시간 Co-op을 지원하도록 확장합니다. T14의 첫 단계로 Unreal `USaveGame` v1에 저장된 상대를 기존 전투에 연결하고 로컬 전투 한 사이클을 검증했습니다. 순차 3번에서 실제 2인 Listen Server 전투/HUD 동기화까지 검증했습니다. Co-op에서는 할당된 Party Member의 Action Request를 서버가 검증·실행하고 전투 상태의 최종 권위를 가집니다. 새 데이터·명령은 직렬화 가능한 형태를 우선하고 강한 로컬 PlayerController 의존성을 피합니다. 구현·검증 상태와 미결정 항목은 [T14 작업 카드](Docs/TODO.md), 실행 방법은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)와 [Listen Server 구현·검증 안내](Docs/T14_NETWORK.md)를 참고하세요.
 
-Co-op 확정 기획은 최대 4인과 원래 캐릭터 소유자만 직접 조작하는 방식입니다. 종료·끊김 시 기존 Host를 유지하며, 원래 인원이 다시 모일 수 없을 때 기존 참가자의 명시적 Host 승계와 불참자 AI 이어하기를 계획합니다. AI 전환에는 Run 시작 시 각자의 사전 동의가 필요하고, 이후 MMR은 현재 인간 참가자에게만 반영하는 기획입니다. 순차 1~5번의 소유권·서버 명령·2인 동기화·확정 턴 복구·아군 AI에 이어, 7번의 독립 범위인 실제 3·4인 전투와 연결 끊김·기존 Host 새 세션 복구를 검증했습니다. Unreal 기본 GameSession의 일반 플레이어 정원도 Host 포함 4명으로 설정했습니다. 전체 회귀 65건과 별도 2·3·4인 AI 복구 3건을 통과했습니다. 6번 승계/불참 AI 통합은 정책 답변 대기이며, 8번 실제 온라인 서비스는 공급자와 랭크 정책 확정 후 연결합니다. [Co-op 확정 기획](Docs/T14_COOP_DESIGN.md)과 [1~8번 순차 작업 대기열](Docs/T14_QUEUE.md)에 구현 경계를 정리합니다.
+Co-op은 최대 4인이고 원래 소유자만 자신의 캐릭터를 조작합니다. 최초 Host를 1번, 합류 순서대로 2·3·4번으로 저장하며 명시적 재개에 참여하는 인간 중 번호가 가장 작은 사람이 Host를 맡는 기획입니다. 싱글로 전환하면 본인이 Host가 되고 나머지는 해당 Run 종료까지 AI를 유지합니다. 개인 사전 동의 없이 Host가 단독으로 전환을 결정하고, 이후 MMR은 현재 인간 참가자에게만 반영하는 방향입니다. 종료·끊김 자체가 자동 승계나 AI 전환을 실행하지는 않습니다.
+
+현재 Host의 노드 선택·Continue 권한, 영구 참가 번호의 데이터·조회 계약과 사전 동의 검사 제거를 반영했습니다. 실제 2·3·4인 전투·끊김·기존 Host 복구는 검증했으며, 6번의 실제 싱글 전환 버튼·승계 복구·Run 참여 상태 보존과 7번의 승계 통합은 남아 있습니다. Steam P2P를 우선하고 선택한 Steam+PlayFab의 무료 개발 한도와 출시 운영비를 구분합니다. P2P만으로 중앙 저장·MMR 검증까지 완료되지는 않습니다. 구현과 검증 결과는 [Co-op 기획](Docs/T14_COOP_DESIGN.md), [순차 대기열](Docs/T14_QUEUE.md), [온라인 연동·비용 경계](Docs/T14_ONLINE.md)를 참고하세요.
 
 ```text
 MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
@@ -28,10 +30,10 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 - [기획 초안과 구현 현황](Docs/PROJECT_PLAN.md): 이미 작성된 기능, 현재 규칙, 결정할 기획, 단계별 목표
 - [T14 Co-op 확정 기획](Docs/T14_COOP_DESIGN.md): 본인 캐릭터 조작권, 기존 참가자의 Host 승계·AI 이어하기, MMR과 턴 경계 복구
 - [T14 순차 작업 대기열](Docs/T14_QUEUE.md): 1~8번의 순서, 상태, 번호별 완료 기준
-- [T14 Listen Server 구현·검증](Docs/T14_NETWORK.md): 실제 2인 PIE RPC, 전투/HUD 복제, 참가자 배정과 미결정 진행 권한
+- [T14 Listen Server 구현·검증](Docs/T14_NETWORK.md): 실제 2·3·4인 PIE RPC, 전투/HUD 복제, 참가자 배정과 Host의 진행 권한
 - [T14 확정 턴 저장·복구](Docs/T14_CHECKPOINT.md): v3 전투 저장, 저장 실패 재시도, 기존 Host의 새 세션 복구와 지원 경계
 - [T14 아군 AI](Docs/T14_PARTY_AI.md): 원래 소유권·진영 유지, 서버 AI 명령 검증, 인간 입력 차단과 AI 모드 저장·복구
-- [T14 승계·AI 이어하기 구현 메모](Docs/T14_RESUME.md): 6번 참여 데이터·로컬 권위 저장소 기반과 정책 답변 후 연결할 UI·복구 범위
+- [T14 승계·AI 이어하기 구현 메모](Docs/T14_RESUME.md): 6번 확정 정책·참여 데이터·로컬 권위 저장소와 후속 UI·복구 통합
 - [T14 온라인 연동 준비](Docs/T14_ONLINE.md): 8번 EOS/Steam·Backend 선택지, 공식 Unreal 확장 지점과 미구현 인증·중앙 저장·MMR 수용 기준
 - [코드 리뷰](Docs/CODE_REVIEW.md): P1/P2 문제의 근거와 검증 시나리오
 
@@ -125,7 +127,7 @@ UI의 턴 종료는 `PartyPlayerController::RequestEndTurn`, 회복약은 `Reque
 
 순차 3번은 서로 다른 NetDriver를 가진 Listen Server/Client 두 PIE 월드에서 실제 Server/Client Reliable RPC를 검증했습니다. 서버 전용 TurnManager와 CombatManager의 복제 뷰, GAS HP/MaxHP RepNotify, 유닛 AP/SubAP·팀·장착·이동·턴/행동/사망 상태, Grid 점유·전열 보호·결과/HUD 복제를 연결했습니다. `AGameplayGameState`는 Run 단계·파티·노드·결과의 읽기 전용 표시 값을 전달하며 클라이언트의 RunState를 권위 상태로 사용하지 않습니다. Development Editor / Win64 빌드, 2인 PIE를 포함한 전체 자동화 42건(성공 26·경고 동반 성공 16·실패 0), 별도 Snapshot 상대 PIE 1건을 통과했습니다.
 
-네트워크 참가자는 `AGameplayGameModeBase::AssignRunParticipant`와 `ApplyCombatParticipantBindings`에서 신뢰된 서버 C++ 코드로 배정합니다. 현재 자동화는 알려진 두 연결에 계정을 명시적으로 연결하며 실제 로그인을 제공하지 않습니다. 실제 인증은 8번입니다. 기존 미식별 Run/TestMap의 입력 호환은 Standalone에만 적용하고 손상된 식별 Run으로 우회하지 않습니다. 전투 밖 노드 선택·Continue의 협동 결정권은 사용자 답변 대기 중으로, 네트워크 화면의 해당 버튼은 읽기 전용이며 자동화는 서버 진입점을 사용합니다. 네트워크 최종 유닛 상태는 결과 화면에서 유지하고 명시적인 Continue 또는 월드 종료에서 정리합니다. 상세 경계와 검증 명령은 [Listen Server 안내](Docs/T14_NETWORK.md)를 참고하세요.
+네트워크 참가자는 `AGameplayGameModeBase::AssignRunParticipant`와 `ApplyCombatParticipantBindings`에서 신뢰된 서버 C++ 코드로 배정합니다. 현재 자동화는 알려진 연결에 계정을 명시적으로 연결하며 실제 로그인을 제공하지 않습니다. 실제 인증은 8번입니다. 기존 미식별 Run/TestMap의 입력 호환은 Standalone에만 적용하고 손상된 식별 Run으로 우회하지 않습니다. 노드 선택·Continue는 현재 Host의 로컬 서버 연결과 신뢰된 계정 배정을 확인해 허용하며 Client는 진행 상태를 표시합니다. 네트워크 최종 유닛 상태는 결과 화면에서 유지하고 명시적인 Continue 또는 월드 종료에서 정리합니다. 상세 경계와 검증 명령은 [Listen Server 안내](Docs/T14_NETWORK.md)를 참고하세요.
 
 캐릭터 생성의 Edit는 선택한 슬롯의 이름(1~32자)과 직업을 편집합니다. 저장 전에는 파티 데이터가 바뀌지 않으며 취소하면 기존 값이 유지됩니다. ClassInfo는 같은 직업 정의의 실제 HP/AP/보조 AP와 시작 스킬을 읽기 전용으로 표시합니다. 저장한 이름·직업과 사용한 직업 목록은 Gameplay로 전달되고, Encounter 스폰은 동일한 설정을 적용한 뒤 이전 전투의 HP를 복원합니다.
 
@@ -236,9 +238,9 @@ T14 로컬 상대 검증은 [Snapshot 설정 스크립트](Source/ProjectAEditor
 
 v3는 턴 순서·다음 유닛·HP/AP/SubAP·재고·사망·점유·실제 장착·고정된 상대 Snapshot을 저장합니다. 저장에 실패하면 이전 파일을 보존하고 다음 턴을 멈추며 Host의 **저장 다시 시도** 버튼으로 재시도합니다. 결과와 Continue도 저장 성공 후 확정합니다. 복구할 때 새 Actor와 명령 실행 ID를 만들며, 처리 중 이동/발사체·활성 GAS 능력·지속 효과·쿨다운 등 표현하지 못하는 상태는 거절합니다. 협동 복구는 기존 Host와 원래 참가자 전원의 서버 연결 배정 후 실행하며 실제 로그인·재접속 UI는 후속 범위입니다. 자세한 계약은 [확정 턴 저장·복구](Docs/T14_CHECKPOINT.md)를 참고하세요.
 
-아군 AI는 `APlayerUnit`의 서버 컴포넌트로 자기 회복약·아군 피해 없는 공격·접근 이동·턴 종료를 실행합니다. 원래 소유자와 Host의 인간 입력은 서버와 HUD에서 차단하며 캐릭터·소유권·팀은 유지합니다. 전투 시작 전 신뢰된 서버 API에서 소유자의 동의를 확인해 모드를 지정하고, 전투 본문 schema 2에 저장·복원합니다. 기본 Run은 인간 조작이며 연결 끊김만으로 AI가 켜지지 않습니다. 실제 불참자 승인·Host 승계와 AI 이어하기 버튼은 다음 6번 범위입니다. [아군 AI 안내](Docs/T14_PARTY_AI.md)에 API와 검증 방법을 정리합니다.
+아군 AI는 `APlayerUnit`의 서버 컴포넌트로 자기 회복약·아군 피해 없는 공격·접근 이동·턴 종료를 실행합니다. 원래 소유자와 Host의 인간 입력은 서버와 HUD에서 차단하며 캐릭터·소유권·팀은 유지합니다. 전투 시작 전 신뢰된 서버 API에서 원래 소유권을 확인해 모드를 지정하고 전투 본문 schema 2에 저장·복원합니다. 개인 사전 동의는 요구하지 않습니다. 기본 Run은 인간 조작이며 연결 끊김만으로 AI가 켜지지 않습니다. 실제 불참자 승인·Host 승계와 싱글 전환 버튼은 6번 통합 범위입니다. [아군 AI 안내](Docs/T14_PARTY_AI.md)에 API와 검증 방법을 정리합니다.
 
-현재 새 싱글플레이는 Run마다 임시 개발용 참가자 한 명을 생성하고 생성한 캐릭터들을 해당 참가자에게 연결합니다. 레벨 이동·다음 노드·저장/복원 동안 식별값을 유지하고 새 게임은 새 식별값을 만듭니다. 동의 UI가 없으므로 AI 동의는 자동 승인하지 않고 `Unknown`으로 저장합니다. 개발용 ID와 소유권 조회는 실제 계정 인증이나 Co-op 접속을 제공하지 않습니다.
+현재 새 싱글플레이는 Run마다 임시 개발용 참가자 한 명을 생성하고 생성한 캐릭터들을 해당 참가자에게 연결합니다. Identity schema 2의 최초 참가 번호는 1이며 레벨 이동·다음 노드·저장/복원 동안 유지합니다. 새 게임은 새 식별값을 만듭니다. 이전 동의 필드는 호환용 `Unknown`·버전 0으로 보존하며 AI 승인 조건으로 사용하지 않습니다. 기존 schema 1의 번호는 0(미상)으로 유지하고 배열 순서로 추측하지 않습니다. 개발용 ID와 번호/소유권 조회는 실제 계정 인증이나 Co-op 접속·Host 승계를 제공하지 않습니다.
 
 Options에서 그래픽 품질과 수직 동기화를 선택하고 **적용 및 저장**으로 반영합니다. 적용 전 닫기는 변경을 버리며, 설정은 Unreal `GameUserSettings.ini`에 유지됩니다. Quit는 실제 게임 종료를 요청합니다. 테스트는 `-ProjectASaveSlot=T11_PIE`처럼 별도 슬롯을 지정해 플레이 저장을 보호합니다.
 

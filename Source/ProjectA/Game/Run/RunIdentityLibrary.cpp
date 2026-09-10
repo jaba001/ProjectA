@@ -48,7 +48,7 @@ namespace
 
     bool ValidateIdentifiedRoster(const FRunIdentityData& Identity, TArray<FRunAccountId>& OutAccounts, FText& OutError)
     {
-        if (Identity.SchemaVersion != 1 || !IsIdentifiedOrigin(Identity.Origin))
+        if ((Identity.SchemaVersion != 1 && Identity.SchemaVersion != URunIdentityLibrary::CurrentSchemaVersion) || !IsIdentifiedOrigin(Identity.Origin))
         {
             OutError = NSLOCTEXT("RunIdentity", "SchemaOrigin", "지원하지 않는 Run 식별 정보 버전 또는 출처입니다.");
             return false;
@@ -59,6 +59,8 @@ namespace
             return false;
         }
         TArray<FRunAccountId> Accounts;
+        TSet<int32> JoinOrdinals;
+        int32 HostOrdinal = 0;
         for (const FRunParticipantData& Participant : Identity.OriginalParticipants)
         {
             if (!IsValidAccountId(Participant.AccountId, Identity.Origin) || Accounts.Contains(Participant.AccountId) || !IsValidConsent(Participant))
@@ -66,11 +68,26 @@ namespace
                 OutError = NSLOCTEXT("RunIdentity", "Participant", "원래 참가자 식별자 또는 AI 동의 기록이 올바르지 않거나 참가자가 중복됩니다.");
                 return false;
             }
+            if (Identity.SchemaVersion == 1 ? Participant.JoinOrdinal != 0 : Participant.JoinOrdinal < 1 || Participant.JoinOrdinal > Identity.OriginalParticipants.Num() || JoinOrdinals.Contains(Participant.JoinOrdinal))
+            {
+                OutError = NSLOCTEXT("RunIdentity", "JoinOrdinal", "구버전은 참가 번호를 추정할 수 없으며 새 번호는 1부터 참가자 수까지 중복 없이 연속되어야 합니다.");
+                return false;
+            }
+            JoinOrdinals.Add(Participant.JoinOrdinal);
+            if (Participant.AccountId == Identity.HostAccountId)
+            {
+                HostOrdinal = Participant.JoinOrdinal;
+            }
             Accounts.Add(Participant.AccountId);
         }
         if (!IsValidAccountId(Identity.HostAccountId, Identity.Origin) || !Accounts.Contains(Identity.HostAccountId))
         {
             OutError = NSLOCTEXT("RunIdentity", "Host", "Host는 원래 참가자 중 한 명이어야 합니다.");
+            return false;
+        }
+        if (Identity.SchemaVersion == URunIdentityLibrary::CurrentSchemaVersion && Identity.HostEpoch == 1 && HostOrdinal != 1)
+        {
+            OutError = NSLOCTEXT("RunIdentity", "InitialHostOrdinal", "최초 Host는 원래 합류 번호 1번이어야 합니다.");
             return false;
         }
         OutAccounts = MoveTemp(Accounts);
@@ -82,7 +99,7 @@ namespace
 bool URunIdentityLibrary::ValidateIdentity(const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, FText& OutError)
 {
     OutError = FText::GetEmpty();
-    if (Identity.SchemaVersion != 1 || (Identity.Origin != ERunIdentityOrigin::LegacyOffline && !IsIdentifiedOrigin(Identity.Origin)))
+    if ((Identity.SchemaVersion != 1 && Identity.SchemaVersion != CurrentSchemaVersion) || (Identity.Origin != ERunIdentityOrigin::LegacyOffline && !IsIdentifiedOrigin(Identity.Origin)))
     {
         OutError = NSLOCTEXT("RunIdentity", "SchemaOrigin", "지원하지 않는 Run 식별 정보 버전 또는 출처입니다.");
         return false;
@@ -99,7 +116,7 @@ bool URunIdentityLibrary::ValidateIdentity(const FRunIdentityData& Identity, con
     }
     if (Identity.Origin == ERunIdentityOrigin::LegacyOffline)
     {
-        if (Identity.RunId.IsValid() || !Identity.OriginalParticipants.IsEmpty() || !Identity.HostAccountId.IsEmpty() || Identity.HostEpoch != 0)
+        if (Identity.SchemaVersion != 1 || Identity.RunId.IsValid() || !Identity.OriginalParticipants.IsEmpty() || !Identity.HostAccountId.IsEmpty() || Identity.HostEpoch != 0)
         {
             OutError = NSLOCTEXT("RunIdentity", "LegacyIdentity", "이전 오프라인 진행에는 추정한 Run 소유권이나 Host 정보를 추가할 수 없습니다.");
             return false;
@@ -170,4 +187,57 @@ bool URunIdentityLibrary::IsCharacterOwner(const FRunIdentityData& Identity, con
         }
     }
     return false;
+}
+
+bool URunIdentityLibrary::TryGetJoinOrdinal(const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, const FRunAccountId& AccountId, int32& OutOrdinal, FText& OutError)
+{
+    if (!ValidateIdentity(Identity, Members, OutError)) return false;
+    if (Identity.SchemaVersion != CurrentSchemaVersion)
+    {
+        OutError = NSLOCTEXT("RunIdentity", "UnknownJoinOrder", "이 저장에는 명시적인 최초 합류 번호가 없습니다.");
+        return false;
+    }
+    const FRunParticipantData* Participant = Identity.OriginalParticipants.FindByPredicate([&AccountId](const FRunParticipantData& Entry) { return Entry.AccountId == AccountId; });
+    if (!Participant)
+    {
+        OutError = NSLOCTEXT("RunIdentity", "JoinAccount", "참가 번호를 조회할 계정은 원래 참가자여야 합니다.");
+        return false;
+    }
+    OutOrdinal = Participant->JoinOrdinal;
+    OutError = FText::GetEmpty();
+    return true;
+}
+
+bool URunIdentityLibrary::TrySelectHostCandidate(const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, const TArray<FRunAccountId>& HumanParticipants, FRunAccountId& OutAccountId, FText& OutError)
+{
+    if (!ValidateIdentity(Identity, Members, OutError)) return false;
+    if (Identity.SchemaVersion != CurrentSchemaVersion)
+    {
+        OutError = NSLOCTEXT("RunIdentity", "UnknownJoinOrder", "이 저장에는 명시적인 최초 합류 번호가 없습니다.");
+        return false;
+    }
+    if (HumanParticipants.IsEmpty() || HumanParticipants.Num() > Identity.OriginalParticipants.Num())
+    {
+        OutError = NSLOCTEXT("RunIdentity", "CandidateCount", "Host 후보 조회에는 원래 참가자 중 한 명 이상의 명시적인 인간 참가자가 필요합니다.");
+        return false;
+    }
+    TArray<FRunAccountId> Seen;
+    const FRunParticipantData* Candidate = nullptr;
+    for (const FRunAccountId& AccountId : HumanParticipants)
+    {
+        const FRunParticipantData* Participant = Identity.OriginalParticipants.FindByPredicate([&AccountId](const FRunParticipantData& Entry) { return Entry.AccountId == AccountId; });
+        if (!Participant || Seen.Contains(AccountId))
+        {
+            OutError = NSLOCTEXT("RunIdentity", "CandidateAccounts", "명시적인 인간 참가자는 중복되지 않는 원래 참가자여야 합니다.");
+            return false;
+        }
+        Seen.Add(AccountId);
+        if (!Candidate || Participant->JoinOrdinal < Candidate->JoinOrdinal)
+        {
+            Candidate = Participant;
+        }
+    }
+    OutAccountId = Candidate->AccountId;
+    OutError = FText::GetEmpty();
+    return true;
 }

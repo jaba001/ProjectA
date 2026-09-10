@@ -10,7 +10,19 @@
 
 6번의 `FLocalRunAuthorityStore`는 같은 PC의 개발 저장소 대역이다. 이를 온라인 중앙 저장으로 노출하지 않는다. 기존 Run v1/v2/v3와 Snapshot v1은 현재 로컬 계약을 유지하며 온라인 전송 포맷은 서비스 선택과 함께 검토한다.
 
-## 사용자에게 보낸 선택지
+## 선택한 방향과 비용 조건
+
+사용자는 후속 다섯 항목의 **4B(Steam + PlayFab)**를 선택했고, Steam 우선 및 서버 운영비를 피하고 싶다는 조건을 추가했다. 전투는 Unreal Listen Server가 실행하고 Steam P2P/SDR로 연결하는 방향이다. 별도 전투 서버를 임대하지 않아도 되지만 실제 4인 인터넷 접속의 Host CPU·네트워크·복구 동작은 별도 검증해야 한다. [Steam SDR](https://partner.steamgames.com/doc/features/multiplayer/steamdatagramrelay?l=english)
+
+P2P는 전투 전송을 해결한다. 공동 Run의 최신 저장, 동시에 둘 이상 이어가지 못하게 하는 승계 승인, 결과 검증과 MMR은 별도 책임이다. Steam Cloud의 기본 저장은 같은 사용자의 여러 PC 사이 동기화이며 사용자별 파일을 격리한다. 참가자에게 체크포인트를 복사해 주더라도 각자가 별도로 재개하는 진행 분기를 막는 중앙 비교·갱신 기능은 자동 제공되지 않는다. [Steam Cloud](https://partner.steamgames.com/doc/features/cloud?l=english)
+
+Steam Leaderboards는 점수 저장·표시 기능이며 ProjectA 전투 결과의 정당성을 검사하지 않는다. Trusted 쓰기를 켜면 클라이언트 쓰기를 막지만 점수 제출은 publisher key를 사용하는 보안 서버에서 해야 한다. 그 키를 Listen Host 클라이언트에 넣지 않는다. [Leaderboard 설정](https://partner.steamgames.com/doc/features/leaderboards?l=english), [SetLeaderboardScore](https://partner.steamgames.com/doc/webapi/ISteamLeaderboards#SetLeaderboardScore)
+
+2026-09-10 확인한 PlayFab Development Mode 문서는 개발 타이틀 최대 10개, 타이틀당 누적 생성 계정 1,000개와 서비스별 한도를 안내한다. 이는 출시 후 영구 무료 운영 보장이 아니다. Foundation Mode는 Xbox 출시 또는 출시 계획과 Partner Center 연결 조건이 있어 Steam 전용 프로젝트가 자동으로 해당되는 것으로 가정하지 않는다. Azure Functions의 실제 계산 비용도 별도다. 일부 가격 페이지의 과거 100K 문구보다 현재 Title 모드·개발 한도를 확인한다. [Development Mode](https://learn.microsoft.com/en-us/gaming/playfab/pricing/development-mode), [서비스 모드](https://learn.microsoft.com/en-us/gaming/playfab/get-started/mode-overview), [가격](https://developer.microsoft.com/en-us/games/products/playfab/pricing/)
+
+따라서 Steam P2P와 무료 개발 한도를 우선 활용하되 유료 리소스·과금 전환은 임의로 활성화하지 않는다. 출시 시점에도 자체 Backend 비용을 전혀 허용하지 않는다면 현재 요구한 신뢰할 수 있는 단일 진행·MMR을 같은 수준으로 유지할 방법을 추가 결정해야 한다. 이번 답변을 랭크 제거·무검증 점수 허용·오프라인 분기 승인으로 해석하지 않는다.
+
+## 이전 서비스 비교
 
 두 질문은 독립적인 선택이다. 추천 표시나 답변 대기는 승인으로 간주하지 않으며, 상태 변화 없이 질문을 반복하지 않는다.
 
@@ -21,7 +33,7 @@
 | Backend | A · PlayFab 관리형 | 공식 Unreal SDK와 계정·게임 데이터·서버 기능 활용, 일부 운영 부담 감소 | PlayFab Title, ProjectA용 서버 로직과 원자적 저장 설계, 사용량·제품 의존성 관리 |
 | Backend | B · 직접 HTTPS 서버 + PostgreSQL | 승계·revision·참여 이력·결과 중복 방지를 필요한 트랜잭션으로 구성 | 서버 배포·TLS·인증 검증·DB·백업·운영 직접 관리 |
 
-장단점은 아래 공식 기능을 ProjectA에 적용한 설계 판단이며 특정 조합의 채택 결정은 아니다. 현재 추천은 플랫폼 A와 Backend A다. 먼저 서비스와 개발 프로젝트 보유 여부를 확인한다. 앱 식별 정보와 권한 있는 테스트 환경이 정해진 뒤 필요한 설정을 연결하며, 서버 비밀 키를 저장소나 클라이언트에 넣지 않는다.
+위 표는 이전의 독립 질문별 보기다. 후속 통합 보기 4B는 Steam+PlayFab이며 위의 비용 조건과 함께 채택했다. 앱 식별 정보와 권한 있는 무료 개발 환경이 정해진 뒤 필요한 설정을 연결하며, 서버 비밀 키를 저장소나 클라이언트에 넣지 않는다.
 
 EOS는 제품 등록과 OSS EOS 구성이 필요하고, UE에 포함된 EOS SDK를 사용할 수 있다. Steam은 OSS Steam과 Steamworks 설정을 사용한다. [UE 5.7 OSS EOS](https://dev.epicgames.com/documentation/en-us/unreal-engine/online-subsystem-eos-plugin-in-unreal-engine?application_version=5.7), [UE 5.7 OSS Steam](https://dev.epicgames.com/documentation/en-us/unreal-engine/online-subsystem-steam-interface-in-unreal-engine?application_version=5.7)
 
@@ -71,8 +83,8 @@ PlayFab은 공식 Unreal SDK와 CloudScript를 제공하지만 ProjectA의 승�
 
 4번의 실제 승계는 6번 정책·구현이 필요하다. MMR 판정 시점·계산/정산 단위·이탈/턴 반복 악용 대응·전투 결과 검증 방식은 아직 확정하지 않았다. 플랫폼/Backend 선택만으로 이 정책들을 함께 승인한 것으로 간주하지 않는다. 결정이 필요한 단계에 도달하면 구체적인 보기와 영향을 추가 확인한다.
 
-## 이번 준비의 검증과 대기
+## 최초 8번 준비의 검증 기록
 
-현재 프로젝트와 설치된 UE 5.7 소스, 위 공식 문서를 대조했다. 문서 10개의 로컬 링크 133개와 `git diff --check`를 통과했다. 문서만 변경하므로 C++ 빌드·PIE를 반복하지 않았으며 플러그인 활성화·로그인·서비스 생성·유료 리소스·Backend 배포·MMR 반영도 실행하지 않았다. 준비 기록을 별도 커밋·push한다. 앞선 7번의 빌드/65건/AI 3건 성공을 8번 온라인 통합 검증으로 계산하지 않는다.
+최초 준비에서 프로젝트와 설치된 UE 5.7 소스, 위 공식 문서를 대조했다. 당시 문서 10개의 로컬 링크 133개와 `git diff --check`를 통과했고 문서만 변경해 C++ 빌드·PIE는 반복하지 않았다. `f877e4d`로 커밋·push했으며 플러그인 활성화·로그인·서비스 생성·유료 리소스·Backend 배포·MMR 반영은 실행하지 않았다. 앞선 7번의 빌드/65건/AI 3건 성공을 8번 온라인 통합 검증으로 계산하지 않는다. 후속 확정 정책 반영과 코드 검증은 [대기열](T14_QUEUE.md)에 별도로 기록한다.
 
-현재는 플랫폼과 Backend 두 질문의 답변 및 선택한 개발 서비스의 준비 상태를 기다린다. 답변이나 외부 상태 변화가 없으면 동일 질문·조사·준비 커밋을 반복하지 않는다.
+Steam 우선과 4B에 대한 답변은 받았다. 실제 개발 서비스의 준비 상태·무료 한도와 아직 미정인 MMR 정책은 남아 있다. 공급자 선택을 다시 묻지 않으며 답변이나 외부 상태 변화가 없으면 동일 질문·조사·준비 커밋을 반복하지 않는다.

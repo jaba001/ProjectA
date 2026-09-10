@@ -2,7 +2,7 @@
 
 게임의 목표와 이후 기능 판단 기준은 [게임 기획 방향](GAME_DESIGN.md)을 따른다. 이 문서는 현재 Vertical Slice의 구현 규약과 검증 경계를 기록하며, 목표 기능이나 후속 제안을 구현 완료로 취급하지 않는다.
 
-기준일: 2026-09-10. 기본 싱글플레이 Vertical Slice를 유지하며 T14 순차 1~5번의 소유권·2인 동기화·확정 턴 복구·아군 AI를 검증했다. 추가 승인으로 7번의 독립적인 3·4인 전투·끊김·기존 Host 새 세션 복구와 일반 4명 입장 정원을 검증했다. 최종 Editor 빌드·전체 회귀 65건·별도 2·3·4인 AI 복구 3건을 통과했다. 6번 명시적 Host 승계·불참 AI와 이에 의존하는 7번 통합은 정책 답변 대기이고, 8번 실제 온라인 서비스는 공급자·랭크 정책 확정 후 연결한다. 기존 slice 결과는 [작업 보고](VERTICAL_SLICE_REPORT.md), T14 번호별 결과는 [순차 대기열](T14_QUEUE.md)에 별도로 기록한다.
+기준일: 2026-09-10. 기본 싱글플레이와 T14 순차 1~5번, 7번 독립 범위인 2·3·4인 전투·끊김·기존 Host 복구를 검증했다. 후속 답변으로 최초 합류 번호순 승계, 사전 동의 없는 Host 단독 AI 전환, 해당 Run의 AI 유지, Steam 우선과 Host의 노드·Continue 결정권을 확정했다. 번호 데이터·조회와 Host 진행 권한·동의 검사 제거를 코드에 반영했으며 실제 싱글 전환·승계 복구·참여 상태 보존 및 온라인 서비스·MMR은 후속 통합 범위다. 기존 slice 결과는 [작업 보고](VERTICAL_SLICE_REPORT.md), T14 번호별 검증은 [순차 대기열](T14_QUEUE.md)에 기록한다.
 
 ## 1. 확정한 게임 흐름
 
@@ -29,7 +29,7 @@ flowchart LR
 | `URunStateSubsystem` | GameInstance 수명. 파티·노드·결과·HP와 Run/참가자/캐릭터 소유권/Host/동의 보존. Actor 참조 없이 전투 밖 진행과 확정 턴 체크포인트를 SaveGame에 저장 |
 | `AGameplayGameModeBase` | 서버에서 Arena·EncounterManager·CombatManager 준비, 신뢰된 C++ 참가자 배정과 전투 바인딩 |
 | `AGameplayGameState` | Run 단계·파티·노드·결과의 읽기 전용 표시 뷰와 전투/아레나 참조 복제. 클라이언트 RunState를 권위 상태로 사용하지 않음 |
-| `AGameplayPlayerController` | PartyPlayerController 상속. Root UI와 서버 전투 문맥 수신, 소유 연결의 전투 RPC. 노드/Continue UI 명령은 현재 Standalone만 허용 |
+| `AGameplayPlayerController` | PartyPlayerController 상속. Root UI와 서버 전투 문맥 수신, 소유 연결의 전투 RPC. Standalone 또는 신뢰 배정된 현재 Listen Host만 노드/Continue UI와 요청 실행 |
 | `UGameplayRootWidget` | CommonUI Run / Combat / Modal 스택 관리 |
 | `URunMapWidget` | 노드 정의 표시, 선택 요청. Spawn 수행 안 함 |
 | `AEncounterManager` | 준비/스폰/전투 연결/HP 추출/정리. RunState의 유효 전이를 요청 |
@@ -54,15 +54,15 @@ Co-op은 Listen Server의 Host-authoritative 구조를 우선한다. 최대 4인
 
 순차 2번에서 이동·스킬·회복약·턴 종료를 값 Command와 PlayerController의 소유 연결 RPC 진입점으로 통합했다. 순차 3번은 실제 두 PIE 월드 사이의 RPC와 소유권 검증, Turn·HP/AP/SubAP·이동·Grid 점유/전열 보호·사망·결과·장착/HUD 복제를 구현하고 실제 2인 PIE에서 검증했다. 서버만 유닛 행동과 GAS 능력을 실행하며 HP/MaxHP는 Attribute RepNotify로 전달한다. GameState의 Run 표시 뷰와 CombatManager의 실행 중 복제 뷰를 영속 Run/Command 데이터와 분리한다.
 
-`AssignRunParticipant`와 `ApplyCombatParticipantBindings`는 신뢰된 서버 C++ 연결 배정이며 실제 로그인은 아니다. 네트워크 자동화는 알려진 두 연결에 원래 참가자 계정을 명시적으로 배정하고, 기존 자동 연결은 Standalone의 개발용 단일 참가자를 유지한다. 전투 밖 노드 선택·Continue의 협동 결정권은 사용자 답변 대기 중이다. 결정 전 네트워크 화면의 해당 버튼은 읽기 전용이며 테스트는 서버 진입점으로 진행한다. [Listen Server 안내](T14_NETWORK.md)와 [확정 턴 저장·복구](T14_CHECKPOINT.md)에 구현 경계를 기록한다. 4번은 Editor 빌드·전체 52건·독립 프로세스 저장/복원·원본 상대 교체/삭제 후 복구·별도 Snapshot PIE를 통과했다. 번호별 결과는 [대기열](T14_QUEUE.md)을 따른다.
+`AssignRunParticipant`와 `ApplyCombatParticipantBindings`는 신뢰된 서버 C++ 연결 배정이며 실제 로그인은 아니다. 네트워크 자동화는 알려진 연결에 원래 참가자 계정을 명시적으로 배정하고, 기존 자동 연결은 Standalone의 개발용 단일 참가자를 유지한다. 노드 선택·Continue는 5A에 따라 현재 Host만 실행하며 버튼과 요청에서 로컬 서버 연결·신뢰 배정·현재 Host 계정을 함께 검사한다. Client는 공유 진행을 표시한다. [Listen Server 안내](T14_NETWORK.md)와 [확정 턴 저장·복구](T14_CHECKPOINT.md)에 구현 경계를 기록하고 번호별 검증은 [대기열](T14_QUEUE.md)을 따른다.
 
-5번은 `APlayerUnit`에 Human/ServerAI 조작 모드와 `UPartyAutoCombatComponent`를 연결했다. 신뢰된 서버 C++는 전투 시작 전에 원래 소유자의 Run 시작 시 동의(`Granted`, 정책 버전 1)를 확인해 모드를 설정한다. AI는 별도 실행 세션·요청 순번으로 공통 행동 검증을 이용하며 인간 입력과 중복 실행되지 않는다. Run 저장 v3의 전투 본문 schema 2에 모드를 저장하고 schema 1은 Human으로 호환한다. 복원 시 AI 실행 세션은 새로 만들며 소유권·Host·팀을 바꾸지 않는다. 최종 Editor Build5·전체 회귀 56건(성공 36·경고 동반 성공 20·실패 0), 실제 AI `Coop2` 1건과 독립 프로세스 AI `RestartWrite`·`RestartRead` 각 1건, 별도 Snapshot PIE 회귀 1건을 통과했다. 초기 테스트 생존 전제 보정과 상세 결과는 [대기열](T14_QUEUE.md)을 따른다. 원래 참가자 전원의 연결 조건은 유지하며, 재개 시 전환·불참 연결 예외·승계/AI 이어하기 UI는 다음 6번에 남긴다.
+5번은 `APlayerUnit`에 Human/ServerAI 조작 모드와 `UPartyAutoCombatComponent`를 연결했다. 신뢰된 서버 C++는 전투 시작 전에 원래 소유권을 확인해 모드를 설정한다. 후속 확정으로 개인 사전 동의 검사는 제거했다. AI는 별도 실행 세션·요청 순번으로 공통 행동 검증을 이용하며 인간 입력과 중복 실행되지 않는다. Run 저장 v3의 전투 본문 schema 2에 모드를 저장하고 schema 1은 Human으로 호환한다. 복원 시 AI 실행 세션은 새로 만들며 소유권·Host·팀을 바꾸지 않는다. 최초 구현의 전체 56건·실제 AI Co-op·독립 프로세스 복구와 이후 검증은 [대기열](T14_QUEUE.md)을 따른다. 원래 참가자 전원의 연결 조건은 유지하며 재개 시 전환·불참 연결 예외·승계/AI 이어하기 UI는 6번 통합 범위다.
 
-정상 종료·갑작스러운 끊김만으로 Host를 자동 변경하지 않는다. 4번은 연결 끊김 시 전투를 중단하고 기존 Host와 원래 참가자가 새 세션에서 마지막 확정 턴을 복구하도록 한다. 원래 파티가 다시 모일 수 없을 때 명시적인 Host 승계·AI 이어하기 버튼을 제공하는 것은 후속 6번이다. AI 전환에는 각자의 Run 시작 시 사전 동의를 사용하며, 이후 MMR은 현재 인간 참가자에게만 반영하고 불참자에게 추가 변동을 주지 않는다. 실제 MMR 정책·연동은 후속 범위다.
+정상 종료·갑작스러운 끊김만으로 Host를 자동 변경하지 않는다. 4번은 연결 끊김 시 전투를 중단하고 기존 Host와 원래 참가자가 새 세션에서 마지막 확정 턴을 복구하도록 한다. 6번의 명시적 재개는 참여하는 인간 중 최초 번호가 가장 작은 사람이 Host가 되고 그 Host가 사전 동의 없이 AI 전환을 확정한다. 혼자 싱글로 전환하면 본인이 Host가 되고 나머지는 해당 Run 종료까지 AI를 유지한다. 이후 MMR은 현재 인간 참가자에게만 반영하고 불참자에게 추가 변동을 주지 않는 기획이며 실제 판정·계산·연동은 후속 범위다.
 
-MMR 랭크를 목표로 하므로 원래 참가자·캐릭터 소유자·현재 Host를 구분하고, 동일 Run의 동시 승계·진행 분기·결과 중복 반영을 방지해야 한다. Unreal 기본 네트워크 기능을 사용하되 경쟁 콘텐츠의 계정 인증·권위 저장·MMR 검증은 별도 단계다. Steam/EOS, Backend와 불리한 전투에서의 고의 이탈 방지 정책은 아직 결정하지 않았다. 상세 합의와 순서는 [Co-op 확정 기획](T14_COOP_DESIGN.md)을 따른다.
+MMR 랭크를 목표로 하므로 원래 참가자·캐릭터 소유자·현재 Host를 구분하고 동일 Run의 동시 승계·진행 분기·결과 중복 반영을 방지해야 한다. Steam P2P와 Unreal Listen Server를 우선하며 선택한 Steam+PlayFab 조합에는 운영비를 피하려는 사용자 조건이 있다. 무료 개발 한도와 중앙 저장·결과 검증의 비용을 구분하고 유료 리소스를 임의로 활성화하지 않는다. 고의 이탈 방지·MMR 세부 정책은 아직 결정하지 않았다. [Co-op 기획](T14_COOP_DESIGN.md)과 [온라인 안내](T14_ONLINE.md)를 따른다.
 
-새 Run/Party/Encounter/Combat 기능은 직렬화 가능한 Runtime Data와 Command를 우선하고 Actor reference 및 로컬 PlayerController에 강하게 결합하지 않는다. 실행 중 복제 뷰의 유닛 조회에만 Actor 참조를 사용한다. 미결정 정책이 구현에 영향을 주면 사용자에게 선택지와 영향을 설명해 결정한다. 기본 Run은 싱글플레이를 유지한다. 6번 정책 대기와 독립적인 7번 3·4인 검증은 추가 승인으로 먼저 마쳤으며, 승계/불참 AI 통합과 8번 서비스 연동 전 T14 전체를 완료로 표시하지 않는다.
+새 Run/Party/Encounter/Combat 기능은 직렬화 가능한 Runtime Data와 Command를 우선하고 Actor reference 및 로컬 PlayerController에 강하게 결합하지 않는다. 실행 중 복제 뷰의 유닛 조회에만 Actor 참조를 사용한다. 미결정 정책이 구현에 영향을 주면 사용자에게 선택지와 영향을 설명해 결정한다. 기본 Run은 싱글플레이를 유지한다. 7번 독립 3·4인 검증은 마쳤으나 6번 승계/불참 AI 통합과 8번 서비스 연동 전 T14 전체를 완료로 표시하지 않는다.
 
 ## 3. 파티 규칙
 

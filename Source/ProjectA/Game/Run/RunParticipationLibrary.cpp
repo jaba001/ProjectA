@@ -7,7 +7,7 @@ bool URunParticipationLibrary::Validate(const FRunParticipationData& Participati
     {
         return false;
     }
-    OutError = NSLOCTEXT("RunParticipation", "Invalid", "Run 참여 상태가 원래 참가자·Host·AI 사전 동의와 일치하지 않습니다.");
+    OutError = NSLOCTEXT("RunParticipation", "Invalid", "Run 참여 상태가 원래 참가자·Host와 일치하지 않습니다.");
     if (Identity.Origin == ERunIdentityOrigin::LegacyOffline || Participation.SchemaVersion != 1 || Participation.HumanParticipants.IsEmpty() || Participation.HumanParticipants.Num() > Identity.OriginalParticipants.Num() || !Participation.HumanParticipants.Contains(Identity.HostAccountId))
     {
         return false;
@@ -20,14 +20,6 @@ bool URunParticipationLibrary::Validate(const FRunParticipationData& Participati
             return false;
         }
         Seen.Add(Human);
-    }
-    for (const FRunParticipantData& Participant : Identity.OriginalParticipants)
-    {
-        if (!Seen.Contains(Participant.AccountId) && (Participant.AIConsent != ERunAIConsent::Granted || Participant.ConsentPolicyVersion != 1))
-        {
-            OutError = NSLOCTEXT("RunParticipation", "Consent", "AI로 참여할 원래 소유자의 정책 버전 1 사전 동의가 필요합니다.");
-            return false;
-        }
     }
     OutError = FText::GetEmpty();
     return true;

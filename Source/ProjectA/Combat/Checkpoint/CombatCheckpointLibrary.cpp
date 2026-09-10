@@ -97,15 +97,6 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
                 return false;
             }
             PartySlots.Add(Unit.PartySlot);
-            if (Unit.PartyControlMode == EPartyControlMode::ServerAI)
-            {
-                const FRunParticipantData* Participant = Checkpoint.Identity.OriginalParticipants.FindByPredicate([&Unit](const FRunParticipantData& Candidate) { return Candidate.AccountId == Unit.OwnerAccountId; });
-                if (!Participant || Participant->AIConsent != ERunAIConsent::Granted || Participant->ConsentPolicyVersion != 1)
-                {
-                    OutError = NSLOCTEXT("CombatCheckpoint", "AIConsent", "서버 AI 조작을 복원하려면 원래 소유자의 정책 버전 1 사전 동의가 필요합니다.");
-                    return false;
-                }
-            }
             LivingPlayers += !Unit.bDead ? 1 : 0;
         }
         else

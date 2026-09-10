@@ -43,7 +43,7 @@ public:
 private:
     ACombatManager* GetManager() const;
     bool AllowsStandaloneLegacy(const APartyPlayerController* Controller) const;
-    bool HasAIConsent(const APlayerUnit* Unit) const;
+    bool HasOriginalOwner(const APlayerUnit* Unit) const;
     FCombatActionResponse ExecuteUnitAction(AUnitBase* Unit, const FCombatActionRequest& Request);
 
     UPROPERTY(Transient)

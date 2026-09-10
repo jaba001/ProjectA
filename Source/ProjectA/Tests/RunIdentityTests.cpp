@@ -1,7 +1,9 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Abilities/GameplayAbility.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunIdentityLibrary.h"
 #include "Game/Run/RunSaveGame.h"
@@ -13,6 +15,8 @@
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UnrealType.h"
+#include "Unit/EnemyUnit.h"
+#include "Unit/PlayerUnit.h"
 
 namespace
 {
@@ -64,6 +68,70 @@ namespace
             UGameplayStatics::DeleteGameInSlot(Slot, 0);
         }
     };
+
+    FRunIdentityFixture MakeNumberedIdentity()
+    {
+        FRunIdentityFixture Fixture;
+        Fixture.Identity.SchemaVersion = URunIdentityLibrary::CurrentSchemaVersion;
+        Fixture.Party.Pop();
+        for (int32 Index = 0; Index < 4; ++Index)
+        {
+            if (Index >= 2)
+            {
+                FRunParticipantData Participant;
+                Participant.AccountId.Provider = TEXT("FixtureProvider");
+                Participant.AccountId.Subject = FString::Printf(TEXT("NumberedOwner%d"), Index + 1);
+                Fixture.Identity.OriginalParticipants.Add(Participant);
+                FRunPartyMember Member = Fixture.Party[0];
+                Member.SlotIndex = Index == 2 ? 0 : 2;
+                Member.CharacterId = FGuid::NewGuid();
+                Member.OwnerAccountId = Participant.AccountId;
+                Fixture.Party.Add(Member);
+            }
+            Fixture.Identity.OriginalParticipants[Index].JoinOrdinal = Index + 1;
+        }
+        return Fixture;
+    }
+
+    bool MakeIdentityCheckpoint(URunStateSubsystem* Run, FCombatCheckpointData& Checkpoint)
+    {
+        Checkpoint.AttemptId = FGuid::NewGuid();
+        Checkpoint.Revision = 1;
+        Checkpoint.Identity = Run->GetRunIdentity();
+        Checkpoint.NodeId = Run->GetCurrentNodeId();
+        Checkpoint.EncounterId = Run->GetCurrentEncounterId();
+        for (const FRunPartyMember& Member : Run->GetPartyMembers())
+        {
+            FProfessionDefinition Profession;
+            if (!Run->PartyDefinition || !Run->PartyDefinition->ResolveProfession(Member.ClassId, Profession) || Profession.StartingSkills.IsEmpty()) return false;
+            FCombatCheckpointUnit& Unit = Checkpoint.Units.AddDefaulted_GetRef();
+            Unit.UnitId = FGuid::NewGuid();
+            Unit.CharacterId = Member.CharacterId;
+            Unit.OwnerAccountId = Member.OwnerAccountId;
+            Unit.PartySlot = Member.SlotIndex;
+            Unit.UnitClass = FSoftObjectPath(Profession.CombatClass.Get());
+            Unit.CharacterName = Member.CharacterName;
+            Unit.HP = Profession.MaxHP;
+            Unit.MaxHP = Profession.MaxHP;
+            Unit.GridCoord = FIntPoint(Member.SlotIndex, 0);
+            for (USkillDefinitionDataAsset* Skill : Profession.StartingSkills)
+            {
+                if (!Skill) return false;
+                Unit.Skills.Add(FSoftObjectPath(Skill));
+            }
+            Unit.DefaultAttackAbility = FSoftObjectPath(Profession.StartingSkills[0]->AbilityClass.Get());
+        }
+        FCombatCheckpointUnit Enemy = Checkpoint.Units[0];
+        Enemy.UnitId = FGuid::NewGuid();
+        Enemy.CharacterId.Invalidate();
+        Enemy.OwnerAccountId = FRunAccountId();
+        Enemy.PartySlot = INDEX_NONE;
+        Enemy.Team = ETeam::Enemy;
+        Enemy.UnitClass = FSoftObjectPath(AEnemyUnit::StaticClass());
+        Enemy.GridCoord = FIntPoint(0, 2);
+        Checkpoint.Units.Add(Enemy);
+        return true;
+    }
 
     bool SameIdentity(const FRunIdentityData& Left, const FRunIdentityData& Right)
     {
@@ -150,7 +218,7 @@ bool FRunIdentityValidationTest::RunTest(const FString& Parameters)
         TestFalse(FString(Label) + TEXT(" provides an error"), Error.IsEmpty());
         Invalid = Valid;
     };
-    Invalid.Identity.SchemaVersion = 2;
+    Invalid.Identity.SchemaVersion = 3;
     Reject(TEXT("Unknown identity schema is rejected"));
     Invalid.Identity.RunId.Invalidate();
     TestFalse(TEXT("Malformed Run cannot report a participant match"), URunIdentityLibrary::IsOriginalParticipant(Invalid.Identity, Invalid.Identity.HostAccountId));
@@ -236,6 +304,7 @@ bool FRunIdentityLifecycleTest::RunTest(const FString& Parameters)
     const FRunIdentityData Identity = Fixture.Run->GetRunIdentity();
     const TArray<FRunPartyMember> Party = Fixture.Run->GetPartyMembers();
     TestTrue(TEXT("Singleplayer initialization creates a local-development identity"), Identity.Origin == ERunIdentityOrigin::LocalDevelopment);
+    TestEqual(TEXT("New singleplayer explicitly records identity schema two"), Identity.SchemaVersion, 2);
     TestTrue(TEXT("New Run ID is valid"), Identity.RunId.IsValid());
     TestEqual(TEXT("Singleplayer has one original participant"), Identity.OriginalParticipants.Num(), 1);
     TestEqual(TEXT("Initial Host epoch is one"), Identity.HostEpoch, 1);
@@ -244,6 +313,7 @@ bool FRunIdentityLifecycleTest::RunTest(const FString& Parameters)
         return false;
     }
     TestEqual(TEXT("Development identity is explicitly namespaced"), Identity.HostAccountId.Provider, FName(TEXT("Development")));
+    TestEqual(TEXT("New singleplayer Host has explicit original join number one"), Identity.OriginalParticipants[0].JoinOrdinal, 1);
     TestTrue(TEXT("Starting singleplayer never invents AI consent"), Identity.OriginalParticipants[0].AIConsent == ERunAIConsent::Unknown);
     TestEqual(TEXT("Unknown consent has no policy version"), Identity.OriginalParticipants[0].ConsentPolicyVersion, 0);
     TestFalse(TEXT("Sorted empty slot remains unidentified"), Party[0].CharacterId.IsValid());
@@ -431,6 +501,159 @@ bool FRunIdentityLegacyCompatibilityTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Resaving legacy data preserves character fields without ownership"), SameParty(Legacy->Party, Fixture.Run->GetPartyMembers()));
     }
     Fixture.Run->OnRunStateChanged.Clear();
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunJoinOrderValidationTest, "ProjectA.Run.Identity.JoinOrderValidation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunJoinOrderValidationTest::RunTest(const FString& Parameters)
+{
+    const FRunIdentityFixture Valid = MakeNumberedIdentity();
+    FText Error;
+    TestTrue(TEXT("Four explicit original join numbers validate"), URunIdentityLibrary::ValidateIdentity(Valid.Identity, Valid.Party, Error));
+    FRunIdentityFixture Invalid = Valid;
+    const auto Reject = [this, &Valid, &Invalid, &Error](const TCHAR* Label)
+    {
+        TestFalse(Label, URunIdentityLibrary::ValidateIdentity(Invalid.Identity, Invalid.Party, Error));
+        TestFalse(TEXT("Invalid numbering reports a reason"), Error.IsEmpty());
+        TestFalse(TEXT("Invalid numbering cannot report original participation"), URunIdentityLibrary::IsOriginalParticipant(Invalid.Identity, Invalid.Identity.HostAccountId));
+        Invalid = Valid;
+    };
+    Invalid.Identity.OriginalParticipants[1].JoinOrdinal = 0;
+    Reject(TEXT("Schema two never infers a missing number"));
+    Invalid.Identity.OriginalParticipants[1].JoinOrdinal = -1;
+    Reject(TEXT("Negative join number is rejected"));
+    Invalid.Identity.OriginalParticipants[1].JoinOrdinal = 1;
+    Reject(TEXT("Duplicate join numbers are rejected"));
+    Invalid.Identity.OriginalParticipants[1].JoinOrdinal = 5;
+    Reject(TEXT("Gapped or out-of-roster join numbers are rejected"));
+    Invalid.Identity.HostAccountId = Invalid.Identity.OriginalParticipants[1].AccountId;
+    Reject(TEXT("Initial Host must hold original join number one"));
+    Invalid.Identity.SchemaVersion = 1;
+    Reject(TEXT("Schema one cannot carry inferred join numbers"));
+    FRunIdentityData Legacy;
+    Legacy.SchemaVersion = 2;
+    TestFalse(TEXT("Metadata-free legacy identity stays schema one"), URunIdentityLibrary::ValidateIdentity(Legacy, {}, Error));
+
+    FRunIdentityFixture Reordered = Valid;
+    Reordered.Identity.OriginalParticipants.Swap(0, 3);
+    Reordered.Identity.OriginalParticipants.Swap(1, 2);
+    TestTrue(TEXT("Stored array order is independent from original join order"), URunIdentityLibrary::ValidateIdentity(Reordered.Identity, Reordered.Party, Error));
+    for (int32 Index = 0; Index < 4; ++Index)
+    {
+        int32 Ordinal = -77;
+        TestTrue(TEXT("Each original account exposes its explicit number"), URunIdentityLibrary::TryGetJoinOrdinal(Reordered.Identity, Reordered.Party, Valid.Identity.OriginalParticipants[Index].AccountId, Ordinal, Error));
+        TestEqual(TEXT("Number survives roster array reordering"), Ordinal, Index + 1);
+    }
+    Reordered.Identity.HostEpoch = 2;
+    Reordered.Identity.HostAccountId = Valid.Identity.OriginalParticipants[2].AccountId;
+    TestTrue(TEXT("A later Host epoch may name another original participant"), URunIdentityLibrary::ValidateIdentity(Reordered.Identity, Reordered.Party, Error));
+    FRunAccountId Candidate;
+    Candidate.Provider = TEXT("Sentinel");
+    Candidate.Subject = TEXT("PreserveOutput");
+    const FRunAccountId Sentinel = Candidate;
+    const TArray<FRunAccountId> HumanAccounts{ Valid.Identity.OriginalParticipants[3].AccountId, Valid.Identity.OriginalParticipants[1].AccountId, Valid.Identity.OriginalParticipants[2].AccountId };
+    TestTrue(TEXT("Explicit resuming humans yield a stored-order Host candidate"), URunIdentityLibrary::TrySelectHostCandidate(Reordered.Identity, Reordered.Party, HumanAccounts, Candidate, Error));
+    TestTrue(TEXT("Lowest original number wins regardless of current Host and array order"), Candidate == Valid.Identity.OriginalParticipants[1].AccountId);
+    TestTrue(TEXT("Successful candidate selection clears prior errors"), Error.IsEmpty());
+    for (int32 Index = 1; Index < 4; ++Index)
+    {
+        const FRunAccountId& Account = Valid.Identity.OriginalParticipants[Index].AccountId;
+        TestTrue(TEXT("Each original number two through four is a candidate when listed alone"), URunIdentityLibrary::TrySelectHostCandidate(Reordered.Identity, Reordered.Party, { Account }, Candidate, Error));
+        TestTrue(TEXT("A singleton list selects its explicit account"), Candidate == Account);
+    }
+
+    const FRunIdentityFixture Unnumbered;
+    const auto RejectCandidate = [this, &Candidate, &Sentinel, &Error](const FRunIdentityFixture& Fixture, const TArray<FRunAccountId>& Humans, const TCHAR* Label)
+    {
+        Candidate = Sentinel;
+        TestFalse(Label, URunIdentityLibrary::TrySelectHostCandidate(Fixture.Identity, Fixture.Party, Humans, Candidate, Error));
+        TestTrue(TEXT("Rejected candidate lookup preserves output"), Candidate == Sentinel);
+        TestFalse(TEXT("Rejected candidate lookup reports a reason"), Error.IsEmpty());
+    };
+    RejectCandidate(Reordered, {}, TEXT("Empty resuming humans are rejected"));
+    RejectCandidate(Reordered, { HumanAccounts[0], HumanAccounts[0] }, TEXT("Duplicate resuming humans are rejected"));
+    RejectCandidate(Reordered, { HumanAccounts[0], Sentinel }, TEXT("An external account rejects the entire candidate request"));
+    RejectCandidate(Unnumbered, { Unnumbered.Identity.HostAccountId }, TEXT("Old array positions cannot be used as inferred join numbers"));
+    Invalid = Reordered;
+    Invalid.Identity.RunId.Invalidate();
+    RejectCandidate(Invalid, HumanAccounts, TEXT("Malformed Run identity rejects candidate lookup"));
+    Invalid = Reordered;
+    Invalid.Party[0].CharacterId.Invalidate();
+    RejectCandidate(Invalid, HumanAccounts, TEXT("Invalid character ownership rejects candidate lookup"));
+
+    int32 Ordinal = -77;
+    TestFalse(TEXT("External account has no join number"), URunIdentityLibrary::TryGetJoinOrdinal(Reordered.Identity, Reordered.Party, Sentinel, Ordinal, Error));
+    TestEqual(TEXT("Unknown account lookup preserves output"), Ordinal, -77);
+    TestFalse(TEXT("Legacy schema has no inferred join number"), URunIdentityLibrary::TryGetJoinOrdinal(Unnumbered.Identity, Unnumbered.Party, Unnumbered.Identity.HostAccountId, Ordinal, Error));
+    TestEqual(TEXT("Legacy lookup preserves output"), Ordinal, -77);
+    TestFalse(TEXT("Invalid party rejects number lookup"), URunIdentityLibrary::TryGetJoinOrdinal(Invalid.Identity, Invalid.Party, Invalid.Identity.HostAccountId, Ordinal, Error));
+    TestEqual(TEXT("Invalid party lookup preserves output"), Ordinal, -77);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunJoinOrderPersistenceTest, "ProjectA.Run.Identity.JoinOrderPersistence", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunJoinOrderPersistenceTest::RunTest(const FString& Parameters)
+{
+    for (int32 IdentitySchema = 1; IdentitySchema <= 2; ++IdentitySchema)
+    {
+        FRunIdentityFixture Input = MakeNumberedIdentity();
+        Input.Identity.SchemaVersion = IdentitySchema;
+        Input.Identity.HostEpoch = 3;
+        Input.Identity.HostAccountId = Input.Identity.OriginalParticipants[2].AccountId;
+        if (IdentitySchema == 1)
+        {
+            for (FRunParticipantData& Participant : Input.Identity.OriginalParticipants)
+            {
+                Participant.JoinOrdinal = 0;
+            }
+        }
+        Input.Identity.OriginalParticipants.Swap(0, 3);
+        FScopedIdentityRun Fixture;
+        FText Error;
+        if (!TestTrue(TEXT("Explicit four-owner identity initializes without migration"), Fixture.Run->InitializeRunWithIdentity(Input.Party, Input.Identity, Error))) return false;
+        if (!TestTrue(TEXT("Map checkpoint saves"), Fixture.Run->SaveCheckpoint(Error))) return false;
+        TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
+        if (!TestNotNull(TEXT("Map checkpoint loads through native SaveGame"), Saved.Get())) return false;
+        TestEqual(TEXT("Both identity schemas retain outer map-save version two"), Saved->Version, 2);
+        TestTrue(TEXT("Map save preserves schema, roster order, join numbers, Host and ownership metadata"), SameIdentity(Saved->Identity, Input.Identity));
+        TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
+        Restored->EnableCheckpointSaving(Fixture.Slot);
+        if (!TestTrue(TEXT("Map checkpoint passes ordinary load validation"), Restored->LoadCheckpoint(Error))) return false;
+        TestTrue(TEXT("Loaded map identity preserves explicit numbers or unknown old numbering"), SameIdentity(Restored->GetRunIdentity(), Input.Identity));
+
+        if (!TestTrue(TEXT("Numbered and old-identity Runs can begin combat"), Fixture.Run->BeginEncounter(TEXT("Combat_01")) && Fixture.Run->MarkCombatStarted())) return false;
+        FCombatCheckpointData Checkpoint;
+        if (!TestTrue(TEXT("Real profession data creates a valid storage fixture"), MakeIdentityCheckpoint(Fixture.Run.Get(), Checkpoint))) return false;
+        if (!TestTrue(TEXT("Combat checkpoint commits through production validation and atomic storage"), Fixture.Run->CommitCombatCheckpoint(Checkpoint, Error)))
+        {
+            AddError(Error.ToString());
+            return false;
+        }
+        Saved.Reset(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
+        if (!TestNotNull(TEXT("Combat checkpoint loads through native SaveGame"), Saved.Get())) return false;
+        TestEqual(TEXT("Both identity schemas retain outer combat-save version three"), Saved->Version, 3);
+        TestTrue(TEXT("Combat file preserves every outer identity field"), SameIdentity(Saved->Identity, Input.Identity));
+        TestTrue(TEXT("Nested combat identity retains the same schema and join numbers"), SameIdentity(Saved->CombatCheckpoint.Identity, Input.Identity));
+        if (!TestTrue(TEXT("Combat checkpoint passes ordinary load validation"), Restored->LoadCheckpoint(Error))) return false;
+        TestTrue(TEXT("Restored combat identity is never reordered or inferred"), SameIdentity(Restored->GetRunIdentity(), Input.Identity));
+        TestTrue(TEXT("Restored checkpoint retains original Host and full nested identity"), SameIdentity(Restored->GetCombatCheckpoint().Identity, Input.Identity) && Restored->ValidateCheckpointHost(Input.Identity.HostAccountId, Error));
+
+        const FRunIdentityData Before = Restored->GetRunIdentity();
+        const TArray<FRunPartyMember> BeforeParty = Restored->GetPartyMembers();
+        const FCombatCheckpointData BeforeCheckpoint = Restored->GetCombatCheckpoint();
+        Saved->CombatCheckpoint.Identity.OriginalParticipants[0].JoinOrdinal = IdentitySchema == 1 ? 1 : 0;
+        if (!TestTrue(TEXT("Corrupt nested numbering fixture writes"), UGameplayStatics::SaveGameToSlot(Saved.Get(), Fixture.Slot, 0))) return false;
+        TArray<uint8> BeforeBytes;
+        TestTrue(TEXT("Corrupt fixture bytes are readable"), UGameplayStatics::LoadDataFromSlot(BeforeBytes, Fixture.Slot, 0));
+        TestFalse(TEXT("Mismatched or invalid nested join numbering cannot load"), Restored->LoadCheckpoint(Error));
+        TestTrue(TEXT("Rejected numbering preserves the current Run and character ownership"), SameIdentity(Restored->GetRunIdentity(), Before) && SameParty(Restored->GetPartyMembers(), BeforeParty));
+        TestTrue(TEXT("Rejected numbering preserves the confirmed checkpoint"), FCombatCheckpointData::StaticStruct()->CompareScriptStruct(&Restored->GetCombatCheckpoint(), &BeforeCheckpoint, 0));
+        TArray<uint8> AfterBytes;
+        TestTrue(TEXT("Rejected fixture bytes remain readable"), UGameplayStatics::LoadDataFromSlot(AfterBytes, Fixture.Slot, 0));
+        TestTrue(TEXT("Rejected numbering never rewrites the save file"), BeforeBytes == AfterBytes);
+    }
     return true;
 }
 

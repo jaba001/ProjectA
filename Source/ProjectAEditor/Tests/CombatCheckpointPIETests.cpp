@@ -680,11 +680,6 @@ private:
             FRunParticipantData& Participant = Identity.OriginalParticipants.AddDefaulted_GetRef();
             Participant.AccountId.Provider = TEXT("CheckpointPIEFixture");
             Participant.AccountId.Subject = Index == 0 ? TEXT("OriginalHost") : Index == 1 ? TEXT("OriginalGuest") : FString::Printf(TEXT("OriginalGuest%d"), Index);
-            if (bPartyAI && Index == 1)
-            {
-                Participant.AIConsent = ERunAIConsent::Granted;
-                Participant.ConsentPolicyVersion = 1;
-            }
             FRunPartyMember& Member = Party.AddDefaulted_GetRef();
             Member.SlotIndex = Index;
             Member.bCreated = true;
@@ -807,7 +802,7 @@ private:
         if (!Test->TestNotNull(TEXT("AI opt-in starts with an actual confirmed disk checkpoint."), Save.Get())) return false;
         FCombatCheckpointData& Checkpoint = Save->CombatCheckpoint;
         FCombatCheckpointUnit* AIUnit = Checkpoint.Units.FindByPredicate([this](const FCombatCheckpointUnit& Unit) { return Unit.CharacterId == GuestCharacter; });
-        if (!Test->TestTrue(TEXT("AI fixture preserves the owner's Run-start consent."), AIUnit && Checkpoint.Identity.OriginalParticipants[1].AIConsent == ERunAIConsent::Granted && Checkpoint.Identity.OriginalParticipants[1].ConsentPolicyVersion == 1)) return false;
+        if (!Test->TestTrue(TEXT("AI fixture uses Unknown legacy consent without prior approval."), AIUnit && Checkpoint.Identity.OriginalParticipants[1].AIConsent == ERunAIConsent::Unknown && Checkpoint.Identity.OriginalParticipants[1].ConsentPolicyVersion == 0)) return false;
         // This explicit test fixture selects AI before the new session; it is not a live transition API.
         // 새 세션 전에 AI를 선택하는 명시적 테스트 데이터이며 실행 중 전환 API가 아닙니다.
         Checkpoint.SchemaVersion = 2;
@@ -1502,7 +1497,7 @@ bool FCombatCheckpointSessionTest::RunTest(const FString& Parameters)
         AddError(TEXT("T14CheckpointAI and T14CheckpointOpponent are separate fixture variants."));
         return false;
     }
-    if (bPartyAI) AddInfo(TEXT("Testing persisted guest AI with its original consent, ownership and actual two-world combat."));
+    if (bPartyAI) AddInfo(TEXT("Testing persisted guest AI without prior consent while preserving ownership and actual two-world combat."));
     ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<CombatCheckpointPIETests::FCheckpointSessions>(this, CombatCheckpointPIETests::ERunMode::SessionRestart, Slot, OpponentChange, bPartyAI));
     return true;
@@ -1515,7 +1510,7 @@ bool FCombatCheckpointThreePlayersTest::RunTest(const FString& Parameters)
     const bool bPartyAI = FParse::Param(FCommandLine::Get(), TEXT("T14CheckpointAI"));
     const FString Slot = TEXT("T14_CombatPIE3_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
     AddInfo(TEXT("Three original participants: actual client disconnect, unchanged original Host, and a fresh fully rejoined PIE session."));
-    if (bPartyAI) AddInfo(TEXT("The original guest remains connected while its consented, persisted AI mode is restored."));
+    if (bPartyAI) AddInfo(TEXT("The original guest remains connected while its persisted AI mode is restored without prior consent."));
     ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<CombatCheckpointPIETests::FCheckpointSessions>(this, CombatCheckpointPIETests::ERunMode::SessionRestart, Slot, CombatCheckpointPIETests::EOpponentSourceChange::None, bPartyAI, 3));
     return true;
@@ -1528,7 +1523,7 @@ bool FCombatCheckpointFourPlayersTest::RunTest(const FString& Parameters)
     const bool bPartyAI = FParse::Param(FCommandLine::Get(), TEXT("T14CheckpointAI"));
     const FString Slot = TEXT("T14_CombatPIE4_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
     AddInfo(TEXT("Four original participants: actual client disconnect, unchanged original Host, and a fresh fully rejoined PIE session."));
-    if (bPartyAI) AddInfo(TEXT("The original guest remains connected while its consented, persisted AI mode is restored."));
+    if (bPartyAI) AddInfo(TEXT("The original guest remains connected while its persisted AI mode is restored without prior consent."));
     ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<CombatCheckpointPIETests::FCheckpointSessions>(this, CombatCheckpointPIETests::ERunMode::SessionRestart, Slot, CombatCheckpointPIETests::EOpponentSourceChange::None, bPartyAI, 4));
     return true;

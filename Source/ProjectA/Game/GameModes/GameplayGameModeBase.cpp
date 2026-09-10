@@ -146,7 +146,32 @@ bool AGameplayGameModeBase::AssignRunParticipant(APartyPlayerController* Control
         }
     }
     RunParticipants.Add(Key, AccountId);
+    if (AGameplayPlayerController* GameplayController = Cast<AGameplayPlayerController>(Controller); GameplayController && GameplayController->IsLocalController())
+    {
+        GameplayController->RefreshRunFlowPermissions();
+    }
     return true;
+}
+
+bool AGameplayGameModeBase::CanControlRunFlow(const APartyPlayerController* Controller) const
+{
+    if (!HasAuthority() || GetNetMode() != NM_ListenServer || !IsValid(Controller) || Controller->GetWorld() != GetWorld() || !Controller->HasAuthority() || !Controller->IsLocalController() || !GetGameInstance())
+    {
+        return false;
+    }
+    const URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+    if (!Run || !Run->GetRunIdentity().RunId.IsValid() || !URunIdentityLibrary::IsOriginalParticipant(Run->GetRunIdentity(), Run->GetRunIdentity().HostAccountId))
+    {
+        return false;
+    }
+    for (const TPair<TWeakObjectPtr<APartyPlayerController>, FRunAccountId>& Entry : RunParticipants)
+    {
+        if (Entry.Key.Get() == Controller)
+        {
+            return Entry.Value == Run->GetRunIdentity().HostAccountId;
+        }
+    }
+    return false;
 }
 
 bool AGameplayGameModeBase::ApplyCombatParticipantBindings(UCombatActionAuthority* Authority)

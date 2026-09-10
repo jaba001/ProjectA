@@ -47,6 +47,11 @@ struct PROJECTA_API FRunParticipantData
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Run|Identity")
     FRunAccountId AccountId;
 
+    // Schema two records the original join order explicitly; zero preserves unknown order in older saves.
+    // 스키마 2는 최초 합류 순서를 명시하며 0은 구버전 저장의 알 수 없는 순서를 보존합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Run|Identity")
+    int32 JoinOrdinal = 0;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Run|Identity")
     ERunAIConsent AIConsent = ERunAIConsent::Unknown;
 
@@ -59,6 +64,8 @@ struct PROJECTA_API FRunIdentityData
 {
     GENERATED_BODY()
 
+    // Keep the legacy default so missing metadata never acquires an inferred join order.
+    // 누락된 메타데이터에 합류 순서를 추정하여 부여하지 않도록 구버전 기본값을 유지합니다.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Run|Identity")
     int32 SchemaVersion = 1;
 

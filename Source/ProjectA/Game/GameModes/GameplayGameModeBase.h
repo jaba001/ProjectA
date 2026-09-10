@@ -26,6 +26,7 @@ public:
     bool AssignRunParticipant(APartyPlayerController* Controller, const FRunAccountId& AccountId);
     bool ApplyCombatParticipantBindings(UCombatActionAuthority* Authority);
     bool HasOriginalHostConnection(const FRunAccountId& HostAccount) const;
+    bool CanControlRunFlow(const APartyPlayerController* Controller) const;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gameplay")
     TSubclassOf<ACombatManager> CombatManagerClass;

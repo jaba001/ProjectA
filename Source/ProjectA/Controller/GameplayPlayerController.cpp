@@ -7,6 +7,7 @@
 #include "Framework/Application/SlateUser.h"
 #include "Game/Encounter/EncounterManager.h"
 #include "Game/Encounter/CombatArena.h"
+#include "Game/GameModes/GameplayGameModeBase.h"
 #include "Game/GameState/GameplayGameState.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "UI/Gameplay/GameplayRootWidget.h"
@@ -135,7 +136,7 @@ void AGameplayPlayerController::InitializeGameplay(AEncounterManager* InEncounte
 
 void AGameplayPlayerController::RequestStartNode(FName NodeId)
 {
-    if (GetNetMode() == NM_Standalone && EncounterManager)
+    if (CanIssueRunCommands() && EncounterManager)
     {
         EncounterManager->RequestStartNode(NodeId);
     }
@@ -143,10 +144,31 @@ void AGameplayPlayerController::RequestStartNode(FName NodeId)
 
 void AGameplayPlayerController::RequestContinueRun()
 {
-    if (GetNetMode() == NM_Standalone && EncounterManager)
+    if (CanIssueRunCommands() && EncounterManager)
     {
         EncounterManager->ContinueRun();
     }
+}
+
+bool AGameplayPlayerController::CanIssueRunCommands() const
+{
+    if (!HasAuthority() || !IsLocalController())
+    {
+        return false;
+    }
+    if (GetNetMode() == NM_Standalone)
+    {
+        return true;
+    }
+    // Recheck the current Run host against the server's trusted connection assignment for every request.
+    // 요청마다 현재 Run Host와 서버가 신뢰 배정한 연결을 다시 대조합니다.
+    const AGameplayGameModeBase* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGameplayGameModeBase>() : nullptr;
+    return Mode && Mode->CanControlRunFlow(this);
+}
+
+void AGameplayPlayerController::RefreshRunFlowPermissions()
+{
+    RefreshGameplayFlow();
 }
 
 void AGameplayPlayerController::RequestRetryCombatCheckpoint()
@@ -200,7 +222,7 @@ void AGameplayPlayerController::RefreshGameplayFlow()
 
     if (GameplayRootWidget)
     {
-        GameplayRootWidget->RefreshFlowView(FGameplayViewState::FromRun(RunState, FlowMessage), GetNetMode() == NM_Standalone, IsLocalController() && EncounterManager && EncounterManager->CanRetryCombatCheckpoint());
+        GameplayRootWidget->RefreshFlowView(FGameplayViewState::FromRun(RunState, FlowMessage), CanIssueRunCommands(), IsLocalController() && EncounterManager && EncounterManager->CanRetryCombatCheckpoint());
     }
 
     // Active CommonUI screens own the input config; the controller keeps combat authorization.

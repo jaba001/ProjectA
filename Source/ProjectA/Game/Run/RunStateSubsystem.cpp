@@ -313,10 +313,12 @@ bool URunStateSubsystem::InitializeRun(const TArray<FRunPartyMember>& Members, F
     // Standalone runs use a per-run development identity until an authenticated provider is integrated.
     // 인증 공급자 연동 전까지 싱글플레이는 Run마다 별도의 개발용 식별자를 사용합니다.
     FRunIdentityData Identity;
+    Identity.SchemaVersion = URunIdentityLibrary::CurrentSchemaVersion;
     Identity.Origin = ERunIdentityOrigin::LocalDevelopment;
     Identity.RunId = FGuid::NewGuid();
     Identity.HostEpoch = 1;
     FRunParticipantData& Participant = Identity.OriginalParticipants.AddDefaulted_GetRef();
+    Participant.JoinOrdinal = 1;
     Participant.AccountId.Provider = TEXT("Development");
     Participant.AccountId.Subject = FGuid::NewGuid().ToString(EGuidFormats::Digits);
     Identity.HostAccountId = Participant.AccountId;

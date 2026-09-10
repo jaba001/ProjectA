@@ -100,7 +100,7 @@ namespace PartyAITests
             return Controller;
         }
 
-        bool Initialize(ERunAIConsent Consent = ERunAIConsent::Granted)
+        bool Initialize(ERunAIConsent Consent = ERunAIConsent::Unknown)
         {
             FirstTile = AddTile(FIntPoint(0, 0), ETileTerritory::Player);
             First = AddUnit<APlayerUnit>(FirstTile, ETeam::Player);
@@ -184,7 +184,7 @@ namespace PartyAITests
     };
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPartyAIControlTest, "ProjectA.Coop.PartyAI.ControlAndConsent", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPartyAIControlTest, "ProjectA.Coop.PartyAI.ControlAndOwnership", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FPartyAIControlTest::RunTest(const FString& Parameters)
 {
@@ -193,21 +193,20 @@ bool FPartyAIControlTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Identified ownership fixture initializes"), Fixture.Initialize(ERunAIConsent::Unknown))) return false;
     const FRunAccountId Owner = Fixture.Authority()->GetOwnerAccountId(Fixture.First);
     const FGuid Character = Fixture.Authority()->GetCharacterId(Fixture.First);
-    TestFalse(TEXT("Unknown consent cannot enable AI"), Fixture.Authority()->SetPartyControlMode(Fixture.First, EPartyControlMode::ServerAI, Fixture.Error));
+    TestTrue(TEXT("Server can prepare AI with Unknown legacy consent"), Fixture.Authority()->SetPartyControlMode(Fixture.First, EPartyControlMode::ServerAI, Fixture.Error));
+    TestTrue(TEXT("Idle preparation can restore Human before combat starts"), Fixture.Authority()->SetPartyControlMode(Fixture.First, EPartyControlMode::Human, Fixture.Error));
     Fixture.Identity.OriginalParticipants[0].AIConsent = ERunAIConsent::Declined;
     Fixture.Identity.OriginalParticipants[0].ConsentPolicyVersion = 1;
     TestTrue(TEXT("Declined consent remains valid ownership data"), Fixture.Reconfigure());
-    TestFalse(TEXT("Declined consent cannot enable AI"), Fixture.Authority()->SetPartyControlMode(Fixture.First, EPartyControlMode::ServerAI, Fixture.Error));
-    Fixture.Identity.OriginalParticipants[0].AIConsent = ERunAIConsent::Granted;
-    TestTrue(TEXT("Granted consent configures"), Fixture.Reconfigure());
     Fixture.Combat->SetRole(ROLE_SimulatedProxy);
     TestFalse(TEXT("A client manager cannot change the control mode"), Fixture.Authority()->SetPartyControlMode(Fixture.First, EPartyControlMode::ServerAI, Fixture.Error));
     Fixture.Combat->SetRole(ROLE_Authority);
-    TestTrue(TEXT("Consented server initialization enables AI"), Fixture.Authority()->SetPartyControlMode(Fixture.First, EPartyControlMode::ServerAI, Fixture.Error));
+    TestTrue(TEXT("Server can prepare AI with Declined legacy consent"), Fixture.Authority()->SetPartyControlMode(Fixture.First, EPartyControlMode::ServerAI, Fixture.Error));
     const FGuid Session = Fixture.First->GetAIControlSessionId();
     TestTrue(TEXT("AI has a server execution session"), Session.IsValid());
     TestEqual(TEXT("AI keeps the original character"), Fixture.Authority()->GetCharacterId(Fixture.First), Character);
     TestTrue(TEXT("AI keeps the original owner"), Fixture.Authority()->GetOwnerAccountId(Fixture.First) == Owner);
+    TestTrue(TEXT("AI preparation preserves legacy consent metadata"), Fixture.Authority()->GetRunIdentity().OriginalParticipants[0].AIConsent == ERunAIConsent::Declined && Fixture.Authority()->GetRunIdentity().OriginalParticipants[0].ConsentPolicyVersion == 1);
     TestEqual(TEXT("AI remains on the player team"), Fixture.First->GetTeam(), ETeam::Player);
     TestFalse(TEXT("Original owner cannot directly control its AI character"), Fixture.Authority()->CanControllerControl(Fixture.Host, Fixture.First));
     TestFalse(TEXT("Another participant cannot directly control the AI character"), Fixture.Authority()->CanControllerControl(Fixture.Guest, Fixture.First));
@@ -219,8 +218,13 @@ bool FPartyAIControlTest::RunTest(const FString& Parameters)
     Human.ParticipantBindingId = Fixture.Host->GetParticipantBindingId();
     TestEqual(TEXT("Server rejects the original owner's human action while AI controls"), Fixture.Authority()->Execute(Fixture.Host, Human).Result, ECombatRequestResult::NotOwner);
     TestEqual(TEXT("Rejected human packet still reserves its sequence"), Fixture.Authority()->Execute(Fixture.Host, Human).Result, ECombatRequestResult::DuplicateRequest);
+    Human.ParticipantBindingId = Fixture.Guest->GetParticipantBindingId();
+    TestEqual(TEXT("Another participant cannot use a human command on the AI character"), Fixture.Authority()->Execute(Fixture.Guest, Human).Result, ECombatRequestResult::NotOwner);
     TestEqual(TEXT("Rejected human input does not spend AP"), Fixture.First->GetCurrentActionPoint(), 4);
     TestEqual(TEXT("Rejected human input does not deal damage"), Fixture.Enemy->GetAttributeSet()->GetHP(), 100.0f);
+    TestEqual(TEXT("AI with Declined legacy consent executes through server validation"), Fixture.SubmitAI(Fixture.Make(1, ECombatActionKind::Skill, Fixture.EnemyTile)).Result, ECombatRequestResult::Accepted);
+    TestEqual(TEXT("Declined legacy consent does not prevent actual AI damage"), Fixture.Enemy->GetAttributeSet()->GetHP(), 90.0f);
+    TestEqual(TEXT("AI still pays its authoritative cost"), Fixture.First->GetCurrentActionPoint(), 3);
     Fixture.Combat->SuspendCombatForRecovery();
     FRunIdentityData Replacement = Fixture.Identity;
     Replacement.RunId = FGuid::NewGuid();
@@ -247,6 +251,11 @@ bool FPartyAICommandTest::RunTest(const FString& Parameters)
     FFixture Fixture;
     if (!TestTrue(TEXT("AI fixture starts"), Fixture.Initialize() && Fixture.StartAI())) return false;
     FCombatActionRequest Request = Fixture.Make(1, ECombatActionKind::Skill, Fixture.EnemyTile);
+    Fixture.Combat->SetRole(ROLE_SimulatedProxy);
+    TestEqual(TEXT("A client cannot execute AI commands even without a consent gate"), Fixture.SubmitAI(Request).Result, ECombatRequestResult::InvalidContext);
+    Fixture.Combat->SetRole(ROLE_Authority);
+    TestEqual(TEXT("Rejected client AI command preserves HP"), Fixture.Enemy->GetAttributeSet()->GetHP(), 100.0f);
+    TestEqual(TEXT("Rejected client AI command preserves AP"), Fixture.First->GetCurrentActionPoint(), 4);
     TestTrue(TEXT("Wrong AI session cannot execute"), Fixture.Authority()->ExecuteServerAI(Fixture.First, Request, FGuid::NewGuid()).Result != ECombatRequestResult::Accepted);
     FCombatActionRequest Wrong = Request;
     Wrong.CombatInstanceId = FGuid::NewGuid();
