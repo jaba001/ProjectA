@@ -20,6 +20,9 @@ class PROJECTA_API URunStateSubsystem : public UGameInstanceSubsystem
 
 public:
     URunStateSubsystem();
+    // Resolve the checkpoint before menu initialization so local Snapshot runs cannot overwrite PvE progress.
+    // 로컬 Snapshot 진행이 PvE 기록을 덮어쓰지 않도록 메뉴 초기화 전에 체크포인트를 결정합니다.
+    static FString ResolveCheckpointSlot(const TCHAR* CommandLine);
     // Keep the selected catalog across travel so previews and spawning use the same data.
     // 미리보기와 스폰이 같은 데이터를 쓰도록 선택한 목록을 레벨 이동 동안 유지합니다.
     UPROPERTY(Transient)

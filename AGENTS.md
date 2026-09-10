@@ -8,6 +8,7 @@
 
 ## 데이터와 멀티플레이 확장 원칙
 
+- Unreal 기본 기능과 공식 확장 지점을 우선 활용한다. 저장·데이터·능력·네트워크 기능은 USaveGame·USTRUCT/DataAsset·GAS·Replication 등 기존 엔진 기능으로 해결할 수 있는지 먼저 확인한다.
 - [T14 기획](Docs/TODO.md)의 Async PvP와 Listen Server 기반 Co-op 방향을 따른다. 첫 Vertical Slice와 기본 Run은 싱글플레이를 유지하며 전체 Replication 리팩터링을 즉시 진행하지 않는다.
 - 새 Run/Party/Encounter/Combat 데이터는 직렬화 가능한 Runtime Data와 Command를 우선한다. Actor reference에 과도하게 의존하거나 향후 Snapshot·Replication 확장을 방해하는 강한 로컬 PlayerController 의존성을 만들지 않는다.
 - Co-op 구현 시 플레이어는 할당된 Party Member만 조작한다. 서버가 Action Request를 검증·실행하고 CombatManager·TurnManager·Grid Occupancy·Unit State·HP/AP·사망·Combat Result의 최종 권위를 가진다.

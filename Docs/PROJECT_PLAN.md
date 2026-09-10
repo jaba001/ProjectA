@@ -41,6 +41,8 @@ D01 / T14: ProjectA는 최종적으로 Async PvP와 실시간 Co-op을 지원한
 
 Async PvP는 서버에 저장된 상대 Party/Build Snapshot으로 Encounter를 구성하고 기존 PvE Unit/Combat 흐름을 재사용한다. Snapshot은 파티 구성·Class·Stats·Skills·Equipment·Formation·데이터 버전을 표현해야 한다. 초기 로컬 Snapshot 전투와 경쟁 콘텐츠의 서버 결과 검증은 별도 단계다.
 
+T14의 첫 구현은 사용자 선택 1A+2B에 따라 로컬 Snapshot 전투와 Unreal `USaveGame` v1을 사용한다. 파티 값은 Actor 참조 없는 USTRUCT로 저장하고, 고정 ID를 DataAsset 카탈로그로 해석해 기존 적 AI/Combat을 실행한다. 저장 구조 버전은 1만 허용하고 콘텐츠 버전은 카탈로그와 일치해야 한다. 로컬 전투 한 사이클 검증 이후 Listen Server Co-op 동기화를 진행한다. 실행 방법과 현재 계약은 [T14 Snapshot 안내](T14_SNAPSHOT.md)를 따른다.
+
 상대 Snapshot은 AI가 조작하며 아군은 직접 Grid 전투를 조작한다. 향후 플레이어가 설정한 Tactics를 Snapshot에 포함할 수 있는 구조를 고려하되 전술 편집 기능은 후속 기획으로 둔다.
 
 Co-op은 Listen Server의 Host-authoritative 구조를 우선한다. 각 플레이어는 할당된 Party Member만 조작하고 Client의 Action Request는 서버가 검증·실행한다. CombatManager·TurnManager·Grid Occupancy·Unit State·HP/AP·사망·Combat Result의 최종 권위는 서버에 있다. Steam/EOS 등의 P2P transport와 접속 인원 등은 아직 결정하지 않았다.
@@ -83,7 +85,7 @@ R01/R02는 `EUnitActionResult`와 공통 행동 완료 경로로 수정한다. G
 | T11 메뉴 기능 | 버전 1 체크포인트 자동 저장/이어하기, 품질·수직 동기화 옵션, 실제 Quit 연결. 빌드·자동화 23건 및 패키지 저장/Continue/Quit 검증 완료 |
 | T12 메뉴 에셋 | Designer 기준 유지, 표시 전용 프리뷰·재진입 정리, 누락 상태 안내 바인딩 보완. 빌드·전체 24건 및 최종 PIE·생성본 검증 완료 |
 | T13 콘텐츠 | 전투 한정 회복약·HUD, SkillPool 휩쓸기 획득/GAS 장착, 적 전진 후보와 AP당 대상 점수 구현. 빌드·자동화 26건 및 저장 맵 PIE 통과 |
-| T14 네트워크 | Async PvP Snapshot + Listen Server Co-op 기획 확정 / 구현 후속. 현재 싱글플레이 유지, Snapshot 전투·다중 PIE 미검증 |
+| T14 네트워크 | 로컬 USaveGame v1 Snapshot 저장·카탈로그 해석·Encounter 연결 구현. 검증 결과는 [작업 카드](TODO.md)에 기록하며 Co-op 다중 PIE는 후속 |
 
 ## 6. 검증과 다음 단계
 

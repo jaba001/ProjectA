@@ -1,5 +1,6 @@
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunSaveGame.h"
+#include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
@@ -7,7 +8,29 @@
 
 URunStateSubsystem::URunStateSubsystem()
 {
-    FParse::Value(FCommandLine::Get(), TEXT("ProjectASaveSlot="), SaveSlot);
+    SaveSlot = ResolveCheckpointSlot(FCommandLine::Get());
+}
+
+FString URunStateSubsystem::ResolveCheckpointSlot(const TCHAR* CommandLine)
+{
+    FString ExplicitSlot;
+    if (FParse::Value(CommandLine, TEXT("ProjectASaveSlot="), ExplicitSlot) && !ExplicitSlot.TrimStartAndEnd().IsEmpty())
+    {
+        return ExplicitSlot;
+    }
+    FString OpponentSlot;
+    if (FParse::Value(CommandLine, TEXT("ProjectAOpponentSnapshot="), OpponentSlot) || FParse::Param(CommandLine, TEXT("ProjectAOpponentSnapshot")))
+    {
+        const FName SlotId = OpponentSlot.Len() <= 64 ? FName(*OpponentSlot) : NAME_None;
+        if (!UPartySnapshotLibrary::GetSaveSlotName(SlotId).IsEmpty())
+        {
+            return TEXT("ProjectA_SnapshotRun_") + SlotId.ToString();
+        }
+        // Invalid launch arguments must remain isolated while gameplay reports the selection error.
+        // 잘못된 실행 인수도 Gameplay에서 선택 오류를 알리는 동안 일반 진행과 분리합니다.
+        return TEXT("ProjectA_RejectedSnapshotRun");
+    }
+    return TEXT("ProjectA_Run");
 }
 
 void URunStateSubsystem::EnableCheckpointSaving(const FString& Slot)

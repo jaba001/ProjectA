@@ -913,6 +913,16 @@ bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TA
     return true;
 }
 
+bool AUnitBase::ConfigureMoveRange(int32 InMoveRange)
+{
+    if (!HasAuthority() || IsBusy() || IsActiveTurn() || InMoveRange < 0 || InMoveRange > 32)
+    {
+        return false;
+    }
+    MoveRange = InMoveRange;
+    return true;
+}
+
 bool AUnitBase::AcquireAndEquipSkill(USkillDefinitionDataAsset* Skill)
 {
     if (!HasAuthority() || IsBusy() || !IsUnitAlive() || !AbilitySystem || !UCombatTargetingLibrary::IsSupportedSkillArea(Skill) || !Skill->AbilityClass || Skill->ActionPointCost <= 0 || GetAvailableSkillAbilityClasses().Contains(Skill->AbilityClass) || EquippedSkillAbilityClasses.Num() >= 4)

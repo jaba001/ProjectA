@@ -5,7 +5,7 @@ Unreal Engine 기반 Grid Turn-Based Combat System 프로젝트입니다.
 
 게임의 목표는 파티 전체를 성장시키는 협동 로그라이크에 Async PvP와 직접 조작 전술 전투를 결합하는 것입니다. 물리적인 월드맵 탐험을 제외하고 UI에서 선택·강화·전투·보상을 빠르게 이어가며, 단위 시간당 의미 있는 선택을 늘리는 것을 기준으로 삼습니다. 목표 Run 흐름과 개발 우선순위, 후속 결정 사항은 [게임 기획 방향](Docs/GAME_DESIGN.md)에 정리합니다.
 
-현재 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 최종적으로 상대 Party/Build Snapshot을 사용하는 Async PvP와 Listen Server 기반의 실시간 Co-op을 지원하도록 확장합니다. T14는 기획 확정 / 구현 후속 상태입니다. Co-op에서는 할당된 Party Member의 Action Request를 서버가 검증·실행하며 전투 상태의 최종 권위를 가집니다. 새 데이터·명령은 직렬화 가능한 형태를 우선하고 강한 로컬 PlayerController 의존성을 피합니다. 전체 Replication 리팩터링은 즉시 진행하지 않으며 Snapshot 전투와 다중 PIE 검증은 아직 완료되지 않았습니다. 상세 범위와 미결정 항목은 [T14 작업 카드](Docs/TODO.md)를 참고하세요.
+현재 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 최종적으로 상대 Party/Build Snapshot을 사용하는 Async PvP와 Listen Server 기반의 실시간 Co-op을 지원하도록 확장합니다. T14의 첫 단계로 Unreal `USaveGame` v1에 저장된 상대를 기존 전투에 연결했습니다. 로컬 전투 한 사이클 검증 후 Co-op 동기화를 진행하며, 다중 PIE와 온라인 서비스는 후속 범위입니다. Co-op에서는 할당된 Party Member의 Action Request를 서버가 검증·실행하고 전투 상태의 최종 권위를 가집니다. 새 데이터·명령은 직렬화 가능한 형태를 우선하고 강한 로컬 PlayerController 의존성을 피합니다. 구현·검증 상태와 미결정 항목은 [T14 작업 카드](Docs/TODO.md), 실행 방법은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)를 참고하세요.
 
 ```text
 MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
@@ -81,6 +81,7 @@ Editor-only dependency는 이 모듈에만 둡니다.
 - Combat HUD Widget
 - MainMenu / CharacterCreation CommonUI 화면 흐름
 - Persistent Gameplay의 Run Map → Encounter → Result 진행과 파티 HP 이관
+- USaveGame v1 상대 Snapshot 저장·검증과 DataAsset 카탈로그 기반 Encounter 생성
 - 전투 결과 1회 통지, 종료 후 입력/턴 잠금, 유닛·AI·스킬 액터·그리드 점유 정리
 - 제자리/접근 스킬의 공통 완료 결과와 실패·취소 후 적 AI 복구
 - Blueprint Designer 위젯이 부족해도 동작하는 native fallback UI
@@ -115,7 +116,7 @@ UI 관련 상세 메모는 아래 파일에 정리되어 있습니다.
 
 스폰 공격은 몽타주 종료와 스킬 액터의 impact가 모두 끝난 뒤 GAS를 종료합니다. 몽타주가 없으면 impact까지 기다립니다. 스폰 클래스는 `SkillActorBase` 계열이어야 하며, `RequestFinish`를 impact 전에 호출하거나 액터가 파괴되면 실패로 종료합니다. 미충돌은 Ability의 `SpawnedActorTimeout`(기본 10초) 후 실패로 정리합니다. 취소·시전자 사망 시 대기 액터를 파괴해 늦은 피해를 차단하고 이미 소비한 AP는 환불하지 않습니다. 플레이어는 AP와 보조 AP가 모두 0이면 행동 완료 다음 틱에 자동으로 턴을 종료하며, 보조 AP가 남으면 이동/아이템을 계속 사용할 수 있습니다.
 
-T13 전투 콘텐츠: 각 전투의 새 유닛은 회복약 1개를 가집니다. HUD의 회복약 버튼은 자신을 HP 40만큼 회복하고 수량 1개와 SubAP 1을 소모합니다. 최대 HP를 넘지 않으며, 만피·수량 부족·잘못된 대상은 소모 없이 거절합니다. `HealingItemAmount/HealingItemCount`는 유닛 클래스에서 조정할 수 있고 C++/Blueprint의 `StartItemAction`은 생존 아군도 대상으로 받습니다. HUD는 자기 회복만 제공합니다.
+T13 전투 콘텐츠: 각 전투의 새 유닛은 기본 회복약 1개를 가집니다. T14의 Snapshot 상대는 적 아이템 AI가 미구현이므로 회복약을 지급하지 않습니다. HUD의 회복약 버튼은 자신을 HP 40만큼 회복하고 수량 1개와 SubAP 1을 소모합니다. 최대 HP를 넘지 않으며, 만피·수량 부족·잘못된 대상은 소모 없이 거절합니다. `HealingItemAmount/HealingItemCount`는 유닛 클래스에서 조정할 수 있고 C++/Blueprint의 `StartItemAction`은 생존 아군도 대상으로 받습니다. HUD는 자기 회복만 제공합니다.
 
 `PartyDefinition.EncounterSkillPool`에서 직업 설정 후 스킬 하나를 가중 추첨해 즉시 GAS에 부여하고 추가 슬롯에 장착합니다. 보유 Ability·잘못된 데이터·0 이하 가중치는 추첨에서 제외하며 추가 슬롯은 최대 4개입니다. 현재 풀은 `DA_SweepingStrike`(휩쓸기) 하나이며 대상 주변 체비셰프 반경 1의 적에게 피해 10, AP 1을 적용합니다. 시작 직업 스킬은 유지합니다. 회복약과 추가 스킬은 전투 한정 지급으로 다음 전투에서 새로 지급하며 저장된 HP만 이어집니다. 영구 인벤토리·보상 선택 UI는 구현 범위에 포함하지 않습니다. 에셋 작성 스크립트는 `Source/ProjectAEditor/Scripts/ConfigureCombatContent.py`입니다.
 
@@ -210,7 +211,9 @@ C++ 파일을 생성, 삭제, 이름 변경한 뒤 프로젝트 파일 재생성
 
 ## 저장·이어하기와 옵션 (T11)
 
-새 게임 시작, 전투 결과 확정, Continue 시 단일 `ProjectA_Run` 슬롯에 파티 이름·직업·HP·노드 진행·결과와 직업 데이터 경로를 저장합니다. 전투 중 종료하면 해당 전투 시작 전 체크포인트로 돌아갑니다. 결과 화면에서 종료했다면 결과 화면으로 복원하며, 패배하거나 모든 노드를 완료한 기록은 이어할 수 없습니다. 새 파티로 게임을 시작하면 기존 저장을 교체합니다.
+새 게임 시작, 전투 결과 확정, Continue 시 기본 `ProjectA_Run` 슬롯에 파티 이름·직업·HP·노드 진행·결과와 직업 데이터 경로를 저장합니다. 전투 중 종료하면 해당 전투 시작 전 체크포인트로 돌아갑니다. 결과 화면에서 종료했다면 결과 화면으로 복원하며, 패배하거나 모든 노드를 완료한 기록은 이어할 수 없습니다. 새 파티로 게임을 시작하면 선택된 슬롯의 기존 저장을 교체합니다.
+
+T14 로컬 상대 검증은 [Snapshot 설정 스크립트](Source/ProjectAEditor/Scripts/ConfigureSnapshotContent.py) 실행 후 `-ProjectAOpponentSnapshot=SampleOpponent`로 선택합니다. 상대 데이터는 `ProjectA_Opponent_SampleOpponent`, Run 체크포인트는 `ProjectA_SnapshotRun_SampleOpponent`로 분리됩니다. 명시적인 `-ProjectASaveSlot=...`은 우선하며, 이어하기에는 같은 상대 실행 인자를 사용합니다. 저장값과 에셋 설정은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)를 참고하세요.
 
 메인메뉴 Continue는 저장이 없거나 손상/버전 불일치/직업 데이터 누락/종료된 진행이면 비활성화하고 이유를 표시합니다. 쓰기 실패는 시작 화면 또는 Gameplay의 지도/결과 화면에 표시하며 게임 중 쓰기 실패가 이전 체크포인트까지 갱신했다는 뜻은 아닙니다. 저장 형식은 버전 1이며 이전 버전 변환과 전투 도중 액터/AP/발사체 복원은 지원하지 않습니다.
 

@@ -119,7 +119,7 @@ ACT 1 — Forest, Round 1 / 5
 → 결과 기록
 ```
 
-Snapshot이 향후 표현할 수 있어야 할 데이터는 다음과 같다. 아래는 설계 대상이며 현재 구현된 저장 스키마가 아니다.
+Snapshot이 표현할 데이터는 다음과 같다. 로컬 v1 저장 스키마와 검증 범위는 [T14 Snapshot 안내](T14_SNAPSHOT.md)에 정의한다. 장비·전술은 식별자를 저장할 수 있지만 현재 실행은 빈 값만 지원하며 세부 동작은 후속 기획이다.
 
 | 데이터 | 내용 |
 |---|---|
@@ -132,7 +132,7 @@ Snapshot이 향후 표현할 수 있어야 할 데이터는 다음과 같다. �
 
 월드 Actor 자체를 저장하지 않는다. PvE Encounter와 Snapshot Encounter는 가능한 한 같은 Unit/Combat 흐름을 사용한다.
 
-초기에는 로컬 Snapshot으로 전투를 검증할 수 있다. 경쟁 콘텐츠로 제공하기 전에는 서버의 데이터·결과 검증과 위변조 대응 정책을 별도로 설계한다. 로컬 Snapshot 전투나 일부 복제 선언만으로 온라인 경쟁 콘텐츠가 완성됐다고 기록하지 않는다.
+첫 구현은 사용자 선택 1A+2B에 따라 로컬 `USaveGame` v1 Snapshot으로 전투를 검증한다. 저장 구조 버전이 1이 아니거나 콘텐츠 버전이 카탈로그와 다르면 거절한다. 로컬 전투 한 사이클 검증 후 Co-op 동기화를 진행한다. 경쟁 콘텐츠로 제공하기 전에는 서버의 데이터·결과 검증과 위변조 대응 정책을 별도로 설계한다. 로컬 Snapshot 전투나 일부 복제 선언만으로 온라인 경쟁 콘텐츠가 완성됐다고 기록하지 않는다.
 
 ## 8. 상대 AI와 플레이어가 설정하는 전술
 
@@ -213,11 +213,11 @@ Actor는 Run/Encounter 데이터를 월드에 표현하는 Runtime Instance로 �
 - Dedicated Server, Ranking, Anti-Cheat
 - Procedural WorldMap, Open World, 복잡한 Node Generator
 
-멀티플레이는 최종 목표로 유지하며, 본격 구현 시점은 게임 Loop가 더 구체화된 이후로 잡는다.
+멀티플레이는 최종 목표로 유지하며, 사용자 선택에 따라 로컬 Snapshot 전투 한 사이클을 검증한 뒤 Listen Server Co-op 동기화를 다음 구현 단계로 진행한다. 온라인 서비스와 전체 네트워크 전환을 한 번에 완료하는 범위는 아니다.
 
 ## 13. 현재 구현과 목표의 차이
 
-아래는 2026-09-10의 [README](../README.md)와 [작업 보드](TODO.md)에 기록된 상태다. 이 문서 작성으로 런타임 기능이 추가되거나 빌드·PIE 검증이 새로 완료된 것은 아니다.
+아래는 2026-09-10의 [README](../README.md)와 [작업 보드](TODO.md)에 기록된 상태다. 세부 구현·빌드·PIE 결과는 각 작업 카드의 실제 검증 기록을 기준으로 한다.
 
 | 영역 | 현재 기록된 구현 | 이번 기획의 확장 목표 |
 |---|---|---|
@@ -225,8 +225,8 @@ Actor는 Run/Encounter 데이터를 월드에 표현하는 Runtime Instance로 �
 | 파티 성장 | 파티 이름·직업·HP와 노드 진행 보존 | 선택한 장비·스킬·빌드가 Run 동안 누적 |
 | 추가 스킬·아이템 | 전투 한정 스킬·회복약을 새 전투마다 지급 | 획득·장착·소모·보상의 Run 단위 규칙 |
 | 패배 | Run 종료 | 패배 후 진행·보상·최종 종료 조건 구체화 필요 |
-| 상대 | 현재 PvE Encounter와 적 AI | 다른 플레이어의 Build/Formation/Tactics Snapshot |
-| 멀티플레이 | 싱글플레이, T14 기획 확정 / 구현 후속 | Async PvP와 Listen Server Co-op |
+| 상대 | PvE 및 로컬 Snapshot Encounter와 적 AI. 장비·전술 실행은 미지원 | 다른 플레이어의 Build/Formation/Tactics Snapshot |
+| 멀티플레이 | 싱글플레이, T14 로컬 Snapshot 구현 / Co-op 후속 | Async PvP와 Listen Server Co-op |
 
 ## 14. 후속 결정과 작은 검증 제안
 
@@ -241,7 +241,7 @@ Actor는 Run/Encounter 데이터를 월드에 표현하는 Runtime Instance로 �
 | 플레이어 수·조작권 | 최대 접속 인원과 한 플레이어가 맡을 Party Member 수를 정해야 한다 |
 | 플레이 흐름과 정보 | 목표 시간·Round 수·최종 Encounter 조건, 상대 사전 공개 범위, Ready 대기·이탈 처리 규칙을 정해야 한다 |
 | 빌드와 전술 상세 | 성장·스킬·장비의 지속 범위와 구체적인 Tactics 옵션·평가 규칙을 정해야 한다 |
-| 네트워크 서비스 정책 | Host disconnect, Steam/EOS, Lobby/Invite, Backend·매칭, Snapshot 저장 포맷·버전 호환, 데이터·결과 검증은 T14의 후속 결정 사항이다 |
+| 네트워크 서비스 정책 | 로컬 저장은 USaveGame v1·미지원 버전 거절로 결정했다. Host disconnect, Steam/EOS, Lobby/Invite, Backend·매칭, 온라인 전송 포맷·버전 마이그레이션, 데이터·결과 검증은 T14의 후속 결정 사항이다 |
 
 가장 작은 후속 검증 제안은 **전투 보상 선택이 다음 전투의 플레이를 바꾸는 짧은 싱글플레이 Run**이다.
 

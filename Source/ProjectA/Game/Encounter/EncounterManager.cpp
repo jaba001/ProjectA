@@ -5,12 +5,14 @@
 #include "Combat/SkillActor/SkillActorBase.h"
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/EncounterDefinitionDataAsset.h"
+#include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "GAS/Attribute/AS_Unit.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
@@ -72,7 +74,7 @@ bool AEncounterManager::RequestStartNode(FName NodeId)
     const TObjectPtr<UEncounterDefinitionDataAsset>* Definition = Definitions.Find(RunState->GetCurrentEncounterId());
     if (!Definition || !IsValid(*Definition) || !SpawnEncounter(*Definition))
     {
-        return FailPreparation(FText::FromString(TEXT("Encounter spawn failed. Check unit classes and spawn coordinates. / 유닛 클래스와 스폰 좌표를 확인하세요.")));
+        return FailPreparation(FlowMessage.IsEmpty() ? FText::FromString(TEXT("Encounter spawn failed. Check unit classes and spawn coordinates. / 유닛 클래스와 스폰 좌표를 확인하세요.")) : FlowMessage);
     }
     CombatManager->SetCombatGrid(Arena->Grid);
     TArray<AUnitBase*> Units;
@@ -101,7 +103,45 @@ bool AEncounterManager::RequestStartNode(FName NodeId)
 
 bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition)
 {
-    if (Definition->EnemyUnitClasses.IsEmpty() || Definition->EnemyUnitClasses.Num() > Arena->EnemyCoords.Num())
+    const bool bUseSnapshot = !Definition->OpponentSnapshotSlot.IsNone();
+    FPartySnapshot Snapshot;
+    TArray<TArray<TObjectPtr<USkillDefinitionDataAsset>>> SnapshotSkills;
+    if (bUseSnapshot)
+    {
+        // Validate the entire saved party before spawning any encounter unit.
+        // 인카운터 유닛을 생성하기 전에 저장된 파티 전체를 검증합니다.
+        if (!IsValid(Definition->SnapshotCatalog))
+        {
+            FlowMessage = FText::FromString(TEXT("Opponent Snapshot catalog is missing. / 상대 스냅샷 카탈로그가 없습니다."));
+            return false;
+        }
+        if (!UPartySnapshotLibrary::LoadSnapshot(Definition->OpponentSnapshotSlot, Snapshot, FlowMessage) || !Definition->SnapshotCatalog->ValidateForEncounter(Snapshot, Arena->EnemyCoords.Num(), FlowMessage))
+        {
+            return false;
+        }
+        TSet<ACombatGridTile*> FormationTiles;
+        for (const FPartySnapshotMember& Member : Snapshot.Members)
+        {
+            if (!Arena->EnemyCoords.IsValidIndex(Member.FormationSlot))
+            {
+                FlowMessage = FText::FromString(TEXT("Opponent Snapshot formation is outside this arena. / 상대 스냅샷 배치가 아레나 범위를 벗어났습니다."));
+                return false;
+            }
+            ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Arena->EnemyCoords[Member.FormationSlot]);
+            if (!Tile || Tile->GetOccupyingUnit() || Tile->GetTerritory() != ETileTerritory::Enemy || FormationTiles.Contains(Tile))
+            {
+                FlowMessage = FText::FromString(TEXT("Opponent Snapshot formation requires distinct empty enemy tiles. / 상대 스냅샷 배치에는 중복되지 않는 빈 적 타일이 필요합니다."));
+                return false;
+            }
+            FormationTiles.Add(Tile);
+            TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills = SnapshotSkills.AddDefaulted_GetRef();
+            if (!Definition->SnapshotCatalog->ResolveSkills(Member, Skills, FlowMessage))
+            {
+                return false;
+            }
+        }
+    }
+    else if (Definition->EnemyUnitClasses.IsEmpty() || Definition->EnemyUnitClasses.Num() > Arena->EnemyCoords.Num())
     {
         return false;
     }
@@ -153,19 +193,40 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
     {
         return false;
     }
-    for (int32 Index = 0; Index < Definition->EnemyUnitClasses.Num(); ++Index)
+    const int32 EnemyCount = bUseSnapshot ? Snapshot.Members.Num() : Definition->EnemyUnitClasses.Num();
+    for (int32 Index = 0; Index < EnemyCount; ++Index)
     {
-        ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Arena->EnemyCoords[Index]);
-        if (!Tile || Tile->GetOccupyingUnit() || Tile->GetTerritory() != ETileTerritory::Enemy || !Definition->EnemyUnitClasses[Index])
+        const FPartySnapshotMember* Member = bUseSnapshot ? &Snapshot.Members[Index] : nullptr;
+        const int32 FormationSlot = Member ? Member->FormationSlot : Index;
+        TSubclassOf<AEnemyUnit> EnemyClass = Member ? Definition->SnapshotCatalog->EnemyClasses.FindRef(Member->ClassId) : Definition->EnemyUnitClasses[Index];
+        ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Arena->EnemyCoords[FormationSlot]);
+        if (!Tile || Tile->GetOccupyingUnit() || Tile->GetTerritory() != ETileTerritory::Enemy || !EnemyClass)
         {
             return false;
         }
-        AEnemyUnit* Unit = GetWorld()->SpawnActor<AEnemyUnit>(Definition->EnemyUnitClasses[Index], Tile->GetActorLocation() + FVector(0.f, 0.f, 100.f), FRotator(0.f, -90.f, 0.f), Params);
+        AEnemyUnit* Unit = GetWorld()->SpawnActor<AEnemyUnit>(EnemyClass, Tile->GetActorLocation() + FVector(0.f, 0.f, 100.f), FRotator(0.f, -90.f, 0.f), Params);
         if (!Unit)
         {
             return false;
         }
         SpawnedUnits.Add(Unit);
+        if (Member)
+        {
+            if (!Unit->ConfigureProfession(Member->Stats.MaxHP, Member->Stats.MaxActionPoints, Member->Stats.MaxSubActionPoints, SnapshotSkills[Index]))
+            {
+                FlowMessage = FText::FromString(TEXT("Opponent Snapshot unit configuration failed. / 상대 스냅샷 유닛 설정에 실패했습니다."));
+                return false;
+            }
+            Unit->RuntimeCharacterName = FText::FromString(Member->CharacterName);
+            if (!Unit->ConfigureMoveRange(Member->Stats.MoveRange))
+            {
+                return false;
+            }
+            // Enemy item decisions are unsupported, so snapshot actors receive no implicit healing items.
+            // 적 아이템 판단은 미지원이므로 스냅샷 액터에는 암묵적인 회복 아이템을 지급하지 않습니다.
+            Unit->HealingItemCount = 0;
+            Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), Member->Stats.CurrentHP);
+        }
         Unit->SetTeam(ETeam::Enemy);
         Unit->SetCurrentTile(Tile);
     }

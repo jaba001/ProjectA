@@ -417,6 +417,9 @@ public:
     TSubclassOf<UGameplayAbility> GetDefaultAttackAbilityClass() const { return DefaultAttackAbilityClass; }
 
     float GetInitialMaxHP() const { return InitMaxHP; }
+    // Configure runtime movement data before this unit enters an active turn.
+    // 유닛이 활성 턴에 들어가기 전에 런타임 이동 데이터를 설정합니다.
+    bool ConfigureMoveRange(int32 InMoveRange);
     // Apply resolved profession data before the spawned unit enters combat.
     // 스폰 유닛이 전투에 들어가기 전에 해석된 직업 데이터를 적용합니다.
     bool ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills);

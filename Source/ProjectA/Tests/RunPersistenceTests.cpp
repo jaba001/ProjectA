@@ -9,6 +9,81 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunSnapshotCheckpointIsolationTest, "ProjectA.Persistence.SnapshotCheckpointIsolation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunSnapshotCheckpointIsolationTest::RunTest(const FString& Parameters)
+{
+    TestEqual(TEXT("Ordinary launches retain the PvE checkpoint"), URunStateSubsystem::ResolveCheckpointSlot(TEXT("")), FString(TEXT("ProjectA_Run")));
+    TestEqual(TEXT("Snapshot selection receives a dedicated checkpoint"), URunStateSubsystem::ResolveCheckpointSlot(TEXT("-ProjectAOpponentSnapshot=Local_01")), FString(TEXT("ProjectA_SnapshotRun_Local_01")));
+    TestEqual(TEXT("Explicit checkpoint selection takes precedence"), URunStateSubsystem::ResolveCheckpointSlot(TEXT("-ProjectAOpponentSnapshot=Local_01 -ProjectASaveSlot=ChosenRun")), FString(TEXT("ChosenRun")));
+    TestEqual(TEXT("Empty explicit selection cannot remove Snapshot isolation"), URunStateSubsystem::ResolveCheckpointSlot(TEXT("-ProjectASaveSlot=\"\" -ProjectAOpponentSnapshot=Local_01")), FString(TEXT("ProjectA_SnapshotRun_Local_01")));
+    const TArray<FString> InvalidSelections = { TEXT("-ProjectAOpponentSnapshot"), TEXT("-ProjectAOpponentSnapshot="), TEXT("-ProjectAOpponentSnapshot=\"\""), TEXT("-ProjectAOpponentSnapshot=\"   \""), TEXT("-ProjectAOpponentSnapshot=../ProjectA_Run"), TEXT("-ProjectAOpponentSnapshot=None"), TEXT("-ProjectAOpponentSnapshot=상대") };
+    for (const FString& CommandLine : InvalidSelections)
+    {
+        TestEqual(*FString::Printf(TEXT("Rejected selection preserves PvE isolation: %s"), *CommandLine), URunStateSubsystem::ResolveCheckpointSlot(*CommandLine), FString(TEXT("ProjectA_RejectedSnapshotRun")));
+    }
+    TestEqual(TEXT("Oversized selection is rejected before FName creation"), URunStateSubsystem::ResolveCheckpointSlot(*(TEXT("-ProjectAOpponentSnapshot=") + FString::ChrN(2048, TEXT('a')))), FString(TEXT("ProjectA_RejectedSnapshotRun")));
+
+    struct FScopedCheckpointSlots
+    {
+        TArray<FString> Names;
+
+        ~FScopedCheckpointSlots()
+        {
+            for (const FString& Name : Names)
+            {
+                UGameplayStatics::DeleteGameInSlot(Name, 0);
+            }
+        }
+    } Slots;
+    const FString Token = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    const FString FirstSelection = TEXT("-ProjectAOpponentSnapshot=T14_A_") + Token;
+    const FString SecondSelection = TEXT("-ProjectAOpponentSnapshot=T14_B_") + Token;
+    const FString ExplicitSelection = FirstSelection + TEXT(" -ProjectASaveSlot=T14_Explicit_") + Token;
+    UGameInstance* Instance = NewObject<UGameInstance>();
+    UPartyDefinitionDataAsset* Catalog = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+    if (!TestNotNull(TEXT("Checkpoint isolation uses the real profession catalog"), Catalog))
+    {
+        return false;
+    }
+    const auto CreateRun = [Instance, Catalog](const FString& Arguments)
+    {
+        // Restore process arguments immediately after construction, before any world or file operation.
+        // 월드나 파일 작업 전에 생성 직후 프로세스 인수를 즉시 복원합니다.
+        const FString PreviousArguments = FCommandLine::Get();
+        FCommandLine::Set(*Arguments);
+        URunStateSubsystem* Run = NewObject<URunStateSubsystem>(Instance);
+        FCommandLine::Set(*PreviousArguments);
+        Run->PartyDefinition = Catalog;
+        Run->EnableCheckpointSaving();
+        return Run;
+    };
+    FRunPartyMember Member;
+    Member.SlotIndex = 0;
+    Member.ClassId = TEXT("Hunter");
+    Member.bCreated = true;
+    FText Error;
+    const TArray<FString> Selections = { FirstSelection, SecondSelection, ExplicitSelection };
+    for (int32 Index = 0; Index < Selections.Num(); ++Index)
+    {
+        const FString Slot = URunStateSubsystem::ResolveCheckpointSlot(*Selections[Index]);
+        Slots.Names.Add(Slot);
+        URunStateSubsystem* Run = CreateRun(Selections[Index]);
+        Member.CharacterName = FText::FromString(FString::Printf(TEXT("Isolated Hunter %d"), Index));
+        TestTrue(TEXT("Selected run initializes and saves"), Run->InitializeRun({ Member }, Error));
+        TestTrue(TEXT("Constructor writes to the selected isolated checkpoint"), UGameplayStatics::DoesSaveGameExist(Slot, 0));
+    }
+    for (int32 Index = 0; Index < Selections.Num(); ++Index)
+    {
+        URunStateSubsystem* Restored = CreateRun(Selections[Index]);
+        if (TestTrue(TEXT("Each launch selection restores its own checkpoint"), Restored->LoadCheckpoint(Error)))
+        {
+            TestEqual(TEXT("Other Snapshot runs and explicit overrides do not replace this party"), Restored->GetPartyMembers()[0].CharacterName.ToString(), FString::Printf(TEXT("Isolated Hunter %d"), Index));
+        }
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunPersistenceTest, "ProjectA.Persistence.Checkpoints", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 
 bool FRunPersistenceTest::RunTest(const FString& Parameters)

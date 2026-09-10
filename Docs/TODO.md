@@ -1,6 +1,6 @@
 # ProjectA 작업 보드와 재개 메모
 
-최근 정리: 2026-09-10 · `main` · T13 콘텐츠 검증 완료, T14 하이브리드 멀티플레이 기획 확정 / 구현 후속.
+최근 정리: 2026-09-10 · `main` · T14 로컬 Snapshot 구현 / Co-op 동기화 후속.
 
 [게임 기획 방향](GAME_DESIGN.md) · [기획·구현 현황](PROJECT_PLAN.md) · [코드 리뷰와 검증 시나리오](CODE_REVIEW.md)
 
@@ -8,7 +8,7 @@
 
 파티 전체 성장·UI 중심 Run·직접 조작 전투·Async PvP·아군 Co-op과 Decision Density를 [게임 기획 방향](GAME_DESIGN.md)의 기준으로 삼는다. 현재 구현과 목표를 구분하며, 보상 선택을 다음 전투에 유지하는 작은 Run은 후속 검증 제안이다. 패배 후 진행·보상·협동 재화 배분 등은 미결정 상태로 둔다.
 
-**T13 아이템·적 이동·추가 스킬 콘텐츠까지 검증을 완료했다. T14는 Async PvP와 Listen Server 기반 Co-op을 지원하는 방향으로 기획을 확정했다. 현재는 싱글플레이 루프와 콘텐츠 개발을 이어가며, 새 데이터와 명령은 향후 Snapshot·Replication 확장을 고려한다. 본격 네트워크 구현 전 아래 미결정 항목을 사용자와 정한다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다.
+**T14는 사용자 선택 1A+2B에 따라 로컬 상대 Snapshot 전투와 Unreal USaveGame v1을 먼저 구현한다. 로컬 전투 한 사이클 검증 후 Listen Server Co-op 동기화를 다음 단계로 진행한다. 기본 Run은 싱글플레이를 유지하고, Unreal 기본 기능과 공식 확장 지점을 우선한다. 본격 Co-op 구현 전 아래 미결정 항목을 사용자와 정한다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다.
 
 체크박스는 작업 완료를 뜻한다. 코드를 작성했어도 완료 조건을 검증하지 못했다면 체크하지 않고 `검증 대기`로 기록한다. P1/P2는 리뷰 결함의 심각도이고 M0~M3는 개발 순서이므로 서로 구분한다.
 
@@ -183,7 +183,7 @@
 - AI: 대상 수/AP·거리·HP 점수로 임시 기본 공격 가중치 제거. 공통 이동 후보 중 전진을 평가하고 목적지 재검증, 성공 후 재판단/실패 후 턴 종료.
 - 검증: Development Editor / Win64 빌드, 전체 자동화 26건(성공 13·경고 동반 성공 13·실패 0). 아이템 효과/소모/거절, 실제 획득 스킬 피해, 이동 선택/막힘/실패 전이 및 저장 맵 PIE의 HUD 회복·두 전투 재지급 검증. `Saved/Automation/T13Final/index.json`, `Saved/Automation/T13Build.log`. 패키지 재빌드는 미실행.
 
-### T14 · 하이브리드 멀티플레이 기반 설계 — 기획 확정 / 구현 후속
+### T14 · 하이브리드 멀티플레이 기반 설계 — 로컬 Snapshot 구현 / Co-op 후속
 
 게임 전체의 목표 Run Loop와 우선순위는 [게임 기획 방향](GAME_DESIGN.md)을 따른다. 이 카드는 네트워크 확장 범위와 완료 조건을 기록한다.
 
@@ -241,15 +241,17 @@ Client가 직접 Combat State를 확정하지 않는다.
 
 #### 본격 네트워크 구현 전 결정할 항목
 
+로컬 1차 범위는 **1A Snapshot 전투 우선**, 저장은 **2B Unreal USaveGame v1**로 결정했다. 미지원 저장 구조 버전과 다른 카탈로그 콘텐츠 버전은 거절한다. Unreal 기본 기능을 우선하며 로컬 전투 사이클을 검증한 뒤 Co-op 동기화로 넘어간다.
+
 - 최대 협동 플레이어 수
 - 한 플레이어가 조작할 Party Member 수
 - Host disconnect 정책
 - Steam / EOS 선택
 - Lobby / Invite 방식
-- Async PvP Snapshot 저장 포맷
+- Async PvP 온라인 Snapshot 전송 포맷과 Backend 저장 방식
 - Backend 및 매칭 방식
 - 전투 결과 검증 정책
-- 버전이 다른 Snapshot의 호환 정책
+- 후속 버전 Snapshot의 마이그레이션 정책(현재 v1 외 거절)
 
 #### 완료 조건
 
@@ -259,7 +261,16 @@ Co-op에서는 최소 2개의 PIE 인스턴스에서 Listen Server / Client로 �
 
 #### 현재 구현·검증 상태
 
-기획만 확정했으며 Snapshot Encounter와 Co-op 구현 완료를 의미하지 않는다. UnitBase의 Team, CombatManager의 CurrentTurnIndex 등 일부 복제 선언은 기존대로 유지한다. 이번 변경은 문서·작업 원칙 정리이며, 빌드·자동화 재실행 및 다중 PIE 검증은 미실행이다.
+- [x] 로컬 Snapshot 저장·불러오기 → 실제 Encounter → 기존 Combat 전투 한 사이클
+- [ ] Listen Server / Client 다중 PIE, 플레이어별 조작권과 전투 상태 동기화
+
+`FPartySnapshot` 값 데이터를 `UPartySnapshotSaveGame`에 저장하고 `UPartySnapshotLibrary`로 검증·복원한다. 신뢰된 `UOpponentSnapshotCatalogDataAsset`이 ClassId/SkillIds를 해석하고 EncounterManager가 저장된 스탯·순서 있는 스킬·Formation으로 적을 생성한다. 장비·전술 식별자는 저장 가능하지만 실행은 빈 값만 지원하며 HP 0 상대도 현재 실행에서는 거절한다. 스냅샷 적은 회복약이나 무작위 추가 스킬을 받지 않는다.
+
+`ConfigureSnapshotContent.py`와 샘플 Blueprint/카탈로그를 추가했다. `-ProjectAOpponentSnapshot=SampleOpponent`로 선택하며 기본 PvE와 상대별 Run 체크포인트를 분리한다. `.sav`는 로컬 생성 데이터이고 저장된 상대는 두 노드에서 매번 불러온다. 사용 방법·데이터 계약·경계는 [T14 Snapshot 안내](T14_SNAPSHOT.md)에 정리했다.
+
+검증: Development Editor / Win64 빌드, 전체 자동화 32건(성공 18·경고 동반 성공 14·실패 0), 별도 Snapshot 모드 저장 맵 PIE 1건(경고 동반 성공). 스키마/수치/ID/스킬/배치 거절과 저장 왕복, Run 저장 분리, 준비 실패 시 Map 복귀·상세 오류·점유/유닛/턴 정리, 기존 PvE 회귀를 확인했다. Snapshot 실제 적과 저장값 일치, Slate 이동/스킬/타일 입력, 적 AI 피해, 자연 승리→Continue→다음 노드→GAS 패배, 결과 1회와 정리를 검증하고 전투 화면을 확인했다. `Saved/Automation/T14Build.log`, `Saved/Automation/T14Full/index.json`, `Saved/Automation/T14SnapshotPIE/index.json`.
+
+다음은 Co-op의 인원·파티원 할당·Host disconnect 정책을 결정하고 조작 요청/서버 검증/상태 복제를 구현하는 단계다. 전체 Replication 전환·다중 PIE·패키지 재빌드는 이번에 수행하지 않았으며 T14 전체 완료는 체크하지 않는다.
 
 ## 검증을 실행할 때 확인할 설정
 
@@ -273,6 +284,7 @@ Co-op에서는 최소 2개의 PIE 인스턴스에서 Listen Server / Client로 �
 
 | 날짜 | 작업 | 완료/검증 | 다음 시작점 |
 |---|---|---|---|
+| 2026-09-10 | T14 로컬 Snapshot 전투 | 1A+2B 확정, USaveGame v1·카탈로그·기존 Combat 연결·Run 저장 분리. Editor 빌드·전체 32건·별도 Snapshot PIE 1건 통과 | Co-op 인원·조작권·Host disconnect 정책 결정 후 Listen Server 동기화 |
 | 2026-09-10 | 게임 기획 방향 문서 정리 | GAME_DESIGN에 원문 기획·현재 구현 차이·미결정 정책·검증 제안 구분, README/PROJECT_PLAN/TODO 연결, 원문 대조·문서 4개 로컬 링크 59개·코드 블록 닫힘 확인. 문서 변경으로 빌드·PIE 미실행 | 싱글플레이 Run 성장 검증의 범위와 필요한 정책 결정 |
 | 2026-09-10 | T14 하이브리드 멀티플레이 기획 확정 | 사용자 확정안으로 이전 보류 방침 대체, 문서·작업 원칙 정합성 및 링크 검사 | 싱글플레이 콘텐츠 개발 지속, 네트워크 구현 전 미결정 항목 협의 |
 | 2026-09-10 | T14 네트워크 범위 정리 | 기존 싱글플레이 범위 적용으로 보류, 문서·복제 선언 대조 | 범위 확장 시 서버/인원/조작권 결정 |

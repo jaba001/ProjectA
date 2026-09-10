@@ -9,6 +9,7 @@ class ACombatManager;
 class AEncounterManager;
 class UPartyDefinitionDataAsset;
 class UEncounterDefinitionDataAsset;
+class UOpponentSnapshotCatalogDataAsset;
 
 UCLASS()
 class PROJECTA_API AGameplayGameModeBase : public AGameModeBase
@@ -29,6 +30,11 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gameplay")
     TMap<FName, TObjectPtr<UEncounterDefinitionDataAsset>> EncounterDefinitions;
+
+    // The command-line Snapshot selection uses this trusted catalog and a separate run checkpoint.
+    // 명령줄 Snapshot 선택은 이 신뢰 목록과 별도 진행 체크포인트를 사용합니다.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gameplay|Snapshot")
+    TObjectPtr<UOpponentSnapshotCatalogDataAsset> LocalOpponentCatalog;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gameplay")
     FName ArenaTag = TEXT("GameplayArena");

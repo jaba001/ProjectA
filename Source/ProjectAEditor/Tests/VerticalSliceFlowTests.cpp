@@ -28,8 +28,13 @@
 #include "EngineUtils.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Game/Encounter/EncounterManager.h"
+#include "Game/Encounter/CombatArena.h"
 #include "Game/GameModes/GameplayGameModeBase.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/Snapshot/PartySnapshotLibrary.h"
+#include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "GAS/Effect/GE_Damage.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
@@ -52,6 +57,7 @@
 #include "UI/MainMenu/MainMenuRootWidget.h"
 #include "UI/MainMenu/MainMenuScreenWidget.h"
 #include "Unit/UnitBase.h"
+#include "Unit/EnemyUnit.h"
 #include "UnrealClient.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Widgets/SViewport.h"
@@ -82,6 +88,11 @@ class FPlayVerticalSlice : public IAutomationLatentCommand
 public:
     explicit FPlayVerticalSlice(FAutomationTestBase* InTest) : Test(InTest), StageStarted(FPlatformTime::Seconds())
     {
+        FString Slot;
+        if (FParse::Value(FCommandLine::Get(), TEXT("ProjectAOpponentSnapshot="), Slot))
+        {
+            SnapshotSlot = FName(*Slot);
+        }
     }
 
     virtual ~FPlayVerticalSlice() override
@@ -93,6 +104,10 @@ public:
         if (Player.IsValid())
         {
             Player->OnActionCompleted.RemoveAll(this);
+        }
+        if (Enemy.IsValid())
+        {
+            Enemy->OnActionCompleted.RemoveAll(this);
         }
         if (InputViewport.IsValid())
         {
@@ -374,6 +389,46 @@ public:
             Test->TestEqual(TEXT("Spawned name matches edited slot."), Player->RuntimeCharacterName.ToString(), FString(TEXT("Vertical Slice Hero")));
             Test->TestTrue(TEXT("Encounter pool grants an extra equipped skill."), Player->GetAvailableSkillAbilityClasses().Num() > SpawnDefinition.StartingSkills.Num());
             Test->TestEqual(TEXT("Encounter supplies one potion."), Player->HealingItemCount, 1);
+            if (!SnapshotSlot.IsNone())
+            {
+                FPartySnapshot Loaded;
+                FText Error;
+                if (!Require(UPartySnapshotLibrary::LoadSnapshot(SnapshotSlot, Loaded, Error) && Loaded.Members.Num() == 1, TEXT("PIE loads the saved single-opponent Snapshot.")))
+                {
+                    return true;
+                }
+                const FPartySnapshotMember& Member = Loaded.Members[0];
+                Test->TestEqual(TEXT("Opponent name comes from SaveGame."), Enemy->RuntimeCharacterName.ToString(), Member.CharacterName);
+                Test->TestEqual(TEXT("Opponent max HP comes from SaveGame."), Enemy->GetAttributeSet()->GetMaxHP(), Member.Stats.MaxHP);
+                Test->TestEqual(TEXT("Opponent current HP comes from SaveGame without normalization."), Enemy->GetAttributeSet()->GetHP(), Member.Stats.CurrentHP);
+                Test->TestEqual(TEXT("Opponent AP comes from SaveGame."), Enemy->GetMaxActionPoint(), Member.Stats.MaxActionPoints);
+                Test->TestEqual(TEXT("Opponent SubAP comes from SaveGame."), Enemy->GetMaxSubActionPoint(), Member.Stats.MaxSubActionPoints);
+                Test->TestEqual(TEXT("Opponent movement range comes from SaveGame."), Enemy->GetMoveRange(), Member.Stats.MoveRange);
+                Test->TestEqual(TEXT("Opponent receives exactly the saved skill count."), Enemy->GetAvailableSkillAbilityClasses().Num(), Member.SkillIds.Num());
+                Test->TestEqual(TEXT("Opponent receives no implicit potion."), Enemy->HealingItemCount, 0);
+                for (TActorIterator<ACombatArena> ArenaIt(World); ArenaIt; ++ArenaIt)
+                {
+                    if (ArenaIt->EnemyCoords.IsValidIndex(Member.FormationSlot))
+                    {
+                        Test->TestEqual(TEXT("Snapshot formation maps through arena enemy slots."), Enemy->GetCurrentTile()->GridCoord, ArenaIt->EnemyCoords[Member.FormationSlot]);
+                    }
+                }
+                if (!Require(Mode && Mode->LocalOpponentCatalog, TEXT("Snapshot uses the trusted catalog.")))
+                {
+                    return true;
+                }
+                Test->TestEqual(TEXT("Opponent class resolves through trusted ClassId."), Enemy->GetClass(), Mode->LocalOpponentCatalog->EnemyClasses.FindRef(Member.ClassId).Get());
+                for (int32 Index = 0; Index < Member.SkillIds.Num(); ++Index)
+                {
+                    USkillDefinitionDataAsset* Skill = Enemy->FindSkillDataByAbilityClass(Enemy->GetAvailableSkillAbilityClasses()[Index]);
+                    Test->TestEqual(TEXT("Opponent skill order comes from SaveGame."), Skill, Mode->LocalOpponentCatalog->Skills.FindRef(Member.SkillIds[Index]).Get());
+                }
+                if (Stage == 3)
+                {
+                    SnapshotPlayerHP = Player->GetAttributeSet()->GetHP();
+                    Enemy->OnActionCompleted.AddRaw(this, &FPlayVerticalSlice::HandleSnapshotActionCompleted);
+                }
+            }
             if (Stage == 9)
             {
                 Test->TestTrue(TEXT("The second encounter uses the same persistent world."), GameplayWorld.Get() == World);
@@ -508,6 +563,11 @@ public:
         {
             if (Run->GetPhase() == ERunPhase::Result && Run->GetLastResult() == ECombatResult::Victory)
             {
+                if (!SnapshotSlot.IsNone())
+                {
+                    Test->TestTrue(TEXT("Saved opponent AI completes a real skill before natural Victory."), SnapshotSkillsCompleted > 0);
+                    Test->TestTrue(TEXT("Saved opponent skill applies actual damage to the player."), bSnapshotDamageApplied);
+                }
                 Advance();
                 return false;
             }
@@ -767,6 +827,15 @@ private:
         bStationarySucceeded = Result == EUnitActionResult::Succeeded;
     }
 
+    void HandleSnapshotActionCompleted(AUnitBase* Unit, EUnitActionType ActionType, EUnitActionResult Result)
+    {
+        if (ActionType == EUnitActionType::Skill && Result == EUnitActionResult::Succeeded)
+        {
+            ++SnapshotSkillsCompleted;
+            bSnapshotDamageApplied |= Player.IsValid() && Player->GetAttributeSet()->GetHP() < SnapshotPlayerHP;
+        }
+    }
+
     void Capture(const TCHAR* FileName)
     {
         FScreenshotRequest::RequestScreenshot(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/VerticalSliceScreenshots"), FileName), true, false);
@@ -967,6 +1036,10 @@ private:
 
     FAutomationTestBase* Test;
     int32 Stage = 0;
+    FName SnapshotSlot;
+    int32 SnapshotSkillsCompleted = 0;
+    float SnapshotPlayerHP = 0.0f;
+    bool bSnapshotDamageApplied = false;
     int32 ResultCount = 0;
     int32 TurnBeforeAI = 0;
     int32 PointerStep = 0;
