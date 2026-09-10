@@ -91,6 +91,7 @@ protected:
     // 대체 캐릭터 생성 레이아웃과 이벤트를 초기화합니다.
     virtual void NativeOnInitialized() override;
     virtual void NativeOnDeactivated() override;
+    virtual void NativeOnActivated() override;
 
     // Enables native C++ layout creation when designer widgets are absent.
     // 디자이너 위젯이 없을 때 네이티브 C++ 레이아웃 생성을 활성화합니다.
@@ -162,15 +163,15 @@ protected:
 
     // Top-right close button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 우측 상단 닫기 버튼입니다.
-    // TODO: Bind a UButton named Button_Close in WBP_CharacterCreationWidget for returning to the main menu.
-    // TODO: 메인메뉴로 돌아가려면 WBP_CharacterCreationWidget에 Button_Close 이름의 UButton을 바인딩합니다.
+    // T12: Verified Button_Close binding in the saved Designer WBP.
+    // T12: 저장된 Designer WBP의 Button_Close 바인딩을 검증했습니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_Close;
 
     // Start game button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 게임 시작 버튼입니다.
-    // TODO: Bind a UButton named Button_StartGame in WBP_CharacterCreationWidget for starting the game.
-    // TODO: 게임 시작을 위해 WBP_CharacterCreationWidget에 Button_StartGame 이름의 UButton을 바인딩합니다.
+    // T12: Verified Button_StartGame binding in the saved Designer WBP.
+    // T12: 저장된 Designer WBP의 Button_StartGame 바인딩을 검증했습니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_StartGame;
 

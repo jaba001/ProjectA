@@ -702,7 +702,10 @@ void UCharacterCreationWidget::ConfigurePartySlotsFixedHeight()
         return;
     }
 
-    PartySlotsFixedHeightBox->SetHeightOverride(PartySlotsFixedHeight);
+    // Keep a baseline height while allowing all slot controls to fit at the current UI scale.
+    // 기본 높이는 유지하되 현재 UI 배율에서 모든 슬롯 버튼이 들어가도록 확장을 허용합니다.
+    PartySlotsFixedHeightBox->ClearHeightOverride();
+    PartySlotsFixedHeightBox->SetMinDesiredHeight(PartySlotsFixedHeight);
 }
 
 void UCharacterCreationWidget::InitializeClassSlotWidgetArrays()
@@ -1466,5 +1469,23 @@ void UCharacterCreationWidget::CloseSlotDetails()
 void UCharacterCreationWidget::NativeOnDeactivated()
 {
     CloseSlotDetails();
+    for (int32 Index = 0; Index < SlotClassIds.Num(); ++Index)
+    {
+        ClearPreviewStageSlot(Index);
+    }
     Super::NativeOnDeactivated();
+}
+
+void UCharacterCreationWidget::NativeOnActivated()
+{
+    Super::NativeOnActivated();
+    // A new visit starts a fresh draft even when CommonUI reuses the widget instance.
+    // CommonUI가 위젯 인스턴스를 재사용해도 재진입 시 새 파티 초안으로 시작합니다.
+    InitializeClassSlots();
+    for (FText& Name : SlotCharacterNames)
+    {
+        Name = FText::GetEmpty();
+    }
+    RefreshClassSlotWidgets();
+    RefreshPreview();
 }

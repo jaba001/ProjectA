@@ -204,3 +204,11 @@ C++ 파일을 생성, 삭제, 이름 변경한 뒤 프로젝트 파일 재생성
 메인메뉴 Continue는 저장이 없거나 손상/버전 불일치/직업 데이터 누락/종료된 진행이면 비활성화하고 이유를 표시합니다. 쓰기 실패는 시작 화면 또는 Gameplay의 지도/결과 화면에 표시하며 게임 중 쓰기 실패가 이전 체크포인트까지 갱신했다는 뜻은 아닙니다. 저장 형식은 버전 1이며 이전 버전 변환과 전투 도중 액터/AP/발사체 복원은 지원하지 않습니다.
 
 Options에서 그래픽 품질과 수직 동기화를 선택하고 **적용 및 저장**으로 반영합니다. 적용 전 닫기는 변경을 버리며, 설정은 Unreal `GameUserSettings.ini`에 유지됩니다. Quit는 실제 게임 종료를 요청합니다. 테스트는 `-ProjectASaveSlot=T11_PIE`처럼 별도 슬롯을 지정해 플레이 저장을 보호합니다.
+
+## 메뉴 프리뷰와 UI 구조 (T12)
+
+메뉴 화면 구조의 기준(D08)은 기존 Designer WBP입니다. JSON 명세는 생성·바인딩 검증용 scaffold이며 기존 WBP를 자동 재생성하지 않습니다. `GenerateUiScaffold -Spec=... -AddMissing`은 기존 위젯의 속성과 계층을 유지하고 누락된 위젯만 추가합니다. `-Overwrite`와 함께 사용할 수 없으며, 현재 프로젝트 명세는 `generateNativeSource=false`를 유지합니다. 생성 화면에는 누락됐던 `Text_StartGameStatus`를 추가해 시작/저장 실패 안내가 보이도록 연결했습니다.
+
+MainMenu는 배치된 `MainMenuPreviewStage` 카메라와 표시 전용 `BP_PartyMenuPreview`를 사용합니다. 네 ClassId 모두 기존 캐릭터 메시를 재사용하며 직업별 새 모델·애니메이션은 제작하지 않았습니다. GameMode는 전투 Pawn을 생성하지 않습니다. 생성 화면 Back/X는 프리뷰를 정리하고 초안을 버리며, 재진입하면 네 슬롯이 빈 상태로 시작합니다. 상세 편집 패널이 열려 있으면 Back은 먼저 패널만 닫습니다. 슬롯 패널은 최소 높이를 유지하면서 내용에 맞게 늘어나 ClassInfo 버튼이 잘리지 않도록 합니다.
+
+기존 메뉴 WBP 3종과 별도 경로의 JSON 생성본은 `ProjectA.Menu.AssetContracts`에서 바인딩 이름·타입을 확인합니다. 생성본 검증은 `/Game/T12Validation`에 임시 생성한 뒤 `-T12GeneratedAssets`를 지정하며 원본 에셋에 덮어쓰지 않습니다. 맵 설정 스크립트는 `Source/ProjectAEditor/Scripts/ConfigureMenuPreview.py`입니다.

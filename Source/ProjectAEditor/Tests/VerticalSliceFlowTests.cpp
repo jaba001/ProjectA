@@ -48,6 +48,9 @@
 #include "UI/Gameplay/EncounterResultWidget.h"
 #include "UI/Gameplay/RunMapWidget.h"
 #include "UI/MainMenu/CharacterCreationWidget.h"
+#include "UI/MainMenu/MainMenuPreviewStage.h"
+#include "UI/MainMenu/MainMenuRootWidget.h"
+#include "UI/MainMenu/MainMenuScreenWidget.h"
 #include "Unit/UnitBase.h"
 #include "UnrealClient.h"
 #include "UObject/StrongObjectPtr.h"
@@ -132,6 +135,10 @@ public:
             {
                 return false;
             }
+            if (!CheckMenuLifecycle(Menu))
+            {
+                return true;
+            }
             Menu->ShowCharacterCreationScreen();
             UOptionsWidget* Options = CreateWidget<UOptionsWidget>(Menu, UOptionsWidget::StaticClass());
             Options->ActivateWidget();
@@ -168,6 +175,42 @@ public:
             }
             if (!bProfessionPanelTested)
             {
+                if (PreviewCaptureStage < 3)
+                {
+                    if (PreviewCaptureStage == 0)
+                    {
+                        for (int32 Index = 0; Index < 4; ++Index)
+                        {
+                            Cast<UButton>(Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_Create"), Index))))->OnClicked.Broadcast();
+                        }
+                        PreviewCaptureStage = 1;
+                        ProfessionPanelTime = FPlatformTime::Seconds();
+                        return false;
+                    }
+                    if (FPlatformTime::Seconds() - ProfessionPanelTime < 0.5)
+                    {
+                        return false;
+                    }
+                    if (PreviewCaptureStage == 1)
+                    {
+                        const float ScreenBottom = Creation->GetCachedGeometry().LocalToAbsolute(Creation->GetCachedGeometry().GetLocalSize()).Y;
+                        for (int32 Index = 0; Index < 4; ++Index)
+                        {
+                            UWidget* Info = Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_ClassInfo"), Index)));
+                            const FGeometry& Geometry = Info->GetCachedGeometry();
+                            Test->TestTrue(TEXT("Every ClassInfo button fits inside the creation screen."), Geometry.LocalToAbsolute(Geometry.GetLocalSize()).Y <= ScreenBottom + 1.0f);
+                        }
+                        Capture(TEXT("00-FourPreviews.png"));
+                        PreviewCaptureStage = 2;
+                        ProfessionPanelTime = FPlatformTime::Seconds();
+                        return false;
+                    }
+                    for (int32 Index = 0; Index < 4; ++Index)
+                    {
+                        Cast<UButton>(Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_Delete"), Index))))->OnClicked.Broadcast();
+                    }
+                    PreviewCaptureStage = 3;
+                }
                 CreateButton->OnClicked.Broadcast();
                 UButton* Edit = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_Edit")));
                 UButton* Info = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_ClassInfo")));
@@ -624,6 +667,81 @@ private:
         Test->AddInfo(FString::Printf(TEXT("Vertical slice PIE stage %d."), Stage));
     }
 
+    bool CheckMenuLifecycle(AMainMenuPlayerController* Menu)
+    {
+        AMainMenuPreviewStage* Preview = Menu->GetPreviewStage();
+        Test->TestNull(TEXT("MainMenu does not spawn an extra combat pawn."), Menu->GetPawn());
+        if (!Require(Preview && Menu->GetViewTarget() == Preview, TEXT("Saved MainMenu has an active preview camera.")))
+        {
+            return false;
+        }
+        UMainMenuRootWidget* NativeRoot = CreateWidget<UMainMenuRootWidget>(Menu, UMainMenuRootWidget::StaticClass());
+        NativeRoot->AddToViewport();
+        for (const TCHAR* StackName : { TEXT("MainStack"), TEXT("MenuStack"), TEXT("ModalStack") })
+        {
+            Test->TestNotNull(TEXT("Native root supplies each stack."), NativeRoot->GetWidgetFromName(StackName));
+        }
+        Test->TestNotNull(TEXT("Native menu pushes to stack."), NativeRoot->PushMainScreen(UMainMenuScreenWidget::StaticClass()));
+        UClass* Designer = LoadClass<UCharacterCreationWidget>(nullptr, TEXT("/Game/User_JeHoon/UI/MainMenu/WBP_CharacterCreationWidget.WBP_CharacterCreationWidget_C"));
+        for (UClass* WidgetClass : { UCharacterCreationWidget::StaticClass(), Designer })
+        {
+            UCharacterCreationWidget* Draft = CreateWidget<UCharacterCreationWidget>(Menu, WidgetClass);
+            if (!Require(Draft != nullptr, TEXT("Native and Designer creation widgets instantiate.")))
+            {
+                return false;
+            }
+            Draft->AddToViewport();
+            for (int32 Cycle = 0; Cycle < 2; ++Cycle)
+            {
+                Draft->ActivateWidget();
+                for (const FRunPartyMember& Member : Draft->GetPartyMembers())
+                {
+                    Test->TestFalse(TEXT("Every new visit starts with an empty draft."), Member.bCreated);
+                }
+                TArray<TWeakObjectPtr<AActor>> PreviousPreviews;
+                for (int32 Index = 0; Index < 4; ++Index)
+                {
+                    UButton* Create = Cast<UButton>(Draft->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_Create"), Index))));
+                    if (!Require(Create != nullptr, TEXT("All four creation controls are bound.")))
+                    {
+                        return false;
+                    }
+                    Create->OnClicked.Broadcast();
+                    AActor* Actor = Preview->GetPreviewActorForSlot(Index);
+                    Test->TestNotNull(TEXT("Each profession has a visible preview class."), Actor);
+                    Test->TestNull(TEXT("Preview cannot execute pawn AI or combat."), Cast<APawn>(Actor));
+                    PreviousPreviews.Add(Actor);
+                }
+                if (Cycle == 0)
+                {
+                    UButton* Close = Cast<UButton>(Draft->GetWidgetFromName(TEXT("Button_Close")));
+                    if (!Require(Close != nullptr, TEXT("Close button exists.")))
+                    {
+                        return false;
+                    }
+                    Close->OnClicked.Broadcast();
+                }
+                else
+                {
+                    Draft->RequestBack();
+                }
+                Test->TestFalse(TEXT("Back and X deactivate the creation screen."), Draft->IsActivated());
+                for (int32 Index = 0; Index < 4; ++Index)
+                {
+                    Test->TestNull(TEXT("Closing releases every preview slot."), Preview->GetPreviewActorForSlot(Index));
+                    Test->TestFalse(TEXT("Closing destroys the previous preview actor."), PreviousPreviews[Index].IsValid());
+                }
+                Test->TestTrue(TEXT("Back keeps the menu preview camera."), Menu->GetViewTarget() == Preview);
+            }
+            Draft->RemoveFromParent();
+        }
+        Preview->SetPreviewActorForSlot(0, TEXT("Hunter"));
+        Preview->SetPreviewActorForSlot(0, TEXT("MissingProfession"));
+        Test->TestNull(TEXT("Missing preview class clears the old actor."), Preview->GetPreviewActorForSlot(0));
+        NativeRoot->RemoveFromParent();
+        return true;
+    }
+
     void HandleResult(ECombatResult Result)
     {
         ++ResultCount;
@@ -846,6 +964,7 @@ private:
     float EnemyHPBeforeSkill = 0.0f;
     float PlayerHPBeforeAI = 0.0f;
     bool bProfessionPanelTested = false;
+    int32 PreviewCaptureStage = 0;
     bool bProfessionCaptured = false;
     double ProfessionPanelTime = 0.0;
     bool bMapCaptured = false;

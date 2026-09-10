@@ -1,12 +1,12 @@
 # ProjectA 작업 보드와 재개 메모
 
-최근 정리: 2026-09-10 · `main` · T11 체크포인트 저장·이어하기·옵션·종료 구현과 패키지 검증 완료.
+최근 정리: 2026-09-10 · `main` · T12 메뉴 에셋·프리뷰·생성 도구 검증 완료.
 
 [기획·구현 현황](PROJECT_PLAN.md) · [코드 리뷰와 검증 시나리오](CODE_REVIEW.md)
 
 ## 다음에 켜면 여기부터
 
-**Vertical Slice와 T03~T07 검증을 완료했다. T09 직업 정의와 슬롯 상세 편집 검증을 완료했다. T11 저장/이어하기·옵션·게임 종료까지 완료했다. 다음 작업은 T12 UI 에셋·프리뷰·생성 도구 검증이다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다.
+**Vertical Slice와 T03~T07 검증을 완료했다. T09 직업 정의와 슬롯 상세 편집 검증을 완료했다. T11 저장/이어하기·옵션·게임 종료까지 완료했다. T12 메뉴 검증까지 완료했다. 다음 작업은 T13 아이템·적 이동·추가 스킬 콘텐츠다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다.
 
 체크박스는 작업 완료를 뜻한다. 코드를 작성했어도 완료 조건을 검증하지 못했다면 체크하지 않고 `검증 대기`로 기록한다. P1/P2는 리뷰 결함의 심각도이고 M0~M3는 개발 순서이므로 서로 구분한다.
 
@@ -161,10 +161,15 @@
 - 근거: Saved/Automation/T11EditorFinalBuild.log, T11GameBuild.log, T11Final/index.json, T11PackageFinal.log, T11PackWrite/index.json, T11PackContinue/index.json 및 Saved/Logs/T11PackQuit.log. 테스트 슬롯만 사용하며 실제 ProjectA_Run 슬롯은 변경하지 않았다.
 - 완료 조건: 재실행 후 파티/진행 복원, 저장이 없을 때 안내, 옵션 변경 반영, 패키징 실행 파일에서 종료 확인.
 
-### T12 · UI 에셋·프리뷰·생성 도구 검증 — 검증 대기
+### T12 · UI 에셋·프리뷰·생성 도구 검증 — 구현 및 검증 완료
 
-- [ ] 완료
-- 작업: `MainMenu.umap`의 PreviewStage 배치, 네 ClassId의 프리뷰 클래스, 메뉴 WBP 3종의 스택/슬롯/버튼 바인딩 확인. Back/X/재진입 시 프리뷰 정리·유지 정책을 적용한다. JSON과 Designer 중 구조 기준을 D08에서 정한다.
+- [x] 완료
+- D08: 기존 Designer WBP를 구조 기준으로 유지. JSON 3종은 DryRun/별도 생성본 검증용. AddMissing으로 기존 구조를 보존하며 누락된 Text_StartGameStatus만 원본에 추가.
+- 구현: MainMenu PreviewStage 배치와 네 직업의 표시 전용 프리뷰, 카메라 자동 Pawn 전환 차단, 메뉴 GameMode의 추가 전투 Pawn 제거. Back/X·deactivation·스테이지 EndPlay에서 프리뷰 정리, 재진입 시 빈 초안. 기존 메시 재사용이며 직업별 신규 아트는 별도.
+- 검증: Development Editor / Win64 빌드 및 전체 자동화 24건 통과(경고 포함 13건, 실패 0). JSON 3종 DryRun·별도 생성/compile/save 성공, 원본/생성본 바인딩·타입 대조. AddMissing 기존 제목 보존과 신규 위젯 저장, 2회 실행 시 1개/0개 추가 확인.
+- 최종 화면 보정: 추가 Pawn 제거 후 관련 3건 통과, 프리뷰 회전 보정과 슬롯 패널 최소 높이 적용 후 SavedMapsPIELoop 재통과. 네 ClassInfo 버튼이 화면 안에 들어오는지 검사하고 캡처로 프리뷰 4개·카메라·버튼 표시 확인.
+- 검증 경계: Back/X·반복 활성화·생성/삭제는 delegate 및 위젯 API로 확인. 실제 이동/스킬은 기존 Slate 클릭 검증 유지. 직업별 원화/새 모델과 T12 변경의 패키지 재검증은 별도. 선택적 이전 팝업 바인딩은 완료 처리하지 않음.
+- 근거: Saved/Automation/T12FinalBuild.log, T12Final/index.json, T12PreviewFinal/index.json, T12LayoutFinal/index.json, VerticalSliceScreenshots/00-FourPreviews.png와 Saved/Logs/T12_*_DryRun.log, T12_*_Generate.log, T12AddMissingValidation1/2.log.
 - 완료 조건: V07·V08·V09 통과. C++의 BindWidget TODO는 실제 에셋과 대조한 후 완료 여부를 판정한다. JSON에 이름이 있다고 바인딩 검증 완료로 보지 않는다.
 
 ### T13 · 아이템·적 이동·추가 스킬 콘텐츠 — 후속 작업
@@ -192,6 +197,7 @@
 
 | 날짜 | 작업 | 완료/검증 | 다음 시작점 |
 |---|---|---|---|
+| 2026-09-10 | T12 메뉴 에셋·프리뷰·생성 도구 | 빌드·전체 24건 및 최종 PIE 통과, JSON 생성/누락 보완·화면 검수 | T13 콘텐츠 |
 | 2026-09-10 | T11 체크포인트 저장·이어하기·옵션·종료 | Editor/게임 빌드·전체 자동화 23건·패키지 저장/Continue/Quit 검증 | T12 UI 에셋·프리뷰 |
 | 2026-09-10 | T10 기존 전투 진행 루프 재확인 | 현재 코드와 직전 빌드·자동화 21건 결과 대조, 추가 런타임 변경 없음 | T11 메뉴 저장/이어하기 |
 | 2026-09-10 | T09 공통 직업 정의와 상세 편집 | 빌드·전체 자동화 21건 통과, 네 직업 및 저장 맵 PIE 검증·화면 확인 | T11 메뉴 저장/이어하기 |

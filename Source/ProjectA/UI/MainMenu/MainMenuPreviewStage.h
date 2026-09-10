@@ -27,7 +27,14 @@ public:
     UFUNCTION(BlueprintCallable, Category = "MainMenu|Preview")
     void ClearPreviewActorForSlot(int32 SlotIndex);
 
+    UFUNCTION(BlueprintCallable, Category = "MainMenu|Preview")
+    void ClearAllPreviewActors();
+
+    UFUNCTION(BlueprintPure, Category = "MainMenu|Preview")
+    AActor* GetPreviewActorForSlot(int32 SlotIndex) const;
+
 protected:
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     // Root component used to move the entire preview stage in L_MainMenu.
     // L_MainMenu에서 전체 프리뷰 스테이지를 이동하기 위한 루트 컴포넌트입니다.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MainMenu|Preview")

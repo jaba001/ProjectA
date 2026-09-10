@@ -1125,6 +1125,58 @@ bool ApplyWidgetProperties(const FUiScaffoldWidgetSpec& WidgetSpec, UWidget* Wid
 	return true;
 }
 
+bool AddMissingDesignerWidgets(const FUiScaffoldSpec& Spec, UWidgetBlueprint* WidgetBlueprint)
+{
+    UWidgetTree* Tree = WidgetBlueprint->WidgetTree;
+    if (!Tree)
+    {
+        return false;
+    }
+    WidgetBlueprint->Modify();
+    TMap<FString, UWidget*> AddedWidgets;
+    for (const FUiScaffoldWidgetSpec& WidgetSpec : Spec.Widgets)
+    {
+        UClass* WidgetClass = GetWidgetClass(WidgetSpec.Type);
+        UWidget* Existing = Tree->FindWidget(FName(*WidgetSpec.Name));
+        if (Existing)
+        {
+            if (!WidgetClass || !Existing->IsA(WidgetClass))
+            {
+                UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] Existing widget type differs: %s"), *WidgetSpec.Name);
+                return false;
+            }
+            continue;
+        }
+        if (!WidgetClass || WidgetSpec.Parent.IsEmpty())
+        {
+            return false;
+        }
+        UWidget* Widget = Tree->ConstructWidget<UWidget>(WidgetClass, FName(*WidgetSpec.Name));
+        RegisterDesignerWidget(WidgetBlueprint, Widget, WidgetSpec.bBind);
+        if (!ApplyWidgetProperties(WidgetSpec, Widget))
+        {
+            return false;
+        }
+        AddedWidgets.Add(WidgetSpec.Name, Widget);
+    }
+    for (const FUiScaffoldWidgetSpec& WidgetSpec : Spec.Widgets)
+    {
+        if (!AddedWidgets.Contains(WidgetSpec.Name))
+        {
+            continue;
+        }
+        UWidget* Parent = AddedWidgets.Contains(WidgetSpec.Parent) ? AddedWidgets[WidgetSpec.Parent] : Tree->FindWidget(FName(*WidgetSpec.Parent));
+        UWidget* Child = AddedWidgets[WidgetSpec.Name];
+        if (!Parent || !Child || !AddChildWidget(Parent, Child, WidgetSpec))
+        {
+            return false;
+        }
+    }
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
+    UE_LOG(LogTemp, Display, TEXT("[GenerateUiScaffoldCommandlet] Added %d missing widgets; existing Designer properties and hierarchy preserved."), AddedWidgets.Num());
+    return true;
+}
+
 bool PopulateDesignerTree(const FUiScaffoldSpec& Spec, UWidgetBlueprint* WidgetBlueprint)
 {
 	if (!WidgetBlueprint || !WidgetBlueprint->WidgetTree)
@@ -1284,6 +1336,12 @@ int32 UGenerateUiScaffoldCommandlet::Main(const FString& Params)
 
 	const bool bOverwrite = FParse::Param(*Params, TEXT("Overwrite"));
 	const bool bDryRun = FParse::Param(*Params, TEXT("DryRun"));
+    const bool bAddMissing = FParse::Param(*Params, TEXT("AddMissing"));
+    if (bAddMissing && bOverwrite)
+    {
+        UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] AddMissing and Overwrite cannot be combined."));
+        return 1;
+    }
 	const FString SpecFullPath = MakeProjectFullPath(SpecPath);
 
 	UE_LOG(LogTemp, Display, TEXT("[GenerateUiScaffoldCommandlet] Spec path: %s"), *SpecFullPath);
@@ -1325,10 +1383,10 @@ int32 UGenerateUiScaffoldCommandlet::Main(const FString& Params)
 	}
 
 	const bool bAssetExistsBeforeRun = DoesAssetExist(Spec);
-	UWidgetBlueprint* WidgetBlueprint = CreateOrLoadWidgetBlueprint(Spec, NativeClass, bOverwrite);
+	UWidgetBlueprint* WidgetBlueprint = CreateOrLoadWidgetBlueprint(Spec, NativeClass, bOverwrite || bAddMissing);
 	if (!WidgetBlueprint)
 	{
-		if (bAssetExistsBeforeRun && !bOverwrite)
+		if (bAssetExistsBeforeRun && !bOverwrite && !bAddMissing)
 		{
 			return 0;
 		}
@@ -1336,7 +1394,7 @@ int32 UGenerateUiScaffoldCommandlet::Main(const FString& Params)
 		return 1;
 	}
 
-	if (!PopulateDesignerTree(Spec, WidgetBlueprint))
+	if (!(bAddMissing ? AddMissingDesignerWidgets(Spec, WidgetBlueprint) : PopulateDesignerTree(Spec, WidgetBlueprint)))
 	{
 		return 1;
 	}

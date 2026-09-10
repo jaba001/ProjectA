@@ -40,43 +40,43 @@ protected:
 
     // Background image optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 배경 이미지입니다.
-    // TODO: Bind a UImage named Image_Background in WBP_MainMenuScreenWidget to edit the background in Blueprint.
-    // TODO: Blueprint에서 배경을 편집하려면 WBP_MainMenuScreenWidget에 Image_Background 이름의 UImage를 바인딩합니다.
+    // T12: Verified Image_Background binding in the saved Designer WBP.
+    // T12: 저장된 Designer WBP의 Image_Background 바인딩을 검증했습니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UImage> Image_Background;
 
     // Title text optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 제목 텍스트입니다.
-    // TODO: Bind a UTextBlock named Text_Title in WBP_MainMenuScreenWidget to edit the title in Blueprint.
-    // TODO: Blueprint에서 제목을 편집하려면 WBP_MainMenuScreenWidget에 Text_Title 이름의 UTextBlock을 바인딩합니다.
+    // T12: Verified Text_Title binding in the saved Designer WBP.
+    // T12: 저장된 Designer WBP의 Text_Title 바인딩을 검증했습니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UTextBlock> Text_Title;
 
     // New Game button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 새 게임 버튼입니다.
-    // TODO: Bind a UButton named Button_NewGame in WBP_MainMenuScreenWidget to use a designer button.
-    // TODO: 디자이너 버튼을 사용하려면 WBP_MainMenuScreenWidget에 Button_NewGame 이름의 UButton을 바인딩합니다.
+    // T12: Verified Button_NewGame binding in the saved Designer WBP.
+    // T12: 저장된 Designer WBP의 Button_NewGame 바인딩을 검증했습니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_NewGame;
 
     // Continue button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 이어하기 버튼입니다.
-    // TODO: Bind a UButton named Button_Continue in WBP_MainMenuScreenWidget to use a designer button.
-    // TODO: 디자이너 버튼을 사용하려면 WBP_MainMenuScreenWidget에 Button_Continue 이름의 UButton을 바인딩합니다.
+    // T12: Verified Button_Continue binding in the saved Designer WBP.
+    // T12: 저장된 Designer WBP의 Button_Continue 바인딩을 검증했습니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_Continue;
 
     // Options button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 옵션 버튼입니다.
-    // TODO: Bind a UButton named Button_Options in WBP_MainMenuScreenWidget to use a designer button.
-    // TODO: 디자이너 버튼을 사용하려면 WBP_MainMenuScreenWidget에 Button_Options 이름의 UButton을 바인딩합니다.
+    // T12: Verified Button_Options binding in the saved Designer WBP.
+    // T12: 저장된 Designer WBP의 Button_Options 바인딩을 검증했습니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_Options;
 
     // Quit button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 종료 버튼입니다.
-    // TODO: Bind a UButton named Button_Quit in WBP_MainMenuScreenWidget to use a designer button.
-    // TODO: 디자이너 버튼을 사용하려면 WBP_MainMenuScreenWidget에 Button_Quit 이름의 UButton을 바인딩합니다.
+    // T12: Verified Button_Quit binding in the saved Designer WBP.
+    // T12: 저장된 Designer WBP의 Button_Quit 바인딩을 검증했습니다.
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_Quit;
 

@@ -83,11 +83,30 @@ void AMainMenuPreviewStage::ClearPreviewActorForSlot(int32 SlotIndex)
     }
 
     AActor* PreviewActor = SpawnedPreviewActors[SlotIndex];
-    if (PreviewActor)
+    if (IsValid(PreviewActor))
     {
         PreviewActor->Destroy();
-        SpawnedPreviewActors[SlotIndex] = nullptr;
     }
+    SpawnedPreviewActors[SlotIndex] = nullptr;
+}
+
+void AMainMenuPreviewStage::ClearAllPreviewActors()
+{
+    for (int32 Index = 0; Index < SpawnedPreviewActors.Num(); ++Index)
+    {
+        ClearPreviewActorForSlot(Index);
+    }
+}
+
+AActor* AMainMenuPreviewStage::GetPreviewActorForSlot(int32 SlotIndex) const
+{
+    return SpawnedPreviewActors.IsValidIndex(SlotIndex) && IsValid(SpawnedPreviewActors[SlotIndex]) ? SpawnedPreviewActors[SlotIndex].Get() : nullptr;
+}
+
+void AMainMenuPreviewStage::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    ClearAllPreviewActors();
+    Super::EndPlay(EndPlayReason);
 }
 
 USceneComponent* AMainMenuPreviewStage::GetSlotAnchor(int32 SlotIndex) const

@@ -30,6 +30,7 @@ void AMainMenuPlayerController::BeginPlay()
 
     if (MainMenuPreviewStage)
     {
+        bAutoManageActiveCameraTarget = false;
         SetViewTarget(MainMenuPreviewStage);
     }
     else
