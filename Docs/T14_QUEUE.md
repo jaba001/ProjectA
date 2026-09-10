@@ -10,7 +10,7 @@
 | 2 | 완료 | 서버 Action Request와 소유권 검증 | 서버 참가자 바인딩, 본인 캐릭터·턴·자원·대상 검증과 중복 거절, Standalone 실행 회귀 통과 |
 | 3 | 완료 | 2인 Listen Server 전투 동기화 | 실제 2개 PIE의 소유 연결 RPC, 본인 Unit 조작, Turn·Grid·HP/AP·사망·결과·HUD 일치 검증 |
 | 4 | 완료 | 확정 턴 체크포인트와 기존 Host 복구 | v3 턴 저장·실패 재시도, 실제 2인 새 세션/별도 프로세스 복구, 고정 상대·손상·처리 중 행동 검증 |
-| 5 | 대기 | 아군 AI 판단과 행동 | 4 완료 후 소유권·아군 진영을 유지하는 서버 AI, 인간 입력과 동시 실행 차단 |
+| 5 | 완료 | 아군 AI 판단과 행동 | 소유권·아군 진영 유지, 서버 AI·인간 입력 차단, 실제 2인 AI와 별도 프로세스 모드 복구 검증 |
 | 6 | 대기 | 명시적 Host 승계와 AI 이어하기 | 5 완료 후 원래 참가자·사전 동의 검증, 승계/AI 버튼, 로컬 권위 저장소 대역을 통한 중복 재개 거절 |
 | 7 | 대기 | 3·4인 검증 | 6 완료 후 최대 인원 조작권·동기화·끊김·복구·승계/AI 통합 검증 |
 | 8 | 대기 | 실제 인증·중앙 저장·MMR 연동 | 7 완료 및 공급자·Backend·MMR 참여 판정/이탈/결과 검증 정책 확정 후 실제 서비스 검증 |
@@ -109,3 +109,25 @@
 최종 검증 파일: `Saved/Automation/T14CheckpointBuild7.log`, `T14CheckpointFull3/index.json`, `T14CheckpointRestartWrite/index.json`, `T14CheckpointRestartRead/index.json`, `T14CheckpointSnapshotReplace/index.json`, `T14CheckpointSnapshotDelete/index.json`, `T14CheckpointSnapshotPIE/index.json`. 최초 실패 로그는 `Saved/Logs/T14CheckpointFull1.log`, `T14CheckpointFull2.log`에 보존한다.
 
 커밋 제목: `[codex] 확정 턴 체크포인트와 기존 Host 복구 추가`. 다음 번호는 5번 아군 AI 판단과 행동이다. 다음 실행은 해당 커밋의 upstream 반영까지 확인한 뒤 착수한다. 6~8번과 노드 선택·Continue 결정권 질문은 대기 상태를 유지한다.
+
+## 5번 구현 범위
+
+4번 `19908e2`의 upstream 반영과 깨끗한 작업 트리를 확인하고 착수했다. `APlayerUnit`에 서버 전용 `UPartyAutoCombatComponent`를 연결하고 원래 캐릭터·소유자·팀을 유지한다. 인간과 AI는 공통 명령 실행에서 턴·자원·장착·대상·Grid를 검증하며, AI는 인간 연결 대신 별도 실행 세션과 순번을 사용한다. AI 차례에는 양쪽 인간 입력을 잠그고 HUD에 AI를 표시한다.
+
+AI는 자기 회복약·아군 피해 없는 공격·접근 이동·턴 종료를 판단하고 다음 틱 완료 흐름을 사용한다. 전투 시작 전 신뢰된 서버 준비 API만 모드를 설정할 수 있으며 소유자의 사전 동의를 확인한다. 새 전투 본문 schema 2에 파티 조작 모드를 저장하고 이전 schema 1의 Human·기존 v1/v2 저장을 읽는다. 끊김 시 자동 전환·승계·인간 복귀·MMR·참가 배정 예외는 6~8번으로 유지한다. 상세 구조는 [아군 AI 안내](T14_PARTY_AI.md)를 따른다.
+
+## 5번 검증 기록 — 2026-09-10
+
+- Development Editor / Win64 최종 빌드 통과. Visual Studio를 실행하지 않았다.
+- 전체 자동화 56건 통과: 성공 36건·경고 동반 성공 20건·실패 0건. 새 런타임 AI 3건과 저장 호환 1건을 포함한다. 전용 프로세스 테스트는 아래 별도 Writer/Reader로 실제 실행했다.
+- AI의 미동의·거절·잘못된 정책 버전, Client의 모드 변경, 원래 소유자/Host의 인간 명령, AI의 이전 문맥·중복·잘못된 장착/대상·부족한 자원을 거절했다. 거절한 순번을 재사용하지 않으며 공통 GAS 피해·AP·회복약 HP/재고/SubAP·이동·턴 종료를 확인했다.
+- 아군 포함 피해 스킬 제외, 실패한 이동 후 턴 종료 1회, 중단/이전 완료 콜백 무효화, 다음 AI 턴의 실제 공격과 증가하는 순번을 확인했다. 저장 대기·복구 중단 중 Run 재설정이 원래 식별 정보를 바꾸지 못하도록 보정하고 검증했다.
+- 실제 두 PIE 세션의 `-T14CheckpointAI` 전투 1건 통과. 저장된 AI 유닛의 원래 소유자 RPC도 거절하고 회복약 1회·공격 4회·이동 1회·턴 종료와 적 턴 이후 Host 차례 복귀를 확인했다. 양쪽의 모드·소유권·팀·턴·HP/AP·Grid·HUD와 새 확정 기록을 비교했다.
+- 별도 Editor-Cmd 프로세스 Writer/Reader 각각 1건 통과. Writer가 사전 동의한 AI 모드를 디스크에 준비하고 Reader는 이 본문을 새 Actor로 복구해 동일한 실제 AI 행동을 검증했다. schema 1 Human과 기존 전투 밖 v1/v2 호환, schema 2 모드/동의·유형 검증도 통과했다.
+- 최초 AI Co-op 테스트는 높은 HP의 적에게 Host가 사망해 Host 차례 복귀 조건을 기다렸다. 로그에서 AI의 5·7·9턴 정상 종료와 최종 패배를 확인했다. 테스트 Host HP와 저장 Party HP를 보정한 뒤 원래 행동 횟수·턴·동기화 조건을 유지한 재실행에서 통과했다. 런타임 AI의 턴 종료 로직은 이 실패 때문에 변경하지 않았다.
+- 별도 Snapshot 모드의 기존 저장 맵 PIE 1건도 통과했다. 인간 입력·상대 Snapshot·전투→승리→Continue→다음 전투→패배 흐름을 유지했다. 경고는 기존 Spawn/GAS Cue 설정, 격리 월드·종료 중 Nav 조회와 의도한 이동 실패 경로 등이다. 문서 로컬 링크와 diff 검사를 통과했다.
+- 기본 Run의 Human 조작과 원래 참가자 전원 연결 조건은 유지한다. 실제 불참 승인·연결 예외·명시적 Host 승계/AI 이어하기 UI·인간 복귀·3~4인·실제 인증/중앙 저장/MMR·패키지 재빌드는 이 번호에서 실행하지 않았다.
+
+최종 검증 파일: `Saved/Automation/T14PartyAIBuild5.log`, `T14PartyAIFull2/index.json`, `T14PartyAICoop2/index.json`, `T14PartyAIRestartWrite/index.json`, `T14PartyAIRestartRead/index.json`, `T14PartyAISnapshotPIE/index.json`. 최초 실패는 `T14PartyAICoop1/index.json`과 `Saved/Logs/T14PartyAICoop1.log`에 보존한다.
+
+커밋 제목: `[codex] 소유권을 유지하는 아군 서버 AI 추가`. 다음 번호는 6번 명시적 Host 승계와 AI 이어하기다. 다음 실행은 해당 커밋의 upstream 반영까지 확인한 뒤 착수한다. 7~8번과 노드 선택·Continue 결정권 질문은 대기 상태를 유지한다.

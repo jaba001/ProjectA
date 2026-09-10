@@ -45,6 +45,7 @@ public:
     AUnitBase* ResolveRuntimeUnit(FGuid UnitId) const;
     FGuid GetCharacterId(const AUnitBase* Unit) const;
     FRunAccountId GetOwnerAccountId(const AUnitBase* Unit) const;
+    bool IsPartyAIControlled(const AUnitBase* Unit) const;
 
     // Publish from server state changes; clients can only consume the replicated view.
     // 서버 상태 변경 시 게시하며 클라이언트는 복제된 뷰만 읽습니다.

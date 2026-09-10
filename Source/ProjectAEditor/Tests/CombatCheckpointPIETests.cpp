@@ -5,6 +5,7 @@
 #include "AbilitySystemComponent.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Combat/Checkpoint/CombatCheckpointTypes.h"
+#include "Combat/AI/PartyAutoCombatComponent.h"
 #include "Combat/CombatManager.h"
 #include "Components/Button.h"
 #include "Controller/GameplayPlayerController.h"
@@ -42,6 +43,7 @@
 #include "Tests/AutomationEditorCommon.h"
 #include "UI/Combat/CombatHUDWidget.h"
 #include "Unit/UnitBase.h"
+#include "Unit/PlayerUnit.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UnrealType.h"
 
@@ -77,6 +79,8 @@ enum class EStep : uint8
     Restored,
     OldRequest,
     NewRequest,
+    AIHumanRequest,
+    AIActing,
     Closing,
     Finished
 };
@@ -104,7 +108,7 @@ UCombatHUDWidget* FindHUD(APartyPlayerController* Controller)
 class FCheckpointSessions : public IAutomationLatentCommand
 {
 public:
-    FCheckpointSessions(FAutomationTestBase* InTest, ERunMode InMode, FString InSlot, EOpponentSourceChange InOpponentChange = EOpponentSourceChange::None) : Test(InTest), Mode(InMode), Slot(MoveTemp(InSlot)), OpponentChange(InOpponentChange), bRestoring(InMode == ERunMode::ProcessReader), StepStarted(FPlatformTime::Seconds())
+    FCheckpointSessions(FAutomationTestBase* InTest, ERunMode InMode, FString InSlot, EOpponentSourceChange InOpponentChange = EOpponentSourceChange::None, bool bInPartyAI = false) : Test(InTest), Mode(InMode), Slot(MoveTemp(InSlot)), OpponentChange(InOpponentChange), bPartyAI(bInPartyAI), bRestoring(InMode == ERunMode::ProcessReader), StepStarted(FPlatformTime::Seconds())
     {
         if (OpponentChange != EOpponentSourceChange::None)
         {
@@ -409,12 +413,13 @@ public:
             }
             OldGuest = Guest;
             OldHost = HostUnit;
+            if (bPartyAI && !PrepareAIRecord()) return CloseSession();
             bPreserveWriterFile = Mode == ERunMode::ProcessWriter;
             return CloseSession(Mode == ERunMode::SessionRestart);
         }
         else if (Step == EStep::Restored)
         {
-            if (!ViewsMatch(ClientCombat) || !UnitsMatch(ClientCombat) || !Client->CanUseActiveUnitAction() || !FindHUD(Host.Get()) || !FindHUD(Client.Get()))
+            if (!ViewsMatch(ClientCombat) || !UnitsMatch(ClientCombat) || (!bPartyAI && !Client->CanUseActiveUnitAction()) || !FindHUD(Host.Get()) || !FindHUD(Client.Get()))
             {
                 return false;
             }
@@ -433,7 +438,7 @@ public:
             Test->TestTrue(TEXT("Both HUDs show the restored turn."), FindHUD(Host.Get())->GetTurnInfoText().ToString() == FindHUD(Client.Get())->GetTurnInfoText().ToString());
             UButton* HostEndTurn = Cast<UButton>(FindHUD(Host.Get())->GetWidgetFromName(TEXT("Button_EndTurn")));
             UButton* ClientEndTurn = Cast<UButton>(FindHUD(Client.Get())->GetWidgetFromName(TEXT("Button_EndTurn")));
-            Test->TestTrue(TEXT("Restored HUD input is available only to the current owner."), HostEndTurn && ClientEndTurn && !HostEndTurn->GetIsEnabled() && ClientEndTurn->GetIsEnabled());
+            Test->TestTrue(TEXT("Restored HUD input respects ownership and server AI control."), HostEndTurn && ClientEndTurn && !HostEndTurn->GetIsEnabled() && ClientEndTurn->GetIsEnabled() == !bPartyAI);
             Test->TestTrue(TEXT("Client RunState remains non-authoritative after restore."), ClientWorld->GetGameInstance()->GetSubsystem<URunStateSubsystem>()->GetPhase() == ERunPhase::None);
             if (!Test->TestFalse(TEXT("The Host cannot take over the guest's restored turn."), Host->CanUseActiveUnitAction()))
             {
@@ -446,6 +451,13 @@ public:
                 return CloseSession();
             }
             Test->TestTrue(TEXT("Restored ownership is enforced by the server."), Host->SubmitCombatActionRequest(WrongOwner).Result == ECombatRequestResult::NotOwner);
+            if (bPartyAI)
+            {
+                Test->TestFalse(TEXT("AI guest's original owner cannot directly control the restored unit."), Client->CanUseActiveUnitAction());
+                if (!Send(Client.Get(), ECombatActionKind::EndTurn)) return CloseSession();
+                Advance(EStep::AIHumanRequest);
+                return false;
+            }
             if (Mode == ERunMode::ProcessReader)
             {
                 if (!Send(Client.Get(), ECombatActionKind::EndTurn))
@@ -487,6 +499,51 @@ public:
             CheckFrozenOpponent();
             return CloseSession();
         }
+        else if (Step == EStep::AIHumanRequest)
+        {
+            if (!ClientResponseArrived()) return false;
+            if (!Test->TestTrue(TEXT("The owning client RPC cannot directly end an AI-controlled turn."), Client->GetLastCombatActionResponse().Result == ECombatRequestResult::NotOwner)) return CloseSession();
+            APlayerUnit* AIUnit = Cast<APlayerUnit>(Guest.Get());
+            UPartyAutoCombatComponent* Brain = AIUnit ? AIUnit->FindComponentByClass<UPartyAutoCombatComponent>() : nullptr;
+            if (!Test->TestNotNull(TEXT("The restored player keeps its server AI component."), Brain)) return CloseSession();
+            Brain->StartTurn();
+            Advance(EStep::AIActing);
+        }
+        else if (Step == EStep::AIActing)
+        {
+            const bool bViewsSynced = ViewsMatch(ClientCombat);
+            const bool bUnitsSynced = UnitsMatch(ClientCombat);
+            Diagnostic = FString::Printf(TEXT("AITurn=%d Current=%s HostHP=%.1f GuestHP=%.1f EnemyHP=%.1f Items=%d Skills=%d Moves=%d GuestCoord=%s ViewSync=%d UnitSync=%d Result=%d"), Combat->GetTurnSerial(), *GetNameSafe(Combat->GetCurrentUnit()), HostUnit->GetAttributeSet()->GetHP(), Guest->GetAttributeSet()->GetHP(), Enemy->GetAttributeSet()->GetHP(), AIItems, AISkills, AIMoves, Guest->GetCurrentTile() ? *Guest->GetCurrentTile()->GridCoord.ToString() : TEXT("None"), bViewsSynced, bUnitsSynced, static_cast<int32>(Combat->GetCombatResult()));
+            if (LastObservedAITurn != Combat->GetTurnSerial())
+            {
+                LastObservedAITurn = Combat->GetTurnSerial();
+                Test->AddInfo(Diagnostic);
+            }
+            if (!HostUnit->IsUnitAlive() || !Guest->IsUnitAlive() || Combat->GetCombatResult() != ECombatResult::None)
+            {
+                Test->AddError(TEXT("AI fixture ended or lost a required living participant before returning to the Host: ") + Diagnostic);
+                return CloseSession();
+            }
+            if (bAIActionFailed)
+            {
+                Test->AddError(TEXT("Restored party AI failed an actual navigation, item or skill action: ") + Diagnostic);
+                return CloseSession();
+            }
+            if (AIItems == 0 || AISkills == 0 || AIMoves == 0 || Combat->GetCurrentUnit() != HostUnit.Get() || !bViewsSynced || !bUnitsSynced) return false;
+            APlayerUnit* AIUnit = Cast<APlayerUnit>(Guest.Get());
+            APlayerUnit* ClientAI = Cast<APlayerUnit>(ClientCombat->ResolveRuntimeUnit(Combat->GetRuntimeUnitId(Guest.Get())));
+            Test->TestTrue(TEXT("Actual server AI heals itself and consumes its own item."), bAIHealingObserved && AIItems == 1 && Guest->HealingItemCount == 0);
+            Test->TestTrue(TEXT("Actual server AI damages an opponent and successfully moves."), AISkills > 0 && AIMoves > 0 && Enemy->GetAttributeSet()->GetHP() < EnemyHPBeforeSkill);
+            Test->TestTrue(TEXT("Server and client retain AI mode and the original player team."), AIUnit && ClientAI && AIUnit->IsServerAIControlled() && ClientAI->IsServerAIControlled() && AIUnit->GetTeam() == ETeam::Player && ClientAI->GetTeam() == ETeam::Player);
+            Test->TestTrue(TEXT("AI execution does not transfer original ownership."), Combat->GetCharacterId(Guest.Get()) == GuestCharacter && Combat->GetOwnerAccountId(Guest.Get()) == Expected.Identity.OriginalParticipants[1].AccountId && ClientCombat->GetOwnerAccountId(ClientAI) == Expected.Identity.OriginalParticipants[1].AccountId);
+            Test->TestTrue(TEXT("AI turn and opponent turn finish without human guest input."), Combat->GetTurnSerial() > Expected.CompletedTurnSerial + 2 && Host->CanUseActiveUnitAction() && !Client->CanUseActiveUnitAction());
+            const FCombatCheckpointData& NewCheckpoint = Run->GetCombatCheckpoint();
+            const FCombatCheckpointUnit* SavedAI = NewCheckpoint.Units.FindByPredicate([this](const FCombatCheckpointUnit& Unit) { return Unit.CharacterId == GuestCharacter; });
+            Test->TestTrue(TEXT("The next confirmed checkpoint retains AI mode and original owner."), NewCheckpoint.Revision > Expected.Revision && NewCheckpoint.SchemaVersion == 2 && SavedAI && SavedAI->PartyControlMode == EPartyControlMode::ServerAI && SavedAI->OwnerAccountId == Expected.Identity.OriginalParticipants[1].AccountId);
+            Test->TestTrue(TEXT("Both HUDs show the same post-AI turn."), FindHUD(Host.Get()) && FindHUD(Client.Get()) && FindHUD(Host.Get())->GetTurnInfoText().EqualTo(FindHUD(Client.Get())->GetTurnInfoText()));
+            ReadAndCompareCommitted();
+            return CloseSession();
+        }
         return false;
     }
 
@@ -507,6 +564,11 @@ private:
             FRunParticipantData& Participant = Identity.OriginalParticipants.AddDefaulted_GetRef();
             Participant.AccountId.Provider = TEXT("CheckpointPIEFixture");
             Participant.AccountId.Subject = Index == 0 ? TEXT("OriginalHost") : TEXT("OriginalGuest");
+            if (bPartyAI && Index == 1)
+            {
+                Participant.AIConsent = ERunAIConsent::Granted;
+                Participant.ConsentPolicyVersion = 1;
+            }
             FRunPartyMember& Member = Party.AddDefaulted_GetRef();
             Member.SlotIndex = Index;
             Member.bCreated = true;
@@ -588,7 +650,79 @@ private:
             Test->AddError(Error.ToString());
             return false;
         }
-        return ResolveFixtureUnits();
+        if (!ResolveFixtureUnits()) return false;
+        if (bPartyAI)
+        {
+            APlayerUnit* AIUnit = Cast<APlayerUnit>(Guest.Get());
+            UPartyAutoCombatComponent* Brain = AIUnit ? AIUnit->FindComponentByClass<UPartyAutoCombatComponent>() : nullptr;
+            if (!Test->TestTrue(TEXT("The disk record restores the original guest as server AI."), Expected.SchemaVersion == 2 && AIUnit && AIUnit->IsServerAIControlled() && Brain)) return false;
+            // Hold only the initial AI decision until both replicated HUDs expose the control lock.
+            // 복제된 양쪽 HUD의 조작 잠금을 확인할 때까지 최초 AI 판단만 대기시킵니다.
+            Brain->Stop();
+            EnemyHPBeforeSkill = Enemy->GetAttributeSet()->GetHP();
+            ObservePartyAI();
+        }
+        return true;
+    }
+
+    bool PrepareAIRecord()
+    {
+        FText Error;
+        TStrongObjectPtr<URunSaveGame> Save(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Slot, Error)));
+        if (!Test->TestNotNull(TEXT("AI opt-in starts with an actual confirmed disk checkpoint."), Save.Get())) return false;
+        FCombatCheckpointData& Checkpoint = Save->CombatCheckpoint;
+        FCombatCheckpointUnit* AIUnit = Checkpoint.Units.FindByPredicate([this](const FCombatCheckpointUnit& Unit) { return Unit.CharacterId == GuestCharacter; });
+        if (!Test->TestTrue(TEXT("AI fixture preserves the owner's Run-start consent."), AIUnit && Checkpoint.Identity.OriginalParticipants[1].AIConsent == ERunAIConsent::Granted && Checkpoint.Identity.OriginalParticipants[1].ConsentPolicyVersion == 1)) return false;
+        // This explicit test fixture selects AI before the new session; it is not a live transition API.
+        // 새 세션 전에 AI를 선택하는 명시적 테스트 데이터이며 실행 중 전환 API가 아닙니다.
+        Checkpoint.SchemaVersion = 2;
+        AIUnit->PartyControlMode = EPartyControlMode::ServerAI;
+        AIUnit->HP = FMath::Max(1.0f, AIUnit->MaxHP - 40.0f);
+        AIUnit->HealingItemCount = 1;
+        AIUnit->HealingItemAmount = 40.0f;
+        // Keep the passive Host and opponent alive until the complete guest AI turn can be observed.
+        // 아군 AI의 전체 턴을 관찰할 때까지 수동 Host와 상대가 생존하도록 테스트 체력을 설정합니다.
+        for (FCombatCheckpointUnit& Unit : Checkpoint.Units)
+        {
+            if (Unit.Team == ETeam::Enemy || Unit.CharacterId == HostCharacter)
+            {
+                Unit.MaxHP = 1000.0f;
+                Unit.HP = 1000.0f;
+            }
+        }
+        for (FRunPartyMember& Member : Save->Party)
+        {
+            const FCombatCheckpointUnit* Unit = Checkpoint.Units.FindByPredicate([&Member](const FCombatCheckpointUnit& Entry) { return Entry.CharacterId == Member.CharacterId; });
+            if (Unit) Member.CurrentHP = Unit->HP;
+        }
+        if (!Test->TestTrue(TEXT("The writer persists AI mode before ending its process/session."), FRunCheckpointStorage::Save(Save.Get(), Slot, Error))) return false;
+        Expected = Checkpoint;
+        return true;
+    }
+
+    void ObservePartyAI()
+    {
+        RemoveActionObserver();
+        ObservedUnit = Guest;
+        AIItems = 0;
+        AISkills = 0;
+        AIMoves = 0;
+        bAIHealingObserved = false;
+        bAIActionFailed = false;
+        LastObservedAITurn = INDEX_NONE;
+        const float HPBefore = Guest->GetAttributeSet()->GetHP();
+        ActionObserver = Guest->OnActionCompleted.AddLambda([this, HPBefore](AUnitBase* Unit, EUnitActionType Kind, EUnitActionResult Result)
+        {
+            bAIActionFailed |= Result != EUnitActionResult::Succeeded;
+            if (Kind == EUnitActionType::Item)
+            {
+                ++AIItems;
+                bAIHealingObserved |= Unit->GetAttributeSet()->GetHP() > HPBefore;
+            }
+            else if (Kind == EUnitActionType::Skill) ++AISkills;
+            else if (Kind == EUnitActionType::Move) ++AIMoves;
+            Test->AddInfo(FString::Printf(TEXT("Party AI completion: Kind=%d Result=%d Turn=%d HP=%.1f AP=%d SubAP=%d Coord=%s Items=%d Skills=%d Moves=%d"), static_cast<int32>(Kind), static_cast<int32>(Result), Combat.IsValid() ? Combat->GetTurnSerial() : INDEX_NONE, Unit->GetAttributeSet()->GetHP(), Unit->GetCurrentActionPoint(), Unit->GetCurrentSubActionPoint(), Unit->GetCurrentTile() ? *Unit->GetCurrentTile()->GridCoord.ToString() : TEXT("None"), AIItems, AISkills, AIMoves));
+        });
     }
 
     bool RejectMisplacedSavedTransform()
@@ -763,6 +897,7 @@ private:
             bUnitValid &= Unit->GetCurrentActionPoint() == (bActive ? Saved.MaxAP : Saved.AP) && Unit->GetCurrentSubActionPoint() == (bActive ? Saved.MaxSubAP : Saved.SubAP);
             bUnitValid &= Unit->GetMaxActionPoint() == Saved.MaxAP && Unit->GetMaxSubActionPoint() == Saved.MaxSubAP && Unit->HealingItemCount == Saved.HealingItemCount && Unit->HealingItemAmount == Saved.HealingItemAmount && Unit->GetMoveRange() == Saved.MoveRange;
             bUnitValid &= Manager->GetCharacterId(Unit) == Saved.CharacterId && Manager->GetOwnerAccountId(Unit) == Saved.OwnerAccountId;
+            if (const APlayerUnit* Player = Cast<APlayerUnit>(Unit)) bUnitValid &= Player->GetPartyControlMode() == Saved.PartyControlMode;
             bUnitValid &= Saved.bHasTile ? Unit->GetCurrentTile() && Unit->GetCurrentTile()->GridCoord == Saved.GridCoord && Unit->GetCurrentTile()->GetOccupyingUnit() == Unit : !Unit->GetCurrentTile();
             bUnitValid &= FVector::DistSquared2D(Unit->GetActorLocation(), Saved.Transform.GetLocation()) < 1.0f;
             bUnitValid &= Unit->GetEquippedSkillDataAssets().Num() == Saved.Skills.Num() && FSoftObjectPath(Unit->GetDefaultAttackAbilityClass().Get()) == Saved.DefaultAttackAbility;
@@ -787,6 +922,11 @@ private:
             AUnitBase* ClientUnit = ClientCombat->ResolveRuntimeUnit(Combat->GetRuntimeUnitId(ServerUnit));
             if (!ClientUnit || !ClientUnit->GetAttributeSet() || ClientUnit->IsBusy() != ServerUnit->IsBusy() || ClientUnit->IsUnitAlive() != ServerUnit->IsUnitAlive() || ClientUnit->GetCurrentActionPoint() != ServerUnit->GetCurrentActionPoint() || ClientUnit->GetCurrentSubActionPoint() != ServerUnit->GetCurrentSubActionPoint() || ClientUnit->HealingItemCount != ServerUnit->HealingItemCount || !FMath::IsNearlyEqual(ClientUnit->GetAttributeSet()->GetHP(), ServerUnit->GetAttributeSet()->GetHP()) || ClientCombat->GetOwnerAccountId(ClientUnit) != Combat->GetOwnerAccountId(ServerUnit)) return false;
             if (ClientUnit->GetMaxActionPoint() != ServerUnit->GetMaxActionPoint() || ClientUnit->GetMaxSubActionPoint() != ServerUnit->GetMaxSubActionPoint() || ClientUnit->GetMoveRange() != ServerUnit->GetMoveRange() || ClientUnit->HealingItemAmount != ServerUnit->HealingItemAmount || !FMath::IsNearlyEqual(ClientUnit->GetAttributeSet()->GetMaxHP(), ServerUnit->GetAttributeSet()->GetMaxHP()) || ClientUnit->GetEquippedSkillDataAssets() != ServerUnit->GetEquippedSkillDataAssets() || ClientUnit->GetDefaultAttackAbilityClass() != ServerUnit->GetDefaultAttackAbilityClass() || ClientUnit->IsActiveTurn() != ServerUnit->IsActiveTurn() || ClientUnit->GetTeam() != ServerUnit->GetTeam() || !ClientUnit->RuntimeCharacterName.EqualTo(ServerUnit->RuntimeCharacterName)) return false;
+            if (const APlayerUnit* ServerPlayer = Cast<APlayerUnit>(ServerUnit))
+            {
+                const APlayerUnit* ClientPlayer = Cast<APlayerUnit>(ClientUnit);
+                if (!ClientPlayer || ClientPlayer->GetPartyControlMode() != ServerPlayer->GetPartyControlMode()) return false;
+            }
             ACombatGridTile* ServerTile = ServerUnit->GetCurrentTile();
             ACombatGridTile* ClientTile = ClientUnit->GetCurrentTile();
             if (ServerTile ? !ClientTile || ServerTile->GridCoord != ClientTile->GridCoord || ClientTile->GetOccupyingUnit() != ClientUnit : ClientTile != nullptr) return false;
@@ -980,6 +1120,7 @@ private:
     ERunMode Mode;
     FString Slot;
     EOpponentSourceChange OpponentChange;
+    bool bPartyAI = false;
     FName OpponentSlot;
     FPartySnapshot OriginalOpponent;
     FPartySnapshot ReplacementOpponent;
@@ -1000,6 +1141,12 @@ private:
     FCombatActionRequest OldRequest;
     int64 PendingSequence = 0;
     float EnemyHPBeforeSkill = 0.0f;
+    int32 AIItems = 0;
+    int32 AISkills = 0;
+    int32 AIMoves = 0;
+    bool bAIHealingObserved = false;
+    bool bAIActionFailed = false;
+    int32 LastObservedAITurn = INDEX_NONE;
     FCombatCheckpointData Expected;
     FDelegateHandle ActionObserver;
     TOptional<EUnitActionResult> ActionResult;
@@ -1025,6 +1172,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatCheckpointSessionTest, "ProjectA.Coop.Ch
 
 bool FCombatCheckpointSessionTest::RunTest(const FString& Parameters)
 {
+    const bool bPartyAI = FParse::Param(FCommandLine::Get(), TEXT("T14CheckpointAI"));
     CombatCheckpointPIETests::EOpponentSourceChange OpponentChange = CombatCheckpointPIETests::EOpponentSourceChange::None;
     FString OpponentOption;
     if (FParse::Value(FCommandLine::Get(), TEXT("T14CheckpointOpponent="), OpponentOption))
@@ -1039,8 +1187,14 @@ bool FCombatCheckpointSessionTest::RunTest(const FString& Parameters)
         AddInfo(TEXT("Testing actual frozen-opponent restoration after source Snapshot change: ") + OpponentOption);
     }
     const FString Slot = TEXT("T14_CombatPIE_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    if (bPartyAI && OpponentChange != CombatCheckpointPIETests::EOpponentSourceChange::None)
+    {
+        AddError(TEXT("T14CheckpointAI and T14CheckpointOpponent are separate fixture variants."));
+        return false;
+    }
+    if (bPartyAI) AddInfo(TEXT("Testing persisted guest AI with its original consent, ownership and actual two-world combat."));
     ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
-    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<CombatCheckpointPIETests::FCheckpointSessions>(this, CombatCheckpointPIETests::ERunMode::SessionRestart, Slot, OpponentChange));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<CombatCheckpointPIETests::FCheckpointSessions>(this, CombatCheckpointPIETests::ERunMode::SessionRestart, Slot, OpponentChange, bPartyAI));
     return true;
 }
 
@@ -1058,7 +1212,7 @@ bool FCombatCheckpointProcessTest::RunTest(const FString& Parameters)
     FString Slot;
     if (!TestTrue(TEXT("Process restart requires one mode and an isolated explicit slot."), bWrite != bRead && FParse::Value(FCommandLine::Get(), TEXT("T14CheckpointSlot="), Slot) && Slot.StartsWith(TEXT("T14_CombatProcess_")) && FRunCheckpointStorage::IsSafeSlotName(Slot))) return false;
     ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
-    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<CombatCheckpointPIETests::FCheckpointSessions>(this, bWrite ? CombatCheckpointPIETests::ERunMode::ProcessWriter : CombatCheckpointPIETests::ERunMode::ProcessReader, Slot));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<CombatCheckpointPIETests::FCheckpointSessions>(this, bWrite ? CombatCheckpointPIETests::ERunMode::ProcessWriter : CombatCheckpointPIETests::ERunMode::ProcessReader, Slot, CombatCheckpointPIETests::EOpponentSourceChange::None, FParse::Param(FCommandLine::Get(), TEXT("T14CheckpointAI"))));
     return true;
 }
 

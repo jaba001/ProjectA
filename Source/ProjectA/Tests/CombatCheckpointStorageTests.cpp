@@ -137,7 +137,7 @@ bool FCombatCheckpointValueTest::RunTest(const FString& Parameters)
         TestFalse(FString(Label) + TEXT(" reports why"), Error.IsEmpty());
         Invalid = Valid;
     };
-    Invalid.SchemaVersion = 2;
+    Invalid.SchemaVersion = 3;
     Reject(TEXT("Unknown checkpoint schema is rejected"));
     Invalid.ContentVersion = 2;
     Reject(TEXT("Unknown content version is rejected"));
@@ -452,6 +452,97 @@ bool FCombatCheckpointTerminalTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Committed Continue publishes once"), Events, 2);
     TestTrue(TEXT("Next encounter begins after terminal commit"), Fixture.Run->BeginEncounter(TEXT("Combat_02")) && Fixture.Run->MarkCombatStarted());
     TestTrue(TEXT("A new encounter can begin a new attempt at revision one"), Fixture.Run->CommitCombatCheckpoint(Fixture.MakeCheckpoint(), Error));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatCheckpointAIControlTest, "ProjectA.Checkpoint.AIControlCompatibility", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatCheckpointAIControlTest::RunTest(const FString& Parameters)
+{
+    FCheckpointStorageFixture Fixture;
+    FText Error;
+    if (!TestTrue(TEXT("Real-content fixture initializes"), Fixture.Initialize(Error)))
+    {
+        return false;
+    }
+    const FCombatCheckpointData Human = Fixture.MakeCheckpoint();
+    TestEqual(TEXT("Default checkpoint schema preserves existing empty-payload compatibility"), Human.SchemaVersion, 1);
+    if (!TestTrue(TEXT("Schema one Human boundary commits without AI consent"), Fixture.Run->CommitCombatCheckpoint(Human, Error)))
+    {
+        return false;
+    }
+    TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
+    Restored->EnableCheckpointSaving(Fixture.Slot);
+    if (!TestTrue(TEXT("Schema one Human boundary remains loadable"), Restored->LoadCheckpoint(Error)))
+    {
+        return false;
+    }
+    TestTrue(TEXT("Schema one load preserves every checkpoint field"), SameCheckpoint(Restored->GetCombatCheckpoint(), Human));
+    TestTrue(TEXT("Schema one load retains Human party control"), Restored->GetCombatCheckpoint().Units[0].PartyControlMode == EPartyControlMode::Human);
+
+    FCombatCheckpointData ValidAI = Human;
+    ValidAI.Identity.OriginalParticipants[0].AIConsent = ERunAIConsent::Granted;
+    ValidAI.Identity.OriginalParticipants[0].ConsentPolicyVersion = 1;
+    ValidAI.Units[0].PartyControlMode = EPartyControlMode::ServerAI;
+    TestFalse(TEXT("Schema one cannot smuggle AI mode even with valid consent"), UCombatCheckpointLibrary::Validate(ValidAI, Fixture.Run->GetPartyMembers(), Error));
+    ValidAI.SchemaVersion = 2;
+    TestTrue(TEXT("Schema two supports AI with the original owner's policy-one consent"), UCombatCheckpointLibrary::Validate(ValidAI, Fixture.Run->GetPartyMembers(), Error));
+    FCombatCheckpointData Invalid = ValidAI;
+    const auto Reject = [this, &Fixture, &ValidAI, &Invalid, &Error](const TCHAR* Label)
+    {
+        TestFalse(Label, UCombatCheckpointLibrary::Validate(Invalid, Fixture.Run->GetPartyMembers(), Error));
+        TestFalse(FString(Label) + TEXT(" reports why"), Error.IsEmpty());
+        Invalid = ValidAI;
+    };
+    Invalid.Identity.OriginalParticipants[0].AIConsent = ERunAIConsent::Unknown;
+    Invalid.Identity.OriginalParticipants[0].ConsentPolicyVersion = 0;
+    Reject(TEXT("Unknown consent cannot authorize stored AI control"));
+    Invalid.Identity.OriginalParticipants[0].AIConsent = ERunAIConsent::Declined;
+    Reject(TEXT("Declined consent cannot authorize stored AI control"));
+    Invalid.Identity.OriginalParticipants[0].ConsentPolicyVersion = 0;
+    Reject(TEXT("Granted consent requires its supported policy version"));
+    Invalid.Units[0].PartyControlMode = static_cast<EPartyControlMode>(255);
+    Reject(TEXT("Unknown control mode is rejected"));
+    Invalid.Units[1].PartyControlMode = EPartyControlMode::ServerAI;
+    Reject(TEXT("Party AI mode cannot be assigned to an enemy entry"));
+
+    // Consent belongs to a new Run's original identity; do not mutate consent on the running fixture.
+    // 동의는 새 Run의 원래 식별 정보에 속하며 실행 중인 테스트 Run의 동의를 바꾸지 않습니다.
+    FRunIdentityData ConsentingIdentity = ValidAI.Identity;
+    ConsentingIdentity.RunId = FGuid::NewGuid();
+    const TArray<FRunPartyMember> Members = Fixture.Run->GetPartyMembers();
+    if (!TestTrue(TEXT("New Run records granted consent at initialization"), Fixture.Run->InitializeRunWithIdentity(Members, ConsentingIdentity, Error)) || !TestTrue(TEXT("Consenting Run enters combat"), Fixture.Run->BeginEncounter(TEXT("Combat_01")) && Fixture.Run->MarkCombatStarted()))
+    {
+        return false;
+    }
+    FCombatCheckpointData AI = Fixture.MakeCheckpoint();
+    AI.SchemaVersion = 2;
+    AI.Units[0].PartyControlMode = EPartyControlMode::ServerAI;
+    if (!TestTrue(TEXT("Consented schema two AI boundary commits to disk"), Fixture.Run->CommitCombatCheckpoint(AI, Error)))
+    {
+        AddError(Error.ToString());
+        return false;
+    }
+    TStrongObjectPtr<URunSaveGame> Disk(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
+    if (!TestTrue(TEXT("Native SaveGame reader loads the AI boundary"), Disk.IsValid()))
+    {
+        return false;
+    }
+    TestEqual(TEXT("The Run save remains version three for combat"), Disk->Version, 3);
+    TestEqual(TEXT("Stored combat schema is two"), Disk->CombatCheckpoint.SchemaVersion, 2);
+    TestTrue(TEXT("Native serialization retains every AI checkpoint field"), SameCheckpoint(Disk->CombatCheckpoint, AI));
+    TestTrue(TEXT("AI checkpoint can continue"), Restored->CanContinueSavedRun(Error));
+    if (!TestTrue(TEXT("Run load restores the persisted AI control field"), Restored->LoadCheckpoint(Error)))
+    {
+        return false;
+    }
+    const FCombatCheckpointUnit& SavedPlayer = Restored->GetCombatCheckpoint().Units[0];
+    TestTrue(TEXT("Restored party unit remains ServerAI controlled"), SavedPlayer.PartyControlMode == EPartyControlMode::ServerAI);
+    TestTrue(TEXT("Restored enemy keeps the neutral party-control marker"), Restored->GetCombatCheckpoint().Units[1].PartyControlMode == EPartyControlMode::Human);
+    TestEqual(TEXT("AI restoration keeps the original character ID"), SavedPlayer.CharacterId, Members[0].CharacterId);
+    TestTrue(TEXT("AI restoration keeps the original unit owner"), SavedPlayer.OwnerAccountId == Members[0].OwnerAccountId);
+    TestTrue(TEXT("AI restoration keeps persistent party ownership"), Restored->GetPartyMembers()[0].OwnerAccountId == Members[0].OwnerAccountId);
+    TestTrue(TEXT("AI restoration keeps complete Run, Host and consent metadata"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Restored->GetRunIdentity(), &ConsentingIdentity, 0));
     return true;
 }
 

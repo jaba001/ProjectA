@@ -14,6 +14,7 @@ class PROJECTA_API UCombatCheckpointLibrary : public UBlueprintFunctionLibrary
     GENERATED_BODY()
 
 public:
+    static constexpr int32 CurrentSchemaVersion = 2;
     static constexpr int32 CurrentContentVersion = 1;
     static bool Validate(const FCombatCheckpointData& Checkpoint, const TArray<FRunPartyMember>& Party, FText& OutError);
 };

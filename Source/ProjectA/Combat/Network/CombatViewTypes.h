@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Combat/AI/PartyControlTypes.h"
 #include "Game/Run/RunIdentityTypes.h"
 #include "Types/CombatResult.h"
 #include "CombatViewTypes.generated.h"
@@ -25,6 +26,9 @@ struct PROJECTA_API FCombatUnitView
 
     UPROPERTY(BlueprintReadOnly)
     FRunAccountId OwnerAccountId;
+
+    UPROPERTY(BlueprintReadOnly)
+    EPartyControlMode PartyControlMode = EPartyControlMode::Human;
 };
 
 // Clients observe a server-produced combat view without constructing or advancing a TurnManager.

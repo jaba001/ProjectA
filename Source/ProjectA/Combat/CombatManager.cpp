@@ -4,6 +4,7 @@
 #include "Game/Turn/TurnManager.h"
 #include "Controller/PartyPlayerController.h"
 #include "Unit/UnitBase.h"
+#include "Unit/PlayerUnit.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Kismet/GameplayStatics.h"
@@ -106,6 +107,10 @@ void ACombatManager::PublishCombatView()
         NewView.CombatResult = TurnManager->GetCombatResult();
         NewView.CurrentUnit = TurnManager->GetCurrentUnit();
         NewView.CurrentUnitName = TurnManager->GetCurrentUnitName();
+        if (const APlayerUnit* Player = Cast<APlayerUnit>(NewView.CurrentUnit); Player && Player->IsServerAIControlled())
+        {
+            NewView.CurrentUnitName += TEXT(" (AI)");
+        }
     }
     for (AUnitBase* Unit : CombatUnits)
     {
@@ -113,6 +118,10 @@ void ACombatManager::PublishCombatView()
         {
             FCombatUnitView& Entry = NewView.Units.AddDefaulted_GetRef();
             Entry.Unit = Unit;
+            if (const APlayerUnit* Player = Cast<APlayerUnit>(Unit))
+            {
+                Entry.PartyControlMode = Player->GetPartyControlMode();
+            }
             if (ActionAuthority)
             {
                 Entry.RuntimeUnitId = ActionAuthority->GetUnitId(Unit);
@@ -130,6 +139,17 @@ void ACombatManager::PublishCombatView()
 void ACombatManager::HandleTurnChanged()
 {
     PublishCombatView();
+}
+
+bool ACombatManager::IsPartyAIControlled(const AUnitBase* Unit) const
+{
+    if (HasAuthority())
+    {
+        const APlayerUnit* Player = Cast<APlayerUnit>(Unit);
+        return Player && Player->IsServerAIControlled();
+    }
+    const FCombatUnitView* Entry = CombatView.Units.FindByPredicate([Unit](const FCombatUnitView& Value) { return Value.Unit == Unit; });
+    return Entry && Entry->PartyControlMode == EPartyControlMode::ServerAI;
 }
 
 bool ACombatManager::HandleCommitTurnBoundary(int32 CompletedTurnSerial, int32 NextTurnIndex)

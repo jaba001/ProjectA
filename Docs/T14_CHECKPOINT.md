@@ -18,6 +18,7 @@
 - `FCombatCheckpointData`는 스키마/콘텐츠 버전, 전투 시도 `AttemptId`, 순번 `Revision`, Run/원래 참가자/Host, 노드·인카운터, 완료 턴과 다음 유닛 인덱스를 저장한다.
 - `Units` 배열이 턴 순서다. 각 유닛은 체크포인트 ID, 원래 캐릭터/소유자/파티 슬롯, 팀, 클래스 에셋 경로, 이름, HP/MaxHP·AP/SubAP·상한, 이동 범위, 회복약, 사망, 타일 좌표, 변환, 순서 있는 실제 장착과 기본 공격을 저장한다.
 - 상대 Snapshot 전투는 읽어 온 원본 본문·카탈로그와 해석한 실제 유닛 빌드를 보존한다. 복원할 때 외부 상대 슬롯을 다시 읽거나 `EncounterSkillPool`을 다시 추첨하지 않는다.
+- 순차 5번부터 새 전투 본문은 schema 2로 파티 조작 모드도 저장한다. schema 1은 기존 Human으로 읽고, AI 복원은 원래 소유자의 사전 동의를 확인한 뒤 새 실행 세션을 부여한다. Run SaveGame v3와 콘텐츠 버전 1은 유지한다. 상세 내용은 [아군 AI 안내](T14_PARTY_AI.md)를 따른다.
 - 영속 데이터에는 Actor·Controller·GAS 실행 핸들이 없다. 복원된 Actor와 명령용 실행 ID·유닛 ID·연결 바인딩 nonce는 새로 생성한다. Run·소유권·Host 계정/세대·AttemptId·체크포인트 ID는 유지한다.
 
 현재 콘텐츠 버전은 `UCombatCheckpointLibrary::CurrentContentVersion` 1이다. 저장된 스킬·클래스 경로의 동작 계약을 바꾸는 콘텐츠 변경은 버전도 갱신해야 한다. 저장 파일은 현재 로컬 콘텐츠를 참조하며 실행 코드 자체를 동결하거나 서버가 인증한 데이터를 제공하지 않는다.

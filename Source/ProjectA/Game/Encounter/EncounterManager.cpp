@@ -168,6 +168,7 @@ bool AEncounterManager::BuildTurnCheckpoint(int32 CompletedTurnSerial, int32 Nex
         }
     }
     FCombatCheckpointData Candidate;
+    Candidate.SchemaVersion = UCombatCheckpointLibrary::CurrentSchemaVersion;
     Candidate.AttemptId = CombatAttemptId;
     const FCombatCheckpointData& Previous = RunState->GetCombatCheckpoint();
     if (Previous.AttemptId == CombatAttemptId && Previous.Revision == MAX_int64)

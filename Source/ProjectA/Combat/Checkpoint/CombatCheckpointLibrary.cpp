@@ -37,7 +37,7 @@ namespace
 bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint, const TArray<FRunPartyMember>& Party, FText& OutError)
 {
     OutError = NSLOCTEXT("CombatCheckpoint", "Invalid", "전투 체크포인트가 손상되었거나 현재 콘텐츠와 호환되지 않습니다.");
-    if (Checkpoint.SchemaVersion != 1 || Checkpoint.ContentVersion != CurrentContentVersion || !Checkpoint.AttemptId.IsValid() || Checkpoint.Revision < 1 || Checkpoint.Revision == MAX_int64 || Checkpoint.Identity.Origin == ERunIdentityOrigin::LegacyOffline || Checkpoint.NodeId.IsNone() || Checkpoint.EncounterId.IsNone() || Checkpoint.CompletedTurnSerial < 0 || Checkpoint.CompletedTurnSerial == MAX_int32 || Checkpoint.Units.Num() < 2 || Checkpoint.Units.Num() > 8 || !Checkpoint.Units.IsValidIndex(Checkpoint.NextTurnIndex))
+    if ((Checkpoint.SchemaVersion != 1 && Checkpoint.SchemaVersion != CurrentSchemaVersion) || Checkpoint.ContentVersion != CurrentContentVersion || !Checkpoint.AttemptId.IsValid() || Checkpoint.Revision < 1 || Checkpoint.Revision == MAX_int64 || Checkpoint.Identity.Origin == ERunIdentityOrigin::LegacyOffline || Checkpoint.NodeId.IsNone() || Checkpoint.EncounterId.IsNone() || Checkpoint.CompletedTurnSerial < 0 || Checkpoint.CompletedTurnSerial == MAX_int32 || Checkpoint.Units.Num() < 2 || Checkpoint.Units.Num() > 8 || !Checkpoint.Units.IsValidIndex(Checkpoint.NextTurnIndex))
     {
         return false;
     }
@@ -55,6 +55,10 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
     for (const FCombatCheckpointUnit& Unit : Checkpoint.Units)
     {
         if (!Unit.UnitId.IsValid() || UnitIds.Contains(Unit.UnitId) || (Unit.Team != ETeam::Player && Unit.Team != ETeam::Enemy) || !IsAssetPath(Unit.UnitClass) || !IsReadableName(Unit.CharacterName))
+        {
+            return false;
+        }
+        if ((Unit.PartyControlMode != EPartyControlMode::Human && Unit.PartyControlMode != EPartyControlMode::ServerAI) || ((Checkpoint.SchemaVersion == 1 || Unit.Team == ETeam::Enemy) && Unit.PartyControlMode != EPartyControlMode::Human))
         {
             return false;
         }
@@ -93,6 +97,15 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
                 return false;
             }
             PartySlots.Add(Unit.PartySlot);
+            if (Unit.PartyControlMode == EPartyControlMode::ServerAI)
+            {
+                const FRunParticipantData* Participant = Checkpoint.Identity.OriginalParticipants.FindByPredicate([&Unit](const FRunParticipantData& Candidate) { return Candidate.AccountId == Unit.OwnerAccountId; });
+                if (!Participant || Participant->AIConsent != ERunAIConsent::Granted || Participant->ConsentPolicyVersion != 1)
+                {
+                    OutError = NSLOCTEXT("CombatCheckpoint", "AIConsent", "서버 AI 조작을 복원하려면 원래 소유자의 정책 버전 1 사전 동의가 필요합니다.");
+                    return false;
+                }
+            }
             LivingPlayers += !Unit.bDead ? 1 : 0;
         }
         else

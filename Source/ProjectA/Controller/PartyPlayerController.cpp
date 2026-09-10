@@ -363,7 +363,7 @@ bool APartyPlayerController::CanUseActiveUnitAction() const
         return false;
     }
 
-    if (!ActiveUnit->IsUnitAlive() || ActiveUnit->GetTeam() != ETeam::Player)
+    if (!ActiveUnit->IsUnitAlive() || ActiveUnit->GetTeam() != ETeam::Player || CombatManager->IsPartyAIControlled(ActiveUnit))
     {
         return false;
     }

@@ -8,6 +8,7 @@
 #include "Game/Run/RunIdentityLibrary.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Unit/UnitBase.h"
+#include "Unit/PlayerUnit.h"
 
 ACombatManager* UCombatActionAuthority::GetManager() const
 {
@@ -30,6 +31,7 @@ void UCombatActionAuthority::Reset()
     Participants.Reset();
     ParticipantBindingIds.Reset();
     LastRequestSequences.Reset();
+    LastAIRequestSequences.Reset();
     CombatInstanceId.Invalidate();
     RunIdentity = FRunIdentityData();
     PartyMembers.Reset();
@@ -62,6 +64,7 @@ void UCombatActionAuthority::BeginCombat()
     }
     CombatInstanceId = FGuid::NewGuid();
     LastRequestSequences.Reset();
+    LastAIRequestSequences.Reset();
     TMap<FGuid, TWeakObjectPtr<AUnitBase>> NewIds;
     for (const TPair<FGuid, TWeakObjectPtr<AUnitBase>>& Entry : UnitsById)
     {
@@ -75,15 +78,15 @@ void UCombatActionAuthority::BeginCombat()
 
 bool UCombatActionAuthority::ConfigureRun(const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, const TMap<int32, TObjectPtr<AUnitBase>>& PartyActors, FText& OutError)
 {
-    bRequiresRunConfiguration = true;
-    bRunConfigured = false;
-    CharacterIds.Reset();
     ACombatManager* Manager = GetManager();
-    if (!IsValid(Manager) || !Manager->HasAuthority() || Manager->IsCombatActive())
+    if (!IsValid(Manager) || !Manager->HasAuthority() || Manager->GetTurnManager())
     {
         OutError = NSLOCTEXT("CombatRequest", "ConfigureContext", "Run 소유권은 서버에서 전투 시작 전에 설정해야 합니다.");
         return false;
     }
+    bRequiresRunConfiguration = true;
+    bRunConfigured = false;
+    CharacterIds.Reset();
     if (!URunIdentityLibrary::ValidateIdentity(Identity, Members, OutError))
     {
         return false;
@@ -130,6 +133,13 @@ bool UCombatActionAuthority::ConfigureRun(const FRunIdentityData& Identity, cons
     PartyMembers = Members;
     CharacterIds = MoveTemp(NewCharacterIds);
     bRunConfigured = true;
+    for (const TPair<int32, TObjectPtr<AUnitBase>>& Entry : PartyActors)
+    {
+        if (APlayerUnit* Player = Cast<APlayerUnit>(Entry.Value))
+        {
+            Player->InitializeAutoCombat(Manager);
+        }
+    }
     OutError = FText::GetEmpty();
     return true;
 }
@@ -184,6 +194,10 @@ bool UCombatActionAuthority::CanControllerControl(const APartyPlayerController* 
 {
     const ACombatManager* Manager = GetManager();
     if (!IsValid(Manager) || !Manager->HasAuthority() || !IsValid(Controller) || !IsValid(Unit) || Controller->GetWorld() != Manager->GetWorld() || Unit->GetWorld() != Manager->GetWorld() || Controller->GetCombatManager() != Manager || Unit->GetTeam() != ETeam::Player || !GetUnitId(Unit).IsValid() || !Manager->GetRegisteredUnits().Contains(Unit))
+    {
+        return false;
+    }
+    if (const APlayerUnit* Player = Cast<APlayerUnit>(Unit); Player && Player->IsServerAIControlled())
     {
         return false;
     }
@@ -317,6 +331,87 @@ FCombatActionResponse UCombatActionAuthority::Execute(APartyPlayerController* Co
     if (!CanControllerControl(Controller, Unit))
     {
         return Reject(ECombatRequestResult::NotOwner, TEXT("자신이 소유한 캐릭터만 직접 조작할 수 있습니다."));
+    }
+    return ExecuteUnitAction(Unit, Request);
+}
+
+bool UCombatActionAuthority::HasAIConsent(const APlayerUnit* Unit) const
+{
+    if (!bRunConfigured || !GetCharacterId(Unit).IsValid())
+    {
+        return false;
+    }
+    const FRunAccountId Owner = GetOwnerAccountId(Unit);
+    const FRunParticipantData* Participant = RunIdentity.OriginalParticipants.FindByPredicate([&Owner](const FRunParticipantData& Entry) { return Entry.AccountId == Owner; });
+    return Participant && Participant->AIConsent == ERunAIConsent::Granted && Participant->ConsentPolicyVersion == 1;
+}
+
+bool UCombatActionAuthority::SetPartyControlMode(APlayerUnit* Unit, EPartyControlMode Mode, FText& OutError)
+{
+    OutError = FText::FromString(TEXT("원래 소유자가 확인된 유휴 아군의 조작 방식은 서버에서 전투 시작 전에만 설정할 수 있습니다."));
+    ACombatManager* Manager = GetManager();
+    if (!IsValid(Manager) || !Manager->HasAuthority() || Manager->GetTurnManager() || !bRunConfigured || !IsValid(Unit) || Unit->GetWorld() != Manager->GetWorld() || Unit->GetTeam() != ETeam::Player || !GetCharacterId(Unit).IsValid() || !GetUnitId(Unit).IsValid() || !Manager->GetRegisteredUnits().Contains(Unit) || (Mode != EPartyControlMode::Human && Mode != EPartyControlMode::ServerAI))
+    {
+        return false;
+    }
+    if (Mode == EPartyControlMode::ServerAI && !HasAIConsent(Unit))
+    {
+        OutError = FText::FromString(TEXT("원래 캐릭터 소유자의 Run 시작 시 AI 전환 동의가 필요합니다."));
+        return false;
+    }
+    if (!Unit->ApplyPartyControlMode(Mode))
+    {
+        return false;
+    }
+    Manager->PublishCombatView();
+    OutError = FText::GetEmpty();
+    return true;
+}
+
+FCombatActionResponse UCombatActionAuthority::ExecuteServerAI(APlayerUnit* Unit, const FCombatActionRequest& Request, FGuid ControlSessionId)
+{
+    FCombatActionResponse Response;
+    Response.CombatInstanceId = Request.CombatInstanceId;
+    Response.RequestSequence = Request.RequestSequence;
+    Response.Result = ECombatRequestResult::InvalidContext;
+    Response.Message = FText::FromString(TEXT("현재 서버 AI의 전투·조작 세션과 일치하지 않습니다."));
+    ACombatManager* Manager = GetManager();
+    if (!IsValid(Manager) || !Manager->HasAuthority() || !Manager->IsCombatActive() || !bRunConfigured || !IsValid(Unit) || Unit->GetTeam() != ETeam::Player || ResolveUnit(Request.UnitId) != Unit || !Unit->IsServerAIControlled() || !HasAIConsent(Unit) || !ControlSessionId.IsValid() || Unit->GetAIControlSessionId() != ControlSessionId || !CombatInstanceId.IsValid() || Request.CombatInstanceId != CombatInstanceId || Request.RunId != RunIdentity.RunId || Request.HostEpoch != RunIdentity.HostEpoch || Request.ParticipantBindingId.IsValid())
+    {
+        return Response;
+    }
+    if (Request.Version != 1 || Request.RequestSequence <= 0)
+    {
+        Response.Result = ECombatRequestResult::InvalidRequest;
+        return Response;
+    }
+    int64& LastSequence = LastAIRequestSequences.FindOrAdd(ControlSessionId);
+    if (Request.RequestSequence <= LastSequence)
+    {
+        Response.Result = ECombatRequestResult::DuplicateRequest;
+        return Response;
+    }
+    // AI has its own execution session; rejected mutable requests cannot become valid through replay.
+    // AI는 별도 실행 세션을 사용하며 변경 가능한 조건으로 거절된 요청은 재전송으로 승인되지 않습니다.
+    LastSequence = Request.RequestSequence;
+    return ExecuteUnitAction(Unit, Request);
+}
+
+FCombatActionResponse UCombatActionAuthority::ExecuteUnitAction(AUnitBase* Unit, const FCombatActionRequest& Request)
+{
+    FCombatActionResponse Response;
+    Response.CombatInstanceId = Request.CombatInstanceId;
+    Response.RequestSequence = Request.RequestSequence;
+    const auto Reject = [&Response](ECombatRequestResult Result, const TCHAR* Message)
+    {
+        Response.Result = Result;
+        Response.Message = FText::FromString(Message);
+        return Response;
+    };
+    ACombatManager* Manager = GetManager();
+    if (!Manager || !Manager->HasAuthority() || !Manager->IsCombatActive() || !Manager->GetTurnManager() || Request.TurnSerial != Manager->GetTurnManager()->GetTurnCounter())
+    {
+        return Reject(ECombatRequestResult::InvalidContext, TEXT("요청한 턴은 현재 서버 턴이 아닙니다."));
     }
     if (Unit != Manager->GetCurrentUnit() || !Unit->IsActiveTurn() || !Unit->IsUnitAlive() || Unit->IsBusy())
     {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Combat/AI/PartyControlTypes.h"
 #include "Game/Run/RunIdentityTypes.h"
 #include "Game/Snapshot/PartySnapshotTypes.h"
 #include "Unit/UnitBase.h"
@@ -27,6 +28,9 @@ struct PROJECTA_API FCombatCheckpointUnit
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     ETeam Team = ETeam::Player;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    EPartyControlMode PartyControlMode = EPartyControlMode::Human;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     FSoftObjectPath UnitClass;

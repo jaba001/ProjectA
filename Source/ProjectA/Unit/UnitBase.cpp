@@ -9,6 +9,7 @@
 
 #include "Combat/CombatManager.h"
 #include "Combat/Checkpoint/CombatCheckpointTypes.h"
+#include "Unit/PlayerUnit.h"
 #include "Combat/Library/CombatTargetingLibrary.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
@@ -1227,6 +1228,8 @@ bool AUnitBase::CaptureCheckpointState(FCombatCheckpointUnit& OutState, FText& O
         }
     }
     Captured.Team = Team;
+    const APlayerUnit* Player = Cast<APlayerUnit>(this);
+    Captured.PartyControlMode = Player ? Player->GetPartyControlMode() : EPartyControlMode::Human;
     Captured.CharacterName = RuntimeCharacterName.IsEmpty() ? FText::FromString(GetName()) : RuntimeCharacterName;
     Captured.HP = AttributeSet->GetHP();
     Captured.MaxHP = AttributeSet->GetMaxHP();
@@ -1251,6 +1254,12 @@ bool AUnitBase::RestoreCheckpointState(const FCombatCheckpointUnit& State, FText
     if (!HasAuthority() || bCheckpointStateRestored || CurrentActionSerial != 0 || IsActiveTurn() || IsBusy() || bIsDead || CurrentTile || !AttributeSet || State.UnitClass != FSoftObjectPath(GetClass()))
     {
         OutError = FText::FromString(TEXT("체크포인트와 같은 클래스의 새 비활성 유닛에만 상태를 복원할 수 있습니다."));
+        return false;
+    }
+    APlayerUnit* Player = Cast<APlayerUnit>(this);
+    if ((State.PartyControlMode != EPartyControlMode::Human && State.PartyControlMode != EPartyControlMode::ServerAI) || (State.PartyControlMode == EPartyControlMode::ServerAI && (!Player || State.Team != ETeam::Player)))
+    {
+        OutError = FText::FromString(TEXT("저장된 파티 조작 모드가 유닛 유형과 일치하지 않습니다."));
         return false;
     }
     if (!ValidateCheckpointGAS(AbilitySystem, OutError))
@@ -1316,6 +1325,13 @@ bool AUnitBase::RestoreCheckpointState(const FCombatCheckpointUnit& State, FText
     bTurnMustEndAfterCurrentAction = false;
     MovePhase = EUnitMovePhase::None;
     CurrentActionType = EUnitActionType::None;
+    // Fresh actors receive a fresh AI session; restoring a mode does not start an AI turn.
+    // 새 액터에 새 AI 세션을 부여하며 조작 모드 복원만으로 AI 턴을 시작하지 않습니다.
+    if (Player && !Player->ApplyPartyControlMode(State.PartyControlMode))
+    {
+        OutError = FText::FromString(TEXT("복구할 유닛의 파티 조작 모드를 적용하지 못했습니다."));
+        return false;
+    }
     SetActorTransform(State.Transform, false, nullptr, ETeleportType::TeleportPhysics);
     DefaultBattleRotation = State.Transform.Rotator();
     if (bIsDead)
