@@ -143,7 +143,7 @@ void AUnitBase::OnTurnEnd()
 
 bool AUnitBase::HasEnoughActionPoint(int32 Cost) const
 {
-    return CurrentActionPoint >= Cost;
+    return Cost > 0 && CurrentActionPoint >= Cost;
 }
 
 bool AUnitBase::ConsumeActionPoint(int32 Cost)

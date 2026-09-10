@@ -38,11 +38,14 @@ P1은 전투 진행 정지 또는 행동 상태 훼손을 먼저 해결할 항�
 
 ## P2
 
-### R03. 스킬 사용 가능 판정과 실제 AP 차감이 서로 다른 값을 사용함
+### R03. 스킬 사용 가능 판정과 실제 AP 차감이 서로 다른 값을 사용함 — 수정 및 자동화·PIE 검증 완료
 
-- **근거:** [SkillDefinitionDataAsset.h](../Source/ProjectA/DataAsset/SkillDefinitionDataAsset.h)과 [GA_AttackBase.h](../Source/ProjectA/GAS/Ability/GA_AttackBase.h)에 각각 `ActionPointCost`가 있다. 입력/`StartSkill`은 전자를, [GA_AttackBase.cpp](../Source/ProjectA/GAS/Ability/GA_AttackBase.cpp) `ActivateAbility`는 후자를 사용한다.
-- **발생 조건과 영향:** DataAsset 비용 1, Ability 비용 2인 스킬에서 AP 1인 유닛은 입력 검사를 통과하지만 Ability 내부에서 종료한다. 반대 조합은 표시보다 적게 차감한다. 내부의 직접 `EndAbility` 경로도 이제 R01 공통 종료 통지를 받지만, 표시/소비 비용 이원화는 남아 있다.
+- **수정 전 근거:** [SkillDefinitionDataAsset.h](../Source/ProjectA/DataAsset/SkillDefinitionDataAsset.h)과 [GA_AttackBase.h](../Source/ProjectA/GAS/Ability/GA_AttackBase.h)에 각각 `ActionPointCost`가 있었다. 입력/`StartSkill`은 전자를, [GA_AttackBase.cpp](../Source/ProjectA/GAS/Ability/GA_AttackBase.cpp) `ActivateAbility`는 후자를 사용했다.
+- **수정 전 발생 조건과 영향:** DataAsset 비용 1, Ability 비용 2인 스킬에서 AP 1인 유닛은 입력 검사를 통과하지만 Ability 내부에서 종료했다. 반대 조합은 표시보다 적게 차감했다.
 - **검증/수정:** 두 비용을 일부러 다르게 설정해 표시·선택 가능 여부·차감량을 비교한다. 비용의 단일 기준을 정하고 실패 시 T01/T02의 완료 규약을 따른다.
+- **현재 수정:** DataAsset 비용을 HUD·플레이어 입력·적 후보 평가·StartSkill·GAS 차감의 기준으로 통합했다. 과거 Ability 비용은 편집할 수 없는 deprecated 호환 필드로만 남긴다. 비용은 1 이상이어야 하며 음수 차감으로 AP를 얻는 경로도 차단한다. AP 차감은 컨텍스트 검증과 GAS 커밋 이후로 옮겼다.
+- **실행 결과:** 2026-09-10 정식 빌드 성공, 전체 자동화 11건 성공(실패 0). `ProjectA.Combat.Costs.DefinitionAndInput`은 비용 1/2/3/0/-1과 AP 1/2, 표시 문자열·입력 허용·실제 피해·차감량 및 과거 비용 99 무시를 확인한다. `ActivationFailure`는 어빌리티 누락·GAS 태그 차단·빈 타일의 공격 컨텍스트 실패에서 자원 보존과 1회 완료, 정상 재시도를 확인한다. `EnemyAffordableSkill`은 비용을 지불할 수 없는 우선 스킬 대신 가능한 스킬을 선택하는지 확인하며 피해 검증은 이 테스트의 범위가 아니다. 저장 맵 PIE는 실제 HUD 비용 표시·버튼 활성화와 기존 Slate 클릭/전투 루프를 통과했다. [결과 JSON](../Saved/Automation/T03APCost1/index.json), [로그](../Saved/Logs/T03APCost1.log) 참조.
+- **검증 경계:** 테스트 6건에 기존 환경/의도적인 잘못된 데이터/간소화된 그리드 fixture 경고가 남는다. GAS 커밋 자체의 실패 및 AP 차감 이후 중단을 새로 주입한 테스트는 포함하지 않는다. 이미 소비한 AP의 비환불 정책은 유지하며 범위 타입 통합은 T06으로 남긴다.
 - **연결 작업:** T03.
 
 ### R04. 적 타겟 선정이 전열 보호와 스킬 대상 규칙을 적용하지 않음

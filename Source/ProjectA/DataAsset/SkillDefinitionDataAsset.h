@@ -43,8 +43,13 @@ public:
 
     // Action Point cost required to use this skill.
     // 이 스킬 사용에 필요한 행동력 비용입니다.
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Cost")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Cost", meta = (ClampMin = "1"))
     int32 ActionPointCost = 1;
+
+    // Display the authoritative AP cost, or identify invalid skill data.
+    // 기준 AP 비용을 표시하며 잘못된 스킬 데이터는 오류로 표시합니다.
+    UFUNCTION(BlueprintPure, Category = "Skill|Cost")
+    FText GetActionPointCostText() const;
 
     // Whether this skill ignores front-line protection and can target back-line units directly.
     // 전열 보호를 무시하고 후열 유닛을 직접 대상으로 삼을 수 있는지 여부입니다.

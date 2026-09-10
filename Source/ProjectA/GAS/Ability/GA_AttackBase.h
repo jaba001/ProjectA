@@ -94,9 +94,9 @@ protected:
     EUnitActionResult ActionResult = EUnitActionResult::Failed;
 
 protected:
-    // Base Action Point cost for attack abilities
-    // 공격 어빌리티 기본 행동력 비용
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Cost", meta = (ClampMin = "0"))
+    // Keep legacy asset references readable; execution uses only the skill definition cost.
+    // 기존 에셋 참조 호환을 위해 유지하며 실행 비용은 스킬 정의에서만 읽습니다.
+    UPROPERTY(BlueprintReadOnly, Category = "Attack|Cost", meta = (DeprecatedProperty, DeprecationMessage = "Use SkillDefinitionDataAsset.ActionPointCost instead."))
     int32 ActionPointCost = 1;
 
     // Attack montage

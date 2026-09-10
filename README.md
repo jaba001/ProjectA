@@ -19,7 +19,7 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 - [기획 초안과 구현 현황](Docs/PROJECT_PLAN.md): 이미 작성된 기능, 현재 규칙, 결정할 기획, 단계별 목표
 - [코드 리뷰](Docs/CODE_REVIEW.md): P1/P2 문제의 근거와 검증 시나리오
 
-문서는 2026-09-08 현재 작업 트리를 기준으로 정리합니다. 코드 구현, 정식 빌드, 에셋 설정 확인, PIE 검증은 별도로 기록합니다.
+문서는 2026-09-10 현재 작업 트리를 기준으로 정리합니다. 코드 구현, 정식 빌드, 에셋 설정 확인, PIE 검증은 별도로 기록합니다.
 
 ## Codex 작업 완료 규칙
 
@@ -68,6 +68,7 @@ Editor-only dependency는 이 모듈에만 둡니다.
 - Grid 기반 전투 시스템
 - Turn Manager 기반 턴 진행 구조
 - Gameplay Ability System 활용
+- 스킬 DataAsset의 AP 비용으로 HUD 표시·사용 가능 판정·실제 차감을 통합
 - Tile 기반 이동 및 타겟 선택
 - Unit AI Controller
 - Combat HUD Widget
@@ -94,6 +95,8 @@ UI 관련 상세 메모는 아래 파일에 정리되어 있습니다.
 - `UCombatHUDWidget`: 기존 Move / Skill / End Turn 입력 연결
 - Gameplay 입력 모드는 CommonUI 화면이 관리한다. CombatHUD는 게임·UI 입력을 함께 허용하고, Run Map/Result는 월드 입력을 차단한다.
 - `UEncounterResultWidget`: Victory Continue / Defeat
+
+스킬 AP 비용은 `USkillDefinitionDataAsset::ActionPointCost`에서만 설정하며 1 이상이어야 합니다. HUD는 비용을 표시하고, 0·음수 비용 또는 AP 부족 시 선택과 실행을 거절합니다. 공격 컨텍스트 검증과 GAS 커밋이 성공한 뒤 AP를 한 번 차감하며, 실행 시작 후 소비한 AP는 취소 시 환불하지 않습니다. `GA_AttackBase`의 기존 비용 필드는 에셋 참조 호환용으로만 유지하고 실행에는 사용하지 않습니다.
 
 기존 MainMenu와 CharacterCreation은 런타임 fallback을 유지합니다.
 Scaffold generator는 기존 native class를 부모로 사용하는 WBP의 Designer tree를 JSON spec 기준으로 생성합니다.

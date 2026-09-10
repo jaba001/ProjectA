@@ -320,7 +320,7 @@ FEnemyActionDecision AEnemyUnit::EvaluateSkillCandidate(USkillDefinitionDataAsse
     Decision.SkillData = SkillData;
     Decision.Score = -TNumericLimits<float>::Max();
 
-    if (!SkillData)
+    if (!SkillData || !SkillData->AbilityClass || !HasEnoughActionPoint(SkillData->ActionPointCost))
     {
         return Decision;
     }

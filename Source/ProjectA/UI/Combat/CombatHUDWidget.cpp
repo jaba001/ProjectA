@@ -117,7 +117,20 @@ void UCombatHUDWidget::RefreshControls()
     for (const TPair<FName, TObjectPtr<UGameplayActionButton>>& Pair : SkillButtons)
     {
         USkillDefinitionDataAsset* Skill = DisplayedSkills.FindRef(Pair.Key);
-        Pair.Value->SetIsEnabled(Skill && Controller->CanUseActiveUnitActionPoint(Skill->ActionPointCost));
+        Pair.Value->SetIsEnabled(Skill && Skill->AbilityClass && Controller->CanUseActiveUnitActionPoint(Skill->ActionPointCost));
+        if (Skill)
+        {
+            UTextBlock* Label = Cast<UTextBlock>(Pair.Value->GetContent());
+            if (Label)
+            {
+                FText SkillName = Skill->SkillName;
+                if (SkillName.IsEmpty())
+                {
+                    SkillName = FText::FromName(Skill->SkillId);
+                }
+                Label->SetText(FText::Format(NSLOCTEXT("CombatHUD", "SkillWithCost", "{0} ({1})"), SkillName, Skill->GetActionPointCostText()));
+            }
+        }
     }
 }
 

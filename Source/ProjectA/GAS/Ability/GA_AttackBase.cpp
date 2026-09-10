@@ -11,6 +11,7 @@
 #include "Combat/SkillActor/AttackSkillActorBase.h"
 #include "Combat/SkillActor/SkillActorBase.h"
 #include "Unit/UnitBase.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 
 UGA_AttackBase::UGA_AttackBase()
 {
@@ -30,14 +31,6 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
     bFinishRequested = false;
     ActionResult = EUnitActionResult::Failed;
 
-    // Commit cost, cooldown, and other requirements
-    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=CommitAbilityFailed | Ability=%s"), *GetNameSafe(GetClass()));
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-        return;
-    }
-
     // Get the unit using this Ability
     CachedOwnerUnit = Cast<AUnitBase>(GetAvatarActorFromActorInfo());
 
@@ -48,22 +41,16 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
         return;
     }
 
-    if (ActionPointCost > 0)
+    // Use the selected skill definition even when several definitions share an ability class.
+    // 여러 스킬 정의가 같은 어빌리티 클래스를 사용해도 선택한 정의의 비용을 사용합니다.
+    const USkillDefinitionDataAsset* SkillData = CachedOwnerUnit->PendingSkillData;
+    if (!SkillData || SkillData->AbilityClass != GetClass() || !CachedOwnerUnit->HasEnoughActionPoint(SkillData->ActionPointCost))
     {
-        if (!CachedOwnerUnit->HasEnoughActionPoint(ActionPointCost))
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=NotEnoughActionPoint | Cost=%d | Owner=%s"), ActionPointCost, *GetNameSafe(CachedOwnerUnit));
-            EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-            return;
-        }
-
-        if (!CachedOwnerUnit->ConsumeActionPoint(ActionPointCost))
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=ConsumeActionPointFailed | Cost=%d | Owner=%s"), ActionPointCost, *GetNameSafe(CachedOwnerUnit));
-            EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-            return;
-        }
+        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=InvalidSkillOrAP | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return;
     }
+    const int32 SkillActionPointCost = SkillData->ActionPointCost;
 
     // Cache attack context required by child Ability
     if (!CacheAttackContext())
@@ -77,6 +64,22 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
     if (!ValidateAttackContext())
     {
         UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=ValidateAttackContextFailed | Ability=%s | Owner=%s"), *GetNameSafe(GetClass()), *GetNameSafe(CachedOwnerUnit));
+        FinishAttackAbility(true);
+        return;
+    }
+
+    // Charge AP only after context validation and a successful GAS commit.
+    // 컨텍스트 검증과 GAS 커밋이 성공한 뒤에만 AP를 차감합니다.
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=CommitAbilityFailed | Ability=%s"), *GetNameSafe(GetClass()));
+        FinishAttackAbility(true);
+        return;
+    }
+
+    if (!CachedOwnerUnit->ConsumeActionPoint(SkillActionPointCost))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=ConsumeActionPointFailed | Cost=%d | Owner=%s"), SkillActionPointCost, *GetNameSafe(CachedOwnerUnit));
         FinishAttackAbility(true);
         return;
     }

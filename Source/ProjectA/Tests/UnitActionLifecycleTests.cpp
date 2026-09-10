@@ -4,9 +4,12 @@
 
 #include "Abilities/GameplayAbility.h"
 #include "AbilitySystemComponent.h"
+#include "Combat/CombatManager.h"
+#include "Controller/PartyPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/World.h"
 #include "GAS/Ability/GA_DefaultAttack.h"
+#include "GAS/Ability/GA_AreaAttack.h"
 #include "GAS/Effect/GE_Damage.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "TimerManager.h"
@@ -78,6 +81,23 @@ namespace UnitActionLifecycleTests
         check(Property);
         Property->GetUnderlyingProperty()->SetIntPropertyValue(Property->ContainerPtrToValuePtr<void>(Unit), static_cast<uint64>(Phase));
     }
+
+    UGameplayAbility* GrantAttack(AUnitBase* Unit)
+    {
+        UAbilitySystemComponent* ASC = Unit->GetAbilitySystemComponent();
+        const FGameplayAbilitySpecHandle Handle = ASC->GiveAbility(FGameplayAbilitySpec(UGA_DefaultAttack::StaticClass(), 1));
+        UGameplayAbility* Ability = ASC->FindAbilitySpecFromHandle(Handle)->GetPrimaryInstance();
+        FindFProperty<FClassProperty>(UGA_AttackBase::StaticClass(), TEXT("DamageEffectClass"))->SetObjectPropertyValue_InContainer(Ability, UGE_Damage::StaticClass());
+        return Ability;
+    }
+
+    void EquipSkill(AUnitBase* Unit, USkillDefinitionDataAsset* Skill)
+    {
+        FArrayProperty* Property = FindFProperty<FArrayProperty>(AUnitBase::StaticClass(), TEXT("EquippedSkillDataAssets"));
+        FScriptArrayHelper Helper(Property, Property->ContainerPtrToValuePtr<void>(Unit));
+        const int32 Index = Helper.AddValue();
+        CastFieldChecked<FObjectPropertyBase>(Property->Inner)->SetObjectPropertyValue(Helper.GetRawPtr(Index), Skill);
+    }
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitInstantSkillTest, "ProjectA.Combat.Actions.InstantSkillAndActivationFailure", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -125,12 +145,12 @@ bool FUnitInstantSkillTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Next action can start immediately"), Completions, 2);
     TestEqual(TEXT("Second action damage"), Target->GetAttributeSet()->GetHP(), 80.0f);
 
-    // Retain the separate data/ability costs and test their existing rejection path.
-    // 데이터와 어빌리티의 비용 분리를 유지하면서 기존 거절 경로를 검증합니다.
+    // Reject invalid definition costs before ability activation.
+    // 잘못된 정의 비용은 어빌리티 활성화 전에 거절합니다.
     Skill->ActionPointCost = 0;
     Unit->StartSkill(Skill, TargetTile);
-    TestEqual(TEXT("Ability AP rejection completes once"), Completions, 3);
-    TestEqual(TEXT("Ability setup rejection is failure"), LastResult, EUnitActionResult::Failed);
+    TestEqual(TEXT("Invalid cost rejection completes once"), Completions, 3);
+    TestEqual(TEXT("Invalid cost reports failure"), LastResult, EUnitActionResult::Failed);
     TestEqual(TEXT("Rejection applies no damage"), Target->GetAttributeSet()->GetHP(), 80.0f);
     Unit->OnActionCompleted.Clear();
     return true;
@@ -291,6 +311,188 @@ bool FEnemyMoveRequestFailureTest::RunTest(const FString& Parameters)
     Scope.World->GetTimerManager().Tick(0.01f);
     TestEqual(TEXT("Rejected request leaves AI Wait"), Enemy->GetTurnState(), EEnemyTurnState::EndTurn);
     Enemy->OnTurnEnd();
+    Enemy->OnActionCompleted.Clear();
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkillDefinitionCostTest, "ProjectA.Combat.Costs.DefinitionAndInput", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillDefinitionCostTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    FScopedWorld Scope;
+    AUnitBase* Unit = Scope.SpawnUnit<AUnitBase>(FVector(0.0f, 0.0f, 100.0f));
+    AUnitBase* Target = Scope.SpawnUnit<AUnitBase>(FVector(500.0f, 0.0f, 100.0f));
+    Unit->SetTeam(ETeam::Player);
+    Target->SetTeam(ETeam::Enemy);
+    Scope.SpawnTile(Unit);
+    ACombatGridTile* TargetTile = Scope.SpawnTile(Target);
+    UGameplayAbility* Ability = GrantAttack(Unit);
+    // Deliberately conflict with legacy serialized costs to detect accidental reuse.
+    // 과거 직렬화 비용을 일부러 다르게 설정해 잘못된 재사용을 검출합니다.
+    FindFProperty<FIntProperty>(UGA_AttackBase::StaticClass(), TEXT("ActionPointCost"))->SetPropertyValue_InContainer(Ability, 99);
+    ACombatManager* Combat = Scope.World->SpawnActor<ACombatManager>();
+    Combat->RegisterUnits({ Unit, Target });
+    Combat->StartCombat_Internal();
+    APartyPlayerController* Controller = Scope.World->SpawnActor<APartyPlayerController>();
+    Controller->SetCombatContext(Combat, true);
+    int32 Completions = 0;
+    EUnitActionResult LastResult = EUnitActionResult::Failed;
+    Unit->OnActionCompleted.AddLambda([&](AUnitBase*, EUnitActionType, EUnitActionResult Result)
+    {
+        ++Completions;
+        LastResult = Result;
+    });
+
+    for (int32 AvailableAP : { 2, 1 })
+    {
+        for (int32 Cost : { 1, 2, 3, 0, -1 })
+        {
+            Unit->OnTurnStart();
+            if (AvailableAP == 1)
+            {
+                Unit->ConsumeActionPoint(1);
+            }
+            USkillDefinitionDataAsset* Skill = MakeSkill(Unit, UGA_DefaultAttack::StaticClass());
+            Skill->ActionPointCost = Cost;
+            const bool bExpectedUsable = Cost > 0 && Cost <= AvailableAP;
+            const FString Context = FString::Printf(TEXT("AP=%d Cost=%d"), AvailableAP, Cost);
+            TestEqual(Context + TEXT(" unit affordability"), Unit->HasEnoughActionPoint(Cost), bExpectedUsable);
+            TestEqual(Context + TEXT(" HUD affordability"), Controller->CanUseActiveUnitActionPoint(Cost), bExpectedUsable);
+            if (Cost > 0)
+            {
+                TestEqual(Context + TEXT(" displayed cost"), Skill->GetActionPointCostText().ToString(), FString::Printf(TEXT("AP %d"), Cost));
+            }
+            else
+            {
+                TestTrue(Context + TEXT(" invalid data is visibly identified"), Skill->GetActionPointCostText().ToString().Contains(TEXT("Invalid AP")));
+                TestFalse(Context + TEXT(" direct invalid consumption rejected"), Unit->ConsumeActionPoint(Cost));
+                TestEqual(Context + TEXT(" invalid consumption never grants AP"), Unit->GetCurrentActionPoint(), AvailableAP);
+            }
+            Controller->EnterSkillMode(Skill);
+            TestEqual(Context + TEXT(" selection matches affordability"), Controller->IsSkillInputMode(), bExpectedUsable);
+            Controller->CancelTileInputMode();
+            const float HPBefore = Target->GetAttributeSet()->GetHP();
+            const int32 CompletionsBefore = Completions;
+            Unit->StartSkill(Skill, TargetTile);
+            TestEqual(Context + TEXT(" completes once"), Completions, CompletionsBefore + 1);
+            TestFalse(Context + TEXT(" releases busy state"), Unit->IsBusy());
+            TestNull(Context + TEXT(" clears skill context"), Unit->PendingSkillData.Get());
+            if (bExpectedUsable)
+            {
+                TestEqual(Context + TEXT(" exact definition charge"), Unit->GetCurrentActionPoint(), AvailableAP - Cost);
+                TestEqual(Context + TEXT(" real damage"), Target->GetAttributeSet()->GetHP(), HPBefore - 10.0f);
+                TestEqual(Context + TEXT(" success result"), LastResult, EUnitActionResult::Succeeded);
+            }
+            else
+            {
+                TestEqual(Context + TEXT(" no AP charge"), Unit->GetCurrentActionPoint(), AvailableAP);
+                TestEqual(Context + TEXT(" no damage"), Target->GetAttributeSet()->GetHP(), HPBefore);
+                TestEqual(Context + TEXT(" failed result"), LastResult, EUnitActionResult::Failed);
+            }
+        }
+    }
+    Unit->OnActionCompleted.Clear();
+    Combat->ResetCombat();
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkillCostFailureTest, "ProjectA.Combat.Costs.ActivationFailure", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillCostFailureTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    FScopedWorld Scope;
+    AUnitBase* Unit = Scope.SpawnUnit<AUnitBase>(FVector(0.0f, 0.0f, 100.0f));
+    AUnitBase* Target = Scope.SpawnUnit<AUnitBase>(FVector(500.0f, 0.0f, 100.0f));
+    Scope.SpawnTile(Unit);
+    ACombatGridTile* TargetTile = Scope.SpawnTile(Target);
+    USkillDefinitionDataAsset* Skill = MakeSkill(Unit, UGA_DefaultAttack::StaticClass());
+    Skill->ActionPointCost = 2;
+    int32 Completions = 0;
+    EUnitActionResult LastResult = EUnitActionResult::Succeeded;
+    Unit->OnActionCompleted.AddLambda([&](AUnitBase*, EUnitActionType, EUnitActionResult Result)
+    {
+        ++Completions;
+        LastResult = Result;
+    });
+    const auto CheckFailure = [&](const FString& Context, int32 ExpectedCompletions)
+    {
+        TestEqual(Context + TEXT(" completes once"), Completions, ExpectedCompletions);
+        TestEqual(Context + TEXT(" result"), LastResult, EUnitActionResult::Failed);
+        TestEqual(Context + TEXT(" preserves AP"), Unit->GetCurrentActionPoint(), 2);
+        TestEqual(Context + TEXT(" preserves movement AP"), Unit->GetCurrentSubActionPoint(), 1);
+        TestEqual(Context + TEXT(" no damage"), Target->GetAttributeSet()->GetHP(), 100.0f);
+        TestFalse(Context + TEXT(" not busy"), Unit->IsBusy());
+        TestFalse(Context + TEXT(" does not request turn end"), Unit->MustEndTurnAfterCurrentAction());
+        TestNull(Context + TEXT(" cleared context"), Unit->PendingSkillData.Get());
+    };
+
+    Unit->StartSkill(Skill, TargetTile);
+    CheckFailure(TEXT("Missing ability"), 1);
+    UGameplayAbility* Ability = GrantAttack(Unit);
+    FGameplayTagContainer* BlockedTags = FindFProperty<FStructProperty>(UGameplayAbility::StaticClass(), TEXT("ActivationBlockedTags"))->ContainerPtrToValuePtr<FGameplayTagContainer>(Ability);
+    const FGameplayTag BlockTag = FGameplayTag::RequestGameplayTag(TEXT("Event.Attack.Release"));
+    BlockedTags->AddTag(BlockTag);
+    Unit->GetAbilitySystemComponent()->AddLooseGameplayTag(BlockTag);
+    Unit->StartSkill(Skill, TargetTile);
+    CheckFailure(TEXT("GAS activation blocked"), 2);
+    Unit->GetAbilitySystemComponent()->RemoveLooseGameplayTag(BlockTag);
+    BlockedTags->Reset();
+
+    ACombatGridTile* EmptyTile = Scope.World->SpawnActor<ACombatGridTile>();
+    Skill->TargetRule = ESkillTargetRule::AnyTile;
+    Unit->StartSkill(Skill, EmptyTile);
+    CheckFailure(TEXT("Attack context invalid"), 3);
+
+    Skill->TargetRule = ESkillTargetRule::EnemyUnit;
+    Unit->StartSkill(Skill, TargetTile);
+    TestEqual(TEXT("Valid retry completes once"), Completions, 4);
+    TestEqual(TEXT("Valid retry succeeds"), LastResult, EUnitActionResult::Succeeded);
+    TestEqual(TEXT("Valid retry charges the definition cost once"), Unit->GetCurrentActionPoint(), 0);
+    TestEqual(TEXT("Valid retry applies damage once"), Target->GetAttributeSet()->GetHP(), 90.0f);
+    Unit->OnActionCompleted.Clear();
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEnemyAffordableSkillTest, "ProjectA.Combat.Costs.EnemyAffordableSkill", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyAffordableSkillTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    FScopedWorld Scope;
+    AEnemyUnit* Enemy = Scope.SpawnUnit<AEnemyUnit>(FVector(0.0f, 0.0f, 100.0f));
+    AUnitBase* Target = Scope.SpawnUnit<AUnitBase>(FVector(50.0f, 0.0f, 100.0f));
+    Enemy->SetTeam(ETeam::Enemy);
+    Target->SetTeam(ETeam::Player);
+    Scope.SpawnTile(Enemy);
+    Scope.SpawnTile(Target);
+    FindFProperty<FClassProperty>(AUnitBase::StaticClass(), TEXT("DefaultAttackAbilityClass"))->SetObjectPropertyValue_InContainer(Enemy, UGA_DefaultAttack::StaticClass());
+    FArrayProperty* Classes = FindFProperty<FArrayProperty>(AUnitBase::StaticClass(), TEXT("EquippedSkillAbilityClasses"));
+    FScriptArrayHelper ClassHelper(Classes, Classes->ContainerPtrToValuePtr<void>(Enemy));
+    const int32 Index = ClassHelper.AddValue();
+    CastFieldChecked<FClassProperty>(Classes->Inner)->SetObjectPropertyValue(ClassHelper.GetRawPtr(Index), UGA_AreaAttack::StaticClass());
+    USkillDefinitionDataAsset* Expensive = MakeSkill(Enemy, UGA_DefaultAttack::StaticClass());
+    USkillDefinitionDataAsset* Affordable = MakeSkill(Enemy, UGA_AreaAttack::StaticClass());
+    EquipSkill(Enemy, Expensive);
+    EquipSkill(Enemy, Affordable);
+    Enemy->GetAbilitySystemComponent()->GiveAbility(FGameplayAbilitySpec(UGA_AreaAttack::StaticClass(), 1));
+    FindFProperty<FFloatProperty>(AEnemyUnit::StaticClass(), TEXT("SkillBaseScore"))->SetPropertyValue_InContainer(Enemy, 1000.0f);
+    int32 Completions = 0;
+    Enemy->OnActionCompleted.AddLambda([&](AUnitBase*, EUnitActionType, EUnitActionResult Result)
+    {
+        ++Completions;
+        TestEqual(TEXT("Affordable alternative succeeds"), Result, EUnitActionResult::Succeeded);
+    });
+    for (int32 RejectedCost : { 3, 0, -1 })
+    {
+        Expensive->ActionPointCost = RejectedCost;
+        const int32 Before = Completions;
+        Enemy->OnTurnStart();
+        TestEqual(TEXT("AI skips unaffordable or invalid high priority attack"), Completions, Before + 1);
+        TestEqual(TEXT("AI pays for affordable alternative"), Enemy->GetCurrentActionPoint(), 1);
+        Enemy->OnTurnEnd();
+    }
     Enemy->OnActionCompleted.Clear();
     return true;
 }

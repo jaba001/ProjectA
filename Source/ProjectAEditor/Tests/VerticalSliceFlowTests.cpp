@@ -10,6 +10,7 @@
 #include "CommonGameViewportClient.h"
 #include "Components/Button.h"
 #include "Components/HorizontalBox.h"
+#include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Controller/GameplayPlayerController.h"
 #include "Controller/MainMenuPlayerController.h"
@@ -333,6 +334,16 @@ public:
             if (Skills && Skills->GetChildrenCount() > 0)
             {
                 SkillButton = Cast<UButton>(Skills->GetChildAt(0));
+            }
+            if (SkillButton)
+            {
+                const USkillDefinitionDataAsset* Skill = Player->FindSkillDataByAbilityClass(Player->GetDefaultAttackAbilityClass());
+                const UTextBlock* Label = Cast<UTextBlock>(SkillButton->GetContent());
+                if (!Require(Skill && Label && Label->GetText().ToString().Contains(Skill->GetActionPointCostText().ToString()), TEXT("The real HUD displays the selected definition's AP cost.")))
+                {
+                    return true;
+                }
+                Test->TestEqual(TEXT("HUD skill availability matches the definition cost."), SkillButton->GetIsEnabled(), Controller->CanUseActiveUnitActionPoint(Skill->ActionPointCost));
             }
             if (!QueueWidgetClick(SkillButton))
             {

@@ -1,6 +1,6 @@
 # ProjectA 작업 보드와 재개 메모
 
-최근 정리: 2026-09-08 · `main` / `2b0d9ea` + 현재 미커밋 작업.
+최근 정리: 2026-09-10 · `main` · T03 AP 비용 통합과 자동화 11건 검증 완료.
 
 [기획·구현 현황](PROJECT_PLAN.md) · [코드 리뷰와 검증 시나리오](CODE_REVIEW.md)
 
@@ -51,12 +51,16 @@
 - 접근/복귀 실패와 취소는 원타일/행동 시작 위치로 복구한다. 이미 소비된 AP·보조 AP는 환불하지 않는다.
 - 이동 요청 즉시 거절, phase 주입, 실제 NavMesh 이동 테스트를 구분한다. VERTICAL-05 실행 근거는 최종 보고 참조.
 
-### T03 · P2 · AP 비용 기준 통합 — 미착수
+### T03 · P2 · AP 비용 기준 통합 — 수정 및 자동화·PIE 검증 완료
 
-- [ ] 완료
+- [x] 완료
 - 근거: 리뷰 R03. 위치: [SkillDefinitionDataAsset.h](../Source/ProjectA/DataAsset/SkillDefinitionDataAsset.h), [GA_AttackBase.cpp](../Source/ProjectA/GAS/Ability/GA_AttackBase.cpp).
 - 작업: 표시·사용 가능 판정·실제 차감이 같은 비용을 사용하게 한다. 잘못된 비용과 활성화 실패 시 자원 처리도 검증한다.
 - 완료 조건: V04 중 비용 검증 통과. 비용 1/2, AP 부족, 잘못된 데이터에서 표시와 실행 결과가 일치.
+- 구현: `SkillDefinitionDataAsset.ActionPointCost`를 단일 기준으로 사용한다. HUD에 비용을 표시하고 0·음수 비용은 입력·AI 후보·직접 실행·차감에서 거절한다. Ability의 기존 비용은 deprecated 호환 필드이며 더 이상 편집하거나 실행 비용으로 사용하지 않는다.
+- 자원 처리: 공격 컨텍스트 검증 및 GAS 커밋 성공 후 AP를 차감한다. 어빌리티 누락·GAS 활성화 차단·컨텍스트 실패는 AP/보조 AP를 보존하고 완료를 1회 통지한다. 정상 실행에서 이미 차감한 AP의 비환불 규칙은 유지한다.
+- 검증: 2026-09-10 Development Editor / Win64 빌드 성공. `ProjectA.Combat.Costs` 3건과 기존 행동/Run/저장 맵 PIE를 포함한 전체 11건 성공, 실패 0건. 비용 1/2/3/0/-1과 보유 AP 1/2 조합, 과거 Ability 비용 99 무시, 실패 후 재시도, 적의 사용 가능한 대안 선택, 실제 HUD 비용 표시와 Slate 클릭을 확인했다.
+- 실행 근거: [빌드 로그](../Saved/Automation/T03APCostBuild.log), [자동화 결과](../Saved/Automation/T03APCost1/index.json), [PIE 로그](../Saved/Logs/T03APCost1.log). Saved 산출물은 로컬 검증 자료이며 Git 추적 대상이 아니다. V04의 범위 타입 검증은 T06으로 남긴다.
 
 ### T04 · P2 · 플레이어/적 타겟 규칙 통합 — 기존 TODO
 
