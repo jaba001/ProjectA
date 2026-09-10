@@ -29,6 +29,7 @@
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerState.h"
 #include "GAS/Attribute/AS_Unit.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
@@ -43,6 +44,7 @@
 #include "Tests/AutomationEditorCommon.h"
 #include "UI/Combat/CombatHUDWidget.h"
 #include "Unit/UnitBase.h"
+#include "Unit/EnemyUnit.h"
 #include "Unit/PlayerUnit.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UnrealType.h"
@@ -81,6 +83,11 @@ enum class EStep : uint8
     NewRequest,
     AIHumanRequest,
     AIActing,
+    ExtraTurn,
+    ExtraOwnerRejected,
+    ExtraItem,
+    ExtraTurnEnded,
+    Disconnected,
     Closing,
     Finished
 };
@@ -105,10 +112,18 @@ UCombatHUDWidget* FindHUD(APartyPlayerController* Controller)
     return nullptr;
 }
 
+struct FPeer
+{
+    int32 PIEInstance = INDEX_NONE;
+    TWeakObjectPtr<UWorld> World;
+    TWeakObjectPtr<AGameplayPlayerController> Client;
+    TWeakObjectPtr<AGameplayPlayerController> Remote;
+};
+
 class FCheckpointSessions : public IAutomationLatentCommand
 {
 public:
-    FCheckpointSessions(FAutomationTestBase* InTest, ERunMode InMode, FString InSlot, EOpponentSourceChange InOpponentChange = EOpponentSourceChange::None, bool bInPartyAI = false) : Test(InTest), Mode(InMode), Slot(MoveTemp(InSlot)), OpponentChange(InOpponentChange), bPartyAI(bInPartyAI), bRestoring(InMode == ERunMode::ProcessReader), StepStarted(FPlatformTime::Seconds())
+    FCheckpointSessions(FAutomationTestBase* InTest, ERunMode InMode, FString InSlot, EOpponentSourceChange InOpponentChange = EOpponentSourceChange::None, bool bInPartyAI = false, int32 InParticipantCount = 2) : Test(InTest), Mode(InMode), Slot(MoveTemp(InSlot)), OpponentChange(InOpponentChange), bPartyAI(bInPartyAI), ParticipantCount(InParticipantCount), bRestoring(InMode == ERunMode::ProcessReader), StepStarted(FPlatformTime::Seconds())
     {
         if (OpponentChange != EOpponentSourceChange::None)
         {
@@ -142,6 +157,7 @@ public:
                 if (bRestartAfterClose)
                 {
                     Test->TestTrue(TEXT("The first session's combat units were destroyed."), !OldGuest.IsValid() && !OldHost.IsValid());
+                    for (const TWeakObjectPtr<AUnitBase>& Unit : OldUnits) Test->TestFalse(TEXT("Every participant and opponent actor from the old session was destroyed."), Unit.IsValid());
                     if (!ChangeOpponentSource())
                     {
                         Step = EStep::Finished;
@@ -176,7 +192,7 @@ public:
             }
             PlaySettings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
             PlaySettings->SetPlayNetMode(PIE_ListenServer);
-            PlaySettings->SetPlayNumberOfClients(2);
+            PlaySettings->SetPlayNumberOfClients(ParticipantCount);
             PlaySettings->SetRunUnderOneProcess(true);
             PlaySettings->bLaunchSeparateServer = false;
             PlaySettings->NewWindowWidth = 1280;
@@ -192,6 +208,10 @@ public:
             GEditor->RequestPlaySession(Params);
             Advance(EStep::Connect);
             return false;
+        }
+        if (Step == EStep::Disconnected)
+        {
+            return ObserveDisconnectedSession();
         }
         if (Step == EStep::Connect)
         {
@@ -217,6 +237,7 @@ public:
         {
             return false;
         }
+        if (ParticipantCount > 2 && !AllPeersMatch()) return false;
         if (Step == EStep::Opening)
         {
             if (!ViewsMatch(ClientCombat) || !UnitsMatch(ClientCombat) || !Host->CanUseActiveUnitAction())
@@ -319,7 +340,57 @@ public:
             {
                 return CloseSession();
             }
-            Advance(EStep::Confirmed);
+            ExtraParticipant = 2;
+            Advance(ParticipantCount > 2 ? EStep::ExtraTurn : EStep::Confirmed);
+        }
+        else if (Step == EStep::ExtraTurn)
+        {
+            AUnitBase* Unit = PartyUnits.IsValidIndex(ExtraParticipant) ? PartyUnits[ExtraParticipant].Get() : nullptr;
+            AGameplayPlayerController* Owner = Peers.IsValidIndex(ExtraParticipant - 1) ? Peers[ExtraParticipant - 1].Client.Get() : nullptr;
+            if (!ClientResponseArrived() || !Unit || Combat->GetCurrentUnit() != Unit || !Owner || !Owner->CanUseActiveUnitAction()) return false;
+            if (!CheckAccepted()) return CloseSession();
+            ExtraHPBeforeItem = Unit->GetAttributeSet()->GetHP();
+            ExtraItemsBefore = Unit->HealingItemCount;
+            // The first guest sends a real wrong-owner RPC for each additional participant's active unit.
+            // 첫 게스트가 추가 참가자의 활성 유닛마다 실제 소유권 위반 RPC를 전송합니다.
+            if (!Send(Client.Get(), ECombatActionKind::EndTurn)) return CloseSession();
+            Advance(EStep::ExtraOwnerRejected);
+        }
+        else if (Step == EStep::ExtraOwnerRejected)
+        {
+            if (!ClientResponseArrived()) return false;
+            if (!Test->TestTrue(TEXT("Another participant cannot end the additional owner's turn over RPC."), Client->GetLastCombatActionResponse().Result == ECombatRequestResult::NotOwner)) return CloseSession();
+            AGameplayPlayerController* Owner = Peers[ExtraParticipant - 1].Client.Get();
+            if (bRestoring)
+            {
+                if (!Send(Owner, ECombatActionKind::EndTurn)) return CloseSession();
+                Advance(EStep::ExtraTurnEnded);
+                return false;
+            }
+            ACombatManager* OwnerCombat = Owner->GetCombatManager();
+            AUnitBase* OwnerUnit = OwnerCombat ? OwnerCombat->ResolveRuntimeUnit(Combat->GetRuntimeUnitId(PartyUnits[ExtraParticipant].Get())) : nullptr;
+            if (!OwnerUnit || !Send(Owner, ECombatActionKind::HealingItem, nullptr, OwnerUnit->GetCurrentTile())) return CloseSession();
+            Advance(EStep::ExtraItem);
+        }
+        else if (Step == EStep::ExtraItem)
+        {
+            if (!ClientResponseArrived()) return false;
+            AUnitBase* Unit = PartyUnits[ExtraParticipant].Get();
+            if (!CheckAccepted() || !Test->TestTrue(TEXT("The additional connection heals its own unit and spends its own item."), Unit->GetAttributeSet()->GetHP() > ExtraHPBeforeItem && Unit->HealingItemCount == ExtraItemsBefore - 1)) return CloseSession();
+            if (!Send(Peers[ExtraParticipant - 1].Client.Get(), ECombatActionKind::EndTurn)) return CloseSession();
+            Advance(EStep::ExtraTurnEnded);
+        }
+        else if (Step == EStep::ExtraTurnEnded)
+        {
+            if (!ClientResponseArrived() || Combat->GetCurrentUnit() == PartyUnits[ExtraParticipant].Get()) return false;
+            if (!CheckAccepted()) return CloseSession();
+            ++ExtraParticipant;
+            if (bRestoring && ExtraParticipant == ParticipantCount)
+            {
+                ReadAndCompareCommitted();
+                return CloseSession();
+            }
+            Advance(ExtraParticipant < ParticipantCount ? EStep::ExtraTurn : EStep::Confirmed);
         }
         else if (Step == EStep::Confirmed)
         {
@@ -380,7 +451,9 @@ public:
             for (AUnitBase* Unit : Combat->GetRegisteredUnits())
             {
                 OldRuntimeIds.Add(Combat->GetRuntimeUnitId(Unit));
+                OldUnits.Add(Unit);
             }
+            for (const FPeer& Peer : Peers) OldBindings.Add(Peer.Client->GetParticipantBindingId());
             // Slow only this fixture action so the test can observe interruption before arrival.
             // 도착 전에 중단 상태를 관찰할 수 있도록 이번 테스트 행동의 이동 속도만 낮춥니다.
             Guest->GetCharacterMovement()->MaxWalkSpeed = 50.0f;
@@ -413,7 +486,19 @@ public:
             }
             OldGuest = Guest;
             OldHost = HostUnit;
-            if (bPartyAI && !PrepareAIRecord()) return CloseSession();
+            if (bPartyAI && ParticipantCount == 2 && !PrepareAIRecord()) return CloseSession();
+            if (ParticipantCount > 2)
+            {
+                UNetConnection* Connection = Peers.Last().Remote.IsValid() ? Peers.Last().Remote->GetNetConnection() : nullptr;
+                if (!Test->TestNotNull(TEXT("The final participant has an actual connection to interrupt."), Connection)) return CloseSession();
+                // Expect exactly the engine error caused by deliberately closing this participant's connection.
+                // 이 참가자의 연결을 의도적으로 종료하여 발생하는 엔진 오류만 정확히 한 번 예상합니다.
+                Test->AddExpectedErrorPlain(TEXT("UEngine::BroadcastNetworkFailure: FailureType = ConnectionLost, ErrorString = "), EAutomationExpectedErrorFlags::Contains, 1);
+                Connection->Close();
+                Connection->FlushNet(true);
+                Advance(EStep::Disconnected);
+                return false;
+            }
             bPreserveWriterFile = Mode == ERunMode::ProcessWriter;
             return CloseSession(Mode == ERunMode::SessionRestart);
         }
@@ -426,6 +511,14 @@ public:
             if (!CheckRuntimeAgainstCheckpoint(Combat.Get(), true) || !CheckRuntimeAgainstCheckpoint(ClientCombat, true))
             {
                 return CloseSession();
+            }
+            for (int32 Index = 0; Index < Peers.Num(); ++Index)
+            {
+                AGameplayPlayerController* PeerController = Peers[Index].Client.Get();
+                if (!CheckRuntimeAgainstCheckpoint(PeerController->GetCombatManager(), true)) return CloseSession();
+                if (OldBindings.IsValidIndex(Index)) Test->TestTrue(TEXT("Every returning original connection receives a fresh participant binding."), PeerController->GetParticipantBindingId().IsValid() && PeerController->GetParticipantBindingId() != OldBindings[Index]);
+                Test->TestTrue(TEXT("Every restored client retains an empty authoritative Run subsystem."), Peers[Index].World->GetGameInstance()->GetSubsystem<URunStateSubsystem>()->GetPhase() == ERunPhase::None);
+                Test->TestTrue(TEXT("Every restored HUD shows the same turn and permits only the active Human owner."), FindHUD(PeerController) && FindHUD(PeerController)->GetTurnInfoText().EqualTo(FindHUD(Host.Get())->GetTurnInfoText()) && PeerController->CanUseActiveUnitAction() == (Index == 0 && !bPartyAI));
             }
             Test->TestTrue(TEXT("The original Host identity and epoch survive session restoration."), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Expected.Identity, &Run->GetRunIdentity(), 0));
             Test->TestTrue(TEXT("Restoration preserves the confirmed body and attempt."), SameCheckpoint(Expected, Run->GetCombatCheckpoint()));
@@ -497,6 +590,12 @@ public:
             CheckAccepted();
             Test->TestTrue(TEXT("Restored combat makes a newer durable turn boundary."), Run->GetCombatCheckpoint().Revision > Expected.Revision);
             CheckFrozenOpponent();
+            if (ParticipantCount > 2)
+            {
+                ExtraParticipant = 2;
+                Advance(EStep::ExtraTurn);
+                return false;
+            }
             return CloseSession();
         }
         else if (Step == EStep::AIHumanRequest)
@@ -511,6 +610,23 @@ public:
         }
         else if (Step == EStep::AIActing)
         {
+            if (bWaitingForExtraAITurn)
+            {
+                if (!ClientResponseArrived()) return false;
+                if (!CheckAccepted()) return CloseSession();
+                bWaitingForExtraAITurn = false;
+            }
+            for (int32 Index = 2; Index < ParticipantCount; ++Index)
+            {
+                if (Combat->GetCurrentUnit() == PartyUnits[Index].Get())
+                {
+                    AGameplayPlayerController* Owner = Peers[Index - 1].Client.Get();
+                    if (!Owner->CanUseActiveUnitAction()) return false;
+                    if (!Send(Owner, ECombatActionKind::EndTurn)) return CloseSession();
+                    bWaitingForExtraAITurn = true;
+                    return false;
+                }
+            }
             const bool bViewsSynced = ViewsMatch(ClientCombat);
             const bool bUnitsSynced = UnitsMatch(ClientCombat);
             Diagnostic = FString::Printf(TEXT("AITurn=%d Current=%s HostHP=%.1f GuestHP=%.1f EnemyHP=%.1f Items=%d Skills=%d Moves=%d GuestCoord=%s ViewSync=%d UnitSync=%d Result=%d"), Combat->GetTurnSerial(), *GetNameSafe(Combat->GetCurrentUnit()), HostUnit->GetAttributeSet()->GetHP(), Guest->GetAttributeSet()->GetHP(), Enemy->GetAttributeSet()->GetHP(), AIItems, AISkills, AIMoves, Guest->GetCurrentTile() ? *Guest->GetCurrentTile()->GridCoord.ToString() : TEXT("None"), bViewsSynced, bUnitsSynced, static_cast<int32>(Combat->GetCombatResult()));
@@ -559,11 +675,11 @@ private:
         Identity.RunId = FGuid::NewGuid();
         Identity.HostEpoch = 1;
         TArray<FRunPartyMember> Party;
-        for (int32 Index = 0; Index < 2; ++Index)
+        for (int32 Index = 0; Index < ParticipantCount; ++Index)
         {
             FRunParticipantData& Participant = Identity.OriginalParticipants.AddDefaulted_GetRef();
             Participant.AccountId.Provider = TEXT("CheckpointPIEFixture");
-            Participant.AccountId.Subject = Index == 0 ? TEXT("OriginalHost") : TEXT("OriginalGuest");
+            Participant.AccountId.Subject = Index == 0 ? TEXT("OriginalHost") : Index == 1 ? TEXT("OriginalGuest") : FString::Printf(TEXT("OriginalGuest%d"), Index);
             if (bPartyAI && Index == 1)
             {
                 Participant.AIConsent = ERunAIConsent::Granted;
@@ -590,6 +706,7 @@ private:
         {
             return false;
         }
+        if (ParticipantCount > 2 && !ConfigureExpandedArena(true)) return false;
         if (!BindOriginalParticipants() || !Test->TestTrue(TEXT("The server starts the checkpoint encounter."), Encounter->RequestStartNode(State->GetNodes()[0].NodeId)) || !ResolveFixtureUnits())
         {
             Test->AddError(Encounter->GetFlowMessage().ToString());
@@ -604,6 +721,23 @@ private:
         }
         Guest->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), Guest->GetAttributeSet()->GetMaxHP() - 40.0f);
         Guest->ForceNetUpdate();
+        if (ParticipantCount > 2)
+        {
+            for (int32 Index = 2; Index < ParticipantCount; ++Index)
+            {
+                AUnitBase* Unit = PartyUnits[Index].Get();
+                const TArray<TObjectPtr<USkillDefinitionDataAsset>> ExtraSkills = Unit->GetEquippedSkillDataAssets();
+                if (!Test->TestTrue(TEXT("Additional owners keep authored skills and enough resources for their item RPC."), Unit->ConfigureProfession(Unit->GetAttributeSet()->GetMaxHP(), 4, 2, ExtraSkills))) return false;
+                Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), Unit->GetAttributeSet()->GetMaxHP() - 40.0f);
+                Unit->HealingItemCount = 1;
+                Unit->ForceNetUpdate();
+            }
+            // A real server death exercises corpse restoration without ending the surviving opponent encounter.
+            // 생존한 상대의 전투를 끝내지 않으면서 실제 서버 사망으로 시체 복구를 검증합니다.
+            Corpse->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), 0.0f);
+            Corpse->Die();
+            if (!Test->TestTrue(TEXT("The expanded fixture includes an actual dead opponent without tile occupancy."), !Corpse->IsUnitAlive() && !Corpse->GetCurrentTile())) return false;
+        }
         return true;
     }
 
@@ -615,6 +749,7 @@ private:
             return false;
         }
         Run->EnableCheckpointSaving(Slot);
+        if (ParticipantCount > 2 && !ConfigureExpandedArena(false)) return false;
         if (!Test->TestTrue(TEXT("The new server loads a combat checkpoint from disk."), Run->LoadCheckpoint(Error)))
         {
             Test->AddError(Error.ToString());
@@ -624,7 +759,7 @@ private:
         {
             Expected = Run->GetCombatCheckpoint();
         }
-        if (!Test->TestTrue(TEXT("No live memory state is needed to load the same confirmed body."), SameCheckpoint(Expected, Run->GetCombatCheckpoint())) || !Test->TestEqual(TEXT("The restored record contains both original participants."), Expected.Identity.OriginalParticipants.Num(), 2))
+        if (!Test->TestTrue(TEXT("No live memory state is needed to load the same confirmed body."), SameCheckpoint(Expected, Run->GetCombatCheckpoint())) || !Test->TestEqual(TEXT("The restored record contains every original participant."), Expected.Identity.OriginalParticipants.Num(), ParticipantCount))
         {
             return false;
         }
@@ -684,7 +819,7 @@ private:
         // 아군 AI의 전체 턴을 관찰할 때까지 수동 Host와 상대가 생존하도록 테스트 체력을 설정합니다.
         for (FCombatCheckpointUnit& Unit : Checkpoint.Units)
         {
-            if (Unit.Team == ETeam::Enemy || Unit.CharacterId == HostCharacter)
+            if (!Unit.bDead && (Unit.Team == ETeam::Enemy || Unit.CharacterId == HostCharacter))
             {
                 Unit.MaxHP = 1000.0f;
                 Unit.HP = 1000.0f;
@@ -850,18 +985,137 @@ private:
     {
         const FRunIdentityData& Identity = Run->GetRunIdentity();
         AGameplayGameModeBase* GameMode = Server->GetAuthGameMode<AGameplayGameModeBase>();
-        return Test->TestTrue(TEXT("Known test connections receive the original account identities."), Identity.OriginalParticipants.Num() == 2 && GameMode->AssignRunParticipant(Host.Get(), Identity.HostAccountId) && GameMode->AssignRunParticipant(Remote.Get(), Identity.OriginalParticipants[1].AccountId));
+        if (!Test->TestTrue(TEXT("The original roster matches all real test connections."), Identity.OriginalParticipants.Num() == ParticipantCount && Peers.Num() == ParticipantCount - 1 && GameMode->AssignRunParticipant(Host.Get(), Identity.HostAccountId))) return false;
+        for (int32 Index = 0; Index < Peers.Num(); ++Index)
+        {
+            if (!Test->TestTrue(TEXT("Each known test connection receives its original account identity."), GameMode->AssignRunParticipant(Peers[Index].Remote.Get(), Identity.OriginalParticipants[Index + 1].AccountId))) return false;
+        }
+        return true;
     }
 
     bool ResolveFixtureUnits()
     {
+        PartyUnits.SetNum(ParticipantCount);
+        Enemy.Reset();
+        Corpse.Reset();
         for (AUnitBase* Unit : Encounter->GetSpawnedUnits())
         {
             if (Combat->GetCharacterId(Unit) == HostCharacter) HostUnit = Unit;
             else if (Combat->GetCharacterId(Unit) == GuestCharacter) Guest = Unit;
-            else if (Unit->GetTeam() == ETeam::Enemy) Enemy = Unit;
+            else if (Unit->GetTeam() == ETeam::Enemy)
+            {
+                if (!Enemy.IsValid()) Enemy = Unit;
+                else Corpse = Unit;
+            }
+            for (const FRunPartyMember& Member : Run->GetPartyMembers())
+            {
+                if (Member.CharacterId == Combat->GetCharacterId(Unit) && PartyUnits.IsValidIndex(Member.SlotIndex)) PartyUnits[Member.SlotIndex] = Unit;
+            }
         }
-        return Test->TestTrue(TEXT("The encounter creates two owned characters and one opponent."), HostUnit.IsValid() && Guest.IsValid() && Enemy.IsValid() && Encounter->GetSpawnedUnits().Num() == 3);
+        const bool bAllPartyPresent = !PartyUnits.ContainsByPredicate([](const TWeakObjectPtr<AUnitBase>& Unit) { return !Unit.IsValid(); });
+        return Test->TestTrue(TEXT("The encounter creates every owned character and the expected opponent roster."), bAllPartyPresent && HostUnit.IsValid() && Guest.IsValid() && Enemy.IsValid() && (ParticipantCount == 2 || Corpse.IsValid()) && Encounter->GetSpawnedUnits().Num() == ParticipantCount + (ParticipantCount > 2 ? 2 : 1));
+    }
+
+    bool ConfigureExpandedArena(bool bConfigureOpponents)
+    {
+        AGameplayGameModeBase* GameMode = Server->GetAuthGameMode<AGameplayGameModeBase>();
+        AGameplayGameState* GameState = Server->GetGameState<AGameplayGameState>();
+        ACombatArena* Arena = GameState ? GameState->GetArena() : nullptr;
+        if (!Test->TestTrue(TEXT("Expanded-party fixtures use an idle authored arena."), GameMode && Arena && Arena->PlayerCoords.Num() >= ParticipantCount && Encounter->GetSpawnedUnits().IsEmpty())) return false;
+        // Preserve the established guest movement route while placing extra owners on unused player tiles.
+        // 기존 게스트 이동 경로를 유지하고 추가 소유자는 사용하지 않는 아군 타일에 배치합니다.
+        for (int32 Index = 2; Index < ParticipantCount; ++Index) Arena->PlayerCoords[Index] = FIntPoint(Index, 0);
+        if (!bConfigureOpponents) return true;
+        TMap<FName, TObjectPtr<UEncounterDefinitionDataAsset>> Definitions = GameMode->EncounterDefinitions;
+        for (TPair<FName, TObjectPtr<UEncounterDefinitionDataAsset>>& Entry : Definitions)
+        {
+            if (!Test->TestTrue(TEXT("The expanded fixture starts from an authored PvE enemy class."), Entry.Value && Entry.Value->OpponentSnapshotSlot.IsNone() && !Entry.Value->EnemyUnitClasses.IsEmpty())) return false;
+            UEncounterDefinitionDataAsset* Definition = DuplicateObject<UEncounterDefinitionDataAsset>(Entry.Value.Get(), GameMode);
+            const TSubclassOf<AEnemyUnit> CorpseClass = Definition->EnemyUnitClasses[0];
+            Definition->EnemyUnitClasses = {CorpseClass, CorpseClass};
+            Entry.Value = Definition;
+        }
+        Combat->OnCombatResult.RemoveAll(Encounter.Get());
+        Encounter->InitializeEncounter(Arena, Combat.Get(), GameMode->PartyDefinition, Definitions);
+        return true;
+    }
+
+    bool ObserveDisconnectedSession()
+    {
+        if (!Server.IsValid() || !Combat.IsValid() || !Run.IsValid() || !Encounter.IsValid())
+        {
+            Test->AddError(TEXT("The server must survive an individual participant disconnect."));
+            return CloseSession();
+        }
+        if (SuspensionObservedAt > 0.0 && (!SuspendedStateMatches() || !SameCheckpoint(Expected, Run->GetCombatCheckpoint())))
+        {
+            Test->AddError(TEXT("Disconnected combat changed its turn, action state, resources, occupancy, or confirmed checkpoint during stable observation."));
+            return CloseSession();
+        }
+        if (Combat->IsCombatActive() || Encounter->GetFlowMessage().IsEmpty()) return false;
+        for (int32 Index = 0; Index + 1 < Peers.Num(); ++Index)
+        {
+            AGameplayPlayerController* Controller = Peers[Index].Client.Get();
+            ACombatManager* Manager = Controller ? Controller->GetCombatManager() : nullptr;
+            const AGameplayGameState* State = Manager ? Manager->GetWorld()->GetGameState<AGameplayGameState>() : nullptr;
+            if (!Manager || !State || !ViewsMatch(Manager) || !UnitsMatch(Manager) || Controller->CanUseActiveUnitAction() || State->GetViewState().Phase != ERunPhase::Combat || !State->GetViewState().FlowMessage.EqualTo(Encounter->GetFlowMessage())) return false;
+        }
+        if (SuspensionObservedAt == 0.0)
+        {
+            SuspendedRuntime = CaptureSuspendedState();
+            SuspensionObservedAt = FPlatformTime::Seconds();
+            Test->AddInfo(TEXT("All remaining clients display the suspended combat; observing unchanged state across subsequent world ticks."));
+            return false;
+        }
+        if (FPlatformTime::Seconds() - SuspensionObservedAt < 0.75) return false;
+        Test->TestTrue(TEXT("Turn, resources, occupancy, control modes, and checkpoint stay fixed after disconnect callbacks settle."), SuspendedStateMatches() && SameCheckpoint(Expected, Run->GetCombatCheckpoint()));
+        Test->TestFalse(TEXT("Disconnect stops the unfinished movement without an automatic turn."), Guest->IsBusy());
+        Test->TestFalse(TEXT("Disconnect prevents further Host actions."), Host->CanUseActiveUnitAction());
+        Test->TestTrue(TEXT("Disconnect keeps the original Host identity, epoch, and canonical turn boundary."), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Expected.Identity, &Run->GetRunIdentity(), 0) && SameCheckpoint(Expected, Run->GetCombatCheckpoint()));
+        Test->TestTrue(TEXT("Disconnect does not manufacture a combat result."), Combat->GetCombatResult() == ECombatResult::None && Run->GetPhase() == ERunPhase::Combat);
+        for (const TWeakObjectPtr<AUnitBase>& Unit : PartyUnits)
+        {
+            const APlayerUnit* Player = Cast<APlayerUnit>(Unit.Get());
+            Test->TestTrue(TEXT("A missing participant never changes any original character to AI."), Player && Player->GetPartyControlMode() == EPartyControlMode::Human);
+        }
+        if (!ReadAndCompareCommitted()) return CloseSession();
+        Test->TestTrue(TEXT("The confirmed expanded-party record includes a real dead opponent without occupancy."), Expected.Units.ContainsByPredicate([](const FCombatCheckpointUnit& Unit) { return Unit.Team == ETeam::Enemy && Unit.bDead && Unit.HP == 0.0f && !Unit.bHasTile; }));
+        if (bPartyAI && !PrepareAIRecord()) return CloseSession();
+        return CloseSession(true);
+    }
+
+    FCombatCheckpointData CaptureSuspendedState() const
+    {
+        FCombatCheckpointData State;
+        State.AttemptId = Combat->GetCombatInstanceId();
+        State.CompletedTurnSerial = Combat->GetTurnSerial();
+        State.NextTurnIndex = Combat->GetCurrentTurnIndex();
+        for (AUnitBase* Unit : Combat->GetRegisteredUnits())
+        {
+            FCombatCheckpointUnit& Entry = State.Units.AddDefaulted_GetRef();
+            Entry.UnitId = Combat->GetRuntimeUnitId(Unit);
+            Entry.CharacterId = Combat->GetCharacterId(Unit);
+            Entry.OwnerAccountId = Combat->GetOwnerAccountId(Unit);
+            Entry.HP = Unit->GetAttributeSet()->GetHP();
+            Entry.AP = Unit->GetCurrentActionPoint();
+            Entry.SubAP = Unit->GetCurrentSubActionPoint();
+            Entry.HealingItemCount = Unit->HealingItemCount;
+            Entry.bDead = !Unit->IsUnitAlive();
+            Entry.bHasTile = Unit->GetCurrentTile() != nullptr;
+            if (Entry.bHasTile) Entry.GridCoord = Unit->GetCurrentTile()->GridCoord;
+            if (const APlayerUnit* Player = Cast<APlayerUnit>(Unit)) Entry.PartyControlMode = Player->GetPartyControlMode();
+        }
+        return State;
+    }
+
+    bool SuspendedStateMatches() const
+    {
+        if (Combat->IsCombatActive() || Combat->IsAwaitingTurnCheckpoint()) return false;
+        for (AUnitBase* Unit : Combat->GetRegisteredUnits())
+        {
+            if (!IsValid(Unit) || !Unit->GetAttributeSet() || Unit->IsBusy() || Unit->IsActiveTurn()) return false;
+        }
+        return SameCheckpoint(SuspendedRuntime, CaptureSuspendedState());
     }
 
     bool ReadAndCompareCommitted()
@@ -936,9 +1190,21 @@ private:
 
     bool ViewsMatch(ACombatManager* ClientCombat) const
     {
-        const AGameplayGameState* ClientState = ClientWorld->GetGameState<AGameplayGameState>();
+        const AGameplayGameState* ClientState = ClientCombat->GetWorld()->GetGameState<AGameplayGameState>();
         if (!ClientState || ClientState->GetViewState().ConfirmedCombatRevision != Run->GetCombatCheckpoint().Revision) return false;
-        return ClientCombat->GetCombatInstanceId() == Combat->GetCombatInstanceId() && ClientCombat->GetRunId() == Combat->GetRunId() && ClientCombat->GetHostEpoch() == Combat->GetHostEpoch() && ClientCombat->GetTurnSerial() == Combat->GetTurnSerial() && ClientCombat->GetRuntimeUnitId(ClientCombat->GetCurrentUnit()) == Combat->GetRuntimeUnitId(Combat->GetCurrentUnit());
+        return ClientCombat->GetCombatInstanceId() == Combat->GetCombatInstanceId() && ClientCombat->GetRunId() == Combat->GetRunId() && ClientCombat->GetHostEpoch() == Combat->GetHostEpoch() && ClientCombat->GetTurnSerial() == Combat->GetTurnSerial() && ClientCombat->GetCombatResult() == Combat->GetCombatResult() && ClientCombat->IsCombatActive() == Combat->IsCombatActive() && ClientCombat->IsAwaitingTurnCheckpoint() == Combat->IsAwaitingTurnCheckpoint() && ClientCombat->GetRuntimeUnitId(ClientCombat->GetCurrentUnit()) == Combat->GetRuntimeUnitId(Combat->GetCurrentUnit());
+    }
+
+    bool AllPeersMatch() const
+    {
+        if (Peers.Num() != ParticipantCount - 1) return false;
+        for (int32 Index = 0; Index < Peers.Num(); ++Index)
+        {
+            AGameplayPlayerController* Controller = Peers[Index].Client.Get();
+            ACombatManager* Manager = Controller ? Controller->GetCombatManager() : nullptr;
+            if (!Manager || !ViewsMatch(Manager) || !UnitsMatch(Manager) || !Controller->GetParticipantBindingId().IsValid() || Controller->GetBoundParticipantAccount() != Run->GetRunIdentity().OriginalParticipants[Index + 1].AccountId || !FindHUD(Controller)) return false;
+        }
+        return true;
     }
 
     bool Send(APartyPlayerController* Controller, ECombatActionKind Kind, USkillDefinitionDataAsset* Skill = nullptr, ACombatGridTile* Target = nullptr, FCombatActionRequest* OutRequest = nullptr)
@@ -947,8 +1213,9 @@ private:
         if (!Test->TestTrue(TEXT("The fixture encodes a real controller action."), Controller->BuildCombatActionRequest(Kind, Skill, Target, Request))) return false;
         if (OutRequest) *OutRequest = Request;
         const FCombatActionResponse Response = Controller->SubmitCombatActionRequest(Request);
-        if (Controller == Client.Get())
+        if (!Controller->HasAuthority())
         {
+            PendingController = Controller;
             PendingSequence = Request.RequestSequence;
             return Test->TestTrue(TEXT("Client action is sent through the owning network connection."), Response.Result == ECombatRequestResult::Pending);
         }
@@ -957,13 +1224,14 @@ private:
 
     bool ClientResponseArrived() const
     {
-        const FCombatActionResponse& Response = Client->GetLastCombatActionResponse();
+        if (!PendingController.IsValid()) return false;
+        const FCombatActionResponse& Response = PendingController->GetLastCombatActionResponse();
         return Response.RequestSequence == PendingSequence && Response.Result != ECombatRequestResult::Pending;
     }
 
     bool CheckAccepted()
     {
-        return Test->TestTrue(TEXT("The server acknowledges the client action."), Client->GetLastCombatActionResponse().Result == ECombatRequestResult::Accepted);
+        return Test->TestTrue(TEXT("The server acknowledges the client action."), PendingController.IsValid() && PendingController->GetLastCombatActionResponse().Result == ECombatRequestResult::Accepted);
     }
 
     void ObserveAction(AUnitBase* Unit, EUnitActionType Kind)
@@ -1005,31 +1273,56 @@ private:
 
     bool FindConnectedWorlds()
     {
+        TArray<FPeer> FoundPeers;
         for (const FWorldContext& Context : GEngine->GetWorldContexts())
         {
             UWorld* World = Context.World();
             if (Context.WorldType != EWorldType::PIE || !World || !World->GetMapName().Contains(TEXT("Gameplay"))) continue;
             if (World->GetNetMode() == NM_ListenServer) Server = World;
-            else if (World->GetNetMode() == NM_Client) ClientWorld = World;
+            else if (World->GetNetMode() == NM_Client)
+            {
+                FPeer& Peer = FoundPeers.AddDefaulted_GetRef();
+                Peer.PIEInstance = Context.PIEInstance;
+                Peer.World = World;
+                Peer.Client = Cast<AGameplayPlayerController>(World->GetFirstPlayerController());
+            }
         }
-        if (!Server.IsValid() || !ClientWorld.IsValid()) return false;
+        if (!Server.IsValid() || FoundPeers.Num() != ParticipantCount - 1) return false;
         UNetDriver* ServerDriver = Server->GetNetDriver();
-        UNetDriver* ClientDriver = ClientWorld->GetNetDriver();
-        if (!ServerDriver || !ClientDriver || !ClientDriver->ServerConnection || ClientDriver->ServerConnection->GetConnectionState() != USOCK_Open || ServerDriver->ClientConnections.Num() != 1 || ServerDriver->ClientConnections[0]->GetConnectionState() != USOCK_Open) return false;
-        Client = Cast<AGameplayPlayerController>(ClientWorld->GetFirstPlayerController());
+        if (!ServerDriver || ServerDriver->ClientConnections.Num() != ParticipantCount - 1) return false;
+        FoundPeers.Sort([](const FPeer& Left, const FPeer& Right) { return Left.PIEInstance < Right.PIEInstance; });
         for (FConstPlayerControllerIterator It = Server->GetPlayerControllerIterator(); It; ++It)
         {
             AGameplayPlayerController* Controller = Cast<AGameplayPlayerController>(It->Get());
             if (Controller && Controller->IsLocalController()) Host = Controller;
-            else if (Controller && Controller->GetNetConnection()) Remote = Controller;
+            else if (Controller && Controller->GetNetConnection() && Controller->GetPlayerState<APlayerState>())
+            {
+                for (FPeer& Peer : FoundPeers)
+                {
+                    const APlayerState* PlayerState = Peer.Client.IsValid() ? Peer.Client->GetPlayerState<APlayerState>() : nullptr;
+                    if (PlayerState && PlayerState->GetPlayerId() == Controller->GetPlayerState<APlayerState>()->GetPlayerId()) Peer.Remote = Controller;
+                }
+            }
         }
+        TSet<AGameplayPlayerController*> UniqueRemoteControllers;
+        for (const FPeer& Peer : FoundPeers)
+        {
+            UNetDriver* Driver = Peer.World->GetNetDriver();
+            UNetConnection* RemoteConnection = Peer.Remote.IsValid() ? Peer.Remote->GetNetConnection() : nullptr;
+            if (!Peer.Client.IsValid() || !Driver || Driver == ServerDriver || !Driver->ServerConnection || Driver->ServerConnection->GetConnectionState() != USOCK_Open || !RemoteConnection || RemoteConnection->GetConnectionState() != USOCK_Open || UniqueRemoteControllers.Contains(Peer.Remote.Get())) return false;
+            UniqueRemoteControllers.Add(Peer.Remote.Get());
+        }
+        Peers = MoveTemp(FoundPeers);
+        ClientWorld = Peers[0].World;
+        Client = Peers[0].Client;
+        Remote = Peers[0].Remote;
         AGameplayGameModeBase* GameMode = Server->GetAuthGameMode<AGameplayGameModeBase>();
         AGameplayGameState* GameState = Server->GetGameState<AGameplayGameState>();
         if (!Client.IsValid() || !Host.IsValid() || !Remote.IsValid() || !GameMode || !GameMode->GetEncounterManager() || !GameState || !GameState->GetArena()) return false;
         Encounter = GameMode->GetEncounterManager();
         Combat = Encounter->GetCombatManager();
         Run = Server->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
-        Test->TestTrue(TEXT("Separate Listen Server and client worlds have real connected NetDrivers."), ServerDriver != ClientDriver && !Client->HasAuthority());
+        Test->TestTrue(TEXT("Every original participant has a distinct connected client world and server connection."), UniqueRemoteControllers.Num() == ParticipantCount - 1 && !Client->HasAuthority());
         return Combat.IsValid() && Run.IsValid();
     }
 
@@ -1098,6 +1391,10 @@ private:
         HostUnit.Reset();
         Guest.Reset();
         Enemy.Reset();
+        Corpse.Reset();
+        PartyUnits.Reset();
+        Peers.Reset();
+        PendingController.Reset();
     }
 
     void Advance(EStep Next)
@@ -1121,6 +1418,16 @@ private:
     FString Slot;
     EOpponentSourceChange OpponentChange;
     bool bPartyAI = false;
+    bool bWaitingForExtraAITurn = false;
+    int32 ParticipantCount = 2;
+    int32 ExtraParticipant = 2;
+    float ExtraHPBeforeItem = 0.0f;
+    int32 ExtraItemsBefore = 0;
+    TArray<FPeer> Peers;
+    TArray<TWeakObjectPtr<AUnitBase>> PartyUnits;
+    TArray<TWeakObjectPtr<AUnitBase>> OldUnits;
+    TArray<FGuid> OldBindings;
+    TWeakObjectPtr<APartyPlayerController> PendingController;
     FName OpponentSlot;
     FPartySnapshot OriginalOpponent;
     FPartySnapshot ReplacementOpponent;
@@ -1130,6 +1437,8 @@ private:
     bool bRestartAfterClose = false;
     bool bPreserveWriterFile = false;
     double StepStarted;
+    double SuspensionObservedAt = 0.0;
+    FCombatCheckpointData SuspendedRuntime;
     FString Diagnostic;
     FIntPoint MoveCoord = FIntPoint(2, 1);
     FIntPoint UnconfirmedCoord = FIntPoint(3, 1);
@@ -1162,6 +1471,7 @@ private:
     TWeakObjectPtr<AUnitBase> HostUnit;
     TWeakObjectPtr<AUnitBase> Guest;
     TWeakObjectPtr<AUnitBase> Enemy;
+    TWeakObjectPtr<AUnitBase> Corpse;
     TWeakObjectPtr<AUnitBase> OldGuest;
     TWeakObjectPtr<AUnitBase> OldHost;
     TWeakObjectPtr<AUnitBase> ObservedUnit;
@@ -1195,6 +1505,32 @@ bool FCombatCheckpointSessionTest::RunTest(const FString& Parameters)
     if (bPartyAI) AddInfo(TEXT("Testing persisted guest AI with its original consent, ownership and actual two-world combat."));
     ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<CombatCheckpointPIETests::FCheckpointSessions>(this, CombatCheckpointPIETests::ERunMode::SessionRestart, Slot, OpponentChange, bPartyAI));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatCheckpointThreePlayersTest, "ProjectA.Coop.CheckpointSessionRestart3Players", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatCheckpointThreePlayersTest::RunTest(const FString& Parameters)
+{
+    const bool bPartyAI = FParse::Param(FCommandLine::Get(), TEXT("T14CheckpointAI"));
+    const FString Slot = TEXT("T14_CombatPIE3_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    AddInfo(TEXT("Three original participants: actual client disconnect, unchanged original Host, and a fresh fully rejoined PIE session."));
+    if (bPartyAI) AddInfo(TEXT("The original guest remains connected while its consented, persisted AI mode is restored."));
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<CombatCheckpointPIETests::FCheckpointSessions>(this, CombatCheckpointPIETests::ERunMode::SessionRestart, Slot, CombatCheckpointPIETests::EOpponentSourceChange::None, bPartyAI, 3));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatCheckpointFourPlayersTest, "ProjectA.Coop.CheckpointSessionRestart4Players", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatCheckpointFourPlayersTest::RunTest(const FString& Parameters)
+{
+    const bool bPartyAI = FParse::Param(FCommandLine::Get(), TEXT("T14CheckpointAI"));
+    const FString Slot = TEXT("T14_CombatPIE4_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    AddInfo(TEXT("Four original participants: actual client disconnect, unchanged original Host, and a fresh fully rejoined PIE session."));
+    if (bPartyAI) AddInfo(TEXT("The original guest remains connected while its consented, persisted AI mode is restored."));
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<CombatCheckpointPIETests::FCheckpointSessions>(this, CombatCheckpointPIETests::ERunMode::SessionRestart, Slot, CombatCheckpointPIETests::EOpponentSourceChange::None, bPartyAI, 4));
     return true;
 }
 

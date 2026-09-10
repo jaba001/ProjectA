@@ -25,6 +25,7 @@
 #include "Game/GameState/GameplayGameState.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/GameSession.h"
 #include "GAS/Attribute/AS_Unit.h"
 #include "GAS/Effect/GE_Damage.h"
 #include "Grid/Combat/CombatGridManager.h"
@@ -60,13 +61,14 @@ T* FindScreen(APartyPlayerController* Controller)
     return nullptr;
 }
 
-// Two in-process PIE worlds still exchange commands and replicated actors through separate NetDrivers.
-// 한 프로세스의 두 PIE 월드도 서로 다른 NetDriver로 명령과 복제 액터를 교환합니다.
+// Each in-process PIE world exchanges commands and replicated actors through a separate NetDriver.
+// 한 프로세스의 각 PIE 월드는 서로 다른 NetDriver로 명령과 복제 액터를 교환합니다.
 class FPlayCoopNetwork : public IAutomationLatentCommand
 {
 public:
-    explicit FPlayCoopNetwork(FAutomationTestBase* InTest) : Test(InTest), StageStarted(FPlatformTime::Seconds())
+    explicit FPlayCoopNetwork(FAutomationTestBase* InTest, int32 InParticipantCount = 2) : Test(InTest), ParticipantCount(InParticipantCount), StageStarted(FPlatformTime::Seconds())
     {
+        MoveCoord = GetMoveCoord(1);
     }
 
     virtual ~FPlayCoopNetwork() override
@@ -96,7 +98,7 @@ public:
         }
         if (FPlatformTime::Seconds() - StageStarted > 120.0)
         {
-            Test->AddError(FString::Printf(TEXT("Co-op network PIE timed out at stage %d; last client response=%d sequence=%lld."), Stage, Client.IsValid() ? static_cast<int32>(Client->GetLastCombatActionResponse().Result) : -1, Client.IsValid() ? Client->GetLastCombatActionResponse().RequestSequence : -1));
+            Test->AddError(FString::Printf(TEXT("Co-op network PIE (%d players, owner %d) timed out at stage %d; last client response=%d sequence=%lld."), ParticipantCount, ActiveRemoteIndex + 1, Stage, Client.IsValid() ? static_cast<int32>(Client->GetLastCombatActionResponse().Result) : -1, Client.IsValid() ? Client->GetLastCombatActionResponse().RequestSequence : -1));
             Test->AddError(FString::Printf(TEXT("Last %s navigation readiness: %s"), Stage == 0 ? TEXT("editor before PIE") : TEXT("server"), Stage == 0 ? *EditorNavigationStatus : *NavigationStatus));
             return EndSession();
         }
@@ -108,7 +110,7 @@ public:
             }
             PlaySettings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
             PlaySettings->SetPlayNetMode(PIE_ListenServer);
-            PlaySettings->SetPlayNumberOfClients(2);
+            PlaySettings->SetPlayNumberOfClients(ParticipantCount);
             PlaySettings->SetRunUnderOneProcess(true);
             PlaySettings->bLaunchSeparateServer = false;
             PlaySettings->NewWindowWidth = 1280;
@@ -138,6 +140,15 @@ public:
             Advance();
             return false;
         }
+        if (!bClientBindingsReady)
+        {
+            if (!MatchClientBindings())
+            {
+                return false;
+            }
+            bClientBindingsReady = true;
+            SelectRemote(0);
+        }
         if (!ServerWorld.IsValid() || !ClientWorld.IsValid() || !Host.IsValid() || !RemoteServerController.IsValid() || !Client.IsValid() || !ServerCombat.IsValid())
         {
             Test->AddError(TEXT("A required co-op world or controller disappeared during the test."));
@@ -152,7 +163,7 @@ public:
         }
         if (Stage == 2)
         {
-            if (!ViewsMatch(ClientCombat) || !UnitMatches(HostUnit.Get(), ClientCombat) || !UnitMatches(GuestUnit.Get(), ClientCombat) || !UnitMatches(EnemyUnit.Get(), ClientCombat) || !HUDOwnershipReady(true))
+            if (!AllClientsMatch() || !HUDOwnershipReady(true))
             {
                 return false;
             }
@@ -196,6 +207,13 @@ public:
             }
             Test->TestTrue(TEXT("The server rejects the guest's real RPC for the host character."), Client->GetLastCombatActionResponse().Result == ECombatRequestResult::NotOwner);
             Test->TestEqual(TEXT("Rejected ownership leaves the server turn unchanged."), ServerCombat->GetTurnSerial(), TurnBefore);
+            if (ActiveRemoteIndex + 1 < ParticipantCount - 1)
+            {
+                SelectRemote(ActiveRemoteIndex + 1);
+                SetStage(2);
+                return false;
+            }
+            SelectRemote(0);
             if (!ClickHUD(Host.Get(), TEXT("Button_EndTurn")))
             {
                 return EndSession();
@@ -205,7 +223,7 @@ public:
         }
         if (Stage == 4)
         {
-            if (ServerCombat->GetCurrentUnit() != GuestUnit.Get() || !ViewsMatch(ClientCombat) || !UnitMatches(GuestUnit.Get(), ClientCombat) || !Client->CanUseActiveUnitAction() || !HUDOwnershipReady(false))
+            if (ServerCombat->GetCurrentUnit() != GuestUnit.Get() || !AllClientsMatch() || !Client->CanUseActiveUnitAction() || !HUDOwnershipReady(false))
             {
                 return false;
             }
@@ -220,7 +238,7 @@ public:
         }
         if (Stage == 5)
         {
-            if (!ResponseArrived() || !UnitMatches(GuestUnit.Get(), ClientCombat))
+            if (!ResponseArrived() || !AllClientsMatch())
             {
                 return false;
             }
@@ -240,6 +258,7 @@ public:
             {
                 return EndSession();
             }
+            MoveResult.Reset();
             MoveObserver = GuestUnit->OnActionCompleted.AddLambda([this](AUnitBase*, EUnitActionType Action, EUnitActionResult Result)
             {
                 if (Action == EUnitActionType::Move)
@@ -267,7 +286,7 @@ public:
                 CheckAccepted(TEXT("Client movement"));
                 return EndSession();
             }
-            if (!ResponseArrived() || !MoveResult.IsSet() || GuestUnit->IsBusy() || !GuestUnit->GetCurrentTile() || GuestUnit->GetCurrentTile()->GridCoord != MoveCoord || !UnitMatches(GuestUnit.Get(), ClientCombat))
+            if (!ResponseArrived() || !MoveResult.IsSet() || GuestUnit->IsBusy() || !GuestUnit->GetCurrentTile() || GuestUnit->GetCurrentTile()->GridCoord != MoveCoord || !AllClientsMatch())
             {
                 return false;
             }
@@ -305,7 +324,7 @@ public:
         }
         if (Stage == 7)
         {
-            if (!ResponseArrived() || GuestUnit->IsBusy() || !UnitMatches(GuestUnit.Get(), ClientCombat) || !UnitMatches(EnemyUnit.Get(), ClientCombat))
+            if (!ResponseArrived() || GuestUnit->IsBusy() || !AllClientsMatch())
             {
                 return false;
             }
@@ -341,7 +360,9 @@ public:
         }
         if (Stage == 9)
         {
-            if (!ResponseArrived() || ServerCombat->GetTurnSerial() <= TurnBefore || ServerCombat->GetCurrentUnit() != HostUnit.Get() || !ViewsMatch(ClientCombat))
+            const bool bMoreRemoteTurns = ActiveRemoteIndex + 1 < ParticipantCount - 1;
+            AUnitBase* ExpectedNextUnit = bMoreRemoteTurns ? PartyUnits[ActiveRemoteIndex + 2].Get() : HostUnit.Get();
+            if (!ResponseArrived() || ServerCombat->GetTurnSerial() <= TurnBefore || ServerCombat->GetCurrentUnit() != ExpectedNextUnit || !AllClientsMatch())
             {
                 return false;
             }
@@ -349,24 +370,40 @@ public:
             {
                 return EndSession();
             }
+            Test->AddInfo(FString::Printf(TEXT("Owner %d completed real potion, movement, skill, replay rejection and end-turn RPCs; all %d clients match."), ActiveRemoteIndex + 1, ParticipantCount - 1));
+            if (bMoreRemoteTurns)
+            {
+                SelectRemote(ActiveRemoteIndex + 1);
+                SetStage(4);
+                return false;
+            }
             // Lethal fixture damage verifies replicated death independently of balance and AI targeting.
             // 치명적인 테스트 피해로 밸런스와 AI 대상 선택에 의존하지 않고 사망 복제를 검증합니다.
-            if (!Test->TestTrue(TEXT("Server fixture applies lethal damage to the guest character."), UCombatEffectLibrary::ApplyDamageToUnit(EnemyUnit.Get(), GuestUnit.Get(), UGE_Damage::StaticClass(), 100000.0f)))
+            for (int32 OwnerIndex = 1; OwnerIndex < ParticipantCount; ++OwnerIndex)
             {
-                return EndSession();
+                if (!Test->TestTrue(FString::Printf(TEXT("Server fixture applies lethal damage to owner %d's character."), OwnerIndex), UCombatEffectLibrary::ApplyDamageToUnit(EnemyUnit.Get(), PartyUnits[OwnerIndex].Get(), UGE_Damage::StaticClass(), 100000.0f)))
+                {
+                    return EndSession();
+                }
             }
             Advance();
             return false;
         }
         if (Stage == 10)
         {
-            AUnitBase* ClientGuest = ClientCombat->ResolveRuntimeUnit(GuestUnitId);
-            if (!ClientGuest || ClientGuest->IsUnitAlive() || ClientGuest->GetCurrentTile() || !UnitMatches(GuestUnit.Get(), ClientCombat))
+            if (!AllClientsMatch())
             {
                 return false;
             }
-            Test->TestFalse(TEXT("Both worlds observe the guest character's death."), GuestUnit->IsUnitAlive());
-            Test->TestNull(TEXT("Client death clears the previous grid occupant."), ClientCombat->GetTileByCoord(MoveCoord)->GetOccupyingUnit());
+            for (int32 OwnerIndex = 1; OwnerIndex < ParticipantCount; ++OwnerIndex)
+            {
+                Test->TestFalse(FString::Printf(TEXT("Every world observes owner %d's character death."), OwnerIndex), PartyUnits[OwnerIndex]->IsUnitAlive());
+                for (const TWeakObjectPtr<AGameplayPlayerController>& RemoteClient : RemoteClients)
+                {
+                    ACombatGridTile* PreviousTile = RemoteClient->GetCombatManager()->GetTileByCoord(GetMoveCoord(OwnerIndex));
+                    Test->TestTrue(TEXT("Each client death clears the previous grid occupant."), PreviousTile && !PreviousTile->GetOccupyingUnit());
+                }
+            }
             if (!Test->TestTrue(TEXT("Server fixture applies lethal damage to the last enemy."), UCombatEffectLibrary::ApplyDamageToUnit(HostUnit.Get(), EnemyUnit.Get(), UGE_Damage::StaticClass(), 100000.0f)))
             {
                 return EndSession();
@@ -376,16 +413,20 @@ public:
         }
         if (Stage == 11)
         {
-            if (ServerState->GetViewState().Phase != ERunPhase::Result || ClientState->GetViewState().Phase != ERunPhase::Result || !ViewsMatch(ClientCombat) || !UnitMatches(EnemyUnit.Get(), ClientCombat) || !FindScreen<UEncounterResultWidget>(Host.Get()) || !FindScreen<UEncounterResultWidget>(Client.Get()))
+            if (ServerState->GetViewState().Phase != ERunPhase::Result || !AllClientsMatch() || !AllClientsShowResult() || !FindScreen<UEncounterResultWidget>(Host.Get()))
             {
                 return false;
             }
-            Test->TestTrue(TEXT("Server and client share the Victory result."), ServerState->GetViewState().LastResult == ECombatResult::Victory && ClientState->GetViewState().LastResult == ECombatResult::Victory && ClientCombat->GetCombatResult() == ECombatResult::Victory);
+            Test->TestTrue(TEXT("The server confirms Victory."), ServerState->GetViewState().LastResult == ECombatResult::Victory);
             Test->TestFalse(TEXT("The result locks host combat input."), Host->CanUseActiveUnitAction());
-            Test->TestFalse(TEXT("The result locks client combat input."), Client->CanUseActiveUnitAction());
             UTextBlock* HostResult = Cast<UTextBlock>(FindScreen<UEncounterResultWidget>(Host.Get())->GetWidgetFromName(TEXT("Text_Result")));
-            UTextBlock* ClientResult = Cast<UTextBlock>(FindScreen<UEncounterResultWidget>(Client.Get())->GetWidgetFromName(TEXT("Text_Result")));
-            Test->TestTrue(TEXT("Both result HUDs display the same final text."), HostResult && ClientResult && HostResult->GetText().ToString() == ClientResult->GetText().ToString());
+            for (const TWeakObjectPtr<AGameplayPlayerController>& RemoteClient : RemoteClients)
+            {
+                Test->TestTrue(TEXT("Every client receives Victory in both gameplay and combat state."), RemoteClient->GetWorld()->GetGameState<AGameplayGameState>()->GetViewState().LastResult == ECombatResult::Victory && RemoteClient->GetCombatManager()->GetCombatResult() == ECombatResult::Victory);
+                Test->TestFalse(TEXT("The result locks each client's combat input."), RemoteClient->CanUseActiveUnitAction());
+                UTextBlock* ClientResult = Cast<UTextBlock>(FindScreen<UEncounterResultWidget>(RemoteClient.Get())->GetWidgetFromName(TEXT("Text_Result")));
+                Test->TestTrue(TEXT("Every result HUD displays the same final text."), HostResult && ClientResult && HostResult->GetText().ToString() == ClientResult->GetText().ToString());
+            }
             // The fixture invokes the server transition without defining a multiplayer node-voting policy.
             // 멀티플레이 노드 선택 정책을 정하지 않고 테스트가 서버 전환을 직접 실행합니다.
             if (!Test->TestTrue(TEXT("The server fixture continues after result inspection."), Encounter->ContinueRun()))
@@ -397,16 +438,17 @@ public:
         }
         if (Stage == 12)
         {
-            if (ServerState->GetViewState().Phase != ERunPhase::Map || ClientState->GetViewState().Phase != ERunPhase::Map || !ServerCombat->GetRegisteredUnits().IsEmpty() || !ClientCombat->GetRegisteredUnits().IsEmpty() || !FindScreen<URunMapWidget>(Client.Get()))
+            if (ServerState->GetViewState().Phase != ERunPhase::Map || !ServerCombat->GetRegisteredUnits().IsEmpty() || !AllClientsCleanedUp())
             {
                 return false;
             }
             Test->TestTrue(TEXT("Server cleanup releases encounter actors."), Encounter->GetSpawnedUnits().IsEmpty());
-            if (ACombatArena* Arena = ClientState->GetArena(); Arena && Arena->Grid)
+            for (const TWeakObjectPtr<AGameplayPlayerController>& RemoteClient : RemoteClients)
             {
+                ACombatArena* Arena = RemoteClient->GetWorld()->GetGameState<AGameplayGameState>()->GetArena();
                 for (const TPair<FIntPoint, ACombatGridTile*>& Entry : Arena->Grid->TileMap)
                 {
-                    Test->TestNull(TEXT("Client cleanup leaves no grid occupancy."), Entry.Value->GetOccupyingUnit());
+                    Test->TestNull(TEXT("Every client cleanup leaves no grid occupancy."), Entry.Value->GetOccupyingUnit());
                 }
             }
             return EndSession();
@@ -490,6 +532,8 @@ private:
 
     bool FindConnectedWorlds()
     {
+        ObservedClients.Reset();
+        ServerRemoteControllers.Reset();
         for (const FWorldContext& Context : GEngine->GetWorldContexts())
         {
             UWorld* World = Context.World();
@@ -503,20 +547,38 @@ private:
             }
             else if (World->GetNetMode() == NM_Client)
             {
-                ClientWorld = World;
+                if (AGameplayPlayerController* Controller = Cast<AGameplayPlayerController>(World->GetFirstPlayerController()))
+                {
+                    ObservedClients.Add(Controller);
+                }
             }
         }
-        if (!ServerWorld.IsValid() || !ClientWorld.IsValid())
+        if (!ServerWorld.IsValid() || ObservedClients.Num() != ParticipantCount - 1)
         {
             return false;
         }
         UNetDriver* ServerDriver = ServerWorld->GetNetDriver();
-        UNetDriver* ClientDriver = ClientWorld->GetNetDriver();
-        if (!ServerDriver || !ClientDriver || !ClientDriver->ServerConnection || ClientDriver->ServerConnection->GetConnectionState() != USOCK_Open || ServerDriver->ClientConnections.Num() != 1 || ServerDriver->ClientConnections[0]->GetConnectionState() != USOCK_Open)
+        if (!ServerDriver || ServerDriver->ClientConnections.Num() != ParticipantCount - 1)
         {
             return false;
         }
-        Client = Cast<AGameplayPlayerController>(ClientWorld->GetFirstPlayerController());
+        for (UNetConnection* Connection : ServerDriver->ClientConnections)
+        {
+            AGameplayPlayerController* Controller = Connection ? Cast<AGameplayPlayerController>(Connection->OwningActor) : nullptr;
+            if (!Controller || Connection->GetConnectionState() != USOCK_Open)
+            {
+                return false;
+            }
+            ServerRemoteControllers.Add(Controller);
+        }
+        for (const TWeakObjectPtr<AGameplayPlayerController>& RemoteClient : ObservedClients)
+        {
+            UNetDriver* Driver = RemoteClient->GetWorld()->GetNetDriver();
+            if (!Driver || !Driver->ServerConnection || Driver->ServerConnection->GetConnectionState() != USOCK_Open)
+            {
+                return false;
+            }
+        }
         for (FConstPlayerControllerIterator It = ServerWorld->GetPlayerControllerIterator(); It; ++It)
         {
             AGameplayPlayerController* Controller = Cast<AGameplayPlayerController>(It->Get());
@@ -524,20 +586,81 @@ private:
             {
                 Host = Controller;
             }
-            else if (Controller && Controller->GetNetConnection())
-            {
-                RemoteServerController = Controller;
-            }
         }
         AGameplayGameModeBase* Mode = ServerWorld->GetAuthGameMode<AGameplayGameModeBase>();
         AGameplayGameState* State = ServerWorld->GetGameState<AGameplayGameState>();
-        if (!Client.IsValid() || !Host.IsValid() || !RemoteServerController.IsValid() || !Mode || !Mode->GetEncounterManager() || !State || !State->GetArena())
+        if (!Host.IsValid() || !Mode || !Mode->GetEncounterManager() || !State || !State->GetArena() || Mode->GetNumPlayers() != ParticipantCount)
         {
             return false;
         }
-        Test->TestTrue(TEXT("Separate PIE worlds own separate connected NetDrivers."), ServerWorld.Get() != ClientWorld.Get() && ServerDriver != ClientDriver && ServerDriver->ClientConnections[0]->GetConnectionState() == USOCK_Open);
-        Test->TestFalse(TEXT("Commands originate from an actual non-authoritative client controller."), Client->HasAuthority());
+        Test->TestEqual(TEXT("The server counts every requested player connection."), Mode->GetNumPlayers(), ParticipantCount);
+        if (!Test->TestNotNull(TEXT("Gameplay creates the official GameSession admission controller."), Mode->GameSession.Get()))
+        {
+            return false;
+        }
+        Test->TestEqual(TEXT("The configured GameSession supports at most four players."), Mode->GameSession->MaxPlayers, 4);
+        // Exercise Unreal's admission rule without launching an additional fifth PIE instance.
+        // 다섯 번째 PIE 인스턴스를 추가로 실행하지 않고 언리얼의 입장 규칙을 호출합니다.
+        Test->TestTrue(TEXT("GameSession admits a remaining player only below its four-player capacity."), Mode->GameSession->ApproveLogin(TEXT("")).IsEmpty() == (ParticipantCount < 4));
+        for (const TWeakObjectPtr<AGameplayPlayerController>& RemoteClient : ObservedClients)
+        {
+            Test->TestTrue(TEXT("Every client world owns a separate connected NetDriver."), ServerWorld.Get() != RemoteClient->GetWorld() && ServerDriver != RemoteClient->GetWorld()->GetNetDriver());
+            Test->TestFalse(TEXT("Commands originate from actual non-authoritative client controllers."), RemoteClient->HasAuthority());
+        }
         return true;
+    }
+
+    bool MatchClientBindings()
+    {
+        RemoteClients.Reset();
+        TSet<AGameplayPlayerController*> MatchedClients;
+        for (int32 Index = 0; Index < ParticipantCount - 1; ++Index)
+        {
+            AGameplayPlayerController* ServerController = ServerRemoteControllers[Index].Get();
+            if (!ServerController)
+            {
+                return false;
+            }
+            AGameplayPlayerController* MatchingClient = nullptr;
+            for (const TWeakObjectPtr<AGameplayPlayerController>& Candidate : ObservedClients)
+            {
+                if (Candidate.IsValid() && Candidate->GetBoundParticipantAccount() == Identity.OriginalParticipants[Index + 1].AccountId && Candidate->GetParticipantBindingId().IsValid() && Candidate->GetParticipantBindingId() == ServerController->GetParticipantBindingId())
+                {
+                    MatchingClient = Candidate.Get();
+                    break;
+                }
+            }
+            if (!MatchingClient || MatchedClients.Contains(MatchingClient))
+            {
+                return false;
+            }
+            MatchedClients.Add(MatchingClient);
+            RemoteClients.Add(MatchingClient);
+        }
+        Test->TestEqual(TEXT("Every explicitly assigned account resolves to a unique replicated client binding."), MatchedClients.Num(), ParticipantCount - 1);
+        return true;
+    }
+
+    FIntPoint GetMoveCoord(int32 OwnerIndex) const
+    {
+        // Keep the two-player route; larger parties move to their own empty rear tile.
+        // 2인 이동 경로는 유지하며 더 큰 파티는 각자 비어 있는 후열 타일로 이동합니다.
+        return ParticipantCount == 2 ? FIntPoint(2, 1) : FIntPoint(OwnerIndex, 0);
+    }
+
+    void SelectRemote(int32 Index)
+    {
+        RemoveMoveObserver();
+        ActiveRemoteIndex = Index;
+        RemoteServerController = ServerRemoteControllers[Index];
+        Client = RemoteClients[Index];
+        ClientWorld = Client->GetWorld();
+        GuestUnit = PartyUnits[Index + 1];
+        GuestUnitId = ServerCombat->GetRuntimeUnitId(GuestUnit.Get());
+        MoveCoord = GetMoveCoord(Index + 1);
+        MoveResult.Reset();
+        PendingSequence = 0;
+        bLoggedNavigationCoverage = false;
     }
 
     bool InitializeRun()
@@ -556,17 +679,23 @@ private:
         Hunter.bUseUnitClassDefaults = false;
         Hunter.ActionPoints = 4;
         Hunter.SubActionPoints = 2;
+        if (ParticipantCount > 2)
+        {
+            // Keep the longer fixture alive for every owner's command round without changing authored balance.
+            // 원본 밸런스를 바꾸지 않고 모든 소유자의 명령 차례가 끝날 때까지 긴 테스트를 유지합니다.
+            Hunter.MaxHP = 1000.0f;
+        }
         PartyCatalog->Professions.Add(TEXT("Hunter"), Hunter);
         Run->PartyDefinition = PartyCatalog.Get();
         Identity.Origin = ERunIdentityOrigin::AccountProvider;
         Identity.RunId = FGuid::NewGuid();
         Identity.HostEpoch = 1;
         TArray<FRunPartyMember> Party;
-        for (int32 Index = 0; Index < 2; ++Index)
+        for (int32 Index = 0; Index < ParticipantCount; ++Index)
         {
             FRunParticipantData& Participant = Identity.OriginalParticipants.AddDefaulted_GetRef();
             Participant.AccountId.Provider = TEXT("CoopPIEFixture");
-            Participant.AccountId.Subject = Index == 0 ? TEXT("ExplicitHostOwner") : TEXT("ExplicitGuestOwner");
+            Participant.AccountId.Subject = Index == 0 ? TEXT("ExplicitHostOwner") : FString::Printf(TEXT("ExplicitGuestOwner%d"), Index);
             FRunPartyMember& Member = Party.AddDefaulted_GetRef();
             Member.SlotIndex = Index;
             Member.bCreated = true;
@@ -577,16 +706,23 @@ private:
         }
         Identity.HostAccountId = Identity.OriginalParticipants[0].AccountId;
         FText Error;
-        if (!Test->TestTrue(TEXT("The server initializes the explicit two-owner Run."), Run->InitializeRunWithIdentity(Party, Identity, Error)))
+        if (!Test->TestTrue(TEXT("The server initializes the Run with every explicit owner."), Run->InitializeRunWithIdentity(Party, Identity, Error)))
         {
             Test->AddError(Error.ToString());
             return false;
         }
         // The fixture explicitly maps accounts to known connections; connection order is not persisted as identity.
         // 테스트가 알려진 연결에 계정을 명시적으로 배정하며 접속 순서를 영구 식별자로 저장하지 않습니다.
-        if (!Test->TestTrue(TEXT("The server assigns the fixture host account."), Mode->AssignRunParticipant(Host.Get(), Identity.OriginalParticipants[0].AccountId)) || !Test->TestTrue(TEXT("The server assigns the fixture guest account."), Mode->AssignRunParticipant(RemoteServerController.Get(), Identity.OriginalParticipants[1].AccountId)))
+        if (!Test->TestTrue(TEXT("The server assigns the fixture host account."), Mode->AssignRunParticipant(Host.Get(), Identity.OriginalParticipants[0].AccountId)))
         {
             return false;
+        }
+        for (int32 Index = 0; Index < ParticipantCount - 1; ++Index)
+        {
+            if (!Test->TestTrue(FString::Printf(TEXT("The server explicitly assigns owner %d to its fixture connection."), Index + 1), Mode->AssignRunParticipant(ServerRemoteControllers[Index].Get(), Identity.OriginalParticipants[Index + 1].AccountId)))
+            {
+                return false;
+            }
         }
         ServerCombat->OnCombatResult.RemoveAll(Encounter.Get());
         Encounter->InitializeEncounter(State->GetArena(), ServerCombat.Get(), PartyCatalog.Get(), Mode->EncounterDefinitions);
@@ -595,35 +731,129 @@ private:
             Test->AddError(Encounter->GetFlowMessage().ToString());
             return false;
         }
+        PartyUnits.SetNum(ParticipantCount);
         for (AUnitBase* Unit : Encounter->GetSpawnedUnits())
         {
             if (Unit->GetTeam() == ETeam::Enemy)
             {
                 EnemyUnit = Unit;
             }
-            else if (ServerCombat->GetOwnerAccountId(Unit) == Identity.OriginalParticipants[0].AccountId)
+            else
             {
-                HostUnit = Unit;
-            }
-            else if (ServerCombat->GetOwnerAccountId(Unit) == Identity.OriginalParticipants[1].AccountId)
-            {
-                GuestUnit = Unit;
+                for (int32 OwnerIndex = 0; OwnerIndex < ParticipantCount; ++OwnerIndex)
+                {
+                    if (ServerCombat->GetOwnerAccountId(Unit) == Identity.OriginalParticipants[OwnerIndex].AccountId)
+                    {
+                        PartyUnits[OwnerIndex] = Unit;
+                        Test->TestTrue(TEXT("A spawned character preserves its original owner and CharacterId."), ServerCombat->GetCharacterId(Unit) == Party[OwnerIndex].CharacterId);
+                    }
+                }
             }
         }
-        if (!Test->TestTrue(TEXT("The fixture creates two owned characters and one opponent."), HostUnit.IsValid() && GuestUnit.IsValid() && EnemyUnit.IsValid() && Encounter->GetSpawnedUnits().Num() == 3))
+        bool bAllOwnersSpawned = true;
+        for (const TWeakObjectPtr<AUnitBase>& Unit : PartyUnits)
+        {
+            bAllOwnersSpawned &= Unit.IsValid();
+        }
+        if (!Test->TestTrue(TEXT("The fixture creates all owned characters and one opponent."), EnemyUnit.IsValid() && Encounter->GetSpawnedUnits().Num() == ParticipantCount + 1 && bAllOwnersSpawned))
         {
             return false;
         }
-        GuestUnitId = ServerCombat->GetRuntimeUnitId(GuestUnit.Get());
+        HostUnit = PartyUnits[0];
         EnemyUnitId = ServerCombat->GetRuntimeUnitId(EnemyUnit.Get());
-        GuestUnit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), GuestUnit->GetAttributeSet()->GetMaxHP() - 40.0f);
-        GuestUnit->ForceNetUpdate();
+        for (int32 OwnerIndex = 1; OwnerIndex < ParticipantCount; ++OwnerIndex)
+        {
+            AUnitBase* Unit = PartyUnits[OwnerIndex].Get();
+            Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), Unit->GetAttributeSet()->GetMaxHP() - 40.0f);
+            Unit->ForceNetUpdate();
+        }
+        if (ParticipantCount > 2)
+        {
+            EnemyUnit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetMaxHPAttribute(), 1000.0f);
+            EnemyUnit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), 1000.0f);
+            EnemyUnit->ForceNetUpdate();
+        }
         return true;
     }
 
     bool ViewsMatch(ACombatManager* ClientCombat) const
     {
         return ClientCombat->GetCombatInstanceId() == ServerCombat->GetCombatInstanceId() && ClientCombat->GetRunId() == ServerCombat->GetRunId() && ClientCombat->GetHostEpoch() == ServerCombat->GetHostEpoch() && ClientCombat->GetTurnSerial() == ServerCombat->GetTurnSerial() && ClientCombat->GetCombatResult() == ServerCombat->GetCombatResult() && ClientCombat->IsCombatActive() == ServerCombat->IsCombatActive() && ClientCombat->GetRuntimeUnitId(ClientCombat->GetCurrentUnit()) == ServerCombat->GetRuntimeUnitId(ServerCombat->GetCurrentUnit());
+    }
+
+    bool AllClientsMatch() const
+    {
+        AGameplayGameState* ServerState = ServerWorld->GetGameState<AGameplayGameState>();
+        ACombatArena* ServerArena = ServerState ? ServerState->GetArena() : nullptr;
+        if (!ServerArena || !ServerArena->Grid || RemoteClients.Num() != ParticipantCount - 1)
+        {
+            return false;
+        }
+        for (int32 Index = 0; Index < RemoteClients.Num(); ++Index)
+        {
+            AGameplayPlayerController* Controller = RemoteClients[Index].Get();
+            AGameplayGameState* State = Controller ? Controller->GetWorld()->GetGameState<AGameplayGameState>() : nullptr;
+            ACombatManager* Combat = State ? State->GetCombatManager() : nullptr;
+            ACombatArena* Arena = State ? State->GetArena() : nullptr;
+            if (!Combat || !Arena || !Arena->Grid || Controller->GetCombatManager() != Combat || Controller->GetBoundParticipantAccount() != Identity.OriginalParticipants[Index + 1].AccountId || Controller->GetParticipantBindingId() != ServerRemoteControllers[Index]->GetParticipantBindingId() || !ViewsMatch(Combat) || Combat->GetRegisteredUnits().Num() != ServerCombat->GetRegisteredUnits().Num() || State->GetViewState().Phase != ServerState->GetViewState().Phase || State->GetViewState().LastResult != ServerState->GetViewState().LastResult || Arena->Grid->TileMap.Num() != ServerArena->Grid->TileMap.Num())
+            {
+                return false;
+            }
+            for (AUnitBase* Unit : ServerCombat->GetRegisteredUnits())
+            {
+                if (!UnitMatches(Unit, Combat))
+                {
+                    return false;
+                }
+            }
+            // Compare empty tiles too so a stale occupant cannot hide outside the units' current tiles.
+            // 유닛의 현재 타일 밖에 남은 점유자도 확인하도록 빈 타일까지 비교합니다.
+            for (const TPair<FIntPoint, ACombatGridTile*>& Entry : ServerArena->Grid->TileMap)
+            {
+                ACombatGridTile* ClientTile = Combat->GetTileByCoord(Entry.Key);
+                AUnitBase* ServerOccupant = Entry.Value ? Entry.Value->GetOccupyingUnit() : nullptr;
+                AUnitBase* ClientOccupant = ClientTile ? ClientTile->GetOccupyingUnit() : nullptr;
+                if (!ClientTile || (ServerOccupant == nullptr) != (ClientOccupant == nullptr) || Combat->GetRuntimeUnitId(ClientOccupant) != ServerCombat->GetRuntimeUnitId(ServerOccupant))
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    bool AllClientsShowResult() const
+    {
+        for (const TWeakObjectPtr<AGameplayPlayerController>& Controller : RemoteClients)
+        {
+            if (!Controller.IsValid() || !FindScreen<UEncounterResultWidget>(Controller.Get()))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool AllClientsCleanedUp() const
+    {
+        for (const TWeakObjectPtr<AGameplayPlayerController>& Controller : RemoteClients)
+        {
+            AGameplayGameState* State = Controller.IsValid() ? Controller->GetWorld()->GetGameState<AGameplayGameState>() : nullptr;
+            ACombatManager* Combat = State ? State->GetCombatManager() : nullptr;
+            ACombatArena* Arena = State ? State->GetArena() : nullptr;
+            if (!Combat || !Arena || !Arena->Grid || State->GetViewState().Phase != ERunPhase::Map || !Combat->GetRegisteredUnits().IsEmpty() || !FindScreen<URunMapWidget>(Controller.Get()))
+            {
+                return false;
+            }
+            for (const TPair<FIntPoint, ACombatGridTile*>& Entry : Arena->Grid->TileMap)
+            {
+                if (!Entry.Value || Entry.Value->GetOccupyingUnit())
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     bool ServerNavigationReady()
@@ -694,7 +924,7 @@ private:
             return false;
         }
         AUnitBase* ClientUnit = ClientCombat->ResolveRuntimeUnit(ServerCombat->GetRuntimeUnitId(ServerUnit));
-        if (!ClientUnit || !ClientUnit->GetAttributeSet() || ClientUnit->IsUnitAlive() != ServerUnit->IsUnitAlive() || ClientUnit->IsBusy() != ServerUnit->IsBusy() || ClientUnit->GetTeam() != ServerUnit->GetTeam() || ClientUnit->GetCurrentActionPoint() != ServerUnit->GetCurrentActionPoint() || ClientUnit->GetCurrentSubActionPoint() != ServerUnit->GetCurrentSubActionPoint() || ClientUnit->HealingItemCount != ServerUnit->HealingItemCount || !FMath::IsNearlyEqual(ClientUnit->GetAttributeSet()->GetHP(), ServerUnit->GetAttributeSet()->GetHP()) || !FMath::IsNearlyEqual(ClientUnit->GetAttributeSet()->GetMaxHP(), ServerUnit->GetAttributeSet()->GetMaxHP()) || ClientCombat->GetOwnerAccountId(ClientUnit) != ServerCombat->GetOwnerAccountId(ServerUnit))
+        if (!ClientUnit || !ClientUnit->GetAttributeSet() || ClientUnit->IsUnitAlive() != ServerUnit->IsUnitAlive() || ClientUnit->IsBusy() != ServerUnit->IsBusy() || ClientUnit->GetTeam() != ServerUnit->GetTeam() || ClientUnit->GetCurrentActionPoint() != ServerUnit->GetCurrentActionPoint() || ClientUnit->GetCurrentSubActionPoint() != ServerUnit->GetCurrentSubActionPoint() || ClientUnit->HealingItemCount != ServerUnit->HealingItemCount || !FMath::IsNearlyEqual(ClientUnit->GetAttributeSet()->GetHP(), ServerUnit->GetAttributeSet()->GetHP()) || !FMath::IsNearlyEqual(ClientUnit->GetAttributeSet()->GetMaxHP(), ServerUnit->GetAttributeSet()->GetMaxHP()) || ClientCombat->GetOwnerAccountId(ClientUnit) != ServerCombat->GetOwnerAccountId(ServerUnit) || ClientCombat->GetCharacterId(ClientUnit) != ServerCombat->GetCharacterId(ServerUnit))
         {
             return false;
         }
@@ -706,20 +936,37 @@ private:
     void CheckHUDOwnership(bool bHostTurn)
     {
         UCombatHUDWidget* HostHUD = FindScreen<UCombatHUDWidget>(Host.Get());
-        UCombatHUDWidget* ClientHUD = FindScreen<UCombatHUDWidget>(Client.Get());
         UButton* HostEnd = HostHUD ? Cast<UButton>(HostHUD->GetWidgetFromName(TEXT("Button_EndTurn"))) : nullptr;
-        UButton* ClientEnd = ClientHUD ? Cast<UButton>(ClientHUD->GetWidgetFromName(TEXT("Button_EndTurn"))) : nullptr;
-        Test->TestTrue(TEXT("Both HUDs show the same replicated turn text."), HostHUD && ClientHUD && HostHUD->GetTurnInfoText().ToString() == ClientHUD->GetTurnInfoText().ToString());
-        Test->TestTrue(TEXT("Only the owner sees an enabled end-turn control."), HostEnd && ClientEnd && HostEnd->GetIsEnabled() == bHostTurn && ClientEnd->GetIsEnabled() != bHostTurn);
+        Test->TestTrue(TEXT("The host's end-turn control follows ownership."), HostEnd && HostEnd->GetIsEnabled() == bHostTurn);
+        for (int32 Index = 0; Index < RemoteClients.Num(); ++Index)
+        {
+            UCombatHUDWidget* ClientHUD = FindScreen<UCombatHUDWidget>(RemoteClients[Index].Get());
+            UButton* ClientEnd = ClientHUD ? Cast<UButton>(ClientHUD->GetWidgetFromName(TEXT("Button_EndTurn"))) : nullptr;
+            const bool bOwnerTurn = !bHostTurn && Index == ActiveRemoteIndex;
+            Test->TestTrue(TEXT("Every HUD shows the same replicated turn text."), HostHUD && ClientHUD && HostHUD->GetTurnInfoText().ToString() == ClientHUD->GetTurnInfoText().ToString());
+            Test->TestTrue(TEXT("Only the active owner sees an enabled end-turn control."), ClientEnd && ClientEnd->GetIsEnabled() == bOwnerTurn);
+            Test->TestTrue(TEXT("Each client can act only during its own character's turn."), RemoteClients[Index]->CanUseActiveUnitAction() == bOwnerTurn);
+        }
     }
 
     bool HUDOwnershipReady(bool bHostTurn) const
     {
         UCombatHUDWidget* HostHUD = FindScreen<UCombatHUDWidget>(Host.Get());
-        UCombatHUDWidget* ClientHUD = FindScreen<UCombatHUDWidget>(Client.Get());
         UButton* HostEnd = HostHUD ? Cast<UButton>(HostHUD->GetWidgetFromName(TEXT("Button_EndTurn"))) : nullptr;
-        UButton* ClientEnd = ClientHUD ? Cast<UButton>(ClientHUD->GetWidgetFromName(TEXT("Button_EndTurn"))) : nullptr;
-        return HostEnd && ClientEnd && HostEnd->GetIsEnabled() == bHostTurn && ClientEnd->GetIsEnabled() != bHostTurn;
+        if (!HostEnd || HostEnd->GetIsEnabled() != bHostTurn)
+        {
+            return false;
+        }
+        for (int32 Index = 0; Index < RemoteClients.Num(); ++Index)
+        {
+            UCombatHUDWidget* ClientHUD = FindScreen<UCombatHUDWidget>(RemoteClients[Index].Get());
+            UButton* ClientEnd = ClientHUD ? Cast<UButton>(ClientHUD->GetWidgetFromName(TEXT("Button_EndTurn"))) : nullptr;
+            if (!ClientEnd || ClientEnd->GetIsEnabled() != (!bHostTurn && Index == ActiveRemoteIndex) || HostHUD->GetTurnInfoText().ToString() != ClientHUD->GetTurnInfoText().ToString())
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     bool ClickHUD(APartyPlayerController* Controller, FName ButtonName)
@@ -760,9 +1007,14 @@ private:
 
     void Advance()
     {
-        ++Stage;
+        SetStage(Stage + 1);
+    }
+
+    void SetStage(int32 NextStage)
+    {
+        Stage = NextStage;
         StageStarted = FPlatformTime::Seconds();
-        Test->AddInfo(FString::Printf(TEXT("Co-op network PIE stage %d."), Stage));
+        Test->AddInfo(FString::Printf(TEXT("Co-op network PIE (%d players, owner %d) stage %d."), ParticipantCount, ActiveRemoteIndex + 1, Stage));
     }
 
     bool EndSession()
@@ -777,6 +1029,8 @@ private:
     static constexpr int32 Ending = 100;
     static constexpr int32 Finished = 101;
     FAutomationTestBase* Test;
+    int32 ParticipantCount = 2;
+    int32 ActiveRemoteIndex = 0;
     int32 Stage = 0;
     double StageStarted;
     int32 TurnBefore = 0;
@@ -795,6 +1049,7 @@ private:
     FString NavigationStatus = TEXT("Not evaluated yet.");
     FString EditorNavigationStatus = TEXT("Not evaluated yet.");
     bool bLoggedNavigationCoverage = false;
+    bool bClientBindingsReady = false;
     FRunIdentityData Identity;
     TStrongObjectPtr<ULevelEditorPlaySettings> PlaySettings;
     TStrongObjectPtr<UPartyDefinitionDataAsset> PartyCatalog;
@@ -803,6 +1058,10 @@ private:
     TWeakObjectPtr<AGameplayPlayerController> Host;
     TWeakObjectPtr<AGameplayPlayerController> RemoteServerController;
     TWeakObjectPtr<AGameplayPlayerController> Client;
+    TArray<TWeakObjectPtr<AGameplayPlayerController>> ObservedClients;
+    TArray<TWeakObjectPtr<AGameplayPlayerController>> RemoteClients;
+    TArray<TWeakObjectPtr<AGameplayPlayerController>> ServerRemoteControllers;
+    TArray<TWeakObjectPtr<AUnitBase>> PartyUnits;
     TWeakObjectPtr<ACombatManager> ServerCombat;
     TWeakObjectPtr<AEncounterManager> Encounter;
     TWeakObjectPtr<AUnitBase> HostUnit;
@@ -817,6 +1076,24 @@ bool FCoopNetworkPIETest::RunTest(const FString& Parameters)
 {
     ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectACoopNetworkTests::FPlayCoopNetwork>(this));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCoopThreePlayerNetworkPIETest, "ProjectA.Coop.ListenServerThreePlayerCombat", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCoopThreePlayerNetworkPIETest::RunTest(const FString& Parameters)
+{
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectACoopNetworkTests::FPlayCoopNetwork>(this, 3));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCoopFourPlayerNetworkPIETest, "ProjectA.Coop.ListenServerFourPlayerCombat", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCoopFourPlayerNetworkPIETest::RunTest(const FString& Parameters)
+{
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectACoopNetworkTests::FPlayCoopNetwork>(this, 4));
     return true;
 }
 

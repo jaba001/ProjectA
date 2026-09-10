@@ -7,7 +7,7 @@ Unreal Engine 기반 Grid Turn-Based Combat System 프로젝트입니다.
 
 현재 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 최종적으로 상대 Party/Build Snapshot을 사용하는 Async PvP와 Listen Server 기반의 실시간 Co-op을 지원하도록 확장합니다. T14의 첫 단계로 Unreal `USaveGame` v1에 저장된 상대를 기존 전투에 연결하고 로컬 전투 한 사이클을 검증했습니다. 순차 3번에서 실제 2인 Listen Server 전투/HUD 동기화까지 검증했습니다. Co-op에서는 할당된 Party Member의 Action Request를 서버가 검증·실행하고 전투 상태의 최종 권위를 가집니다. 새 데이터·명령은 직렬화 가능한 형태를 우선하고 강한 로컬 PlayerController 의존성을 피합니다. 구현·검증 상태와 미결정 항목은 [T14 작업 카드](Docs/TODO.md), 실행 방법은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)와 [Listen Server 구현·검증 안내](Docs/T14_NETWORK.md)를 참고하세요.
 
-Co-op 확정 기획은 최대 4인과 원래 캐릭터 소유자만 직접 조작하는 방식입니다. 종료·끊김 시 기존 Host를 유지하며, 원래 인원이 다시 모일 수 없을 때 기존 참가자의 명시적 Host 승계와 불참자 AI 이어하기를 계획합니다. AI 전환에는 Run 시작 시 각자의 사전 동의가 필요하고, 이후 MMR은 현재 인간 참가자에게만 반영하는 기획입니다. 순차 1~4번의 소유권·서버 명령·2인 동기화·확정 턴 복구에 이어 5번에서 원래 소유권과 아군 진영을 유지하는 서버 AI를 구현하고 실제 2인 전투와 별도 프로세스 복구를 검증했습니다. 다음은 6번 명시적 승계/AI 이어하기이며, 7~8번의 3~4인·온라인 서비스는 대기 중입니다. [Co-op 확정 기획](Docs/T14_COOP_DESIGN.md)과 [1~8번 순차 작업 대기열](Docs/T14_QUEUE.md)에 구현 경계를 정리합니다.
+Co-op 확정 기획은 최대 4인과 원래 캐릭터 소유자만 직접 조작하는 방식입니다. 종료·끊김 시 기존 Host를 유지하며, 원래 인원이 다시 모일 수 없을 때 기존 참가자의 명시적 Host 승계와 불참자 AI 이어하기를 계획합니다. AI 전환에는 Run 시작 시 각자의 사전 동의가 필요하고, 이후 MMR은 현재 인간 참가자에게만 반영하는 기획입니다. 순차 1~5번의 소유권·서버 명령·2인 동기화·확정 턴 복구·아군 AI에 이어, 7번의 독립 범위인 실제 3·4인 전투와 연결 끊김·기존 Host 새 세션 복구를 검증했습니다. Unreal 기본 GameSession의 일반 플레이어 정원도 Host 포함 4명으로 설정했습니다. 전체 회귀 65건과 별도 2·3·4인 AI 복구 3건을 통과했습니다. 6번 승계/불참 AI 통합은 정책 답변 대기이며, 8번 실제 온라인 서비스는 공급자와 랭크 정책 확정 후 연결합니다. [Co-op 확정 기획](Docs/T14_COOP_DESIGN.md)과 [1~8번 순차 작업 대기열](Docs/T14_QUEUE.md)에 구현 경계를 정리합니다.
 
 ```text
 MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI

@@ -23,6 +23,7 @@ public class ProjectAEditor : ModuleRules
 			"GameplayAbilities",
 			"InputCore",
 			"NavigationSystem",
+			"NetCore",
 			"Json",
 			"JsonUtilities",
 			"Kismet",
