@@ -3,7 +3,7 @@
 Unreal Engine 기반 Grid Turn-Based Combat System 프로젝트입니다.
 전투 구조는 grid, unit, turn, GAS 중심으로 구성되어 있고, CommonUI 기반 메뉴와 노드 진행 UI를 하나의 persistent Gameplay 레벨의 전투에 연결합니다.
 
-현재 Vertical Slice는 싱글플레이를 지원합니다. T14 네트워크 구현은 기존 기획 범위에 따라 보류했습니다. 일부 복제 선언은 남아 있지만 멀티플레이 전투·진행·HUD 동기화와 다중 PIE 검증은 완료되지 않았습니다. 재개 조건은 [T14 작업 카드](Docs/TODO.md)를 참고하세요.
+현재 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 최종적으로 상대 Party/Build Snapshot을 사용하는 Async PvP와 Listen Server 기반의 실시간 Co-op을 지원하도록 확장합니다. T14는 기획 확정 / 구현 후속 상태입니다. Co-op에서는 할당된 Party Member의 Action Request를 서버가 검증·실행하며 전투 상태의 최종 권위를 가집니다. 새 데이터·명령은 직렬화 가능한 형태를 우선하고 강한 로컬 PlayerController 의존성을 피합니다. 전체 Replication 리팩터링은 즉시 진행하지 않으며 Snapshot 전투와 다중 PIE 검증은 아직 완료되지 않았습니다. 상세 범위와 미결정 항목은 [T14 작업 카드](Docs/TODO.md)를 참고하세요.
 
 ```text
 MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI

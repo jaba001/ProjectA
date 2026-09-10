@@ -1,12 +1,12 @@
 # ProjectA 작업 보드와 재개 메모
 
-최근 정리: 2026-09-10 · `main` · T13 콘텐츠 검증 완료, T14는 현재 싱글플레이 범위에 따라 보류.
+최근 정리: 2026-09-10 · `main` · T13 콘텐츠 검증 완료, T14 하이브리드 멀티플레이 기획 확정 / 구현 후속.
 
 [기획·구현 현황](PROJECT_PLAN.md) · [코드 리뷰와 검증 시나리오](CODE_REVIEW.md)
 
 ## 다음에 켜면 여기부터
 
-**T13 아이템·적 이동·추가 스킬 콘텐츠까지 검증을 완료했다. T14는 기존 싱글플레이 범위(D01)에 따라 보류한다. 네트워크 구현을 재개하려면 멀티플레이로 범위를 확장하고 서버 방식·접속 인원·파티 조작권을 먼저 정한다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다.
+**T13 아이템·적 이동·추가 스킬 콘텐츠까지 검증을 완료했다. T14는 Async PvP와 Listen Server 기반 Co-op을 지원하는 방향으로 기획을 확정했다. 현재는 싱글플레이 루프와 콘텐츠 개발을 이어가며, 새 데이터와 명령은 향후 Snapshot·Replication 확장을 고려한다. 본격 네트워크 구현 전 아래 미결정 항목을 사용자와 정한다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다.
 
 체크박스는 작업 완료를 뜻한다. 코드를 작성했어도 완료 조건을 검증하지 못했다면 체크하지 않고 `검증 대기`로 기록한다. P1/P2는 리뷰 결함의 심각도이고 M0~M3는 개발 순서이므로 서로 구분한다.
 
@@ -181,15 +181,79 @@
 - AI: 대상 수/AP·거리·HP 점수로 임시 기본 공격 가중치 제거. 공통 이동 후보 중 전진을 평가하고 목적지 재검증, 성공 후 재판단/실패 후 턴 종료.
 - 검증: Development Editor / Win64 빌드, 전체 자동화 26건(성공 13·경고 동반 성공 13·실패 0). 아이템 효과/소모/거절, 실제 획득 스킬 피해, 이동 선택/막힘/실패 전이 및 저장 맵 PIE의 HUD 회복·두 전투 재지급 검증. `Saved/Automation/T13Final/index.json`, `Saved/Automation/T13Build.log`. 패키지 재빌드는 미실행.
 
-### T14 · 네트워크 범위 결정과 후속 구현 — 보류 (싱글플레이)
+### T14 · 하이브리드 멀티플레이 기반 설계 — 기획 확정 / 구현 후속
 
 - [ ] 완료
-- D01: 현재 Vertical Slice는 싱글플레이로 유지한다. 기존 [기획 범위](PROJECT_PLAN.md)의 멀티플레이 제외 결정을 적용하며, 네트워크 구현 완료로 체크하지 않는다.
-- 현황: UnitBase의 Team, CombatManager의 CurrentTurnIndex 등 일부 복제 선언은 존재하지만 전체 전투·진행·HUD의 클라이언트 동기화는 미완성이다. 기존 선언은 유지한다.
-- 재개 조건: 멀티플레이 범위 확정 후 Listen/Dedicated 서버, 동시 접속 인원, 파티 유닛 조작권과 공유 진행/저장 정책을 결정한다.
-- 네트워크를 선택한 경우 작업: 전투 상태 소유권, 요청 RPC, HP/AP/사망/점유/턴 정보 복제, HUD 갱신을 설계한다.
-- 완료 조건: 지원할 서버 방식과 클라이언트 수를 정하고 양측 동일 상태·권한 검사를 실제 다중 PIE에서 확인. `bReplicates=true`만으로 완료 처리하지 않는다.
-- 이번 검증: 기획·README·작업 보드의 범위와 현재 복제 선언 대조, 문서 링크 및 diff 검사. 런타임 변경이 없어 빌드·테스트를 재실행하지 않았으며 다중 PIE는 미실행이다.
+
+ProjectA는 최종적으로 멀티플레이를 지원한다.
+
+첫 Vertical Slice와 기본 Run은 싱글플레이 구조를 유지하되, 이후 다음 두 멀티플레이 방식을 지원할 수 있도록 아키텍처를 확장한다. D01은 이 하이브리드 방향으로 갱신하며 이전 T14 보류 기록을 대체한다.
+
+#### Async PvP
+
+Backpack Battles / The Bazaar 계열의 비동기 PvP를 목표로 한다.
+
+실시간으로 상대 플레이어와 연결하지 않고 서버에 저장된 상대의 파티/빌드 Snapshot을 받아 Encounter를 구성한다.
+
+Opponent Snapshot에는 최소한 파티 구성, Class, Stats, Skills, Equipment, Formation 및 데이터 버전을 저장할 수 있어야 한다.
+
+Combat 시스템은 PvE Encounter와 Async PvP Encounter를 가능한 한 동일한 Unit/Combat 흐름으로 처리한다.
+
+초기 구현에서는 Snapshot 기반 로컬 전투가 가능하지만, 경쟁 콘텐츠 적용 전 결과 위변조와 데이터 검증을 위한 서버 권위 정책을 별도로 설계한다.
+
+#### Co-op Multiplayer
+
+아군과 함께 플레이하는 실시간 협동 모드를 지원한다.
+
+Unreal Engine의 서버 권위 구조를 유지하며 한 플레이어가 Listen Server 역할을 하는 Host-authoritative 방식을 우선한다.
+
+네트워크 transport는 향후 Steam 또는 EOS 등의 P2P 연결 방식을 검토한다.
+
+각 플레이어는 자신에게 할당된 Party Member만 조작한다.
+
+Client는 이동, 스킬, 타겟 선택, 턴 종료 등의 Action Request를 서버에 요청하고, 실제 행동 가능 여부와 Combat State 변경은 서버에서 검증하고 실행한다.
+
+#### 네트워크 권위 원칙
+
+CombatManager, TurnManager, Grid Occupancy, Unit State, HP/AP, 사망, Combat Result는 서버가 최종 권위를 가진다.
+
+Client가 직접 Combat State를 확정하지 않는다.
+
+현재 일부 Actor의 `bReplicates` 설정만으로 네트워크 지원 완료로 취급하지 않는다.
+
+#### 현재 작업 범위
+
+현재 Vertical Slice를 즉시 전체 Replication 구조로 리팩터링하지 않는다.
+
+우선 기존 싱글플레이 게임 루프와 콘텐츠 개발을 진행한다.
+
+다만 앞으로 추가하는 Run/Party/Encounter/Combat 데이터는 Actor reference에 과도하게 의존하지 않고 직렬화 가능한 Runtime Data와 Command 형태를 우선한다.
+
+새 기능 구현 시 향후 Async PvP Snapshot 및 Listen Server Replication을 방해하는 강한 로컬 PlayerController 의존성을 만들지 않는다.
+
+작업 중 애매하거나 결정이 필요한 항목은 구체적인 선택지와 영향을 사용자에게 피드백한다. 미결정 정책을 임의로 확정하지 않으며, 결정에 의존하지 않는 작업은 계속 진행한다.
+
+#### 본격 네트워크 구현 전 결정할 항목
+
+- 최대 협동 플레이어 수
+- 한 플레이어가 조작할 Party Member 수
+- Host disconnect 정책
+- Steam / EOS 선택
+- Lobby / Invite 방식
+- Async PvP Snapshot 저장 포맷
+- Backend 및 매칭 방식
+- 전투 결과 검증 정책
+- 버전이 다른 Snapshot의 호환 정책
+
+#### 완료 조건
+
+Async PvP에서는 저장된 상대 Party Snapshot 하나로 실제 Encounter를 생성하고 기존 Combat 시스템을 통해 전투할 수 있어야 한다.
+
+Co-op에서는 최소 2개의 PIE 인스턴스에서 Listen Server / Client로 접속하여 각 플레이어가 자신의 Unit만 조작하고 동일한 Turn, Grid, HP/AP, 사망 및 Combat Result 상태를 확인할 수 있어야 한다.
+
+#### 현재 구현·검증 상태
+
+기획만 확정했으며 Snapshot Encounter와 Co-op 구현 완료를 의미하지 않는다. UnitBase의 Team, CombatManager의 CurrentTurnIndex 등 일부 복제 선언은 기존대로 유지한다. 이번 변경은 문서·작업 원칙 정리이며, 빌드·자동화 재실행 및 다중 PIE 검증은 미실행이다.
 
 ## 검증을 실행할 때 확인할 설정
 
@@ -203,6 +267,7 @@
 
 | 날짜 | 작업 | 완료/검증 | 다음 시작점 |
 |---|---|---|---|
+| 2026-09-10 | T14 하이브리드 멀티플레이 기획 확정 | 사용자 확정안으로 이전 보류 방침 대체, 문서·작업 원칙 정합성 및 링크 검사 | 싱글플레이 콘텐츠 개발 지속, 네트워크 구현 전 미결정 항목 협의 |
 | 2026-09-10 | T14 네트워크 범위 정리 | 기존 싱글플레이 범위 적용으로 보류, 문서·복제 선언 대조 | 범위 확장 시 서버/인원/조작권 결정 |
 | 2026-09-10 | T13 전투 콘텐츠 | 빌드·전체 26건 및 저장 맵 PIE 통과 | T14 네트워크 범위 결정 |
 | 2026-09-10 | T12 메뉴 에셋·프리뷰·생성 도구 | 빌드·전체 24건 및 최종 PIE 통과, JSON 생성/누락 보완·화면 검수 | T13 콘텐츠 |

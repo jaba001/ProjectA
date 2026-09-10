@@ -6,6 +6,14 @@
 - 중괄호는 Allman 스타일로 작성한다.
 - 주석은 코드 옆에 작성하지 않고, 설명할 코드의 윗줄에 영어와 한글로 작성한다.
 
+## 데이터와 멀티플레이 확장 원칙
+
+- [T14 기획](Docs/TODO.md)의 Async PvP와 Listen Server 기반 Co-op 방향을 따른다. 첫 Vertical Slice와 기본 Run은 싱글플레이를 유지하며 전체 Replication 리팩터링을 즉시 진행하지 않는다.
+- 새 Run/Party/Encounter/Combat 데이터는 직렬화 가능한 Runtime Data와 Command를 우선한다. Actor reference에 과도하게 의존하거나 향후 Snapshot·Replication 확장을 방해하는 강한 로컬 PlayerController 의존성을 만들지 않는다.
+- Co-op 구현 시 플레이어는 할당된 Party Member만 조작한다. 서버가 Action Request를 검증·실행하고 CombatManager·TurnManager·Grid Occupancy·Unit State·HP/AP·사망·Combat Result의 최종 권위를 가진다.
+- Async PvP의 초기 로컬 Snapshot 전투와 경쟁 콘텐츠의 서버 데이터·결과 검증을 구분한다. 일부 복제 선언이나 로컬 테스트만으로 네트워크 지원 완료로 기록하지 않는다.
+- 작업 중 애매하거나 결정이 필요한 정책은 구체적인 선택지와 영향을 사용자에게 피드백한다. 미결정 정책을 임의로 확정하지 않고, 해당 결정에 의존하지 않는 작업은 계속 진행한다.
+
 ## Visual Studio 사용
 
 - 작업 완료나 변경 파일 안내를 위해 Visual Studio를 자동으로 실행하거나 활성화하지 않는다. 사용자가 요청하거나 작업 수행에 필요한 경우에만 연다.

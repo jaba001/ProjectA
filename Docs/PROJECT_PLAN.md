@@ -33,9 +33,15 @@ flowchart LR
 | `UCombatHUDWidget` | CommonActivatableWidget, 기존 Move/Skill/End Turn 명령 연결 |
 | `UEncounterResultWidget` | Victory Continue / Defeat. 향후 보상 선택을 넣을 위치 |
 
-Streaming, Level Instance, 전투 중 상태 저장, 인벤토리와 장비, 여러 Act, 멀티플레이 리팩터링은 범위 밖이다. GameInstance에 전투/UI를 몰아넣지 않는다.
+Streaming, Level Instance, 전투 중 상태 저장, 인벤토리와 장비, 여러 Act, 즉시 전체 Replication 리팩터링은 현재 Vertical Slice 범위 밖이다. GameInstance에 전투/UI를 몰아넣지 않는다.
 
-D01 / T14: 현재 Vertical Slice의 지원 범위는 싱글플레이다. 이 범위에 따라 T14 네트워크 구현은 보류하며 기존 일부 복제 선언은 유지한다. 멀티플레이로 확장할 때 서버 방식·동시 접속 인원·파티 조작권·공유 진행/저장 정책을 먼저 결정하고, 구현 후 실제 다중 PIE에서 권한과 동기화를 검증한다. 현재 멀티플레이 지원이나 검증 완료를 의미하지 않는다.
+D01 / T14: ProjectA는 최종적으로 Async PvP와 실시간 Co-op을 지원한다. 첫 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 네트워크 기획 확정과 구현 완료를 구분한다. 상세 범위·미결정 항목·완료 조건은 [T14 작업 카드](TODO.md)를 기준으로 한다.
+
+Async PvP는 서버에 저장된 상대 Party/Build Snapshot으로 Encounter를 구성하고 기존 PvE Unit/Combat 흐름을 재사용한다. Snapshot은 파티 구성·Class·Stats·Skills·Equipment·Formation·데이터 버전을 표현해야 한다. 초기 로컬 Snapshot 전투와 경쟁 콘텐츠의 서버 결과 검증은 별도 단계다.
+
+Co-op은 Listen Server의 Host-authoritative 구조를 우선한다. 각 플레이어는 할당된 Party Member만 조작하고 Client의 Action Request는 서버가 검증·실행한다. CombatManager·TurnManager·Grid Occupancy·Unit State·HP/AP·사망·Combat Result의 최종 권위는 서버에 있다. Steam/EOS 등의 P2P transport와 접속 인원 등은 아직 결정하지 않았다.
+
+새 Run/Party/Encounter/Combat 기능은 직렬화 가능한 Runtime Data와 Command를 우선하고 Actor reference 및 로컬 PlayerController에 강하게 결합하지 않는다. 미결정 정책이 구현에 영향을 주면 사용자에게 선택지와 영향을 설명해 결정한다. 현재는 싱글플레이 루프·콘텐츠 개발을 계속하며 전체 Replication 리팩터링을 즉시 시작하지 않는다.
 
 ## 3. 파티 규칙
 
@@ -73,7 +79,7 @@ R01/R02는 `EUnitActionResult`와 공통 행동 완료 경로로 수정한다. G
 | T11 메뉴 기능 | 버전 1 체크포인트 자동 저장/이어하기, 품질·수직 동기화 옵션, 실제 Quit 연결. 빌드·자동화 23건 및 패키지 저장/Continue/Quit 검증 완료 |
 | T12 메뉴 에셋 | Designer 기준 유지, 표시 전용 프리뷰·재진입 정리, 누락 상태 안내 바인딩 보완. 빌드·전체 24건 및 최종 PIE·생성본 검증 완료 |
 | T13 콘텐츠 | 전투 한정 회복약·HUD, SkillPool 휩쓸기 획득/GAS 장착, 적 전진 후보와 AP당 대상 점수 구현. 빌드·자동화 26건 및 저장 맵 PIE 통과 |
-| T14 네트워크 | D01의 싱글플레이 범위에 따라 보류. 기존 부분 복제만 유지, 다중 PIE 미검증 |
+| T14 네트워크 | Async PvP Snapshot + Listen Server Co-op 기획 확정 / 구현 후속. 현재 싱글플레이 유지, Snapshot 전투·다중 PIE 미검증 |
 
 ## 6. 검증과 다음 단계
 
