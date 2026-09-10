@@ -17,6 +17,11 @@ AEnemyUnit::AEnemyUnit()
 
 void AEnemyUnit::OnTurnStart()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     Super::OnTurnStart();
 
     SetTurnState(EEnemyTurnState::StartTurn);
@@ -24,6 +29,11 @@ void AEnemyUnit::OnTurnStart()
 
 void AEnemyUnit::OnTurnEnd()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     Super::OnTurnEnd();
     GetWorldTimerManager().ClearTimer(ActionContinuationTimer);
     CurrentTurnState = EEnemyTurnState::None;
@@ -42,7 +52,7 @@ void AEnemyUnit::OnUnitActionCompleted(EUnitActionType ActionType, EUnitActionRe
 {
     Super::OnUnitActionCompleted(ActionType, Result);
 
-    if (!IsActiveTurn() || !IsUnitAlive())
+    if (!HasAuthority() || !IsActiveTurn() || !IsUnitAlive())
     {
         return;
     }
@@ -74,6 +84,13 @@ void AEnemyUnit::OnUnitActionCompleted(EUnitActionType ActionType, EUnitActionRe
 
 void AEnemyUnit::SetTurnState(EEnemyTurnState NewState)
 {
+    // Replicated turn flags must never start a client-side AI state machine.
+    // 복제된 턴 플래그가 클라이언트 AI 상태 머신을 실행하면 안 됩니다.
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (CurrentTurnState == NewState)
     {
         return;

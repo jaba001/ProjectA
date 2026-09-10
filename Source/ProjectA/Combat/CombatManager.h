@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Game/Turn/TurnManager.h"
+#include "Combat/Network/CombatViewTypes.h"
 #include "CombatManager.generated.h"
 
 class UTurnManager;
@@ -10,6 +11,8 @@ class AUnitBase;
 class ACombatGridManager;
 class ACombatGridTile;
 class UCombatActionAuthority;
+
+DECLARE_MULTICAST_DELEGATE(FOnCombatViewChanged);
 
 // Actor that coordinates combat units, turns, movement, and target tiles.
 // 전투 유닛, 턴, 이동, 대상 타일을 조율하는 액터입니다.
@@ -20,12 +23,27 @@ class PROJECTA_API ACombatManager : public AActor
 
 public:
     FOnCombatResult OnCombatResult;
+    FOnCombatViewChanged OnCombatViewChanged;
     bool IsCombatActive() const;
     void EndCombat();
     void ResetCombat();
-    void SetCombatGrid(ACombatGridManager* Grid) { CombatGridManager = Grid; }
+    void SetCombatGrid(ACombatGridManager* Grid);
     const TArray<AUnitBase*>& GetRegisteredUnits() const { return CombatUnits; }
     UCombatActionAuthority* GetActionAuthority() const { return ActionAuthority; }
+    const FCombatViewState& GetCombatViewState() const { return CombatView; }
+    FGuid GetCombatInstanceId() const { return CombatView.CombatInstanceId; }
+    FGuid GetRunId() const { return CombatView.RunId; }
+    int32 GetHostEpoch() const { return CombatView.HostEpoch; }
+    int32 GetTurnSerial() const;
+    ECombatResult GetCombatResult() const;
+    FGuid GetRuntimeUnitId(const AUnitBase* Unit) const;
+    AUnitBase* ResolveRuntimeUnit(FGuid UnitId) const;
+    FGuid GetCharacterId(const AUnitBase* Unit) const;
+    FRunAccountId GetOwnerAccountId(const AUnitBase* Unit) const;
+
+    // Publish from server state changes; clients can only consume the replicated view.
+    // 서버 상태 변경 시 게시하며 클라이언트는 복제된 뷰만 읽습니다.
+    void PublishCombatView();
 
     // Sets combat manager defaults.
     // 전투 매니저 기본값을 설정합니다.
@@ -43,6 +61,16 @@ protected:
 
 
 private:
+    UPROPERTY(ReplicatedUsing = OnRep_CombatView)
+    FCombatViewState CombatView;
+
+    UFUNCTION()
+    void OnRep_CombatView();
+
+    UFUNCTION()
+    void OnRep_CombatGrid();
+
+    void HandleTurnChanged();
     UPROPERTY(VisibleAnywhere, Category = "Combat|Commands")
     TObjectPtr<UCombatActionAuthority> ActionAuthority;
 
@@ -79,11 +107,12 @@ private:
     UPROPERTY()
     TArray<AUnitBase*> CombatUnits;
 
-    // Current turn index (replicated to clients)
-    UPROPERTY(Replicated)
-    int32 CurrentTurnIndex;
-
+    // The server caches its index; clients read the same value from the combat view.
+    // 서버는 턴 인덱스를 캐시하며 클라이언트는 전투 뷰의 같은 값을 읽습니다.
     UPROPERTY()
+    int32 CurrentTurnIndex = INDEX_NONE;
+
+    UPROPERTY(ReplicatedUsing = OnRep_CombatGrid)
     ACombatGridManager* CombatGridManager;
 
     UPROPERTY()

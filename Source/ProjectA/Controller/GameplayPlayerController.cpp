@@ -6,8 +6,12 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/SlateUser.h"
 #include "Game/Encounter/EncounterManager.h"
+#include "Game/Encounter/CombatArena.h"
+#include "Game/GameState/GameplayGameState.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "UI/Gameplay/GameplayRootWidget.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 AGameplayPlayerController::AGameplayPlayerController()
 {
@@ -18,7 +22,12 @@ AGameplayPlayerController::AGameplayPlayerController()
 void AGameplayPlayerController::BeginPlay()
 {
     Super::BeginPlay();
-    SetCombatContext(nullptr, false);
+    // Initial replication can precede client BeginPlay; keep the server's received context intact.
+    // 초기 복제는 클라이언트 BeginPlay보다 먼저 올 수 있으므로 수신한 서버 문맥을 유지합니다.
+    if (HasAuthority())
+    {
+        SetCombatContext(nullptr, false);
+    }
 
     if (!IsLocalController())
     {
@@ -34,7 +43,10 @@ void AGameplayPlayerController::BeginPlay()
             ViewportClient->SetIgnoreInput(false);
         }
 
-        RunState = GameInstance->GetSubsystem<URunStateSubsystem>();
+        if (HasAuthority())
+        {
+            RunState = GameInstance->GetSubsystem<URunStateSubsystem>();
+        }
     }
 
     if (RunState)
@@ -54,6 +66,11 @@ void AGameplayPlayerController::BeginPlay()
         GameplayRootWidget->AddToViewport();
     }
 
+    TryBindGameplayState();
+    if (!GameplayState)
+    {
+        GetWorldTimerManager().SetTimer(BindStateTimer, this, &AGameplayPlayerController::TryBindGameplayState, 0.1f, true);
+    }
     RefreshGameplayFlow();
 
     // Restore this player's viewport focus after travel so CommonUI can apply the active screen's input config.
@@ -72,6 +89,11 @@ void AGameplayPlayerController::BeginPlay()
 
 void AGameplayPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    GetWorldTimerManager().ClearTimer(BindStateTimer);
+    if (GameplayState)
+    {
+        GameplayState->OnGameplayViewChanged.RemoveAll(this);
+    }
     if (RunState)
     {
         RunState->OnRunStateChanged.RemoveAll(this);
@@ -92,6 +114,10 @@ void AGameplayPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason
 
 void AGameplayPlayerController::InitializeGameplay(AEncounterManager* InEncounterManager)
 {
+    if (HasAuthority() && GetGameInstance())
+    {
+        RunState = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+    }
     if (EncounterManager)
     {
         EncounterManager->OnFlowChanged.RemoveAll(this);
@@ -109,7 +135,7 @@ void AGameplayPlayerController::InitializeGameplay(AEncounterManager* InEncounte
 
 void AGameplayPlayerController::RequestStartNode(FName NodeId)
 {
-    if (EncounterManager)
+    if (GetNetMode() == NM_Standalone && EncounterManager)
     {
         EncounterManager->RequestStartNode(NodeId);
     }
@@ -117,7 +143,7 @@ void AGameplayPlayerController::RequestStartNode(FName NodeId)
 
 void AGameplayPlayerController::RequestContinueRun()
 {
-    if (EncounterManager)
+    if (GetNetMode() == NM_Standalone && EncounterManager)
     {
         EncounterManager->ContinueRun();
     }
@@ -125,6 +151,19 @@ void AGameplayPlayerController::RequestContinueRun()
 
 void AGameplayPlayerController::RefreshGameplayFlow()
 {
+    if (!HasAuthority())
+    {
+        if (GameplayState && GameplayRootWidget)
+        {
+            const FGameplayViewState& View = GameplayState->GetViewState();
+            GameplayRootWidget->RefreshFlowView(View, false);
+            if (View.Phase == ERunPhase::Combat && GameplayState->GetArena())
+            {
+                GameplayState->GetArena()->ActivateArena(this);
+            }
+        }
+        return;
+    }
     if (!RunState)
     {
         return;
@@ -149,10 +188,30 @@ void AGameplayPlayerController::RefreshGameplayFlow()
 
     if (GameplayRootWidget)
     {
-        GameplayRootWidget->RefreshFlow(RunState, FlowMessage);
+        GameplayRootWidget->RefreshFlowView(FGameplayViewState::FromRun(RunState, FlowMessage), GetNetMode() == NM_Standalone);
     }
 
     // Active CommonUI screens own the input config; the controller keeps combat authorization.
     // 활성 CommonUI 화면이 입력 설정을 소유하고 컨트롤러는 전투 조작 허용 상태를 유지합니다.
     bShowMouseCursor = true;
+}
+
+void AGameplayPlayerController::TryBindGameplayState()
+{
+    AGameplayGameState* State = GetWorld()->GetGameState<AGameplayGameState>();
+    if (!State)
+    {
+        return;
+    }
+    if (GameplayState != State)
+    {
+        if (GameplayState)
+        {
+            GameplayState->OnGameplayViewChanged.RemoveAll(this);
+        }
+        GameplayState = State;
+        GameplayState->OnGameplayViewChanged.AddUObject(this, &AGameplayPlayerController::RefreshGameplayFlow);
+    }
+    GetWorldTimerManager().ClearTimer(BindStateTimer);
+    RefreshGameplayFlow();
 }

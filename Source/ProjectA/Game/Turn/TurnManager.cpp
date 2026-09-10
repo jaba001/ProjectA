@@ -51,6 +51,7 @@ void UTurnManager::StartTurn()
     UE_LOG(LogTemp, Log, TEXT("[Turn %d] START | Index=%d | Unit=%s"), TurnCounter, CurrentTurnIndex, *Unit->GetName());
 
     Unit->OnTurnStart();
+    OnTurnChanged.Broadcast();
 }
 
 void UTurnManager::EndTurn()
@@ -241,6 +242,7 @@ void UTurnManager::StopCombat()
             Unit->OnTurnEnd();
         }
     }
+    OnTurnChanged.Broadcast();
 }
 
 void UTurnManager::ResetCombat()
@@ -251,4 +253,5 @@ void UTurnManager::ResetCombat()
     TurnCounter = 0;
     CombatResult = ECombatResult::None;
     OnCombatResult.Clear();
+    OnTurnChanged.Clear();
 }

@@ -5,11 +5,16 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Combat/CombatManager.h"
 #include "Unit/UnitBase.h"
+#include "Grid/Combat/CombatGridManager.h"
+#include "Net/UnrealNetwork.h"
 
 // Sets default values
 ACombatGridTile::ACombatGridTile()
 {
     PrimaryActorTick.bCanEverTick = false;
+    bReplicates = true;
+    bAlwaysRelevant = true;
+    SetReplicateMovement(true);
 
     OccupyingUnit = nullptr;
 
@@ -38,10 +43,77 @@ void ACombatGridTile::BeginPlay()
     Super::BeginPlay();
 
     // Cache original color
-    if (TileSprite)
+    if (TileSprite && !bOriginalColorCached)
     {
         OriginalColor = TileSprite->GetSpriteColor();
+        bOriginalColorCached = true;
     }
+    OnRep_GridIndex();
+    UpdateTileVisual();
+}
+
+void ACombatGridTile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(ACombatGridTile, GridCoord);
+    DOREPLIFETIME(ACombatGridTile, GridManager);
+    DOREPLIFETIME(ACombatGridTile, OccupyingUnit);
+    DOREPLIFETIME(ACombatGridTile, Territory);
+    DOREPLIFETIME(ACombatGridTile, bProtectedByFront);
+}
+
+void ACombatGridTile::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (RegisteredGridManager.IsValid())
+    {
+        RegisteredGridManager->UnregisterReplicatedTile(this);
+    }
+    RegisteredGridManager.Reset();
+    Super::EndPlay(EndPlayReason);
+}
+
+void ACombatGridTile::InitializeGridTile(ACombatGridManager* Manager, const FIntPoint& Coord, ETileTerritory NewTerritory)
+{
+    if (!HasAuthority() || !IsValid(Manager) || Manager->GetWorld() != GetWorld())
+    {
+        return;
+    }
+
+    GridManager = Manager;
+    GridCoord = Coord;
+    Territory = NewTerritory;
+    OnRep_GridIndex();
+    UpdateTileVisual();
+    ForceNetUpdate();
+}
+
+void ACombatGridTile::OnRep_GridIndex()
+{
+    if (RegisteredGridManager.IsValid() && RegisteredGridManager.Get() != GridManager.Get())
+    {
+        RegisteredGridManager->UnregisterReplicatedTile(this);
+    }
+    RegisteredGridManager = GridManager.Get();
+    if (IsValid(GridManager))
+    {
+        GridManager->RegisterReplicatedTile(this);
+    }
+}
+
+void ACombatGridTile::OnRep_TileState()
+{
+    UpdateTileVisual();
+}
+
+void ACombatGridTile::SetTerritory(ETileTerritory NewTerritory)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+    Territory = NewTerritory;
+    UpdateTileVisual();
+    ForceNetUpdate();
 }
 
 //void ACombatGridTile::Tick(float DeltaTime)
@@ -95,9 +167,15 @@ void ACombatGridTile::NotifyActorEndCursorOver()
 
 void ACombatGridTile::SetOccupyingUnit(AUnitBase* NewUnit)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     OccupyingUnit = NewUnit;
 
     UpdateTileVisual();
+    ForceNetUpdate();
 }
 
 void ACombatGridTile::UpdateTileVisual()
@@ -105,6 +183,14 @@ void ACombatGridTile::UpdateTileVisual()
     if (!TileSprite)
     {
         return;
+    }
+
+    // Initial replication may update visuals before BeginPlay caches the color.
+    // 초기 복제가 BeginPlay의 색상 캐시보다 먼저 화면을 갱신할 수 있습니다.
+    if (!bOriginalColorCached)
+    {
+        OriginalColor = TileSprite->GetSpriteColor();
+        bOriginalColorCached = true;
     }
 
     if (bSkillTargetHighlighted && ActiveSprite)
@@ -192,9 +278,15 @@ void ACombatGridTile::ClearHighlightVisual()
 
 void ACombatGridTile::SetProtectedByFront(bool bInProtectedByFront)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     bProtectedByFront = bInProtectedByFront;
 
     //UE_LOG(LogTemp, Log, TEXT("[GridTile] SetProtectedByFront | Coord=(%d,%d) | Protected=%s"), GridCoord.X, GridCoord.Y, bProtectedByFront ? TEXT("true") : TEXT("false"));
 
     UpdateTileVisual();
+    ForceNetUpdate();
 }

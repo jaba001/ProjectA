@@ -1,16 +1,16 @@
 # ProjectA 작업 보드와 재개 메모
 
-최근 정리: 2026-09-10 · `main` · T14 순차 1~2번 완료 / 3번 2인 Listen Server 동기화부터 8번까지 순차 자동 진행 대기.
+최근 정리: 2026-09-10 · `main` · T14 순차 1~3번 완료 / 다음은 4번 확정 턴 체크포인트·기존 Host 복구 / 5~8번 순차 대기.
 
 [게임 기획 방향](GAME_DESIGN.md) · [기획·구현 현황](PROJECT_PLAN.md) · [코드 리뷰와 검증 시나리오](CODE_REVIEW.md)
 
 ## 다음에 켜면 여기부터
 
-[T14 순차 작업 대기열](T14_QUEUE.md): 사용자 요청에 따라 1~8번을 한 번에 한 개씩 진행한다. 1번 Run·참가자·캐릭터 소유권 데이터 구현/검증을 완료했고 다음은 2번 서버 Action Request다. 번호별 검증·커밋·push를 마친 뒤 다음 번호로 자동 진행한다. 3~8번은 순서대로 대기하며 기획 결정이 필요하면 선택지별 장단점을 사용자에게 확인한다.
+[T14 순차 작업 대기열](T14_QUEUE.md): 사용자 요청에 따라 1~8번을 한 번에 한 개씩 진행한다. 1~3번의 소유권 데이터·서버 Action Request·실제 2인 전투/HUD 동기화 검증을 완료했다. 다음은 4번 확정 턴 체크포인트와 기존 Host 복구다. 번호별 검증·커밋·push를 마친 뒤 다음 번호로 자동 진행한다. 4~8번은 순서대로 대기하며 기획 결정이 필요하면 선택지별 장단점을 사용자에게 확인한다. 전투 밖 노드 선택·Continue의 협동 결정권은 답변 대기 중이다.
 
 파티 전체 성장·UI 중심 Run·직접 조작 전투·Async PvP·아군 Co-op과 Decision Density를 [게임 기획 방향](GAME_DESIGN.md)의 기준으로 삼는다. 현재 구현과 목표를 구분하며, 보상 선택을 다음 전투에 유지하는 작은 Run은 후속 검증 제안이다. 패배 후 진행·보상·협동 재화 배분 등은 미결정 상태로 둔다.
 
-**T14 로컬 상대 Snapshot/Unreal USaveGame v1 전투 사이클을 검증했다. 후속 Co-op은 최대 4인·본인 캐릭터 소유권 고정·기존 Host 유지와 명시적 승계/AI 이어하기로 기획을 확정했다. AI 전환은 시작 시 사전 동의, 이후 MMR은 인간 참가자만 반영, 복구는 확정 턴 경계를 기준으로 한다. 소유권 값 데이터·저장·조회는 순차 1번에서 구현했으며, 다음은 서버 명령 검증·2인 동기화다. 승계·AI·턴 복구는 후속 단계로 나눈다. 기본 Run은 싱글플레이를 유지하고 Unreal 기본 기능을 우선한다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다.
+**T14 로컬 상대 Snapshot/Unreal USaveGame v1 전투 사이클을 검증했다. 후속 Co-op은 최대 4인·본인 캐릭터 소유권 고정·기존 Host 유지와 명시적 승계/AI 이어하기로 기획을 확정했다. AI 전환은 시작 시 사전 동의, 이후 MMR은 인간 참가자만 반영, 복구는 확정 턴 경계를 기준으로 한다. 순차 1~2번의 소유권 데이터·저장·조회와 서버 명령 검증을 완료했고, 3번의 실제 2인 Listen Server 동기화까지 검증했다. 승계·AI·턴 복구는 후속 단계로 나눈다. 기본 Run은 싱글플레이를 유지하고 Unreal 기본 기능을 우선한다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드와 [Listen Server 안내](T14_NETWORK.md), 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다.
 
 체크박스는 작업 완료를 뜻한다. 코드를 작성했어도 완료 조건을 검증하지 못했다면 체크하지 않고 `검증 대기`로 기록한다. P1/P2는 리뷰 결함의 심각도이고 M0~M3는 개발 순서이므로 서로 구분한다.
 
@@ -185,7 +185,7 @@
 - AI: 대상 수/AP·거리·HP 점수로 임시 기본 공격 가중치 제거. 공통 이동 후보 중 전진을 평가하고 목적지 재검증, 성공 후 재판단/실패 후 턴 종료.
 - 검증: Development Editor / Win64 빌드, 전체 자동화 26건(성공 13·경고 동반 성공 13·실패 0). 아이템 효과/소모/거절, 실제 획득 스킬 피해, 이동 선택/막힘/실패 전이 및 저장 맵 PIE의 HUD 회복·두 전투 재지급 검증. `Saved/Automation/T13Final/index.json`, `Saved/Automation/T13Build.log`. 패키지 재빌드는 미실행.
 
-### T14 · 하이브리드 멀티플레이 기반 설계 — 로컬 Snapshot 구현 / Co-op 후속
+### T14 · 하이브리드 멀티플레이 기반 설계 — 로컬 Snapshot·2인 전투 동기화 완료 / 복구·AI·승계 후속
 
 게임 전체의 목표 Run Loop와 우선순위는 [게임 기획 방향](GAME_DESIGN.md)을 따른다. 이 카드는 네트워크 확장 범위와 완료 조건을 기록한다.
 
@@ -244,9 +244,7 @@ Client가 직접 Combat State를 확정하지 않는다.
 
 #### 현재 작업 범위
 
-현재 Vertical Slice를 즉시 전체 Replication 구조로 리팩터링하지 않는다.
-
-우선 기존 싱글플레이 게임 루프와 콘텐츠 개발을 진행한다.
+기본 Vertical Slice와 Run은 싱글플레이를 유지한다. 현재는 순차 3번의 2인 Listen Server 전투/HUD 동기화에 범위를 한정해 구현·검증하며 전체 게임의 온라인 기능을 완료한 것으로 취급하지 않는다.
 
 다만 앞으로 추가하는 Run/Party/Encounter/Combat 데이터는 Actor reference에 과도하게 의존하지 않고 직렬화 가능한 Runtime Data와 Command 형태를 우선한다.
 
@@ -259,6 +257,7 @@ Client가 직접 Combat State를 확정하지 않는다.
 로컬 1차 범위는 **1A Snapshot 전투 우선**, 저장은 **2B Unreal USaveGame v1**로 결정했다. 미지원 저장 구조 버전과 다른 카탈로그 콘텐츠 버전은 거절한다. Unreal 기본 기능을 우선하며 로컬 전투 사이클을 검증한 뒤 Co-op 동기화로 넘어간다.
 
 - 1인당 본인 소유 캐릭터 수와 접속 인원보다 배정 가능한 캐릭터가 적을 때의 시작 규칙
+- 전투 밖 노드 선택·Continue의 협동 결정권. 사용자 답변 전 네트워크 화면은 읽기 전용이며 자동화는 신뢰된 서버 진입점 사용
 - AI 전환 뒤 원래 소유자의 복귀/수동 조작 전환 시점과 비전투 장비·스킬·Ready 처리
 - 현재 인간 참가자를 MMR 정산 대상으로 확정하는 시점과 MMR 계산·정산 단위
 - 고의 이탈·미확정 턴 반복·승계 후 중복 진행 방지의 구체적인 랭크 정책
@@ -281,8 +280,9 @@ Co-op에서는 최소 2개의 PIE 인스턴스에서 Listen Server / Client로 �
 
 - [x] 로컬 Snapshot 저장·불러오기 → 실제 Encounter → 기존 Combat 전투 한 사이클
 - [x] Co-op 최대 인원·캐릭터 소유권·명시적 Host 승계/AI·MMR 반영 대상·턴 복구 기획 확정
-- [ ] Listen Server / Client 다중 PIE, 플레이어별 조작권과 전투 상태 동기화
-- [ ] 기존 참가자 신원·원래 소유권 유지, 턴 경계 체크포인트와 승계 복구 데이터
+- [x] 순차 1~2번 Run·참가자·캐릭터 소유권 값 데이터/저장과 서버 Action Request 검증
+- [x] 순차 3번 Listen Server / Client 2인 PIE, 플레이어별 조작권과 전투/HUD 상태 동기화
+- [ ] 턴 경계 체크포인트와 기존 Host 복구, 원래 소유권을 유지하는 승계 복구 데이터
 - [ ] Host 승계 + 불참자 AI로 계속하기 버튼, 아군 AI 판단과 중복 재개 방지
 
 `FPartySnapshot` 값 데이터를 `UPartySnapshotSaveGame`에 저장하고 `UPartySnapshotLibrary`로 검증·복원한다. 신뢰된 `UOpponentSnapshotCatalogDataAsset`이 ClassId/SkillIds를 해석하고 EncounterManager가 저장된 스탯·순서 있는 스킬·Formation으로 적을 생성한다. 장비·전술 식별자는 저장 가능하지만 실행은 빈 값만 지원하며 HP 0 상대도 현재 실행에서는 거절한다. 스냅샷 적은 회복약이나 무작위 추가 스킬을 받지 않는다.
@@ -293,7 +293,9 @@ Co-op에서는 최소 2개의 PIE 인스턴스에서 Listen Server / Client로 �
 
 이전 `ee61c84` 변경은 확정 기획과 구현 경계를 문서화한 작업이며 C++·기존 SaveGame v1·에셋 변경은 없었다. 위 32건/별도 PIE 결과는 로컬 Snapshot 구현의 기록이다. 순차 1번 소유권 데이터·v2 저장·기존 v1 호환과 2번 서버 명령·소유권·중복 검증 결과는 [대기열](T14_QUEUE.md)에 별도 기록한다.
 
-서버 Action Request와 원래 참가자·캐릭터 소유권 검증을 연결했다. 다음은 3번 2인 Listen Server의 실제 명령 전송과 전투/HUD 상태 복제다. 이후 턴 복구·아군 AI·명시적 승계를 순차 검증한다. 랭크의 이탈 방지 등 미결정 정책을 임의로 확정하지 않으며 T14 전체 완료는 체크하지 않는다.
+순차 3번은 서로 다른 NetDriver를 가진 두 PIE 월드 사이의 실제 PlayerController RPC와 서버 소유권 검증을 연결했다. 서버 전용 TurnManager, CombatManager의 전투/유닛 식별 뷰, GAS HP/MaxHP RepNotify, Unit AP/SubAP·이동·장착·턴/행동/사망 상태, Grid 점유·전열 보호·결과/HUD 복제를 구현했다. GameState는 Run 단계·파티·노드·결과의 읽기 전용 표시 정보를 전달하고 클라이언트 RunState를 권위 상태로 사용하지 않는다. 상세 구조와 실행 방법은 [Listen Server 안내](T14_NETWORK.md)를 따른다.
+
+`AssignRunParticipant`와 `ApplyCombatParticipantBindings`는 신뢰된 서버 C++ 연결 배정이며 실제 로그인 인증이 아니다. 네트워크 노드 선택·Continue 결정권은 사용자 답변 대기 중이므로 해당 UI는 읽기 전용이고 자동화는 서버 진입점을 사용한다. 네트워크 최종 유닛은 결과 화면에서 유지한 뒤 명시적인 Continue 또는 월드 종료에서 정리한다. 3번은 Development Editor / Win64 빌드·전체 자동화 42건(성공 26·경고 동반 성공 16·실패 0)·별도 Snapshot 상대 PIE 1건을 통과했다. 상세 결과와 초기 NavMesh 테스트 순서 오류의 수정 기록은 [대기열](T14_QUEUE.md)에 남긴다. 4~8번의 턴 복구·아군 AI·명시적 승계·3~4인·온라인 서비스는 대기하고 T14 전체 완료는 체크하지 않는다.
 
 ## 검증을 실행할 때 확인할 설정
 
@@ -307,6 +309,7 @@ Co-op에서는 최소 2개의 PIE 인스턴스에서 Listen Server / Client로 �
 
 | 날짜 | 작업 | 완료/검증 | 다음 시작점 |
 |---|---|---|---|
+| 2026-09-10 | T14 순차 3번 2인 Listen Server 전투/HUD 동기화 | 실제 소유 연결 RPC·본인 조작권·턴·HP/AP·Grid·사망·결과 검증. Editor 빌드·전체 42건·별도 Snapshot PIE 1건 통과. PIE 시작 전 편집기 Nav 생성 대기 보정 | 순차 4번 확정 턴 체크포인트·기존 Host 복구, 5~8번 대기. 노드/Continue 결정권 답변 대기 |
 | 2026-09-10 | T14 순차 2번 서버 Action Request와 소유권 검증 | 이동·스킬·회복약·턴 종료 통합, 서버 참가자 바인딩·소유권·턴·순번·자원·대상 검증. Editor 빌드·전체 41건·별도 Snapshot PIE 1건 통과 | 순차 3번 2인 Listen Server 전투/HUD 동기화, 4~8번 대기 |
 | 2026-09-10 | T14 순차 1번 Run·참가자·캐릭터 소유권 | v2 식별/동의/Host 저장·조회, 실제 메타데이터 없는 v1 호환, Editor 빌드·전체 36건·Snapshot PIE·독립 프로세스 저장/복원 통과 | 순차 2번 서버 Action Request와 소유권 검증, 3~8번 대기 |
 | 2026-09-10 | T14 Co-op 소유권·승계·AI 이어하기 기획 | 최대 4인·본인 캐릭터 고정, 명시적 Host 승계/AI, 사전 동의·인간 참가자만 MMR·확정 턴 복구 결정. 현재 코드 대조·문서 정합성 검증, C++/빌드/PIE 변경 없음 | 소유권/Run 참가자 데이터와 서버 요청 검증 → 2인 동기화 → 턴 복구·승계·아군 AI |

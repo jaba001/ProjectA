@@ -13,6 +13,7 @@
 #include "EngineUtils.h"
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/GameModes/GameplayGameModeBase.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "GAS/Attribute/AS_Unit.h"
 #include "Grid/Combat/CombatGridManager.h"
@@ -103,6 +104,14 @@ bool AEncounterManager::RequestStartNode(FName NodeId)
         if (!ActionAuthority->BindParticipant(LocalController, Identity.OriginalParticipants[0].AccountId))
         {
             return FailPreparation(FText::FromString(TEXT("The local participant could not be bound to combat. / 로컬 참가자를 전투에 연결하지 못했습니다.")));
+        }
+    }
+    if (GetNetMode() != NM_Standalone)
+    {
+        AGameplayGameModeBase* Mode = GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
+        if (!Mode || !Mode->ApplyCombatParticipantBindings(ActionAuthority))
+        {
+            return FailPreparation(FText::FromString(TEXT("Every original participant must have a trusted server connection. / 원래 참가자 모두의 서버 연결 배정이 필요합니다.")));
         }
     }
     Arena->ActivateArena(GetWorld()->GetFirstPlayerController());
@@ -282,7 +291,12 @@ void AEncounterManager::FinishEncounter()
             RunState->UpdatePartyMemberHP(Entry.Key, HP);
         }
     }
-    CleanupEncounter();
+    // Keep final network actor state available through the result screen, until explicit Continue or travel.
+    // 네트워크 최종 액터 상태는 결과 화면에서 유지하며 명시적인 Continue나 레벨 이동 때 정리합니다.
+    if (GetNetMode() == NM_Standalone)
+    {
+        CleanupEncounter();
+    }
     const ECombatResult Result = PendingResult;
     PendingResult = ECombatResult::None;
     RunState->CompleteEncounter(Result);
@@ -292,9 +306,13 @@ void AEncounterManager::FinishEncounter()
 
 bool AEncounterManager::ContinueRun()
 {
-    if (!RunState || PendingResult != ECombatResult::None)
+    if (!HasAuthority() || !RunState || PendingResult != ECombatResult::None || RunState->GetPhase() != ERunPhase::Result)
     {
         return false;
+    }
+    if (GetNetMode() != NM_Standalone)
+    {
+        CleanupEncounter();
     }
     return RunState->ContinueRun();
 }
@@ -312,10 +330,12 @@ bool AEncounterManager::FailPreparation(const FText& Message)
 
 void AEncounterManager::SetPlayerCombatInput(bool bEnabled)
 {
-    APartyPlayerController* Controller = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController());
-    if (Controller)
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
-        Controller->SetCombatContext(CombatManager, bEnabled);
+        if (APartyPlayerController* Controller = Cast<APartyPlayerController>(It->Get()))
+        {
+            Controller->SetCombatContext(CombatManager, bEnabled);
+        }
     }
 }
 

@@ -2,9 +2,11 @@
 
 게임의 목표와 이후 기능 판단 기준은 [게임 기획 방향](GAME_DESIGN.md)을 따른다. 이 문서는 현재 Vertical Slice의 구현 규약과 검증 경계를 기록하며, 목표 기능이나 후속 제안을 구현 완료로 취급하지 않는다.
 
-기준일: 2026-09-08. 기존 미커밋 메뉴·4슬롯 프리뷰 작업을 보존하며 첫 Vertical Slice를 연결한다. 코드·빌드·에셋·PIE의 실제 결과는 [작업 보고](VERTICAL_SLICE_REPORT.md)에 별도로 기록한다.
+기준일: 2026-09-10. 기본 싱글플레이 Vertical Slice를 유지하며 T14 순차 3번의 2인 Listen Server 동기화를 검증했다. 다음은 4번 확정 턴 체크포인트와 기존 Host 복구다. 기존 slice 결과는 [작업 보고](VERTICAL_SLICE_REPORT.md), T14 번호별 결과는 [순차 대기열](T14_QUEUE.md)에 별도로 기록한다.
 
 ## 1. 확정한 게임 흐름
+
+아래는 기본 싱글플레이 흐름이다. 네트워크 전투는 결과 화면에서 최종 유닛 상태를 유지하고 명시적인 Continue 또는 월드 종료에서 정리한다.
 
 ```mermaid
 flowchart LR
@@ -25,13 +27,14 @@ flowchart LR
 | 구성 | 역할 / 수명 |
 |---|---|
 | `URunStateSubsystem` | GameInstance 수명. 파티·노드·결과·HP와 Run/참가자/캐릭터 소유권/Host/동의 보존. Actor 참조 없이 전투 밖 체크포인트를 SaveGame에 저장 |
-| `AGameplayGameModeBase` | 레벨 BeginPlay 다음 틱에 Arena를 찾아 EncounterManager와 CombatManager 생성, Controller 연결 |
-| `AGameplayPlayerController` | PartyPlayerController 상속. Root UI와 전투 조작 허용 상태 관리, 노드/Continue 요청 전달 |
+| `AGameplayGameModeBase` | 서버에서 Arena·EncounterManager·CombatManager 준비, 신뢰된 C++ 참가자 배정과 전투 바인딩 |
+| `AGameplayGameState` | Run 단계·파티·노드·결과의 읽기 전용 표시 뷰와 전투/아레나 참조 복제. 클라이언트 RunState를 권위 상태로 사용하지 않음 |
+| `AGameplayPlayerController` | PartyPlayerController 상속. Root UI와 서버 전투 문맥 수신, 소유 연결의 전투 RPC. 노드/Continue UI 명령은 현재 Standalone만 허용 |
 | `UGameplayRootWidget` | CommonUI Run / Combat / Modal 스택 관리 |
 | `URunMapWidget` | 노드 정의 표시, 선택 요청. Spawn 수행 안 함 |
 | `AEncounterManager` | 준비/스폰/전투 연결/HP 추출/정리. RunState의 유효 전이를 요청 |
 | `ACombatArena` | Grid origin·슬롯별 좌표·카메라·타일 활성화. 향후 다른 Arena 구현으로 교체 가능 |
-| `ACombatManager` / `UTurnManager` | 기존 이동·타겟·턴 로직 재사용, 결과 이벤트 및 정지/등록 해제 추가 |
+| `ACombatManager` / `UTurnManager` | 서버만 턴·승패 확정. CombatManager가 전투 ID·턴·결과·유닛 식별/원래 소유권의 복제 뷰 전달 |
 | `UCombatActionAuthority` | CombatManager 소유 서버 객체. 연결 참가자·원래 소유권·턴·요청 중복·장착 스킬·자원·대상을 검사한 뒤 기존 유닛 행동 실행 |
 | `UCombatHUDWidget` | CommonActivatableWidget, 기존 Move/Skill/End Turn 명령 연결 |
 | `UEncounterResultWidget` | Victory Continue / Defeat. 향후 보상 선택을 넣을 위치 |
@@ -48,13 +51,15 @@ T14의 첫 구현은 사용자 선택 1A+2B에 따라 로컬 Snapshot 전투와 
 
 Co-op은 Listen Server의 Host-authoritative 구조를 우선한다. 최대 4인으로 설계하고 첫 동기화는 2인으로 검증한다. 원래 캐릭터 소유자만 직접 조작하고 다른 사람이 같은 Run에 대체 참가하지 못한다. Host가 바뀌어도 타인 캐릭터의 인간 조작권은 얻지 않는다. Client의 Action Request는 서버가 검증·실행하며 CombatManager·TurnManager·Grid Occupancy·Unit State·HP/AP·사망·Combat Result의 최종 권위는 서버에 있다.
 
-순차 2번에서 이동·스킬·회복약·턴 종료를 값 Command와 PlayerController의 소유 연결 RPC 진입점으로 통합했다. 실제 로그인 대신 신뢰된 서버 코드가 참가자를 바인딩하며 현재 자동 연결은 Standalone의 개발용 단일 참가자다. 서버 검증과 싱글플레이 회귀 결과는 [대기열](T14_QUEUE.md)에 기록한다. Client 전투/HUD 상태 복제와 실제 2인 PIE 왕복은 순차 3번에서 구현·검증한다.
+순차 2번에서 이동·스킬·회복약·턴 종료를 값 Command와 PlayerController의 소유 연결 RPC 진입점으로 통합했다. 순차 3번은 실제 두 PIE 월드 사이의 RPC와 소유권 검증, Turn·HP/AP/SubAP·이동·Grid 점유/전열 보호·사망·결과·장착/HUD 복제를 구현하고 실제 2인 PIE에서 검증했다. 서버만 유닛 행동과 GAS 능력을 실행하며 HP/MaxHP는 Attribute RepNotify로 전달한다. GameState의 Run 표시 뷰와 CombatManager의 실행 중 복제 뷰를 영속 Run/Command 데이터와 분리한다.
+
+`AssignRunParticipant`와 `ApplyCombatParticipantBindings`는 신뢰된 서버 C++ 연결 배정이며 실제 로그인은 아니다. 네트워크 자동화는 알려진 두 연결에 원래 참가자 계정을 명시적으로 배정하고, 기존 자동 연결은 Standalone의 개발용 단일 참가자를 유지한다. 전투 밖 노드 선택·Continue의 협동 결정권은 사용자 답변 대기 중이다. 결정 전 네트워크 화면의 해당 버튼은 읽기 전용이며 테스트는 서버 진입점으로 진행한다. [Listen Server 안내](T14_NETWORK.md)에 구현·실행 경계를, [대기열](T14_QUEUE.md)에 번호별 검증 결과를 기록한다. 3번은 Editor 빌드·전체 자동화 42건·별도 Snapshot PIE를 통과했다. 다음은 4번 확정 턴 복구이며 5~8번과 T14 전체 완료는 대기한다.
 
 정상 종료·갑작스러운 끊김만으로 Host를 자동 변경하지 않는다. 원래 파티가 다시 모일 수 없을 때 기존 참가자가 명시적으로 Host를 승계하고 불참자 캐릭터를 AI로 전환해 이어가는 버튼을 제공한다. AI 전환에는 각자의 Run 시작 시 사전 동의를 사용하며, 이후 MMR은 현재 인간 참가자에게만 반영하고 불참자에게 추가 변동을 주지 않는다. 마지막 확정 턴 경계에서 복구한다. 이는 구현 후속 기획이며 현재 전투 밖 체크포인트의 기능이 아니다.
 
 MMR 랭크를 목표로 하므로 원래 참가자·캐릭터 소유자·현재 Host를 구분하고, 동일 Run의 동시 승계·진행 분기·결과 중복 반영을 방지해야 한다. Unreal 기본 네트워크 기능을 사용하되 경쟁 콘텐츠의 계정 인증·권위 저장·MMR 검증은 별도 단계다. Steam/EOS, Backend와 불리한 전투에서의 고의 이탈 방지 정책은 아직 결정하지 않았다. 상세 합의와 순서는 [Co-op 확정 기획](T14_COOP_DESIGN.md)을 따른다.
 
-새 Run/Party/Encounter/Combat 기능은 직렬화 가능한 Runtime Data와 Command를 우선하고 Actor reference 및 로컬 PlayerController에 강하게 결합하지 않는다. 미결정 정책이 구현에 영향을 주면 사용자에게 선택지와 영향을 설명해 결정한다. 현재는 싱글플레이 루프·콘텐츠 개발을 계속하며 전체 Replication 리팩터링을 즉시 시작하지 않는다.
+새 Run/Party/Encounter/Combat 기능은 직렬화 가능한 Runtime Data와 Command를 우선하고 Actor reference 및 로컬 PlayerController에 강하게 결합하지 않는다. 실행 중 복제 뷰의 유닛 조회에만 Actor 참조를 사용한다. 미결정 정책이 구현에 영향을 주면 사용자에게 선택지와 영향을 설명해 결정한다. 기본 Run은 싱글플레이를 유지하고 3번의 2인 전투 동기화를 검증한 뒤 4번 턴 복구로 진행한다.
 
 ## 3. 파티 규칙
 
@@ -71,7 +76,7 @@ Gameplay의 입력 모드는 활성 CommonUI 화면이 소유한다. CombatHUD�
 
 `CanStartNode → BeginEncounter → PrepareArena → SpawnParty/Enemies → MarkCombatStarted → StartCombat` 순서다. 누락 클래스/잘못된 좌표/중복 점유/빈 편성은 부분 스폰을 정리하고 Run Map 오류 메시지로 돌아간다.
 
-`OnUnitDied → EvaluateCombatResult → StopCombat`에서 결과를 1회 확정한다. 먼저 모든 유닛의 활성 턴을 끄고 행동을 취소하며 추가 입력을 막는다. 사망 콜백이 반환된 다음 틱에 HP를 저장하고 TurnOrder·CombatUnits·ASC/AI 이동·타이머·컨트롤러·스킬 액터·Unit·타일 점유를 정리한다. Result Continue는 정리가 끝난 상태에서 다음 노드를 연다.
+`OnUnitDied → EvaluateCombatResult → StopCombat`에서 결과를 1회 확정한다. 먼저 모든 유닛의 활성 턴을 끄고 행동을 취소하며 추가 입력을 막는다. 사망 콜백이 반환된 다음 틱에 HP를 저장한다. Standalone은 TurnOrder·CombatUnits·ASC/AI 이동·타이머·컨트롤러·스킬 액터·Unit·타일 점유를 정리한 뒤 결과를 표시한다. 네트워크는 최종 HP·사망·점유 해제가 복제되도록 결과 화면에서 유닛을 유지하고 명시적인 Continue에서 정리한 뒤 다음 노드를 연다.
 
 전체 팀이 전멸하지 않은 상태에서 현재 턴 유닛이 죽으면 다음 틱에 다음 생존 유닛으로 진행한다. 같은 사망으로 중복 전이하지 않는다.
 
@@ -92,7 +97,7 @@ R01/R02는 `EUnitActionResult`와 공통 행동 완료 경로로 수정한다. G
 | T11 메뉴 기능 | 체크포인트 자동 저장/이어하기, 품질·수직 동기화 옵션, 실제 Quit 연결. T11 당시 v1 빌드·자동화 23건 및 패키지 저장/Continue/Quit 검증 완료. T14에서 새 Run은 v2 소유권 메타데이터, 기존 v1은 LegacyOffline 호환 |
 | T12 메뉴 에셋 | Designer 기준 유지, 표시 전용 프리뷰·재진입 정리, 누락 상태 안내 바인딩 보완. 빌드·전체 24건 및 최종 PIE·생성본 검증 완료 |
 | T13 콘텐츠 | 전투 한정 회복약·HUD, SkillPool 휩쓸기 획득/GAS 장착, 적 전진 후보와 AP당 대상 점수 구현. 빌드·자동화 26건 및 저장 맵 PIE 통과 |
-| T14 네트워크 | 로컬 USaveGame v1 Snapshot 저장·카탈로그 해석·Encounter 연결 구현. 검증 결과는 [작업 카드](TODO.md)에 기록하며 Co-op 다중 PIE는 후속 |
+| T14 네트워크 | 로컬 Snapshot과 순차 1~3번 완료. 실제 2인 RPC·소유권·전투/HUD 복제, 전체 42건·별도 Snapshot PIE 통과. 신뢰된 C++ 연결 배정만 제공하며 4~8번 대기, 전체 T14 미완료 |
 
 ## 6. 검증과 다음 단계
 

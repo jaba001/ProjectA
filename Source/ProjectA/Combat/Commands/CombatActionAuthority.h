@@ -29,6 +29,8 @@ public:
     bool CanControllerControl(const APartyPlayerController* Controller, const AUnitBase* Unit) const;
     FCombatActionResponse Execute(APartyPlayerController* Controller, const FCombatActionRequest& Request);
     FGuid GetUnitId(const AUnitBase* Unit) const;
+    FGuid GetCharacterId(const AUnitBase* Unit) const;
+    FRunAccountId GetOwnerAccountId(const AUnitBase* Unit) const;
     AUnitBase* ResolveUnit(FGuid UnitId) const;
     FGuid GetCombatInstanceId() const { return CombatInstanceId; }
     FGuid GetParticipantBindingId(const APartyPlayerController* Controller) const;

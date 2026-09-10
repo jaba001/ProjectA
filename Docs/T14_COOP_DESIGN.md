@@ -4,7 +4,7 @@
 
 [T14 작업 카드](TODO.md) · [게임 기획 방향](GAME_DESIGN.md) · [프로젝트 기획과 구현 현황](PROJECT_PLAN.md) · [프로젝트 안내](../README.md)
 
-이 문서는 사용자 확정안을 기록하고 후속 구현의 경계를 정한다. Co-op, 턴 경계 복구, Host 승계, AI 이어하기, MMR 기능의 구현 완료를 의미하지 않는다. 현재 싱글플레이와 로컬 상대 Snapshot 전투를 유지한다.
+이 문서는 사용자 확정안을 기록하고 후속 구현의 경계를 정한다. 순차 1~3번을 완료하고 실제 2인 Listen Server 전투/HUD 복제를 검증했다. 3~4인이나 T14 전체 완료를 의미하지 않는다. 기본 싱글플레이와 로컬 상대 Snapshot 전투를 유지하며 턴 경계 복구·Host 승계·AI 이어하기·3~4인·MMR의 4~8번은 대기한다. 현재 실행 경계는 [Listen Server 안내](T14_NETWORK.md)를 따른다.
 
 ## 1. 확정한 플레이 규칙
 
@@ -51,6 +51,7 @@ AI 이어하기가 확정된 뒤에는 현재 인간 참여자에게만 MMR을 �
 - MMR의 현재 인간 참여자를 판정하는 기준 시점과 이탈·재접속 악용 방지 방법
 - 재집결 불가를 확인하는 조건, 승계 후보가 여러 명일 때 선택 방식
 - 일시적인 Client 끊김 동안 턴 대기·일시정지·시간 제한을 어떻게 처리할지
+- 전투 밖 노드 선택·Continue를 누가 결정할지. 사용자 답변 전 네트워크 화면은 해당 버튼을 읽기 전용으로 표시하며 자동화는 서버 진입점을 사용한다
 
 ## 4. 필수 데이터 경계와 설계 후보
 
@@ -75,18 +76,19 @@ AI 이어하기가 확정된 뒤에는 현재 인간 참여자에게만 MMR을 �
 
 Client는 이동·스킬·대상·턴 종료의 의도를 요청한다. 순차 2번의 `FCombatActionRequest`에는 Run·Host 세대·전투 실행 ID·연결 바인딩 ID·턴 번호·요청 순번·행동 유닛 ID·스킬 PrimaryAssetId·대상 유닛 ID와 Grid 좌표를 담는다. Actor reference는 서버 실행 중 해석에만 사용하며 계정이나 비용을 요청 본문에서 받지 않는다. 회복약도 이 경로를 거친다.
 
-`UCombatActionAuthority`는 CombatManager의 서버 객체로 Run/파티 값과 실행 중 유닛 매핑을 보관한다. 신뢰된 서버 코드가 Controller에 원래 참가자를 바인딩하고, PlayerController Server Reliable RPC가 자신의 연결로 받은 명령을 전달한다. 새 연결은 별도 바인딩 ID를 받으며 같은 바인딩을 반복해도 순번을 초기화하지 않는다. 응답의 `Accepted`는 디스패치 승인이고 비동기 행동 성공과 구분한다. 현재 Standalone 자동 바인딩은 개발용 단일 참가자만 대상으로 하며 실제 로그인·2인 전송·Client 상태 복제는 3번 이후다.
+`UCombatActionAuthority`는 CombatManager의 서버 객체로 Run/파티 값과 실행 중 유닛 매핑을 보관한다. 신뢰된 서버 코드가 Controller에 원래 참가자를 바인딩하고, PlayerController Server Reliable RPC가 자신의 연결로 받은 명령을 전달한다. 새 연결은 별도 바인딩 ID를 받으며 같은 바인딩을 반복해도 순번을 초기화하지 않는다. 응답의 `Accepted`는 디스패치 승인이고 비동기 행동 성공과 구분한다. Standalone 자동 바인딩은 개발용 단일 참가자만 대상으로 한다. 순차 3번의 네트워크 경로는 GameMode의 `AssignRunParticipant`와 `ApplyCombatParticipantBindings`로 원래 참가자를 신뢰된 서버 C++ 연결에 배정하며, 자동화는 두 PIE 월드 사이의 실제 RPC를 검증한다. 이 배정은 실제 로그인 인증이 아니며 인증 공급자 연동은 8번이다.
 
 서버는 다음을 확인한 뒤 기존 행동 API를 실행한다.
 
 - 현재 Run·Host 세대와 일치하며 이미 처리한 요청이 아닌지
 - 요청 연결이 원래 참가자이고 해당 캐릭터의 소유자인지
-- 해당 캐릭터가 현재 인간 조작 상태이며 요청자의 조작 대상인지
 - 실제 현재 턴, 생존, 행동 중 여부, AP/SubAP, 스킬 보유, 타겟, Grid 규칙을 만족하는지
 
-AI는 Client를 가장하지 않고 서버 내부의 AI 실행 주체로 같은 행동 검증 경로를 이용한다. 소유자의 인간 명령과 AI 판단이 동시에 한 캐릭터를 움직이지 않게 상태를 전환한다.
+후속 아군 AI 전환에서는 Client를 가장하지 않고 서버 내부의 AI 실행 주체로 행동 검증 경로를 이용한다. 소유자의 인간 명령과 AI 판단이 동시에 한 캐릭터를 움직이지 않게 조작 상태를 전환하고 검사해야 한다. 현재 3번은 AI 이어하기를 실행하지 않는다.
 
 `CombatManager`·`TurnManager`·Grid 점유·유닛 상태·HP/AP·사망·전투 결과는 서버가 확정한다. Client UI는 요청 중 상태와 서버가 확정한 결과를 표시한다.
+
+3번에서 서버 전용 TurnManager, CombatManager의 전투/소유권 복제 뷰, GAS HP/MaxHP RepNotify, 유닛 AP/SubAP·장착·이동·턴/행동/사망 상태, Grid 점유·영역·전열 보호와 HUD를 연결했다. GameState는 Phase·파티·노드·결과의 읽기 전용 표시 값을 전달하고 클라이언트 GameInstance의 RunState를 서버 Run으로 복원하지 않는다. 네트워크 결과 화면에서는 최종 유닛 상태를 유지하고 명시적인 Continue 또는 월드 종료에서 정리한다. 실제 두 월드의 전투/HUD 일치, 전체 자동화 42건과 별도 Snapshot PIE를 통과했다.
 
 ## 6. 확정 턴 경계 복구
 
@@ -146,14 +148,15 @@ Server RPC는 소유 연결을 고려해야 하며, 서버에 전달됐다는 �
 
 | 현재 구현 | 후속 작업 |
 |---|---|
-| `FRunPartyMember`: 슬롯·이름·직업·생성 여부·HP·CharacterId·OwnerAccountId | 접속·AI 조작 상태 분리와 서버 행동 권한 검증 |
-| `RunSaveGame` v2: 전투 밖 HP·노드·결과와 Run/참가자/소유자/Host/동의, 기존 v1 호환 | revision 및 턴 경계 상태, 실제 인증·연결 기반 소유권 강제 |
-| `PartyPlayerController`의 값 Command·소유 연결 RPC 진입점과 서버 바인딩·소유권 검증 | 실제 연결의 참가자 식별 연동, 2인 전송과 Client 전투/HUD 상태 복제 검증 |
+| `FRunPartyMember`: 슬롯·이름·직업·생성 여부·HP·CharacterId·OwnerAccountId와 서버 소유권 검사 | 접속·AI 조작 상태 분리와 전환 검증 |
+| `RunSaveGame` v2: 전투 밖 HP·노드·결과와 Run/참가자/소유자/Host/동의, 기존 v1 호환 | revision 및 턴 경계 상태, 실제 계정 인증 |
+| `PartyPlayerController` 값 Command·실제 소유 연결 RPC와 GameMode의 신뢰된 C++ 참가자 배정 | 2인 전송·소유권·Client 전투/HUD 동기화 검증 완료. 실제 로그인은 8번 |
+| `AGameplayGameState`의 읽기 전용 Run 표시 뷰, 클라이언트 RunState와 책임 분리 | 미결정인 노드/Continue 결정권 확정 후 네트워크 진행 명령 연결 |
 | `APlayerUnit`: 인간 행동과 자원 소진 턴 종료 | 인간 입력과 교체 가능한 서버 AI 판단 연결 |
 | `AEnemyUnit`: 적 AI 판단 FSM | 소유권·팀을 유지하는 아군 AI 실행 구조 검토 |
 | `UnitAIController`: 이동 처리 | AI 컨트롤러 존재만으로 전투 판단 지원을 가정하지 않음 |
 | 로컬 상대 Snapshot 저장·검증·기존 Encounter 생성 | 온라인 Snapshot 신뢰와 Co-op 복구 기록은 별도 구현 |
-| 일부 Actor·ASC 복제 설정 | 턴·Grid·HP/AP·사망·결과의 실제 다중 PIE 동기화 검증 |
+| 서버 전용 턴·행동·GAS, Unit/Grid/전투 뷰 Replication·RepNotify | 2인 턴·Grid·HP/AP·사망·결과 일치 검증 완료. 3~4인·끊김/복구·승계는 4~7번 |
 
 현재 Snapshot 스키마는 상대 빌드를 표현한다. 진행 중인 협동 전투의 턴 경계 체크포인트와 동일한 저장 본문으로 단정하지 않는다.
 

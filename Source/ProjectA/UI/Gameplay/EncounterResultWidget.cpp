@@ -47,8 +47,9 @@ void UEncounterResultWidget::NativeOnInitialized()
 
 void UEncounterResultWidget::ShowResult(ECombatResult Result, const FText& Message)
 {
+    DisplayedResult = Result;
     const bool bVictory = Result == ECombatResult::Victory;
-    Button_Continue->SetIsEnabled(bVictory);
+    Button_Continue->SetIsEnabled(bVictory && bContinueAllowed);
     Button_Continue->SetVisibility(ESlateVisibility::Collapsed);
     Text_Result->SetText(FText::FromString(TEXT("Defeat / 패배\nThe run has ended. / 진행이 종료되었습니다.")));
 
@@ -63,8 +64,21 @@ void UEncounterResultWidget::ShowResult(ECombatResult Result, const FText& Messa
     }
 }
 
+void UEncounterResultWidget::SetContinueEnabled(bool bEnabled)
+{
+    bContinueAllowed = bEnabled;
+    if (Button_Continue)
+    {
+        Button_Continue->SetIsEnabled(bContinueAllowed && DisplayedResult == ECombatResult::Victory);
+    }
+}
+
 void UEncounterResultWidget::HandleContinueClicked()
 {
+    if (!bContinueAllowed || DisplayedResult != ECombatResult::Victory)
+    {
+        return;
+    }
     if (AGameplayPlayerController* Controller = Cast<AGameplayPlayerController>(GetOwningPlayer()))
     {
         Controller->RequestContinueRun();

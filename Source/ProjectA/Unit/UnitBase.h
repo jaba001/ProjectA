@@ -85,17 +85,17 @@ public:
 public:
     // Unit identifier
     // 유닛 식별 번호입니다.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UnitBase")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "UnitBase")
     int32 UnitIndex = 0;
 
     // Display name copied from the run party without owning persistent state.
     // 영구 상태를 소유하지 않고 런 파티에서 복사한 표시 이름입니다.
-    UPROPERTY(BlueprintReadOnly, Category = "UnitBase|Runtime")
+    UPROPERTY(BlueprintReadOnly, Replicated, Category = "UnitBase|Runtime")
     FText RuntimeCharacterName;
 
     // Team affiliation
     // 유닛의 팀 소속입니다.
-    UPROPERTY(Replicated)
+    UPROPERTY(ReplicatedUsing = OnRep_Team)
     ETeam Team = ETeam::Player;
 
     // Changes this unit's team affiliation.
@@ -109,6 +109,20 @@ public:
     ETeam GetTeam() const { return Team; }
 
 protected:
+    // Replication updates presentation without running server combat callbacks.
+    // 복제는 서버 전투 콜백을 실행하지 않고 화면만 갱신합니다.
+    UFUNCTION()
+    void OnRep_Team();
+
+    UFUNCTION()
+    void OnRep_CurrentTile(ACombatGridTile* PreviousTile);
+
+    UFUNCTION()
+    void OnRep_Death();
+
+    void ApplyDeathPresentation();
+    bool bDeathPresentationApplied = false;
+
     // Default battle orientation
     // Player uses Yaw 90
     // Enemy uses Yaw -90
@@ -116,13 +130,13 @@ protected:
     FRotator DefaultBattleRotation;
 
     // Current action type
-    UPROPERTY()
+    UPROPERTY(Replicated)
     EUnitActionType CurrentActionType = EUnitActionType::None;
 
 public:
     // Whether this unit is currently active in turn
     // 현재 이 유닛의 턴이 활성화되어 있는지 여부입니다.
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UnitBase|Turn")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|Turn")
     bool bIsActiveTurn = false;
 
     // Activate unit and reset AP at turn start
@@ -136,7 +150,7 @@ public:
     virtual void OnTurnEnd();
 
     // Flag indicating turn must end after current action
-    UPROPERTY()
+    UPROPERTY(Replicated)
     bool bTurnMustEndAfterCurrentAction = false;
 
     // Check if turn must end after current action
@@ -162,7 +176,7 @@ public:
     bool ConsumeActionPoint(int32 Cost);
 
     UFUNCTION(BlueprintCallable, Category = "UnitBase|ActionPoint")
-    void ResetActionPoint() { CurrentActionPoint = MaxActionPoint; }
+    void ResetActionPoint();
 
 public:
     // Sub-action resources
@@ -180,7 +194,7 @@ public:
     bool ConsumeSubActionPoint(int32 Cost);
 
     UFUNCTION(BlueprintCallable, Category = "UnitBase|SubActionPoint")
-    void ResetSubActionPoint() { CurrentSubActionPoint = MaxSubActionPoint; }
+    void ResetSubActionPoint();
 
 public:
     // Check if unit is alive
@@ -192,17 +206,17 @@ public:
     virtual void Die();
 
     // Ragdoll impulse
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UnitBase|Death")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "UnitBase|Death")
     FVector DeathImpulse;
 
 protected:
     // Death flag
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_Death)
     bool bIsDead = false;
 
 public:
     // Current occupied combat tile
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UnitBase|Grid")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_CurrentTile, Category = "UnitBase|Grid")
     ACombatGridTile* CurrentTile = nullptr;
 
     // Pending tile for movement
@@ -290,7 +304,7 @@ protected:
     bool bSkillRequiresReturn = false;
 
     // Current movement/action phase
-    UPROPERTY()
+    UPROPERTY(Replicated)
     EUnitMovePhase MovePhase = EUnitMovePhase::None;
 
 public:
@@ -338,7 +352,7 @@ public:
 
 protected:
     // Movement action category
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UnitBase|Move")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|Move")
     int32 MoveRange = 1;
 
 public:
@@ -358,10 +372,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Item")
     virtual void StartItemAction(AUnitBase* TargetUnit);
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UnitBase|Item")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|Item")
     float HealingItemAmount = 40.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UnitBase|Item")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|Item")
     int32 HealingItemCount = 1;
 
     UFUNCTION(BlueprintPure, Category = "UnitBase|Item")
@@ -393,16 +407,16 @@ protected:
     UAS_Unit* AttributeSet = nullptr;
 
     // Default attack Ability class
-    UPROPERTY(EditDefaultsOnly, Category = "UnitBase|GAS|Ability")
+    UPROPERTY(EditDefaultsOnly, Replicated, Category = "UnitBase|GAS|Ability")
     TSubclassOf<UGameplayAbility> DefaultAttackAbilityClass;
 
     // Additional skill slots for AI and combat logic
     // Assumes up to 4 skills equipped in addition to default attack
-    UPROPERTY(EditDefaultsOnly, Category = "UnitBase|GAS|Ability")
+    UPROPERTY(EditDefaultsOnly, Replicated, Category = "UnitBase|GAS|Ability")
     TArray<TSubclassOf<UGameplayAbility>> EquippedSkillAbilityClasses;
 
     // Skill definition data currently equipped by this unit
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UnitBase|Skill", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|Skill", meta = (AllowPrivateAccess = "true"))
     TArray<TObjectPtr<USkillDefinitionDataAsset>> EquippedSkillDataAssets;
 
 public:
@@ -432,19 +446,19 @@ protected:
     float InitMaxHP = 100.f;
 
     // Max Action Points per unit
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UnitBase|ActionPoint")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Replicated, Category = "UnitBase|ActionPoint")
     int32 MaxActionPoint = 2;
 
     // Remaining Action Points for current turn
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UnitBase|ActionPoint")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|ActionPoint")
     int32 CurrentActionPoint = 0;
 
     // Max Sub Action Points per unit
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UnitBase|SubActionPoint")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Replicated, Category = "UnitBase|SubActionPoint")
     int32 MaxSubActionPoint = 1;
 
     // Remaining Sub Action Points for current turn
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UnitBase|SubActionPoint")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|SubActionPoint")
     int32 CurrentSubActionPoint = 0;
 
 };

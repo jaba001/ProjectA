@@ -8,6 +8,7 @@
 class AUnitBase;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnCombatResult, ECombatResult);
+DECLARE_MULTICAST_DELEGATE(FOnTurnChanged);
 
 // Server-side object that manages combat turn order.
 // 전투 턴 순서를 관리하는 서버 측 오브젝트입니다.
@@ -18,6 +19,7 @@ class PROJECTA_API UTurnManager : public UObject
 
 public:
     FOnCombatResult OnCombatResult;
+    FOnTurnChanged OnTurnChanged;
 
     bool IsCombatActive() const { return bCombatActive; }
     ECombatResult GetCombatResult() const { return CombatResult; }

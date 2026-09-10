@@ -9,6 +9,7 @@
 #include "Unit/UnitBase.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Abilities/GameplayAbility.h"
+#include "Net/UnrealNetwork.h"
 
 APartyPlayerController::APartyPlayerController()
 {
@@ -30,9 +31,72 @@ void APartyPlayerController::BeginPlay()
 
 void APartyPlayerController::SetCombatContext(ACombatManager* InManager, bool bEnableInput)
 {
-    CancelTileInputMode();
+    if (CombatManager != InManager || bCombatInputEnabled != bEnableInput)
+    {
+        CancelTileInputMode();
+    }
     CombatManager = InManager;
     bCombatInputEnabled = bEnableInput;
+    OnRep_CombatContext();
+}
+
+void APartyPlayerController::SetCombatParticipantBinding(const FRunAccountId& AccountId, FGuid BindingId)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+    BoundParticipantAccount = AccountId;
+    ParticipantBindingId = BindingId;
+    ForceNetUpdate();
+    OnRep_CombatContext();
+}
+
+void APartyPlayerController::OnRep_CombatContext()
+{
+    if (ObservedCombatManager.Get() != CombatManager)
+    {
+        if (ObservedCombatManager.IsValid())
+        {
+            ObservedCombatManager->OnCombatViewChanged.RemoveAll(this);
+        }
+        ObservedCombatManager = CombatManager;
+        if (CombatManager)
+        {
+            CombatManager->OnCombatViewChanged.AddUObject(this, &APartyPlayerController::HandleCombatViewChanged);
+        }
+    }
+    HandleCombatViewChanged();
+}
+
+void APartyPlayerController::HandleCombatViewChanged()
+{
+    const FGuid CombatId = CombatManager ? CombatManager->GetCombatInstanceId() : FGuid();
+    const int32 TurnSerial = CombatManager ? CombatManager->GetTurnSerial() : 0;
+    if (ObservedCombatId != CombatId || ObservedTurnSerial != TurnSerial || !bCombatInputEnabled)
+    {
+        CancelTileInputMode();
+    }
+    ObservedCombatId = CombatId;
+    ObservedTurnSerial = TurnSerial;
+}
+
+void APartyPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME_CONDITION(APartyPlayerController, CombatManager, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(APartyPlayerController, bCombatInputEnabled, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(APartyPlayerController, BoundParticipantAccount, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(APartyPlayerController, ParticipantBindingId, COND_OwnerOnly);
+}
+
+void APartyPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (ObservedCombatManager.IsValid())
+    {
+        ObservedCombatManager->OnCombatViewChanged.RemoveAll(this);
+    }
+    Super::EndPlay(EndPlayReason);
 }
 
 void APartyPlayerController::InitializeCombatManager()
@@ -104,18 +168,17 @@ void APartyPlayerController::RequestHealingItem()
 
 bool APartyPlayerController::BuildCombatActionRequest(ECombatActionKind Kind, USkillDefinitionDataAsset* Skill, ACombatGridTile* TargetTile, FCombatActionRequest& OutRequest)
 {
-    if (!CombatManager || !CombatManager->IsCombatActive() || !CombatManager->GetTurnManager())
+    if (!CombatManager || !CombatManager->IsCombatActive())
     {
         return false;
     }
-    UCombatActionAuthority* Authority = CombatManager->GetActionAuthority();
-    if (!Authority || !Authority->GetCombatInstanceId().IsValid() || !Authority->GetUnitId(GetActiveUnit()).IsValid())
+    if (!CombatManager->GetCombatInstanceId().IsValid() || !CombatManager->GetRuntimeUnitId(GetActiveUnit()).IsValid())
     {
         return false;
     }
-    if (RequestCombatInstanceId != Authority->GetCombatInstanceId())
+    if (RequestCombatInstanceId != CombatManager->GetCombatInstanceId())
     {
-        RequestCombatInstanceId = Authority->GetCombatInstanceId();
+        RequestCombatInstanceId = CombatManager->GetCombatInstanceId();
         NextRequestSequence = 0;
     }
     if (NextRequestSequence == MAX_int64 || (TargetTile && (TargetTile->GetWorld() != GetWorld() || CombatManager->GetTileByCoord(TargetTile->GridCoord) != TargetTile)))
@@ -123,13 +186,13 @@ bool APartyPlayerController::BuildCombatActionRequest(ECombatActionKind Kind, US
         return false;
     }
     OutRequest = FCombatActionRequest();
-    OutRequest.RunId = Authority->GetRunIdentity().RunId;
-    OutRequest.HostEpoch = Authority->GetRunIdentity().HostEpoch;
+    OutRequest.RunId = CombatManager->GetRunId();
+    OutRequest.HostEpoch = CombatManager->GetHostEpoch();
     OutRequest.CombatInstanceId = RequestCombatInstanceId;
-    OutRequest.ParticipantBindingId = Authority->GetParticipantBindingId(this);
-    OutRequest.TurnSerial = CombatManager->GetTurnManager()->GetTurnCounter();
+    OutRequest.ParticipantBindingId = ParticipantBindingId;
+    OutRequest.TurnSerial = CombatManager->GetTurnSerial();
     OutRequest.RequestSequence = ++NextRequestSequence;
-    OutRequest.UnitId = Authority->GetUnitId(GetActiveUnit());
+    OutRequest.UnitId = CombatManager->GetRuntimeUnitId(GetActiveUnit());
     OutRequest.Kind = Kind;
     if (TargetTile)
     {
@@ -141,12 +204,12 @@ bool APartyPlayerController::BuildCombatActionRequest(ECombatActionKind Kind, US
         const bool bUnitTarget = Skill->bMoveToTarget || Skill->TargetRule == ESkillTargetRule::EnemyUnit || Skill->TargetRule == ESkillTargetRule::AllyUnit || Skill->TargetRule == ESkillTargetRule::AnyUnit;
         if (bUnitTarget && TargetTile)
         {
-            OutRequest.TargetUnitId = Authority->GetUnitId(TargetTile->GetOccupyingUnit());
+            OutRequest.TargetUnitId = CombatManager->GetRuntimeUnitId(TargetTile->GetOccupyingUnit());
         }
     }
     else if (Kind == ECombatActionKind::HealingItem && TargetTile)
     {
-        OutRequest.TargetUnitId = Authority->GetUnitId(TargetTile->GetOccupyingUnit());
+        OutRequest.TargetUnitId = CombatManager->GetRuntimeUnitId(TargetTile->GetOccupyingUnit());
     }
     return true;
 }
@@ -170,7 +233,10 @@ FCombatActionResponse APartyPlayerController::SubmitCombatActionRequest(const FC
     if (!HasAuthority())
     {
         Response.Result = ECombatRequestResult::Pending;
-        LastCombatActionResponse = Response;
+        if (Request.RequestSequence == LatestSubmittedSequence && Request.RequestSequence > LastHandledResponseSequence)
+        {
+            LastCombatActionResponse = Response;
+        }
         ServerRequestCombatAction(Request);
         return Response;
     }
@@ -209,7 +275,7 @@ void APartyPlayerController::HandleCombatActionResponse(const FCombatActionRespo
 {
     // Only the latest request can update feedback, and a new selection survives a delayed acknowledgement.
     // 최신 요청만 응답 상태를 갱신하며 응답이 늦어져도 새로 선택한 입력은 유지합니다.
-    if (!CombatManager || !CombatManager->GetActionAuthority() || Response.CombatInstanceId != CombatManager->GetActionAuthority()->GetCombatInstanceId() || Response.CombatInstanceId != LatestSubmittedCombatId || Response.RequestSequence != LatestSubmittedSequence || Response.RequestSequence <= LastHandledResponseSequence)
+    if (!CombatManager || Response.CombatInstanceId != CombatManager->GetCombatInstanceId() || Response.CombatInstanceId != LatestSubmittedCombatId || Response.RequestSequence != LatestSubmittedSequence || Response.RequestSequence <= LastHandledResponseSequence)
     {
         return;
     }
@@ -233,6 +299,12 @@ bool APartyPlayerController::IsEquippedInputSkill(USkillDefinitionDataAsset* Ski
     for (const USkillDefinitionDataAsset* Equipped : Unit->GetEquippedSkillDataAssets())
     {
         Matches += IsValid(Equipped) && Equipped->GetPrimaryAssetId() == Skill->GetPrimaryAssetId() ? 1 : 0;
+    }
+    if (!HasAuthority())
+    {
+        // Clients select replicated loadout data; only the server inspects or activates GAS specs.
+        // 클라이언트는 복제된 장착 데이터를 선택하며 GAS Spec 검사와 실행은 서버만 수행합니다.
+        return Matches == 1;
     }
     const FGameplayAbilitySpec* Spec = Unit->GetAbilitySystemComponent()->FindAbilitySpecFromClass(Skill->AbilityClass);
     return Matches == 1 && Spec && !Spec->IsActive();
@@ -279,7 +351,7 @@ void APartyPlayerController::HandleTileClicked(ACombatGridTile* Tile)
 
 bool APartyPlayerController::CanUseActiveUnitAction() const
 {
-    if (!HasAuthority() || !bCombatInputEnabled || !CombatManager || !CombatManager->IsCombatActive())
+    if ((!HasAuthority() && !IsLocalController()) || !bCombatInputEnabled || !CombatManager || !CombatManager->IsCombatActive())
     {
         return false;
     }
@@ -306,7 +378,11 @@ bool APartyPlayerController::CanUseActiveUnitAction() const
         return false;
     }
 
-    return CombatManager->GetActionAuthority() && CombatManager->GetActionAuthority()->CanControllerControl(this, ActiveUnit);
+    if (HasAuthority())
+    {
+        return CombatManager->GetActionAuthority() && CombatManager->GetActionAuthority()->CanControllerControl(this, ActiveUnit);
+    }
+    return ParticipantBindingId.IsValid() && !BoundParticipantAccount.IsEmpty() && CombatManager->GetOwnerAccountId(ActiveUnit) == BoundParticipantAccount;
 }
 
 bool APartyPlayerController::CanUseActiveUnitActionPoint(int32 Cost) const

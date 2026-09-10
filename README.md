@@ -5,9 +5,9 @@ Unreal Engine 기반 Grid Turn-Based Combat System 프로젝트입니다.
 
 게임의 목표는 파티 전체를 성장시키는 협동 로그라이크에 Async PvP와 직접 조작 전술 전투를 결합하는 것입니다. 물리적인 월드맵 탐험을 제외하고 UI에서 선택·강화·전투·보상을 빠르게 이어가며, 단위 시간당 의미 있는 선택을 늘리는 것을 기준으로 삼습니다. 목표 Run 흐름과 개발 우선순위, 후속 결정 사항은 [게임 기획 방향](Docs/GAME_DESIGN.md)에 정리합니다.
 
-현재 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 최종적으로 상대 Party/Build Snapshot을 사용하는 Async PvP와 Listen Server 기반의 실시간 Co-op을 지원하도록 확장합니다. T14의 첫 단계로 Unreal `USaveGame` v1에 저장된 상대를 기존 전투에 연결했습니다. 로컬 전투 한 사이클 검증 후 Co-op 동기화를 진행하며, 다중 PIE와 온라인 서비스는 후속 범위입니다. Co-op에서는 할당된 Party Member의 Action Request를 서버가 검증·실행하고 전투 상태의 최종 권위를 가집니다. 새 데이터·명령은 직렬화 가능한 형태를 우선하고 강한 로컬 PlayerController 의존성을 피합니다. 구현·검증 상태와 미결정 항목은 [T14 작업 카드](Docs/TODO.md), 실행 방법은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)를 참고하세요.
+현재 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 최종적으로 상대 Party/Build Snapshot을 사용하는 Async PvP와 Listen Server 기반의 실시간 Co-op을 지원하도록 확장합니다. T14의 첫 단계로 Unreal `USaveGame` v1에 저장된 상대를 기존 전투에 연결하고 로컬 전투 한 사이클을 검증했습니다. 순차 3번에서 실제 2인 Listen Server 전투/HUD 동기화까지 검증했습니다. Co-op에서는 할당된 Party Member의 Action Request를 서버가 검증·실행하고 전투 상태의 최종 권위를 가집니다. 새 데이터·명령은 직렬화 가능한 형태를 우선하고 강한 로컬 PlayerController 의존성을 피합니다. 구현·검증 상태와 미결정 항목은 [T14 작업 카드](Docs/TODO.md), 실행 방법은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)와 [Listen Server 구현·검증 안내](Docs/T14_NETWORK.md)를 참고하세요.
 
-Co-op 확정 기획은 최대 4인과 원래 캐릭터 소유자만 직접 조작하는 방식입니다. 종료·끊김 시 기존 Host를 유지하고, 원래 인원이 다시 모일 수 없을 때 기존 참가자가 명시적으로 Host를 승계해 불참자 캐릭터를 AI로 전환하는 이어하기를 계획합니다. AI 전환에는 Run 시작 시 각자의 사전 동의가 필요하며, AI 전환 후 MMR은 현재 인간 참가자에게만 반영합니다. 복구 목표는 마지막 확정 턴 경계입니다. Run·참가자·캐릭터 소유권의 값 데이터와 저장·조회 기반을 추가했으며, 네트워크 조작권 강제·승계·랭크·턴 복구는 후속입니다. [Co-op 확정 기획](Docs/T14_COOP_DESIGN.md)과 [1~8번 순차 작업 대기열](Docs/T14_QUEUE.md)에 구현 경계를 정리합니다.
+Co-op 확정 기획은 최대 4인과 원래 캐릭터 소유자만 직접 조작하는 방식입니다. 종료·끊김 시 기존 Host를 유지하고, 원래 인원이 다시 모일 수 없을 때 기존 참가자가 명시적으로 Host를 승계해 불참자 캐릭터를 AI로 전환하는 이어하기를 계획합니다. AI 전환에는 Run 시작 시 각자의 사전 동의가 필요하며, AI 전환 후 MMR은 현재 인간 참가자에게만 반영합니다. 복구 목표는 마지막 확정 턴 경계입니다. Run·참가자·캐릭터 소유권의 값 데이터와 저장·조회, 서버 명령 검증은 순차 1~2번에서 완료했습니다. 실제 연결의 조작권과 상태 복제는 3번에서 검증했으며, 턴 복구·아군 AI·승계·온라인 서비스의 4~8번은 대기 중입니다. [Co-op 확정 기획](Docs/T14_COOP_DESIGN.md)과 [1~8번 순차 작업 대기열](Docs/T14_QUEUE.md)에 구현 경계를 정리합니다.
 
 ```text
 MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
@@ -26,6 +26,7 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 - [기획 초안과 구현 현황](Docs/PROJECT_PLAN.md): 이미 작성된 기능, 현재 규칙, 결정할 기획, 단계별 목표
 - [T14 Co-op 확정 기획](Docs/T14_COOP_DESIGN.md): 본인 캐릭터 조작권, 기존 참가자의 Host 승계·AI 이어하기, MMR과 턴 경계 복구
 - [T14 순차 작업 대기열](Docs/T14_QUEUE.md): 1~8번의 순서, 상태, 번호별 완료 기준
+- [T14 Listen Server 구현·검증](Docs/T14_NETWORK.md): 실제 2인 PIE RPC, 전투/HUD 복제, 참가자 배정과 미결정 진행 권한
 - [코드 리뷰](Docs/CODE_REVIEW.md): P1/P2 문제의 근거와 검증 시나리오
 
 문서는 2026-09-10 현재 작업 트리를 기준으로 정리합니다. 코드 구현, 정식 빌드, 에셋 설정 확인, PIE 검증은 별도로 기록합니다.
@@ -116,7 +117,9 @@ UI 관련 상세 메모는 아래 파일에 정리되어 있습니다.
 
 UI의 턴 종료는 `PartyPlayerController::RequestEndTurn`, 회복약은 `RequestHealingItem`, C++ AI의 내부 종료는 `CombatManager::RequestEndTurnForUnit(this)`를 사용합니다. 기존 CombatManager의 인자 없는 Blueprint 종료 함수는 deprecated 상태이며 플레이어 입력 검사를 거칩니다. `Accepted` 응답은 실행 진입을 뜻하고 이동·스킬의 최종 성공은 기존 행동 완료 이벤트로 확인합니다. 늦은 응답은 새 전투나 최신 요청·새 선택을 덮지 않습니다. 턴 전환과 전투 종료 시 이전 선택·하이라이트를 정리합니다.
 
-현재 이 요청 경로의 검증 대상은 Standalone Gameplay·Snapshot의 저장 맵 PIE와 TestMap 형태의 미식별 전투 테스트입니다. 소유 연결의 Server/Client Reliable RPC 진입점은 추가했지만 Client 전투/HUD 상태 복제와 실제 2인 PIE 왕복은 [대기열](Docs/T14_QUEUE.md)의 3번입니다. 서버의 C++ 참가자 바인딩은 인증 공급자 연동 지점이며 실제 인증은 8번입니다. 기존 미식별 Run/TestMap의 입력 호환은 Standalone에만 적용하고 손상된 식별 Run으로 우회하지 않습니다.
+순차 3번은 서로 다른 NetDriver를 가진 Listen Server/Client 두 PIE 월드에서 실제 Server/Client Reliable RPC를 검증했습니다. 서버 전용 TurnManager와 CombatManager의 복제 뷰, GAS HP/MaxHP RepNotify, 유닛 AP/SubAP·팀·장착·이동·턴/행동/사망 상태, Grid 점유·전열 보호·결과/HUD 복제를 연결했습니다. `AGameplayGameState`는 Run 단계·파티·노드·결과의 읽기 전용 표시 값을 전달하며 클라이언트의 RunState를 권위 상태로 사용하지 않습니다. Development Editor / Win64 빌드, 2인 PIE를 포함한 전체 자동화 42건(성공 26·경고 동반 성공 16·실패 0), 별도 Snapshot 상대 PIE 1건을 통과했습니다.
+
+네트워크 참가자는 `AGameplayGameModeBase::AssignRunParticipant`와 `ApplyCombatParticipantBindings`에서 신뢰된 서버 C++ 코드로 배정합니다. 현재 자동화는 알려진 두 연결에 계정을 명시적으로 연결하며 실제 로그인을 제공하지 않습니다. 실제 인증은 8번입니다. 기존 미식별 Run/TestMap의 입력 호환은 Standalone에만 적용하고 손상된 식별 Run으로 우회하지 않습니다. 전투 밖 노드 선택·Continue의 협동 결정권은 사용자 답변 대기 중으로, 네트워크 화면의 해당 버튼은 읽기 전용이며 자동화는 서버 진입점을 사용합니다. 네트워크 최종 유닛 상태는 결과 화면에서 유지하고 명시적인 Continue 또는 월드 종료에서 정리합니다. 상세 경계와 검증 명령은 [Listen Server 안내](Docs/T14_NETWORK.md)를 참고하세요.
 
 캐릭터 생성의 Edit는 선택한 슬롯의 이름(1~32자)과 직업을 편집합니다. 저장 전에는 파티 데이터가 바뀌지 않으며 취소하면 기존 값이 유지됩니다. ClassInfo는 같은 직업 정의의 실제 HP/AP/보조 AP와 시작 스킬을 읽기 전용으로 표시합니다. 저장한 이름·직업과 사용한 직업 목록은 Gameplay로 전달되고, Encounter 스폰은 동일한 설정을 적용한 뒤 이전 전투의 HP를 복원합니다.
 

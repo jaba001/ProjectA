@@ -8,6 +8,8 @@
 ACombatArena::ACombatArena()
 {
     PrimaryActorTick.bCanEverTick = false;
+    bReplicates = true;
+    bAlwaysRelevant = true;
     SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("ArenaOrigin")));
     PlayerCoords = {FIntPoint(0, 1), FIntPoint(1, 1), FIntPoint(2, 1), FIntPoint(3, 1)};
     EnemyCoords = {FIntPoint(0, 2), FIntPoint(1, 2), FIntPoint(2, 2), FIntPoint(3, 2)};

@@ -21,6 +21,7 @@ public:
     virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
 
     void ShowResult(ECombatResult Result, const FText& Message = FText::GetEmpty());
+    void SetContinueEnabled(bool bEnabled);
 
 protected:
     virtual void NativeOnInitialized() override;
@@ -32,6 +33,9 @@ protected:
     TObjectPtr<UButton> Button_Continue;
 
 private:
+    bool bContinueAllowed = true;
+    ECombatResult DisplayedResult = ECombatResult::None;
+
     UFUNCTION()
     void HandleContinueClicked();
 };

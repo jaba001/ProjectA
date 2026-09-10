@@ -10,6 +10,7 @@ class UCombatHUDWidget;
 class UEncounterResultWidget;
 class URunMapWidget;
 class URunStateSubsystem;
+struct FGameplayViewState;
 
 UCLASS()
 class PROJECTA_API UGameplayRootWidget : public UCommonUserWidget
@@ -18,6 +19,7 @@ class PROJECTA_API UGameplayRootWidget : public UCommonUserWidget
 
 public:
     void RefreshFlow(const URunStateSubsystem* RunState, const FText& FlowMessage);
+    void RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands);
 
 protected:
     virtual void NativeOnInitialized() override;

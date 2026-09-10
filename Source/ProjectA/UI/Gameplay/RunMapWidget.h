@@ -7,6 +7,7 @@
 class URunStateSubsystem;
 class UTextBlock;
 class UVerticalBox;
+struct FGameplayViewState;
 
 UCLASS()
 class PROJECTA_API URunMapWidget : public UCommonActivatableWidget
@@ -19,6 +20,7 @@ public:
     virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
 
     void RefreshRunMap(const URunStateSubsystem* RunState, const FText& FlowMessage);
+    void RefreshRunMapView(const FGameplayViewState& View, bool bAllowRunCommands);
 
 protected:
     virtual void NativeOnInitialized() override;
@@ -36,5 +38,6 @@ protected:
     TObjectPtr<UVerticalBox> NodeList;
 
 private:
+    bool bRunCommandsAllowed = true;
     void HandleNodeSelected(FName NodeId);
 };

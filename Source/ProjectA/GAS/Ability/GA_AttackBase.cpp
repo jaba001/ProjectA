@@ -17,6 +17,11 @@
 
 UGA_AttackBase::UGA_AttackBase()
 {
+    // The server owns activation, cancellation, and completion of combat abilities.
+    // 전투 어빌리티의 활성화·취소·완료는 서버가 소유합니다.
+    NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
+    NetSecurityPolicy = EGameplayAbilityNetSecurityPolicy::ServerOnly;
+
     // Keep an ability instance per unit
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 

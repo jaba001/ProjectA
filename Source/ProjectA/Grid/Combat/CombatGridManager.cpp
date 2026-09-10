@@ -1,15 +1,29 @@
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Engine/World.h"
+#include "Net/UnrealNetwork.h"
 
 ACombatGridManager::ACombatGridManager()
 {
     PrimaryActorTick.bCanEverTick = false;
+    bReplicates = true;
+    bAlwaysRelevant = true;
+}
+
+void ACombatGridManager::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(ACombatGridManager, bGridActive);
 }
 
 void ACombatGridManager::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (!HasAuthority())
+    {
+        return;
+    }
 
     if (!TileClass)
     {
@@ -22,7 +36,7 @@ void ACombatGridManager::BeginPlay()
 
 void ACombatGridManager::GenerateGrid()
 {
-    if (!TileClass) return;
+    if (!HasAuthority() || !TileClass) return;
 
     UWorld* World = GetWorld();
     if (!World) return;
@@ -52,18 +66,7 @@ void ACombatGridManager::GenerateGrid()
 
             if (Tile)
             {
-                Tile->GridCoord = FIntPoint(Row, Col);
-
-                if (Col < ColCount / 2)
-                {
-                    Tile->SetTerritory(ETileTerritory::Player);
-                }
-                else
-                {
-                    Tile->SetTerritory(ETileTerritory::Enemy);
-                }
-
-                TileMap.Add(Tile->GridCoord, Tile);
+                Tile->InitializeGridTile(this, FIntPoint(Row, Col), Col < ColCount / 2 ? ETileTerritory::Player : ETileTerritory::Enemy);
             }
         }
     }
@@ -183,6 +186,11 @@ TArray<ACombatGridTile*> ACombatGridManager::GetTilesInChebyshevRange(ACombatGri
 
 void ACombatGridManager::ClearOccupancy()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     for (const TPair<FIntPoint, ACombatGridTile*>& Entry : TileMap)
     {
         if (IsValid(Entry.Value))
@@ -196,30 +204,76 @@ void ACombatGridManager::ClearOccupancy()
 
 void ACombatGridManager::SetGridActive(bool bActive)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    bGridActive = bActive;
+    OnRep_GridActive();
+    ForceNetUpdate();
+}
+
+void ACombatGridManager::OnRep_GridActive()
+{
     for (const TPair<FIntPoint, ACombatGridTile*>& Entry : TileMap)
     {
         if (IsValid(Entry.Value))
         {
-            Entry.Value->SetActorHiddenInGame(!bActive);
-            Entry.Value->SetActorEnableCollision(bActive);
+            Entry.Value->SetActorHiddenInGame(!bGridActive);
+            Entry.Value->SetActorEnableCollision(bGridActive);
         }
     }
 }
 
 void ACombatGridManager::DestroyGrid()
 {
-    for (const TPair<FIntPoint, ACombatGridTile*>& Entry : TileMap)
+    if (!HasAuthority())
     {
-        if (IsValid(Entry.Value))
+        return;
+    }
+
+    // Tile EndPlay unregisters itself, so detach the index before destruction.
+    // 타일 EndPlay가 자신을 해제하므로 파괴 전에 색인을 분리합니다.
+    TArray<ACombatGridTile*> Tiles;
+    TileMap.GenerateValueArray(Tiles);
+    TileMap.Reset();
+    for (ACombatGridTile* Tile : Tiles)
+    {
+        if (IsValid(Tile))
         {
-            Entry.Value->Destroy();
+            Tile->Destroy();
         }
     }
-    TileMap.Reset();
+}
+
+void ACombatGridManager::RegisterReplicatedTile(ACombatGridTile* Tile)
+{
+    if (!IsValid(Tile) || Tile->GetWorld() != GetWorld() || Tile->GetGridManager() != this)
+    {
+        return;
+    }
+
+    UnregisterReplicatedTile(Tile);
+    TileMap.Add(Tile->GridCoord, Tile);
+    Tile->SetActorHiddenInGame(!bGridActive);
+    Tile->SetActorEnableCollision(bGridActive);
+}
+
+void ACombatGridManager::UnregisterReplicatedTile(ACombatGridTile* Tile)
+{
+    for (auto It = TileMap.CreateIterator(); It; ++It)
+    {
+        if (It.Value() == Tile)
+        {
+            It.RemoveCurrent();
+        }
+    }
 }
 
 void ACombatGridManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     DestroyGrid();
+    TileMap.Reset();
     Super::EndPlay(EndPlayReason);
 }

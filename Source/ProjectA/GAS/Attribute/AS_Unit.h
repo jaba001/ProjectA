@@ -21,18 +21,29 @@ class PROJECTA_API UAS_Unit : public UAttributeSet
 public:
     // Current hit points.
     // 현재 체력입니다.
-    UPROPERTY(BlueprintReadOnly, Category = "Attributes")
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_HP, Category = "Attributes")
     FGameplayAttributeData HP;
     ATTRIBUTE_ACCESSORS(UAS_Unit, HP)
 
     // Maximum hit points.
     // 최대 체력입니다.
-    UPROPERTY(BlueprintReadOnly, Category = "Attributes")
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MaxHP, Category = "Attributes")
     FGameplayAttributeData MaxHP;
     ATTRIBUTE_ACCESSORS(UAS_Unit, MaxHP)
 
 public:
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
     // Reacts after gameplay effects modify attributes.
     // 게임플레이 이펙트가 어트리뷰트를 변경한 뒤 후처리합니다.
     virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
+
+protected:
+    // Notify GAS observers when authoritative attributes arrive.
+    // 서버 어트리뷰트가 도착하면 GAS 관찰자에게 알립니다.
+    UFUNCTION()
+    void OnRep_HP(const FGameplayAttributeData& PreviousHP);
+
+    UFUNCTION()
+    void OnRep_MaxHP(const FGameplayAttributeData& PreviousMaxHP);
 };

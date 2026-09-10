@@ -14,6 +14,7 @@ ACombatManager::ACombatManager()
 {
     PrimaryActorTick.bCanEverTick = false;
     bReplicates = true;
+    bAlwaysRelevant = true;
     CombatGridManager = nullptr;
     ActionAuthority = CreateDefaultSubobject<UCombatActionAuthority>(TEXT("ActionAuthority"));
 }
@@ -22,7 +23,10 @@ void ACombatManager::BeginPlay()
 {
     Super::BeginPlay();
 
-    CombatGridManager = Cast<ACombatGridManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatGridManager::StaticClass()));
+    if (!CombatGridManager)
+    {
+        CombatGridManager = Cast<ACombatGridManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatGridManager::StaticClass()));
+    }
 
     if (!CombatGridManager)
     {
@@ -33,12 +37,187 @@ void ACombatManager::BeginPlay()
     UE_LOG(LogTemp, Log, TEXT("[CombatManager] CombatGridManager initialized"));
 }
 
-void ACombatManager::GetLifetimeReplicatedProps(
-    TArray<FLifetimeProperty>& OutLifetimeProps) const
+void ACombatManager::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    DOREPLIFETIME(ACombatManager, CurrentTurnIndex);
+    DOREPLIFETIME(ACombatManager, CombatView);
+    DOREPLIFETIME(ACombatManager, CombatGridManager);
+}
+
+void ACombatManager::SetCombatGrid(ACombatGridManager* Grid)
+{
+    if (!HasAuthority() || (Grid && Grid->GetWorld() != GetWorld()))
+    {
+        return;
+    }
+    CombatGridManager = Grid;
+    ForceNetUpdate();
+    OnRep_CombatGrid();
+}
+
+void ACombatManager::OnRep_CombatGrid()
+{
+    OnCombatViewChanged.Broadcast();
+}
+
+void ACombatManager::OnRep_CombatView()
+{
+    if (!HasAuthority())
+    {
+        CombatUnits.Reset();
+        for (const FCombatUnitView& Entry : CombatView.Units)
+        {
+            if (IsValid(Entry.Unit))
+            {
+                CombatUnits.AddUnique(Entry.Unit);
+            }
+        }
+        CurrentTurnIndex = CombatView.CurrentTurnIndex;
+    }
+    OnCombatViewChanged.Broadcast();
+}
+
+void ACombatManager::PublishCombatView()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+    FCombatViewState NewView;
+    if (!TurnManager && CombatUnits.IsEmpty() && CombatView.CombatResult != ECombatResult::None)
+    {
+        NewView = CombatView;
+    }
+    NewView.ViewRevision = CombatView.ViewRevision + 1;
+    if (ActionAuthority && (TurnManager || !CombatUnits.IsEmpty() || CombatView.CombatResult == ECombatResult::None))
+    {
+        NewView.CombatInstanceId = ActionAuthority->GetCombatInstanceId();
+        NewView.RunId = ActionAuthority->GetRunIdentity().RunId;
+        NewView.HostEpoch = ActionAuthority->GetRunIdentity().HostEpoch;
+    }
+    if (TurnManager)
+    {
+        NewView.TurnSerial = TurnManager->GetTurnCounter();
+        NewView.CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
+        NewView.bCombatActive = TurnManager->IsCombatActive();
+        NewView.CombatResult = TurnManager->GetCombatResult();
+        NewView.CurrentUnit = TurnManager->GetCurrentUnit();
+        NewView.CurrentUnitName = TurnManager->GetCurrentUnitName();
+    }
+    for (AUnitBase* Unit : CombatUnits)
+    {
+        if (IsValid(Unit))
+        {
+            FCombatUnitView& Entry = NewView.Units.AddDefaulted_GetRef();
+            Entry.Unit = Unit;
+            if (ActionAuthority)
+            {
+                Entry.RuntimeUnitId = ActionAuthority->GetUnitId(Unit);
+                Entry.CharacterId = ActionAuthority->GetCharacterId(Unit);
+                Entry.OwnerAccountId = ActionAuthority->GetOwnerAccountId(Unit);
+            }
+        }
+    }
+    CombatView = MoveTemp(NewView);
+    CurrentTurnIndex = CombatView.CurrentTurnIndex;
+    ForceNetUpdate();
+    OnRep_CombatView();
+}
+
+void ACombatManager::HandleTurnChanged()
+{
+    PublishCombatView();
+}
+
+int32 ACombatManager::GetTurnSerial() const
+{
+    return HasAuthority() && TurnManager ? TurnManager->GetTurnCounter() : CombatView.TurnSerial;
+}
+
+ECombatResult ACombatManager::GetCombatResult() const
+{
+    return HasAuthority() && TurnManager ? TurnManager->GetCombatResult() : CombatView.CombatResult;
+}
+
+FGuid ACombatManager::GetRuntimeUnitId(const AUnitBase* Unit) const
+{
+    if (!IsValid(Unit))
+    {
+        return FGuid();
+    }
+    if (HasAuthority())
+    {
+        return ActionAuthority ? ActionAuthority->GetUnitId(Unit) : FGuid();
+    }
+    for (const FCombatUnitView& Entry : CombatView.Units)
+    {
+        if (Entry.Unit == Unit)
+        {
+            return Entry.RuntimeUnitId;
+        }
+    }
+    return FGuid();
+}
+
+AUnitBase* ACombatManager::ResolveRuntimeUnit(FGuid UnitId) const
+{
+    if (!UnitId.IsValid())
+    {
+        return nullptr;
+    }
+    if (HasAuthority())
+    {
+        return ActionAuthority ? ActionAuthority->ResolveUnit(UnitId) : nullptr;
+    }
+    for (const FCombatUnitView& Entry : CombatView.Units)
+    {
+        if (Entry.RuntimeUnitId == UnitId && IsValid(Entry.Unit))
+        {
+            return Entry.Unit;
+        }
+    }
+    return nullptr;
+}
+
+FGuid ACombatManager::GetCharacterId(const AUnitBase* Unit) const
+{
+    if (!IsValid(Unit))
+    {
+        return FGuid();
+    }
+    if (HasAuthority())
+    {
+        return ActionAuthority ? ActionAuthority->GetCharacterId(Unit) : FGuid();
+    }
+    for (const FCombatUnitView& Entry : CombatView.Units)
+    {
+        if (Entry.Unit == Unit)
+        {
+            return Entry.CharacterId;
+        }
+    }
+    return FGuid();
+}
+
+FRunAccountId ACombatManager::GetOwnerAccountId(const AUnitBase* Unit) const
+{
+    if (!IsValid(Unit))
+    {
+        return FRunAccountId();
+    }
+    if (HasAuthority())
+    {
+        return ActionAuthority ? ActionAuthority->GetOwnerAccountId(Unit) : FRunAccountId();
+    }
+    for (const FCombatUnitView& Entry : CombatView.Units)
+    {
+        if (Entry.Unit == Unit)
+        {
+            return Entry.OwnerAccountId;
+        }
+    }
+    return FRunAccountId();
 }
 
 
@@ -90,6 +269,7 @@ void ACombatManager::StartCombat_Internal()
 
     if (TurnManager)
     {
+        TurnManager->OnTurnChanged.RemoveAll(this);
         TurnManager->ResetCombat();
     }
     TurnManager = NewObject<UTurnManager>(this);
@@ -101,10 +281,12 @@ void ACombatManager::StartCombat_Internal()
 
     ActionAuthority->BeginCombat();
     TurnManager->OnCombatResult.AddUObject(this, &ACombatManager::HandleCombatResult);
+    TurnManager->OnTurnChanged.AddUObject(this, &ACombatManager::HandleTurnChanged);
     TurnManager->InitializeTurnOrder(CombatUnits);
     CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
     RefreshReachableMoveTiles();
     RefreshTileProtectedByFront();
+    PublishCombatView();
 }
 
 void ACombatManager::RegisterUnits(const TArray<AUnitBase*>& Units)
@@ -114,13 +296,19 @@ void ACombatManager::RegisterUnits(const TArray<AUnitBase*>& Units)
     ResetCombat();
     for (AUnitBase* Unit : Units)
     {
-        if (IsValid(Unit))
+        if (IsValid(Unit) && !CombatUnits.Contains(Unit))
         {
             CombatUnits.AddUnique(Unit);
             Unit->OnUnitDied.AddUObject(this, &ACombatManager::HandleUnitDied);
+            Unit->OnActionCompleted.AddWeakLambda(this, [this](AUnitBase*, EUnitActionType, EUnitActionResult)
+            {
+                PublishCombatView();
+            });
         }
     }
     ActionAuthority->RegisterUnits(CombatUnits);
+    CombatView.CombatResult = ECombatResult::None;
+    PublishCombatView();
 }
 
 void ACombatManager::AdvanceTurn()
@@ -137,7 +325,6 @@ void ACombatManager::AdvanceTurn()
 
     ClearPlayerSelection();
     TurnManager->EndTurn();
-    //Ŭ�󵿱�ȭ
     CurrentTurnIndex = TurnManager->GetCurrentTurnIndex();
     RefreshReachableMoveTiles();
     RefreshTileProtectedByFront();
@@ -178,14 +365,14 @@ AUnitBase* ACombatManager::GetCurrentUnit() const
 {
     if (IsCombatActive())
     {
-        return TurnManager->GetCurrentUnit();
+        return HasAuthority() ? TurnManager->GetCurrentUnit() : CombatView.CurrentUnit.Get();
     }
     return nullptr;
 }
 
 bool ACombatManager::IsCombatActive() const
 {
-    return TurnManager && TurnManager->IsCombatActive();
+    return HasAuthority() ? TurnManager && TurnManager->IsCombatActive() : CombatView.bCombatActive;
 }
 
 void ACombatManager::HandleUnitDied(AUnitBase* Unit)
@@ -207,6 +394,7 @@ void ACombatManager::HandleUnitDied(AUnitBase* Unit)
             }));
         }
     }
+    PublishCombatView();
 }
 
 void ACombatManager::HandleCombatResult(ECombatResult Result)
@@ -217,6 +405,10 @@ void ACombatManager::HandleCombatResult(ECombatResult Result)
 
 void ACombatManager::EndCombat()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
     ClearPlayerSelection();
     GetWorldTimerManager().ClearTimer(DeadTurnTimer);
     if (TurnManager)
@@ -235,16 +427,26 @@ void ACombatManager::EndCombat()
             Unit->CancelCurrentAction();
         }
     }
+    if (TurnManager)
+    {
+        PublishCombatView();
+    }
 }
 
 void ACombatManager::ResetCombat()
 {
+    if (!HasAuthority())
+    {
+        CombatUnits.Reset();
+        return;
+    }
     EndCombat();
     for (AUnitBase* Unit : CombatUnits)
     {
         if (IsValid(Unit))
         {
             Unit->OnUnitDied.RemoveAll(this);
+            Unit->OnActionCompleted.RemoveAll(this);
         }
     }
     CombatUnits.Reset();
@@ -254,14 +456,31 @@ void ACombatManager::ResetCombat()
     }
     if (TurnManager)
     {
+        TurnManager->OnTurnChanged.RemoveAll(this);
         TurnManager->ResetCombat();
         TurnManager = nullptr;
     }
     CurrentTurnIndex = INDEX_NONE;
+    // Cleanup removes actor references while retaining the last result until a new encounter is registered.
+    // 정리는 액터 참조를 제거하되 다음 인카운터가 등록될 때까지 마지막 결과를 유지합니다.
+    FCombatViewState ClearedView;
+    if (CombatView.CombatResult != ECombatResult::None)
+    {
+        ClearedView.CombatInstanceId = CombatView.CombatInstanceId;
+        ClearedView.RunId = CombatView.RunId;
+        ClearedView.HostEpoch = CombatView.HostEpoch;
+        ClearedView.TurnSerial = CombatView.TurnSerial;
+        ClearedView.CombatResult = CombatView.CombatResult;
+    }
+    ClearedView.ViewRevision = CombatView.ViewRevision + 1;
+    CombatView = MoveTemp(ClearedView);
+    ForceNetUpdate();
+    OnRep_CombatView();
 }
 
 void ACombatManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    OnCombatViewChanged.Clear();
     ResetCombat();
     OnCombatResult.Clear();
     Super::EndPlay(EndPlayReason);

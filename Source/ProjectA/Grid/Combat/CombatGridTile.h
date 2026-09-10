@@ -7,6 +7,7 @@
 #include "CombatGridTile.generated.h"
 
 class AUnitBase;
+class ACombatGridManager;
 
 // Territory owner assigned to a combat grid tile.
 // 전투 그리드 타일에 지정되는 영역 소유자입니다.
@@ -29,11 +30,13 @@ public:
     // Sets tile defaults and component references.
     // 타일 기본값과 컴포넌트 참조를 설정합니다.
     ACombatGridTile();
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
     // Caches the original visual state after startup.
     // 시작 후 원래 시각 상태를 캐시합니다.
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
     //virtual void Tick(float DeltaTime) override;
@@ -88,7 +91,8 @@ public:
     bool GetProtectedByFront() const { return bProtectedByFront; }
 
 private:
-    FLinearColor OriginalColor;
+    FLinearColor OriginalColor = FLinearColor::White;
+    bool bOriginalColorCached = false;
 
     UPROPERTY(EditAnywhere, Category = "CombatGridTile")
     FLinearColor ProtectedByFrontColor = FLinearColor(1.0f, 0.0f, 1.0f, 1.0f);
@@ -117,7 +121,12 @@ private:
 public:
     // Sets tile territory ownership.
     // 타일의 영역 소유자를 설정합니다.
-    void SetTerritory(ETileTerritory NewTerritory) { Territory = NewTerritory; }
+    void SetTerritory(ETileTerritory NewTerritory);
+
+    // Assign the authoritative grid identity before indexing a generated tile.
+    // 생성된 타일을 색인하기 전에 서버 그리드 식별 정보를 지정합니다.
+    void InitializeGridTile(ACombatGridManager* Manager, const FIntPoint& Coord, ETileTerritory NewTerritory);
+    ACombatGridManager* GetGridManager() const { return GridManager; }
 
     // Returns tile territory ownership.
     // 타일의 영역 소유자를 반환합니다.
@@ -127,18 +136,29 @@ public:
 public:
     // Grid coordinate of this tile.
     // 이 타일의 그리드 좌표입니다.
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CombatGridTile")
-    FIntPoint GridCoord;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_GridIndex, Category = "CombatGridTile")
+    FIntPoint GridCoord = FIntPoint::ZeroValue;
 
 private:
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_TileState)
     AUnitBase* OccupyingUnit;
 
-    UPROPERTY(EditAnywhere, Category = "CombatGridTile")
+    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_TileState, Category = "CombatGridTile")
     ETileTerritory Territory = ETileTerritory::None;
 
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_TileState)
     bool bProtectedByFront = false;
+
+    UPROPERTY(ReplicatedUsing = OnRep_GridIndex)
+    TObjectPtr<ACombatGridManager> GridManager = nullptr;
+
+    TWeakObjectPtr<ACombatGridManager> RegisteredGridManager;
+
+    UFUNCTION()
+    void OnRep_GridIndex();
+
+    UFUNCTION()
+    void OnRep_TileState();
 
 private:
     // Whether this tile is currently highlighted as a reachable movement tile

@@ -81,6 +81,11 @@ private:
     TWeakObjectPtr<AUnitBase> DisplayedUnit;
 
     UPROPERTY(Transient)
+    TArray<TObjectPtr<USkillDefinitionDataAsset>> DisplayedLoadout;
+
+    bool bDisplayedPlayerUnit = false;
+
+    UPROPERTY(Transient)
     TMap<FName, TObjectPtr<USkillDefinitionDataAsset>> DisplayedSkills;
 
     UPROPERTY(Transient)

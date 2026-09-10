@@ -8,7 +8,7 @@
 |---|---|---|---|
 | 1 | 완료 | Run·원래 참가자·캐릭터 소유권 데이터 | Actor 없는 식별·동의·Host 데이터, 신규 Run 생성과 저장 왕복, 기존 v1 호환, 소유권 조회 검증 |
 | 2 | 완료 | 서버 Action Request와 소유권 검증 | 서버 참가자 바인딩, 본인 캐릭터·턴·자원·대상 검증과 중복 거절, Standalone 실행 회귀 통과 |
-| 3 | 대기 | 2인 Listen Server 전투 동기화 | 2 완료 후 2개 PIE에서 본인 Unit 조작, Turn·Grid·HP/AP·사망·결과·HUD 일치 |
+| 3 | 완료 | 2인 Listen Server 전투 동기화 | 실제 2개 PIE의 소유 연결 RPC, 본인 Unit 조작, Turn·Grid·HP/AP·사망·결과·HUD 일치 검증 |
 | 4 | 대기 | 확정 턴 체크포인트와 기존 Host 복구 | 3 완료 후 마지막 확정 턴의 상태를 저장·복원, 처리 중 행동·손상·저장 실패 검증 |
 | 5 | 대기 | 아군 AI 판단과 행동 | 4 완료 후 소유권·아군 진영을 유지하는 서버 AI, 인간 입력과 동시 실행 차단 |
 | 6 | 대기 | 명시적 Host 승계와 AI 이어하기 | 5 완료 후 원래 참가자·사전 동의 검증, 승계/AI 버튼, 로컬 권위 저장소 대역을 통한 중복 재개 거절 |
@@ -61,3 +61,27 @@
 최종 검증 파일: `Saved/Automation/T14CommandsFixBuild.log`, `T14CommandsFull2/index.json`, `T14CommandsSnapshotPIE/index.json`. 최초 실패 결과는 `T14CommandsFull/index.json`에 보존한다.
 
 커밋 제목: `[codex] 전투 명령의 서버 검증과 소유권 확인 추가`. 다음 번호는 3번 2인 Listen Server 전투 동기화다. 다음 실행은 해당 커밋의 upstream 반영까지 확인한 뒤 착수한다.
+
+## 3번 구현 범위
+
+2번 `05843c3`의 upstream 반영과 깨끗한 작업 트리를 확인하고 착수했다. 서버 `CombatManager`의 전투 뷰와 `GameplayGameState`의 Run 표시 값을 RepNotify로 전달한다. 서버만 TurnManager·AI·실제 AbilitySpec을 실행하며 클라이언트 HUD는 복제된 턴·소유권·장착 정의를 사용한다.
+
+유닛 AP/SubAP·행동·현재 타일·사망·회복약·장착 정보를 복제하고 HP/MaxHP는 GAS Attribute RepNotify, 이동은 Character Movement를 사용한다. Grid는 서버만 생성하며 클라이언트는 복제 타일로 좌표 조회와 점유·영역·전열 보호 표시를 구성한다. PlayerController의 소유 연결에 참가자 바인딩과 입력 문맥을 전달하고 2번의 서버 명령 검증을 재사용한다.
+
+네트워크 결과 화면에서는 최종 유닛 상태를 유지하고 명시적인 Continue에서 정리한다. 신뢰된 서버 C++의 연결 배정은 원래 참가자·중복 연결을 검사하지만 실제 계정 인증은 아니다. 기본 Run과 메뉴 진입은 싱글플레이를 유지하며, 네트워크의 노드 선택·Continue 결정권은 사용자 답변 대기 중이라 화면을 읽기 전용으로 두고 테스트가 서버 진입점을 호출한다. 상세 구조와 테스트 방법은 [전투 동기화 안내](T14_NETWORK.md)를 따른다.
+
+## 3번 검증 기록 — 2026-09-10
+
+- Development Editor / Win64 최종 빌드 통과. Visual Studio를 실행하지 않고 명령줄로 빌드했다.
+- 전체 자동화 42건 통과: 성공 26건·경고 동반 성공 16건·실패 0건. 신규 `ProjectA.Coop.ListenServerClientCombat`과 기존 Gameplay 저장 맵 PIE를 포함한다.
+- 별도 Snapshot 상대 모드의 저장 맵 PIE 1건 통과. 기존 Slate 입력·GAS 피해·적 AI·승리→Continue→다음 노드·패배 흐름을 유지했다.
+- 실제 두 PIE 월드의 Listen Server/Client NetDriver와 열린 연결을 확인했다. 클라이언트의 타인 캐릭터 명령을 거절하고, 본인 턴의 회복약·이동·실제 장착 스킬·중복 거절·턴 종료를 RPC로 검증했다. 직접 Client Unit 호출로 서버 자원·피해를 확정할 수 없는지도 확인했다.
+- 양쪽의 HP/MaxHP·AP/SubAP·재고·소유권·현재 타일·턴과 HUD 버튼을 비교했다. 서버의 치명적 GAS 피해 뒤 사망·점유 해제·승리·결과 화면·입력 잠금과 Continue 후 정리를 확인했다. 테스트용 서버 배정과 진행 호출은 실제 로그인이나 노드 투표 정책으로 취급하지 않는다.
+- 최초 네트워크 PIE 2회는 이동 준비/완료에서 실패했다. 모든 타일의 투영 실패와 편집기 NavMesh 재생성 직후 PIE 시작 로그를 대조해 테스트 초기화 순서 문제를 확인했다. 편집기 자동 생성 완료와 유효 경로를 기다리도록 수정한 뒤 별도 네트워크 PIE와 전체 실행에서 통과했다. Gameplay 에셋·NavMesh 범위·서버 이동 성공 조건은 변경하지 않았다. 세 번째 진단 실행은 원인 확인 후 종료했다.
+- 클라이언트 BeginPlay의 초기 복제 문맥 덮어쓰기, 승인된 요청 재전송 시 Pending 표시 고착, 초기 타일 색상 캐시 순서도 검토·보정했다. 마지막 코드 리뷰에서 추가 확정 P1/P2는 없었다.
+- 경고는 기존 미설정 Spawn/GAS Cue 경로, 종료 중 Nav 조회와 격리 테스트의 의도한 거절·실패 경로 등이다. 문서 로컬 링크·diff 검사를 통과했다.
+- 3·4인, 네트워크 손실/지연, 끊김/턴 복구, Host 승계·AI 전환, 실제 인증·서비스/MMR, 패키지 재빌드 및 발사체별 시각 효과 동기화 검증은 이번 번호에서 실행하지 않았다.
+
+최종 검증 파일: `Saved/Automation/T14NetworkReadyBuild.log`, `T14NetworkPIE4/index.json`, `T14NetworkFull/index.json`, `T14NetworkSnapshotPIE/index.json`. 최초 실패·진단 로그는 `Saved/Logs/T14NetworkPIE1.log`~`T14NetworkPIE3.log`에 보존한다.
+
+커밋 제목: `[codex] 2인 Listen Server 전투와 HUD 동기화 추가`. 다음 번호는 4번 확정 턴 체크포인트와 기존 Host 복구다. 다음 실행은 해당 커밋의 upstream 반영까지 확인한 뒤 착수한다. 노드 선택·Continue 결정권 질문은 유지하며 답변이 오면 그 정책에 의존하는 진행 입력을 연결한다.

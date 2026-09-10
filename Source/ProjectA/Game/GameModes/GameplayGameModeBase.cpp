@@ -1,11 +1,16 @@
 #include "Game/GameModes/GameplayGameModeBase.h"
 #include "Combat/CombatManager.h"
+#include "Combat/Commands/CombatActionAuthority.h"
 #include "Controller/GameplayPlayerController.h"
 #include "DataAsset/EncounterDefinitionDataAsset.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Encounter/EncounterManager.h"
+#include "Game/GameState/GameplayGameState.h"
+#include "Game/Run/RunStateSubsystem.h"
+#include "Game/Run/RunIdentityLibrary.h"
+#include "Engine/GameInstance.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "TimerManager.h"
 #include "Misc/CommandLine.h"
@@ -16,6 +21,7 @@ AGameplayGameModeBase::AGameplayGameModeBase()
     DefaultPawnClass = nullptr;
     HUDClass = nullptr;
     PlayerControllerClass = AGameplayPlayerController::StaticClass();
+    GameStateClass = AGameplayGameState::StaticClass();
     CombatManagerClass = ACombatManager::StaticClass();
     EncounterManagerClass = AEncounterManager::StaticClass();
 }
@@ -78,11 +84,90 @@ void AGameplayGameModeBase::InitializeGameplay()
         }
     }
     EncounterManager->InitializeEncounter(Arena, Combat, PartyDefinition, RuntimeDefinitions);
-    AGameplayPlayerController* Controller = Cast<AGameplayPlayerController>(GetWorld()->GetFirstPlayerController());
-    if (Controller)
+    if (AGameplayGameState* State = GetGameState<AGameplayGameState>())
     {
-        Controller->InitializeGameplay(EncounterManager);
+        State->InitializeServerView(EncounterManager, Arena);
     }
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    {
+        if (AGameplayPlayerController* Controller = Cast<AGameplayPlayerController>(It->Get()))
+        {
+            Controller->InitializeGameplay(EncounterManager);
+        }
+    }
+}
+
+void AGameplayGameModeBase::PostLogin(APlayerController* NewPlayer)
+{
+    Super::PostLogin(NewPlayer);
+    if (EncounterManager)
+    {
+        if (AGameplayPlayerController* Controller = Cast<AGameplayPlayerController>(NewPlayer))
+        {
+            Controller->InitializeGameplay(EncounterManager);
+        }
+    }
+}
+
+bool AGameplayGameModeBase::AssignRunParticipant(APartyPlayerController* Controller, const FRunAccountId& AccountId)
+{
+    if (!HasAuthority() || !IsValid(Controller) || Controller->GetWorld() != GetWorld() || !GetGameInstance())
+    {
+        return false;
+    }
+    URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+    if (!URunIdentityLibrary::IsOriginalParticipant(Run->GetRunIdentity(), AccountId))
+    {
+        return false;
+    }
+    const TWeakObjectPtr<APartyPlayerController> Key(Controller);
+    if (const FRunAccountId* Existing = RunParticipants.Find(Key))
+    {
+        return *Existing == AccountId;
+    }
+    for (auto It = RunParticipants.CreateIterator(); It; ++It)
+    {
+        if (!It.Key().IsValid())
+        {
+            It.RemoveCurrent();
+        }
+        else if (It.Value() == AccountId)
+        {
+            return false;
+        }
+    }
+    RunParticipants.Add(Key, AccountId);
+    return true;
+}
+
+bool AGameplayGameModeBase::ApplyCombatParticipantBindings(UCombatActionAuthority* Authority)
+{
+    if (!HasAuthority() || !Authority)
+    {
+        return false;
+    }
+    const FRunIdentityData& Identity = Authority->GetRunIdentity();
+    if (Identity.Origin == ERunIdentityOrigin::LegacyOffline || Identity.OriginalParticipants.Num() < 2 || Identity.OriginalParticipants.Num() > 4)
+    {
+        return false;
+    }
+    for (const FRunParticipantData& Participant : Identity.OriginalParticipants)
+    {
+        APartyPlayerController* Match = nullptr;
+        for (const TPair<TWeakObjectPtr<APartyPlayerController>, FRunAccountId>& Entry : RunParticipants)
+        {
+            if (Entry.Key.IsValid() && Entry.Value == Participant.AccountId)
+            {
+                Match = Entry.Key.Get();
+                break;
+            }
+        }
+        if (!Match || !Authority->BindParticipant(Match, Participant.AccountId))
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 void AGameplayGameModeBase::EndPlay(const EEndPlayReason::Type EndPlayReason)

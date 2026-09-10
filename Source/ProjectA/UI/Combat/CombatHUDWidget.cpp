@@ -2,6 +2,7 @@
 
 #include "Blueprint/WidgetTree.h"
 #include "Combat/CombatManager.h"
+#include "Combat/Library/CombatTargetingLibrary.h"
 #include "CommonInputModeTypes.h"
 #include "Components/Border.h"
 #include "Components/Button.h"
@@ -14,7 +15,6 @@
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/EngineBaseTypes.h"
-#include "Game/Turn/TurnManager.h"
 #include "UI/Gameplay/GameplayActionButton.h"
 #include "Unit/UnitBase.h"
 
@@ -104,10 +104,14 @@ void UCombatHUDWidget::RefreshControls()
 
     CachedCombatManager = Controller->GetCombatManager();
     AUnitBase* ActiveUnit = Controller->GetActiveUnit();
+    const bool bPlayerUnit = IsValid(ActiveUnit) && ActiveUnit->GetTeam() == ETeam::Player;
 
-    if (DisplayedUnit.Get() != ActiveUnit || (ActiveUnit && ActiveUnit->GetTeam() == ETeam::Player && ActiveUnit->GetAvailableSkillAbilityClasses().Num() != DisplayedSkills.Num()))
+    // Compare replicated definitions, including late resolution and same-sized loadout replacements.
+    // 늦게 해석된 참조와 같은 개수의 장착 교체까지 포함하여 복제된 정의 목록을 비교합니다.
+    if (DisplayedUnit.Get() != ActiveUnit || bDisplayedPlayerUnit != bPlayerUnit || (bPlayerUnit && DisplayedLoadout != ActiveUnit->GetEquippedSkillDataAssets()))
     {
         DisplayedUnit = ActiveUnit;
+        bDisplayedPlayerUnit = bPlayerUnit;
         RebuildSkills(ActiveUnit);
     }
 
@@ -134,7 +138,7 @@ void UCombatHUDWidget::RefreshControls()
     for (const TPair<FName, TObjectPtr<UGameplayActionButton>>& Pair : SkillButtons)
     {
         USkillDefinitionDataAsset* Skill = DisplayedSkills.FindRef(Pair.Key);
-        Pair.Value->SetIsEnabled(Skill && Skill->AbilityClass && Controller->CanUseActiveUnitActionPoint(Skill->ActionPointCost));
+        Pair.Value->SetIsEnabled(UCombatTargetingLibrary::IsSupportedSkillArea(Skill) && Skill->AbilityClass && Skill->ActionPointCost > 0 && Controller->CanUseActiveUnitActionPoint(Skill->ActionPointCost));
         if (Skill)
         {
             UTextBlock* Label = Cast<UTextBlock>(Pair.Value->GetContent());
@@ -156,6 +160,7 @@ void UCombatHUDWidget::RebuildSkills(AUnitBase* ActiveUnit)
     SkillList->ClearChildren();
     DisplayedSkills.Reset();
     SkillButtons.Reset();
+    DisplayedLoadout.Reset();
 
     if (!ActiveUnit || ActiveUnit->GetTeam() != ETeam::Player)
     {
@@ -163,12 +168,11 @@ void UCombatHUDWidget::RebuildSkills(AUnitBase* ActiveUnit)
     }
 
     int32 SkillIndex = 0;
+    DisplayedLoadout = ActiveUnit->GetEquippedSkillDataAssets();
 
-    for (TSubclassOf<UGameplayAbility> AbilityClass : ActiveUnit->GetAvailableSkillAbilityClasses())
+    for (USkillDefinitionDataAsset* Skill : DisplayedLoadout)
     {
-        USkillDefinitionDataAsset* Skill = ActiveUnit->FindSkillDataByAbilityClass(AbilityClass);
-
-        if (!Skill)
+        if (!IsValid(Skill) || !Skill->GetPrimaryAssetId().IsValid())
         {
             continue;
         }
@@ -192,13 +196,13 @@ void UCombatHUDWidget::RebuildSkills(AUnitBase* ActiveUnit)
 
 FText UCombatHUDWidget::GetTurnInfoText() const
 {
-    if (!CachedCombatManager.IsValid() || !CachedCombatManager->GetTurnManager())
+    if (!CachedCombatManager.IsValid())
     {
         return FText::FromString(TEXT("TURN: 0  Current Unit: None"));
     }
 
-    UTurnManager* TurnManager = CachedCombatManager->GetTurnManager();
-    return FText::FromString(FString::Printf(TEXT("TURN: %d  Current Unit: %s"), TurnManager->GetTurnCounter(), *TurnManager->GetCurrentUnitName()));
+    const FCombatViewState& View = CachedCombatManager->GetCombatViewState();
+    return FText::FromString(FString::Printf(TEXT("TURN: %d  Current Unit: %s"), CachedCombatManager->GetTurnSerial(), *View.CurrentUnitName));
 }
 
 void UCombatHUDWidget::HandleSkillSelected(FName SkillId)

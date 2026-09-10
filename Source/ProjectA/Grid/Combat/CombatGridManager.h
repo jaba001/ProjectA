@@ -17,6 +17,7 @@ public:
     // Sets grid manager defaults.
     // 그리드 매니저 기본값을 설정합니다.
     ACombatGridManager();
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
     // Generates or prepares grid data at startup.
@@ -25,6 +26,13 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+    // Keep visibility consistent for tiles that arrive after the manager.
+    // 매니저보다 늦게 도착하는 타일도 같은 표시 상태를 유지합니다.
+    UPROPERTY(ReplicatedUsing = OnRep_GridActive)
+    bool bGridActive = true;
+
+    UFUNCTION()
+    void OnRep_GridActive();
 
     UPROPERTY(EditAnywhere, Category = "CombatGrid")
     TSubclassOf<ACombatGridTile> TileClass;
@@ -53,6 +61,11 @@ public:
     void ClearOccupancy();
     void SetGridActive(bool bActive);
     void DestroyGrid();
+
+    // Index replicated tile actors without creating client-side grid actors.
+    // 클라이언트에서 타일을 생성하지 않고 복제된 타일 액터를 색인합니다.
+    void RegisterReplicatedTile(ACombatGridTile* Tile);
+    void UnregisterReplicatedTile(ACombatGridTile* Tile);
 
     // Map from grid coordinate to tile actor.
     // 그리드 좌표에서 타일 액터로 이어지는 맵입니다.

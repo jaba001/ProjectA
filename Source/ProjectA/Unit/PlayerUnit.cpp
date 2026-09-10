@@ -10,6 +10,11 @@ APlayerUnit::APlayerUnit()
 
 void APlayerUnit::OnTurnStart()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     GetWorldTimerManager().ClearTimer(ExhaustedTurnTimer);
     Super::OnTurnStart();
 
@@ -17,6 +22,11 @@ void APlayerUnit::OnTurnStart()
 
 void APlayerUnit::OnTurnEnd()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     GetWorldTimerManager().ClearTimer(ExhaustedTurnTimer);
     Super::OnTurnEnd();
 }

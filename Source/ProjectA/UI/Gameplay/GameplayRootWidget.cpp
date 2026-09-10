@@ -3,6 +3,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Game/GameState/GameplayViewTypes.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "UI/Combat/CombatHUDWidget.h"
 #include "UI/Gameplay/EncounterResultWidget.h"
@@ -55,7 +56,12 @@ void UGameplayRootWidget::RefreshFlow(const URunStateSubsystem* RunState, const 
         return;
     }
 
-    const ERunPhase Phase = RunState->GetPhase();
+    RefreshFlowView(FGameplayViewState::FromRun(RunState, FlowMessage), true);
+}
+
+void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands)
+{
+    const ERunPhase Phase = View.Phase;
 
     if (!bHasDisplayedPhase || DisplayedPhase != Phase)
     {
@@ -89,12 +95,13 @@ void UGameplayRootWidget::RefreshFlow(const URunStateSubsystem* RunState, const 
 
     if (RunMapWidget)
     {
-        RunMapWidget->RefreshRunMap(RunState, FlowMessage);
+        RunMapWidget->RefreshRunMapView(View, bAllowRunCommands);
         RunMapWidget->SetIsEnabled(Phase != ERunPhase::Preparing);
     }
 
     if (ResultWidget)
     {
-        ResultWidget->ShowResult(RunState->GetLastResult(), FlowMessage);
+        ResultWidget->ShowResult(View.LastResult, View.FlowMessage);
+        ResultWidget->SetContinueEnabled(bAllowRunCommands);
     }
 }

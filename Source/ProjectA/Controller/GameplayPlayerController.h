@@ -7,6 +7,7 @@
 class AEncounterManager;
 class UGameplayRootWidget;
 class URunStateSubsystem;
+class AGameplayGameState;
 
 // Reuses grid input while owning only gameplay UI and input routing.
 // 그리드 입력을 재사용하고 Gameplay UI와 입력 전환만 소유합니다.
@@ -35,6 +36,11 @@ protected:
 
 private:
     void RefreshGameplayFlow();
+    void TryBindGameplayState();
+    FTimerHandle BindStateTimer;
+
+    UPROPERTY(Transient)
+    TObjectPtr<AGameplayGameState> GameplayState;
 
     UPROPERTY(Transient)
     TObjectPtr<UGameplayRootWidget> GameplayRootWidget;

@@ -18,6 +18,13 @@ void UCombatActionAuthority::Reset()
 {
     // Preserve the Run requirement so clearing a failed configuration cannot reopen offline compatibility.
     // 실패한 설정을 지워도 오프라인 호환이 다시 열리지 않도록 Run 설정 필요 여부를 유지합니다.
+    for (const TPair<TWeakObjectPtr<APartyPlayerController>, FRunAccountId>& Entry : Participants)
+    {
+        if (Entry.Key.IsValid())
+        {
+            Entry.Key->SetCombatParticipantBinding(FRunAccountId(), FGuid());
+        }
+    }
     UnitsById.Reset();
     CharacterIds.Reset();
     Participants.Reset();
@@ -154,6 +161,7 @@ bool UCombatActionAuthority::BindParticipant(APartyPlayerController* Controller,
     }
     Participants.Add(ControllerKey, AccountId);
     ParticipantBindingIds.Add(ControllerKey, FGuid::NewGuid());
+    Controller->SetCombatParticipantBinding(AccountId, ParticipantBindingIds.FindRef(ControllerKey));
     return true;
 }
 
@@ -206,6 +214,31 @@ FGuid UCombatActionAuthority::GetUnitId(const AUnitBase* Unit) const
         }
     }
     return FGuid();
+}
+
+FGuid UCombatActionAuthority::GetCharacterId(const AUnitBase* Unit) const
+{
+    if (!bRunConfigured || !IsValid(Unit))
+    {
+        return FGuid();
+    }
+    return CharacterIds.FindRef(TWeakObjectPtr<AUnitBase>(const_cast<AUnitBase*>(Unit)));
+}
+
+FRunAccountId UCombatActionAuthority::GetOwnerAccountId(const AUnitBase* Unit) const
+{
+    const FGuid CharacterId = GetCharacterId(Unit);
+    if (CharacterId.IsValid())
+    {
+        for (const FRunPartyMember& Member : PartyMembers)
+        {
+            if (Member.bCreated && Member.CharacterId == CharacterId)
+            {
+                return Member.OwnerAccountId;
+            }
+        }
+    }
+    return FRunAccountId();
 }
 
 AUnitBase* UCombatActionAuthority::ResolveUnit(FGuid UnitId) const

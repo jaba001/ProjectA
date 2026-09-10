@@ -43,9 +43,12 @@ AUnitBase::AUnitBase()
     AttributeSet = CreateDefaultSubobject<UAS_Unit>(TEXT("AttributeSet"));
 
     AbilitySystem->SetIsReplicated(true);
-    AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
+    // AI-controlled units expose attributes and cues without a player-owned ASC.
+    // AI가 제어하는 유닛은 플레이어 소유 ASC 없이 어트리뷰트와 큐를 전달합니다.
+    AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
     bReplicates = true;
+    bAlwaysRelevant = true;
     SetReplicateMovement(true);
 }
 
@@ -78,13 +81,17 @@ void AUnitBase::BeginPlay()
         }
     }
 
-    if (AttributeSet)
+    if (HasAuthority() && AttributeSet)
     {
         AttributeSet->InitMaxHP(InitMaxHP);
         AttributeSet->InitHP(InitMaxHP);
     }
 
     DefaultBattleRotation = GetActorRotation();
+    if (bIsDead)
+    {
+        ApplyDeathPresentation();
+    }
 }
 
 void AUnitBase::Tick(float DeltaTime)
@@ -94,12 +101,14 @@ void AUnitBase::Tick(float DeltaTime)
 
 void AUnitBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    bIsActiveTurn = false;
-    CancelCurrentAction();
-
-    if (IsValid(CurrentTile) && CurrentTile->GetOccupyingUnit() == this)
+    if (HasAuthority())
     {
-        CurrentTile->SetOccupyingUnit(nullptr);
+        bIsActiveTurn = false;
+        CancelCurrentAction();
+        if (IsValid(CurrentTile) && CurrentTile->GetOccupyingUnit() == this)
+        {
+            CurrentTile->SetOccupyingUnit(nullptr);
+        }
     }
 
     CurrentTile = nullptr;
@@ -113,14 +122,56 @@ void AUnitBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(AUnitBase, Team);
+    DOREPLIFETIME(AUnitBase, UnitIndex);
+    DOREPLIFETIME(AUnitBase, RuntimeCharacterName);
+    DOREPLIFETIME(AUnitBase, CurrentActionType);
+    DOREPLIFETIME(AUnitBase, bIsActiveTurn);
+    DOREPLIFETIME(AUnitBase, bTurnMustEndAfterCurrentAction);
+    DOREPLIFETIME(AUnitBase, bIsDead);
+    DOREPLIFETIME(AUnitBase, DeathImpulse);
+    DOREPLIFETIME(AUnitBase, CurrentTile);
+    DOREPLIFETIME(AUnitBase, MovePhase);
+    DOREPLIFETIME(AUnitBase, MoveRange);
+    DOREPLIFETIME(AUnitBase, HealingItemAmount);
+    DOREPLIFETIME(AUnitBase, HealingItemCount);
+    DOREPLIFETIME(AUnitBase, DefaultAttackAbilityClass);
+    DOREPLIFETIME(AUnitBase, EquippedSkillAbilityClasses);
+    DOREPLIFETIME(AUnitBase, EquippedSkillDataAssets);
+    DOREPLIFETIME(AUnitBase, MaxActionPoint);
+    DOREPLIFETIME(AUnitBase, CurrentActionPoint);
+    DOREPLIFETIME(AUnitBase, MaxSubActionPoint);
+    DOREPLIFETIME(AUnitBase, CurrentSubActionPoint);
+}
+
+void AUnitBase::OnRep_Team()
+{
+    if (IsValid(CurrentTile))
+    {
+        CurrentTile->UpdateTileVisual();
+    }
+}
+
+void AUnitBase::OnRep_CurrentTile(ACombatGridTile* PreviousTile)
+{
+    if (IsValid(PreviousTile))
+    {
+        PreviousTile->UpdateTileVisual();
+    }
+    if (IsValid(CurrentTile))
+    {
+        CurrentTile->UpdateTileVisual();
+    }
 }
 
 void AUnitBase::SetTeam(ETeam NewTeam)
 {
     if (!HasAuthority())
-        return;  
+    {
+        return;
+    }
 
     Team = NewTeam;
+    ForceNetUpdate();
 
     if (CurrentTile)
     {
@@ -130,16 +181,46 @@ void AUnitBase::SetTeam(ETeam NewTeam)
 
 void AUnitBase::OnTurnStart()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     bIsActiveTurn = true;
     ResetActionPoint();
     ResetSubActionPoint();
     bTurnMustEndAfterCurrentAction = false;
+    ForceNetUpdate();
 }
 
 void AUnitBase::OnTurnEnd()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     bIsActiveTurn = false;
     bTurnMustEndAfterCurrentAction = false;
+    ForceNetUpdate();
+}
+
+void AUnitBase::ResetActionPoint()
+{
+    if (HasAuthority())
+    {
+        CurrentActionPoint = MaxActionPoint;
+        ForceNetUpdate();
+    }
+}
+
+void AUnitBase::ResetSubActionPoint()
+{
+    if (HasAuthority())
+    {
+        CurrentSubActionPoint = MaxSubActionPoint;
+        ForceNetUpdate();
+    }
 }
 
 bool AUnitBase::HasEnoughActionPoint(int32 Cost) const
@@ -149,12 +230,13 @@ bool AUnitBase::HasEnoughActionPoint(int32 Cost) const
 
 bool AUnitBase::ConsumeActionPoint(int32 Cost)
 {
-    if (!HasEnoughActionPoint(Cost))
+    if (!HasAuthority() || !HasEnoughActionPoint(Cost))
     {
         return false;
     }
 
     CurrentActionPoint -= Cost;
+    ForceNetUpdate();
 
     bTurnMustEndAfterCurrentAction = CurrentActionPoint <= 0 && CurrentSubActionPoint <= 0;
 
@@ -168,12 +250,13 @@ bool AUnitBase::HasEnoughSubActionPoint(int32 Cost) const
 
 bool AUnitBase::ConsumeSubActionPoint(int32 Cost)
 {
-    if (!HasEnoughSubActionPoint(Cost))
+    if (!HasAuthority() || !HasEnoughSubActionPoint(Cost))
     {
         return false;
     }
 
     CurrentSubActionPoint -= Cost;
+    ForceNetUpdate();
     bTurnMustEndAfterCurrentAction = CurrentActionPoint <= 0 && CurrentSubActionPoint <= 0;
 
     return true;
@@ -186,8 +269,10 @@ bool AUnitBase::IsUnitAlive() const
 
 void AUnitBase::Die()
 {
-    if (bIsDead)
+    if (!HasAuthority() || bIsDead)
+    {
         return;
+    }
 
     bIsDead = true;
     bIsActiveTurn = false;
@@ -200,32 +285,23 @@ void AUnitBase::Die()
     CurrentActionType = EUnitActionType::None;
     MovePhase = EUnitMovePhase::None;
 
-    //사망 시 타일 점유 해제
+    // Release occupancy only on the authoritative death path.
+    // 서버 사망 처리에서만 타일 점유를 해제합니다.
     if (CurrentTile)
     {
         CurrentTile->SetOccupyingUnit(nullptr);
         CurrentTile = nullptr;
     }
 
-    GetCharacterMovement()->DisableMovement();
-
-    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-    GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
-    GetMesh()->SetAllBodiesSimulatePhysics(true);
-
-    FVector Impulse;
-
-    if (!DeathImpulse.IsNearlyZero())
+    // Generate the cosmetic impulse once on the server for every viewer.
+    // 모든 관찰자에게 전달할 시각 임펄스는 서버에서 한 번 생성합니다.
+    if (DeathImpulse.IsNearlyZero())
     {
-        Impulse = DeathImpulse;
+        DeathImpulse = FMath::VRand() * 2000.0f;
+        DeathImpulse.Z = FMath::Abs(DeathImpulse.Z) + 500.0f;
     }
-    else
-    {
-        Impulse = FMath::VRand() * 2000.0f;
-        Impulse.Z = FMath::Abs(Impulse.Z) + 500.0f;
-    }
-    GetMesh()->AddImpulse(Impulse, NAME_None, true);
+    ApplyDeathPresentation();
+    ForceNetUpdate();
 
     //UE_LOG(LogTemp, Log, TEXT("[Death] %s died"), *GetName());
     ACombatManager* CombatManager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatManager::StaticClass()));
@@ -238,16 +314,50 @@ void AUnitBase::Die()
     OnUnitDied.Broadcast(this);
 }
 
+void AUnitBase::OnRep_Death()
+{
+    if (bIsDead)
+    {
+        ApplyDeathPresentation();
+    }
+}
+
+void AUnitBase::ApplyDeathPresentation()
+{
+    if (bDeathPresentationApplied)
+    {
+        return;
+    }
+
+    bDeathPresentationApplied = true;
+    GetCharacterMovement()->DisableMovement();
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+    GetMesh()->SetAllBodiesSimulatePhysics(true);
+    GetMesh()->AddImpulse(DeathImpulse, NAME_None, true);
+}
+
 void AUnitBase::BeginCurrentAction(EUnitActionType ActionType)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     ++CurrentActionSerial;
     CurrentActionType = ActionType;
     ActionOriginTile = CurrentTile;
     ActionOriginTransform = GetActorTransform();
+    ForceNetUpdate();
 }
 
 void AUnitBase::CompleteCurrentAction(EUnitActionResult Result)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (CurrentActionType == EUnitActionType::None)
     {
         return;
@@ -294,6 +404,7 @@ void AUnitBase::CompleteCurrentAction(EUnitActionResult Result)
         AbilitySystem->CancelAbilityHandle(AbilityToCancel);
     }
 
+    ForceNetUpdate();
     OnUnitActionCompleted(CompletedType, Result);
     OnActionCompleted.Broadcast(this, CompletedType, Result);
 }
@@ -304,11 +415,21 @@ void AUnitBase::OnUnitActionCompleted(EUnitActionType ActionType, EUnitActionRes
 
 void AUnitBase::CancelCurrentAction()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     CompleteCurrentAction(EUnitActionResult::Cancelled);
 }
 
 void AUnitBase::RestoreActionOrigin()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     // The original tile stays reserved during a skill approach and return.
     // 스킬 접근과 복귀 중에는 원래 타일의 점유를 유지합니다.
     if (IsValid(ActionOriginTile))
@@ -344,6 +465,7 @@ void AUnitBase::SetCurrentTile(ACombatGridTile* NewTile)
     }
 
     CurrentTile = NewTile;
+    ForceNetUpdate();
 
     CurrentTile->SetOccupyingUnit(this);
 
@@ -358,6 +480,11 @@ void AUnitBase::SetCurrentTile(ACombatGridTile* NewTile)
 
 void AUnitBase::MoveToTile(ACombatGridTile* TargetTile)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (CurrentActionType == EUnitActionType::None)
     {
         BeginCurrentAction(EUnitActionType::Move);
@@ -389,6 +516,11 @@ void AUnitBase::MoveToTile(ACombatGridTile* TargetTile)
 
 void AUnitBase::MoveToTarget(AUnitBase* TargetUnit)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (!TargetUnit || !TargetUnit->IsUnitAlive())
     {
         HandleMoveFailed();
@@ -415,6 +547,11 @@ void AUnitBase::MoveToTarget(AUnitBase* TargetUnit)
 
 void AUnitBase::ReturnToOriginalTile()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (!OriginalTileBeforeSkill)
     {
         UE_LOG(LogTemp, Warning, TEXT("[Skill] ReturnToOriginalTile failed: OriginalTileBeforeSkill is null"));
@@ -445,6 +582,11 @@ void AUnitBase::ReturnToOriginalTile()
 
 void AUnitBase::SnapToTile(ACombatGridTile* Tile, const FRotator& TargetRotation)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (!Tile)
     {
         HandleMoveFailed();
@@ -465,6 +607,11 @@ void AUnitBase::SnapToTile(ACombatGridTile* Tile, const FRotator& TargetRotation
 
 void AUnitBase::HandleActionSnapFinished(int32 ActionSerial)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     // A delayed snap callback must not finish a newer action after cancellation.
     // 취소 후 늦게 도착한 위치 보정 콜백이 새로운 행동을 완료하면 안 됩니다.
     if (ActionSerial == static_cast<int32>(CurrentActionSerial))
@@ -475,6 +622,11 @@ void AUnitBase::HandleActionSnapFinished(int32 ActionSerial)
 
 void AUnitBase::OnSnapToTileFinished()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (MovePhase == EUnitMovePhase::ReturningToOriginalTile)
     {
         OnReturnToOriginalTileFinished();
@@ -495,6 +647,11 @@ void AUnitBase::OnReturnToOriginalTileFinished()
 
 void AUnitBase::HandleMoveCompleted()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     switch (MovePhase)
     {
     case EUnitMovePhase::MovingToTile:
@@ -536,6 +693,11 @@ void AUnitBase::HandleMoveCompleted()
 
 void AUnitBase::HandleMoveFailed(EUnitActionResult Result)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (!IsBusy())
     {
         return;
@@ -548,6 +710,11 @@ void AUnitBase::HandleMoveFailed(EUnitActionResult Result)
 
 AUnitAIController* AUnitBase::GetOrCreateAIController()
 {
+    if (!HasAuthority())
+    {
+        return nullptr;
+    }
+
     AUnitAIController* AICon = Cast<AUnitAIController>(GetController());
 
     if (!AICon)
@@ -601,6 +768,11 @@ void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile
 
 void AUnitBase::ExecuteSkillAtTarget()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (CurrentActionType != EUnitActionType::Skill || MovePhase != EUnitMovePhase::WaitingForSkill)
     {
         return;
@@ -666,6 +838,11 @@ void AUnitBase::ExecuteSkillAtTarget()
 
 void AUnitBase::HandleSkillAbilityEnded(const FAbilityEndedData& EndedData)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (CurrentActionType != EUnitActionType::Skill || EndedData.AbilitySpecHandle != ActiveSkillHandle)
     {
         return;
@@ -690,6 +867,11 @@ void AUnitBase::HandleSkillAbilityEnded(const FAbilityEndedData& EndedData)
 
 void AUnitBase::CompleteSkillExecution(EUnitActionResult Result)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (CurrentActionType != EUnitActionType::Skill || MovePhase != EUnitMovePhase::WaitingForSkill)
     {
         return;
@@ -712,6 +894,11 @@ TArray<AUnitBase*> AUnitBase::ResolveSkillTargetUnits()
 
 void AUnitBase::OnSkillFinished()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     // GAS owns completion while its bound ability is still active.
     // 연결된 어빌리티가 활성 상태인 동안에는 GAS가 완료를 소유합니다.
     if (ActiveSkillHandle.IsValid())
@@ -724,6 +911,11 @@ void AUnitBase::OnSkillFinished()
 
 void AUnitBase::ClearSkillContext()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     PendingTile = nullptr;
     PendingTargetUnit = nullptr;
     PendingSkillTargetTile = nullptr;
@@ -779,22 +971,32 @@ void AUnitBase::StartMoveAction(ACombatGridTile* TargetTile)
 
 void AUnitBase::OnMoveActionFinished()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     CompleteCurrentAction(EUnitActionResult::Succeeded);
 }
 
 void AUnitBase::ClearMoveContext()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     PendingTile = nullptr;
 }
 
 bool AUnitBase::CanUseHealingItem(AUnitBase* TargetUnit) const
 {
-    return HasAuthority() && IsActiveTurn() && !IsBusy() && IsUnitAlive() && HasEnoughSubActionPoint(1) && HealingItemCount > 0 && FMath::IsFinite(HealingItemAmount) && HealingItemAmount > 0.0f && IsValid(TargetUnit) && TargetUnit->GetWorld() == GetWorld() && TargetUnit->GetTeam() == GetTeam() && TargetUnit->IsUnitAlive() && TargetUnit->AbilitySystem && TargetUnit->AttributeSet && TargetUnit->AttributeSet->GetHP() < TargetUnit->AttributeSet->GetMaxHP();
+    return IsActiveTurn() && !IsBusy() && IsUnitAlive() && HasEnoughSubActionPoint(1) && HealingItemCount > 0 && FMath::IsFinite(HealingItemAmount) && HealingItemAmount > 0.0f && IsValid(TargetUnit) && TargetUnit->GetWorld() == GetWorld() && TargetUnit->GetTeam() == GetTeam() && TargetUnit->IsUnitAlive() && TargetUnit->AbilitySystem && TargetUnit->AttributeSet && TargetUnit->AttributeSet->GetHP() < TargetUnit->AttributeSet->GetMaxHP();
 }
 
 void AUnitBase::StartItemAction(AUnitBase* TargetUnit)
 {
-    if (!CanUseHealingItem(TargetUnit) || !ConsumeSubActionPoint(1))
+    if (!HasAuthority() || !CanUseHealingItem(TargetUnit) || !ConsumeSubActionPoint(1))
     {
         return;
     }
@@ -805,6 +1007,11 @@ void AUnitBase::StartItemAction(AUnitBase* TargetUnit)
 
 void AUnitBase::ExecuteItemAtTarget()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     if (CurrentActionType != EUnitActionType::Item || !IsValid(PendingTargetUnit) || HealingItemCount <= 0)
     {
         return;
@@ -822,11 +1029,21 @@ void AUnitBase::ExecuteItemAtTarget()
 
 void AUnitBase::OnItemFinished()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     CompleteCurrentAction(EUnitActionResult::Succeeded);
 }
 
 void AUnitBase::ClearItemContext()
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     PendingTargetUnit = nullptr;
 }
 

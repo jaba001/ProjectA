@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Combat/Commands/CombatActionTypes.h"
+#include "Game/Run/RunIdentityTypes.h"
 #include "PartyPlayerController.generated.h"
 
 class AUnitBase;
@@ -40,6 +41,8 @@ protected:
     // Finds required combat actors and initializes HUD.
     // 필요한 전투 액터를 찾고 HUD를 초기화합니다.
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
     virtual bool ShouldCreateCombatHUD() const { return true; }
 
@@ -79,6 +82,9 @@ public:
     FCombatActionResponse SubmitCombatActionRequest(const FCombatActionRequest& Request);
     const FCombatActionResponse& GetLastCombatActionResponse() const { return LastCombatActionResponse; }
     bool IsCombatInputEnabled() const { return bCombatInputEnabled; }
+    void SetCombatParticipantBinding(const FRunAccountId& AccountId, FGuid BindingId);
+    const FRunAccountId& GetBoundParticipantAccount() const { return BoundParticipantAccount; }
+    FGuid GetParticipantBindingId() const { return ParticipantBindingId; }
     FOnCombatActionResponse OnCombatActionResponse;
 
     // Own all player tile commands; tile actors only forward input.
@@ -135,6 +141,20 @@ public:
     bool IsValidTileForPendingSkill(ACombatGridTile* Tile) const;
 
 private:
+    UFUNCTION()
+    void OnRep_CombatContext();
+
+    void HandleCombatViewChanged();
+    TWeakObjectPtr<ACombatManager> ObservedCombatManager;
+    FGuid ObservedCombatId;
+    int32 ObservedTurnSerial = 0;
+
+    UPROPERTY(ReplicatedUsing = OnRep_CombatContext)
+    FRunAccountId BoundParticipantAccount;
+
+    UPROPERTY(ReplicatedUsing = OnRep_CombatContext)
+    FGuid ParticipantBindingId;
+
     void HandleCombatActionResponse(const FCombatActionResponse& Response);
     bool IsEquippedInputSkill(USkillDefinitionDataAsset* Skill) const;
     FGuid RequestCombatInstanceId;
@@ -148,6 +168,7 @@ private:
     UPROPERTY(Transient)
     FCombatActionResponse LastCombatActionResponse;
 
+    UPROPERTY(ReplicatedUsing = OnRep_CombatContext)
     bool bCombatInputEnabled = true;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tile", meta = (AllowPrivateAccess = "true"))
     ACombatGridTile* SelectedTile = nullptr;
@@ -166,6 +187,6 @@ private:
     UPROPERTY()
     UUserWidget* HUDWidget = nullptr;
 
-    UPROPERTY()
+    UPROPERTY(ReplicatedUsing = OnRep_CombatContext)
     ACombatManager* CombatManager = nullptr;
 };

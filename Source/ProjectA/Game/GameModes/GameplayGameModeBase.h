@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "Game/Run/RunIdentityTypes.h"
 #include "GameplayGameModeBase.generated.h"
 
 class ACombatArena;
@@ -10,6 +11,8 @@ class AEncounterManager;
 class UPartyDefinitionDataAsset;
 class UEncounterDefinitionDataAsset;
 class UOpponentSnapshotCatalogDataAsset;
+class APartyPlayerController;
+class UCombatActionAuthority;
 
 UCLASS()
 class PROJECTA_API AGameplayGameModeBase : public AGameModeBase
@@ -18,6 +21,10 @@ class PROJECTA_API AGameplayGameModeBase : public AGameModeBase
 
 public:
     AGameplayGameModeBase();
+    // Trusted server integration point, never exposed as a client account-claim RPC.
+    // 신뢰된 서버 연동 지점이며 클라이언트 계정 주장 RPC로 노출하지 않습니다.
+    bool AssignRunParticipant(APartyPlayerController* Controller, const FRunAccountId& AccountId);
+    bool ApplyCombatParticipantBindings(UCombatActionAuthority* Authority);
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gameplay")
     TSubclassOf<ACombatManager> CombatManagerClass;
@@ -45,9 +52,11 @@ public:
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    virtual void PostLogin(APlayerController* NewPlayer) override;
 
 private:
     void InitializeGameplay();
+    TMap<TWeakObjectPtr<APartyPlayerController>, FRunAccountId> RunParticipants;
 
     UPROPERTY(Transient)
     TObjectPtr<AEncounterManager> EncounterManager;
