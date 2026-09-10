@@ -14,6 +14,7 @@
 #include "EngineUtils.h"
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/Run/RunParticipationLibrary.h"
 #include "Game/GameModes/GameplayGameModeBase.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "GAS/Attribute/AS_Unit.h"
@@ -54,8 +55,13 @@ void AEncounterManager::InitializeEncounter(ACombatArena* InArena, ACombatManage
 
 bool AEncounterManager::RequestStartNode(FName NodeId)
 {
-    if (!HasAuthority() || bPreparing || PendingResult != ECombatResult::None || !RunState || !RunState->CanStartNode(NodeId))
+    if (!HasAuthority() || bShuttingDown || bPreparing || PendingResult != ECombatResult::None || !RunState || !RunState->CanStartNode(NodeId))
     {
+        return false;
+    }
+    if (!ValidateManagedExecution(FlowMessage))
+    {
+        OnFlowChanged.Broadcast();
         return false;
     }
     bPreparing = true;
@@ -118,9 +124,34 @@ bool AEncounterManager::RequestStartNode(FName NodeId)
 bool AEncounterManager::ConfigureCombatParticipants(FText& OutError)
 {
     UCombatActionAuthority* Authority = CombatManager ? CombatManager->GetActionAuthority() : nullptr;
-    if (!Authority || !Authority->ConfigureRun(RunState->GetRunIdentity(), RunState->GetPartyMembers(), PartyActors, OutError))
+    if (!Authority || !Authority->ConfigureRun(RunState->GetRunIdentity(), RunState->GetPartyMembers(), PartyActors, OutError, RunState->IsManagedRun()))
     {
         return false;
+    }
+    if (RunState->IsManagedRun())
+    {
+        if (!ValidateManagedExecution(OutError, true))
+        {
+            return false;
+        }
+        // The persistent roster determines control on both fresh encounters and restored actors.
+        // 새 전투와 복원 액터 모두 영속 참가 목록으로 조작 방식을 결정합니다.
+        for (const TPair<int32, TObjectPtr<AUnitBase>>& Entry : PartyActors)
+        {
+            APlayerUnit* Player = Cast<APlayerUnit>(Entry.Value);
+            EPartyControlMode ControlMode = EPartyControlMode::Human;
+            if (!Player || !URunParticipationLibrary::ResolveControlMode(RunState->GetParticipation(), RunState->GetRunIdentity(), RunState->GetPartyMembers(), Authority->GetCharacterId(Player), ControlMode, OutError) || !Authority->SetPartyControlMode(Player, ControlMode, OutError))
+            {
+                return false;
+            }
+        }
+        AGameplayGameModeBase* Mode = GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
+        if (!Mode || !Mode->ApplyCombatParticipantBindings(Authority))
+        {
+            OutError = FText::FromString(TEXT("현재 인간 참가자의 전투 연결 배정을 완료하지 못했습니다."));
+            return false;
+        }
+        return true;
     }
     const FRunIdentityData& Identity = RunState->GetRunIdentity();
     APartyPlayerController* LocalController = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController());
@@ -141,6 +172,74 @@ bool AEncounterManager::ConfigureCombatParticipants(FText& OutError)
             return false;
         }
     }
+    return true;
+}
+
+bool AEncounterManager::ValidateManagedExecution(FText& OutError, bool bAllowResumePending) const
+{
+    if (!RunState || !RunState->IsManagedRun())
+    {
+        return true;
+    }
+    OutError = FText::FromString(TEXT("현재 Host의 관리 Run 실행 권한과 완료된 복원이 필요합니다."));
+    if (!HasAuthority() || bShuttingDown || !RunState->HasManagedLease() || (!bAllowResumePending && RunState->IsManagedResumePending()))
+    {
+        return false;
+    }
+    const AGameplayGameModeBase* Mode = GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
+    return Mode && Mode->ValidateManagedRunConnections(OutError);
+}
+
+bool AEncounterManager::ValidateManagedCheckpointModes(const FCombatCheckpointData& Checkpoint, FText& OutError) const
+{
+    if (!RunState->IsManagedRun())
+    {
+        return true;
+    }
+    for (const FCombatCheckpointUnit& Unit : Checkpoint.Units)
+    {
+        if (Unit.Team == ETeam::Player)
+        {
+            EPartyControlMode ExpectedMode = EPartyControlMode::Human;
+            if (!URunParticipationLibrary::ResolveControlMode(RunState->GetParticipation(), RunState->GetRunIdentity(), RunState->GetPartyMembers(), Unit.CharacterId, ExpectedMode, OutError))
+            {
+                return false;
+            }
+            if (Unit.PartyControlMode != ExpectedMode)
+            {
+                OutError = FText::FromString(TEXT("저장된 캐릭터의 조작 방식이 Run의 영속 인간 참가 목록과 일치하지 않습니다."));
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool AEncounterManager::ResumeManagedGameplay(FText& OutError)
+{
+    OutError = FText::FromString(TEXT("재개할 관리 Run과 현재 Host의 실행 권한이 필요합니다."));
+    if (!RunState || !RunState->IsManagedRun() || !ValidateManagedExecution(OutError, true))
+    {
+        FlowMessage = OutError;
+        OnFlowChanged.Broadcast();
+        return false;
+    }
+    if (RunState->GetPhase() == ERunPhase::Combat)
+    {
+        return RestoreSavedCombat(RunState->GetRunIdentity().HostAccountId, OutError);
+    }
+    if ((RunState->GetPhase() != ERunPhase::Map && RunState->GetPhase() != ERunPhase::Result) || !SpawnedUnits.IsEmpty() || !RunState->ConfirmManagedResumeStarted(OutError))
+    {
+        if (OutError.IsEmpty())
+        {
+            OutError = FText::FromString(TEXT("진행 지도 또는 승리 결과에서만 전투 없는 관리 재개를 완료할 수 있습니다."));
+        }
+        FlowMessage = OutError;
+        OnFlowChanged.Broadcast();
+        return false;
+    }
+    FlowMessage = FText::GetEmpty();
+    OnFlowChanged.Broadcast();
     return true;
 }
 
@@ -218,6 +317,13 @@ bool AEncounterManager::BuildTurnCheckpoint(int32 CompletedTurnSerial, int32 Nex
 bool AEncounterManager::CommitTurnCheckpoint(int32 CompletedTurnSerial, int32 NextTurnIndex)
 {
     FText Error;
+    if (!ValidateManagedExecution(Error, true))
+    {
+        FlowMessage = Error;
+        SetPlayerCombatInput(false);
+        OnFlowChanged.Broadcast();
+        return false;
+    }
     if (PendingTurnCheckpoint.Revision == 0 && !BuildTurnCheckpoint(CompletedTurnSerial, NextTurnIndex, PendingTurnCheckpoint, Error))
     {
         FlowMessage = Error;
@@ -288,7 +394,7 @@ bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FTe
             OnFlowChanged.Broadcast();
         }
     };
-    if (!HasAuthority() || bPreparing || PendingResult != ECombatResult::None || !RunState || !RunState->HasCombatCheckpoint() || RunState->GetPhase() != ERunPhase::Combat || !SpawnedUnits.IsEmpty())
+    if (!HasAuthority() || bShuttingDown || bPreparing || PendingResult != ECombatResult::None || !RunState || !RunState->HasCombatCheckpoint() || RunState->GetPhase() != ERunPhase::Combat || !SpawnedUnits.IsEmpty())
     {
         OutError = FText::FromString(TEXT("빈 서버 전투 월드에서 저장된 전투를 복원해야 합니다."));
         return false;
@@ -299,7 +405,19 @@ bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FTe
     }
     const FCombatCheckpointData Checkpoint = RunState->GetCombatCheckpoint();
     AGameplayGameModeBase* Mode = GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
-    if (GetNetMode() == NM_Standalone)
+    if (RunState->IsManagedRun())
+    {
+        if (!RunState->IsManagedResumePending())
+        {
+            OutError = FText::FromString(TEXT("관리 전투는 명시적으로 승인한 재개에서 한 번만 복원할 수 있습니다."));
+            return false;
+        }
+        if (!ValidateManagedExecution(OutError, true) || !ValidateManagedCheckpointModes(Checkpoint, OutError))
+        {
+            return false;
+        }
+    }
+    else if (GetNetMode() == NM_Standalone)
     {
         if (Checkpoint.Identity.Origin != ERunIdentityOrigin::LocalDevelopment || Checkpoint.Identity.OriginalParticipants.Num() != 1)
         {
@@ -368,6 +486,10 @@ bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FTe
     {
         return FailRestore(FText::FromString(TEXT("저장된 턴 경계를 활성화하지 못했습니다.")), OutError);
     }
+    if (RunState->IsManagedRun() && !RunState->ConfirmManagedResumeStarted(OutError))
+    {
+        return FailRestore(OutError, OutError);
+    }
     SetPlayerCombatInput(CombatManager->IsCombatActive());
     OnFlowChanged.Broadcast();
     OutError = FText::GetEmpty();
@@ -387,7 +509,12 @@ bool AEncounterManager::FailRestore(const FText& Error, FText& OutError)
 
 bool AEncounterManager::CanRetryCombatCheckpoint() const
 {
-    return HasAuthority() && RunState && !bPreparing && ((CombatManager && CombatManager->IsAwaitingTurnCheckpoint()) || (PendingResult != ECombatResult::None && !RunState->GetSaveError().IsEmpty()));
+    FText Error;
+    if (!HasAuthority() || bShuttingDown || !RunState || bPreparing || !ValidateManagedExecution(Error, true))
+    {
+        return false;
+    }
+    return (RunState->IsManagedRun() && RunState->IsManagedResumePending() && SpawnedUnits.IsEmpty()) || (CombatManager && CombatManager->IsAwaitingTurnCheckpoint()) || (PendingResult != ECombatResult::None && !RunState->GetSaveError().IsEmpty());
 }
 
 bool AEncounterManager::RetryCombatCheckpoint(FText& OutError)
@@ -396,6 +523,10 @@ bool AEncounterManager::RetryCombatCheckpoint(FText& OutError)
     {
         OutError = FText::FromString(TEXT("재시도할 전투 저장이 없습니다."));
         return false;
+    }
+    if (RunState->IsManagedRun() && RunState->IsManagedResumePending() && SpawnedUnits.IsEmpty())
+    {
+        return ResumeManagedGameplay(OutError);
     }
     if (PendingResult != ECombatResult::None)
     {
@@ -569,7 +700,7 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
 
 void AEncounterManager::HandleCombatResult(ECombatResult Result)
 {
-    if (PendingResult != ECombatResult::None || !RunState || RunState->GetPhase() != ERunPhase::Combat || Result == ECombatResult::None)
+    if (bShuttingDown || PendingResult != ECombatResult::None || !RunState || RunState->GetPhase() != ERunPhase::Combat || Result == ECombatResult::None)
     {
         return;
     }
@@ -582,6 +713,12 @@ void AEncounterManager::HandleCombatResult(ECombatResult Result)
 
 void AEncounterManager::FinishEncounter()
 {
+    if (bShuttingDown || !ValidateManagedExecution(FlowMessage))
+    {
+        SetPlayerCombatInput(false);
+        OnFlowChanged.Broadcast();
+        return;
+    }
     for (const TPair<int32, TObjectPtr<AUnitBase>>& Entry : PartyActors)
     {
         if (IsValid(Entry.Value) && Entry.Value->GetAttributeSet())
@@ -614,8 +751,13 @@ void AEncounterManager::FinishEncounter()
 
 bool AEncounterManager::ContinueRun()
 {
-    if (!HasAuthority() || !RunState || PendingResult != ECombatResult::None || RunState->GetPhase() != ERunPhase::Result)
+    if (!HasAuthority() || bShuttingDown || !RunState || PendingResult != ECombatResult::None || RunState->GetPhase() != ERunPhase::Result)
     {
+        return false;
+    }
+    if (!ValidateManagedExecution(FlowMessage))
+    {
+        OnFlowChanged.Broadcast();
         return false;
     }
     if (!RunState->ContinueRun())
@@ -644,6 +786,8 @@ bool AEncounterManager::FailPreparation(const FText& Message)
 
 void AEncounterManager::SetPlayerCombatInput(bool bEnabled)
 {
+    FText Error;
+    bEnabled = bEnabled && !bShuttingDown && ValidateManagedExecution(Error);
     for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
         if (APartyPlayerController* Controller = Cast<APartyPlayerController>(It->Get()))
@@ -694,14 +838,25 @@ void AEncounterManager::CleanupEncounter()
     }
 }
 
-void AEncounterManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void AEncounterManager::ShutdownGameplay()
 {
+    if (bShuttingDown)
+    {
+        return;
+    }
+    bShuttingDown = true;
     GetWorldTimerManager().ClearTimer(FinishTimer);
     if (CombatManager)
     {
         CombatManager->OnCombatResult.RemoveAll(this);
     }
     CleanupEncounter();
+    PendingResult = ECombatResult::None;
+}
+
+void AEncounterManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    ShutdownGameplay();
     OnFlowChanged.Clear();
     Super::EndPlay(EndPlayReason);
 }

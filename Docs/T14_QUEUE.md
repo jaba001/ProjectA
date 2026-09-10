@@ -13,7 +13,7 @@
 | 3 | 완료 | 2인 Listen Server 전투 동기화 | 실제 2개 PIE의 소유 연결 RPC, 본인 Unit 조작, Turn·Grid·HP/AP·사망·결과·HUD 일치 검증 |
 | 4 | 완료 | 확정 턴 체크포인트와 기존 Host 복구 | v3 턴 저장·실패 재시도, 실제 2인 새 세션/별도 프로세스 복구, 고정 상대·손상·처리 중 행동 검증 |
 | 5 | 완료 | 아군 AI 판단과 행동 | 소유권·아군 진영 유지, 서버 AI·인간 입력 차단, 실제 2인 AI와 별도 프로세스 모드 복구 검증 |
-| 6 | 진행 중 · 정책 확정 | 명시적 Host 승계와 AI 이어하기 | 번호·Host 결정·영구 AI 정책 확정. 참여 DTO·로컬 권위 저장소 기반 위에 실제 전환 UI/영속 참여/복구 통합 필요 |
+| 6 | 로컬 개발 범위 완료 | 명시적 Host 승계와 AI 이어하기 | 관리 v4·영속 Human·실제 싱글 전환/실패 재시도·3→2인 새 Host 복구와 중복 실행 거절 검증. 실제 서비스는 8번 |
 | 7 | 독립 범위 검증 완료 · 승계 통합 대기 | 3·4인 검증 | 실제 3·4인 조작권·동기화·끊김·기존 Host 복구 및 연결된 소유자의 AI 모드 검증. 승계/불참 AI 통합은 6 정책·구현 후 검증 |
 | 8 | 준비 문서 완료 · 개발 서비스 준비 필요 | 실제 인증·중앙 저장·MMR 연동 | Steam P2P 우선·4B 선택. 무료 개발 범위/출시 비용·환경과 남은 랭크 정책 확인 후 실제 구현·검증 |
 
@@ -211,3 +211,21 @@ README 정합성·문서 10개의 로컬 링크 133개·diff 검사와 독립 �
 검증 파일: `Saved/Automation/T14HostPolicyBuild2.log`, `T14HostPolicyFull1/index.json`, `T14HostPolicyCombat2/index.json`, `T14HostPolicyAI1/index.json`, `T14HostPolicySnapshot1/index.json`. 최초 UI 준비 시점 실패는 Full1에 보존한다. 커밋 제목은 `[codex] 협동 참가 번호와 Host 결정권 정책 반영`이다.
 
 이 변경은 실제 싱글 전환 UI·Run 참여 상태 영속화·새 Host 전투 복구를 아직 연결하지 않았으므로 6번 전체 완료가 아니다. 이 통합을 로컬 개발 저장소로 진행한 뒤 7번 승계 검증으로 이어간다. 실제 Steam 계정 인증·원격 공동 저장·MMR·유료 서비스는 이번 검증에 포함하지 않았다.
+
+## 6번 관리 Run 통합 — 2026-09-10
+
+정책 커밋 `04ed243`의 upstream 반영 후 로컬 개발 저장소에 관리 Run v4를 연결했다. 원래 번호·캐릭터 소유권과 전투 밖 Human 목록을 보존하며, 새 Host/HostEpoch·목록·안쪽 전투 Identity/모드를 최신 stamp와 함께 원자적으로 획득한다. Human 목록은 이후 재개에서 줄어들 수만 있어 이미 AI인 계정의 인간 복귀를 막는다. 모든 관리 저장은 현재 실행 lease를 검사하고 일반 슬롯으로 우회하지 않는다. 일반 v1/v2/v3와 Snapshot v1은 유지한다.
+
+신뢰된 C++ 개발 호출자와 재개 대상이 설정된 메뉴에 **싱글로 전환하기**·**싱글 진행 이어하기**를 추가했다. 실제 Steam 계정 입력이나 온라인 로그인을 제공하는 메뉴는 아니다. 현재 Human만 연결을 배정하고 한 명이면 Standalone, 둘 이상이면 Listen Server에서 마지막 확정 턴을 복원한다. 새 전투에도 영속 AI 상태를 적용한다. 정상 종료는 전투·콜백을 중단한 뒤 lease를 반환하며 옛 Authority의 인간/AI 요청·바인딩·모드 변경도 차단한다.
+
+검토에서 메뉴 이동 실패 후 lease가 남는 문제와 v4 검증이 실패 이유를 비우는 문제를 보정했다. 관리 메뉴 여행의 TravelFailure는 GameInstance 수명으로 감시하며 같은 실행·WorldContext의 실패에서만 lease를 반환한다. 이미 확정한 Host·AI·저장 바이트는 보존하고 새 메뉴에서 다시 이어갈 수 있다. Gameplay 도착 후 복원 실패는 별도 재시도 흐름을 사용한다.
+
+- Development Editor / Win64 최종 `T14ManagedRunBuild3.log` 성공. 신규 native 4건은 2·3·4번 단독 재개·번호순 공동 재개·3C·Busy/stale·실패 원자성·일반 v4 로드 우회 거절을 검사한다.
+- 전체 `T14ManagedRunFull1/index.json` 75건 성공 51·경고 동반 성공 24·실패 0. 새 실제 관리 PIE 2건은 전용 인자가 없으면 안내만 출력하므로 다음 별도 실행과 구분한다.
+- `T14ManagedRunPIE2/index.json`의 실제 관리 PIE 2건 모두 경고 동반 성공. 3인 저장→2번 Host/3번 Client·1번 AI 복구와 실제 명령·상태/HUD 일치, 4번의 메뉴 싱글 전환·나머지 AI·결과/다음 전투·새 확정 저장을 확인했다. 마지막 전투에서 직접 lease를 닫은 뒤 옛 명령의 거절과 턴·자원 불변을 검사했다.
+- 싱글 테스트는 존재하는 비맵 패키지로 실제 TravelFailure를 발생시키고 옛 메뉴 Controller 파괴·같은 GameInstance의 새 메뉴·확정 바이트 보존·다시 이어하기·정상 전투까지 확인했다. `Saved/Automation/T14ManagedResumeMenu.png`의 실제 화면을 열어 문구와 버튼 배치를 확인했다.
+- 최초 `T14ManagedHostPIE1`은 테스트 namespace가 32자 제한을 초과해 초기화에서 실패했다. fixture를 31자로 줄인 뒤 최종 실제 PIE에서 통과했으며 production 검증 조건은 완화하지 않았다.
+- 기존 v3 AI opt-in `T14ManagedRunAI1/index.json`의 실제 2·3·4인 복구 3건과 `T14ManagedRunSnapshot1/index.json`의 별도 Snapshot 저장 맵 PIE 1건도 모두 경고 동반 성공했다. 경고는 기존 Spawn/NavMesh/GAS·PIE 종료와 의도한 연결/맵 이동 실패 경로이며 미해결 실패는 없다.
+- README 정합성·코드 교차 검토·실제 메뉴 화면 확인·문서 링크와 diff 검사 후 `[codex] 관리 Run 승계와 싱글 AI 이어하기 연결`로 커밋·push한다. Visual Studio와 패키지 빌드는 열거나 실행하지 않았다.
+
+이 통합은 동일 PC의 로컬 개발 Run을 대상으로 한다. 원격 중앙 저장·실제 Steam 계정·P2P/초대·MMR 검증은 8번에 남는다. 기존 기반의 별도 프로세스 잠금 검증을 이번 실제 원격 승계 검증으로 재사용하지 않는다. 다음 7번은 원래 4명·현재 인간 3명·불참 AI 1명의 추가 실제 PIE를 확인한다.

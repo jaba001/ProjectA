@@ -2,9 +2,11 @@
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
+#include "Components/Border.h"
 #include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
@@ -61,6 +63,32 @@ void UMainMenuScreenWidget::NativeOnInitialized()
         UOverlaySlot* StatusSlot = Root->AddChildToOverlay(SaveStatus);
         StatusSlot->SetVerticalAlignment(VAlign_Bottom);
         StatusSlot->SetPadding(FMargin(24.0f));
+        // Extend the existing Designer menu only when an explicitly selected cooperative record is available.
+        // 명시적으로 선택한 협동 기록이 있을 때만 기존 Designer 메뉴에 이어가기 영역을 표시합니다.
+        ManagedResumePanel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("ManagedResumePanel"));
+        ManagedResumePanel->SetBrushColor(FLinearColor(0.025f, 0.035f, 0.05f, 0.95f));
+        ManagedResumePanel->SetPadding(FMargin(20.0f));
+        ManagedResumePanel->SetVisibility(ESlateVisibility::Collapsed);
+        UOverlaySlot* ResumeSlot = Root->AddChildToOverlay(ManagedResumePanel);
+        ResumeSlot->SetHorizontalAlignment(HAlign_Right);
+        ResumeSlot->SetVerticalAlignment(VAlign_Center);
+        ResumeSlot->SetPadding(FMargin(24.0f));
+        USizeBox* ResumeSize = WidgetTree->ConstructWidget<USizeBox>();
+        ResumeSize->SetWidthOverride(320.0f);
+        ManagedResumePanel->SetContent(ResumeSize);
+        UVerticalBox* ResumeContent = WidgetTree->ConstructWidget<UVerticalBox>();
+        ResumeSize->SetContent(ResumeContent);
+        ManagedResumeText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_ManagedResume"));
+        ManagedResumeText->SetAutoWrapText(true);
+        ResumeContent->AddChildToVerticalBox(ManagedResumeText)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 16.0f));
+        ConvertToSoloButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_ConvertToSolo"));
+        CreateButtonText(ConvertToSoloButton, NSLOCTEXT("ManagedRunMenu", "Convert", "싱글로 전환하기"));
+        ResumeContent->AddChildToVerticalBox(ConvertToSoloButton)->SetPadding(FMargin(0.0f, 4.0f));
+        ConvertToSoloButton->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleConvertToSoloClicked);
+        ResumeSoloButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_ResumeSolo"));
+        CreateButtonText(ResumeSoloButton, NSLOCTEXT("ManagedRunMenu", "Resume", "싱글 진행 이어하기"));
+        ResumeContent->AddChildToVerticalBox(ResumeSoloButton)->SetPadding(FMargin(0.0f, 4.0f));
+        ResumeSoloButton->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleResumeSoloClicked);
     }
 }
 
@@ -77,6 +105,58 @@ void UMainMenuScreenWidget::NativeOnActivated()
     {
         SaveStatus->SetText(bCanContinue ? FText::FromString(TEXT("이어하기: 마지막 체크포인트에서 복원합니다. 새 게임을 시작하면 기존 저장을 교체합니다.")) : Error);
     }
+    URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+    Run->OnRunStateChanged.RemoveAll(this);
+    Run->OnRunStateChanged.AddUObject(this, &UMainMenuScreenWidget::RefreshResumeActions);
+    RefreshResumeActions();
+}
+
+void UMainMenuScreenWidget::NativeOnDeactivated()
+{
+    if (UGameInstance* Instance = GetGameInstance())
+    {
+        if (URunStateSubsystem* Run = Instance->GetSubsystem<URunStateSubsystem>()) Run->OnRunStateChanged.RemoveAll(this);
+    }
+    Super::NativeOnDeactivated();
+}
+
+void UMainMenuScreenWidget::RefreshResumeActions()
+{
+    if (!ManagedResumePanel || !ManagedResumeText || !ConvertToSoloButton || !ResumeSoloButton) return;
+    const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    const bool bSelected = Run && Run->GetManagedResumeTarget().IsValid();
+    ManagedResumePanel->SetVisibility(bSelected ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    ConvertToSoloButton->SetIsEnabled(false);
+    ResumeSoloButton->SetIsEnabled(false);
+    ConvertToSoloButton->SetVisibility(ESlateVisibility::Collapsed);
+    ResumeSoloButton->SetVisibility(ESlateVisibility::Collapsed);
+    if (!bSelected) return;
+    const AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer());
+    FManagedRunPreview Preview;
+    FText Error;
+    if (!Controller || !Controller->GetManagedResumePreview(Preview, Error))
+    {
+        ManagedResumeText->SetText(Error);
+        return;
+    }
+    if (Preview.Phase == ERunPhase::Complete || Preview.Phase == ERunPhase::Defeat)
+    {
+        ManagedResumeText->SetText(NSLOCTEXT("ManagedRunMenu", "Finished", "종료된 파티 진행입니다."));
+        return;
+    }
+    if (!Preview.Participation.HumanParticipants.Contains(Run->GetLocalCaller()))
+    {
+        ManagedResumeText->SetText(NSLOCTEXT("ManagedRunMenu", "AlreadyAI", "본인 캐릭터가 이미 AI로 전환된 진행입니다. 해당 Run에서는 인간 조작으로 복귀할 수 없습니다."));
+        return;
+    }
+    const FRunParticipantData* Participant = Preview.Identity.OriginalParticipants.FindByPredicate([Run](const FRunParticipantData& Entry) { return Entry.AccountId == Run->GetLocalCaller(); });
+    if (!Participant) return;
+    const bool bConvert = Preview.Participation.HumanParticipants.Num() > 1;
+    ManagedResumeText->SetText(FText::Format(bConvert ? NSLOCTEXT("ManagedRunMenu", "ConvertSummary", "파티 저장 · 본인 {0}번\n\n본인이 Host가 되어 이어갑니다. 나머지 캐릭터는 이 Run이 끝날 때까지 AI로 유지되며, 돌아와도 직접 조작할 수 없습니다.") : NSLOCTEXT("ManagedRunMenu", "ResumeSummary", "파티 저장 · 본인 {0}번\n\n본인 캐릭터로 이어갑니다. 나머지 캐릭터는 계속 AI가 조작합니다."), FText::AsNumber(Participant->JoinOrdinal)));
+    ConvertToSoloButton->SetVisibility(bConvert ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    ConvertToSoloButton->SetIsEnabled(bConvert);
+    ResumeSoloButton->SetVisibility(bConvert ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+    ResumeSoloButton->SetIsEnabled(!bConvert);
 }
 
 void UMainMenuScreenWidget::EnsureCodeGeneratedLayout()
@@ -212,6 +292,32 @@ void UMainMenuScreenWidget::HandleContinueClicked()
         if (!Controller->ContinueSavedGame(Error) && SaveStatus)
         {
             SaveStatus->SetText(Error);
+        }
+    }
+}
+
+void UMainMenuScreenWidget::HandleConvertToSoloClicked()
+{
+    if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
+    {
+        FText Error;
+        if (!Controller->ConvertManagedRunToSolo(Error))
+        {
+            RefreshResumeActions();
+            if (ManagedResumeText) ManagedResumeText->SetText(Error);
+        }
+    }
+}
+
+void UMainMenuScreenWidget::HandleResumeSoloClicked()
+{
+    if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
+    {
+        FText Error;
+        if (!Controller->ContinueManagedSoloRun(Error))
+        {
+            RefreshResumeActions();
+            if (ManagedResumeText) ManagedResumeText->SetText(Error);
         }
     }
 }

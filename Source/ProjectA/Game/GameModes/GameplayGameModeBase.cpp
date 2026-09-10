@@ -10,6 +10,7 @@
 #include "Game/GameState/GameplayGameState.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunIdentityLibrary.h"
+#include "Game/Run/RunParticipationLibrary.h"
 #include "Engine/GameInstance.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "TimerManager.h"
@@ -96,7 +97,25 @@ void AGameplayGameModeBase::InitializeGameplay()
         }
     }
     URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
-    if (GetNetMode() == NM_Standalone && Run->HasCombatCheckpoint())
+    if (Run->IsManagedRun())
+    {
+        // The trusted development caller owns this local server; never claim an account from a UI field.
+        // 신뢰된 개발 호출자가 이 로컬 서버를 소유하며 UI 입력으로 계정을 주장하지 않습니다.
+        for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+        {
+            APartyPlayerController* Controller = Cast<APartyPlayerController>(It->Get());
+            if (Controller && Controller->IsLocalController())
+            {
+                AssignRunParticipant(Controller, Run->GetLocalCaller());
+            }
+        }
+        FText Error;
+        if (!EncounterManager->ResumeManagedGameplay(Error))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[Gameplay] Managed Run is waiting for resume: %s"), *Error.ToString());
+        }
+    }
+    else if (GetNetMode() == NM_Standalone && Run->HasCombatCheckpoint())
     {
         FText Error;
         if (!EncounterManager->RestoreSavedCombat(Run->GetRunIdentity().HostAccountId, Error))
@@ -125,7 +144,7 @@ bool AGameplayGameModeBase::AssignRunParticipant(APartyPlayerController* Control
         return false;
     }
     URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
-    if (!URunIdentityLibrary::IsOriginalParticipant(Run->GetRunIdentity(), AccountId))
+    if (!URunIdentityLibrary::IsOriginalParticipant(Run->GetRunIdentity(), AccountId) || (Run->IsManagedRun() && (!Run->HasManagedLease() || Run->GetLocalCaller() != Run->GetRunIdentity().HostAccountId || !Run->GetParticipation().HumanParticipants.Contains(AccountId) || (Controller->IsLocalController() ? AccountId != Run->GetLocalCaller() : AccountId == Run->GetRunIdentity().HostAccountId))))
     {
         return false;
     }
@@ -146,21 +165,36 @@ bool AGameplayGameModeBase::AssignRunParticipant(APartyPlayerController* Control
         }
     }
     RunParticipants.Add(Key, AccountId);
-    if (AGameplayPlayerController* GameplayController = Cast<AGameplayPlayerController>(Controller); GameplayController && GameplayController->IsLocalController())
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
-        GameplayController->RefreshRunFlowPermissions();
+        if (AGameplayPlayerController* GameplayController = Cast<AGameplayPlayerController>(It->Get()); GameplayController && GameplayController->IsLocalController())
+        {
+            GameplayController->RefreshRunFlowPermissions();
+        }
     }
     return true;
 }
 
-bool AGameplayGameModeBase::CanControlRunFlow(const APartyPlayerController* Controller) const
+bool AGameplayGameModeBase::CanControlRunFlow(const APartyPlayerController* Controller, bool bAllowResumePending) const
 {
-    if (!HasAuthority() || GetNetMode() != NM_ListenServer || !IsValid(Controller) || Controller->GetWorld() != GetWorld() || !Controller->HasAuthority() || !Controller->IsLocalController() || !GetGameInstance())
+    if (!HasAuthority() || !IsValid(Controller) || Controller->GetWorld() != GetWorld() || !Controller->HasAuthority() || !Controller->IsLocalController() || !GetGameInstance())
     {
         return false;
     }
     const URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
     if (!Run || !Run->GetRunIdentity().RunId.IsValid() || !URunIdentityLibrary::IsOriginalParticipant(Run->GetRunIdentity(), Run->GetRunIdentity().HostAccountId))
+    {
+        return false;
+    }
+    if (Run->IsManagedRun())
+    {
+        FText Error;
+        if ((!bAllowResumePending && Run->IsManagedResumePending()) || !ValidateManagedRunConnections(Error))
+        {
+            return false;
+        }
+    }
+    else if (GetNetMode() != NM_ListenServer)
     {
         return false;
     }
@@ -181,6 +215,26 @@ bool AGameplayGameModeBase::ApplyCombatParticipantBindings(UCombatActionAuthorit
         return false;
     }
     const FRunIdentityData& Identity = Authority->GetRunIdentity();
+    const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    if (Run && Run->IsManagedRun())
+    {
+        FText Error;
+        if (!ValidateManagedRunConnections(Error) || !FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Run->GetRunIdentity(), 0))
+        {
+            return false;
+        }
+        for (const FRunAccountId& Human : Run->GetParticipation().HumanParticipants)
+        {
+            for (const TPair<TWeakObjectPtr<APartyPlayerController>, FRunAccountId>& Entry : RunParticipants)
+            {
+                if (Entry.Key.IsValid() && Entry.Value == Human && !Authority->BindParticipant(Entry.Key.Get(), Human))
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
     if (Identity.Origin == ERunIdentityOrigin::LegacyOffline || Identity.OriginalParticipants.Num() < 2 || Identity.OriginalParticipants.Num() > 4)
     {
         return false;
@@ -201,6 +255,44 @@ bool AGameplayGameModeBase::ApplyCombatParticipantBindings(UCombatActionAuthorit
             return false;
         }
     }
+    return true;
+}
+
+bool AGameplayGameModeBase::ValidateManagedRunConnections(FText& OutError) const
+{
+    const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    OutError = FText::FromString(TEXT("관리 Run을 실행할 현재 Host의 유효한 로컬 권한이 필요합니다."));
+    if (!HasAuthority() || !Run || !Run->IsManagedRun() || !Run->HasManagedLease() || Run->GetRunIdentity().Origin != ERunIdentityOrigin::LocalDevelopment || Run->GetLocalCaller() != Run->GetRunIdentity().HostAccountId || (GetNetMode() != NM_Standalone && GetNetMode() != NM_ListenServer))
+    {
+        return false;
+    }
+    if (!URunParticipationLibrary::Validate(Run->GetParticipation(), Run->GetRunIdentity(), Run->GetPartyMembers(), OutError))
+    {
+        return false;
+    }
+    if (GetNetMode() == NM_Standalone && (Run->GetParticipation().HumanParticipants.Num() != 1 || Run->GetParticipation().HumanParticipants[0] != Run->GetLocalCaller()))
+    {
+        OutError = FText::FromString(TEXT("싱글 재개에는 현재 Host 한 명만 인간 참가자로 남아 있어야 합니다."));
+        return false;
+    }
+    for (const FRunAccountId& Human : Run->GetParticipation().HumanParticipants)
+    {
+        APartyPlayerController* Match = nullptr;
+        for (const TPair<TWeakObjectPtr<APartyPlayerController>, FRunAccountId>& Entry : RunParticipants)
+        {
+            if (Entry.Key.IsValid() && Entry.Value == Human)
+            {
+                Match = Entry.Key.Get();
+                break;
+            }
+        }
+        if (!Match || Match->GetWorld() != GetWorld() || Match->IsLocalController() != (Human == Run->GetRunIdentity().HostAccountId))
+        {
+            OutError = FText::FromString(TEXT("현재 인간 참가자 모두의 서버 연결 배정이 필요합니다. 불참자는 자동으로 AI 전환되지 않습니다."));
+            return false;
+        }
+    }
+    OutError = FText::GetEmpty();
     return true;
 }
 
@@ -239,5 +331,16 @@ void AGameplayGameModeBase::Logout(AController* Exiting)
 void AGameplayGameModeBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     GetWorldTimerManager().ClearTimer(InitializeTimer);
+    URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    if (Run && Run->IsManagedRun())
+    {
+        // Stop actors and callbacks before releasing the execution lease retained by the GameInstance.
+        // GameInstance가 보유한 실행 lease를 반환하기 전에 액터와 콜백을 중단합니다.
+        if (IsValid(EncounterManager))
+        {
+            EncounterManager->ShutdownGameplay();
+        }
+        Run->CloseManagedRun();
+    }
     Super::EndPlay(EndPlayReason);
 }

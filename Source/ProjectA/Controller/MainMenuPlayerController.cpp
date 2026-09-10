@@ -165,3 +165,54 @@ bool AMainMenuPlayerController::ContinueSavedGame(FText& OutError)
     UGameplayStatics::OpenLevel(this, GameplayLevelName);
     return true;
 }
+
+bool AMainMenuPlayerController::GetManagedResumePreview(FManagedRunPreview& OutPreview, FText& OutError) const
+{
+    OutError = NSLOCTEXT("ManagedRunMenu", "Unavailable", "이어갈 파티 저장과 본인 참가 정보가 필요합니다.");
+    const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    if (!HasAuthority() || !IsLocalController() || GetNetMode() != NM_Standalone || !Run || !Run->GetManagedResumeTarget().IsValid()) return false;
+    if (Run->HasManagedLease())
+    {
+        OutError = NSLOCTEXT("ManagedRunMenu", "Running", "현재 진행을 종료한 뒤 저장에서 이어갈 수 있습니다.");
+        return false;
+    }
+    return Run->ReadManagedRun(Run->GetManagedResumeTarget(), OutPreview, OutError);
+}
+
+bool AMainMenuPlayerController::ConvertManagedRunToSolo(FText& OutError)
+{
+    return StartManagedSolo(true, OutError);
+}
+
+bool AMainMenuPlayerController::ContinueManagedSoloRun(FText& OutError)
+{
+    return StartManagedSolo(false, OutError);
+}
+
+bool AMainMenuPlayerController::StartManagedSolo(bool bConvert, FText& OutError)
+{
+    if (GameplayLevelName.IsNone() || !FPackageName::DoesPackageExist(GameplayLevelName.ToString()))
+    {
+        OutError = NSLOCTEXT("ManagedRunMenu", "MissingMap", "Gameplay 레벨을 찾을 수 없습니다.");
+        return false;
+    }
+    FManagedRunPreview Preview;
+    if (!GetManagedResumePreview(Preview, OutError)) return false;
+    URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+    const FRunAccountId Caller = Run->GetLocalCaller();
+    if (!Preview.Participation.HumanParticipants.Contains(Caller) || (bConvert ? Preview.Participation.HumanParticipants.Num() <= 1 : Preview.Participation.HumanParticipants.Num() != 1))
+    {
+        OutError = NSLOCTEXT("ManagedRunMenu", "RosterChanged", "참가 상태가 바뀌었거나 이미 AI로 전환된 캐릭터입니다. 해당 Run에서는 인간 조작으로 복귀할 수 없습니다.");
+        return false;
+    }
+    // Compare the freshly read stamp again during acquisition before publishing a new Host or opening gameplay.
+    // 새 Host를 공개하거나 Gameplay를 열기 전에 획득 과정에서 방금 읽은 기록을 다시 대조합니다.
+    if (!Run->ResumeManagedRun(Preview.Stamp, { Caller }, OutError)) return false;
+    if (!Run->BeginManagedMenuTravel(OutError))
+    {
+        Run->CloseManagedRun();
+        return false;
+    }
+    UGameplayStatics::OpenLevel(this, GameplayLevelName);
+    return true;
+}

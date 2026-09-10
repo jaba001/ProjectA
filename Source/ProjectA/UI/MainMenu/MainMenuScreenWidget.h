@@ -8,6 +8,7 @@ class UButton;
 class UImage;
 class UTextBlock;
 class UVerticalBox;
+class UBorder;
 
 // Main menu screen widget base for blueprint button callbacks.
 // 블루프린트 버튼 콜백을 위한 메인메뉴 화면 위젯 기반 클래스입니다.
@@ -27,11 +28,14 @@ public:
     UFUNCTION(BlueprintCallable, Category = "MainMenu")
     void RequestQuitGame();
 
+    void RefreshResumeActions();
+
 protected:
     // Initializes fallback menu layout and button events.
     // 대체 메뉴 레이아웃과 버튼 이벤트를 초기화합니다.
     virtual void NativeOnInitialized() override;
     virtual void NativeOnActivated() override;
+    virtual void NativeOnDeactivated() override;
 
     // Enables native C++ layout creation when designer widgets are absent.
     // 디자이너 위젯이 없을 때 네이티브 C++ 레이아웃 생성을 활성화합니다.
@@ -83,6 +87,14 @@ protected:
 private:
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> SaveStatus;
+    UPROPERTY(Transient)
+    TObjectPtr<UBorder> ManagedResumePanel;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> ManagedResumeText;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> ConvertToSoloButton;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> ResumeSoloButton;
     // Creates the fallback main menu layout in C++.
     // C++에서 대체 메인메뉴 레이아웃을 생성합니다.
     void EnsureCodeGeneratedLayout();
@@ -104,6 +116,12 @@ private:
 
     UFUNCTION()
     void HandleContinueClicked();
+
+    UFUNCTION()
+    void HandleConvertToSoloClicked();
+
+    UFUNCTION()
+    void HandleResumeSoloClicked();
 
     UFUNCTION()
     void HandleOptionsClicked();

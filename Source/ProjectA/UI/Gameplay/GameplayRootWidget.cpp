@@ -101,7 +101,7 @@ void UGameplayRootWidget::HandleRetryCheckpoint()
 void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands, bool bCanRetryCheckpoint)
 {
     const ERunPhase Phase = View.Phase;
-    CheckpointNotice->SetVisibility(Phase == ERunPhase::Combat && !View.FlowMessage.IsEmpty() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    CheckpointNotice->SetVisibility((Phase == ERunPhase::Combat && !View.FlowMessage.IsEmpty()) || bCanRetryCheckpoint ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     CheckpointMessage->SetText(View.FlowMessage);
     RetryCheckpointButton->SetVisibility(bCanRetryCheckpoint ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 

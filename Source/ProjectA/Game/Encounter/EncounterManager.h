@@ -33,9 +33,11 @@ public:
     // Restore only a validated idle boundary for the original host and original participants.
     // 기존 Host와 원래 참가자에 대해 검증된 유휴 경계만 복원합니다.
     bool RestoreSavedCombat(const FRunAccountId& HostAccount, FText& OutError);
+    bool ResumeManagedGameplay(FText& OutError);
     bool RetryCombatCheckpoint(FText& OutError);
     bool CanRetryCombatCheckpoint() const;
     void SuspendForDisconnectedParticipant();
+    void ShutdownGameplay();
 
     FText GetFlowMessage() const { return FlowMessage; }
     ACombatManager* GetCombatManager() const { return CombatManager; }
@@ -58,6 +60,8 @@ private:
     void EnableCombatCheckpoints();
     bool ValidateRestoreArena(const FCombatCheckpointData& Checkpoint, FText& OutError) const;
     bool FailRestore(const FText& Error, FText& OutError);
+    bool ValidateManagedExecution(FText& OutError, bool bAllowResumePending = false) const;
+    bool ValidateManagedCheckpointModes(const FCombatCheckpointData& Checkpoint, FText& OutError) const;
 
     UPROPERTY(Transient)
     TObjectPtr<URunStateSubsystem> RunState;
@@ -84,6 +88,7 @@ private:
     ECombatResult PendingResult = ECombatResult::None;
     FTimerHandle FinishTimer;
     bool bPreparing = false;
+    bool bShuttingDown = false;
 
     UPROPERTY(Transient)
     FCombatCheckpointData PendingTurnCheckpoint;

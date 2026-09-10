@@ -9,6 +9,7 @@ class UCharacterCreationWidget;
 class UMainMenuRootWidget;
 class UMainMenuScreenWidget;
 class AMainMenuPreviewStage;
+struct FManagedRunPreview;
 
 // Player controller that creates and drives the CommonUI main menu.
 // CommonUI 메인메뉴를 생성하고 제어하는 플레이어 컨트롤러입니다.
@@ -56,6 +57,12 @@ public:
 
     bool ContinueSavedGame(FText& OutError);
 
+    // Read the selected shared development record using the configured caller, never an account supplied by UI.
+    // UI가 입력한 계정 대신 설정된 호출자로 선택된 개발용 공유 기록을 읽습니다.
+    bool GetManagedResumePreview(FManagedRunPreview& OutPreview, FText& OutError) const;
+    bool ConvertManagedRunToSolo(FText& OutError);
+    bool ContinueManagedSoloRun(FText& OutError);
+
 protected:
     // Root widget class assigned by the main menu player controller blueprint.
     // 메인메뉴 플레이어 컨트롤러 블루프린트에서 지정하는 루트 위젯 클래스입니다.
@@ -89,4 +96,7 @@ protected:
 
     UPROPERTY(Transient)
     TObjectPtr<UCharacterCreationWidget> ActiveCharacterCreationWidget;
+
+private:
+    bool StartManagedSolo(bool bConvert, FText& OutError);
 };

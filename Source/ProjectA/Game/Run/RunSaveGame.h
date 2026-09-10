@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
 #include "Game/Run/RunTypes.h"
+#include "Game/Run/RunParticipationTypes.h"
 #include "Combat/Checkpoint/CombatCheckpointTypes.h"
 #include "Types/CombatResult.h"
 #include "RunSaveGame.generated.h"
@@ -17,6 +18,8 @@ public:
     int32 Version = 2;
     UPROPERTY()
     FRunIdentityData Identity;
+    UPROPERTY()
+    FRunParticipationData Participation;
     UPROPERTY()
     TArray<FRunPartyMember> Party;
     UPROPERTY()

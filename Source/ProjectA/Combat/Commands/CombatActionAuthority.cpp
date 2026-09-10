@@ -4,8 +4,11 @@
 #include "Combat/Library/CombatTargetingLibrary.h"
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Game/Run/RunIdentityLibrary.h"
+#include "Game/Run/RunParticipationLibrary.h"
+#include "Game/Run/RunStateSubsystem.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Unit/UnitBase.h"
 #include "Unit/PlayerUnit.h"
@@ -15,10 +18,37 @@ ACombatManager* UCombatActionAuthority::GetManager() const
     return GetTypedOuter<ACombatManager>();
 }
 
+bool UCombatActionAuthority::HasManagedExecutionAuthority(bool bAllowResumePending) const
+{
+    const ACombatManager* Manager = GetManager();
+    const URunStateSubsystem* Run = IsValid(Manager) && Manager->GetGameInstance() ? Manager->GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    if (!bManagedExecution)
+    {
+        return !Run || !Run->IsManagedRun();
+    }
+    if (!bRunConfigured || !Run || !Run->IsManagedRun() || !Run->HasManagedLease() || (!bAllowResumePending && Run->IsManagedResumePending()) || Run->GetRunIdentity().Origin != ERunIdentityOrigin::LocalDevelopment || Run->GetLocalCaller() != RunIdentity.HostAccountId || !ManagedSessionId.IsValid() || ManagedSessionId != Run->GetManagedStamp().SessionId || !FRunIdentityData::StaticStruct()->CompareScriptStruct(&RunIdentity, &Run->GetRunIdentity(), 0))
+    {
+        return false;
+    }
+    FText Error;
+    return URunParticipationLibrary::Validate(Run->GetParticipation(), RunIdentity, PartyMembers, Error);
+}
+
+bool UCombatActionAuthority::IsManagedHumanParticipant(const FRunAccountId& AccountId) const
+{
+    if (!bManagedExecution)
+    {
+        return true;
+    }
+    const ACombatManager* Manager = GetManager();
+    const URunStateSubsystem* Run = IsValid(Manager) && Manager->GetGameInstance() ? Manager->GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    return Run && Run->IsManagedRun() && Run->GetParticipation().HumanParticipants.Contains(AccountId);
+}
+
 void UCombatActionAuthority::Reset()
 {
-    // Preserve the Run requirement so clearing a failed configuration cannot reopen offline compatibility.
-    // 실패한 설정을 지워도 오프라인 호환이 다시 열리지 않도록 Run 설정 필요 여부를 유지합니다.
+    // Preserve Run and managed requirements so clearing a configuration or lease never opens offline compatibility.
+    // 설정이나 lease를 지워도 오프라인 호환이 열리지 않도록 Run 및 관리 실행 필요 여부를 유지합니다.
     for (const TPair<TWeakObjectPtr<APartyPlayerController>, FRunAccountId>& Entry : Participants)
     {
         if (Entry.Key.IsValid())
@@ -33,6 +63,7 @@ void UCombatActionAuthority::Reset()
     LastRequestSequences.Reset();
     LastAIRequestSequences.Reset();
     CombatInstanceId.Invalidate();
+    ManagedSessionId.Invalidate();
     RunIdentity = FRunIdentityData();
     PartyMembers.Reset();
     bRunConfigured = false;
@@ -58,7 +89,7 @@ void UCombatActionAuthority::RegisterUnits(const TArray<AUnitBase*>& Units)
 void UCombatActionAuthority::BeginCombat()
 {
     ACombatManager* Manager = GetManager();
-    if (!IsValid(Manager) || !Manager->HasAuthority())
+    if (!IsValid(Manager) || !Manager->HasAuthority() || !HasManagedExecutionAuthority(true))
     {
         return;
     }
@@ -76,7 +107,7 @@ void UCombatActionAuthority::BeginCombat()
     UnitsById = MoveTemp(NewIds);
 }
 
-bool UCombatActionAuthority::ConfigureRun(const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, const TMap<int32, TObjectPtr<AUnitBase>>& PartyActors, FText& OutError)
+bool UCombatActionAuthority::ConfigureRun(const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, const TMap<int32, TObjectPtr<AUnitBase>>& PartyActors, FText& OutError, bool bManaged)
 {
     ACombatManager* Manager = GetManager();
     if (!IsValid(Manager) || !Manager->HasAuthority() || Manager->GetTurnManager())
@@ -87,6 +118,28 @@ bool UCombatActionAuthority::ConfigureRun(const FRunIdentityData& Identity, cons
     bRequiresRunConfiguration = true;
     bRunConfigured = false;
     CharacterIds.Reset();
+    const URunStateSubsystem* Run = Manager->GetGameInstance() ? Manager->GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    bManagedExecution = bManagedExecution || bManaged || (Run && Run->IsManagedRun());
+    ManagedSessionId.Invalidate();
+    if (bManagedExecution)
+    {
+        OutError = NSLOCTEXT("CombatRequest", "ManagedConfigure", "관리 전투는 현재 Host의 유효한 실행 lease와 동일한 Run 데이터로만 설정할 수 있습니다.");
+        if (!bManaged || !Run || !Run->IsManagedRun() || !Run->HasManagedLease() || Identity.Origin != ERunIdentityOrigin::LocalDevelopment || Run->GetLocalCaller() != Identity.HostAccountId || !FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Run->GetRunIdentity(), 0) || Members.Num() != Run->GetPartyMembers().Num())
+        {
+            return false;
+        }
+        for (int32 Index = 0; Index < Members.Num(); ++Index)
+        {
+            if (!FRunPartyMember::StaticStruct()->CompareScriptStruct(&Members[Index], &Run->GetPartyMembers()[Index], 0))
+            {
+                return false;
+            }
+        }
+        if (!URunParticipationLibrary::Validate(Run->GetParticipation(), Identity, Members, OutError))
+        {
+            return false;
+        }
+    }
     if (!URunIdentityLibrary::ValidateIdentity(Identity, Members, OutError))
     {
         return false;
@@ -133,6 +186,7 @@ bool UCombatActionAuthority::ConfigureRun(const FRunIdentityData& Identity, cons
     PartyMembers = Members;
     CharacterIds = MoveTemp(NewCharacterIds);
     bRunConfigured = true;
+    ManagedSessionId = bManagedExecution ? Run->GetManagedStamp().SessionId : FGuid();
     for (const TPair<int32, TObjectPtr<AUnitBase>>& Entry : PartyActors)
     {
         if (APlayerUnit* Player = Cast<APlayerUnit>(Entry.Value))
@@ -147,7 +201,7 @@ bool UCombatActionAuthority::ConfigureRun(const FRunIdentityData& Identity, cons
 bool UCombatActionAuthority::BindParticipant(APartyPlayerController* Controller, const FRunAccountId& AccountId)
 {
     ACombatManager* Manager = GetManager();
-    if (!IsValid(Manager) || !Manager->HasAuthority() || !IsValid(Controller) || Controller->GetWorld() != Manager->GetWorld() || !bRunConfigured || !URunIdentityLibrary::IsOriginalParticipant(RunIdentity, AccountId))
+    if (!IsValid(Manager) || !Manager->HasAuthority() || !IsValid(Controller) || Controller->GetWorld() != Manager->GetWorld() || !bRunConfigured || !HasManagedExecutionAuthority(true) || !IsManagedHumanParticipant(AccountId) || !URunIdentityLibrary::IsOriginalParticipant(RunIdentity, AccountId))
     {
         return false;
     }
@@ -187,13 +241,13 @@ FGuid UCombatActionAuthority::GetParticipantBindingId(const APartyPlayerControll
 bool UCombatActionAuthority::AllowsStandaloneLegacy(const APartyPlayerController* Controller) const
 {
     const ACombatManager* Manager = GetManager();
-    return IsValid(Manager) && IsValid(Controller) && Manager->GetNetMode() == NM_Standalone && Controller->IsLocalController() && RunIdentity.Origin == ERunIdentityOrigin::LegacyOffline && (!bRequiresRunConfiguration || bRunConfigured);
+    return !bManagedExecution && IsValid(Manager) && IsValid(Controller) && Manager->GetNetMode() == NM_Standalone && Controller->IsLocalController() && RunIdentity.Origin == ERunIdentityOrigin::LegacyOffline && (!bRequiresRunConfiguration || bRunConfigured);
 }
 
 bool UCombatActionAuthority::CanControllerControl(const APartyPlayerController* Controller, const AUnitBase* Unit) const
 {
     const ACombatManager* Manager = GetManager();
-    if (!IsValid(Manager) || !Manager->HasAuthority() || !IsValid(Controller) || !IsValid(Unit) || Controller->GetWorld() != Manager->GetWorld() || Unit->GetWorld() != Manager->GetWorld() || Controller->GetCombatManager() != Manager || Unit->GetTeam() != ETeam::Player || !GetUnitId(Unit).IsValid() || !Manager->GetRegisteredUnits().Contains(Unit))
+    if (!IsValid(Manager) || !Manager->HasAuthority() || !HasManagedExecutionAuthority(false) || !IsValid(Controller) || !IsValid(Unit) || Controller->GetWorld() != Manager->GetWorld() || Unit->GetWorld() != Manager->GetWorld() || Controller->GetCombatManager() != Manager || Unit->GetTeam() != ETeam::Player || !GetUnitId(Unit).IsValid() || !Manager->GetRegisteredUnits().Contains(Unit))
     {
         return false;
     }
@@ -211,7 +265,7 @@ bool UCombatActionAuthority::CanControllerControl(const APartyPlayerController* 
     }
     const FRunAccountId* Participant = Participants.Find(TWeakObjectPtr<APartyPlayerController>(const_cast<APartyPlayerController*>(Controller)));
     const FGuid* CharacterId = CharacterIds.Find(TWeakObjectPtr<AUnitBase>(const_cast<AUnitBase*>(Unit)));
-    return Participant && CharacterId && GetParticipantBindingId(Controller).IsValid() && URunIdentityLibrary::IsCharacterOwner(RunIdentity, PartyMembers, *CharacterId, *Participant);
+    return Participant && CharacterId && IsManagedHumanParticipant(*Participant) && GetParticipantBindingId(Controller).IsValid() && URunIdentityLibrary::IsCharacterOwner(RunIdentity, PartyMembers, *CharacterId, *Participant);
 }
 
 FGuid UCombatActionAuthority::GetUnitId(const AUnitBase* Unit) const
@@ -275,7 +329,7 @@ FCombatActionResponse UCombatActionAuthority::Execute(APartyPlayerController* Co
         return Response;
     };
     ACombatManager* Manager = GetManager();
-    if (!IsValid(Manager) || !Manager->HasAuthority() || !IsValid(Controller) || Controller->GetWorld() != Manager->GetWorld() || Controller->GetCombatManager() != Manager || !Manager->IsCombatActive() || !CombatInstanceId.IsValid() || Request.CombatInstanceId != CombatInstanceId || (bRequiresRunConfiguration && !bRunConfigured) || Request.RunId != RunIdentity.RunId || Request.HostEpoch != RunIdentity.HostEpoch)
+    if (!IsValid(Manager) || !Manager->HasAuthority() || !HasManagedExecutionAuthority(false) || !IsValid(Controller) || Controller->GetWorld() != Manager->GetWorld() || Controller->GetCombatManager() != Manager || !Manager->IsCombatActive() || !CombatInstanceId.IsValid() || Request.CombatInstanceId != CombatInstanceId || (bRequiresRunConfiguration && !bRunConfigured) || Request.RunId != RunIdentity.RunId || Request.HostEpoch != RunIdentity.HostEpoch)
     {
         return Reject(ECombatRequestResult::InvalidContext, TEXT("현재 서버 전투와 일치하지 않거나 전투 입력을 받을 수 없습니다."));
     }
@@ -350,8 +404,13 @@ bool UCombatActionAuthority::SetPartyControlMode(APlayerUnit* Unit, EPartyContro
 {
     OutError = FText::FromString(TEXT("원래 소유자가 확인된 유휴 아군의 조작 방식은 서버에서 전투 시작 전에만 설정할 수 있습니다."));
     ACombatManager* Manager = GetManager();
-    if (!IsValid(Manager) || !Manager->HasAuthority() || Manager->GetTurnManager() || !bRunConfigured || !IsValid(Unit) || Unit->GetWorld() != Manager->GetWorld() || Unit->GetTeam() != ETeam::Player || !HasOriginalOwner(Unit) || !GetUnitId(Unit).IsValid() || !Manager->GetRegisteredUnits().Contains(Unit) || (Mode != EPartyControlMode::Human && Mode != EPartyControlMode::ServerAI))
+    if (!IsValid(Manager) || !Manager->HasAuthority() || !HasManagedExecutionAuthority(true) || Manager->GetTurnManager() || !bRunConfigured || !IsValid(Unit) || Unit->GetWorld() != Manager->GetWorld() || Unit->GetTeam() != ETeam::Player || !HasOriginalOwner(Unit) || !GetUnitId(Unit).IsValid() || !Manager->GetRegisteredUnits().Contains(Unit) || (Mode != EPartyControlMode::Human && Mode != EPartyControlMode::ServerAI))
     {
+        return false;
+    }
+    if (bManagedExecution && Mode != (IsManagedHumanParticipant(GetOwnerAccountId(Unit)) ? EPartyControlMode::Human : EPartyControlMode::ServerAI))
+    {
+        OutError = NSLOCTEXT("CombatRequest", "ManagedControlMode", "관리 Run의 영속 인간 참가 목록과 다른 조작 방식은 적용할 수 없습니다.");
         return false;
     }
     if (!Unit->ApplyPartyControlMode(Mode))
@@ -371,7 +430,7 @@ FCombatActionResponse UCombatActionAuthority::ExecuteServerAI(APlayerUnit* Unit,
     Response.Result = ECombatRequestResult::InvalidContext;
     Response.Message = FText::FromString(TEXT("현재 서버 AI의 전투·조작 세션과 일치하지 않습니다."));
     ACombatManager* Manager = GetManager();
-    if (!IsValid(Manager) || !Manager->HasAuthority() || !Manager->IsCombatActive() || !bRunConfigured || !IsValid(Unit) || Unit->GetTeam() != ETeam::Player || ResolveUnit(Request.UnitId) != Unit || !Unit->IsServerAIControlled() || !HasOriginalOwner(Unit) || !ControlSessionId.IsValid() || Unit->GetAIControlSessionId() != ControlSessionId || !CombatInstanceId.IsValid() || Request.CombatInstanceId != CombatInstanceId || Request.RunId != RunIdentity.RunId || Request.HostEpoch != RunIdentity.HostEpoch || Request.ParticipantBindingId.IsValid())
+    if (!IsValid(Manager) || !Manager->HasAuthority() || !HasManagedExecutionAuthority(true) || !Manager->IsCombatActive() || !bRunConfigured || !IsValid(Unit) || Unit->GetTeam() != ETeam::Player || ResolveUnit(Request.UnitId) != Unit || !Unit->IsServerAIControlled() || !HasOriginalOwner(Unit) || (bManagedExecution && IsManagedHumanParticipant(GetOwnerAccountId(Unit))) || !ControlSessionId.IsValid() || Unit->GetAIControlSessionId() != ControlSessionId || !CombatInstanceId.IsValid() || Request.CombatInstanceId != CombatInstanceId || Request.RunId != RunIdentity.RunId || Request.HostEpoch != RunIdentity.HostEpoch || Request.ParticipantBindingId.IsValid())
     {
         return Response;
     }

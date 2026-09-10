@@ -23,7 +23,7 @@ public:
     void Reset();
     void RegisterUnits(const TArray<AUnitBase*>& Units);
     void BeginCombat();
-    bool ConfigureRun(const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, const TMap<int32, TObjectPtr<AUnitBase>>& PartyActors, FText& OutError);
+    bool ConfigureRun(const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, const TMap<int32, TObjectPtr<AUnitBase>>& PartyActors, FText& OutError, bool bManaged = false);
 
     // Only trusted server code may bind a connection; no account claim arrives in the command payload.
     // 신뢰된 서버 코드만 연결을 바인딩하며 명령에는 계정 주장을 받지 않습니다.
@@ -42,6 +42,8 @@ public:
 
 private:
     ACombatManager* GetManager() const;
+    bool HasManagedExecutionAuthority(bool bAllowResumePending) const;
+    bool IsManagedHumanParticipant(const FRunAccountId& AccountId) const;
     bool AllowsStandaloneLegacy(const APartyPlayerController* Controller) const;
     bool HasOriginalOwner(const APlayerUnit* Unit) const;
     FCombatActionResponse ExecuteUnitAction(AUnitBase* Unit, const FCombatActionRequest& Request);
@@ -59,6 +61,8 @@ private:
     TMap<TWeakObjectPtr<APartyPlayerController>, int64> LastRequestSequences;
     TMap<FGuid, int64> LastAIRequestSequences;
     FGuid CombatInstanceId;
+    FGuid ManagedSessionId;
     bool bRequiresRunConfiguration = false;
+    bool bManagedExecution = false;
     bool bRunConfigured = false;
 };

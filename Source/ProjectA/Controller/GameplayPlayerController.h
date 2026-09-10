@@ -40,6 +40,7 @@ protected:
 
 private:
     void RefreshGameplayFlow();
+    bool CanRetryGameplayRecovery() const;
     void TryBindGameplayState();
     FTimerHandle BindStateTimer;
 

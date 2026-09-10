@@ -14,7 +14,7 @@
 
 ## 저장 계약
 
-- 전투 중 저장은 `RunSaveGame` v3다. 전투 밖 v1/v2 형식과 읽기는 유지하며, v1의 `LegacyOffline` 소유권을 추정해 전투 복구 대상으로 이관하지 않는다.
+- 일반 전투 중 저장은 `RunSaveGame` v3다. 전투 밖 v1/v2 형식과 읽기는 유지하며, v1의 `LegacyOffline` 소유권을 추정해 전투 복구 대상으로 이관하지 않는다. 6번 관리 Run은 전투 밖 인간 참가 목록을 추가한 v4로 모든 단계를 저장한다.
 - `FCombatCheckpointData`는 스키마/콘텐츠 버전, 전투 시도 `AttemptId`, 순번 `Revision`, Run/원래 참가자/Host, 노드·인카운터, 완료 턴과 다음 유닛 인덱스를 저장한다.
 - `Units` 배열이 턴 순서다. 각 유닛은 체크포인트 ID, 원래 캐릭터/소유자/파티 슬롯, 팀, 클래스 에셋 경로, 이름, HP/MaxHP·AP/SubAP·상한, 이동 범위, 회복약, 사망, 타일 좌표, 변환, 순서 있는 실제 장착과 기본 공격을 저장한다.
 - 상대 Snapshot 전투는 읽어 온 원본 본문·카탈로그와 해석한 실제 유닛 빌드를 보존한다. 복원할 때 외부 상대 슬롯을 다시 읽거나 `EncounterSkillPool`을 다시 추첨하지 않는다.
@@ -37,7 +37,9 @@ UE 5.7 기본 `SaveGameToSlot`은 직접 덮어쓰고, `IFileManager::Move`의 �
 
 메인 메뉴는 `CanContinueStandaloneSavedRun`으로 버튼 상태를 확인하고 `LoadStandaloneCheckpoint`로 클릭 시 로드한 본문을 다시 검증한다. 기존 v1 오프라인 저장과 참가자 한 명의 LocalDevelopment v2/v3만 허용한다. 유효한 협동·AccountProvider 저장도 이 메뉴에서는 세션이 필요하다는 안내와 함께 거절하며, 현재 Run이나 저장을 바꾸거나 Gameplay로 이동하지 않는다. 일반 `CanContinueSavedRun`·`LoadCheckpoint`의 협동 저장 지원은 유지한다.
 
-원래 참가자의 연결이 끊기면 전투를 멈춘다. 부분 실행 상태를 새 체크포인트로 저장하거나 Host·인간 조작권을 자동 변경하지 않는다. 기존 Host와 원래 참가자는 새 세션에서 마지막 확정 기록을 복원한다. 살아 있는 기존 세션에 즉시 재접속하는 UI와 Host 승계·AI 이어하기는 후속 범위다.
+원래 참가자의 연결이 끊기면 전투를 멈춘다. 부분 실행 상태를 새 체크포인트로 저장하거나 Host·인간 조작권을 자동 변경하지 않는다. 기존 v3의 Host와 원래 참가자는 새 세션에서 마지막 확정 기록을 복원한다. 살아 있는 기존 세션에 즉시 재접속하는 UI는 후속 범위다.
+
+6번 관리 v4는 `ResumeManagedRun`이 최신 저장소 stamp·실행 lease·원래 번호·이전 인간 목록을 대조한 뒤 새 Host/세대와 영속 인간 목록을 함께 확정한다. 전투 본문의 Host/세대와 파티 모드도 같이 바꾸되 AttemptId·확정 턴·HP/AP·장착·점유는 보존한다. 이 승인 이후 현재 인간 참가자의 연결만 배정하며 혼자이면 Standalone, 둘 이상이면 Listen Server에서 복원한다. 일반 `LoadCheckpoint`나 MainMenu Continue로 v4를 직접 로드하지 않는다. 저장·복원 실패 재시도와 구체적 검증은 [승계 구현 메모](T14_RESUME.md)를 따른다.
 
 현재 복구는 프로젝트의 유휴 Grid 전투를 대상으로 한다. 활성 Ability, 미완료 이동/스킬 액터, 지속/주기 효과, 쿨다운·상태 태그 등 현재 저장 계약이 표현하지 못하는 상태는 조용히 버리지 않고 거절한다. 장착 추첨 결과는 저장하지만 향후 전투 중 게임플레이 난수를 재현하는 범용 RandomStream 저장이나 임의 GAS 상태 복원까지 구현한 것은 아니다. 전열 보호는 복원한 진영·점유에서 재계산한다.
 

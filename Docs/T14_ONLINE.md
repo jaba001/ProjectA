@@ -8,7 +8,7 @@
 
 `ProjectA.uproject`, `ProjectA.Build.cs`, `Config`에는 프로젝트의 EOS/Steam/PlayFab 활성화·연동 설정이 없다. Runtime에는 공급자 로그인, 서버 티켓 검증, 온라인 세션 생성과 Backend 요청이 없다. 엔진의 기본 플러그인이나 `ERunIdentityOrigin::AccountProvider` 값은 실제 인증 성공을 뜻하지 않는다. 현재 `AssignRunParticipant`는 신뢰된 서버 C++가 테스트 계정을 알려진 연결에 배정하는 지점이다.
 
-6번의 `FLocalRunAuthorityStore`는 같은 PC의 개발 저장소 대역이다. 이를 온라인 중앙 저장으로 노출하지 않는다. 기존 Run v1/v2/v3와 Snapshot v1은 현재 로컬 계약을 유지하며 온라인 전송 포맷은 서비스 선택과 함께 검토한다.
+6번의 `FLocalRunAuthorityStore`는 같은 PC의 개발 저장소 대역이며 관리 Run v4의 메뉴·승계·전투 복구와 연결한다. 이를 온라인 중앙 저장으로 노출하지 않는다. v4는 고정된 C++ 개발 호출자만 허용하고 AccountProvider 생성·재개를 거절한다. 기존 Run v1/v2/v3와 Snapshot v1은 현재 로컬 계약을 유지하며 실제 계정·온라인 전송·공유 저장은 8번에서 별도 연결한다.
 
 ## 선택한 방향과 비용 조건
 

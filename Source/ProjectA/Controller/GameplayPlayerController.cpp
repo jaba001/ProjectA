@@ -156,7 +156,8 @@ bool AGameplayPlayerController::CanIssueRunCommands() const
     {
         return false;
     }
-    if (GetNetMode() == NM_Standalone)
+    const URunStateSubsystem* CurrentRun = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    if (GetNetMode() == NM_Standalone && (!CurrentRun || !CurrentRun->IsManagedRun()))
     {
         return true;
     }
@@ -175,12 +176,23 @@ void AGameplayPlayerController::RequestRetryCombatCheckpoint()
 {
     // The current local server retries its own storage; this is not a client progression command.
     // 현재 로컬 서버가 자신의 저장을 재시도하며 클라이언트 진행 명령으로 사용하지 않습니다.
-    if (HasAuthority() && IsLocalController() && EncounterManager)
+    if (CanRetryGameplayRecovery())
     {
         FText Error;
         EncounterManager->RetryCombatCheckpoint(Error);
         RefreshGameplayFlow();
     }
+}
+
+bool AGameplayPlayerController::CanRetryGameplayRecovery() const
+{
+    if (!HasAuthority() || !IsLocalController() || !EncounterManager || !EncounterManager->CanRetryCombatCheckpoint())
+    {
+        return false;
+    }
+    const URunStateSubsystem* CurrentRun = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    const AGameplayGameModeBase* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGameplayGameModeBase>() : nullptr;
+    return !CurrentRun || !CurrentRun->IsManagedRun() || (Mode && Mode->CanControlRunFlow(this, true));
 }
 
 void AGameplayPlayerController::RefreshGameplayFlow()
@@ -203,7 +215,8 @@ void AGameplayPlayerController::RefreshGameplayFlow()
         return;
     }
 
-    const bool bInCombat = RunState->GetPhase() == ERunPhase::Combat;
+    const bool bManagedInputAllowed = !RunState->IsManagedRun() || (RunState->HasManagedLease() && !RunState->IsManagedResumePending() && RunState->GetLocalCaller() == RunState->GetRunIdentity().HostAccountId);
+    const bool bInCombat = RunState->GetPhase() == ERunPhase::Combat && bManagedInputAllowed;
     ACombatManager* Manager = nullptr;
     FText FlowMessage;
 
@@ -222,7 +235,7 @@ void AGameplayPlayerController::RefreshGameplayFlow()
 
     if (GameplayRootWidget)
     {
-        GameplayRootWidget->RefreshFlowView(FGameplayViewState::FromRun(RunState, FlowMessage), CanIssueRunCommands(), IsLocalController() && EncounterManager && EncounterManager->CanRetryCombatCheckpoint());
+        GameplayRootWidget->RefreshFlowView(FGameplayViewState::FromRun(RunState, FlowMessage), CanIssueRunCommands(), CanRetryGameplayRecovery());
     }
 
     // Active CommonUI screens own the input config; the controller keeps combat authorization.
