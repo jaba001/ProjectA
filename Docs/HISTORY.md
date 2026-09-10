@@ -147,3 +147,10 @@ T14의 Writer/Reader·AI·관리 PIE는 전용 인자가 없는 전체 실행에
 - 직전 지시 이전에 시작된 `Saved/Automation/T14ManagedScaleFull1/index.json`은 76건(성공 49·경고 동반 성공 27·실패 0)이었다. 이 결과에는 전용 인자로 실행한 관리 PIE 3건이 포함되지만, 실행 뒤 추가한 최신 바인딩 복제 대기 조건은 포함하지 않는다. 최신 소스 작동 성공으로 계산하지 않는다.
 - Unity 빌드의 보조 함수명 충돌과 바인딩 준비 대기 변경을 포함한 Development Editor / Win64 컴파일은 `-DisableAdaptiveUnity`로 성공했다. 이번 로그는 `Saved/Automation/T14ManualHandoffBuild1.log`다.
 - 이번 인계에서는 새 작동 테스트를 실행하지 않았다. 최신 7번은 [TEST_REPORT](TEST_REPORT.md)의 사용자 결과 대기로 유지한다.
+
+## 8. 2026-09-11 재개 준비
+
+- 사용자가 7번 작동 테스트 미실행과 Steam App ID·PlayFab Title 미준비를 확인하여 검증 대기와 서비스 준비 상태를 유지했다.
+- UE 5.7 설치 소스에서 OnlineSubsystemSteam·SteamSockets와 IP 전용 SocketSubsystemSteamIP의 차이를 확인했다. 프로젝트 서비스 설정·PlayFab 플러그인은 없는 상태다.
+- 공식 안내를 대조해 공용 Steam ID 480 개발 연결과 자체 앱 등록 수수료, PlayFab Foundation 전환·Xbox 관련 자격 조건, 계정/Title 준비 절차를 MULTIPLAYER와 TEST_REPORT에 추가했다.
+- 이번 변경은 기존 문서 갱신뿐이다. 가입·결제·SDK 설치·컴파일·작동 테스트·기본 실행 설정 변경은 수행하지 않았다. 온라인 구현 완료로 기록하지 않는다.

@@ -197,8 +197,8 @@ Gameplay 도착 후 전투 복원 실패는 lease·pending을 유지하는 별�
 Steam Cloud는 기본적으로 같은 사용자의 PC 사이 저장 동기화이며 참가자 간 단일 최신 Run을 원자적으로 확정하는 기능이 아니다.
 Steam Leaderboards는 전투 정당성을 검증하지 않는다. Trusted 점수 제출의 publisher key를 Listen Host 클라이언트나 저장소에 넣지 않는다.
 
-과거 조사에서 PlayFab 개발 모드는 타이틀/누적 계정/서비스별 한도를 안내했다. 현행 한도·무료 자격·출시 가격은 연동 전에 다시 확인해야 한다.
-개발 무료 한도를 영구 무료 운영으로 취급하지 않는다. Foundation 자격·Azure Functions 계산 비용도 별도로 확인한다.
+2026-09-11 재확인한 [PlayFab Development 문서](https://learn.microsoft.com/en-us/xbox/playfab/pricing/development-mode)는 Foundation으로의 전환을 안내한다. 아래 준비 절차처럼 현재 계정에 제공되는 모드·무료 자격을 확인한다. 과거 개발 한도를 신규 Title의 무료 보장으로 사용하지 않는다.
+개발 무료 한도를 영구 무료 운영으로 취급하지 않는다. Foundation 자격·별도 계산 리소스 비용도 확인한다.
 유료 리소스·과금 전환을 임의 활성화하지 않는다. 비용 조건을 랭크 삭제·무검증 점수·오프라인 진행 분기 승인으로 해석하지 않는다.
 공식 참고: [Steam 인증](https://partner.steamgames.com/doc/features/auth?l=english), [Steam Cloud](https://partner.steamgames.com/doc/features/cloud?l=english), [PlayFab 개발 모드](https://learn.microsoft.com/en-us/gaming/playfab/pricing/development-mode).
 
@@ -212,6 +212,35 @@ Unreal Online Subsystem·공식 SDK·엔진 비동기 delegate를 우선하며 �
 전투 Attempt의 결과·MMR은 다른 요청 ID로 재제출해도 한 번만 반영해야 한다. 서명·TLS만으로 전투 정당성을 증명하지 않는다.
 MMR 판정 시점·계산/정산 단위, 이탈·미확정 턴 반복 악용 대응, 결과 재현/서버 계산 등 검증 방식은 미정이다.
 비전투 AI 편집/보상·일시 끊김의 대기/시간 제한·AI 소유자의 관전 정책도 미정이며 필요 시 구체적인 선택지로 결정한다.
+
+## T14-8 서비스 준비
+
+2026-09-11 사용자 확인: **자체 Steam App ID와 PlayFab Title 모두 없음**, 준비부터 진행한다. T14-7 작동 테스트도 미실행이며 그대로 대기다. 아래는 계정 준비 안내와 확인한 엔진 경로이며 실제 연동 구현 완료를 뜻하지 않는다.
+
+### 비용과 준비 순서
+
+1. [PlayFab Game Manager](https://developer.playfab.com/)에 Microsoft 계정으로 로그인하고 Studio를 준비한다. 생성 화면에서 Title 이름은 개발 환경임을 구별할 수 있게 `ProjectA-Dev` 등을 사용한다. Title이 생성되면 게임 이름 아래의 Title ID와 선택된 서비스 모드를 확인한다. 계정·Studio·Title 생성 순서는 [공식 시작 안내](https://learn.microsoft.com/en-us/xbox/playfab/live-service-management/gamemanager/quickstart)를 따른다.
+2. Title을 확정하기 전에 무료로 제공되는 모드와 사용량 조건을 확인한다. [Foundation 온보딩](https://learn.microsoft.com/en-us/xbox/playfab/get-started/foundation-onboarding)은 Entra ID·Xbox 출시/출시 계획·Partner Center·미리보기 승인을 전제로 안내한다. Steam 우선이라는 기존 결정을 Xbox 출시 계획으로 바꾸거나 자격을 추정하지 않는다. 무료 모드가 없거나 유료 전환만 보이면 모드 이름·표시된 비용을 확인한 뒤 다음 방향을 결정한다. Launch/Live 전환과 유료 계산·호스팅 리소스 생성은 현재 준비 범위에 없다.
+3. Steam은 정식 앱 등록과 결제 전 연결 시제품을 구분한다. [Epic의 App ID 안내](https://dev.epicgames.com/documentation/en-us/unreal-engine/online-subsystem-steam-interface-in-unreal-engine)는 모든 개발자가 공유하는 테스트 ID `480`을 허용하며 출시에 자체 ID가 필요하다고 명시한다. 480은 별도 개발 연결에서만 사용할 후보이며 ProjectA의 소유권·배포 권한이나 PlayFab 정식 Steam 인증 준비 완료를 뜻하지 않는다.
+4. 자체 ID를 만들 시점에는 [Steamworks 온보딩](https://partner.steamgames.com/doc/gettingstarted/onboarding)의 계약·신원·은행/세금 절차와 앱 등록을 사용자가 진행한다. [Steam Direct 수수료](https://partner.steamgames.com/doc/gettingstarted/appfee)는 앱당 USD 100 상당이며 지역 세금이 적용될 수 있다. 이는 전투 서버의 월 운영비와 별도다. 현재 결제를 요청하거나 대신 실행하는 단계는 아니다.
+5. 자체 App ID·Title이 준비되면 PlayFab의 Steam 연동 설정에서 해당 앱 ID와 권한이 있는 Web API Key를 연결한다. 키는 공급자 관리 화면에서만 취급하고 게임/Listen Host/Git/채팅에 넣지 않는다. Steam 티켓으로 로그인하는 계약과 필요한 설정은 [공식 Steam 인증 API](https://learn.microsoft.com/en-us/xbox/playfab/api-references/c/pfauthentication/functions/pfauthenticationloginwithsteamasync)를 따른다. 단순 CustomID 로그인이나 로그인 성공 자체를 전투 결과 검증으로 대신하지 않는다.
+
+위 Epic 웹 예제의 기존 SteamNetDriver 설정은 프로젝트에 그대로 복사하지 않는다. 설치된 UE 5.7 소스와 플러그인 구성을 아래처럼 대조했다.
+
+### 로컬 엔진 점검과 다음 구현
+
+| 대상 | 정적 확인 결과 / 적용 방향 |
+|---|---|
+| 프로젝트 | `ProjectA.uproject`에 Steam/PlayFab 활성화 없음. Build.cs의 OnlineSubsystem은 주석뿐이며 Config에 Steam 서비스/NetDriver 설정 없음 |
+| Steam API | 엔진 `Plugins/Online/OnlineSubsystemSteam/OnlineSubsystemSteam.uplugin` 존재, 기본 비활성 |
+| P2P transport | 엔진 `Plugins/Runtime/Steam/SteamSockets/SteamSockets.uplugin`과 `USteamSocketsNetDriver` 존재. `/Script/SteamSockets.SteamSocketsNetDriver`를 사용할 경로 |
+| IP 전용 경로 | `SocketSubsystemSteamIP.uplugin`은 NAT punchthrough를 제공하지 않으며 P2P에 SteamSockets를 쓰도록 명시. 두 플러그인을 같은 transport로 취급하지 않음 |
+| PlayFab | 프로젝트와 설치된 엔진에서 `.uplugin`을 찾지 못함. SDK 도입 시 UE 5.7 지원 버전·인증 API를 먼저 고정 |
+| 관리 저장 | 현재 `FLocalRunAuthorityStore`는 같은 PC 동기 파일/OS lease, 개발 호출자만 지원. Steam 계정 ID만 주입해 온라인 관리 Run으로 승격하지 않음 |
+
+연결 구현 순서는 **명시적인 개발 온라인 설정 → 엔진 OnlineSubsystem 세션·SteamSockets 연결 → 검증된 원래 계정 배정 → 별도 PC의 사용자 접속 확인 → 공유 저장/승계 원자 처리 → 확정된 MMR 정책**으로 둔다. 온라인 초기화 실패를 개발 계정 성공으로 대체하지 않는다. 기본 싱글플레이 진입과 기존 로컬 저장은 계속 지원한다.
+
+사용자가 준비 결과로 전달할 것은 `Steam: 자체 ID 준비/480 개발 연결 희망/보류`, `PlayFab: Title ID 또는 미생성 이유와 표시 모드`, `서로 다른 계정의 테스트 PC 2대 준비 여부`다. 비밀번호·인증 티켓·Web API/Secret Key·은행/세금 정보는 전달 대상이 아니다. 최초 온라인 작동 확인은 서비스 준비와 구현 후 [TEST_REPORT](TEST_REPORT.md)에 추가한다.
 
 ## 개발 실행 참조
 
