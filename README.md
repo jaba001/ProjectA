@@ -29,6 +29,7 @@ MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
 - [T14 Listen Server 구현·검증](Docs/T14_NETWORK.md): 실제 2인 PIE RPC, 전투/HUD 복제, 참가자 배정과 미결정 진행 권한
 - [T14 확정 턴 저장·복구](Docs/T14_CHECKPOINT.md): v3 전투 저장, 저장 실패 재시도, 기존 Host의 새 세션 복구와 지원 경계
 - [T14 아군 AI](Docs/T14_PARTY_AI.md): 원래 소유권·진영 유지, 서버 AI 명령 검증, 인간 입력 차단과 AI 모드 저장·복구
+- [T14 승계·AI 이어하기 구현 메모](Docs/T14_RESUME.md): 6번 참여 데이터·로컬 권위 저장소 기반과 정책 답변 후 연결할 UI·복구 범위
 - [코드 리뷰](Docs/CODE_REVIEW.md): P1/P2 문제의 근거와 검증 시나리오
 
 문서는 2026-09-10 현재 작업 트리를 기준으로 정리합니다. 코드 구현, 정식 빌드, 에셋 설정 확인, PIE 검증은 별도로 기록합니다.
