@@ -11,6 +11,9 @@
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
 #include "Components/ComboBoxString.h"
+#include "Components/CheckBox.h"
+#include "GameFramework/GameUserSettings.h"
+#include "UI/MainMenu/OptionsWidget.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Components/HorizontalBox.h"
 #include "Components/TextBlock.h"
@@ -130,6 +133,24 @@ public:
                 return false;
             }
             Menu->ShowCharacterCreationScreen();
+            UOptionsWidget* Options = CreateWidget<UOptionsWidget>(Menu, UOptionsWidget::StaticClass());
+            Options->ActivateWidget();
+            UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings();
+            const auto PreviousQuality = Settings->ScalabilityQuality;
+            const bool bPreviousVSync = Settings->IsVSyncEnabled();
+            UComboBoxString* Quality = Cast<UComboBoxString>(Options->GetWidgetFromName(TEXT("QualitySelect")));
+            UCheckBox* VSync = Cast<UCheckBox>(Options->GetWidgetFromName(TEXT("VSyncCheck")));
+            Quality->SetSelectedIndex(1);
+            VSync->SetIsChecked(!bPreviousVSync);
+            Test->TestEqual(TEXT("Options remain unchanged before Apply."), Settings->IsVSyncEnabled(), bPreviousVSync);
+            Options->ApplyOptions();
+            Settings->LoadSettings(true);
+            Test->TestEqual(TEXT("Quality persists after reload."), Settings->GetOverallScalabilityLevel(), 1);
+            Test->TestEqual(TEXT("VSync persists after reload."), Settings->IsVSyncEnabled(), !bPreviousVSync);
+            Settings->ScalabilityQuality = PreviousQuality;
+            Settings->SetVSyncEnabled(bPreviousVSync);
+            Settings->ApplySettings(false);
+            Options->DeactivateWidget();
             Advance();
             return false;
         }
@@ -311,6 +332,7 @@ public:
             if (Stage == 9)
             {
                 Test->TestTrue(TEXT("The second encounter uses the same persistent world."), GameplayWorld.Get() == World);
+                Test->TestEqual(TEXT("Next encounter restores checkpoint HP."), Player->GetAttributeSet()->GetHP(), Run->GetPartyMembers()[0].CurrentHP);
                 if (!Require(UCombatEffectLibrary::ApplyDamageToUnit(Enemy.Get(), Player.Get(), UGE_Damage::StaticClass(), 100000.0f), TEXT("GAS lethal damage applied to the party for Defeat coverage.")))
                 {
                     return true;
@@ -537,6 +559,7 @@ public:
                 return false;
             }
             Test->TestTrue(TEXT("The run receives the expected result."), Run->GetLastResult() == ExpectedResult);
+            Test->TestTrue(TEXT("The settled combat result is saved successfully."), Run->GetSaveError().IsEmpty());
             if (!CheckInputPolicy(Controller, false))
             {
                 return true;

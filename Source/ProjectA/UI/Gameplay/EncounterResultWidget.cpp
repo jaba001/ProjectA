@@ -45,7 +45,7 @@ void UEncounterResultWidget::NativeOnInitialized()
     Button_Continue->OnClicked.AddUniqueDynamic(this, &UEncounterResultWidget::HandleContinueClicked);
 }
 
-void UEncounterResultWidget::ShowResult(ECombatResult Result)
+void UEncounterResultWidget::ShowResult(ECombatResult Result, const FText& Message)
 {
     const bool bVictory = Result == ECombatResult::Victory;
     Button_Continue->SetIsEnabled(bVictory);
@@ -56,6 +56,10 @@ void UEncounterResultWidget::ShowResult(ECombatResult Result)
     {
         Button_Continue->SetVisibility(ESlateVisibility::Visible);
         Text_Result->SetText(FText::FromString(TEXT("Victory / 승리\nEncounter complete. / 전투를 완료했습니다.")));
+    }
+    if (!Message.IsEmpty())
+    {
+        Text_Result->SetText(FText::FromString(Text_Result->GetText().ToString() + TEXT("\n") + Message.ToString()));
     }
 }
 

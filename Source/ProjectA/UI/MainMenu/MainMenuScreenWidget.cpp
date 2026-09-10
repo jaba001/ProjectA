@@ -9,6 +9,11 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Controller/MainMenuPlayerController.h"
+#include "UI/MainMenu/MainMenuRootWidget.h"
+#include "UI/MainMenu/OptionsWidget.h"
+#include "Game/Run/RunStateSubsystem.h"
+#include "Engine/GameInstance.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 void UMainMenuScreenWidget::NativeOnInitialized()
 {
@@ -42,6 +47,35 @@ void UMainMenuScreenWidget::NativeOnInitialized()
     if (Button_Quit)
     {
         Button_Quit->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleQuitClicked);
+    }
+    if (WidgetTree && WidgetTree->RootWidget)
+    {
+        UWidget* PreviousRoot = WidgetTree->RootWidget;
+        UOverlay* Root = WidgetTree->ConstructWidget<UOverlay>();
+        WidgetTree->RootWidget = Root;
+        UOverlaySlot* PreviousSlot = Root->AddChildToOverlay(PreviousRoot);
+        PreviousSlot->SetHorizontalAlignment(HAlign_Fill);
+        PreviousSlot->SetVerticalAlignment(VAlign_Fill);
+        SaveStatus = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("SaveStatus"));
+        SaveStatus->SetAutoWrapText(true);
+        UOverlaySlot* StatusSlot = Root->AddChildToOverlay(SaveStatus);
+        StatusSlot->SetVerticalAlignment(VAlign_Bottom);
+        StatusSlot->SetPadding(FMargin(24.0f));
+    }
+}
+
+void UMainMenuScreenWidget::NativeOnActivated()
+{
+    Super::NativeOnActivated();
+    FText Error;
+    const bool bCanContinue = GetGameInstance()->GetSubsystem<URunStateSubsystem>()->CanContinueSavedRun(Error);
+    if (Button_Continue)
+    {
+        Button_Continue->SetIsEnabled(bCanContinue);
+    }
+    if (SaveStatus)
+    {
+        SaveStatus->SetText(bCanContinue ? FText::FromString(TEXT("이어하기: 마지막 체크포인트에서 복원합니다. 새 게임을 시작하면 기존 저장을 교체합니다.")) : Error);
     }
 }
 
@@ -172,12 +206,22 @@ void UMainMenuScreenWidget::HandleNewGameClicked()
 
 void UMainMenuScreenWidget::HandleContinueClicked()
 {
-    UE_LOG(LogTemp, Warning, TEXT("[MainMenuScreenWidget] Continue is not implemented yet."));
+    if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
+    {
+        FText Error;
+        if (!Controller->ContinueSavedGame(Error) && SaveStatus)
+        {
+            SaveStatus->SetText(Error);
+        }
+    }
 }
 
 void UMainMenuScreenWidget::HandleOptionsClicked()
 {
-    UE_LOG(LogTemp, Warning, TEXT("[MainMenuScreenWidget] Options is not implemented yet."));
+    if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
+    {
+        Controller->GetMainMenuRootWidget()->PushMenuScreen(UOptionsWidget::StaticClass());
+    }
 }
 
 void UMainMenuScreenWidget::HandleQuitClicked()
@@ -200,5 +244,5 @@ void UMainMenuScreenWidget::RequestNewGame()
 
 void UMainMenuScreenWidget::RequestQuitGame()
 {
-    UE_LOG(LogTemp, Log, TEXT("Quit game requested from main menu."));
+    UKismetSystemLibrary::QuitGame(this, GetOwningPlayer(), EQuitPreference::Quit, false);
 }

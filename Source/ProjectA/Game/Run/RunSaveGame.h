@@ -1,0 +1,33 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/SaveGame.h"
+#include "Game/Run/RunTypes.h"
+#include "Types/CombatResult.h"
+#include "RunSaveGame.generated.h"
+
+UCLASS()
+class PROJECTA_API URunSaveGame : public USaveGame
+{
+    GENERATED_BODY()
+
+public:
+    UPROPERTY()
+    int32 Version = 1;
+    UPROPERTY()
+    TArray<FRunPartyMember> Party;
+    UPROPERTY()
+    TArray<FRunNodeDefinition> Nodes;
+    UPROPERTY()
+    TArray<FName> CompletedNodes;
+    UPROPERTY()
+    FName CurrentNode;
+    UPROPERTY()
+    FName CurrentEncounter;
+    UPROPERTY()
+    ERunPhase Phase = ERunPhase::None;
+    UPROPERTY()
+    ECombatResult Result = ECombatResult::None;
+    UPROPERTY()
+    FSoftObjectPath Catalog;
+};

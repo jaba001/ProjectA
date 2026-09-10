@@ -142,6 +142,11 @@ void AGameplayPlayerController::RefreshGameplayFlow()
 
     SetCombatContext(Manager, bInCombat);
 
+    if (!RunState->GetSaveError().IsEmpty())
+    {
+        FlowMessage = RunState->GetSaveError();
+    }
+
     if (GameplayRootWidget)
     {
         GameplayRootWidget->RefreshFlow(RunState, FlowMessage);

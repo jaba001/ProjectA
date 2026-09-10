@@ -81,8 +81,8 @@ P1은 전투 진행 정지 또는 행동 상태 훼손을 먼저 해결할 항�
 
 | 항목 | 코드에서 확인한 경계 | 연결 작업 |
 |---|---|---|
-| 파티 데이터 이관 | 4슬롯 runtime data → RunStateSubsystem → Gameplay/Encounter 스폰 연결 구현, 디스크 저장 없음 | T08 |
-| Continue / Options / Quit | MainMenuScreenWidget의 처리 함수가 로그만 출력 | T11 |
+| 파티 데이터 이관 | 4슬롯 runtime data → RunStateSubsystem → Gameplay/Encounter 스폰 연결 구현, 체크포인트 디스크 저장은 T11에서 추가 | T08 |
+| Continue / Options / Quit | 체크포인트 Continue 및 저장 상태 안내, GameUserSettings 옵션, QuitGame 연결(T11 빌드·자동화·패키지 검증 완료) | T11 |
 | 캐릭터 편집/직업 설명 | 슬롯 이름·직업 저장/취소와 읽기 전용 ClassInfo 연결 | T09 |
 | 실제 스탯 미리보기 | 공통 직업 정의의 HP/AP/보조 AP·시작 스킬을 UI와 스폰에 함께 적용 | T09 |
 | 아이템 효과 | `ExecuteItemAtTarget`이 효과 적용 없이 종료 | T13 |

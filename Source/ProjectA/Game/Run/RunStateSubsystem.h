@@ -7,6 +7,7 @@
 #include "RunStateSubsystem.generated.h"
 
 class UPartyDefinitionDataAsset;
+class URunSaveGame;
 
 DECLARE_MULTICAST_DELEGATE(FOnRunStateChanged);
 
@@ -18,6 +19,7 @@ class PROJECTA_API URunStateSubsystem : public UGameInstanceSubsystem
     GENERATED_BODY()
 
 public:
+    URunStateSubsystem();
     // Keep the selected catalog across travel so previews and spawning use the same data.
     // 미리보기와 스폰이 같은 데이터를 쓰도록 선택한 목록을 레벨 이동 동안 유지합니다.
     UPROPERTY(Transient)
@@ -59,7 +61,19 @@ public:
 
     FOnRunStateChanged OnRunStateChanged;
 
+    bool SaveCheckpoint(FText& OutError);
+    bool LoadCheckpoint(FText& OutError);
+    bool CanContinueSavedRun(FText& OutError) const;
+    void EnableCheckpointSaving(const FString& Slot = FString());
+    const FText& GetSaveError() const { return SaveError; }
+
 private:
+    bool ValidateSave(const URunSaveGame* Save, FText& OutError) const;
+    void AutoSaveCheckpoint();
+    FString SaveSlot = TEXT("ProjectA_Run");
+    bool bCheckpointSaving = false;
+    FText SaveError;
+
     UPROPERTY(Transient)
     TArray<FRunPartyMember> PartyMembers;
 

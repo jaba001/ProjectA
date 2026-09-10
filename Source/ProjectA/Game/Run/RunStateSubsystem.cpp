@@ -1,4 +1,156 @@
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/Run/RunSaveGame.h"
+#include "DataAsset/PartyDefinitionDataAsset.h"
+#include "Kismet/GameplayStatics.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+
+URunStateSubsystem::URunStateSubsystem()
+{
+    FParse::Value(FCommandLine::Get(), TEXT("ProjectASaveSlot="), SaveSlot);
+}
+
+void URunStateSubsystem::EnableCheckpointSaving(const FString& Slot)
+{
+    if (!Slot.IsEmpty())
+    {
+        SaveSlot = Slot;
+    }
+    bCheckpointSaving = true;
+}
+
+void URunStateSubsystem::AutoSaveCheckpoint()
+{
+    if (bCheckpointSaving && Phase != ERunPhase::Preparing && Phase != ERunPhase::Combat)
+    {
+        SaveCheckpoint(SaveError);
+    }
+}
+
+bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError) const
+{
+    OutError = FText::FromString(TEXT("저장 파일이 손상되었거나 현재 버전·직업 설정과 호환되지 않습니다."));
+    if (!Save || Save->Version != 1 || Save->Party.IsEmpty() || Save->Party.Num() > 4 || Save->Nodes.Num() != 2 || Save->CompletedNodes.Num() > 2)
+    {
+        return false;
+    }
+    UPartyDefinitionDataAsset* Catalog = Cast<UPartyDefinitionDataAsset>(Save->Catalog.TryLoad());
+    if (!Catalog)
+    {
+        return false;
+    }
+    TSet<int32> Slots;
+    int32 Created = 0;
+    int32 Living = 0;
+    for (const FRunPartyMember& Member : Save->Party)
+    {
+        if (Member.SlotIndex < 0 || Member.SlotIndex >= 4 || Slots.Contains(Member.SlotIndex) || !FMath::IsFinite(Member.CurrentHP) || Member.CurrentHP < -1.0f)
+        {
+            return false;
+        }
+        Slots.Add(Member.SlotIndex);
+        if (Member.bCreated)
+        {
+            FProfessionDefinition Definition;
+            const bool bInitialHP = Member.CurrentHP == -1.0f && Save->Phase == ERunPhase::Map && Save->CompletedNodes.IsEmpty();
+            if (Member.CharacterName.ToString().TrimStartAndEnd().IsEmpty() || !Catalog->ResolveProfession(Member.ClassId, Definition) || (Member.CurrentHP < 0.0f && !bInitialHP))
+            {
+                return false;
+            }
+            ++Created;
+            Living += Member.CurrentHP != 0.0f ? 1 : 0;
+        }
+    }
+    for (int32 Index = 0; Index < Save->Nodes.Num(); ++Index)
+    {
+        const FName Expected(*FString::Printf(TEXT("Combat_%02d"), Index + 1));
+        if (Save->Nodes[Index].NodeId != Expected || Save->Nodes[Index].EncounterId != TEXT("DefaultEncounter") || Save->Nodes[Index].NodeType != ERunNodeType::Combat || (Save->CompletedNodes.IsValidIndex(Index) && Save->CompletedNodes[Index] != Expected))
+        {
+            return false;
+        }
+    }
+    const int32 Completed = Save->CompletedNodes.Num();
+    const bool bMapEntry = Save->Result == ECombatResult::None && Save->CurrentNode.IsNone();
+    const bool bMapContinue = Completed > 0 && Save->Result == ECombatResult::Victory && Save->CurrentNode == Save->Nodes[Completed - 1].NodeId;
+    const bool bMap = Save->Phase == ERunPhase::Map && Completed < 2 && Save->CurrentEncounter.IsNone() && (bMapEntry || bMapContinue);
+    const bool bResult = Save->Phase == ERunPhase::Result && Completed > 0 && Save->Result == ECombatResult::Victory && Save->CurrentNode == Save->Nodes[Completed - 1].NodeId && Save->CurrentEncounter == TEXT("DefaultEncounter");
+    const bool bComplete = Save->Phase == ERunPhase::Complete && Completed == 2 && Save->Result == ECombatResult::Victory && Save->CurrentNode == Save->Nodes.Last().NodeId && Save->CurrentEncounter.IsNone();
+    const bool bDefeat = Save->Phase == ERunPhase::Defeat && Completed < 2 && Save->Result == ECombatResult::Defeat && Living == 0 && Save->CurrentNode == Save->Nodes[Completed].NodeId && Save->CurrentEncounter == TEXT("DefaultEncounter");
+    if (Created == 0 || (!bMap && !bResult && !bComplete && !bDefeat) || (!bDefeat && Living == 0))
+    {
+        return false;
+    }
+    OutError = FText::GetEmpty();
+    return true;
+}
+
+bool URunStateSubsystem::SaveCheckpoint(FText& OutError)
+{
+    URunSaveGame* Save = NewObject<URunSaveGame>();
+    Save->Party = PartyMembers;
+    Save->Nodes = Nodes;
+    Save->CompletedNodes = CompletedNodes;
+    Save->CurrentNode = CurrentNodeId;
+    Save->CurrentEncounter = CurrentEncounterId;
+    Save->Phase = Phase;
+    Save->Result = LastResult;
+    Save->Catalog = FSoftObjectPath(PartyDefinition);
+    if (!ValidateSave(Save, OutError))
+    {
+        return false;
+    }
+    if (!UGameplayStatics::SaveGameToSlot(Save, SaveSlot, 0))
+    {
+        OutError = FText::FromString(TEXT("진행을 저장하지 못했습니다. 저장 공간과 쓰기 권한을 확인해 주세요."));
+        return false;
+    }
+    return true;
+}
+
+bool URunStateSubsystem::CanContinueSavedRun(FText& OutError) const
+{
+    if (!UGameplayStatics::DoesSaveGameExist(SaveSlot, 0))
+    {
+        OutError = FText::FromString(TEXT("이어할 저장 기록이 없습니다."));
+        return false;
+    }
+    const URunSaveGame* Save = Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(SaveSlot, 0));
+    if (!ValidateSave(Save, OutError))
+    {
+        return false;
+    }
+    if (Save->Phase == ERunPhase::Defeat || Save->Phase == ERunPhase::Complete)
+    {
+        OutError = FText::FromString(TEXT("종료된 진행입니다. 새 게임을 시작해 주세요."));
+        return false;
+    }
+    return true;
+}
+
+bool URunStateSubsystem::LoadCheckpoint(FText& OutError)
+{
+    if (!CanContinueSavedRun(OutError))
+    {
+        return false;
+    }
+    const URunSaveGame* Save = Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(SaveSlot, 0));
+    if (!ValidateSave(Save, OutError))
+    {
+        return false;
+    }
+    PartyMembers = Save->Party;
+    Nodes = Save->Nodes;
+    CompletedNodes = Save->CompletedNodes;
+    CurrentNodeId = Save->CurrentNode;
+    CurrentEncounterId = Save->CurrentEncounter;
+    Phase = Save->Phase;
+    LastResult = Save->Result;
+    PartyDefinition = Cast<UPartyDefinitionDataAsset>(Save->Catalog.ResolveObject());
+    SaveError = FText::GetEmpty();
+    bCheckpointSaving = true;
+    OnRunStateChanged.Broadcast();
+    return true;
+}
 
 bool URunStateSubsystem::InitializeRun(const TArray<FRunPartyMember>& Members, FText& OutError)
 {
@@ -63,6 +215,7 @@ bool URunStateSubsystem::InitializeRun(const TArray<FRunPartyMember>& Members, F
     CurrentEncounterId = NAME_None;
     LastResult = ECombatResult::None;
     Phase = ERunPhase::Map;
+    AutoSaveCheckpoint();
     OnRunStateChanged.Broadcast();
     return true;
 }
@@ -89,6 +242,7 @@ bool URunStateSubsystem::BeginEncounter(FName NodeId)
     CurrentEncounterId = Node.EncounterId;
     LastResult = ECombatResult::None;
     Phase = ERunPhase::Preparing;
+    AutoSaveCheckpoint();
     OnRunStateChanged.Broadcast();
     return true;
 }
@@ -101,6 +255,7 @@ bool URunStateSubsystem::MarkCombatStarted()
     }
 
     Phase = ERunPhase::Combat;
+    AutoSaveCheckpoint();
     OnRunStateChanged.Broadcast();
     return true;
 }
@@ -124,6 +279,7 @@ bool URunStateSubsystem::CompleteEncounter(ECombatResult Result)
         Phase = ERunPhase::Defeat;
     }
 
+    AutoSaveCheckpoint();
     OnRunStateChanged.Broadcast();
     return true;
 }
@@ -138,6 +294,7 @@ bool URunStateSubsystem::AbortEncounter()
     CurrentNodeId = NAME_None;
     CurrentEncounterId = NAME_None;
     Phase = ERunPhase::Map;
+    AutoSaveCheckpoint();
     OnRunStateChanged.Broadcast();
     return true;
 }
@@ -157,6 +314,7 @@ bool URunStateSubsystem::ContinueRun()
         Phase = ERunPhase::Complete;
     }
 
+    AutoSaveCheckpoint();
     OnRunStateChanged.Broadcast();
     return true;
 }

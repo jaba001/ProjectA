@@ -31,6 +31,7 @@ protected:
     // Initializes fallback menu layout and button events.
     // 대체 메뉴 레이아웃과 버튼 이벤트를 초기화합니다.
     virtual void NativeOnInitialized() override;
+    virtual void NativeOnActivated() override;
 
     // Enables native C++ layout creation when designer widgets are absent.
     // 디자이너 위젯이 없을 때 네이티브 C++ 레이아웃 생성을 활성화합니다.
@@ -80,6 +81,8 @@ protected:
     TObjectPtr<UButton> Button_Quit;
 
 private:
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> SaveStatus;
     // Creates the fallback main menu layout in C++.
     // C++에서 대체 메인메뉴 레이아웃을 생성합니다.
     void EnsureCodeGeneratedLayout();

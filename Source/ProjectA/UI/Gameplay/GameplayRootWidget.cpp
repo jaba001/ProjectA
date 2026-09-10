@@ -95,6 +95,6 @@ void UGameplayRootWidget::RefreshFlow(const URunStateSubsystem* RunState, const 
 
     if (ResultWidget)
     {
-        ResultWidget->ShowResult(RunState->GetLastResult());
+        ResultWidget->ShowResult(RunState->GetLastResult(), FlowMessage);
     }
 }

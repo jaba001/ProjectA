@@ -20,7 +20,7 @@ public:
     // 결과 화면에서 메뉴 입력을 복원하여 종료한 전투에 플레이어 행동을 전달하지 않습니다.
     virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
 
-    void ShowResult(ECombatResult Result);
+    void ShowResult(ECombatResult Result, const FText& Message = FText::GetEmpty());
 
 protected:
     virtual void NativeOnInitialized() override;

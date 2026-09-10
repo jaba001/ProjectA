@@ -22,7 +22,7 @@ flowchart LR
 
 | 구성 | 역할 / 수명 |
 |---|---|
-| `URunStateSubsystem` | GameInstance 수명. PartyMembers, CurrentNodeId, CompletedNodes, CurrentEncounterId, Phase, LastResult, HP만 보존. Actor 참조와 디스크 저장 없음 |
+| `URunStateSubsystem` | GameInstance 수명. PartyMembers, CurrentNodeId, CompletedNodes, CurrentEncounterId, Phase, LastResult, HP만 보존. Actor 참조 없이 전투 밖 체크포인트를 SaveGame에 저장 |
 | `AGameplayGameModeBase` | 레벨 BeginPlay 다음 틱에 Arena를 찾아 EncounterManager와 CombatManager 생성, Controller 연결 |
 | `AGameplayPlayerController` | PartyPlayerController 상속. Root UI와 전투 조작 허용 상태 관리, 노드/Continue 요청 전달 |
 | `UGameplayRootWidget` | CommonUI Run / Combat / Modal 스택 관리 |
@@ -33,7 +33,7 @@ flowchart LR
 | `UCombatHUDWidget` | CommonActivatableWidget, 기존 Move/Skill/End Turn 명령 연결 |
 | `UEncounterResultWidget` | Victory Continue / Defeat. 향후 보상 선택을 넣을 위치 |
 
-Streaming, Level Instance, SaveGame, 인벤토리와 장비, 여러 Act, 멀티플레이 리팩터링은 범위 밖이다. GameInstance에 전투/UI를 몰아넣지 않는다.
+Streaming, Level Instance, 전투 중 상태 저장, 인벤토리와 장비, 여러 Act, 멀티플레이 리팩터링은 범위 밖이다. GameInstance에 전투/UI를 몰아넣지 않는다.
 
 ## 3. 파티 규칙
 
@@ -68,7 +68,7 @@ R01/R02는 `EUnitActionResult`와 공통 행동 완료 경로로 수정한다. G
 | R06 / T06 범위 | Single/AroundTarget/AroundSelf 공통 계산, 기존 시전자 제외 유지. 미지원 타입/음수 반경은 에셋 검증·실행 전 거절. 전체 자동화 18건 통과 |
 | T07 발사체 완료 | GAS가 몽타주+impact 완료를 기다림. 미충돌 시간 제한·취소/사망 정리 및 플레이어 AP·보조 AP 모두 소진 시 자동 종료 완료. 빌드 및 전체 자동화 20건 통과 |
 | T09 직업/편집 | 공통 직업 정의로 UI/스폰 연결, 이름·직업 편집과 읽기 전용 ClassInfo 구현. 기존 클래스 밸런스 유지, 직업별 신규 콘텐츠는 별도 |
-| T11 메뉴 기능 | SaveGame/Continue/Options/Quit 완성은 이번 범위 밖 |
+| T11 메뉴 기능 | 버전 1 체크포인트 자동 저장/이어하기, 품질·수직 동기화 옵션, 실제 Quit 연결. 빌드·자동화 23건 및 패키지 저장/Continue/Quit 검증 완료 |
 | T13 콘텐츠 | 아이템 효과, 적 이동 후보 점수, 추가 스킬은 후속 |
 | T14 네트워크 | 이번 slice는 싱글플레이. 기존 부분 복제만 유지 |
 

@@ -140,6 +140,27 @@ bool AMainMenuPlayerController::StartNewGameFromParty(const TArray<FRunPartyMemb
         return false;
     }
 
+    if (!RunState->SaveCheckpoint(OutError))
+    {
+        return false;
+    }
+    RunState->EnableCheckpointSaving();
+    UGameplayStatics::OpenLevel(this, GameplayLevelName);
+    return true;
+}
+
+bool AMainMenuPlayerController::ContinueSavedGame(FText& OutError)
+{
+    if (GameplayLevelName.IsNone() || !FPackageName::DoesPackageExist(GameplayLevelName.ToString()))
+    {
+        OutError = FText::FromString(TEXT("Gameplay 레벨을 찾을 수 없습니다."));
+        return false;
+    }
+    URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+    if (!Run || !Run->LoadCheckpoint(OutError))
+    {
+        return false;
+    }
     UGameplayStatics::OpenLevel(this, GameplayLevelName);
     return true;
 }

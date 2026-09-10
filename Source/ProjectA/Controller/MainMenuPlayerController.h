@@ -54,6 +54,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "MainMenu")
     bool StartNewGameFromParty(const TArray<FRunPartyMember>& PartyMembers, FText& OutError);
 
+    bool ContinueSavedGame(FText& OutError);
+
 protected:
     // Root widget class assigned by the main menu player controller blueprint.
     // 메인메뉴 플레이어 컨트롤러 블루프린트에서 지정하는 루트 위젯 클래스입니다.
