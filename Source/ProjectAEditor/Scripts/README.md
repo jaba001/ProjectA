@@ -42,9 +42,11 @@ $scriptDirectory = Join-Path $projectDirectory 'Source/ProjectAEditor/Scripts'
 6. 저장된 메뉴 맵에서 시작하는 PIE 통합 테스트를 실행한다. 이 환경의 UE 5.7에서는 `-NullRHI` 상태의 PIE travel이 `GenericWindow::GetRestoredDimensions` fatal을 일으켜, 실제 렌더러의 `-RenderOffscreen`을 사용한다.
 
 ```powershell
-& $editorExecutable $projectFile -unattended -nop4 -RenderOffscreen -nosound '-ExecCmds=Automation RunTests ProjectA.VerticalSlice.SavedMapsPIELoop' '-TestExit=Automation Test Queue Empty' ("-ReportExportPath=$projectDirectory/Saved/Automation/VerticalSlicePIE")
+& $editorExecutable $projectFile -unattended -nop4 -RenderOffscreen -nosound -Windowed -ResX=1280 -ResY=720 -WinX=0 -WinY=0 '-ExecCmds=Automation RunTests ProjectA.VerticalSlice.SavedMapsPIELoop' '-TestExit=Automation Test Queue Empty' ("-ReportExportPath=$projectDirectory/Saved/Automation/VerticalSlicePIE")
 ```
 
 테스트는 위젯 버튼 델리게이트로 캐릭터 생성·노드 선택·Continue를 실행한다. 첫 Move/Skill은 실제 Slate 합성 마우스 이벤트로 HUD 버튼과 월드 타일을 클릭한다. 히트 테스트·CommonUI·게임 뷰포트 전달 및 이동/피해 적용을 검사한 뒤 기존 기본 공격과 Enemy AI로 Victory까지 진행한다. 기존 몽타주의 제자리 실행은 메모리 내 SkillData 복사본으로 한 번 검사하고, 두 번째 Encounter의 Defeat는 테스트용 치명 피해로 유도한다. 디스크 에셋이나 전투 수치를 바꾸지 않는다. 물리적 마우스로 전체 흐름을 조작한 검증과 육안 검수는 별도다.
+
+오프스크린 Slate 클릭 검증은 창 위치와 크기를 위 명령처럼 명시한다. 2026-09-10 기본 창 설정의 첫 실행에서는 Move 버튼 hit-test가 실패했으며, 창 조건을 명시한 동일 빌드의 PIE 재실행은 통과했다. 클릭 검사를 직접 함수 호출로 대체하지 않는다.
 
 자동화 프로세스가 exit 0이어도 테스트 자체는 실패할 수 있으므로 JSON 보고서의 테스트 결과와 `Test Completed. Result={Success}` 로그를 확인한다. 화면 캡처는 `Saved/Automation/VerticalSliceScreenshots`에 요청한다.

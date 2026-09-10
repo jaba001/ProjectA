@@ -3,6 +3,7 @@
 #include "EngineUtils.h"
 
 #include "Combat/CombatManager.h"
+#include "Combat/Library/CombatTargetingLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
@@ -204,7 +205,7 @@ void AEnemyUnit::EnterSkillState()
         return;
     }
 
-    if (!CurrentTarget || !CurrentTarget->IsUnitAlive())
+    if (!UCombatTargetingLibrary::IsValidSkillTarget(this, CurrentDecision.SkillData, CurrentTargetTile))
     {
         UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] EnterSkillState Failed | Reason=InvalidTarget | Unit=%s"), *GetName());
         SetTurnState(EEnemyTurnState::EndTurn);
@@ -325,23 +326,16 @@ FEnemyActionDecision AEnemyUnit::EvaluateSkillCandidate(USkillDefinitionDataAsse
         return Decision;
     }
 
-    AUnitBase* BestTarget = FindBestSkillTarget(SkillData);
-
-    if (!BestTarget)
-    {
-        return Decision;
-    }
-
-    ACombatGridTile* TargetTile = BestTarget->GetCurrentTile();
+    ACombatGridTile* TargetTile = FindBestSkillTargetTile(SkillData);
 
     if (!TargetTile)
     {
         return Decision;
     }
 
-    Decision.TargetUnit = BestTarget;
+    Decision.TargetUnit = TargetTile->GetOccupyingUnit();
     Decision.TargetTile = TargetTile;
-    Decision.Score = SkillBaseScore + EvaluateSkillTargetScore(SkillData, BestTarget);
+    Decision.Score = SkillBaseScore + EvaluateSkillTileScore(SkillData, TargetTile);
 
     return Decision;
 }
@@ -371,37 +365,22 @@ float AEnemyUnit::EvaluateSkillTargetScore(USkillDefinitionDataAsset* SkillData,
     return EvaluateSkillSlotScore(SkillData, Candidate);
 }
 
-AUnitBase* AEnemyUnit::FindBestSkillTarget(USkillDefinitionDataAsset* SkillData) const
+ACombatGridTile* AEnemyUnit::FindBestSkillTargetTile(USkillDefinitionDataAsset* SkillData) const
 {
-    AUnitBase* BestTarget = nullptr;
+    ACombatGridTile* BestTarget = nullptr;
     float BestScore = -TNumericLimits<float>::Max();
 
-    // TODO: Apply the same target-rule and front-protection validation used by player skill targeting.
-    for (TActorIterator<AUnitBase> It(GetWorld()); It; ++It)
+    // Include empty tiles and allies using the same eligibility as player selection.
+    // 플레이어 선택과 같은 허용 규칙으로 빈 타일과 아군도 후보에 포함합니다.
+    for (TActorIterator<ACombatGridTile> It(GetWorld()); It; ++It)
     {
-        AUnitBase* Candidate = *It;
-
-        if (!Candidate)
+        ACombatGridTile* Candidate = *It;
+        if (!UCombatTargetingLibrary::IsValidSkillTarget(this, SkillData, Candidate))
         {
             continue;
         }
 
-        if (Candidate == this)
-        {
-            continue;
-        }
-
-        if (!Candidate->IsUnitAlive())
-        {
-            continue;
-        }
-
-        if (Candidate->GetTeam() != ETeam::Player)
-        {
-            continue;
-        }
-
-        const float Score = EvaluateSkillTargetScore(SkillData, Candidate);
+        const float Score = EvaluateSkillTileScore(SkillData, Candidate);
 
         if (Score > BestScore)
         {
@@ -411,6 +390,21 @@ AUnitBase* AEnemyUnit::FindBestSkillTarget(USkillDefinitionDataAsset* SkillData)
     }
 
     return BestTarget;
+}
+
+float AEnemyUnit::EvaluateSkillTileScore(USkillDefinitionDataAsset* SkillData, ACombatGridTile* Candidate) const
+{
+    if (AUnitBase* Unit = Candidate->GetOccupyingUnit())
+    {
+        return EvaluateSkillTargetScore(SkillData, Unit);
+    }
+
+    float Score = -FVector::Dist(GetActorLocation(), Candidate->GetActorLocation()) * DistanceWeight;
+    if (SkillData->AbilityClass == DefaultAttackAbilityClass)
+    {
+        Score += 100000.0f;
+    }
+    return Score;
 }
 
 float AEnemyUnit::EvaluateDefaultAttackScore(AUnitBase* Candidate) const

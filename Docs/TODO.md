@@ -1,12 +1,12 @@
 # ProjectA 작업 보드와 재개 메모
 
-최근 정리: 2026-09-10 · `main` · T03 AP 비용 통합과 자동화 11건 검증 완료.
+최근 정리: 2026-09-10 · `main` · T04 타겟 규칙 통합과 전체 자동화 14건 검증 완료.
 
 [기획·구현 현황](PROJECT_PLAN.md) · [코드 리뷰와 검증 시나리오](CODE_REVIEW.md)
 
 ## 다음에 켜면 여기부터
 
-**현재 Vertical Slice 코드 연결을 완료하고 정식 빌드·에셋·PIE를 분리 검증한다.** 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다. 다음 콘텐츠 작업은 네 직업의 공통 전투 fallback 교체다.
+**Vertical Slice와 T03·T04 검증을 완료했다. 다음 전투 안정화 작업은 T05 입력/AI 턴 종료 분리 마무리와 T06 범위 계산 통합이다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다. 다음 콘텐츠 작업은 네 직업의 공통 전투 fallback 교체다.
 
 체크박스는 작업 완료를 뜻한다. 코드를 작성했어도 완료 조건을 검증하지 못했다면 체크하지 않고 `검증 대기`로 기록한다. P1/P2는 리뷰 결함의 심각도이고 M0~M3는 개발 순서이므로 서로 구분한다.
 
@@ -62,12 +62,18 @@
 - 검증: 2026-09-10 Development Editor / Win64 빌드 성공. `ProjectA.Combat.Costs` 3건과 기존 행동/Run/저장 맵 PIE를 포함한 전체 11건 성공, 실패 0건. 비용 1/2/3/0/-1과 보유 AP 1/2 조합, 과거 Ability 비용 99 무시, 실패 후 재시도, 적의 사용 가능한 대안 선택, 실제 HUD 비용 표시와 Slate 클릭을 확인했다.
 - 실행 근거: [빌드 로그](../Saved/Automation/T03APCostBuild.log), [자동화 결과](../Saved/Automation/T03APCost1/index.json), [PIE 로그](../Saved/Logs/T03APCost1.log). Saved 산출물은 로컬 검증 자료이며 Git 추적 대상이 아니다. V04의 범위 타입 검증은 T06으로 남긴다.
 
-### T04 · P2 · 플레이어/적 타겟 규칙 통합 — 기존 TODO
+### T04 · P2 · 플레이어/적 타겟 규칙 통합 — 수정 및 자동화·PIE 검증 완료
 
-- [ ] 완료
+- [x] 완료
 - 근거: 리뷰 R04. 위치: [EnemyUnit.cpp](../Source/ProjectA/Unit/EnemyUnit.cpp), [PartyPlayerController.cpp](../Source/ProjectA/Controller/PartyPlayerController.cpp), [CombatTargetingLibrary.cpp](../Source/ProjectA/Combat/Library/CombatTargetingLibrary.cpp).
 - 작업: 시전자·스킬·타일 기반 공통 검증으로 진영·생존·전열 보호를 검사하고 실행 진입에서도 사용한다.
 - 완료 조건: V03 중 타겟 검사 통과. 같은 스킬/진영 조건에서 UI와 AI가 같은 대상 목록을 얻음.
+- 구현: `IsValidSkillTarget`을 플레이어 선택·적 후보 평가/실행 진입·StartSkill·GAS 활성화 직전에 공통 적용한다. 진영·생존·타일 점유 일치·월드 일치·전열 보호를 검사한다.
+- 규칙: 기존 플레이어 규칙대로 전열 보호는 `EnemyUnit`에만 적용한다. 제자리 `AllyUnit`/`AnyUnit`은 자기 자신을 허용하고, 타일 규칙은 영역에 맞는 빈 타일을 허용한다. 접근형은 자신이 아닌 생존 유닛이 필요하다. 범위 피해 대상 집합은 T06 범위다.
+- 재검증: 유닛 대상의 진영·생존·전열 보호·선택한 타일의 점유자가 바뀌면 실행을 거절하고 AP를 보존한다. 제자리 타일 스킬은 해당 타일의 현재 점유 상태를 사용한다.
+- 검증: Development Editor / Win64 빌드 성공. `ProjectA.Combat.Targeting` 3건과 기존 로직/저장 맵 PIE를 포함한 전체 14건 성공, 실패 0건(22.73초). 양 진영·6개 규칙·6개 타일·전열 보호·무시·접근 여부 576개 조합을 공통 함수와 플레이어 필터에서 확인했다. 적의 전열 보호/무시·자신/빈 타일 선택, 직접 실행 차단 및 실행 대기 중 진영 변경·사망·점유자 교체 후 1회 실패/자원 보존/정상 재시도를 검증했다.
+- 검증 경계: 대상 상태 변경은 transient 테스트 월드와 실행 대기 phase 주입으로 재현한다. 첫 전체 실행의 저장 맵 PIE는 Move 버튼의 Slate hit-test에서 실패했으며, 창 위치·크기를 명시한 동일 빌드의 단독 PIE 및 최종 전체 실행은 통과했다. 실제 Slate Move/스킬 클릭·승리·Continue·두 번째 전투·패배 종료를 확인했다. 테스트 7건에 기존 환경/실패 주입/간소화된 월드 경고가 남는다. 사용자 수정 `BPGA_DefaultAttack.uasset`을 그대로 사용해 검증했으며 에셋 내용은 보존하고 이번 커밋에 포함하지 않는다.
+- 실행 근거: [빌드 로그](../Saved/Automation/T04TargetingBuild.log), [최종 결과](../Saved/Automation/T04TargetingFinal/index.json), [최종 로그](../Saved/Logs/T04TargetingFinal.log). Saved 산출물은 로컬 검증 자료다.
 
 ### T05 · P2 · 플레이어 입력과 AI 턴 종료 분리 — slice 필수 범위 최소 적용
 
@@ -157,6 +163,7 @@
 
 | 날짜 | 작업 | 완료/검증 | 다음 시작점 |
 |---|---|---|---|
+| 2026-09-10 | T04 공통 타겟 규칙과 실행 직전 재검증 | 정식 빌드 및 전체 자동화 14건 성공, 576개 타겟 조합/실제 AI 선택/실행 거절·재시도/Slate PIE 검증 | T05 입력과 AI 턴 종료 분리 마무리 |
 | 2026-09-08 | P1 공통 행동 완료/AI 복구, Run State/Gameplay/Encounter/UI/결과/cleanup 연결 | 정식 빌드/에셋 29항목/자동화 8건/자연 Victory PIE 통과, HUD·결과·타일 캡처 검수, 세부 경계는 VERTICAL_SLICE_REPORT.md | 직업별 fallback 교체 |
 | 2026-09-07 | 현재 코드·설정·TODO 검토, 기획/작업 보드/리뷰 문서 작성 | 정적 리뷰: P1 2건, P2 4건. 런타임 수정 없음. 빌드·PIE 미실행 | T01의 제자리 스킬 완료 규약 |
 

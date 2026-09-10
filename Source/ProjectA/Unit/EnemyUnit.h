@@ -122,7 +122,8 @@ protected:
     // Target evaluation for skill actions
     // 스킬 행동의 대상 평가 로직입니다.
     float EvaluateSkillTargetScore(USkillDefinitionDataAsset* SkillData, AUnitBase* Candidate) const;
-    AUnitBase* FindBestSkillTarget(USkillDefinitionDataAsset* SkillData) const;
+    ACombatGridTile* FindBestSkillTargetTile(USkillDefinitionDataAsset* SkillData) const;
+    float EvaluateSkillTileScore(USkillDefinitionDataAsset* SkillData, ACombatGridTile* Candidate) const;
     float EvaluateDefaultAttackScore(AUnitBase* Candidate) const;
     float EvaluateSkillSlotScore(USkillDefinitionDataAsset* SkillData, AUnitBase* Candidate) const;
     float EvaluateLowHPScore(AUnitBase* Candidate) const;

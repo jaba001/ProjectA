@@ -48,12 +48,15 @@ P1은 전투 진행 정지 또는 행동 상태 훼손을 먼저 해결할 항�
 - **검증 경계:** 테스트 6건에 기존 환경/의도적인 잘못된 데이터/간소화된 그리드 fixture 경고가 남는다. GAS 커밋 자체의 실패 및 AP 차감 이후 중단을 새로 주입한 테스트는 포함하지 않는다. 이미 소비한 AP의 비환불 정책은 유지하며 범위 타입 통합은 T06으로 남긴다.
 - **연결 작업:** T03.
 
-### R04. 적 타겟 선정이 전열 보호와 스킬 대상 규칙을 적용하지 않음
+### R04. 적 타겟 선정이 전열 보호와 스킬 대상 규칙을 적용하지 않음 — 수정 및 자동화·PIE 검증 완료
 
-- **근거:** [EnemyUnit.cpp](../Source/ProjectA/Unit/EnemyUnit.cpp) `FindBestSkillTarget` 부근은 살아 있는 Player 팀만 점수 평가한다. [PartyPlayerController.cpp](../Source/ProjectA/Controller/PartyPlayerController.cpp) `IsValidTileForPendingSkill`의 TargetRule·전열 보호 검사를 공유하지 않으며 소스 TODO도 남아 있다.
+- **수정 전 근거:** [EnemyUnit.cpp](../Source/ProjectA/Unit/EnemyUnit.cpp) `FindBestSkillTarget`은 살아 있는 Player 팀만 점수 평가했다. [PartyPlayerController.cpp](../Source/ProjectA/Controller/PartyPlayerController.cpp) `IsValidTileForPendingSkill`의 TargetRule·전열 보호 검사를 공유하지 않았다.
 - **발생 조건과 영향:** `bIgnoreFront=false`인 적 기본 공격이 보호된 후열을 더 높은 점수로 고르면 직접 공격할 수 있다. AllyUnit 스킬도 플레이어를 후보로 삼는다.
 - **검증/수정:** 전열 생존/사망 상태와 EnemyUnit/AllyUnit 규칙을 조합해 플레이어·AI의 허용 대상 목록을 비교한다. 명시적인 시전자·스킬·타일을 받는 공통 검증을 AI 선택과 실행 진입에 적용한다.
-- **연결 작업:** T04. 기존 보류 TODO를 현재 코드에서 다시 확인한 항목이다.
+- **현재 수정:** `CombatTargetingLibrary::IsValidSkillTarget`으로 플레이어·AI·실행 진입을 통합했다. AI는 타일을 순회해 아군/자기 자신/빈 타일도 규칙에 맞게 평가한다. 실행 직전에 상태와 점유를 재검증하여 선택한 유닛이 바뀐 요청은 AP 소비 전에 실패 처리한다. 제자리 타일 스킬은 현재 점유자를 따른다.
+- **규칙 경계:** 기존 플레이어 기준을 유지하여 전열 보호는 `EnemyUnit`에만 적용한다. `AnyUnit`과 타일 규칙으로 선택한 대상에 새 보호 규칙을 추가하지 않는다. 접근형 스킬은 다른 생존 유닛을 요구한다. 범위 효과의 실제 피해 대상 필터링은 T06으로 남긴다.
+- **검증:** `RulesAndPlayerSelection`의 576개 조합, `EnemySelection`의 실제 AI 선택, `ExecutionRevalidation`의 직접 거절/대기 phase 주입/재시도 검증 통과. 정식 빌드와 기존 행동·AP·Run·Slate PIE를 포함한 최종 전체 자동화 14건이 통과했다. 첫 PIE hit-test 실패와 창 조건을 명시한 재실행 등 상세 근거는 [T04](TODO.md) 참조.
+- **연결 작업:** T04.
 
 ### R05. 플레이어 입력의 행동 가능 검사에 소속 팀 제한이 없음 — slice 필수 최소 수정
 

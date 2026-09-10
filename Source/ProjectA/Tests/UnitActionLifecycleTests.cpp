@@ -5,6 +5,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "AbilitySystemComponent.h"
 #include "Combat/CombatManager.h"
+#include "Combat/Library/CombatTargetingLibrary.h"
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/World.h"
@@ -50,6 +51,10 @@ namespace UnitActionLifecycleTests
             Unit->bIsActiveTurn = true;
             Unit->ResetActionPoint();
             Unit->ResetSubActionPoint();
+            if (Unit->IsA<AEnemyUnit>())
+            {
+                Unit->SetTeam(ETeam::Enemy);
+            }
             return Unit;
         }
 
@@ -108,6 +113,7 @@ bool FUnitInstantSkillTest::RunTest(const FString& Parameters)
     FScopedWorld Scope;
     AUnitBase* Unit = Scope.SpawnUnit<AUnitBase>(FVector(0.0f, 0.0f, 100.0f));
     AUnitBase* Target = Scope.SpawnUnit<AUnitBase>(FVector(500.0f, 0.0f, 100.0f));
+    Target->SetTeam(ETeam::Enemy);
     Scope.SpawnTile(Unit);
     ACombatGridTile* TargetTile = Scope.SpawnTile(Target);
     UAbilitySystemComponent* ASC = Unit->GetAbilitySystemComponent();
@@ -164,6 +170,7 @@ bool FUnitHeldSkillTest::RunTest(const FString& Parameters)
     FScopedWorld Scope;
     AUnitBase* Unit = Scope.SpawnUnit<AUnitBase>(FVector(0.0f, 0.0f, 100.0f));
     AUnitBase* Target = Scope.SpawnUnit<AUnitBase>(FVector(500.0f, 0.0f, 100.0f));
+    Target->SetTeam(ETeam::Enemy);
     Scope.SpawnTile(Unit);
     ACombatGridTile* TargetTile = Scope.SpawnTile(Target);
     UAbilitySystemComponent* ASC = Unit->GetAbilitySystemComponent();
@@ -405,6 +412,7 @@ bool FSkillCostFailureTest::RunTest(const FString& Parameters)
     FScopedWorld Scope;
     AUnitBase* Unit = Scope.SpawnUnit<AUnitBase>(FVector(0.0f, 0.0f, 100.0f));
     AUnitBase* Target = Scope.SpawnUnit<AUnitBase>(FVector(500.0f, 0.0f, 100.0f));
+    Target->SetTeam(ETeam::Enemy);
     Scope.SpawnTile(Unit);
     ACombatGridTile* TargetTile = Scope.SpawnTile(Target);
     USkillDefinitionDataAsset* Skill = MakeSkill(Unit, UGA_DefaultAttack::StaticClass());
@@ -441,6 +449,7 @@ bool FSkillCostFailureTest::RunTest(const FString& Parameters)
     BlockedTags->Reset();
 
     ACombatGridTile* EmptyTile = Scope.World->SpawnActor<ACombatGridTile>();
+    EmptyTile->SetTerritory(ETileTerritory::Enemy);
     Skill->TargetRule = ESkillTargetRule::AnyTile;
     Unit->StartSkill(Skill, EmptyTile);
     CheckFailure(TEXT("Attack context invalid"), 3);
@@ -494,6 +503,225 @@ bool FEnemyAffordableSkillTest::RunTest(const FString& Parameters)
         Enemy->OnTurnEnd();
     }
     Enemy->OnActionCompleted.Clear();
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkillTargetRuleTest, "ProjectA.Combat.Targeting.RulesAndPlayerSelection", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillTargetRuleTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    for (ETeam SourceTeam : { ETeam::Player, ETeam::Enemy })
+    {
+        FScopedWorld Scope;
+        AUnitBase* Source = Scope.SpawnUnit<AUnitBase>(FVector::ZeroVector);
+        AUnitBase* Ally = Scope.SpawnUnit<AUnitBase>(FVector(100.0f, 0.0f, 0.0f));
+        AUnitBase* Opponent = Scope.SpawnUnit<AUnitBase>(FVector(200.0f, 0.0f, 0.0f));
+        Source->SetTeam(SourceTeam);
+        Ally->SetTeam(SourceTeam);
+        ETeam OpposingTeam = ETeam::Enemy;
+        ETileTerritory AllyTerritory = ETileTerritory::Player;
+        ETileTerritory EnemyTerritory = ETileTerritory::Enemy;
+        if (SourceTeam == ETeam::Enemy)
+        {
+            OpposingTeam = ETeam::Player;
+            AllyTerritory = ETileTerritory::Enemy;
+            EnemyTerritory = ETileTerritory::Player;
+        }
+        Opponent->SetTeam(OpposingTeam);
+        TArray<ACombatGridTile*> Tiles = { Scope.SpawnTile(Source), Scope.SpawnTile(Ally), Scope.SpawnTile(Opponent), Scope.World->SpawnActor<ACombatGridTile>(), Scope.World->SpawnActor<ACombatGridTile>(), Scope.World->SpawnActor<ACombatGridTile>() };
+        Tiles[0]->SetTerritory(AllyTerritory);
+        Tiles[1]->SetTerritory(AllyTerritory);
+        Tiles[2]->SetTerritory(EnemyTerritory);
+        Tiles[3]->SetTerritory(AllyTerritory);
+        Tiles[4]->SetTerritory(EnemyTerritory);
+        ACombatManager* Combat = Scope.World->SpawnActor<ACombatManager>();
+        Combat->RegisterUnits({ Source, Opponent });
+        Combat->StartCombat_Internal();
+        APartyPlayerController* Controller = Scope.World->SpawnActor<APartyPlayerController>();
+        Controller->SetCombatContext(Combat, true);
+        USkillDefinitionDataAsset* Skill = MakeSkill(Source, UGA_DefaultAttack::StaticClass());
+        // Exercise target filtering for both teams without bypassing the separate turn-input guard.
+        // 턴 입력 권한 검사를 변경하지 않고 양 진영의 대상 필터를 검증합니다.
+        FindFProperty<FObjectPropertyBase>(APartyPlayerController::StaticClass(), TEXT("PendingSkillData"))->SetObjectPropertyValue_InContainer(Controller, Skill);
+        const bool Expected[6][6] =
+        {
+            { false, false, true, false, false, false },
+            { true, true, false, false, false, false },
+            { true, true, true, false, false, false },
+            { false, false, true, false, true, false },
+            { true, true, false, true, false, false },
+            { true, true, true, true, true, false }
+        };
+        for (int32 RuleIndex = 0; RuleIndex < 6; ++RuleIndex)
+        {
+            Skill->TargetRule = static_cast<ESkillTargetRule>(RuleIndex);
+            for (bool bProtected : { false, true })
+            {
+                Tiles[2]->SetProtectedByFront(bProtected);
+                for (bool bIgnoreFront : { false, true })
+                {
+                    Skill->bIgnoreFront = bIgnoreFront;
+                    for (bool bApproach : { false, true })
+                    {
+                        Skill->bMoveToTarget = bApproach;
+                        for (int32 TileIndex = 0; TileIndex < Tiles.Num(); ++TileIndex)
+                        {
+                            bool bAllowed = Expected[RuleIndex][TileIndex];
+                            if (RuleIndex == 0 && TileIndex == 2 && bProtected && !bIgnoreFront)
+                            {
+                                bAllowed = false;
+                            }
+                            if (bApproach && (TileIndex == 0 || TileIndex >= 3))
+                            {
+                                bAllowed = false;
+                            }
+                            const FString Context = FString::Printf(TEXT("Team=%d Rule=%d Tile=%d Protected=%d Ignore=%d Approach=%d"), static_cast<int32>(SourceTeam), RuleIndex, TileIndex, bProtected, bIgnoreFront, bApproach);
+                            TestEqual(Context + TEXT(" shared rule"), UCombatTargetingLibrary::IsValidSkillTarget(Source, Skill, Tiles[TileIndex]), bAllowed);
+                            TestEqual(Context + TEXT(" player filter"), Controller->IsValidTileForPendingSkill(Tiles[TileIndex]), bAllowed);
+                        }
+                    }
+                }
+            }
+        }
+        Skill->TargetRule = ESkillTargetRule::AnyUnit;
+        Skill->bMoveToTarget = false;
+        FindFProperty<FBoolProperty>(AUnitBase::StaticClass(), TEXT("bIsDead"))->SetPropertyValue_InContainer(Opponent, true);
+        TestFalse(TEXT("Dead occupant is rejected"), Controller->IsValidTileForPendingSkill(Tiles[2]));
+        FindFProperty<FBoolProperty>(AUnitBase::StaticClass(), TEXT("bIsDead"))->SetPropertyValue_InContainer(Opponent, false);
+        Tiles[4]->SetOccupyingUnit(Opponent);
+        TestFalse(TEXT("Stale tile occupancy is rejected"), Controller->IsValidTileForPendingSkill(Tiles[4]));
+        Skill->TargetRule = static_cast<ESkillTargetRule>(255);
+        TestFalse(TEXT("Unknown target rule is rejected"), Controller->IsValidTileForPendingSkill(Tiles[2]));
+        TestFalse(TEXT("Null source is rejected"), UCombatTargetingLibrary::IsValidSkillTarget(nullptr, Skill, Tiles[0]));
+        TestFalse(TEXT("Null skill is rejected"), UCombatTargetingLibrary::IsValidSkillTarget(Source, nullptr, Tiles[0]));
+        TestFalse(TEXT("Null tile is rejected"), UCombatTargetingLibrary::IsValidSkillTarget(Source, Skill, nullptr));
+        Combat->ResetCombat();
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEnemyTargetRuleTest, "ProjectA.Combat.Targeting.EnemySelection", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyTargetRuleTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    FScopedWorld Scope;
+    AEnemyUnit* Enemy = Scope.SpawnUnit<AEnemyUnit>(FVector::ZeroVector);
+    AUnitBase* Protected = Scope.SpawnUnit<AUnitBase>(FVector(10.0f, 0.0f, 0.0f));
+    AUnitBase* Exposed = Scope.SpawnUnit<AUnitBase>(FVector(100.0f, 0.0f, 0.0f));
+    ACombatGridTile* SelfTile = Scope.SpawnTile(Enemy);
+    ACombatGridTile* ProtectedTile = Scope.SpawnTile(Protected);
+    ACombatGridTile* ExposedTile = Scope.SpawnTile(Exposed);
+    ACombatGridTile* EmptyTile = Scope.World->SpawnActor<ACombatGridTile>();
+    SelfTile->SetTerritory(ETileTerritory::Enemy);
+    EmptyTile->SetTerritory(ETileTerritory::Player);
+    ProtectedTile->SetProtectedByFront(true);
+    USkillDefinitionDataAsset* Skill = MakeSkill(Enemy, UGameplayAbility::StaticClass());
+    EquipSkill(Enemy, Skill);
+    FindFProperty<FClassProperty>(AUnitBase::StaticClass(), TEXT("DefaultAttackAbilityClass"))->SetObjectPropertyValue_InContainer(Enemy, UGameplayAbility::StaticClass());
+    Enemy->GetAbilitySystemComponent()->GiveAbility(FGameplayAbilitySpec(UGameplayAbility::StaticClass(), 1));
+    const auto CheckSelection = [&](ESkillTargetRule Rule, bool bIgnoreFront, ACombatGridTile* ExpectedTile)
+    {
+        Skill->TargetRule = Rule;
+        Skill->bIgnoreFront = bIgnoreFront;
+        Enemy->OnTurnStart();
+        TestTrue(TEXT("AI begins the selected action"), Enemy->IsBusy());
+        TestEqual(TEXT("AI chooses a rule-valid tile"), Enemy->PendingSkillTargetTile, ExpectedTile);
+        TestTrue(TEXT("AI choice passes shared validation"), UCombatTargetingLibrary::IsValidSkillTarget(Enemy, Skill, Enemy->PendingSkillTargetTile));
+        Enemy->CancelCurrentAction();
+        Enemy->OnTurnEnd();
+    };
+    CheckSelection(ESkillTargetRule::EnemyUnit, false, ExposedTile);
+    CheckSelection(ESkillTargetRule::EnemyUnit, true, ProtectedTile);
+    CheckSelection(ESkillTargetRule::AllyUnit, false, SelfTile);
+    CheckSelection(ESkillTargetRule::AnyUnit, false, SelfTile);
+    CheckSelection(ESkillTargetRule::EnemyTile, false, EmptyTile);
+    CheckSelection(ESkillTargetRule::AllyTile, false, SelfTile);
+    ProtectedTile->SetProtectedByFront(false);
+    CheckSelection(ESkillTargetRule::EnemyUnit, false, ProtectedTile);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkillTargetExecutionTest, "ProjectA.Combat.Targeting.ExecutionRevalidation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillTargetExecutionTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    FScopedWorld Scope;
+    AUnitBase* Source = Scope.SpawnUnit<AUnitBase>(FVector::ZeroVector);
+    AUnitBase* Target = Scope.SpawnUnit<AUnitBase>(FVector(100.0f, 0.0f, 0.0f));
+    Target->SetTeam(ETeam::Enemy);
+    Scope.SpawnTile(Source);
+    ACombatGridTile* Tile = Scope.SpawnTile(Target);
+    GrantAttack(Source);
+    USkillDefinitionDataAsset* Skill = MakeSkill(Source, UGA_DefaultAttack::StaticClass());
+    int32 Completions = 0;
+    EUnitActionResult LastResult = EUnitActionResult::Succeeded;
+    Source->OnActionCompleted.AddLambda([&](AUnitBase*, EUnitActionType, EUnitActionResult Result)
+    {
+        ++Completions;
+        LastResult = Result;
+    });
+    Tile->SetProtectedByFront(true);
+    Source->StartSkill(Skill, Tile);
+    TestEqual(TEXT("Direct protected-target request fails"), LastResult, EUnitActionResult::Failed);
+    TestEqual(TEXT("Protected-target rejection preserves AP"), Source->GetCurrentActionPoint(), 2);
+    TestEqual(TEXT("Protected-target rejection causes no damage"), Target->GetAttributeSet()->GetHP(), 100.0f);
+    Tile->SetProtectedByFront(false);
+    Target->SetTeam(ETeam::Player);
+    Source->StartSkill(Skill, Tile);
+    TestEqual(TEXT("Direct friendly-target request fails"), LastResult, EUnitActionResult::Failed);
+    TestEqual(TEXT("Direct rejections complete exactly once each"), Completions, 2);
+    Target->SetTeam(ETeam::Enemy);
+
+    // Inject the waiting phase to model changes during approach without depending on navigation.
+    // 내비게이션에 의존하지 않고 접근 중 상태 변경을 재현하도록 실행 대기 단계를 주입합니다.
+    for (int32 Scenario = 0; Scenario < 4; ++Scenario)
+    {
+        FEnumProperty* ActionProperty = FindFProperty<FEnumProperty>(AUnitBase::StaticClass(), TEXT("CurrentActionType"));
+        ActionProperty->GetUnderlyingProperty()->SetIntPropertyValue(ActionProperty->ContainerPtrToValuePtr<void>(Source), static_cast<uint64>(EUnitActionType::Skill));
+        SetMovementPhase(Source, EUnitMovePhase::WaitingForSkill);
+        Source->PendingSkillData = Skill;
+        Source->PendingSkillAbilityClass = Skill->AbilityClass;
+        Source->PendingSkillTargetTile = Tile;
+        Source->PendingTargetUnit = Target;
+        if (Scenario == 0)
+        {
+            Tile->SetProtectedByFront(true);
+        }
+        else if (Scenario == 1)
+        {
+            Target->SetTeam(ETeam::Player);
+        }
+        else if (Scenario == 2)
+        {
+            FindFProperty<FBoolProperty>(AUnitBase::StaticClass(), TEXT("bIsDead"))->SetPropertyValue_InContainer(Target, true);
+        }
+        else
+        {
+            ACombatGridTile* OtherTile = Scope.World->SpawnActor<ACombatGridTile>();
+            Target->SetCurrentTile(OtherTile);
+            AUnitBase* Replacement = Scope.SpawnUnit<AUnitBase>(FVector(100.0f, 0.0f, 0.0f));
+            Replacement->SetTeam(ETeam::Enemy);
+            Replacement->SetCurrentTile(Tile);
+        }
+        Source->ExecuteSkillAtTarget();
+        TestEqual(TEXT("Changed target completes once"), Completions, Scenario + 3);
+        TestEqual(TEXT("Changed target reports failure"), LastResult, EUnitActionResult::Failed);
+        TestFalse(TEXT("Changed target releases busy state"), Source->IsBusy());
+        TestEqual(TEXT("Changed target preserves AP"), Source->GetCurrentActionPoint(), 2);
+        TestEqual(TEXT("Changed target causes no damage"), Target->GetAttributeSet()->GetHP(), 100.0f);
+        Tile->SetProtectedByFront(false);
+        Target->SetTeam(ETeam::Enemy);
+        FindFProperty<FBoolProperty>(AUnitBase::StaticClass(), TEXT("bIsDead"))->SetPropertyValue_InContainer(Target, false);
+    }
+    Target->SetCurrentTile(Tile);
+    Source->StartSkill(Skill, Tile);
+    TestEqual(TEXT("Valid retry succeeds"), LastResult, EUnitActionResult::Succeeded);
+    TestEqual(TEXT("Valid retry charges AP once"), Source->GetCurrentActionPoint(), 1);
+    TestEqual(TEXT("Valid retry applies real damage"), Target->GetAttributeSet()->GetHP(), 90.0f);
+    Source->OnActionCompleted.Clear();
     return true;
 }
 

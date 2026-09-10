@@ -1,4 +1,5 @@
 #include "PartyPlayerController.h"
+#include "Combat/Library/CombatTargetingLibrary.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Blueprint/UserWidget.h"
 #include "Combat/CombatManager.h"
@@ -290,105 +291,5 @@ void APartyPlayerController::CancelTileInputMode()
 
 bool APartyPlayerController::IsValidTileForPendingSkill(ACombatGridTile* Tile) const
 {
-    if (!PendingSkillData || !Tile)
-    {
-        return false;
-    }
-
-    AUnitBase* ActiveUnit = GetActiveUnit();
-
-    if (!ActiveUnit)
-    {
-        return false;
-    }
-
-    AUnitBase* TargetUnit = Tile->GetOccupyingUnit();
-    const ETeam ActiveTeam = ActiveUnit->GetTeam();
-    const ETileTerritory TileTerritory = Tile->GetTerritory();
-
-    // Check whether the tile belongs to enemy territory for the active unit.
-    auto IsEnemyTileForActiveTeam = [&]() -> bool
-        {
-            return (ActiveTeam == ETeam::Player && TileTerritory == ETileTerritory::Enemy)
-                || (ActiveTeam == ETeam::Enemy && TileTerritory == ETileTerritory::Player);
-        };
-
-    // Check whether the tile belongs to ally territory for the active unit.
-    auto IsAllyTileForActiveTeam = [&]() -> bool
-        {
-            return (ActiveTeam == ETeam::Player && TileTerritory == ETileTerritory::Player)
-                || (ActiveTeam == ETeam::Enemy && TileTerritory == ETileTerritory::Enemy);
-        };
-
-    // Check whether the tile has a living target unit.
-    auto HasAliveTargetUnit = [&]() -> bool
-        {
-            return TargetUnit && TargetUnit->IsUnitAlive();
-        };
-
-    // Check whether the target unit is an enemy of the active unit.
-    auto IsEnemyTargetUnit = [&]() -> bool
-        {
-            return HasAliveTargetUnit() && TargetUnit->GetTeam() != ActiveTeam;
-        };
-
-    // Check whether the target unit is an ally of the active unit.
-    auto IsAllyTargetUnit = [&]() -> bool
-        {
-            return HasAliveTargetUnit() && TargetUnit->GetTeam() == ActiveTeam;
-        };
-
-    // Check whether front protection blocks this tile.
-    auto IsBlockedByFrontProtection = [&]() -> bool
-        {
-            return !PendingSkillData->bIgnoreFront && Tile->GetProtectedByFront();
-        };
-
-    // Dead units on a tile should never be treated as valid targets.
-    if (TargetUnit && !TargetUnit->IsUnitAlive())
-    {
-        return false;
-    }
-
-    switch (PendingSkillData->TargetRule)
-    {
-    case ESkillTargetRule::EnemyUnit:
-    {
-        if (!IsEnemyTargetUnit())
-        {
-            return false;
-        }
-
-        if (IsBlockedByFrontProtection())
-        {
-            return false;
-        }
-
-        return true;
-    }
-    case ESkillTargetRule::AllyUnit:
-    {
-        return IsAllyTargetUnit();
-    }
-    case ESkillTargetRule::AnyUnit:
-    {
-        return HasAliveTargetUnit();
-    }
-    case ESkillTargetRule::EnemyTile:
-    {
-        return IsEnemyTileForActiveTeam();
-    }
-    case ESkillTargetRule::AllyTile:
-    {
-        return IsAllyTileForActiveTeam();
-    }
-    case ESkillTargetRule::AnyTile:
-    {
-        return TileTerritory != ETileTerritory::None;
-    }
-    default:
-    {
-        return false;
-    }
-    }
+    return UCombatTargetingLibrary::IsValidSkillTarget(GetActiveUnit(), PendingSkillData, Tile);
 }

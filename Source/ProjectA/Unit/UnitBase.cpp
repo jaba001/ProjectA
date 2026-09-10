@@ -569,7 +569,7 @@ void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile
 
     BeginCurrentAction(EUnitActionType::Skill);
 
-    if (!SkillData || !TargetTile || !SkillData->AbilityClass || !AbilitySystem || !HasEnoughActionPoint(SkillData->ActionPointCost))
+    if (!UCombatTargetingLibrary::IsValidSkillTarget(this, SkillData, TargetTile) || !SkillData->AbilityClass || !AbilitySystem || !HasEnoughActionPoint(SkillData->ActionPointCost))
     {
         CompleteCurrentAction(EUnitActionResult::Failed);
         return;
@@ -607,25 +607,26 @@ void AUnitBase::ExecuteSkillAtTarget()
         return;
     }
 
-    if (!PendingSkillData || !AbilitySystem || !PendingSkillAbilityClass)
+    if (!UCombatTargetingLibrary::IsValidSkillTarget(this, PendingSkillData, PendingSkillTargetTile) || !AbilitySystem || !PendingSkillAbilityClass)
     {
         CompleteSkillExecution(EUnitActionResult::Failed);
         return;
     }
 
     const ESkillTargetRule TargetRule = PendingSkillData->TargetRule;
-    if (TargetRule == ESkillTargetRule::EnemyUnit || TargetRule == ESkillTargetRule::AllyUnit || TargetRule == ESkillTargetRule::AnyUnit)
+    if (PendingSkillData->bMoveToTarget || TargetRule == ESkillTargetRule::EnemyUnit || TargetRule == ESkillTargetRule::AllyUnit || TargetRule == ESkillTargetRule::AnyUnit)
     {
-        if (!IsValid(PendingTargetUnit) || !PendingTargetUnit->IsUnitAlive())
+        if (!IsValid(PendingTargetUnit) || PendingTargetUnit != PendingSkillTargetTile->GetOccupyingUnit())
         {
             CompleteSkillExecution(EUnitActionResult::Failed);
             return;
         }
     }
-    else if (!IsValid(PendingSkillTargetTile))
+    else
     {
-        CompleteSkillExecution(EUnitActionResult::Failed);
-        return;
+        // Tile skills follow current occupancy; unit skills keep their selected unit.
+        // 타일 스킬은 현재 점유 상태를 따르고 유닛 스킬은 선택한 유닛을 유지합니다.
+        PendingTargetUnit = PendingSkillTargetTile->GetOccupyingUnit();
     }
 
     FVector LookTargetLocation = GetActorLocation();
