@@ -19,6 +19,7 @@
 #include "Grid/Combat/CombatGridTile.h"
 #include "TimerManager.h"
 #include "Unit/EnemyUnit.h"
+#include "Unit/PlayerUnit.h"
 #include "Unit/UnitBase.h"
 #include "UObject/UnrealType.h"
 
@@ -27,6 +28,16 @@ namespace UnitActionLifecycleTests
     struct FScopedWorld
     {
         UWorld* World = nullptr;
+        uint64 TimerFrame = 0;
+
+        // Advance isolated timer frames without changing the surrounding editor frame.
+        // 외부 에디터 프레임을 바꾸지 않고 격리된 타이머 프레임을 진행합니다.
+        void TickTimers(float DeltaSeconds)
+        {
+            TimerFrame = FMath::Max(TimerFrame, GFrameCounter) + 1;
+            TGuardValue<uint64> FrameGuard(GFrameCounter, TimerFrame);
+            World->GetTimerManager().Tick(DeltaSeconds);
+        }
 
         FScopedWorld()
         {
@@ -1006,6 +1017,143 @@ bool FSkillAreaRejectionTest::RunTest(const FString& Parameters)
     Source->StartSkill(Skill, Tile);
     TestEqual(TEXT("Valid retry deals damage"), Target->GetAttributeSet()->GetHP(), 90.0f);
     TestEqual(TEXT("Valid retry consumes AP"), Source->GetCurrentActionPoint(), 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSpawnedAttackCompletionTest, "ProjectA.Combat.Completion.ProjectileBoundaries", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSpawnedAttackCompletionTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    FScopedWorld Scope;
+    Scope.TickTimers(0.0f);
+    AUnitBase* Source = Scope.SpawnUnit<AUnitBase>(FVector::ZeroVector);
+    AUnitBase* Target = Scope.SpawnUnit<AUnitBase>(FVector(200.0f, 0.0f, 0.0f));
+    Target->SetTeam(ETeam::Enemy);
+    Scope.SpawnTile(Source);
+    ACombatGridTile* Tile = Scope.SpawnTile(Target);
+    UGameplayAbility* Ability = GrantAttack(Source);
+    FindFProperty<FClassProperty>(UGA_AttackBase::StaticClass(), TEXT("SpawnedAttackActorClass"))->SetObjectPropertyValue_InContainer(Ability, AAttackSkillActorBase::StaticClass());
+    FindFProperty<FFloatProperty>(UGA_AttackBase::StaticClass(), TEXT("SpawnedActorTimeout"))->SetPropertyValue_InContainer(Ability, 0.2f);
+    USkillDefinitionDataAsset* Skill = MakeSkill(Source, UGA_DefaultAttack::StaticClass());
+    int32 Completed = 0;
+    EUnitActionResult LastResult = EUnitActionResult::Succeeded;
+    Source->OnActionCompleted.AddLambda([&](AUnitBase*, EUnitActionType, EUnitActionResult Result)
+    {
+        ++Completed;
+        LastResult = Result;
+    });
+    for (int32 Scenario = 0; Scenario < 6; ++Scenario)
+    {
+        Source->OnTurnStart();
+        const int32 Before = Completed;
+        const float HPBefore = Target->GetAttributeSet()->GetHP();
+        Source->StartSkill(Skill, Tile);
+        AAttackSkillActorBase* Actor = nullptr;
+        for (TActorIterator<AAttackSkillActorBase> It(Scope.World); It; ++It)
+        {
+            Actor = *It;
+        }
+        if (!TestNotNull(TEXT("Projectile exists"), Actor))
+        {
+            return false;
+        }
+        TestTrue(TEXT("No-montage release waits for projectile"), Source->IsBusy());
+        TestEqual(TEXT("No early completion"), Completed, Before);
+        TestEqual(TEXT("AP charged only once before impact"), Source->GetCurrentActionPoint(), 1);
+        if (Scenario == 0)
+        {
+            // Inject an unfinished animation to exercise impact-before-montage ordering.
+            // 미완료 애니메이션 상태를 주입해 몽타주 이전 임팩트 순서를 검증합니다.
+            FindFProperty<FBoolProperty>(UGA_AttackBase::StaticClass(), TEXT("bAnimationFinished"))->SetPropertyValue_InContainer(Ability, false);
+            Actor->RequestImpact();
+            TestTrue(TEXT("Impact still waits for animation"), Source->IsBusy());
+            Ability->ProcessEvent(Ability->FindFunctionChecked(TEXT("OnAttackMontageCompleted")), nullptr);
+        }
+        else if (Scenario == 1)
+        {
+            Actor->RequestFinish();
+        }
+        else if (Scenario == 2)
+        {
+            Actor->Destroy();
+        }
+        else if (Scenario == 3)
+        {
+            Scope.TickTimers(0.0f);
+            Scope.TickTimers(0.3f);
+        }
+        else if (Scenario == 4)
+        {
+            Source->CancelCurrentAction();
+        }
+        else
+        {
+            Source->Die();
+        }
+        TestFalse(TEXT("Terminal path clears busy"), Source->IsBusy());
+        TestEqual(TEXT("Terminal path completes exactly once"), Completed, Before + 1);
+        const EUnitActionResult ExpectedResult = Scenario == 0 ? EUnitActionResult::Succeeded : (Scenario >= 4 ? EUnitActionResult::Cancelled : EUnitActionResult::Failed);
+        TestEqual(TEXT("Terminal result is preserved"), LastResult, ExpectedResult);
+        Actor->RequestImpact();
+        Actor->RequestFinish();
+        Actor->Destroy();
+        TestEqual(TEXT("Late callbacks cannot complete again"), Completed, Before + 1);
+        TestEqual(TEXT("Late or failed projectile cannot damage"), Target->GetAttributeSet()->GetHP(), HPBefore - (Scenario == 0 ? 10.0f : 0.0f));
+        TestEqual(TEXT("Consumed AP is not refunded"), Source->GetCurrentActionPoint(), 1);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPlayerExhaustionTest, "ProjectA.Combat.Completion.PlayerResourceExhaustion", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPlayerExhaustionTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    for (int32 RemainingAP : { 0, 1 })
+    {
+        for (int32 RemainingSubAP : { 0, 1 })
+        {
+            FScopedWorld Scope;
+            Scope.TickTimers(0.0f);
+            APlayerUnit* Source = Scope.SpawnUnit<APlayerUnit>(FVector::ZeroVector);
+            AUnitBase* Target = Scope.SpawnUnit<AUnitBase>(FVector(200.0f, 0.0f, 0.0f));
+            Target->SetTeam(ETeam::Enemy);
+            Scope.SpawnTile(Source);
+            ACombatGridTile* Tile = Scope.SpawnTile(Target);
+            UGameplayAbility* Ability = GrantAttack(Source);
+            FindFProperty<FClassProperty>(UGA_AttackBase::StaticClass(), TEXT("SpawnedAttackActorClass"))->SetObjectPropertyValue_InContainer(Ability, AAttackSkillActorBase::StaticClass());
+            USkillDefinitionDataAsset* Skill = MakeSkill(Source, UGA_DefaultAttack::StaticClass());
+            Skill->ActionPointCost = 2 - RemainingAP;
+            ACombatManager* Combat = Scope.World->SpawnActor<ACombatManager>();
+            Combat->RegisterUnits({ Source, Target });
+            Combat->StartCombat_Internal();
+            if (RemainingSubAP == 0)
+            {
+                Source->ConsumeSubActionPoint(1);
+            }
+            Source->StartSkill(Skill, Tile);
+            Scope.TickTimers(0.01f);
+            TestEqual(TEXT("Exhaustion cannot end a projectile in flight"), Combat->GetCurrentUnit(), static_cast<AUnitBase*>(Source));
+            for (TActorIterator<AAttackSkillActorBase> It(Scope.World); It; ++It)
+            {
+                It->RequestImpact();
+            }
+            TestEqual(TEXT("Completion notification precedes turn transition"), Combat->GetCurrentUnit(), static_cast<AUnitBase*>(Source));
+            Scope.TickTimers(0.01f);
+            AUnitBase* Expected = RemainingAP == 0 && RemainingSubAP == 0 ? Target : Source;
+            TestEqual(TEXT("Only exhaustion of both pools ends turn"), Combat->GetCurrentUnit(), Expected);
+            TestFalse(TEXT("Player action is complete"), Source->IsBusy());
+            if (RemainingAP == 0 && RemainingSubAP == 1)
+            {
+                TestFalse(TEXT("Legacy end-turn flag preserves remaining movement"), Source->MustEndTurnAfterCurrentAction());
+                Source->StartItemAction(Source);
+                Scope.TickTimers(0.01f);
+                TestEqual(TEXT("Last sub-action also triggers exhausted turn end"), Combat->GetCurrentUnit(), Target);
+            }
+            Combat->ResetCombat();
+        }
+    }
     return true;
 }
 

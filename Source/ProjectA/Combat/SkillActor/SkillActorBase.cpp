@@ -13,6 +13,11 @@ ASkillActorBase::ASkillActorBase()
 
 void ASkillActorBase::InitializeSkillActor(const FSkillActorInitData& InitData)
 {
+    if (bInitialized || bResolved)
+    {
+        return;
+    }
+    bInitialized = true;
     SourceUnit = InitData.SourceUnit;
     SkillData = InitData.SkillData;
     TargetTile = InitData.TargetTile;
@@ -31,7 +36,7 @@ void ASkillActorBase::InitializeSkillActor(const FSkillActorInitData& InitData)
 
 void ASkillActorBase::RequestImpact()
 {
-    if (bImpactHandled)
+    if (!bInitialized || bResolved || bImpactHandled)
     {
         UE_LOG(LogTemp, Warning, TEXT("[SkillActorBase] RequestImpact Ignored | Reason=AlreadyHandled | Actor=%s"), *GetNameSafe(this));
         return;
@@ -44,7 +49,8 @@ void ASkillActorBase::RequestImpact()
 
 void ASkillActorBase::RequestFinish()
 {
-    // TODO: Decide whether spawned skill actors should drive SourceUnit skill completion after impact.
+    // Finishing without impact reports failure to the owning ability.
+    // 임팩트 없는 종료는 소유 어빌리티에 실패로 보고합니다.
     FinishSkillActor();
 }
 
@@ -84,5 +90,29 @@ void ASkillActorBase::HandleImpact()
 
 void ASkillActorBase::FinishSkillActor()
 {
+    ResolveSkillActor(bImpactHandled);
     SetLifeSpan(DestroyDelayAfterFinish);
+}
+
+void ASkillActorBase::ResolveSkillActor(bool bSucceeded)
+{
+    if (bResolved)
+    {
+        return;
+    }
+    bResolved = true;
+    OnSkillActorResolved.Broadcast(this, bSucceeded);
+    OnSkillActorResolved.Clear();
+}
+
+void ASkillActorBase::Destroyed()
+{
+    ResolveSkillActor(false);
+    Super::Destroyed();
+}
+
+void ASkillActorBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    ResolveSkillActor(false);
+    Super::EndPlay(EndPlayReason);
 }

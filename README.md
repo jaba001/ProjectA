@@ -104,6 +104,8 @@ UI 관련 상세 메모는 아래 파일에 정리되어 있습니다.
 
 타일 액터는 클릭을 `PartyPlayerController::HandleTileClicked`로 전달합니다. 플레이어 명령은 권한·전투 입력 잠금·Player 팀·활성 턴·생존·busy를 확인하며 클릭 시 비용과 타겟을 재검사합니다. UI의 턴 종료는 `PartyPlayerController::RequestEndTurn`, C++ AI의 내부 종료는 `CombatManager::RequestEndTurnForUnit(this)`를 사용합니다. 기존 CombatManager의 인자 없는 Blueprint 종료 함수는 deprecated 상태이며 플레이어 입력 검사를 거칩니다. 턴 전환과 전투 종료 시 이전 선택·하이라이트를 정리합니다.
 
+스폰 공격은 몽타주 종료와 스킬 액터의 impact가 모두 끝난 뒤 GAS를 종료합니다. 몽타주가 없으면 impact까지 기다립니다. 스폰 클래스는 `SkillActorBase` 계열이어야 하며, `RequestFinish`를 impact 전에 호출하거나 액터가 파괴되면 실패로 종료합니다. 미충돌은 Ability의 `SpawnedActorTimeout`(기본 10초) 후 실패로 정리합니다. 취소·시전자 사망 시 대기 액터를 파괴해 늦은 피해를 차단하고 이미 소비한 AP는 환불하지 않습니다. 플레이어는 AP와 보조 AP가 모두 0이면 행동 완료 다음 틱에 자동으로 턴을 종료하며, 보조 AP가 남으면 이동/아이템을 계속 사용할 수 있습니다.
+
 기존 MainMenu와 CharacterCreation은 런타임 fallback을 유지합니다.
 Scaffold generator는 기존 native class를 부모로 사용하는 WBP의 Designer tree를 JSON spec 기준으로 생성합니다.
 

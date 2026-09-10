@@ -76,6 +76,20 @@ protected:
     // Common finish handler
     void FinishAttackAbility(bool bWasCancelled);
 
+    // Keep GAS active until animation and the spawned actor both resolve.
+    // 애니메이션과 스폰 액터가 모두 끝날 때까지 GAS를 유지합니다.
+    void HandleSpawnedActorResolved(class ASkillActorBase* Actor, bool bSucceeded);
+    void HandleSpawnedActorTimeout();
+    TWeakObjectPtr<class ASkillActorBase> PendingAttackActor;
+    FTimerHandle SpawnedActorTimeoutHandle;
+    UPROPERTY()
+    bool bAnimationFinished = false;
+
+    // Bound missed-projectile waits; charged AP is not refunded.
+    // 미충돌 발사체의 대기 시간을 제한하며 소비한 AP는 환불하지 않습니다.
+    UPROPERTY(EditDefaultsOnly, Category = "Attack", meta = (ClampMin = "0.1"))
+    float SpawnedActorTimeout = 10.0f;
+
 protected:
     // Unit currently performing the attack
     UPROPERTY()

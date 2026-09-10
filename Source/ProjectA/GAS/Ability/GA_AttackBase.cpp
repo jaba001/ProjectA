@@ -6,6 +6,7 @@
 #include "GameplayTagContainer.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "TimerManager.h"
 
 #include "Grid/Combat/CombatGridTile.h"
 #include "Combat/SkillActor/AttackSkillActorBase.h"
@@ -30,6 +31,7 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
     CachedActivationInfo = ActivationInfo;
     bAttackReleasedThisActivation = false;
     bFinishRequested = false;
+    bAnimationFinished = false;
     ActionResult = EUnitActionResult::Failed;
 
     // Get the unit using this Ability
@@ -49,6 +51,11 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
     {
         UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=InvalidSkillOrAP | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return;
+    }
+    if (SpawnedAttackActorClass && !SpawnedAttackActorClass->IsChildOf(ASkillActorBase::StaticClass()))
+    {
+        FinishAttackAbility(true);
         return;
     }
     const int32 SkillActionPointCost = SkillData->ActionPointCost;
@@ -132,6 +139,16 @@ void UGA_AttackBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const F
     {
         ActionResult = EUnitActionResult::Cancelled;
     }
+
+    // Unbind before destroying so cancellation cannot complete another activation.
+    // 파괴 전에 바인딩을 해제해 취소가 다른 활성화를 완료하지 못하게 합니다.
+    GetWorld()->GetTimerManager().ClearTimer(SpawnedActorTimeoutHandle);
+    if (ASkillActorBase* Actor = PendingAttackActor.Get())
+    {
+        Actor->OnSkillActorResolved.RemoveAll(this);
+        Actor->Destroy();
+    }
+    PendingAttackActor.Reset();
 
     // Clear cached task references
     PlayMontageTask = nullptr;
@@ -257,9 +274,23 @@ void UGA_AttackBase::SpawnAttackActor()
 
     if (!SpawnedActor)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] SpawnAttackActor Failed | SpawnedActorNull | Owner=%s | ActorClass=%s"), *GetNameSafe(CachedOwnerUnit), *GetNameSafe(SpawnedAttackActorClass));
+        ActionResult = EUnitActionResult::Failed;
+        FinishAttackAbility(true);
         return;
     }
+
+    ASkillActorBase* CompletionActor = Cast<ASkillActorBase>(SpawnedActor);
+    if (!IsValid(CompletionActor))
+    {
+        SpawnedActor->Destroy();
+        ActionResult = EUnitActionResult::Failed;
+        FinishAttackAbility(true);
+        return;
+    }
+    PendingAttackActor = CompletionActor;
+    CompletionActor->OnSkillActorResolved.AddUObject(this, &UGA_AttackBase::HandleSpawnedActorResolved);
+    const float Timeout = FMath::IsFinite(SpawnedActorTimeout) ? FMath::Max(0.1f, SpawnedActorTimeout) : 10.0f;
+    GetWorld()->GetTimerManager().SetTimer(SpawnedActorTimeoutHandle, this, &UGA_AttackBase::HandleSpawnedActorTimeout, Timeout, false);
 
     FSkillActorInitData InitData;
     InitData.SourceUnit = CachedOwnerUnit;
@@ -297,15 +328,46 @@ void UGA_AttackBase::ClearCachedAttackContext()
 
 void UGA_AttackBase::FinishAttackAbility(bool bWasCancelled)
 {
-    // Prevent duplicate finish handling
     if (bFinishRequested)
     {
         return;
     }
-
+    if (!bWasCancelled)
+    {
+        bAnimationFinished = true;
+        if (PendingAttackActor.IsValid())
+        {
+            return;
+        }
+    }
     bFinishRequested = true;
-
-    // Unit completion is observed through GAS after all ability cleanup.
-    // 어빌리티 정리가 끝난 뒤 GAS를 통해 유닛 완료를 관찰합니다.
     EndAbility(CachedHandle, CurrentActorInfo, CachedActivationInfo, false, bWasCancelled);
+}
+
+void UGA_AttackBase::HandleSpawnedActorResolved(ASkillActorBase* Actor, bool bSucceeded)
+{
+    if (bFinishRequested || PendingAttackActor.Get() != Actor)
+    {
+        return;
+    }
+    GetWorld()->GetTimerManager().ClearTimer(SpawnedActorTimeoutHandle);
+    PendingAttackActor.Reset();
+    if (!bSucceeded)
+    {
+        ActionResult = EUnitActionResult::Failed;
+        FinishAttackAbility(true);
+    }
+    else if (bAnimationFinished)
+    {
+        FinishAttackAbility(false);
+    }
+}
+
+void UGA_AttackBase::HandleSpawnedActorTimeout()
+{
+    if (!bFinishRequested)
+    {
+        ActionResult = EUnitActionResult::Failed;
+        FinishAttackAbility(true);
+    }
 }

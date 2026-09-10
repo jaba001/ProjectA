@@ -8,6 +8,9 @@ class ACombatGridTile;
 class AUnitBase;
 class USceneComponent;
 class USkillDefinitionDataAsset;
+class ASkillActorBase;
+
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnSkillActorResolved, ASkillActorBase*, bool);
 
 USTRUCT(BlueprintType)
 struct FSkillActorInitData
@@ -41,6 +44,12 @@ class PROJECTA_API ASkillActorBase : public AActor
 
 public:
     ASkillActorBase();
+
+    // Report impact or terminal failure once to the owning ability.
+    // 소유 어빌리티에 임팩트 또는 최종 실패를 한 번 보고합니다.
+    FOnSkillActorResolved OnSkillActorResolved;
+    virtual void Destroyed() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
     // Initialize this skill actor with runtime skill context.
@@ -84,6 +93,10 @@ public:
     bool HasImpactHandled() const;
 
 protected:
+    bool bInitialized = false;
+    bool bResolved = false;
+    void ResolveSkillActor(bool bSucceeded);
+
     // Called after InitializeSkillActor.
     // InitializeSkillActor 호출 후 실행됩니다.
     virtual void BeginSkillActor();

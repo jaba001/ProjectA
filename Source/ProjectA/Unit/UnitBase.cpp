@@ -155,10 +155,7 @@ bool AUnitBase::ConsumeActionPoint(int32 Cost)
 
     CurrentActionPoint -= Cost;
 
-    if (CurrentActionPoint <= 0)
-    {
-        bTurnMustEndAfterCurrentAction = true;
-    }
+    bTurnMustEndAfterCurrentAction = CurrentActionPoint <= 0 && CurrentSubActionPoint <= 0;
 
     return true;
 }
@@ -176,6 +173,7 @@ bool AUnitBase::ConsumeSubActionPoint(int32 Cost)
     }
 
     CurrentSubActionPoint -= Cost;
+    bTurnMustEndAfterCurrentAction = CurrentActionPoint <= 0 && CurrentSubActionPoint <= 0;
 
     return true;
 }

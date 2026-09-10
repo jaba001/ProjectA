@@ -1,12 +1,12 @@
 # ProjectA 작업 보드와 재개 메모
 
-최근 정리: 2026-09-10 · `main` · T06 범위 계산 통합과 전체 자동화 18건 검증 완료.
+최근 정리: 2026-09-10 · `main` · T07 발사체 완료·자원 소진 정책과 전체 자동화 20건 검증 완료.
 
 [기획·구현 현황](PROJECT_PLAN.md) · [코드 리뷰와 검증 시나리오](CODE_REVIEW.md)
 
 ## 다음에 켜면 여기부터
 
-**Vertical Slice와 T03·T04·T05·T06 검증을 완료했다. 다음 작업은 T07 발사체 완료 책임과 자원 소진 정책 설계다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다. 다음 콘텐츠 작업은 네 직업의 공통 전투 fallback 교체다.
+**Vertical Slice와 T03~T07 검증을 완료했다. 다음 콘텐츠 작업은 T09 직업별 전투 데이터와 공통 fallback 교체다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다.
 
 체크박스는 작업 완료를 뜻한다. 코드를 작성했어도 완료 조건을 검증하지 못했다면 체크하지 않고 `검증 대기`로 기록한다. P1/P2는 리뷰 결함의 심각도이고 M0~M3는 개발 순서이므로 서로 구분한다.
 
@@ -98,12 +98,18 @@
 - 검증: Development Editor / Win64 빌드 성공. 양 진영×6개 대상 규칙×3개 범위×반경 0/1의 72개 조건을 직접/실제 스폰 경로로 실행해 피해·AP·완료 상태 확인. 사망/시전자 제외, 대각선 경계, 중복 impact 방지, 미지원 6종과 잘못된 enum 거절 및 정상 재시도 검증. 기존 Slate 저장 맵 PIE를 포함한 전체 18건 통과(경고 포함 11건, 실패 0). 에디터 검증 추가 후 범위 2건 재검증.
 - 실행 근거: [빌드](../Saved/Automation/T06AreaBuild.log), [전체 결과](../Saved/Automation/T06AreaFinal/index.json), [최종 범위 검증](../Saved/Automation/T06AreaValidation/index.json), [전체 로그](../Saved/Logs/T06AreaFinal.log). 기존 사용자 수정 공격 에셋을 유지한 로컬 검증이다. 경고는 빈 범위/의도한 거절 및 축소 월드·기존 콘텐츠 설정 안내를 포함한다. 느린 발사체의 위치 고정/행동 완료 시점 정책은 T07 범위다.
 
-### T07 · 스킬 액터·자원 소진 시 완료 책임 확정 — 설계 대기
+### T07 · 스킬 액터·자원 소진 시 완료 책임 확정 — 수정 및 자동화·PIE 검증 완료
 
-- [ ] 완료
+- [x] 완료
 - 선행 결정: D04·D05. 위치: [SkillActorBase.cpp](../Source/ProjectA/Combat/SkillActor/SkillActorBase.cpp), [GA_AttackBase.cpp](../Source/ProjectA/GAS/Ability/GA_AttackBase.cpp), [PlayerUnit.cpp](../Source/ProjectA/Unit/PlayerUnit.cpp).
-- 작업: 몽타주 종료/impact/실패 중 무엇이 행동 완료인지 정한다. 발사체 미충돌·시전자 사망 등에도 종료 경로를 보장하고 플레이어 AP 소진 처리와 연결한다.
+- D04 적용 규칙: 직접 효과는 기존 GAS 종료 기준을 유지하고 스폰 공격은 몽타주와 impact 모두 완료 후 GAS 종료. 미충돌은 기본 10초(Ability에서 조절), impact 전 RequestFinish/파괴는 실패. 취소·사망은 대기 액터 파괴와 바인딩/타이머 정리로 늦은 피해를 차단한다. 완료 통지는 1회이며 이미 소비한 AP는 비환불이다.
+- D05 적용 규칙: 플레이어 AP·보조 AP 모두 0이면 행동 완료 다음 틱에 내부 턴 종료 요청. 한쪽 자원이 남으면 턴을 유지한다. 요청 시 행동 번호와 현재 상태를 재검사하고 턴 변경 시 예약을 취소한다. 기존 MustEndTurnAfterCurrentAction 플래그도 두 자원 소진 기준으로 맞춘다.
+- 경계: 스폰 클래스는 SkillActorBase 계열이어야 한다. effect 대상/중심은 T06의 impact 시점 규칙을 유지한다. 애니메이션 asset 자체의 미종료 문제와 멀티플레이 RPC는 별도 범위다.
 - 완료 조건: 느린 발사체·미충돌·중단에서 정해진 시점까지 턴을 유지하고 완료는 한 번 발생. AP 0/보조 AP 잔여 조합이 확정 규칙대로 처리됨.
+
+- 검증: Development Editor / Win64 빌드 및 전체 자동화 20건 통과(경고 포함 13건, 실패 0). ProjectileBoundaries에서 impact와 몽타주 순서, 조기 종료·파괴·시간 초과·취소·사망, 늦은 impact 차단과 1회 완료·AP 비환불 확인. PlayerResourceExhaustion에서 AP/보조 AP 0/1의 4조합, 비행 중 턴 유지와 마지막 보조 행동 후 자동 종료 확인. 기존 직접/스폰 범위 검사와 저장 맵 Slate PIE도 통과.
+- 검증 경계: 몽타주 순서는 미완료 플래그 주입과 실제 완료 콜백 호출로 확인하며 새 애니메이션 에셋의 재생 테스트는 아니다. 미충돌은 격리 월드의 타이머 프레임 진행으로 확인한다. 첫 실행들의 프레임/예약 활성화 누락을 테스트에서 보완했다. 경고는 의도한 늦은 요청·축소 월드와 기존 콘텐츠 설정을 포함한다.
+- 실행 근거: [빌드](../Saved/Automation/T07CompletionBuild.log), [최종 결과](../Saved/Automation/T07CompletionFinal3/index.json), [최종 로그](../Saved/Logs/T07CompletionFinal3.log). 기존 사용자 공격 Blueprint 변경을 유지해 검증하고 커밋에서 제외했다.
 
 ## M1. 생성한 파티를 실제 게임에 연결
 
@@ -173,6 +179,7 @@
 
 | 날짜 | 작업 | 완료/검증 | 다음 시작점 |
 |---|---|---|---|
+| 2026-09-10 | T07 발사체 완료와 자원 소진 종료 | 빌드·전체 자동화 20건 통과, impact/중단/미충돌/사망 1회 완료 및 AP 조합 검증 | T09 직업별 전투 데이터 |
 | 2026-09-10 | T06 범위 계산 통합과 미지원 타입 검증 | 정식 빌드 및 전체 자동화 18건 성공, 72조건의 직접/스폰 실제 피해 일치와 미지원 거절·복구 검증 | T07 완료 책임·자원 소진 정책 설계 |
 | 2026-09-10 | T05 플레이어 입력과 AI 턴 종료 분리 | 정식 빌드 및 전체 자동화 16건 성공, 적 턴 입력 차단/AI 독립 종료/타일 명령/Slate PIE 검증 | T06 범위 계산 통합과 미지원 타입 검증 |
 | 2026-09-10 | T04 공통 타겟 규칙과 실행 직전 재검증 | 정식 빌드 및 전체 자동화 14건 성공, 576개 타겟 조합/실제 AI 선택/실행 거절·재시도/Slate PIE 검증 | T05 입력과 AI 턴 종료 분리 마무리 |
