@@ -68,11 +68,13 @@ P1은 전투 진행 정지 또는 행동 상태 훼손을 먼저 해결할 항�
 - **연결 작업:** T05.
 - **검증 범위:** `PlayerAndEnemyTurnIsolation`은 실제 AEnemyUnit의 취소 후 다음 틱 전 비busy 구간에 플레이어 이동/스킬/타일/종료 및 기존 Blueprint 진입점을 호출하고, UI가 잠겨도 AI가 정상 종료하는지 확인한다. `TileCommandsAndTurnGuards`는 요청자/활성 상태/busy/사망/전투 종료 검사와 실제 타일 클릭의 AP 재검사·피해를 확인한다. 정식 빌드와 저장 맵 Slate PIE를 포함한 전체 자동화 16건 통과. 상세 실행 근거는 [T05](TODO.md) 참조. 네트워크 다중 클라이언트 검증은 T14 범위다.
 
-### R06. 스킬 범위 계산이 직접 효과와 스폰 액터 경로에서 다름
+### R06. 스킬 범위 계산이 직접 효과와 스폰 액터 경로에서 다름 — 공통 계산 및 검증 완료
 
 - **근거:** [GA_AreaAttack.cpp](../Source/ProjectA/GAS/Ability/GA_AreaAttack.cpp) `ResolveCenterTile`은 AroundSelf에 시전자 타일을 사용한다. [AttackSkillActorBase.cpp](../Source/ProjectA/Combat/SkillActor/AttackSkillActorBase.cpp) `ResolveImpactTargetUnits`은 Single 외 모든 타입을 TargetTile 중심 반경으로 계산한다. [SkillTypes.h](../Source/ProjectA/Types/SkillTypes.h)에 선언된 Row/Column/AllEnemies 등의 개별 계산도 없다.
 - **발생 조건과 영향:** AroundSelf에서 시전자와 다른 타일을 타겟으로 넘기면 직접 피해와 스폰 액터 피해 위치가 달라진다. Row 등의 타입은 직접 효과에서는 중심 타일을 얻지 못하고, 스폰 경로에서는 주변 사각 범위로 처리한다.
 - **검증/수정:** 동일 스킬의 직접 효과/스폰 액터 실행에서 대상 집합을 비교한다. 공통 범위 계산을 사용하고 미지원 타입은 에디터 검증에서 명시적으로 거절하거나 구현한다.
+- **현재 수정:** 공통 중심/대상 수집을 두 범위 효과 경로와 UnitBase에 연결했다. AroundSelf는 시전자 타일 중심이며 시전자 제외를 유지한다. 미지원 타입과 음수 반경은 에셋 IsDataValid 및 AP 소비 전 검사로 거절하고 임팩트에서도 재확인한다.
+- **검증:** 72조건의 직접/실제 스폰 피해 및 AP·행동 완료 일치, 미지원 거절·정상 재시도 검증. 정식 빌드와 기존 Slate PIE를 포함한 전체 18건 통과. 실행 자료와 범위 경계는 [T06](TODO.md) 참조.
 - **연결 작업:** T06.
 
 ## 완료로 오해하기 쉬운 미구현/설계 항목

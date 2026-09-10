@@ -1,12 +1,12 @@
 # ProjectA 작업 보드와 재개 메모
 
-최근 정리: 2026-09-10 · `main` · T05 플레이어 입력/AI 턴 종료 분리와 전체 자동화 16건 검증 완료.
+최근 정리: 2026-09-10 · `main` · T06 범위 계산 통합과 전체 자동화 18건 검증 완료.
 
 [기획·구현 현황](PROJECT_PLAN.md) · [코드 리뷰와 검증 시나리오](CODE_REVIEW.md)
 
 ## 다음에 켜면 여기부터
 
-**Vertical Slice와 T03·T04·T05 검증을 완료했다. 다음 전투 안정화 작업은 T06 범위 계산 통합이다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다. 다음 콘텐츠 작업은 네 직업의 공통 전투 fallback 교체다.
+**Vertical Slice와 T03·T04·T05·T06 검증을 완료했다. 다음 작업은 T07 발사체 완료 책임과 자원 소진 정책 설계다.** 기존 slice 실행 결과는 [Vertical Slice 보고](VERTICAL_SLICE_REPORT.md), 후속 검증은 각 작업 카드, 에디터 연결은 [설정 안내](VERTICAL_SLICE_SETUP.md)를 기준으로 한다. 다음 콘텐츠 작업은 네 직업의 공통 전투 fallback 교체다.
 
 체크박스는 작업 완료를 뜻한다. 코드를 작성했어도 완료 조건을 검증하지 못했다면 체크하지 않고 `검증 대기`로 기록한다. P1/P2는 리뷰 결함의 심각도이고 M0~M3는 개발 순서이므로 서로 구분한다.
 
@@ -86,12 +86,17 @@
 
 - 실행 근거: [빌드 로그](../Saved/Automation/T05InputBuild.log), [전체 결과](../Saved/Automation/T05InputFinal2/index.json), [전체 로그](../Saved/Logs/T05InputFinal2.log). 첫 실행에서 새 테스트 월드의 컨트롤러 미등록을 수정했고, 중복 등록 정리 후 [입력 2건 재검증](../Saved/Automation/T05InputFocusedFinal/index.json)도 통과했다. 기존 사용자 변경 에셋을 유지한 로컬 검증이며 Saved 산출물은 커밋하지 않는다.
 
-### T06 · P2 · 범위 계산 통합과 미지원 타입 검증 — 미착수
+### T06 · P2 · 범위 계산 통합과 미지원 타입 검증 — 수정 및 자동화·PIE 검증 완료
 
-- [ ] 완료
+- [x] 완료
 - 근거: 리뷰 R06. 위치: [GA_AreaAttack.cpp](../Source/ProjectA/GAS/Ability/GA_AreaAttack.cpp), [AttackSkillActorBase.cpp](../Source/ProjectA/Combat/SkillActor/AttackSkillActorBase.cpp).
-- 작업: Single/AroundTarget/AroundSelf의 공통 계산, 나머지 enum의 구현 또는 명시적 미지원 검사. D06에서 자기 자신 포함 규칙을 확정한다.
+- 구현: `CombatTargetingLibrary`로 중심·체비셰프 범위·진영·생존·점유·중복 검사를 통합하고 GA_AreaAttack, AttackSkillActorBase, UnitBase의 대상 수집에 연결했다. Single은 그리드 매니저 없이 대상 타일만 사용한다. AroundSelf는 효과 적용 시점의 시전자 타일을 사용한다.
+- D06 적용 규칙: 기존 범위 효과와 동일하게 시전자 자신을 제외한다. 아군/전체 범위 효과에도 동일하게 적용하며 기본 단일 공격의 별도 효과 구현은 변경하지 않는다. 전열 보호는 최초 EnemyUnit 선택에만 적용하고 범위 피해에 추가하지 않는다.
+- 미지원: Row/Column/LeftAndTarget/RightAndTarget/DiagonalTarget/AllEnemies 및 잘못된 enum, 음수 반경은 에셋 IsDataValid와 선택/실행 진입에서 거절한다. AP 소비 전 검사하고 수동 스폰 액터의 impact도 일반 반경으로 대체하지 않는다.
 - 완료 조건: V04 중 범위 검사 통과. 동일 입력에서 직접/스폰 효과의 대상 집합이 같고 미지원 타입이 조용히 다른 범위로 실행되지 않음.
+
+- 검증: Development Editor / Win64 빌드 성공. 양 진영×6개 대상 규칙×3개 범위×반경 0/1의 72개 조건을 직접/실제 스폰 경로로 실행해 피해·AP·완료 상태 확인. 사망/시전자 제외, 대각선 경계, 중복 impact 방지, 미지원 6종과 잘못된 enum 거절 및 정상 재시도 검증. 기존 Slate 저장 맵 PIE를 포함한 전체 18건 통과(경고 포함 11건, 실패 0). 에디터 검증 추가 후 범위 2건 재검증.
+- 실행 근거: [빌드](../Saved/Automation/T06AreaBuild.log), [전체 결과](../Saved/Automation/T06AreaFinal/index.json), [최종 범위 검증](../Saved/Automation/T06AreaValidation/index.json), [전체 로그](../Saved/Logs/T06AreaFinal.log). 기존 사용자 수정 공격 에셋을 유지한 로컬 검증이다. 경고는 빈 범위/의도한 거절 및 축소 월드·기존 콘텐츠 설정 안내를 포함한다. 느린 발사체의 위치 고정/행동 완료 시점 정책은 T07 범위다.
 
 ### T07 · 스킬 액터·자원 소진 시 완료 책임 확정 — 설계 대기
 
@@ -168,6 +173,7 @@
 
 | 날짜 | 작업 | 완료/검증 | 다음 시작점 |
 |---|---|---|---|
+| 2026-09-10 | T06 범위 계산 통합과 미지원 타입 검증 | 정식 빌드 및 전체 자동화 18건 성공, 72조건의 직접/스폰 실제 피해 일치와 미지원 거절·복구 검증 | T07 완료 책임·자원 소진 정책 설계 |
 | 2026-09-10 | T05 플레이어 입력과 AI 턴 종료 분리 | 정식 빌드 및 전체 자동화 16건 성공, 적 턴 입력 차단/AI 독립 종료/타일 명령/Slate PIE 검증 | T06 범위 계산 통합과 미지원 타입 검증 |
 | 2026-09-10 | T04 공통 타겟 규칙과 실행 직전 재검증 | 정식 빌드 및 전체 자동화 14건 성공, 576개 타겟 조합/실제 AI 선택/실행 거절·재시도/Slate PIE 검증 | T05 입력과 AI 턴 종료 분리 마무리 |
 | 2026-09-08 | P1 공통 행동 완료/AI 복구, Run State/Gameplay/Encounter/UI/결과/cleanup 연결 | 정식 빌드/에셋 29항목/자동화 8건/자연 Victory PIE 통과, HUD·결과·타일 캡처 검수, 세부 경계는 VERTICAL_SLICE_REPORT.md | 직업별 fallback 교체 |

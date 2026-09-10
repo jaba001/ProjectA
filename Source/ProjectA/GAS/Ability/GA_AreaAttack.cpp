@@ -76,119 +76,15 @@ void UGA_AreaAttack::ClearCachedAttackContext()
 
 ACombatGridTile* UGA_AreaAttack::ResolveCenterTile() const
 {
-    if (!CachedOwnerUnit || !CachedSkillData)
-    {
-        return nullptr;
-    }
-
-    if (CachedSkillData->AreaType == ESkillAreaType::AroundSelf)
-    {
-        return CachedOwnerUnit->GetCurrentTile();
-    }
-
-    if (CachedSkillData->AreaType == ESkillAreaType::AroundTarget)
-    {
-        return CachedTargetTile;
-    }
-
-    if (CachedSkillData->AreaType == ESkillAreaType::Single)
-    {
-        return CachedTargetTile;
-    }
-
-    return nullptr;
+    return UCombatTargetingLibrary::ResolveSkillAreaCenter(CachedOwnerUnit, CachedSkillData, CachedTargetTile);
 }
 
 TArray<AUnitBase*> UGA_AreaAttack::ResolveAreaTargetUnits() const
 {
-    TArray<AUnitBase*> Result;
-
-    if (!CachedOwnerUnit || !CachedSkillData)
-    {
-        return Result;
-    }
-
-    ACombatGridTile* CenterTile = ResolveCenterTile();
-
-    if (!CenterTile)
-    {
-        return Result;
-    }
-
-    ACombatGridManager* CombatGridManager = Cast<ACombatGridManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatGridManager::StaticClass()));
-
-    if (!CombatGridManager)
-    {
-        return Result;
-    }
-
-    TArray<ACombatGridTile*> AreaTiles;
-
-    if (CachedSkillData->AreaType == ESkillAreaType::Single)
-    {
-        AreaTiles.Add(CenterTile);
-    }
-    else
-    {
-        AreaTiles = CombatGridManager->GetTilesInChebyshevRange(CenterTile, CachedSkillData->AreaRadius);
-    }
-
-    TArray<AUnitBase*> RawUnits = UCombatTargetingLibrary::CollectUniqueAliveUnitsFromTiles(AreaTiles, CachedOwnerUnit);
-
-    for (AUnitBase* TargetUnit : RawUnits)
-    {
-        if (!IsValidAreaTargetUnit(TargetUnit))
-        {
-            continue;
-        }
-
-        Result.Add(TargetUnit);
-    }
-
-    return Result;
+    return UCombatTargetingLibrary::ResolveSkillAreaTargets(CachedOwnerUnit, CachedSkillData, CachedTargetTile);
 }
 
 bool UGA_AreaAttack::IsValidAreaTargetUnit(AUnitBase* TargetUnit) const
 {
-    if (!CachedOwnerUnit || !CachedSkillData || !TargetUnit)
-    {
-        return false;
-    }
-
-    if (!TargetUnit->IsUnitAlive())
-    {
-        return false;
-    }
-
-    if (CachedSkillData->TargetRule == ESkillTargetRule::EnemyUnit)
-    {
-        return CachedOwnerUnit->GetTeam() != TargetUnit->GetTeam();
-    }
-
-    if (CachedSkillData->TargetRule == ESkillTargetRule::AllyUnit)
-    {
-        return CachedOwnerUnit->GetTeam() == TargetUnit->GetTeam();
-    }
-
-    if (CachedSkillData->TargetRule == ESkillTargetRule::AnyUnit)
-    {
-        return true;
-    }
-
-    if (CachedSkillData->TargetRule == ESkillTargetRule::EnemyTile)
-    {
-        return CachedOwnerUnit->GetTeam() != TargetUnit->GetTeam();
-    }
-
-    if (CachedSkillData->TargetRule == ESkillTargetRule::AllyTile)
-    {
-        return CachedOwnerUnit->GetTeam() == TargetUnit->GetTeam();
-    }
-
-    if (CachedSkillData->TargetRule == ESkillTargetRule::AnyTile)
-    {
-        return true;
-    }
-
-    return false;
+    return UCombatTargetingLibrary::IsSkillEffectTarget(CachedOwnerUnit, CachedSkillData, TargetUnit);
 }

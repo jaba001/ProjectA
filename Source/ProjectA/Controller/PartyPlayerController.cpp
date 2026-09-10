@@ -254,9 +254,9 @@ void APartyPlayerController::EnterSkillMode(USkillDefinitionDataAsset* SkillData
         return;
     }
 
-    if (!SkillData)
+    if (!UCombatTargetingLibrary::IsSupportedSkillArea(SkillData))
     {
-        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] EnterSkillMode failed | SkillData is null"));
+        UE_LOG(LogTemp, Warning, TEXT("[PartyPlayerController] EnterSkillMode failed | Missing skill or unsupported area"));
         return;
     }
 

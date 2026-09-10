@@ -100,7 +100,7 @@ UI 관련 상세 메모는 아래 파일에 정리되어 있습니다.
 
 스킬 AP 비용은 `USkillDefinitionDataAsset::ActionPointCost`에서만 설정하며 1 이상이어야 합니다. HUD는 비용을 표시하고, 0·음수 비용 또는 AP 부족 시 선택과 실행을 거절합니다. 공격 컨텍스트 검증과 GAS 커밋이 성공한 뒤 AP를 한 번 차감하며, 실행 시작 후 소비한 AP는 취소 시 환불하지 않습니다. `GA_AttackBase`의 기존 비용 필드는 에셋 참조 호환용으로만 유지하고 실행에는 사용하지 않습니다.
 
-스킬 대상은 `CombatTargetingLibrary::IsValidSkillTarget`으로 검사합니다. 기존 플레이어 규칙대로 전열 보호는 `EnemyUnit` 선택에 적용하고 `bIgnoreFront`로 무시할 수 있습니다. 제자리 `AllyUnit`/`AnyUnit` 스킬은 자기 자신도 선택할 수 있으며, 타일 스킬은 영역에 맞는 빈 타일도 선택합니다. 접근 스킬은 다른 생존 유닛이 필요합니다. 실행 직전에 대상을 다시 검사하며, 유닛 대상이 이동하거나 다른 유닛으로 교체되면 실패 처리합니다. 범위 공격의 피해 대상 계산 통합은 T06에서 진행합니다.
+스킬 대상은 `CombatTargetingLibrary::IsValidSkillTarget`으로 검사합니다. 기존 플레이어 규칙대로 전열 보호는 `EnemyUnit` 선택에 적용하고 `bIgnoreFront`로 무시할 수 있습니다. 제자리 `AllyUnit`/`AnyUnit` 스킬은 자기 자신도 선택할 수 있으며, 타일 스킬은 영역에 맞는 빈 타일도 선택합니다. 접근 스킬은 다른 생존 유닛이 필요합니다. 실행 직전에 대상을 다시 검사하며, 유닛 대상이 이동하거나 다른 유닛으로 교체되면 실패 처리합니다. 범위 공격의 직접 효과와 스킬 액터는 `CombatTargetingLibrary::ResolveSkillAreaTargets`로 피해 대상을 계산합니다. `Single`은 대상 타일, `AroundTarget`은 대상 타일 중심, `AroundSelf`는 효과 적용 시점의 시전자 타일 중심 체비셰프 반경을 사용합니다. 범위 효과는 기존처럼 시전자 자신을 제외하고 진영·생존·점유 상태를 확인합니다. Row/Column/LeftAndTarget/RightAndTarget/DiagonalTarget/AllEnemies와 음수 반경은 미지원으로 에셋 검증 및 실행 전 검사에서 거절하며 AP를 소비하지 않습니다. 범위 스킬은 `GA_AreaAttack` 계열을 사용하고 기본 단일 공격의 별도 효과 구현은 유지합니다.
 
 타일 액터는 클릭을 `PartyPlayerController::HandleTileClicked`로 전달합니다. 플레이어 명령은 권한·전투 입력 잠금·Player 팀·활성 턴·생존·busy를 확인하며 클릭 시 비용과 타겟을 재검사합니다. UI의 턴 종료는 `PartyPlayerController::RequestEndTurn`, C++ AI의 내부 종료는 `CombatManager::RequestEndTurnForUnit(this)`를 사용합니다. 기존 CombatManager의 인자 없는 Blueprint 종료 함수는 deprecated 상태이며 플레이어 입력 검사를 거칩니다. 턴 전환과 전투 종료 시 이전 선택·하이라이트를 정리합니다.
 

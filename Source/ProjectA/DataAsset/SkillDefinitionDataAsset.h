@@ -16,6 +16,12 @@ class PROJECTA_API USkillDefinitionDataAsset : public UPrimaryDataAsset
     GENERATED_BODY()
 
 public:
+#if WITH_EDITOR
+    // Report unsupported area definitions in the editor's asset validation.
+    // 에디터 에셋 검증에서 미지원 범위 정의를 오류로 보고합니다.
+    virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
+#endif
+
     // Skill identifier name.
     // 스킬 식별자 이름입니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")

@@ -708,71 +708,7 @@ void AUnitBase::CompleteSkillExecution(EUnitActionResult Result)
 
 TArray<AUnitBase*> AUnitBase::ResolveSkillTargetUnits()
 {
-    TArray<AUnitBase*> Result;
-
-    if (!PendingSkillData)
-    {
-        return Result;
-    }
-
-    if (PendingSkillData->AreaType == ESkillAreaType::Single)
-    {
-        AUnitBase* TargetUnit = PendingTargetUnit;
-
-        if (!TargetUnit && PendingSkillTargetTile)
-        {
-            TargetUnit = PendingSkillTargetTile->GetOccupyingUnit();
-        }
-
-        if (!TargetUnit)
-        {
-            return Result;
-        }
-
-        if (TargetUnit == this)
-        {
-            return Result;
-        }
-
-        if (!TargetUnit->IsUnitAlive())
-        {
-            return Result;
-        }
-
-        Result.Add(TargetUnit);
-        return Result;
-    }
-
-    ACombatGridTile* CenterTile = nullptr;
-
-    if (PendingSkillData->AreaType == ESkillAreaType::AroundTarget)
-    {
-        CenterTile = PendingSkillTargetTile;
-    }
-    else if (PendingSkillData->AreaType == ESkillAreaType::AroundSelf)
-    {
-        CenterTile = CurrentTile;
-    }
-    else
-    {
-        return Result;
-    }
-
-    if (!CenterTile)
-    {
-        return Result;
-    }
-
-    ACombatGridManager* CombatGridManager = Cast<ACombatGridManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatGridManager::StaticClass()));
-
-    if (!CombatGridManager)
-    {
-        return Result;
-    }
-
-    const TArray<ACombatGridTile*> AreaTiles = CombatGridManager->GetTilesInChebyshevRange(CenterTile, PendingSkillData->AreaRadius);
-
-    return UCombatTargetingLibrary::CollectUniqueAliveUnitsFromTiles(AreaTiles, this);
+    return UCombatTargetingLibrary::ResolveSkillAreaTargets(this, PendingSkillData, PendingSkillTargetTile);
 }
 
 void AUnitBase::OnSkillFinished()

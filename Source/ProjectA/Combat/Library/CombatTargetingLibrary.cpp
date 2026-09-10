@@ -2,10 +2,12 @@
 #include "Grid/Combat/CombatGridTile.h"
 #include "Unit/UnitBase.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Grid/Combat/CombatGridManager.h"
+#include "Kismet/GameplayStatics.h"
 
 bool UCombatTargetingLibrary::IsValidSkillTarget(const AUnitBase* SourceUnit, const USkillDefinitionDataAsset* SkillData, const ACombatGridTile* TargetTile)
 {
-    if (!IsValid(SourceUnit) || !SourceUnit->IsUnitAlive() || !IsValid(SkillData) || !IsValid(TargetTile) || SourceUnit->GetWorld() != TargetTile->GetWorld())
+    if (!IsValid(SourceUnit) || !SourceUnit->IsUnitAlive() || !IsSupportedSkillArea(SkillData) || !IsValid(TargetTile) || SourceUnit->GetWorld() != TargetTile->GetWorld())
     {
         return false;
     }
@@ -102,4 +104,80 @@ TArray<AUnitBase*> UCombatTargetingLibrary::CollectUniqueAliveUnitsFromTiles(con
     }
 
     return ResultUnits;
+}
+
+bool UCombatTargetingLibrary::IsSupportedSkillArea(const USkillDefinitionDataAsset* SkillData)
+{
+    return IsValid(SkillData) && SkillData->AreaRadius >= 0 && (SkillData->AreaType == ESkillAreaType::Single || SkillData->AreaType == ESkillAreaType::AroundTarget || SkillData->AreaType == ESkillAreaType::AroundSelf);
+}
+
+ACombatGridTile* UCombatTargetingLibrary::ResolveSkillAreaCenter(const AUnitBase* SourceUnit, const USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile)
+{
+    if (!IsValid(SourceUnit) || !IsSupportedSkillArea(SkillData))
+    {
+        return nullptr;
+    }
+    ACombatGridTile* Center = SkillData->AreaType == ESkillAreaType::AroundSelf ? SourceUnit->GetCurrentTile() : TargetTile;
+    return IsValid(Center) && Center->GetWorld() == SourceUnit->GetWorld() ? Center : nullptr;
+}
+
+bool UCombatTargetingLibrary::IsSkillEffectTarget(const AUnitBase* SourceUnit, const USkillDefinitionDataAsset* SkillData, const AUnitBase* TargetUnit)
+{
+    if (!IsValid(SourceUnit) || !IsSupportedSkillArea(SkillData) || !IsValid(TargetUnit) || !TargetUnit->IsUnitAlive() || TargetUnit == SourceUnit || TargetUnit->GetWorld() != SourceUnit->GetWorld())
+    {
+        return false;
+    }
+    // Effect coverage uses team rules; front protection only restricts initial selection.
+    // 효과 범위에는 진영 규칙을 적용하며 전열 보호는 최초 선택만 제한합니다.
+    switch (SkillData->TargetRule)
+    {
+    case ESkillTargetRule::EnemyUnit:
+    case ESkillTargetRule::EnemyTile:
+        return SourceUnit->GetTeam() != TargetUnit->GetTeam();
+    case ESkillTargetRule::AllyUnit:
+    case ESkillTargetRule::AllyTile:
+        return SourceUnit->GetTeam() == TargetUnit->GetTeam();
+    case ESkillTargetRule::AnyUnit:
+    case ESkillTargetRule::AnyTile:
+        return true;
+    default:
+        return false;
+    }
+}
+
+TArray<AUnitBase*> UCombatTargetingLibrary::ResolveSkillAreaTargets(AUnitBase* SourceUnit, const USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile)
+{
+    TArray<AUnitBase*> Result;
+    ACombatGridTile* Center = ResolveSkillAreaCenter(SourceUnit, SkillData, TargetTile);
+    if (!Center)
+    {
+        return Result;
+    }
+    TArray<ACombatGridTile*> Tiles;
+    if (SkillData->AreaType == ESkillAreaType::Single)
+    {
+        Tiles.Add(Center);
+    }
+    else
+    {
+        ACombatGridManager* Grid = Cast<ACombatGridManager>(UGameplayStatics::GetActorOfClass(SourceUnit->GetWorld(), ACombatGridManager::StaticClass()));
+        if (!Grid)
+        {
+            return Result;
+        }
+        Tiles = Grid->GetTilesInChebyshevRange(Center, SkillData->AreaRadius);
+    }
+    for (ACombatGridTile* Tile : Tiles)
+    {
+        if (!IsValid(Tile) || Tile->GetWorld() != SourceUnit->GetWorld())
+        {
+            continue;
+        }
+        AUnitBase* Unit = Tile->GetOccupyingUnit();
+        if (IsSkillEffectTarget(SourceUnit, SkillData, Unit) && Unit->GetCurrentTile() == Tile)
+        {
+            Result.AddUnique(Unit);
+        }
+    }
+    return Result;
 }

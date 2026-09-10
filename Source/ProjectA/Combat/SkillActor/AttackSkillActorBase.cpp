@@ -41,7 +41,7 @@ void AAttackSkillActorBase::HandleImpact()
 
 void AAttackSkillActorBase::ApplyImpactEffect()
 {
-    if (!SourceUnit || !SkillData || !TargetTile)
+    if (!UCombatTargetingLibrary::ResolveSkillAreaCenter(SourceUnit, SkillData, TargetTile))
     {
         UE_LOG(LogTemp, Warning, TEXT("[AttackSkillActorBase] ApplyImpactEffect Failed | MissingContext | Actor=%s | Source=%s | Skill=%s | TargetTile=%s"), *GetNameSafe(this), *GetNameSafe(SourceUnit), *GetNameSafe(SkillData), *GetNameSafe(TargetTile));
         return;
@@ -68,82 +68,15 @@ void AAttackSkillActorBase::ApplyImpactEffect()
 
 TArray<AUnitBase*> AAttackSkillActorBase::ResolveImpactTargetUnits() const
 {
-    TArray<AUnitBase*> Result;
-
-    if (!SourceUnit || !SkillData || !TargetTile)
+    TArray<AUnitBase*> Result = UCombatTargetingLibrary::ResolveSkillAreaTargets(SourceUnit, SkillData, TargetTile);
+    Result.RemoveAll([this](AUnitBase* Unit)
     {
-        return Result;
-    }
-
-    ACombatGridManager* CombatGridManager = Cast<ACombatGridManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatGridManager::StaticClass()));
-
-    if (!CombatGridManager)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[AttackSkillActorBase] ResolveImpactTargetUnits Failed | CombatGridManager null | Actor=%s"), *GetNameSafe(this));
-        return Result;
-    }
-
-    TArray<ACombatGridTile*> AreaTiles;
-
-    if (SkillData->AreaType == ESkillAreaType::Single)
-    {
-        AreaTiles.Add(TargetTile);
-    }
-    else
-    {
-        AreaTiles = CombatGridManager->GetTilesInChebyshevRange(TargetTile, SkillData->AreaRadius);
-    }
-
-    TArray<AUnitBase*> RawUnits = UCombatTargetingLibrary::CollectUniqueAliveUnitsFromTiles(AreaTiles, SourceUnit);
-
-    for (AUnitBase* TargetUnit : RawUnits)
-    {
-        if (!IsValidImpactTargetUnit(TargetUnit))
-        {
-            continue;
-        }
-
-        Result.Add(TargetUnit);
-    }
-
+        return !IsValidImpactTargetUnit(Unit);
+    });
     return Result;
 }
 
 bool AAttackSkillActorBase::IsValidImpactTargetUnit(AUnitBase* TargetUnit) const
 {
-    if (!SourceUnit || !SkillData || !TargetUnit)
-    {
-        return false;
-    }
-
-    if (!TargetUnit->IsUnitAlive())
-    {
-        return false;
-    }
-
-    const ETeam SourceTeam = SourceUnit->GetTeam();
-    const ETeam TargetTeam = TargetUnit->GetTeam();
-
-    switch (SkillData->TargetRule)
-    {
-    case ESkillTargetRule::EnemyUnit:
-    case ESkillTargetRule::EnemyTile:
-    {
-        return SourceTeam != TargetTeam;
-    }
-    case ESkillTargetRule::AllyUnit:
-    case ESkillTargetRule::AllyTile:
-    {
-        return SourceTeam == TargetTeam;
-    }
-    case ESkillTargetRule::AnyUnit:
-    case ESkillTargetRule::AnyTile:
-    {
-        return true;
-    }
-    default:
-    {
-        return false;
-    }
-    }
+    return UCombatTargetingLibrary::IsSkillEffectTarget(SourceUnit, SkillData, TargetUnit);
 }

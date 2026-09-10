@@ -5,6 +5,10 @@
 #include "Abilities/GameplayAbility.h"
 #include "AbilitySystemComponent.h"
 #include "Combat/CombatManager.h"
+#include "Combat/SkillActor/AttackSkillActorBase.h"
+#include "Grid/Combat/CombatGridManager.h"
+#include "EngineUtils.h"
+#include "Misc/DataValidation.h"
 #include "Combat/Library/CombatTargetingLibrary.h"
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
@@ -848,6 +852,160 @@ bool FPlayerCommandGuardTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Ended combat rejects unit completion"), Combat->RequestEndTurnForUnit(Player));
     TestEqual(TEXT("Ended combat rejects damage input"), Enemy->GetAttributeSet()->GetHP(), 90.0f);
     Combat->ResetCombat();
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkillAreaParityTest, "ProjectA.Combat.Area.DirectAndSpawnedParity", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillAreaParityTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    FScopedWorld Scope;
+    ACombatGridManager* Grid = Scope.World->SpawnActor<ACombatGridManager>();
+    const TArray<FIntPoint> Coords = { {0, 0}, {4, 0}, {5, 1}, {1, 1}, {-1, 0}, {8, 8}, {4, 1} };
+    TArray<AUnitBase*> Units;
+    TArray<ACombatGridTile*> Tiles;
+    for (const FIntPoint& Coord : Coords)
+    {
+        AUnitBase* Unit = Scope.SpawnUnit<AUnitBase>(FVector(Coord.X * 200.0f, Coord.Y * 200.0f, 100.0f));
+        ACombatGridTile* Tile = Scope.SpawnTile(Unit);
+        Tile->GridCoord = Coord;
+        Grid->TileMap.Add(Coord, Tile);
+        Units.Add(Unit);
+        Tiles.Add(Tile);
+    }
+    AUnitBase* Source = Units[0];
+    UAbilitySystemComponent* ASC = Source->GetAbilitySystemComponent();
+    const FGameplayAbilitySpecHandle Handle = ASC->GiveAbility(FGameplayAbilitySpec(UGA_AreaAttack::StaticClass(), 1));
+    UGameplayAbility* Ability = ASC->FindAbilitySpecFromHandle(Handle)->GetPrimaryInstance();
+    FindFProperty<FClassProperty>(UGA_AttackBase::StaticClass(), TEXT("DamageEffectClass"))->SetObjectPropertyValue_InContainer(Ability, UGE_Damage::StaticClass());
+    FClassProperty* SpawnClass = FindFProperty<FClassProperty>(UGA_AttackBase::StaticClass(), TEXT("SpawnedAttackActorClass"));
+    USkillDefinitionDataAsset* Skill = MakeSkill(Source, UGA_AreaAttack::StaticClass());
+    Skill->bIgnoreFront = true;
+    FindFProperty<FBoolProperty>(AUnitBase::StaticClass(), TEXT("bIsDead"))->SetPropertyValue_InContainer(Units[6], true);
+    for (ETeam Team : { ETeam::Player, ETeam::Enemy })
+    {
+        const ETeam Other = Team == ETeam::Player ? ETeam::Enemy : ETeam::Player;
+        for (ESkillTargetRule Rule : { ESkillTargetRule::EnemyUnit, ESkillTargetRule::AllyUnit, ESkillTargetRule::AnyUnit, ESkillTargetRule::EnemyTile, ESkillTargetRule::AllyTile, ESkillTargetRule::AnyTile })
+        {
+            const bool bAllyRule = Rule == ESkillTargetRule::AllyUnit || Rule == ESkillTargetRule::AllyTile;
+            const bool bEnemyRule = Rule == ESkillTargetRule::EnemyUnit || Rule == ESkillTargetRule::EnemyTile;
+            Source->SetTeam(Team);
+            Units[1]->SetTeam(bAllyRule ? Team : Other);
+            Units[2]->SetTeam(Team);
+            Units[3]->SetTeam(Other);
+            Units[4]->SetTeam(Team);
+            Units[5]->SetTeam(Other);
+            Units[6]->SetTeam(Other);
+            for (int32 Index = 0; Index < Units.Num(); ++Index)
+            {
+                Tiles[Index]->SetTerritory(Units[Index]->GetTeam() == ETeam::Player ? ETileTerritory::Player : ETileTerritory::Enemy);
+            }
+            Skill->TargetRule = Rule;
+            for (ESkillAreaType Shape : { ESkillAreaType::Single, ESkillAreaType::AroundTarget, ESkillAreaType::AroundSelf })
+            {
+                Skill->AreaType = Shape;
+                for (int32 Radius : { 0, 1 })
+                {
+                    Skill->AreaRadius = Radius;
+                    // Explicit fixture coverage includes diagonal neighbors and excludes the caster/dead unit.
+                    // 명시적 배치 기준은 대각선 이웃을 포함하고 시전자와 사망 유닛을 제외합니다.
+                    TArray<int32> Covered;
+                    if (Shape == ESkillAreaType::Single || Shape == ESkillAreaType::AroundTarget)
+                    {
+                        Covered.Add(1);
+                        if (Shape == ESkillAreaType::AroundTarget && Radius == 1)
+                        {
+                            Covered.Add(2);
+                        }
+                    }
+                    else if (Radius == 1)
+                    {
+                        Covered = { 3, 4 };
+                    }
+                    for (bool bSpawn : { false, true })
+                    {
+                        for (AUnitBase* Unit : Units)
+                        {
+                            Unit->GetAttributeSet()->InitHP(100.0f);
+                        }
+                        Source->OnTurnStart();
+                        SpawnClass->SetObjectPropertyValue_InContainer(Ability, bSpawn ? AAttackSkillActorBase::StaticClass() : nullptr);
+                        Source->StartSkill(Skill, Tiles[1]);
+                        if (bSpawn)
+                        {
+                            int32 ActorCount = 0;
+                            for (TActorIterator<AAttackSkillActorBase> It(Scope.World); It; ++It)
+                            {
+                                ++ActorCount;
+                                It->RequestImpact();
+                                It->RequestImpact();
+                                It->Destroy();
+                            }
+                            TestEqual(TEXT("Ability spawns exactly one impact actor"), ActorCount, 1);
+                        }
+                        for (int32 Index = 0; Index < Units.Num(); ++Index)
+                        {
+                            const bool bSameTeam = Units[Index]->GetTeam() == Team;
+                            const bool bAllowed = (!bAllyRule || bSameTeam) && (!bEnemyRule || !bSameTeam);
+                            const float ExpectedHP = Covered.Contains(Index) && bAllowed ? 90.0f : 100.0f;
+                            TestEqual(FString::Printf(TEXT("Team=%d Rule=%d Shape=%d Radius=%d Spawn=%d Unit=%d"), int32(Team), int32(Rule), int32(Shape), Radius, bSpawn, Index), Units[Index]->GetAttributeSet()->GetHP(), ExpectedHP);
+                        }
+                        TestEqual(TEXT("Area action consumes AP once"), Source->GetCurrentActionPoint(), 1);
+                        TestFalse(TEXT("Area action completes"), Source->IsBusy());
+                    }
+                }
+            }
+        }
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkillAreaRejectionTest, "ProjectA.Combat.Area.UnsupportedAndRecovery", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillAreaRejectionTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    FScopedWorld Scope;
+    AUnitBase* Source = Scope.SpawnUnit<AUnitBase>(FVector::ZeroVector);
+    AUnitBase* Target = Scope.SpawnUnit<AUnitBase>(FVector(200.0f, 0.0f, 0.0f));
+    Target->SetTeam(ETeam::Enemy);
+    Scope.SpawnTile(Source);
+    ACombatGridTile* Tile = Scope.SpawnTile(Target);
+    GrantAttack(Source);
+    USkillDefinitionDataAsset* Skill = MakeSkill(Source, UGA_DefaultAttack::StaticClass());
+    for (ESkillAreaType Shape : { ESkillAreaType::Row, ESkillAreaType::Column, ESkillAreaType::LeftAndTarget, ESkillAreaType::RightAndTarget, ESkillAreaType::DiagonalTarget, ESkillAreaType::AllEnemies, static_cast<ESkillAreaType>(255) })
+    {
+        Skill->AreaType = Shape;
+#if WITH_EDITOR
+        FDataValidationContext ValidationContext;
+        TestEqual(TEXT("Editor rejects unsupported area"), Skill->IsDataValid(ValidationContext), EDataValidationResult::Invalid);
+#endif
+        TestFalse(TEXT("Unsupported area is not selectable"), UCombatTargetingLibrary::IsValidSkillTarget(Source, Skill, Tile));
+        Source->StartSkill(Skill, Tile);
+        TestFalse(TEXT("Invalid area leaves unit idle"), Source->IsBusy());
+        TestNull(TEXT("Invalid area clears context"), Source->PendingSkillData.Get());
+        TestEqual(TEXT("Invalid area does not consume AP"), Source->GetCurrentActionPoint(), 2);
+        FSkillActorInitData Init;
+        Init.SourceUnit = Source;
+        Init.SkillData = Skill;
+        Init.TargetTile = Tile;
+        AAttackSkillActorBase* Actor = Scope.World->SpawnActor<AAttackSkillActorBase>();
+        Actor->InitializeAttackSkillActor(Init, UGE_Damage::StaticClass(), 10.0f);
+        Actor->RequestImpact();
+        TestEqual(TEXT("Invalid actor area does not fall back to splash"), Target->GetAttributeSet()->GetHP(), 100.0f);
+        Actor->Destroy();
+    }
+    Skill->AreaType = ESkillAreaType::AroundTarget;
+    Skill->AreaRadius = -1;
+    Source->StartSkill(Skill, Tile);
+    TestEqual(TEXT("Negative radius does not consume AP"), Source->GetCurrentActionPoint(), 2);
+    Skill->AreaType = ESkillAreaType::Single;
+    Skill->AreaRadius = 0;
+    TestEqual(TEXT("Single resolution needs no grid manager"), UCombatTargetingLibrary::ResolveSkillAreaTargets(Source, Skill, Tile).Num(), 1);
+    Source->StartSkill(Skill, Tile);
+    TestEqual(TEXT("Valid retry deals damage"), Target->GetAttributeSet()->GetHP(), 90.0f);
+    TestEqual(TEXT("Valid retry consumes AP"), Source->GetCurrentActionPoint(), 1);
     return true;
 }
 

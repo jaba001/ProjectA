@@ -12,6 +12,7 @@
 #include "Combat/SkillActor/SkillActorBase.h"
 #include "Unit/UnitBase.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Combat/Library/CombatTargetingLibrary.h"
 
 UGA_AttackBase::UGA_AttackBase()
 {
@@ -44,7 +45,7 @@ void UGA_AttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
     // Use the selected skill definition even when several definitions share an ability class.
     // 여러 스킬 정의가 같은 어빌리티 클래스를 사용해도 선택한 정의의 비용을 사용합니다.
     const USkillDefinitionDataAsset* SkillData = CachedOwnerUnit->PendingSkillData;
-    if (!SkillData || SkillData->AbilityClass != GetClass() || !CachedOwnerUnit->HasEnoughActionPoint(SkillData->ActionPointCost))
+    if (!UCombatTargetingLibrary::IsSupportedSkillArea(SkillData) || SkillData->AbilityClass != GetClass() || !CachedOwnerUnit->HasEnoughActionPoint(SkillData->ActionPointCost))
     {
         UE_LOG(LogTemp, Warning, TEXT("[GA_AttackBase] ActivateAbility Failed | Reason=InvalidSkillOrAP | Owner=%s"), *GetNameSafe(CachedOwnerUnit));
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
