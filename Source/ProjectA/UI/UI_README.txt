@@ -501,7 +501,7 @@ GameplayPlayerController는 화면별 SetInputMode를 호출하지 않는다. Be
 새 JSON spec: GameplayRootWidget.json, RunMapWidget.json, CombatHUDWidget.json, EncounterResultWidget.json.
 Generator 기능을 추가하지 않고 실제 Designer tree 생성·Blueprint compile·save 및 별도 프로세스 재로드 검증을 수행한다.
 CharacterCreation의 Text_StartGameStatus는 선택 바인딩이며 기존 Designer 구조에 없으면 native가 표시 영역을 추가한다.
-정확한 클래스/변수/에디터 연결 순서는 Docs/VERTICAL_SLICE_SETUP.md, 실제 검증 결과는 Docs/VERTICAL_SLICE_REPORT.md를 참고한다.
+정확한 클래스/변수/에디터 연결 순서는 Docs/PROJECT_PLAN.md, 실제 검증 결과는 Docs/HISTORY.md를 참고한다.
 
 T12 구조 기준과 누락 보완
 

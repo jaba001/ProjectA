@@ -95,7 +95,7 @@ struct FPeer
 class FManagedSessions : public IAutomationLatentCommand
 {
 public:
-    FManagedSessions(FAutomationTestBase* InTest, bool bInSolo) : Test(InTest), bSolo(bInSolo), OriginalCount(bInSolo ? 4 : 3), StoreNamespace(TEXT("ManagedPIE_") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(20)), StepStarted(FPlatformTime::Seconds())
+    FManagedSessions(FAutomationTestBase* InTest, bool bInSolo, int32 InOriginalCount = 3) : Test(InTest), bSolo(bInSolo), OriginalCount(bInSolo ? 4 : InOriginalCount), StoreNamespace(TEXT("ManagedPIE_") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(20)), StepStarted(FPlatformTime::Seconds())
     {
         Identity.SchemaVersion = 2;
         Identity.Origin = ERunIdentityOrigin::LocalDevelopment;
@@ -229,7 +229,7 @@ public:
         else if (Step == EStep::Restored)
         {
             if (!AllViewsMatch()) return false;
-            if (!Test->TestTrue(TEXT("Successful Gameplay restoration consumes the pending resume barrier."), Run->HasManagedLease() && !Run->IsManagedResumePending()) || !CheckModes()) return Close();
+            if (!Test->TestTrue(TEXT("Successful Gameplay restoration consumes the pending resume barrier."), Run->HasManagedLease() && !Run->IsManagedResumePending()) || !CheckModes() || !CheckHumanBindings()) return Close();
             if (!bSolo && !RejectOtherCharacter()) return Close();
             Advance(EStep::AICombat);
         }
@@ -245,9 +245,13 @@ public:
                 Test->AddError(TEXT("The high-HP fixture ended before confirming resumed AI and a newer checkpoint."));
                 return Close();
             }
-            if (AISkills > 0 && Run->GetCombatCheckpoint().Revision > Expected.Revision && Combat->GetCurrentUnit() == PartyUnits[HostIndex()].Get() && AllViewsMatch())
+            if (AISkills > 0 && !PendingController.IsValid() && Run->GetCombatCheckpoint().Revision > Expected.Revision && Combat->GetCurrentUnit() == PartyUnits[HostIndex()].Get() && AllViewsMatch())
             {
                 if (!Test->TestTrue(TEXT("An absent original owner's AI performs real successful attacks."), AIHPAfterAttack < AIHPBeforeAttack) || !CheckModes() || !CheckSavedAI()) return Close();
+                for (int32 Index = 0; Index < Peers.Num(); ++Index)
+                {
+                    if (!Test->TestTrue(TEXT("Each remaining original client receives acceptance for its own actual combat RPC."), AcceptedRemoteAccounts.Contains(Party[Index + 2].OwnerAccountId))) return Close();
+                }
                 for (const FPeer& Peer : Peers) Test->TestFalse(TEXT("Remaining clients cannot decide managed Run progression."), Peer.Client->CanIssueRunCommands());
                 // End only the fixture encounter after natural AI execution so result and next-encounter persistence are tested.
                 // 실제 AI 실행을 확인한 뒤 테스트 전투만 종료하여 결과·다음 전투의 영속 상태를 검증합니다.
@@ -319,7 +323,15 @@ public:
 
 private:
     int32 HostIndex() const { return bResuming ? (bSolo ? 3 : 1) : 0; }
-    int32 ConnectionCount() const { return bResuming ? (bSolo ? 1 : 2) : OriginalCount; }
+    int32 ConnectionCount() const { return bResuming ? (bSolo ? 1 : OriginalCount - 1) : OriginalCount; }
+
+    TArray<FRunAccountId> ResumedHumans() const
+    {
+        if (bSolo) return { Party[3].OwnerAccountId };
+        TArray<FRunAccountId> Humans;
+        for (int32 Index = 1; Index < OriginalCount; ++Index) Humans.Add(Party[Index].OwnerAccountId);
+        return Humans;
+    }
 
     void Advance(EStep Next)
     {
@@ -365,6 +377,7 @@ private:
         Peers.Reset();
         PartyUnits.Reset();
         PendingController.Reset();
+        AcceptedRemoteAccounts.Reset();
         bResumeUnitsObserved = false;
     }
 
@@ -455,7 +468,7 @@ private:
         if (!Test->TestTrue(TEXT("The current local Host is explicitly bound to its original development identity."), Mode->AssignRunParticipant(Host.Get(), Party[HostIndex()].OwnerAccountId))) return false;
         for (int32 Index = 0; Index < Peers.Num(); ++Index)
         {
-            const int32 OwnerIndex = bResuming ? 2 : Index + 1;
+            const int32 OwnerIndex = bResuming ? Index + 2 : Index + 1;
             if (!Test->TestTrue(TEXT("Only current human original participants receive actual remote connections."), Mode->AssignRunParticipant(Peers[Index].Remote.Get(), Party[OwnerIndex].OwnerAccountId))) return false;
         }
         return true;
@@ -478,8 +491,8 @@ private:
         FText Error;
         FManagedRunPreview Preview;
         if (!ConfigureCaller(Run.Get()) || !Test->TestTrue(TEXT("The successor reads the latest record after the original Gameplay execution closes."), Run->ReadManagedRun(Identity.RunId, Preview, Error) && Preview.Stamp == ExpectedStamp)) return false;
-        const TArray<FRunAccountId> Humans{ Party[1].OwnerAccountId, Party[2].OwnerAccountId };
-        if (!Test->TestTrue(TEXT("Original number two acquires exactly the latest checkpoint for humans two and three."), Run->ResumeManagedRun(Preview.Stamp, Humans, Error)) || !CheckAcquiredBoundary(Run.Get()) || !BindHumans() || !Test->TestTrue(TEXT("The successor restores combat without the original Host connection."), Encounter->RestoreSavedCombat(Party[1].OwnerAccountId, Error)))
+        const TArray<FRunAccountId> Humans = ResumedHumans();
+        if (!Test->TestTrue(TEXT("Original number two acquires exactly the latest checkpoint for all remaining original humans."), Run->ResumeManagedRun(Preview.Stamp, Humans, Error)) || !CheckAcquiredBoundary(Run.Get()) || !BindHumans() || !Test->TestTrue(TEXT("The successor restores combat without the original Host connection."), Encounter->RestoreSavedCombat(Party[1].OwnerAccountId, Error)))
         {
             Test->AddError(Error.ToString());
             return false;
@@ -580,8 +593,30 @@ private:
 
     bool CheckParticipation()
     {
-        const TArray<FRunAccountId> Humans = bSolo ? TArray<FRunAccountId>{ Party[3].OwnerAccountId } : TArray<FRunAccountId>{ Party[1].OwnerAccountId, Party[2].OwnerAccountId };
+        const TArray<FRunAccountId> Humans = ResumedHumans();
         return Test->TestTrue(TEXT("Approved human participation remains fixed through results and future encounters."), Run->GetParticipation().HumanParticipants == Humans && Run->GetRunIdentity().OriginalParticipants.Num() == OriginalCount);
+    }
+
+    bool CheckHumanBindings()
+    {
+        UCombatActionAuthority* Authority = Combat->GetActionAuthority();
+        if (!Test->TestTrue(TEXT("The successor has one live connection per remaining human."), Authority && Peers.Num() + 1 == ResumedHumans().Num())) return false;
+        const FGuid HostBinding = Host->GetParticipantBindingId();
+        if (!Test->TestTrue(TEXT("The successor Host has its own original account and server-issued binding."), HostBinding.IsValid() && HostBinding == Authority->GetParticipantBindingId(Host.Get()) && Host->GetBoundParticipantAccount() == Party[HostIndex()].OwnerAccountId)) return false;
+        TSet<FGuid> Bindings{ HostBinding };
+        for (int32 Index = 0; Index < Peers.Num(); ++Index)
+        {
+            const FPeer& Peer = Peers[Index];
+            const int32 OwnerIndex = Index + 2;
+            const FGuid Binding = Peer.Client->GetParticipantBindingId();
+            if (!Test->TestTrue(TEXT("Every client has a distinct binding for the matching original server-side account."), Binding.IsValid() && !Bindings.Contains(Binding) && Binding == Authority->GetParticipantBindingId(Peer.Remote.Get()) && Peer.Client->GetBoundParticipantAccount() == Party[OwnerIndex].OwnerAccountId && Peer.Remote->GetBoundParticipantAccount() == Party[OwnerIndex].OwnerAccountId)) return false;
+            Bindings.Add(Binding);
+            for (int32 CharacterIndex = 0; CharacterIndex < OriginalCount; ++CharacterIndex)
+            {
+                if (!Test->TestEqual(TEXT("A remaining client controls exactly its original character, including after Host succession."), Authority->CanControllerControl(Peer.Remote.Get(), PartyUnits[CharacterIndex].Get()), CharacterIndex == OwnerIndex)) return false;
+            }
+        }
+        return true;
     }
 
     bool CheckResumeIdentity()
@@ -649,6 +684,7 @@ private:
         if (Run->GetPhase() == ERunPhase::Combat && (!Combat->IsCombatActive() || !Combat->GetCurrentUnit() || !FindScreen<UCombatHUDWidget>(Host.Get()) || Host->GetBoundParticipantAccount() != Party[HostIndex()].OwnerAccountId)) return false;
         for (const FPeer& Peer : Peers)
         {
+            if (!Peer.Client->GetParticipantBindingId().IsValid() || Peer.Client->GetParticipantBindingId() != Peer.Remote->GetParticipantBindingId() || Peer.Client->GetBoundParticipantAccount() != Peer.Remote->GetBoundParticipantAccount()) return false;
             AGameplayGameState* State = Peer.World->GetGameState<AGameplayGameState>();
             ACombatManager* ClientCombat = State ? State->GetCombatManager() : nullptr;
             if (!ClientCombat || ClientCombat != Peer.Client->GetCombatManager() || State->GetViewState().Phase != Run->GetPhase() || State->GetViewState().ConfirmedCombatRevision != Run->GetCombatCheckpoint().Revision || ClientCombat->GetCombatInstanceId() != Combat->GetCombatInstanceId() || ClientCombat->GetRunId() != Combat->GetRunId() || ClientCombat->GetHostEpoch() != Combat->GetHostEpoch() || ClientCombat->GetTurnSerial() != Combat->GetTurnSerial() || ClientCombat->IsCombatActive() != Combat->IsCombatActive() || ClientCombat->IsAwaitingTurnCheckpoint() != Combat->IsAwaitingTurnCheckpoint() || ClientCombat->GetCombatResult() != Combat->GetCombatResult() || ClientCombat->GetRuntimeUnitId(ClientCombat->GetCurrentUnit()) != Combat->GetRuntimeUnitId(Combat->GetCurrentUnit()) || ClientCombat->GetRegisteredUnits().Num() != Combat->GetRegisteredUnits().Num()) return false;
@@ -690,6 +726,7 @@ private:
             const FCombatActionResponse& Response = PendingController->GetLastCombatActionResponse();
             if (Response.RequestSequence != PendingSequence || Response.Result == ECombatRequestResult::Pending) return true;
             if (!Test->TestTrue(TEXT("The successor server acknowledges the remaining client's real command."), Response.Result == ECombatRequestResult::Accepted)) return false;
+            AcceptedRemoteAccounts.AddUnique(PendingController->GetBoundParticipantAccount());
             PendingController.Reset();
         }
         if (!AllViewsMatch()) return true;
@@ -840,6 +877,7 @@ private:
     TWeakObjectPtr<URunStateSubsystem> FailedTravelRun;
     TArray<uint8> FailedTravelBytes;
     TWeakObjectPtr<AGameplayPlayerController> PendingController;
+    TArray<FRunAccountId> AcceptedRemoteAccounts;
     int64 PendingSequence = 0;
 };
 }
@@ -855,6 +893,20 @@ bool FManagedRunHostSuccessionPIETest::RunTest(const FString& Parameters)
     }
     ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ManagedRunPIETests::FManagedSessions>(this, false));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FManagedRunFourPlayerSuccessionPIETest, "ProjectA.ManagedRunPIE.HostSuccession4Players", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FManagedRunFourPlayerSuccessionPIETest::RunTest(const FString& Parameters)
+{
+    if (!FParse::Param(FCommandLine::Get(), TEXT("T14ManagedRunPIE")))
+    {
+        AddInfo(TEXT("Use -T14ManagedRunPIE for actual four-original-player succession to three humans and one absent AI."));
+        return true;
+    }
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ManagedRunPIETests::FManagedSessions>(this, false, 4));
     return true;
 }
 

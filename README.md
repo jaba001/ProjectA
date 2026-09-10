@@ -1,51 +1,39 @@
 # ProjectA
 
-Unreal Engine 기반 Grid Turn-Based Combat System 프로젝트입니다.
-전투 구조는 grid, unit, turn, GAS 중심으로 구성되어 있고, CommonUI 기반 메뉴와 노드 진행 UI를 하나의 persistent Gameplay 레벨의 전투에 연결합니다.
+Unreal Engine 5.7 기반의 파티·Grid 턴제 전투 프로젝트입니다. 파티 빌드 성장, 직접 조작 전술 전투, 상대 Snapshot을 사용하는 Async PvP와 아군 Co-op을 목표로 합니다. 물리적인 월드맵 탐험 대신 UI에서 선택·강화·전투·보상을 이어갑니다.
 
-게임의 목표는 파티 전체를 성장시키는 협동 로그라이크에 Async PvP와 직접 조작 전술 전투를 결합하는 것입니다. 물리적인 월드맵 탐험을 제외하고 UI에서 선택·강화·전투·보상을 빠르게 이어가며, 단위 시간당 의미 있는 선택을 늘리는 것을 기준으로 삼습니다. 목표 Run 흐름과 개발 우선순위, 후속 결정 사항은 [게임 기획 방향](Docs/GAME_DESIGN.md)에 정리합니다.
-
-현재 Vertical Slice와 기본 Run은 싱글플레이를 유지하며, 최종적으로 상대 Party/Build Snapshot을 사용하는 Async PvP와 Listen Server 기반의 실시간 Co-op을 지원하도록 확장합니다. T14의 첫 단계로 Unreal `USaveGame` v1에 저장된 상대를 기존 전투에 연결하고 로컬 전투 한 사이클을 검증했습니다. 순차 3번에서 실제 2인 Listen Server 전투/HUD 동기화까지 검증했습니다. Co-op에서는 할당된 Party Member의 Action Request를 서버가 검증·실행하고 전투 상태의 최종 권위를 가집니다. 새 데이터·명령은 직렬화 가능한 형태를 우선하고 강한 로컬 PlayerController 의존성을 피합니다. 구현·검증 상태와 미결정 항목은 [T14 작업 카드](Docs/TODO.md), 실행 방법은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)와 [Listen Server 구현·검증 안내](Docs/T14_NETWORK.md)를 참고하세요.
-
-Co-op은 최대 4인이고 원래 소유자만 자신의 캐릭터를 조작합니다. 최초 Host를 1번, 합류 순서대로 2·3·4번으로 저장하며 명시적 재개에 참여하는 인간 중 번호가 가장 작은 사람이 Host를 맡는 기획입니다. 싱글로 전환하면 본인이 Host가 되고 나머지는 해당 Run 종료까지 AI를 유지합니다. 개인 사전 동의 없이 Host가 단독으로 전환을 결정하고, 이후 MMR은 현재 인간 참가자에게만 반영하는 방향입니다. 종료·끊김 자체가 자동 승계나 AI 전환을 실행하지는 않습니다.
-
-현재 Host의 노드 선택·Continue 권한과 번호·사전 동의 제거 정책에 이어, 로컬 개발 저장소의 관리 Run v4에 명시적 승계·싱글 전환 메뉴·확정 전투 복구를 연결했습니다. 인간 참가 목록을 전투 밖에도 저장하고 다음 전투와 재개에서도 AI의 인간 복귀를 막습니다. 관리 Run은 유효한 실행 권한으로만 저장·행동하며 일반 Continue로 우회하지 않습니다. Steam P2P를 우선하고 선택한 Steam+PlayFab의 무료 개발 한도와 출시 운영비를 구분합니다. P2P만으로 중앙 저장·MMR 검증까지 완료되지는 않습니다. 실제 검증 결과와 남은 범위는 [재개 구현 메모](Docs/T14_RESUME.md), [순차 대기열](Docs/T14_QUEUE.md), [온라인 연동·비용 경계](Docs/T14_ONLINE.md)를 참고하세요.
+현재 기본 Run은 싱글플레이이며 같은 Gameplay 레벨에서 두 순차 전투를 진행합니다.
 
 ```text
 MainMenu → CharacterCreation (1~4명) → Gameplay → Run Map UI
-→ Combat Node → Encounter → 기존 Grid Combat → Victory → Result Continue → Run Map UI
-                                             → Defeat → 종료 화면
+→ Combat → Victory → Result Continue → 다음 노드
+         → Defeat → 종료 화면
 ```
 
-`URunStateSubsystem`이 슬롯·이름·ClassId·HP·노드 진행을 레벨 전환 동안 보존합니다. `AEncounterManager`는 아레나 준비, 파티/적 스폰, 결과 추출과 정리를 맡고 기존 CombatManager/TurnManager/GAS를 재사용합니다. 두 개의 순차 전투 노드가 같은 Gameplay 레벨에서 실행됩니다. 진행은 전투 밖과 식별된 Run의 확정 턴 경계에서 디스크에 자동 저장합니다.
+`URunStateSubsystem`이 파티·이름·직업·HP·노드 진행을 보존하고, `AEncounterManager`가 기존 CombatManager/TurnManager/GAS를 사용해 전투를 준비·정리합니다. 일반 Continue는 지원되는 오프라인 저장을 복구하며 협동·계정 기반 저장은 필요한 세션 연결을 안내합니다.
 
-메인 메뉴의 Continue는 기존 오프라인 저장과 원래 참가자가 한 명인 로컬 개발용 저장을 복구합니다. 협동·계정 기반 저장은 필요한 세션 연결을 안내하고 메뉴에 머무릅니다. 버튼 표시 이후 파일이 바뀌어도 클릭 시 다시 검증하며, 협동 서버의 저장 로드·기존 Host 복구 진입점은 유지합니다.
+T14는 로컬 상대 Snapshot, Listen Server 상태 동기화, 확정 턴 복구, 아군 AI와 관리 Run v4의 명시적 Host 승계를 구현했습니다. 최대 4인·원래 소유자만 조작·최초 참가 번호순 승계가 기준입니다. Host가 사전 동의 없이 AI 전환을 확정하고 해당 Run에서는 인간 조작으로 돌아오지 않습니다. 현재 Host만 노드·Continue를 결정합니다.
 
-개발용 관리 Run의 원래 참가 정보와 저장 대상이 설정되면 별도 **싱글로 전환하기** 패널을 표시합니다. 본인이 Host가 되고 나머지는 해당 Run 종료까지 AI로 남는다는 안내 후 저장 확정·Gameplay 복구를 실행합니다. 이미 혼자 이어간 Run에는 **싱글 진행 이어하기**를 표시합니다. 현재 대상·호출자 배정은 C++ 개발 fixture에서 제공하며 기본 새 게임이 협동 Run을 생성하거나 실제 Steam 계정을 인증하는 기능은 아직 없습니다.
+6번까지 로컬 개발 범위는 완료했습니다. 7번 최신 승계 확장은 사용자 작동 검증 대기이며, 8번 실제 Steam/PlayFab 인증·P2P·공유 저장·MMR은 미구현입니다. 관리 Run의 **싱글로 전환하기** 메뉴는 C++ 개발 fixture가 호출자·저장 대상을 설정해야 표시됩니다. 기본 새 게임이 협동 Run을 만들거나 Steam 계정을 인증하는 기능은 아직 없습니다.
 
-실행/에셋 설정과 검증 경계는 [Vertical Slice 설정](Docs/VERTICAL_SLICE_SETUP.md)과 [작업 보고](Docs/VERTICAL_SLICE_REPORT.md)를 확인하세요. 네 직업의 표시명·설명·아이콘·전투 클래스·스탯·시작 스킬은 `DA_VerticalSliceParty.Professions`에서 관리합니다. 기본 설정은 기존 `BP_PlayerUnit`의 전투 밸런스를 유지하며, 직업별 수치는 데이터에서 별도로 지정할 수 있습니다.
+## 문서 안내
 
-## 작업 재개 문서
+Docs는 다음 6개 문서로 관리합니다. 작업마다 새 문서를 추가하지 않고 해당 문서를 갱신합니다.
 
-- [게임 기획 방향](Docs/GAME_DESIGN.md): 게임 정체성, 목표 Run Loop, 콘텐츠·전투·협동 방향, 개발 우선순위와 미결정 정책
-- [TODO와 작업 기록](Docs/TODO.md): 다음 작업, 우선순위, 완료 조건, 중단 지점 기록
-- [기획 초안과 구현 현황](Docs/PROJECT_PLAN.md): 이미 작성된 기능, 현재 규칙, 결정할 기획, 단계별 목표
-- [T14 Co-op 확정 기획](Docs/T14_COOP_DESIGN.md): 본인 캐릭터 조작권, 기존 참가자의 Host 승계·AI 이어하기, MMR과 턴 경계 복구
-- [T14 순차 작업 대기열](Docs/T14_QUEUE.md): 1~8번의 순서, 상태, 번호별 완료 기준
-- [T14 Listen Server 구현·검증](Docs/T14_NETWORK.md): 실제 2·3·4인 PIE RPC, 전투/HUD 복제, 참가자 배정과 Host의 진행 권한
-- [T14 확정 턴 저장·복구](Docs/T14_CHECKPOINT.md): v3 전투 저장, 저장 실패 재시도, 기존 Host의 새 세션 복구와 지원 경계
-- [T14 아군 AI](Docs/T14_PARTY_AI.md): 원래 소유권·진영 유지, 서버 AI 명령 검증, 인간 입력 차단과 AI 모드 저장·복구
-- [T14 승계·AI 이어하기 구현 메모](Docs/T14_RESUME.md): 관리 Run v4·로컬 실행 권한·싱글 전환 메뉴·승계 복구와 검증 범위
-- [T14 온라인 연동 준비](Docs/T14_ONLINE.md): 8번 EOS/Steam·Backend 선택지, 공식 Unreal 확장 지점과 미구현 인증·중앙 저장·MMR 수용 기준
-- [코드 리뷰](Docs/CODE_REVIEW.md): P1/P2 문제의 근거와 검증 시나리오
+| 문서 | 찾을 내용 |
+|---|---|
+| [GAME_DESIGN](Docs/GAME_DESIGN.md) | 게임 목표·Run 흐름·협동 확정 정책·콘텐츠 방향 |
+| [PROJECT_PLAN](Docs/PROJECT_PLAN.md) | 현재 구조·실행 흐름·에셋·설정 방법 |
+| [TODO](Docs/TODO.md) | 다음 작업·T14 1~8번 상태·남은 결정 |
+| [MULTIPLAYER](Docs/MULTIPLAYER.md) | Snapshot·서버 권위·저장 버전·AI·승계·온라인 연결 계약 |
+| [TEST_REPORT](Docs/TEST_REPORT.md) | 사용자가 실행할 테스트 절차·기대 결과·결과 기록 |
+| [HISTORY](Docs/HISTORY.md) | 완료 작업·커밋·당시 검증 근거와 실패 수정 이력 |
 
-문서는 2026-09-10 현재 작업 트리를 기준으로 정리합니다. 코드 구현, 정식 빌드, 에셋 설정 확인, PIE 검증은 별도로 기록합니다.
+## Codex 작업 규칙
 
-## Codex 작업 완료 규칙
+[AGENTS.md](AGENTS.md)에 코드·문서·Git 규칙을 정의합니다. **작동 테스트는 사용자가 수행합니다.** Codex는 컴파일·정적 검사와 README 확인 후 테스트 보고서를 갱신하고, 사용자 검증 대기를 명시해 해당 변경을 커밋·push합니다. 이후 사용자가 특정 실행을 명시적으로 요청하지 않는 한 PIE·게임·Unreal 자동화·패키지 작동 테스트를 시작하지 않습니다. Visual Studio도 자동으로 열지 않습니다.
 
-[AGENTS.md](AGENTS.md)에 코드 스타일과 작업 완료 규칙을 정의합니다. Codex는 파일 수정 후 변경에 맞는 검증과 README 확인을 마치면 해당 작업의 변경을 한글 메시지로 커밋하고 현재 브랜치의 upstream으로 push합니다.
-
-Codex가 만드는 커밋은 Summary(제목)에 `[codex] ` 접두사를 붙이고, Description(본문)에 변경 내용과 이유 및 검증 결과를 한글로 기록합니다.
+커밋 제목은 `[codex] `로 시작하고 본문에는 변경 내용·이유·실제 검증 결과를 한글로 기록합니다.
 
 ## Engine
 
@@ -129,7 +117,7 @@ UI의 턴 종료는 `PartyPlayerController::RequestEndTurn`, 회복약은 `Reque
 
 순차 3번은 서로 다른 NetDriver를 가진 Listen Server/Client 두 PIE 월드에서 실제 Server/Client Reliable RPC를 검증했습니다. 서버 전용 TurnManager와 CombatManager의 복제 뷰, GAS HP/MaxHP RepNotify, 유닛 AP/SubAP·팀·장착·이동·턴/행동/사망 상태, Grid 점유·전열 보호·결과/HUD 복제를 연결했습니다. `AGameplayGameState`는 Run 단계·파티·노드·결과의 읽기 전용 표시 값을 전달하며 클라이언트의 RunState를 권위 상태로 사용하지 않습니다. Development Editor / Win64 빌드, 2인 PIE를 포함한 전체 자동화 42건(성공 26·경고 동반 성공 16·실패 0), 별도 Snapshot 상대 PIE 1건을 통과했습니다.
 
-네트워크 참가자는 `AGameplayGameModeBase::AssignRunParticipant`와 `ApplyCombatParticipantBindings`에서 신뢰된 서버 C++ 코드로 배정합니다. 현재 자동화는 알려진 연결에 계정을 명시적으로 연결하며 실제 로그인을 제공하지 않습니다. 실제 인증은 8번입니다. 기존 미식별 Run/TestMap의 입력 호환은 Standalone에만 적용하고 손상된 식별 Run으로 우회하지 않습니다. 노드 선택·Continue는 현재 Host의 로컬 서버 연결과 신뢰된 계정 배정을 확인해 허용하며 Client는 진행 상태를 표시합니다. 네트워크 최종 유닛 상태는 결과 화면에서 유지하고 명시적인 Continue 또는 월드 종료에서 정리합니다. 상세 경계와 검증 명령은 [Listen Server 안내](Docs/T14_NETWORK.md)를 참고하세요.
+네트워크 참가자는 `AGameplayGameModeBase::AssignRunParticipant`와 `ApplyCombatParticipantBindings`에서 신뢰된 서버 C++ 코드로 배정합니다. 현재 자동화는 알려진 연결에 계정을 명시적으로 연결하며 실제 로그인을 제공하지 않습니다. 실제 인증은 8번입니다. 기존 미식별 Run/TestMap의 입력 호환은 Standalone에만 적용하고 손상된 식별 Run으로 우회하지 않습니다. 노드 선택·Continue는 현재 Host의 로컬 서버 연결과 신뢰된 계정 배정을 확인해 허용하며 Client는 진행 상태를 표시합니다. 네트워크 최종 유닛 상태는 결과 화면에서 유지하고 명시적인 Continue 또는 월드 종료에서 정리합니다. 상세 경계와 검증 명령은 [Listen Server 안내](Docs/MULTIPLAYER.md)를 참고하세요.
 
 캐릭터 생성의 Edit는 선택한 슬롯의 이름(1~32자)과 직업을 편집합니다. 저장 전에는 파티 데이터가 바뀌지 않으며 취소하면 기존 값이 유지됩니다. ClassInfo는 같은 직업 정의의 실제 HP/AP/보조 AP와 시작 스킬을 읽기 전용으로 표시합니다. 저장한 이름·직업과 사용한 직업 목록은 Gameplay로 전달되고, Encounter 스폰은 동일한 설정을 적용한 뒤 이전 전투의 HP를 복원합니다.
 
@@ -170,13 +158,13 @@ JSON spec 위치:
 기본 commandlet:
 
 ```powershell
-"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -DryRun -Spec="Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScreenWidget.json"
+& "C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -DryRun -Spec="Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScreenWidget.json"
 ```
 
 실제 생성:
 
 ```powershell
-"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -Overwrite -Spec="Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScreenWidget.json"
+& "C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -run=GenerateUiScaffold -nop4 -unattended -NullRHI -Overwrite -Spec="Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScreenWidget.json"
 ```
 
 현재 지원하는 widget type:
@@ -234,13 +222,13 @@ C++ 파일을 생성, 삭제, 이름 변경한 뒤 프로젝트 파일 재생성
 
 새 게임 시작, 확정 턴 경계, 전투 결과 확정, Continue 시 기본 `ProjectA_Run` 슬롯에 진행을 저장합니다. 식별된 Run은 전투 중 종료해도 마지막 확정 턴부터 이어가며, 처리 중이던 행동은 저장하지 않습니다. 결과 화면에서 종료했다면 결과 화면으로 복원하며, 패배하거나 모든 노드를 완료한 기록은 이어할 수 없습니다. 새 파티로 게임을 시작하면 선택된 슬롯의 기존 저장을 교체합니다.
 
-T14 로컬 상대 검증은 [Snapshot 설정 스크립트](Source/ProjectAEditor/Scripts/ConfigureSnapshotContent.py) 실행 후 `-ProjectAOpponentSnapshot=SampleOpponent`로 선택합니다. 상대 데이터는 `ProjectA_Opponent_SampleOpponent`, Run 체크포인트는 `ProjectA_SnapshotRun_SampleOpponent`로 분리됩니다. 명시적인 `-ProjectASaveSlot=...`은 우선하며, 이어하기에는 같은 상대 실행 인자를 사용합니다. 저장값과 에셋 설정은 [로컬 Snapshot 안내](Docs/T14_SNAPSHOT.md)를 참고하세요.
+T14 로컬 상대 검증은 [Snapshot 설정 스크립트](Source/ProjectAEditor/Scripts/ConfigureSnapshotContent.py) 실행 후 `-ProjectAOpponentSnapshot=SampleOpponent`로 선택합니다. 상대 데이터는 `ProjectA_Opponent_SampleOpponent`, Run 체크포인트는 `ProjectA_SnapshotRun_SampleOpponent`로 분리됩니다. 명시적인 `-ProjectASaveSlot=...`은 우선하며, 이어하기에는 같은 상대 실행 인자를 사용합니다. 저장값과 에셋 설정은 [로컬 Snapshot 안내](Docs/MULTIPLAYER.md)를 참고하세요.
 
 메인메뉴 Continue는 저장이 없거나 손상/버전 불일치/직업 데이터 누락/종료된 진행이면 비활성화하고 이유를 표시합니다. 신규 Run의 전투 밖 저장은 v2, 확정 턴 저장은 v3이며 Run·원래 참가자·캐릭터 소유자·Host/세대를 유지합니다. 실제 식별 정보가 없는 v1은 `LegacyOffline`으로 이어가며 전투 밖 복구만 지원합니다. 손상된 v2/v3를 이전 형식으로 우회하지 않습니다.
 
-v3는 턴 순서·다음 유닛·HP/AP/SubAP·재고·사망·점유·실제 장착·고정된 상대 Snapshot을 저장합니다. 저장에 실패하면 이전 파일을 보존하고 다음 턴을 멈추며 Host의 **저장 다시 시도** 버튼으로 재시도합니다. 결과와 Continue도 저장 성공 후 확정합니다. 복구할 때 새 Actor와 명령 실행 ID를 만들며, 처리 중 이동/발사체·활성 GAS 능력·지속 효과·쿨다운 등 표현하지 못하는 상태는 거절합니다. 일반 v3 협동 복구는 기존 Host와 원래 참가자 전원의 서버 연결 배정 후 실행하고, 관리 v4는 승인된 현재 인간 참가자만 연결합니다. 실제 로그인·재접속 UI는 후속 범위입니다. 자세한 계약은 [확정 턴 저장·복구](Docs/T14_CHECKPOINT.md)를 참고하세요.
+v3는 턴 순서·다음 유닛·HP/AP/SubAP·재고·사망·점유·실제 장착·고정된 상대 Snapshot을 저장합니다. 저장에 실패하면 이전 파일을 보존하고 다음 턴을 멈추며 Host의 **저장 다시 시도** 버튼으로 재시도합니다. 결과와 Continue도 저장 성공 후 확정합니다. 복구할 때 새 Actor와 명령 실행 ID를 만들며, 처리 중 이동/발사체·활성 GAS 능력·지속 효과·쿨다운 등 표현하지 못하는 상태는 거절합니다. 일반 v3 협동 복구는 기존 Host와 원래 참가자 전원의 서버 연결 배정 후 실행하고, 관리 v4는 승인된 현재 인간 참가자만 연결합니다. 실제 로그인·재접속 UI는 후속 범위입니다. 자세한 계약은 [확정 턴 저장·복구](Docs/MULTIPLAYER.md)를 참고하세요.
 
-아군 AI는 `APlayerUnit`의 서버 컴포넌트로 자기 회복약·아군 피해 없는 공격·접근 이동·턴 종료를 실행합니다. 원래 소유자와 Host의 인간 입력은 서버와 HUD에서 차단하며 캐릭터·소유권·팀은 유지합니다. 전투 시작 전 신뢰된 서버 API에서 원래 소유권을 확인해 모드를 지정하고 전투 본문 schema 2에 저장·복원합니다. 개인 사전 동의는 요구하지 않습니다. 기본 Run은 인간 조작이며 연결 끊김만으로 AI가 켜지지 않습니다. 관리 Run v4의 명시적 재개는 전투 밖에 보존한 인간 참가 목록으로 모드를 결정하며 기존 AI 계정을 다시 인간 목록에 추가할 수 없습니다. [아군 AI 안내](Docs/T14_PARTY_AI.md)에 API와 검증 방법을 정리합니다.
+아군 AI는 `APlayerUnit`의 서버 컴포넌트로 자기 회복약·아군 피해 없는 공격·접근 이동·턴 종료를 실행합니다. 원래 소유자와 Host의 인간 입력은 서버와 HUD에서 차단하며 캐릭터·소유권·팀은 유지합니다. 전투 시작 전 신뢰된 서버 API에서 원래 소유권을 확인해 모드를 지정하고 전투 본문 schema 2에 저장·복원합니다. 개인 사전 동의는 요구하지 않습니다. 기본 Run은 인간 조작이며 연결 끊김만으로 AI가 켜지지 않습니다. 관리 Run v4의 명시적 재개는 전투 밖에 보존한 인간 참가 목록으로 모드를 결정하며 기존 AI 계정을 다시 인간 목록에 추가할 수 없습니다. [아군 AI 안내](Docs/MULTIPLAYER.md)에 API와 검증 방법을 정리합니다.
 
 관리 Run v4는 Run별 공유 개발 저장소에 전체 본문·revision·HostEpoch·실행 세션을 함께 확정합니다. 모든 자동 저장과 턴 저장은 배타적 실행 권한을 검사하며 일반 `ProjectA_Run` 슬롯에 대신 쓰지 않습니다. 재개는 최신 기록의 원래 소유권·번호·확정 턴을 유지하고 새 Host와 영속 인간 목록만 승인해 적용합니다. 기존 v1/v2/v3를 자동 이관하지 않으며, 같은 PC의 개발 저장소 검증을 원격 중앙 저장이나 위변조 방지로 취급하지 않습니다.
 

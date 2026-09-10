@@ -1,0 +1,86 @@
+# 사용자 작동 테스트 보고서
+
+작성일: 2026-09-10 · 대상: T14-7 승계 통합 후속 및 기본 전투 입력 · **작동 검증 상태: 사용자 확인 대기**
+
+## 이번 변경과 확인 결과
+
+| 구분 | 내용 | 상태 |
+|---|---|---|
+| 문서 정리 | Docs 14개를 기획·구조·작업·멀티플레이·테스트·이력의 6개로 통합 | 내용·로컬 링크 50개 정적 확인 완료 |
+| 중단 전 작성한 테스트 코드 | 4명 중 최초 Host 불참 후 3명 재개, 각 Client 바인딩·턴 종료 RPC 승인 확인 추가 | 작성 완료, 사용자 작동 검증 대기 |
+| 테스트 안정화 | 참가자 바인딩 복제를 기다린 뒤 비교, Unity 빌드의 중복 보조 함수명 수정 | 컴파일 확인 완료 |
+| 컴파일 | Development Editor / Win64, `-DisableAdaptiveUnity` | 성공: `Saved/Automation/T14ManualHandoffBuild1.log` |
+| 이번 작동 테스트 | PIE·게임·Unreal 자동화·패키지 실행 | Codex 미실행, 사용자가 아래 절차로 확인 |
+
+앞으로 Codex는 컴파일·정적 검사를 수행하고 이 보고서를 갱신한다. 작동 테스트는 사용자가 실행하며, 결과를 받기 전에는 성공으로 표시하지 않는다. 이전 실행 결과는 [HISTORY](HISTORY.md)의 당시 코드 기준 기록이며 최신 변경의 통과를 대신하지 않는다.
+
+## 준비 조건
+
+- UE 5.7에서 최신 소스와 빌드된 `ProjectAEditor`를 사용한다. Visual Studio 실행은 필요하지 않다.
+- 일반 플레이 확인은 `/Game/User_JeHoon/LEVEL/MainMenu`에서 시작한다. 프로젝트 기본 설정과 에셋 경로는 [PROJECT_PLAN](PROJECT_PLAN.md)을 따른다.
+- 일반 새 게임은 싱글플레이다. **관리 Run의 협동 생성·참가 번호 선택·실제 Steam 로그인 UI는 아직 없다.** 관리 이어하기 패널은 C++ 개발 fixture가 호출자와 저장 대상을 설정해야 표시된다.
+- 아래 관리 시나리오는 같은 PC의 개발 신원·로컬 저장소와 여러 PIE 월드를 사용하는 기존 자동화 fixture다. 실제 친구 초대·다른 PC·Steam 인증 시험과 구분한다.
+- 일반 새 게임은 기존 단일 진행 슬롯을 갱신한다. 보존할 세이브가 있으면 실행 전에 `Saved/SaveGames`를 별도 위치에 복사한다. 관리 fixture는 고유 namespace/Run ID를 사용한다.
+
+## A. 직접 플레이 확인
+
+| ID | 사용자가 할 일 | 기대 결과 | 결과 |
+|---|---|---|---|
+| A1 | MainMenu → 새 게임 → 캐릭터 1~4명 생성 → 시작 → 첫 Combat 노드 선택 | Gameplay에 생성한 파티가 등장하고 현재 턴·HP/AP가 표시됨 | 대기 |
+| A2 | 자기 턴에 Move 선택 → 표시된 빈 도달 타일 클릭 | 실제 이동·점유 타일·자원이 갱신되고 완료 후 다음 입력이 가능함 | 대기 |
+| A3 | 사용 가능한 스킬 선택 → 유효한 적/타일 클릭 | 타겟 표시와 실제 효과·HP/AP가 일치하고 스킬 완료 후 입력이 풀림 | 대기 |
+| A4 | 적 턴과 이동/스킬 처리 중 Move·스킬·타일 클릭을 시도하고 정상 진행을 기다림 | 유효하지 않은 행동은 실행되지 않고 적 행동 완료 후 자기 턴에 입력이 다시 가능함 | 대기 |
+| A5 | 전투 승리 → Continue → 두 번째 Combat 노드 선택 | 같은 Gameplay에서 다음 전투가 시작되고 파티·HP·노드 진행이 유지됨 | 대기 |
+
+막힌 항목이 있으면 이후 결과를 억지로 완료하지 않고 최초 실패 단계·화면·로그를 기록한다. 원래 문제인 ‘버튼 또는 타일 무반응’은 A2/A3에서 버튼 선택 여부, 범위 표시 여부, 실제 이동/효과 여부를 나누어 적는다.
+
+## B. 사용자가 실행할 승계 시나리오
+
+다음 세 fixture를 한 번 실행하면 B1~B3을 확인한다. 아래 명령은 **사용자 실행용 안내**이며 Codex는 실행하지 않는다. 기존 에디터의 작업을 저장하고 PIE를 종료한 뒤 PowerShell에 붙여 넣는다. 보고서 경로는 실행 시각마다 새로 만든다.
+
+```powershell
+$reportPath = Join-Path (Get-Location) ('Saved/Automation/UserManagedRun_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
+& 'C:/Program Files/Epic Games/UE_5.7/Engine/Binaries/Win64/UnrealEditor-Cmd.exe' 'C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject' -unattended -nop4 -RenderOffscreen -nosound -T14ManagedRunPIE '-ExecCmds=Automation RunTests ProjectA.ManagedRunPIE.' '-TestExit=Automation Test Queue Empty' "-ReportExportPath=$reportPath"
+```
+
+명령의 현재 폴더는 프로젝트 루트여야 한다. 화면을 직접 조작하는 A와 달리 이 명령은 기존 테스트 코드가 세션과 행동을 구동한다. 직접 에디터에서 실행하려면 `-T14ManagedRunPIE` 인자를 주어 에디터를 시작하고 Session Frontend의 Automation에서 `ProjectA.ManagedRunPIE.` 세 항목을 선택한다. 인자가 없으면 안내만 출력하고 종료하므로 그 성공 표시는 실제 검증이 아니다.
+
+| ID / 테스트 | 구성과 확인 절차 | 기대 결과 | 결과 |
+|---|---|---|---|
+| B1 · `HostSuccession` | 원래 3인의 확정 턴 저장 → 기존 실행 종료 → 2번 Host·3번 Client·1번 AI로 복구 | Run·원래 소유권·확정 본문 유지, 새 실행/바인딩, 3번의 자기 캐릭터 턴 종료 RPC 승인, 타인 조작 거절, AI 실제 공격과 다음 전투 유지 | 대기 |
+| B2 · `HostSuccession4Players` | 원래 4인의 확정 턴 저장 → 2번 Host·3/4번 Client·1번 AI로 복구 | 두 Client가 서로 다른 본인 계정 바인딩을 갖고 각자 턴 종료 RPC 승인, 전투 중 Turn·Grid·HP/AP 일치와 결과 화면·Continue 권한 확인 | 대기 |
+| B3 · `SoloMenuConversion` | 원래 4번이 메뉴에서 싱글 전환 → 의도한 맵 이동 실패 → 새 메뉴에서 재시도 → 전투/다음 Encounter | 본인이 Host, 나머지 영구 AI, 실패 중 확정 저장 보존·lease 정리, 재시도 후 복구 장벽 해제·AI 행동·다음 전투의 AI 유지 | 대기 |
+
+결과 파일 `$reportPath/index.json`에서 세 테스트 각각의 상태와 오류/경고 메시지를 확인한다. `Saved/Logs/ProjectA.log`와 보고서 경로를 함께 남긴다. 경고가 있으면 ‘경고 동반 성공’으로 기록하고 실패·미실행·실행 중 항목이 없는지 확인한다.
+
+검증 범위: 추가 Client별 승인 검사는 **턴 종료 RPC**이며 이동·회복약·스킬 전부를 각 Client에서 검증하는 것은 아니다. AI 공격은 실제 실행하지만 결과/다음 전투 검사는 fixture가 치명적 GAS 피해를 주어 승리를 유도한다. 이후 결과 화면과 권한을 확인하며 최종 사망·점유 상태 전체를 다시 비교하지는 않는다. 같은 PC 성공만으로 인터넷 환경·지연/손실·서비스 인증이 확인되지는 않는다.
+
+## C. 필요할 때 추가 확인
+
+B가 실패하거나 관련 코드가 다시 바뀌면 필요한 항목만 선택한다. 매 문서 수정마다 전체 테스트를 반복하지 않는다.
+
+| ID | 확인 내용 | 방법과 기대 결과 | 상태 |
+|---|---|---|---|
+| C1 | 중복 실행·오래된 stamp·영구 AI의 인간 복귀·v4 일반 로드 우회 | 기존 `ProjectA.Run.Managed` fixture를 사용자가 선택 실행. 거절 뒤 저장 본문·진행·실행 권한 보존 | 필요 시 |
+| C2 | 닫힌 관리 lease의 옛 명령 | 기존 관리 fixture의 종료·권한 검사를 확인. 직접 Close 직후 인간/AI 명령·바인딩·모드 변경 거절과 턴·HP/AP·모드 불변 확인. 늦은 콜백·저장 시도 검증은 별도 | 필요 시 |
+| C3 | 2·3·4인 일반 Co-op 입력·턴 복구 | `ProjectA.Coop.` 기존 시나리오. 각자 조작·동일 상태·기존 Host 복구 확인. 필요한 전용 인자는 [MULTIPLAYER](MULTIPLAYER.md) 참조 | 필요 시 |
+| C4 | 로컬 상대 Snapshot | 개발용 Snapshot 설정 후 전투 진입. 저장한 파티 빌드·배치로 적 생성, 지원하지 않는 데이터는 오류 표시 | 필요 시 |
+| C5 | 일반 Continue·패키지 | 별도로 보존한 일반 세이브로 Continue 확인. 패키지 확인은 최신 패키지를 만든 경우에만 그 빌드 기준으로 기록 | 필요 시 |
+
+실패 주입·가짜 연결·관리 lease 조작은 일반 UI에서 재현할 수 있는 버튼으로 제공하지 않는다. 위 테스트 fixture를 쓰거나 필요한 재현 도구를 별도 작업으로 준비해야 한다. Steam/PlayFab과 MMR은 [TODO](TODO.md)의 8번 준비 이후 별도 보고서 대상으로 추가한다.
+
+## 사용자 결과 기록
+
+아래 내용을 채워 전달하면 실패 항목부터 수정한다. 테스트를 실행하지 않은 항목은 대기로 유지한다.
+
+```text
+실행 날짜 / 확인한 커밋:
+환경: 직접 PIE / 사용자 실행 fixture / 패키지
+항목 ID와 결과: 예) A2 실패, B1 성공, B2 미실행
+실패한 최초 단계:
+기대 결과 / 실제 결과:
+재현 횟수:
+보고서·로그 경로 / 오류 문구:
+```
+
+이 보고서는 앞으로 같은 파일에서 최신 변경·필수 시나리오·사용자 결과를 갱신한다. 완료된 검증의 핵심 근거는 [HISTORY](HISTORY.md)에 짧게 남긴다.

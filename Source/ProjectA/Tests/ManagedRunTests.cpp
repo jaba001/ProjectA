@@ -155,8 +155,8 @@ namespace
         }
     };
 
-    bool SameIdentity(const FRunIdentityData& Left, const FRunIdentityData& Right) { return FRunIdentityData::StaticStruct()->CompareScriptStruct(&Left, &Right, 0); }
-    bool SameCheckpoint(const FCombatCheckpointData& Left, const FCombatCheckpointData& Right) { return FCombatCheckpointData::StaticStruct()->CompareScriptStruct(&Left, &Right, 0); }
+    bool ManagedSameIdentity(const FRunIdentityData& Left, const FRunIdentityData& Right) { return FRunIdentityData::StaticStruct()->CompareScriptStruct(&Left, &Right, 0); }
+    bool ManagedSameCheckpoint(const FCombatCheckpointData& Left, const FCombatCheckpointData& Right) { return FCombatCheckpointData::StaticStruct()->CompareScriptStruct(&Left, &Right, 0); }
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FManagedRunContextTest, "ProjectA.Run.Managed.ContextAndIsolation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
@@ -196,7 +196,7 @@ bool FManagedRunContextTest::RunTest(const FString& Parameters)
     TStrongObjectPtr<URunSaveGame> Saved = Fixture.LoadPayload();
     if (!TestNotNull(TEXT("The authority record contains native RunSaveGame bytes"), Saved.Get())) return false;
     TestEqual(TEXT("Managed payload version is four"), Saved->Version, 4);
-    TestTrue(TEXT("Creation preserves identity without authentication claims"), SameIdentity(Saved->Identity, Fixture.Identity));
+    TestTrue(TEXT("Creation preserves identity without authentication claims"), ManagedSameIdentity(Saved->Identity, Fixture.Identity));
 
     TStrongObjectPtr<UPartySnapshotSaveGame> Marker(NewObject<UPartySnapshotSaveGame>());
     if (!TestTrue(TEXT("An isolated ordinary-slot marker exists"), UGameplayStatics::SaveGameToSlot(Marker.Get(), Fixture.OrdinarySlot, 0))) return false;
@@ -211,7 +211,7 @@ bool FManagedRunContextTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Managed saving leaves ordinary progress bytes untouched"), OrdinaryBefore == OrdinaryAfter);
     TestFalse(TEXT("Ordinary initialization cannot discard a held managed lease"), Host->InitializeRun(Fixture.Party, Fixture.Error));
     TestFalse(TEXT("Ordinary loading cannot replace an active managed Run"), Host->LoadCheckpoint(Fixture.Error));
-    TestTrue(TEXT("Rejected replacement retains the managed identity and lease"), Host->HasManagedLease() && SameIdentity(Host->GetRunIdentity(), Fixture.Identity));
+    TestTrue(TEXT("Rejected replacement retains the managed identity and lease"), Host->HasManagedLease() && ManagedSameIdentity(Host->GetRunIdentity(), Fixture.Identity));
 
     URunStateSubsystem* Reader = Fixture.NewSession(2);
     if (!TestNotNull(TEXT("Another original owner has a separate development context"), Reader)) return false;
@@ -256,10 +256,10 @@ bool FManagedRunSoloTest::RunTest(const FString& Parameters)
         {
             if (Unit.Team == ETeam::Player) Unit.PartyControlMode = Unit.OwnerAccountId == Fixture.Account(Ordinal) ? EPartyControlMode::Human : EPartyControlMode::ServerAI;
         }
-        TestTrue(TEXT("Resume changes only Host identity and party control modes at the confirmed turn"), SameCheckpoint(Solo->GetCombatCheckpoint(), Expected));
+        TestTrue(TEXT("Resume changes only Host identity and party control modes at the confirmed turn"), ManagedSameCheckpoint(Solo->GetCombatCheckpoint(), Expected));
         TStrongObjectPtr<URunSaveGame> Saved = Fixture.LoadPayload();
         if (!TestNotNull(TEXT("The resumed authority payload is readable"), Saved.Get())) return false;
-        TestTrue(TEXT("Outer and nested identities commit the same Host epoch"), SameIdentity(Saved->Identity, Solo->GetRunIdentity()) && SameIdentity(Saved->CombatCheckpoint.Identity, Saved->Identity));
+        TestTrue(TEXT("Outer and nested identities commit the same Host epoch"), ManagedSameIdentity(Saved->Identity, Solo->GetRunIdentity()) && ManagedSameIdentity(Saved->CombatCheckpoint.Identity, Saved->Identity));
         TestTrue(TEXT("The persisted human roster contains only the selected caller"), Saved->Participation.HumanParticipants.Num() == 1 && Saved->Participation.HumanParticipants[0] == Fixture.Account(Ordinal));
         FCombatCheckpointData Next = Expected;
         ++Next.Revision;
@@ -325,7 +325,7 @@ bool FManagedRunOrderedResumeTest::RunTest(const FString& Parameters)
     const TArray<uint8> BeforeResultBytes = Fixture.FileBytes();
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("Failed terminal save does not publish a result"), Second->CompleteEncounter(ECombatResult::Victory));
-    TestTrue(TEXT("Failed result keeps combat, checkpoint and revision unchanged"), Second->GetPhase() == ERunPhase::Combat && Second->GetLastResult() == ECombatResult::None && Second->GetCompletedNodes().IsEmpty() && SameCheckpoint(Second->GetCombatCheckpoint(), Checkpoint) && Second->GetManagedStamp() == BeforeResult && Fixture.FileBytes() == BeforeResultBytes);
+    TestTrue(TEXT("Failed result keeps combat, checkpoint and revision unchanged"), Second->GetPhase() == ERunPhase::Combat && Second->GetLastResult() == ECombatResult::None && Second->GetCompletedNodes().IsEmpty() && ManagedSameCheckpoint(Second->GetCombatCheckpoint(), Checkpoint) && Second->GetManagedStamp() == BeforeResult && Fixture.FileBytes() == BeforeResultBytes);
     if (!TestTrue(TEXT("The same terminal result retries through its lease"), Second->CompleteEncounter(ECombatResult::Victory))) return false;
     TStrongObjectPtr<URunSaveGame> ResultSave = Fixture.LoadPayload();
     if (!TestNotNull(TEXT("Result payload remains available"), ResultSave.Get())) return false;
@@ -340,7 +340,7 @@ bool FManagedRunOrderedResumeTest::RunTest(const FString& Parameters)
     FCombatCheckpointData Next;
     if (!Fixture.MakeCheckpoint(Second, Next)) return false;
     TestTrue(TEXT("New encounter state commits as v4 with unchanged original ownership"), Second->CommitCombatCheckpoint(Next, Fixture.Error));
-    TestTrue(TEXT("Following combat keeps the resumed Host and original join numbers"), SameIdentity(Second->GetRunIdentity(), Checkpoint.Identity));
+    TestTrue(TEXT("Following combat keeps the resumed Host and original join numbers"), ManagedSameIdentity(Second->GetRunIdentity(), Checkpoint.Identity));
     return true;
 }
 
@@ -390,7 +390,7 @@ bool FManagedRunCompatibilityTest::RunTest(const FString& Parameters)
     Managed->Participation = FRunParticipationData();
     TestTrue(TEXT("An ordinary v2 fixture without managed fields writes"), UGameplayStatics::SaveGameToSlot(Managed.Get(), Fixture.OrdinarySlot, 0));
     TestTrue(TEXT("Ordinary v2 identity/party saves remain loadable without managed conversion"), Second->LoadCheckpoint(Fixture.Error));
-    TestTrue(TEXT("Ordinary loading preserves its identity and has no managed lease"), SameIdentity(Second->GetRunIdentity(), Managed->Identity) && !Second->IsManagedRun() && !Second->HasManagedLease());
+    TestTrue(TEXT("Ordinary loading preserves its identity and has no managed lease"), ManagedSameIdentity(Second->GetRunIdentity(), Managed->Identity) && !Second->IsManagedRun() && !Second->HasManagedLease());
     return true;
 }
 
