@@ -168,9 +168,10 @@ void AEnemyUnit::EnterDecideActionState()
 
 void AEnemyUnit::EnterMoveState()
 {
-    // Movement action evaluation is not implemented yet,
-    // so fallback safely to ending the turn
-    if (!CurrentTargetTile)
+    // Validate the selected destination before starting movement.
+    // 이동 시작 전에 선택한 목적지를 확인합니다.
+    ACombatManager* Manager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatManager::StaticClass()));
+    if (!CurrentTargetTile || !Manager || !Manager->CalculateReachableMoveTiles(this).Contains(CurrentTargetTile))
     {
         SetTurnState(EEnemyTurnState::EndTurn);
         return;
@@ -267,6 +268,11 @@ FEnemyActionDecision AEnemyUnit::DecideBestAction() const
 
     const FEnemyActionDecision SkillDecision = EvaluateSkillAction();
     const FEnemyActionDecision WaitDecision = EvaluateWaitAction();
+    const FEnemyActionDecision MoveDecision = EvaluateMoveAction();
+    if (MoveDecision.Score > BestDecision.Score)
+    {
+        BestDecision = MoveDecision;
+    }
 
     if (SkillDecision.Score > BestDecision.Score)
     {
@@ -321,7 +327,7 @@ FEnemyActionDecision AEnemyUnit::EvaluateSkillCandidate(USkillDefinitionDataAsse
     Decision.SkillData = SkillData;
     Decision.Score = -TNumericLimits<float>::Max();
 
-    if (!SkillData || !SkillData->AbilityClass || !HasEnoughActionPoint(SkillData->ActionPointCost))
+    if (!SkillData || !SkillData->AbilityClass || SkillData->ActionPointCost <= 0 || !HasEnoughActionPoint(SkillData->ActionPointCost))
     {
         return Decision;
     }
@@ -335,7 +341,10 @@ FEnemyActionDecision AEnemyUnit::EvaluateSkillCandidate(USkillDefinitionDataAsse
 
     Decision.TargetUnit = TargetTile->GetOccupyingUnit();
     Decision.TargetTile = TargetTile;
-    Decision.Score = SkillBaseScore + EvaluateSkillTileScore(SkillData, TargetTile);
+    // Compare useful target coverage per AP; stable ties retain the default attack.
+    // AP당 유효 대상 수를 비교하며 동점이면 기본 공격을 유지합니다.
+    const int32 TargetCount = FMath::Max(1, UCombatTargetingLibrary::ResolveSkillAreaTargets(const_cast<AEnemyUnit*>(this), SkillData, TargetTile).Num());
+    Decision.Score = SkillBaseScore * TargetCount / SkillData->ActionPointCost + EvaluateSkillTileScore(SkillData, TargetTile);
 
     return Decision;
 }
@@ -358,8 +367,7 @@ float AEnemyUnit::EvaluateSkillTargetScore(USkillDefinitionDataAsset* SkillData,
 
     if (SkillData->AbilityClass == DefaultAttackAbilityClass)
     {
-        // Temporary weight for default attack, to be replaced with slot-based weights
-        return EvaluateDefaultAttackScore(Candidate) + 100000.f;
+        return EvaluateDefaultAttackScore(Candidate) + EvaluateLowHPScore(Candidate);
     }
 
     return EvaluateSkillSlotScore(SkillData, Candidate);
@@ -399,11 +407,7 @@ float AEnemyUnit::EvaluateSkillTileScore(USkillDefinitionDataAsset* SkillData, A
         return EvaluateSkillTargetScore(SkillData, Unit);
     }
 
-    float Score = -FVector::Dist(GetActorLocation(), Candidate->GetActorLocation()) * DistanceWeight;
-    if (SkillData->AbilityClass == DefaultAttackAbilityClass)
-    {
-        Score += 100000.0f;
-    }
+    float Score = -(FVector::Dist(GetActorLocation(), Candidate->GetActorLocation()) / 200.0f) * DistanceWeight;
     return Score;
 }
 
@@ -414,7 +418,7 @@ float AEnemyUnit::EvaluateDefaultAttackScore(AUnitBase* Candidate) const
         return -TNumericLimits<float>::Max();
     }
 
-    const float Distance = FVector::Dist(GetActorLocation(), Candidate->GetActorLocation());
+    const float Distance = (FVector::Dist(GetActorLocation(), Candidate->GetActorLocation()) / 200.0f);
 
     return -(Distance * DistanceWeight);
 }
@@ -426,7 +430,7 @@ float AEnemyUnit::EvaluateSkillSlotScore(USkillDefinitionDataAsset* SkillData, A
         return -TNumericLimits<float>::Max();
     }
 
-    const float Distance = FVector::Dist(GetActorLocation(), Candidate->GetActorLocation());
+    const float Distance = (FVector::Dist(GetActorLocation(), Candidate->GetActorLocation()) / 200.0f);
     float Score = -(Distance * DistanceWeight);
 
     const int32 SkillIndex = EquippedSkillAbilityClasses.IndexOfByKey(SkillData->AbilityClass);
@@ -552,4 +556,44 @@ void AEnemyUnit::ApplyDecision(const FEnemyActionDecision& Decision)
         break;
     }
     }
+}
+
+FEnemyActionDecision AEnemyUnit::EvaluateMoveAction() const
+{
+    FEnemyActionDecision Decision;
+    Decision.ActionType = EEnemyActionType::Move;
+    if (!HasEnoughSubActionPoint(1) || !GetCurrentTile())
+    {
+        return Decision;
+    }
+    ACombatManager* Manager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ACombatManager::StaticClass()));
+    if (!Manager)
+    {
+        return Decision;
+    }
+    const auto NearestOpponentDistance = [this](const FVector& Location)
+    {
+        float Distance = TNumericLimits<float>::Max();
+        for (TActorIterator<AUnitBase> It(GetWorld()); It; ++It)
+        {
+            if (It->IsUnitAlive() && It->GetTeam() != GetTeam())
+            {
+                Distance = FMath::Min(Distance, FVector::Dist(Location, It->GetActorLocation()));
+            }
+        }
+        return Distance;
+    };
+    const float CurrentDistance = NearestOpponentDistance(GetCurrentTile()->GetActorLocation());
+    for (ACombatGridTile* Tile : Manager->CalculateReachableMoveTiles(const_cast<AEnemyUnit*>(this)))
+    {
+        const float Gain = CurrentDistance - NearestOpponentDistance(Tile->GetActorLocation());
+        // Only advance toward an opponent; lateral and retreating moves keep SubAP.
+        // 상대에게 가까워지는 이동만 선택하고 횡이동이나 후퇴에는 SubAP를 쓰지 않습니다.
+        if (Gain > 1.0f && Gain / 200.0f > Decision.Score)
+        {
+            Decision.TargetTile = Tile;
+            Decision.Score = Gain / 200.0f;
+        }
+    }
+    return Decision;
 }

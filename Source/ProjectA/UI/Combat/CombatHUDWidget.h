@@ -63,6 +63,12 @@ private:
     void HandleMoveClicked();
 
     UFUNCTION()
+    void HandleItemClicked();
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> Button_Item;
+
+    UFUNCTION()
     void HandleEndTurnClicked();
 
     UFUNCTION()

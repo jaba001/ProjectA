@@ -116,6 +116,7 @@ protected:
     FEnemyActionDecision EvaluateSkillAction() const;
     FEnemyActionDecision EvaluateSkillCandidate(USkillDefinitionDataAsset* SkillData) const;
     FEnemyActionDecision EvaluateWaitAction() const;
+    FEnemyActionDecision EvaluateMoveAction() const;
     void ApplyDecision(const FEnemyActionDecision& Decision);
 
 protected:

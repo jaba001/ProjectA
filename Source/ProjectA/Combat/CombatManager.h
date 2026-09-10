@@ -56,7 +56,10 @@ private:
 
     // Calculates tiles that the unit can reach with movement.
     // 유닛이 이동으로 도달할 수 있는 타일을 계산합니다.
+public:
     TArray<ACombatGridTile*> CalculateReachableMoveTiles(AUnitBase* Unit) const;
+
+private:
 
     // Checks whether the unit can enter the tile.
     // 유닛이 해당 타일에 진입할 수 있는지 확인합니다.

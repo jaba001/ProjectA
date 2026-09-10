@@ -12,6 +12,7 @@
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "DataAsset/SkillPoolDataAsset.h"
 #include "Controller/UnitAIController.h"
 #include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -786,43 +787,36 @@ void AUnitBase::ClearMoveContext()
     PendingTile = nullptr;
 }
 
+bool AUnitBase::CanUseHealingItem(AUnitBase* TargetUnit) const
+{
+    return HasAuthority() && IsActiveTurn() && !IsBusy() && IsUnitAlive() && HasEnoughSubActionPoint(1) && HealingItemCount > 0 && FMath::IsFinite(HealingItemAmount) && HealingItemAmount > 0.0f && IsValid(TargetUnit) && TargetUnit->GetWorld() == GetWorld() && TargetUnit->GetTeam() == GetTeam() && TargetUnit->IsUnitAlive() && TargetUnit->AbilitySystem && TargetUnit->AttributeSet && TargetUnit->AttributeSet->GetHP() < TargetUnit->AttributeSet->GetMaxHP();
+}
+
 void AUnitBase::StartItemAction(AUnitBase* TargetUnit)
 {
-    if (!HasAuthority())
+    if (!CanUseHealingItem(TargetUnit) || !ConsumeSubActionPoint(1))
     {
         return;
     }
-
-    if (!bIsActiveTurn)
-    {
-        return;
-    }
-
-    if (IsBusy() || !IsUnitAlive())
-    {
-        return;
-    }
-
-    if (!HasEnoughSubActionPoint(1))
-    {
-        return;
-    }
-
-    if (!ConsumeSubActionPoint(1))
-    {
-        return;
-    }
-
-    
-
     BeginCurrentAction(EUnitActionType::Item);
     PendingTargetUnit = TargetUnit;
-
     ExecuteItemAtTarget();
 }
 
 void AUnitBase::ExecuteItemAtTarget()
 {
+    if (CurrentActionType != EUnitActionType::Item || !IsValid(PendingTargetUnit) || HealingItemCount <= 0)
+    {
+        return;
+    }
+    // Consume before notifying attribute listeners to prevent reentrant item use.
+    // 속성 리스너 호출 전에 수량을 차감해 재진입 사용을 방지합니다.
+    --HealingItemCount;
+    AUnitBase* Target = PendingTargetUnit;
+    PendingTargetUnit = nullptr;
+    const float HP = Target->AttributeSet->GetHP();
+    const float MaxHP = Target->AttributeSet->GetMaxHP();
+    Target->AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), FMath::Min(MaxHP, HP + HealingItemAmount));
     OnItemFinished();
 }
 
@@ -917,4 +911,46 @@ bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TA
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetMaxHPAttribute(), MaxHP);
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), MaxHP);
     return true;
+}
+
+bool AUnitBase::AcquireAndEquipSkill(USkillDefinitionDataAsset* Skill)
+{
+    if (!HasAuthority() || IsBusy() || !IsUnitAlive() || !AbilitySystem || !UCombatTargetingLibrary::IsSupportedSkillArea(Skill) || !Skill->AbilityClass || Skill->ActionPointCost <= 0 || GetAvailableSkillAbilityClasses().Contains(Skill->AbilityClass) || EquippedSkillAbilityClasses.Num() >= 4)
+    {
+        return false;
+    }
+    AbilitySystem->GiveAbility(FGameplayAbilitySpec(Skill->AbilityClass, 1, 0));
+    EquippedSkillDataAssets.Add(Skill);
+    EquippedSkillAbilityClasses.Add(Skill->AbilityClass);
+    return true;
+}
+
+USkillDefinitionDataAsset* AUnitBase::AcquireSkillFromPool(USkillPoolDataAsset* Pool)
+{
+    if (!IsValid(Pool) || !HasAuthority() || IsBusy() || !IsUnitAlive())
+    {
+        return nullptr;
+    }
+    // Filter owned and invalid entries before rolling so duplicates do not waste rewards.
+    // 획득 전 보유 및 잘못된 항목을 제외해 중복으로 보상을 잃지 않도록 합니다.
+    double TotalWeight = 0.0;
+    TArray<const FSkillPoolEntry*> Candidates;
+    for (const FSkillPoolEntry& Entry : Pool->Entries)
+    {
+        if (Entry.Weight > 0 && UCombatTargetingLibrary::IsSupportedSkillArea(Entry.Skill) && Entry.Skill->AbilityClass && Entry.Skill->ActionPointCost > 0 && !GetAvailableSkillAbilityClasses().Contains(Entry.Skill->AbilityClass))
+        {
+            Candidates.Add(&Entry);
+            TotalWeight += Entry.Weight;
+        }
+    }
+    double Roll = FMath::FRand() * TotalWeight;
+    for (const FSkillPoolEntry* Entry : Candidates)
+    {
+        Roll -= Entry->Weight;
+        if (Roll <= 0.0)
+        {
+            return AcquireAndEquipSkill(Entry->Skill) ? Entry->Skill.Get() : nullptr;
+        }
+    }
+    return nullptr;
 }

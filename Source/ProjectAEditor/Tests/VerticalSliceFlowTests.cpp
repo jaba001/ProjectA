@@ -372,6 +372,8 @@ public:
             Test->TestEqual(TEXT("Spawned AP matches detail preview."), Player->GetMaxActionPoint(), SpawnDefinition.ActionPoints);
             Test->TestEqual(TEXT("Spawned sub AP matches detail preview."), Player->GetMaxSubActionPoint(), SpawnDefinition.SubActionPoints);
             Test->TestEqual(TEXT("Spawned name matches edited slot."), Player->RuntimeCharacterName.ToString(), FString(TEXT("Vertical Slice Hero")));
+            Test->TestTrue(TEXT("Encounter pool grants an extra equipped skill."), Player->GetAvailableSkillAbilityClasses().Num() > SpawnDefinition.StartingSkills.Num());
+            Test->TestEqual(TEXT("Encounter supplies one potion."), Player->HealingItemCount, 1);
             if (Stage == 9)
             {
                 Test->TestTrue(TEXT("The second encounter uses the same persistent world."), GameplayWorld.Get() == World);
@@ -403,6 +405,18 @@ public:
             UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(World, Player->GetActorLocation(), MoveTile->GetActorLocation(), Player.Get());
             UE_LOG(LogTemp, Display, TEXT("[VerticalSliceNavigation] System=%s DefaultData=%s Building=%d Locked=%d PathValid=%d Player=%s Goal=%s"), *GetNameSafe(Navigation), *GetNameSafe(Navigation->GetDefaultNavDataInstance(FNavigationSystem::DontCreate)), UNavigationSystemV1::IsNavigationBeingBuilt(World), UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World), Path && Path->IsValid(), *Player->GetActorLocation().ToString(), *MoveTile->GetActorLocation().ToString());
             UCombatHUDWidget* HUD = FindActiveWidget<UCombatHUDWidget>(World);
+            UButton* PotionButton = HUD ? Cast<UButton>(HUD->WidgetTree->FindWidget(TEXT("Button_Item"))) : nullptr;
+            if (!Require(PotionButton != nullptr, TEXT("Combat HUD exposes the potion action.")))
+            {
+                return true;
+            }
+            const float BeforePotionHP = Player->GetAttributeSet()->GetHP();
+            Player->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), BeforePotionHP - 20.0f);
+            PotionButton->OnClicked.Broadcast();
+            Test->TestEqual(TEXT("HUD potion applies healing."), Player->GetAttributeSet()->GetHP(), BeforePotionHP);
+            Test->TestEqual(TEXT("HUD potion consumes stock."), Player->HealingItemCount, 0);
+            Test->TestEqual(TEXT("HUD potion consumes SubAP."), Player->GetCurrentSubActionPoint(), SpawnDefinition.SubActionPoints - 1);
+            Player->ResetSubActionPoint();
             UButton* MoveButton = nullptr;
             if (HUD)
             {

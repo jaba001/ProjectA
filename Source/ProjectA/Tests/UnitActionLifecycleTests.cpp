@@ -21,6 +21,7 @@
 #include "Unit/EnemyUnit.h"
 #include "Unit/PlayerUnit.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
+#include "DataAsset/SkillPoolDataAsset.h"
 #include "Unit/UnitBase.h"
 #include "UObject/UnrealType.h"
 
@@ -1148,6 +1149,7 @@ bool FPlayerExhaustionTest::RunTest(const FString& Parameters)
             if (RemainingAP == 0 && RemainingSubAP == 1)
             {
                 TestFalse(TEXT("Legacy end-turn flag preserves remaining movement"), Source->MustEndTurnAfterCurrentAction());
+                Source->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), 50.0f);
                 Source->StartItemAction(Source);
                 Scope.TickTimers(0.01f);
                 TestEqual(TEXT("Last sub-action also triggers exhausted turn end"), Combat->GetCurrentUnit(), Target);
@@ -1215,6 +1217,90 @@ bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
     Override.MaxHP = -1.0f;
     TestFalse(TEXT("Invalid tuning is rejected"), Custom->ResolveProfession(TEXT("Scholar"), Resolved));
     TestFalse(TEXT("Unknown professions do not silently use fallback"), Custom->ResolveProfession(TEXT("Warrior"), Resolved));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatContentTest, "ProjectA.Combat.Content.ItemsAndSkillAcquisition", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatContentTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    FScopedWorld Scope;
+    AUnitBase* Unit = Scope.SpawnUnit<AUnitBase>(FVector::ZeroVector);
+    AUnitBase* Enemy = Scope.SpawnUnit<AUnitBase>(FVector(200.0f, 0.0f, 0.0f));
+    Enemy->SetTeam(ETeam::Enemy);
+    Scope.SpawnTile(Unit);
+    ACombatGridTile* TargetTile = Scope.SpawnTile(Enemy);
+    const int32 SubAP = Unit->GetCurrentSubActionPoint();
+    Unit->StartItemAction(nullptr);
+    Unit->StartItemAction(Enemy);
+    Unit->StartItemAction(Unit);
+    TestEqual(TEXT("Invalid/full HP targets preserve stock"), Unit->HealingItemCount, 1);
+    TestEqual(TEXT("Invalid/full HP targets preserve SubAP"), Unit->GetCurrentSubActionPoint(), SubAP);
+    Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), 80.0f);
+    Unit->StartItemAction(Unit);
+    TestEqual(TEXT("Potion clamps healing to max HP"), Unit->GetAttributeSet()->GetHP(), 100.0f);
+    TestEqual(TEXT("Potion consumes one stock"), Unit->HealingItemCount, 0);
+    TestEqual(TEXT("Potion consumes one SubAP"), Unit->GetCurrentSubActionPoint(), SubAP - 1);
+    TestFalse(TEXT("Potion completes synchronously"), Unit->IsBusy());
+    Unit->ResetSubActionPoint();
+    Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), 20.0f);
+    Unit->StartItemAction(Unit);
+    TestEqual(TEXT("No stock cannot heal"), Unit->GetAttributeSet()->GetHP(), 20.0f);
+    Unit->HealingItemCount = 1;
+    Unit->StartItemAction(Unit);
+    TestEqual(TEXT("Potion applies authored amount"), Unit->GetAttributeSet()->GetHP(), 60.0f);
+    USkillPoolDataAsset* Pool = NewObject<USkillPoolDataAsset>(Unit);
+    USkillDefinitionDataAsset* Skill = MakeSkill(Unit, UGA_AreaAttack::StaticClass());
+    FSkillPoolEntry Entry;
+    Entry.Skill = Skill;
+    Entry.Weight = 1;
+    Pool->Entries.Add(Entry);
+    TestEqual(TEXT("Pool reward equips the selected definition"), Unit->AcquireSkillFromPool(Pool), Skill);
+    TestEqual(TEXT("Equipped lookup matches acquired data"), Unit->FindSkillDataByAbilityClass(Skill->AbilityClass), Skill);
+    TestNull(TEXT("Owned ability is excluded from pool"), Unit->AcquireSkillFromPool(Pool));
+    TestFalse(TEXT("Duplicate direct acquisition is rejected"), Unit->AcquireAndEquipSkill(Skill));
+    const int32 AP = Unit->GetCurrentActionPoint();
+    Unit->StartSkill(Skill, TargetTile);
+    TestEqual(TEXT("Acquired ability executes actual damage"), Enemy->GetAttributeSet()->GetHP(), 90.0f);
+    TestEqual(TEXT("Acquired ability charges data AP"), Unit->GetCurrentActionPoint(), AP - 1);
+    TestFalse(TEXT("Acquired ability completes"), Unit->IsBusy());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEnemyMovementContentTest, "ProjectA.Combat.Content.EnemyMovementAndWait", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyMovementContentTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    FScopedWorld Scope;
+    ACombatGridManager* Grid = Scope.World->SpawnActor<ACombatGridManager>();
+    ACombatManager* Combat = Scope.World->SpawnActor<ACombatManager>();
+    FindFProperty<FObjectPropertyBase>(ACombatManager::StaticClass(), TEXT("CombatGridManager"))->SetObjectPropertyValue_InContainer(Combat, Grid);
+    AEnemyUnit* Enemy = Scope.SpawnUnit<AEnemyUnit>(FVector(400.0f, 0.0f, 0.0f));
+    AUnitBase* Player = Scope.SpawnUnit<AUnitBase>(FVector::ZeroVector);
+    ACombatGridTile* Origin = Scope.SpawnTile(Enemy);
+    Origin->GridCoord = FIntPoint(2, 0);
+    Origin->SetTerritory(ETileTerritory::Enemy);
+    ACombatGridTile* Destination = Scope.World->SpawnActor<ACombatGridTile>(FVector(200.0f, 0.0f, 0.0f), FRotator::ZeroRotator);
+    Destination->GridCoord = FIntPoint(1, 0);
+    Destination->SetTerritory(ETileTerritory::Enemy);
+    Grid->TileMap.Add(Origin->GridCoord, Origin);
+    Grid->TileMap.Add(Destination->GridCoord, Destination);
+    TestTrue(TEXT("AI shares the legal move candidate list"), Combat->CalculateReachableMoveTiles(Enemy).Contains(Destination));
+    Enemy->OnTurnStart();
+    TestEqual(TEXT("Enemy without skills spends SubAP on advance"), Enemy->GetCurrentSubActionPoint(), 0);
+    // The isolated world has no navigation; movement failure must release the FSM.
+    // 격리 월드에는 내비게이션이 없으므로 이동 실패 시 FSM이 해제되어야 합니다.
+    Enemy->HandleMoveFailed();
+    Scope.TickTimers(0.1f);
+    TestEqual(TEXT("Failed move transitions to end turn"), Enemy->GetTurnState(), EEnemyTurnState::EndTurn);
+    TestFalse(TEXT("Failed move releases busy state"), Enemy->IsBusy());
+    Enemy->OnTurnEnd();
+    Destination->SetOccupyingUnit(Player);
+    Enemy->OnTurnStart();
+    TestEqual(TEXT("Blocked candidates choose wait"), Enemy->GetTurnState(), EEnemyTurnState::EndTurn);
+    TestEqual(TEXT("Wait preserves SubAP"), Enemy->GetCurrentSubActionPoint(), 1);
     return true;
 }
 

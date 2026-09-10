@@ -65,6 +65,15 @@ void UCombatHUDWidget::NativeOnInitialized()
         Button_Cancel = CreateAction(TEXT("Button_Cancel"), TEXT("Cancel / 취소"));
     }
 
+    if (UPanelWidget* Actions = Button_Move->GetParent())
+    {
+        Button_Item = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_Item"));
+        UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+        Label->SetText(NSLOCTEXT("CombatHUD", "HealingItem", "Potion / 회복약 (SubAP 1)"));
+        Cast<UButtonSlot>(Button_Item->AddChild(Label))->SetPadding(FMargin(20.0f, 12.0f));
+        Actions->AddChild(Button_Item);
+        Button_Item->OnClicked.AddUniqueDynamic(this, &UCombatHUDWidget::HandleItemClicked);
+    }
     SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     WidgetTree->RootWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     Button_Move->OnClicked.AddUniqueDynamic(this, &UCombatHUDWidget::HandleMoveClicked);
@@ -96,7 +105,7 @@ void UCombatHUDWidget::RefreshControls()
     CachedCombatManager = Controller->GetCombatManager();
     AUnitBase* ActiveUnit = Controller->GetActiveUnit();
 
-    if (DisplayedUnit.Get() != ActiveUnit)
+    if (DisplayedUnit.Get() != ActiveUnit || (ActiveUnit && ActiveUnit->GetTeam() == ETeam::Player && ActiveUnit->GetAvailableSkillAbilityClasses().Num() != DisplayedSkills.Num()))
     {
         DisplayedUnit = ActiveUnit;
         RebuildSkills(ActiveUnit);
@@ -110,6 +119,14 @@ void UCombatHUDWidget::RefreshControls()
         Text_Action->SetText(FText::FromString(FString::Printf(TEXT("HP %.0f | AP %d | Move AP %d | Select an action, then a tile. / 행동 선택 후 타일 클릭"), ActiveUnit->GetAttributeSet()->GetHP(), ActiveUnit->GetCurrentActionPoint(), ActiveUnit->GetCurrentSubActionPoint())));
     }
 
+    if (Button_Item)
+    {
+        Button_Item->SetIsEnabled(Controller->CanUseActiveUnitAction() && ActiveUnit && ActiveUnit->CanUseHealingItem(ActiveUnit));
+        if (UTextBlock* Label = Cast<UTextBlock>(Button_Item->GetContent()))
+        {
+            Label->SetText(FText::Format(NSLOCTEXT("CombatHUD", "PotionStock", "Potion / 회복약 {0} (SubAP 1)"), FText::AsNumber(ActiveUnit ? ActiveUnit->HealingItemCount : 0)));
+        }
+    }
     Button_Move->SetIsEnabled(Controller->CanUseActiveUnitSubActionPoint(1));
     Button_EndTurn->SetIsEnabled(Controller->CanUseActiveUnitAction());
     Button_Cancel->SetIsEnabled(Controller->GetTileInputMode() != ETileInputMode::None && Controller->CanUseActiveUnitAction());
@@ -213,5 +230,19 @@ void UCombatHUDWidget::HandleCancelClicked()
     if (APartyPlayerController* Controller = Cast<APartyPlayerController>(GetOwningPlayer()))
     {
         Controller->CancelTileInputMode();
+    }
+}
+
+void UCombatHUDWidget::HandleItemClicked()
+{
+    APartyPlayerController* Controller = Cast<APartyPlayerController>(GetOwningPlayer());
+    if (Controller && Controller->CanUseActiveUnitAction())
+    {
+        AUnitBase* Unit = Controller->GetActiveUnit();
+        if (Unit && Unit->CanUseHealingItem(Unit))
+        {
+            Controller->CancelTileInputMode();
+            Unit->StartItemAction(Unit);
+        }
     }
 }

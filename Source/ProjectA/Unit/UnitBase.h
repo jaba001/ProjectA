@@ -358,6 +358,21 @@ public:
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Item")
     virtual void StartItemAction(AUnitBase* TargetUnit);
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UnitBase|Item")
+    float HealingItemAmount = 40.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UnitBase|Item")
+    int32 HealingItemCount = 1;
+
+    UFUNCTION(BlueprintPure, Category = "UnitBase|Item")
+    bool CanUseHealingItem(AUnitBase* TargetUnit) const;
+
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill")
+    bool AcquireAndEquipSkill(USkillDefinitionDataAsset* Skill);
+
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill")
+    USkillDefinitionDataAsset* AcquireSkillFromPool(class USkillPoolDataAsset* Pool);
+
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Item")
     virtual void ExecuteItemAtTarget();
 

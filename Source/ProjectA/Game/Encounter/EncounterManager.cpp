@@ -140,6 +140,7 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         {
             return false;
         }
+        Unit->AcquireSkillFromPool(PartyDefinition->EncounterSkillPool);
         Unit->RuntimeCharacterName = Member.CharacterName;
         Unit->SetTeam(ETeam::Player);
         Unit->SetCurrentTile(Tile);

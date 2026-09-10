@@ -110,6 +110,12 @@ UI 관련 상세 메모는 아래 파일에 정리되어 있습니다.
 
 스폰 공격은 몽타주 종료와 스킬 액터의 impact가 모두 끝난 뒤 GAS를 종료합니다. 몽타주가 없으면 impact까지 기다립니다. 스폰 클래스는 `SkillActorBase` 계열이어야 하며, `RequestFinish`를 impact 전에 호출하거나 액터가 파괴되면 실패로 종료합니다. 미충돌은 Ability의 `SpawnedActorTimeout`(기본 10초) 후 실패로 정리합니다. 취소·시전자 사망 시 대기 액터를 파괴해 늦은 피해를 차단하고 이미 소비한 AP는 환불하지 않습니다. 플레이어는 AP와 보조 AP가 모두 0이면 행동 완료 다음 틱에 자동으로 턴을 종료하며, 보조 AP가 남으면 이동/아이템을 계속 사용할 수 있습니다.
 
+T13 전투 콘텐츠: 각 전투의 새 유닛은 회복약 1개를 가집니다. HUD의 회복약 버튼은 자신을 HP 40만큼 회복하고 수량 1개와 SubAP 1을 소모합니다. 최대 HP를 넘지 않으며, 만피·수량 부족·잘못된 대상은 소모 없이 거절합니다. `HealingItemAmount/HealingItemCount`는 유닛 클래스에서 조정할 수 있고 C++/Blueprint의 `StartItemAction`은 생존 아군도 대상으로 받습니다. HUD는 자기 회복만 제공합니다.
+
+`PartyDefinition.EncounterSkillPool`에서 직업 설정 후 스킬 하나를 가중 추첨해 즉시 GAS에 부여하고 추가 슬롯에 장착합니다. 보유 Ability·잘못된 데이터·0 이하 가중치는 추첨에서 제외하며 추가 슬롯은 최대 4개입니다. 현재 풀은 `DA_SweepingStrike`(휩쓸기) 하나이며 대상 주변 체비셰프 반경 1의 적에게 피해 10, AP 1을 적용합니다. 시작 직업 스킬은 유지합니다. 회복약과 추가 스킬은 전투 한정 지급으로 다음 전투에서 새로 지급하며 저장된 HP만 이어집니다. 영구 인벤토리·보상 선택 UI는 구현 범위에 포함하지 않습니다. 에셋 작성 스크립트는 `Source/ProjectAEditor/Scripts/ConfigureCombatContent.py`입니다.
+
+적 AI는 유효 대상 수/AP와 거리·HP 선호도로 스킬을 비교합니다. 기본 공격의 임시 `+100000` 가중치는 제거했고 스킬 간 동점은 기존 순서를 유지합니다. 이동은 CombatManager의 같은 영역·점유·이동 범위 후보 중 가장 가까운 상대와의 거리가 줄어드는 타일만 평가합니다. 거리 점수는 200 Unreal 단위를 기준으로 정규화합니다. 이동 성공은 다음 틱에 재판단하고 실패는 턴 종료로 복구합니다. 유효한 스킬이나 전진 후보가 없으면 대기합니다.
+
 기존 MainMenu와 CharacterCreation은 런타임 fallback을 유지합니다.
 Scaffold generator는 기존 native class를 부모로 사용하는 WBP의 Designer tree를 JSON spec 기준으로 생성합니다.
 

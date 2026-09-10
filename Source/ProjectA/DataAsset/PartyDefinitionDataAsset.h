@@ -42,6 +42,10 @@ class PROJECTA_API UPartyDefinitionDataAsset : public UDataAsset
 
 public:
     UPartyDefinitionDataAsset();
+    // One encounter-local skill is drawn after profession setup; checkpoints store no temporary loadout.
+    // 직업 설정 후 전투 한정 스킬 하나를 획득하며 체크포인트에는 임시 장착을 저장하지 않습니다.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Party")
+    TObjectPtr<class USkillPoolDataAsset> EncounterSkillPool;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Party")
     TMap<FName, FProfessionDefinition> Professions;
 

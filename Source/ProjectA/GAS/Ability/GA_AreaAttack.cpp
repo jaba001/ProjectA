@@ -1,4 +1,5 @@
 #include "GAS/Ability/GA_AreaAttack.h"
+#include "GAS/Effect/GE_Damage.h"
 #include "Combat/Library/CombatTargetingLibrary.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Combat/Library/CombatEffectLibrary.h"
@@ -9,6 +10,7 @@
 
 UGA_AreaAttack::UGA_AreaAttack()
 {
+    DamageEffectClass = UGE_Damage::StaticClass();
 }
 
 bool UGA_AreaAttack::CacheAttackContext()
