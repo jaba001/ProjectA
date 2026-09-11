@@ -1,6 +1,6 @@
 # 사용자 작동 테스트 보고서
 
-갱신일: 2026-09-11 · 대상: 콘텐츠 경로 통일 / T14-7 승계 통합·기본 전투 입력 / T14-8 서비스 준비 · **작동 검증 상태: 사용자 확인 대기**
+갱신일: 2026-09-11 · 대상: 2인 전투 동기화 / 콘텐츠 경로 통일 / T14-7 승계 통합·기본 전투 입력 / T14-8 서비스 준비 · **작동 검증 상태: F의 2인 전투 자동화 통과, 나머지 기존 대기 유지**
 
 2026-09-11 사용자 확인: A/B 작동 테스트는 아직 실행하지 않았고 Steam App ID·PlayFab Title도 미준비다. 아래 A~D의 대기 상태를 유지한다. 서비스 준비 문서 정리 당시에는 문서·설정·엔진 소스만 정적으로 확인했다. 이후 콘텐츠 경로 변경의 검증은 E에 별도로 기록한다.
 
@@ -65,7 +65,7 @@ B가 실패하거나 관련 코드가 다시 바뀌면 필요한 항목만 선�
 |---|---|---|---|
 | C1 | 중복 실행·오래된 stamp·영구 AI의 인간 복귀·v4 일반 로드 우회 | 기존 `ProjectA.Run.Managed` fixture를 사용자가 선택 실행. 거절 뒤 저장 본문·진행·실행 권한 보존 | 필요 시 |
 | C2 | 닫힌 관리 lease의 옛 명령 | 기존 관리 fixture의 종료·권한 검사를 확인. 직접 Close 직후 인간/AI 명령·바인딩·모드 변경 거절과 턴·HP/AP·모드 불변 확인. 늦은 콜백·저장 시도 검증은 별도 | 필요 시 |
-| C3 | 2·3·4인 일반 Co-op 입력·턴 복구 | `ProjectA.Coop.` 기존 시나리오. 각자 조작·동일 상태·기존 Host 복구 확인. 필요한 전용 인자는 [MULTIPLAYER](MULTIPLAYER.md) 참조 | 필요 시 |
+| C3 | 2·3·4인 일반 Co-op 입력·턴 복구 | `ProjectA.Coop.` 기존 시나리오. 각자 조작·동일 상태·기존 Host 복구 확인. 필요한 전용 인자는 [MULTIPLAYER](MULTIPLAYER.md) 참조 | 2인 전투만 F에서 통과, 나머지 필요 시 |
 | C4 | 로컬 상대 Snapshot | 개발용 Snapshot 설정 후 전투 진입. 저장한 파티 빌드·배치로 적 생성, 지원하지 않는 데이터는 오류 표시 | 필요 시 |
 | C5 | 일반 Continue·패키지 | 별도로 보존한 일반 세이브로 Continue 확인. 패키지 확인은 최신 패키지를 만든 경우에만 그 빌드 기준으로 기록 | 필요 시 |
 
@@ -99,6 +99,28 @@ Codex 정적 점검: UE 5.7의 OnlineSubsystemSteam·SteamSockets는 설치되�
 | E3 | UI 생성 도구에 작업 폴더 밖 assetPath를 지정한 명세로 DryRun, 이어서 작업 폴더 안의 명세로 DryRun | 밖 경로는 오류로 거절, 안 경로는 유효성 검사 통과 | 미실행 |
 
 Codex 확인: Unreal AssetTools로 이동·저장 후 별도 에디터 명령줄 프로세스에서 위젯 3종의 패키지 로드와 이전 경로 참조 부재를 확인했다(오류·경고 0). 기존 경로의 에셋·Redirector는 0개다. 추가 Redirector 정리 명령은 이미 빈 폴더여서 대상 없음 경고 1건으로 종료했다. Development Editor / Win64 컴파일은 성공했다(`Saved/Automation/ContentRootBuild.log`). 에셋 편집·패키지 조사만 수행했으며 PIE·게임·Unreal 자동화 작동 테스트는 실행하지 않았다.
+
+## F. 2026-09-11 Codex 직접 실행: 2인 전투 동기화
+
+사용자의 이번 요청인 “2인테스트 직접 해볼래?”에 따라 이 항목만 Codex가 실행했다. 앞으로의 작동 테스트를 자동 실행하도록 일반 규칙을 변경한 것은 아니다.
+
+- 목적·대상: `e90cd21` 코드/에셋과 직전 성공한 Development Editor / Win64 빌드로 `ProjectA.Coop.ListenServerClientCombat` 1건 실행. 기존 사용자 삭제 에셋 3개가 없는 현재 작업 폴더 기준이며 복원하지 않았다.
+- 환경: UE 5.7.4, 같은 PC·한 에디터 프로세스의 Listen Server/Client PIE 월드 2개, 각 월드의 별도 NetDriver와 실제 RPC. 화면은 RenderOffscreen으로 렌더링하며 테스트 코드가 계정 배정과 행동을 구동했다. Visual Studio는 실행하지 않았다.
+- 실행: 기존 [멀티플레이 실행 안내](MULTIPLAYER.md)의 Co-op 명령에서 필터를 `ProjectA.Coop.ListenServerClientCombat`으로 한정하고 `-ReportExportPath=Saved/Automation/CoopTwoPlayer_20260911_095426`을 지정했다.
+- 결과: **1건 경고 동반 성공, 실패 0, 미실행 0, 오류 0, 경고 4**. 테스트 본체 14.998초, 프로세스 종료 코드 0. PIE 세션 종료 확인.
+- 원본 기록: `Saved/Automation/CoopTwoPlayer_20260911_095426/index.json`, 같은 폴더의 `Editor.log`와 `index.html`. Saved 보고서는 로컬 보관이며 Git에는 이 요약을 기록한다.
+
+| 확인 항목 | 기대 결과 및 실제 확인 | 결과 |
+|---|---|---|
+| 조작권·Host 권한 | 자신의 턴·캐릭터에만 행동 허용, 미배정/잘못된 Host와 Client의 노드·Continue 거절 | 통과 |
+| Client 행동 | 회복약·실제 이동·장착 스킬의 GAS 피해·턴 종료가 서버에서 실행되고 응답 수신 | 통과 |
+| 중복 명령 | 이미 처리한 스킬 RPC 재전송 시 추가 피해·AP 소비 방지 | 통과 |
+| 상태 동기화 | Turn·HUD·HP/AP/SubAP·Grid 점유·이동 및 사망 상태 일치 | 통과 |
+| 결과와 다음 전투 | Victory 표시·입력 잠금, Host Continue로 정리·다음 전투 진입, 두 노드 완료 후 Complete와 정리 동기화 | 통과 |
+
+경고 4건: 클래스 미지정 SpawnActor 2건은 Host 시작/Client 합류 시 발생했다. GameplayGameMode의 `DefaultPawnClass = nullptr`와 관련 가능성이 있으나 호출 스택으로 원인을 확정하지 않았다. GameplayCue 검색 경로 미지정 1건은 `/Game` 전체 검색 fallback 안내다. RecastNavMesh 탐색 실패 1건은 PIE 종료 과정에서 발생했으며 그 전에 실제 이동 성공을 확인했다. 경고를 숨기거나 테스트 조건을 완화하지 않았다.
+
+범위 제한: 버튼 delegate와 명령 호출을 쓰는 자동화이며 두 사람이 마우스로 조작한 사용성 검증은 아니다. 사망·승리 일부는 테스트용 치명 피해로 유도하므로 자연스러운 전투 밸런스 검증으로 확대하지 않는다. Steam 초대·별도 PC/P2P·저장 복구·Host 승계·3/4인은 이번에 실행하지 않았으며 T14-7/8과 A/B/E의 대기 상태를 완료로 바꾸지 않는다.
 
 ## 사용자 결과 기록
 
