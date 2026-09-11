@@ -9,6 +9,7 @@
 #include "UI/MainMenu/MainMenuPreviewStage.h"
 #include "UI/MainMenu/MainMenuRootWidget.h"
 #include "UI/MainMenu/MainMenuScreenWidget.h"
+#include "Game/Development/DevelopmentCoopSubsystem.h"
 
 AMainMenuPlayerController::AMainMenuPlayerController()
 {
@@ -20,6 +21,7 @@ AMainMenuPlayerController::AMainMenuPlayerController()
 void AMainMenuPlayerController::BeginPlay()
 {
     Super::BeginPlay();
+    if (IsLocalController()) GetGameInstance()->GetSubsystem<UDevelopmentCoopSubsystem>()->ArriveAtMenu();
 
     bShowMouseCursor = true;
 

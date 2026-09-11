@@ -6,10 +6,11 @@
 |---|---|
 | 2인 전투 / F | HUD·Cue 수정 전 경고 동반 성공 1건, 오류 0·경고 4 |
 | 4인 전투 / G | HUD·Cue 수정 전 경고 동반 성공 1건, 오류 0·경고 6 |
-| 승계 / B | 로컬 PIE 3건 경고 동반 성공, 관리 계약 4건 성공. 테스트 오류 0·경고 11 |
+| 승계 / B | 개발용 UI 추가 전 ff22940 기준 PIE 3건·관리 계약 4건 통과. 테스트 오류 0·경고 11 |
 | HUD·Cue 수정 / H | B에서 빈 HUD 경고 미발생, Cue fallback 재발. H1~H3 별도 대기 |
 | 직접 조작·콘텐츠 경로 / A·E | 검증 대기 |
 | 서비스 준비 / D | Steam App ID·PlayFab Title 미준비 |
+| 개발용 협동 UI / I | Editor 컴파일·정적 검사 완료, 작동 검증 미실행 |
 
 작동 테스트는 사용자 수행이 원칙이며 명시적 요청에 한해 Codex가 실행한다. 컴파일·정적 검사와 작동 검증을 구분하며 미실행 항목은 완료로 표시하지 않는다.
 
@@ -18,6 +19,7 @@
 - UE 5.7에서 최신 소스와 빌드된 `ProjectAEditor`를 사용한다. Visual Studio 실행은 필요하지 않다.
 - 일반 플레이 확인은 `/Game/User_JeHoon/LEVEL/MainMenu`에서 시작한다. 프로젝트 기본 설정과 에셋 경로는 [PROJECT_PLAN](PROJECT_PLAN.md)을 따른다.
 - 일반 새 게임은 싱글플레이다. **관리 Run의 협동 생성·참가 번호 선택·실제 Steam 로그인 UI는 아직 없다.** 관리 이어하기 패널은 C++ 개발 fixture가 호출자와 저장 대상을 설정해야 표시된다.
+- 개발용 협동 버튼은 새 비관리 방 생성·주소 접속용이다. I의 수동 절차를 사용하며 B의 관리 저장·승계를 대체하지 않는다.
 - 아래 관리 시나리오는 같은 PC의 개발 신원·로컬 저장소와 여러 PIE 월드를 사용하는 기존 자동화 fixture다. 실제 친구 초대·다른 PC·Steam 인증 시험과 구분한다.
 - 일반 새 게임은 기존 단일 진행 슬롯을 갱신한다. 보존할 세이브가 있으면 실행 전에 `Saved/SaveGames`를 별도 위치에 복사한다. 관리 fixture는 고유 namespace/Run ID를 사용한다.
 
@@ -185,6 +187,43 @@ B가 실패하거나 관련 코드가 다시 바뀌면 필요한 항목만 선�
 | H3 | `ProjectA.Coop.ListenServerFourPlayerCombat` 실행 | 4인 조작권·행동·동기화 통과, 기존 SpawnActor/Cue 경고 미발생 | 미실행 |
 
 H2/H3은 [개발 실행 참조](MULTIPLAYER.md#개발-실행-참조)의 필터를 해당 이름으로 지정한다. JSON 상태와 경고를 함께 확인한다. 커스텀 HUDClass 사용 시 임시 GameMode 사본에서 기존 AHUD 초기화 유지도 확인한다. 종료 NavMesh 경고는 이번 수정 대상에서 제외한다.
+
+## I. 개발용 협동 UI
+
+목적: 자동화 fixture 없이 실제 버튼으로 2~4인 Listen Server 접속과 본인 캐릭터 조작을 확인한다.
+
+대상: MainMenu 개발용 협동 화면, GameInstance 연결 상태, 서버 Lobby/GameState 복제, GameMode 참가 배정, Gameplay 대기실·나가기와 기존 전투 연결. 영구 WBP·맵·DataAsset 변경은 없다.
+
+검증: Development Editor / Win64 컴파일 성공(`Saved/Automation/DevelopmentCoopUIBuildFinal.log`). Shipping 비활성 조건·서버 요청 검증·정원과 번호 유지·저장 슬롯 분리·문서 링크를 정적으로 확인했다. 주소 검증 테스트 `ProjectA.DevelopmentCoop.AddressValidation`은 추가·컴파일했으며 실행하지 않았다. PIE·게임·자동화·패키지 실행은 전부 미실행이다.
+
+### 준비와 실행
+
+작업을 저장하고 최신 Editor 빌드를 적용한다. 동일 PC에서는 아래 명령으로 서로 독립된 MainMenu 게임 창 2개를 연다. 기본 PIE Client 자동 접속 설정은 사용하지 않는다. 4인 확인은 `$count = 4`로 변경한다. 아래 명령은 사용자 실행용이며 이번 작업에서 실행하지 않았다.
+
+```powershell
+$editor = 'C:/Program Files/Epic Games/UE_5.7/Engine/Binaries/Win64/UnrealEditor.exe'
+$project = 'C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject'
+$count = 2
+for ($player = 1; $player -le $count; $player++)
+{
+    Start-Process -FilePath $editor -ArgumentList @("`"$project`"", '/Game/User_JeHoon/LEVEL/MainMenu', '-game', '-windowed', '-ResX=1280', '-ResY=720')
+}
+```
+
+첫 창에서 **개발용 협동 → 인원 선택 → 방 만들기**. 나머지 창은 **개발용 협동 → `127.0.0.1:7777` → 주소로 참가**. 모두 **준비 완료** 후 Host가 **시작**하고 첫 Combat 노드를 선택한다. LAN의 다른 PC에서는 동일 빌드와 Host의 IPv4 주소를 사용하며 필요한 경우 사용자가 Windows 방화벽의 해당 연결을 허용한다. 현재 Host UI는 기본 포트 7777을 사용한다.
+
+| ID | 사용자 절차 | 기대 결과 | 상태 |
+|---|---|---|---|
+| I1 | 두 창을 접속시키고 한 명만 준비한 뒤 모두 준비 | Host 1번·Client 2번과 본인 표시. 인원 미달/준비 미완료 시 시작 차단, 전원 준비 후 Host만 시작 | 미실행 |
+| I2 | 각 창에서 자기 턴의 이동·회복약·스킬·턴 종료, 타인의 유닛 조작 시도 | 대기실 종료 후 실제 마우스 입력 작동. 본인 캐릭터만 조작, Turn·Grid·HP/AP·사망 상태 일치 | 미실행 |
+| I3 | 전투 승리 후 각 창의 Continue 확인, Host가 다음 노드 시작 | Client의 진행 결정 차단, Host만 Continue/노드 선택, 다음 전투에도 원래 소유권 유지 | 미실행 |
+| I4 | 네 창을 순서대로 접속하고 모두 준비·행동. 별도 다섯 번째 창으로 참가 시도 | Host 1번·접속 순서 2/3/4번, 네 캐릭터 한 명씩 조작. 정원 초과 및 시작 후 참가 거절 | 미실행 |
+| I5 | 대기실 또는 전투 중 Client가 나가기, 같은 방에 재참가 시도 | 번호 재사용·타인 조작권 획득·AI 전환 없음. 방의 새 참가/시작 차단, 전투 중에는 중단. 새 방 재생성 안내 | 미실행 |
+| I6 | 잘못된 주소·포트·URL 옵션 입력, 없는 Host 접속 후 취소, 실제 Host 나가기 | 입력 검증·연결 대기/실패 표시, 취소·메뉴 복귀 가능. Host 종료 시 Client에 연결 종료 안내, 자동 승계 없음 | 미실행 |
+| I7 | 일반 저장을 별도 보존하고 개발 방 전투·메뉴 복귀 후 일반 Continue | `ProjectA_Run` 보존, 개발 저장은 `ProjectA_DevCoop_<RunId>`로 분리. 일반 Continue가 개발 저장을 로드하지 않음 | 미실행 |
+| I8 | 새 주소 검증 테스트와 필요한 기존 2/4인·관리 승계 fixture 실행 | 주소의 경로/옵션 주입 거절. 개발 방 옵션이 없는 기존 전투·승계 흐름 유지 | 미실행 |
+
+범위 제한: Hunter 고정 파티·새 방 전용이다. Steam/P2P 인증·초대·공유 저장·협동 재접속·관리 Run 승계·MMR은 구현하지 않는다. 개발용 접속 순서 배정을 인증된 계정 식별로 사용하지 않는다. 개발 슬롯은 자동 삭제하지 않으며 반복 생성 시 Saved에 누적된다. 기존 GameplayCue·종료 NavMesh 경고는 이번 변경으로 해결된 것으로 기록하지 않는다.
 
 ## 문서 정적 검증
 

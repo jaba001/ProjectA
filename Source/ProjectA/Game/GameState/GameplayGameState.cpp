@@ -5,6 +5,15 @@
 #include "Game/Encounter/EncounterManager.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Net/UnrealNetwork.h"
+#include "Game/Development/DevelopmentCoopLobby.h"
+
+void AGameplayGameState::SetDevelopmentLobby(ADevelopmentCoopLobby* Lobby)
+{
+    if (!HasAuthority()) return;
+    DevelopmentLobby = Lobby;
+    ForceNetUpdate();
+    OnRep_GameplayView();
+}
 
 FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, const FText& Message)
 {
@@ -78,6 +87,7 @@ void AGameplayGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
     DOREPLIFETIME(AGameplayGameState, ViewState);
     DOREPLIFETIME(AGameplayGameState, CombatManager);
     DOREPLIFETIME(AGameplayGameState, CombatArena);
+    DOREPLIFETIME(AGameplayGameState, DevelopmentLobby);
 }
 
 void AGameplayGameState::EndPlay(const EEndPlayReason::Type EndPlayReason)

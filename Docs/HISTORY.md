@@ -13,6 +13,7 @@
 | UI 문서 이전 | Source의 UI_README.txt를 Docs/UI_README.md로 이전·축약. 생성 옵션·JSON 필드·바인딩·프리뷰 규칙 유지, SizeBox·크기 필드·작업 경로 제한 반영 |
 | HUD·Cue 경고 수정 | MainMenu·Gameplay의 빈 HUD 생성 요청 생략, UE DeveloperSettings의 Cue 검색 경로 지정. 에셋 메타데이터 조사·Editor 빌드·정적 검사 완료, 수정 후 작동 검증 대기 |
 | T14-7 승계 검증 | ff22940 기준 3→2인·4→3인 승계·단독 메뉴 AI 재개 PIE 3건 경고 동반 성공, 관리 계약 4건 성공. 테스트 오류 0·경고 11. 빈 HUD 경고 미발생, Cue fallback 재발과 빈 실행 설정 배열 확인. 게임 코드·제작 에셋 변경 없음 |
+| 개발용 협동 UI | Non-Shipping 메뉴의 2~4인 방 생성·IPv4 참가·준비·Host 시작, 접속 순서 배정·기존 전투 연결·별도 저장·이탈/추가 접속 차단 구현. Editor 컴파일·정적 검사 완료, 작동 검증 대기. 영구 에셋 생성·변경 없음 |
 
 2·4인 검증은 기존 사용자 삭제 에셋 3건을 보존한 작업 폴더에서 수행했다. 조작권·행동 RPC·상태·두 전투 완료를 확인했으며 Steam/P2P·수동 조작·승계·복구 검증은 포함하지 않는다. 상세는 [TEST_REPORT](TEST_REPORT.md)에 기록한다.
 

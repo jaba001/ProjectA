@@ -9,6 +9,7 @@ class ACombatArena;
 class ACombatManager;
 class AEncounterManager;
 class URunStateSubsystem;
+class ADevelopmentCoopLobby;
 
 DECLARE_MULTICAST_DELEGATE(FOnGameplayViewChanged);
 
@@ -24,6 +25,8 @@ public:
     const FGameplayViewState& GetViewState() const { return ViewState; }
     ACombatManager* GetCombatManager() const { return CombatManager; }
     ACombatArena* GetArena() const { return CombatArena; }
+    ADevelopmentCoopLobby* GetDevelopmentLobby() const { return DevelopmentLobby; }
+    void SetDevelopmentLobby(ADevelopmentCoopLobby* Lobby);
     FOnGameplayViewChanged OnGameplayViewChanged;
 
 protected:
@@ -31,6 +34,8 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+    UPROPERTY(ReplicatedUsing = OnRep_GameplayView)
+    TObjectPtr<ADevelopmentCoopLobby> DevelopmentLobby;
     void RefreshServerView();
 
     UFUNCTION()

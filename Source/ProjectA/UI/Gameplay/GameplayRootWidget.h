@@ -14,6 +14,8 @@ class UBorder;
 class UButton;
 class UTextBlock;
 struct FGameplayViewState;
+class ADevelopmentCoopLobby;
+class UDevelopmentCoopWidget;
 
 UCLASS()
 class PROJECTA_API UGameplayRootWidget : public UCommonUserWidget
@@ -23,6 +25,7 @@ class PROJECTA_API UGameplayRootWidget : public UCommonUserWidget
 public:
     void RefreshFlow(const URunStateSubsystem* RunState, const FText& FlowMessage);
     void RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands, bool bCanRetryCheckpoint = false);
+    void RefreshDevelopmentLobby(ADevelopmentCoopLobby* Lobby);
 
 protected:
     virtual void NativeOnInitialized() override;
@@ -46,6 +49,16 @@ protected:
     TObjectPtr<UCommonActivatableWidgetStack> ModalLayer;
 
 private:
+    UFUNCTION()
+    void HandleLeaveDevelopmentCoop();
+    UPROPERTY(Transient)
+    TObjectPtr<UDevelopmentCoopWidget> DevelopmentWidget;
+    UPROPERTY(Transient)
+    TObjectPtr<UCommonActivatableWidgetStack> DevelopmentLayer;
+    UPROPERTY(Transient)
+    TObjectPtr<UBorder> DevelopmentBar;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> DevelopmentMessage;
     UFUNCTION()
     void HandleRetryCheckpoint();
 

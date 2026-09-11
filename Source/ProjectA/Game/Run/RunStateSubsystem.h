@@ -108,6 +108,9 @@ public:
     bool CanContinueStandaloneSavedRun(FText& OutError) const;
     bool LoadStandaloneCheckpoint(FText& OutError);
     void EnableCheckpointSaving(const FString& Slot = FString());
+    // Clear only transient development-room state without writing or deleting any save.
+    // 저장을 기록하거나 삭제하지 않고 개발용 방의 일시적인 상태만 비웁니다.
+    void ResetDevelopmentRun();
     const FText& GetSaveError() const { return SaveError; }
     bool CommitCombatCheckpoint(const FCombatCheckpointData& Checkpoint, FText& OutError);
     const FCombatCheckpointData& GetCombatCheckpoint() const { return CombatCheckpoint; }

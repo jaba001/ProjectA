@@ -16,6 +16,14 @@
 #include "Game/Run/RunStateSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Game/Development/DevelopmentCoopSubsystem.h"
+#include "UI/MainMenu/DevelopmentCoopWidget.h"
+
+void UMainMenuScreenWidget::HandleDevelopmentCoopClicked()
+{
+    if (!UDevelopmentCoopSubsystem::IsAvailable()) return;
+    if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer())) Controller->GetMainMenuRootWidget()->PushMenuScreen(UDevelopmentCoopWidget::StaticClass());
+}
 
 void UMainMenuScreenWidget::NativeOnInitialized()
 {
@@ -89,6 +97,16 @@ void UMainMenuScreenWidget::NativeOnInitialized()
         CreateButtonText(ResumeSoloButton, NSLOCTEXT("ManagedRunMenu", "Resume", "싱글 진행 이어하기"));
         ResumeContent->AddChildToVerticalBox(ResumeSoloButton)->SetPadding(FMargin(0.0f, 4.0f));
         ResumeSoloButton->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleResumeSoloClicked);
+        if (UDevelopmentCoopSubsystem::IsAvailable())
+        {
+            UButton* DevelopmentButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_DevelopmentCoop"));
+            CreateButtonText(DevelopmentButton, FText::FromString(TEXT("개발용 협동")));
+            DevelopmentButton->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleDevelopmentCoopClicked);
+            UOverlaySlot* DevelopmentSlot = Root->AddChildToOverlay(DevelopmentButton);
+            DevelopmentSlot->SetHorizontalAlignment(HAlign_Left);
+            DevelopmentSlot->SetVerticalAlignment(VAlign_Top);
+            DevelopmentSlot->SetPadding(FMargin(24.f));
+        }
     }
 }
 
@@ -104,6 +122,8 @@ void UMainMenuScreenWidget::NativeOnActivated()
     if (SaveStatus)
     {
         SaveStatus->SetText(bCanContinue ? FText::FromString(TEXT("이어하기: 마지막 체크포인트에서 복원합니다. 새 게임을 시작하면 기존 저장을 교체합니다.")) : Error);
+        const FText& DevelopmentStatus = GetGameInstance()->GetSubsystem<UDevelopmentCoopSubsystem>()->GetStatus();
+        if (!DevelopmentStatus.IsEmpty()) SaveStatus->SetText(DevelopmentStatus);
     }
     URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
     Run->OnRunStateChanged.RemoveAll(this);

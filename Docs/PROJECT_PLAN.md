@@ -100,6 +100,16 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 ## 콘텐츠·UI 설정
 
+### 개발용 협동 진입
+
+Non-Shipping MainMenu의 **개발용 협동**은 새 방 전용이다. Host는 `OpenLevel(..., listen?ProjectADevCoop=2~4)`, Client는 정규화한 IPv4:포트로 `ClientTravel`을 사용한다. 기본 포트는 7777이며 별도 세션 검색·온라인 인증은 없다.
+
+`UDevelopmentCoopSubsystem`은 GameInstance 단위 연결 대기·실패 메시지를 관리한다. `ADevelopmentCoopLobby`가 참가 번호·연결·준비 상태를 복제하고, GameMode의 PreLogin/PostLogin에서 정원·시작 여부와 서버 배정을 확인한다. 준비 RPC는 요청한 연결에만 적용하며 시작·노드·Continue는 Host만 허용한다.
+
+Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서버가 LocalDevelopment 식별자·Hunter 한 명씩의 파티를 생성하고 기존 Run/Combat 흐름으로 연결한다. 이탈 시 번호를 재사용하지 않고 방을 닫으며 전투 중에는 기존 중단 처리를 적용한다. 대체 참가·자동 승계·AI 전환은 없다.
+
+체크포인트는 `ProjectA_DevCoop_<RunId>`로 분리한다. 메뉴 복귀 시 메모리와 저장 슬롯 선택을 초기화하고 디스크 기록은 보존한다. 일반 `ProjectA_Run`과 관리 저장은 덮어쓰지 않는다. 개발용 방에는 저장 선택·협동 재접속·Host 승계 UI를 제공하지 않는다.
+
 | 항목 | 현재 규칙 |
 |---|---|
 | 직업 편집 | Edit에서 이름 1~32자·직업 편집. 저장 시 적용, 취소 시 기존 값 유지. ClassInfo는 HP/AP/SubAP·시작 스킬 표시 |
@@ -134,7 +144,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 | 관리 v4 | 영속 Human 목록·전 단계 본문, CAS revision·HostEpoch·단일 실행 lease |
 | 상대 Snapshot v1 | 별도 USaveGame·고정 ID 카탈로그, 콘텐츠 버전 일치 |
 
-일반 Continue는 LegacyOffline 또는 LocalDevelopment 단일 참가자만 지원한다. 협동·AccountProvider·관리 v4는 별도 재개 경로와 실제 로드 검증을 사용한다. 관리 메뉴는 신뢰된 C++ 호출자·재개 대상 설정이 필요하며 일반 협동 생성·로그인·저장 검색 UI는 미구현이다.
+일반 Continue는 LegacyOffline 또는 LocalDevelopment 단일 참가자만 지원한다. 협동·AccountProvider·관리 v4는 별도 재개 경로와 실제 로드 검증을 사용한다. 관리 메뉴는 신뢰된 C++ 호출자·재개 대상 설정이 필요하며 로그인·관리 저장 검색 UI는 미구현이다. 개발용 새 방 UI는 위 개발 진입 경로를 사용한다.
 
 일반 v3 협동은 원래 참가자 전원, 관리 v4는 현재 Human 전원의 서버 배정 후 복구한다. 로컬 관리 저장은 Win64 개발 어댑터이며 온라인 인증·중앙 권위를 제공하지 않는다. 버전·재개·실패·종료·AI 계약과 명령줄 옵션은 [MULTIPLAYER](MULTIPLAYER.md)를 따른다.
 

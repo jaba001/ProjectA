@@ -13,6 +13,22 @@
 #include "UI/Gameplay/GameplayRootWidget.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "Game/Development/DevelopmentCoopLobby.h"
+#include "Game/Development/DevelopmentCoopSubsystem.h"
+
+void AGameplayPlayerController::ServerSetDevelopmentReady_Implementation(bool bReady)
+{
+    if (!UDevelopmentCoopSubsystem::IsAvailable()) return;
+    AGameplayGameState* State = GetWorld()->GetGameState<AGameplayGameState>();
+    if (State && State->GetDevelopmentLobby()) State->GetDevelopmentLobby()->SetReady(this, bReady);
+}
+
+void AGameplayPlayerController::RequestStartDevelopmentCoop()
+{
+    if (!HasAuthority() || !IsLocalController() || !UDevelopmentCoopSubsystem::IsAvailable()) return;
+    AGameplayGameState* State = GetWorld()->GetGameState<AGameplayGameState>();
+    if (State && State->GetDevelopmentLobby()) State->GetDevelopmentLobby()->Start(this);
+}
 
 AGameplayPlayerController::AGameplayPlayerController()
 {
@@ -197,6 +213,11 @@ bool AGameplayPlayerController::CanRetryGameplayRecovery() const
 
 void AGameplayPlayerController::RefreshGameplayFlow()
 {
+    if (IsLocalController() && GameplayRootWidget && GameplayState)
+    {
+        GameplayRootWidget->RefreshDevelopmentLobby(GameplayState->GetDevelopmentLobby());
+        if (GameplayState->GetDevelopmentLobby()) GetGameInstance()->GetSubsystem<UDevelopmentCoopSubsystem>()->Connected();
+    }
     if (!HasAuthority())
     {
         if (GameplayState && GameplayRootWidget)

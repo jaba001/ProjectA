@@ -13,6 +13,7 @@ class UEncounterDefinitionDataAsset;
 class UOpponentSnapshotCatalogDataAsset;
 class APartyPlayerController;
 class UCombatActionAuthority;
+class ADevelopmentCoopLobby;
 
 UCLASS()
 class PROJECTA_API AGameplayGameModeBase : public AGameModeBase
@@ -53,6 +54,9 @@ public:
     AEncounterManager* GetEncounterManager() const { return EncounterManager; }
 
 protected:
+    virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
+    virtual void InitGameState() override;
+    virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
     virtual void InitializeHUDForPlayer_Implementation(APlayerController* NewPlayer) override;
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -60,6 +64,9 @@ protected:
     virtual void Logout(AController* Exiting) override;
 
 private:
+    int32 DevelopmentCoopCapacity = 0;
+    UPROPERTY(Transient)
+    TObjectPtr<ADevelopmentCoopLobby> DevelopmentLobby;
     void InitializeGameplay();
     TMap<TWeakObjectPtr<APartyPlayerController>, FRunAccountId> RunParticipants;
 

@@ -17,6 +17,10 @@
 #include "TimerManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Game/Development/DevelopmentCoopLobby.h"
+#include "Game/Development/DevelopmentCoopSubsystem.h"
+#include "GameFramework/GameSession.h"
+#include "Kismet/GameplayStatics.h"
 
 AGameplayGameModeBase::AGameplayGameModeBase()
 {
@@ -38,6 +42,37 @@ void AGameplayGameModeBase::InitializeHUDForPlayer_Implementation(APlayerControl
     }
 }
 
+void AGameplayGameModeBase::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+    Super::InitGame(MapName, Options, ErrorMessage);
+    if (!UGameplayStatics::HasOption(Options, TEXT("ProjectADevCoop"))) return;
+    DevelopmentCoopCapacity = UGameplayStatics::GetIntOption(Options, TEXT("ProjectADevCoop"), 0);
+    if (!UDevelopmentCoopSubsystem::IsAvailable() || DevelopmentCoopCapacity < 2 || DevelopmentCoopCapacity > 4)
+    {
+        DevelopmentCoopCapacity = 0;
+        ErrorMessage = TEXT("Development co-op requires a non-Shipping build and 2-4 participants.");
+    }
+}
+
+void AGameplayGameModeBase::InitGameState()
+{
+    Super::InitGameState();
+    if (DevelopmentCoopCapacity == 0) return;
+    DevelopmentLobby = GetWorld()->SpawnActor<ADevelopmentCoopLobby>();
+    if (DevelopmentLobby)
+    {
+        DevelopmentLobby->InitializeLobby(DevelopmentCoopCapacity);
+        if (AGameplayGameState* State = GetGameState<AGameplayGameState>()) State->SetDevelopmentLobby(DevelopmentLobby);
+    }
+}
+
+void AGameplayGameModeBase::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+    Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+    if (UGameplayStatics::HasOption(Options, TEXT("ProjectADevClient")) && DevelopmentCoopCapacity == 0) ErrorMessage = TEXT("The destination is not a development co-op room.");
+    if (DevelopmentCoopCapacity > 0 && (!DevelopmentLobby || !DevelopmentLobby->CanAdmit())) ErrorMessage = TEXT("Development room is full or already started. Create a new room to participate.");
+}
+
 void AGameplayGameModeBase::BeginPlay()
 {
     Super::BeginPlay();
@@ -51,6 +86,7 @@ void AGameplayGameModeBase::BeginPlay()
 
 void AGameplayGameModeBase::InitializeGameplay()
 {
+    if (DevelopmentLobby) GetGameInstance()->GetSubsystem<URunStateSubsystem>()->ResetDevelopmentRun();
     FString SlotOverride;
     const bool bUseSnapshot = FParse::Value(FCommandLine::Get(), TEXT("ProjectAOpponentSnapshot="), SlotOverride) || FParse::Param(FCommandLine::Get(), TEXT("ProjectAOpponentSnapshot"));
     const FName SnapshotSlot = SlotOverride.Len() <= 64 ? FName(*SlotOverride) : NAME_None;
@@ -139,6 +175,11 @@ void AGameplayGameModeBase::InitializeGameplay()
 void AGameplayGameModeBase::PostLogin(APlayerController* NewPlayer)
 {
     Super::PostLogin(NewPlayer);
+    if (DevelopmentCoopCapacity > 0 && (!DevelopmentLobby || !DevelopmentLobby->AddParticipant(Cast<AGameplayPlayerController>(NewPlayer))))
+    {
+        if (GameSession) GameSession->KickPlayer(NewPlayer, FText::FromString(TEXT("개발용 방이 가득 찼거나 이미 시작되었습니다.")));
+        return;
+    }
     if (EncounterManager)
     {
         if (AGameplayPlayerController* Controller = Cast<AGameplayPlayerController>(NewPlayer))
@@ -188,6 +229,7 @@ bool AGameplayGameModeBase::AssignRunParticipant(APartyPlayerController* Control
 
 bool AGameplayGameModeBase::CanControlRunFlow(const APartyPlayerController* Controller, bool bAllowResumePending) const
 {
+    if (DevelopmentCoopCapacity > 0 && (!DevelopmentLobby || !DevelopmentLobby->HasStarted() || DevelopmentLobby->GetMembers().ContainsByPredicate([](const FDevelopmentCoopMember& Member) { return !Member.bConnected; }))) return false;
     if (!HasAuthority() || !IsValid(Controller) || Controller->GetWorld() != GetWorld() || !Controller->HasAuthority() || !Controller->IsLocalController() || !GetGameInstance())
     {
         return false;
@@ -325,6 +367,7 @@ bool AGameplayGameModeBase::HasOriginalHostConnection(const FRunAccountId& HostA
 
 void AGameplayGameModeBase::Logout(AController* Exiting)
 {
+    if (DevelopmentLobby) DevelopmentLobby->RemoveParticipant(Cast<AGameplayPlayerController>(Exiting));
     APartyPlayerController* Participant = Cast<APartyPlayerController>(Exiting);
     if (Participant && RunParticipants.Contains(Participant))
     {

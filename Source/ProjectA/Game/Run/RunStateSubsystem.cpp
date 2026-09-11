@@ -13,6 +13,26 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "UObject/StrongObjectPtr.h"
+#include "Game/Development/DevelopmentCoopSubsystem.h"
+
+void URunStateSubsystem::ResetDevelopmentRun()
+{
+    if (!UDevelopmentCoopSubsystem::IsAvailable() || bManagedRun || ManagedLease) return;
+    bCheckpointSaving = false;
+    SaveSlot = ResolveCheckpointSlot(FCommandLine::Get());
+    RunIdentity = FRunIdentityData();
+    Participation = FRunParticipationData();
+    PartyMembers.Reset();
+    Nodes.Reset();
+    CompletedNodes.Reset();
+    CurrentNodeId = CurrentEncounterId = NAME_None;
+    Phase = ERunPhase::None;
+    LastResult = ECombatResult::None;
+    CombatCheckpoint = FCombatCheckpointData();
+    SaveError = FText::GetEmpty();
+    PartyDefinition = nullptr;
+    OnRunStateChanged.Broadcast();
+}
 
 namespace
 {

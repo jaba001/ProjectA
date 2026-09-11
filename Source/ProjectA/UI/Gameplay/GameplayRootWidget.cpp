@@ -14,6 +14,34 @@
 #include "UI/Gameplay/EncounterResultWidget.h"
 #include "UI/Gameplay/RunMapWidget.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
+#include "Game/Development/DevelopmentCoopLobby.h"
+#include "Game/Development/DevelopmentCoopSubsystem.h"
+#include "UI/MainMenu/DevelopmentCoopWidget.h"
+#include "Engine/GameInstance.h"
+
+void UGameplayRootWidget::HandleLeaveDevelopmentCoop()
+{
+    GetGameInstance()->GetSubsystem<UDevelopmentCoopSubsystem>()->Leave(GetOwningPlayer());
+}
+
+void UGameplayRootWidget::RefreshDevelopmentLobby(ADevelopmentCoopLobby* Lobby)
+{
+    const bool bEnabled = Lobby && UDevelopmentCoopSubsystem::IsAvailable();
+    DevelopmentBar->SetVisibility(bEnabled && Lobby->HasStarted() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    if (bEnabled) DevelopmentMessage->SetText(Lobby->GetMessage());
+    if (bEnabled && !Lobby->HasStarted())
+    {
+        DevelopmentLayer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+        if (!DevelopmentWidget) DevelopmentWidget = DevelopmentLayer->AddWidget<UDevelopmentCoopWidget>(UDevelopmentCoopWidget::StaticClass());
+        DevelopmentWidget->RefreshLobby(Lobby);
+    }
+    else
+    {
+        if (DevelopmentWidget) DevelopmentWidget->DeactivateWidget();
+        DevelopmentWidget = nullptr;
+        DevelopmentLayer->SetVisibility(ESlateVisibility::Collapsed);
+    }
+}
 
 void UGameplayRootWidget::NativeOnInitialized()
 {
@@ -75,6 +103,29 @@ void UGameplayRootWidget::NativeOnInitialized()
     RetryCheckpointButton->OnClicked.AddDynamic(this, &UGameplayRootWidget::HandleRetryCheckpoint);
     NoticeContent->AddChildToVerticalBox(RetryCheckpointButton);
     CheckpointNotice->SetVisibility(ESlateVisibility::Collapsed);
+    DevelopmentLayer = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>();
+    UOverlaySlot* DevelopmentLayerSlot = NoticeRoot->AddChildToOverlay(DevelopmentLayer);
+    DevelopmentLayerSlot->SetHorizontalAlignment(HAlign_Fill);
+    DevelopmentLayerSlot->SetVerticalAlignment(VAlign_Fill);
+    DevelopmentLayer->SetVisibility(ESlateVisibility::Collapsed);
+    DevelopmentBar = WidgetTree->ConstructWidget<UBorder>();
+    DevelopmentBar->SetPadding(FMargin(8.f));
+    UOverlaySlot* DevelopmentSlot = NoticeRoot->AddChildToOverlay(DevelopmentBar);
+    DevelopmentSlot->SetHorizontalAlignment(HAlign_Right);
+    DevelopmentSlot->SetVerticalAlignment(VAlign_Top);
+    UVerticalBox* DevelopmentContent = WidgetTree->ConstructWidget<UVerticalBox>();
+    DevelopmentBar->SetContent(DevelopmentContent);
+    DevelopmentMessage = WidgetTree->ConstructWidget<UTextBlock>();
+    DevelopmentMessage->SetAutoWrapText(true);
+    DevelopmentMessage->SetWrapTextAt(280.f);
+    DevelopmentContent->AddChildToVerticalBox(DevelopmentMessage);
+    UButton* Leave = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_LeaveDevelopmentCoop"));
+    UTextBlock* LeaveLabel = WidgetTree->ConstructWidget<UTextBlock>();
+    LeaveLabel->SetText(FText::FromString(TEXT("개발 협동 나가기 · Host는 방 종료")));
+    Leave->SetContent(LeaveLabel);
+    Leave->OnClicked.AddDynamic(this, &UGameplayRootWidget::HandleLeaveDevelopmentCoop);
+    DevelopmentContent->AddChildToVerticalBox(Leave);
+    DevelopmentBar->SetVisibility(ESlateVisibility::Collapsed);
 
     SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     WidgetTree->RootWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);

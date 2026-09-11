@@ -85,6 +85,8 @@ protected:
     TObjectPtr<UButton> Button_Quit;
 
 private:
+    UFUNCTION()
+    void HandleDevelopmentCoopClicked();
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> SaveStatus;
     UPROPERTY(Transient)

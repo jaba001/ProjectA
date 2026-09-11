@@ -29,6 +29,9 @@ public:
     void RequestContinueRun();
 
     void RequestRetryCombatCheckpoint();
+    UFUNCTION(Server, Reliable)
+    void ServerSetDevelopmentReady(bool bReady);
+    void RequestStartDevelopmentCoop();
 
 protected:
     virtual void BeginPlay() override;
