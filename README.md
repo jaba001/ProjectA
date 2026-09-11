@@ -29,6 +29,7 @@ Unreal Engine 5.7 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 |---|---|
 | [GAME_DESIGN](Docs/GAME_DESIGN.md) | 목표 기획과 확정 방향 |
 | [PROJECT_PLAN](Docs/PROJECT_PLAN.md) | 모듈·전투·UI·에셋·설정 |
+| [UI_README](Docs/UI_README.md) | UI 구조·JSON 명세·생성 옵션 |
 | [TODO](Docs/TODO.md) | 미완료 작업과 결정 사항 |
 | [MULTIPLAYER](Docs/MULTIPLAYER.md) | 식별·소유권·저장·네트워크 계약 |
 | [TEST_REPORT](Docs/TEST_REPORT.md) | 실행 절차·검증 결과·경고 대응 |
@@ -39,7 +40,7 @@ Unreal Engine 5.7 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 - 엔진: Unreal Engine 5.7, C++, GAS, CommonUI, UMG.
 - 모듈: `Source/ProjectA`는 런타임, `Source/ProjectAEditor`는 에셋 도구·에디터 테스트. Editor 의존성은 런타임 모듈에 추가하지 않는다.
 - 제작 에셋: `Content/User_JeHoon` (`/Game/User_JeHoon`). 외부 리소스·템플릿 원본은 유지하며 편집 사본을 제작 경로에 둔다.
-- UI: [에셋 도구](Source/ProjectAEditor/Scripts/README.md), [위젯·JSON 명세](Source/ProjectA/UI/UI_README.txt).
+- UI: [에셋 도구](Source/ProjectAEditor/Scripts/README.md), [위젯·JSON 명세](Docs/UI_README.md).
 
 Development Editor / Win64 빌드:
 
