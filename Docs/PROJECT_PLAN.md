@@ -92,6 +92,10 @@ Standalone은 결과 확정 후 TurnOrder·CombatUnits·ASC/이동·타이머·�
 
 활성 CommonUI 화면이 입력 모드를 소유한다. CombatHUD는 `All / CaptureDuringMouseDown`, RunMap/Result는 `Menu / NoCapture`를 사용한다.
 
+MainMenu·Gameplay GameMode는 `InitializeHUDForPlayer`에서 HUDClass가 있을 때만 엔진 기본 AHUD 초기화를 호출한다. HUDClass=None인 CommonUI 화면은 빈 클래스 생성 요청을 생략한다.
+
+GameplayCue 검색은 `DefaultGame.ini`의 `GameplayAbilitiesDeveloperSettings.GameplayCueNotifyPaths=/Game/User_JeHoon`으로 제한한다. 현재 `/Game`의 GameplayCueNotify 에셋은 0개다. 해당 경로 밖의 Cue를 도입할 때는 의존 경로를 명시적으로 추가한다.
+
 GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMenu의 UIOnly 상태에서 travel한 뒤 남는 viewport `IgnoreInput`과 로컬 포커스는 native 진입 코드가 복구한다. 이 입력 수정에는 WBP 재생성이 필요 없다.
 
 ## 콘텐츠·UI 설정

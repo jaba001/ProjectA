@@ -11,6 +11,7 @@
 | 8c29017 | 2인 경고 대응 분석·보고서 직접 요약 규칙. 게임 코드 변경·재실행 없음 |
 | 2026-09-11 후속 | 8c29017 기준 4인 전투 자동화: 경고 동반 성공 1건, 오류 0·경고 6, 31.563초. Markdown 문체·중복 정리 |
 | UI 문서 이전 | Source의 UI_README.txt를 Docs/UI_README.md로 이전·축약. 생성 옵션·JSON 필드·바인딩·프리뷰 규칙 유지, SizeBox·크기 필드·작업 경로 제한 반영 |
+| HUD·Cue 경고 수정 | MainMenu·Gameplay의 빈 HUD 생성 요청 생략, UE DeveloperSettings의 Cue 검색 경로 지정. 에셋 메타데이터 조사·Editor 빌드·정적 검사 완료, 수정 후 작동 검증 대기 |
 
 2·4인 검증은 기존 사용자 삭제 에셋 3건을 보존한 작업 폴더에서 수행했다. 조작권·행동 RPC·상태·두 전투 완료를 확인했으며 Steam/P2P·수동 조작·승계·복구 검증은 포함하지 않는다. 상세는 [TEST_REPORT](TEST_REPORT.md)에 기록한다.
 

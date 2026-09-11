@@ -4,8 +4,9 @@
 
 | 대상 | 상태 |
 |---|---|
-| 2인 전투 / F | 경고 동반 성공 1건, 오류 0·경고 4 |
-| 4인 전투 / G | 경고 동반 성공 1건, 오류 0·경고 6 |
+| 2인 전투 / F | HUD·Cue 수정 전 경고 동반 성공 1건, 오류 0·경고 4 |
+| 4인 전투 / G | HUD·Cue 수정 전 경고 동반 성공 1건, 오류 0·경고 6 |
+| HUD·Cue 수정 / H | Editor 빌드·정적 검사 완료, 작동 검증 대기 |
 | 직접 조작·승계·콘텐츠 경로 / A·B·E | 검증 대기 |
 | 서비스 준비 / D | Steam App ID·PlayFab Title 미준비 |
 
@@ -127,7 +128,7 @@ B가 실패하거나 관련 코드가 다시 바뀌면 필요한 항목만 선�
 | GameplayCue 검색 경로 미지정 | 1 / 1건 | /Game 전체 검색 fallback. 실제 Cue 의존성을 조사한 뒤 필요한 검색 경로 명시 |
 | 종료 시 RecastNavMesh 없음 | 1 / 1건 | 실제 이동 통과 후 PIE 종료 과정에서 발생. 낮은 우선순위로 추적하며 플레이 중 발생·이동 실패 동반 시 종료/CrowdManager 경로 조사 |
 
-HUD·Cue 항목을 우선 정리하고 수정 후 컴파일·2/4인 재검증을 권장한다. 현재 경고는 미해결이며 로그 필터링·테스트 조건 완화는 적용하지 않았다.
+위 표는 수정 전 실행 기록이다. HUD·Cue 수정과 재검증 상태는 H를 따른다. 종료 NavMesh 경고는 추적 대상이며 로그 필터링·테스트 조건 완화는 적용하지 않는다.
 
 ### 검증 제한
 
@@ -146,6 +147,25 @@ HUD·Cue 항목을 우선 정리하고 수정 후 컴파일·2/4인 재검증을
 | 산출물 | Saved/Automation/CoopFourPlayer_20260911_110655의 index.json·Editor.log·index.html |
 
 절차·수용 결과·경고 대응은 F의 공통 표를 따른다. 테스트용 HP·AP 조정은 메모리 사본에 한정한다. 실제 다섯 번째 접속과 4→3인 Host 승계는 실행하지 않았다. PIE와 프로세스 종료를 확인했다.
+
+## H. HUD·GameplayCue 경고 수정
+
+목적: 참가자 초기화의 빈 AHUD 생성 요청과 GAS의 `/Game` 전체 검색 fallback 제거.
+
+- 대상: MainMenu·Gameplay GameMode의 공식 `InitializeHUDForPlayer_Implementation`에서 HUDClass 미지정 시 요청 생략. 클래스 지정 시 Super의 기본 초기화 유지.
+- 설정: UE 5.7의 `GameplayAbilitiesDeveloperSettings.GameplayCueNotifyPaths`를 `/Game/User_JeHoon`으로 지정. 외부 Cue 추가 시 필요한 검색 경로도 등록한다.
+- 조사: AssetRegistry의 `/Game` 전체 메타데이터에서 GameplayCueNotify 계열 에셋 0개. 현재 검색 범위 축소로 제외되는 기존 Cue는 발견되지 않았다. 로그: `Saved/Automation/GameplayCueAssetInventory.json`.
+- 검증: Development Editor / Win64 빌드 성공(`Saved/Automation/HudCueWarningBuild.log`). 엔진 소스의 HUD 호출·DeveloperSettings 읽기 경로와 Config를 정적으로 대조했다. PIE·게임·자동화 테스트는 미실행이다.
+
+준비: 수정된 Editor 빌드로 재시작하고 기존 작업을 저장한다. 생성 경고·Cue fallback과 종료 NavMesh 경고를 구분해 기록한다.
+
+| ID | 사용자 실행 절차 | 기대 결과 | 상태 |
+|---|---|---|---|
+| H1 | MainMenu → 캐릭터 생성 → Gameplay 진입 | 빈 클래스 생성 경고 없이 기존 메뉴·CommonUI·전투 화면 유지 | 미실행 |
+| H2 | `ProjectA.Coop.ListenServerClientCombat` 실행 | 2인 조작권·행동·동기화 통과, 기존 SpawnActor/Cue 경고 미발생 | 미실행 |
+| H3 | `ProjectA.Coop.ListenServerFourPlayerCombat` 실행 | 4인 조작권·행동·동기화 통과, 기존 SpawnActor/Cue 경고 미발생 | 미실행 |
+
+H2/H3은 [개발 실행 참조](MULTIPLAYER.md#개발-실행-참조)의 필터를 해당 이름으로 지정한다. JSON 상태와 경고를 함께 확인한다. 커스텀 HUDClass 사용 시 임시 GameMode 사본에서 기존 AHUD 초기화 유지도 확인한다. 종료 NavMesh 경고는 이번 수정 대상에서 제외한다.
 
 ## 문서 정적 검증
 

@@ -15,4 +15,7 @@ public:
     // Sets main menu defaults such as player controller and no pawn.
     // 플레이어 컨트롤러와 폰 없음 같은 메인메뉴 기본값을 설정합니다.
     AMainMenuGameModeBase();
+
+protected:
+    virtual void InitializeHUDForPlayer_Implementation(APlayerController* NewPlayer) override;
 };

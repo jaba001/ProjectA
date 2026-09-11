@@ -53,6 +53,7 @@ public:
     AEncounterManager* GetEncounterManager() const { return EncounterManager; }
 
 protected:
+    virtual void InitializeHUDForPlayer_Implementation(APlayerController* NewPlayer) override;
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void PostLogin(APlayerController* NewPlayer) override;

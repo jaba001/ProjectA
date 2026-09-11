@@ -5,6 +5,7 @@
 #include "DataAsset/EncounterDefinitionDataAsset.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/HUD.h"
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Encounter/EncounterManager.h"
 #include "Game/GameState/GameplayGameState.h"
@@ -25,6 +26,16 @@ AGameplayGameModeBase::AGameplayGameModeBase()
     GameStateClass = AGameplayGameState::StaticClass();
     CombatManagerClass = ACombatManager::StaticClass();
     EncounterManagerClass = AEncounterManager::StaticClass();
+}
+
+void AGameplayGameModeBase::InitializeHUDForPlayer_Implementation(APlayerController* NewPlayer)
+{
+    // CommonUI does not require an AHUD; retain engine initialization for explicitly configured HUD classes.
+    // CommonUI는 AHUD가 필요하지 않으며 명시적으로 지정한 HUD 클래스는 엔진 기본 초기화를 유지합니다.
+    if (NewPlayer && HUDClass)
+    {
+        Super::InitializeHUDForPlayer_Implementation(NewPlayer);
+    }
 }
 
 void AGameplayGameModeBase::BeginPlay()

@@ -4,7 +4,7 @@
 
 ## 현재 상태
 
-기본 Run은 싱글플레이다. T14 1~6번의 로컬 Snapshot·Listen Server·턴 복구·관리 v4·아군 AI는 구현 및 검증 완료다. 최신 2·4인 전투 재검증은 통과했으며 7번의 추가 4→3인 승계는 검증 대기다.
+기본 Run은 싱글플레이다. T14 1~6번의 로컬 Snapshot·Listen Server·턴 복구·관리 v4·아군 AI는 구현 및 검증 완료다. 2·4인 전투는 HUD·Cue 경고 수정 전 통과했으며 수정 후 재검증과 7번의 추가 4→3인 승계는 대기다.
 
 8번의 Steam/PlayFab 인증·인터넷 P2P·공유 저장·결과 검증·MMR은 미구현이다. 구현 이력은 [HISTORY](HISTORY.md), 최신 실행·검증 제한은 [TEST_REPORT](TEST_REPORT.md)를 따른다. 작동 테스트는 사용자 수행이 원칙이며 명시적 요청 시 Codex가 실행한다.
 
