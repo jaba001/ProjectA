@@ -8,7 +8,7 @@
 
 8번의 Steam/PlayFab 인증·인터넷 P2P·공유 저장·결과 검증·MMR은 미구현이다. 구현 이력은 [HISTORY](HISTORY.md), 최신 실행·검증 제한은 [TEST_REPORT](TEST_REPORT.md)를 따른다. 작동 테스트는 사용자 수행이 원칙이며 명시적 요청 시 Codex가 실행한다.
 
-후속 개발용 협동 UI는 새 Listen Server 방 생성·주소 참가·준비·시작을 연결했으며 작동 검증은 대기다. 과거 T14-7 결과는 UI 추가 전 기준이다. 실행 절차와 제한은 [TEST_REPORT I](TEST_REPORT.md#i-개발용-협동-ui)를 따른다.
+후속 개발용 협동 UI는 새 Listen Server 방 생성·주소 참가·준비·시작을 연결했으며 작동 검증은 대기다. 과거 T14-7 결과는 UI 추가 전 기준이다. 실행 절차와 제한은 [TEST_REPORT 9절](TEST_REPORT.md#9-개발용-협동-ui)을 따른다.
 
 ## 확정 정책
 
@@ -275,7 +275,7 @@ Snapshot Run은 `ProjectA_SnapshotRun_<SlotId>`, PvE는 `ProjectA_Run`이다. `-
 | 위 복구 + `-T14CheckpointAI` | 소유자도 연결된 AI 모드 복구. 불참 승계와 구분 |
 | 위 복구 + `-T14CheckpointOpponent=Replace` 또는 `Delete` | 원본 상대 변경/삭제 후 고정 본문 복구 |
 | `ProjectA.ManagedRunPIE.HostSuccession` | 원래 3명 → 2번 Host·3번 Client·1번 AI |
-| `ProjectA.ManagedRunPIE.HostSuccession4Players` | 원래 4명 → 2번 Host·3/4번 Client·1번 AI. 실행 결과는 TEST_REPORT B 참조 |
+| `ProjectA.ManagedRunPIE.HostSuccession4Players` | 원래 4명 → 2번 Host·3/4번 Client·1번 AI. 실행 결과는 TEST_REPORT 2절 참조 |
 | `ProjectA.ManagedRunPIE.SoloMenuConversion` | 4번의 실제 메뉴 단독 전환·영구 AI·이동 실패 후 재개 |
 | `ProjectA.Run.Managed` / `ProjectA.Checkpoint` | 관리 저장/전이/호환과 확정 경계/손상/거절 |
 

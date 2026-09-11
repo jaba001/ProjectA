@@ -14,11 +14,11 @@
 
 Designer WBP를 화면 구조의 기준으로 유지한다. JSON은 초기 생성·바인딩 검증·누락 보완에 사용하며 결과 WidgetTree는 WBP에 저장된다. 이미지·브러시·폰트·세부 스타일은 Designer에서 편집한다. Editor API·의존성은 ProjectAEditor에 한정한다.
 
-개발용 협동은 기존 MainMenu에 native 버튼을 추가하고 `UDevelopmentCoopWidget`으로 방 생성·주소 참가·대기실을 표시한다. Gameplay는 전용 CommonUI 레이어에 대기실을 표시하고 시작 시 닫아 기존 전투 입력으로 복귀한다. 전투 중에는 상태·나가기 영역을 유지한다. 기존 WBP 재생성은 필요 없으며 새 영구 에셋은 생성하지 않는다. 작동 확인은 [TEST_REPORT I](TEST_REPORT.md#i-개발용-협동-ui)를 따른다.
+개발용 협동은 기존 MainMenu에 native 버튼을 추가하고 `UDevelopmentCoopWidget`으로 방 생성·주소 참가·대기실을 표시한다. Gameplay는 전용 CommonUI 레이어에 대기실을 표시하고 시작 시 닫아 기존 전투 입력으로 복귀한다. 전투 중에는 상태·나가기 영역을 유지한다. 기존 WBP 재생성은 필요 없으며 새 영구 에셋은 생성하지 않는다. 작동 확인은 [TEST_REPORT 9절](TEST_REPORT.md#9-개발용-협동-ui)을 따른다.
 
 ## 실행과 옵션
 
-`URunEncounterWidget`은 기존 Gameplay RunLayer에서 선택 화면과 빈 상점을 표시한다. `EncounterChoice`에서 상점1·상점2·상점3 버튼을, `Shop`에서 선택한 상점 이름과 나가기 버튼을 사용한다. Host만 버튼을 활성화하고 Client는 같은 상태를 표시한다. CommonUI 메뉴 입력을 사용하며 기존 WBP 변경·새 영구 에셋 생성은 필요 없다. [TEST_REPORT J](TEST_REPORT.md#j-상점-인카운터)에서 확인한다.
+`URunEncounterWidget`은 기존 Gameplay RunLayer에서 선택 화면과 빈 상점을 표시한다. `EncounterChoice`에서 상점1·상점2·상점3 버튼을, `Shop`에서 선택한 상점 이름과 나가기 버튼을 사용한다. Host만 버튼을 활성화하고 Client는 같은 상태를 표시한다. CommonUI 메뉴 입력을 사용하며 기존 WBP 변경·새 영구 에셋 생성은 필요 없다. [TEST_REPORT 10절](TEST_REPORT.md#10-상점-인카운터)에서 확인한다.
 
 Development Editor / Win64 빌드 후 프로젝트 루트 PowerShell에서 실행한다. 빌드·프로젝트 파일 재생성 명령은 [README](../README.md#개발-환경)를 따른다.
 

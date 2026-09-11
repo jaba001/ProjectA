@@ -82,7 +82,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 향후 확률 제시는 정의와 별도의 `FRunEncounterPoolEntry` USTRUCT에 정의 ID/참조·상대 가중치·출현 구간·조건을 두는 구성을 권장한다. 에디터 중심 편집은 DataAsset의 배열, 대량 수치·CSV 편집이 필요하면 `FTableRowBase` 기반 DataTable을 사용한다. 추첨은 Host에서 확정하고 제시 결과를 Run에 저장한다. 현재 가중치 필드·추첨·재추첨 정책은 미구현이다.
 
-전이 저장 실패 시 선택·퇴장 상태를 되돌리고 같은 버튼으로 재시도한다. 기존 저장의 schema 0은 상점 없는 경로를 유지하며 새 Run의 schema 1과 구분한다. 상점 내부 재개·관리 lease·Host 진행 권한은 [MULTIPLAYER](MULTIPLAYER.md), 사용자 확인은 [TEST_REPORT J](TEST_REPORT.md#j-상점-인카운터)를 따른다.
+전이 저장 실패 시 선택·퇴장 상태를 되돌리고 같은 버튼으로 재시도한다. 기존 저장의 schema 0은 상점 없는 경로를 유지하며 새 Run의 schema 1과 구분한다. 상점 내부 재개·관리 lease·Host 진행 권한은 [MULTIPLAYER](MULTIPLAYER.md), 사용자 확인은 [TEST_REPORT 10절](TEST_REPORT.md#10-상점-인카운터)을 따른다.
 
 ### 파티
 
@@ -115,7 +115,7 @@ Standalone은 결과 확정 후 TurnOrder·CombatUnits·ASC/이동·타이머·�
 
 MainMenu·Gameplay GameMode는 `InitializeHUDForPlayer`에서 HUDClass가 있을 때만 엔진 기본 AHUD 초기화를 호출한다. HUDClass=None인 CommonUI 화면은 빈 클래스 생성 요청을 생략한다.
 
-GameplayCue 검색은 `DefaultGame.ini`에 `GameplayAbilitiesDeveloperSettings.GameplayCueNotifyPaths=/Game/User_JeHoon`을 지정했다. 다만 ff22940의 실제 실행에서는 설정 배열이 비어 있고 `/Game` fallback 경고가 재발해 적용 원인 조사와 수정이 필요하다. 현재 `/Game`의 GameplayCueNotify 에셋은 0개이며 외부 Cue 도입 시 의존 경로도 등록한다. 검증 근거는 [TEST_REPORT H](TEST_REPORT.md#h-hudgameplaycue-경고-수정)를 따른다.
+GameplayCue 검색은 `DefaultGame.ini`에 `GameplayAbilitiesDeveloperSettings.GameplayCueNotifyPaths=/Game/User_JeHoon`을 지정했다. 다만 ff22940의 실제 실행에서는 설정 배열이 비어 있고 `/Game` fallback 경고가 재발해 적용 원인 조사와 수정이 필요하다. 현재 `/Game`의 GameplayCueNotify 에셋은 0개이며 외부 Cue 도입 시 의존 경로도 등록한다. 검증 근거는 [TEST_REPORT 8절](TEST_REPORT.md#8-hudgameplaycue-경고-수정)을 따른다.
 
 GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMenu의 UIOnly 상태에서 travel한 뒤 남는 viewport `IgnoreInput`과 로컬 포커스는 native 진입 코드가 복구한다. 이 입력 수정에는 WBP 재생성이 필요 없다.
 
