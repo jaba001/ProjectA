@@ -27,6 +27,7 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
         View.PartyMembers = Run->GetPartyMembers();
         View.Nodes = Run->GetNodes();
         View.CompletedNodes = Run->GetCompletedNodes();
+        View.EncounterProgress = Run->GetEncounterProgress();
         for (const FRunNodeDefinition& Node : View.Nodes)
         {
             if (Run->CanStartNode(Node.NodeId))

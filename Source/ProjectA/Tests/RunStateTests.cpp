@@ -71,7 +71,9 @@ bool FRunProgressionTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("A completed result cannot be aborted"), RunState->AbortEncounter());
     TestEqual(TEXT("Remaining HP is stored by original slot"), RunState->GetPartyMembers()[0].CurrentHP, 87.0f);
     TestFalse(TEXT("Next combat waits for Continue"), RunState->CanStartNode(SecondNode));
-    TestTrue(TEXT("Victory Continue returns to map"), RunState->ContinueRun());
+    TestTrue(TEXT("Victory Continue opens encounter choices"), RunState->ContinueRun());
+    TestFalse(TEXT("The next battle cannot bypass a Run encounter"), RunState->BeginEncounter(SecondNode));
+    TestTrue(TEXT("A shop can be entered and left"), RunState->SelectRunEncounter(TEXT("Shop_02")) && RunState->LeaveRunEncounter());
     TestFalse(TEXT("Completed first node cannot restart"), RunState->CanStartNode(FirstNode));
     TestTrue(TEXT("Second encounter is unlocked"), RunState->BeginEncounter(SecondNode));
     TestTrue(TEXT("Second combat starts"), RunState->MarkCombatStarted());

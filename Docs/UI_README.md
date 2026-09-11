@@ -18,6 +18,8 @@ Designer WBP를 화면 구조의 기준으로 유지한다. JSON은 초기 생�
 
 ## 실행과 옵션
 
+`URunEncounterWidget`은 기존 Gameplay RunLayer에서 선택 화면과 빈 상점을 표시한다. `EncounterChoice`에서 상점1·상점2·상점3 버튼을, `Shop`에서 선택한 상점 이름과 나가기 버튼을 사용한다. Host만 버튼을 활성화하고 Client는 같은 상태를 표시한다. CommonUI 메뉴 입력을 사용하며 기존 WBP 변경·새 영구 에셋 생성은 필요 없다. [TEST_REPORT J](TEST_REPORT.md#j-상점-인카운터)에서 확인한다.
+
 Development Editor / Win64 빌드 후 프로젝트 루트 PowerShell에서 실행한다. 빌드·프로젝트 파일 재생성 명령은 [README](../README.md#개발-환경)를 따른다.
 
 ```powershell

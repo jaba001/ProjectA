@@ -6,6 +6,7 @@
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
+#include "DataAsset/RunEncounterPoolDataAsset.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
@@ -22,6 +23,7 @@ void URunStateSubsystem::ResetDevelopmentRun()
     SaveSlot = ResolveCheckpointSlot(FCommandLine::Get());
     RunIdentity = FRunIdentityData();
     Participation = FRunParticipationData();
+    EncounterProgress = FRunEncounterProgress();
     PartyMembers.Reset();
     Nodes.Reset();
     CompletedNodes.Reset();
@@ -99,6 +101,34 @@ void URunStateSubsystem::AutoSaveCheckpoint()
     }
 }
 
+bool URunStateSubsystem::ValidateEncounterProgress(const URunSaveGame* Save) const
+{
+    const FRunEncounterProgress& Progress = Save->EncounterProgress;
+    const bool bChoice = Save->Phase == ERunPhase::EncounterChoice;
+    const bool bShop = Save->Phase == ERunPhase::Shop;
+    if (Progress.SchemaVersion == 0)
+    {
+        return !bChoice && !bShop && Progress.Offers.IsEmpty() && Progress.SelectedEncounterId.IsNone() && !Progress.bCompleted;
+    }
+    if (Progress.SchemaVersion != 1 || Progress.Offers.Num() != 3 || Save->Identity.Origin == ERunIdentityOrigin::LegacyOffline) return false;
+    TSet<FName> Ids;
+    for (const FRunEncounterOffer& Offer : Progress.Offers)
+    {
+        if (Offer.EncounterId.IsNone() || Ids.Contains(Offer.EncounterId) || Offer.DisplayName.ToString().TrimStartAndEnd().IsEmpty() || Offer.Type != ERunEncounterType::Shop) return false;
+        Ids.Add(Offer.EncounterId);
+    }
+    const bool bSelected = !Progress.SelectedEncounterId.IsNone();
+    if ((bSelected && !Ids.Contains(Progress.SelectedEncounterId)) || (Progress.bCompleted && !bSelected)) return false;
+    const int32 Completed = Save->CompletedNodes.Num();
+    if (Completed == 0) return !bChoice && !bShop && !bSelected && !Progress.bCompleted;
+    if (bChoice || bShop)
+    {
+        return Completed == 1 && Save->CurrentNode == Save->Nodes[0].NodeId && Save->CurrentEncounter.IsNone() && Save->Result == ECombatResult::Victory && !Progress.bCompleted && bSelected == bShop;
+    }
+    if (Save->Phase == ERunPhase::Result && Completed == 1) return !bSelected && !Progress.bCompleted;
+    return Progress.bCompleted;
+}
+
 bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError) const
 {
     OutError = FText::FromString(TEXT("저장 파일이 손상되었거나 현재 버전·직업 설정과 호환되지 않습니다."));
@@ -106,6 +136,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
     {
         return false;
     }
+    if (!ValidateEncounterProgress(Save)) return false;
     // Legacy saves remain offline; missing or damaged ownership must never downgrade a new save.
     // 기존 저장은 오프라인으로 유지하며 새 저장의 누락·손상된 소유권을 구버전으로 우회하지 않습니다.
     if ((Save->Version == 1) != (Save->Identity.Origin == ERunIdentityOrigin::LegacyOffline))
@@ -182,7 +213,8 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
     const bool bComplete = Save->Phase == ERunPhase::Complete && Completed == 2 && Save->Result == ECombatResult::Victory && Save->CurrentNode == Save->Nodes.Last().NodeId && Save->CurrentEncounter.IsNone();
     const bool bDefeat = Save->Phase == ERunPhase::Defeat && Completed < 2 && Save->Result == ECombatResult::Defeat && Living == 0 && Save->CurrentNode == Save->Nodes[Completed].NodeId && Save->CurrentEncounter == TEXT("DefaultEncounter");
     const bool bCombat = (Save->Version == 3 || bManaged) && Save->Phase == ERunPhase::Combat && Completed < 2 && Save->Result == ECombatResult::None && Save->CurrentNode == Save->Nodes[Completed].NodeId && Save->CurrentEncounter == TEXT("DefaultEncounter");
-    if (Created == 0 || (!bMap && !bResult && !bComplete && !bDefeat && !bCombat) || (!bDefeat && Living == 0) || (Save->Version == 3 && !bCombat))
+    const bool bRunEncounter = Save->Phase == ERunPhase::EncounterChoice || Save->Phase == ERunPhase::Shop;
+    if (Created == 0 || (!bMap && !bResult && !bComplete && !bDefeat && !bCombat && !bRunEncounter) || (!bDefeat && Living == 0) || (Save->Version == 3 && !bCombat))
     {
         return false;
     }
@@ -222,6 +254,7 @@ URunSaveGame* URunStateSubsystem::CreateSaveData() const
     Save->Version = bManagedRun ? 4 : RunIdentity.Origin == ERunIdentityOrigin::LegacyOffline ? 1 : 2;
     Save->Identity = RunIdentity;
     Save->Participation = Participation;
+    Save->EncounterProgress = EncounterProgress;
     Save->Party = PartyMembers;
     Save->Nodes = Nodes;
     Save->CompletedNodes = CompletedNodes;
@@ -417,6 +450,7 @@ void URunStateSubsystem::ApplySaveData(const URunSaveGame* Save)
 {
     RunIdentity = Save->Identity;
     Participation = Save->Participation;
+    EncounterProgress = Save->EncounterProgress;
     bManagedRun = Save->Version == 4;
     PartyMembers = Save->Party;
     Nodes = Save->Nodes;
@@ -448,9 +482,12 @@ bool URunStateSubsystem::HasManagedLease() const
 
 bool URunStateSubsystem::CanMutateManagedRun() const { return !bManagedRun || HasManagedLease(); }
 
-URunSaveGame* URunStateSubsystem::CreateInitialSaveData(const TArray<FRunPartyMember>& Members, const FRunIdentityData& Identity) const
+URunSaveGame* URunStateSubsystem::CreateInitialSaveData(const TArray<FRunPartyMember>& Members, const FRunIdentityData& Identity, FText& OutError) const
 {
     URunSaveGame* Save = NewObject<URunSaveGame>();
+    const URunEncounterPoolDataAsset* Pool = PartyDefinition && PartyDefinition->RunEncounterPool ? PartyDefinition->RunEncounterPool.Get() : GetDefault<URunEncounterPoolDataAsset>();
+    if (!Pool->BuildFixedOffers(Save->EncounterProgress.Offers, OutError)) return nullptr;
+    Save->EncounterProgress.SchemaVersion = 1;
     Save->Identity = Identity;
     Save->Party = Members;
     Save->Party.Sort([](const FRunPartyMember& Left, const FRunPartyMember& Right) { return Left.SlotIndex < Right.SlotIndex; });
@@ -475,7 +512,8 @@ bool URunStateSubsystem::CreateManagedRun(const TArray<FRunPartyMember>& Members
     OutError = NSLOCTEXT("ManagedRun", "CreateContext", "관리 Run은 고정된 개발용 최초 Host가 번호를 가진 원래 참가자 2~4명으로 새로 생성해야 합니다.");
     if (!bHasLocalCallerContext || bManagedRun || ManagedLease || Phase == ERunPhase::Combat || Phase == ERunPhase::Preparing || Identity.Origin != ERunIdentityOrigin::LocalDevelopment || Identity.SchemaVersion != URunIdentityLibrary::CurrentSchemaVersion || Identity.HostEpoch != 1 || Identity.HostAccountId != LocalCallerContext.AccountId || Identity.OriginalParticipants.Num() < 2 || Identity.OriginalParticipants.Num() > 4 || Identity.RunId == RunIdentity.RunId) return false;
     if (!URunIdentityLibrary::ValidateIdentity(Identity, Members, OutError)) return false;
-    TStrongObjectPtr<URunSaveGame> Save(CreateInitialSaveData(Members, Identity));
+    TStrongObjectPtr<URunSaveGame> Save(CreateInitialSaveData(Members, Identity, OutError));
+    if (!Save) return false;
     Save->Version = 4;
     for (const FRunParticipantData& Participant : Identity.OriginalParticipants)
     {
@@ -664,6 +702,7 @@ void URunStateSubsystem::CloseManagedRun()
     bCheckpointSaving = false;
     RunIdentity = FRunIdentityData();
     Participation = FRunParticipationData();
+    EncounterProgress = FRunEncounterProgress();
     PartyMembers.Reset();
     Nodes.Reset();
     CompletedNodes.Reset();
@@ -759,7 +798,8 @@ bool URunStateSubsystem::InitializeRunWithIdentity(const TArray<FRunPartyMember>
         return false;
     }
 
-    TStrongObjectPtr<URunSaveGame> Save(CreateInitialSaveData(Members, Identity));
+    TStrongObjectPtr<URunSaveGame> Save(CreateInitialSaveData(Members, Identity, OutError));
+    if (!Save) return false;
     ApplySaveData(Save.Get());
     AutoSaveCheckpoint();
     OnRunStateChanged.Broadcast();
@@ -887,11 +927,47 @@ bool URunStateSubsystem::ContinueRun()
     {
         Phase = ERunPhase::Complete;
     }
+    else if (EncounterProgress.SchemaVersion == 1 && !EncounterProgress.bCompleted)
+    {
+        Phase = ERunPhase::EncounterChoice;
+    }
 
     if (bCheckpointSaving && !SaveCheckpoint(SaveError))
     {
         CurrentEncounterId = PreviousEncounterId;
         Phase = ERunPhase::Result;
+        return false;
+    }
+    OnRunStateChanged.Broadcast();
+    return true;
+}
+
+bool URunStateSubsystem::SelectRunEncounter(FName EncounterId)
+{
+    if (!CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::EncounterChoice || EncounterProgress.bCompleted || !EncounterProgress.SelectedEncounterId.IsNone()) return false;
+    const FRunEncounterOffer* Offer = EncounterProgress.Offers.FindByPredicate([EncounterId](const FRunEncounterOffer& Candidate) { return Candidate.EncounterId == EncounterId; });
+    if (!Offer || Offer->Type != ERunEncounterType::Shop) return false;
+    EncounterProgress.SelectedEncounterId = EncounterId;
+    Phase = ERunPhase::Shop;
+    if (bCheckpointSaving && !SaveCheckpoint(SaveError))
+    {
+        EncounterProgress.SelectedEncounterId = NAME_None;
+        Phase = ERunPhase::EncounterChoice;
+        return false;
+    }
+    OnRunStateChanged.Broadcast();
+    return true;
+}
+
+bool URunStateSubsystem::LeaveRunEncounter()
+{
+    if (!CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::Shop || EncounterProgress.bCompleted || EncounterProgress.SelectedEncounterId.IsNone()) return false;
+    EncounterProgress.bCompleted = true;
+    Phase = ERunPhase::Map;
+    if (bCheckpointSaving && !SaveCheckpoint(SaveError))
+    {
+        EncounterProgress.bCompleted = false;
+        Phase = ERunPhase::Shop;
         return false;
     }
     OnRunStateChanged.Broadcast();

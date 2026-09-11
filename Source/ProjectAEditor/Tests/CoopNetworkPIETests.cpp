@@ -2,6 +2,8 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "RunEncounterPIEHelpers.h"
+
 #include "AbilitySystemComponent.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Combat/CombatManager.h"
@@ -459,7 +461,7 @@ public:
                 UTextBlock* ClientResult = Cast<UTextBlock>(FindScreen<UEncounterResultWidget>(RemoteClient.Get())->GetWidgetFromName(TEXT("Text_Result")));
                 Test->TestTrue(TEXT("Every result HUD displays the same final text."), HostResult && ClientResult && HostResult->GetText().ToString() == ClientResult->GetText().ToString());
             }
-            if (!ClickHostContinue(ERunPhase::Map))
+            if (!ClickHostContinue(ERunPhase::EncounterChoice))
             {
                 return EndSession();
             }
@@ -468,6 +470,10 @@ public:
         }
         if (Stage == 12)
         {
+            TArray<AGameplayPlayerController*> ShopClients;
+            for (const TWeakObjectPtr<AGameplayPlayerController>& ShopClient : RemoteClients) ShopClients.Add(ShopClient.Get());
+            bool bShopFailed = false;
+            if (!RunEncounterPIE::TickToMap(Test, Host.Get(), ShopClients, bShopFailed)) return bShopFailed ? EndSession() : false;
             if (ServerState->GetViewState().Phase != ERunPhase::Map || !ServerCombat->GetRegisteredUnits().IsEmpty() || !AllClientsCleanedUp() || !MapPermissionsReady(1, RemoteClients))
             {
                 return false;
@@ -600,6 +606,8 @@ private:
             Test->TestFalse(TEXT("A remote participant's server controller also lacks host flow authority."), Controller->CanIssueRunCommands());
             Controller->RequestStartNode(NodeId);
             Controller->RequestContinueRun();
+            Controller->RequestSelectRunEncounter(TEXT("Shop_03"));
+            Controller->RequestLeaveRunEncounter();
         }
         Test->TestTrue(TEXT("Rejected non-host flow calls preserve phase, combat instance, completion and actors."), Run->GetPhase() == ExpectedPhase && ServerCombat->GetCombatInstanceId() == CombatBefore && Run->GetCompletedNodes().Num() == CompletedBefore && Encounter->GetSpawnedUnits().Num() == SpawnedBefore);
     }

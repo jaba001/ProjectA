@@ -6,7 +6,7 @@ Unreal Engine 5.7 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 
 | 구분 | 상태 |
 |---|---|
-| 기본 Run | 싱글플레이. 동일 Gameplay 레벨에서 두 전투 진행 |
+| 기본 Run | 두 전투 사이 상점1·상점2·상점3 중 하나 선택·진입·퇴장. 동일 Gameplay 유지 |
 | 전투 | 이동·스킬·회복약·턴 종료, GAS 피해, 서버 권위·조작권 검증 |
 | 저장 | 일반 Run v1~3, 관리 Run v4, 확정 턴 복구, 로컬 Host 승계·AI 전환 |
 | 멀티플레이 | 로컬 Snapshot 및 Listen Server 구현. 3→2인·4→3인 승계와 단독 AI 재개 검증 통과 |
@@ -19,7 +19,9 @@ Unreal Engine 5.7 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 1. UE 5.7에서 `ProjectA.uproject`와 `/Game/User_JeHoon/LEVEL/MainMenu`를 연다.
 2. New Game → 캐릭터 1~4명 생성 → Start Game → 첫 Combat 노드를 선택한다.
 3. Move·스킬·회복약·End Turn으로 전투를 진행한다.
-4. Victory → Continue → 다음 전투로 진행한다. 패배 시 Run을 종료한다.
+4. 첫 Victory → Continue → 상점1·상점2·상점3 중 하나 선택 → 나가기 → 두 번째 전투로 진행한다. 마지막 Victory 뒤 Continue 또는 패배 시 Run을 종료한다.
+
+상점은 이름과 나가기 버튼만 제공하는 시험용 화면이다. 상품·재화·회복·확률 추첨은 미구현이다. 새 Run에 적용하며 기존 저장은 원래 두 전투 경로를 유지한다. 선택 목록·선택한 상점·퇴장 여부를 저장하고 협동에서는 Host만 진행을 결정한다. 확인 절차는 [테스트 보고서 J](Docs/TEST_REPORT.md#j-상점-인카운터)를 따른다.
 
 일반 Continue는 지원되는 오프라인 저장을 복구한다. 협동·관리 저장은 별도 재개 절차를 사용한다. 상세 설정은 [PROJECT_PLAN](Docs/PROJECT_PLAN.md)을 따른다.
 
@@ -60,7 +62,7 @@ C++ 파일 추가·삭제·이름 변경 후 프로젝트 파일 재생성:
 
 2026-09-11 `ff22940` 기준 **승계 PIE 3건·관리 계약 4건 통과, 테스트 오류 0·경고 11**. 원래 소유권·턴 복구·AI 전환·맵 이동 실패 후 재시도를 확인했다. 빈 HUD 경고는 미발생이나 GameplayCue fallback은 재발해 추가 수정이 필요하다. 일반 2·4인 전투는 경고 수정 전 통과 이력이며 수정 후 별도 재검증 대기다. 실행 범위·경고·절차는 [TEST_REPORT](Docs/TEST_REPORT.md)를 따른다.
 
-개발용 협동 UI 추가 후 Development Editor / Win64 컴파일·정적 검사 완료. PIE·게임·자동화 테스트는 미실행이며 위 과거 결과는 최신 UI의 통과 근거로 사용하지 않는다.
+상점 인카운터 추가 후 Development Editor / Win64 컴파일·정적 검사 완료. PIE·게임·자동화 테스트는 미실행이며 위 과거 결과는 최신 코드의 통과 근거로 사용하지 않는다.
 
 ## 작업 규칙
 

@@ -21,7 +21,7 @@
 3. Start Game → `/Game/User_JeHoon/LEVEL/Gameplay` → Run Map에서 첫 Combat 노드를 선택한다.
 4. HUD의 스킬을 선택하고 대상 타일을 클릭한다. Move는 표시된 이동 가능 빈 아군 타일을 선택한다.
 5. 행동 완료 후 End Turn으로 적 턴을 진행한다. 회복약은 전투 중 HUD에서 사용한다.
-6. Victory → Continue → 두 번째 Combat 노드를 진행한다. 두 번째 Victory 뒤 Continue는 완료된 Run Map을 표시한다.
+6. 첫 Victory → Continue → 상점1·상점2·상점3 중 하나 선택 → 나가기 → 두 번째 Combat 노드를 진행한다. 두 번째 Victory 뒤 Continue는 완료된 Run Map을 표시한다.
 7. 파티 전멸 시 Defeat 화면을 유지하며 추가 전투 입력을 받지 않는다.
 
 ```mermaid
@@ -32,7 +32,10 @@ flowchart LR
     D --> E[Encounter 준비]
     E --> F[Grid Combat]
     F -->|Victory| G[Result]
-    G -->|Continue| D
+    G -->|첫 승리 Continue| I[상점 3개 중 선택]
+    I --> J[선택한 상점]
+    J -->|나가기| D
+    G -->|마지막 승리 Continue| K[Run 완료]
     F -->|Defeat| H[패배 화면]
 ```
 
@@ -50,6 +53,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 | `AGameplayPlayerController` | `APartyPlayerController` 상속. 로컬 Root UI, 소유 연결의 전투 RPC, 현재 Host의 노드 선택·Continue 요청 |
 | `UGameplayRootWidget` | 해당 플레이어 화면의 CommonUI Run/Combat/Modal 스택과 저장 실패·재시도 안내 |
 | `URunMapWidget` | 노드와 진행 상태 표시, 선택 요청. 직접 Spawn하지 않음 |
+| `URunEncounterWidget` | 상점 3개 선택·선택한 상점 이름·나가기 표시. 기존 RunLayer의 native CommonUI 화면 |
 | `AEncounterManager` | Encounter 준비·스폰·전투 연결·HP 추출·정리와 Run 전이. 관리 참여 목록을 새 전투/복구에 적용 |
 | `ACombatArena` | 배치된 Grid, 슬롯별 좌표, 카메라, 타일 활성화 관리 |
 | `ACombatManager` / `UTurnManager` | 서버의 전투·턴·승패 확정. 전투 ID·턴·결과·유닛 식별/소유권의 실행 중 복제 뷰 제공 |
@@ -62,6 +66,23 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 실행 중 복제 뷰와 Actor 조회는 허용하되 Run/Party/Encounter/Command는 직렬화 가능한 값 데이터가 기준이다. GameInstance에 전투 Actor나 UI 동작을 집중시키지 않는다.
 
 ## 파티와 전투 규약
+
+### 상점 인카운터
+
+새 Run은 첫 승리 결과의 Continue에서 `EncounterChoice`, 선택 시 `Shop`, 나가기 시 `Map`으로 전환한다. 전투 노드 수는 2개를 유지하며 상점 방문을 전투 완료 수에 더하지 않는다. 선택하지 않은 상점은 방문할 수 없고 상품·재화·회복 효과는 없다. 레벨 이동·별도 Arena 스폰 없이 UI로 처리한다.
+
+| 데이터 | 역할 |
+|---|---|
+| `URunEncounterPoolDataAsset` | `FixedOffers`에 상점 3개 정의. 현재는 고정 목록이며 추첨하지 않음 |
+| `FRunEncounterOffer` | `EncounterId`·`DisplayName`·`Type`의 USTRUCT 값 데이터 |
+| `FRunEncounterProgress` | schema·제시 목록·선택 ID·퇴장 완료 여부. Run 저장과 GameState 표시 뷰에 포함 |
+| `UPartyDefinitionDataAsset::RunEncounterPool` | 새 Run에서 사용할 풀. 미지정 시 native 기본값 상점1·상점2·상점3 사용 |
+
+풀을 직접 편집하려면 `Content/User_JeHoon/Blueprint/DataAsset` 아래에 `RunEncounterPoolDataAsset` 유형의 DataAsset을 만들고 `DA_VerticalSliceParty.RunEncounterPool`에 연결한다. 서로 다른 ID와 이름을 가진 Shop 3개가 필요하다. 기본 동작에는 에셋 생성·WBP 재생성이 필요 없다. 정의는 새 Run 초기화 시 값으로 복사하며 진행 중 풀 수정으로 저장된 선택지가 바뀌지 않는다.
+
+향후 확률 제시는 정의와 별도의 `FRunEncounterPoolEntry` USTRUCT에 정의 ID/참조·상대 가중치·출현 구간·조건을 두는 구성을 권장한다. 에디터 중심 편집은 DataAsset의 배열, 대량 수치·CSV 편집이 필요하면 `FTableRowBase` 기반 DataTable을 사용한다. 추첨은 Host에서 확정하고 제시 결과를 Run에 저장한다. 현재 가중치 필드·추첨·재추첨 정책은 미구현이다.
+
+전이 저장 실패 시 선택·퇴장 상태를 되돌리고 같은 버튼으로 재시도한다. 기존 저장의 schema 0은 상점 없는 경로를 유지하며 새 Run의 schema 1과 구분한다. 상점 내부 재개·관리 lease·Host 진행 권한은 [MULTIPLAYER](MULTIPLAYER.md), 사용자 확인은 [TEST_REPORT J](TEST_REPORT.md#j-상점-인카운터)를 따른다.
 
 ### 파티
 

@@ -377,6 +377,7 @@ bool FCombatCheckpointCorruptLoadTest::RunTest(const FString& Parameters)
     // A legacy save stays explicitly offline, and cannot smuggle a v3 payload through version one.
     // 기존 저장은 명시적인 오프라인 상태를 유지하며 v1에 v3 데이터를 숨길 수 없습니다.
     Disk->Version = 1;
+    Disk->EncounterProgress = FRunEncounterProgress();
     Disk->Identity = FRunIdentityData();
     Disk->Party[0].CharacterId.Invalidate();
     Disk->Party[0].OwnerAccountId = FRunAccountId();
@@ -448,8 +449,10 @@ bool FCombatCheckpointTerminalTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Failed Continue keeps the result file"), Fixture.ReadBytes() == ResultBytes);
     TestEqual(TEXT("Failed Continue publishes no event"), Events, 1);
     TestTrue(TEXT("Continue retries successfully"), Fixture.Run->ContinueRun());
-    TestTrue(TEXT("Committed Continue exposes the next node"), Fixture.Run->CanStartNode(TEXT("Combat_02")));
     TestEqual(TEXT("Committed Continue publishes once"), Events, 2);
+    TestTrue(TEXT("Encounter entry and exit commit after retry"), Fixture.Run->SelectRunEncounter(TEXT("Shop_02")) && Fixture.Run->LeaveRunEncounter());
+    TestTrue(TEXT("Committed Continue exposes the next node"), Fixture.Run->CanStartNode(TEXT("Combat_02")));
+    TestEqual(TEXT("Shop entry and exit each publish once"), Events, 4);
     TestTrue(TEXT("Next encounter begins after terminal commit"), Fixture.Run->BeginEncounter(TEXT("Combat_02")) && Fixture.Run->MarkCombatStarted());
     TestTrue(TEXT("A new encounter can begin a new attempt at revision one"), Fixture.Run->CommitCombatCheckpoint(Fixture.MakeCheckpoint(), Error));
     return true;

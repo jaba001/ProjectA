@@ -2,6 +2,8 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "RunEncounterPIEHelpers.h"
+
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetTree.h"
@@ -717,6 +719,8 @@ public:
         }
         if (Stage == 8)
         {
+            bool bShopFailed = false;
+            if (!RunEncounterPIE::TickToMap(Test, Controller, {}, bShopFailed)) return bShopFailed;
             URunMapWidget* MapWidget = FindActiveWidget<URunMapWidget>(World);
             if (Run->GetPhase() != ERunPhase::Map || !MapWidget)
             {

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Game/Run/RunTypes.h"
+#include "Game/Run/RunEncounterTypes.h"
 #include "Types/CombatResult.h"
 #include "GameplayViewTypes.generated.h"
 
@@ -37,6 +38,9 @@ struct PROJECTA_API FGameplayViewState
 
     UPROPERTY()
     TArray<FName> AvailableNodes;
+
+    UPROPERTY()
+    FRunEncounterProgress EncounterProgress;
 
     static FGameplayViewState FromRun(const URunStateSubsystem* Run, const FText& Message);
 };

@@ -183,6 +183,16 @@ bool AGameplayPlayerController::CanIssueRunCommands() const
     return Mode && Mode->CanControlRunFlow(this);
 }
 
+void AGameplayPlayerController::RequestSelectRunEncounter(FName EncounterId)
+{
+    if (CanIssueRunCommands() && EncounterManager) EncounterManager->SelectRunEncounter(EncounterId);
+}
+
+void AGameplayPlayerController::RequestLeaveRunEncounter()
+{
+    if (CanIssueRunCommands() && EncounterManager) EncounterManager->LeaveRunEncounter();
+}
+
 void AGameplayPlayerController::RefreshRunFlowPermissions()
 {
     RefreshGameplayFlow();

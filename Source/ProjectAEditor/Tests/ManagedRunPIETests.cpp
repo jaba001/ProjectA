@@ -2,6 +2,8 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "RunEncounterPIEHelpers.h"
+
 #include "AbilitySystemComponent.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Combat/CombatManager.h"
@@ -281,12 +283,16 @@ public:
             if (!Test->TestTrue(TEXT("Client Continue attempts preserve the managed result."), Run->GetPhase() == ERunPhase::Result)) return Close();
             RemoveObservers();
             Button->OnClicked.Broadcast();
-            if (!Test->TestTrue(TEXT("Current Host's result button commits the next map without losing managed authority."), Run->GetPhase() == ERunPhase::Map && Run->HasManagedLease() && !Run->HasCombatCheckpoint())) return Close();
+            if (!Test->TestTrue(TEXT("Current Host's result button commits encounter choices without losing managed authority."), Run->GetPhase() == ERunPhase::EncounterChoice && Run->HasManagedLease() && !Run->HasCombatCheckpoint())) return Close();
             if (!CheckParticipation()) return Close();
             Advance(EStep::NextMap);
         }
         else if (Step == EStep::NextMap)
         {
+            TArray<AGameplayPlayerController*> ShopClients;
+            for (const FPeer& Peer : Peers) ShopClients.Add(Peer.Client.Get());
+            bool bShopFailed = false;
+            if (!RunEncounterPIE::TickToMap(Test, Host.Get(), ShopClients, bShopFailed)) return bShopFailed ? Close() : false;
             UButton* Button = NodeButton(Host.Get(), 1);
             if (!Button || !Button->GetIsEnabled()) return false;
             FManagedRunPreview Preview;

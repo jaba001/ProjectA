@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
 #include "Game/Run/RunTypes.h"
+#include "Game/Run/RunEncounterTypes.h"
 #include "Game/Run/RunParticipationTypes.h"
 #include "Combat/Checkpoint/CombatCheckpointTypes.h"
 #include "Types/CombatResult.h"
@@ -38,4 +39,6 @@ public:
     FSoftObjectPath Catalog;
     UPROPERTY()
     FCombatCheckpointData CombatCheckpoint;
+    UPROPERTY()
+    FRunEncounterProgress EncounterProgress;
 };

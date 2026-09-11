@@ -335,6 +335,8 @@ bool FManagedRunOrderedResumeTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Failed Continue retains the result for retry"), Second->ContinueRun());
     TestTrue(TEXT("Failed Continue preserves the current encounter and authority stamp"), Second->GetPhase() == ERunPhase::Result && Second->GetCurrentEncounterId() == TEXT("DefaultEncounter") && Second->GetManagedStamp() == ResultStamp);
     TestTrue(TEXT("Continue succeeds without losing permanent AI state"), Second->ContinueRun());
+    TestTrue(TEXT("Managed shop entry retains its lease"), Second->SelectRunEncounter(TEXT("Shop_02")) && Second->HasManagedLease());
+    TestTrue(TEXT("Managed shop exit retains participation"), Second->LeaveRunEncounter());
     TestTrue(TEXT("The following node preserves the exact human roster"), Second->CanStartNode(TEXT("Combat_02")) && Second->GetParticipation().HumanParticipants == Humans);
     TestTrue(TEXT("The following encounter starts normally"), Second->BeginEncounter(TEXT("Combat_02")) && Second->MarkCombatStarted());
     FCombatCheckpointData Next;

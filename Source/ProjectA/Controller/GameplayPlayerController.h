@@ -27,6 +27,8 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Gameplay")
     void RequestContinueRun();
+    void RequestSelectRunEncounter(FName EncounterId);
+    void RequestLeaveRunEncounter();
 
     void RequestRetryCombatCheckpoint();
     UFUNCTION(Server, Reliable)

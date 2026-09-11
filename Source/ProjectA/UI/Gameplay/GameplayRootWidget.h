@@ -9,6 +9,7 @@ class UCommonActivatableWidgetStack;
 class UCombatHUDWidget;
 class UEncounterResultWidget;
 class URunMapWidget;
+class URunEncounterWidget;
 class URunStateSubsystem;
 class UBorder;
 class UButton;
@@ -79,4 +80,7 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UEncounterResultWidget> ResultWidget;
+
+    UPROPERTY(Transient)
+    TObjectPtr<URunEncounterWidget> RunEncounterWidget;
 };

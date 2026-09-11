@@ -228,11 +228,12 @@ bool AEncounterManager::ResumeManagedGameplay(FText& OutError)
     {
         return RestoreSavedCombat(RunState->GetRunIdentity().HostAccountId, OutError);
     }
-    if ((RunState->GetPhase() != ERunPhase::Map && RunState->GetPhase() != ERunPhase::Result) || !SpawnedUnits.IsEmpty() || !RunState->ConfirmManagedResumeStarted(OutError))
+    const ERunPhase Phase = RunState->GetPhase();
+    if ((Phase != ERunPhase::Map && Phase != ERunPhase::Result && Phase != ERunPhase::EncounterChoice && Phase != ERunPhase::Shop) || !SpawnedUnits.IsEmpty() || !RunState->ConfirmManagedResumeStarted(OutError))
     {
         if (OutError.IsEmpty())
         {
-            OutError = FText::FromString(TEXT("진행 지도 또는 승리 결과에서만 전투 없는 관리 재개를 완료할 수 있습니다."));
+            OutError = FText::FromString(TEXT("진행 지도·승리 결과·인카운터 선택·상점에서만 전투 없는 관리 재개를 완료할 수 있습니다."));
         }
         FlowMessage = OutError;
         OnFlowChanged.Broadcast();
@@ -771,6 +772,32 @@ bool AEncounterManager::ContinueRun()
         CleanupEncounter();
     }
     return true;
+}
+
+bool AEncounterManager::SelectRunEncounter(FName EncounterId)
+{
+    if (!HasAuthority() || bShuttingDown || bPreparing || PendingResult != ECombatResult::None || !RunState) return false;
+    bool bSucceeded = false;
+    if (ValidateManagedExecution(FlowMessage))
+    {
+        bSucceeded = RunState->SelectRunEncounter(EncounterId);
+        FlowMessage = RunState->GetSaveError();
+    }
+    OnFlowChanged.Broadcast();
+    return bSucceeded;
+}
+
+bool AEncounterManager::LeaveRunEncounter()
+{
+    if (!HasAuthority() || bShuttingDown || bPreparing || PendingResult != ECombatResult::None || !RunState) return false;
+    bool bSucceeded = false;
+    if (ValidateManagedExecution(FlowMessage))
+    {
+        bSucceeded = RunState->LeaveRunEncounter();
+        FlowMessage = RunState->GetSaveError();
+    }
+    OnFlowChanged.Broadcast();
+    return bSucceeded;
 }
 
 bool AEncounterManager::FailPreparation(const FText& Message)

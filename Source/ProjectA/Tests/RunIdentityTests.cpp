@@ -180,6 +180,7 @@ namespace
     bool WriteLegacyIdentityFixture(URunSaveGame* Save, const FString& Slot)
     {
         Save->Version = 1;
+        Save->EncounterProgress = FRunEncounterProgress();
         TArray<uint8> Bytes;
         if (!UGameplayStatics::SaveGameToMemory(Save, Bytes))
         {
@@ -349,6 +350,7 @@ bool FRunIdentityLifecycleTest::RunTest(const FString& Parameters)
     Fixture.Run->UpdatePartyMemberHP(3, 86.0f);
     TestTrue(TEXT("First victory completes"), Fixture.Run->CompleteEncounter(ECombatResult::Victory));
     TestTrue(TEXT("Continue returns to the next node"), Fixture.Run->ContinueRun());
+    TestTrue(TEXT("An encounter can be selected and completed"), Fixture.Run->SelectRunEncounter(TEXT("Shop_02")) && Fixture.Run->LeaveRunEncounter());
     TestTrue(TEXT("Progression preserves Run, participant, Host and consent identity"), SameIdentity(Fixture.Run->GetRunIdentity(), Identity));
     for (int32 Index = 0; Index < Party.Num(); ++Index)
     {

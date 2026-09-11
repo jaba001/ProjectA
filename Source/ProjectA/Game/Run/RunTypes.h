@@ -19,7 +19,9 @@ enum class ERunPhase : uint8
     Combat,
     Result,
     Complete,
-    Defeat
+    Defeat,
+    EncounterChoice,
+    Shop
 };
 
 // Runtime party data survives level travel without keeping combat actors alive.

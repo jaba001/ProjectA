@@ -29,6 +29,8 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Run")
     bool ContinueRun();
+    bool SelectRunEncounter(FName EncounterId);
+    bool LeaveRunEncounter();
 
     // Restore only a validated idle boundary for the original host and original participants.
     // 기존 Host와 원래 참가자에 대해 검증된 유휴 경계만 복원합니다.

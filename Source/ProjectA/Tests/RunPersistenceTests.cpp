@@ -118,6 +118,7 @@ bool FRunPersistenceTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Slot survives disk serialization"), Restored->GetPartyMembers()[0].SlotIndex, 2);
     TestEqual(TEXT("Catalog survives disk serialization"), Restored->PartyDefinition.Get(), Run->PartyDefinition.Get());
     TestTrue(TEXT("Loaded result can Continue"), Restored->ContinueRun());
+    TestTrue(TEXT("Loaded choices lead through a shop"), Restored->SelectRunEncounter(TEXT("Shop_02")) && Restored->LeaveRunEncounter());
     TestTrue(TEXT("Next node is available"), Restored->CanStartNode(TEXT("Combat_02")));
     URunSaveGame* Invalid = Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
     Invalid->Version = 999;
@@ -211,6 +212,7 @@ bool FRunRestartTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Restored HP"), Run->GetPartyMembers()[0].CurrentHP, 61.0f);
         TestEqual(TEXT("Restored profession"), Run->GetPartyMembers()[0].ClassId, FName(TEXT("Scholar")));
         TestTrue(TEXT("Restored result continues"), Run->ContinueRun());
+        TestTrue(TEXT("Restored choices lead through a shop"), Run->SelectRunEncounter(TEXT("Shop_02")) && Run->LeaveRunEncounter());
         TestTrue(TEXT("Restored progress opens second node"), Run->CanStartNode(TEXT("Combat_02")));
         UGameplayStatics::DeleteGameInSlot(TEXT("T11_ProcessRestart"), 0);
     }

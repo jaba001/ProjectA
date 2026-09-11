@@ -58,8 +58,11 @@ ID·버전은 아래 계층별로 구분한다. 영속 DTO에 Actor·Controller�
 | Identity schema 1 | 최초 번호 0을 유지하며 번호순 승계를 거절 |
 | Identity schema 2 | 1~참가자 수의 고유하고 연속된 최초 번호. 최초 epoch 1의 Host는 1번 |
 | CombatCheckpoint schema 1 / 2 | 1은 Human 호환, 2는 Human/ServerAI 모드 포함. 현재 콘텐츠 버전 1 |
+| Run EncounterProgress schema 0 / 1 | 0은 기존 상점 없는 경로. 1은 고정 상점 3개의 제시 목록·선택 ID·퇴장 상태. 새 일반/관리 Run에 적용 |
 
 새 일반 싱글 Run은 임시 개발 참가자 한 명과 Identity schema 2를 만든다. 실제 계정 인증을 의미하지 않는다.
+
+인카운터 선택·상점 퇴장은 기존 노드·Continue와 같이 현재 Host만 결정한다. Client는 GameState의 직렬화 가능한 표시 뷰를 수신하며 별도 구매·소유권 변경은 없다. 선택·퇴장을 저장한 뒤 상태를 공개하고 실패 시 이전 상태로 복원한다. 관리 Run은 기존 lease·저장소 revision으로 전이를 기록하며 `EncounterChoice`·`Shop`도 전투 밖 재개를 허용한다. 일반 싱글 이어하기는 선택 화면 또는 선택한 상점을 복원한다. 기존 저장의 누락 필드는 schema 0으로 읽어 원래 경로를 유지한다. 새 저장을 이전 실행 파일로 여는 역호환은 지원 대상으로 보지 않는다.
 기존 `AIConsent`·`ConsentPolicyVersion`은 구버전 구조 검증용으로 읽으며 AI 승인 조건으로 사용하지 않는다.
 v1~3을 관리 v4로 자동 이관하지 않는다. 전투별 AI 플래그에서 영속 Human 이력을 추정하지 않는다.
 스킬·클래스의 동작 계약을 바꾸면 콘텐츠 버전도 검토해야 한다. 저장은 실행 코드 자체를 동결하지 않는다.

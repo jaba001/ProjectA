@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/EngineBaseTypes.h"
 #include "Game/Run/RunTypes.h"
+#include "Game/Run/RunEncounterTypes.h"
 #include "Game/Run/ManagedRunTypes.h"
 #include "Game/Run/Authority/LocalRunAuthorityStore.h"
 #include "Combat/Checkpoint/CombatCheckpointTypes.h"
@@ -96,6 +97,9 @@ public:
     bool CompleteEncounter(ECombatResult Result);
     bool AbortEncounter();
     bool ContinueRun();
+    bool SelectRunEncounter(FName EncounterId);
+    bool LeaveRunEncounter();
+    const FRunEncounterProgress& GetEncounterProgress() const { return EncounterProgress; }
     void UpdatePartyMemberHP(int32 SlotIndex, float CurrentHP);
 
     FOnRunStateChanged OnRunStateChanged;
@@ -120,11 +124,12 @@ public:
 
 private:
     bool ValidateSave(const URunSaveGame* Save, FText& OutError) const;
+    bool ValidateEncounterProgress(const URunSaveGame* Save) const;
     bool ValidateContinuableSave(const URunSaveGame* Save, bool bStandaloneOnly, FText& OutError) const;
     bool CanContinueSavedRunInternal(bool bStandaloneOnly, FText& OutError) const;
     bool LoadCheckpointInternal(bool bStandaloneOnly, FText& OutError);
     URunSaveGame* CreateSaveData() const;
-    URunSaveGame* CreateInitialSaveData(const TArray<FRunPartyMember>& Members, const FRunIdentityData& Identity) const;
+    URunSaveGame* CreateInitialSaveData(const TArray<FRunPartyMember>& Members, const FRunIdentityData& Identity, FText& OutError) const;
     bool WriteSaveData(URunSaveGame* Save, FText& OutError);
     void ApplySaveData(const URunSaveGame* Save);
     bool ReadManagedSave(FGuid RunId, FRunAuthorityRecordData& OutRecord, TStrongObjectPtr<URunSaveGame>& OutSave, FText& OutError) const;
@@ -149,6 +154,9 @@ private:
 
     UPROPERTY(Transient)
     FRunParticipationData Participation;
+
+    UPROPERTY(Transient)
+    FRunEncounterProgress EncounterProgress;
 
     UPROPERTY(Transient)
     FCombatCheckpointData CombatCheckpoint;

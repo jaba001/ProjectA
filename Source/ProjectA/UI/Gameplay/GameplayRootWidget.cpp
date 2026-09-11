@@ -13,6 +13,7 @@
 #include "UI/Combat/CombatHUDWidget.h"
 #include "UI/Gameplay/EncounterResultWidget.h"
 #include "UI/Gameplay/RunMapWidget.h"
+#include "UI/Gameplay/RunEncounterWidget.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
 #include "Game/Development/DevelopmentCoopLobby.h"
 #include "Game/Development/DevelopmentCoopSubsystem.h"
@@ -165,6 +166,7 @@ void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool b
         ModalLayer->ClearWidgets();
         RunMapWidget = nullptr;
         ResultWidget = nullptr;
+        RunEncounterWidget = nullptr;
         RunLayer->SetVisibility(ESlateVisibility::Collapsed);
         CombatLayer->SetVisibility(ESlateVisibility::Collapsed);
         ModalLayer->SetVisibility(ESlateVisibility::Collapsed);
@@ -179,6 +181,11 @@ void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool b
             ModalLayer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
             ResultWidget = Cast<UEncounterResultWidget>(ModalLayer->AddWidget(ResultWidgetClass));
         }
+        else if (Phase == ERunPhase::EncounterChoice || Phase == ERunPhase::Shop)
+        {
+            RunLayer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+            RunEncounterWidget = RunLayer->AddWidget<URunEncounterWidget>(URunEncounterWidget::StaticClass());
+        }
         else
         {
             RunLayer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
@@ -191,6 +198,8 @@ void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool b
         RunMapWidget->RefreshRunMapView(View, bAllowRunCommands);
         RunMapWidget->SetIsEnabled(Phase != ERunPhase::Preparing);
     }
+
+    if (RunEncounterWidget) RunEncounterWidget->RefreshEncounter(View, bAllowRunCommands);
 
     if (ResultWidget)
     {
