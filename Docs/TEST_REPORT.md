@@ -118,7 +118,15 @@ Codex 확인: Unreal AssetTools로 이동·저장 후 별도 에디터 명령줄
 | 상태 동기화 | Turn·HUD·HP/AP/SubAP·Grid 점유·이동 및 사망 상태 일치 | 통과 |
 | 결과와 다음 전투 | Victory 표시·입력 잠금, Host Continue로 정리·다음 전투 진입, 두 노드 완료 후 Complete와 정리 동기화 | 통과 |
 
-경고 4건: 클래스 미지정 SpawnActor 2건은 Host 시작/Client 합류 시 발생했다. GameplayGameMode의 `DefaultPawnClass = nullptr`와 관련 가능성이 있으나 호출 스택으로 원인을 확정하지 않았다. GameplayCue 검색 경로 미지정 1건은 `/Game` 전체 검색 fallback 안내다. RecastNavMesh 탐색 실패 1건은 PIE 종료 과정에서 발생했으며 그 전에 실제 이동 성공을 확인했다. 경고를 숨기거나 테스트 조건을 완화하지 않았다.
+경고 4건의 대응은 아래와 같다. 이번 후속 분석에서는 코드·엔진 소스·기존 로그만 확인했으며 게임 코드/설정 수정이나 작동 테스트 재실행은 하지 않았다.
+
+| 경고 | 원인·영향 분석 | 권장 대응 |
+|---|---|---|
+| 클래스 미지정 SpawnActor 2건 | Host 시작/Client 합류 시 발생. 앞선 DefaultPawnClass 추정보다 `HUDClass = nullptr` 경로가 유력하다. UE 5.7의 `InitializeHUDForPlayer` → `ClientSetHUD`가 null 클래스로도 `SpawnActor<AHUD>`를 호출한다. 현재 CommonUI 전투 화면은 테스트에서 정상 확인했으며 정확한 발생 호출 스택은 미확보 | 우선 정리. 공식 `InitializeHUDForPlayer` 확장 지점에서 HUDClass가 없는 경우 불필요한 AHUD 생성 요청을 생략하고, 클래스가 있으면 기본 초기화를 유지하는 방향. 경고 제거만을 위해 임의 Pawn이나 HUD를 추가하지 않음 |
+| GameplayCue 검색 경로 미지정 1건 | GAS 초기화가 검색 경로의 빈 배열을 발견해 `/Game` 전체 검색으로 대체. 콘텐츠 증가 시 불필요한 검색 비용 발생 가능 | 우선 정리. 사용하는 GameplayCue 에셋 위치를 확인한 뒤 UE의 GameplayCueNotifyPaths 설정에 필요한 경로를 명시. 새 제작 Cue는 User_JeHoon 아래에 두되 외부 Cue 의존성을 누락하지 않음 |
+| RecastNavMesh 탐색 실패 1건 | 로그의 `UEDPIE_0_Gameplay` BeginTearingDown 직후 발생. 앞선 실제 이동과 Grid 동기화는 통과했으므로 이 로그만으로 플레이 중 NavMesh 결함으로 판단하지 않음 | 낮은 우선순위로 추적. 플레이 중에도 발생하거나 이동 실패가 동반될 때 종료 순서·CrowdManager 재생성을 조사. 엔진 수정·NavMesh 강제 재생성·경고 필터링은 우선 적용하지 않음 |
+
+첫 3건을 정리한 뒤 해당 수정의 컴파일과 2인 테스트로 확인하는 순서를 권장한다. 경고가 없어졌는지는 수정 후 실제 실행 결과로 판단하며, 이번 분석으로 해결 처리하지 않는다.
 
 범위 제한: 버튼 delegate와 명령 호출을 쓰는 자동화이며 두 사람이 마우스로 조작한 사용성 검증은 아니다. 사망·승리 일부는 테스트용 치명 피해로 유도하므로 자연스러운 전투 밸런스 검증으로 확대하지 않는다. Steam 초대·별도 PC/P2P·저장 복구·Host 승계·3/4인은 이번에 실행하지 않았으며 T14-7/8과 A/B/E의 대기 상태를 완료로 바꾸지 않는다.
 
