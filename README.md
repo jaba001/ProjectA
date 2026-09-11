@@ -31,6 +31,8 @@ Docs는 다음 6개 문서로 관리합니다. 작업마다 새 문서를 추가
 
 ## Codex 작업 규칙
 
+사용자와 Codex가 만드는 엔진 에셋은 모두 `Content/User_JeHoon/` (`/Game/User_JeHoon/`) 아래에 저장합니다. 검증용 생성본도 동일하며 메뉴 검증 위젯 3종은 `Validation/T12`에 있습니다. 외부 리소스·템플릿 원본은 기존 위치를 유지하고 직접 수정할 사본을 작업 폴더에 만듭니다. UI 생성 도구도 이 경로를 검사합니다.
+
 [AGENTS.md](AGENTS.md)에 코드·문서·Git 규칙을 정의합니다. **작동 테스트는 사용자가 수행합니다.** Codex는 컴파일·정적 검사와 README 확인 후 테스트 보고서를 갱신하고, 사용자 검증 대기를 명시해 해당 변경을 커밋·push합니다. 이후 사용자가 특정 실행을 명시적으로 요청하지 않는 한 PIE·게임·Unreal 자동화·패키지 작동 테스트를 시작하지 않습니다. Visual Studio도 자동으로 열지 않습니다.
 
 커밋 제목은 `[codex] `로 시작하고 본문에는 변경 내용·이유·실제 검증 결과를 한글로 기록합니다.
@@ -242,4 +244,4 @@ Options에서 그래픽 품질과 수직 동기화를 선택하고 **적용 및 
 
 MainMenu는 배치된 `MainMenuPreviewStage` 카메라와 표시 전용 `BP_PartyMenuPreview`를 사용합니다. 네 ClassId 모두 기존 캐릭터 메시를 재사용하며 직업별 새 모델·애니메이션은 제작하지 않았습니다. GameMode는 전투 Pawn을 생성하지 않습니다. 생성 화면 Back/X는 프리뷰를 정리하고 초안을 버리며, 재진입하면 네 슬롯이 빈 상태로 시작합니다. 상세 편집 패널이 열려 있으면 Back은 먼저 패널만 닫습니다. 슬롯 패널은 최소 높이를 유지하면서 내용에 맞게 늘어나 ClassInfo 버튼이 잘리지 않도록 합니다.
 
-기존 메뉴 WBP 3종과 별도 경로의 JSON 생성본은 `ProjectA.Menu.AssetContracts`에서 바인딩 이름·타입을 확인합니다. 생성본 검증은 `/Game/T12Validation`에 임시 생성한 뒤 `-T12GeneratedAssets`를 지정하며 원본 에셋에 덮어쓰지 않습니다. 맵 설정 스크립트는 `Source/ProjectAEditor/Scripts/ConfigureMenuPreview.py`입니다.
+기존 메뉴 WBP 3종과 별도 경로의 JSON 생성본은 `ProjectA.Menu.AssetContracts`에서 바인딩 이름·타입을 확인합니다. 생성본 검증은 `/Game/User_JeHoon/Validation/T12`에 임시 생성한 뒤 `-T12GeneratedAssets`를 지정하며 원본 에셋에 덮어쓰지 않습니다. 맵 설정 스크립트는 `Source/ProjectAEditor/Scripts/ConfigureMenuPreview.py`입니다.

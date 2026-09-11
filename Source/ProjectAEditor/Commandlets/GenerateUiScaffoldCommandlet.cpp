@@ -523,9 +523,9 @@ bool ValidateSpec(const FUiScaffoldSpec& Spec)
 		bValid = false;
 	}
 
-	if (!Spec.AssetPath.StartsWith(TEXT("/Game/")))
+	if (Spec.AssetPath != TEXT("/Game/User_JeHoon") && !Spec.AssetPath.StartsWith(TEXT("/Game/User_JeHoon/"), ESearchCase::CaseSensitive))
 	{
-		UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] assetPath must start with /Game/: %s"), *Spec.AssetPath);
+		UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] assetPath must be inside /Game/User_JeHoon: %s"), *Spec.AssetPath);
 		bValid = false;
 	}
 

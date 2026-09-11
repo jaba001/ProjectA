@@ -6,6 +6,13 @@
 - 중괄호는 Allman 스타일로 작성한다.
 - 주석은 코드 옆에 작성하지 않고, 설명할 코드의 윗줄에 영어와 한글로 작성한다.
 
+## 엔진 콘텐츠 위치
+
+- 사용자와 Codex가 제작·수정용으로 복제하는 모든 엔진 에셋은 `Content/User_JeHoon/` (`/Game/User_JeHoon/`) 아래에 저장한다. 기존 폴더의 대소문자를 유지한다.
+- 맵·Blueprint·Widget·DataAsset·Material·FX와 검증용 생성 에셋에도 동일하게 적용한다. 검증용 메뉴 생성본은 `/Game/User_JeHoon/Validation/T12`를 사용한다.
+- 외부 리소스와 엔진 템플릿 원본은 기존 위치를 유지하고, 직접 편집할 작업 사본은 위 폴더에 만든다. C++·설정·생성 명세·로그는 각각 기존 Source·Config·Saved 위치를 유지한다.
+- 기존 에셋 이동은 Unreal AssetTools 등 엔진 기능으로 수행하고 참조 갱신·Redirector 정리를 확인한다. 탐색기에서 uasset/umap만 이동하지 않는다. 엔진이 관리하는 External Actors/Objects 경로도 임의로 옮기지 않는다.
+
 ## 데이터와 멀티플레이 확장 원칙
 
 - Unreal 기본 기능과 공식 확장 지점을 우선 활용한다. 저장·데이터·능력·네트워크 기능은 USaveGame·USTRUCT/DataAsset·GAS·Replication 등 기존 엔진 기능으로 해결할 수 있는지 먼저 확인한다.

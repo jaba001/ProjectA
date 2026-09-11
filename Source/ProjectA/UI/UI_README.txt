@@ -332,7 +332,7 @@ Commandlet은 asset을 수정하기 전에 다음 항목을 검증한다.
 - 필수 top-level field 존재 여부
 - nativeClass U prefix
 - 지원하는 parentClass인지 여부
-- assetPath가 /Game/으로 시작하는지 여부
+- assetPath가 /Game/User_JeHoon 또는 그 하위 경로인지 여부
 - widgets 배열 존재 여부
 - widget name 중복
 - 지원하지 않는 widget type
@@ -508,6 +508,6 @@ T12 구조 기준과 누락 보완
 - D08: 기존 Designer WBP를 화면 구조의 기준으로 유지한다. JSON은 scaffold와 바인딩 검증에 사용한다.
 - -AddMissing: 기존 위젯 속성/계층은 보존하고 누락된 위젯만 추가 후 compile/save. 기존 타입 불일치는 거절한다. -Overwrite와 동시 사용 불가.
 - 예: -run=GenerateUiScaffold -Spec=Source/ProjectAEditor/UiScaffoldSpecs/CharacterCreationWidget.json -AddMissing
-- DryRun은 JSON 유효성만 확인한다. 실제 생성 검증은 assetPath를 /Game/T12Validation로 바꾼 Saved 아래 복사 명세로 실행한다.
+- DryRun은 JSON 유효성만 확인한다. 실제 생성 검증은 assetPath를 /Game/User_JeHoon/Validation/T12로 바꾼 Saved 아래 복사 명세로 실행한다.
 - T12GeneratedAssets 검증 fixture: 메뉴 3종을 위 경로에 생성한다. MainMenuScreenWidget 복사 명세의 Text_Title 내용을 다르게 쓰고 T12_MissingLabel(TextBlock, parent=RootOverlay)을 추가해 AddMissing을 2회 실행한다. 테스트는 기존 제목 보존/신규 위젯 저장/바인딩을 별도 프로세스에서 확인한다.
 - 실제 원본에 추가한 것은 CharacterCreation의 Text_StartGameStatus 1개다. 확인된 BindWidget TODO만 검증 주석으로 갱신하며 선택적인 이전 팝업/Warrior 계열 바인딩은 완료로 간주하지 않는다.

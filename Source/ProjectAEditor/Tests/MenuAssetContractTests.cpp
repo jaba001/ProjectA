@@ -27,9 +27,9 @@ bool FMenuAssetContractTest::RunTest(const FString& Parameters)
         {
             return false;
         }
-        for (const FString& Directory : { Spec->GetStringField(TEXT("assetPath")), FString(TEXT("/Game/T12Validation")) })
+        for (const FString& Directory : { Spec->GetStringField(TEXT("assetPath")), FString(TEXT("/Game/User_JeHoon/Validation/T12")) })
         {
-            if (Directory == TEXT("/Game/T12Validation") && !FParse::Param(FCommandLine::Get(), TEXT("T12GeneratedAssets")))
+            if (Directory == TEXT("/Game/User_JeHoon/Validation/T12") && !FParse::Param(FCommandLine::Get(), TEXT("T12GeneratedAssets")))
             {
                 continue;
             }
@@ -53,13 +53,13 @@ bool FMenuAssetContractTest::RunTest(const FString& Parameters)
                 if (TestNotNull(*(AssetPath + TEXT(" binding ") + WidgetName), Actual))
                 {
                     TestEqual(*(WidgetName + TEXT(" widget type")), Actual->GetClass()->GetName(), Widget->GetStringField(TEXT("type")));
-                    if (Directory == TEXT("/Game/T12Validation") && WidgetName == TEXT("Text_Title"))
+                    if (Directory == TEXT("/Game/User_JeHoon/Validation/T12") && WidgetName == TEXT("Text_Title"))
                     {
                         TestEqual(TEXT("AddMissing preserves existing Designer text."), Cast<UTextBlock>(Actual)->GetText().ToString(), Widget->GetStringField(TEXT("text")));
                     }
                 }
             }
-            if (Directory == TEXT("/Game/T12Validation") && FString(Name) == TEXT("MainMenuScreenWidget"))
+            if (Directory == TEXT("/Game/User_JeHoon/Validation/T12") && FString(Name) == TEXT("MainMenuScreenWidget"))
             {
                 TestNotNull(TEXT("AddMissing saves the new widget."), Blueprint->WidgetTree->FindWidget(TEXT("T12_MissingLabel")));
             }
