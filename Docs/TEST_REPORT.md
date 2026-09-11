@@ -6,8 +6,9 @@
 |---|---|
 | 2인 전투 / F | HUD·Cue 수정 전 경고 동반 성공 1건, 오류 0·경고 4 |
 | 4인 전투 / G | HUD·Cue 수정 전 경고 동반 성공 1건, 오류 0·경고 6 |
-| HUD·Cue 수정 / H | Editor 빌드·정적 검사 완료, 작동 검증 대기 |
-| 직접 조작·승계·콘텐츠 경로 / A·B·E | 검증 대기 |
+| 승계 / B | 로컬 PIE 3건 경고 동반 성공, 관리 계약 4건 성공. 테스트 오류 0·경고 11 |
+| HUD·Cue 수정 / H | B에서 빈 HUD 경고 미발생, Cue fallback 재발. H1~H3 별도 대기 |
+| 직접 조작·콘텐츠 경로 / A·E | 검증 대기 |
 | 서비스 준비 / D | Steam App ID·PlayFab Title 미준비 |
 
 작동 테스트는 사용자 수행이 원칙이며 명시적 요청에 한해 Codex가 실행한다. 컴파일·정적 검사와 작동 검증을 구분하며 미실행 항목은 완료로 표시하지 않는다.
@@ -34,7 +35,7 @@
 
 ## B. 승계 검증
 
-사용자 실행 대상은 B1~B3이다. 작업 저장·PIE 종료 후 프로젝트 루트 PowerShell에서 실행한다. 보고서는 실행 시각별 경로에 저장한다.
+사용자 명시 요청으로 B1~B3을 실행했다. 재현 시 작업 저장·PIE 종료 후 프로젝트 루트 PowerShell에서 실행한다. 보고서는 실행 시각별 경로에 저장한다.
 
 ```powershell
 $reportPath = Join-Path (Get-Location) ('Saved/Automation/UserManagedRun_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
@@ -45,11 +46,28 @@ $reportPath = Join-Path (Get-Location) ('Saved/Automation/UserManagedRun_' + (Ge
 
 | ID / 테스트 | 구성과 확인 절차 | 기대 결과 | 결과 |
 |---|---|---|---|
-| B1 · `HostSuccession` | 원래 3인의 확정 턴 저장 → 기존 실행 종료 → 2번 Host·3번 Client·1번 AI로 복구 | Run·원래 소유권·확정 본문 유지, 새 실행/바인딩, 3번의 자기 캐릭터 턴 종료 RPC 승인, 타인 조작 거절, AI 실제 공격과 다음 전투 유지 | 대기 |
-| B2 · `HostSuccession4Players` | 원래 4인의 확정 턴 저장 → 2번 Host·3/4번 Client·1번 AI로 복구 | 두 Client가 서로 다른 본인 계정 바인딩을 갖고 각자 턴 종료 RPC 승인, 전투 중 Turn·Grid·HP/AP 일치와 결과 화면·Continue 권한 확인 | 대기 |
-| B3 · `SoloMenuConversion` | 원래 4번이 메뉴에서 싱글 전환 → 의도한 맵 이동 실패 → 새 메뉴에서 재시도 → 전투/다음 Encounter | 본인이 Host, 나머지 영구 AI, 실패 중 확정 저장 보존·lease 정리, 재시도 후 복구 장벽 해제·AI 행동·다음 전투의 AI 유지 | 대기 |
+| B1 · `HostSuccession` | 원래 3인의 확정 턴 저장 → 기존 실행 종료 → 2번 Host·3번 Client·1번 AI로 복구 | Run·원래 소유권·확정 본문 유지, 새 실행/바인딩, 3번의 자기 캐릭터 턴 종료 RPC 승인, 타인 조작 거절, AI 실제 공격과 다음 전투 유지 | 경고 동반 성공, 24.000초·경고 3 |
+| B2 · `HostSuccession4Players` | 원래 4인의 확정 턴 저장 → 2번 Host·3/4번 Client·1번 AI로 복구 | 두 Client가 서로 다른 본인 계정 바인딩을 갖고 각자 턴 종료 RPC 승인, 전투 중 Turn·Grid·HP/AP 일치와 결과 화면·Continue 권한 확인 | 경고 동반 성공, 24.871초·경고 3 |
+| B3 · `SoloMenuConversion` | 원래 4번이 메뉴에서 싱글 전환 → 의도한 맵 이동 실패 → 새 메뉴에서 재시도 → 전투/다음 Encounter | 본인이 Host, 나머지 영구 AI, 실패 중 확정 저장 보존·lease 정리, 재시도 후 복구 장벽 해제·AI 행동·다음 전투의 AI 유지 | 경고 동반 성공, 38.344초·경고 5 |
 
 결과 파일 `$reportPath/index.json`에서 세 테스트 각각의 상태와 오류/경고 메시지를 확인한다. `Saved/Logs/ProjectA.log`와 보고서 경로를 함께 남긴다. 경고가 있으면 ‘경고 동반 성공’으로 기록하고 실패·미실행·실행 중 항목이 없는지 확인한다.
+
+### 2026-09-11 실행 결과
+
+- 기준: `ff22940`, 직전 성공한 Development Editor / Win64 빌드. UE 5.7.4, 동일 PC·한 프로세스의 별도 PIE 월드/NetDriver, 실제 RPC·맵 이동, RenderOffscreen.
+- B1~B3: 경고 동반 성공 3건, 실패·테스트 오류·미실행 0, 경고 11, 합계 87.214초, 종료 코드 0. 산출물: `Saved/Automation/ManagedSuccession_20260911_115936/index.json`·`Editor.log`·`index.html`.
+- 추가 관리 계약: `ProjectA.Run.Managed.`의 ContextAndIsolation·OrderedResumeAndProgression·RejectionAndCompatibility·SoloAndPermanentAI 4건 성공. 오류·경고·미실행 0, 0.938초, 종료 코드 0. 산출물: `Saved/Automation/ManagedContracts_20260911_120207/index.json`·`Editor.log`.
+- 수용 결과: 번호순 승계·원래 소유권·확정 턴 보존, 각 Client의 바인딩/턴 종료 승인, 전투 상태 일치, AI 공격·다음 전투 유지, 메뉴 이동 실패 후 저장 보존·재시도 통과. 2/3/4번의 단독 재개, 영구 AI의 인간 복귀·오래된 stamp·대체 참가·일반 로드 우회 거절도 통과.
+- 종료된 실행의 인간/AI 명령·재바인딩·제어 모드 변경 거절과 턴·HP/AP·AI 모드 보존 통과. 지연 콜백 전체와 인터넷의 동시 승계 경쟁은 범위 밖이다.
+- PIE·프로세스 종료 확인. 기존 사용자 삭제 에셋 3건 보존, 게임 코드·제작 에셋 변경 없음. 고유 namespace/슬롯을 사용했으며 추가 컴파일은 수행하지 않았다.
+
+| 경고 | 건수 | 판단·대응 |
+|---|---|---|
+| 종료/월드 전환의 RecastNavMesh 미발견 | 8 | AI 행동과 복구는 통과. 전환·종료 처리의 별도 추적 항목 |
+| 의도한 비맵 목적지의 TravelFailure | 2 | B3 실패 주입의 예상 로그. 저장 보존·재시도 성공으로 처리 경로 확인 |
+| GameplayCue 전체 `/Game` 검색 fallback | 1 | 이전 설정 수정 후에도 재발. H의 미해결 항목으로 유지 |
+
+빈 클래스 SpawnActor 경고는 B1~B3에서 발생하지 않았다. 위 오류·경고 수는 테스트 JSON 기준이다. 테스트 시작 전 Editor 초기화 로그에는 별도의 `LogAutomationTest: Error: Condition failed` 4건과 엔진 UI 리소스 경고가 각 실행에 기록되어 있으며, 실행 로그 전체 무오류를 의미하지 않는다. 테스트 판정 변경·로그 필터링은 적용하지 않았다.
 
 검증 범위: 추가 Client별 승인 검사는 **턴 종료 RPC**이며 이동·회복약·스킬 전부를 각 Client에서 검증하는 것은 아니다. AI 공격은 실제 실행하지만 결과/다음 전투 검사는 fixture가 치명적 GAS 피해를 주어 승리를 유도한다. 이후 결과 화면과 권한을 확인하며 최종 사망·점유 상태 전체를 다시 비교하지는 않는다. 같은 PC 성공만으로 인터넷 환경·지연/손실·서비스 인증이 확인되지는 않는다.
 
@@ -59,8 +77,8 @@ B가 실패하거나 관련 코드가 다시 바뀌면 필요한 항목만 선�
 
 | ID | 확인 내용 | 방법과 기대 결과 | 상태 |
 |---|---|---|---|
-| C1 | 중복 실행·오래된 stamp·영구 AI의 인간 복귀·v4 일반 로드 우회 | 기존 `ProjectA.Run.Managed` fixture를 사용자가 선택 실행. 거절 뒤 저장 본문·진행·실행 권한 보존 | 필요 시 |
-| C2 | 닫힌 관리 lease의 옛 명령 | 기존 관리 fixture의 종료·권한 검사를 확인. 직접 Close 직후 인간/AI 명령·바인딩·모드 변경 거절과 턴·HP/AP·모드 불변 확인. 늦은 콜백·저장 시도 검증은 별도 | 필요 시 |
+| C1 | 중복 실행·오래된 stamp·영구 AI의 인간 복귀·v4 일반 로드 우회 | 기존 `ProjectA.Run.Managed` fixture. 거절 뒤 저장 본문·진행·실행 권한 보존 | B 추가 계약 4건 통과 |
+| C2 | 닫힌 관리 lease의 옛 명령 | 직접 Close 직후 인간/AI 명령·바인딩·모드 변경 거절과 턴·HP/AP·모드 불변 확인. 늦은 콜백 전체 검증은 별도 | B1~B3 및 기존 Host의 옛 저장 거절 통과 |
 | C3 | 2·3·4인 일반 Co-op 입력·턴 복구 | `ProjectA.Coop.` 기존 시나리오. 각자 조작·동일 상태·기존 Host 복구 확인. 필요한 전용 인자는 [MULTIPLAYER](MULTIPLAYER.md) 참조 | 2·4인 전투 F/G 통과, 복구·3인은 별도 |
 | C4 | 로컬 상대 Snapshot | 개발용 Snapshot 설정 후 전투 진입. 저장한 파티 빌드·배치로 적 생성, 지원하지 않는 데이터는 오류 표시 | 필요 시 |
 | C5 | 일반 Continue·패키지 | 별도로 보존한 일반 세이브로 Continue 확인. 패키지 확인은 최신 패키지를 만든 경우에만 그 빌드 기준으로 기록 | 필요 시 |
@@ -132,7 +150,7 @@ B가 실패하거나 관련 코드가 다시 바뀌면 필요한 항목만 선�
 
 ### 검증 제한
 
-테스트는 개발 계정 배정·버튼 delegate·명령 호출을 사용한다. 실제 마우스 조작·사용성·Steam 초대·별도 PC/P2P·지연/손실·저장 복구·Host 승계는 검증 범위에서 제외한다. 사망·승리 일부는 치명 피해로 유도하며 자연 전투 밸런스 검증으로 해석하지 않는다. A/B/E와 T14-7/8의 대기 상태는 유지한다.
+테스트는 개발 계정 배정·버튼 delegate·명령 호출을 사용한다. 실제 마우스 조작·사용성·Steam 초대·별도 PC/P2P·지연/손실·저장 복구·Host 승계는 F/G의 검증 범위에서 제외한다. 사망·승리 일부는 치명 피해로 유도하며 자연 전투 밸런스 검증으로 해석하지 않는다. 승계 결과는 B를 따르며 A/E와 T14-8은 대기다.
 
 ## G. 4인 전투 동기화
 
@@ -155,7 +173,8 @@ B가 실패하거나 관련 코드가 다시 바뀌면 필요한 항목만 선�
 - 대상: MainMenu·Gameplay GameMode의 공식 `InitializeHUDForPlayer_Implementation`에서 HUDClass 미지정 시 요청 생략. 클래스 지정 시 Super의 기본 초기화 유지.
 - 설정: UE 5.7의 `GameplayAbilitiesDeveloperSettings.GameplayCueNotifyPaths`를 `/Game/User_JeHoon`으로 지정. 외부 Cue 추가 시 필요한 검색 경로도 등록한다.
 - 조사: AssetRegistry의 `/Game` 전체 메타데이터에서 GameplayCueNotify 계열 에셋 0개. 현재 검색 범위 축소로 제외되는 기존 Cue는 발견되지 않았다. 로그: `Saved/Automation/GameplayCueAssetInventory.json`.
-- 검증: Development Editor / Win64 빌드 성공(`Saved/Automation/HudCueWarningBuild.log`). 엔진 소스의 HUD 호출·DeveloperSettings 읽기 경로와 Config를 정적으로 대조했다. PIE·게임·자동화 테스트는 미실행이다.
+- 수정 당시 검증: Development Editor / Win64 빌드 성공(`Saved/Automation/HudCueWarningBuild.log`). 엔진 소스의 HUD 호출·DeveloperSettings 읽기 경로와 Config를 정적으로 대조했으며 당시 작동 테스트는 미실행이었다.
+- 후속 B 검증: 빈 HUD 생성 경고는 미발생이나 GameplayCue fallback은 1건 재발했다. 별도 읽기 진단에서 실제 DeveloperSettings의 `GameplayCueNotifyPaths`가 빈 배열임을 확인했다(`Saved/Automation/ManagedCueSettingsDiagnostic.json`, 최종 진단 종료 코드 0). 파일의 설정과 실행값이 다른 원인은 추가 조사 대상이다. Python 접근명 조정 전 진단 시도 2회는 실패했으며 승계 테스트 실패와 구분한다.
 
 준비: 수정된 Editor 빌드로 재시작하고 기존 작업을 저장한다. 생성 경고·Cue fallback과 종료 NavMesh 경고를 구분해 기록한다.
 

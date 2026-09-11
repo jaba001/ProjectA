@@ -2,7 +2,7 @@
 
 기준일: 2026-09-11. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
 
-기본 Run은 싱글플레이다. T14 1~6번은 로컬 범위 완료, 7번 최신 승계는 검증 대기, 8번 Steam/PlayFab·MMR은 미구현이다. 최신 2·4인 전투 결과는 [TEST_REPORT](TEST_REPORT.md)에 기록한다.
+기본 Run은 싱글플레이다. T14 1~7번은 로컬 개발·검증 범위 완료, 8번 Steam/PlayFab·MMR은 미구현이다. 승계·전투 결과와 남은 경고는 [TEST_REPORT](TEST_REPORT.md)에 기록한다.
 
 | 영역 | 기준 문서 |
 |---|---|
@@ -94,7 +94,7 @@ Standalone은 결과 확정 후 TurnOrder·CombatUnits·ASC/이동·타이머·�
 
 MainMenu·Gameplay GameMode는 `InitializeHUDForPlayer`에서 HUDClass가 있을 때만 엔진 기본 AHUD 초기화를 호출한다. HUDClass=None인 CommonUI 화면은 빈 클래스 생성 요청을 생략한다.
 
-GameplayCue 검색은 `DefaultGame.ini`의 `GameplayAbilitiesDeveloperSettings.GameplayCueNotifyPaths=/Game/User_JeHoon`으로 제한한다. 현재 `/Game`의 GameplayCueNotify 에셋은 0개다. 해당 경로 밖의 Cue를 도입할 때는 의존 경로를 명시적으로 추가한다.
+GameplayCue 검색은 `DefaultGame.ini`에 `GameplayAbilitiesDeveloperSettings.GameplayCueNotifyPaths=/Game/User_JeHoon`을 지정했다. 다만 ff22940의 실제 실행에서는 설정 배열이 비어 있고 `/Game` fallback 경고가 재발해 적용 원인 조사와 수정이 필요하다. 현재 `/Game`의 GameplayCueNotify 에셋은 0개이며 외부 Cue 도입 시 의존 경로도 등록한다. 검증 근거는 [TEST_REPORT H](TEST_REPORT.md#h-hudgameplaycue-경고-수정)를 따른다.
 
 GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMenu의 UIOnly 상태에서 travel한 뒤 남는 viewport `IgnoreInput`과 로컬 포커스는 native 진입 코드가 복구한다. 이 입력 수정에는 WBP 재생성이 필요 없다.
 

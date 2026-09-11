@@ -4,7 +4,7 @@
 
 ## 현재 상태
 
-기본 Run은 싱글플레이다. T14 1~6번의 로컬 Snapshot·Listen Server·턴 복구·관리 v4·아군 AI는 구현 및 검증 완료다. 2·4인 전투는 HUD·Cue 경고 수정 전 통과했으며 수정 후 재검증과 7번의 추가 4→3인 승계는 대기다.
+기본 Run은 싱글플레이다. T14 1~6번의 로컬 Snapshot·Listen Server·턴 복구·관리 v4·아군 AI는 구현 및 검증 완료다. 7번은 ff22940 기준 승계 PIE 3건·관리 계약 4건 통과로 로컬 검증을 완료했다. 일반 2·4인 전투의 HUD·Cue 수정 후 재검증은 별도이며 Cue fallback 재발은 후속 수정 대상이다.
 
 8번의 Steam/PlayFab 인증·인터넷 P2P·공유 저장·결과 검증·MMR은 미구현이다. 구현 이력은 [HISTORY](HISTORY.md), 최신 실행·검증 제한은 [TEST_REPORT](TEST_REPORT.md)를 따른다. 작동 테스트는 사용자 수행이 원칙이며 명시적 요청 시 Codex가 실행한다.
 
@@ -213,7 +213,7 @@ MMR 판정 시점·계산/정산 단위, 이탈·미확정 턴 반복 악용 대
 
 ## T14-8 서비스 준비
 
-2026-09-11 기준 자체 Steam App ID·PlayFab Title 미준비, T14-7 최신 승계 검증 대기. 아래 절차는 서비스 준비 범위이며 실제 연동은 미구현이다.
+2026-09-11 기준 자체 Steam App ID·PlayFab Title 미준비, T14-7 로컬 승계 검증 완료. 아래 절차는 서비스 준비 범위이며 실제 연동은 미구현이다.
 
 ### 비용과 준비 순서
 
@@ -269,7 +269,7 @@ Snapshot Run은 `ProjectA_SnapshotRun_<SlotId>`, PvE는 `ProjectA_Run`이다. `-
 | 위 복구 + `-T14CheckpointAI` | 소유자도 연결된 AI 모드 복구. 불참 승계와 구분 |
 | 위 복구 + `-T14CheckpointOpponent=Replace` 또는 `Delete` | 원본 상대 변경/삭제 후 고정 본문 복구 |
 | `ProjectA.ManagedRunPIE.HostSuccession` | 원래 3명 → 2번 Host·3번 Client·1번 AI |
-| `ProjectA.ManagedRunPIE.HostSuccession4Players` | 원래 4명 → 2번 Host·3/4번 Client·1번 AI. 최신 사용자 검증 대상 |
+| `ProjectA.ManagedRunPIE.HostSuccession4Players` | 원래 4명 → 2번 Host·3/4번 Client·1번 AI. 실행 결과는 TEST_REPORT B 참조 |
 | `ProjectA.ManagedRunPIE.SoloMenuConversion` | 4번의 실제 메뉴 단독 전환·영구 AI·이동 실패 후 재개 |
 | `ProjectA.Run.Managed` / `ProjectA.Checkpoint` | 관리 저장/전이/호환과 확정 경계/손상/거절 |
 
