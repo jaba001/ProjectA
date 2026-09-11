@@ -1,14 +1,12 @@
-# ProjectA 멀티플레이 계약과 개발 안내
+# 멀티플레이 설계·개발 계약
 
 [프로젝트 안내](../README.md) · [과거 구현·검증 이력](HISTORY.md) · [사용자 테스트와 결과](TEST_REPORT.md)
 
 ## 현재 상태
 
-- 기본 Run은 싱글플레이이며 Async PvP의 로컬 상대 Snapshot과 Listen Server Co-op 전투를 지원한다.
-- T14 1~6번의 로컬 개발 범위는 구현·검증을 마쳤다. 6번은 관리 v4, 3→2인 Host 승계와 4번 참가자의 싱글 전환을 포함한다.
-- 7번의 기존 2·3·4인 전투/기존 Host 복구 이력과 현재 추가한 승계 확장을 구분한다. 최신 변경은 컴파일을 확인했으며 최종 사용자 작동 검증 대기다.
-- 8번은 Steam/PlayFab 개발 환경·접근 권한이 필요하다. 실제 로그인, 인터넷 P2P, 공동 저장, 결과 검증과 MMR은 미구현이다.
-- 과거 실행 횟수·실패 수정·로그는 HISTORY에서 관리한다. 앞으로 작동 테스트는 사용자가 담당하며 Codex가 UE·PIE·자동화를 임의 실행하지 않는다.
+기본 Run은 싱글플레이다. T14 1~6번의 로컬 Snapshot·Listen Server·턴 복구·관리 v4·아군 AI는 구현 및 검증 완료다. 최신 2·4인 전투 재검증은 통과했으며 7번의 추가 4→3인 승계는 검증 대기다.
+
+8번의 Steam/PlayFab 인증·인터넷 P2P·공유 저장·결과 검증·MMR은 미구현이다. 구현 이력은 [HISTORY](HISTORY.md), 최신 실행·검증 제한은 [TEST_REPORT](TEST_REPORT.md)를 따른다. 작동 테스트는 사용자 수행이 원칙이며 명시적 요청 시 Codex가 실행한다.
 
 ## 확정 정책
 
@@ -20,11 +18,11 @@
 | 참가자 | 원래 Run 참가자 외 대체 참가자는 허용하지 않는다 |
 | 최초 번호 | 최초 Host는 1번, 최초 합류 순서대로 2·3·4번. 재접속 순서나 파티 슬롯으로 다시 부여하지 않는다 |
 | 중단 | 정상 종료·연결 끊김만으로 Host나 AI 모드를 바꾸지 않는다 |
-| 명시적 재개 | 이번에 Human으로 재개할 원래 참가자 중 최초 번호가 가장 작은 사람이 Host가 된다 |
+| 명시적 재개 | 현재 Human으로 재개할 원래 참가자 중 최초 번호가 가장 작은 사람이 Host가 된다 |
 | 단독 전환 | 2·3·4번이 혼자 전환하면 본인이 Host, 나머지 원래 캐릭터는 AI가 된다 |
 | AI 결정 | 재개 Host가 단독 확정한다. 개인별 사전 동의는 요구하지 않는다 |
-| 영구 AI | 해당 Run 종료까지 AI를 유지한다(3C). 이후 Human 목록이나 Host 후보에 다시 넣지 않는다 |
-| 진행 결정 | 현재 Host만 노드 선택·승리 Continue를 실행한다(5A) |
+| 영구 AI | 해당 Run 종료까지 AI를 유지한다. 이후 Human 목록이나 Host 후보에 다시 넣지 않는다 |
+| 진행 결정 | 현재 Host만 노드 선택·승리 Continue를 실행한다 |
 | 복구 지점 | 마지막으로 저장까지 완료된 확정 턴 경계 |
 | 경쟁 목표 | 현재 Human 참여자에게만 MMR을 반영하고 불참자에게 추가 변동을 적용하지 않는다. 실제 계산·연동은 후속이다 |
 
@@ -34,7 +32,7 @@
 
 ## 식별자와 저장 버전
 
-서로 다른 목적의 ID와 버전을 섞지 않는다. 영속 DTO는 Actor·Controller·Ability 인스턴스나 실행 핸들을 저장하지 않는다.
+ID·버전은 아래 계층별로 구분한다. 영속 DTO에 Actor·Controller·Ability 인스턴스·실행 핸들을 저장하지 않는다.
 
 | 식별자 | 수명과 의미 |
 |---|---|
@@ -83,7 +81,7 @@ v1~3을 관리 v4로 자동 이관하지 않는다. 전투별 AI 플래그에서
 
 `FCombatActionRequest`에는 Run/Host 세대·전투/바인딩 ID·턴·순번·유닛 ID·행동·스킬 PrimaryAssetId·대상 유닛/좌표를 담는다.
 Client가 주장한 계정·비용·Actor reference를 받지 않는다. 서버가 현재 장착 AbilitySpec, AP/SubAP, 생존·busy·턴·대상을 다시 확인한다.
-명령 순번을 재사용하거나 오래된 전투·턴·바인딩으로 요청하면 거절한다. `Accepted`는 실행 요청 승인으로 비동기 이동/스킬 성공과 구분한다.
+같은 실행 문맥에서 거절된 요청도 순번을 소비한다. 순번 재사용과 오래된 전투·턴·바인딩 요청은 거절한다. `Accepted`는 실행 요청 승인으로 비동기 이동/스킬 성공과 구분한다.
 늦은 응답은 새 선택을 지우지 않으며 처리한 응답의 재전송이 UI를 Pending에 남기지 않는다.
 
 Unit의 팀·AP/SubAP·장착·턴/행동/사망·타일, Grid의 점유·영역·전열 보호를 서버에서 복제한다.
@@ -192,7 +190,7 @@ Gameplay 도착 후 전투 복원 실패는 lease·pending을 유지하는 별�
 
 ## Steam·PlayFab와 남은 서비스 정책
 
-선택은 Steam+PlayFab(4B), 전투는 Unreal Listen Server와 Steam P2P/SDR 우선이다. 운영비를 피하려는 조건을 함께 유지한다.
+연동 기준은 Steam+PlayFab, 전투 연결은 Unreal Listen Server·Steam P2P/SDR이다. 운영비 회피 조건을 적용한다.
 별도 전투 서버 임대가 없어도 공동 Run 저장·승계 승인·결과 검증·MMR의 비용과 권위는 별도다.
 Steam Cloud는 기본적으로 같은 사용자의 PC 사이 저장 동기화이며 참가자 간 단일 최신 Run을 원자적으로 확정하는 기능이 아니다.
 Steam Leaderboards는 전투 정당성을 검증하지 않는다. Trusted 점수 제출의 publisher key를 Listen Host 클라이언트나 저장소에 넣지 않는다.
@@ -202,7 +200,7 @@ Steam Leaderboards는 전투 정당성을 검증하지 않는다. Trusted 점수
 유료 리소스·과금 전환을 임의 활성화하지 않는다. 비용 조건을 랭크 삭제·무검증 점수·오프라인 진행 분기 승인으로 해석하지 않는다.
 공식 참고: [Steam 인증](https://partner.steamgames.com/doc/features/auth?l=english), [Steam Cloud](https://partner.steamgames.com/doc/features/cloud?l=english), [PlayFab 개발 모드](https://learn.microsoft.com/en-us/gaming/playfab/pricing/development-mode).
 
-8번에는 Steamworks AppID·테스트 계정/권한, PlayFab Title과 허용된 개발 환경이 필요하다. 공급자 선택은 다시 결정하지 않는다.
+준비물은 Steamworks AppID·테스트 계정/권한·PlayFab Title·승인된 개발 환경이다. 공급자는 기존 결정을 유지한다.
 Unreal Online Subsystem·공식 SDK·엔진 비동기 delegate를 우선하며 선택한 UE 5.7 플러그인/NetDriver 코드를 확인해 설정한다.
 로그인 성공·표시명·PIE ID·Client Verified 플래그를 서버 인증 증거로 쓰지 않는다. 서버가 검증한 티켓 계정을 실제 연결에 대응한다.
 온라인 실패를 Development 계정이나 로컬 저장 성공으로 대체하지 않으며 이전 연결의 늦은 인증 완료도 현재 Run을 바꾸지 못하게 해야 한다.
@@ -215,7 +213,7 @@ MMR 판정 시점·계산/정산 단위, 이탈·미확정 턴 반복 악용 대
 
 ## T14-8 서비스 준비
 
-2026-09-11 사용자 확인: **자체 Steam App ID와 PlayFab Title 모두 없음**, 준비부터 진행한다. T14-7 작동 테스트도 미실행이며 그대로 대기다. 아래는 계정 준비 안내와 확인한 엔진 경로이며 실제 연동 구현 완료를 뜻하지 않는다.
+2026-09-11 기준 자체 Steam App ID·PlayFab Title 미준비, T14-7 최신 승계 검증 대기. 아래 절차는 서비스 준비 범위이며 실제 연동은 미구현이다.
 
 ### 비용과 준비 순서
 
@@ -244,8 +242,7 @@ MMR 판정 시점·계산/정산 단위, 이탈·미확정 턴 반복 악용 대
 
 ## 개발 실행 참조
 
-아래는 사용자가 필요할 때 선택할 명령과 fixture다. 이 문서 통합에서 실행하지 않았으며 테스트 순서·결과 작성은 [TEST_REPORT](TEST_REPORT.md)를 따른다.
-프로젝트 루트 PowerShell, 로컬 UE 5.7 설치 경로를 기준으로 한다. 샘플 생성은 로컬 에셋/저장을 만들므로 최초 준비 때만 사용한다.
+프로젝트 루트 PowerShell·UE 5.7 기준 명령이다. 실행 대상·결과는 [TEST_REPORT](TEST_REPORT.md)를 따른다. 샘플 생성은 로컬 에셋/저장을 작성하므로 최초 준비 시에만 실행한다.
 
 ```powershell
 $editor = 'C:/Program Files/Epic Games/UE_5.7/Engine/Binaries/Win64/UnrealEditor.exe'

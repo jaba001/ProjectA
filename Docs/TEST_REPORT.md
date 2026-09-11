@@ -1,20 +1,15 @@
-# 사용자 작동 테스트 보고서
+# 테스트 보고서
 
-갱신일: 2026-09-11 · 대상: 2인 전투 동기화 / 콘텐츠 경로 통일 / T14-7 승계 통합·기본 전투 입력 / T14-8 서비스 준비 · **작동 검증 상태: F의 2인 전투 자동화 통과, 나머지 기존 대기 유지**
+갱신일: 2026-09-11. 최신 실행 결과와 사용자 검증 절차를 관리한다. 이력은 [HISTORY](HISTORY.md), 설정은 [PROJECT_PLAN](PROJECT_PLAN.md)를 따른다.
 
-2026-09-11 사용자 확인: A/B 작동 테스트는 아직 실행하지 않았고 Steam App ID·PlayFab Title도 미준비다. 아래 A~D의 대기 상태를 유지한다. 서비스 준비 문서 정리 당시에는 문서·설정·엔진 소스만 정적으로 확인했다. 이후 콘텐츠 경로 변경의 검증은 E에 별도로 기록한다.
+| 대상 | 상태 |
+|---|---|
+| 2인 전투 / F | 경고 동반 성공 1건, 오류 0·경고 4 |
+| 4인 전투 / G | 경고 동반 성공 1건, 오류 0·경고 6 |
+| 직접 조작·승계·콘텐츠 경로 / A·B·E | 검증 대기 |
+| 서비스 준비 / D | Steam App ID·PlayFab Title 미준비 |
 
-## 2026-09-10 변경과 확인 결과
-
-| 구분 | 내용 | 상태 |
-|---|---|---|
-| 문서 정리 | Docs 14개를 기획·구조·작업·멀티플레이·테스트·이력의 6개로 통합 | 내용·로컬 링크 50개 정적 확인 완료 |
-| 중단 전 작성한 테스트 코드 | 4명 중 최초 Host 불참 후 3명 재개, 각 Client 바인딩·턴 종료 RPC 승인 확인 추가 | 작성 완료, 사용자 작동 검증 대기 |
-| 테스트 안정화 | 참가자 바인딩 복제를 기다린 뒤 비교, Unity 빌드의 중복 보조 함수명 수정 | 컴파일 확인 완료 |
-| 컴파일 | Development Editor / Win64, `-DisableAdaptiveUnity` | 성공: `Saved/Automation/T14ManualHandoffBuild1.log` |
-| 이번 작동 테스트 | PIE·게임·Unreal 자동화·패키지 실행 | Codex 미실행, 사용자가 아래 절차로 확인 |
-
-앞으로 Codex는 컴파일·정적 검사를 수행하고 이 보고서를 갱신한다. 작동 테스트는 사용자가 실행하며, 결과를 받기 전에는 성공으로 표시하지 않는다. 이전 실행 결과는 [HISTORY](HISTORY.md)의 당시 코드 기준 기록이며 최신 변경의 통과를 대신하지 않는다.
+작동 테스트는 사용자 수행이 원칙이며 명시적 요청에 한해 Codex가 실행한다. 컴파일·정적 검사와 작동 검증을 구분하며 미실행 항목은 완료로 표시하지 않는다.
 
 ## 준비 조건
 
@@ -26,7 +21,7 @@
 
 ## A. 직접 플레이 확인
 
-| ID | 사용자가 할 일 | 기대 결과 | 결과 |
+| ID | 절차 | 기대 결과 | 상태 |
 |---|---|---|---|
 | A1 | MainMenu → 새 게임 → 캐릭터 1~4명 생성 → 시작 → 첫 Combat 노드 선택 | Gameplay에 생성한 파티가 등장하고 현재 턴·HP/AP가 표시됨 | 대기 |
 | A2 | 자기 턴에 Move 선택 → 표시된 빈 도달 타일 클릭 | 실제 이동·점유 타일·자원이 갱신되고 완료 후 다음 입력이 가능함 | 대기 |
@@ -34,18 +29,18 @@
 | A4 | 적 턴과 이동/스킬 처리 중 Move·스킬·타일 클릭을 시도하고 정상 진행을 기다림 | 유효하지 않은 행동은 실행되지 않고 적 행동 완료 후 자기 턴에 입력이 다시 가능함 | 대기 |
 | A5 | 전투 승리 → Continue → 두 번째 Combat 노드 선택 | 같은 Gameplay에서 다음 전투가 시작되고 파티·HP·노드 진행이 유지됨 | 대기 |
 
-막힌 항목이 있으면 이후 결과를 억지로 완료하지 않고 최초 실패 단계·화면·로그를 기록한다. 원래 문제인 ‘버튼 또는 타일 무반응’은 A2/A3에서 버튼 선택 여부, 범위 표시 여부, 실제 이동/효과 여부를 나누어 적는다.
+실패 시 최초 단계·화면·로그를 기록한다. A2/A3의 입력 문제는 버튼 선택·범위 표시·이동/효과 적용 단계로 구분한다.
 
-## B. 사용자가 실행할 승계 시나리오
+## B. 승계 검증
 
-다음 세 fixture를 한 번 실행하면 B1~B3을 확인한다. 아래 명령은 **사용자 실행용 안내**이며 Codex는 실행하지 않는다. 기존 에디터의 작업을 저장하고 PIE를 종료한 뒤 PowerShell에 붙여 넣는다. 보고서 경로는 실행 시각마다 새로 만든다.
+사용자 실행 대상은 B1~B3이다. 작업 저장·PIE 종료 후 프로젝트 루트 PowerShell에서 실행한다. 보고서는 실행 시각별 경로에 저장한다.
 
 ```powershell
 $reportPath = Join-Path (Get-Location) ('Saved/Automation/UserManagedRun_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
 & 'C:/Program Files/Epic Games/UE_5.7/Engine/Binaries/Win64/UnrealEditor-Cmd.exe' 'C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject' -unattended -nop4 -RenderOffscreen -nosound -T14ManagedRunPIE '-ExecCmds=Automation RunTests ProjectA.ManagedRunPIE.' '-TestExit=Automation Test Queue Empty' "-ReportExportPath=$reportPath"
 ```
 
-명령의 현재 폴더는 프로젝트 루트여야 한다. 화면을 직접 조작하는 A와 달리 이 명령은 기존 테스트 코드가 세션과 행동을 구동한다. 직접 에디터에서 실행하려면 `-T14ManagedRunPIE` 인자를 주어 에디터를 시작하고 Session Frontend의 Automation에서 `ProjectA.ManagedRunPIE.` 세 항목을 선택한다. 인자가 없으면 안내만 출력하고 종료하므로 그 성공 표시는 실제 검증이 아니다.
+테스트 코드가 세션·행동을 구동한다. 에디터에서는 `-T14ManagedRunPIE`로 시작 후 Session Frontend → Automation → `ProjectA.ManagedRunPIE.` 3개를 선택한다. 전용 인자가 없으면 실제 검증 없이 종료된다.
 
 | ID / 테스트 | 구성과 확인 절차 | 기대 결과 | 결과 |
 |---|---|---|---|
@@ -57,7 +52,7 @@ $reportPath = Join-Path (Get-Location) ('Saved/Automation/UserManagedRun_' + (Ge
 
 검증 범위: 추가 Client별 승인 검사는 **턴 종료 RPC**이며 이동·회복약·스킬 전부를 각 Client에서 검증하는 것은 아니다. AI 공격은 실제 실행하지만 결과/다음 전투 검사는 fixture가 치명적 GAS 피해를 주어 승리를 유도한다. 이후 결과 화면과 권한을 확인하며 최종 사망·점유 상태 전체를 다시 비교하지는 않는다. 같은 PC 성공만으로 인터넷 환경·지연/손실·서비스 인증이 확인되지는 않는다.
 
-## C. 필요할 때 추가 확인
+## C. 추가 회귀 검증
 
 B가 실패하거나 관련 코드가 다시 바뀌면 필요한 항목만 선택한다. 매 문서 수정마다 전체 테스트를 반복하지 않는다.
 
@@ -65,7 +60,7 @@ B가 실패하거나 관련 코드가 다시 바뀌면 필요한 항목만 선�
 |---|---|---|---|
 | C1 | 중복 실행·오래된 stamp·영구 AI의 인간 복귀·v4 일반 로드 우회 | 기존 `ProjectA.Run.Managed` fixture를 사용자가 선택 실행. 거절 뒤 저장 본문·진행·실행 권한 보존 | 필요 시 |
 | C2 | 닫힌 관리 lease의 옛 명령 | 기존 관리 fixture의 종료·권한 검사를 확인. 직접 Close 직후 인간/AI 명령·바인딩·모드 변경 거절과 턴·HP/AP·모드 불변 확인. 늦은 콜백·저장 시도 검증은 별도 | 필요 시 |
-| C3 | 2·3·4인 일반 Co-op 입력·턴 복구 | `ProjectA.Coop.` 기존 시나리오. 각자 조작·동일 상태·기존 Host 복구 확인. 필요한 전용 인자는 [MULTIPLAYER](MULTIPLAYER.md) 참조 | 2인 전투만 F에서 통과, 나머지 필요 시 |
+| C3 | 2·3·4인 일반 Co-op 입력·턴 복구 | `ProjectA.Coop.` 기존 시나리오. 각자 조작·동일 상태·기존 Host 복구 확인. 필요한 전용 인자는 [MULTIPLAYER](MULTIPLAYER.md) 참조 | 2·4인 전투 F/G 통과, 복구·3인은 별도 |
 | C4 | 로컬 상대 Snapshot | 개발용 Snapshot 설정 후 전투 진입. 저장한 파티 빌드·배치로 적 생성, 지원하지 않는 데이터는 오류 표시 | 필요 시 |
 | C5 | 일반 Continue·패키지 | 별도로 보존한 일반 세이브로 Continue 확인. 패키지 확인은 최신 패키지를 만든 경우에만 그 빌드 기준으로 기록 | 필요 시 |
 
@@ -73,7 +68,7 @@ B가 실패하거나 관련 코드가 다시 바뀌면 필요한 항목만 선�
 
 ## D. T14-8 서비스 준비 보고서
 
-목적: 과금·기본 싱글플레이 설정 변경 없이 실제 온라인 연결에 필요한 준비물을 확인한다. 상세 링크와 비용 조건은 [서비스 준비 절차](MULTIPLAYER.md#t14-8-서비스-준비)를 따른다. 현재는 런타임 연동 코드가 없으므로 접속·인증·MMR 작동을 시험하는 단계가 아니다.
+목적: 온라인 연결의 계정·환경·비용 조건 확인. [서비스 준비 절차](MULTIPLAYER.md#t14-8-서비스-준비) 기준이며 접속·인증·MMR 작동 검증은 연동 구현 후 수행한다.
 
 | ID | 사용자가 확인할 항목 | 준비 완료 기준 | 상태 |
 |---|---|---|---|
@@ -82,7 +77,7 @@ B가 실패하거나 관련 코드가 다시 바뀌면 필요한 항목만 선�
 | D3 | Steam 자체 ID 등록 시점 또는 480 개발 연결 선택 | 정식 등록 수수료와 공용 480의 제한을 구분하고 사용할 준비 경로 확정 | 미결정 |
 | D4 | 추후 연결을 확인할 Steam 계정 2개·PC 2대의 사용 가능 여부 | 같은 빌드를 각 계정에서 실행할 환경. 자체 앱 사용 시 각 테스트 계정에 앱 접근 권한 필요 | 미확인 |
 
-Codex 정적 점검: UE 5.7의 OnlineSubsystemSteam·SteamSockets는 설치되어 있고 프로젝트에서 비활성이다. PlayFab 플러그인·Title 설정은 없다. 계정/Title 생성·결제·SDK 설치·게임 실행은 수행하지 않았다. 준비 결과를 받은 뒤 연결 코드를 구현하고 다음 사용자 작동 보고서를 작성한다. D 완료만으로 T14-7이나 온라인 수용 조건을 통과 처리하지 않는다.
+정적 확인: OnlineSubsystemSteam·SteamSockets 설치/비활성, PlayFab 플러그인·Title 미설정. 계정 생성·결제·SDK 설치·온라인 실행은 미수행이다. 준비 완료 후 연동 구현·작동 검증을 별도 진행한다.
 
 ## E. 엔진 콘텐츠 경로 통일
 
@@ -90,7 +85,7 @@ Codex 정적 점검: UE 5.7의 OnlineSubsystemSteam·SteamSockets는 설치되�
 
 대상 변경: 메뉴 검증 위젯 3종을 `T12Validation`에서 `User_JeHoon/Validation/T12`로 이동하고 UI 생성 도구·검증 코드·생성 안내 경로를 통일했다. 일반 메뉴 원본은 `User_JeHoon/UI/MainMenu`에 있다.
 
-준비 조건: UE 5.7과 이번 Development Editor / Win64 빌드를 사용한다. 생성 도구를 직접 확인할 때는 Saved의 T12 명세를 사용하고 일반 메뉴 원본을 덮어쓰지 않는다.
+준비 조건: UE 5.7과 콘텐츠 경로 변경을 포함한 Development Editor / Win64 빌드를 사용한다. 생성 도구는 Saved의 T12 명세로 확인하며 일반 메뉴 원본은 보존한다.
 
 | ID | 사용자 실행 절차 | 기대 결과 | 상태 |
 |---|---|---|---|
@@ -98,41 +93,67 @@ Codex 정적 점검: UE 5.7의 OnlineSubsystemSteam·SteamSockets는 설치되�
 | E2 | 일반 MainMenu에서 캐릭터 생성 → Gameplay 진입 | 검증 위젯이 일반 메뉴를 대체하지 않고 기존 화면·전투 진입 유지 | 미실행 |
 | E3 | UI 생성 도구에 작업 폴더 밖 assetPath를 지정한 명세로 DryRun, 이어서 작업 폴더 안의 명세로 DryRun | 밖 경로는 오류로 거절, 안 경로는 유효성 검사 통과 | 미실행 |
 
-Codex 확인: Unreal AssetTools로 이동·저장 후 별도 에디터 명령줄 프로세스에서 위젯 3종의 패키지 로드와 이전 경로 참조 부재를 확인했다(오류·경고 0). 기존 경로의 에셋·Redirector는 0개다. 추가 Redirector 정리 명령은 이미 빈 폴더여서 대상 없음 경고 1건으로 종료했다. Development Editor / Win64 컴파일은 성공했다(`Saved/Automation/ContentRootBuild.log`). 에셋 편집·패키지 조사만 수행했으며 PIE·게임·Unreal 자동화 작동 테스트는 실행하지 않았다.
+검증: AssetTools 이동·저장 후 별도 프로세스에서 위젯 3종 로드, 이전 경로 에셋/Redirector 0개 확인(오류·경고 0). 추가 정리 명령은 빈 폴더로 대상 없음 경고 1건. Editor 빌드 성공(`Saved/Automation/ContentRootBuild.log`), 콘텐츠 변경의 작동 검증은 미실행이다.
 
-## F. 2026-09-11 Codex 직접 실행: 2인 전투 동기화
+## F. 2인 전투 동기화
 
-사용자의 이번 요청인 “2인테스트 직접 해볼래?”에 따라 이 항목만 Codex가 실행했다. 앞으로의 작동 테스트를 자동 실행하도록 일반 규칙을 변경한 것은 아니다.
+목적: 원래 소유자의 행동 요청과 서버 전투 상태의 Client 반영 확인. 사용자 명시 요청에 따라 Codex가 실행했다.
 
-- 목적·대상: `e90cd21` 코드/에셋과 직전 성공한 Development Editor / Win64 빌드로 `ProjectA.Coop.ListenServerClientCombat` 1건 실행. 기존 사용자 삭제 에셋 3개가 없는 현재 작업 폴더 기준이며 복원하지 않았다.
-- 환경: UE 5.7.4, 같은 PC·한 에디터 프로세스의 Listen Server/Client PIE 월드 2개, 각 월드의 별도 NetDriver와 실제 RPC. 화면은 RenderOffscreen으로 렌더링하며 테스트 코드가 계정 배정과 행동을 구동했다. Visual Studio는 실행하지 않았다.
-- 실행: 기존 [멀티플레이 실행 안내](MULTIPLAYER.md)의 Co-op 명령에서 필터를 `ProjectA.Coop.ListenServerClientCombat`으로 한정하고 `-ReportExportPath=Saved/Automation/CoopTwoPlayer_20260911_095426`을 지정했다.
-- 결과: **1건 경고 동반 성공, 실패 0, 미실행 0, 오류 0, 경고 4**. 테스트 본체 14.998초, 프로세스 종료 코드 0. PIE 세션 종료 확인.
-- 원본 기록: `Saved/Automation/CoopTwoPlayer_20260911_095426/index.json`, 같은 폴더의 `Editor.log`와 `index.html`. Saved 보고서는 로컬 보관이며 Git에는 이 요약을 기록한다.
+| 항목 | 기록 |
+|---|---|
+| 기준 | e90cd21 코드/에셋, 직전 성공한 Development Editor / Win64 빌드 |
+| 환경 | UE 5.7.4, 동일 PC·한 프로세스의 Listen Server 1 / Client 1, 별도 NetDriver·실제 RPC, RenderOffscreen |
+| 테스트 | ProjectA.Coop.ListenServerClientCombat |
+| 결과 | 경고 동반 성공 1건, 실패/오류/미실행 0, 경고 4, 14.998초, 종료 코드 0 |
+| 산출물 | Saved/Automation/CoopTwoPlayer_20260911_095426의 index.json·Editor.log·index.html |
 
-| 확인 항목 | 기대 결과 및 실제 확인 | 결과 |
+### 공통 절차와 수용 결과
+
+| 항목 | 절차·기대 결과 | 2인 / 4인 |
 |---|---|---|
-| 조작권·Host 권한 | 자신의 턴·캐릭터에만 행동 허용, 미배정/잘못된 Host와 Client의 노드·Continue 거절 | 통과 |
-| Client 행동 | 회복약·실제 이동·장착 스킬의 GAS 피해·턴 종료가 서버에서 실행되고 응답 수신 | 통과 |
-| 중복 명령 | 이미 처리한 스킬 RPC 재전송 시 추가 피해·AP 소비 방지 | 통과 |
-| 상태 동기화 | Turn·HUD·HP/AP/SubAP·Grid 점유·이동 및 사망 상태 일치 | 통과 |
-| 결과와 다음 전투 | Victory 표시·입력 잠금, Host Continue로 정리·다음 전투 진입, 두 노드 완료 후 Complete와 정리 동기화 | 통과 |
+| 조작권 | 참가자별 서버 바인딩, 자기 캐릭터·자기 턴만 허용, 미배정/잘못된 Host·Client의 진행 거절 | 통과 / 통과 |
+| 행동 | 각 Client의 회복약·이동·장착 스킬·턴 종료를 RPC로 실행하고 서버 결과 수신 | 통과 / 통과 |
+| 중복 요청 | 처리된 스킬 재전송 시 추가 피해·AP 차감 거절 | 통과 / 통과 |
+| 상태 | Turn·HUD·HP/MaxHP·AP/SubAP·재고·이동·Grid·사망 일치 | 통과 / 통과 |
+| 전투 진행 | Victory·입력 잠금·Host Continue·다음 전투·두 노드 Complete·Actor 정리 | 통과 / 통과 |
 
-경고 4건의 대응은 아래와 같다. 이번 후속 분석에서는 코드·엔진 소스·기존 로그만 확인했으며 게임 코드/설정 수정이나 작동 테스트 재실행은 하지 않았다.
+실행은 [멀티플레이 명령](MULTIPLAYER.md#개발-실행-참조)의 필터를 위 테스트명으로 한정하고 ReportExportPath를 산출물 경로로 지정한다. 기존 사용자 삭제 에셋 3건을 보존했으며 저장된 제작 에셋은 변경하지 않았다. 원본 보고서는 로컬 Saved에 보관한다.
 
-| 경고 | 원인·영향 분석 | 권장 대응 |
+### 경고 대응
+
+| 종류 | 2인 / 4인 | 분석·권장 대응 |
 |---|---|---|
-| 클래스 미지정 SpawnActor 2건 | Host 시작/Client 합류 시 발생. 앞선 DefaultPawnClass 추정보다 `HUDClass = nullptr` 경로가 유력하다. UE 5.7의 `InitializeHUDForPlayer` → `ClientSetHUD`가 null 클래스로도 `SpawnActor<AHUD>`를 호출한다. 현재 CommonUI 전투 화면은 테스트에서 정상 확인했으며 정확한 발생 호출 스택은 미확보 | 우선 정리. 공식 `InitializeHUDForPlayer` 확장 지점에서 HUDClass가 없는 경우 불필요한 AHUD 생성 요청을 생략하고, 클래스가 있으면 기본 초기화를 유지하는 방향. 경고 제거만을 위해 임의 Pawn이나 HUD를 추가하지 않음 |
-| GameplayCue 검색 경로 미지정 1건 | GAS 초기화가 검색 경로의 빈 배열을 발견해 `/Game` 전체 검색으로 대체. 콘텐츠 증가 시 불필요한 검색 비용 발생 가능 | 우선 정리. 사용하는 GameplayCue 에셋 위치를 확인한 뒤 UE의 GameplayCueNotifyPaths 설정에 필요한 경로를 명시. 새 제작 Cue는 User_JeHoon 아래에 두되 외부 Cue 의존성을 누락하지 않음 |
-| RecastNavMesh 탐색 실패 1건 | 로그의 `UEDPIE_0_Gameplay` BeginTearingDown 직후 발생. 앞선 실제 이동과 Grid 동기화는 통과했으므로 이 로그만으로 플레이 중 NavMesh 결함으로 판단하지 않음 | 낮은 우선순위로 추적. 플레이 중에도 발생하거나 이동 실패가 동반될 때 종료 순서·CrowdManager 재생성을 조사. 엔진 수정·NavMesh 강제 재생성·경고 필터링은 우선 적용하지 않음 |
+| 클래스 미지정 SpawnActor | 2 / 4건 | 참가자 시작·합류 시 발생. 빈 HUDClass가 InitializeHUDForPlayer → ClientSetHUD → SpawnActor로 전달되는 경로가 유력하며 호출 스택은 미확보. 공식 HUD 초기화에서 클래스 없는 요청을 생략하는 수정 검토 |
+| GameplayCue 검색 경로 미지정 | 1 / 1건 | /Game 전체 검색 fallback. 실제 Cue 의존성을 조사한 뒤 필요한 검색 경로 명시 |
+| 종료 시 RecastNavMesh 없음 | 1 / 1건 | 실제 이동 통과 후 PIE 종료 과정에서 발생. 낮은 우선순위로 추적하며 플레이 중 발생·이동 실패 동반 시 종료/CrowdManager 경로 조사 |
 
-첫 3건을 정리한 뒤 해당 수정의 컴파일과 2인 테스트로 확인하는 순서를 권장한다. 경고가 없어졌는지는 수정 후 실제 실행 결과로 판단하며, 이번 분석으로 해결 처리하지 않는다.
+HUD·Cue 항목을 우선 정리하고 수정 후 컴파일·2/4인 재검증을 권장한다. 현재 경고는 미해결이며 로그 필터링·테스트 조건 완화는 적용하지 않았다.
 
-범위 제한: 버튼 delegate와 명령 호출을 쓰는 자동화이며 두 사람이 마우스로 조작한 사용성 검증은 아니다. 사망·승리 일부는 테스트용 치명 피해로 유도하므로 자연스러운 전투 밸런스 검증으로 확대하지 않는다. Steam 초대·별도 PC/P2P·저장 복구·Host 승계·3/4인은 이번에 실행하지 않았으며 T14-7/8과 A/B/E의 대기 상태를 완료로 바꾸지 않는다.
+### 검증 제한
+
+테스트는 개발 계정 배정·버튼 delegate·명령 호출을 사용한다. 실제 마우스 조작·사용성·Steam 초대·별도 PC/P2P·지연/손실·저장 복구·Host 승계는 검증 범위에서 제외한다. 사망·승리 일부는 치명 피해로 유도하며 자연 전투 밸런스 검증으로 해석하지 않는다. A/B/E와 T14-7/8의 대기 상태는 유지한다.
+
+## G. 4인 전투 동기화
+
+목적: 최대 정원의 참가자별 조작권·턴 진행·다중 Client 동기화 확인. 사용자 조건부 실행 요청에 따라 Codex가 필요성을 판단하고 실행했다.
+
+| 항목 | 기록 |
+|---|---|
+| 기준·환경 | 8c29017, 기존 Editor 빌드, UE 5.7.4, 동일 PC·한 프로세스의 Listen Server 1 / Client 3 |
+| 테스트 | ProjectA.Coop.ListenServerFourPlayerCombat |
+| 결과 | 경고 동반 성공 1건, 실패/오류/미실행 0, 경고 6, 31.563초, 종료 코드 0 |
+| 추가 확인 | 원격 소유자 3명 각각의 행동 RPC와 모든 Client 상태 일치. 정원 4명에서 GameSession 추가 입장 거절 검사 |
+| 산출물 | Saved/Automation/CoopFourPlayer_20260911_110655의 index.json·Editor.log·index.html |
+
+절차·수용 결과·경고 대응은 F의 공통 표를 따른다. 테스트용 HP·AP 조정은 메모리 사본에 한정한다. 실제 다섯 번째 접속과 4→3인 Host 승계는 실행하지 않았다. PIE와 프로세스 종료를 확인했다.
+
+## 문서 정적 검증
+
+Markdown 9개를 공식 문체로 정리하고 중복 상세를 기준 문서로 통합했다. 실행 명령·정책·수치·검증 근거를 유지하고 로컬 링크 61개·앵커 5개·코드 블록·diff 정적 검사를 통과했다. 문서 편집에 따른 추가 빌드·게임 실행은 수행하지 않았다.
 
 ## 사용자 결과 기록
 
-아래 내용을 채워 전달하면 실패 항목부터 수정한다. 테스트를 실행하지 않은 항목은 대기로 유지한다.
+결과 제출 형식은 다음과 같다. 미실행 항목은 대기로 유지한다.
 
 ```text
 실행 날짜 / 확인한 커밋:
@@ -144,4 +165,4 @@ Codex 확인: Unreal AssetTools로 이동·저장 후 별도 에디터 명령줄
 보고서·로그 경로 / 오류 문구:
 ```
 
-이 보고서는 앞으로 같은 파일에서 최신 변경·필수 시나리오·사용자 결과를 갱신한다. 완료된 검증의 핵심 근거는 [HISTORY](HISTORY.md)에 짧게 남긴다.
+완료된 검증의 핵심 근거는 [HISTORY](HISTORY.md)에 기록한다.

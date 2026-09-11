@@ -1,10 +1,10 @@
 # ProjectA 구현 구조와 설정
 
-기준일: 2026-09-10. 현재 코드의 책임, 기본 Run 사용법, Gameplay 에셋 연결을 한곳에서 관리한다.
+기준일: 2026-09-11. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
 
-기본 Run은 싱글플레이다. T14 6번은 로컬 개발 저장소 범위에서 완료했으며, 7번의 최종 작동 검증은 사용자가 직접 진행한다. 8번의 실제 Steam/PlayFab 서비스와 MMR은 미구현이다. T14 전체 완료로 취급하지 않는다.
+기본 Run은 싱글플레이다. T14 1~6번은 로컬 범위 완료, 7번 최신 승계는 검증 대기, 8번 Steam/PlayFab·MMR은 미구현이다. 최신 2·4인 전투 결과는 [TEST_REPORT](TEST_REPORT.md)에 기록한다.
 
-| 찾는 내용 | 기준 문서 |
+| 영역 | 기준 문서 |
 |---|---|
 | 게임 목표와 콘텐츠 방향 | [GAME_DESIGN](GAME_DESIGN.md) |
 | 남은 작업과 완료 조건 | [TODO](TODO.md) |
@@ -14,7 +14,7 @@
 
 ## 기본 실행 흐름
 
-Unreal Engine 5.7의 `ProjectA.uproject`를 사용한다. 아래는 사용자가 직접 실행할 때의 안내다.
+실행 환경은 UE 5.7의 `ProjectA.uproject`다.
 
 1. 기본 시작 맵인 `/Game/User_JeHoon/LEVEL/MainMenu`를 연다.
 2. Play → New Game → CharacterCreation에서 1~4명의 캐릭터를 생성한다. 직업 화살표와 Edit로 직업·이름을 바꾼다.
@@ -94,31 +94,45 @@ Standalone은 결과 확정 후 TurnOrder·CombatUnits·ASC/이동·타이머·�
 
 GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMenu의 UIOnly 상태에서 travel한 뒤 남는 viewport `IgnoreInput`과 로컬 포커스는 native 진입 코드가 복구한다. 이 입력 수정에는 WBP 재생성이 필요 없다.
 
+## 콘텐츠·UI 설정
+
+| 항목 | 현재 규칙 |
+|---|---|
+| 직업 편집 | Edit에서 이름 1~32자·직업 편집. 저장 시 적용, 취소 시 기존 값 유지. ClassInfo는 HP/AP/SubAP·시작 스킬 표시 |
+| 직업 데이터 | `bUseUnitClassDefaults=true`는 클래스 기본값, false는 정의의 MaxHP/ActionPoints/SubActionPoints/StartingSkills 사용. CombatClass 미지정 시 기존 매핑·fallback 사용. 잘못된 직업·수치·중복 Ability는 거절 |
+| 회복약 | 기본 1개/전투, HP 40 회복, 수량 1·SubAP 1 소비. 만피·재고 부족·잘못된 대상은 무소모 거절. HUD는 자기 회복, StartItemAction은 생존 아군 지원. HealingItemAmount/HealingItemCount로 조정 |
+| 추가 스킬 | EncounterSkillPool에서 직업 설정 후 가중 추첨 1개를 부여·장착. 보유 Ability·잘못된 데이터·가중치 0 이하는 제외. 추가 슬롯 최대 4개 |
+| 현재 추가 스킬 | DA_SweepingStrike: 대상 주변 체비셰프 반경 1, 적 피해 10, AP 1. 시작 스킬 유지 |
+| 전투 간 이관 | HP 유지. 회복약·추가 스킬은 새 전투에서 재지급. 전투 중 복구는 저장된 장착·재고 유지. Snapshot 적은 회복약·무작위 추가 스킬 제외 |
+| 적 AI | 유효 대상 수/AP·거리·HP 선호도로 스킬 비교. 동점은 기존 순서. 같은 영역·점유·범위의 후보 중 상대와 가까워지는 타일만 이동. 거리 점수는 200 Unreal 단위 기준. 성공 후 재판단, 실패 시 턴 종료, 유효 행동이 없으면 대기 |
+| 메뉴 프리뷰 | MainMenuPreviewStage의 카메라·4개 앵커·ClassId별 BP_PartyMenuPreview 사용. 기존 메시 재사용, 전투 Pawn 생성 없음 |
+| 생성 화면 종료 | Back/X는 초안·프리뷰 정리. 재진입 시 빈 4슬롯. 상세 패널이 열려 있으면 먼저 패널만 닫음. 최소 슬롯 높이로 ClassInfo 표시 유지 |
+| 옵션·종료 | 적용 및 저장으로 그래픽 품질·VSync를 GameUserSettings.ini에 저장. 적용 전 닫기는 취소. Quit는 게임 종료 요청 |
+
+### 타겟·행동 세부 규칙
+
+- 전열 보호는 EnemyUnit 대상에 적용하며 `bIgnoreFront`로 예외 처리한다. 제자리 AllyUnit/AnyUnit은 자신도 선택 가능하고 타일 스킬은 유효 영역의 빈 타일을 지원한다. 접근 스킬은 다른 생존 유닛이 필요하다. 실행 전 대상 이동·교체를 재검사한다.
+- 범위는 Single·AroundTarget·AroundSelf를 지원한다. 후자는 효과 시점 시전자 타일 기준이며 범위 계산은 체비셰프 반경을 사용한다. 범위 효과는 시전자 제외 후 진영·생존·점유를 검사한다. Row/Column/LeftAndTarget/RightAndTarget/DiagonalTarget/AllEnemies·음수 반경은 AP 소비 전 거절한다. 범위 능력은 GA_AreaAttack 계열이다.
+- `GA_AttackBase`의 이전 비용 필드는 호환용이다. 실제 비용은 SkillDefinition의 ActionPointCost만 사용한다.
+- 타일은 `PartyPlayerController::HandleTileClicked`, UI는 `RequestEndTurn`·`RequestHealingItem`, AI 내부 종료는 `CombatManager::RequestEndTurnForUnit`을 사용한다. 인자 없는 Blueprint 턴 종료는 deprecated이며 플레이어 검사를 거친다.
+- 스폰 스킬은 SkillActorBase 계열을 사용한다. 몽타주가 없으면 impact만 대기하며, impact 이전 RequestFinish·Actor 소멸은 실패다. 미충돌 제한은 SpawnedActorTimeout 기본 10초다.
+- 플레이어 AP/SubAP가 모두 0이면 행동 완료 다음 틱에 턴을 종료한다. 보조 자원이 남으면 이동·아이템을 허용한다.
+
 ## 저장과 멀티플레이 연결 경계
 
-| 저장 종류 | 현재 계약 |
+일반 기본 슬롯은 `ProjectA_Run`, 상대 Snapshot 슬롯은 `ProjectA_Opponent_` 접두사를 사용한다. 새 게임·확정 턴·결과·Continue에서 저장하며 새 파티 시작은 선택 슬롯을 갱신한다. 전투 중 종료는 마지막 확정 턴, 결과 화면 종료는 결과 단계로 복구한다. 패배·완료 Run은 일반 Continue 대상에서 제외한다. 테스트 슬롯은 `-ProjectASaveSlot=...`로 분리한다.
+
+| 저장 종류 | 범위 |
 |---|---|
-| 일반 Run v1 | Identity 없는 `LegacyOffline` 구버전 호환. 메타데이터를 추정해 승격하지 않음 |
-| 일반 Run v2 | 전투 밖 파티·진행과 Identity/캐릭터 소유권 저장 |
-| 일반 Run v3 | 마지막 확정 턴의 전투 체크포인트 포함. 새 Actor로 복구 |
-| 관리 Run v4 | 로컬 기준 저장소에 전체 Run 본문·참여 목록 저장. CAS revision·HostEpoch·실행 lease로 쓰기/재개 제한 |
-| 상대 Snapshot v1 | 별도 `USaveGame` 슬롯과 고정 ID 카탈로그. 미지원 구조 버전 거절, 콘텐츠 버전 일치 요구 |
+| 일반 v1 | Identity 없는 LegacyOffline 호환, 소유자·Host 추정 이관 금지 |
+| 일반 v2 | 전투 밖 파티·진행·식별/소유권 |
+| 일반 v3 | 확정 턴 체크포인트, 새 Actor로 복구 |
+| 관리 v4 | 영속 Human 목록·전 단계 본문, CAS revision·HostEpoch·단일 실행 lease |
+| 상대 Snapshot v1 | 별도 USaveGame·고정 ID 카탈로그, 콘텐츠 버전 일치 |
 
-일반 저장 기본 슬롯은 `ProjectA_Run`, 상대 Snapshot은 `ProjectA_Opponent_` 접두사로 분리한다. Identity schema 1은 번호 0을 유지하고 schema 2는 명시적인 합류 번호 1~N을 검증한다. 전투 체크포인트 schema 1은 Human, schema 2는 저장된 Human/ServerAI 모드를 지원한다.
+일반 Continue는 LegacyOffline 또는 LocalDevelopment 단일 참가자만 지원한다. 협동·AccountProvider·관리 v4는 별도 재개 경로와 실제 로드 검증을 사용한다. 관리 메뉴는 신뢰된 C++ 호출자·재개 대상 설정이 필요하며 일반 협동 생성·로그인·저장 검색 UI는 미구현이다.
 
-일반 메뉴 `이어하기`는 유효한 LegacyOffline 또는 LocalDevelopment 단일 참가자 저장만 연다. 협동 저장과 관리 v4는 별도 복구 경로를 사용하며 조회 후 파일이 바뀌어도 실제 로드에서 다시 검사한다.
-
-관리 Run은 C++에서 변경 불가능한 개발 호출자 문맥과 재개 대상을 설정해야 한다. 메뉴의 `싱글로 전환하기`/`싱글 진행 이어하기`는 최신 기준 기록으로 명시적 재개를 요청한다. 계정 입력 UI·자동 개발 계정 생성·저장 검색·실제 로그인은 제공하지 않는다.
-
-`CreateManagedRun`은 최초 2~4명의 Human을 기록한다. `ResumeManagedRun`은 이전 Human의 부분집합과 최소 합류 번호 Host를 검사하며 HostEpoch·참여 목록·중첩 전투 Identity/모드를 원자적으로 갱신한다. 원래 캐릭터 소유권은 바뀌지 않는다.
-
-`ConfirmManagedResumeStarted` 전에는 인간 명령·노드·Continue를 막는다. 전투 복구 실패는 현재 Host의 재시도를 기다린다. 메뉴 travel 실패는 GameInstance에서 감지해 lease를 해제하고 확정 기록·호출자·재개 대상을 유지한다.
-
-정상 월드 종료는 전투·AI 콜백 중단 뒤 `CloseManagedRun`을 호출한다. 결과에서 전투 본문을 비워도 참여 목록은 다음 전투에 남는다. 이미 AI로 바뀐 소유자는 같은 Run에서 Human으로 돌아오지 않는다.
-
-일반 협동 v3는 원래 참가자 전원, 관리 v4는 현재 Human 전원의 연결을 요구한다. `AssignRunParticipant`/`ApplyCombatParticipantBindings`는 신뢰된 서버 C++ 배정이며 인증 기능이 아니다. Host도 타인의 Human 캐릭터를 직접 조작하지 못한다.
-
-관리 저장은 Win64 로컬 개발 대역이며 `AccountProvider`를 허용하지 않는다. 로컬 잠금은 온라인 접속 확인이나 중앙 서버 권위를 대신하지 않는다. Snapshot 선택 CLI·협동 실행·저장 원자성·온라인 준비의 세부 계약은 [MULTIPLAYER](MULTIPLAYER.md)를 따른다.
+일반 v3 협동은 원래 참가자 전원, 관리 v4는 현재 Human 전원의 서버 배정 후 복구한다. 로컬 관리 저장은 Win64 개발 어댑터이며 온라인 인증·중앙 권위를 제공하지 않는다. 버전·재개·실패·종료·AI 계약과 명령줄 옵션은 [MULTIPLAYER](MULTIPLAYER.md)를 따른다.
 
 ## Gameplay 에셋과 배치
 
@@ -178,36 +192,17 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 ## 에셋 도구와 CLI
 
-도구는 Development Editor / Win64 빌드 결과를 사용한다. 아래 명령은 필요할 때 사용자가 실행할 참조다. Python은 해당 프로세스의 `-EnablePlugins=PythonScriptPlugin`으로만 활성화한다.
+Development Editor / Win64 빌드를 사용한다. 초기 순서는 UI 생성 → Gameplay 생성 → Navigation Build → 저장 연결 검사다. 최초 생성 도구는 대상이 없는 환경에서만 실행하며 현재 TestMap 삭제 상태를 사전에 확인한다.
 
-| 경로 | 용도 |
-|---|---|
-| `Source/ProjectAEditor/Scripts/AuditGameplayAssets.py` | AssetRegistry와 실제 Blueprint/맵 참조 읽기, `Saved/Automation/GameplayAssetAudit.json` 기록 |
-| `Source/ProjectAEditor/Scripts/ConfigureGameplayAssets.py` | 최초 Gameplay/Blueprint/DataAsset 생성과 연결. 대상이 존재하면 중단하므로 현재 저장소에서 재실행하지 않음 |
-| `Source/ProjectAEditor/Scripts/ValidateGameplayAssets.py` | 부모·클래스·위젯·스폰·카메라 참조 검사, `Saved/Automation/GameplayAssetValidation.json` 기록 |
-| `Source/ProjectAEditor/UiScaffoldSpecs/` | `GameplayRootWidget.json`, `RunMapWidget.json`, `CombatHUDWidget.json`, `EncounterResultWidget.json`을 기존 GenerateUiScaffold로 관리 |
+JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Designer WBP가 화면 구조의 기준이며 자동 재생성하지 않는다. `-AddMissing`은 기존 속성·계층을 보존해 누락 위젯만 추가하며 `-Overwrite`와 병용할 수 없다. 현재 명세는 `generateNativeSource=false`다. 생성본은 실제 Compile·Save가 필요하며 DryRun은 구조 검사만 수행한다.
 
-```powershell
-$editorExecutable = 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-$projectFile = 'C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject'
-& $editorExecutable $projectFile -run=PythonScript -EnablePlugins=PythonScriptPlugin -script='Source/ProjectAEditor/Scripts/AuditGameplayAssets.py' -unattended -nop4 -NullRHI
-& $editorExecutable $projectFile -run=GenerateUiScaffold '-Spec=Source/ProjectAEditor/UiScaffoldSpecs/GameplayRootWidget.json' -unattended -nop4 -NullRHI
-& $editorExecutable $projectFile -run=PythonScript -EnablePlugins=PythonScriptPlugin -script='Source/ProjectAEditor/Scripts/ValidateGameplayAssets.py' -unattended -nop4 -NullRHI
-```
-
-초기 생성 도구의 실행 옵션은 위 Python 명령에서 script를 `ConfigureGameplayAssets.py`로 바꾼다. 생성 대상이 없는 신규 설정에만 사용한다. 복제 직후에는 Bounds/Recast Actor만으로 이동 경로가 생기지 않으므로 Gameplay 하나의 내비게이션 데이터를 빌드·저장해야 한다.
-
-```powershell
-& $editorExecutable $projectFile -run=ResavePackages -BuildNavigationData -Package=/Game/User_JeHoon/LEVEL/Gameplay -ProjectOnly -unattended -nop4 -NullRHI
-```
-
-초기 설정 순서는 UI 생성 → Gameplay 최초 생성 → Navigation Build → 저장된 연결 검사다. 실제 이동·입력·복구 작동은 별도 확인한다. 사용자 실행 절차와 확인 항목은 [TEST_REPORT](TEST_REPORT.md), 과거 실행 결과는 HISTORY에서 관리한다.
+메뉴 WBP 3종은 `UI/MainMenu`, 검증 사본은 `Validation/T12`에 둔다. `ProjectA.Menu.AssetContracts -T12GeneratedAssets`로 생성본을 검사한다. 지원 위젯·명세·옵션은 [UI 명세](../Source/ProjectA/UI/UI_README.txt), 실행 명령·제약은 [에셋 도구](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
 
 ## 현재 한계와 보존 대상
 
 - 기본 콘텐츠는 두 노드와 공통 PlayerUnit을 사용한다. 네 직업의 고유 스킬/스탯 완성, 전투 사이 회복·부활·보상, 전체 인벤토리/장비와 여러 Act는 미구현이다.
 - 기존 4×4 Grid, GAS 피해·몽타주·스킬 Actor, 적 AI, AP/보조 AP를 재사용한다. Streaming/Level Instance는 현재 흐름에 없다.
-- `TestMap` 원본과 기존 MainMenu를 유지한다. `WorldMap` 레벨/native class는 deprecated 상태로 보존하며 실행 흐름에 사용하지 않는다.
-- WorldMap의 WorldSettings가 `WorldMapGameModeBase`를 참조하므로 클래스를 임의로 삭제하지 않는다. 삭제/이름 변경이 없어 CoreRedirect도 추가하지 않았다.
+- 2026-09-11 작업 폴더의 TestMap과 기존 Blueprint 2개는 사용자 삭제 상태다. 자동 복원하지 않는다. WorldMap 레벨/native class는 deprecated 상태이며 실행 흐름에서 제외한다.
+- WorldMap의 WorldSettings가 참조하는 WorldMapGameModeBase는 호환을 위해 보존한다.
 - 로컬 Snapshot·Listen Server·개발용 관리 저장의 구현을 실제 계정 인증, Steam 연결, PlayFab 운영, 경쟁 결과 검증이나 MMR 완료로 기록하지 않는다.
 - 빌드·자동화 결과와 사용자의 실제 조작 검증을 구분한다. 다음 구현 우선순위와 T14 잔여 조건은 [TODO](TODO.md), 최종 작동 확인은 [TEST_REPORT](TEST_REPORT.md)를 따른다.

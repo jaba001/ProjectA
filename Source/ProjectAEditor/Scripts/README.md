@@ -1,6 +1,6 @@
-# Gameplay asset 도구
+# Gameplay 에셋 도구
 
-Development Editor | Win64 정식 빌드 후 실행한다. Python은 실행한 에디터 프로세스에서만 `-EnablePlugins=PythonScriptPlugin`으로 활성화하며 `.uproject`나 프로젝트 Config를 변경하지 않는다.
+Development Editor / Win64 빌드를 사용한다. Python은 `-EnablePlugins=PythonScriptPlugin`으로 해당 프로세스에서만 활성화한다. 제작 경로는 `/Game/User_JeHoon`이다. 최초 생성·Audit는 기존 TestMap을 요구하므로 현재 사용자 삭제 상태에서 실행 전 원본 가용성을 확인한다.
 
 ```powershell
 $editorExecutable = 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
@@ -45,8 +45,11 @@ $scriptDirectory = Join-Path $projectDirectory 'Source/ProjectAEditor/Scripts'
 & $editorExecutable $projectFile -unattended -nop4 -RenderOffscreen -nosound -Windowed -ResX=1280 -ResY=720 -WinX=0 -WinY=0 '-ExecCmds=Automation RunTests ProjectA.VerticalSlice.SavedMapsPIELoop' '-TestExit=Automation Test Queue Empty' ("-ReportExportPath=$projectDirectory/Saved/Automation/VerticalSlicePIE")
 ```
 
-테스트는 위젯 버튼 델리게이트로 캐릭터 생성·노드 선택·Continue를 실행한다. 첫 Move/Skill은 실제 Slate 합성 마우스 이벤트로 HUD 버튼과 월드 타일을 클릭한다. 히트 테스트·CommonUI·게임 뷰포트 전달 및 이동/피해 적용을 검사한 뒤 기존 기본 공격과 Enemy AI로 Victory까지 진행한다. 기존 몽타주의 제자리 실행은 메모리 내 SkillData 복사본으로 한 번 검사하고, 두 번째 Encounter의 Defeat는 테스트용 치명 피해로 유도한다. 디스크 에셋이나 전투 수치를 바꾸지 않는다. 물리적 마우스로 전체 흐름을 조작한 검증과 육안 검수는 별도다.
+검증 범위:
 
-오프스크린 Slate 클릭 검증은 창 위치와 크기를 위 명령처럼 명시한다. 2026-09-10 기본 창 설정의 첫 실행에서는 Move 버튼 hit-test가 실패했으며, 창 조건을 명시한 동일 빌드의 PIE 재실행은 통과했다. 클릭 검사를 직접 함수 호출로 대체하지 않는다.
+- 캐릭터 생성·노드·Continue는 위젯 delegate, 첫 Move/Skill은 Slate 합성 마우스로 HUD와 타일 입력 검사.
+- 기본 공격·Enemy AI로 첫 Victory 확인, 메모리 SkillData로 제자리 몽타주 실행 확인, 두 번째 Defeat는 치명 피해로 유도.
+- 디스크 에셋·밸런스는 변경하지 않는다. 실제 마우스 사용성·육안 확인은 별도다.
+- 오프스크린 클릭은 위 명령의 창 위치·크기를 유지한다. 기본 창 설정의 과거 hit-test 실패는 같은 빌드에서 창 조건 지정 후 통과했다. 클릭 검사를 함수 호출로 대체하지 않는다.
 
-자동화 프로세스가 exit 0이어도 테스트 자체는 실패할 수 있으므로 JSON 보고서의 테스트 결과와 `Test Completed. Result={Success}` 로그를 확인한다. 화면 캡처는 `Saved/Automation/VerticalSliceScreenshots`에 요청한다.
+종료 코드와 함께 JSON의 테스트 상태·오류 및 `Test Completed. Result={Success}`를 확인한다. 화면 캡처 경로는 `Saved/Automation/VerticalSliceScreenshots`다. 작동 테스트 실행 원칙과 결과 기록은 [TEST_REPORT](../../../Docs/TEST_REPORT.md)를 따른다.
