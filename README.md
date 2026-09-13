@@ -31,13 +31,15 @@ Unreal Engine 5.7 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 
 | 문서 | 내용 |
 |---|---|
-| [GAME_DESIGN](Docs/GAME_DESIGN.md) | 목표 기획과 확정 방향 |
+| [GAME_DESIGN](Docs/GAME_DESIGN.md) | 목표 기획·확정 방향·아이템 클론 제안 |
 | [PROJECT_PLAN](Docs/PROJECT_PLAN.md) | 모듈·전투·UI·에셋·설정 |
 | [UI_README](Docs/UI_README.md) | UI 구조·JSON 명세·생성 옵션 |
 | [TODO](Docs/TODO.md) | 미완료 작업과 결정 사항 |
 | [MULTIPLAYER](Docs/MULTIPLAYER.md) | 식별·소유권·저장·네트워크 계약 |
 | [TEST_REPORT](Docs/TEST_REPORT.md) | 실행 절차·검증 결과·경고 대응 |
 | [HISTORY](Docs/HISTORY.md) | 완료 이력과 기준 커밋 |
+
+[아이템 클론 기획](Docs/GAME_DESIGN.md#7-아이템-클론-기획)은 For The King 1·2를 참고한 44개 항목과 작품별 차이·원작 출처·데이터 변환 항목을 제공한다. 기획 제안이며 장비·거래·약초 시스템 구현은 포함하지 않는다. 채택할 정책은 [후속 결정](Docs/TODO.md#7-아이템-클론-기획-후속-결정)에서 관리한다.
 
 ## 개발 환경
 
