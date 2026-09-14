@@ -36,6 +36,7 @@ C++·리플렉션 변경 반영을 위해 빌드 후 UE를 재시작한다. 기�
 | 문서 | 내용 |
 |---|---|
 | [GAME_DESIGN](Docs/GAME_DESIGN.md) | 목표 기획·확정 방향·아이템 클론 제안 |
+| [STATUS_EFFECTS](Docs/STATUS_EFFECTS.md) | 해로운 상태이상 8종의 확정·잠정·미정 규칙, 구현 연결 검토와 미실행 검증 계획 |
 | [PROJECT_PLAN](Docs/PROJECT_PLAN.md) | 모듈·전투·UI·에셋·설정 |
 | [UI_README](Docs/UI_README.md) | UI 구조·JSON 명세·생성 옵션 |
 | [TODO](Docs/TODO.md) | 미완료 작업과 결정 사항 |
