@@ -4,13 +4,11 @@
 
 ## 현재 상태
 
-기본 Run은 싱글플레이다. T14 1~6번의 로컬 Snapshot·Listen Server·턴 복구·관리 v4·아군 AI는 구현 및 검증 완료다. 7번은 ff22940 기준 승계 PIE 3건·관리 계약 4건 통과로 로컬 검증을 완료했다. 일반 2·4인 전투의 HUD·Cue 수정 후 재검증은 별도이며 Cue fallback 재발은 후속 수정 대상이다.
+기본 Combat는 라운드 계획·시간차 실행으로 교체했다. `ACombatRoundCoordinator`가 서버 계획·시각·위치·충돌·피해를 소유하며 기존 Listen Server·원래 캐릭터 소유권·관리 lease를 연결한다. 순차 턴·연속 AI 실행과 턴 저장 복원은 폐기했다. 새 2/4인 전투·UI의 작동 검증은 미실행이다.
 
-8번의 Steam/PlayFab 인증·인터넷 P2P·공유 저장·결과 검증·MMR은 미구현이다. 구현 이력은 [HISTORY](HISTORY.md), 최신 실행·검증 제한은 [TEST_REPORT](TEST_REPORT.md)를 따른다. 작동 테스트는 사용자 수행이 원칙이며 명시적 요청 시 Codex가 실행한다.
+이전 ff22940의 승계 PIE·관리 계약 성공은 순차 전투 이력이다. 현재 비전투 관리 재개는 유지하지만 저장된 Phase Combat는 본문·Host·참가자·lease 변경 전에 거절한다. 새 전투의 라운드 중간 복구는 미지원이다. 상세 경계는 [12절](#12-시간차-자동-전투의-확장-경계)을 따른다.
 
-후속 개발용 협동 UI는 새 Listen Server 방 생성·주소 참가·준비·시작을 연결했으며 작동 검증은 대기다. 과거 T14-7 결과는 UI 추가 전 기준이다. 실행 절차와 제한은 [TEST_REPORT 9절](TEST_REPORT.md#9-개발용-협동-ui)을 따른다.
-
-2026-09-14 확정된 시간차 자동 전투는 미구현이다. 아래 턴·명령·저장 계약은 현재 순차 전투를 설명하며, 새 전투에 필요한 경계는 [12절](#12-시간차-자동-전투의-확장-경계)에서 구분한다.
+Steam/PlayFab 인증·인터넷 P2P·공유 저장·결과 검증·MMR은 미구현이다. 개발용 새 협동 방의 수동 절차는 [TEST_REPORT 9절](TEST_REPORT.md#9-개발용-협동-ui), 최신 라운드 확인은 [12절](TEST_REPORT.md#12-시간차-자동-전투-기획-검토)을 따른다.
 
 ## 확정 정책
 
@@ -27,7 +25,7 @@
 | AI 결정 | 재개 Host가 단독 확정한다. 개인별 사전 동의는 요구하지 않는다 |
 | 영구 AI | 해당 Run 종료까지 AI를 유지한다. 이후 Human 목록이나 Host 후보에 다시 넣지 않는다 |
 | 진행 결정 | 현재 Host만 노드 선택·승리 Continue를 실행한다 |
-| 복구 지점 | 마지막으로 저장까지 완료된 확정 턴 경계 |
+| 현재 복구 지점 | 마지막 전투 외 확정 저장. 새 라운드 중간 복구와 이전 순차 Combat 저장 재개는 미지원 |
 | 경쟁 목표 | 현재 Human 참여자에게만 MMR을 반영하고 불참자에게 추가 변동을 적용하지 않는다. 실제 계산·연동은 후속이다 |
 
 명시적 재개는 확정 데이터로 새 서버를 여는 기능이다. 실행 중인 Listen Server를 즉시 옮기는 자동 Host Migration은 아니다.
@@ -45,21 +43,21 @@ ID·버전은 아래 계층별로 구분한다. 영속 DTO에 Actor·Controller�
 | `JoinOrdinal` | 최초 합류 번호. 승계 후보 순서를 결정 |
 | `CharacterId` / `OwnerAccountId` | 원래 캐릭터와 소유자. AI·Host 변경으로 이전하지 않음 |
 | `HostAccountId` / `HostEpoch` | 현재 Host와 실행 세대. 명시적 관리 재개 시 epoch 증가 |
-| `AttemptId` | 확정 전투 시도. 같은 전투 복구·승계에서 유지 |
-| 전투 체크포인트 `Revision` | 해당 Attempt의 확정 턴 저장 순번 |
+| 이전 `AttemptId` | 과거 순차 전투 저장을 읽어 식별하는 필드. 현재 실행/복구에 사용하지 않음 |
+| 이전 전투 체크포인트 `Revision` | 과거 본문 검증용. 새 라운드 저장 순번으로 재해석하지 않음 |
 | 저장소 stamp | RunId·저장소 revision·HostEpoch·SessionId. 저장소 revision은 지도/결과/재개를 포함한 모든 저장 순번 |
-| Runtime ID·nonce | 전투/유닛 실행 ID, 연결 바인딩 ID, AI 조작 세션. 복구 시 새로 생성 |
+| Runtime ID·수정 번호 | 새 CombatId·RoundNumber·PlanRevision, 서버 유닛 ID·소유 연결. Run 영속 ID와 구분 |
 
 | 저장 계층 | 지원과 호환 |
 |---|---|
 | Opponent Snapshot | schema 1, 카탈로그와 일치하는 ContentVersion. Run 저장과 별개 |
 | Run SaveGame v1 | 식별 정보 없는 `LegacyOffline`. 소유자·Host를 추정 이관하지 않음 |
 | Run SaveGame v2 | 일반 Run의 전투 밖 진행과 식별/소유권 |
-| Run SaveGame v3 | 일반 Run의 확정 전투 본문. 협동 복구는 기존 Host·원래 참가자 전원 연결 |
-| Run SaveGame v4 | 관리 Run의 전 단계·영속 Human 목록과 확정 전투. LocalDevelopment 원래 참가자 2~4명만 허용 |
+| Run SaveGame v3 | 이전 순차 Combat 본문. 현재 Continue/로드 거절, 파일 보존 |
+| Run SaveGame v4 | 비전투 관리 진행·영속 Human 목록·lease 유지. 이전 Combat 재개 거절. LocalDevelopment 원래 참가자 2~4명 |
 | Identity schema 1 | 최초 번호 0을 유지하며 번호순 승계를 거절 |
 | Identity schema 2 | 1~참가자 수의 고유하고 연속된 최초 번호. 최초 epoch 1의 Host는 1번 |
-| CombatCheckpoint schema 1 / 2 | 1은 Human 호환, 2는 Human/ServerAI 모드 포함. 현재 콘텐츠 버전 1 |
+| CombatCheckpoint schema 1 / 2 | 과거 Human/ServerAI 저장의 구조 검증만 유지. 현재 라운드 저장/복구에는 사용하지 않음 |
 | Run EncounterProgress schema 0 / 1 | 0은 기존 상점 없는 경로. 1은 고정 상점 3개의 제시 목록·선택 ID·퇴장 상태. 새 일반/관리 Run에 적용 |
 
 새 일반 싱글 Run은 임시 개발 참가자 한 명과 Identity schema 2를 만든다. 실제 계정 인증을 의미하지 않는다.
@@ -73,38 +71,27 @@ v1~3을 관리 v4로 자동 이관하지 않는다. 전투별 AI 플래그에서
 
 | 구성 | 책임 |
 |---|---|
-| GameMode | 서버 Arena/Encounter 준비, 신뢰된 참가자 배정, Host 진행 권한, 종료 정리 |
-| RunStateSubsystem | 서버 GameInstance의 영속 진행·참여 목록·관리 lease. Client 공유 상태 원본이 아님 |
-| GameState | Phase·파티·노드·결과·확정 revision·오류의 읽기 전용 표시 뷰 |
-| CombatManager / TurnManager | 서버 턴·전투 결과·등록 유닛·Grid 검증. Client는 TurnManager를 생성하지 않음 |
-| CombatActionAuthority | 값 명령의 실행 문맥·연결·소유권·턴·장착·대상·자원 검증 |
-| PartyPlayerController | 소유 연결의 Server Reliable RPC와 응답, 로컬 선택/UI |
-| Unit / Grid | 서버 상태를 Replication·RepNotify로 전달. HP/MaxHP는 GAS, 이동은 Character Movement |
+| GameMode / Encounter | 서버 Arena·파티·참가자·Run 시작/종료, Host 진행 권한 |
+| RunState / GameState | 영속 진행·관리 lease와 읽기 전용 진행/결과 표시 뷰 |
+| CombatManager / RoundCoordinator | 전투 등록·계획·준비·서버 시각표·실제 이동·공격·최종 결과 |
+| CombatActionAuthority | 원래 캐릭터 소유권·서버 연결·관리 SessionId/lease·현재 Human/AI 검증 |
+| CombatRoundPlayerController | 소유 연결의 Reliable 계획/준비 RPC, 서버 응답·최신 복제 대기 |
+| Unit / Projectile | 서버 HP·실제 위치·사망·투사체 충돌과 복제 표현 |
 
-`AssignRunParticipant`는 알려진 서버 연결에 계정을 배정하는 신뢰된 C++ 진입점이다. 같은 연결의 계정 변경·같은 계정의 중복 연결을 거절한다.
-일반 협동 전투는 원래 참가자 전원을 요구한다. 관리 v4는 승인된 현재 Human 전원만 요구하고 AI 소유자의 Human 배정을 거절한다.
-정원 검사는 Unreal `PreLogin/Login → ApproveLogin`을 사용하며 소유권 검증과 별개다. `?MaxPlayers`·디버그 override는 엔진 규칙상 정원을 바꿀 수 있다.
-현재 fixture의 명시적 배정은 로그인 인증이 아니다. 서버는 향후 검증한 공급자 계정을 연결에 대응해야 한다.
+`AssignRunParticipant`는 신뢰 C++가 서버 연결에 계정을 배정한다. 계정 입력·표시 이름으로 소유권을 주장할 수 없다. 일반 협동은 원래 참가자 전원, 관리 Run은 승인된 현재 Human 전원이 필요하다. 새 Host도 다른 캐릭터의 인간 조작권을 얻지 않는다.
 
-`FCombatActionRequest`에는 Run/Host 세대·전투/바인딩 ID·턴·순번·유닛 ID·행동·스킬 PrimaryAssetId·대상 유닛/좌표를 담는다.
-Client가 주장한 계정·비용·Actor reference를 받지 않는다. 서버가 현재 장착 AbilitySpec, AP/SubAP, 생존·busy·턴·대상을 다시 확인한다.
-같은 실행 문맥에서 거절된 요청도 순번을 소비한다. 순번 재사용과 오래된 전투·턴·바인딩 요청은 거절한다. `Accepted`는 실행 요청 승인으로 비동기 이동/스킬 성공과 구분한다.
-늦은 응답은 새 선택을 지우지 않으며 처리한 응답의 재전송이 UI를 Pending에 남기지 않는다.
+계획 요청은 CombatId·RoundNumber·PlanRevision·UnitId·SkillId·대상 ID/좌표·목적지만 전달한다. 서버가 소유권·등록·스킬 부여·비용·목표·최종 배치를 검증하고 피해량/시각은 서버 데이터에서 결정한다. 해석이 끝난 이전 라운드나 낡은 수정 번호, 해결 중 편집, 대체 연결의 요청은 거절한다. UI는 서버 응답과 복제된 최신 상태를 기다린다.
 
-Unit의 팀·AP/SubAP·장착·턴/행동/사망·타일, Grid의 점유·영역·전열 보호를 서버에서 복제한다.
-GAS는 서버 전용 능력 실행과 Minimal 복제를 사용한다. 유닛의 AIController 이동을 인간 PlayerController 소유권에 의존시키지 않는다.
-HUD는 같은 서버 상태를 읽되 자기 Human 캐릭터 차례에만 행동 버튼을 활성화한다. AI 차례에는 `(AI)`를 표시한다.
-네트워크 결과 화면은 최종 유닛을 유지하고 Host Continue 또는 월드 종료에서 정리한다. 일반 Standalone은 결과 시 즉시 정리한다.
-Host의 진행 권한은 버튼과 실제 요청 모두 검사한다. 미배정·다른 Host·Client·서버의 원격 Controller는 노드/Continue를 확정하지 못한다.
+현재 계획 변경 시 인간 팀원의 Ready를 모두 해제하고 전체 준비 완료에서 명령을 잠근다. 이 정책과 복귀 칸 충돌·동시 타격 순서는 사용자 확인 대기 중인 구현 기본값이다. Client 프레임·충돌·몽타주가 독립 피해를 확정하지 않는다. 실제 네트워크의 지연·손실·4인 표시 일치는 미검증이다.
 
 ## Async PvP 상대 Snapshot
 
 `UPartySnapshotSaveGame`에 `FPartySnapshot`을 담고 Unreal SaveGame API로 저장한다. 초기 구현은 작은 파티의 동기 I/O다.
-Snapshot은 실시간 상대 접속 없이 상대 빌드 하나로 Encounter를 만든다. 원래 아군 소유권·Host·턴 복구 데이터와 별개다.
+Snapshot은 실시간 상대 접속 없이 상대 빌드 하나로 Encounter를 만든다. 원래 아군 소유권·Host와 라운드 실행 상태는 별개다.
 
 - 필드: SnapshotId·MemberId·ClassId·이름·Stats·순서 있는 SkillIds·EquipmentIds·TacticsId·FormationSlot·버전.
 - 카탈로그가 고정 ID를 신뢰된 Enemy 클래스/스킬 에셋으로 해석한다. 상대 데이터의 임의 클래스 경로를 실행하지 않는다.
-- 1~4명, FormationSlot 0~3, 스킬 1~5개. 첫 스킬이 기본 공격이며 ID/배치/스킬 및 동일 AbilityClass 중복을 거절한다.
+- 1~4명, FormationSlot 0~3, 순서 있는 스킬 1~5개. ID/배치/스킬 중복과 서로 다른 카탈로그 ID가 같은 스킬 에셋을 가리키는 별칭 중복을 거절한다. `ResolveRoundSkill`로 검증하며 명시 프로필은 GAS 클래스 없이 허용한다. 서로 다른 스킬 에셋의 동일 AbilityClass 공유는 허용한다.
 - 수치 상한은 HP 1,000,000, AP/SubAP 100, 이동 범위 32로 검증용 한계이며 밸런스 수치가 아니다.
 - EquipmentIds/TacticsId는 저장 가능하지만 현재 전투에서는 빈 값만 지원한다.
 - HP는 저장값 그대로 적용한다. HP 0은 저장 가능하나 현재 Snapshot Encounter에서는 거절한다.
@@ -113,50 +100,31 @@ Snapshot은 실시간 상대 접속 없이 상대 빌드 하나로 Encounter를 
 - 실패하면 상세 오류와 함께 준비를 정리하며 PvE 적으로 조용히 대체하지 않는다. 잘못된 저장/로드는 기존 파일/출력 값을 보존한다.
 
 생성한 적은 기존 `ConfigureProfession → RegisterUnits → StartCombat → Result → Cleanup` 흐름을 사용한다.
-새 Encounter마다 상대 슬롯을 읽지만, 전투 체크포인트는 읽은 본문·카탈로그·실제 장착을 고정한다.
-원본 슬롯을 변경·삭제해도 진행 중이던 전투는 고정 본문으로 복구한다. 다음 새 전투는 상대 슬롯을 다시 읽는다.
+새 Encounter마다 상대 슬롯을 읽어 유닛·장착을 준비한다. 현재 진행 중 전투는 저장/복구하지 않는다. 마지막 비전투 저장에서 Encounter를 다시 시작하면 상대 슬롯을 다시 읽는다. 상대 변경/삭제와 경쟁 재시도 정책은 별도 설계 대상이다.
 Run 전체 상대 이력, 경쟁 HP 정규화, 사망한 상대 포함 규칙, 매칭·서버 데이터/결과 검증은 후속이다.
 
 ## 확정 턴과 파일 저장
 
-저장 순서는 `OnTurnEnd 완료 → 다음 생존 유닛 선택 → 저장 완료 → OnTurnStart`다.
-첫 전투는 완료 턴 0 경계를 저장한다. 저장 시 모든 유닛은 비활성이고 다음 턴 AP/SubAP 초기화 전 상태다.
-`CompletedTurnSerial`과 `NextTurnIndex`로 복원하며 다음 활성 유닛의 정상 턴 초기화는 한 번만 실행한다.
-다른 유닛의 자원 잔량은 저장값을 유지한다. 이미 AI 판단이 시작된 뒤의 `OnTurnChanged`를 저장 훅으로 쓰지 않는다.
+기존 확정 턴 실행·저장/복원 경로는 폐기했다. `CompletedTurnSerial`·`NextTurnIndex`·Checkpoint schema는 이전 파일을 인식하고 검증하는 데만 남기며 새 라운드 번호로 재해석하지 않는다. `CommitCombatCheckpoint`·`RestoreSavedCombat`은 명시적으로 거절한다. 기존 파일은 삭제·다운그레이드하지 않는다.
 
-확정 본문은 다음을 담는다.
+현재 저장은 Map·Result·EncounterChoice·Shop·종료 결과 등 비전투 Run 전이만 수행한다. Preparing/Combat는 자동 저장하지 않는다. 새 전투 중 종료하면 마지막 비전투 확정 기록에서 해당 Encounter를 다시 시작한다. 라운드 경계·진행 중 시전/투사체·난수 상태의 저장과 복구는 미구현이다.
 
-- Run Identity, 노드/Encounter, AttemptId·revision, 완료 턴과 다음 유닛 인덱스.
-- 턴 순서대로 Unit 체크포인트 ID·원래 캐릭터/소유자·파티 슬롯·팀·클래스·이름.
-- HP/MaxHP·AP/SubAP와 상한, 이동 범위·회복약, 사망·타일 좌표·Transform.
-- 순서 있는 실제 스킬·기본 공격·Human/ServerAI 모드와 고정 상대 Snapshot.
+일반 Continue/로드는 저장된 Phase Combat를 메모리 적용 전에 거절한다. 관리 Resume는 이전 Combat를 참가자·HostEpoch·lease·기준 저장 변경 전에 거절한다. 원래 소유권·버전 검증과 비전투 저장의 지원 범위는 유지한다.
 
-저장 실패는 같은 다음 유닛·턴 번호·후보 본문을 유지한 채 전투를 멈춘다. Human·Enemy AI·자동 턴 종료가 앞서 진행하지 않는다.
-현재 로컬 Host의 **저장 다시 시도**가 같은 본문을 재시도하며 성공 후 다음 턴을 한 번만 연다. Client는 오류와 중단 상태만 수신한다.
-최종 승패와 Continue도 저장 성공 뒤 공개한다. 실패하면 대기 결과·기존 단계·확정 파일을 보존한다.
-
-Unreal `USaveGame`/`SaveGameToMemory`로 직렬화하고 같은 디렉터리의 임시 파일을 flush·바이트 재검증한 뒤 Win64 파일 교체로 확정한다.
-기존 파일을 먼저 지우지 않으며 미완료 `.tmp`는 로드 대상이 아니다. 현재 동기 저장은 Win64 로컬 어댑터로 다른 플랫폼/중앙 저장과 구분한다.
-전원 상실·저장 장치 고장에 대한 절대 내구성이나 온라인 위변조 방지를 주장하지 않는다.
-
-버전·Identity·중복 ID/점유·수치·생존/HP·다음 유닛·클래스/스킬·직업/아레나 적합성을 검증한다.
-생존 유닛의 XY는 점유 타일 중심에서 5cm 이내여야 한다. 고정 상대의 클래스·장착·최대 스탯도 대조한다.
-손상된 전투를 구버전 저장으로 낮춰 읽지 않으며 실패한 복원은 부분 Actor를 정리하고 확정 기록을 유지한다.
-활성 Ability·이동/스킬 액터·지속/주기 효과·쿨다운·상태 태그 등 표현하지 못하는 상태는 저장 시 거절한다.
-범용 GAS 상태·게임플레이 난수 스트림 복구는 미구현이다. 전열 보호는 복원한 진영·점유로 재계산한다.
+최종 승패와 Continue는 저장 성공 뒤 공개하며 실패 시 대기 결과·기존 단계·파일을 보존하고 재시도한다. Unreal USaveGame 직렬화와 같은 디렉터리 임시 파일의 flush·바이트 검사·Win64 파일 교체를 유지한다. 기존 파일을 먼저 지우지 않는다. 로컬 어댑터는 온라인 정본 권위나 절대 내구성을 보장하지 않는다.
 
 ## 관리 v4 재개와 lease
 
 `FRunParticipationData.HumanParticipants`는 원래 소유자 중 지금 Human인 계정을 전투 밖에도 보존한다.
 현재 목록에 없는 원래 캐릭터는 AI다. 사망만으로 목록을 바꾸지 않으며 결과에서 전투 본문을 비워도 목록은 남는다.
-새 Encounter와 복원은 이 목록으로 모드를 결정한다. 저장된 모드가 다르면 스폰 전에 거절한다.
+새 Encounter는 이 목록으로 모드를 결정한다. 이전 Combat 본문의 조작 모드는 구조 검증 후 재개 거절 대상으로만 사용한다.
 
 | API | 계약 |
 |---|---|
 | `ConfigureLocalDevelopmentCaller` | 신뢰 C++가 Development 계정·namespace를 주입. 같은 GameInstance에서 변경 불가 |
 | `CreateManagedRun` | 최초 Host 1번·epoch 1·원래 2~4명 전원 Human. 기록과 lease 생성 성공 뒤 메모리에 적용 |
 | `ReadManagedRun` | 원래 개발 참가자가 최신 본문/stamp를 조회. 조회만으로 권한·현재 Run을 바꾸지 않음 |
-| `ResumeManagedRun` | 닫힌 실행·최신 stamp·이전 Human의 부분집합·번호순 Host를 검증하고 새 본문/세대/lease를 원자적으로 획득 |
+| `ResumeManagedRun` | 저장된 Combat는 변경 전에 거절. 비전투 기록은 닫힌 실행·최신 stamp·Human 부분집합·번호순 Host 검증 후 새 본문/세대/lease 획득 |
 | `ConfirmManagedResumeStarted` | Gameplay 복구 성공 뒤 pending 해제. 실패하면 lease·pending·오류를 유지 |
 | `BeginManagedMenuTravel` | 같은 실행 SessionId·WorldContext의 TravelFailure를 GameInstance에서 감시 |
 | `CloseManagedRun` | 전투/콜백 중단 후 lease·활성 상태 해제. 호출자·재개 대상은 유지 |
@@ -167,9 +135,9 @@ Run별 유효한 저장소 revision·HostEpoch·SessionId로 갱신하며 충돌
 프로세스가 종료되어 핸들이 풀려도 Host는 자동 변경되지 않는다. 명시적 Resume에서만 새 epoch·SessionId를 만든다.
 이는 동일 PC 개발 대역이며 다른 PC의 중앙 저장·계정 인증·네트워크 장애 판정이 아니다.
 
-재개는 Run과 CombatCheckpoint Identity/모드를 함께 바꾸되 원래 소유권·번호·AttemptId·확정 턴을 보존한다.
+현재 재개는 비전투 Run Identity·영속 Human 목록만 갱신하며 원래 소유권·번호를 유지한다. 이전 CombatCheckpoint Identity/모드 갱신 코드는 제거했다.
 현재 Human이 본인 Host 한 명이면 Standalone으로 복구한다. Listen Server에서는 현재 Human 전원이 배정될 때까지 멈추며 자동 AI 전환하지 않는다.
-pending 중 Human 명령·노드·Continue를 막고 유효 lease의 서버 복원 준비·확정 턴 저장은 허용한다.
+pending 중 Human 명령·노드·Continue를 막고 비전투 Gameplay 진입 확인 후 해제한다. 순차 턴 체크포인트 저장은 허용하지 않는다.
 정상 월드 종료는 `ShutdownGameplay → CloseManagedRun` 순서로 Actor·AI·타이머·능력 콜백을 먼저 중단한다.
 
 Authority는 관리 실행 여부를 `Reset` 후에도 유지하며 현재 lease·전체 Identity·호출자 Host·SessionId를 재검사한다.
@@ -178,23 +146,13 @@ Human 바인딩과 서버 AI 모드 설정도 영속 목록에 맞아야 한다.
 
 ## 메뉴와 아군 AI
 
-일반 MainMenu **이어하기**는 v1 오프라인 또는 단일 참가자 LocalDevelopment v2/v3만 허용한다.
-클릭 시 실제 로드 본문을 다시 검증한다. 협동·AccountProvider·v4 저장은 일반 Standalone 진입으로 우회하지 않는다.
-일반 `LoadCheckpoint`의 협동 v3 지원은 유지하지만 기존 Host와 원래 참가자 전원의 서버 배정이 필요하다.
+일반 MainMenu 이어하기는 v1 오프라인 또는 단일 참가자 LocalDevelopment v2의 비전투 상태만 허용한다. 실제 클릭에서 방금 읽은 본문을 다시 검증한다. 일반 `LoadCheckpoint` 역시 이전 v3/Combat를 거절한다. 협동·AccountProvider·v4를 Standalone 경로로 우회하지 않는다.
 
-관리 패널은 신뢰 개발 경로가 호출자와 `SetManagedResumeTarget`을 설정했을 때만 표시한다. 사용자 계정 입력·자동 계정 추정·저장 검색은 없다.
-별도의 **개발용 협동**은 서버가 새 테스트 식별자를 발급하는 비관리 방이다. 주소 입력으로 계정을 주장하거나 기존 관리 저장을 열지 않으며, 원래 소유자가 재접속했다는 인증 수단으로 사용하지 않는다. 이탈한 방은 새 방으로 다시 시작한다.
-**싱글로 전환하기**는 여러 Human 중 본인만 남기는 새 실행을 획득하며 타 캐릭터의 영구 AI를 안내한다.
-**싱글 진행 이어하기**는 이미 본인만 Human인 관리 Run을 새 실행으로 연다. 이미 AI인 본인·종료/손상/오래된 기록은 거절한다.
-메뉴 TravelFailure는 확정 Host/AI를 되돌리지 않고 해당 lease를 해제한다. Controller가 사라져도 같은 GameInstance의 새 메뉴에서 다시 이어간다.
-Gameplay 도착 후 전투 복원 실패는 lease·pending을 유지하는 별도 재시도다. 계정 공급자 연동 전에는 fixture를 온라인 재개 서비스로 노출하지 않는다.
+관리 패널은 신뢰 개발 경로가 호출자·재개 대상을 설정했을 때만 표시한다. 비전투 기록에 대해 번호순 Host·영구 AI·lease를 유지한다. Combat 기록은 명시적인 미지원 메시지와 함께 거절한다. 메뉴 이동 실패는 확정 Host/AI 기록을 되돌리지 않고 lease를 해제하여 재시도를 허용한다. 온라인 로그인·관리 저장 검색·수동 협동 재개 UI는 미구현이다.
 
-`UPartyAutoCombatComponent`는 PlayerUnit의 클래스·팀·원래 소유자를 유지하고 서버에서만 판단한다. 프레임 Tick이나 가짜 PlayerController를 만들지 않는다.
-판단 순서는 유효 자기 회복약 → 장착·부여된 공격 스킬 → 접근이 나아지는 도달 가능 이동 → 턴 종료다.
-적 피해 대상이 없는 스킬과 아군 피해가 포함되는 공격은 제외한다. 동점은 장착 순서·타일 좌표로 처리한다.
-`ExecuteServerAI`는 별도 조작 세션·순번으로 인간과 같은 턴/자원/대상 검증을 이용한다. Client용 AI 우회 RPC는 없다.
-행동 전 대기를 설정하고 완료 뒤 다음 틱에 판단한다. 실패는 무한 재시도하지 않고 턴 종료로 정리한다.
-사망·턴 종료·전투/월드 정지는 전투·턴·AI 세션·generation이 지난 콜백을 무효화한다. 인간용 자원 소진 타이머와 중복 실행하지 않는다.
+개발용 협동은 새 비관리 Listen 방을 생성한다. 주소 참가가 원래 소유자 인증을 대신하지 않으며 이탈한 방은 새 방으로 시작한다. 자동 Host 변경·대체 참가·자동 AI 전환은 없다.
+
+이전 `UPartyAutoCombatComponent`와 EnemyUnit의 순차 재판단 실행은 제거했다. RoundCoordinator가 인간 초안 이전에 적·ServerAI 아군의 명령을 한 번 고정하고 준비 상태로 만든다. 클래스·진영·원래 소유자는 유지한다. 초기 AI는 가까운 적과 단일 공격을 선택하며 타일 접근·지원·이동 전술은 후속이다.
 
 ## Steam·PlayFab와 남은 서비스 정책
 
@@ -265,6 +223,8 @@ SlotId는 영문·숫자·밑줄 1~64자이며 `ProjectA_Opponent_<SlotId>`로 �
 Snapshot Run은 `ProjectA_SnapshotRun_<SlotId>`, PvE는 `ProjectA_Run`이다. `-ProjectASaveSlot=...`이 우선하며 이어하기는 같은 상대 인자를 사용한다.
 패키지에서 샘플을 쓰려면 그 실행 환경의 저장 API로 먼저 생성해야 한다. 실행 인자를 제거하면 기본 PvE다.
 
+아래 순차 전투·턴 복구용 명령/옵션은 과거 재현 기록이다. 현재 기본 전투의 실행 지침이나 통과 근거로 사용하지 않으며 새 검증은 TEST_REPORT 12절을 따른다.
+
 ```powershell
 & $editorCmd $project -unattended -nop4 -RenderOffscreen -nosound '-ExecCmds=Automation RunTests ProjectA.Coop.' '-TestExit=Automation Test Queue Empty'
 & $editorCmd $project -unattended -nop4 -RenderOffscreen -nosound -T14ManagedRunPIE '-ExecCmds=Automation RunTests ProjectA.ManagedRunPIE.' '-TestExit=Automation Test Queue Empty'
@@ -294,20 +254,14 @@ PIE fixture는 고유 저장 namespace/슬롯과 명시적 계정 매핑을 사�
 
 ## 12 시간차 자동 전투의 확장 경계
 
-상태: [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 기획 방향 확정, 네트워크·저장 전환 미구현. 기존 순차 턴·체크포인트 v1/v2·Run v2/v3/v4와 검증 이력은 그대로 유지한다. 상세 미결정 계약은 [TODO 8절](TODO.md#8-시간차-자동-전투-후속-결정)을 따른다.
-
 ### 12-1 서버 실행과 조작권
 
-서버가 계획 요청의 소유권·라운드·유효성을 검사하고 확정 명령·행동 시각·실제 위치·스킬 발동·피격·피해·사망·결과를 관리하는 방향이다. 투사체 적중은 서버 충돌 판정으로 확정한다. 유닛 간 이동 비충돌과 공격 검출을 분리하며, 발사된 투사체의 수명은 시전자의 사망·능력 종료와 분리해야 한다.
+기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 라운드 계획/시간차 실행이다. 기존 Run 식별·소유 연결·관리 lease를 사용하되 순차 행동 실행은 제거한다. 서버가 계획·전체 잠금·0.01초 실행·실제 좌표·투사체 충돌·피해·사망·잔여 공격 종료를 확정하고 Client에 상태를 복제한다.
 
-현재 즉시 실행용 `FCombatActionRequest`의 TurnSerial·현재 유닛 조건을 단순 해제해 계획 제출에 재사용하지 않는다. 라운드·초안 수정 번호·준비 상태·명령 잠금과 오래된 요청 거절 계약이 필요하다. Host 권위와 타인 캐릭터 소유권을 구분하고 최대 4인·Human/AI 혼합을 유지한다. 자세한 DTO·RPC·복제 필드는 후속 구현 설계 대상이다.
-
-클라이언트는 서버 상태로 이동·시전·투사체·결과를 표시한다. 각 클라이언트의 프레임률·도착 순서로 피해나 승패를 독립 확정하지 않는다. 서버 시간의 기준·동시 타격 처리와 시험 허용 오차는 명세가 필요하다. Listen Server를 사용한다는 사실만으로 경쟁 결과의 위변조 검증이나 인터넷 서비스 지원을 완료로 보지 않는다.
+동일 예정 시각의 타격은 안정적인 서버 순서로 즉시 처리하는 초기값이다. 전체 라운드의 원자적 동시 성립이나 물리 충돌까지 포함한 결정성을 보장하지 않는다. 준비 해제·최종 목적지 충돌 정책도 사용자 확정과 구분한다. 지연/손실·표현 품질·2/4인 체감 검증은 미실행이다.
 
 ### 12-2 Snapshot과 복구
 
-상대 Party Snapshot과 라운드 실행 상태·확정 명령은 별도 데이터다. 적 명령은 인간 초안 이전에 고정한다. 속도 값의 출처와 지원 스킬별 실행 정책을 정하되 새 Tactics·Snapshot 스키마를 무조건 추가하지 않는다. 현재 EquipmentIds/TacticsId 빈 값 제한을 새 기획으로 해제한 것으로 기록하지 않는다.
+상대 Party Snapshot과 실행 중 라운드/명령은 별도 데이터다. 기존 카탈로그로 스폰한 장착 스킬은 명시 RoundDefinition 또는 초기 변환을 사용한다. 원래 GAS 효과·EquipmentIds/TacticsId·Snapshot Speed가 모두 지원되는 것으로 해석하지 않는다. 적 계획은 인간 초안 이전에 고정한다.
 
-기존 확정 턴 경계는 다음 유닛 활성화를 전제로 하므로 시간차 전투에 그대로 대응하지 않는다. 다음 계획 단계의 안정 상태에서 복구할지, 진행 중 시전·이동·투사체·지연 피해까지 복원할지 미정이다. 라운드 재실행 시 난수·고정 적 명령·피해 중복 및 기존 저장의 규칙 버전 식별도 통합 전에 결정한다. 전투 중단만으로 자동 Host 승계·AI 전환을 새로 도입하지 않는다.
-
-첫 프로토타입을 일반 Run 저장과 분리하는 안을 권장한다. 기존 저장 버전·관리 lease·MMR·온라인 서비스를 이번 문서 작업에서 변경하지 않으며, 실제 두 사람의 동시 계획과 결과 일치는 [TEST_REPORT 12절](TEST_REPORT.md#12-시간차-자동-전투-기획-검토)의 후속 사용자 검증 대상이다.
+이전 Phase Combat 저장은 로드/관리 재개를 거절하며 파일·현재 상태·lease를 바꾸지 않는다. 새 전투는 마지막 비전투 확정 기록만 재개할 수 있다. 진행 중 라운드의 시전·실제 좌표·투사체·지연 피해·난수·이미 적용된 결과 복구는 미구현이다. 중단만으로 자동 Host 승계나 AI 전환하지 않는다. 상세 결정은 [TODO 8절](TODO.md#8-시간차-자동-전투-후속-결정), 사용자 확인은 [TEST_REPORT 12절](TEST_REPORT.md#12-시간차-자동-전투-기획-검토)에 둔다.

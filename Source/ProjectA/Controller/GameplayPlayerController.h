@@ -38,7 +38,6 @@ public:
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-    virtual bool ShouldCreateCombatHUD() const override { return false; }
 
     UPROPERTY(EditDefaultsOnly, Category = "Gameplay|UI")
     TSubclassOf<UGameplayRootWidget> GameplayRootWidgetClass;

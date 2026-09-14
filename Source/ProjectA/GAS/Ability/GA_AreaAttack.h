@@ -4,17 +4,8 @@
 #include "GAS/Ability/GA_AttackBase.h"
 #include "GA_AreaAttack.generated.h"
 
-class ACombatGridTile;
-class ACombatGridManager;
-class AUnitBase;
-class USkillDefinitionDataAsset;
-
-// Tile-centered area attack Ability
-// - The common attack lifecycle is handled by UGA_AttackBase
-// - This class is responsible for caching center tile and skill data
-// - Calculating area tiles
-// - Collecting target units within the area
-// - Applying damage to multiple targets
+// Keep authored Blueprint identity without the removed direct or tile-based damage path.
+// 제거된 직접 또는 타일 기반 피해 경로 없이 제작 블루프린트 식별자를 유지합니다.
 UCLASS()
 class PROJECTA_API UGA_AreaAttack : public UGA_AttackBase
 {
@@ -22,36 +13,4 @@ class PROJECTA_API UGA_AreaAttack : public UGA_AttackBase
 
 public:
     UGA_AreaAttack();
-
-protected:
-    // Cache the current area attack context
-    virtual bool CacheAttackContext() override;
-
-    // Validate the cached context
-    virtual bool ValidateAttackContext() const override;
-
-    // Apply attack effect to area targets
-    virtual void ApplyAttackEffect() override;
-
-    // Clear cached area attack context
-    virtual void ClearCachedAttackContext() override;
-
-protected:
-    // Resolve the actual center tile for the area
-    ACombatGridTile* ResolveCenterTile() const;
-
-    // Resolve the list of target units within the area
-    TArray<AUnitBase*> ResolveAreaTargetUnits() const;
-
-    // Validate whether the unit is a valid target based on team rules
-    bool IsValidAreaTargetUnit(AUnitBase* TargetUnit) const;
-
-protected:
-    // Currently selected target tile
-    UPROPERTY()
-    ACombatGridTile* CachedTargetTile = nullptr;
-
-    // Skill definition data currently being executed
-    UPROPERTY()
-    USkillDefinitionDataAsset* CachedSkillData = nullptr;
 };

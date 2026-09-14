@@ -131,6 +131,8 @@ namespace
         {
             TStrongObjectPtr<URunSaveGame> State(NewObject<URunSaveGame>());
             State->Identity = Run->GetRunIdentity();
+            State->Participation = Run->GetParticipation();
+            State->EncounterProgress = Run->GetEncounterProgress();
             State->Party = Run->GetPartyMembers();
             State->Nodes = Run->GetNodes();
             State->CompletedNodes = Run->GetCompletedNodes();
@@ -167,7 +169,7 @@ bool FStandaloneContinueEligibilityTest::RunTest(const FString& Parameters)
     const TArray<FCase> Cases = {
         {ERunIdentityOrigin::LegacyOffline, 0, 4, false, true},
         {ERunIdentityOrigin::LocalDevelopment, 1, 4, false, true},
-        {ERunIdentityOrigin::LocalDevelopment, 1, 4, true, true},
+        {ERunIdentityOrigin::LocalDevelopment, 1, 4, true, false},
         {ERunIdentityOrigin::AccountProvider, 1, 1, false, false},
         {ERunIdentityOrigin::AccountProvider, 1, 1, true, false},
         {ERunIdentityOrigin::AccountProvider, 2, 2, false, false},
@@ -183,7 +185,7 @@ bool FStandaloneContinueEligibilityTest::RunTest(const FString& Parameters)
         const TArray<uint8> BeforeRuntime = Fixture.CaptureRuntime();
         const TArray<uint8> BeforeDisk = Fixture.ReadBytes();
         const int32 BeforeEvents = Events;
-        TestTrue(Label + TEXT("general eligibility remains available to the network restore path"), Fixture.Run->CanContinueSavedRun(Error));
+        TestEqual(Label + TEXT("general eligibility rejects retired combat and preserves noncombat support"), Fixture.Run->CanContinueSavedRun(Error), !Case.bCombat);
         TestEqual(Label + TEXT("menu eligibility follows the existing Standalone binding support"), Fixture.Run->CanContinueStandaloneSavedRun(Error), Case.bStandalone);
         if (!Case.bStandalone) TestFalse(Label + TEXT("menu rejection explains the required session"), Error.IsEmpty());
         TestTrue(Label + TEXT("both queries preserve runtime, disk and event count"), Fixture.CaptureRuntime() == BeforeRuntime && Fixture.ReadBytes() == BeforeDisk && Events == BeforeEvents);
@@ -197,8 +199,16 @@ bool FStandaloneContinueEligibilityTest::RunTest(const FString& Parameters)
             TestEqual(Label + TEXT("one accepted menu load publishes exactly one event"), Events, BeforeEvents + 1);
             TestTrue(Label + TEXT("accepted menu load retains the complete identity"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Save->Identity, &Fixture.Run->GetRunIdentity(), 0));
         }
-        TestTrue(Label + TEXT("the general network load still accepts the valid save"), Fixture.Run->LoadCheckpoint(Error));
-        TestTrue(Label + TEXT("general load preserves the saved checkpoint body"), FCombatCheckpointData::StaticStruct()->CompareScriptStruct(&Save->CombatCheckpoint, &Fixture.Run->GetCombatCheckpoint(), 0));
+        TestEqual(Label + TEXT("general load enforces the same combat migration gate"), Fixture.Run->LoadCheckpoint(Error), !Case.bCombat);
+        if (Case.bCombat)
+        {
+            TestTrue(Label + TEXT("retired combat is explained explicitly"), Error.ToString().Contains(TEXT("순차 턴")));
+            TestTrue(Label + TEXT("general rejection preserves current Run, file and events"), Fixture.CaptureRuntime() == BeforeRuntime && Fixture.ReadBytes() == BeforeDisk && Events == BeforeEvents);
+        }
+        else
+        {
+            TestTrue(Label + TEXT("general noncombat load preserves complete identity"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Save->Identity, &Fixture.Run->GetRunIdentity(), 0));
+        }
         TestTrue(Label + TEXT("all reads leave file bytes unchanged"), Fixture.ReadBytes() == BeforeDisk);
     }
     return true;
@@ -210,14 +220,14 @@ bool FStandaloneContinueFileReplacementTest::RunTest(const FString& Parameters)
 {
     FStandaloneContinueFixture Fixture;
     FText Error;
-    TStrongObjectPtr<URunSaveGame> Original = Fixture.MakeSave(ERunIdentityOrigin::LocalDevelopment, 1, 1, true);
-    if (!TestNotNull(TEXT("A current local combat is available for preservation checks"), Original.Get())) return false;
+    TStrongObjectPtr<URunSaveGame> Original = Fixture.MakeSave(ERunIdentityOrigin::LocalDevelopment, 1, 1, false);
+    if (!TestNotNull(TEXT("A current local Map is available for preservation checks"), Original.Get())) return false;
     int32 Events = 0;
     const FDelegateHandle Observer = Fixture.Run->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
     ON_SCOPE_EXIT { Fixture.Run->OnRunStateChanged.Remove(Observer); };
     for (bool bReplacementCombat : {false, true})
     {
-        if (!TestTrue(TEXT("The original local combat is installed"), FRunCheckpointStorage::Save(Original.Get(), Fixture.Slot, Error)) || !TestTrue(TEXT("The current runtime starts from the original local combat"), Fixture.Run->LoadStandaloneCheckpoint(Error))) return false;
+        if (!TestTrue(TEXT("The original local Map is installed"), FRunCheckpointStorage::Save(Original.Get(), Fixture.Slot, Error)) || !TestTrue(TEXT("The current runtime starts from the original local Map"), Fixture.Run->LoadStandaloneCheckpoint(Error))) return false;
         const TArray<uint8> BeforeRuntime = Fixture.CaptureRuntime();
         const FText BeforeSaveError = Fixture.Run->GetSaveError();
         const bool bBeforeSaving = Fixture.Run->IsCheckpointSavingEnabled();
@@ -226,14 +236,22 @@ bool FStandaloneContinueFileReplacementTest::RunTest(const FString& Parameters)
         TStrongObjectPtr<URunSaveGame> Replaced = Fixture.MakeSave(ERunIdentityOrigin::AccountProvider, 2, 2, bReplacementCombat);
         if (!TestNotNull(TEXT("The replacement is a cooperative native save"), Replaced.Get()) || !TestTrue(TEXT("The file changes after the menu eligibility check"), FRunCheckpointStorage::Save(Replaced.Get(), Fixture.Slot, Error))) return false;
         const TArray<uint8> ReplacedBytes = Fixture.ReadBytes();
-        TestTrue(TEXT("The replacement is valid for the general network restore path"), Fixture.Run->CanContinueSavedRun(Error));
+        TestEqual(TEXT("General eligibility accepts only the noncombat replacement"), Fixture.Run->CanContinueSavedRun(Error), !bReplacementCombat);
         TestFalse(TEXT("Actual menu load rechecks the replacement instead of trusting the enabled button"), Fixture.Run->LoadStandaloneCheckpoint(Error));
         TestFalse(TEXT("The rejected click reports why this session cannot restore the save"), Error.IsEmpty());
         TestTrue(TEXT("Rejected click preserves every current Run field and its persistence status"), Fixture.CaptureRuntime() == BeforeRuntime && Fixture.Run->GetSaveError().EqualTo(BeforeSaveError) && Fixture.Run->IsCheckpointSavingEnabled() == bBeforeSaving);
         TestEqual(TEXT("Rejected click publishes no Run event"), Events, BeforeEvents);
         TestTrue(TEXT("Rejected click preserves the exact replacement file"), Fixture.ReadBytes() == ReplacedBytes);
-        TestTrue(TEXT("The same replacement remains available to an explicit network load"), Fixture.Run->LoadCheckpoint(Error));
-        TestEqual(TEXT("General load retains the replacement's real Run ID"), Fixture.Run->GetRunIdentity().RunId, Replaced->Identity.RunId);
+        TestEqual(TEXT("Explicit load also rejects a retired combat replacement"), Fixture.Run->LoadCheckpoint(Error), !bReplacementCombat);
+        if (bReplacementCombat)
+        {
+            TestTrue(TEXT("General rejection keeps all prior runtime state and events"), Fixture.CaptureRuntime() == BeforeRuntime && Events == BeforeEvents);
+            TestTrue(TEXT("General rejection keeps the replaced file intact"), Fixture.ReadBytes() == ReplacedBytes);
+        }
+        else
+        {
+            TestEqual(TEXT("Supported general load retains the replacement's real Run ID"), Fixture.Run->GetRunIdentity().RunId, Replaced->Identity.RunId);
+        }
     }
     if (!TestTrue(TEXT("The local save is restored for a second eligibility check"), FRunCheckpointStorage::Save(Original.Get(), Fixture.Slot, Error)) || !TestTrue(TEXT("The menu enables a local save again"), Fixture.Run->CanContinueStandaloneSavedRun(Error))) return false;
     TStrongObjectPtr<URunSaveGame> NewLocal = Fixture.MakeSave(ERunIdentityOrigin::LocalDevelopment, 1, 2, false);

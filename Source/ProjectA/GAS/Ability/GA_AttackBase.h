@@ -7,12 +7,11 @@
 #include "GA_AttackBase.generated.h"
 
 class AActor;
-class AUnitBase;
 class UAnimMontage;
 class UGameplayEffect;
-class UAbilityTask_PlayMontageAndWait;
-class UAbilityTask_WaitGameplayEvent;
 
+// Existing Blueprint classes retain authored values but cannot execute the retired attack lifecycle.
+// 기존 블루프린트 클래스는 제작 수치를 유지하지만 사용 중단된 공격 생명주기를 실행하지 않습니다.
 UCLASS(Abstract)
 class PROJECTA_API UGA_AttackBase : public UGameplayAbility
 {
@@ -21,131 +20,38 @@ class PROJECTA_API UGA_AttackBase : public UGameplayAbility
 public:
     UGA_AttackBase();
 
-    EUnitActionResult GetActionResult() const { return ActionResult; }
+    // Read authored attack power without executing a legacy ability.
+    // 기존 어빌리티를 실행하지 않고 제작된 공격 수치를 읽습니다.
+    float GetAuthoredDamageAmount() const { return DamageAmount; }
+    EUnitActionResult GetActionResult() const { return EUnitActionResult::Failed; }
+    virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
 protected:
-    // Common attack activation entry point
-    // Handles commit, owner caching, context caching, and release timing flow
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
-    // Common attack end entry point
-    // Handles task cleanup and cached state cleanup
-    virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
-
-protected:
-    // Called when the attack montage is completed
-    UFUNCTION()
-    void OnAttackMontageCompleted();
-
-    // Called when the attack montage begins blend-out
-    UFUNCTION()
-    void OnAttackMontageBlendOut();
-
-    // Called when the attack montage is interrupted
-    UFUNCTION()
-    void OnAttackMontageInterrupted();
-
-    // Called when the attack montage is cancelled
-    UFUNCTION()
-    void OnAttackMontageCancelled();
-
-    // Called when the attack release event is received
-    UFUNCTION()
-    void OnReleaseEventReceived(FGameplayEventData Payload);
-
-    // Child Ability caches its own attack context
-    virtual bool CacheAttackContext();
-
-    // Child Ability validates whether the current context is valid
-    virtual bool ValidateAttackContext() const;
-
-    // Release attack once per activation
-    // - Spawn actor if configured
-    // - Otherwise apply direct effect
-    virtual void ReleaseAttack();
-
-    // Child Ability applies the actual attack effect
-    virtual void ApplyAttackEffect();
-
-    // Child Ability spawns the attack actor if needed
-    virtual void SpawnAttackActor();
-
-    // Child Ability clears its own cached context
-    virtual void ClearCachedAttackContext();
-
-    // Common finish handler
-    void FinishAttackAbility(bool bWasCancelled);
-
-    // Keep GAS active until animation and the spawned actor both resolve.
-    // 애니메이션과 스폰 액터가 모두 끝날 때까지 GAS를 유지합니다.
-    void HandleSpawnedActorResolved(class ASkillActorBase* Actor, bool bSucceeded);
-    void HandleSpawnedActorTimeout();
-    TWeakObjectPtr<class ASkillActorBase> PendingAttackActor;
-    FTimerHandle SpawnedActorTimeoutHandle;
-    UPROPERTY()
-    bool bAnimationFinished = false;
-
-    // Bound missed-projectile waits; charged AP is not refunded.
-    // 미충돌 발사체의 대기 시간을 제한하며 소비한 AP는 환불하지 않습니다.
-    UPROPERTY(EditDefaultsOnly, Category = "Attack", meta = (ClampMin = "0.1"))
-    float SpawnedActorTimeout = 10.0f;
-
-protected:
-    // Unit currently performing the attack
-    UPROPERTY()
-    AUnitBase* CachedOwnerUnit = nullptr;
-
-    // Whether attack has already been released during this activation
-    UPROPERTY()
-    bool bAttackReleasedThisActivation = false;
-
-    // Flag used to prevent duplicate finish handling
-    UPROPERTY()
-    bool bFinishRequested = false;
-
-    // Setup rejection is a failure; interruptions after setup are cancellations.
-    // 준비 단계의 거절은 실패이며 준비 이후의 중단은 취소입니다.
-    EUnitActionResult ActionResult = EUnitActionResult::Failed;
-
-protected:
-    // Keep legacy asset references readable; execution uses only the skill definition cost.
-    // 기존 에셋 참조 호환을 위해 유지하며 실행 비용은 스킬 정의에서만 읽습니다.
+    // Compatibility properties preserve existing assets while round definitions own execution.
+    // 라운드 정의가 실행을 소유하며 호환 속성은 기존 에셋을 보존합니다.
     UPROPERTY(BlueprintReadOnly, Category = "Attack|Cost", meta = (DeprecatedProperty, DeprecationMessage = "Use SkillDefinitionDataAsset.ActionPointCost instead."))
     int32 ActionPointCost = 1;
 
-    // Attack montage
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     UAnimMontage* AttackMontage = nullptr;
 
-    // Damage GE class applied to the actual target
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     TSubclassOf<UGameplayEffect> DamageEffectClass;
 
-    // Base attack damage value
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     float DamageAmount = 10.0f;
 
-    // Event tag used for attack release timing
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     FGameplayTag AttackReleaseEventTag;
 
-    // Optional spawned attack actor class
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     TSubclassOf<AActor> SpawnedAttackActorClass;
 
-    // Optional socket name used by spawned attack actor
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     FName SpawnSocketName = NAME_None;
 
-protected:
-    // Cached activation info
-    FGameplayAbilitySpecHandle CachedHandle;
-    FGameplayAbilityActivationInfo CachedActivationInfo;
-
-    // Cached AbilityTasks
-    UPROPERTY()
-    UAbilityTask_PlayMontageAndWait* PlayMontageTask = nullptr;
-
-    UPROPERTY()
-    UAbilityTask_WaitGameplayEvent* WaitReleaseEventTask = nullptr;
+    UPROPERTY(EditDefaultsOnly, Category = "Attack", meta = (ClampMin = "0.1"))
+    float SpawnedActorTimeout = 10.0f;
 };

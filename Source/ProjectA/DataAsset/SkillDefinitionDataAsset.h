@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Types/SkillTypes.h"
+#include "Combat/Round/CombatRoundTypes.h"
 #include "SkillDefinitionDataAsset.generated.h"
 
 class UGameplayAbility;
@@ -16,9 +17,21 @@ class PROJECTA_API USkillDefinitionDataAsset : public UPrimaryDataAsset
     GENERATED_BODY()
 
 public:
+    // Opt into authored real-time execution values; older assets receive a documented migration profile.
+    // 실시간 실행 수치를 직접 지정하며 기존 에셋은 명시된 이행 기본값을 사용합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Round")
+    bool bUseRoundDefinition = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Round", meta = (EditCondition = "bUseRoundDefinition"))
+    FCombatRoundSkill RoundDefinition;
+
+    // Resolve and validate the same execution profile for runtime, catalogues and editor validation.
+    // 실행 중 처리, 카탈로그, 에디터 검증에서 동일한 실행 프로필을 해석하고 검사합니다.
+    bool ResolveRoundSkill(FCombatRoundSkill& OutSkill, FText& OutError) const;
+
 #if WITH_EDITOR
-    // Report unsupported area definitions in the editor's asset validation.
-    // 에디터 에셋 검증에서 미지원 범위 정의를 오류로 보고합니다.
+    // Report invalid profiles and legacy semantics that require an explicit round definition.
+    // 잘못된 프로필과 명시적 라운드 정의가 필요한 기존 의미를 오류로 보고합니다.
     virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
 #endif
 
@@ -42,8 +55,8 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
     TObjectPtr<UTexture2D> SkillIcon = nullptr;
 
-    // GAS Ability class executed by this skill.
-    // 이 스킬이 실행하는 GAS 어빌리티 클래스입니다.
+    // Legacy attack metadata source; authored round profiles do not execute or require this class.
+    // 기존 공격 메타데이터 원본이며 직접 작성한 라운드 프로필은 이 클래스를 실행하거나 요구하지 않습니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
     TSubclassOf<UGameplayAbility> AbilityClass = nullptr;
 

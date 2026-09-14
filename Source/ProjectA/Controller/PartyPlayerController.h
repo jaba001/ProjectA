@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/PlayerController.h"
+#include "Controller/CombatRoundPlayerController.h"
 #include "Combat/Commands/CombatActionTypes.h"
 #include "Game/Run/RunIdentityTypes.h"
 #include "PartyPlayerController.generated.h"
@@ -14,8 +14,8 @@ class USkillDefinitionDataAsset;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnCombatActionResponse, const FCombatActionResponse&);
 
-// Tile input mode selected by the player controller.
-// 플레이어 컨트롤러에서 선택한 타일 입력 모드입니다.
+// Retained for serialized Blueprint references; tile clicks no longer execute actions.
+// 직렬화된 Blueprint 참조를 위해 보존하며 타일 클릭은 더 이상 행동을 실행하지 않습니다.
 UENUM(BlueprintType)
 enum class ETileInputMode : uint8
 {
@@ -25,53 +25,37 @@ enum class ETileInputMode : uint8
     Item
 };
 
-// Player controller that bridges combat UI input and combat actions.
-// 전투 UI 입력과 전투 행동을 연결하는 플레이어 컨트롤러입니다.
+// Preserves party identity and Run authorization while inheriting round planning requests.
+// 라운드 계획 요청을 상속하면서 파티 식별자와 Run 권한을 유지합니다.
 UCLASS()
-class PROJECTA_API APartyPlayerController : public APlayerController
+class PROJECTA_API APartyPlayerController : public ACombatRoundPlayerController
 {
     GENERATED_BODY()
 
 public:
-    // Sets controller defaults for combat input.
-    // 전투 입력을 위한 컨트롤러 기본값을 설정합니다.
     APartyPlayerController();
-
-protected:
-    // Finds required combat actors and initializes HUD.
-    // 필요한 전투 액터를 찾고 HUD를 초기화합니다.
-    virtual void BeginPlay() override;
-    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
-    virtual bool ShouldCreateCombatHUD() const { return true; }
-
-private:
-    // Finds and caches the combat manager.
-    // 전투 매니저를 찾아 캐시합니다.
-    void InitializeCombatManager();
-
-    // Creates and stores the combat HUD widget.
-    // 전투 HUD 위젯을 생성하고 보관합니다.
-    void InitializeHUD();
-
-public:
     void SetCombatContext(ACombatManager* InManager, bool bEnableInput);
-    // Returns the currently active combat unit.
-    // 현재 활성화된 전투 유닛을 반환합니다.
+    void SetCombatParticipantBinding(const FRunAccountId& AccountId, FGuid BindingId);
+    const FRunAccountId& GetBoundParticipantAccount() const { return BoundParticipantAccount; }
+    FGuid GetParticipantBindingId() const { return ParticipantBindingId; }
+    bool IsCombatInputEnabled() const { return bCombatInputEnabled; }
+    virtual bool IsRoundInputEnabled() const override { return bCombatInputEnabled; }
+    FOnCombatActionResponse OnCombatActionResponse;
+
     UFUNCTION(BlueprintCallable, Category = "Combat")
+    ACombatManager* GetCombatManager() const { return CombatManager; }
+
+    // Legacy serialized calls reject execution instead of bypassing the round lock.
+    // 기존 직렬화 호출은 라운드 잠금을 우회하지 않고 실행을 거부합니다.
+    UFUNCTION(BlueprintCallable, Category = "Combat|Legacy", meta = (DeprecatedFunction, DeprecationMessage = "Select a unit in round planning."))
     AUnitBase* GetActiveUnit() const;
 
-    // Requests the active unit's turn end.
-    // 활성 유닛의 턴 종료를 요청합니다.
-    UFUNCTION(BlueprintCallable, Category = "Combat")
+    UFUNCTION(BlueprintCallable, Category = "Combat|Legacy", meta = (DeprecatedFunction, DeprecationMessage = "Use round readiness."))
     void RequestEndTurn();
 
-    UFUNCTION(BlueprintCallable, Category = "Combat")
+    UFUNCTION(BlueprintCallable, Category = "Combat|Legacy", meta = (DeprecatedFunction, DeprecationMessage = "Use a supported round skill."))
     void RequestHealingItem();
 
-    // The owning connection sends intent only; server bindings determine the requesting participant.
-    // 소유 연결은 행동 의도만 전송하며 요청 참가자는 서버의 바인딩으로 결정합니다.
     UFUNCTION(Server, Reliable)
     void ServerRequestCombatAction(const FCombatActionRequest& Request);
 
@@ -81,29 +65,17 @@ public:
     bool BuildCombatActionRequest(ECombatActionKind Kind, USkillDefinitionDataAsset* Skill, ACombatGridTile* TargetTile, FCombatActionRequest& OutRequest);
     FCombatActionResponse SubmitCombatActionRequest(const FCombatActionRequest& Request);
     const FCombatActionResponse& GetLastCombatActionResponse() const { return LastCombatActionResponse; }
-    bool IsCombatInputEnabled() const { return bCombatInputEnabled; }
-    void SetCombatParticipantBinding(const FRunAccountId& AccountId, FGuid BindingId);
-    const FRunAccountId& GetBoundParticipantAccount() const { return BoundParticipantAccount; }
-    FGuid GetParticipantBindingId() const { return ParticipantBindingId; }
-    FOnCombatActionResponse OnCombatActionResponse;
-
-    // Own all player tile commands; tile actors only forward input.
-    // 플레이어 타일 명령을 전담하며 타일 액터는 입력만 전달합니다.
     void HandleTileClicked(ACombatGridTile* Tile);
 
-    UFUNCTION(BlueprintCallable, Category = "Combat")
-    ACombatManager* GetCombatManager() const { return CombatManager; }
-
-    UFUNCTION(BlueprintCallable, Category = "Combat")
+    UFUNCTION(BlueprintCallable, Category = "Combat|Legacy")
     bool CanUseActiveUnitAction() const;
 
-    UFUNCTION(BlueprintCallable, Category = "Combat")
+    UFUNCTION(BlueprintCallable, Category = "Combat|Legacy")
     bool CanUseActiveUnitActionPoint(int32 Cost) const;
 
-    UFUNCTION(BlueprintCallable, Category = "Combat")
+    UFUNCTION(BlueprintCallable, Category = "Combat|Legacy")
     bool CanUseActiveUnitSubActionPoint(int32 Cost) const;
 
-public:
     UFUNCTION(BlueprintCallable, Category = "Tile")
     void SetSelectedTile(ACombatGridTile* InTile);
 
@@ -113,32 +85,35 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Tile")
     void ClearSelectedTile();
 
-public:
-    UFUNCTION(BlueprintCallable, Category = "Tile")
+    UFUNCTION(BlueprintCallable, Category = "Tile|Legacy")
     void SetTileInputMode(ETileInputMode NewMode);
 
-    UFUNCTION(BlueprintCallable, Category = "Tile")
+    UFUNCTION(BlueprintCallable, Category = "Tile|Legacy")
     void EnterMoveMode();
 
-    UFUNCTION(BlueprintCallable, Category = "Tile")
+    UFUNCTION(BlueprintCallable, Category = "Tile|Legacy")
     void EnterSkillMode(USkillDefinitionDataAsset* SkillData);
 
     UFUNCTION(BlueprintCallable, Category = "Tile")
     void CancelTileInputMode();
 
     UFUNCTION(BlueprintCallable, Category = "Tile")
-    ETileInputMode GetTileInputMode() const { return CurrentTileInputMode; }
+    ETileInputMode GetTileInputMode() const { return ETileInputMode::None; }
 
     UFUNCTION(BlueprintCallable, Category = "Tile")
-    bool IsMoveInputMode() const { return CurrentTileInputMode == ETileInputMode::Move; }
+    bool IsMoveInputMode() const { return false; }
 
     UFUNCTION(BlueprintCallable, Category = "Tile")
-    bool IsSkillInputMode() const { return CurrentTileInputMode == ETileInputMode::Skill; }
+    bool IsSkillInputMode() const { return false; }
 
     UFUNCTION(BlueprintCallable, Category = "Tile")
-    USkillDefinitionDataAsset* GetPendingSkillData() const { return PendingSkillData; }
+    USkillDefinitionDataAsset* GetPendingSkillData() const { return nullptr; }
 
     bool IsValidTileForPendingSkill(ACombatGridTile* Tile) const;
+
+protected:
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
     UFUNCTION()
@@ -146,8 +121,6 @@ private:
 
     void HandleCombatViewChanged();
     TWeakObjectPtr<ACombatManager> ObservedCombatManager;
-    FGuid ObservedCombatId;
-    int32 ObservedTurnSerial = 0;
 
     UPROPERTY(ReplicatedUsing = OnRep_CombatContext)
     FRunAccountId BoundParticipantAccount;
@@ -155,38 +128,20 @@ private:
     UPROPERTY(ReplicatedUsing = OnRep_CombatContext)
     FGuid ParticipantBindingId;
 
-    void HandleCombatActionResponse(const FCombatActionResponse& Response);
-    bool IsEquippedInputSkill(USkillDefinitionDataAsset* Skill) const;
-    FGuid RequestCombatInstanceId;
-    int64 NextRequestSequence = 0;
-    FGuid LatestSubmittedCombatId;
-    int64 LatestSubmittedSequence = 0;
-    int64 LastHandledResponseSequence = 0;
-    uint64 SelectionRevision = 0;
-    uint64 SubmittedSelectionRevision = 0;
+    UPROPERTY(ReplicatedUsing = OnRep_CombatContext)
+    bool bCombatInputEnabled = false;
+
+    UPROPERTY(ReplicatedUsing = OnRep_CombatContext)
+    TObjectPtr<ACombatManager> CombatManager;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ACombatGridTile> SelectedTile;
 
     UPROPERTY(Transient)
     FCombatActionResponse LastCombatActionResponse;
 
-    UPROPERTY(ReplicatedUsing = OnRep_CombatContext)
-    bool bCombatInputEnabled = true;
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tile", meta = (AllowPrivateAccess = "true"))
-    ACombatGridTile* SelectedTile = nullptr;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tile", meta = (AllowPrivateAccess = "true"))
-    ETileInputMode CurrentTileInputMode = ETileInputMode::None;
-
-    // Skill definition data currently pending in skill input mode
-    UPROPERTY()
-    TObjectPtr<USkillDefinitionDataAsset> PendingSkillData = nullptr;
-
-private:
-    UPROPERTY(EditAnywhere, Category = "UI")
+    // Preserve the authored property without instantiating the old immediate-action HUD.
+    // 기존 즉시 행동 HUD를 생성하지 않고 작성된 속성만 보존합니다.
+    UPROPERTY(meta = (DeprecatedProperty))
     TSubclassOf<UUserWidget> HUDWidgetClass;
-
-    UPROPERTY()
-    UUserWidget* HUDWidget = nullptr;
-
-    UPROPERTY(ReplicatedUsing = OnRep_CombatContext)
-    ACombatManager* CombatManager = nullptr;
 };

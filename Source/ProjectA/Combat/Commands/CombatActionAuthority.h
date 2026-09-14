@@ -12,8 +12,8 @@ class APartyPlayerController;
 class AUnitBase;
 class APlayerUnit;
 
-// Server-owned command validation is separate from UI state and internal AI execution.
-// 서버 명령 검증을 UI 상태 및 내부 AI 실행과 분리합니다.
+// Retains authoritative Run ownership and connection bindings for round planning.
+// 라운드 계획에 필요한 서버 Run 소유권과 연결 바인딩을 유지합니다.
 UCLASS()
 class PROJECTA_API UCombatActionAuthority : public UObject
 {
@@ -29,6 +29,8 @@ public:
     // 신뢰된 서버 코드만 연결을 바인딩하며 명령에는 계정 주장을 받지 않습니다.
     bool BindParticipant(APartyPlayerController* Controller, const FRunAccountId& AccountId);
     bool CanControllerControl(const APartyPlayerController* Controller, const AUnitBase* Unit) const;
+    // Retained callers receive an explicit rejection instead of executing a sequential action.
+    // 유지된 호출자는 순차 행동 실행 대신 명시적인 거절을 받습니다.
     FCombatActionResponse Execute(APartyPlayerController* Controller, const FCombatActionRequest& Request);
     bool SetPartyControlMode(APlayerUnit* Unit, EPartyControlMode Mode, FText& OutError);
     FCombatActionResponse ExecuteServerAI(APlayerUnit* Unit, const FCombatActionRequest& Request, FGuid ControlSessionId);
@@ -40,13 +42,15 @@ public:
     FGuid GetParticipantBindingId(const APartyPlayerController* Controller) const;
     const FRunIdentityData& GetRunIdentity() const { return RunIdentity; }
 
+    // Revalidate the persistent Host lease before planning mutations and simulation steps.
+    // 계획 변경과 시뮬레이션 간격 전에 영속 Host lease를 다시 검증합니다.
+    bool HasManagedExecutionAuthority(bool bAllowResumePending) const;
+
 private:
     ACombatManager* GetManager() const;
-    bool HasManagedExecutionAuthority(bool bAllowResumePending) const;
     bool IsManagedHumanParticipant(const FRunAccountId& AccountId) const;
     bool AllowsStandaloneLegacy(const APartyPlayerController* Controller) const;
     bool HasOriginalOwner(const APlayerUnit* Unit) const;
-    FCombatActionResponse ExecuteUnitAction(AUnitBase* Unit, const FCombatActionRequest& Request);
 
     UPROPERTY(Transient)
     FRunIdentityData RunIdentity;
@@ -58,8 +62,6 @@ private:
     TMap<TWeakObjectPtr<AUnitBase>, FGuid> CharacterIds;
     TMap<TWeakObjectPtr<APartyPlayerController>, FRunAccountId> Participants;
     TMap<TWeakObjectPtr<APartyPlayerController>, FGuid> ParticipantBindingIds;
-    TMap<TWeakObjectPtr<APartyPlayerController>, int64> LastRequestSequences;
-    TMap<FGuid, int64> LastAIRequestSequences;
     FGuid CombatInstanceId;
     FGuid ManagedSessionId;
     bool bRequiresRunConfiguration = false;

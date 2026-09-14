@@ -13,7 +13,6 @@ class AUnitAIController;
 class UGameplayAbility;
 class USkillDefinitionDataAsset;
 class AUnitBase;
-struct FCombatCheckpointUnit;
 
 // Team affiliation used by combat units.
 // 전투 유닛의 소속 팀을 나타냅니다.
@@ -89,6 +88,11 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "UnitBase")
     int32 UnitIndex = 0;
 
+    // Round initiative only; movement and projectile speeds are authored separately.
+    // 라운드 시작 시각에만 사용하며 이동과 투사체 속도는 별도로 지정합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "UnitBase|Round", meta = (ClampMin = "0"))
+    int32 CombatSpeed = 20;
+
     // Display name copied from the run party without owning persistent state.
     // 영구 상태를 소유하지 않고 런 파티에서 복사한 표시 이름입니다.
     UPROPERTY(BlueprintReadOnly, Replicated, Category = "UnitBase|Runtime")
@@ -130,9 +134,6 @@ protected:
     UPROPERTY()
     FRotator DefaultBattleRotation;
 
-    // Current action type
-    UPROPERTY(Replicated)
-    EUnitActionType CurrentActionType = EUnitActionType::None;
 
 public:
     // Whether this unit is currently active in turn
@@ -140,8 +141,8 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|Turn")
     bool bIsActiveTurn = false;
 
-    // Activate unit and reset AP at turn start
-    // 턴 시작 시 유닛을 활성화하고 행동력을 초기화합니다.
+    // Retired individual turn entry point; never activates the unit.
+    // 개별 턴 진입점은 제거되어 유닛을 활성화하지 않습니다.
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Turn")
     virtual void OnTurnStart();
 
@@ -163,7 +164,8 @@ public:
 
 public:
     // Action resources
-    // Reset to MaxActionPoint at turn start
+    // Reset to MaxActionPoint during round planning.
+    // 라운드 계획 단계에서 최대 행동력으로 초기화합니다.
     UFUNCTION(BlueprintCallable, Category = "UnitBase|ActionPoint")
     int32 GetCurrentActionPoint() const { return CurrentActionPoint; }
 
@@ -181,7 +183,8 @@ public:
 
 public:
     // Sub-action resources
-    // Reset to MaxSubActionPoint at turn start
+    // Reset to MaxSubActionPoint during round planning.
+    // 라운드 계획 단계에서 최대 보조 행동력으로 초기화합니다.
     UFUNCTION(BlueprintCallable, Category = "UnitBase|SubActionPoint")
     int32 GetCurrentSubActionPoint() const { return CurrentSubActionPoint; }
 
@@ -220,14 +223,6 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_CurrentTile, Category = "UnitBase|Grid")
     ACombatGridTile* CurrentTile = nullptr;
 
-    // Pending tile for movement
-    UPROPERTY()
-    ACombatGridTile* PendingTile = nullptr;
-
-    // Original tile before action (used for return after melee attack)
-    UPROPERTY()
-    ACombatGridTile* OriginalTileBeforeSkill = nullptr;
-
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Grid")
     void SetCurrentTile(ACombatGridTile* NewTile);
 
@@ -262,7 +257,7 @@ public:
 
     // Check if unit is currently moving or acting
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement")
-    bool IsBusy() const { return CurrentActionType != EUnitActionType::None || MovePhase != EUnitMovePhase::None; }
+    bool IsBusy() const;
 
     // Cancels active abilities and movement before encounter cleanup.
     // 인카운터 정리 전에 활성 어빌리티와 이동을 취소합니다.
@@ -279,54 +274,9 @@ public:
     // Entry point for AIController movement failure callback
     virtual void HandleMoveFailed(EUnitActionResult Result = EUnitActionResult::Failed);
 
-    // Get or create AIController
-    AUnitAIController* GetOrCreateAIController();
-
-protected:
-    // Action lifetime is independent of whether the skill requires movement.
-    // 행동 수명은 스킬의 이동 필요 여부와 독립적입니다.
-    void BeginCurrentAction(EUnitActionType ActionType);
-    void CompleteCurrentAction(EUnitActionResult Result);
-    virtual void OnUnitActionCompleted(EUnitActionType ActionType, EUnitActionResult Result);
-    void RestoreActionOrigin();
-    void HandleSkillAbilityEnded(const FAbilityEndedData& EndedData);
-    void CompleteSkillExecution(EUnitActionResult Result);
-
-    UFUNCTION()
-    void HandleActionSnapFinished(int32 ActionSerial);
-
-    UPROPERTY()
-    TObjectPtr<ACombatGridTile> ActionOriginTile = nullptr;
-
-    FTransform ActionOriginTransform;
-    FDelegateHandle SkillAbilityEndedHandle;
-    FGameplayAbilitySpecHandle ActiveSkillHandle;
-    uint32 CurrentActionSerial = 0;
-    bool bSkillRequiresReturn = false;
-
-    // Current movement/action phase
-    UPROPERTY(Replicated)
-    EUnitMovePhase MovePhase = EUnitMovePhase::None;
-
 public:
-    // Current skill target unit
-    UPROPERTY()
-    AUnitBase* PendingTargetUnit = nullptr;
-
-    // Selected target tile for current skill input
-    UPROPERTY()
-    ACombatGridTile* PendingSkillTargetTile = nullptr;
-
-    // Skill definition data currently pending execution
-    UPROPERTY()
-    TObjectPtr<USkillDefinitionDataAsset> PendingSkillData = nullptr;
-
-    // Ability class scheduled for execution
-    UPROPERTY()
-    TSubclassOf<UGameplayAbility> PendingSkillAbilityClass = nullptr;
-
-    // If true, move to target before executing skill
-    // If false, execute skill immediately in place
+    // Retired reflected entry points reject immediate execution.
+    // 제거된 즉시 실행 진입점은 에셋 참조 호환을 위해 거절만 수행합니다.
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill")
     virtual void StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile);
 
@@ -347,9 +297,6 @@ public:
     UFUNCTION(Category = "UnitBase|Skill")
     virtual void ClearSkillContext();
 
-    // Prevent duplicate damage application within a single action
-    UPROPERTY()
-    bool bSkillDamageApplied = false;
 
 protected:
     // Movement action category
@@ -440,12 +387,6 @@ public:
     // Apply resolved profession data before the spawned unit enters combat.
     // 스폰 유닛이 전투에 들어가기 전에 해석된 직업 데이터를 적용합니다.
     bool ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills);
-    bool CaptureCheckpointState(FCombatCheckpointUnit& OutState, FText& OutError) const;
-    bool RestoreCheckpointState(const FCombatCheckpointUnit& State, FText& OutError);
-
-private:
-    bool bCheckpointStateRestored = false;
-
 protected:
     // Initial attributes
     UPROPERTY(EditDefaultsOnly, Category = "UnitBase|GAS|Attribute")
@@ -455,7 +396,8 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Replicated, Category = "UnitBase|ActionPoint")
     int32 MaxActionPoint = 2;
 
-    // Remaining Action Points for current turn
+    // Remaining action points for the current round.
+    // 현재 라운드의 남은 행동력입니다.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|ActionPoint")
     int32 CurrentActionPoint = 0;
 
@@ -463,7 +405,8 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Replicated, Category = "UnitBase|SubActionPoint")
     int32 MaxSubActionPoint = 1;
 
-    // Remaining Sub Action Points for current turn
+    // Remaining sub action points for the current round.
+    // 현재 라운드의 남은 보조 행동력입니다.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|SubActionPoint")
     int32 CurrentSubActionPoint = 0;
 

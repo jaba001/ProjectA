@@ -11,6 +11,7 @@
 #include "Game/GameState/GameplayViewTypes.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "UI/Combat/CombatHUDWidget.h"
+#include "UI/Combat/CombatRoundPlanningWidget.h"
 #include "UI/Gameplay/EncounterResultWidget.h"
 #include "UI/Gameplay/RunMapWidget.h"
 #include "UI/Gameplay/RunEncounterWidget.h"
@@ -51,11 +52,6 @@ void UGameplayRootWidget::NativeOnInitialized()
     if (!RunMapWidgetClass)
     {
         RunMapWidgetClass = URunMapWidget::StaticClass();
-    }
-
-    if (!CombatHUDWidgetClass)
-    {
-        CombatHUDWidgetClass = UCombatHUDWidget::StaticClass();
     }
 
     if (!ResultWidgetClass)
@@ -174,7 +170,7 @@ void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool b
         if (Phase == ERunPhase::Combat)
         {
             CombatLayer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-            CombatLayer->AddWidget(CombatHUDWidgetClass);
+            CombatLayer->AddWidget<UCombatRoundPlanningWidget>(UCombatRoundPlanningWidget::StaticClass());
         }
         else if (Phase == ERunPhase::Result || Phase == ERunPhase::Defeat)
         {

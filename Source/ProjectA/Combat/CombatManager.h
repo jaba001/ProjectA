@@ -11,11 +11,12 @@ class AUnitBase;
 class ACombatGridManager;
 class ACombatGridTile;
 class UCombatActionAuthority;
+class ACombatRoundCoordinator;
 
 DECLARE_MULTICAST_DELEGATE(FOnCombatViewChanged);
 
-// Actor that coordinates combat units, turns, movement, and target tiles.
-// 전투 유닛, 턴, 이동, 대상 타일을 조율하는 액터입니다.
+// Connects persistent encounter ownership to the authoritative timed-round combat session.
+// 영속 인카운터 소유권을 서버 권위의 시간차 라운드 전투에 연결합니다.
 UCLASS()
 class PROJECTA_API ACombatManager : public AActor
 {
@@ -35,6 +36,8 @@ public:
     void SetCombatGrid(ACombatGridManager* Grid);
     const TArray<AUnitBase*>& GetRegisteredUnits() const { return CombatUnits; }
     UCombatActionAuthority* GetActionAuthority() const { return ActionAuthority; }
+    ACombatRoundCoordinator* GetRoundCoordinator() const { return RoundCoordinator; }
+    ACombatGridManager* GetCombatGrid() const { return CombatGridManager; }
     const FCombatViewState& GetCombatViewState() const { return CombatView; }
     FGuid GetCombatInstanceId() const { return CombatView.CombatInstanceId; }
     FGuid GetRunId() const { return CombatView.RunId; }
@@ -76,15 +79,15 @@ private:
     UFUNCTION()
     void OnRep_CombatGrid();
 
-    void HandleTurnChanged();
-    bool HandleCommitTurnBoundary(int32 CompletedTurnSerial, int32 NextTurnIndex);
+    UFUNCTION()
+    void OnRep_RoundCoordinator();
+
     bool bSuspendedForRecovery = false;
     UPROPERTY(VisibleAnywhere, Category = "Combat|Commands")
     TObjectPtr<UCombatActionAuthority> ActionAuthority;
 
     void HandleUnitDied(AUnitBase* Unit);
     void HandleCombatResult(ECombatResult Result);
-    FTimerHandle DeadTurnTimer;
     // Player unit classes
     // 플레이어 유닛 클래스 목록입니다.
     UPROPERTY(EditDefaultsOnly, Category = "Combat")
@@ -95,21 +98,11 @@ private:
     UPROPERTY(EditDefaultsOnly, Category = "Combat")
     TArray<TSubclassOf<AUnitBase>> EnemyUnitClasses;
 
-    // Calculates tiles that the unit can reach with movement.
-    // 유닛이 이동으로 도달할 수 있는 타일을 계산합니다.
-public:
-    TArray<ACombatGridTile*> CalculateReachableMoveTiles(AUnitBase* Unit) const;
-
 private:
-
-    // Checks whether the unit can enter the tile.
-    // 유닛이 해당 타일에 진입할 수 있는지 확인합니다.
-    bool CanUnitEnterTile(AUnitBase* Unit, ACombatGridTile* Tile) const;
-
-private:
-    // Server-only turn manager
-    UPROPERTY()
-    UTurnManager* TurnManager;
+    // Clients discover the same server-owned round coordinator through this reference.
+    // 클라이언트는 이 참조로 동일한 서버 소유 라운드 조정자를 찾습니다.
+    UPROPERTY(ReplicatedUsing = OnRep_RoundCoordinator)
+    TObjectPtr<ACombatRoundCoordinator> RoundCoordinator = nullptr;
 
     // Combat unit list (owned by server)
     UPROPERTY()
@@ -127,18 +120,19 @@ private:
     TArray<ACombatGridTile*> ReachableMoveTiles;
 
 public:
-    // Current turn unit
-    UFUNCTION(BlueprintCallable)
-    UTurnManager* GetTurnManager() const { return TurnManager; }
+    // Serialized Blueprint references remain readable but cannot start sequential combat.
+    // 직렬화된 블루프린트 참조는 유지하지만 순차 전투를 시작할 수 없습니다.
+    UFUNCTION(BlueprintCallable, meta = (DeprecatedFunction, DeprecationMessage = "Sequential combat was replaced by timed-round combat."))
+    UTurnManager* GetTurnManager() const { return nullptr; }
 
     UFUNCTION(Server, Reliable)
     void Server_StartCombat();
 
     void StartCombat_Internal();
 
-    // Legacy Blueprint requests follow the player controller's input restrictions.
-    // 기존 블루프린트 요청에도 플레이어 컨트롤러의 입력 제한을 적용합니다.
-    UFUNCTION(BlueprintCallable, meta = (DeprecatedFunction, DeprecationMessage = "Use PartyPlayerController.RequestEndTurn for player input."))
+    // Old end-turn requests are rejected; readiness belongs to round planning.
+    // 기존 턴 종료 요청은 거절하며 준비 완료는 라운드 계획에서 처리합니다.
+    UFUNCTION(BlueprintCallable, meta = (DeprecatedFunction, DeprecationMessage = "Use timed-round planning readiness."))
     void RequestEndTurn();
 
     // Internal callers must identify the living, idle unit whose turn they are ending.
@@ -154,7 +148,6 @@ public:
     AUnitBase* GetCurrentUnit() const;
 
 private:
-    void AdvanceTurn();
     void ClearPlayerSelection();
 
 public:
@@ -191,13 +184,12 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Combat")
     ACombatGridTile* GetTileByCoord(FIntPoint Coord) const;
 
-    // Refresh front-line protection state
+    // Clears retired front-line protection presentation.
+    // 제거된 전열 보호 표시를 해제합니다.
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void RefreshTileProtectedByFront();
 
 private:
-    TArray<ACombatGridTile*> CalculateSkillTargetTiles(AUnitBase* Unit) const;
-
     UPROPERTY()
     TArray<ACombatGridTile*> SkillTargetTiles;
 

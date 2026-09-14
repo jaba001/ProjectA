@@ -1,6 +1,6 @@
 # UI 구조·생성 도구
 
-기준일: 2026-09-11. 화면 구성과 JSON 기반 Widget Blueprint 생성 규칙을 정의한다. 게임 흐름·에셋 연결은 [PROJECT_PLAN](PROJECT_PLAN.md), 실행 결과는 [TEST_REPORT](TEST_REPORT.md)를 따른다.
+기준일: 2026-09-14. 화면 구성과 JSON 기반 Widget Blueprint 생성 규칙을 정의한다. 게임 흐름·에셋 연결은 [PROJECT_PLAN](PROJECT_PLAN.md), 실행 결과는 [TEST_REPORT](TEST_REPORT.md)를 따른다.
 
 ## 구성과 편집 원칙
 
@@ -12,9 +12,9 @@
 | WBP | `/Game/User_JeHoon/UI/MainMenu`, `/Game/User_JeHoon/UI/Gameplay` |
 | 검증 사본 | `/Game/User_JeHoon/Validation/T12` |
 
-Designer WBP를 화면 구조의 기준으로 유지한다. JSON은 초기 생성·바인딩 검증·누락 보완에 사용하며 결과 WidgetTree는 WBP에 저장된다. 이미지·브러시·폰트·세부 스타일은 Designer에서 편집한다. Editor API·의존성은 ProjectAEditor에 한정한다.
+기존 Designer WBP를 화면 구조의 기준으로 유지한다. 새 라운드 계획 화면은 7절의 native CommonUI 생성 경로를 사용한다. JSON은 초기 생성·바인딩 검증·누락 보완에 사용하며 결과 WidgetTree는 WBP에 저장된다. 이미지·브러시·폰트·세부 스타일은 Designer에서 편집한다. Editor API·의존성은 ProjectAEditor에 한정한다.
 
-개발용 협동은 기존 MainMenu에 native 버튼을 추가하고 `UDevelopmentCoopWidget`으로 방 생성·주소 참가·대기실을 표시한다. Gameplay는 전용 CommonUI 레이어에 대기실을 표시하고 시작 시 닫아 기존 전투 입력으로 복귀한다. 전투 중에는 상태·나가기 영역을 유지한다. 기존 WBP 재생성은 필요 없으며 새 영구 에셋은 생성하지 않는다. 작동 확인은 [TEST_REPORT 9절](TEST_REPORT.md#9-개발용-협동-ui)을 따른다.
+개발용 협동은 기존 MainMenu에 native 버튼을 추가하고 `UDevelopmentCoopWidget`으로 방 생성·주소 참가·대기실을 표시한다. Gameplay는 전용 CommonUI 레이어에 대기실을 표시하고 시작 시 닫아 새 라운드 계획 화면으로 전환한다. 전투 중에는 상태·나가기 영역을 유지한다. 기존 WBP 재생성은 필요 없으며 새 영구 에셋은 생성하지 않는다. 작동 확인은 [TEST_REPORT 9절](TEST_REPORT.md#9-개발용-협동-ui)을 따른다.
 
 ## 실행과 옵션
 
@@ -105,8 +105,8 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 | CharacterCreation | 슬롯 생성 시 편집 패널·프리뷰 표시. 슬롯 X는 해당 캐릭터 제거. 화면 Back/X는 초안·프리뷰 정리 |
 | PreviewStage | MainMenu의 월드 Actor·카메라 사용. SceneCapture2D·RenderTarget 미사용 |
 | GameplayRoot | CommonUserWidget. RunLayer·CombatLayer·ModalLayer는 CommonActivatableWidgetStack |
-| Gameplay 화면 | RunMap·CombatHUD·Result는 CommonActivatableWidget. 스폰은 EncounterManager가 담당 |
-| 입력 | CombatHUD: All/CaptureDuringMouseDown, RunMap·Result: Menu/NoCapture. 커서 표시 유지, CommonUI가 입력 모드 관리 |
+| Gameplay 화면 | RunMap·RoundPlanning·Result는 CommonActivatableWidget. 스폰은 EncounterManager가 담당. 이전 CombatHUD WBP는 참조만 보존 |
+| 입력 | RoundPlanning·RunMap·Result: Menu/NoCapture. 커서 표시 유지, CommonUI가 입력 모드 관리 |
 
 프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 StableHand/Scholar/Herbalist/Hunter 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
@@ -119,3 +119,11 @@ GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메
 - 바인딩/갱신 실패: Native 빌드·이름/타입·부모 클래스·AddMissing/Overwrite 옵션 확인.
 - 작동 확인: 버튼 동작·CommonUI 화면 전환·프리뷰 교체. 실행은 [작업 규칙](../AGENTS.md#작동-테스트와-보고서), 결과는 [TEST_REPORT](TEST_REPORT.md)에 기록.
 - T12 검증: 메뉴 명세 3종을 Validation/T12로 복사 생성한다. MainMenuScreenWidget의 Text_Title 변경과 T12_MissingLabel(TextBlock, parent=RootOverlay) 추가 후 AddMissing을 2회 실행하고 기존 제목 보존·신규 위젯·바인딩을 확인한다. 테스트 필터는 `ProjectA.Menu.AssetContracts`, 생성본 옵션은 `-T12GeneratedAssets`다.
+
+## 7 기본 라운드 전투 UI
+
+`UGameplayRootWidget`의 CombatLayer는 `UCombatRoundPlanningWidget`을 사용한다. 기존 `CombatHUDWidgetClass`와 `UCombatHUDWidget`은 Blueprint 참조를 위한 외형이며 순차 명령 버튼을 실행하지 않는다. 새 화면은 native 생성으로 동작하므로 WBP/JSON 재생성·기존 맵 재배치·Config 변경이 필요 없다. C++ 빌드 후 UE 재시작으로 리플렉션 변경을 반영한다.
+
+오른쪽 목록에서 조작할 아군 → 스킬 → 대상 유닛/공격 타일 → 필요한 접근 목적지를 선택하고 계획 적용한다. 자신의 모든 생존 아군을 지정한 뒤 준비 완료한다. 왼쪽에는 아군 계획과 라운드 시작에 고정된 적 의도를 표시한다. 해결 중에는 편집을 막고 경과 시간·행동 단계·HP·남은 투사체를 표시한다.
+
+`ACombatRoundPlayerController`는 소유 연결의 계획/준비 RPC와 서버 응답을 관리한다. 최신 복제 수정 번호 도착 전 중복 요청을 막으며 이전 라운드 요청은 거절한다. 계획 수정 시 팀 준비 해제·복귀 칸 충돌 거절은 [기획 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 확인 대기 임시 정책이다. 화면·전투·협동의 최신 작동 확인은 [TEST_REPORT 12절](TEST_REPORT.md#12-시간차-자동-전투-기획-검토)을 따른다.

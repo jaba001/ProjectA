@@ -2,69 +2,26 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-#include "RunEncounterPIEHelpers.h"
-
-#include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
-#include "Blueprint/WidgetTree.h"
-#include "Combat/CombatManager.h"
-#include "Combat/Commands/CombatActionAuthority.h"
-#include "Combat/Library/CombatEffectLibrary.h"
-#include "CommonGameViewportClient.h"
 #include "Components/Button.h"
-#include "Components/EditableTextBox.h"
-#include "Components/ComboBoxString.h"
 #include "Components/CheckBox.h"
-#include "GameFramework/GameUserSettings.h"
-#include "UI/MainMenu/OptionsWidget.h"
-#include "DataAsset/PartyDefinitionDataAsset.h"
-#include "Components/HorizontalBox.h"
+#include "Components/ComboBoxString.h"
+#include "Components/EditableTextBox.h"
 #include "Components/TextBlock.h"
-#include "Components/VerticalBox.h"
-#include "Controller/GameplayPlayerController.h"
 #include "Controller/MainMenuPlayerController.h"
-#include "DataAsset/SkillDefinitionDataAsset.h"
+#include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Editor.h"
-#include "Engine/GameInstance.h"
-#include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
-#include "EngineUtils.h"
-#include "Framework/Application/SlateApplication.h"
-#include "Game/Encounter/EncounterManager.h"
-#include "Game/Encounter/CombatArena.h"
-#include "Game/GameModes/GameplayGameModeBase.h"
-#include "Game/Run/RunStateSubsystem.h"
-#include "Game/Snapshot/PartySnapshotLibrary.h"
-#include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
-#include "Misc/CommandLine.h"
-#include "Misc/Parse.h"
-#include "GAS/Effect/GE_Damage.h"
-#include "Grid/Combat/CombatGridManager.h"
-#include "Grid/Combat/CombatGridTile.h"
-#include "Input/CommonUIActionRouterBase.h"
-#include "Input/Events.h"
-#include "InputCoreTypes.h"
-#include "InputKeyEventArgs.h"
-#include "Layout/WidgetPath.h"
-#include "NavigationData.h"
-#include "NavigationPath.h"
-#include "NavigationSystem.h"
+#include "GameFramework/GameUserSettings.h"
+#include "GameFramework/Pawn.h"
 #include "Misc/Paths.h"
-#include "Slate/SceneViewport.h"
 #include "Tests/AutomationEditorCommon.h"
-#include "UI/Combat/CombatHUDWidget.h"
-#include "UI/Gameplay/EncounterResultWidget.h"
-#include "UI/Gameplay/RunMapWidget.h"
 #include "UI/MainMenu/CharacterCreationWidget.h"
 #include "UI/MainMenu/MainMenuPreviewStage.h"
 #include "UI/MainMenu/MainMenuRootWidget.h"
 #include "UI/MainMenu/MainMenuScreenWidget.h"
-#include "Unit/UnitBase.h"
-#include "Unit/EnemyUnit.h"
+#include "UI/MainMenu/OptionsWidget.h"
 #include "UnrealClient.h"
-#include "UObject/StrongObjectPtr.h"
-#include "Widgets/SViewport.h"
-#include "Widgets/SWindow.h"
 
 namespace ProjectAVerticalSliceTests
 {
@@ -84,61 +41,21 @@ T* FindActiveWidget(UWorld* World)
     return nullptr;
 }
 
-// Exercise saved maps, real Slate combat clicks, navigation, GAS and encounter cleanup in PIE.
-// PIE에서 저장된 맵, 실제 Slate 전투 클릭, 내비게이션, GAS 및 인카운터 정리를 실행합니다.
-class FPlayVerticalSlice : public IAutomationLatentCommand
+// Preserve saved-menu, preview cleanup and character draft coverage independently of combat execution.
+// 전투 실행과 독립적으로 저장된 메뉴, 미리보기 정리 및 캐릭터 초안 검증을 유지합니다.
+class FPlayMenuLifecycle : public IAutomationLatentCommand
 {
 public:
-    explicit FPlayVerticalSlice(FAutomationTestBase* InTest) : Test(InTest), StageStarted(FPlatformTime::Seconds())
+    explicit FPlayMenuLifecycle(FAutomationTestBase* InTest) : Test(InTest), StageStarted(FPlatformTime::Seconds())
     {
-        FString Slot;
-        if (FParse::Value(FCommandLine::Get(), TEXT("ProjectAOpponentSnapshot="), Slot))
-        {
-            SnapshotSlot = FName(*Slot);
-        }
-    }
-
-    virtual ~FPlayVerticalSlice() override
-    {
-        if (Combat.IsValid())
-        {
-            Combat->OnCombatResult.RemoveAll(this);
-        }
-        if (Player.IsValid())
-        {
-            Player->OnActionCompleted.RemoveAll(this);
-        }
-        if (Enemy.IsValid())
-        {
-            Enemy->OnActionCompleted.RemoveAll(this);
-        }
-        if (InputViewport.IsValid())
-        {
-            InputViewport->OnInputKey().RemoveAll(this);
-        }
     }
 
     virtual bool Update() override
     {
-        double StageTimeout = 60.0;
-        if (Stage == 6)
+        if (FPlatformTime::Seconds() - StageStarted > 60.0)
         {
-            StageTimeout = 180.0;
-        }
-        if (FPlatformTime::Seconds() - StageStarted > StageTimeout)
-        {
-            Test->AddError(FString::Printf(TEXT("Vertical slice PIE timed out at stage %d."), Stage));
+            Test->AddError(FString::Printf(TEXT("Saved menu PIE timed out at stage %d."), Stage));
             return true;
-        }
-        if (bPointerClickPending)
-        {
-            // Mouse-over events cache the clickable primitive during the following player tick.
-            // 마우스 오버 이벤트는 다음 플레이어 틱에 클릭 가능한 프리미티브를 캐시합니다.
-            if (GFrameCounter <= PointerQueuedFrame || FPlatformTime::Seconds() - PointerQueuedTime < 0.1)
-            {
-                return false;
-            }
-            return !CompletePointerClick();
         }
         UWorld* World = GEditor->PlayWorld;
         if (!World || !World->GetFirstPlayerController())
@@ -277,553 +194,15 @@ public:
             {
                 return true;
             }
-            Creation->RequestStartGame();
-            Advance();
-            return false;
-        }
-
-        AGameplayGameModeBase* Mode = Cast<AGameplayGameModeBase>(World->GetAuthGameMode());
-        AGameplayPlayerController* Controller = Cast<AGameplayPlayerController>(World->GetFirstPlayerController());
-        URunStateSubsystem* Run = World->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
-        if (!Mode || !Controller || !Run || !Mode->GetEncounterManager())
-        {
-            return false;
-        }
-        AEncounterManager* Encounter = Mode->GetEncounterManager();
-
-        if (Stage == 2)
-        {
-            URunMapWidget* MapWidget = FindActiveWidget<URunMapWidget>(World);
-            if (Run->GetPhase() != ERunPhase::Map || !MapWidget || FPlatformTime::Seconds() - StageStarted < 1.0)
-            {
-                return false;
-            }
-            if (!Require(World->GetMapName().Contains(TEXT("Gameplay")), TEXT("Start Game traveled to Gameplay.")))
-            {
-                return true;
-            }
-            if (!bMapCaptured)
-            {
-                Capture(TEXT("01-RunMap.png"));
-                bMapCaptured = true;
-                StageStarted = FPlatformTime::Seconds();
-                return false;
-            }
-            InputViewport = Cast<UCommonGameViewportClient>(World->GetGameViewport());
-            if (!Require(InputViewport.IsValid(), TEXT("PIE uses the actual CommonUI game viewport.")) || !CheckInputPolicy(Controller, false))
-            {
-                return true;
-            }
-            InputViewport->OnInputKey().AddRaw(this, &FPlayVerticalSlice::HandleGameViewportInput);
-            Test->TestEqual(TEXT("Edited profession survives travel."), Run->GetPartyMembers()[0].ClassId, FName(TEXT("Hunter")));
-            Test->TestEqual(TEXT("Party name survives travel."), Run->GetPartyMembers()[0].CharacterName.ToString(), FString(TEXT("Vertical Slice Hero")));
-            if (!CaptureRunIdentity(Run))
-            {
-                return true;
-            }
-            GameplayWorld = World;
-            Combat = Encounter->GetCombatManager();
-            if (!Require(Combat.IsValid(), TEXT("Gameplay owns a combat manager.")))
-            {
-                return true;
-            }
-            Combat->OnCombatResult.AddRaw(this, &FPlayVerticalSlice::HandleResult);
-            if (!ClickNode(MapWidget, 0))
-            {
-                return true;
-            }
-            Advance();
-            return false;
-        }
-        if (Stage == 3 || Stage == 9)
-        {
-            if (Run->GetPhase() != ERunPhase::Combat || FPlatformTime::Seconds() - StageStarted < 1.0)
-            {
-                return false;
-            }
-            if (Stage == 3 && PointerStep == 1)
-            {
-                if (!Require(Controller->IsMoveInputMode(), TEXT("A real Slate click on HUD Move enters move mode.")) || !QueueTileClick(Controller, MoveTile.Get()))
-                {
-                    return true;
-                }
-                PointerStep = 2;
-                return false;
-            }
-            if (Stage == 3 && PointerStep == 2)
-            {
-                if (!Require(GameMouseDownCount == GameMouseDownBeforeTile + 1, TEXT("The first tile mouse-down passes CommonUI to the game viewport.")) || !Require(Controller->GetSelectedTile() == MoveTile.Get() && !Controller->IsMoveInputMode(), TEXT("The player controller dispatches the real click to the move tile.")) || !Require(Player->IsBusy() || Player->GetCurrentTile() == MoveTile.Get(), TEXT("The world tile click starts the movement action.")))
-                {
-                    return true;
-                }
-                CheckAcceptedActionRequest(Controller, TEXT("Slate move"));
-                Advance();
-                return false;
-            }
-            if (!CheckInputPolicy(Controller, true))
-            {
-                return true;
-            }
-            if (!CheckRunIdentity(Run, Stage == 3 ? TEXT("First encounter") : TEXT("Second encounter")))
-            {
-                return true;
-            }
-            if (!Require(Encounter->GetSpawnedUnits().Num() == 2 && Combat->GetRegisteredUnits().Num() == 2, TEXT("Only one created party member and one enemy spawn/register.")))
-            {
-                return true;
-            }
-            Player = nullptr;
-            Enemy = nullptr;
-            for (AUnitBase* Unit : Encounter->GetSpawnedUnits())
-            {
-                if (Unit->GetTeam() == ETeam::Player)
-                {
-                    Player = Unit;
-                }
-                else
-                {
-                    Enemy = Unit;
-                }
-                FirstEncounterUnits.Add(Unit);
-            }
-            if (!Require(Player.IsValid() && Enemy.IsValid(), TEXT("Both encounter teams have actors.")))
-            {
-                return true;
-            }
-            FProfessionDefinition SpawnDefinition;
-            if (!Require(Run->PartyDefinition && Run->PartyDefinition->ResolveProfession(Run->GetPartyMembers()[0].ClassId, SpawnDefinition), TEXT("Travel retains the exact profession catalog.")))
-            {
-                return true;
-            }
-            Test->TestEqual(TEXT("Spawned max HP matches detail preview."), Player->GetAttributeSet()->GetMaxHP(), SpawnDefinition.MaxHP);
-            Test->TestEqual(TEXT("Spawned AP matches detail preview."), Player->GetMaxActionPoint(), SpawnDefinition.ActionPoints);
-            Test->TestEqual(TEXT("Spawned sub AP matches detail preview."), Player->GetMaxSubActionPoint(), SpawnDefinition.SubActionPoints);
-            Test->TestEqual(TEXT("Spawned name matches edited slot."), Player->RuntimeCharacterName.ToString(), FString(TEXT("Vertical Slice Hero")));
-            Test->TestTrue(TEXT("Encounter pool grants an extra equipped skill."), Player->GetAvailableSkillAbilityClasses().Num() > SpawnDefinition.StartingSkills.Num());
-            Test->TestEqual(TEXT("Encounter supplies one potion."), Player->HealingItemCount, 1);
-            if (!SnapshotSlot.IsNone())
-            {
-                FPartySnapshot Loaded;
-                FText Error;
-                if (!Require(UPartySnapshotLibrary::LoadSnapshot(SnapshotSlot, Loaded, Error) && Loaded.Members.Num() == 1, TEXT("PIE loads the saved single-opponent Snapshot.")))
-                {
-                    return true;
-                }
-                const FPartySnapshotMember& Member = Loaded.Members[0];
-                Test->TestEqual(TEXT("Opponent name comes from SaveGame."), Enemy->RuntimeCharacterName.ToString(), Member.CharacterName);
-                Test->TestEqual(TEXT("Opponent max HP comes from SaveGame."), Enemy->GetAttributeSet()->GetMaxHP(), Member.Stats.MaxHP);
-                Test->TestEqual(TEXT("Opponent current HP comes from SaveGame without normalization."), Enemy->GetAttributeSet()->GetHP(), Member.Stats.CurrentHP);
-                Test->TestEqual(TEXT("Opponent AP comes from SaveGame."), Enemy->GetMaxActionPoint(), Member.Stats.MaxActionPoints);
-                Test->TestEqual(TEXT("Opponent SubAP comes from SaveGame."), Enemy->GetMaxSubActionPoint(), Member.Stats.MaxSubActionPoints);
-                Test->TestEqual(TEXT("Opponent movement range comes from SaveGame."), Enemy->GetMoveRange(), Member.Stats.MoveRange);
-                Test->TestEqual(TEXT("Opponent receives exactly the saved skill count."), Enemy->GetAvailableSkillAbilityClasses().Num(), Member.SkillIds.Num());
-                Test->TestEqual(TEXT("Opponent receives no implicit potion."), Enemy->HealingItemCount, 0);
-                for (TActorIterator<ACombatArena> ArenaIt(World); ArenaIt; ++ArenaIt)
-                {
-                    if (ArenaIt->EnemyCoords.IsValidIndex(Member.FormationSlot))
-                    {
-                        Test->TestEqual(TEXT("Snapshot formation maps through arena enemy slots."), Enemy->GetCurrentTile()->GridCoord, ArenaIt->EnemyCoords[Member.FormationSlot]);
-                    }
-                }
-                if (!Require(Mode && Mode->LocalOpponentCatalog, TEXT("Snapshot uses the trusted catalog.")))
-                {
-                    return true;
-                }
-                Test->TestEqual(TEXT("Opponent class resolves through trusted ClassId."), Enemy->GetClass(), Mode->LocalOpponentCatalog->EnemyClasses.FindRef(Member.ClassId).Get());
-                for (int32 Index = 0; Index < Member.SkillIds.Num(); ++Index)
-                {
-                    USkillDefinitionDataAsset* Skill = Enemy->FindSkillDataByAbilityClass(Enemy->GetAvailableSkillAbilityClasses()[Index]);
-                    Test->TestEqual(TEXT("Opponent skill order comes from SaveGame."), Skill, Mode->LocalOpponentCatalog->Skills.FindRef(Member.SkillIds[Index]).Get());
-                }
-                if (Stage == 3)
-                {
-                    SnapshotPlayerHP = Player->GetAttributeSet()->GetHP();
-                    Enemy->OnActionCompleted.AddRaw(this, &FPlayVerticalSlice::HandleSnapshotActionCompleted);
-                }
-            }
-            if (Stage == 9)
-            {
-                Test->TestTrue(TEXT("The second encounter uses the same persistent world."), GameplayWorld.Get() == World);
-                Test->TestEqual(TEXT("Next encounter restores checkpoint HP."), Player->GetAttributeSet()->GetHP(), Run->GetPartyMembers()[0].CurrentHP);
-                if (!Require(UCombatEffectLibrary::ApplyDamageToUnit(Enemy.Get(), Player.Get(), UGE_Damage::StaticClass(), 100000.0f), TEXT("GAS lethal damage applied to the party for Defeat coverage.")))
-                {
-                    return true;
-                }
-                Advance();
-                return false;
-            }
-            for (TActorIterator<ACombatGridManager> It(World); It; ++It)
-            {
-                Grid = *It;
-                break;
-            }
-            if (!Require(Grid.IsValid() && Grid->TileMap.Num() == 16, TEXT("The runtime grid contains sixteen tiles.")))
-            {
-                return true;
-            }
-            Test->TestFalse(TEXT("Run Map deactivates for combat."), FindActiveWidget<URunMapWidget>(World) != nullptr);
-            Capture(TEXT("02-Combat.png"));
-            MoveTile = Grid->GetTileAtCoord(FIntPoint(1, 1));
-            UNavigationSystemV1* Navigation = UNavigationSystemV1::GetCurrent(World);
-            if (!Require(Navigation != nullptr, TEXT("Gameplay creates a navigation system.")))
-            {
-                return true;
-            }
-            UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(World, Player->GetActorLocation(), MoveTile->GetActorLocation(), Player.Get());
-            UE_LOG(LogTemp, Display, TEXT("[VerticalSliceNavigation] System=%s DefaultData=%s Building=%d Locked=%d PathValid=%d Player=%s Goal=%s"), *GetNameSafe(Navigation), *GetNameSafe(Navigation->GetDefaultNavDataInstance(FNavigationSystem::DontCreate)), UNavigationSystemV1::IsNavigationBeingBuilt(World), UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World), Path && Path->IsValid(), *Player->GetActorLocation().ToString(), *MoveTile->GetActorLocation().ToString());
-            UCombatHUDWidget* HUD = FindActiveWidget<UCombatHUDWidget>(World);
-            UButton* PotionButton = HUD ? Cast<UButton>(HUD->WidgetTree->FindWidget(TEXT("Button_Item"))) : nullptr;
-            if (!Require(PotionButton != nullptr, TEXT("Combat HUD exposes the potion action.")))
-            {
-                return true;
-            }
-            const float BeforePotionHP = Player->GetAttributeSet()->GetHP();
-            Player->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), BeforePotionHP - 20.0f);
-            PotionButton->OnClicked.Broadcast();
-            CheckAcceptedActionRequest(Controller, TEXT("HUD potion"));
-            Test->TestEqual(TEXT("HUD potion applies healing."), Player->GetAttributeSet()->GetHP(), BeforePotionHP);
-            Test->TestEqual(TEXT("HUD potion consumes stock."), Player->HealingItemCount, 0);
-            Test->TestEqual(TEXT("HUD potion consumes SubAP."), Player->GetCurrentSubActionPoint(), SpawnDefinition.SubActionPoints - 1);
-            Player->ResetSubActionPoint();
-            UButton* MoveButton = nullptr;
-            if (HUD)
-            {
-                MoveButton = Cast<UButton>(HUD->GetWidgetFromName(TEXT("Button_Move")));
-            }
-            if (!QueueWidgetClick(MoveButton))
-            {
-                return true;
-            }
-            PointerStep = 1;
-            return false;
-        }
-        if (Stage == 4)
-        {
-            if (PointerStep == 1)
-            {
-                if (!Require(Controller->IsSkillInputMode() && Controller->GetPendingSkillData() == Player->FindSkillDataByAbilityClass(Player->GetDefaultAttackAbilityClass()), TEXT("A real Slate click on the HUD skill selects the configured basic attack.")) || !QueueTileClick(Controller, Enemy->GetCurrentTile()))
-                {
-                    return true;
-                }
-                PointerStep = 2;
-                return false;
-            }
-            if (PointerStep == 2)
-            {
-                if (!Require(GameMouseDownCount == GameMouseDownBeforeTile + 1, TEXT("The skill target mouse-down passes CommonUI to the game viewport.")) || !Require(!Controller->IsSkillInputMode() && Player->IsBusy(), TEXT("The actual enemy tile click consumes skill selection and starts the approach action.")))
-                {
-                    return true;
-                }
-                CheckAcceptedActionRequest(Controller, TEXT("Slate skill"));
-                Advance();
-                return false;
-            }
-            if (!Player.IsValid() || Player->IsBusy())
-            {
-                return false;
-            }
-            if (!Require(Player->GetCurrentTile() == MoveTile.Get() && MoveTile->GetOccupyingUnit() == Player.Get(), TEXT("Existing movement updates tile ownership.")))
-            {
-                return true;
-            }
-            Test->TestTrue(TEXT("Movement snaps the actor to its owned tile."), FVector::DistSquared2D(Player->GetActorLocation(), MoveTile->GetActorLocation()) < 1.0f);
-            EnemyHPBeforeSkill = Enemy->GetAttributeSet()->GetHP();
-            UCombatHUDWidget* HUD = FindActiveWidget<UCombatHUDWidget>(World);
-            UHorizontalBox* Skills = nullptr;
-            if (HUD)
-            {
-                Skills = Cast<UHorizontalBox>(HUD->GetWidgetFromName(TEXT("SkillList")));
-            }
-            UButton* SkillButton = nullptr;
-            if (Skills && Skills->GetChildrenCount() > 0)
-            {
-                SkillButton = Cast<UButton>(Skills->GetChildAt(0));
-            }
-            if (SkillButton)
-            {
-                const USkillDefinitionDataAsset* Skill = Player->FindSkillDataByAbilityClass(Player->GetDefaultAttackAbilityClass());
-                const UTextBlock* Label = Cast<UTextBlock>(SkillButton->GetContent());
-                if (!Require(Skill && Label && Label->GetText().ToString().Contains(Skill->GetActionPointCostText().ToString()), TEXT("The real HUD displays the selected definition's AP cost.")))
-                {
-                    return true;
-                }
-                Test->TestEqual(TEXT("HUD skill availability matches the definition cost."), SkillButton->GetIsEnabled(), Controller->CanUseActiveUnitActionPoint(Skill->ActionPointCost));
-            }
-            if (!QueueWidgetClick(SkillButton))
-            {
-                return true;
-            }
-            PointerStep = 1;
-            return false;
-        }
-        if (Stage == 5)
-        {
-            if (!Player.IsValid() || Player->IsBusy() || FPlatformTime::Seconds() - StageStarted < 0.1)
-            {
-                return false;
-            }
-            if (!Require(Enemy.IsValid() && Enemy->GetAttributeSet()->GetHP() < EnemyHPBeforeSkill, TEXT("Existing approach skill deals GAS damage and completes.")))
-            {
-                return true;
-            }
-            Test->TestTrue(TEXT("Skill return restores actor and occupied tile."), Player->GetCurrentTile() == MoveTile.Get() && MoveTile->GetOccupyingUnit() == Player.Get() && FVector::DistSquared2D(Player->GetActorLocation(), MoveTile->GetActorLocation()) < 1.0f);
-            PlayerHPBeforeAI = Player->GetAttributeSet()->GetHP();
-            TurnBeforeAI = Combat->GetTurnManager()->GetTurnCounter();
-            Controller->RequestEndTurn();
-            CheckAcceptedActionRequest(Controller, TEXT("End turn"));
-            Advance();
-            return false;
-        }
-        if (Stage == 6)
-        {
-            if (Run->GetPhase() == ERunPhase::Result && Run->GetLastResult() == ECombatResult::Victory)
-            {
-                if (!SnapshotSlot.IsNone())
-                {
-                    Test->TestTrue(TEXT("Saved opponent AI completes a real skill before natural Victory."), SnapshotSkillsCompleted > 0);
-                    Test->TestTrue(TEXT("Saved opponent skill applies actual damage to the player."), bSnapshotDamageApplied);
-                }
-                Advance();
-                return false;
-            }
-            if (!Require(Run->GetPhase() != ERunPhase::Defeat, TEXT("Unmodified party and skill content can reach natural Victory.")))
-            {
-                return true;
-            }
-            if (!Player.IsValid() || Combat->GetCurrentUnit() != Player.Get())
-            {
-                return false;
-            }
-            if (bStationaryPending)
-            {
-                if (Player->IsBusy())
-                {
-                    Test->TestFalse(TEXT("Stationary montage blocks additional player actions."), Controller->CanUseActiveUnitAction());
-                    return false;
-                }
-                Test->TestEqual(TEXT("Stationary montage completes exactly once."), StationaryCompletionCount, 1);
-                Test->TestTrue(TEXT("Stationary montage completes successfully without movement."), bStationarySucceeded && Player->GetActorLocation().Equals(StationaryLocation, 1.0f));
-                Player->OnActionCompleted.RemoveAll(this);
-                StationarySkill.Reset();
-                bStationaryPending = false;
-                bStationaryVerified = true;
-            }
-            if (Player->IsBusy())
-            {
-                return false;
-            }
-            if (!bEnemyTurnVerified)
-            {
-                if (!Require(Combat->GetTurnManager()->GetTurnCounter() > TurnBeforeAI && Player->GetAttributeSet()->GetHP() < PlayerHPBeforeAI, TEXT("Enemy AI deals damage and returns control to the player.")))
-                {
-                    return true;
-                }
-                bEnemyTurnVerified = true;
-            }
-            if (Player->HasEnoughActionPoint(1) && Enemy.IsValid())
-            {
-                USkillDefinitionDataAsset* Skill = Player->FindSkillDataByAbilityClass(Player->GetDefaultAttackAbilityClass());
-                if (!Require(Skill != nullptr, TEXT("Player retains its configured basic skill definition.")))
-                {
-                    return true;
-                }
-                if (!bStationaryVerified)
-                {
-                    // Change only a transient copy to cover the existing montage as a stationary skill.
-                    // 기존 몽타주의 제자리 스킬 경로를 검증하도록 임시 복사본만 변경합니다.
-                    StationarySkill.Reset(DuplicateObject<USkillDefinitionDataAsset>(Skill, Player.Get()));
-                    StationarySkill->bMoveToTarget = false;
-                    StationaryLocation = Player->GetActorLocation();
-                    bStationaryPending = true;
-                    Player->OnActionCompleted.AddRaw(this, &FPlayVerticalSlice::HandleStationaryCompleted);
-                    Player->StartSkill(StationarySkill.Get(), Enemy->GetCurrentTile());
-                    Test->TestTrue(TEXT("Stationary montage enters the action busy state."), Player->IsBusy());
-                }
-                else
-                {
-                    Player->StartSkill(Skill, Enemy->GetCurrentTile());
-                }
-            }
-            else
-            {
-                Controller->RequestEndTurn();
-            }
-            return false;
-        }
-        if (Stage == 7 || Stage == 10)
-        {
-            UEncounterResultWidget* Result = FindActiveWidget<UEncounterResultWidget>(World);
-            const bool bDefeat = Stage == 10;
-            ERunPhase ExpectedPhase = ERunPhase::Result;
-            ECombatResult ExpectedResult = ECombatResult::Victory;
-            int32 ExpectedCount = 1;
-            if (bDefeat)
-            {
-                ExpectedPhase = ERunPhase::Defeat;
-                ExpectedResult = ECombatResult::Defeat;
-                ExpectedCount = 2;
-            }
-            if (Run->GetPhase() != ExpectedPhase || !Result)
-            {
-                return false;
-            }
-            if (FPlatformTime::Seconds() - StageStarted < 1.0)
-            {
-                return false;
-            }
-            if ((!bDefeat && !bVictoryCaptured) || (bDefeat && !bDefeatCaptured))
-            {
-                if (bDefeat)
-                {
-                    Capture(TEXT("04-Defeat.png"));
-                    bDefeatCaptured = true;
-                }
-                else
-                {
-                    Capture(TEXT("03-Victory.png"));
-                    bVictoryCaptured = true;
-                }
-                StageStarted = FPlatformTime::Seconds();
-                return false;
-            }
-            if (FPlatformTime::Seconds() - StageStarted < 0.25)
-            {
-                return false;
-            }
-            Test->TestTrue(TEXT("The run receives the expected result."), Run->GetLastResult() == ExpectedResult);
-            Test->TestTrue(TEXT("The settled combat result is saved successfully."), Run->GetSaveError().IsEmpty());
-            if (!CheckInputPolicy(Controller, false))
-            {
-                return true;
-            }
-            Test->TestEqual(TEXT("Each combat broadcasts its result once."), ResultCount, ExpectedCount);
-            CheckCleanup(Encounter);
-            Test->TestFalse(TEXT("Result screen blocks further player actions."), Controller->CanUseActiveUnitAction());
-            const int32 FinishedTurn = Combat->GetCurrentTurnIndex();
-            Controller->RequestEndTurn();
-            Test->TestEqual(TEXT("Player input cannot advance finished combat."), Combat->GetCurrentTurnIndex(), FinishedTurn);
-            if (bDefeat)
-            {
-                Test->TestFalse(TEXT("Defeat cannot continue the run."), Encounter->ContinueRun());
-                Advance();
-                return false;
-            }
-            UButton* ContinueButton = Cast<UButton>(Result->GetWidgetFromName(TEXT("Button_Continue")));
-            if (!Require(ContinueButton && ContinueButton->GetIsEnabled(), TEXT("Victory exposes an enabled Continue button.")))
-            {
-                return true;
-            }
-            ContinueButton->OnClicked.Broadcast();
-            Advance();
-            return false;
-        }
-        if (Stage == 8)
-        {
-            bool bShopFailed = false;
-            if (!RunEncounterPIE::TickToMap(Test, Controller, {}, bShopFailed)) return bShopFailed;
-            URunMapWidget* MapWidget = FindActiveWidget<URunMapWidget>(World);
-            if (Run->GetPhase() != ERunPhase::Map || !MapWidget)
-            {
-                return false;
-            }
-            CheckCleanup(Encounter);
-            Test->TestEqual(TEXT("Victory completes one node."), Run->GetCompletedNodes().Num(), 1);
-            if (!CheckRunIdentity(Run, TEXT("Victory Continue")))
-            {
-                return true;
-            }
-            if (!ClickNode(MapWidget, 1))
-            {
-                return true;
-            }
-            Advance();
-            return false;
-        }
-        if (Stage == 11 && FPlatformTime::Seconds() - StageStarted > 0.25)
-        {
-            Test->TestEqual(TEXT("No duplicate result is broadcast after Defeat settles."), ResultCount, 2);
-            Test->TestTrue(TEXT("Defeat remains terminal."), Run->GetPhase() == ERunPhase::Defeat && !Combat->IsCombatActive());
+            Creation->RequestBack();
+            Test->TestFalse(TEXT("Completed character draft closes without starting a Run."), Creation->IsActivated());
             return true;
         }
-        return false;
+
+        return true;
     }
 
 private:
-    // These checks prove standalone request dispatch; existing assertions verify eventual action effects.
-    // 이 검사는 Standalone 요청 전달을 확인하며 최종 행동 효과는 기존 검사로 검증합니다.
-    void CheckAcceptedActionRequest(APartyPlayerController* Controller, const TCHAR* Action)
-    {
-        const FString Prefix = FString(Action) + TEXT(": ");
-        const FCombatActionResponse& Response = Controller->GetLastCombatActionResponse();
-        Test->TestTrue(Prefix + TEXT("the server action request is accepted."), Response.Result == ECombatRequestResult::Accepted);
-        Test->TestTrue(Prefix + TEXT("the response identifies the current combat."), Response.CombatInstanceId.IsValid() && Combat.IsValid() && Combat->GetActionAuthority() && Response.CombatInstanceId == Combat->GetActionAuthority()->GetCombatInstanceId());
-        Test->TestTrue(Prefix + TEXT("the request sequence advances within its combat."), Response.RequestSequence > 0 && (Response.CombatInstanceId != LastAcceptedCombatInstanceId || Response.RequestSequence > LastAcceptedRequestSequence));
-        LastAcceptedCombatInstanceId = Response.CombatInstanceId;
-        LastAcceptedRequestSequence = Response.RequestSequence;
-    }
-
-    // Compare persistent identities across encounter actor replacement and the Continue transition.
-    // 인카운터 액터 교체와 Continue 전환에서도 영속 식별자가 유지되는지 비교합니다.
-    bool CaptureRunIdentity(const URunStateSubsystem* Run)
-    {
-        InitialRunIdentity = Run->GetRunIdentity();
-        InitialPartyMembers = Run->GetPartyMembers();
-        bool bValid = Test->TestTrue(TEXT("MainMenu creates a valid RunId before Gameplay begins."), InitialRunIdentity.RunId.IsValid());
-        bValid &= Test->TestTrue(TEXT("A new solo run records its local development origin."), InitialRunIdentity.Origin == ERunIdentityOrigin::LocalDevelopment);
-        bValid &= Test->TestFalse(TEXT("A new solo run has a host account identifier."), InitialRunIdentity.HostAccountId.IsEmpty());
-        bValid &= Test->TestEqual(TEXT("A new solo run records exactly one original participant."), InitialRunIdentity.OriginalParticipants.Num(), 1);
-        if (InitialRunIdentity.OriginalParticipants.Num() == 1)
-        {
-            const auto& Participant = InitialRunIdentity.OriginalParticipants[0];
-            bValid &= Test->TestTrue(TEXT("The solo host is the original participant."), Participant.AccountId == InitialRunIdentity.HostAccountId);
-            bValid &= Test->TestTrue(TEXT("A new solo participant has not supplied AI consent."), Participant.AIConsent == ERunAIConsent::Unknown);
-            bValid &= Test->TestEqual(TEXT("A new solo run has no accepted consent policy version."), Participant.ConsentPolicyVersion, 0);
-        }
-        TSet<FGuid> CharacterIds;
-        for (const FRunPartyMember& Member : InitialPartyMembers)
-        {
-            if (!Member.bCreated)
-            {
-                continue;
-            }
-            bValid &= Test->TestTrue(TEXT("Every created character has a valid persistent CharacterId."), Member.CharacterId.IsValid());
-            bValid &= Test->TestFalse(TEXT("Created characters have distinct CharacterIds."), CharacterIds.Contains(Member.CharacterId));
-            bValid &= Test->TestTrue(TEXT("The solo host owns every created party member."), Member.OwnerAccountId == InitialRunIdentity.HostAccountId);
-            CharacterIds.Add(Member.CharacterId);
-        }
-        return bValid;
-    }
-
-    bool CheckRunIdentity(const URunStateSubsystem* Run, const TCHAR* Transition)
-    {
-        const FString Prefix = FString(Transition) + TEXT(": ");
-        const FRunIdentityData& Identity = Run->GetRunIdentity();
-        bool bMatches = Test->TestEqual(Prefix + TEXT("RunId is preserved."), Identity.RunId, InitialRunIdentity.RunId);
-        bMatches &= Test->TestTrue(Prefix + TEXT("identity origin is preserved."), Identity.Origin == InitialRunIdentity.Origin);
-        bMatches &= Test->TestTrue(Prefix + TEXT("host account is preserved."), Identity.HostAccountId == InitialRunIdentity.HostAccountId);
-        bMatches &= Test->TestEqual(Prefix + TEXT("host epoch is preserved."), Identity.HostEpoch, InitialRunIdentity.HostEpoch);
-        bMatches &= Test->TestEqual(Prefix + TEXT("original participant count is preserved."), Identity.OriginalParticipants.Num(), InitialRunIdentity.OriginalParticipants.Num());
-        for (int32 Index = 0; Index < FMath::Min(Identity.OriginalParticipants.Num(), InitialRunIdentity.OriginalParticipants.Num()); ++Index)
-        {
-            const auto& Participant = Identity.OriginalParticipants[Index];
-            const auto& Original = InitialRunIdentity.OriginalParticipants[Index];
-            bMatches &= Test->TestTrue(Prefix + TEXT("original participant account is preserved."), Participant.AccountId == Original.AccountId);
-            bMatches &= Test->TestTrue(Prefix + TEXT("participant AI consent is preserved."), Participant.AIConsent == Original.AIConsent);
-            bMatches &= Test->TestEqual(Prefix + TEXT("participant consent policy version is preserved."), Participant.ConsentPolicyVersion, Original.ConsentPolicyVersion);
-        }
-        const TArray<FRunPartyMember>& Members = Run->GetPartyMembers();
-        bMatches &= Test->TestEqual(Prefix + TEXT("party slot count is preserved."), Members.Num(), InitialPartyMembers.Num());
-        for (int32 Index = 0; Index < FMath::Min(Members.Num(), InitialPartyMembers.Num()); ++Index)
-        {
-            const FRunPartyMember& Member = Members[Index];
-            const FRunPartyMember& Original = InitialPartyMembers[Index];
-            bMatches &= Test->TestEqual(Prefix + TEXT("party slot is preserved."), Member.SlotIndex, Original.SlotIndex);
-            bMatches &= Test->TestEqual(Prefix + TEXT("character identity is preserved."), Member.CharacterId, Original.CharacterId);
-            bMatches &= Test->TestTrue(Prefix + TEXT("character ownership is preserved."), Member.OwnerAccountId == Original.OwnerAccountId);
-        }
-        return bMatches;
-    }
-
     bool Require(bool bCondition, const TCHAR* Message)
     {
         return Test->TestTrue(Message, bCondition);
@@ -832,9 +211,8 @@ private:
     void Advance()
     {
         ++Stage;
-        PointerStep = 0;
         StageStarted = FPlatformTime::Seconds();
-        Test->AddInfo(FString::Printf(TEXT("Vertical slice PIE stage %d."), Stage));
+        Test->AddInfo(FString::Printf(TEXT("Saved menu PIE stage %d."), Stage));
     }
 
     bool CheckMenuLifecycle(AMainMenuPlayerController* Menu)
@@ -912,280 +290,28 @@ private:
         return true;
     }
 
-    void HandleResult(ECombatResult Result)
-    {
-        ++ResultCount;
-    }
-
-    void HandleStationaryCompleted(AUnitBase* Unit, EUnitActionType ActionType, EUnitActionResult Result)
-    {
-        ++StationaryCompletionCount;
-        bStationarySucceeded = Result == EUnitActionResult::Succeeded;
-    }
-
-    void HandleSnapshotActionCompleted(AUnitBase* Unit, EUnitActionType ActionType, EUnitActionResult Result)
-    {
-        if (ActionType == EUnitActionType::Skill && Result == EUnitActionResult::Succeeded)
-        {
-            ++SnapshotSkillsCompleted;
-            bSnapshotDamageApplied |= Player.IsValid() && Player->GetAttributeSet()->GetHP() < SnapshotPlayerHP;
-        }
-    }
-
     void Capture(const TCHAR* FileName)
     {
         FScreenshotRequest::RequestScreenshot(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/VerticalSliceScreenshots"), FileName), true, false);
     }
 
-    bool CheckInputPolicy(AGameplayPlayerController* Controller, bool bCombat)
-    {
-        ULocalPlayer* LocalPlayer = Controller->GetLocalPlayer();
-        UCommonUIActionRouterBase* Router = nullptr;
-        if (LocalPlayer)
-        {
-            Router = LocalPlayer->GetSubsystem<UCommonUIActionRouterBase>();
-        }
-        if (!Require(Router && InputViewport.IsValid(), TEXT("The local player owns the CommonUI action router and viewport.")))
-        {
-            return false;
-        }
-        UCommonActivatableWidget* ActiveScreen = FindActiveWidget<URunMapWidget>(Controller->GetWorld());
-        if (!ActiveScreen)
-        {
-            ActiveScreen = FindActiveWidget<UCombatHUDWidget>(Controller->GetWorld());
-        }
-        if (!ActiveScreen)
-        {
-            ActiveScreen = FindActiveWidget<UEncounterResultWidget>(Controller->GetWorld());
-        }
-        const ERouteUIInputResult ActualRoute = Router->ProcessInput(EKeys::LeftMouseButton, IE_Pressed);
-        Router->ProcessInput(EKeys::LeftMouseButton, IE_Released);
-        UE_LOG(LogTemp, Display, TEXT("[VerticalSliceInput] Stage=%d Screen=%s PendingTree=%d SupportsFocus=%d Mode=%d Capture=%d IgnoreInput=%d CanProcessGame=%d MouseRoute=%d"), Stage, *GetNameSafe(ActiveScreen), Router->IsPendingTreeChange(), ActiveScreen && ActiveScreen->SupportsActivationFocus(), static_cast<int32>(Router->GetActiveInputMode()), static_cast<int32>(InputViewport->GetMouseCaptureMode()), InputViewport->IgnoreInput(), Router->CanProcessNormalGameInput(), static_cast<int32>(ActualRoute));
-        if (!Require(!InputViewport->IgnoreInput(), TEXT("Gameplay clears the UIOnly viewport input gate inherited from MainMenu.")))
-        {
-            return false;
-        }
-        ECommonInputMode ExpectedMode = ECommonInputMode::Menu;
-        ERouteUIInputResult ExpectedRoute = ERouteUIInputResult::BlockGameInput;
-        EMouseCaptureMode ExpectedCapture = EMouseCaptureMode::NoCapture;
-        if (bCombat)
-        {
-            ExpectedMode = ECommonInputMode::All;
-            ExpectedRoute = ERouteUIInputResult::Unhandled;
-            ExpectedCapture = EMouseCaptureMode::CaptureDuringMouseDown;
-        }
-        bool bPassed = Require(Router->GetActiveInputMode() == ExpectedMode, TEXT("The active CommonUI mode matches the current run phase."));
-        bPassed &= Require(Router->CanProcessNormalGameInput() == bCombat, TEXT("CommonUI permits world input only during combat."));
-        bPassed &= Require(ActualRoute == ExpectedRoute, TEXT("CommonUI routes or blocks actual mouse input for the current phase."));
-        bPassed &= Require(InputViewport->GetMouseCaptureMode() == ExpectedCapture, TEXT("Combat forwards the first mouse-down and menu screens release capture."));
-        return bPassed;
-    }
-
-    bool QueueWidgetClick(UButton* Button)
-    {
-        if (!Require(Button && Button->GetIsEnabled() && Button->GetCachedWidget().IsValid(), TEXT("The combat HUD exposes an enabled, painted action button.")))
-        {
-            return false;
-        }
-        const FGeometry& Geometry = Button->GetCachedGeometry();
-        if (!Require(Geometry.GetLocalSize().X > 0.0f && Geometry.GetLocalSize().Y > 0.0f, TEXT("The action button has a clickable Slate geometry.")))
-        {
-            return false;
-        }
-        return QueuePointerClick(Geometry.LocalToAbsolute(Geometry.GetLocalSize() * 0.5f), Button->GetCachedWidget());
-    }
-
-    bool QueueTileClick(AGameplayPlayerController* Controller, ACombatGridTile* Tile)
-    {
-        FSceneViewport* Viewport = nullptr;
-        TSharedPtr<SViewport> ViewportWidget;
-        if (InputViewport.IsValid())
-        {
-            Viewport = InputViewport->GetGameViewport();
-            ViewportWidget = InputViewport->GetGameViewportWidget();
-        }
-        if (!Require(Viewport && ViewportWidget.IsValid() && Tile, TEXT("The target tile and actual PIE Slate viewport are available.")))
-        {
-            return false;
-        }
-        const FIntPoint ViewportSize = Viewport->GetSizeXY();
-        if (!Require(ViewportSize.X > 0 && ViewportSize.Y > 0, TEXT("The PIE viewport has rendered dimensions.")))
-        {
-            return false;
-        }
-        // Pick an exposed tile surface, avoiding unit capsules and the HUD without changing collision.
-        // 충돌 설정을 변경하지 않고 유닛 캡슐과 HUD를 피한 노출된 타일 표면을 선택합니다.
-        const FVector Offsets[] = {FVector(0.0f, 0.0f, 10.0f), FVector(65.0f, 0.0f, 10.0f), FVector(-65.0f, 0.0f, 10.0f), FVector(0.0f, -65.0f, 10.0f), FVector(65.0f, -65.0f, 10.0f), FVector(-65.0f, -65.0f, 10.0f), FVector(0.0f, 65.0f, 10.0f)};
-        FSlateApplication& Slate = FSlateApplication::Get();
-        for (const FVector& Offset : Offsets)
-        {
-            FVector2D Pixel;
-            if (!Controller->ProjectWorldLocationToScreen(Tile->GetActorLocation() + Offset, Pixel) || Pixel.X < 0.0f || Pixel.Y < 0.0f || Pixel.X >= ViewportSize.X || Pixel.Y >= ViewportSize.Y)
-            {
-                continue;
-            }
-            FHitResult Hit;
-            if (!Controller->GetHitResultAtScreenPosition(Pixel, ECC_Visibility, true, Hit) || Hit.GetActor() != Tile)
-            {
-                continue;
-            }
-            const FGeometry& Geometry = Viewport->GetCachedGeometry();
-            const FVector2D Position = Geometry.LocalToAbsolute(FVector2D(Pixel.X / ViewportSize.X, Pixel.Y / ViewportSize.Y) * Geometry.GetLocalSize());
-            const FWidgetPath Path = Slate.LocateWindowUnderMouse(Position, Slate.GetInteractiveTopLevelWindows(), false, Slate.GetUserIndexForMouse());
-            if (!Path.IsValid() || Path.GetLastWidget() != ViewportWidget.ToSharedRef())
-            {
-                continue;
-            }
-            Viewport->SetMouse(FMath::RoundToInt(Pixel.X), FMath::RoundToInt(Pixel.Y));
-            GameMouseDownBeforeTile = GameMouseDownCount;
-            return QueuePointerClick(Slate.GetCursorPos(), ViewportWidget);
-        }
-        return Require(false, TEXT("A visible tile surface reaches the game viewport through the real Slate hit-test path."));
-    }
-
-    bool QueuePointerClick(const FVector2D& Position, const TSharedPtr<SWidget>& ExpectedWidget)
-    {
-        FSlateApplication& Slate = FSlateApplication::Get();
-        const FWidgetPath Path = Slate.LocateWindowUnderMouse(Position, Slate.GetInteractiveTopLevelWindows(), false, Slate.GetUserIndexForMouse());
-        if (!Require(ExpectedWidget.IsValid() && Path.IsValid() && Path.ContainsWidget(ExpectedWidget.Get()), TEXT("The pointer hit-test path contains the requested gameplay widget.")))
-        {
-            return false;
-        }
-        PointerWindow = Path.GetWindow();
-        PointerWidget = ExpectedWidget;
-        PointerPosition = Position;
-        PointerQueuedFrame = GFrameCounter;
-        PointerQueuedTime = FPlatformTime::Seconds();
-        bPointerClickPending = true;
-        const FVector2D PreviousPosition = Slate.GetCursorPos();
-        Slate.SetCursorPos(Position);
-        const TSet<FKey> NoButtons;
-        const FPointerEvent Move(Slate.GetUserIndexForMouse(), FSlateApplication::CursorPointerIndex, Position, PreviousPosition, NoButtons, EKeys::Invalid, 0.0f, Slate.GetModifierKeys());
-        Slate.ProcessMouseMoveEvent(Move);
-        return true;
-    }
-
-    bool CompletePointerClick()
-    {
-        bPointerClickPending = false;
-        FSlateApplication& Slate = FSlateApplication::Get();
-        TSharedPtr<SWindow> Window = PointerWindow.Pin();
-        TSharedPtr<SWidget> Widget = PointerWidget.Pin();
-        const FWidgetPath Path = Slate.LocateWindowUnderMouse(PointerPosition, Slate.GetInteractiveTopLevelWindows(), false, Slate.GetUserIndexForMouse());
-        if (!Require(Window.IsValid() && Widget.IsValid() && Path.IsValid() && Path.ContainsWidget(Widget.Get()), TEXT("The real pointer target remains hit-testable after its hover tick.")))
-        {
-            return false;
-        }
-        // Use Slate input dispatch so CommonUI, widget hit testing and actor click handling all participate.
-        // CommonUI, 위젯 히트 테스트 및 액터 클릭 처리가 모두 참여하도록 Slate 입력을 전달합니다.
-        const TSet<FKey> PressedButtons = {EKeys::LeftMouseButton};
-        const TSet<FKey> NoButtons;
-        const FPointerEvent Down(Slate.GetUserIndexForMouse(), FSlateApplication::CursorPointerIndex, PointerPosition, PointerPosition, PressedButtons, EKeys::LeftMouseButton, 0.0f, Slate.GetModifierKeys());
-        Slate.ProcessMouseButtonDownEvent(Window->GetNativeWindow(), Down);
-        const FPointerEvent Up(Slate.GetUserIndexForMouse(), FSlateApplication::CursorPointerIndex, PointerPosition, PointerPosition, NoButtons, EKeys::LeftMouseButton, 0.0f, Slate.GetModifierKeys());
-        Slate.ProcessMouseButtonUpEvent(Up);
-        return true;
-    }
-
-    void HandleGameViewportInput(const FInputKeyEventArgs& Event)
-    {
-        if (Event.Key == EKeys::LeftMouseButton && Event.Event == IE_Pressed)
-        {
-            ++GameMouseDownCount;
-        }
-    }
-
-    bool ClickNode(URunMapWidget* Widget, int32 Index)
-    {
-        UVerticalBox* Nodes = Cast<UVerticalBox>(Widget->GetWidgetFromName(TEXT("NodeList")));
-        if (!Require(Nodes && Nodes->GetChildrenCount() > Index, TEXT("Run Map displays the configured node list.")))
-        {
-            return false;
-        }
-        UButton* Button = Cast<UButton>(Nodes->GetChildAt(Index));
-        if (!Require(Button && Button->GetIsEnabled(), TEXT("The next combat node is selectable.")))
-        {
-            return false;
-        }
-        Button->OnClicked.Broadcast();
-        return true;
-    }
-
-    void CheckCleanup(AEncounterManager* Encounter)
-    {
-        Test->TestTrue(TEXT("Encounter releases spawned actors."), Encounter->GetSpawnedUnits().IsEmpty());
-        Test->TestTrue(TEXT("Combat registration is empty after cleanup."), Combat->GetRegisteredUnits().IsEmpty());
-        Test->TestTrue(TEXT("Turn registration is empty or released after cleanup."), !Combat->GetTurnManager() || Combat->GetTurnManager()->GetRegisteredUnitCount() == 0);
-        for (const TWeakObjectPtr<AUnitBase>& PreviousUnit : FirstEncounterUnits)
-        {
-            Test->TestFalse(TEXT("Previous encounter units are destroyed."), PreviousUnit.IsValid());
-        }
-        FirstEncounterUnits.Reset();
-        if (Grid.IsValid())
-        {
-            for (const TPair<FIntPoint, ACombatGridTile*>& Entry : Grid->TileMap)
-            {
-                Test->TestNull(TEXT("Tiles have no leftover occupant."), Entry.Value->GetOccupyingUnit());
-            }
-        }
-    }
-
     FAutomationTestBase* Test;
-    FGuid LastAcceptedCombatInstanceId;
-    int64 LastAcceptedRequestSequence = 0;
-    FRunIdentityData InitialRunIdentity;
-    TArray<FRunPartyMember> InitialPartyMembers;
     int32 Stage = 0;
-    FName SnapshotSlot;
-    int32 SnapshotSkillsCompleted = 0;
-    float SnapshotPlayerHP = 0.0f;
-    bool bSnapshotDamageApplied = false;
-    int32 ResultCount = 0;
-    int32 TurnBeforeAI = 0;
-    int32 PointerStep = 0;
-    int32 GameMouseDownCount = 0;
-    int32 GameMouseDownBeforeTile = 0;
     double StageStarted;
-    double PointerQueuedTime = 0.0;
-    uint64 PointerQueuedFrame = 0;
-    float EnemyHPBeforeSkill = 0.0f;
-    float PlayerHPBeforeAI = 0.0f;
     bool bProfessionPanelTested = false;
     int32 PreviewCaptureStage = 0;
     bool bProfessionCaptured = false;
     double ProfessionPanelTime = 0.0;
-    bool bMapCaptured = false;
-    bool bVictoryCaptured = false;
-    bool bDefeatCaptured = false;
-    bool bEnemyTurnVerified = false;
-    bool bStationaryPending = false;
-    bool bStationaryVerified = false;
-    bool bStationarySucceeded = false;
-    bool bPointerClickPending = false;
-    int32 StationaryCompletionCount = 0;
-    FVector StationaryLocation = FVector::ZeroVector;
-    FVector2D PointerPosition = FVector2D::ZeroVector;
-    TWeakPtr<SWindow> PointerWindow;
-    TWeakPtr<SWidget> PointerWidget;
-    TWeakObjectPtr<UCommonGameViewportClient> InputViewport;
-    TStrongObjectPtr<USkillDefinitionDataAsset> StationarySkill;
-    TWeakObjectPtr<UWorld> GameplayWorld;
-    TWeakObjectPtr<ACombatManager> Combat;
-    TWeakObjectPtr<ACombatGridManager> Grid;
-    TWeakObjectPtr<ACombatGridTile> MoveTile;
-    TWeakObjectPtr<AUnitBase> Player;
-    TWeakObjectPtr<AUnitBase> Enemy;
-    TArray<TWeakObjectPtr<AUnitBase>> FirstEncounterUnits;
 };
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVerticalSliceFlowTest, "ProjectA.VerticalSlice.SavedMapsPIELoop", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVerticalSliceMenuLifecycleTest, "ProjectA.VerticalSlice.SavedMenuLifecycle", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FVerticalSliceFlowTest::RunTest(const FString& Parameters)
+bool FVerticalSliceMenuLifecycleTest::RunTest(const FString& Parameters)
 {
     ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/MainMenu")));
     ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
-    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectAVerticalSliceTests::FPlayVerticalSlice>(this));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectAVerticalSliceTests::FPlayMenuLifecycle>(this));
     ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
     return true;
 }

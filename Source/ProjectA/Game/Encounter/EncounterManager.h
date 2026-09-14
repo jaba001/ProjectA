@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Combat/Checkpoint/CombatCheckpointTypes.h"
+#include "Game/Run/RunIdentityTypes.h"
 #include "Types/CombatResult.h"
 #include "EncounterManager.generated.h"
 
@@ -32,8 +32,8 @@ public:
     bool SelectRunEncounter(FName EncounterId);
     bool LeaveRunEncounter();
 
-    // Restore only a validated idle boundary for the original host and original participants.
-    // 기존 Host와 원래 참가자에 대해 검증된 유휴 경계만 복원합니다.
+    // Legacy combat-save entry points reject unsupported timed-round recovery.
+    // 기존 전투 저장 진입점은 미지원 시간 기반 라운드 복구를 명시적으로 거절합니다.
     bool RestoreSavedCombat(const FRunAccountId& HostAccount, FText& OutError);
     bool ResumeManagedGameplay(FText& OutError);
     bool RetryCombatCheckpoint(FText& OutError);
@@ -57,13 +57,7 @@ private:
     bool FailPreparation(const FText& Message);
     void SetPlayerCombatInput(bool bEnabled);
     bool ConfigureCombatParticipants(FText& OutError);
-    bool CommitTurnCheckpoint(int32 CompletedTurnSerial, int32 NextTurnIndex);
-    bool BuildTurnCheckpoint(int32 CompletedTurnSerial, int32 NextTurnIndex, FCombatCheckpointData& OutCheckpoint, FText& OutError);
-    void EnableCombatCheckpoints();
-    bool ValidateRestoreArena(const FCombatCheckpointData& Checkpoint, FText& OutError) const;
-    bool FailRestore(const FText& Error, FText& OutError);
     bool ValidateManagedExecution(FText& OutError, bool bAllowResumePending = false) const;
-    bool ValidateManagedCheckpointModes(const FCombatCheckpointData& Checkpoint, FText& OutError) const;
 
     UPROPERTY(Transient)
     TObjectPtr<URunStateSubsystem> RunState;
@@ -91,17 +85,4 @@ private:
     FTimerHandle FinishTimer;
     bool bPreparing = false;
     bool bShuttingDown = false;
-
-    UPROPERTY(Transient)
-    FCombatCheckpointData PendingTurnCheckpoint;
-
-    UPROPERTY(Transient)
-    FPartySnapshot FrozenOpponentSnapshot;
-
-    UPROPERTY(Transient)
-    FSoftObjectPath FrozenOpponentCatalog;
-
-    TMap<TWeakObjectPtr<AUnitBase>, FGuid> CheckpointUnitIds;
-    FGuid CombatAttemptId;
-    bool bHasFrozenOpponent = false;
 };

@@ -63,7 +63,11 @@ bool FOpponentSnapshotCatalogValidationTest::RunTest(const FString& Parameters)
     Candidate = Fixture.Snapshot;
     Candidate.Members[0].SkillIds[1] = Alias->SkillId;
     TestTrue(TEXT("Distinct skill identifiers remain structurally valid storage data"), UPartySnapshotLibrary::ValidateSnapshot(Candidate, Error));
-    TestFalse(TEXT("Two identifiers cannot grant the same ability twice"), Fixture.Catalog->ValidateForEncounter(Candidate, 4, Error));
+    TestTrue(TEXT("Distinct authored skills may share a retired ability class"), Fixture.Catalog->ValidateForEncounter(Candidate, 4, Error));
+    Fixture.Catalog->Skills.Add(TEXT("SameAssetAlias"), Fixture.BasicAttack);
+    Candidate.Members[0].SkillIds[1] = TEXT("SameAssetAlias");
+    TestTrue(TEXT("Catalog aliases remain structurally distinct snapshot identifiers"), UPartySnapshotLibrary::ValidateSnapshot(Candidate, Error));
+    TestFalse(TEXT("Two catalog identifiers cannot duplicate one resolved skill asset"), Fixture.Catalog->ValidateForEncounter(Candidate, 4, Error));
 
     Candidate = Fixture.Snapshot;
     ++Candidate.SchemaVersion;
@@ -137,12 +141,25 @@ bool FOpponentSnapshotSkillResolutionTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Excess skill slots preserve the caller's previous loadout"), Resolved == Previous);
 
     Member.SkillIds = { Fixture.BasicAttack->SkillId, Fixture.BasicAttack->SkillId };
-    TestFalse(TEXT("Duplicate ability resolution cannot collapse two slots into one"), Fixture.Catalog->ResolveSkills(Member, Resolved, Error));
-    TestTrue(TEXT("Duplicate ability rejection preserves the caller's previous loadout"), Resolved == Previous);
+    TestFalse(TEXT("Duplicate skill asset resolution cannot collapse two slots into one"), Fixture.Catalog->ResolveSkills(Member, Resolved, Error));
+    TestTrue(TEXT("Duplicate skill asset rejection preserves the caller's previous loadout"), Resolved == Previous);
     Fixture.AreaAttack->ActionPointCost = 0;
     Member.SkillIds = { Fixture.BasicAttack->SkillId, Fixture.AreaAttack->SkillId };
     TestFalse(TEXT("Invalid trusted skill content still cannot execute"), Fixture.Catalog->ResolveSkills(Member, Resolved, Error));
     TestTrue(TEXT("Invalid trusted content preserves the caller's previous loadout"), Resolved == Previous);
+    FCombatRoundSkill InvalidDefinition;
+    FText AssetError;
+    Fixture.AreaAttack->ResolveRoundSkill(InvalidDefinition, AssetError);
+    TestEqual(TEXT("Catalog propagates the exact round definition error"), Error.ToString(), AssetError.ToString());
+    Fixture.AreaAttack->bUseRoundDefinition = true;
+    Fixture.AreaAttack->AbilityClass = nullptr;
+    Fixture.AreaAttack->RoundDefinition.Kind = ECombatRoundSkillKind::Wait;
+    Fixture.AreaAttack->RoundDefinition.Approach = ECombatRoundApproach::None;
+    Fixture.AreaAttack->RoundDefinition.ActionPointCost = 0;
+    Fixture.AreaAttack->RoundDefinition.Power = 0.0f;
+    TestTrue(TEXT("Explicit round profile resolves without an executable ability class"), Fixture.Catalog->ResolveSkills(Member, Resolved, Error));
+    TestEqual(TEXT("Explicit profile preserves its ordered data asset"), Resolved[1].Get(), Fixture.AreaAttack);
+    TestTrue(TEXT("Snapshot encounter accepts a trusted null-GA round profile"), Fixture.Catalog->ValidateForEncounter(Fixture.Snapshot, 4, Error));
     return true;
 }
 

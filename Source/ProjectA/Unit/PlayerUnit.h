@@ -7,7 +7,6 @@
 
 class ACombatManager;
 class UCombatActionAuthority;
-class UPartyAutoCombatComponent;
 
 // Player-controlled combat unit implementation.
 // 플레이어가 조작하는 전투 유닛 구현 클래스입니다.
@@ -40,13 +39,6 @@ public:
 	// 플레이어 유닛의 턴 종료 동작을 처리합니다.
     virtual void OnTurnEnd() override;
 
-protected:
-    // End exhausted turns only after action cleanup and completion notifications.
-    // 행동 정리와 완료 통지 후에만 자원이 소진된 턴을 종료합니다.
-    virtual void OnUnitActionCompleted(EUnitActionType ActionType, EUnitActionResult Result) override;
-    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-    FTimerHandle ExhaustedTurnTimer;
-
 private:
     friend class UCombatActionAuthority;
     friend class AUnitBase;
@@ -60,9 +52,6 @@ private:
 
     UPROPERTY(ReplicatedUsing = OnRep_PartyControlMode)
     EPartyControlMode PartyControlMode = EPartyControlMode::Human;
-
-    UPROPERTY(VisibleAnywhere, Category = "Unit|Control")
-    TObjectPtr<UPartyAutoCombatComponent> AutoCombat;
 
     // Reject callbacks from an earlier AI assignment; this nonce is neither saved nor replicated.
     // 이전 AI 배정의 콜백을 거절하며 이 식별자는 저장하거나 복제하지 않습니다.

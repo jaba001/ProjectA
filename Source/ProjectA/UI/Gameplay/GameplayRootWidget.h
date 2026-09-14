@@ -34,7 +34,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Gameplay|UI")
     TSubclassOf<URunMapWidget> RunMapWidgetClass;
 
-    UPROPERTY(EditDefaultsOnly, Category = "Gameplay|UI")
+    // Retained only to deserialize authored root widgets; active combat uses the native round screen.
+    // 작성된 루트 위젯 역직렬화용으로만 보존하며 실제 전투는 native 라운드 화면을 사용합니다.
+    UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Combat uses the native round planning screen."))
     TSubclassOf<UCombatHUDWidget> CombatHUDWidgetClass;
 
     UPROPERTY(EditDefaultsOnly, Category = "Gameplay|UI")

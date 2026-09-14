@@ -96,6 +96,27 @@ namespace
             return Checkpoint;
         }
 
+        // Install an old serialized payload directly; production code must never publish it again.
+        // 이전 직렬화 본문을 직접 준비하며 제품 코드는 이 형식을 다시 저장하면 안 됩니다.
+        bool WriteRetiredCombat(const FCombatCheckpointData& Checkpoint, FText& OutError) const
+        {
+            TStrongObjectPtr<URunSaveGame> Save(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));
+            if (!Save) return false;
+            Save->Version = 3;
+            Save->Phase = ERunPhase::Combat;
+            Save->Identity = Checkpoint.Identity;
+            Save->CurrentNode = Checkpoint.NodeId;
+            Save->CurrentEncounter = Checkpoint.EncounterId;
+            Save->CombatCheckpoint = Checkpoint;
+            for (FRunPartyMember& Member : Save->Party)
+            {
+                const FCombatCheckpointUnit* Unit = Checkpoint.Units.FindByPredicate([&Member](const FCombatCheckpointUnit& Entry) { return Entry.Team == ETeam::Player && Entry.PartySlot == Member.SlotIndex; });
+                if (!Unit) return false;
+                Member.CurrentHP = Unit->HP;
+            }
+            return FRunCheckpointStorage::Save(Save.Get(), Slot, OutError);
+        }
+
         TArray<uint8> ReadBytes() const
         {
             TArray<uint8> Bytes;
@@ -177,7 +198,7 @@ bool FCombatCheckpointValueTest::RunTest(const FString& Parameters)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatCheckpointRoundTripTest, "ProjectA.Checkpoint.RoundTripAndHost", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatCheckpointRoundTripTest, "ProjectA.Checkpoint.RetiredCombatReadRejection", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 
 bool FCombatCheckpointRoundTripTest::RunTest(const FString& Parameters)
 {
@@ -226,97 +247,47 @@ bool FCombatCheckpointRoundTripTest::RunTest(const FString& Parameters)
     MismatchedOpponent.OpponentSnapshot.Members.Add(ExtraOpponent);
     TestFalse(TEXT("Frozen opponent count must match saved enemy entries"), UCombatCheckpointLibrary::Validate(MismatchedOpponent, Fixture.Run->GetPartyMembers(), Error));
     TestFalse(TEXT("Frozen opponent count mismatch explains why"), Error.IsEmpty());
+    if (!TestTrue(TEXT("Historical v3 bytes are installed without the retired production commit API"), Fixture.WriteRetiredCombat(Checkpoint, Error))) return false;
+    const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
+    const FRunIdentityData BeforeIdentity = Fixture.Run->GetRunIdentity();
+    const FCombatCheckpointData BeforeCheckpoint = Fixture.Run->GetCombatCheckpoint();
     int32 Events = 0;
     Fixture.Run->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
-    if (!TestTrue(TEXT("Complete v3 boundary atomically commits"), Fixture.Run->CommitCombatCheckpoint(Checkpoint, Error)))
-    {
-        AddError(Error.ToString());
-        return false;
-    }
-    TestTrue(TEXT("Committed checkpoint retains every value"), SameCheckpoint(Fixture.Run->GetCombatCheckpoint(), Checkpoint));
-    TestEqual(TEXT("Boundary persistence does not publish a partial next turn"), Events, 0);
-    TestEqual(TEXT("Persistence does not rewrite encounter-local runtime party HP"), Fixture.Run->GetPartyMembers()[0].CurrentHP, -1.0f);
-    TestTrue(TEXT("CanContinue recognizes v3 combat without loading it into memory"), Fixture.Run->CanContinueSavedRun(Error));
-    TestEqual(TEXT("Continue availability is read-only"), Events, 0);
-    TestTrue(TEXT("Existing Host identity is accepted"), Fixture.Run->ValidateCheckpointHost(Checkpoint.Identity.HostAccountId, Error));
-    FRunAccountId OtherHost = Checkpoint.Identity.HostAccountId;
-    OtherHost.Subject += TEXT("_another");
-    TestFalse(TEXT("Host succession is not inferred by restoration"), Fixture.Run->ValidateCheckpointHost(OtherHost, Error));
     TStrongObjectPtr<URunSaveGame> Disk(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
-    if (!TestTrue(TEXT("Native SaveGame reader understands the committed format"), Disk.IsValid()))
-    {
-        return false;
-    }
-    TestEqual(TEXT("Combat stores version three"), Disk->Version, 3);
-    TestEqual(TEXT("Persisted party HP comes from the actual boundary"), Disk->Party[0].CurrentHP, Checkpoint.Units[0].HP);
-    TestTrue(TEXT("Native serialization preserves frozen Snapshot and all battle fields"), SameCheckpoint(Disk->CombatCheckpoint, Checkpoint));
-    TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
-    Restored->EnableCheckpointSaving(Fixture.Slot);
-    TestTrue(TEXT("A fresh subsystem restores the battle boundary"), Restored->LoadCheckpoint(Error));
-    TestTrue(TEXT("Restoration enters combat"), Restored->GetPhase() == ERunPhase::Combat);
-    TestTrue(TEXT("Restoration preserves all checkpoint fields"), SameCheckpoint(Restored->GetCombatCheckpoint(), Checkpoint));
-    TestTrue(TEXT("Restoration preserves complete original identity"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Restored->GetRunIdentity(), &Checkpoint.Identity, 0));
-    TestTrue(TEXT("Restored Host remains the original Host"), Restored->ValidateCheckpointHost(Checkpoint.Identity.HostAccountId, Error));
+    if (!TestTrue(TEXT("Native serialization still reads retired data without executing it"), Disk.IsValid())) return false;
+    TestEqual(TEXT("Historical bytes retain version three"), Disk->Version, 3);
+    TestTrue(TEXT("Native serialization preserves the frozen opponent and original Host"), SameCheckpoint(Disk->CombatCheckpoint, Checkpoint) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Disk->Identity, &Checkpoint.Identity, 0));
+    TestFalse(TEXT("General Continue rejects retired sequential combat"), Fixture.Run->CanContinueSavedRun(Error));
+    TestTrue(TEXT("The rejection identifies the retired combat contract"), Error.ToString().Contains(TEXT("순차 턴")));
+    TestFalse(TEXT("Standalone Continue rejects the same payload"), Fixture.Run->CanContinueStandaloneSavedRun(Error));
+    TestFalse(TEXT("General load cannot execute the old battle"), Fixture.Run->LoadCheckpoint(Error));
+    TestFalse(TEXT("Standalone load cannot execute the old battle"), Fixture.Run->LoadStandaloneCheckpoint(Error));
+    TestTrue(TEXT("Rejections preserve current identity, phase and checkpoint"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Fixture.Run->GetRunIdentity(), &BeforeIdentity, 0) && Fixture.Run->GetPhase() == ERunPhase::Combat && SameCheckpoint(Fixture.Run->GetCombatCheckpoint(), BeforeCheckpoint));
+    TestEqual(TEXT("Rejections preserve encounter-local runtime HP"), Fixture.Run->GetPartyMembers()[0].CurrentHP, -1.0f);
+    TestTrue(TEXT("Rejections never rewrite historical bytes"), Fixture.ReadBytes() == BeforeBytes);
+    TestEqual(TEXT("Read and rejection publish no Run events"), Events, 0);
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatCheckpointAtomicTest, "ProjectA.Checkpoint.AtomicWriteAndRevision", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatCheckpointAtomicTest, "ProjectA.Checkpoint.RetiredCommitPreservesNoncombat", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 
 bool FCombatCheckpointAtomicTest::RunTest(const FString& Parameters)
 {
     FCheckpointStorageFixture Fixture;
     FText Error;
-    if (!TestTrue(TEXT("Fixture initializes"), Fixture.Initialize(Error)))
-    {
-        return false;
-    }
-    FCombatCheckpointData First = Fixture.MakeCheckpoint();
-    if (!TestTrue(TEXT("First boundary commits"), Fixture.Run->CommitCombatCheckpoint(First, Error)))
-    {
-        return false;
-    }
-    const TArray<uint8> OriginalBytes = Fixture.ReadBytes();
-    TestFalse(TEXT("Committed file has data"), OriginalBytes.IsEmpty());
-    TestFalse(TEXT("Abort cannot replace an already committed battle with map progress"), Fixture.Run->AbortEncounter());
-    TestTrue(TEXT("Rejected Abort preserves combat phase"), Fixture.Run->GetPhase() == ERunPhase::Combat);
-    TestTrue(TEXT("Rejected Abort preserves the complete battle checkpoint"), SameCheckpoint(Fixture.Run->GetCombatCheckpoint(), First));
-    TestTrue(TEXT("Rejected Abort preserves the committed file"), Fixture.ReadBytes() == OriginalBytes);
-    FCombatCheckpointData Next = First;
-    ++Next.Revision;
-    ++Next.CompletedTurnSerial;
-    Next.Units[0].HP = 41.0f;
-    FRunCheckpointStorage::FailNextWriteForTesting();
-    TestFalse(TEXT("Injected pre-replacement failure is reported"), Fixture.Run->CommitCombatCheckpoint(Next, Error));
-    TestFalse(TEXT("Failure remains visible for retry"), Fixture.Run->GetSaveError().IsEmpty());
-    TestTrue(TEXT("Failure preserves every previous file byte"), Fixture.ReadBytes() == OriginalBytes);
-    TestTrue(TEXT("Failure preserves the committed in-memory revision"), SameCheckpoint(Fixture.Run->GetCombatCheckpoint(), First));
-    TestTrue(TEXT("Same pending boundary can retry successfully"), Fixture.Run->CommitCombatCheckpoint(Next, Error));
-    TestTrue(TEXT("Successful retry clears the storage error"), Fixture.Run->GetSaveError().IsEmpty());
-    const TArray<uint8> NextBytes = Fixture.ReadBytes();
-    TestFalse(TEXT("Duplicate revision is rejected"), Fixture.Run->CommitCombatCheckpoint(Next, Error));
-    FCombatCheckpointData Invalid = Next;
-    Invalid.Revision += 2;
-    TestFalse(TEXT("Skipped revision is rejected"), Fixture.Run->CommitCombatCheckpoint(Invalid, Error));
-    Invalid = Next;
-    ++Invalid.Revision;
-    Invalid.CompletedTurnSerial = Next.CompletedTurnSerial;
-    TestFalse(TEXT("Same turn boundary cannot be committed again under a new revision"), Fixture.Run->CommitCombatCheckpoint(Invalid, Error));
-    ++Invalid.CompletedTurnSerial;
-    ++Invalid.Identity.HostEpoch;
-    TestFalse(TEXT("Host epoch cannot change during commit"), Fixture.Run->CommitCombatCheckpoint(Invalid, Error));
-    Invalid = Next;
-    ++Invalid.Revision;
-    ++Invalid.CompletedTurnSerial;
-    Invalid.Units[0].HP = Invalid.Units[0].MaxHP + 1.0f;
-    TestFalse(TEXT("Invalid values cannot overwrite a valid file"), Fixture.Run->CommitCombatCheckpoint(Invalid, Error));
-    TestFalse(TEXT("Ordinary save cannot bypass explicit combat commit"), Fixture.Run->SaveCheckpoint(Error));
-    TestTrue(TEXT("All rejected writes preserve the last committed file"), Fixture.ReadBytes() == NextBytes);
-    TestTrue(TEXT("All rejected writes preserve the last committed data"), SameCheckpoint(Fixture.Run->GetCombatCheckpoint(), Next));
-    Invalid = Next;
-    Invalid.AttemptId = FGuid::NewGuid();
-    TestFalse(TEXT("A new attempt cannot inherit another attempt's revision"), Fixture.Run->CommitCombatCheckpoint(Invalid, Error));
-    Invalid.Revision = 1;
-    TestFalse(TEXT("An active committed combat cannot be replaced with a new attempt"), Fixture.Run->CommitCombatCheckpoint(Invalid, Error));
+    if (!TestTrue(TEXT("Fixture initializes with a durable Map and active unsaved battle"), Fixture.Initialize(Error))) return false;
+    const FCombatCheckpointData Candidate = Fixture.MakeCheckpoint();
+    const FCombatCheckpointData BeforeCheckpoint = Fixture.Run->GetCombatCheckpoint();
+    const FRunIdentityData BeforeIdentity = Fixture.Run->GetRunIdentity();
+    const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
+    TestFalse(TEXT("A valid sequential checkpoint cannot be published by the retired API"), Fixture.Run->CommitCombatCheckpoint(Candidate, Error));
+    TestFalse(TEXT("The retired publication API explains the unsupported contract"), Error.IsEmpty());
+    TestFalse(TEXT("Ordinary saving cannot bypass unsupported midcombat persistence"), Fixture.Run->SaveCheckpoint(Error));
+    TestTrue(TEXT("Rejected writes preserve identity, current phase and all checkpoint values"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Fixture.Run->GetRunIdentity(), &BeforeIdentity, 0) && Fixture.Run->GetPhase() == ERunPhase::Combat && SameCheckpoint(Fixture.Run->GetCombatCheckpoint(), BeforeCheckpoint));
+    TestTrue(TEXT("Rejected writes preserve the last durable noncombat file"), Fixture.ReadBytes() == BeforeBytes);
+    TestEqual(TEXT("Rejected writes preserve current party HP"), Fixture.Run->GetPartyMembers()[0].CurrentHP, -1.0f);
+    TStrongObjectPtr<URunSaveGame> Disk(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
+    TestTrue(TEXT("The retained file is a v2 Map without a battle payload"), Disk.IsValid() && Disk->Version == 2 && Disk->Phase == ERunPhase::Map && SameCheckpoint(Disk->CombatCheckpoint, FCombatCheckpointData()));
     for (const FString& Slot : { FString(), FString(TEXT("../Outside")), FString(TEXT("C:\\Outside")), FString(TEXT("Account/Subject")), FString(TEXT("name.sav")), FString(TEXT("CON")), FString(TEXT("nul")), FString(TEXT("COM1")), FString(TEXT("LPT9")), FString::ChrN(129, TEXT('a')) })
     {
         TestFalse(TEXT("Unsafe slot names are rejected before file access"), FRunCheckpointStorage::IsSafeSlotName(Slot));
@@ -336,7 +307,7 @@ bool FCombatCheckpointCorruptLoadTest::RunTest(const FString& Parameters)
         return false;
     }
     const FCombatCheckpointData Checkpoint = Fixture.MakeCheckpoint();
-    if (!TestTrue(TEXT("Boundary commits"), Fixture.Run->CommitCombatCheckpoint(Checkpoint, Error)))
+    if (!TestTrue(TEXT("Historical boundary fixture is installed"), Fixture.WriteRetiredCombat(Checkpoint, Error)))
     {
         return false;
     }
@@ -353,7 +324,7 @@ bool FCombatCheckpointCorruptLoadTest::RunTest(const FString& Parameters)
         TestFalse(Label, Fixture.Run->CanContinueSavedRun(Error));
         TestFalse(Label, Fixture.Run->LoadCheckpoint(Error));
         TestFalse(TEXT("Rejected load explains the error"), Error.IsEmpty());
-        TestTrue(TEXT("Rejected load preserves the current battle"), SameCheckpoint(Fixture.Run->GetCombatCheckpoint(), Checkpoint));
+        TestTrue(TEXT("Rejected load preserves the current battle"), SameCheckpoint(Fixture.Run->GetCombatCheckpoint(), FCombatCheckpointData()));
         TestTrue(TEXT("Rejected load preserves combat phase"), Fixture.Run->GetPhase() == ERunPhase::Combat);
         TestTrue(TEXT("Rejected load preserves original Run identity"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Fixture.Run->GetRunIdentity(), &Checkpoint.Identity, 0));
         TestEqual(TEXT("Rejected load preserves unsaved runtime party HP"), Fixture.Run->GetPartyMembers()[0].CurrentHP, -1.0f);
@@ -411,11 +382,7 @@ bool FCombatCheckpointTerminalTest::RunTest(const FString& Parameters)
     {
         return false;
     }
-    const FCombatCheckpointData Checkpoint = Fixture.MakeCheckpoint();
-    if (!TestTrue(TEXT("Boundary commits"), Fixture.Run->CommitCombatCheckpoint(Checkpoint, Error)))
-    {
-        return false;
-    }
+    const FCombatCheckpointData Checkpoint = Fixture.Run->GetCombatCheckpoint();
     const TArray<uint8> CombatBytes = Fixture.ReadBytes();
     Fixture.Run->UpdatePartyMemberHP(0, 61.0f);
     int32 Events = 0;
@@ -426,7 +393,7 @@ bool FCombatCheckpointTerminalTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Failed terminal write retains no published result"), Fixture.Run->GetLastResult() == ECombatResult::None);
     TestTrue(TEXT("Failed terminal write rolls back node completion"), Fixture.Run->GetCompletedNodes().IsEmpty());
     TestTrue(TEXT("Failed terminal write preserves the last committed checkpoint"), SameCheckpoint(Fixture.Run->GetCombatCheckpoint(), Checkpoint));
-    TestTrue(TEXT("Failed terminal write preserves the combat file"), Fixture.ReadBytes() == CombatBytes);
+    TestTrue(TEXT("Failed terminal write preserves the precombat file"), Fixture.ReadBytes() == CombatBytes);
     TestFalse(TEXT("Terminal storage error is retained"), Fixture.Run->GetSaveError().IsEmpty());
     TestEqual(TEXT("Failed result publishes no event"), Events, 0);
     TestTrue(TEXT("The same terminal result retries successfully"), Fixture.Run->CompleteEncounter(ECombatResult::Victory));
@@ -438,7 +405,7 @@ bool FCombatCheckpointTerminalTest::RunTest(const FString& Parameters)
     {
         return false;
     }
-    TestEqual(TEXT("Terminal result returns to version two"), Disk->Version, 2);
+    TestEqual(TEXT("Terminal result retains noncombat version two"), Disk->Version, 2);
     TestTrue(TEXT("Terminal file contains no resumable battle"), SameCheckpoint(Disk->CombatCheckpoint, FCombatCheckpointData()));
     TestEqual(TEXT("Terminal file contains final actual HP"), Disk->Party[0].CurrentHP, 61.0f);
     const TArray<uint8> ResultBytes = Fixture.ReadBytes();
@@ -454,7 +421,9 @@ bool FCombatCheckpointTerminalTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Committed Continue exposes the next node"), Fixture.Run->CanStartNode(TEXT("Combat_02")));
     TestEqual(TEXT("Shop entry and exit each publish once"), Events, 4);
     TestTrue(TEXT("Next encounter begins after terminal commit"), Fixture.Run->BeginEncounter(TEXT("Combat_02")) && Fixture.Run->MarkCombatStarted());
-    TestTrue(TEXT("A new encounter can begin a new attempt at revision one"), Fixture.Run->CommitCombatCheckpoint(Fixture.MakeCheckpoint(), Error));
+    const TArray<uint8> NextMapBytes = Fixture.ReadBytes();
+    TestFalse(TEXT("The following timed battle also rejects sequential checkpoints"), Fixture.Run->CommitCombatCheckpoint(Fixture.MakeCheckpoint(), Error));
+    TestTrue(TEXT("The following battle keeps its last noncombat record"), Fixture.ReadBytes() == NextMapBytes && !Fixture.Run->HasCombatCheckpoint());
     return true;
 }
 
@@ -470,18 +439,12 @@ bool FCombatCheckpointAIControlTest::RunTest(const FString& Parameters)
     }
     const FCombatCheckpointData Human = Fixture.MakeCheckpoint();
     TestEqual(TEXT("Default checkpoint schema preserves existing empty-payload compatibility"), Human.SchemaVersion, 1);
-    if (!TestTrue(TEXT("Schema one Human boundary commits without AI consent"), Fixture.Run->CommitCombatCheckpoint(Human, Error)))
-    {
-        return false;
-    }
+    TestTrue(TEXT("Historical schema one Human data remains recognizable"), UCombatCheckpointLibrary::Validate(Human, Fixture.Run->GetPartyMembers(), Error));
+    if (!TestTrue(TEXT("Historical Human fixture is installed"), Fixture.WriteRetiredCombat(Human, Error))) return false;
     TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
     Restored->EnableCheckpointSaving(Fixture.Slot);
-    if (!TestTrue(TEXT("Schema one Human boundary remains loadable"), Restored->LoadCheckpoint(Error)))
-    {
-        return false;
-    }
-    TestTrue(TEXT("Schema one load preserves every checkpoint field"), SameCheckpoint(Restored->GetCombatCheckpoint(), Human));
-    TestTrue(TEXT("Schema one load retains Human party control"), Restored->GetCombatCheckpoint().Units[0].PartyControlMode == EPartyControlMode::Human);
+    TestFalse(TEXT("Recognizable schema one data cannot resume retired combat"), Restored->LoadCheckpoint(Error));
+    TestTrue(TEXT("Rejected Human recovery preserves empty runtime"), Restored->GetPhase() == ERunPhase::None && !Restored->HasCombatCheckpoint());
 
     FCombatCheckpointData ValidAI = Human;
     ValidAI.Units[0].PartyControlMode = EPartyControlMode::ServerAI;
@@ -512,48 +475,20 @@ bool FCombatCheckpointAIControlTest::RunTest(const FString& Parameters)
     Invalid.Units[1].PartyControlMode = EPartyControlMode::ServerAI;
     Reject(TEXT("Party AI mode cannot be assigned to an enemy entry"));
 
-    // Preserve legacy metadata through actual disk round trips without changing a running Run's identity.
-    // 실행 중인 Run 식별 정보를 변경하지 않고 실제 저장 왕복으로 기존 호환 정보를 보존합니다.
-    const TArray<FRunPartyMember> Members = Fixture.Run->GetPartyMembers();
+    // Native historical data stays inspectable while both Human and AI recovery remain retired.
+    // 기존 데이터는 네이티브로 조회할 수 있지만 인간·AI 전투 복구는 모두 폐기합니다.
     for (const ERunAIConsent Consent : { ERunAIConsent::Unknown, ERunAIConsent::Declined })
     {
-        const FString Label = Consent == ERunAIConsent::Unknown ? TEXT("Unknown") : TEXT("Declined");
-        FRunIdentityData AIIdentity = ValidAI.Identity;
-        AIIdentity.RunId = FGuid::NewGuid();
-        AIIdentity.OriginalParticipants[0].AIConsent = Consent;
-        AIIdentity.OriginalParticipants[0].ConsentPolicyVersion = Consent == ERunAIConsent::Unknown ? 0 : 1;
-        if (!TestTrue(Label + TEXT(" legacy consent initializes a new Run"), Fixture.Run->InitializeRunWithIdentity(Members, AIIdentity, Error)) || !TestTrue(Label + TEXT(" Run enters combat"), Fixture.Run->BeginEncounter(TEXT("Combat_01")) && Fixture.Run->MarkCombatStarted()))
-        {
-            return false;
-        }
-        FCombatCheckpointData AI = Fixture.MakeCheckpoint();
-        AI.SchemaVersion = 2;
-        AI.Units[0].PartyControlMode = EPartyControlMode::ServerAI;
-        if (!TestTrue(Label + TEXT(" schema two AI boundary commits to disk"), Fixture.Run->CommitCombatCheckpoint(AI, Error)))
-        {
-            AddError(Error.ToString());
-            return false;
-        }
+        FCombatCheckpointData AI = ValidAI;
+        AI.Identity.OriginalParticipants[0].AIConsent = Consent;
+        AI.Identity.OriginalParticipants[0].ConsentPolicyVersion = Consent == ERunAIConsent::Unknown ? 0 : 1;
+        if (!TestTrue(TEXT("Historical AI fixture is installed"), Fixture.WriteRetiredCombat(AI, Error))) return false;
+        const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
         TStrongObjectPtr<URunSaveGame> Disk(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
-        if (!TestTrue(Label + TEXT(" native SaveGame reader loads the AI boundary"), Disk.IsValid()))
-        {
-            return false;
-        }
-        TestEqual(Label + TEXT(" Run save remains version three for combat"), Disk->Version, 3);
-        TestEqual(Label + TEXT(" stored combat schema is two"), Disk->CombatCheckpoint.SchemaVersion, 2);
-        TestTrue(Label + TEXT(" native serialization retains every AI checkpoint field"), SameCheckpoint(Disk->CombatCheckpoint, AI));
-        TestTrue(Label + TEXT(" AI checkpoint can continue"), Restored->CanContinueSavedRun(Error));
-        if (!TestTrue(Label + TEXT(" Run load restores the persisted AI control field"), Restored->LoadCheckpoint(Error)))
-        {
-            return false;
-        }
-        const FCombatCheckpointUnit& SavedPlayer = Restored->GetCombatCheckpoint().Units[0];
-        TestTrue(Label + TEXT(" restored party unit remains ServerAI controlled"), SavedPlayer.PartyControlMode == EPartyControlMode::ServerAI);
-        TestTrue(Label + TEXT(" restored enemy keeps the neutral party-control marker"), Restored->GetCombatCheckpoint().Units[1].PartyControlMode == EPartyControlMode::Human);
-        TestEqual(Label + TEXT(" AI restoration keeps the original character ID"), SavedPlayer.CharacterId, Members[0].CharacterId);
-        TestTrue(Label + TEXT(" AI restoration keeps the original unit owner"), SavedPlayer.OwnerAccountId == Members[0].OwnerAccountId);
-        TestTrue(Label + TEXT(" AI restoration keeps persistent party ownership"), Restored->GetPartyMembers()[0].OwnerAccountId == Members[0].OwnerAccountId);
-        TestTrue(Label + TEXT(" AI restoration keeps complete Run, Host and legacy consent metadata"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Restored->GetRunIdentity(), &AIIdentity, 0));
+        TestTrue(TEXT("Native reading retains AI mode, ownership and consent fields"), Disk.IsValid() && SameCheckpoint(Disk->CombatCheckpoint, AI));
+        TestFalse(TEXT("AI historical battle is unavailable to Continue"), Restored->CanContinueSavedRun(Error));
+        TestFalse(TEXT("AI historical battle cannot replace a current Run"), Restored->LoadCheckpoint(Error));
+        TestTrue(TEXT("Rejected AI load preserves empty runtime and exact file bytes"), Restored->GetPhase() == ERunPhase::None && !Restored->HasCombatCheckpoint() && Fixture.ReadBytes() == BeforeBytes);
     }
     return true;
 }

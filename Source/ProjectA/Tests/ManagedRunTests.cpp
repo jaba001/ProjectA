@@ -149,14 +149,13 @@ namespace
             return true;
         }
 
-        bool StartAndCommit(URunStateSubsystem* Run, FCombatCheckpointData& Checkpoint)
+        bool StartCombatFixture(URunStateSubsystem* Run, FCombatCheckpointData& Checkpoint)
         {
-            return Run->BeginEncounter(TEXT("Combat_01")) && Run->MarkCombatStarted() && MakeCheckpoint(Run, Checkpoint) && Run->CommitCombatCheckpoint(Checkpoint, Error);
+            return Run->BeginEncounter(TEXT("Combat_01")) && Run->MarkCombatStarted() && MakeCheckpoint(Run, Checkpoint);
         }
     };
 
     bool ManagedSameIdentity(const FRunIdentityData& Left, const FRunIdentityData& Right) { return FRunIdentityData::StaticStruct()->CompareScriptStruct(&Left, &Right, 0); }
-    bool ManagedSameCheckpoint(const FCombatCheckpointData& Left, const FCombatCheckpointData& Right) { return FCombatCheckpointData::StaticStruct()->CompareScriptStruct(&Left, &Right, 0); }
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FManagedRunContextTest, "ProjectA.Run.Managed.ContextAndIsolation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
@@ -241,8 +240,6 @@ bool FManagedRunSoloTest::RunTest(const FString& Parameters)
         FManagedFixture Fixture;
         URunStateSubsystem* Host = Fixture.NewSession(1);
         if (!Host || !TestTrue(TEXT("Original Host creates the four-owner Run"), Host->CreateManagedRun(Fixture.Party, Fixture.Identity, Fixture.Error))) return false;
-        FCombatCheckpointData OriginalCheckpoint;
-        if (!TestTrue(TEXT("A complete original combat boundary commits"), Fixture.StartAndCommit(Host, OriginalCheckpoint))) return false;
         const FRunAuthorityStamp OriginalStamp = Host->GetManagedStamp();
         Host->CloseManagedRun();
         URunStateSubsystem* Solo = Fixture.NewSession(Ordinal);
@@ -250,23 +247,18 @@ bool FManagedRunSoloTest::RunTest(const FString& Parameters)
         if (!TestTrue(TEXT("Original member two, three or four can explicitly resume alone"), Solo->ResumeManagedRun(OriginalStamp, { Fixture.Account(Ordinal) }, Fixture.Error))) return false;
         TestTrue(TEXT("Solo resume changes Host epoch and execution nonce together"), Solo->GetRunIdentity().HostAccountId == Fixture.Account(Ordinal) && Solo->GetManagedStamp().HostEpoch == OriginalStamp.HostEpoch + 1 && Solo->GetManagedStamp().Revision == OriginalStamp.Revision + 1 && Solo->GetManagedStamp().SessionId != OriginalStamp.SessionId);
         TestTrue(TEXT("The resumed Run waits for successful gameplay restoration"), Solo->IsManagedResumePending() && Solo->HasManagedLease());
-        FCombatCheckpointData Expected = OriginalCheckpoint;
-        Expected.Identity = Solo->GetRunIdentity();
-        for (FCombatCheckpointUnit& Unit : Expected.Units)
+        TestTrue(TEXT("Solo resume keeps the supported Map boundary without a combat payload"), Solo->GetPhase() == ERunPhase::Map && !Solo->HasCombatCheckpoint());
+        for (const FRunPartyMember& Member : Solo->GetPartyMembers())
         {
-            if (Unit.Team == ETeam::Player) Unit.PartyControlMode = Unit.OwnerAccountId == Fixture.Account(Ordinal) ? EPartyControlMode::Human : EPartyControlMode::ServerAI;
+            EPartyControlMode Mode = EPartyControlMode::Human;
+            TestTrue(TEXT("The permanent roster resolves each original character's control"), URunParticipationLibrary::ResolveControlMode(Solo->GetParticipation(), Solo->GetRunIdentity(), Solo->GetPartyMembers(), Member.CharacterId, Mode, Fixture.Error));
+            TestTrue(TEXT("Only the selected original owner retains Human control"), Mode == (Member.OwnerAccountId == Fixture.Account(Ordinal) ? EPartyControlMode::Human : EPartyControlMode::ServerAI));
         }
-        TestTrue(TEXT("Resume changes only Host identity and party control modes at the confirmed turn"), ManagedSameCheckpoint(Solo->GetCombatCheckpoint(), Expected));
         TStrongObjectPtr<URunSaveGame> Saved = Fixture.LoadPayload();
         if (!TestNotNull(TEXT("The resumed authority payload is readable"), Saved.Get())) return false;
-        TestTrue(TEXT("Outer and nested identities commit the same Host epoch"), ManagedSameIdentity(Saved->Identity, Solo->GetRunIdentity()) && ManagedSameIdentity(Saved->CombatCheckpoint.Identity, Saved->Identity));
+        TestTrue(TEXT("Supported resume keeps the full outer identity and no nested combat state"), ManagedSameIdentity(Saved->Identity, Solo->GetRunIdentity()) && Saved->CombatCheckpoint.Revision == 0);
         TestTrue(TEXT("The persisted human roster contains only the selected caller"), Saved->Participation.HumanParticipants.Num() == 1 && Saved->Participation.HumanParticipants[0] == Fixture.Account(Ordinal));
-        FCombatCheckpointData Next = Expected;
-        ++Next.Revision;
-        ++Next.CompletedTurnSerial;
-        TestTrue(TEXT("Server restoration may commit a boundary before clearing pending state"), Solo->CommitCombatCheckpoint(Next, Fixture.Error));
-        TestTrue(TEXT("An internal commit does not prematurely confirm gameplay entry"), Solo->IsManagedResumePending());
-        TestTrue(TEXT("Successful actor restoration explicitly clears pending"), Solo->ConfirmManagedResumeStarted(Fixture.Error));
+        TestTrue(TEXT("Successful noncombat gameplay entry explicitly clears pending"), Solo->ConfirmManagedResumeStarted(Fixture.Error));
         TestFalse(TEXT("Gameplay entry is now confirmed"), Solo->IsManagedResumePending());
         const FRunAuthorityStamp Latest = Solo->GetManagedStamp();
         Solo->CloseManagedRun();
@@ -278,7 +270,7 @@ bool FManagedRunSoloTest::RunTest(const FString& Parameters)
         URunStateSubsystem* SameHost = Fixture.NewSession(Ordinal);
         TestTrue(TEXT("The current solo Host can resume again from a new menu session"), SameHost->ResumeManagedRun(Latest, { Fixture.Account(Ordinal) }, Fixture.Error));
         TestTrue(TEXT("Repeated solo resume retains permanent AI and advances the Host epoch"), SameHost->GetParticipation().HumanParticipants.Num() == 1 && SameHost->GetRunIdentity().HostEpoch == Latest.HostEpoch + 1);
-        TestFalse(TEXT("The closed original Host cannot publish an old combat boundary"), Host->CommitCombatCheckpoint(OriginalCheckpoint, Fixture.Error));
+        TestFalse(TEXT("The closed original Host cannot publish retired combat data"), Host->CommitCombatCheckpoint(FCombatCheckpointData(), Fixture.Error));
     }
     return true;
 }
@@ -312,7 +304,7 @@ bool FManagedRunOrderedResumeTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Failed abort retains phase, node and authority revision"), Second->GetPhase() == ERunPhase::Preparing && Second->GetCurrentNodeId() == TEXT("Combat_01") && Second->GetManagedStamp() == BeforeAbort);
     TestTrue(TEXT("Preparation rollback can retry"), Second->AbortEncounter());
     FCombatCheckpointData Checkpoint;
-    if (!TestTrue(TEXT("Resumed participation applies to the next new combat boundary"), Fixture.StartAndCommit(Second, Checkpoint))) return false;
+    if (!TestTrue(TEXT("Resumed participation applies when the next timed battle begins"), Fixture.StartCombatFixture(Second, Checkpoint))) return false;
     for (const FCombatCheckpointUnit& Unit : Checkpoint.Units)
     {
         if (Unit.Team == ETeam::Player)
@@ -323,9 +315,11 @@ bool FManagedRunOrderedResumeTest::RunTest(const FString& Parameters)
     }
     const FRunAuthorityStamp BeforeResult = Second->GetManagedStamp();
     const TArray<uint8> BeforeResultBytes = Fixture.FileBytes();
+    TestFalse(TEXT("An active managed lease cannot publish retired sequential checkpoints"), Second->CommitCombatCheckpoint(Checkpoint, Fixture.Error));
+    TestTrue(TEXT("Rejected managed checkpoint keeps lease, phase, identity, stamp and bytes"), Second->HasManagedLease() && Second->GetPhase() == ERunPhase::Combat && ManagedSameIdentity(Second->GetRunIdentity(), Checkpoint.Identity) && Second->GetManagedStamp() == BeforeResult && Fixture.FileBytes() == BeforeResultBytes && !Second->HasCombatCheckpoint());
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("Failed terminal save does not publish a result"), Second->CompleteEncounter(ECombatResult::Victory));
-    TestTrue(TEXT("Failed result keeps combat, checkpoint and revision unchanged"), Second->GetPhase() == ERunPhase::Combat && Second->GetLastResult() == ECombatResult::None && Second->GetCompletedNodes().IsEmpty() && ManagedSameCheckpoint(Second->GetCombatCheckpoint(), Checkpoint) && Second->GetManagedStamp() == BeforeResult && Fixture.FileBytes() == BeforeResultBytes);
+    TestTrue(TEXT("Failed result keeps combat, checkpoint and revision unchanged"), Second->GetPhase() == ERunPhase::Combat && Second->GetLastResult() == ECombatResult::None && Second->GetCompletedNodes().IsEmpty() && !Second->HasCombatCheckpoint() && Second->GetManagedStamp() == BeforeResult && Fixture.FileBytes() == BeforeResultBytes);
     if (!TestTrue(TEXT("The same terminal result retries through its lease"), Second->CompleteEncounter(ECombatResult::Victory))) return false;
     TStrongObjectPtr<URunSaveGame> ResultSave = Fixture.LoadPayload();
     if (!TestNotNull(TEXT("Result payload remains available"), ResultSave.Get())) return false;
@@ -341,7 +335,7 @@ bool FManagedRunOrderedResumeTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("The following encounter starts normally"), Second->BeginEncounter(TEXT("Combat_02")) && Second->MarkCombatStarted());
     FCombatCheckpointData Next;
     if (!Fixture.MakeCheckpoint(Second, Next)) return false;
-    TestTrue(TEXT("New encounter state commits as v4 with unchanged original ownership"), Second->CommitCombatCheckpoint(Next, Fixture.Error));
+    TestFalse(TEXT("Following timed battle also rejects sequential checkpoint publication"), Second->CommitCombatCheckpoint(Next, Fixture.Error));
     TestTrue(TEXT("Following combat keeps the resumed Host and original join numbers"), ManagedSameIdentity(Second->GetRunIdentity(), Checkpoint.Identity));
     return true;
 }
@@ -393,6 +387,58 @@ bool FManagedRunCompatibilityTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("An ordinary v2 fixture without managed fields writes"), UGameplayStatics::SaveGameToSlot(Managed.Get(), Fixture.OrdinarySlot, 0));
     TestTrue(TEXT("Ordinary v2 identity/party saves remain loadable without managed conversion"), Second->LoadCheckpoint(Fixture.Error));
     TestTrue(TEXT("Ordinary loading preserves its identity and has no managed lease"), ManagedSameIdentity(Second->GetRunIdentity(), Managed->Identity) && !Second->IsManagedRun() && !Second->HasManagedLease());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FManagedRetiredCombatRejectionTest, "ProjectA.Run.Managed.RetiredCombatNoMutation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FManagedRetiredCombatRejectionTest::RunTest(const FString& Parameters)
+{
+    FManagedFixture Fixture(2);
+    URunStateSubsystem* Host = Fixture.NewSession(1);
+    if (!Host || !TestTrue(TEXT("An isolated managed fixture creates"), Host->CreateManagedRun(Fixture.Party, Fixture.Identity, Fixture.Error))) return false;
+    FCombatCheckpointData Checkpoint;
+    if (!TestTrue(TEXT("Real authored skills provide a historical combat fixture"), Fixture.StartCombatFixture(Host, Checkpoint))) return false;
+    TStrongObjectPtr<URunSaveGame> Saved = Fixture.LoadPayload();
+    if (!TestNotNull(TEXT("Supported canonical payload is readable for fixture preparation"), Saved.Get())) return false;
+    Saved->Phase = ERunPhase::Combat;
+    Saved->CurrentNode = Checkpoint.NodeId;
+    Saved->CurrentEncounter = Checkpoint.EncounterId;
+    Saved->CombatCheckpoint = Checkpoint;
+    for (FRunPartyMember& Member : Saved->Party)
+    {
+        const FCombatCheckpointUnit* Unit = Checkpoint.Units.FindByPredicate([&Member](const FCombatCheckpointUnit& Entry) { return Entry.Team == ETeam::Player && Entry.CharacterId == Member.CharacterId; });
+        if (!Unit) return false;
+        Member.CurrentHP = Unit->HP;
+    }
+    const FString Slot = FLocalRunAuthorityStore(Fixture.Namespace).GetSlotName(Fixture.Identity.RunId);
+    TStrongObjectPtr<ULocalRunAuthorityRecord> Record(Cast<ULocalRunAuthorityRecord>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));
+    if (!TestNotNull(TEXT("Native authority wrapper is readable"), Record.Get())) return false;
+    Host->CloseManagedRun();
+    // Install historical bytes after releasing the fixture lease, without the retired production writer.
+    // 테스트 lease를 해제한 뒤 폐기한 제품 저장 API 대신 기존 바이트를 직접 준비합니다.
+    if (!TestTrue(TEXT("Historical managed payload serializes"), UGameplayStatics::SaveGameToMemory(Saved.Get(), Record->Payload)) || !TestTrue(TEXT("Historical authority record is installed"), UGameplayStatics::SaveGameToSlot(Record.Get(), Slot, 0))) return false;
+    URunStateSubsystem* Reader = Fixture.NewSession(2);
+    if (!TestNotNull(TEXT("The second original owner has an independent caller"), Reader)) return false;
+    FManagedRunPreview Preview;
+    if (!TestTrue(TEXT("Historical combat remains inspectable through the read-only preview"), Reader->ReadManagedRun(Fixture.Identity.RunId, Preview, Fixture.Error))) return false;
+    TestTrue(TEXT("The preview identifies the original combat phase and stamp"), Preview.Phase == ERunPhase::Combat && Preview.Stamp == Record->Stamp);
+    if (!TestTrue(TEXT("An original owner may select a record without acquiring it"), Reader->SetManagedResumeTarget(Fixture.Identity.RunId, Fixture.Error))) return false;
+    const TArray<uint8> BeforeBytes = Fixture.FileBytes();
+    const FRunIdentityData BeforeIdentity = Reader->GetRunIdentity();
+    const FGuid BeforeTarget = Reader->GetManagedResumeTarget();
+    const FRunAuthorityStamp BeforeStamp = Reader->GetManagedStamp();
+    int32 Events = 0;
+    Reader->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
+    TestFalse(TEXT("An otherwise valid solo takeover cannot resume retired combat"), Reader->ResumeManagedRun(Preview.Stamp, { Fixture.Account(2) }, Fixture.Error));
+    TestTrue(TEXT("The error explicitly names the retired combat format"), Fixture.Error.ToString().Contains(TEXT("순차 턴")));
+    TestTrue(TEXT("Rejection acquires no lease or partial resume"), !Reader->HasManagedLease() && !Reader->IsManagedRun() && !Reader->IsManagedResumePending());
+    TestTrue(TEXT("Rejection preserves phase, identity, roster, target and execution stamp"), Reader->GetPhase() == ERunPhase::None && ManagedSameIdentity(Reader->GetRunIdentity(), BeforeIdentity) && Reader->GetParticipation().HumanParticipants.IsEmpty() && Reader->GetManagedResumeTarget() == BeforeTarget && Reader->GetManagedStamp() == BeforeStamp);
+    TestTrue(TEXT("Rejection preserves every canonical byte"), Fixture.FileBytes() == BeforeBytes);
+    TestEqual(TEXT("Rejected takeover emits no state transition"), Events, 0);
+    FManagedRunPreview AfterPreview;
+    TestTrue(TEXT("The original canonical stamp and ownership remain readable"), Reader->ReadManagedRun(Fixture.Identity.RunId, AfterPreview, Fixture.Error) && AfterPreview.Stamp == Preview.Stamp && ManagedSameIdentity(AfterPreview.Identity, Saved->Identity));
+    Reader->OnRunStateChanged.Clear();
     return true;
 }
 

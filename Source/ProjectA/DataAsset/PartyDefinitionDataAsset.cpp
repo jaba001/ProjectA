@@ -1,7 +1,6 @@
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Unit/PlayerUnit.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
-#include "Combat/Library/CombatTargetingLibrary.h"
 
 TSubclassOf<APlayerUnit> UPartyDefinitionDataAsset::ResolvePlayerClass(FName ClassId) const
 {
@@ -51,27 +50,22 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
         OutDefinition.MaxHP = Defaults->GetInitialMaxHP();
         OutDefinition.ActionPoints = Defaults->GetMaxActionPoint();
         OutDefinition.SubActionPoints = Defaults->GetMaxSubActionPoint();
-        OutDefinition.StartingSkills.Reset();
-        for (TSubclassOf<UGameplayAbility> Ability : Defaults->GetAvailableSkillAbilityClasses())
-        {
-            if (USkillDefinitionDataAsset* Skill = Defaults->FindSkillDataByAbilityClass(Ability))
-            {
-                OutDefinition.StartingSkills.AddUnique(Skill);
-            }
-        }
+        OutDefinition.StartingSkills = Defaults->GetEquippedSkillDataAssets();
     }
     if (!FMath::IsFinite(OutDefinition.MaxHP) || OutDefinition.MaxHP <= 0.0f || OutDefinition.ActionPoints <= 0 || OutDefinition.SubActionPoints < 0 || OutDefinition.StartingSkills.IsEmpty())
     {
         return false;
     }
-    TSet<UClass*> SkillClasses;
+    TSet<FName> SkillIds;
     for (USkillDefinitionDataAsset* Skill : OutDefinition.StartingSkills)
     {
-        if (!UCombatTargetingLibrary::IsSupportedSkillArea(Skill) || !Skill->AbilityClass || Skill->ActionPointCost <= 0 || SkillClasses.Contains(Skill->AbilityClass))
+        FCombatRoundSkill Resolved;
+        FText Error;
+        if (!IsValid(Skill) || !Skill->ResolveRoundSkill(Resolved, Error) || SkillIds.Contains(Resolved.SkillId))
         {
             return false;
         }
-        SkillClasses.Add(Skill->AbilityClass);
+        SkillIds.Add(Resolved.SkillId);
     }
     return true;
 }
@@ -86,7 +80,9 @@ FText UPartyDefinitionDataAsset::GetProfessionDetails(FName ClassId) const
     FString Skills;
     for (USkillDefinitionDataAsset* Skill : Definition.StartingSkills)
     {
-        Skills += FString::Printf(TEXT("\n• %s (AP %d)"), *Skill->SkillName.ToString(), Skill->ActionPointCost);
+        FCombatRoundSkill Resolved;
+        FText Error;
+        if (Skill->ResolveRoundSkill(Resolved, Error)) Skills += FString::Printf(TEXT("\n• %s (AP %d · 보조 AP %d)"), *Skill->SkillName.ToString(), Resolved.ActionPointCost, Resolved.SubActionPointCost);
     }
     return FText::FromString(FString::Printf(TEXT("%s\n%s\n\nHP %.0f · AP %d · 보조 AP %d\n\n시작 스킬%s"), *Definition.DisplayName.ToString(), *Definition.Description.ToString(), Definition.MaxHP, Definition.ActionPoints, Definition.SubActionPoints, *Skills));
 }

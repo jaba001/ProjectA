@@ -1,6 +1,5 @@
 #include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
 
-#include "Combat/Library/CombatTargetingLibrary.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "Unit/EnemyUnit.h"
@@ -8,7 +7,7 @@
 bool UOpponentSnapshotCatalogDataAsset::ResolveSkills(const FPartySnapshotMember& Member, TArray<TObjectPtr<USkillDefinitionDataAsset>>& OutSkills, FText& OutError) const
 {
     TArray<TObjectPtr<USkillDefinitionDataAsset>> Resolved;
-    TSet<UClass*> AbilityClasses;
+    TSet<FPrimaryAssetId> AssetIds;
     if (Member.SkillIds.IsEmpty() || Member.SkillIds.Num() > 5)
     {
         OutError = NSLOCTEXT("Snapshot", "SkillCount", "Snapshot requires 1–5 ordered skills. / 스킬은 순서가 있는 1~5개여야 합니다.");
@@ -17,12 +16,22 @@ bool UOpponentSnapshotCatalogDataAsset::ResolveSkills(const FPartySnapshotMember
     for (FName SkillId : Member.SkillIds)
     {
         USkillDefinitionDataAsset* Skill = Skills.FindRef(SkillId);
-        if (!UCombatTargetingLibrary::IsSupportedSkillArea(Skill) || !Skill->AbilityClass || Skill->AbilityClass->HasAnyClassFlags(CLASS_Abstract) || Skill->ActionPointCost <= 0 || AbilityClasses.Contains(Skill->AbilityClass))
+        if (!IsValid(Skill))
         {
             OutError = FText::Format(NSLOCTEXT("Snapshot", "UnknownSkill", "Unsupported or duplicate skill: {0}. / 미지원 또는 중복 스킬: {0}."), FText::FromName(SkillId));
             return false;
         }
-        AbilityClasses.Add(Skill->AbilityClass);
+        FCombatRoundSkill RoundSkill;
+        if (!Skill->ResolveRoundSkill(RoundSkill, OutError)) return false;
+        const FPrimaryAssetId AssetId = Skill->GetPrimaryAssetId();
+        if (AssetIds.Contains(AssetId))
+        {
+            OutError = FText::Format(NSLOCTEXT("Snapshot", "DuplicateSkillAsset", "Catalog identifiers resolve to the same skill asset: {0}. / 카탈로그 식별자가 동일한 스킬 에셋을 가리킵니다: {0}."), FText::FromName(SkillId));
+            return false;
+        }
+        // Snapshot aliases cannot duplicate one skill, while distinct round data may share a legacy ability class.
+        // Snapshot 별칭은 같은 스킬을 중복하지 못하며 서로 다른 라운드 데이터는 기존 어빌리티 클래스를 공유할 수 있습니다.
+        AssetIds.Add(AssetId);
         Resolved.Add(Skill);
     }
     OutSkills = MoveTemp(Resolved);

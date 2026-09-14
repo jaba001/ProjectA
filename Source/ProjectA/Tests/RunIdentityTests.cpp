@@ -628,19 +628,35 @@ bool FRunJoinOrderPersistenceTest::RunTest(const FString& Parameters)
         if (!TestTrue(TEXT("Numbered and old-identity Runs can begin combat"), Fixture.Run->BeginEncounter(TEXT("Combat_01")) && Fixture.Run->MarkCombatStarted())) return false;
         FCombatCheckpointData Checkpoint;
         if (!TestTrue(TEXT("Real profession data creates a valid storage fixture"), MakeIdentityCheckpoint(Fixture.Run.Get(), Checkpoint))) return false;
-        if (!TestTrue(TEXT("Combat checkpoint commits through production validation and atomic storage"), Fixture.Run->CommitCombatCheckpoint(Checkpoint, Error)))
+        TArray<uint8> MapBytes;
+        TestTrue(TEXT("Supported Map bytes are captured before the rejected commit"), UGameplayStatics::LoadDataFromSlot(MapBytes, Fixture.Slot, 0));
+        TestFalse(TEXT("Either identity schema rejects retired sequential publication"), Fixture.Run->CommitCombatCheckpoint(Checkpoint, Error));
+        TArray<uint8> AfterCommitBytes;
+        TestTrue(TEXT("The Map record remains readable after rejection"), UGameplayStatics::LoadDataFromSlot(AfterCommitBytes, Fixture.Slot, 0));
+        TestTrue(TEXT("Rejected commit keeps supported Map bytes and original ownership"), MapBytes == AfterCommitBytes && SameIdentity(Fixture.Run->GetRunIdentity(), Input.Identity) && !Fixture.Run->HasCombatCheckpoint());
+
+        // Reproduce a historical v3 file without using the retired production commit path.
+        // 폐기한 제품 저장 경로를 사용하지 않고 기존 v3 파일을 재현합니다.
+        Saved->Version = 3;
+        Saved->Phase = ERunPhase::Combat;
+        Saved->CurrentNode = Checkpoint.NodeId;
+        Saved->CurrentEncounter = Checkpoint.EncounterId;
+        Saved->CombatCheckpoint = Checkpoint;
+        for (FRunPartyMember& Member : Saved->Party)
         {
-            AddError(Error.ToString());
-            return false;
+            const FCombatCheckpointUnit* Unit = Checkpoint.Units.FindByPredicate([&Member](const FCombatCheckpointUnit& Entry) { return Entry.Team == ETeam::Player && Entry.CharacterId == Member.CharacterId; });
+            if (!Unit) return false;
+            Member.CurrentHP = Unit->HP;
         }
-        Saved.Reset(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
-        if (!TestNotNull(TEXT("Combat checkpoint loads through native SaveGame"), Saved.Get())) return false;
-        TestEqual(TEXT("Both identity schemas retain outer combat-save version three"), Saved->Version, 3);
-        TestTrue(TEXT("Combat file preserves every outer identity field"), SameIdentity(Saved->Identity, Input.Identity));
-        TestTrue(TEXT("Nested combat identity retains the same schema and join numbers"), SameIdentity(Saved->CombatCheckpoint.Identity, Input.Identity));
-        if (!TestTrue(TEXT("Combat checkpoint passes ordinary load validation"), Restored->LoadCheckpoint(Error))) return false;
-        TestTrue(TEXT("Restored combat identity is never reordered or inferred"), SameIdentity(Restored->GetRunIdentity(), Input.Identity));
-        TestTrue(TEXT("Restored checkpoint retains original Host and full nested identity"), SameIdentity(Restored->GetCombatCheckpoint().Identity, Input.Identity) && Restored->ValidateCheckpointHost(Input.Identity.HostAccountId, Error));
+        if (!TestTrue(TEXT("Historical numbered combat fixture writes"), UGameplayStatics::SaveGameToSlot(Saved.Get(), Fixture.Slot, 0))) return false;
+        TArray<uint8> HistoricalBytes;
+        TestTrue(TEXT("Historical combat bytes are captured"), UGameplayStatics::LoadDataFromSlot(HistoricalBytes, Fixture.Slot, 0));
+        TestFalse(TEXT("Historical combat with either identity schema cannot load"), Restored->LoadCheckpoint(Error));
+        TestTrue(TEXT("The migration error names the retired combat contract"), Error.ToString().Contains(TEXT("순차 턴")));
+        TestTrue(TEXT("Rejected historical combat keeps the supported Map identity and phase"), SameIdentity(Restored->GetRunIdentity(), Input.Identity) && Restored->GetPhase() == ERunPhase::Map && !Restored->HasCombatCheckpoint());
+        TArray<uint8> AfterLoadBytes;
+        TestTrue(TEXT("Historical bytes remain readable after rejection"), UGameplayStatics::LoadDataFromSlot(AfterLoadBytes, Fixture.Slot, 0));
+        TestTrue(TEXT("Rejection preserves the exact historical file"), HistoricalBytes == AfterLoadBytes);
 
         const FRunIdentityData Before = Restored->GetRunIdentity();
         const TArray<FRunPartyMember> BeforeParty = Restored->GetPartyMembers();

@@ -1,8 +1,6 @@
 #include "Game/Encounter/EncounterManager.h"
 #include "AbilitySystemComponent.h"
-#include "AIController.h"
 #include "Combat/CombatManager.h"
-#include "Combat/Checkpoint/CombatCheckpointLibrary.h"
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Combat/SkillActor/SkillActorBase.h"
 #include "Controller/PartyPlayerController.h"
@@ -20,9 +18,7 @@
 #include "GAS/Attribute/AS_Unit.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
-#include "Game/Turn/TurnManager.h"
 #include "TimerManager.h"
-#include "Misc/ScopeExit.h"
 #include "Unit/EnemyUnit.h"
 #include "Unit/PlayerUnit.h"
 
@@ -99,15 +95,14 @@ bool AEncounterManager::RequestStartNode(FName NodeId)
     {
         return FailPreparation(AuthorityError);
     }
-    CombatAttemptId = FGuid::NewGuid();
-    PendingTurnCheckpoint = FCombatCheckpointData();
-    CheckpointUnitIds.Reset();
-    EnableCombatCheckpoints();
     Arena->ActivateArena(GetWorld()->GetFirstPlayerController());
-    RunState->MarkCombatStarted();
+    if (!RunState->MarkCombatStarted())
+    {
+        return FailPreparation(FText::FromString(TEXT("Run 전투 상태를 활성화하지 못했습니다.")));
+    }
     bPreparing = false;
     CombatManager->StartCombat_Internal();
-    if (!CombatManager->IsCombatActive() && !CombatManager->IsAwaitingTurnCheckpoint())
+    if (!CombatManager->IsCombatActive())
     {
         if (PendingResult != ECombatResult::None)
         {
@@ -134,8 +129,8 @@ bool AEncounterManager::ConfigureCombatParticipants(FText& OutError)
         {
             return false;
         }
-        // The persistent roster determines control on both fresh encounters and restored actors.
-        // 새 전투와 복원 액터 모두 영속 참가 목록으로 조작 방식을 결정합니다.
+        // The persistent roster determines control when each encounter creates its actors.
+        // 각 전투의 액터를 생성할 때 영속 참가 목록으로 조작 방식을 결정합니다.
         for (const TPair<int32, TObjectPtr<AUnitBase>>& Entry : PartyActors)
         {
             APlayerUnit* Player = Cast<APlayerUnit>(Entry.Value);
@@ -190,31 +185,6 @@ bool AEncounterManager::ValidateManagedExecution(FText& OutError, bool bAllowRes
     return Mode && Mode->ValidateManagedRunConnections(OutError);
 }
 
-bool AEncounterManager::ValidateManagedCheckpointModes(const FCombatCheckpointData& Checkpoint, FText& OutError) const
-{
-    if (!RunState->IsManagedRun())
-    {
-        return true;
-    }
-    for (const FCombatCheckpointUnit& Unit : Checkpoint.Units)
-    {
-        if (Unit.Team == ETeam::Player)
-        {
-            EPartyControlMode ExpectedMode = EPartyControlMode::Human;
-            if (!URunParticipationLibrary::ResolveControlMode(RunState->GetParticipation(), RunState->GetRunIdentity(), RunState->GetPartyMembers(), Unit.CharacterId, ExpectedMode, OutError))
-            {
-                return false;
-            }
-            if (Unit.PartyControlMode != ExpectedMode)
-            {
-                OutError = FText::FromString(TEXT("저장된 캐릭터의 조작 방식이 Run의 영속 인간 참가 목록과 일치하지 않습니다."));
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
 bool AEncounterManager::ResumeManagedGameplay(FText& OutError)
 {
     OutError = FText::FromString(TEXT("재개할 관리 Run과 현재 Host의 실행 권한이 필요합니다."));
@@ -244,266 +214,12 @@ bool AEncounterManager::ResumeManagedGameplay(FText& OutError)
     return true;
 }
 
-void AEncounterManager::EnableCombatCheckpoints()
+bool AEncounterManager::RestoreSavedCombat(const FRunAccountId&, FText& OutError)
 {
-    if (CombatManager && RunState->IsCheckpointSavingEnabled() && RunState->GetRunIdentity().Origin != ERunIdentityOrigin::LegacyOffline)
-    {
-        CombatManager->CommitTurnBoundary.BindUObject(this, &AEncounterManager::CommitTurnCheckpoint);
-    }
-}
-
-bool AEncounterManager::BuildTurnCheckpoint(int32 CompletedTurnSerial, int32 NextTurnIndex, FCombatCheckpointData& OutCheckpoint, FText& OutError)
-{
-    if (!HasAuthority() || !CombatManager || !CombatManager->IsAwaitingTurnCheckpoint() || !RunState || RunState->GetPhase() != ERunPhase::Combat || bPreparing || PendingResult != ECombatResult::None)
-    {
-        OutError = FText::FromString(TEXT("다음 턴 시작 전 확정 경계에서만 전투를 저장할 수 있습니다."));
-        return false;
-    }
-    for (TActorIterator<ASkillActorBase> It(GetWorld()); It; ++It)
-    {
-        if (IsValid(*It) && SpawnedUnits.Contains(It->GetSourceUnit()))
-        {
-            OutError = FText::FromString(TEXT("아직 종료되지 않은 스킬 액터가 있어 전투를 저장하지 않습니다."));
-            return false;
-        }
-    }
-    FCombatCheckpointData Candidate;
-    Candidate.SchemaVersion = UCombatCheckpointLibrary::CurrentSchemaVersion;
-    Candidate.AttemptId = CombatAttemptId;
-    const FCombatCheckpointData& Previous = RunState->GetCombatCheckpoint();
-    if (Previous.AttemptId == CombatAttemptId && Previous.Revision == MAX_int64)
-    {
-        OutError = FText::FromString(TEXT("체크포인트 순번의 상한에 도달했습니다."));
-        return false;
-    }
-    Candidate.Revision = Previous.AttemptId == CombatAttemptId ? Previous.Revision + 1 : 1;
-    Candidate.Identity = RunState->GetRunIdentity();
-    Candidate.NodeId = RunState->GetCurrentNodeId();
-    Candidate.EncounterId = RunState->GetCurrentEncounterId();
-    Candidate.CompletedTurnSerial = CompletedTurnSerial;
-    Candidate.NextTurnIndex = NextTurnIndex;
-    Candidate.bHasOpponentSnapshot = bHasFrozenOpponent;
-    Candidate.OpponentSnapshot = FrozenOpponentSnapshot;
-    Candidate.OpponentCatalog = FrozenOpponentCatalog;
-    for (AUnitBase* Unit : CombatManager->GetRegisteredUnits())
-    {
-        FCombatCheckpointUnit& State = Candidate.Units.AddDefaulted_GetRef();
-        if (!IsValid(Unit) || !Unit->CaptureCheckpointState(State, OutError))
-        {
-            return false;
-        }
-        FGuid& UnitId = CheckpointUnitIds.FindOrAdd(Unit);
-        if (!UnitId.IsValid())
-        {
-            UnitId = FGuid::NewGuid();
-        }
-        State.UnitId = UnitId;
-        State.CharacterId = CombatManager->GetCharacterId(Unit);
-        State.OwnerAccountId = CombatManager->GetOwnerAccountId(Unit);
-        for (const TPair<int32, TObjectPtr<AUnitBase>>& Entry : PartyActors)
-        {
-            if (Entry.Value == Unit)
-            {
-                State.PartySlot = Entry.Key;
-                break;
-            }
-        }
-    }
-    // Validation and disk publication operate on a candidate without changing the last committed record.
-    // 마지막 확정 기록을 바꾸지 않고 후보 데이터의 검증과 디스크 저장을 진행합니다.
-    OutCheckpoint = MoveTemp(Candidate);
-    return true;
-}
-
-bool AEncounterManager::CommitTurnCheckpoint(int32 CompletedTurnSerial, int32 NextTurnIndex)
-{
-    FText Error;
-    if (!ValidateManagedExecution(Error, true))
-    {
-        FlowMessage = Error;
-        SetPlayerCombatInput(false);
-        OnFlowChanged.Broadcast();
-        return false;
-    }
-    if (PendingTurnCheckpoint.Revision == 0 && !BuildTurnCheckpoint(CompletedTurnSerial, NextTurnIndex, PendingTurnCheckpoint, Error))
-    {
-        FlowMessage = Error;
-        SetPlayerCombatInput(false);
-        OnFlowChanged.Broadcast();
-        return false;
-    }
-    if (!RunState->CommitCombatCheckpoint(PendingTurnCheckpoint, Error))
-    {
-        FlowMessage = Error;
-        SetPlayerCombatInput(false);
-        OnFlowChanged.Broadcast();
-        return false;
-    }
-    PendingTurnCheckpoint = FCombatCheckpointData();
-    FlowMessage = FText::GetEmpty();
-    SetPlayerCombatInput(true);
-    OnFlowChanged.Broadcast();
-    return true;
-}
-
-bool AEncounterManager::ValidateRestoreArena(const FCombatCheckpointData& Checkpoint, FText& OutError) const
-{
-    if (!Arena || !Arena->Grid || !CombatManager || !PartyDefinition || !Definitions.Contains(Checkpoint.EncounterId))
-    {
-        OutError = FText::FromString(TEXT("저장된 전투를 복원할 아레나 또는 콘텐츠 설정이 없습니다."));
-        return false;
-    }
-    if (!UCombatCheckpointLibrary::Validate(Checkpoint, RunState->GetPartyMembers(), OutError))
-    {
-        return false;
-    }
-    for (const FCombatCheckpointUnit& Unit : Checkpoint.Units)
-    {
-        if (Unit.Team == ETeam::Player)
-        {
-            const FRunPartyMember* Member = RunState->GetPartyMembers().FindByPredicate([&Unit](const FRunPartyMember& Entry) { return Entry.SlotIndex == Unit.PartySlot && Entry.bCreated; });
-            FProfessionDefinition Profession;
-            if (!Member || !PartyDefinition->ResolveProfession(Member->ClassId, Profession) || Unit.UnitClass != FSoftObjectPath(Profession.CombatClass.Get()))
-            {
-                OutError = FText::FromString(TEXT("저장된 유닛 클래스가 원래 캐릭터의 직업 정의와 일치하지 않습니다."));
-                return false;
-            }
-        }
-        ACombatGridTile* Tile = Unit.bHasTile ? Arena->Grid->GetTileAtCoord(Unit.GridCoord) : nullptr;
-        const ETileTerritory Expected = Unit.Team == ETeam::Player ? ETileTerritory::Player : ETileTerritory::Enemy;
-        if (Unit.bHasTile && (!Tile || Tile->GetTerritory() != Expected || Tile->GetOccupyingUnit()))
-        {
-            OutError = FText::FromString(TEXT("저장된 배치가 현재 아레나의 빈 진영 타일과 일치하지 않습니다."));
-            return false;
-        }
-        if (Tile && FVector::DistSquaredXY(Unit.Transform.GetLocation(), Tile->GetActorLocation()) > FMath::Square(5.0f))
-        {
-            OutError = FText::FromString(TEXT("저장된 유닛의 실제 위치가 점유 타일의 중심과 일치하지 않습니다."));
-            return false;
-        }
-    }
-    return true;
-}
-
-bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FText& OutError)
-{
-    ON_SCOPE_EXIT
-    {
-        if (HasAuthority() && SpawnedUnits.IsEmpty() && !OutError.IsEmpty() && !FlowMessage.EqualTo(OutError))
-        {
-            FlowMessage = OutError;
-            OnFlowChanged.Broadcast();
-        }
-    };
-    if (!HasAuthority() || bShuttingDown || bPreparing || PendingResult != ECombatResult::None || !RunState || !RunState->HasCombatCheckpoint() || RunState->GetPhase() != ERunPhase::Combat || !SpawnedUnits.IsEmpty())
-    {
-        OutError = FText::FromString(TEXT("빈 서버 전투 월드에서 저장된 전투를 복원해야 합니다."));
-        return false;
-    }
-    if (!RunState->ValidateCheckpointHost(HostAccount, OutError))
-    {
-        return false;
-    }
-    const FCombatCheckpointData Checkpoint = RunState->GetCombatCheckpoint();
-    AGameplayGameModeBase* Mode = GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
-    if (RunState->IsManagedRun())
-    {
-        if (!RunState->IsManagedResumePending())
-        {
-            OutError = FText::FromString(TEXT("관리 전투는 명시적으로 승인한 재개에서 한 번만 복원할 수 있습니다."));
-            return false;
-        }
-        if (!ValidateManagedExecution(OutError, true) || !ValidateManagedCheckpointModes(Checkpoint, OutError))
-        {
-            return false;
-        }
-    }
-    else if (GetNetMode() == NM_Standalone)
-    {
-        if (Checkpoint.Identity.Origin != ERunIdentityOrigin::LocalDevelopment || Checkpoint.Identity.OriginalParticipants.Num() != 1)
-        {
-            OutError = FText::FromString(TEXT("협동 기록은 기존 Host와 원래 참가자가 연결된 세션에서 복원해야 합니다."));
-            return false;
-        }
-    }
-    else if (!Mode || !Mode->HasOriginalHostConnection(HostAccount))
-    {
-        OutError = FText::FromString(TEXT("기존 Host 계정이 이 Listen Server의 로컬 연결에 배정되어야 합니다."));
-        return false;
-    }
-    if (!ValidateRestoreArena(Checkpoint, OutError))
-    {
-        return false;
-    }
-    bPreparing = true;
-    SetPlayerCombatInput(false);
-    FlowMessage = FText::GetEmpty();
-    FActorSpawnParameters Params;
-    Params.Owner = this;
-    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    for (const FCombatCheckpointUnit& State : Checkpoint.Units)
-    {
-        UClass* UnitClass = Cast<UClass>(State.UnitClass.ResolveObject());
-        AUnitBase* Unit = GetWorld()->SpawnActor<AUnitBase>(UnitClass, State.Transform, Params);
-        if (!Unit)
-        {
-            return FailRestore(FText::FromString(TEXT("저장된 유닛을 생성하지 못했습니다.")), OutError);
-        }
-        SpawnedUnits.Add(Unit);
-        if (!Unit->RestoreCheckpointState(State, OutError))
-        {
-            return FailRestore(OutError, OutError);
-        }
-        if (State.bHasTile)
-        {
-            Unit->SetCurrentTile(Arena->Grid->GetTileAtCoord(State.GridCoord));
-        }
-        if (State.PartySlot != INDEX_NONE)
-        {
-            PartyActors.Add(State.PartySlot, Unit);
-        }
-        CheckpointUnitIds.Add(Unit, State.UnitId);
-    }
-    CombatManager->SetCombatGrid(Arena->Grid);
-    TArray<AUnitBase*> Units;
-    for (AUnitBase* Unit : SpawnedUnits)
-    {
-        Units.Add(Unit);
-    }
-    CombatManager->RegisterUnits(Units);
-    if (!ConfigureCombatParticipants(OutError))
-    {
-        return FailRestore(OutError, OutError);
-    }
-    CombatAttemptId = Checkpoint.AttemptId;
-    bHasFrozenOpponent = Checkpoint.bHasOpponentSnapshot;
-    FrozenOpponentSnapshot = Checkpoint.OpponentSnapshot;
-    FrozenOpponentCatalog = Checkpoint.OpponentCatalog;
-    PendingTurnCheckpoint = FCombatCheckpointData();
-    EnableCombatCheckpoints();
-    Arena->ActivateArena(GetWorld()->GetFirstPlayerController());
-    bPreparing = false;
-    if (!CombatManager->RestoreCombatFromBoundary(Checkpoint.CompletedTurnSerial, Checkpoint.NextTurnIndex))
-    {
-        return FailRestore(FText::FromString(TEXT("저장된 턴 경계를 활성화하지 못했습니다.")), OutError);
-    }
-    if (RunState->IsManagedRun() && !RunState->ConfirmManagedResumeStarted(OutError))
-    {
-        return FailRestore(OutError, OutError);
-    }
-    SetPlayerCombatInput(CombatManager->IsCombatActive());
-    OnFlowChanged.Broadcast();
-    OutError = FText::GetEmpty();
-    return true;
-}
-
-bool AEncounterManager::FailRestore(const FText& Error, FText& OutError)
-{
-    const FText SavedError = Error;
-    CleanupEncounter();
-    bPreparing = false;
-    FlowMessage = SavedError;
-    OutError = SavedError;
+    // Keep old callers fail-closed without interpreting sequential saves as timed rounds.
+    // 기존 호출은 명시적으로 거절하며 순차 턴 저장을 시간 기반 라운드로 해석하지 않습니다.
+    OutError = FText::FromString(TEXT("기존 순차 턴 전투 저장은 새 라운드 전투에서 복원할 수 없습니다. 새 전투의 라운드 중간 저장·복구는 아직 지원하지 않으며 기존 저장 파일은 보존됩니다."));
+    FlowMessage = OutError;
     OnFlowChanged.Broadcast();
     return false;
 }
@@ -515,7 +231,8 @@ bool AEncounterManager::CanRetryCombatCheckpoint() const
     {
         return false;
     }
-    return (RunState->IsManagedRun() && RunState->IsManagedResumePending() && SpawnedUnits.IsEmpty()) || (CombatManager && CombatManager->IsAwaitingTurnCheckpoint()) || (PendingResult != ECombatResult::None && !RunState->GetSaveError().IsEmpty());
+    const bool bCanResumeOutsideCombat = RunState->GetPhase() != ERunPhase::Combat && RunState->IsManagedRun() && RunState->IsManagedResumePending() && SpawnedUnits.IsEmpty();
+    return bCanResumeOutsideCombat || (PendingResult != ECombatResult::None && !RunState->GetSaveError().IsEmpty());
 }
 
 bool AEncounterManager::RetryCombatCheckpoint(FText& OutError)
@@ -532,10 +249,6 @@ bool AEncounterManager::RetryCombatCheckpoint(FText& OutError)
     if (PendingResult != ECombatResult::None)
     {
         FinishEncounter();
-    }
-    else if (CombatManager)
-    {
-        CombatManager->RetryTurnCheckpoint();
     }
     if (CanRetryCombatCheckpoint())
     {
@@ -557,15 +270,12 @@ void AEncounterManager::SuspendForDisconnectedParticipant()
     }
     SetPlayerCombatInput(false);
     CombatManager->SuspendCombatForRecovery();
-    FlowMessage = FText::FromString(TEXT("원래 참가자의 연결이 끊겨 전투를 중단했습니다. 기존 Host와 원래 참가자가 다시 모여 마지막 확정 턴부터 복원하세요."));
+    FlowMessage = FText::FromString(TEXT("원래 참가자의 연결이 끊겨 전투를 중단했습니다. 전투 중간 복구는 미지원입니다. 메뉴에서 마지막 전투 외 저장부터 명시적으로 재개해야 하며 자동 Host 승계나 AI 전환은 수행하지 않습니다."));
     OnFlowChanged.Broadcast();
 }
 
 bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition)
 {
-    bHasFrozenOpponent = false;
-    FrozenOpponentSnapshot = FPartySnapshot();
-    FrozenOpponentCatalog.Reset();
     const bool bUseSnapshot = !Definition->OpponentSnapshotSlot.IsNone();
     FPartySnapshot Snapshot;
     TArray<TArray<TObjectPtr<USkillDefinitionDataAsset>>> SnapshotSkills;
@@ -582,9 +292,6 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         {
             return false;
         }
-        bHasFrozenOpponent = true;
-        FrozenOpponentSnapshot = Snapshot;
-        FrozenOpponentCatalog = FSoftObjectPath(Definition->SnapshotCatalog);
         TSet<ACombatGridTile*> FormationTiles;
         for (const FPartySnapshotMember& Member : Snapshot.Members)
         {
@@ -829,7 +536,6 @@ void AEncounterManager::CleanupEncounter()
     SetPlayerCombatInput(false);
     if (CombatManager)
     {
-        CombatManager->CommitTurnBoundary.Unbind();
         CombatManager->ResetCombat();
     }
     for (TActorIterator<ASkillActorBase> It(GetWorld()); It; ++It)
@@ -857,8 +563,6 @@ void AEncounterManager::CleanupEncounter()
     }
     SpawnedUnits.Reset();
     PartyActors.Reset();
-    CheckpointUnitIds.Reset();
-    PendingTurnCheckpoint = FCombatCheckpointData();
     if (Arena)
     {
         Arena->CleanupArena();
