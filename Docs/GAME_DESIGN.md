@@ -1,6 +1,6 @@
 # 게임 기획
 
-기준일: 2026-09-14. 목표 기획·확정 방향과 구분된 콘텐츠 제안을 정의한다. 구현 상태는 [PROJECT_PLAN](PROJECT_PLAN.md), 미결정 사항은 [TODO](TODO.md), 세부 네트워크 정책은 [MULTIPLAYER](MULTIPLAYER.md)를 따른다. 아이템 클론 기획은 [7절](#7-아이템-클론-기획), 라운드 계획·시간차 자동 전투의 확정 방향은 [8절](#8-라운드-계획과-시간차-자동-전투)에 둔다.
+기준일: 2026-09-15. 목표 기획·확정 방향과 구분된 콘텐츠 제안을 정의한다. 구현 상태는 [PROJECT_PLAN](PROJECT_PLAN.md), 미결정 사항은 [TODO](TODO.md), 세부 네트워크 정책은 [MULTIPLAYER](MULTIPLAYER.md)를 따른다. 아이템 클론 기획은 [7절](#7-아이템-클론-기획), 라운드 계획·시간차 자동 전투의 확정 방향은 [8절](#8-라운드-계획과-시간차-자동-전투)에 둔다.
 
 ## 1 게임의 정체성
 
@@ -71,20 +71,36 @@ For The King의 파티 운영과 The Bazaar·Backpack Battles의 비동기 상�
 
 평가 항목은 빌드 선택의 전술적 영향, 승패 원인의 설명 가능성, AI 허점 의존도, 협동 의사결정 대비 대기 시간이다. 착수 순서는 [TODO](TODO.md)에서 관리한다.
 
+### 6-1 직업 역할 보충 제안
+
+현재 공통 캐릭터 콘텐츠를 직업별 명시 스킬 프로필로 확장할 때 사용할 초안이다. 원작 값은 `Characters.json`의 `Stats`, `Things`, `Passives`와 `SkillConfigs.json`·`Langs/en.json`의 `UI_ENCYCLOPEDIA_SKILL_*` 설명을 대조했다. 아래 HP·SPD·능력치를 ProjectA 초기 수치로 채택하지 않는다. 직업의 `Things`는 해당 정의에 직접 연결된 지급품이며 난이도·Loadout까지 반영한 최종 시작 인벤토리가 아니다.
+
+| 직업 · 원작 ID | 설치본 정적 근거 | ProjectA 역할 제안 · 미확정 |
+|---|---|---|
+| Hunter · `HUNTER` | HP 30·SPD 74·AWR 78. `BOW_HUNTER_BASIC_00`와 `HERB_HERMIT_01` 각 1개. `SKILL_ELITESNEAK`는 탐험 잠입 관련 | 정밀 원거리 공격수. 기본 사격·관통·제어를 선택하고 대상 이동과 투사체 비행을 고려. 탐험 능력의 Node 변환은 별도 결정 |
+| Scholar · `SCHOLAR` | HP 30·SPD 68·INT 78. `BOOK_SCHOLAR_BASIC_00`와 `SCROLL_TELEPORT_01` 각 1개. `SKILL_FINDSCROLL`은 탐험/던전의 스크롤 획득 기회 | 준비형 마법 공격·지원. 시전 시간과 보호 배치를 교환. 주문 효과·시전 시간·Node 정보 제공은 별도 결정 |
+| Herbalist · `HERBALIST` | HP 32·SPD 62·INT 76·AWR 76. `STAFF_HERBALIST_BASIC_00`와 `HERB_GODSBEARD_01` 각 1개. `SKILL_FINDHERB`, `SKILL_PARTYHEAL` 연결 | 배치형 회복 지원. 단일 회복과 주변 회복을 선택하며 집결의 이익과 적 범위 공격 위험을 교환. 범위·시점·소모 비용 별도 결정 |
+| StableHand · `STABLEBOY` | HP 30·SPD 78·STR 72. `BLADE_STABLEBOY_BASIC_00`와 `HERB_NETTLE_01` 각 1개 | 기동 근접 공격수. 접근·타격·복귀를 활용하며 현행 한 주요 행동 예약을 유지. 고유 효과는 이동·배치 역할을 기준으로 별도 설계 |
+
+네 원작 직업 정의는 모두 `PA=1`, `SA=1`이며 위 네 직업 중 SPD 최댓값은 Stablehand 78이다. 원작 SPD를 ProjectA `CombatSpeed`·이동 속도·투사체 속도 전체에 복사하지 않는다. 패시브의 `PROC_*` 숫자는 실행 수식 확인 없이 최종 발동률로 쓰지 않는다. 이 초안은 직업별 최종 스탯·성장률·추가 행동을 확정하지 않으며 [8절](#8-라운드-계획과-시간차-자동-전투)의 전투 계약을 따른다.
+
 ## 7 아이템 클론 기획
 
 ### 7-1 목적과 적용 상태
 
-**원작에 가까운 아이템 구조를 먼저 설계하고, 이후 ProjectA에 맞는 데이터형과 수치로 변환한다.** 참고 작품은 For The King(이하 FTK1)과 For The King II(이하 FTK2)다. 무기 12종, 방어구 8종, 방패 2종, 장신구 4종, 약초 12종, 탐험 도구 4종, 성장 모델 2종의 총 44개 기획 항목을 정의한다. 전체 원작 아이템 도감이나 최신 패치 데이터의 완전 복제는 범위에 포함하지 않는다.
+2026-09-15 사용자 확정: **집중(Focus) 자원과 회복·소모·판정 보정 효과를 기획에서 제외한다.** 집중초 C03·C04는 삭제하고 해당 ID를 재사용하지 않는다. 무기·직업·파이프·재질·야영에도 관련 효과를 추가하지 않는다. AP 회복이나 추가 행동으로 자동 치환하지 않는다. 원작 슬롯 판정의 채택 여부는 별도 결정하며 기본 시간차 전투는 유지한다.
+
+**시간차 전투를 유지하고, 원작 아이템 중 필요한 효과를 ProjectA에 맞게 변환한다.** 참고 작품은 For The King(이하 FTK1)과 For The King II(이하 FTK2)다. 무기 12종, 방어구 8종, 방패 2종, 장신구 4종, 약초 10종, 탐험 도구 4종, 성장 모델 2종의 총 42개 기획 항목을 정의한다. 전체 원작 아이템 도감이나 최신 패치 데이터의 완전 복제는 범위에 포함하지 않는다.
 
 | 표시 | 의미 |
 |---|---|
 | 원작 확인 | 공개 자료에서 확인한 작품별 구조·효과·수치. 출처의 설명 범위만 사용 |
+| 설치 파일 정적 확인 | FTK2 설치본 JSON의 정의·참조·설명문을 확인. 해당 설정의 실제 로드·최종 계산·작동은 미검증 |
 | 클론 설계 | 확인한 기능을 재현하기 위한 기획 해석. 항목의 역할·상호작용·검증 목표 포함 |
 | 변환 후보 | ProjectA에 도입할 때 변경 가능한 부분. 채택·구현 미확정 |
 | 확인 필요 | 원작 자료가 비어 있거나 버전·세부 동작을 확인하지 못한 값. 0이나 없음으로 간주하지 않음 |
 
-참조일은 2026-09-13이다. 개발사 전투 가이드와 커뮤니티 관리 Wiki를 사용했다. 일부 Wiki는 미완성 문서이며, 최신 설치 버전에서 직접 확인한 결과가 아니다. 원작 영문명은 대조용이고 한글 기능명은 기획용 가칭이다. 개별 행에 없는 가격·판정 횟수·희귀도·지속시간·입수 확률은 공통으로 **확인 필요**다. ProjectA의 장비·상점 거래·약초·Focus 구현 완료를 의미하지 않는다.
+공개 자료 참조일은 2026-09-13이며 개발사 가이드와 커뮤니티 Wiki를 사용했다. 2026-09-15에는 사용자 제공 FTK2 Steam 설치본 Build `24247341`의 평문 JSON을 대조했다. 아래 설치본 표가 기존 공개 자료와 다르면 해당 Build의 정적 참조값으로 구분한다. FTK1 항목은 기존 작품의 근거를 유지한다. 원작 영문명은 대조용이고 한글 기능명은 기획용 가칭이다. 개별 행과 보충 표에 없는 가격·판정 횟수·지속시간·입수 확률은 **확인 필요**다. ProjectA의 장비·상점 거래·약초 구현 완료를 의미하지 않는다. 파일 경로·해시·해석 한계는 [7-11절](#7-11-ftk2-설치본-근거와-해석-범위)에 둔다.
 
 읽는 순서는 작품별 구조 → 아이템 카탈로그 → 상세 카드 → 성장·상점 → 데이터 변환 순서다. 원작 수치는 `SourceValue`, 향후 조정 수치는 `DesignValue`로 분리한다. 자료가 없는 필드는 비워 두되 누락 사유를 기록한다.
 
@@ -94,7 +110,7 @@ For The King의 파티 운영과 The Bazaar·Backpack Battles의 비동기 상�
 
 | 구분 | FTK1 원작 확인 | FTK2 원작 확인 | 클론 기준과 변환 표시 |
 |---|---|---|---|
-| 무기 역할 | 무기와 사용하는 능력치의 적합성이 중요. 양손·파괴 가능·Focus 사용 불가 속성 존재 | 무기 카드가 피해·스킬을 제공하며 판정 성공 수가 피해에 관여 | 공격력·판정 능력치·스킬 목록을 별도 관리. 직업 전용 제한은 자동 추가하지 않음 |
+| 무기 역할 | 무기와 사용하는 능력치의 적합성이 중요. 양손·파괴 가능 속성 존재 | 무기 카드가 피해·스킬을 제공하며 판정 성공 수가 피해에 관여 | 공격력·판정 능력치·스킬 목록을 별도 관리. 직업 전용 제한은 자동 추가하지 않음 |
 | 장비 역할 | 몸·머리·발, 방패, 목걸이·장신구로 방어·능력치·면역·스킬 보완 | 손 장비 및 재질 보정 등 장비 조합 확대 | FTK1 슬롯과 FTK2 손 슬롯을 모델별로 구분. 최종 슬롯 수는 후속 결정 |
 | 배치 | FTK2의 이동 가능한 전투 Grid와 구분 | 각 진영 2×4 배치, 행·열·주변 공격과 보호 관계 | ProjectA 4×4와 칸 번호를 직접 대응하지 않고 범위 패턴을 재정의 |
 | 행동 자원 | 약초는 전투 중 턴당 사용 제한 | 주요 행동과 보조 행동 분리. 아이템과 이동이 보조 행동을 경쟁 | ProjectA AP·SubAP에 비용을 명시. FTK2 주요 행동 후 자동 턴 종료도 별도 이식 여부 결정 |
@@ -107,9 +123,7 @@ For The King의 파티 운영과 The Bazaar·Backpack Battles의 비동기 상�
 
 **판정과 효과를 분리한다.** 능력치 판정, 성공 개수, 완전 성공, 회피, 피해, 상태 적용을 독립 항목으로 기록한다. 완전 성공은 모든 판정 슬롯 성공을 뜻하며, 치명타나 적중 보장과 같은 의미로 사용하지 않는다. 무기별 스킬은 `일부 성공에도 피해`, `완전 성공 시 추가 효과`, `완전 성공해야 발동`을 구분한다.
 
-FTK1 Focus는 슬롯 성공을 보장하며 이후 슬롯의 성공률도 보정한다. Focus 사용 불가 속성은 별도다. 따라서 단순히 성공 슬롯만 하나 추가하는 구현은 원작 재현과 다르다. 정확한 능력치 상한·보정 순서·FTK2 차이는 데이터 전환 전에 확인한다. [Focus](https://fortheking.wiki.gg/wiki/Focus)
-
-클론 설계용 예시: 보정 없는 독립 판정의 슬롯당 성공률을 80%로 가정하면 2회 완전 성공 확률은 64%, 4회는 40.96%다. 이는 판정 횟수의 의미를 설명하는 계산이며 특정 원작 무기의 실제 확률이 아니다. Focus·회피·치명타·상태 저항을 포함한 실제 기대값으로 사용하지 않는다.
+클론 설계용 예시: 보정 없는 독립 판정의 슬롯당 성공률을 80%로 가정하면 2회 완전 성공 확률은 64%, 4회는 40.96%다. 이는 판정 횟수의 의미를 설명하는 계산이며 특정 원작 무기의 실제 확률이 아니다. 회피·치명타·상태 저항을 포함한 실제 기대값으로 사용하지 않는다.
 
 FTK2의 물리 방어와 마법 저항은 해당 피해를 감산하며 관통 공격은 방어를 우회한다. 클론에서는 `물리/마법`과 `방어 무시 여부`를 분리하고, 피해 하한·부분 성공 시 관통 여부는 스킬별로 확인한다. 예를 들어 물리 피해 12와 방어 4라면 일반 피해는 8이다. [개발사 방어 설명](https://steamcommunity.com/sharedfiles/filedetails/?id=2974574027)
 
@@ -123,6 +137,23 @@ FTK2의 물리 방어와 마법 저항은 해당 피해를 감산하며 관통 �
 | 소모품 | 사용 가능 상태, 소비 수량, 행동 비용, 실패 시 처리 | 효과가 거절된 경우 수량·자원을 소모할지 명시 |
 | 파괴 | 발생 조건, 예외, 파괴 후 행동 | 일반 내구도 소모와 구분. 재고·스킬·Snapshot 갱신 필요 |
 
+#### 7-3-1 원작 상태와 ProjectA 상태의 차이
+
+원작의 명칭을 ProjectA 효과 ID로 바로 변환하지 않는다. 다음은 `StatusEffects.json` 및 `Langs/en.json`의 `UI_ENCYCLOPEDIA_STATUS_*`를 확인한 결과다. `Duration`·`TickFrequency`의 정확한 감소 시점은 미확인이며 ProjectA의 초·라운드로 환산하지 않는다. ProjectA 규칙의 기준은 [STATUS_EFFECTS](STATUS_EFFECTS.md)다.
+
+| ProjectA 상태 | 설치본 정적 확인 | 변환 시 구분 |
+|---|---|---|
+| 화상 | `STATUS_FIRE_00`: Duration 3, TickFrequency 1, TickCombat true. 도감은 주기 피해로 설명 | ProjectA의 피해 후 수치 감소와 별도. 최종 감소 공식은 미정 |
+| 중독 | `STATUS_POISON_00`: Duration 3, TickOverworld true, TickCombat false, STR/VIT/INT/SPD/TAL/AWR 각 -10 | ProjectA의 피해 후 수치 1 감소와 별도. 피해 주기는 미정 |
+| 출혈 | `STATUS_BLEED_00`: Duration 4, TickFrequency 2, TickCombat true. 도감은 주기 피해로 설명 | ProjectA의 실제 칸 이동마다 발동과 별도 |
+| 냉각 | 이 파일의 최상위 ID·Type에서 CHILL/FREEZE/COLD에 대응하는 별도 상태를 확인하지 못함 | ProjectA 냉각 수치·시각표 정책의 근거로 사용하지 않음 |
+| 빙결 | `STATUS_ICE_00`: Duration 3. Frozen/빙결의 영문 도감 설명은 공격으로 받는 피해 25% 증가 | ProjectA의 현재 또는 다음 라운드 행동 차단과 별도 |
+| 스턴 | `STATUS_STUN_00`: Duration 1, 도감은 행동 불가. `STATUS_DAZE_00`: Duration 1, 도감은 보조 행동 불가 | ProjectA 스턴의 현재 잔여 행동 차단과 이월 없음은 자체 정책 |
+| 혼란 | `STATUS_CONFUSE_00`: Duration 2, TickCombat true. 도감은 무작위 결정 | ProjectA 다음 라운드의 합법 행동 대체·소모 시점은 자체 정책 |
+| 감전 | `STATUS_SHOCK_00`: Duration 2. 영문 도감은 첫 판정 슬롯의 성공을 방해하는 효과로 설명 | ProjectA의 중심·인접 번개 피해와 별도. 한글 설명에는 실패 의미가 누락되어 영문과 불일치 |
+
+원작 `UI_ENCYCLOPEDIA_STATUS_IMMUNITY_STUN`은 Stun·Daze를 함께 설명하고 `...IMMUNITY_DAZE`는 Daze만 설명한다. 면역 연결 ID·설명문·실제 차단 집합은 서로 구분해 검증한다. 상태 정의만으로 중첩·재부여·정화 집합·동시 적용 순서를 확정하지 않는다. 기존 ProjectA 8종 정책은 이번 대조로 변경하지 않는다.
+
 ### 7-4 무기 카탈로그
 
 표의 기능명은 클론 역할을 표현한다. 스킬 영문명은 원작 대조용이다. 수치 미기재 무기는 원작 수치 확인 후 완성하는 설계 카드이며, 임의의 피해·판정 수를 채우지 않는다.
@@ -134,26 +165,58 @@ FTK2의 물리 방어와 마법 저항은 해당 피해를 감산하며 관통 �
 | W03 다기능 직검 | FTK2 Broadsword 계열 | Slash·Cutting Slice·Heavy Strike | 한 무기 안에서 일반·변형·강공격 선택 | 스킬별 AP 비용·정확한 효과 확인 |
 | W04 범위 대검 | FTK2 Greatsword 계열 | Slash·Heavy Strike·Cleave | 단일 집중과 다수 처리 사이 선택 | 양손 슬롯·Cleave의 실제 칸 패턴·감쇠 |
 | W05 독 단검 | FTK2 Assassin Blade | Stab·Poison Strike | 직접 피해와 지속 상태의 효용 비교 | 독 발동 조건·턴 수·중첩·면역 |
-| W06 제어 망치 | FTK2 Hammer 계열 | Bash·Stun·Knock Left | 피해·행동 제어·배치 변경 선택 | 판정 능력치·밀기 충돌·보스 제어 규칙 |
+| W06 제어 망치 | FTK2 Hammer | 설치본 기준 Bash·Stun. 해당 고유 무기에 Knock Left 없음 | 피해와 행동 제어 선택 | VIT 판정·보스 제어 규칙. 밀기는 별도 무기 후보 |
 | W07 방어 파쇄 곡괭이 | FTK2 Pick Axe | Piercing Blow·Armor Break | 즉시 관통과 후속 공격을 위한 방어 약화 비교 | 방어 감소 중첩·지속시간·관통 적용 조건 |
-| W08 화염 지팡이 | FTK2 Fire Staff 계열 | 화염 공격과 집단 Interrupt 계열 행동 | 피해와 적 행동 개입의 선택 | 정확한 스킬별 범위·상태 지속·AP |
+| W08 화염 지팡이 | FTK2 Fire Staff | 설치본 기준 Fire Bolt·Heavy Fire Bolt·Fire Blast와 FIRE 상태 연결. 집단 Interrupt 연결 없음 | 단일·강공격·범위 화상 선택 | 범위·화상 적용 조건·지속·AP |
 | W09 폭발 화포 | FTK2 Heavy Cannon 계열 | Explosive Shot·Concussive Shot | 집중 배치에 대한 압박 | 재장전 유무·비용 확인, 폭발 범위·아군 피해 |
-| W10 집중 구슬 | FTK2 Crystal Ball | Bolt·Mesmerize·Gather Focus·Channel | 자원 준비와 공격을 교대하는 역할 | Focus가 없을 때 대체 자원, Channel 세부 효과 |
-| W11 파괴 위험 무기 모델 | FTK1 Breakable 속성 무기 | 한 공격의 모든 판정 실패 시 파괴, 파괴 후 비무장 | 강한 무기를 잃을 위험과 예비 무기 운용 | 개별 무기의 실제 피해·Focus 허용 여부·파괴 정책 |
-| W12 냉기 활 | FTK2 Bone Bow 계열 | Ice Arrow·Ice Pierce·Freeze | 관통과 냉기 계열 제어를 비교 | 냉기 피해 분류·Freeze 효과·완전 성공 조건 |
+| W10 제어 구슬 | FTK2 Crystal Ball의 공격·제어 부분 | Bolt·Mezmerize를 채택 후보로 발췌 | 직접 피해와 행동 제어의 선택 | 나머지 원작 행동은 채택 대상에서 제외, 새 라운드 제어 규칙 적용 |
+| W11 파괴 위험 무기 모델 | FTK1 Breakable 속성 무기 | 한 공격의 모든 판정 실패 시 파괴, 파괴 후 비무장 | 강한 무기를 잃을 위험과 예비 무기 운용 | 개별 무기의 실제 피해·파괴 정책 |
+| W12 냉기 활 | FTK2 Bone Bow 계열 | 설치본 Tier 0은 Ice Arrow·Freeze, Tier 1은 Ice Pierce 추가. Freeze는 DAZE 상태 연결 | 냉기 공격·관통·보조 행동 제어 비교 | 스킬명 Freeze와 ICE 상태·ProjectA 빙결의 구분 |
 
 W01: [Simple Lute](https://fortheking.wiki.gg/wiki/Simple_Lute). W02: [Simple Bow](https://fortheking.wiki.gg/wiki/Simple_Bow_%28FTK2%29). W03~W10은 목록에서 확인한 스킬 구성을 압축한 것이며 이름만으로 세부 효과를 확정하지 않는다. [FTK2 무기 목록](https://fortheking.wiki.gg/wiki/List_of_Weapons_FTK2). W11: [FTK1 무기 속성](https://fortheking.wiki.gg/wiki/Bludgeon). W12: [FTK2 활](https://fortheking.wiki.gg/wiki/Bow_%28FTK2%29).
 
+#### 7-4-1 설치본 무기 수치와 스킬 연결
+
+근거는 `Things/Weapons.json`의 고유 ID, `Equippable.Stats.ATK`, `Value`, `MinTier/MaxTier`, `Interactable.Abilities`다. 아래 수치는 재질·난이도·장착자 보정을 적용하지 않은 정의값이다. `Value`는 최종 판매가가 아니며 `ATK`는 모든 판정 결과의 확정 피해가 아니다. 스킬 뒤 괄호는 **판정 수 Rolls / 정확도 ACC 보정**이다. Tier가 다른 동명 무기는 별도 항목으로 취급한다.
+
+| 카드 · 설치본 ID | ATK / Value / Tier | 판정 능력치 | 연결 스킬과 판정 |
+|---|---|---|---|
+| W02 · `BOW_HUNTER_BASIC_00` | 6 / 3 / -1 | AWR | Shot `BOW_BASIC_ATTACK` (2 / 0), Pierce `BOW_PIERCE_ATTACK` (2 / -5) |
+| W03 · `BLADE_MILITIA_MEDIUM_03` | 26 / 227 / 3 | STR | Slash `BLADE_BASIC_ATTACK` (3 / 0), Cutting Slice `BLADE_BLEED_ATTACK` (3 / -5), Heavy Strike `BLADE_HEAVY_ATTACK` (4 / -20) |
+| W04 · `BLADE_MILITIA_HEAVY_03` | 35 / 273 / 3 | STR | Slash `BLADE_BASIC_ATTACK` (4 / 0), Heavy Strike `BLADE_HEAVY_ATTACK` (5 / -20), Cleave `BLADE_SPIN_ATTACK` (4 / 0) |
+| W05 · `BLADE_GOBLIN_ASSASSIN_00` | 8 / 28 / 0 | SPD | Stab `GOBLIN_PIERCE_ATTACK` (1 / 0), Poison Strike `MELEE_POISON_ATTACK` (1 / 0) |
+| W06 · `BLUNT_MILITIA_MEDIUM_01` | 16 / 45 / 1 | VIT | Bash `BLUNT_BASIC_ATTACK` (4 / 0), Stun `BLUNT_STUN_ATTACK` (4 / 0) |
+| W07 · `BLUNT_PICKAXE_MEDIUM_01` | 15 / 45 / 1 | STR | Piercing Blow `AXE_PIERCE_ATTACK` (3 / 0), Armor Break `AXE_ARMORDOWN_ATTACK` (3 / -5) |
+| W08 · `STAFF_MILITIA_FIRE_01` | 20 / 50 / 1 | INT | Fire Bolt `MAGIC_FIRE_ATTACK` (4 / 0), Heavy Fire Bolt `MAGIC_FIRE_HEAVY_ATTACK` (6 / -20), Fire Blast `MAGIC_FIRE_SPLASH_ATTACK` (4 / -5) |
+| W09 · `GUN_MILITIA_HEAVY_03` | 40 / 637 / 3 | STR | Explosive Shot `GUN_EXPLOSIVE_ATTACK` (3 / 0), Concussive Shot `GUN_CONCUSSIVE_ATTACK` (3 / -5) |
+| W10 · `ORB_FORTUNETELLER_BASIC_00` | 6 / 5 / -1 | AWR | 채택 검토 대상인 Bolt `MAGIC_BASIC_ATTACK` (3 / 0), Mezmerize `MAGIC_STUN_ONLY_ATTACK` (2 / -10)만 발췌 |
+| W12 · `BOW_BONE_LIGHT_00` | 8 / 15 / 0 | AWR | Ice Arrow `BOW_ICE_ATTACK` (2 / 0), Freeze `BOW_ICE_DAZE_ATTACK` (2 / -7) |
+| W12 · `BOW_BONE_LIGHT_01` | 12 / 34 / 1 | AWR | Ice Arrow (2 / 0), Ice Pierce `BOW_ICE_PIERCE_ATTACK` (2 / -7), Freeze (2 / -7) |
+
+W07에는 동명 `AXE_MINES_MINION_00`도 있으며 ATK 29·Value 227·Tier 3·Class AXE다. 위 표의 Class BLUNT인 Tier 1 곡괭이와 합치지 않는다. W05는 기능명상 독 단검이지만 설치 분류는 `BLADE`이며 SPD +8·CRT +8·SA +1·`SKILL_ELITESNEAK`도 연결된다. 원작 SPD 판정을 ProjectA의 실행 시각과 자동 결합하지 않는다.
+
+`Abilities.json`과 연결해 확인한 추가 규칙은 다음과 같다.
+
+| 대상 | 정적 확인 | 남은 확인 |
+|---|---|---|
+| W04 Cleave | `BLADE_SPIN_ATTACK.TargetArea=SWIPE` | ProjectA 4×4의 실제 피격 칸·감쇠. ROW와 동일하다고 가정하지 않음 |
+| W07 Armor Break | `ADD_STATUS=STATUS_ARMORDOWN_00` | 상태 발동 성공 조건·방어 감소 계산·재부여 |
+| W08 세 공격 | `ADD_STATUS=STATUS_FIRE_00`, Fire Blast의 `TargetArea=SPLASH` | 완전 성공 gate·SPLASH 대상과 화상 틱 경계 |
+| W09 두 공격 | `TargetArea=SPLASH`, 무기와 스킬의 `Ammo=1` | 재장전 자원·행동 비용·최종 탄약 처리 |
+| W12 Freeze | `BOW_ICE_DAZE_ATTACK`의 `ADD_STATUS=STATUS_DAZE_00` | DAZE 면역·보조 행동 차단의 정확한 만료 경계 |
+
+공통 상속·최종 명중·완전 성공 조건은 수치 필드와 별도로 검증한다. `MinValue/MaxValue`만으로 성공 슬롯별 피해표를 생성하지 않는다. 이번 정정은 설치본 참조 보완이며 각 스킬의 ProjectA 비용·타이밍·상태 정책 채택을 의미하지 않는다.
+
 ### 7-5 방어구·방패·장신구 카탈로그
 
-A01~A04와 R03~R04의 숫자는 원작 Loadout 문서에 기재된 값이다. Lore 해금 비용은 Run 상점 구매 가격과 별개이므로 상품 가격으로 복사하지 않는다. [FTK2 Loadout](https://fortheking.wiki.gg/wiki/Lore_Store_%28FTK2%29/Loadout)
+A01~A04와 R03~R04는 설치본 `Things/Attires.json`의 수치로 보충했다. 이전 [FTK2 Loadout 공개 자료](https://fortheking.wiki.gg/wiki/Lore_Store_%28FTK2%29/Loadout)와 다른 A04의 CRT 및 누락 보정은 아래에 구분한다. Lore 해금 비용·정의의 `Value`·최종 Run 상점 가격은 서로 다른 값이다.
 
 | ID · 기능명 | 원작 기준 | 재현할 효과 | 클론 설계 목적 | 변환할 부분 |
 |---|---|---|---|---|
 | A01 균형 상의 | FTK2 Padded Jacket | 방어 +1·저항 +1 | 양 피해 유형의 입문 방어 | 피해 스케일·몸 슬롯 |
-| A02 기절 방지 투구 | FTK2 Dented Helmet | 방어 +1·Stun 면역 | 방어 수치와 행동 유지의 조합 | Stun·Dazed 면역 구분 |
+| A02 기절 방지 투구 | FTK2 Dented Helmet | 방어 +1·저항 +2·Stun 면역 연결 | 방어 수치와 행동 유지의 조합 | Stun·Dazed 면역 구분 |
 | A03 회피 신발 | FTK2 Light Boots | 회피 +5·Entangle 면역 | 회피·이동 제약 대응 | 회피 단위·속박 태그 |
-| A04 치명 장갑 | FTK2 Light Gloves | 치명타 확률 +5% | 손 슬롯을 통한 공격 보완 | 손 슬롯 채택·확률 상한 |
+| A04 치명 장갑 | FTK2 Light Gloves | 설치 정의 CRT +10·저항 +1 | 손 슬롯을 통한 공격 보완 | CRT 적용 단위·손 슬롯 채택·확률 상한 |
 | A05 물리 중갑 모델 | FTK1 Plate Armor 계열 | 물리 방어·Strength 중심, 낮은 저항과 능력치 불이익 가능 | 상대 피해 유형에 따른 선택 | 실제 아이템 지정·감산식·능력치 패널티 |
 | A06 마법 로브 모델 | FTK1 Silk Armor 계열 | 저항·Intelligence 등 중심, 낮은 물리 방어 | 마법 대응과 주문 적합성 | 실제 아이템 지정·물리/마법 구분 |
 | A07 역할 보완 머리 장비 모델 | FTK1 Headgear 계열 | 방어·능력치·면역·스킬 조합 | 부족한 방어 또는 특수 대응 보충 | 개별 아이템 지정·몸 장비와 예산 배분 |
@@ -162,12 +225,31 @@ A01~A04와 R03~R04의 숫자는 원작 Loadout 문서에 기재된 값이다. Lo
 | S02 인접 보호 방패 | FTK2 Tower Shield 계열 | Taunt·Armor Up Neighbors | 인접 아군 방어 지원과 범위 공격 노출의 상충 | Neighbors의 실제 칸·효과량·보호 대상 |
 | R01 마법 증폭 장신구 | FTK1 Amplifying Crystal | 마법 피해 +1·치명타 확률 +4% | 주문 공격의 직접 보완 | 고정 피해와 치명 배율의 계산 순서 |
 | R02 탐험 나침반 | FTK1 Brass Compass | Find Distance +1·Movement +1 | 탐험 편의와 전투 장신구의 교환 | 월드 탐험 대신 Node 정보 제공으로 변환 여부 |
-| R03 물리 방어 반지 | FTK2 Armored Ring | 방어 +2 | 특정 피해 유형 대응 | 실제 장착 슬롯·중복 장착 규칙 |
-| R04 마법 저항 반지 | FTK2 Magic Ring | 저항 +2 | R03과 상대 구성별 선택 | 실제 장착 슬롯·마법 피해 채택 |
+| R03 물리 방어 반지 | FTK2 Armored Ring | HP +3·방어 +2 | 특정 피해 유형 대응 | TRINKET 슬롯·중복 장착 규칙 |
+| R04 마법 저항 반지 | FTK2 Magic Ring | HP +3·저항 +2 | R03과 상대 구성별 선택 | TRINKET 슬롯·마법 피해 채택 |
 
 A05~A07은 특정 실물 아이템의 완성 수치 카드가 아닌 계열 클론이다. [FTK1 방어구](https://fortheking.wiki.gg/wiki/Magic_Shield). A08: [FTK2 재질](https://fortheking.wiki.gg/wiki/Attire_%28FTK2%29). S01~S02: [FTK2 방패 목록](https://fortheking.wiki.gg/wiki/List_of_Weapons_FTK2). R01~R02: [FTK1 장신구](https://fortheking.wiki.gg/wiki/Trinket).
 
-재질의 확인 예시는 Wool의 최대 Focus +1, Silk의 Speed +2, Steel의 방어 +1이다. **천·가죽·금속별 허용 조합을 유지**하며, 모든 방어구에 모든 재질을 붙일 수 있다고 해석하지 않는다. 재질은 위력 단계나 희귀도와 별도 축이다. [재질표](https://fortheking.wiki.gg/wiki/Attire_%28FTK2%29)
+재질의 확인 예시는 Silk의 Speed +2, Steel의 방어 +1이다. **천·가죽·금속별 허용 조합을 유지**하며, 모든 방어구에 모든 재질을 붙일 수 있다고 해석하지 않는다. 재질은 위력 단계나 희귀도와 별도 축이다. [재질표](https://fortheking.wiki.gg/wiki/Attire_%28FTK2%29)
+
+설치본 `ItemMaterials.json`에서도 `ATT_CLOTH.Materials.ATT_SILK`의 SPD +2, `ATT_METAL.Materials.ATT_STEEL`의 DEF +1을 확인했다. 각각 `Attributes.Explicit.Stats`의 보정이다. 동일 Steel 명칭의 `WEP_METAL.Materials.WEP_STEEL`은 ATK +1이므로 무기·방어구 재질 ID를 합치지 않는다. 재질 후보 연결·추첨·최종 합산은 별도 확인한다.
+
+#### 7-5-1 설치본 장비 식별과 방패 효과
+
+다음 `Value`는 파일의 정의값이다. A04의 기존 +5% 표기를 `CRT=10`으로 정정하고, A02의 RES 및 R03/R04의 HP 누락을 보충했다. CRT/EVD의 최종 확률 단위·상한은 실행 계산 확인 대상이다.
+
+| 카드 | 원본 · 고유 ID | 슬롯 · Value | 추가 정적 근거 |
+|---|---|---|---|
+| A01 | `Things/Attires.json` · `CHESTARMOR_LOADOUT_CLOTH_00` | ARMOR · 3 | DEF 1·RES 1 |
+| A02 | `Things/Attires.json` · `HELMET_LOADOUT_HEAVY_00` | HELMET · 3 | DEF 1·RES 2, Passives의 `STATUS_IMMUNITY_STUN` |
+| A03 | `Things/Attires.json` · `BOOTS_LOADOUT_LIGHT_00` | BOOTS · 3 | EVD 5, Passives의 `STATUS_IMMUNITY_ENTANGLE` |
+| A04 | `Things/Attires.json` · `GLOVES_LOADOUT_CRIT_00` | GLOVES · 3 | RES 1·CRT 10 |
+| S01 | `Things/Weapons.json` · `SHIELD_MILITIA_TINY_00` (Wooden Buckler) | OFF_HAND · 10 | EVD 7, `SKILL_GUARD`. Taunt는 SPD 2회, Evade Up은 SPD 1회 |
+| S02 | `Things/Weapons.json` · `SHIELD_MILITIA_HEAVY_00` (Wooden Tower Shield) | OFF_HAND · 22 | SPD -5·DEF 1·RES 1·PDEF 1, `STATUS_IMMUNITY_MOVE`·`SKILL_GUARD`. Taunt는 VIT 2회, Armor Up Neighbors는 VIT 1회 |
+| R03 | `Things/Attires.json` · `TRINKET_BUFF_ARMOR` | TRINKET · 25 | HP 3·DEF 2 |
+| R04 | `Things/Attires.json` · `TRINKET_BUFF_RESIST` | TRINKET · 25 | HP 3·RES 2 |
+
+`Abilities.json.SHIELD_TAUNT_ATTACK`은 `IsMajorAction=false`, Target SELF, `STATUS_TAUNT_00` 연결이다. `SHIELD_EVADE_ATTACK`은 주요 행동이며 `STATUS_EVADEUP_02`에 EVD +35·Duration 2가 있다. `SHIELD_ARMOR_SPLASH_ATTACK`은 주요 행동, Target SELF·TargetArea SPLASH, `STATUS_ARMORUP_GROUP_00`에 DEF +4·Duration 2가 있다. 두 버프의 수명 감소·재부여와 SPLASH의 정확한 이웃 칸, Guard·PDEF 계산은 미확인이다.
 
 ### 7-6 약초·탐험 도구·성장 카탈로그
 
@@ -177,26 +259,54 @@ A05~A07은 특정 실물 아이템의 완성 수치 카드가 아닌 계열 클�
 |---|---|---|---|---|
 | C01 단계형 회복초 | FTK1 Godsbeard | 파이프 0~3에 따라 HP 15/30/45/60 | 회복초 비축과 효율 성장 연결 | 현재 회복약 40과 교체 여부·파이프 소유자 |
 | C02 비율형 회복초 | FTK2 Godsbeard | 장비 등 추가분을 제외한 사용자 HP 기준 50% 회복 | 체력 성장에 대응하는 회복 | 기준 HP의 정의·반올림·아군 사용 |
-| C03 단계형 집중초 | FTK1 Golden Root | 파이프 단계별 Focus 3/4/5/6 | 완전 성공을 위한 자원 비축 | Focus 채택 여부·최대치·초과 회복 |
-| C04 고정형 집중초 | FTK2 Golden Root | Focus +3 | 회복량과 파이프 부가 효과 분리 | AP 회복으로 바꾸면 추가 행동 경제 재설계 |
 | C05 단계형 정화초 | FTK1 Panax | 독·출혈 등 해제, 독 제거량은 파이프 단계에 영향. 저주·Death Mark 제외 | 범용 회복과 상태 대응의 분리 | 해제 대상·스택 처리·동시 해제 순서 |
-| C06 전투 정화초 | FTK2 Panax | 전투 중 상태 해제, 저주 제외 | 공격 약화 등 전투 상태 대응 | 버프 보존·지원 대상·사용 가능 상황 |
+| C06 전투 정화초 | FTK2 Panax | 설치 정의의 자기 대상 CURE 상태 해제. 정확한 제거 집합은 미확인 | 공격 약화 등 전투 상태 대응 | ConsumableType ANY의 실제 허용 상황·버프 보존·지원 대상 |
 | C07 해주초 | FTK2 Hag's Bane | 사용자 저주 제거 | 일반 정화와 장기 불이익 대응 분리 | 저주를 Run에 유지할지 결정 |
 | C08 이동·속도초 | FTK1 Dancing Nettle | 탐험 이동 증가, 전투에서 Speed 증가 | 상황별 사용 가치 변경 | 월드 이동과 Grid 이동을 구분해 대체 |
 | C09 은신·회피초 | FTK1 Hermit Grass | 탐험 은신·전투 회피 보완 | 탐험 위험과 전투 생존 대응 | 회피 지속·Node 위험 회피 대체 |
 | C10 대가형 완전 회복초 | FTK1 Purple Herb | HP 완전 회복과 최대 HP 감소 | 현재 생존과 장기 체력의 교환 | 감소량·적용 순서·영속 범위 |
 | C11 죽음 유예초 | FTK1 Dead Lotus | 짧은 죽음 방지와 저주 대가 | 위기 대응과 후속 정화의 연계 | 유지 시간·최소 HP·보스/경쟁 제한 |
-| C12 완전 회복·정화초 | FTK1 Firesilk | 최대 HP까지 회복하고 질환·저주 해제 | 복합 위기에서 소모할 고가치 자원 | Focus 회복은 이 카드에 자동 추가하지 않음 |
-| U01 야영 도구 | FTK2 Tinder Pouch | 캠프 생성, 파티 HP·Focus 회복 | 전투 전 자원 정비 | 회복 Encounter나 준비 화면 서비스로 변환 |
+| C12 완전 회복·정화초 | FTK1 Firesilk | 최대 HP까지 회복하고 질환·저주 해제 | 복합 위기에서 소모할 고가치 자원 | 회복·정화 적용 순서·희소 보상 여부 |
+| U01 야영 도구 | FTK2 Tinder Pouch | 원작 캠프의 파티 HP 회복 부분만 채택 후보 | 전투 전 자원 정비 | 회복 Encounter나 준비 화면 서비스로 변환 |
 | U02 순간이동 주문서 | FTK2 Teleport Scroll | Intelligence에 따른 거리 안의 빈 육지 Hex로 이동 | 탐험 경로 단축 | Node 건너뛰기·전투 이동 중 채택 여부 |
 | U03 정찰 주문서 | FTK2 Vision Scroll | 월드의 구름 제거·숨은 위치 공개 | 사전 정보 확보 | 다음 후보 노드·상점·상대 정보 공개 |
 | U04 잠금 해제 도구 | FTK2 Lockpicks | 잠긴 대상 개방에 사용하는 도구 | 도구 소비와 잠금 장애의 연결 | 잠금 Encounter·실패 대체 규칙 |
 | P01 약초 효율 성장 | FTK1 Old/Elm/Bone/Dragon Pipe | 4단계 파이프를 통한 약초 효율 상승 | 즉시 소비보다 장기 효율에 투자 | 소유 단위·업그레이드 비용·유지 범위 |
 | P02 영구 공격 성장 사탕 | FTK2 Black Candy | 소비자 물리 피해 영구 +1 | 장착 슬롯 밖의 성장 | Run 내 지속과 계정 영구 성장 구분·누적 한도 |
 
-C01: [FTK1 Godsbeard](https://fortheking.wiki.gg/wiki/Godsbeard). C02: [FTK2 Godsbeard](https://fortheking.wiki.gg/wiki/Godsbeard_%28FTK2%29). C03·P01: [파이프](https://fortheking.wiki.gg/wiki/Pipes). C04: [Golden Root](https://fortheking.wiki.gg/wiki/Golden_Root_%28FTK2%29). C05: [FTK1 Panax](https://fortheking.wiki.gg/wiki/Panax). C06: [FTK2 Panax](https://fortheking.wiki.gg/wiki/Panax_%28FTK2%29). C07: [Hag's Bane](https://fortheking.wiki.gg/wiki/Hag%27s_Bane_%28FTK2%29). C08~C12: [FTK1 약초](https://fortheking.wiki.gg/wiki/Herb). U01~U04: [FTK2 Loadout](https://fortheking.wiki.gg/wiki/Lore_Store_%28FTK2%29/Loadout). P02: [Black Candy](https://fortheking.wiki.gg/wiki/Black_Candy_%28FTK2%29).
+C01: [FTK1 Godsbeard](https://fortheking.wiki.gg/wiki/Godsbeard). C02: [FTK2 Godsbeard](https://fortheking.wiki.gg/wiki/Godsbeard_%28FTK2%29). P01: [파이프](https://fortheking.wiki.gg/wiki/Pipes). C05: [FTK1 Panax](https://fortheking.wiki.gg/wiki/Panax). C06: [FTK2 Panax](https://fortheking.wiki.gg/wiki/Panax_%28FTK2%29). C07: [Hag's Bane](https://fortheking.wiki.gg/wiki/Hag%27s_Bane_%28FTK2%29). C08~C12: [FTK1 약초](https://fortheking.wiki.gg/wiki/Herb). U01~U04: [FTK2 Loadout](https://fortheking.wiki.gg/wiki/Lore_Store_%28FTK2%29/Loadout). P02: [Black Candy](https://fortheking.wiki.gg/wiki/Black_Candy_%28FTK2%29).
 
-FTK2 파이프는 FTK1의 고정 4단계 표로 대체하지 않는다. 공통 파이프 문서의 FTK2 설명이 미완성이므로 종류별 효과·등급·중첩은 **추가 확인 필요**로 남긴다. 이번 성장 카드 P01은 FTK1 모델만 정의한다. [파이프 문서의 작품별 구분](https://fortheking.wiki.gg/wiki/Pipes)
+FTK2 파이프는 아래 설치본의 약초 사용 트리거 장비로 보충한다. P01은 FTK1 단계형 모델로 유지하며 두 작품의 구조를 합치지 않는다. 파이프 예시는 42개 카탈로그에 새 기획 ID를 추가한 것이 아니다. [파이프 문서의 작품별 구분](https://fortheking.wiki.gg/wiki/Pipes)
+
+#### 7-6-1 설치본 소비 효과와 사용 구분
+
+아이템은 `Things/Items.json`, 연결 효과는 `Abilities.json`을 기준으로 한다. C02·C06·C07·P02의 연결 행동은 SELF, `IsMajorAction=false`, `RequiresSkillRoll=false`다. HP 효과의 음수 부호는 원본 그대로 보존한다. 분모·반올림·과잉 회복·만피 사용과 실패 소비는 실행 검증 대상이다.
+
+| 카드 · 아이템 ID | Value · ConsumableType | 연결 Ability · 정적 효과 |
+|---|---|---|
+| C02 · `HERB_GODSBEARD_01` | 12 · ANY | `BASIC_HEAL_01`: CHANGE_STAT의 HP, `FlatPercent=-50` |
+| C06 · `HERB_PANAX_01` | 10 · ANY | `BASIC_CURE_01`: REMOVE_STATUS의 `CURE` selector |
+| C07 · `HERB_HAG_BANE_01` | 16 · ANY | `BASIC_CURSE_REMOVE_01`: REMOVE_STATUS의 `CURSE` selector |
+| U01 · `TOOL_TINDER_01` | 35 · OVERWORLD | `CREATE_SAFE_CAMP` 연결 |
+| U02 · `SCROLL_TELEPORT_01` | 12 · OVERWORLD | `PICK_HEX_TELEPORT` 연결 |
+| U03 · `SCROLL_VISION_01` | 16 · OVERWORLD | `PICK_HEX_VISION` 연결 |
+| U04 · `TOOL_LOCKPICKS_01` | 10 · OVERWORLD | 명시 Ability 연결 미기재. 잠금 상호작용의 실제 소비 경로는 미확인 |
+| P02 · `CANDY_BLACK_01` | 90 · ANY | `BASIC_PHY_ADD_01`: CHANGE_STAT의 PHY, `FlatValue=1`. 저장·영속 범위는 별도 검증 |
+
+`ANY`를 모든 UI·상태에서 무조건 사용 가능하다는 뜻으로 확대하지 않는다. `CURE`와 `CURSE`를 구분하지만 실제 해제 태그 집합과 순서는 아직 확인하지 않았다. 탐험용 도구를 전투 내 이동·정찰 행동으로 변환하면 ProjectA 변경 사항으로 기록한다.
+
+#### 7-6-2 설치본 회복·방어 파이프 4종
+
+근거는 `Things/Attires.json`의 `Equippable.Slots=[PIPE]`, `AbilityTriggers`와 연결 `Abilities.json`·`StatusEffects.json`이다. 다음 네 정의의 `ProcChance=100`은 트리거 설정값이며 모든 상황의 실행 성공을 보장했다는 검증 결과가 아니다.
+
+| 명칭 · 아이템 ID | Tier 범위 · Value | TriggerOn → TriggerAbility | 연결 효과 |
+|---|---|---|---|
+| Healing Pipe · `PIPE_ELM_HEALING_00` | 0~1 · 25 | ANY_HERB → `ABILITY_TRIGGER_HEAL_01` | HP `FlatValue=-5`, 설명상 추가 회복 |
+| Fine Healing Pipe · `PIPE_ELM_HEALING_02` | 2~3 · 126 | ANY_HERB → `ABILITY_TRIGGER_HEAL_02` | HP `FlatValue=-10`, 설명상 추가 회복 |
+| Plated Pipe · `PIPE_BONE_ARMOR_00` | 1~2 · 78 | COMBAT_HERB → `ABILITY_TRIGGER_ARMOR_UP_01` | `STATUS_ARMORUP_00`: DEF +5, Duration 2, TickCombat true |
+| Fine Plated Pipe · `PIPE_BONE_ARMOR_02` | 3 · 398 | COMBAT_HERB → `ABILITY_TRIGGER_ARMOR_UP_02` | `STATUS_ARMORUP_01`: DEF +10, Duration 2, TickCombat true |
+
+FTK2형의 설계상 선택은 **약초 자체 효과 + 장착 파이프의 회복·방어 부가 효과**다. FTK1형의 단계별 기본 회복량 증가와 별도 모델로 비교한다. 일반/Fine은 별도 ID이므로 자동 업그레이드·제작 관계를 가정하지 않는다. Party Heal 시 소비자·수혜자의 어느 파이프가 발동하는지, 연속 사용 시 방어 중첩·갱신, 트리거의 재발동 방지는 미확인이다.
 
 ### 7-7 상세 카드와 판정 예시
 
@@ -206,27 +316,29 @@ FTK2 파이프는 FTK1의 고정 4단계 표로 대체하지 않는다. 공통 �
 |---|---|
 | 기준 | FTK2 Simple Bow, Common, Hunter 시작 무기 |
 | 장착 | 활·양손. 방패와 동시 장착 불가 모델 |
-| 능력치·피해 | Awareness 계열, 물리. 개별 카드의 표시 피해 2~6은 확인값이며 각 스킬의 성공 슬롯별 피해표는 확인 필요 |
+| 능력치·피해 | 설치 정의 AWR·ATK 6·CRT 5·DAM_FLYING 15. 기존 공개 카드의 표시 피해 2~6과 원본 ATK를 구분하며 성공 슬롯별 피해표는 확인 필요 |
 | 기본 행동 | Shot: 적 단일 대상 물리 공격 |
 | 선택 행동 | Pierce: 적 단일 대상, 정확도 -5%, 완전 성공 시 방어 관통 |
-| 비용 | 주요 행동. 원작 판정 슬롯 수는 자료의 아이콘을 확인하지 못했으므로 미기재 |
+| 비용 | 설치본 Shot·Pierce 모두 주요 행동, AWR 판정 2회. ProjectA AP 비용 미확정 |
 | 부가 효과 | Support Range. 월드 전투 합류 지원과 Grid 사거리를 같은 수치로 취급하지 않음 |
-| 획득 | 확인한 개별 문서는 Hunter 시작 장비 전용으로 설명. 일반 상점 판매는 클론 확장 제안으로만 취급 |
+| 획득 | `Characters.json.HUNTER.Things`에 `BOW_HUNTER_BASIC_00=1`. 무기 정의 Value 3·Tier -1은 판매 가능성의 근거가 아니며 일반 상점 편입은 제안 |
 | 비교 의도 | 저방어 상대에게 안정적인 Shot, 고방어 상대에게 완전 성공 위험을 감수한 Pierce |
 | ProjectA 변경란 | AP 비용, 판정 모델, 물리 방어, 후열 보호, 공격 범위, 원작 시작 전용 유지 여부 |
 
 예시 수용 조건: 동일 적과 피해 기준에서 Shot은 방어를 적용한다. Pierce의 완전 성공에는 관통이 적용되지만, 부분 성공에는 완전 성공 보너스를 적용하지 않는다. 관통만으로 후열 타겟 검사를 생략하지 않는다. 이는 추후 구현 검증 명세이며 실행 결과가 아니다. [개별 카드](https://fortheking.wiki.gg/wiki/Simple_Bow_%28FTK2%29), [활 분류](https://fortheking.wiki.gg/wiki/Bow_%28FTK2%29)
 
+설치본 Shot의 `MinValue/MaxValue=0.5/1`, Pierce는 `0/1`이다. `Abilities.json`의 HP 액션에서 Shot은 `IsBlockable=true`, Pierce는 false다. 이 플래그만으로 부분 성공 시 관통 처리까지 확정하지 않으며 위 완전 성공 설명의 런타임 gate와 최종 피해표는 직접 대조 대상으로 유지한다.
+
 #### 7-7-2 C01·P01 회복초와 파이프
 
 아래는 FTK1 원작 확인값이다. 가격은 파이프 기본 업그레이드 가격이며 모든 상황의 최종 판매가를 뜻하지 않는다. [파이프 단계표](https://fortheking.wiki.gg/wiki/Pipes)
 
-| 파이프 | 단계 | 회복초 HP | 집중초 Focus | 기본 업그레이드 가격 |
-|---|---|---|---|---|
-| Old Pipe | 0 | 15 | 3 | 시작 단계 |
-| Elm Pipe | 1 | 30 | 4 | 20 Gold |
-| Bone Pipe | 2 | 45 | 5 | 80 Gold |
-| Dragon Pipe | 3 | 60 | 6 | 300 Gold |
+| 파이프 | 단계 | 회복초 HP | 기본 업그레이드 가격 |
+|---|---|---|---|
+| Old Pipe | 0 | 15 | 시작 단계 |
+| Elm Pipe | 1 | 30 | 20 Gold |
+| Bone Pipe | 2 | 45 | 80 Gold |
+| Dragon Pipe | 3 | 60 | 300 Gold |
 
 클론 설계: 회복초 개수와 약초 효율 단계를 별도 관리한다. 파이프 업그레이드는 회복초 재고를 늘리는 기능으로 취급하지 않는다. 카드에는 현재 단계 회복량과 다음 단계 증가량을 함께 표시한다. 회복초를 많이 보유할수록 효율 투자의 가치가 높아지므로 구매 순간의 단순 HP 회복과 비교할 수 있어야 한다.
 
@@ -241,15 +353,18 @@ FTK2 문서는 장비·성소 등 추가 HP 이전 기준의 50% 회복으로 �
 | 소비 자원 | 회복초 1개. 아군 지원 시 소비자와 수혜자 구분 필요 |
 | 계산 요소 | 기준 HP, 추가 HP, 파이프 보정, 대상별 효율, 반올림 규칙 |
 | 사용 상황 | 자기 턴의 월드·전투 및 던전 방/층 사이. Party Heal·Field Medic는 별도 능력에 의존 |
-| 확인 필요 | 등급별 파이프 부가 효과, 정확한 기준 HP 산식, 경계 HP 반올림, 과잉 회복·만피 사용 처리 |
+| 설치본 보충 | `BASIC_HEAL_01`의 HP `FlatPercent=-50`; 회복·방어 파이프 4종은 7-6-2절. `UI_ENCYCLOPEDIA_SKILL_PARTYHEAL` 계열 설명은 전투 대상 효율 100%·주변 50% |
+| 확인 필요 | 정확한 기준 HP 산식, 경계 HP 반올림, 과잉 회복·만피 사용, Party Heal 파이프 적용 주체와 Field Medic 처리 |
 | 클론 표시 | 예상 실효 회복·대상·소모 수량·보조 행동 비용 |
 | ProjectA 변경란 | 기준 HP 별도 보관 여부, 현재 회복약 40과 병존/대체, 지원 스킬의 범위 |
 
 비교 예시: 기준 HP 80에 장비 HP 40이 추가된 캐릭터라면 부가 보정 전 계산은 40 회복이다. 현재 최대 HP 120의 절반인 60과 차이가 발생한다. 기준 HP와 장비 보너스를 따로 기록해야 하는 이유를 보여 주는 계산 예시다.
 
+Party Heal의 100%/50%는 **회복 효과의 효율**이며 대상 최대 HP의 100%/50%를 회복한다는 뜻이 아니다. 같은 기본 회복량 40을 가정한 설명 예시에서는 대상 40·주변 20이지만, 실제로 누구의 기준 HP를 사용하는지와 파이프·반올림의 순서는 미확인이다.
+
 #### 7-7-4 W11 파괴 위험과 예비 무기
 
-FTK1의 `Breakable`은 한 공격에서 모든 판정을 실패하면 파괴되는 속성이다. `Unfocusable`은 Focus 사용 금지 속성으로 별개다. 모든 파괴 가능 무기에 Focus 금지를 붙이지 않는다. 파괴 후 비무장으로 전환된다는 원작 구조를 보존한다. [무기 속성](https://fortheking.wiki.gg/wiki/Bludgeon)
+FTK1의 `Breakable`은 한 공격에서 모든 판정을 실패하면 파괴되는 속성이다. 파괴 후 비무장으로 전환된다는 원작 구조를 보존한다. [무기 속성](https://fortheking.wiki.gg/wiki/Bludgeon)
 
 클론 설계의 상태 흐름은 `장착 → 행동 판정 → 파괴 조건 검사 → 장착 해제·부여 스킬 회수 → 비무장 행동 제공`이다. 파괴 예외가 있는 작품·직업은 별도 규칙으로 추가한다. 기존 행동의 피해 처리와 파괴의 선후, 장비 교체 비용, 저장 복구 시 재파괴 방지는 구현 전 명세 대상이다. 위험 보상으로 높은 피해를 배정하는 것은 클론 밸런스 제안이며 모든 원작 파괴 무기가 강하다는 뜻은 아니다.
 
@@ -260,7 +375,7 @@ FTK1의 `Breakable`은 한 공격에서 모든 판정을 실패하면 파괴되�
 | 성장 구간 가칭 | 제공할 선택 | 예시 카드 | 검토할 영향 |
 |---|---|---|---|
 | 입문 | 일반 공격·관통·기본 방어·회복 중 결핍 보완 | W02·A01·C01 또는 C02 | 처음부터 모든 대응을 지급하면 구매 판단이 줄어듦 |
-| 역할 형성 | 방어 파쇄·제어·면역·자원 운용 | W06·W07·A02·C04 | 강한 제어와 자원 회복의 반복 사용 제한 필요 |
+| 역할 형성 | 방어 파쇄·제어·면역·정화 | W06·W07·A02·C06 | 강한 제어의 반복 사용과 해제 수단의 균형 필요 |
 | 조합 완성 | 범위 공격·인접 보호·재질·효율 투자 | W04·S02·A08·P01 | 배치·회복초 재고·장비 상호작용 평가 |
 | 희소 보상 | 완전 회복·위험 무기·영구 수치 성장 | C12·W11·P02 | 특정 보상이 승패를 독점하는지 평가 |
 
@@ -270,19 +385,34 @@ FTK1의 `Breakable`은 한 공격에서 모든 판정을 실패하면 파괴되�
 
 협동에서는 재화 소유자·아이템 보관자·장착 캐릭터·요청자를 구분한다. Host의 노드 선택 권한을 타인 아이템 임의 장착·판매 권한으로 확대하지 않는다. 공동 재화·배분·거래 권한은 [5절](#5-협동-확정-정책)과 [미결정 사항](TODO.md#7-아이템-클론-기획-후속-결정)에 따라 결정한다.
 
+#### 7-8-1 설치본 상점·보상 참조
+
+다음은 [설치본](#7-11-ftk2-설치본-근거와-해석-범위)의 설정값이다. 수량 범위 문자열은 그대로 기록하며 균등 추첨·최종 재고·출현 확률을 뜻한다고 가정하지 않는다. `Inherit`가 있는 변형은 상위 정의와 결합 방법을 확인해야 한다.
+
+| 근거 파일 · 내부 ID | 정적 확인값 | ProjectA 보충 제안 |
+|---|---|---|
+| `Markets.json` · `TOWN_TYPICAL` | `RequiredItems`: Godsbeard 3개. `RequiredCategories`: HERB `2-3`, PIPE `1`, ARMOR `4-7`, WEAPON `3-6`, SHIELD `0-2` 등 | 필수 보급과 무작위 장비 슬롯을 분리한 재고 구조. 필수품과 범주 추첨의 중복 허용은 별도 결정 |
+| `Markets.json` · `MERCHANT_PIPESMITH` | PIPE `4-6`, HERB `5-7` | 회복·정화·약초 보정 장비를 함께 비교하는 보급 전문 상점 후보 |
+| `Markets.json` · `MERCHANT_MAGIC` | `Rarity=UNCOMMON`, HAND_EQUIP+MAGICAL `2-4`, ARMOR+MAGICAL `4-6`, SCROLL `3-5` 등 | 공격 유형·역할 태그로 상품 풀을 구분. UNCOMMON의 정확한 필터 동작은 미확인 |
+| `Markets.json` · `MERCHANT_ARMOR` | `Rarity=UNCOMMON`, ARMOR `9-14`, SHIELD `1-2` | 방어·면역·보호 역할을 보완하는 전문 상점 후보 |
+| `SmartLoots.json` · `HUNTER`, `SCHOLAR` | MAIN_HAND Query는 각각 `[BOW]`, `[BOOK, STAFF]`; 별도 `FavoredItemClasses` 존재 | 파티의 사용 가능 무기 후보와 일반 보상 풀을 별도 관리. 실제 보장 횟수·확률은 미확인 |
+| `GameDifficulties.json` · `APPRENTICE_STANDARD`, `JOURNEYMAN_STANDARD`, `MASTER_STANDARD` | `MARKET_INFLATION=80/90/100`, `SMART_LOOT_SHUFFLE=2/4/10` | 난이도별 경제·보상 설정을 분리. 필드값을 할인율이나 재추첨 횟수로 직접 해석하지 않음 |
+
+첫 거래 구현의 제안은 **필수 보급품 슬롯 + 파티 역할 보완 장비 슬롯 + 자유 추첨 슬롯**이다. 상품 후보가 부족할 때는 다른 합법 후보로 대체하고, 그래도 없으면 빈 슬롯을 표시하는 규칙을 후보로 둔다. 상점 진입 시 확정한 상품 ID·수량·가격·변형을 저장하여 로드로 재추첨하지 않는 계약이 필요하다. 현 상점1·2·3의 전문화, 슬롯 개수, 가격, 새로고침, 구매 권한은 [후속 결정](TODO.md#7-아이템-클론-기획-후속-결정) 대상이며 이번에 확정하거나 구현하지 않는다.
+
 ### 7-9 데이터 변환을 위한 공통 명세
 
 다음은 엔진과 무관한 기획 필드 제안이다. 현재 C++ 구조체나 DataAsset 필드명이 아니다. 원작 확인 값과 ProjectA 채택 값을 모두 보존한 뒤 구현 단계에서 실제 형식을 결정한다.
 
 | 묶음 | 기록할 필드 | 의미 |
 |---|---|---|
-| 식별·근거 | DesignId, SourceGame, SourceName, SourceUrl, CheckedDate, VerificationState | W02 등 기획 식별자와 출처·확인 수준 |
+| 식별·근거 | DesignId, SourceGame, SourceName, SourceUrl, SourceBuildId, SourceFile, SourceEntryId, SourceFieldPath, SourceFileHash, CheckedDate, VerificationState | W02 등 기획 식별자와 웹/설치본 출처·확인 수준 |
 | 표시 | WorkingName, DisplayDescription, IconReference | 가칭·효과 설명·향후 제작 이미지 참조 |
 | 분류·장착 | Category, Slot, OccupiedSlots, EquipConditions | 양손 점유·방패 충돌·개별 장착 조건 |
 | 성장·변형 | FamilyId, Tier, Rarity, MaterialId, VariantId | 계열·위력 단계·희귀도·재질의 분리 |
 | 스탯 | Modifiers의 Stat/Operation/Value/Condition | 고정 증가·비율 증가·조건부 보정 |
 | 스킬 | GrantedSkillIds, PassiveEffectIds | 장비 부여 행동과 패시브를 구분 |
-| 판정 | CheckStat, RollCount, AccuracyModifier, FocusPolicy, SuccessRule | 능력치·판정 수·완전 성공·Focus 정책 |
+| 판정 | CheckStat, RollCount, AccuracyModifier, SuccessRule | 원작 능력치·판정 수·완전 성공의 참조값. 자원 소비형 판정 보정 제외 |
 | 대상·효과 | TargetRule, AreaPattern, Falloff, EffectEntries | 선택 규칙·영향 칸·감쇠·순서 있는 효과 |
 | 사용 비용 | AllowedContexts, ActionCost, ConsumeCount, FailurePolicy | 사용 상황·행동 자원·수량·실패 소비 |
 | 상태 | DurationValue, DurationUnit, StackRule, DispelTags, ImmunityTags | 턴/라운드 구분·중첩·해제·면역 |
@@ -290,6 +420,8 @@ FTK1의 `Breakable`은 한 공격에서 모든 판정을 실패하면 파괴되�
 | 조정 기록 | SourceValue, DesignValue, ChangeReason, DecisionState | 원작 수치·조정 수치·이유·채택 상태 |
 
 `null`은 확인 필요, `0`은 효과량/비용 0 확인, 빈 목록은 효과 없음 확인으로 구분한다. 판정값·희귀도·가격이 없는 카드를 임포터가 자동으로 0값 데이터로 만들지 않도록 한다. 버전별로 같은 이름을 가진 C01/C02 등의 카드는 ID를 합치지 않는다.
+
+위 `null` 규칙은 ProjectA 기획 필드의 계약이다. 원본 JSON의 `Interactable.Abilities`에 있는 `스킬ID: null`을 스킬 없음으로 변환하지 않는다. 스킬 ID 참조와 개별 오버라이드 부재를 구분하고 `Abilities.json`의 정의·상속 관계를 함께 기록한다. 실제 로더의 병합·기본값 처리를 검증하기 전에는 완성된 런타임 데이터로 자동 변환하지 않는다.
 
 | 데이터 층 | 저장할 내용 | 분리 이유 |
 |---|---|---|
@@ -307,7 +439,7 @@ FTK1의 `Breakable`은 한 공격에서 모든 판정을 실패하면 파괴되�
 |---|---|---|
 | [SkillDefinitionDataAsset](../Source/ProjectA/DataAsset/SkillDefinitionDataAsset.h) | SkillId·AP 비용·대상·범위·Ability 참조 | 부여 스킬은 기존 ID 체계 사용 검토. 판정·부가 효과 계약은 추가 설계 |
 | [SkillTypes](../Source/ProjectA/Types/SkillTypes.h) | Single·Row·Column 등 범위 분류 | FTK2 패턴의 실제 피격 칸·감쇠를 대조. 이름만 같은 패턴으로 간주하지 않음 |
-| [AS_Unit](../Source/ProjectA/GAS/Attribute/AS_Unit.h) | GAS Attribute는 HP·MaxHP | Focus·능력치·방어·저항·치명·회피를 별도 설계 |
+| [AS_Unit](../Source/ProjectA/GAS/Attribute/AS_Unit.h) | GAS Attribute는 HP·MaxHP | 능력치·방어·저항·치명·회피를 별도 설계 |
 | [UnitBase](../Source/ProjectA/Unit/UnitBase.h) | HealingItemAmount 40·HealingItemCount 1 | 일반 아이템 재고·정의 기반 소비로 확장할지 결정 |
 | [PartySnapshotTypes](../Source/ProjectA/Game/Snapshot/PartySnapshotTypes.h) | EquipmentIds 저장 필드 존재 | 현재 전투의 장비 지원과 구분. 슬롯·변형·장비 스킬 검증 확장 필요 |
 
@@ -319,14 +451,60 @@ DataAsset·USTRUCT·USaveGame·GAS의 기존 확장 지점을 먼저 검토한�
 
 | 조합 | 구성 | 확인하려는 선택 |
 |---|---|---|
-| 단일 관통 | W02·A04·C04 | 일반 공격과 Focus를 소비하는 관통의 차이 |
+| 단일 관통 | W02·A04 | 일반 공격과 관통 공격의 대상별 효율 차이 |
 | 파쇄 지원 | W07·A01·C06 | 자신이 즉시 피해를 줄지 후속 아군의 공격을 돕는지 |
 | 인접 수호 | S02·A02·R03 | 아군을 가까이 보호할지 범위 공격을 피하도록 분산할지 |
-| 약초 투자 | C01·C03·P01 | 소모품 즉시 구매와 파이프 장기 투자 중 선택 |
+| 약초 투자 | C01·P01 | 소모품 즉시 구매와 회복 효율 장기 투자 중 선택 |
 
 추천 검토 순서는 **무기와 부여 스킬 → 기본 방어구·방패 → 회복·정화 → 장착·재고·거래 → 파이프·재질·희소 효과**다. 첫 후보 묶음은 W02·W03·W07·A01·A02·S01·R03·R04와 회복초 C01/C02 중 하나다. 이는 제작 우선순위 제안이며 현재 Run 구조·사용자 작동 테스트 우선순위를 변경하지 않는다.
 
 구현 전에 선택할 정책과 영향은 [TODO의 아이템 후속 결정](TODO.md#7-아이템-클론-기획-후속-결정)에 모은다. 기획 검토·추후 작동 확인 절차는 [TEST_REPORT 11절](TEST_REPORT.md#11-아이템-클론-기획-검토)을 따른다.
+
+### 7-11 FTK2 설치본 근거와 해석 범위
+
+#### 7-11-1 조사 기준
+
+- 확인일: 2026-09-15. Steam App ID `1676840`, 설치 manifest의 `buildid=24247341`. 최신 공개 패치와 동일하다는 확인은 아니다.
+- 설치 경로: `C:\Program Files (x86)\Steam\steamapps\common\For The King II`.
+- 아래 원본 경로 기준: 설치 경로의 `For The King II_Data/StreamingAssets/Assets/Configs/JSON~`.
+- 방법: 평문 JSON 파싱, 아이템 → Ability → Status/설명문 참조 대조, SHA-256 기록. 게임 실행·실행 코드 분석·런타임 설정 로드 검증은 미실행.
+- 범위: 무기·장비·소비 효과·파이프·네 직업 및 상점·재질·상태 참조를 조사했다. 채택 후보 카탈로그는 42개이며 남은 ID는 재번호화하지 않는다. 전체 아이템 도감·전체 밸런스 분석은 아니다.
+
+| 원본 파일 | SHA-256 |
+|---|---|
+| `Things/Weapons.json` | `55c2ac3d5d36071b6607c55373ddefa2cc38ed1cb47014973533eef4c328aa4d` |
+| `Things/Attires.json` | `eb28242ba7e76956e1fff9d93c519c0370255ead0608a94e4fc7800326f3fd67` |
+| `Things/Items.json` | `dd4e9436fee20d99e242ca9c83fb5267054c8eeec2620d2e2f8866c1942884a9` |
+| `Abilities.json` | `582e2aa75042191b3c160028d2449815a98430754623c8be862fb96a1ba2e21b` |
+| `StatusEffects.json` | `d64e3fcca919d9f87c00c8373764a7329b64628587a67205099cd72f5c2bfea6` |
+| `ItemMaterials.json` | `b21c4702dd5425fefaa668e9e336569723124ea4a4094f577cff4467dafd4527` |
+| `Markets.json` | `45c373e143beb154ce4099399abf697f4d294086981a672773a67098d10a8952` |
+| `SmartLoots.json` | `5eb0585790a75ea7a4d2a6b22579dc38ca474bf0c7405f1e481ec6d28e708aaf` |
+| `GameDifficulties.json` | `63f009b6dde1eed95bdf034da0862b621ffec2199190a29000b9179e06fd382b` |
+| `Characters.json` | `0d111f67b0dcb47cb2e7f3c4e45e17f5b13c21b5fe4ad4e017ec74f51c44faf3` |
+| `SkillConfigs.json` | `be91d2cbf2039b5b70fe125c2eb9aaa97c90b64e8e151aeff7ba0a831bb390eb` |
+| `Langs/en.json` | `447c8616a85a9c71cace9f842b7cb5007d732cbb6d13ba2ebca0b5ef74779474` |
+| `Langs/ko.json` | `a8134afbcaef739463c5ef634260bf55be9ce6644e65b909d8ca7af054a20bcd` |
+
+문서의 고유 ID와 필드 경로가 재확인 기준이다. 로컬 세부 추출은 `Saved/ReferenceAudit/FTK2-20260915/`의 `source-manifest.json`, `catalog-evidence.json`, `status-evidence.json`, `classes-evidence.json`, `economy-evidence.json`에 있다. Saved는 Git 제외 경로이며 다른 PC에서는 위 원본 해시·ID로 다시 확인한다.
+
+재확인 예시:
+
+```powershell
+$ftkSourceRoot = 'C:\Program Files (x86)\Steam\steamapps\common\For The King II\For The King II_Data\StreamingAssets\Assets\Configs\JSON~'
+$ftkWeaponsPath = Join-Path $ftkSourceRoot 'Things/Weapons.json'
+$ftkWeapons = Get-Content -Raw -LiteralPath $ftkWeaponsPath | ConvertFrom-Json -AsHashtable
+$ftkWeapons['BOW_HUNTER_BASIC_00'].Interactable.Abilities | ConvertTo-Json -Depth 10
+Get-FileHash -Algorithm SHA256 -LiteralPath $ftkWeaponsPath
+```
+
+#### 7-11-2 해석과 후속 결정
+
+설치본 정의·현지화 설명·실제 게임 동작·ProjectA 제안을 구분한다. 평문 파일의 존재는 런타임에서 그 값이 실제 선택되었음을 증명하지 않는다. 동명 아이템의 Tier·Class·고유 ID, `Inherits`/`Inherit`, 난이도·재질·상위 정의의 적용 순서를 함께 확인해야 한다.
+
+이번에 보완한 것은 판정 수·명시 스킬 연결·장비 보정·소비 효과 selector·파이프 트리거·상점 템플릿·직업 역할 근거다. 최종 판매가·피해 산식·중첩·지속 경계·재장전·실제 정화 집합은 직접 카드/도감 대조 또는 추가 실행 코드 분석이 필요하다. FTK1 수치의 공백은 FTK2 값으로 채우지 않는다.
+
+ProjectA에는 직업 역할·필수 보급과 장비 슬롯을 분리한 상점·약초 부가 효과 모델을 **채택 미확정 제안**으로 보충했다. 기존 시간차 전투와 상태이상 규칙을 유지하며 슬롯 판정·회복 모델·최종 슬롯·개인/공동 재화·경쟁 Snapshot 범위는 [TODO 7절](TODO.md#7-아이템-클론-기획-후속-결정)의 사용자 결정 대상으로 둔다. 확인 절차와 미실행 항목은 [TEST_REPORT 11절](TEST_REPORT.md#11-아이템-클론-기획-검토)에 기록한다.
 
 ## 8 라운드 계획과 시간차 자동 전투
 

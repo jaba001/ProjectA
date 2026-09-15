@@ -41,7 +41,7 @@ C++·리플렉션 변경 반영을 위해 빌드 후 UE를 재시작한다. 기�
 
 | 문서 | 내용 |
 |---|---|
-| [GAME_DESIGN](Docs/GAME_DESIGN.md) | 목표 기획·확정 방향·아이템 클론 제안 |
+| [GAME_DESIGN](Docs/GAME_DESIGN.md) | 목표 기획·확정 방향·FTK2 설치본 근거·아이템/직업/상점 제안 |
 | [STATUS_EFFECTS](Docs/STATUS_EFFECTS.md) | 해로운 상태이상 8종의 확정·잠정·미정 규칙, 구현 연결 검토와 미실행 검증 계획 |
 | [PROJECT_PLAN](Docs/PROJECT_PLAN.md) | 모듈·전투·UI·에셋·설정 |
 | [UI_README](Docs/UI_README.md) | UI 구조·JSON 명세·생성 옵션 |
@@ -50,7 +50,7 @@ C++·리플렉션 변경 반영을 위해 빌드 후 UE를 재시작한다. 기�
 | [TEST_REPORT](Docs/TEST_REPORT.md) | 실행 절차·검증 결과·경고 대응 |
 | [HISTORY](Docs/HISTORY.md) | 완료 이력과 기준 커밋 |
 
-[아이템 클론 기획](Docs/GAME_DESIGN.md#7-아이템-클론-기획)은 For The King 1·2를 참고한 44개 항목과 작품별 차이·원작 출처·데이터 변환 항목을 제공한다. 기획 제안이며 장비·거래·약초 시스템 구현은 포함하지 않는다. 채택할 정책은 [후속 결정](Docs/TODO.md#7-아이템-클론-기획-후속-결정)에서 관리한다.
+[아이템 클론 기획](Docs/GAME_DESIGN.md#7-아이템-클론-기획)은 For The King 1·2를 참고한 42개 항목과 작품별 차이·데이터 변환 항목을 제공한다. 시간차 전투를 유지하며 집중(Focus) 자원·집중초·회복/소모형 효과는 기획에서 제외했다. [FTK2 설치본 Build 24247341](Docs/GAME_DESIGN.md#7-11-ftk2-설치본-근거와-해석-범위)의 JSON으로 무기 판정·장비 보정·회복/방어 파이프·상점·직업 역할을 보충했다. 기획 제안이며 장비·거래·약초 시스템 구현과 원작 작동 검증은 포함하지 않는다. 나머지 채택 정책은 [후속 결정](Docs/TODO.md#7-아이템-클론-기획-후속-결정), 직접 대조 절차는 [TEST_REPORT 11절](Docs/TEST_REPORT.md#11-아이템-클론-기획-검토)에서 관리한다.
 
 ## 개발 환경
 
