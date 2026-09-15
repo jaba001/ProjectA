@@ -1,6 +1,6 @@
 # UI 구조·생성 도구
 
-기준일: 2026-09-15. 화면 구성과 JSON 기반 Widget Blueprint 생성 규칙을 정의한다. 게임 흐름·에셋 연결은 [PROJECT_PLAN](PROJECT_PLAN.md), 실행 결과는 [TEST_REPORT](TEST_REPORT.md)를 따른다.
+기준일: 2026-09-16. 화면 구성과 JSON 기반 Widget Blueprint 생성 규칙을 정의한다. 게임 흐름·에셋 연결은 [PROJECT_PLAN](PROJECT_PLAN.md), 실행 결과는 [TEST_REPORT](TEST_REPORT.md)를 따른다.
 
 ## 구성과 편집 원칙
 
@@ -126,6 +126,10 @@ GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메
 `UGameplayRootWidget`의 CombatLayer는 `UCombatRoundPlanningWidget`을 사용한다. 기존 `CombatHUDWidgetClass`와 `UCombatHUDWidget`은 Blueprint 참조를 위한 외형이며 순차 명령 버튼을 실행하지 않는다. 새 화면은 native 생성으로 동작하므로 WBP/JSON 재생성·기존 맵 재배치·Config 변경이 필요 없다. C++ 빌드 후 UE 재시작으로 리플렉션 변경을 반영한다.
 
 오른쪽 목록에서 조작할 아군 → 스킬 → 대상 유닛/공격 타일 → 필요한 접근 목적지를 선택하고 계획 적용한다. 자신의 모든 생존 아군을 지정한 뒤 준비 완료한다. 왼쪽에는 아군 계획과 라운드 시작에 고정된 적 의도를 표시한다. 해결 중에는 편집을 막고 경과 시간·행동 단계·HP·남은 투사체를 표시한다.
+
+대상 목록은 `IsValidUnitTarget`을 사용한다. 유닛 공격은 살아 있는 적, Guard는 살아 있는 아군만 표시하며 Wait·GroundAttack은 유닛 대상을 사용하지 않는다. 같은 조작 유닛과 스킬 목록을 유지하는 동안 선택 대상이나 다른 소유 아군이 사망하여 목록이 갱신되어도 스킬 초안을 유지한다. 죽은 대상은 합법 대상 후보로 갱신한다. `CanPlanCommand`로 자원·타일·대상을 검사한 뒤 계획 적용을 허용하며, 자신의 모든 생존 유닛에 유효한 계획이 적용되어야 준비 완료할 수 있다.
+
+2026-09-16 입력 보완은 최종 초안 보존 수정을 포함해 Editor 컴파일이 성공했다. 최종 코드·문서 정적 검사를 통과했으며 작동 확인은 [TEST_REPORT 17절](TEST_REPORT.md#17-계획-입력-검사와-장착-tile-공격-ai)을 따른다. 아이콘·모델·애니메이션·VFX·UI 최종 디자인은 [TODO 8-3절](TODO.md#8-3-디자인-보류와-구현-재개-조건)의 확정 후 반영한다.
 
 `ACombatRoundPlayerController`는 소유 연결의 계획/준비 RPC와 서버 응답을 관리한다. 최신 복제 수정 번호 도착 전 중복 요청을 막으며 이전 라운드 요청은 거절한다. 계획 수정 시 팀 준비 해제·복귀 칸 충돌 거절은 [기획 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 확인 대기 임시 정책이다. 화면·전투·협동의 최신 작동 확인은 [TEST_REPORT 12절](TEST_REPORT.md#12-시간차-자동-전투-기획-검토)을 따른다.
 

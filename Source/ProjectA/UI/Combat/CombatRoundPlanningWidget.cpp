@@ -14,6 +14,7 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Controller/CombatRoundPlayerController.h"
 #include "UI/Theme/DemonicUITheme.h"
+#include "Unit/UnitBase.h"
 
 namespace
 {
@@ -181,13 +182,11 @@ void UCombatRoundPlanningWidget::NativeTick(const FGeometry& MyGeometry, float I
 bool UCombatRoundPlanningWidget::RefreshOptions(const ACombatRoundCoordinator* Coordinator, int32 OwnerSlot)
 {
     TArray<int32> NewOwnIds;
-    TArray<int32> NewTargetIds;
     TArray<FName> NewSkillIds;
     for (const FCombatRoundUnitView& Unit : Coordinator->GetView().Units)
     {
-        if (Unit.HP <= 0.f) continue;
+        if (!(Unit.HP > 0.f) || (IsValid(Unit.Unit) && !Unit.Unit->IsUnitAlive())) continue;
         if (OwnerSlot > 0 && !Unit.bEnemy && Unit.OwnerSlot == OwnerSlot) NewOwnIds.Add(Unit.UnitId);
-        NewTargetIds.Add(Unit.UnitId);
     }
     const int32 SelectedUnitId = NewOwnIds.Contains(GetSelectedUnitId()) ? GetSelectedUnitId() : NewOwnIds.IsEmpty() ? INDEX_NONE : NewOwnIds[0];
     const FCombatRoundUnitView* SelectedUnit = Coordinator->GetView().Units.FindByPredicate([SelectedUnitId](const FCombatRoundUnitView& Unit) { return Unit.UnitId == SelectedUnitId; });
@@ -195,33 +194,53 @@ bool UCombatRoundPlanningWidget::RefreshOptions(const ACombatRoundCoordinator* C
     {
         if (SelectedUnit && SelectedUnit->SkillIds.Contains(Skill.SkillId)) NewSkillIds.Add(Skill.SkillId);
     }
-    if (NewOwnIds == OwnUnitIds && NewTargetIds == TargetUnitIds && NewSkillIds == SkillIds) return false;
+    if (NewOwnIds == OwnUnitIds && NewSkillIds == SkillIds) return false;
     const int32 PreviousUnit = GetSelectedUnitId();
-    const int32 PreviousTarget = TargetUnitIds.IsValidIndex(TargetChoice->GetSelectedIndex()) ? TargetUnitIds[TargetChoice->GetSelectedIndex()] : INDEX_NONE;
+    const bool bReloadCommand = PreviousUnit != SelectedUnitId || NewSkillIds != SkillIds;
     const FCombatRoundSkill* PreviousSkill = GetSelectedSkill();
     const FName PreviousSkillId = PreviousSkill ? PreviousSkill->SkillId : NAME_None;
     bUpdatingOptions = true;
     OwnUnitIds = MoveTemp(NewOwnIds);
-    TargetUnitIds = MoveTemp(NewTargetIds);
     SkillIds = MoveTemp(NewSkillIds);
     UnitChoice->ClearOptions();
-    TargetChoice->ClearOptions();
     SkillChoice->ClearOptions();
     for (int32 UnitId : OwnUnitIds) UnitChoice->AddOption(FString::Printf(TEXT("아군 #%d"), UnitId));
-    for (int32 UnitId : TargetUnitIds)
-    {
-        const FCombatRoundUnitView* Unit = Coordinator->GetView().Units.FindByPredicate([UnitId](const FCombatRoundUnitView& Entry) { return Entry.UnitId == UnitId; });
-        TargetChoice->AddOption(FString::Printf(TEXT("%s #%d"), Unit && Unit->bEnemy ? TEXT("적") : TEXT("아군"), UnitId));
-    }
     for (const FName SkillId : SkillIds)
     {
         if (const FCombatRoundSkill* Skill = Coordinator->FindSkill(SkillId)) SkillChoice->AddOption(Skill->Name.ToString());
     }
     UnitChoice->SetSelectedIndex(FMath::Max(0, OwnUnitIds.IndexOfByKey(PreviousUnit)));
-    TargetChoice->SetSelectedIndex(FMath::Max(0, TargetUnitIds.IndexOfByKey(PreviousTarget)));
     SkillChoice->SetSelectedIndex(FMath::Max(0, SkillIds.IndexOfByKey(PreviousSkillId)));
     bUpdatingOptions = false;
-    return true;
+    // Another owned unit leaving the roster must not discard this unit's draft.
+    // 다른 소유 유닛이 목록에서 빠져도 현재 유닛의 초안을 버리지 않습니다.
+    return bReloadCommand;
+}
+
+void UCombatRoundPlanningWidget::RefreshTargetOptions()
+{
+    const ACombatRoundPlayerController* Controller = Cast<ACombatRoundPlayerController>(GetOwningPlayer());
+    const ACombatRoundCoordinator* Coordinator = Controller ? Controller->GetRoundCoordinator() : nullptr;
+    const FCombatRoundSkill* Skill = GetSelectedSkill();
+    TArray<int32> NewTargetIds;
+    if (Coordinator && Skill)
+    {
+        for (const FCombatRoundUnitView& Unit : Coordinator->GetView().Units)
+        {
+            if (Coordinator->IsValidUnitTarget(GetSelectedUnitId(), Skill->SkillId, Unit.UnitId)) NewTargetIds.Add(Unit.UnitId);
+        }
+    }
+    if (NewTargetIds == TargetUnitIds) return;
+    const int32 PreviousTarget = TargetUnitIds.IsValidIndex(TargetChoice->GetSelectedIndex()) ? TargetUnitIds[TargetChoice->GetSelectedIndex()] : INDEX_NONE;
+    TGuardValue<bool> UpdatingOptions(bUpdatingOptions, true);
+    TargetUnitIds = MoveTemp(NewTargetIds);
+    TargetChoice->ClearOptions();
+    for (int32 UnitId : TargetUnitIds)
+    {
+        const FCombatRoundUnitView* Unit = Coordinator->GetView().Units.FindByPredicate([UnitId](const FCombatRoundUnitView& Entry) { return Entry.UnitId == UnitId; });
+        TargetChoice->AddOption(FString::Printf(TEXT("%s #%d"), Unit && Unit->bEnemy ? TEXT("적") : TEXT("아군"), UnitId));
+    }
+    if (!TargetUnitIds.IsEmpty()) TargetChoice->SetSelectedIndex(FMath::Max(0, TargetUnitIds.IndexOfByKey(PreviousTarget)));
 }
 
 void UCombatRoundPlanningWidget::RefreshView()
@@ -231,16 +250,23 @@ void UCombatRoundPlanningWidget::RefreshView()
     const bool bConnected = IsValid(Coordinator);
     const bool bPlanning = bConnected && Coordinator->GetView().Phase == ECombatRoundPhase::Planning;
     const bool bEditable = bPlanning && Controller->GetRoundParticipantSlot() > 0 && Controller->IsRoundInputEnabled() && !Controller->IsRoundRequestPending();
+    bool bValidDraft = false;
+    bool bReadyPlans = false;
     if (bConnected)
     {
         const FCombatRoundView& View = Coordinator->GetView();
-        const bool bOptionsChanged = RefreshOptions(Coordinator, Controller->GetRoundParticipantSlot());
-        if (bOptionsChanged || ObservedCombatId != View.CombatId || ObservedRound != View.RoundNumber)
+        const bool bReloadCommand = RefreshOptions(Coordinator, Controller->GetRoundParticipantSlot());
+        if (bReloadCommand || ObservedCombatId != View.CombatId || ObservedRound != View.RoundNumber)
         {
             ObservedCombatId = View.CombatId;
             ObservedRound = View.RoundNumber;
             LoadSelectedCommand();
         }
+        RefreshTargetOptions();
+        FText DraftError;
+        FText ReadyError;
+        bValidDraft = bPlanning && Coordinator->CanPlanCommand(BuildSelectedCommand(), DraftError);
+        bReadyPlans = bPlanning && CanReadyPlans(ReadyError);
         Header->SetText(FText::FromString(FString::Printf(TEXT("라운드 %d · %s\n내 아군 %d명 · %.1f초 · 투사체 %d"), View.RoundNumber, *RoundPhaseName(View.Phase), OwnUnitIds.Num(), View.ElapsedSeconds, View.PendingProjectiles)));
         FString RosterText;
         for (const FCombatRoundUnitView& Unit : View.Units)
@@ -264,18 +290,20 @@ void UCombatRoundPlanningWidget::RefreshView()
         }
         Roster->SetText(FText::FromString(RosterText));
         const FString Unapplied = bPlanning && HasUnappliedChanges() ? TEXT("\n선택한 유닛의 변경사항이 아직 적용되지 않았습니다.") : TEXT("");
-        Status->SetText(FText::FromString(View.Message.ToString() + TEXT("\n") + Controller->GetRoundRequestStatus().ToString() + Unapplied));
+        const FText ValidationError = !bValidDraft ? DraftError : Unapplied.IsEmpty() ? ReadyError : FText::GetEmpty();
+        const FString Validation = bPlanning && !OwnUnitIds.IsEmpty() && !ValidationError.IsEmpty() ? TEXT("\n") + ValidationError.ToString() : FString();
+        Status->SetText(FText::FromString(View.Message.ToString() + TEXT("\n") + Controller->GetRoundRequestStatus().ToString() + Unapplied + Validation));
     }
     else if (Controller) Status->SetText(Controller->GetRoundRequestStatus().IsEmpty() ? FText::FromString(TEXT("아레나와 참가자 연결을 기다리고 있습니다.")) : Controller->GetRoundRequestStatus());
     const FCombatRoundSkill* Skill = GetSelectedSkill();
     const bool bHasSelection = GetSelectedUnitId() != INDEX_NONE && Skill;
     UnitChoice->SetIsEnabled(bEditable && !OwnUnitIds.IsEmpty());
     SkillChoice->SetIsEnabled(bEditable && !OwnUnitIds.IsEmpty());
-    TargetChoice->SetIsEnabled(bEditable && bHasSelection && Skill->Kind != ECombatRoundSkillKind::GroundAttack && Skill->Kind != ECombatRoundSkillKind::Wait);
+    TargetChoice->SetIsEnabled(bEditable && bHasSelection && !TargetUnitIds.IsEmpty());
     TargetTileChoice->SetIsEnabled(bEditable && bHasSelection && Skill->Kind == ECombatRoundSkillKind::GroundAttack);
     DestinationChoice->SetIsEnabled(bEditable && bHasSelection && Skill->Approach == ECombatRoundApproach::Tile);
-    ApplyButton->SetIsEnabled(bEditable && bHasSelection && HasUnappliedChanges());
-    ReadyButton->SetIsEnabled(bEditable && !OwnUnitIds.IsEmpty() && !HasUnappliedChanges());
+    ApplyButton->SetIsEnabled(bEditable && bValidDraft && HasUnappliedChanges());
+    ReadyButton->SetIsEnabled(bEditable && bReadyPlans);
     UnreadyButton->SetIsEnabled(bEditable && !OwnUnitIds.IsEmpty());
 }
 
@@ -305,14 +333,8 @@ void UCombatRoundPlanningWidget::LoadSelectedCommand()
     const int32 SkillIndex = SkillIds.IndexOfByKey(Unit->Command.SkillId);
     SkillChoice->SetSelectedIndex(FMath::Max(0, SkillIndex));
     RefreshDestinationOptions();
-    int32 TargetIndex = TargetUnitIds.IndexOfByKey(Unit->Command.TargetUnitId);
-    if (TargetIndex == INDEX_NONE)
-    {
-        const FCombatRoundSkill* Skill = GetSelectedSkill();
-        const FCombatRoundUnitView* Target = Coordinator->GetView().Units.FindByPredicate([Skill](const FCombatRoundUnitView& Entry) { return Entry.HP > 0.f && Entry.bEnemy == (!Skill || Skill->Kind != ECombatRoundSkillKind::Guard); });
-        TargetIndex = Target ? TargetUnitIds.IndexOfByKey(Target->UnitId) : 0;
-    }
-    TargetChoice->SetSelectedIndex(FMath::Max(0, TargetIndex));
+    RefreshTargetOptions();
+    if (!TargetUnitIds.IsEmpty()) TargetChoice->SetSelectedIndex(FMath::Max(0, TargetUnitIds.IndexOfByKey(Unit->Command.TargetUnitId)));
     const FIntPoint TargetCoord = SkillIndex == INDEX_NONE ? FIntPoint(Unit->HomeCoord.X, 2) : Unit->Command.TargetCoord;
     TargetTileChoice->SetSelectedIndex(FMath::Max(0, TargetCoords.IndexOfByKey(TargetCoord)));
     DestinationChoice->SetSelectedIndex(FMath::Max(0, DestinationCoords.IndexOfByKey(SkillIndex == INDEX_NONE ? Unit->HomeCoord : Unit->Command.DestinationCoord)));
@@ -373,10 +395,9 @@ void UCombatRoundPlanningWidget::HandleSkillChanged(FString SelectedItem, ESelec
     const ACombatRoundCoordinator* Coordinator = Controller ? Controller->GetRoundCoordinator() : nullptr;
     const FCombatRoundSkill* Skill = GetSelectedSkill();
     RefreshDestinationOptions();
+    RefreshTargetOptions();
     if (Coordinator && Skill)
     {
-        const FCombatRoundUnitView* Target = Coordinator->GetView().Units.FindByPredicate([Skill](const FCombatRoundUnitView& Entry) { return Entry.HP > 0.f && Entry.bEnemy == (Skill->Kind != ECombatRoundSkillKind::Guard); });
-        if (Target) TargetChoice->SetSelectedIndex(TargetUnitIds.IndexOfByKey(Target->UnitId));
         if (Skill->Kind == ECombatRoundSkillKind::GroundAttack && Skill->Approach == ECombatRoundApproach::Tile && !Skill->bRemainAtDestination && TargetCoords.IsValidIndex(TargetTileChoice->GetSelectedIndex())) DestinationChoice->SetSelectedIndex(DestinationCoords.IndexOfByKey(TargetCoords[TargetTileChoice->GetSelectedIndex()]));
     }
     RefreshSkillDescription();
@@ -388,6 +409,13 @@ void UCombatRoundPlanningWidget::HandleApplyPlan()
     ACombatRoundPlayerController* Controller = Cast<ACombatRoundPlayerController>(GetOwningPlayer());
     const FCombatRoundSkill* Skill = GetSelectedSkill();
     if (!Controller || !Skill || GetSelectedUnitId() == INDEX_NONE) return;
+    const ACombatRoundCoordinator* Coordinator = Controller->GetRoundCoordinator();
+    FText Error;
+    if (!Coordinator || !Coordinator->CanPlanCommand(BuildSelectedCommand(), Error))
+    {
+        RefreshView();
+        return;
+    }
     Controller->SubmitRoundPlan(BuildSelectedCommand());
     RefreshView();
 }
@@ -421,13 +449,33 @@ bool UCombatRoundPlanningWidget::HasUnappliedChanges() const
 
 void UCombatRoundPlanningWidget::HandleReady()
 {
-    if (HasUnappliedChanges())
+    FText Error;
+    if (!CanReadyPlans(Error))
     {
         RefreshView();
         return;
     }
     if (ACombatRoundPlayerController* Controller = Cast<ACombatRoundPlayerController>(GetOwningPlayer())) Controller->SetRoundReady(true);
     RefreshView();
+}
+
+bool UCombatRoundPlanningWidget::CanReadyPlans(FText& OutError) const
+{
+    OutError = FText::GetEmpty();
+    const ACombatRoundPlayerController* Controller = Cast<ACombatRoundPlayerController>(GetOwningPlayer());
+    const ACombatRoundCoordinator* Coordinator = Controller ? Controller->GetRoundCoordinator() : nullptr;
+    if (!Coordinator || OwnUnitIds.IsEmpty() || HasUnappliedChanges()) return false;
+    for (const FCombatRoundUnitView& Unit : Coordinator->GetView().Units)
+    {
+        if (!OwnUnitIds.Contains(Unit.UnitId)) continue;
+        FText Error;
+        if (!Coordinator->CanPlanCommand(Unit.Command, Error))
+        {
+            OutError = FText::FromString(FString::Printf(TEXT("아군 #%d의 계획을 확인하세요: %s"), Unit.UnitId, *Error.ToString()));
+            return false;
+        }
+    }
+    return true;
 }
 
 void UCombatRoundPlanningWidget::HandleUnready()

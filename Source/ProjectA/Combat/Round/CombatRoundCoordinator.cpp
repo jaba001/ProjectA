@@ -337,6 +337,8 @@ void ACombatRoundCoordinator::BeginPlanning()
     int32 HighestSpeed = 0;
     for (FCombatRoundUnitView& Entry : View.Units)
     {
+        Entry.HP = 0.f;
+        if (IsValid(Entry.Unit) && Entry.Unit->GetAttributeSet()) Entry.HP = Entry.Unit->GetAttributeSet()->GetHP();
         if (IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive())
         {
             Entry.Speed = FMath::Max(0, Entry.Unit->CombatSpeed);
@@ -366,7 +368,13 @@ void ACombatRoundCoordinator::BeginPlanning()
             continue;
         }
         Actions[Index].OriginalLocation = Entry.Unit->GetActorLocation();
-        if (Entry.OwnerSlot != 0) continue;
+    }
+    // Reset every command before choosing AI actions from the new round state.
+    // 새 라운드 상태로 AI 행동을 선택하기 전에 모든 명령을 초기화합니다.
+    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
+    {
+        FCombatRoundUnitView& Entry = View.Units[Index];
+        if (Entry.OwnerSlot != 0 || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) continue;
 
         // AI commands are fixed before any human draft can be submitted.
         // 인간 초안이 제출되기 전에 AI 명령을 고정합니다.
@@ -376,14 +384,24 @@ void ACombatRoundCoordinator::BeginPlanning()
         {
             Entry.Command.TargetUnitId = View.Units[TargetIndex].UnitId;
             Entry.Command.TargetCoord = View.Units[TargetIndex].HomeCoord;
+            TSet<FName> EquippedSkillIds;
+            for (const USkillDefinitionDataAsset* Definition : Entry.Unit->GetEquippedSkillDataAssets())
+            {
+                if (IsValid(Definition)) EquippedSkillIds.Add(FName(*Definition->GetPrimaryAssetId().ToString()));
+            }
             for (FName SkillId : Entry.SkillIds)
             {
                 const FCombatRoundSkill* Candidate = FindSkill(SkillId);
-                if (!Candidate || Candidate->Kind == ECombatRoundSkillKind::Wait || Candidate->Kind == ECombatRoundSkillKind::Guard || Candidate->Approach == ECombatRoundApproach::Tile) continue;
+                if (!Candidate || Candidate->Kind == ECombatRoundSkillKind::Wait || Candidate->Kind == ECombatRoundSkillKind::Guard || Candidate->bRemainAtDestination) continue;
+                // Only equipped return attacks gain tile approach; prototype tactics keep their previous priority.
+                // 장착한 복귀형 공격만 타일 접근을 허용하여 시험 전술의 기존 선택 우선순위를 유지합니다.
+                if (Candidate->Approach == ECombatRoundApproach::Tile && !EquippedSkillIds.Contains(SkillId)) continue;
                 Entry.Command.SkillId = SkillId;
+                Entry.Command.DestinationCoord = Candidate->Approach == ECombatRoundApproach::Tile ? View.Units[TargetIndex].HomeCoord : Entry.HomeCoord;
                 FText Error;
                 if (ValidateCommand(Entry.Command, Error)) break;
                 Entry.Command.SkillId = TEXT("Wait");
+                Entry.Command.DestinationCoord = Entry.HomeCoord;
             }
         }
         Entry.bReady = true;
@@ -423,6 +441,32 @@ bool ACombatRoundCoordinator::HasExecutionAuthority() const
     const UCombatActionAuthority* Authority = nullptr;
     if (IsValid(CombatManager)) Authority = CombatManager->GetActionAuthority();
     return HasAuthority() && View.CombatId.IsValid() && Authority && Authority->GetCombatInstanceId() == View.CombatId && Authority->HasManagedExecutionAuthority(false);
+}
+
+bool ACombatRoundCoordinator::CanPlanCommand(const FCombatRoundCommand& Command, FText& OutError) const
+{
+    OutError = FText::GetEmpty();
+    if (View.Phase != ECombatRoundPhase::Planning)
+    {
+        OutError = RoundText(TEXT("계획 단계에서만 행동을 선택할 수 있습니다."));
+        return false;
+    }
+    return ValidateCommand(Command, OutError);
+}
+
+bool ACombatRoundCoordinator::IsValidUnitTarget(int32 SourceUnitId, FName SkillId, int32 TargetUnitId) const
+{
+    const int32 SourceIndex = FindUnitIndex(SourceUnitId);
+    const int32 TargetIndex = FindUnitIndex(TargetUnitId);
+    const FCombatRoundSkill* Skill = FindSkill(SkillId);
+    if (!View.Units.IsValidIndex(SourceIndex) || !View.Units.IsValidIndex(TargetIndex) || !Skill) return false;
+    if (Skill->Kind == ECombatRoundSkillKind::Wait || Skill->Kind == ECombatRoundSkillKind::GroundAttack) return false;
+    const FCombatRoundUnitView& Source = View.Units[SourceIndex];
+    const FCombatRoundUnitView& Target = View.Units[TargetIndex];
+    if (!IsValid(Source.Unit) || !IsValid(Target.Unit) || !Source.Unit->IsUnitAlive() || !Target.Unit->IsUnitAlive()) return false;
+    if (!(Source.HP > 0.f) || !(Target.HP > 0.f) || !Source.SkillIds.Contains(SkillId)) return false;
+    const bool bAlly = Source.bEnemy == Target.bEnemy;
+    return Skill->Kind == ECombatRoundSkillKind::Guard ? bAlly : !bAlly;
 }
 
 bool ACombatRoundCoordinator::ValidateCommand(const FCombatRoundCommand& Command, FText& OutError) const
@@ -479,8 +523,7 @@ bool ACombatRoundCoordinator::ValidateCommand(const FCombatRoundCommand& Command
         OutError = RoundText(TEXT("살아 있는 대상 유닛을 선택하세요."));
         return false;
     }
-    const bool bAlly = Entry.bEnemy == View.Units[TargetIndex].bEnemy;
-    if ((Skill->Kind == ECombatRoundSkillKind::Guard && !bAlly) || (Skill->Kind != ECombatRoundSkillKind::Guard && bAlly))
+    if (!IsValidUnitTarget(Command.UnitId, Command.SkillId, Command.TargetUnitId))
     {
         OutError = RoundText(TEXT("스킬의 대상 진영이 올바르지 않습니다."));
         return false;

@@ -31,6 +31,7 @@ private:
     UComboBoxString* AddCombo(UVerticalBox* Box, const FString& Label);
     void RefreshView();
     bool RefreshOptions(const ACombatRoundCoordinator* Coordinator, int32 OwnerSlot);
+    void RefreshTargetOptions();
     void LoadSelectedCommand();
     void RefreshSkillDescription();
     void RefreshDestinationOptions();
@@ -38,6 +39,7 @@ private:
     int32 GetSelectedUnitId() const;
     FCombatRoundCommand BuildSelectedCommand() const;
     bool HasUnappliedChanges() const;
+    bool CanReadyPlans(FText& OutError) const;
 
     UFUNCTION()
     void HandleUnitChanged(FString SelectedItem, ESelectInfo::Type SelectionType);

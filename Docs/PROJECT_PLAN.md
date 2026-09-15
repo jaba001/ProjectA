@@ -1,6 +1,6 @@
 # ProjectA 구현 구조와 설정
 
-기준일: 2026-09-15. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
+기준일: 2026-09-16. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
 
 기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 새 실행·UI·네트워크의 작동 검증은 미실행이다.
 
@@ -103,6 +103,8 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 `ACombatRoundCoordinator`가 계획·준비·잠금·해결을 관리한다. 양 팀 생존자의 `CombatSpeed`로 시작 지연을 고정하며 라운드마다 AP/SubAP를 초기화한다. 서버가 명령의 소유권·전투 ID·라운드·수정 번호·부여 스킬·자원·대상·최종 배치를 검증하고 잠금 시 비용을 한 번 차감한다.
 
+`CanPlanCommand`는 Planning 단계에서 서버의 `ValidateCommand`와 같은 명령 조건을 검사한다. UI는 적용 전 AP/SubAP·타일·대상을 검사하고, 자신의 모든 생존 유닛에 적용된 계획이 유효한지 확인한 뒤 준비 요청을 허용한다. 이 사전 검사는 소유권·수정 번호·관리 lease·최종 목적지 예약 충돌에 대한 서버 검증을 대체하지 않는다.
+
 해결은 0.01초 서버 진행 단위에서 접근·시전·실제 거리 타격·투사체 sphere sweep·복귀를 처리한다. 느린 프레임의 누적 시간을 보존하지만 서버 순서·실시간 충돌을 사용하므로 원자적 동시 판정이나 전체 결정성 보장을 주장하지 않는다. 피해는 즉시 HP·사망에 반영하며 시전자 사망 후 이미 발사한 투사체는 유지한다.
 
 UnitBase의 기존 순차 이동/행동 수명·유닛 체크포인트 capture/restore, UnitAIController의 경로 완료 루프와 기존 이동 BFS를 제거했다. 기존 GA/SkillActor의 즉시 실행과 순차 `StartSkill`·TurnManager·AI 연속 판단·End Turn을 실행하지 않는다. 모든 예약 행동과 복귀·잔여 투사체가 종료된 뒤에만 결과를 Encounter로 전달한다. 양 팀 전멸은 `Suspended`이며 정식 결과 정책 대기다. 현재 지원 범위와 임시 정책은 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)을 기준으로 한다.
@@ -139,7 +141,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 추가 스킬 | EncounterSkillPool에서 직업 설정 후 가중 추첨 1개를 부여·장착. 보유 스킬 에셋 ID·잘못된 라운드 정의·가중치 0 이하는 제외. 장착 최대 5개. 전투 계획/해결 중 장착 변경 거절 |
 | 현재 추가 스킬 | DA_SweepingStrike: 이전 반경 1 정의를 실제 지점 반경 200의 GroundAttack으로 초기 변환, 피해 10·AP 1. 시작 스킬 유지 |
 | 전투 간 이관 | HP 유지. 추가 스킬은 새 전투에서 추첨. 전투 중 복구는 미지원. Snapshot 적은 회복약·무작위 추가 스킬 제외 |
-| 적·아군 AI | 인간 초안 이전 가까운 적과 실행 가능한 단일 명령을 고정. 초기 AI는 접근 타일 선택·지원/이동 복합 전술을 완성하지 않았으며 불가능하면 Wait |
+| 적·아군 AI | 기존 스킬 순서·가까운 적 기준으로 인간 초안 전에 단일 명령 고정. 장착된 복귀형 Tile 공격은 적 HomeCoord를 공격/접근 좌표로 선택 가능. 공통 시험 GroundStrike·MoveShot·Guard의 추가 선택과 지원/잔류 전술은 보류하며 불가능하면 Wait |
 | 메뉴 프리뷰 | MainMenuPreviewStage의 카메라·4개 앵커·ClassId별 BP_PartyMenuPreview 사용. 기존 메시 재사용, 전투 Pawn 생성 없음 |
 | 생성 화면 종료 | Back/X는 초안·프리뷰 정리. 재진입 시 빈 4슬롯. 상세 패널이 열려 있으면 먼저 패널만 닫음. 최소 슬롯 높이로 ClassInfo 표시 유지 |
 | 옵션·종료 | MainMenu의 native `UOptionsWidget`에서 해상도·화면 모드·품질·VSync를 편집. 화면 변경은 15초 확인 후 `GameUserSettings.ini`에 저장하며 취소·시간 초과·미확인 종료 시 전체 변경 복원. 품질·VSync만 변경하면 적용 시 저장. Quit는 게임 종료 요청 |
@@ -248,3 +250,4 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 - WorldMap의 WorldSettings가 참조하는 WorldMapGameModeBase는 호환을 위해 보존한다.
 - 로컬 Snapshot·Listen Server·개발용 관리 저장의 구현을 실제 계정 인증, Steam 연결, PlayFab 운영, 경쟁 결과 검증이나 MMR 완료로 기록하지 않는다.
 - 빌드·자동화 결과와 사용자의 실제 조작 검증을 구분한다. 다음 구현 우선순위와 T14 잔여 조건은 [TODO](TODO.md), 최종 작동 확인은 [TEST_REPORT](TEST_REPORT.md)를 따른다.
+- 2026-09-16 계획 입력·AI 보완의 Editor 컴파일은 최종 초안 보존 수정을 포함해 성공했다. 최종 코드·문서 정적 검사 통과, 작동 검증 미실행이다. 최신 결과·절차는 [TEST_REPORT 17절](TEST_REPORT.md#17-계획-입력-검사와-장착-tile-공격-ai), 디자인 보류 범위와 해제 조건은 [TODO 8-3절](TODO.md#8-3-디자인-보류와-구현-재개-조건)을 따른다.

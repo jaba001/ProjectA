@@ -38,6 +38,8 @@ public:
     int32 GetParticipantSlot(const APlayerController* Controller) const;
     bool SubmitPlan(APlayerController* Controller, FGuid CombatId, int32 RoundNumber, int32 Revision, const FCombatRoundCommand& Command, FText& OutError);
     bool SetParticipantReady(APlayerController* Controller, FGuid CombatId, int32 RoundNumber, int32 Revision, bool bReady, FText& OutError);
+    bool CanPlanCommand(const FCombatRoundCommand& Command, FText& OutError) const;
+    bool IsValidUnitTarget(int32 SourceUnitId, FName SkillId, int32 TargetUnitId) const;
     const FCombatRoundView& GetView() const { return View; }
     const TArray<FCombatRoundSkill>& GetSkills() const { return Skills; }
     const FCombatRoundSkill* FindSkill(FName SkillId) const;
