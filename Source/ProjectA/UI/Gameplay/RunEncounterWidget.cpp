@@ -4,12 +4,17 @@
 #include "Components/Border.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/ScaleBox.h"
+#include "Components/ScaleBoxSlot.h"
+#include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
 #include "Controller/GameplayPlayerController.h"
 #include "Engine/EngineBaseTypes.h"
 #include "Game/GameState/GameplayViewTypes.h"
 #include "UI/Gameplay/GameplayActionButton.h"
+#include "UI/Theme/DemonicUITheme.h"
 
 TOptional<FUIInputConfig> URunEncounterWidget::GetDesiredInputConfig() const
 {
@@ -19,34 +24,55 @@ TOptional<FUIInputConfig> URunEncounterWidget::GetDesiredInputConfig() const
 void URunEncounterWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
+    const UDemonicUITheme& Theme = UDemonicUITheme::Get();
     UOverlay* Root = WidgetTree->ConstructWidget<UOverlay>();
     WidgetTree->RootWidget = Root;
     UBorder* Background = WidgetTree->ConstructWidget<UBorder>();
-    Background->SetBrushColor(FLinearColor(0.025f, 0.04f, 0.06f, 0.98f));
-    Root->AddChildToOverlay(Background);
+    Theme.StyleBackdrop(Background);
+    UOverlaySlot* BackgroundSlot = Root->AddChildToOverlay(Background);
+    BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
+    BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
+    UBorder* Panel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("EncounterPanel"));
+    Theme.StylePanel(Panel);
+    Panel->SetPadding(FMargin(32.0f));
+    UScaleBox* ContentScale = WidgetTree->ConstructWidget<UScaleBox>();
+    ContentScale->SetStretch(EStretch::ScaleToFit);
+    ContentScale->SetStretchDirection(EStretchDirection::DownOnly);
+    UScaleBoxSlot* ScaleSlot = CastChecked<UScaleBoxSlot>(ContentScale->AddChild(Panel));
+    ScaleSlot->SetHorizontalAlignment(HAlign_Center);
+    ScaleSlot->SetVerticalAlignment(VAlign_Center);
+    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(ContentScale);
+    ContentSlot->SetHorizontalAlignment(HAlign_Fill);
+    ContentSlot->SetVerticalAlignment(VAlign_Fill);
+    ContentSlot->SetPadding(FMargin(24.0f));
+    USizeBox* ContentSize = WidgetTree->ConstructWidget<USizeBox>();
+    ContentSize->SetMinDesiredWidth(600.0f);
+    ContentSize->SetMaxDesiredWidth(680.0f);
+    Panel->SetContent(ContentSize);
     UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>();
-    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Content);
-    ContentSlot->SetHorizontalAlignment(HAlign_Center);
-    ContentSlot->SetVerticalAlignment(VAlign_Center);
+    ContentSize->SetContent(Content);
     Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_EncounterTitle"));
     Content->AddChildToVerticalBox(Title);
+    Theme.AddDivider(WidgetTree, Content);
     Actions = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("EncounterActions"));
     Content->AddChildToVerticalBox(Actions);
     for (int32 Index = 0; Index < 3; ++Index)
     {
         UGameplayActionButton* Button = WidgetTree->ConstructWidget<UGameplayActionButton>();
         Button->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandleSelection);
-        Actions->AddChildToVerticalBox(Button);
+        Actions->AddChildToVerticalBox(Button)->SetPadding(FMargin(0.0f, 5.0f));
         ChoiceButtons.Add(Button);
     }
     LeaveButton = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), TEXT("Button_LeaveShop"));
     LeaveButton->Configure(TEXT("Leave"), NSLOCTEXT("RunEncounter", "Leave", "나가기"));
     LeaveButton->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandleLeave);
-    Actions->AddChildToVerticalBox(LeaveButton);
+    Actions->AddChildToVerticalBox(LeaveButton)->SetPadding(FMargin(0.0f, 5.0f));
     Message = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_EncounterMessage"));
     Message->SetAutoWrapText(true);
     Message->SetWrapTextAt(600.f);
-    Content->AddChildToVerticalBox(Message);
+    Content->AddChildToVerticalBox(Message)->SetPadding(FMargin(0.0f, 16.0f, 0.0f, 0.0f));
+    Theme.ApplyControls(WidgetTree);
+    Theme.StyleText(Title, true, 28);
 }
 
 void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool bAllowRunCommands)

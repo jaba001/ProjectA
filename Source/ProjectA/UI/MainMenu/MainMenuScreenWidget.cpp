@@ -3,10 +3,13 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
 #include "Components/Border.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/SizeBox.h"
+#include "Components/ScaleBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
@@ -18,6 +21,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Game/Development/DevelopmentCoopSubsystem.h"
 #include "UI/MainMenu/DevelopmentCoopWidget.h"
+#include "UI/Theme/DemonicUITheme.h"
 
 void UMainMenuScreenWidget::HandleDevelopmentCoopClicked()
 {
@@ -107,6 +111,49 @@ void UMainMenuScreenWidget::NativeOnInitialized()
             DevelopmentSlot->SetVerticalAlignment(VAlign_Top);
             DevelopmentSlot->SetPadding(FMargin(24.f));
         }
+    }
+    ApplyDemonicStyle();
+}
+
+void UMainMenuScreenWidget::ApplyDemonicStyle()
+{
+    const UDemonicUITheme& Theme = UDemonicUITheme::Get();
+    Theme.ApplyControls(WidgetTree);
+    Theme.StyleButton(Button_NewGame, true);
+    Theme.StylePanel(ManagedResumePanel);
+    Theme.StyleText(Text_Title, true, 40);
+    Theme.StyleText(SaveStatus, false, 14);
+    UVerticalBox* MenuBox = Button_NewGame ? Cast<UVerticalBox>(Button_NewGame->GetParent()) : nullptr;
+    UOverlay* MenuOverlay = MenuBox ? Cast<UOverlay>(MenuBox->GetParent()) : nullptr;
+    if (!MenuOverlay) return;
+    // Frame the bound menu without replacing its buttons or Blueprint callbacks.
+    // 바인딩된 버튼과 Blueprint 콜백을 교체하지 않고 메뉴에 프레임을 추가합니다.
+    MenuBox->RemoveFromParent();
+    UScaleBox* Scale = WidgetTree->ConstructWidget<UScaleBox>();
+    Scale->SetStretch(EStretch::ScaleToFit);
+    Scale->SetStretchDirection(EStretchDirection::DownOnly);
+    UOverlaySlot* FrameSlot = MenuOverlay->AddChildToOverlay(Scale);
+    FrameSlot->SetHorizontalAlignment(HAlign_Fill);
+    FrameSlot->SetVerticalAlignment(VAlign_Fill);
+    FrameSlot->SetPadding(FMargin(40.0f, 64.0f));
+    UHorizontalBox* Panels = WidgetTree->ConstructWidget<UHorizontalBox>();
+    Scale->SetContent(Panels);
+    USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
+    Size->SetWidthOverride(460.0f);
+    Panels->AddChildToHorizontalBox(Size)->SetVerticalAlignment(VAlign_Center);
+    UBorder* Frame = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("DemonicMenuFrame"));
+    Theme.StylePanel(Frame);
+    Frame->SetPadding(FMargin(44.0f, 40.0f));
+    Size->SetContent(Frame);
+    Frame->SetContent(MenuBox);
+    if (ManagedResumePanel)
+    {
+        // Scale both panels together so a narrow window cannot overlap the resume actions.
+        // 좁은 창에서 이어가기 버튼이 겹치지 않도록 두 패널을 함께 축소합니다.
+        ManagedResumePanel->RemoveFromParent();
+        UHorizontalBoxSlot* ResumeSlot = Panels->AddChildToHorizontalBox(ManagedResumePanel);
+        ResumeSlot->SetVerticalAlignment(VAlign_Center);
+        ResumeSlot->SetPadding(FMargin(24.0f, 0.0f, 0.0f, 0.0f));
     }
 }
 
@@ -250,7 +297,7 @@ void UMainMenuScreenWidget::ConfigureBackgroundImage()
     }
 
     Image_Background->SetVisibility(ESlateVisibility::Visible);
-    Image_Background->SetColorAndOpacity(FLinearColor(0.12f, 0.12f, 0.12f, 1.0f));
+    UDemonicUITheme::Get().StyleBackgroundImage(Image_Background);
 }
 
 UButton* UMainMenuScreenWidget::CreateMenuButton(UVerticalBox* ParentBox, const FText& ButtonText)

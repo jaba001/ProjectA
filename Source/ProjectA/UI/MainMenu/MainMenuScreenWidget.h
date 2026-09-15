@@ -101,8 +101,12 @@ private:
     // C++에서 대체 메인메뉴 레이아웃을 생성합니다.
     void EnsureCodeGeneratedLayout();
 
-    // Applies the default gray background color.
-    // 기본 회색 배경 색상을 적용합니다.
+    // Styles existing Designer bindings and the native fallback with the shared Demonic art.
+    // 기존 Designer 바인딩과 네이티브 대체 화면에 공통 Demonic 아트를 적용합니다.
+    void ApplyDemonicStyle();
+
+    // Applies the Demonic landscape background.
+    // Demonic 풍경 배경을 적용합니다.
     void ConfigureBackgroundImage();
 
     // Creates a menu button and attaches it to the parent box.

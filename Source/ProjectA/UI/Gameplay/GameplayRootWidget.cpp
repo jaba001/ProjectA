@@ -19,6 +19,7 @@
 #include "Game/Development/DevelopmentCoopLobby.h"
 #include "Game/Development/DevelopmentCoopSubsystem.h"
 #include "UI/MainMenu/DevelopmentCoopWidget.h"
+#include "UI/Theme/DemonicUITheme.h"
 #include "Engine/GameInstance.h"
 
 void UGameplayRootWidget::HandleLeaveDevelopmentCoop()
@@ -123,6 +124,10 @@ void UGameplayRootWidget::NativeOnInitialized()
     Leave->OnClicked.AddDynamic(this, &UGameplayRootWidget::HandleLeaveDevelopmentCoop);
     DevelopmentContent->AddChildToVerticalBox(Leave);
     DevelopmentBar->SetVisibility(ESlateVisibility::Collapsed);
+    const UDemonicUITheme& Theme = UDemonicUITheme::Get();
+    Theme.ApplyControls(WidgetTree);
+    Theme.StylePanel(CheckpointNotice);
+    Theme.StylePanel(DevelopmentBar);
 
     SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     WidgetTree->RootWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);

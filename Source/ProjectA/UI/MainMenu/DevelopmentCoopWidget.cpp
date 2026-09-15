@@ -8,6 +8,7 @@
 #include "Components/EditableTextBox.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/ScaleBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -21,6 +22,7 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerState.h"
 #include "UI/MainMenu/MainMenuRootWidget.h"
+#include "UI/Theme/DemonicUITheme.h"
 
 TOptional<FUIInputConfig> UDevelopmentCoopWidget::GetDesiredInputConfig() const
 {
@@ -43,15 +45,26 @@ void UDevelopmentCoopWidget::NativeOnInitialized()
     UOverlay* Root = WidgetTree->ConstructWidget<UOverlay>();
     WidgetTree->RootWidget = Root;
     UBorder* Background = WidgetTree->ConstructWidget<UBorder>();
-    Background->SetBrushColor(FLinearColor(0.025f, 0.035f, 0.05f, 0.98f));
-    Root->AddChildToOverlay(Background);
+    UDemonicUITheme::Get().StyleBackdrop(Background);
+    UOverlaySlot* BackgroundSlot = Root->AddChildToOverlay(Background);
+    BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
+    BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
     USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
-    Size->SetWidthOverride(560.f);
-    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Size);
-    ContentSlot->SetHorizontalAlignment(HAlign_Center);
-    ContentSlot->SetVerticalAlignment(VAlign_Center);
+    Size->SetWidthOverride(620.f);
+    UScaleBox* ContentScale = WidgetTree->ConstructWidget<UScaleBox>();
+    ContentScale->SetStretch(EStretch::ScaleToFit);
+    ContentScale->SetStretchDirection(EStretchDirection::DownOnly);
+    ContentScale->SetContent(Size);
+    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(ContentScale);
+    ContentSlot->SetHorizontalAlignment(HAlign_Fill);
+    ContentSlot->SetVerticalAlignment(VAlign_Fill);
+    ContentSlot->SetPadding(FMargin(24.0f));
     UVerticalBox* Box = WidgetTree->ConstructWidget<UVerticalBox>();
-    Size->SetContent(Box);
+    UBorder* Frame = WidgetTree->ConstructWidget<UBorder>();
+    UDemonicUITheme::Get().StylePanel(Frame);
+    Frame->SetPadding(FMargin(32.0f));
+    Size->SetContent(Frame);
+    Frame->SetContent(Box);
     UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>();
     Title->SetText(FText::FromString(TEXT("개발용 협동")));
     Box->AddChildToVerticalBox(Title)->SetPadding(FMargin(0.f, 0.f, 0.f, 16.f));
@@ -61,7 +74,7 @@ void UDevelopmentCoopWidget::NativeOnInitialized()
     Box->AddChildToVerticalBox(Notice)->SetPadding(FMargin(0.f, 0.f, 0.f, 16.f));
     if (Cast<AMainMenuPlayerController>(GetOwningPlayer()))
     {
-        Capacity = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass(), TEXT("Combo_DevCoopCapacity"));
+        Capacity = WidgetTree->ConstructWidget<UDemonicComboBoxString>(UDemonicComboBoxString::StaticClass(), TEXT("Combo_DevCoopCapacity"));
         for (const FString& Value : { FString(TEXT("2")), FString(TEXT("3")), FString(TEXT("4")) }) Capacity->AddOption(Value);
         Capacity->SetSelectedOption(TEXT("2"));
         Box->AddChildToVerticalBox(Capacity);
@@ -87,6 +100,9 @@ void UDevelopmentCoopWidget::NativeOnInitialized()
     Status->SetAutoWrapText(true);
     Box->AddChildToVerticalBox(Status)->SetPadding(FMargin(0.f, 12.f));
     AddButton(Box, TEXT("Button_DevCoopBack"), FText::FromString(TEXT("취소 / 메뉴로 돌아가기")))->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleBack);
+    UDemonicUITheme::Get().ApplyControls(WidgetTree);
+    UDemonicUITheme::Get().StyleText(Title, true, 28);
+    UDemonicUITheme::Get().StyleButton(HostButton ? HostButton.Get() : StartButton.Get(), true);
 }
 
 void UDevelopmentCoopWidget::NativeTick(const FGeometry& Geometry, float DeltaTime)

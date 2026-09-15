@@ -23,6 +23,7 @@
 #include "Engine/Texture2D.h"
 #include "UI/MainMenu/MainMenuPreviewStage.h"
 #include "UI/MainMenu/MainMenuRootWidget.h"
+#include "UI/Theme/DemonicUITheme.h"
 
 namespace
 {
@@ -260,6 +261,16 @@ void UCharacterCreationWidget::NativeOnInitialized()
 
     RefreshPreview();
     RefreshClassSlotWidgets();
+    const UDemonicUITheme& Theme = UDemonicUITheme::Get();
+    Theme.ApplyControls(WidgetTree);
+    Theme.StylePanel(BottomPanel);
+    Theme.StylePanel(DetailPanel);
+    Theme.StyleButton(Button_StartGame, true);
+    Theme.StyleButton(DetailSave, true);
+    for (int32 SlotIndex = 0; SlotIndex < 4; ++SlotIndex)
+    {
+        Theme.StylePanel(Cast<UBorder>(GetWidgetFromName(FName(*FString::Printf(TEXT("SlotPanel_%d"), SlotIndex)))));
+    }
 }
 
 void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
@@ -675,7 +686,7 @@ void UCharacterCreationWidget::ConfigureCenterPanelBackground()
     }
 
     CenterPanelBackground->SetVisibility(ESlateVisibility::Visible);
-    CenterPanelBackground->SetBrushColor(FLinearColor(0.22f, 0.22f, 0.22f, 1.0f));
+    UDemonicUITheme::Get().StylePanel(CenterPanelBackground);
     CenterPanelBackground->SetPadding(FMargin(24.0f, 20.0f, 24.0f, 20.0f));
 }
 
@@ -1379,7 +1390,7 @@ void UCharacterCreationWidget::BuildDetailPanel()
     DetailName = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass(), TEXT("ProfessionNameInput"));
     DetailName->SetHintText(FText::FromString(TEXT("캐릭터 이름")));
     Content->AddChildToVerticalBox(DetailName)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
-    DetailClass = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass(), TEXT("ProfessionClassSelect"));
+    DetailClass = WidgetTree->ConstructWidget<UDemonicComboBoxString>(UDemonicComboBoxString::StaticClass(), TEXT("ProfessionClassSelect"));
     for (FName ClassId : AvailablePartyClassIds)
     {
         DetailClass->AddOption(GetDisplayNameForClassId(ClassId).ToString());

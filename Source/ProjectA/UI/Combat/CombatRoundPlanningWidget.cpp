@@ -13,6 +13,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Controller/CombatRoundPlayerController.h"
+#include "UI/Theme/DemonicUITheme.h"
 
 namespace
 {
@@ -60,9 +61,7 @@ UTextBlock* UCombatRoundPlanningWidget::AddText(UVerticalBox* Box, const FString
     UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
     Label->SetText(FText::FromString(Text));
     Label->SetAutoWrapText(true);
-    FSlateFontInfo Font = Label->GetFont();
-    Font.Size = FontSize;
-    Label->SetFont(Font);
+    UDemonicUITheme::Get().StyleText(Label, FontSize >= 18, FontSize);
     Box->AddChildToVerticalBox(Label)->SetPadding(FMargin(0.f, 4.f));
     return Label;
 }
@@ -72,9 +71,8 @@ UButton* UCombatRoundPlanningWidget::AddButton(UVerticalBox* Box, const FString&
     UButton* Button = WidgetTree->ConstructWidget<UButton>();
     UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
     Label->SetText(FText::FromString(Text));
-    FSlateFontInfo Font = Label->GetFont();
-    Font.Size = 16;
-    Label->SetFont(Font);
+    UDemonicUITheme::Get().StyleText(Label, false, 16);
+    UDemonicUITheme::Get().StyleButton(Button);
     Button->SetContent(Label);
     Box->AddChildToVerticalBox(Button)->SetPadding(FMargin(0.f, 5.f));
     return Button;
@@ -83,7 +81,7 @@ UButton* UCombatRoundPlanningWidget::AddButton(UVerticalBox* Box, const FString&
 UComboBoxString* UCombatRoundPlanningWidget::AddCombo(UVerticalBox* Box, const FString& Label)
 {
     AddText(Box, Label);
-    UComboBoxString* Combo = WidgetTree->ConstructWidget<UComboBoxString>();
+    UComboBoxString* Combo = WidgetTree->ConstructWidget<UDemonicComboBoxString>();
     Box->AddChildToVerticalBox(Combo)->SetPadding(FMargin(0.f, 2.f, 0.f, 5.f));
     return Combo;
 }
@@ -91,6 +89,7 @@ UComboBoxString* UCombatRoundPlanningWidget::AddCombo(UVerticalBox* Box, const F
 void UCombatRoundPlanningWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
+    const UDemonicUITheme& Theme = UDemonicUITheme::Get();
     UOverlay* Root = WidgetTree->ConstructWidget<UOverlay>();
     WidgetTree->RootWidget = Root;
     Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
@@ -102,7 +101,7 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
     PlanningSlot->SetVerticalAlignment(VAlign_Fill);
     PlanningSlot->SetPadding(FMargin(12.f));
     UBorder* PlanningPanel = WidgetTree->ConstructWidget<UBorder>();
-    PlanningPanel->SetBrushColor(FLinearColor(0.02f, 0.03f, 0.05f, 0.96f));
+    Theme.StylePanel(PlanningPanel);
     PlanningPanel->SetPadding(FMargin(14.f));
     PlanningSize->SetContent(PlanningPanel);
     UScrollBox* PlanningScroll = WidgetTree->ConstructWidget<UScrollBox>();
@@ -110,6 +109,7 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
     UVerticalBox* Controls = WidgetTree->ConstructWidget<UVerticalBox>();
     PlanningScroll->AddChild(Controls);
     Header = AddText(Controls, TEXT("라운드 전투"), 20);
+    Theme.AddDivider(WidgetTree, Controls);
     AddText(Controls, TEXT("아군을 선택해 스킬과 대상을 지정하고 계획 적용을 누르세요. 소유한 모든 생존 아군의 계획을 확인한 뒤 준비 완료를 누릅니다."));
     UnitChoice = AddCombo(Controls, TEXT("조작할 아군"));
     SkillChoice = AddCombo(Controls, TEXT("스킬"));
@@ -135,15 +135,20 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
     RosterSlot->SetVerticalAlignment(VAlign_Fill);
     RosterSlot->SetPadding(FMargin(12.f));
     UBorder* RosterPanel = WidgetTree->ConstructWidget<UBorder>();
-    RosterPanel->SetBrushColor(FLinearColor(0.02f, 0.03f, 0.05f, 0.86f));
+    Theme.StylePanel(RosterPanel);
     RosterPanel->SetPadding(FMargin(12.f));
     RosterSize->SetContent(RosterPanel);
     UScrollBox* RosterScroll = WidgetTree->ConstructWidget<UScrollBox>();
     RosterPanel->SetContent(RosterScroll);
     UVerticalBox* RosterBox = WidgetTree->ConstructWidget<UVerticalBox>();
     RosterScroll->AddChild(RosterBox);
-    AddText(RosterBox, TEXT("아군 계획 / 고정된 적 의도"), 18);
+    UTextBlock* RosterHeader = AddText(RosterBox, TEXT("아군 계획 / 고정된 적 의도"), 18);
+    Theme.AddDivider(WidgetTree, RosterBox);
     Roster = AddText(RosterBox, FString(), 14);
+    Theme.ApplyControls(WidgetTree);
+    Theme.StyleText(Header, true, 20);
+    Theme.StyleText(RosterHeader, true, 18);
+    Theme.StyleButton(ReadyButton, true);
 
     for (int32 Row = 0; Row < 4; ++Row)
     {

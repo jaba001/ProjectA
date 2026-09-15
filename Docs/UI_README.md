@@ -9,10 +9,11 @@
 | 생성 도구 | [GenerateUiScaffoldCommandlet.cpp](../Source/ProjectAEditor/Commandlets/GenerateUiScaffoldCommandlet.cpp), Editor 전용 |
 | 명세 | [UiScaffoldSpecs](../Source/ProjectAEditor/UiScaffoldSpecs): 메뉴 3종·Gameplay 4종 |
 | Native UI | [Source/ProjectA/UI](../Source/ProjectA/UI), 화면 동작·선택적 fallback |
+| 공통 테마 | [DemonicUITheme](../Source/ProjectA/UI/Theme/DemonicUITheme.h), 기존 DemonicUI 텍스처와 컨트롤 외형 |
 | WBP | `/Game/User_JeHoon/UI/MainMenu`, `/Game/User_JeHoon/UI/Gameplay` |
 | 검증 사본 | `/Game/User_JeHoon/Validation/T12` |
 
-기존 Designer WBP를 화면 구조의 기준으로 유지한다. 새 라운드 계획 화면은 7절의 native CommonUI 생성 경로를 사용한다. JSON은 초기 생성·바인딩 검증·누락 보완에 사용하며 결과 WidgetTree는 WBP에 저장된다. 이미지·브러시·폰트·세부 스타일은 Designer에서 편집한다. Editor API·의존성은 ProjectAEditor에 한정한다.
+기존 Designer WBP를 화면 구조의 기준으로 유지한다. 새 라운드 계획 화면은 7절의 native CommonUI 생성 경로를 사용한다. JSON은 초기 생성·바인딩 검증·누락 보완에 사용하며 결과 WidgetTree는 WBP에 저장된다. 9절의 공통 버튼·배경·글자색은 native 테마가 실행 시 적용하며 나머지 배치·폰트·세부 스타일은 Designer에서 편집한다. Editor API·의존성은 ProjectAEditor에 한정한다.
 
 개발용 협동은 기존 MainMenu에 native 버튼을 추가하고 `UDevelopmentCoopWidget`으로 방 생성·주소 참가·대기실을 표시한다. Gameplay는 전용 CommonUI 레이어에 대기실을 표시하고 시작 시 닫아 새 라운드 계획 화면으로 전환한다. 전투 중에는 상태·나가기 영역을 유지한다. 기존 WBP 재생성은 필요 없으며 새 영구 에셋은 생성하지 않는다. 작동 확인은 [TEST_REPORT 9절](TEST_REPORT.md#9-개발용-협동-ui)을 따른다.
 
@@ -152,3 +153,38 @@ MainMenu의 Options는 native `UOptionsWidget`으로 화면·그래픽 설정을
 - 확인 시간은 게임 시간 배율과 무관한 실제 경과 시간으로 계산한다. 확인·복원 후 선택값과 포커스를 현재 설정에 맞춰 갱신한다.
 
 해상도와 전체 화면 전환은 사용자가 독립 게임 창에서 확인한다. UI 전환·낮은 해상도 배치·15초 복원·재시작 저장의 검증 절차와 최신 결과는 [TEST_REPORT 14절](TEST_REPORT.md#14-시작-메뉴-화면그래픽-설정)을 따른다.
+
+## 9 DemonicUI 공통 테마
+
+기존 DemonicUI의 암갈색 패널·청동 장식·붉은 활성 버튼·청회색 성 배경을 현재 사용 중인 화면에 적용한다. 기준 구현은 [DemonicUITheme.h](../Source/ProjectA/UI/Theme/DemonicUITheme.h)·[DemonicUITheme.cpp](../Source/ProjectA/UI/Theme/DemonicUITheme.cpp)다. 원본 `/Game/DemonicUI` 에셋은 참조만 하며 수정·이동·복제하지 않는다. WBP·JSON·맵·Config 재생성은 필요하지 않다.
+
+### 9-1 적용 구조
+
+- `UDemonicUITheme`의 클래스 기본 객체가 `FObjectFinder`로 텍스처를 읽고 `UPROPERTY` 참조를 유지한다. 브러시가 사용하는 텍스처의 가비지 수집 방지와 쿠킹 의존성 연결을 위한 구조이며 패키지에서의 실제 표시 확인은 별도 수행한다.
+- `ApplyControls`가 기존 WidgetTree의 버튼·콤보박스·체크박스·입력창·스크롤바·일반 글자에 공통 외형을 적용한다. 화면별 배경·패널·제목·주요 버튼은 명시적으로 지정한다. 콜백·바인딩·활성화 조건은 기존 화면이 관리한다.
+- 긴 버튼은 `Button_A_Long_Ready/aimed/active`, 짧은 기호 버튼은 `Button_A_Lil_Ready/aimed/active`를 사용한다. 일반·가리킴·누름·비활성 외형을 구분하고 주요 실행 버튼은 붉은 배경을 사용한다.
+- 패널은 `GUI_Elements/pop_up_window_B`, 배경은 `Backgrounds/Background`, 구분 장식은 `GUI_Elements/Top_frame_m`을 사용한다. VSync 체크는 `Red_buttons/Button_tiny_ready`·`Button_tiny_ok`로 표시한다.
+- native 콤보박스는 `UDemonicComboBoxString`으로 생성하여 Slate가 선택값과 펼침 목록을 만들기 전에 밝은 글자색을 설정한다. 목록 행·선택·가리킴·스크롤바도 공통 색상으로 표시한다.
+- 명시적인 경고·직업 색상은 보존한다. 장식 이미지는 입력을 받지 않으며 프리뷰용 투명 영역과 전투 중앙의 월드 입력 영역에는 불투명 전체 배경을 추가하지 않는다.
+- 중앙 패널은 `ScaleToFit`·`DownOnly`로 작은 화면에 맞춰 축소한다. MainMenu의 메뉴와 명시적인 관리 이어가기 패널은 같은 가로 배치 안에서 함께 축소하며 설정·개발용 협동·RunMap·상점·결과 패널에도 축소 영역을 사용한다. 기존 관리 이어가기 표시 조건은 유지한다.
+- 기존 `WBP_RunMapWidget`·`WBP_EncounterResultWidget`은 알려진 `ContentBox`·`Overlay` 구조에서 현재 컨트롤을 유지한 채 배경·중앙 프레임·축소 영역을 적용한다. 다른 Designer 계층은 재작성하지 않으며 컨트롤 스타일만 적용한다.
+
+### 9-2 화면별 범위
+
+| 화면 | 적용 범위·보존 계약 |
+|---|---|
+| MainMenu | 성 배경·제목·메뉴 버튼·관리 이어가기 패널. 두 패널 동시 표시 시 나란히 배치하고 함께 축소. Continue의 저장 상태별 활성화 유지 |
+| Options | 설정 패널·해상도/화면 모드/품질 목록·VSync·적용/닫기·15초 확인 패널. [8절](#8-시작-메뉴-설정)의 저장·복원·포커스 계약 유지 |
+| 캐릭터 생성 | 슬롯 카드·이름 입력·직업 선택·직업 상세·저장/취소/시작 버튼. 월드 프리뷰 표시와 투명 차단 영역 유지 |
+| 개발용 협동 | 방 생성·주소 입력·참가·대기실·준비/시작/나가기. Host와 원래 소유권의 버튼 활성화 조건 유지 |
+| RunMap | Designer/native 경로의 배경·경로 패널·노드 버튼·안내. 동적 `UGameplayActionButton::Configure`에서도 테마 적용 |
+| 상점 선택·상점 | 선택 목록·상점 이름·나가기·안내. Host 진행 권한 유지 |
+| 전투 결과 | Designer/native 경로의 배경·승리/패배 결과·Continue·메뉴 복귀. 결과별 기존 진행 조건 유지 |
+| 라운드 계획 | 좌우 패널·아군/적 계획·아군/스킬/대상 목록·계획/준비 버튼. 중앙 타일/유닛 지정과 해결 중 편집 잠금 유지 |
+| GameplayRoot 안내 | 저장 복구 안내·저장 다시 시도, 게임 중 협동 상태·나가기. 기존 표시 조건·저장 재시도·퇴장 동작과 안내 바깥 클릭 통과 유지 |
+
+### 9-3 반영과 검증
+
+C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / Win64 빌드 후 UE를 재시작한다. 명령은 [README](../README.md#개발-환경), 현재 검증 상태와 사용자 절차는 [TEST_REPORT 15절](TEST_REPORT.md#15-demonicui-공통-테마)을 따른다. 이전 설정·전투 실행 결과를 새 테마의 가독성·입력·쿠킹 성공 근거로 사용하지 않는다.
+
+에셋 선정 시 패키지 내부 썸네일과 직렬화된 `SizeX`·`SizeY`를 정적으로 조사했다. Unreal의 PNG 썸네일 저장 방식에 맞춰 조사 이미지의 R/B 채널을 보정했으며 게임 텍스처는 변환하지 않았다. 조사 산출물은 `Saved/Automation/DemonicUI`에 있고 실제 UI 실행 화면은 포함하지 않는다.

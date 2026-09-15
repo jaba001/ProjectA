@@ -25,6 +25,7 @@
 #include "HAL/PlatformTime.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "UI/MainMenu/MainMenuRootWidget.h"
+#include "UI/Theme/DemonicUITheme.h"
 #include "Widgets/SWindow.h"
 
 namespace
@@ -65,6 +66,7 @@ UTextBlock* UOptionsWidget::AddText(UVerticalBox* Parent, const FText& Text, int
     FSlateFontInfo Font = Label->GetFont();
     Font.Size = FontSize;
     Label->SetFont(Font);
+    UDemonicUITheme::Get().StyleText(Label, FontSize >= 22);
     Parent->AddChildToVerticalBox(Label)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, BottomPadding));
     return Label;
 }
@@ -72,7 +74,6 @@ UTextBlock* UOptionsWidget::AddText(UVerticalBox* Parent, const FText& Text, int
 UButton* UOptionsWidget::CreateButton(const FName Name, const FText& Text)
 {
     UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), Name);
-    Button->SetBackgroundColor(FLinearColor(0.16f, 0.2f, 0.27f));
     UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
     Label->SetText(Text);
     Label->SetJustification(ETextJustify::Center);
@@ -96,7 +97,7 @@ UComboBoxString* UOptionsWidget::AddSelector(UVerticalBox* Parent, const FName N
     LabelWidget->SetFont(Font);
     LabelSize->SetContent(LabelWidget);
     Row->AddChildToHorizontalBox(LabelSize)->SetVerticalAlignment(VAlign_Center);
-    UComboBoxString* Selector = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass(), Name);
+    UComboBoxString* Selector = WidgetTree->ConstructWidget<UDemonicComboBoxString>(UDemonicComboBoxString::StaticClass(), Name);
     Selector->SetContentPadding(FMargin(14.0f, 10.0f));
     Selector->SetMaxListHeight(260.0f);
     Row->AddChildToHorizontalBox(Selector)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
@@ -109,7 +110,7 @@ void UOptionsWidget::NativeOnInitialized()
     UOverlay* Root = WidgetTree->ConstructWidget<UOverlay>();
     WidgetTree->RootWidget = Root;
     UBorder* Background = WidgetTree->ConstructWidget<UBorder>();
-    Background->SetBrushColor(FLinearColor(0.015f, 0.022f, 0.035f, 1.0f));
+    UDemonicUITheme::Get().StyleBackdrop(Background);
     UOverlaySlot* BackgroundSlot = Root->AddChildToOverlay(Background);
     BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
     BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
@@ -124,13 +125,14 @@ void UOptionsWidget::NativeOnInitialized()
     Size->SetWidthOverride(760.0f);
     Scale->SetContent(Size);
     SettingsPanel = WidgetTree->ConstructWidget<UBorder>();
-    SettingsPanel->SetBrushColor(FLinearColor(0.035f, 0.05f, 0.075f, 1.0f));
+    UDemonicUITheme::Get().StylePanel(SettingsPanel);
     SettingsPanel->SetPadding(FMargin(32.0f));
     Size->SetContent(SettingsPanel);
     UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>();
     SettingsPanel->SetContent(Content);
     AddText(Content, NSLOCTEXT("Options", "Title", "설정"), 32, 8.0f);
     AddText(Content, NSLOCTEXT("Options", "Subtitle", "화면과 그래픽을 조정합니다. 변경한 값은 적용 후 저장됩니다."), 16, 24.0f);
+    UDemonicUITheme::Get().AddDivider(WidgetTree, Content);
     AddText(Content, NSLOCTEXT("Options", "DisplaySection", "화면"), 22, 6.0f);
     WindowMode = AddSelector(Content, TEXT("WindowModeSelect"), NSLOCTEXT("Options", "WindowMode", "화면 모드"));
     for (const TCHAR* Label : { TEXT("전체화면"), TEXT("테두리 없는 전체화면"), TEXT("창 모드") })
@@ -156,7 +158,6 @@ void UOptionsWidget::NativeOnInitialized()
     UHorizontalBox* Actions = WidgetTree->ConstructWidget<UHorizontalBox>();
     Content->AddChildToVerticalBox(Actions);
     ApplyButton = CreateButton(TEXT("ApplyOptionsButton"), NSLOCTEXT("Options", "Apply", "적용 및 저장"));
-    ApplyButton->SetBackgroundColor(FLinearColor(0.12f, 0.4f, 0.65f));
     ApplyButton->OnClicked.AddUniqueDynamic(this, &UOptionsWidget::ApplyOptions);
     UHorizontalBoxSlot* ApplySlot = Actions->AddChildToHorizontalBox(ApplyButton);
     ApplySlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
@@ -179,16 +180,22 @@ void UOptionsWidget::NativeOnInitialized()
     ConfirmationSize->SetWidthOverride(620.0f);
     ConfirmationScale->SetContent(ConfirmationSize);
     UVerticalBox* ConfirmationContent = WidgetTree->ConstructWidget<UVerticalBox>();
-    ConfirmationSize->SetContent(ConfirmationContent);
+    UBorder* ConfirmationFrame = WidgetTree->ConstructWidget<UBorder>();
+    UDemonicUITheme::Get().StylePanel(ConfirmationFrame);
+    ConfirmationFrame->SetPadding(FMargin(32.0f));
+    ConfirmationSize->SetContent(ConfirmationFrame);
+    ConfirmationFrame->SetContent(ConfirmationContent);
     AddText(ConfirmationContent, NSLOCTEXT("Options", "ConfirmTitle", "변경한 화면 설정을 유지할까요?"), 26, 20.0f);
     ConfirmationText = AddText(ConfirmationContent, FText::GetEmpty(), 18, 24.0f);
     UButton* Confirm = CreateButton(TEXT("ConfirmOptionsButton"), NSLOCTEXT("Options", "Keep", "유지 및 저장"));
-    Confirm->SetBackgroundColor(FLinearColor(0.12f, 0.4f, 0.65f));
     Confirm->OnClicked.AddUniqueDynamic(this, &UOptionsWidget::ConfirmOptions);
     ConfirmationContent->AddChildToVerticalBox(Confirm)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
     RevertButton = CreateButton(TEXT("RevertOptionsButton"), NSLOCTEXT("Options", "Revert", "이전 설정으로 복구"));
     RevertButton->OnClicked.AddUniqueDynamic(this, &UOptionsWidget::RevertOptions);
     ConfirmationContent->AddChildToVerticalBox(RevertButton);
+    UDemonicUITheme::Get().ApplyControls(WidgetTree);
+    UDemonicUITheme::Get().StyleButton(ApplyButton, true);
+    UDemonicUITheme::Get().StyleButton(Confirm, true);
     SetConfirmationVisible(false);
 }
 
