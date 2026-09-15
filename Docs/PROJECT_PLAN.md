@@ -250,4 +250,4 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 - WorldMap의 WorldSettings가 참조하는 WorldMapGameModeBase는 호환을 위해 보존한다.
 - 로컬 Snapshot·Listen Server·개발용 관리 저장의 구현을 실제 계정 인증, Steam 연결, PlayFab 운영, 경쟁 결과 검증이나 MMR 완료로 기록하지 않는다.
 - 빌드·자동화 결과와 사용자의 실제 조작 검증을 구분한다. 다음 구현 우선순위와 T14 잔여 조건은 [TODO](TODO.md), 최종 작동 확인은 [TEST_REPORT](TEST_REPORT.md)를 따른다.
-- 2026-09-16 계획 입력·AI 보완의 Editor 컴파일은 최종 초안 보존 수정을 포함해 성공했다. 최종 코드·문서 정적 검사 통과, 작동 검증 미실행이다. 최신 결과·절차는 [TEST_REPORT 17절](TEST_REPORT.md#17-계획-입력-검사와-장착-tile-공격-ai), 디자인 보류 범위와 해제 조건은 [TODO 8-3절](TODO.md#8-3-디자인-보류와-구현-재개-조건)을 따른다.
+- 2026-09-16 계획 입력·AI 보완의 Editor 컴파일은 최종 초안 보존 수정을 포함해 성공했다. 최종 코드·문서 정적 검사 통과, 작동 검증 미실행이다. 최신 결과·절차는 [TEST_REPORT 17절](TEST_REPORT.md#17-계획-입력-검사와-장착-tile-공격-ai), 디자인 보류 범위와 해제 조건은 [TODO 5절](TODO.md#5-디자인-확정-후-구현할-일)을 따른다.

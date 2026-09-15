@@ -214,7 +214,7 @@ S=10이고 중심과 상하좌우 네 칸 모두 적용 대상이면 다섯 유�
 
 | 근거 | 확인 위치 |
 |---|---|
-| 현재 전투 규칙·원작 참조 구분 | [GAME_DESIGN](GAME_DESIGN.md) 7-1·7-9·8-1~8-7, [TODO](TODO.md) 7·8절 |
+| 현재 전투 규칙·원작 참조 구분 | [GAME_DESIGN](GAME_DESIGN.md) 7-1·7-9·8-1~8-7, [TODO](TODO.md) 3-1·3-2절 |
 | 요청·소유권·서버와 저장 경계 | [MULTIPLAYER](MULTIPLAYER.md) 12절, [PROJECT_PLAN](PROJECT_PLAN.md)의 라운드 전투 구조 |
 | 명령·행동 단계·스킬과 유닛 상태 | [CombatRoundTypes.h](../Source/ProjectA/Combat/Round/CombatRoundTypes.h) 19~37·147~183행, [CombatRoundCoordinator.h](../Source/ProjectA/Combat/Round/CombatRoundCoordinator.h) 47~56행 |
 | 속도·AI·검증·잠금 | [CombatRoundCoordinator.cpp](../Source/ProjectA/Combat/Round/CombatRoundCoordinator.cpp)의 `BeginPlanning()`·`ValidateCommand()`·`LockPlans()`, 330~598행 |
