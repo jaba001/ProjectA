@@ -15,6 +15,7 @@
 #include "GameFramework/GameUserSettings.h"
 #include "GameFramework/Pawn.h"
 #include "Misc/Paths.h"
+#include "Misc/ScopeExit.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "UI/MainMenu/CharacterCreationWidget.h"
 #include "UI/MainMenu/MainMenuPreviewStage.h"
@@ -74,25 +75,11 @@ public:
             {
                 return true;
             }
+            if (!CheckOptions(Menu))
+            {
+                return true;
+            }
             Menu->ShowCharacterCreationScreen();
-            UOptionsWidget* Options = CreateWidget<UOptionsWidget>(Menu, UOptionsWidget::StaticClass());
-            Options->ActivateWidget();
-            UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings();
-            const auto PreviousQuality = Settings->ScalabilityQuality;
-            const bool bPreviousVSync = Settings->IsVSyncEnabled();
-            UComboBoxString* Quality = Cast<UComboBoxString>(Options->GetWidgetFromName(TEXT("QualitySelect")));
-            UCheckBox* VSync = Cast<UCheckBox>(Options->GetWidgetFromName(TEXT("VSyncCheck")));
-            Quality->SetSelectedIndex(1);
-            VSync->SetIsChecked(!bPreviousVSync);
-            Test->TestEqual(TEXT("Options remain unchanged before Apply."), Settings->IsVSyncEnabled(), bPreviousVSync);
-            Options->ApplyOptions();
-            Settings->LoadSettings(true);
-            Test->TestEqual(TEXT("Quality persists after reload."), Settings->GetOverallScalabilityLevel(), 1);
-            Test->TestEqual(TEXT("VSync persists after reload."), Settings->IsVSyncEnabled(), !bPreviousVSync);
-            Settings->ScalabilityQuality = PreviousQuality;
-            Settings->SetVSyncEnabled(bPreviousVSync);
-            Settings->ApplySettings(false);
-            Options->DeactivateWidget();
             Advance();
             return false;
         }
@@ -287,6 +274,101 @@ private:
         Preview->SetPreviewActorForSlot(0, TEXT("MissingProfession"));
         Test->TestNull(TEXT("Missing preview class clears the old actor."), Preview->GetPreviewActorForSlot(0));
         NativeRoot->RemoveFromParent();
+        return true;
+    }
+
+    bool CheckOptions(AMainMenuPlayerController* Menu)
+    {
+        UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings();
+        UOptionsWidget* Options = CreateWidget<UOptionsWidget>(Menu, UOptionsWidget::StaticClass());
+        if (!Require(Settings && Options, TEXT("The options screen and engine settings are available.")))
+        {
+            return false;
+        }
+        const Scalability::FQualityLevels PreviousQuality = Settings->ScalabilityQuality;
+        const bool bPreviousVSync = Settings->IsVSyncEnabled();
+        const FIntPoint PreviousResolution = Settings->GetScreenResolution();
+        const EWindowMode::Type PreviousWindowMode = Settings->GetFullscreenMode();
+        ON_SCOPE_EXIT
+        {
+            Options->DeactivateWidget();
+            Settings->SetFullscreenMode(PreviousWindowMode);
+            Settings->SetScreenResolution(PreviousResolution);
+            // Restore the complete quality snapshot after video setters adjust resolution scale.
+            // 화면 설정 함수가 렌더링 비율을 조정한 뒤 전체 품질 스냅샷을 복구합니다.
+            Settings->ScalabilityQuality = PreviousQuality;
+            Settings->SetVSyncEnabled(bPreviousVSync);
+            Settings->ApplyNonResolutionSettings();
+            Settings->SaveSettings();
+        };
+        Options->ActivateWidget();
+        UComboBoxString* Resolution = Cast<UComboBoxString>(Options->GetWidgetFromName(TEXT("ResolutionSelect")));
+        UComboBoxString* WindowMode = Cast<UComboBoxString>(Options->GetWidgetFromName(TEXT("WindowModeSelect")));
+        UComboBoxString* Quality = Cast<UComboBoxString>(Options->GetWidgetFromName(TEXT("QualitySelect")));
+        UCheckBox* VSync = Cast<UCheckBox>(Options->GetWidgetFromName(TEXT("VSyncCheck")));
+        if (!Require(Resolution && WindowMode && Quality && VSync, TEXT("Options exposes resolution, screen mode, quality and VSync controls.")))
+        {
+            return false;
+        }
+        Test->TestEqual(TEXT("All three screen modes are available."), WindowMode->GetOptionCount(), 3);
+        Test->TestTrue(TEXT("The current screen has a selectable resolution."), Resolution->GetSelectedIndex() != INDEX_NONE);
+        const FString SavedResolutionOption = Resolution->GetSelectedOption();
+        const int32 SavedQualityIndex = Quality->GetSelectedIndex();
+        WindowMode->SetSelectedIndex(static_cast<int32>(EWindowMode::WindowedFullscreen));
+        Test->TestFalse(TEXT("Borderless mode disables independent resolution selection."), Resolution->GetIsEnabled());
+        WindowMode->SetSelectedIndex(static_cast<int32>(EWindowMode::Windowed));
+        Test->TestTrue(TEXT("Windowed mode enables available resolution choices."), Resolution->GetIsEnabled());
+        WindowMode->SetSelectedIndex(static_cast<int32>(PreviousWindowMode == EWindowMode::Windowed ? EWindowMode::Fullscreen : EWindowMode::Windowed));
+        if (Resolution->GetOptionCount() > 1) Resolution->SetSelectedIndex((Resolution->GetSelectedIndex() + 1) % Resolution->GetOptionCount());
+        Quality->SetSelectedIndex(1);
+        VSync->SetIsChecked(!bPreviousVSync);
+        Test->TestTrue(TEXT("Draft quality edits do not change engine settings."), Settings->ScalabilityQuality == PreviousQuality);
+        Test->TestEqual(TEXT("Options remain unchanged before Apply."), Settings->IsVSyncEnabled(), bPreviousVSync);
+        Test->TestEqual(TEXT("Draft screen mode edits do not change engine settings."), Settings->GetFullscreenMode(), PreviousWindowMode);
+        Test->TestEqual(TEXT("Draft resolution edits do not change engine settings."), Settings->GetScreenResolution(), PreviousResolution);
+        Options->DeactivateWidget();
+        Options->ActivateWidget();
+        Test->TestEqual(TEXT("Reopening discards the unsaved screen mode."), WindowMode->GetSelectedIndex(), static_cast<int32>(PreviousWindowMode));
+        Test->TestEqual(TEXT("Reopening discards the unsaved resolution."), Resolution->GetSelectedOption(), SavedResolutionOption);
+        Test->TestEqual(TEXT("Reopening discards the unsaved quality preset."), Quality->GetSelectedIndex(), SavedQualityIndex);
+        Test->TestEqual(TEXT("Reopening discards the unsaved VSync value."), VSync->IsChecked(), bPreviousVSync);
+
+        // Leave screen changes unapplied in PIE; real display confirmation is a separate user check.
+        // PIE에서는 화면 변경을 적용하지 않으며 실제 화면 확인은 별도 사용자 검증으로 수행합니다.
+        Quality->SetSelectedIndex(1);
+        VSync->SetIsChecked(!bPreviousVSync);
+        Options->ApplyOptions();
+        Settings->LoadSettings(true);
+        Test->TestEqual(TEXT("Quality persists after reload."), Settings->GetOverallScalabilityLevel(), 1);
+        Test->TestEqual(TEXT("VSync persists after reload."), Settings->IsVSyncEnabled(), !bPreviousVSync);
+        for (int32 CustomCase = 0; CustomCase < 2; ++CustomCase)
+        {
+            Settings->SetOverallScalabilityLevel(2);
+            if (CustomCase == 0)
+            {
+                Settings->ScalabilityQuality.LandscapeQuality = 0;
+            }
+            else
+            {
+                Settings->ScalabilityQuality.ResolutionQuality = 73.0f;
+            }
+            const Scalability::FQualityLevels CustomQuality = Settings->ScalabilityQuality;
+            Options->DeactivateWidget();
+            Options->ActivateWidget();
+            Test->TestEqual(TEXT("A custom landscape or render scale is displayed as custom quality."), Quality->GetSelectedIndex(), 5);
+            const bool bSavedVSync = !Settings->IsVSyncEnabled();
+            VSync->SetIsChecked(bSavedVSync);
+            Options->ApplyOptions();
+            Settings->LoadSettings(true);
+            Test->TestTrue(TEXT("Saving VSync preserves all custom quality fields after reload."), Settings->ScalabilityQuality == CustomQuality);
+            Test->TestEqual(TEXT("VSync saves immediately while custom quality is retained."), Settings->IsVSyncEnabled(), bSavedVSync);
+            Scalability::FQualityLevels ExpectedPreset;
+            ExpectedPreset.SetFromSingleQualityLevel(2);
+            Quality->SetSelectedIndex(2);
+            Options->ApplyOptions();
+            Settings->LoadSettings(true);
+            Test->TestTrue(TEXT("Selecting a preset replaces custom landscape and render scale values."), Settings->ScalabilityQuality == ExpectedPreset);
+        }
         return true;
     }
 
