@@ -97,9 +97,13 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 - 수정하지 않은 이름은 직업 표시명과 슬롯 번호를 사용한다. 개별 이름 변경은 `SetSlotCharacterName`으로 반영한다.
 - 첫 스폰은 직업 정의 HP 또는 클래스 기본 HP, 이후 전투는 저장한 결과 HP를 사용한다. HP 0인 멤버는 다음 전투에 스폰하지 않는다.
 
+`UPartyDefinitionDataAsset::IsDataValid`는 Unreal Data Validation에서 동일한 `ResolveProfession` 검사를 사용한다. 에셋 경로·직업 ID와 함께 누락 클래스, 유효하지 않은 HP/AP, 빈·누락·중복 시작 스킬과 잘못된 라운드 프로필을 보고한다. 직업 클래스 → `PlayerUnitClasses` → 명시 fallback 순서와 클래스 기본값 사용은 유지한다. 제작 파티 에셋을 Content Browser에서 선택해 **Validate Assets**로 사전 확인할 수 있으며, 전투 실행 검증과 구분한다.
+
 ### 행동과 결과
 
 `CanStartNode → BeginEncounter → PrepareArena → SpawnParty/Enemies → ConfigureCombatParticipants → MarkCombatStarted → StartCombat`으로 시작한다. 누락 클래스·잘못된 초기 배치·등록 실패는 부분 스폰을 정리하고 오류를 표시한다.
+
+준비 취소의 지도 저장이 실패하면 `AEncounterManager`가 취소 대기와 원래 준비 오류를 보존한다. `URunStateSubsystem::AbortEncounter`는 일반·관리 Run 모두 저장 실패 시 기존 단계·노드를 복구한다. Host의 기존 **저장 다시 시도**로 취소를 반복하며 저장 성공 후 Map으로 돌아간다. 대기 중 새 노드 시작·중복 스폰은 허용하지 않는다. 상세 검증은 [TEST_REPORT 18절](TEST_REPORT.md#18-준비-취소-복구와-파티-데이터-사전-검사)을 따른다.
 
 `ACombatRoundCoordinator`가 계획·준비·잠금·해결을 관리한다. 양 팀 생존자의 `CombatSpeed`로 시작 지연을 고정하며 라운드마다 AP/SubAP를 초기화한다. 서버가 명령의 소유권·전투 ID·라운드·수정 번호·부여 스킬·자원·대상·최종 배치를 검증하고 잠금 시 비용을 한 번 차감한다.
 
@@ -117,7 +121,7 @@ Standalone은 결과 저장 성공 후 유닛·전투 상태를 정리한다. �
 
 MainMenu·Gameplay GameMode는 `InitializeHUDForPlayer`에서 HUDClass가 있을 때만 엔진 기본 AHUD 초기화를 호출한다. HUDClass=None인 CommonUI 화면은 빈 클래스 생성 요청을 생략한다.
 
-GameplayCue 검색은 `DefaultGame.ini`에 `GameplayAbilitiesDeveloperSettings.GameplayCueNotifyPaths=/Game/User_JeHoon`을 지정했다. 다만 ff22940의 실제 실행에서는 설정 배열이 비어 있고 `/Game` fallback 경고가 재발해 적용 원인 조사와 수정이 필요하다. 현재 `/Game`의 GameplayCueNotify 에셋은 0개이며 외부 Cue 도입 시 의존 경로도 등록한다. 검증 근거는 [TEST_REPORT 8절](TEST_REPORT.md#8-hudgameplaycue-경고-수정)을 따른다.
+GameplayCue 검색은 `DefaultGame.ini`의 `GameplayAbilitiesDeveloperSettings`와 `AbilitySystemGlobals`에 `GameplayCueNotifyPaths=/Game/User_JeHoon`을 지정한다. UE 5.7은 두 배열을 중복 없이 합친다. DeveloperSettings 배열이 비었던 이전 실행에 대비한 공식 호환 설정 보완이며, 빈값의 최초 원인과 최신 실행의 경고 해소는 아직 확인하지 않았다. 이전 에셋 조사에서는 `/Game`의 GameplayCueNotify 에셋이 0개였으며 외부 Cue 도입 시 의존 경로도 등록한다. 검증 근거는 [TEST_REPORT 8절](TEST_REPORT.md#8-hudgameplaycue-경고-수정)을 따른다.
 
 GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMenu의 UIOnly 상태에서 travel한 뒤 남는 viewport `IgnoreInput`과 로컬 포커스는 native 진입 코드가 복구한다. 이 입력 수정에는 WBP 재생성이 필요 없다.
 

@@ -865,19 +865,14 @@ bool URunStateSubsystem::AbortEncounter()
     CurrentNodeId = NAME_None;
     CurrentEncounterId = NAME_None;
     Phase = ERunPhase::Map;
-    if (bManagedRun)
+    // Keep the failed preparation retryable until its map checkpoint is durable.
+    // 지도 체크포인트가 저장될 때까지 실패한 준비의 취소를 재시도할 수 있게 유지합니다.
+    if (bCheckpointSaving && !SaveCheckpoint(SaveError))
     {
-        if (!SaveCheckpoint(SaveError))
-        {
-            CurrentNodeId = PreviousNode;
-            CurrentEncounterId = PreviousEncounter;
-            Phase = PreviousPhase;
-            return false;
-        }
-    }
-    else
-    {
-        AutoSaveCheckpoint();
+        CurrentNodeId = PreviousNode;
+        CurrentEncounterId = PreviousEncounter;
+        Phase = PreviousPhase;
+        return false;
     }
     OnRunStateChanged.Broadcast();
     return true;

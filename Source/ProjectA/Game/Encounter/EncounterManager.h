@@ -50,11 +50,16 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+    friend class FEncounterPreparationRetryTest;
+#endif
+
     bool SpawnEncounter(UEncounterDefinitionDataAsset* Definition);
     void HandleCombatResult(ECombatResult Result);
     void FinishEncounter();
     void CleanupEncounter();
     bool FailPreparation(const FText& Message);
+    bool TryAbortPreparation();
     void SetPlayerCombatInput(bool bEnabled);
     bool ConfigureCombatParticipants(FText& OutError);
     bool ValidateManagedExecution(FText& OutError, bool bAllowResumePending = false) const;
@@ -81,8 +86,10 @@ private:
     TMap<int32, TObjectPtr<AUnitBase>> PartyActors;
 
     FText FlowMessage;
+    FText PreparationFailureMessage;
     ECombatResult PendingResult = ECombatResult::None;
     FTimerHandle FinishTimer;
     bool bPreparing = false;
+    bool bPreparationAbortPending = false;
     bool bShuttingDown = false;
 };

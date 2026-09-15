@@ -55,7 +55,15 @@ public:
     TMap<FName, FProfessionDefinition> Professions;
 
     bool ResolveProfession(FName ClassId, FProfessionDefinition& OutDefinition) const;
+    bool ResolveProfession(FName ClassId, FProfessionDefinition& OutDefinition, FText& OutError) const;
     FText GetProfessionDetails(FName ClassId) const;
+
+#if WITH_EDITOR
+    // Validate the resolved runtime loadout, including legacy class fallbacks.
+    // 기존 클래스 대체 경로를 포함한 실제 런타임 장착 구성을 검증합니다.
+    virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
+#endif
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Party")
     TMap<FName, TSubclassOf<APlayerUnit>> PlayerUnitClasses;
 

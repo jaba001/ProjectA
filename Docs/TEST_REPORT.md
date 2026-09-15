@@ -9,7 +9,7 @@
 | 2인 전투 / 6 | HUD·Cue 수정 전 경고 동반 성공 1건, 오류 0·경고 4 |
 | 4인 전투 / 7 | HUD·Cue 수정 전 경고 동반 성공 1건, 오류 0·경고 6 |
 | 승계 / 2 | 개발용 UI 추가 전 ff22940 기준 PIE 3건·관리 계약 4건 통과. 테스트 오류 0·경고 11 |
-| HUD·Cue 수정 / 8 | 2절에서 빈 HUD 경고 미발생, Cue fallback 재발. 8-1~8-3 별도 대기 |
+| HUD·Cue 수정 / 8 | 기존 실행에서 Cue fallback 재발. UE 5.7의 Globals 호환 설정 보완·검색 경로 회귀 코드 추가. 최신 작동 확인 미실행 |
 | 직접 조작·콘텐츠 경로 / 1·5 | 검증 대기 |
 | 서비스 준비 / 4 | Steam App ID·PlayFab Title 미준비 |
 | 개발용 협동 UI / 9 | Editor 컴파일·정적 검사 완료, 작동 검증 미실행 |
@@ -20,6 +20,7 @@
 | DemonicUI 공통 테마 / 15 | 메뉴·설정·캐릭터 생성·협동·Run·상점·결과·라운드 계획과 저장/협동 안내에 적용. 프로젝트 재생성·최종 Editor 빌드·텍스처 참조/문서 정적 검사 통과. 작동 검증 14항목 미실행 |
 | 공통 DPI·전투 화면 배치 / 16 | 1920×1080 기준 공통 배율, 화면별 추가 축소 제거·전투 가로 여백/고정 카메라 비율 해제. Editor 컴파일·배율/카메라/문서 정적 검사 통과. 작동 검증 8항목 미실행 |
 | 계획 입력 검사·장착 Tile 공격 AI / 17 | 합법 대상·적용 전 검사·준비 조건과 장착된 복귀형 Tile 공격 AI 보완. 회귀 코드 4건과 최종 초안 보존 수정 포함 Editor 컴파일 성공, 최종 코드·문서 정적 검사 통과. 자동화·사용자 작동 검증 8항목 미실행 |
+| 준비 취소 복구·파티 데이터 사전 검사 / 18 | 취소 저장 재시도와 원래 오류 보존, Unreal Data Validation 연결. 최신 컴파일·정적 검사 결과는 18-3절, 작동 확인은 미실행 |
 
 2·6·7절과 이전 관리/턴 복구 성공은 당시 순차 전투 이력이다. 현재 실행 경로와 테스트 계약이 바뀌었으므로 최신 라운드 성공 근거 또는 그대로 실행할 절차로 사용하지 않는다.
 
@@ -191,17 +192,18 @@ $reportPath = Join-Path (Get-Location) ('Saved/Automation/UserManagedRun_' + (Ge
 - 설정: UE 5.7의 `GameplayAbilitiesDeveloperSettings.GameplayCueNotifyPaths`를 `/Game/User_JeHoon`으로 지정. 외부 Cue 추가 시 필요한 검색 경로도 등록한다.
 - 조사: AssetRegistry의 `/Game` 전체 메타데이터에서 GameplayCueNotify 계열 에셋 0개. 현재 검색 범위 축소로 제외되는 기존 Cue는 발견되지 않았다. 로그: `Saved/Automation/GameplayCueAssetInventory.json`.
 - 수정 당시 검증: Development Editor / Win64 빌드 성공(`Saved/Automation/HudCueWarningBuild.log`). 엔진 소스의 HUD 호출·DeveloperSettings 읽기 경로와 Config를 정적으로 대조했으며 당시 작동 테스트는 미실행이었다.
-- 후속 2절 검증: 빈 HUD 생성 경고는 미발생이나 GameplayCue fallback은 1건 재발했다. 별도 읽기 진단에서 실제 DeveloperSettings의 `GameplayCueNotifyPaths`가 빈 배열임을 확인했다(`Saved/Automation/ManagedCueSettingsDiagnostic.json`, 최종 진단 종료 코드 0). 파일의 설정과 실행값이 다른 원인은 추가 조사 대상이다. Python 접근명 조정 전 진단 시도 2회는 실패했으며 승계 테스트 실패와 구분한다.
+- 후속 2절 검증: 빈 HUD 생성 경고는 미발생이나 GameplayCue fallback은 1건 재발했다. 별도 읽기 진단에서 실제 DeveloperSettings의 `GameplayCueNotifyPaths`가 빈 배열임을 확인했다(`Saved/Automation/ManagedCueSettingsDiagnostic.json`, 최종 진단 종료 코드 0). 파일의 설정과 실행값이 다른 최초 원인은 미확정이다. Python 접근명 조정 전 진단 시도 2회는 실패했으며 승계 테스트 실패와 구분한다.
+- 2026-09-16 보완: `DefaultGame.ini`의 `AbilitySystemGlobals.GameplayCueNotifyPaths`에도 `/Game/User_JeHoon`을 등록했다. 로컬 UE 5.7 소스에서 기존 배열의 `UPROPERTY(config)` 선언, DeveloperSettings 배열과의 `TSet` 합산, 합산 결과가 비었을 때만 `/Game`을 추가하는 경로를 확인했다. 기존 사용자 추가 경로를 덮지 않으며 로그를 숨기지 않는다. 회귀 `ProjectA.Configuration.GameplayCueEffectivePaths`는 프로젝트 경로·전체 검색 부재·추가 경로 보존을 검사한다. 컴파일 결과는 18-3절, 회귀 실행은 미실행이다.
 
 준비: 수정된 Editor 빌드로 재시작하고 기존 작업을 저장한다. 생성 경고·Cue fallback과 종료 NavMesh 경고를 구분해 기록한다.
 
 | ID | 사용자 실행 절차 | 기대 결과 | 상태 |
 |---|---|---|---|
-| 8-1 | MainMenu → 캐릭터 생성 → Gameplay 진입 | 빈 클래스 생성 경고 없이 기존 메뉴·CommonUI·전투 화면 유지 | 미실행 |
-| 8-2 | `ProjectA.Coop.ListenServerClientCombat` 실행 | 2인 조작권·행동·동기화 통과, 기존 SpawnActor/Cue 경고 미발생 | 미실행 |
-| 8-3 | `ProjectA.Coop.ListenServerFourPlayerCombat` 실행 | 4인 조작권·행동·동기화 통과, 기존 SpawnActor/Cue 경고 미발생 | 미실행 |
+| 8-1 | MainMenu → 캐릭터 생성 → Gameplay 진입 후 회귀 `ProjectA.Configuration.GameplayCueEffectivePaths` 확인 | 제작 경로 포함·전체 `/Game` fallback 없음, 빈 HUD 생성 경고 없이 기존 화면 유지 | 미실행 |
+| 8-2 | 9절의 개발용 협동 절차로 일반 2인 전투 진행 | 2인 조작권·계획·피격·결과 일치, 기존 SpawnActor/Cue 경고 미발생 | 미실행 |
+| 8-3 | 9절의 개발용 협동 절차를 4인으로 확대 | 4인 조작권·계획·피격·결과 일치, 기존 SpawnActor/Cue 경고 미발생 | 미실행 |
 
-8-2/8-3은 [개발 실행 참조](MULTIPLAYER.md#개발-실행-참조)의 필터를 해당 이름으로 지정한다. JSON 상태와 경고를 함께 확인한다. 커스텀 HUDClass 사용 시 임시 GameMode 사본에서 기존 AHUD 초기화 유지도 확인한다. 종료 NavMesh 경고는 이번 수정 대상에서 제외한다.
+8-2/8-3은 [9절](#9-개발용-협동-ui)의 최신 수동 절차를 사용한다. 제거된 순차 전투 fixture를 재실행 절차로 사용하지 않는다. 회귀 JSON 상태와 서버·클라이언트 로그의 경고를 함께 확인한다. 커스텀 HUDClass 사용 시 제작 경로 아래 임시 GameMode 사본에서 기존 AHUD 초기화 유지도 확인한다. 종료 NavMesh·Editor 초기화 경고는 별도로 추적한다.
 
 ## 9. 개발용 협동 UI
 
@@ -557,6 +559,42 @@ Development Editor / Win64 컴파일은 [CombatRoundTests.cpp](../Source/Project
 게임 플레이·PIE·Unreal 자동화 테스트·패키지 실행은 수행하지 않았다. 위 작동 검증 8항목과 회귀 테스트 4건은 미실행이며 UI/네트워크의 실제 오류·경고와 동작은 미확인이다. 테스트 fixture는 규칙·명령 생성 검증이며 시각·클릭·실제 이동/피격의 통과를 보장하지 않는다.
 
 대상이 잘못 표시되거나 계획/준비가 막히면 항목 ID·소유 유닛·스킬·대상/좌표·현재 AP/SubAP·라운드 단계·서버 오류를 기록한다. AI가 예상과 다른 행동을 선택하면 장착 스킬 순서·명시 프로필·가까운 적의 HomeCoord와 고정 전후 의도를 비교한다. 재현 정보로 데이터 부적합·입력 갱신·서버 최종 거절을 구분하며, 사용자 결과가 오기 전에는 미실행 상태를 완료로 변경하지 않는다.
+
+## 18 준비 취소 복구와 파티 데이터 사전 검사
+
+### 18-1 목적과 대상
+
+전투 준비 취소 중 저장 실패로 진행이 멈추는 문제를 복구하고, 파티 설정 오류를 게임 시작 전에 찾는다.
+
+- `AEncounterManager`는 준비 오류와 취소 대기를 보존한다. 기존 재시도 경로에서 취소를 우선 처리하며 성공한 Map 이벤트 전에 대기 상태를 해제한다.
+- `URunStateSubsystem::AbortEncounter`는 일반·관리 Run 모두 저장 실패 시 원래 단계·노드를 복구한다. 기존 확정 저장은 유지하며 저장 성공 시에만 Map을 공개한다.
+- 저장 실패 중 화면은 기존 정책에 따라 저장 오류를 우선 표시한다. 원래 준비 오류는 내부에 보존하고 취소 저장 성공 후 Map에서 다시 표시한다. 재시도는 현재 로컬 Host만 수행한다.
+- 파티 Data Validation은 런타임 직업 해석을 공유한다. 클래스 fallback과 클래스 기본값 사용을 유지하며 직업 ID·문제 필드·에셋 경로를 오류에 포함한다. 새 밸런스·아이템 규칙은 추가하지 않는다.
+
+### 18-2 준비와 사용자 실행
+
+최신 Development Editor 빌드로 UE를 재시작한다. 기본 플레이와 에셋 사전 검사는 기존 제작 에셋을 사용하며 복제·재생성이 필요 없다. 회귀 테스트의 임시 저장은 고유 슬롯을 사용한다. 실사용 세이브로 권한 변경이나 파일 손상을 강제하지 않는다.
+
+| ID | 실행 절차 | 기대 결과 | 상태 |
+|---|---|---|---|
+| 18-1 | Session Frontend에서 `ProjectA.Encounter.PreparationAbortRetry` 실행 | Preparing·Combat 양쪽의 준비 실패에서 액터·점유 정리, 저장 2회 실패 중 기존 단계·노드·파일 보존, 동일 재시도 성공 후 Map 이벤트 1회·중복 재시도 거절 | 미실행 |
+| 18-2 | `ProjectA.Run.Managed.OrderedResumeAndProgression` 실행 | 관리 준비 취소와 늦은 Combat 취소의 저장 실패 시 stamp·파일 보존, 재시도 성공 후 revision 1회 증가와 노드 재선택 | 미실행 |
+| 18-3 | 테스트 Run에서 준비 취소 저장 오류가 발생한 경우 Host의 저장 다시 시도를 선택하고, 저장 가능 상태 복구 뒤 다시 선택 | 실패 중 안내와 버튼 유지·전투 입력 차단, 성공 후 버튼 해제·원래 준비 오류 표시·Map 복귀. Client는 Host 저장을 직접 재시도하지 않음 | 미실행 |
+| 18-4 | Content Browser에서 `/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty` 선택 → Asset Actions → Validate Assets | 현재 유효한 직업·스킬 구성이 통과. 실패하면 해당 직업과 클래스·능력치·시작 스킬 원인이 표시됨 | 미실행 |
+| 18-5 | `ProjectA.Party.ProfessionDataValidation` 실행 | 기존 카탈로그와 legacy fallback 통과, 비활성 override 무시, 잘못된 HP/AP·누락/중복 스킬·잘못된 프로필 거절, 복구 후 오류 해제 | 미실행 |
+| 18-6 | 일반 새 Run에서 직업 선택 → 첫 전투 → 결과·상점 → 두 번째 전투 진행 | 기존 캐릭터 생성·시작 스킬·전투 준비·상점 진행 유지. 정상 경로에 취소 재시도 안내가 나타나지 않음 | 미실행 |
+
+최초 수동 확인은 18-4와 18-6을 기존 싱글 Run 확인에 묶는다. 18-1·18-2·18-5는 자동화 실행 결과로 판단하며, 18-3은 UI 복구 경로의 별도 확인이다. 발생하지 않은 저장 오류를 정상 플레이 성공만으로 검증 완료 처리하지 않는다. Cue 보완은 [8절](#8-hudgameplaycue-경고-수정), 일반 협동은 [9절](#9-개발용-협동-ui)을 따른다.
+
+### 18-3 개발 확인과 제한
+
+2026-09-16 프로젝트 파일 재생성 성공: 23.17초, `Saved/Logs/TodoAutonomyProjectFiles.log`. 신규 회귀 소스 2개를 포함한 Development Editor / Win64 컴파일 성공: 14.72초, 컴파일 오류·경고 0, `Saved/Logs/TodoAutonomyBuild.log`.
+
+추가 회귀는 `ProjectA.Configuration.GameplayCueEffectivePaths`, `ProjectA.Encounter.PreparationAbortRetry`, `ProjectA.Party.ProfessionDataValidation` 3건이며 기존 관리 진행 회귀 1건을 확장했다. 코드는 컴파일했지만 에디터·게임·PIE·자동화·패키지와 에셋 Validate Assets는 실행하지 않았다. 컴파일 성공은 동작 성공을 의미하지 않는다.
+
+코드 검토는 저장 실패 전후 상태·기존 파일 보존·재시도 권한·동기 이벤트·직업 fallback과 동일한 수용 조건을 확인했다. 독립 코드 리뷰에서 합의된 동작 범위의 추가 P1/P2 문제는 발견하지 못했다. 문서 9개·로컬 링크 227개·앵커 136개·표 99개, 회귀 선언 4개와 프로젝트 파일의 신규 소스 2개 반영, `git diff --check` 검사를 통과했다. 정적 결과는 `Saved/Automation/TodoAutonomyStatic.json`에 기록했다.
+
+기존 DeveloperSettings 배열 빈값의 최초 원인은 미확정이며 Cue 경고 해소·NavMesh·Editor 초기화 경고와 실제 UI 복구는 사용자 실행 결과 대기다. 오류 발생 시 해당 항목 ID·처음 표시된 오류·Preparing/Combat/Map 단계·Host 여부와 로그를 전달하면 관련 경로를 우선 수정한다. 기존 사용자 에셋 삭제 3건은 이번 변경에 포함하지 않았다.
 
 ## 사용자 결과 기록
 

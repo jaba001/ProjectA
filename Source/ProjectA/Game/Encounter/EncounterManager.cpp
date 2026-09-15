@@ -51,7 +51,7 @@ void AEncounterManager::InitializeEncounter(ACombatArena* InArena, ACombatManage
 
 bool AEncounterManager::RequestStartNode(FName NodeId)
 {
-    if (!HasAuthority() || bShuttingDown || bPreparing || PendingResult != ECombatResult::None || !RunState || !RunState->CanStartNode(NodeId))
+    if (!HasAuthority() || bShuttingDown || bPreparing || bPreparationAbortPending || PendingResult != ECombatResult::None || !RunState || !RunState->CanStartNode(NodeId))
     {
         return false;
     }
@@ -61,6 +61,7 @@ bool AEncounterManager::RequestStartNode(FName NodeId)
         return false;
     }
     bPreparing = true;
+    PreparationFailureMessage = FText::GetEmpty();
     FlowMessage = FText::GetEmpty();
     SetPlayerCombatInput(false);
     if (!RunState->BeginEncounter(NodeId))
@@ -232,7 +233,7 @@ bool AEncounterManager::CanRetryCombatCheckpoint() const
         return false;
     }
     const bool bCanResumeOutsideCombat = RunState->GetPhase() != ERunPhase::Combat && RunState->IsManagedRun() && RunState->IsManagedResumePending() && SpawnedUnits.IsEmpty();
-    return bCanResumeOutsideCombat || (PendingResult != ECombatResult::None && !RunState->GetSaveError().IsEmpty());
+    return bPreparationAbortPending || bCanResumeOutsideCombat || (PendingResult != ECombatResult::None && !RunState->GetSaveError().IsEmpty());
 }
 
 bool AEncounterManager::RetryCombatCheckpoint(FText& OutError)
@@ -241,6 +242,12 @@ bool AEncounterManager::RetryCombatCheckpoint(FText& OutError)
     {
         OutError = FText::FromString(TEXT("재시도할 전투 저장이 없습니다."));
         return false;
+    }
+    if (bPreparationAbortPending)
+    {
+        const bool bAborted = TryAbortPreparation();
+        OutError = bAborted ? FText::GetEmpty() : FlowMessage;
+        return bAborted;
     }
     if (RunState->IsManagedRun() && RunState->IsManagedResumePending() && SpawnedUnits.IsEmpty())
     {
@@ -509,13 +516,29 @@ bool AEncounterManager::LeaveRunEncounter()
 
 bool AEncounterManager::FailPreparation(const FText& Message)
 {
-    FlowMessage = Message;
+    PreparationFailureMessage = Message;
+    bPreparationAbortPending = true;
     CleanupEncounter();
     bPreparing = false;
-    RunState->AbortEncounter();
+    TryAbortPreparation();
     UE_LOG(LogTemp, Error, TEXT("[Encounter] %s"), *Message.ToString());
-    OnFlowChanged.Broadcast();
     return false;
+}
+
+bool AEncounterManager::TryAbortPreparation()
+{
+    // Clear the retry flag before a successful abort publishes the map transition synchronously.
+    // 취소 성공이 지도 전환을 동기 통지하기 전에 재시도 플래그를 해제합니다.
+    bPreparationAbortPending = false;
+    FlowMessage = PreparationFailureMessage;
+    if (!RunState->AbortEncounter())
+    {
+        bPreparationAbortPending = true;
+        const FText Error = RunState->GetSaveError().IsEmpty() ? FText::FromString(TEXT("전투 준비 취소를 완료하지 못했습니다. 저장 다시 시도를 사용하세요.")) : RunState->GetSaveError();
+        FlowMessage = FText::Format(FText::FromString(TEXT("{0}\n{1}")), PreparationFailureMessage, Error);
+    }
+    OnFlowChanged.Broadcast();
+    return !bPreparationAbortPending;
 }
 
 void AEncounterManager::SetPlayerCombatInput(bool bEnabled)
@@ -583,6 +606,8 @@ void AEncounterManager::ShutdownGameplay()
     }
     CleanupEncounter();
     PendingResult = ECombatResult::None;
+    bPreparationAbortPending = false;
+    PreparationFailureMessage = FText::GetEmpty();
 }
 
 void AEncounterManager::EndPlay(const EEndPlayReason::Type EndPlayReason)

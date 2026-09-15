@@ -33,16 +33,28 @@ UPartyDefinitionDataAsset::UPartyDefinitionDataAsset()
 
 bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefinition& OutDefinition) const
 {
+    FText Error;
+    return ResolveProfession(ClassId, OutDefinition, Error);
+}
+
+bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefinition& OutDefinition, FText& OutError) const
+{
+    OutError = FText::GetEmpty();
+    const auto Fail = [this, ClassId, &OutError](const FText& Reason)
+    {
+        OutError = FText::Format(NSLOCTEXT("PartyDefinition", "ProfessionError", "{0} [{1}]: {2}"), FText::FromString(GetPathName()), FText::FromName(ClassId), Reason);
+        return false;
+    };
     const FProfessionDefinition* Definition = Professions.Find(ClassId);
     if (!Definition)
     {
-        return false;
+        return Fail(NSLOCTEXT("PartyDefinition", "MissingProfession", "Profession definition is missing. / 직업 정의가 없습니다."));
     }
     OutDefinition = *Definition;
     OutDefinition.CombatClass = ResolvePlayerClass(ClassId);
     if (!OutDefinition.CombatClass)
     {
-        return false;
+        return Fail(NSLOCTEXT("PartyDefinition", "MissingClass", "Set CombatClass, PlayerUnitClasses or FallbackPlayerUnitClass. / CombatClass, PlayerUnitClasses 또는 FallbackPlayerUnitClass를 지정하세요."));
     }
     if (OutDefinition.bUseUnitClassDefaults)
     {
@@ -52,23 +64,69 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
         OutDefinition.SubActionPoints = Defaults->GetMaxSubActionPoint();
         OutDefinition.StartingSkills = Defaults->GetEquippedSkillDataAssets();
     }
-    if (!FMath::IsFinite(OutDefinition.MaxHP) || OutDefinition.MaxHP <= 0.0f || OutDefinition.ActionPoints <= 0 || OutDefinition.SubActionPoints < 0 || OutDefinition.StartingSkills.IsEmpty())
+    if (!FMath::IsFinite(OutDefinition.MaxHP) || OutDefinition.MaxHP <= 0.0f)
     {
-        return false;
+        return Fail(NSLOCTEXT("PartyDefinition", "InvalidHP", "Resolved MaxHP must be finite and positive. / 실제 MaxHP는 유한한 양수여야 합니다."));
+    }
+    if (OutDefinition.ActionPoints <= 0 || OutDefinition.SubActionPoints < 0)
+    {
+        return Fail(NSLOCTEXT("PartyDefinition", "InvalidAP", "Resolved ActionPoints must be positive and SubActionPoints nonnegative. / 실제 ActionPoints는 양수, SubActionPoints는 0 이상이어야 합니다."));
+    }
+    if (OutDefinition.StartingSkills.IsEmpty())
+    {
+        return Fail(NSLOCTEXT("PartyDefinition", "MissingSkills", "The resolved loadout requires at least one starting skill. / 실제 시작 스킬이 한 개 이상 필요합니다."));
     }
     TSet<FName> SkillIds;
-    for (USkillDefinitionDataAsset* Skill : OutDefinition.StartingSkills)
+    for (int32 Index = 0; Index < OutDefinition.StartingSkills.Num(); ++Index)
     {
+        USkillDefinitionDataAsset* Skill = OutDefinition.StartingSkills[Index];
+        if (!IsValid(Skill))
+        {
+            return Fail(FText::Format(NSLOCTEXT("PartyDefinition", "InvalidSkillReference", "StartingSkills[{0}] is missing or invalid. / StartingSkills[{0}] 참조가 없거나 유효하지 않습니다."), FText::AsNumber(Index)));
+        }
         FCombatRoundSkill Resolved;
         FText Error;
-        if (!IsValid(Skill) || !Skill->ResolveRoundSkill(Resolved, Error) || SkillIds.Contains(Resolved.SkillId))
+        if (!Skill->ResolveRoundSkill(Resolved, Error)) return Fail(Error);
+        if (SkillIds.Contains(Resolved.SkillId))
         {
-            return false;
+            return Fail(FText::Format(NSLOCTEXT("PartyDefinition", "DuplicateSkill", "Starting skill asset ID is duplicated: {0}. / 시작 스킬 에셋 ID가 중복됩니다: {0}."), FText::FromName(Resolved.SkillId)));
         }
         SkillIds.Add(Resolved.SkillId);
     }
     return true;
 }
+
+#if WITH_EDITOR
+#include "Misc/DataValidation.h"
+
+EDataValidationResult UPartyDefinitionDataAsset::IsDataValid(FDataValidationContext& Context) const
+{
+    const EDataValidationResult ParentResult = Super::IsDataValid(Context);
+    bool bValid = ParentResult != EDataValidationResult::Invalid;
+    if (Professions.IsEmpty())
+    {
+        Context.AddError(NSLOCTEXT("PartyDefinition", "EmptyProfessions", "At least one profession definition is required. / 직업 정의가 한 개 이상 필요합니다."));
+        bValid = false;
+    }
+    for (const TPair<FName, FProfessionDefinition>& Entry : Professions)
+    {
+        if (Entry.Key.IsNone())
+        {
+            Context.AddError(NSLOCTEXT("PartyDefinition", "EmptyProfessionId", "A profession ID cannot be None. / 직업 ID는 None일 수 없습니다."));
+            bValid = false;
+            continue;
+        }
+        FProfessionDefinition Definition;
+        FText Error;
+        if (!ResolveProfession(Entry.Key, Definition, Error))
+        {
+            Context.AddError(Error);
+            bValid = false;
+        }
+    }
+    return bValid ? EDataValidationResult::Valid : EDataValidationResult::Invalid;
+}
+#endif
 
 FText UPartyDefinitionDataAsset::GetProfessionDetails(FName ClassId) const
 {

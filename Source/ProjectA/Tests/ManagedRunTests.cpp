@@ -303,6 +303,13 @@ bool FManagedRunOrderedResumeTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Failed preparation rollback save remains in its previous phase"), Second->AbortEncounter());
     TestTrue(TEXT("Failed abort retains phase, node and authority revision"), Second->GetPhase() == ERunPhase::Preparing && Second->GetCurrentNodeId() == TEXT("Combat_01") && Second->GetManagedStamp() == BeforeAbort);
     TestTrue(TEXT("Preparation rollback can retry"), Second->AbortEncounter());
+    TestTrue(TEXT("A late preparation failure reaches combat before cancellation"), Second->BeginEncounter(TEXT("Combat_01")) && Second->MarkCombatStarted());
+    const FRunAuthorityStamp BeforeLateAbort = Second->GetManagedStamp();
+    const TArray<uint8> BeforeLateAbortBytes = Fixture.FileBytes();
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("Failed late cancellation remains retryable from combat"), Second->AbortEncounter());
+    TestTrue(TEXT("Failed late cancellation preserves phase, node, stamp and canonical bytes"), Second->GetPhase() == ERunPhase::Combat && Second->GetCurrentNodeId() == TEXT("Combat_01") && Second->GetManagedStamp() == BeforeLateAbort && Fixture.FileBytes() == BeforeLateAbortBytes);
+    TestTrue(TEXT("Late cancellation retries without losing the original encounter"), Second->AbortEncounter() && Second->CanStartNode(TEXT("Combat_01")) && Second->GetManagedStamp().Revision == BeforeLateAbort.Revision + 1);
     FCombatCheckpointData Checkpoint;
     if (!TestTrue(TEXT("Resumed participation applies when the next timed battle begins"), Fixture.StartCombatFixture(Second, Checkpoint))) return false;
     for (const FCombatCheckpointUnit& Unit : Checkpoint.Units)
