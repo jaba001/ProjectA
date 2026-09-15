@@ -43,6 +43,10 @@ protected:
     TSubclassOf<UGameplayRootWidget> GameplayRootWidgetClass;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+    friend class FEncounterPreparationRetryTest;
+#endif
+
     void RefreshGameplayFlow();
     bool CanRetryGameplayRecovery() const;
     void TryBindGameplayState();

@@ -37,7 +37,10 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
         }
         if (!Run->GetSaveError().IsEmpty())
         {
-            View.FlowMessage = Run->GetSaveError();
+            // Preserve the preparation reason in both local UI and the replicated presentation.
+            // 로컬 UI와 복제된 표시 데이터 모두에서 준비 실패 원인을 보존합니다.
+            if (View.FlowMessage.IsEmpty()) View.FlowMessage = Run->GetSaveError();
+            else if (!View.FlowMessage.ToString().Contains(Run->GetSaveError().ToString())) View.FlowMessage = FText::Format(FText::FromString(TEXT("{0}\n{1}")), View.FlowMessage, Run->GetSaveError());
         }
     }
     return View;

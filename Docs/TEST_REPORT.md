@@ -194,12 +194,23 @@ $reportPath = Join-Path (Get-Location) ('Saved/Automation/UserManagedRun_' + (Ge
 - 수정 당시 검증: Development Editor / Win64 빌드 성공(`Saved/Automation/HudCueWarningBuild.log`). 엔진 소스의 HUD 호출·DeveloperSettings 읽기 경로와 Config를 정적으로 대조했으며 당시 작동 테스트는 미실행이었다.
 - 후속 2절 검증: 빈 HUD 생성 경고는 미발생이나 GameplayCue fallback은 1건 재발했다. 별도 읽기 진단에서 실제 DeveloperSettings의 `GameplayCueNotifyPaths`가 빈 배열임을 확인했다(`Saved/Automation/ManagedCueSettingsDiagnostic.json`, 최종 진단 종료 코드 0). 파일의 설정과 실행값이 다른 최초 원인은 미확정이다. Python 접근명 조정 전 진단 시도 2회는 실패했으며 승계 테스트 실패와 구분한다.
 - 2026-09-16 보완: `DefaultGame.ini`의 `AbilitySystemGlobals.GameplayCueNotifyPaths`에도 `/Game/User_JeHoon`을 등록했다. 로컬 UE 5.7 소스에서 기존 배열의 `UPROPERTY(config)` 선언, DeveloperSettings 배열과의 `TSet` 합산, 합산 결과가 비었을 때만 `/Game`을 추가하는 경로를 확인했다. 기존 사용자 추가 경로를 덮지 않으며 로그를 숨기지 않는다. 회귀 `ProjectA.Configuration.GameplayCueEffectivePaths`는 프로젝트 경로·전체 검색 부재·추가 경로 보존을 검사한다. 컴파일 결과는 18-3절, 회귀 실행은 미실행이다.
+- 후속 정적 조사: 설치 UE 5.7.4의 헤더·생성 코드·실제 Editor DLL의 reflection 정보에서 Game 설정과 해당 배열의 Config 플래그가 일치한다. Engine/Plugin/User/Saved ini의 Cue 덮어쓰기와 기존 진단 명령의 `-ini` 재정의는 발견하지 못했다. 최초 원인을 단정하거나 설정 객체를 강제 변경하지 않는다. 회귀는 병합된 Game ini → DeveloperSettings CDO → Globals 유효 경로를 각각 출력하고, 앞 두 배열의 일치까지 검사하도록 보강했다.
+
+기존 경고·오류의 분류는 다음과 같다. 아래 로그는 2026-09-11 이전 코드 이력이며 최신 코드에서 재현했다는 의미가 아니다.
+
+| 항목 | 정적 조사와 권장 대응 | 최신 실행 상태 |
+|---|---|---|
+| 종료 NavMesh 경고 | `UNavigationSystemV1::CleanUp`이 NavData를 먼저 해제한 뒤 CrowdManager를 정리하며 중간 콜백이 NavMesh를 다시 조회하는 엔진 경로와 종료 로그가 일치. 실행 중 이동 실패와 구분하고 엔진 수정·전역 로그 숨김은 적용하지 않음 | 재실행 전 |
+| Editor `Condition failed` 4건 | ProjectA 테스트 시작·엔진 초기화 전의 시작 테스트 오류. 실패 테스트 이름은 Log 수준에 기록되나 기존 기본 수준은 Warning이어서 이름 미확인. 다음 사용자 실행에 `-LogCmds="LogAutomationTest Log"`를 추가해 이름 확인 | 원인 테스트 미확정 |
+| Editor Slate 리소스 경고 | VisionOS·EaseCurveTool·Engine Slate의 로그상 누락 파일이 현재 엔진 설치에도 없음. 제작 에셋 오류와 구분하며 필요 시 엔진 설치 검증 | 최신 실행 미확인 |
+
+근거 로그: `Saved/Automation/ManagedSuccession_20260911_115936/Editor.log`, `Saved/Automation/ManagedContracts_20260911_120207/Editor.log`. 현재 프로젝트 종료 코드에서 CrowdManager를 새로 생성하는 호출은 발견하지 못했다. 위 분류는 오류를 숨기거나 테스트 성공으로 변경하는 처리가 아니다.
 
 준비: 수정된 Editor 빌드로 재시작하고 기존 작업을 저장한다. 생성 경고·Cue fallback과 종료 NavMesh 경고를 구분해 기록한다.
 
 | ID | 사용자 실행 절차 | 기대 결과 | 상태 |
 |---|---|---|---|
-| 8-1 | MainMenu → 캐릭터 생성 → Gameplay 진입 후 회귀 `ProjectA.Configuration.GameplayCueEffectivePaths` 확인 | 제작 경로 포함·전체 `/Game` fallback 없음, 빈 HUD 생성 경고 없이 기존 화면 유지 | 미실행 |
+| 8-1 | MainMenu → 캐릭터 생성 → Gameplay 진입 후 회귀 `ProjectA.Configuration.GameplayCueEffectivePaths` 확인 | Game 설정·CDO 배열 일치, 최종 제작 경로 포함·전체 `/Game` fallback 없음. 불일치 시 세 단계 출력으로 손실 위치 구분 | 미실행 |
 | 8-2 | 9절의 개발용 협동 절차로 일반 2인 전투 진행 | 2인 조작권·계획·피격·결과 일치, 기존 SpawnActor/Cue 경고 미발생 | 미실행 |
 | 8-3 | 9절의 개발용 협동 절차를 4인으로 확대 | 4인 조작권·계획·피격·결과 일치, 기존 SpawnActor/Cue 경고 미발생 | 미실행 |
 
@@ -566,9 +577,10 @@ Development Editor / Win64 컴파일은 [CombatRoundTests.cpp](../Source/Project
 
 전투 준비 취소 중 저장 실패로 진행이 멈추는 문제를 복구하고, 파티 설정 오류를 게임 시작 전에 찾는다.
 
-- `AEncounterManager`는 준비 오류와 취소 대기를 보존한다. 기존 재시도 경로에서 취소를 우선 처리하며 성공한 Map 이벤트 전에 대기 상태를 해제한다.
+- `AEncounterManager`는 준비 오류와 취소 대기를 보존한다. 기존 재시도 경로에서 취소를 우선 처리하며, 저장과 동기 Map 이벤트 동안 새 전투·재시도 진입을 차단한다. 마지막 화면 통지 전에 가드를 해제해 재시도 버튼을 갱신한다.
 - `URunStateSubsystem::AbortEncounter`는 일반·관리 Run 모두 저장 실패 시 원래 단계·노드를 복구한다. 기존 확정 저장은 유지하며 저장 성공 시에만 Map을 공개한다.
-- 저장 실패 중 화면은 기존 정책에 따라 저장 오류를 우선 표시한다. 원래 준비 오류는 내부에 보존하고 취소 저장 성공 후 Map에서 다시 표시한다. 재시도는 현재 로컬 Host만 수행한다.
+- 로컬·복제 표시 데이터 모두 준비 실패 원인과 저장 오류를 중복 없이 함께 표시한다. 취소 저장 성공 후 Map에는 준비 오류를 유지한다. 재시도는 현재 로컬 Host만 수행한다.
+- `AGameplayPlayerController`의 화면 갱신은 Run의 Combat 단계와 실제 전투 활성 여부를 모두 확인한다. 준비 취소 저장 실패·중단·종료 상태에서 입력을 다시 활성화하지 않는다.
 - 파티 Data Validation은 런타임 직업 해석을 공유한다. 클래스 fallback과 클래스 기본값 사용을 유지하며 직업 ID·문제 필드·에셋 경로를 오류에 포함한다. 새 밸런스·아이템 규칙은 추가하지 않는다.
 
 ### 18-2 준비와 사용자 실행
@@ -577,9 +589,9 @@ Development Editor / Win64 컴파일은 [CombatRoundTests.cpp](../Source/Project
 
 | ID | 실행 절차 | 기대 결과 | 상태 |
 |---|---|---|---|
-| 18-1 | Session Frontend에서 `ProjectA.Encounter.PreparationAbortRetry` 실행 | Preparing·Combat 양쪽의 준비 실패에서 액터·점유 정리, 저장 2회 실패 중 기존 단계·노드·파일 보존, 동일 재시도 성공 후 Map 이벤트 1회·중복 재시도 거절 | 미실행 |
+| 18-1 | Session Frontend에서 `ProjectA.Encounter.PreparationAbortRetry` 실행 | Preparing·Combat 실패의 액터·점유 정리와 저장 보존, Controller 재시도·Client 역할 거절, 입력 비활성·복합 오류 표시, 동기 Map 통지 중 새 노드·재시도 거절, 성공 이벤트 1회 | 미실행 |
 | 18-2 | `ProjectA.Run.Managed.OrderedResumeAndProgression` 실행 | 관리 준비 취소와 늦은 Combat 취소의 저장 실패 시 stamp·파일 보존, 재시도 성공 후 revision 1회 증가와 노드 재선택 | 미실행 |
-| 18-3 | 테스트 Run에서 준비 취소 저장 오류가 발생한 경우 Host의 저장 다시 시도를 선택하고, 저장 가능 상태 복구 뒤 다시 선택 | 실패 중 안내와 버튼 유지·전투 입력 차단, 성공 후 버튼 해제·원래 준비 오류 표시·Map 복귀. Client는 Host 저장을 직접 재시도하지 않음 | 미실행 |
+| 18-3 | 테스트 Run에서 준비 취소 저장 오류가 발생한 경우 Host의 저장 다시 시도를 선택하고, 저장 가능 상태 복구 뒤 다시 선택 | 실패 중 두 오류 원인·버튼 유지·화면 갱신 후에도 입력 차단, 성공 후 버튼 해제·준비 오류 표시·Map 복귀. Client는 Host 저장을 직접 재시도하지 않음 | 미실행 |
 | 18-4 | Content Browser에서 `/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty` 선택 → Asset Actions → Validate Assets | 현재 유효한 직업·스킬 구성이 통과. 실패하면 해당 직업과 클래스·능력치·시작 스킬 원인이 표시됨 | 미실행 |
 | 18-5 | `ProjectA.Party.ProfessionDataValidation` 실행 | 기존 카탈로그와 legacy fallback 통과, 비활성 override 무시, 잘못된 HP/AP·누락/중복 스킬·잘못된 프로필 거절, 복구 후 오류 해제 | 미실행 |
 | 18-6 | 일반 새 Run에서 직업 선택 → 첫 전투 → 결과·상점 → 두 번째 전투 진행 | 기존 캐릭터 생성·시작 스킬·전투 준비·상점 진행 유지. 정상 경로에 취소 재시도 안내가 나타나지 않음 | 미실행 |
@@ -588,11 +600,17 @@ Development Editor / Win64 컴파일은 [CombatRoundTests.cpp](../Source/Project
 
 ### 18-3 개발 확인과 제한
 
-2026-09-16 프로젝트 파일 재생성 성공: 23.17초, `Saved/Logs/TodoAutonomyProjectFiles.log`. 신규 회귀 소스 2개를 포함한 Development Editor / Win64 컴파일 성공: 14.72초, 컴파일 오류·경고 0, `Saved/Logs/TodoAutonomyBuild.log`.
+기준 `ad9025d` 이력: 2026-09-16 프로젝트 파일 재생성 성공 23.17초, `Saved/Logs/TodoAutonomyProjectFiles.log`. 당시 신규 회귀 소스 2개를 포함한 Development Editor / Win64 컴파일 성공 14.72초·컴파일 오류/경고 0, `Saved/Logs/TodoAutonomyBuild.log`. 아래 후속 수정의 성공 근거와 구분한다.
 
 추가 회귀는 `ProjectA.Configuration.GameplayCueEffectivePaths`, `ProjectA.Encounter.PreparationAbortRetry`, `ProjectA.Party.ProfessionDataValidation` 3건이며 기존 관리 진행 회귀 1건을 확장했다. 코드는 컴파일했지만 에디터·게임·PIE·자동화·패키지와 에셋 Validate Assets는 실행하지 않았다. 컴파일 성공은 동작 성공을 의미하지 않는다.
 
-코드 검토는 저장 실패 전후 상태·기존 파일 보존·재시도 권한·동기 이벤트·직업 fallback과 동일한 수용 조건을 확인했다. 독립 코드 리뷰에서 합의된 동작 범위의 추가 P1/P2 문제는 발견하지 못했다. 문서 9개·로컬 링크 227개·앵커 136개·표 99개, 회귀 선언 4개와 프로젝트 파일의 신규 소스 2개 반영, `git diff --check` 검사를 통과했다. 정적 결과는 `Saved/Automation/TodoAutonomyStatic.json`에 기록했다.
+`ad9025d` 검토는 저장 실패 전후 상태·기존 파일 보존·재시도 권한·동기 이벤트·직업 fallback의 수용 조건을 확인했다. 당시 문서 9개·로컬 링크 227개·앵커 136개·표 99개, 회귀 선언 4개와 신규 소스 2개 반영, `git diff --check`를 통과했다. 결과는 `Saved/Automation/TodoAutonomyStatic.json`에 기록했다.
+
+후속 수정은 정리된 Combat 단계에서 화면 갱신이 입력을 다시 켜는 문제, 준비 오류가 저장 오류에 덮이는 문제, Map 동기 통지 중 새 노드 요청의 재진입을 보완했다. `ProjectA.Encounter.PreparationAbortRetry`는 실제 Controller 요청 경로와 로컬 플레이어 연결을 포함해 확장했다. Client 역할 전환은 서버 권한 거절만 검사하며 실제 네트워크 복제 성공을 의미하지 않는다. Cue 회귀는 세 설정 단계의 읽기 전용 진단을 보강했다.
+
+후속 Development Editor / Win64 컴파일 성공: 기능 변경 13.57초(`Saved/Logs/TodoSection2Build.log`), 리뷰에서 발견한 회귀 fixture의 로컬 플레이어 연결 보완 후 최종 증분 빌드 4.46초(`Saved/Logs/TodoSection2FinalBuild.log`). 두 빌드 모두 컴파일 오류·경고 0. 독립 리뷰의 발견 사항 1건을 수정했으며 최종 검토에서 추가 실질 결함은 발견하지 못했다. 작동·자동화·에셋 검증은 미실행이다.
+
+후속 문서 9개·로컬 링크 231개·앵커 140개·표 100개와 회귀 선언·프로젝트 파일 정합성, `git diff --check` 검사를 통과했다. 결과는 `Saved/Automation/TodoSection2Static.json`에 기록했다. 새 C++ 파일은 없으므로 기존 프로젝트 파일을 사용했다.
 
 기존 DeveloperSettings 배열 빈값의 최초 원인은 미확정이며 Cue 경고 해소·NavMesh·Editor 초기화 경고와 실제 UI 복구는 사용자 실행 결과 대기다. 오류 발생 시 해당 항목 ID·처음 표시된 오류·Preparing/Combat/Map 단계·Host 여부와 로그를 전달하면 관련 경로를 우선 수정한다. 기존 사용자 에셋 삭제 3건은 이번 변경에 포함하지 않았다.
 

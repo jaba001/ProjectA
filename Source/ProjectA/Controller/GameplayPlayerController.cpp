@@ -1,5 +1,6 @@
 #include "Controller/GameplayPlayerController.h"
 
+#include "Combat/CombatManager.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
@@ -247,7 +248,6 @@ void AGameplayPlayerController::RefreshGameplayFlow()
     }
 
     const bool bManagedInputAllowed = !RunState->IsManagedRun() || (RunState->HasManagedLease() && !RunState->IsManagedResumePending() && RunState->GetLocalCaller() == RunState->GetRunIdentity().HostAccountId);
-    const bool bInCombat = RunState->GetPhase() == ERunPhase::Combat && bManagedInputAllowed;
     ACombatManager* Manager = nullptr;
     FText FlowMessage;
 
@@ -257,12 +257,8 @@ void AGameplayPlayerController::RefreshGameplayFlow()
         FlowMessage = EncounterManager->GetFlowMessage();
     }
 
+    const bool bInCombat = RunState->GetPhase() == ERunPhase::Combat && bManagedInputAllowed && Manager && Manager->IsCombatActive();
     SetCombatContext(Manager, bInCombat);
-
-    if (!RunState->GetSaveError().IsEmpty())
-    {
-        FlowMessage = RunState->GetSaveError();
-    }
 
     if (GameplayRootWidget)
     {

@@ -2,11 +2,14 @@
 
 #include "Misc/AutomationTest.h"
 #include "Combat/CombatManager.h"
+#include "Controller/GameplayPlayerController.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
+#include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Encounter/EncounterManager.h"
+#include "Game/GameState/GameplayViewTypes.h"
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
@@ -79,6 +82,16 @@ bool FEncounterPreparationRetryTest::RunTest(const FString& Parameters)
         Encounter->RunState = Fixture.Run.Get();
         Encounter->CombatManager = Fixture.Combat;
         Encounter->PartyDefinition = Fixture.Run->PartyDefinition;
+        AGameplayPlayerController* Controller = Fixture.World->SpawnActor<AGameplayPlayerController>();
+        if (!TestNotNull(TEXT("The local gameplay controller exists"), Controller)) return false;
+        // Bind a transient local identity without SetPlayer's input, viewport and online initialization.
+        // SetPlayer의 입력·뷰포트·온라인 초기화 없이 일시적인 로컬 플레이어 식별자만 연결합니다.
+        ULocalPlayer* LocalPlayer = NewObject<ULocalPlayer>(Fixture.Instance.Get());
+        Controller->Player = LocalPlayer;
+        LocalPlayer->PlayerController = Controller;
+        if (!TestTrue(TEXT("The fixture controller is local before exercising public Run requests"), Controller->IsLocalController())) return false;
+        Controller->RunState = Fixture.Run.Get();
+        Controller->InitializeGameplay(Encounter);
         const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
         if (FailedPhase == ERunPhase::Preparing)
         {
@@ -88,6 +101,7 @@ bool FEncounterPreparationRetryTest::RunTest(const FString& Parameters)
         else
         {
             if (!TestTrue(TEXT("A late preparation failure starts from the combat phase"), Fixture.Run->BeginEncounter(TEXT("Combat_01")) && Fixture.Run->MarkCombatStarted())) return false;
+            Controller->SetCombatContext(Fixture.Combat, true);
             AUnitBase* Unit = Fixture.World->SpawnActor<AUnitBase>();
             ACombatGridTile* Tile = Fixture.World->SpawnActor<ACombatGridTile>();
             ACombatArena* Arena = Fixture.World->SpawnActor<ACombatArena>();
@@ -107,31 +121,54 @@ bool FEncounterPreparationRetryTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Failed cancellation retains its exact phase and node"), Fixture.Run->GetPhase() == FailedPhase && Fixture.Run->GetCurrentNodeId() == TEXT("Combat_01") && Fixture.Run->GetCurrentEncounterId() == TEXT("DefaultEncounter"));
         TestTrue(TEXT("The previous durable checkpoint remains unchanged"), Fixture.ReadBytes() == BeforeBytes);
         TestTrue(TEXT("Cleaned preparation exposes the existing checkpoint retry action"), Encounter->GetSpawnedUnits().IsEmpty() && !Fixture.Combat->IsCombatActive() && !Encounter->bPreparing && Encounter->CanRetryCombatCheckpoint());
+        TestFalse(TEXT("Flow refresh never re-enables input for a cleaned combat phase"), Controller->IsCombatInputEnabled());
+        TestTrue(TEXT("The local controller exposes the pending recovery"), Controller->CanRetryGameplayRecovery());
         TestTrue(TEXT("The failure retains its preparation and persistence reasons"), !PreparationError.IsEmpty() && !Fixture.Run->GetSaveError().IsEmpty() && Encounter->GetFlowMessage().ToString().Contains(PreparationError.ToString()) && Encounter->GetFlowMessage().ToString().Contains(Fixture.Run->GetSaveError().ToString()));
+        const FGameplayViewState CombinedView = FGameplayViewState::FromRun(Fixture.Run.Get(), Encounter->GetFlowMessage());
+        TestTrue(TEXT("Local and replicated view data preserve both reasons without duplicate storage text"), CombinedView.FlowMessage.EqualTo(Encounter->GetFlowMessage()));
+        const FGameplayViewState SeparateView = FGameplayViewState::FromRun(Fixture.Run.Get(), PreparationError);
+        TestTrue(TEXT("A separate flow reason gains the storage explanation"), SeparateView.FlowMessage.EqualTo(CombinedView.FlowMessage));
+        TestTrue(TEXT("An empty flow reason shows the storage error directly"), FGameplayViewState::FromRun(Fixture.Run.Get(), FText::GetEmpty()).FlowMessage.EqualTo(Fixture.Run->GetSaveError()));
         TestFalse(TEXT("Pending cancellation cannot start the same node again"), Encounter->RequestStartNode(TEXT("Combat_01")));
+        Controller->SetRole(ROLE_SimulatedProxy);
+        TestTrue(TEXT("The simulated client retains local ownership while server authority is absent"), Controller->IsLocalController() && !Controller->HasAuthority());
+        Controller->RequestRetryCombatCheckpoint();
+        TestFalse(TEXT("A client controller cannot expose the server checkpoint retry"), Controller->CanRetryGameplayRecovery());
+        TestTrue(TEXT("A denied client retry preserves pending cancellation and disk"), Encounter->CanRetryCombatCheckpoint() && Fixture.Run->GetPhase() == FailedPhase && Fixture.ReadBytes() == BeforeBytes);
+        Controller->SetRole(ROLE_Authority);
 
         int32 MapEvents = 0;
         bool bRetryVisibleDuringMapEvent = false;
+        bool bAttemptedNestedStart = false;
         Fixture.Run->OnRunStateChanged.AddLambda([&]()
         {
             if (Fixture.Run->GetPhase() == ERunPhase::Map)
             {
                 ++MapEvents;
                 bRetryVisibleDuringMapEvent = Encounter->CanRetryCombatCheckpoint();
+                if (!bAttemptedNestedStart)
+                {
+                    bAttemptedNestedStart = true;
+                    Controller->RequestStartNode(TEXT("Combat_01"));
+                    Controller->RequestRetryCombatCheckpoint();
+                }
             }
         });
         FRunCheckpointStorage::FailNextWriteForTesting();
-        TestFalse(TEXT("Another failed save keeps cancellation retryable"), Encounter->RetryCombatCheckpoint(Error));
-        TestTrue(TEXT("Repeated failure reports its error without advancing phase or disk"), !Error.IsEmpty() && Encounter->CanRetryCombatCheckpoint() && Fixture.Run->GetPhase() == FailedPhase && Fixture.ReadBytes() == BeforeBytes);
+        Controller->RequestRetryCombatCheckpoint();
+        TestTrue(TEXT("The public controller retry keeps repeated storage failure pending"), !Fixture.Run->GetSaveError().IsEmpty() && Controller->CanRetryGameplayRecovery() && Fixture.Run->GetPhase() == FailedPhase && Fixture.ReadBytes() == BeforeBytes);
+        TestFalse(TEXT("Repeated failed recovery keeps combat input disabled"), Controller->IsCombatInputEnabled());
         TestEqual(TEXT("Failed cancellation never publishes a map transition"), MapEvents, 0);
         TestTrue(TEXT("The same retry action commits cancellation once storage recovers"), Encounter->RetryCombatCheckpoint(Error));
         TestTrue(TEXT("Successful cancellation clears persistence and retry state"), Error.IsEmpty() && Fixture.Run->GetSaveError().IsEmpty() && !Encounter->CanRetryCombatCheckpoint());
         TestTrue(TEXT("The map permits the original node without losing the setup error"), Fixture.Run->CanStartNode(TEXT("Combat_01")) && Fixture.Run->GetCurrentNodeId().IsNone() && Fixture.Run->GetCurrentEncounterId().IsNone() && Encounter->GetFlowMessage().EqualTo(PreparationError));
         TestEqual(TEXT("Successful cancellation publishes the map once"), MapEvents, 1);
+        TestTrue(TEXT("The synchronous map observer attempted a public node request"), bAttemptedNestedStart);
         TestFalse(TEXT("The synchronous map observer sees cancellation already completed"), bRetryVisibleDuringMapEvent);
         TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
         TestTrue(TEXT("The committed cancellation persists a clean map"), Saved.IsValid() && Saved->Phase == ERunPhase::Map && Saved->CurrentNode.IsNone() && Saved->CurrentEncounter.IsNone());
         TestFalse(TEXT("A duplicate retry does not repeat cancellation"), Encounter->RetryCombatCheckpoint(Error));
+        Controller->RequestRetryCombatCheckpoint();
         TestEqual(TEXT("Duplicate retries publish no extra transition"), MapEvents, 1);
         Fixture.Run->OnRunStateChanged.Clear();
     }

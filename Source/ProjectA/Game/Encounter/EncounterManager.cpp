@@ -527,18 +527,23 @@ bool AEncounterManager::FailPreparation(const FText& Message)
 
 bool AEncounterManager::TryAbortPreparation()
 {
-    // Clear the retry flag before a successful abort publishes the map transition synchronously.
-    // 취소 성공이 지도 전환을 동기 통지하기 전에 재시도 플래그를 해제합니다.
-    bPreparationAbortPending = false;
-    FlowMessage = PreparationFailureMessage;
-    if (!RunState->AbortEncounter())
+    bool bAborted = false;
     {
-        bPreparationAbortPending = true;
-        const FText Error = RunState->GetSaveError().IsEmpty() ? FText::FromString(TEXT("전투 준비 취소를 완료하지 못했습니다. 저장 다시 시도를 사용하세요.")) : RunState->GetSaveError();
-        FlowMessage = FText::Format(FText::FromString(TEXT("{0}\n{1}")), PreparationFailureMessage, Error);
+        // Block new encounters and retries while the map transition notifies synchronous observers.
+        // 지도 전환이 동기 관찰자에게 통지되는 동안 새 전투와 재시도 진입을 차단합니다.
+        TGuardValue<bool> PreparationGuard(bPreparing, true);
+        bPreparationAbortPending = false;
+        FlowMessage = PreparationFailureMessage;
+        bAborted = RunState->AbortEncounter();
+        bPreparationAbortPending = !bAborted;
+        if (!bAborted)
+        {
+            const FText Error = RunState->GetSaveError().IsEmpty() ? FText::FromString(TEXT("전투 준비 취소를 완료하지 못했습니다. 저장 다시 시도를 사용하세요.")) : RunState->GetSaveError();
+            FlowMessage = FText::Format(FText::FromString(TEXT("{0}\n{1}")), PreparationFailureMessage, Error);
+        }
     }
     OnFlowChanged.Broadcast();
-    return !bPreparationAbortPending;
+    return bAborted;
 }
 
 void AEncounterManager::SetPlayerCombatInput(bool bEnabled)
