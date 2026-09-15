@@ -112,7 +112,13 @@ grid_location.z += 5.0
 grid.set_actor_location(grid_location, False, True)
 camera = require(actor_subsystem.spawn_actor_from_class(unreal.CameraActor, unreal.Vector(-300.0, -1000.0, 1500.0), unreal.Rotator(pitch=-46.97, yaw=90.0, roll=0.0)), "Camera could not be created.")
 camera.set_actor_label("GameplayCamera")
-camera.get_editor_property("camera_component").set_editor_property("field_of_view", 55.0)
+camera_component = camera.get_editor_property("camera_component")
+camera_component.set_editor_property("field_of_view", 55.0)
+# Match the arena's viewport fill and vertical framing when generating the placed camera.
+# 배치 카메라를 생성할 때 아레나와 동일하게 뷰포트 채움과 세로 구도를 설정합니다.
+camera_component.set_editor_property("constrain_aspect_ratio", False)
+camera_component.set_editor_property("override_aspect_ratio_axis_constraint", True)
+camera_component.set_editor_property("aspect_ratio_axis_constraint", unreal.AspectRatioAxisConstraint.ASPECT_RATIO_MAINTAIN_YFOV)
 arena = require(actor_subsystem.spawn_actor_from_class(arena_class, unreal.Vector(0.0, 0.0, 0.0)), "Arena could not be created.")
 arena.set_actor_label("GameplayCombatArena")
 arena.set_editor_property("grid", grid)

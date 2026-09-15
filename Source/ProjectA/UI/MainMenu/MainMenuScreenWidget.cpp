@@ -9,7 +9,6 @@
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/SizeBox.h"
-#include "Components/ScaleBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
@@ -129,15 +128,11 @@ void UMainMenuScreenWidget::ApplyDemonicStyle()
     // Frame the bound menu without replacing its buttons or Blueprint callbacks.
     // 바인딩된 버튼과 Blueprint 콜백을 교체하지 않고 메뉴에 프레임을 추가합니다.
     MenuBox->RemoveFromParent();
-    UScaleBox* Scale = WidgetTree->ConstructWidget<UScaleBox>();
-    Scale->SetStretch(EStretch::ScaleToFit);
-    Scale->SetStretchDirection(EStretchDirection::DownOnly);
-    UOverlaySlot* FrameSlot = MenuOverlay->AddChildToOverlay(Scale);
-    FrameSlot->SetHorizontalAlignment(HAlign_Fill);
-    FrameSlot->SetVerticalAlignment(VAlign_Fill);
-    FrameSlot->SetPadding(FMargin(40.0f, 64.0f));
     UHorizontalBox* Panels = WidgetTree->ConstructWidget<UHorizontalBox>();
-    Scale->SetContent(Panels);
+    UOverlaySlot* FrameSlot = MenuOverlay->AddChildToOverlay(Panels);
+    FrameSlot->SetHorizontalAlignment(HAlign_Center);
+    FrameSlot->SetVerticalAlignment(VAlign_Center);
+    FrameSlot->SetPadding(FMargin(40.0f, 64.0f));
     USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
     Size->SetWidthOverride(460.0f);
     Panels->AddChildToHorizontalBox(Size)->SetVerticalAlignment(VAlign_Center);
@@ -148,8 +143,8 @@ void UMainMenuScreenWidget::ApplyDemonicStyle()
     Frame->SetContent(MenuBox);
     if (ManagedResumePanel)
     {
-        // Scale both panels together so a narrow window cannot overlap the resume actions.
-        // 좁은 창에서 이어가기 버튼이 겹치지 않도록 두 패널을 함께 축소합니다.
+        // Keep both panels in one layout governed by the global viewport DPI scale.
+        // 두 패널을 전역 뷰포트 DPI 배율을 따르는 하나의 레이아웃에 유지합니다.
         ManagedResumePanel->RemoveFromParent();
         UHorizontalBoxSlot* ResumeSlot = Panels->AddChildToHorizontalBox(ManagedResumePanel);
         ResumeSlot->SetVerticalAlignment(VAlign_Center);

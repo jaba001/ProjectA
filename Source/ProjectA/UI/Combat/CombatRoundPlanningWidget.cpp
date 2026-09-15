@@ -99,7 +99,7 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
     UOverlaySlot* PlanningSlot = Root->AddChildToOverlay(PlanningSize);
     PlanningSlot->SetHorizontalAlignment(HAlign_Right);
     PlanningSlot->SetVerticalAlignment(VAlign_Fill);
-    PlanningSlot->SetPadding(FMargin(12.f));
+    PlanningSlot->SetPadding(FMargin(0.f, 12.f));
     UBorder* PlanningPanel = WidgetTree->ConstructWidget<UBorder>();
     Theme.StylePanel(PlanningPanel);
     PlanningPanel->SetPadding(FMargin(14.f));
@@ -133,7 +133,7 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
     UOverlaySlot* RosterSlot = Root->AddChildToOverlay(RosterSize);
     RosterSlot->SetHorizontalAlignment(HAlign_Left);
     RosterSlot->SetVerticalAlignment(VAlign_Fill);
-    RosterSlot->SetPadding(FMargin(12.f));
+    RosterSlot->SetPadding(FMargin(0.f, 12.f));
     UBorder* RosterPanel = WidgetTree->ConstructWidget<UBorder>();
     Theme.StylePanel(RosterPanel);
     RosterPanel->SetPadding(FMargin(12.f));

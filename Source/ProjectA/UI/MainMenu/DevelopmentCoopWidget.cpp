@@ -8,7 +8,6 @@
 #include "Components/EditableTextBox.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
-#include "Components/ScaleBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -51,13 +50,9 @@ void UDevelopmentCoopWidget::NativeOnInitialized()
     BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
     USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
     Size->SetWidthOverride(620.f);
-    UScaleBox* ContentScale = WidgetTree->ConstructWidget<UScaleBox>();
-    ContentScale->SetStretch(EStretch::ScaleToFit);
-    ContentScale->SetStretchDirection(EStretchDirection::DownOnly);
-    ContentScale->SetContent(Size);
-    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(ContentScale);
-    ContentSlot->SetHorizontalAlignment(HAlign_Fill);
-    ContentSlot->SetVerticalAlignment(VAlign_Fill);
+    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Size);
+    ContentSlot->SetHorizontalAlignment(HAlign_Center);
+    ContentSlot->SetVerticalAlignment(VAlign_Center);
     ContentSlot->SetPadding(FMargin(24.0f));
     UVerticalBox* Box = WidgetTree->ConstructWidget<UVerticalBox>();
     UBorder* Frame = WidgetTree->ConstructWidget<UBorder>();

@@ -5,8 +5,6 @@
 #include "Components/Border.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
-#include "Components/ScaleBox.h"
-#include "Components/ScaleBoxSlot.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -66,15 +64,9 @@ void URunMapWidget::NativeOnInitialized()
         UBorder* Panel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("RunMapPanel"));
         Theme.StylePanel(Panel);
         Panel->SetPadding(FMargin(32.0f));
-        UScaleBox* ContentScale = WidgetTree->ConstructWidget<UScaleBox>();
-        ContentScale->SetStretch(EStretch::ScaleToFit);
-        ContentScale->SetStretchDirection(EStretchDirection::DownOnly);
-        UScaleBoxSlot* ScaleSlot = CastChecked<UScaleBoxSlot>(ContentScale->AddChild(Panel));
-        ScaleSlot->SetHorizontalAlignment(HAlign_Center);
-        ScaleSlot->SetVerticalAlignment(VAlign_Center);
-        UOverlaySlot* ContentSlot = Root->AddChildToOverlay(ContentScale);
-        ContentSlot->SetHorizontalAlignment(HAlign_Fill);
-        ContentSlot->SetVerticalAlignment(VAlign_Fill);
+        UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Panel);
+        ContentSlot->SetHorizontalAlignment(HAlign_Center);
+        ContentSlot->SetVerticalAlignment(VAlign_Center);
         ContentSlot->SetPadding(FMargin(24.0f));
         USizeBox* ContentSize = WidgetTree->ConstructWidget<USizeBox>();
         ContentSize->SetMinDesiredWidth(580.0f);

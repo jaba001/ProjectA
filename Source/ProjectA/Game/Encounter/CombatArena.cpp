@@ -1,5 +1,6 @@
 #include "Game/Encounter/CombatArena.h"
 #include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
 #include "Components/SceneComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Grid/Combat/CombatGridManager.h"
@@ -61,6 +62,29 @@ void ACombatArena::ActivateArena(APlayerController* Controller)
     }
     if (ViewTarget)
     {
+        UCameraComponent* Camera = nullptr;
+        if (ACameraActor* CameraActor = Cast<ACameraActor>(ViewTarget))
+        {
+            Camera = CameraActor->GetCameraComponent();
+        }
+        else
+        {
+            TInlineComponentArray<UCameraComponent*> Cameras(ViewTarget);
+            for (UCameraComponent* Candidate : Cameras)
+            {
+                if (!Candidate->IsActive()) continue;
+                Camera = Candidate;
+                break;
+            }
+        }
+        if (Camera)
+        {
+            // Fill the viewport while preserving vertical framing and expanding the view on wider screens.
+            // 세로 구도를 유지하고 넓은 화면에서는 좌우 시야를 확장해 뷰포트를 채웁니다.
+            Camera->SetConstraintAspectRatio(false);
+            Camera->bOverrideAspectRatioAxisConstraint = true;
+            Camera->SetAspectRatioAxisConstraint(AspectRatio_MaintainYFOV);
+        }
         Controller->SetViewTargetWithBlend(ViewTarget, 0.f);
     }
 }

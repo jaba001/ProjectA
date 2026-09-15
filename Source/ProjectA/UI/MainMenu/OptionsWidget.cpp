@@ -11,7 +11,6 @@
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
-#include "Components/ScaleBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -114,16 +113,12 @@ void UOptionsWidget::NativeOnInitialized()
     UOverlaySlot* BackgroundSlot = Root->AddChildToOverlay(Background);
     BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
     BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
-    UScaleBox* Scale = WidgetTree->ConstructWidget<UScaleBox>();
-    Scale->SetStretch(EStretch::ScaleToFit);
-    Scale->SetStretchDirection(EStretchDirection::DownOnly);
-    UOverlaySlot* ScaleSlot = Root->AddChildToOverlay(Scale);
-    ScaleSlot->SetHorizontalAlignment(HAlign_Fill);
-    ScaleSlot->SetVerticalAlignment(VAlign_Fill);
-    ScaleSlot->SetPadding(FMargin(24.0f));
     USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
     Size->SetWidthOverride(760.0f);
-    Scale->SetContent(Size);
+    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Size);
+    ContentSlot->SetHorizontalAlignment(HAlign_Center);
+    ContentSlot->SetVerticalAlignment(VAlign_Center);
+    ContentSlot->SetPadding(FMargin(24.0f));
     SettingsPanel = WidgetTree->ConstructWidget<UBorder>();
     UDemonicUITheme::Get().StylePanel(SettingsPanel);
     SettingsPanel->SetPadding(FMargin(32.0f));
@@ -172,13 +167,11 @@ void UOptionsWidget::NativeOnInitialized()
     UOverlaySlot* ConfirmationSlot = Root->AddChildToOverlay(ConfirmationPanel);
     ConfirmationSlot->SetHorizontalAlignment(HAlign_Fill);
     ConfirmationSlot->SetVerticalAlignment(VAlign_Fill);
-    UScaleBox* ConfirmationScale = WidgetTree->ConstructWidget<UScaleBox>();
-    ConfirmationScale->SetStretch(EStretch::ScaleToFit);
-    ConfirmationScale->SetStretchDirection(EStretchDirection::DownOnly);
-    ConfirmationPanel->SetContent(ConfirmationScale);
+    ConfirmationPanel->SetHorizontalAlignment(HAlign_Center);
+    ConfirmationPanel->SetVerticalAlignment(VAlign_Center);
     USizeBox* ConfirmationSize = WidgetTree->ConstructWidget<USizeBox>();
     ConfirmationSize->SetWidthOverride(620.0f);
-    ConfirmationScale->SetContent(ConfirmationSize);
+    ConfirmationPanel->SetContent(ConfirmationSize);
     UVerticalBox* ConfirmationContent = WidgetTree->ConstructWidget<UVerticalBox>();
     UBorder* ConfirmationFrame = WidgetTree->ConstructWidget<UBorder>();
     UDemonicUITheme::Get().StylePanel(ConfirmationFrame);
