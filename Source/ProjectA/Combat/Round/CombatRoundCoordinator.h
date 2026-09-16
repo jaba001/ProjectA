@@ -49,6 +49,7 @@ private:
     struct FActionRuntime
     {
         FVector OriginalLocation = FVector::ZeroVector;
+        FRotator OriginalRotation = FRotator::ZeroRotator;
         FVector AimLocation = FVector::ZeroVector;
         FVector Destination = FVector::ZeroVector;
         double PhaseStarted = 0.0;

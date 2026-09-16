@@ -423,15 +423,99 @@ bool FCombatRoundMovementTest::RunTest(const FString& Parameters)
     AUnitBase* Source = Fixture.Humans[0];
     AUnitBase* Target = Fixture.Enemies[0];
     const FVector Origin = Source->GetActorLocation();
+    const FRotator OriginalRotation(0.0f, 37.0f, 0.0f);
+    Source->SetActorRotation(OriginalRotation);
     ACombatGridTile* Home = Source->GetCurrentTile();
     if (!Fixture.Submit(0, Fixture.Command(Source, TEXT("Strike"), Target)) || !Fixture.Ready(0)) return false;
     Fixture.Round->Tick(0.25f);
     TestTrue(TEXT("Approach changes the authoritative world position"), FVector::Dist2D(Origin, Source->GetActorLocation()) > 50.0f);
+    TestFalse(TEXT("Approach turns away from the saved home facing"), Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
+    TestFalse(TEXT("Approach exposes actual movement velocity"), Source->GetVelocity().IsNearlyZero());
     TestEqual(TEXT("Home remains reserved during the attack excursion"), Source->GetCurrentTile(), Home);
     TestTrue(TEXT("Melee has not damaged a distant target before approach and windup"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 100.0f));
     if (!TestTrue(TEXT("The round waits through attack and return"), Fixture.AdvanceUntilNextRound(1))) return false;
     TestTrue(TEXT("The survivor physically returns home"), FVector::Dist2D(Origin, Source->GetActorLocation()) <= 2.0f);
+    TestTrue(TEXT("Returning restores the rotation captured when the plan was locked"), Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
+    TestTrue(TEXT("Returning clears the movement velocity"), Source->GetVelocity().IsNearlyZero());
     TestTrue(TEXT("Actual close-range hit applies damage"), Target->GetAttributeSet()->GetHP() < 100.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundReturnFacingTest, "ProjectA.Combat.Round.ReturnFacingBoundaries", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundReturnFacingTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Case = 0; Case < 4; ++Case)
+    {
+        const FString Context = Case == 0 ? TEXT("Enemy return") : Case == 1 ? TEXT("Stationary projectile") : Case == 2 ? TEXT("Return timeout") : TEXT("Resident movement");
+        FCombatRoundSkill Skill;
+        Skill.Kind = Case == 1 ? ECombatRoundSkillKind::Projectile : Case == 3 ? ECombatRoundSkillKind::GroundAttack : ECombatRoundSkillKind::Melee;
+        Skill.Approach = Case == 1 ? ECombatRoundApproach::None : Case == 3 ? ECombatRoundApproach::Tile : ECombatRoundApproach::Unit;
+        Skill.bRemainAtDestination = Case == 3;
+        Skill.WindupSeconds = 0.2f;
+        Skill.Power = 5.0f;
+        Skill.HitRange = Case == 3 ? 500.0f : 150.0f;
+        Skill.ProjectileSpeed = 1000.0f;
+        FFixture Fixture;
+        if (!TestTrue(Context + TEXT(" initializes"), Fixture.Initialize(1, 20, Case == 0 ? &Skill : nullptr, FIntPoint(0, 3), 1, Case == 0 ? nullptr : &Skill))) return false;
+        AUnitBase* Source = Case == 0 ? Fixture.Enemies[0] : Fixture.Humans[0];
+        AUnitBase* Target = Case == 0 ? Fixture.Humans[0] : Fixture.Enemies[0];
+        const int32 SourceIndex = Case == 0 ? 1 : 0;
+        const FVector Origin = Source->GetActorLocation();
+        const FRotator OriginalRotation(0.0f, Case == 0 ? -143.0f : 37.0f, 0.0f);
+        Source->SetActorRotation(OriginalRotation);
+        ACombatGridTile* Home = Source->GetCurrentTile();
+        ACombatGridTile* Destination = Fixture.Grid->GetTileAtCoord(FIntPoint(0, 1));
+        FCombatRoundCommand Command = Case == 0 ? Fixture.Command(Fixture.Humans[0], TEXT("Wait")) : Fixture.Command(Source, Fixture.HumanSkillId, Target);
+        if (Case == 3) Command.DestinationCoord = Destination->GridCoord;
+        if (!TestTrue(Context + TEXT(" submits"), Fixture.Submit(0, Command)) || !TestTrue(Context + TEXT(" locks"), Fixture.Ready(0))) return false;
+
+        if (Case == 0 || Case == 2)
+        {
+            for (int32 Step = 0; Step < 400 && Fixture.Round->GetView().Phase == ECombatRoundPhase::Resolving && Fixture.Round->GetView().Units[SourceIndex].ActionPhase != ECombatRoundActionPhase::Returning; ++Step) Fixture.Round->Tick(0.01f);
+            if (!TestTrue(Context + TEXT(" reaches the return phase after attacking away from home"), Fixture.Round->GetView().Units[SourceIndex].ActionPhase == ECombatRoundActionPhase::Returning && FVector::Dist2D(Origin, Source->GetActorLocation()) > 50.0f)) return false;
+            TestFalse(Context + TEXT(" has changed the original facing"), Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
+        }
+        if (Case == 1)
+        {
+            Fixture.Round->Tick(0.1f);
+            TestTrue(TEXT("Stationary casting remains at its home position"), Source->GetActorLocation().Equals(Origin, 0.1f));
+            TestFalse(TEXT("Stationary casting temporarily faces the target"), Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
+            Fixture.Round->Tick(0.15f);
+            TestTrue(TEXT("A released projectile restores facing before the projectile settles"), Fixture.Round->GetView().Units[SourceIndex].ActionPhase == ECombatRoundActionPhase::Complete && Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
+        }
+        if (Case == 2)
+        {
+            // Hold the unit away from home after each move so the real return timeout must recover it.
+            // 매 이동 뒤 유닛을 원위치 밖에 유지하여 실제 복귀 제한 시간이 복구를 수행하게 합니다.
+            AddExpectedError(TEXT("[Round] Return timeout"), EAutomationExpectedErrorFlags::Contains, 1, false);
+            const FVector InterruptedReturnLocation = Source->GetActorLocation();
+            for (int32 Step = 0; Step < 650 && Fixture.Round->GetView().RoundNumber == 1 && Fixture.Round->GetView().Phase == ECombatRoundPhase::Resolving; ++Step)
+            {
+                Source->SetActorLocation(InterruptedReturnLocation, false);
+                Fixture.Round->Tick(0.01f);
+            }
+        }
+        if (!TestTrue(Context + TEXT(" settles into the next planning round"), Fixture.AdvanceUntilNextRound(1))) return false;
+        TestTrue(Context + TEXT(" applies its attack before settling"), Target->GetAttributeSet()->GetHP() < 100.0f);
+        if (Case == 3)
+        {
+            FVector Facing = Target->GetActorLocation() - Source->GetActorLocation();
+            Facing.Z = 0.0f;
+            TestEqual(TEXT("Successful resident movement updates the reserved tile"), Source->GetCurrentTile(), Destination);
+            TestTrue(TEXT("Successful resident movement stays at the destination"), Source->GetActorLocation().Equals(Destination->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), 0.1f));
+            TestTrue(TEXT("Resident movement preserves its aimed facing"), Source->GetActorRotation().Equals(Facing.Rotation(), 0.1f));
+            TestFalse(TEXT("Resident movement does not restore the departed home's facing"), Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
+        }
+        else
+        {
+            TestTrue(Context + TEXT(" stops movement at completion"), Source->GetVelocity().IsNearlyZero());
+            TestEqual(Context + TEXT(" keeps its reserved home"), Source->GetCurrentTile(), Home);
+            TestTrue(Context + TEXT(" restores its original position"), Source->GetActorLocation().Equals(Origin, Case == 0 ? 2.0f : 0.1f));
+            TestTrue(Context + TEXT(" restores its original facing"), Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
+        }
+    }
     return true;
 }
 

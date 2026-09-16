@@ -726,6 +726,7 @@ void ACombatRoundCoordinator::LockPlans()
         if (Skill.SubActionPointCost > 0) Entry.Unit->ConsumeSubActionPoint(Skill.SubActionPointCost);
         FActionRuntime& Action = Actions[Index];
         Action.OriginalLocation = Entry.Unit->GetActorLocation();
+        Action.OriginalRotation = Entry.Unit->GetActorRotation();
         Action.EffectiveTargetUnitId = Entry.Command.TargetUnitId;
         const int32 TargetIndex = FindUnitIndex(Entry.Command.TargetUnitId);
         Action.AimLocation = Action.OriginalLocation;
@@ -931,6 +932,10 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
             return;
         }
         Entry.Unit->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+        // Return travel faces home; restore the pre-action facing once the return has settled.
+        // 복귀 이동 중에는 원위치를 바라보고 복귀가 끝나면 행동 전 방향을 복원합니다.
+        Entry.Unit->SetActorRotation(Action.OriginalRotation);
+        Entry.Unit->ForceNetUpdate();
         Entry.ActionPhase = ECombatRoundActionPhase::Complete;
         if (Action.bFailed) Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
     }
@@ -964,6 +969,9 @@ void ACombatRoundCoordinator::StartReturn(int32 Index, bool bFailed, const FText
     }
     if (FVector::DistSquared2D(Entry.Unit->GetActorLocation(), Action.OriginalLocation) <= 4.f)
     {
+        Entry.Unit->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+        Entry.Unit->SetActorRotation(Action.OriginalRotation);
+        Entry.Unit->ForceNetUpdate();
         Entry.ActionPhase = ECombatRoundActionPhase::Complete;
         if (bFailed) Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
     }
