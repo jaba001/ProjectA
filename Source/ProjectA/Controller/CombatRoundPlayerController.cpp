@@ -159,8 +159,23 @@ void ACombatRoundPlayerController::SubmitRoundMove(int32 UnitId, FIntPoint Desti
     RequestedRevision = View.PlanRevision;
     bRequestPending = true;
     bAwaitingReplicatedResult = false;
-    RequestStatus = NSLOCTEXT("CombatRound", "MovePending", "이동을 서버에서 확인하고 있습니다.");
+    RequestStatus = NSLOCTEXT("CombatRound", "MovePending", "이동 예약을 서버에서 확인하고 있습니다.");
     ServerSubmitRoundMove(View.CombatId, View.RoundNumber, View.PlanRevision, UnitId, Destination);
+}
+
+void ACombatRoundPlayerController::CancelRoundMove(int32 UnitId)
+{
+    if (!CanSelectRoundWorldTarget()) return;
+    const FCombatRoundView& View = Coordinator->GetView();
+    const FCombatRoundUnitView* Unit = View.Units.FindByPredicate([UnitId](const FCombatRoundUnitView& Entry) { return Entry.UnitId == UnitId; });
+    if (!Unit || Unit->bEnemy || Unit->OwnerSlot != ParticipantSlot || Unit->HP <= 0.f || !Unit->bHasMovePlan) return;
+    RequestedCombatId = View.CombatId;
+    RequestedRound = View.RoundNumber;
+    RequestedRevision = View.PlanRevision;
+    bRequestPending = true;
+    bAwaitingReplicatedResult = false;
+    RequestStatus = NSLOCTEXT("CombatRound", "CancelMovePending", "이동 예약 취소를 서버에서 확인하고 있습니다.");
+    ServerCancelRoundMove(View.CombatId, View.RoundNumber, View.PlanRevision, UnitId);
 }
 
 void ACombatRoundPlayerController::SetRoundReady(bool bReady)
@@ -187,7 +202,14 @@ void ACombatRoundPlayerController::ServerSubmitRoundMove_Implementation(FGuid Co
 {
     FText Error = NSLOCTEXT("CombatRound", "MoveNoSession", "라운드 세션에 연결되지 않았습니다.");
     const bool bAccepted = IsRoundInputEnabled() && IsValid(Coordinator) && Coordinator->SubmitMove(this, CombatId, RoundNumber, Revision, UnitId, Destination, Error);
-    ClientReceiveRoundResponse(bAccepted, bAccepted ? NSLOCTEXT("CombatRound", "MoveAccepted", "이동을 반영했습니다. 행동 계획을 확인해 주세요.") : Error);
+    ClientReceiveRoundResponse(bAccepted, bAccepted ? NSLOCTEXT("CombatRound", "MoveAccepted", "이동을 예약했습니다. 준비 완료 후 SAP 이동을 먼저 실행하고 AP 행동을 진행합니다.") : Error);
+}
+
+void ACombatRoundPlayerController::ServerCancelRoundMove_Implementation(FGuid CombatId, int32 RoundNumber, int32 Revision, int32 UnitId)
+{
+    FText Error = NSLOCTEXT("CombatRound", "CancelMoveNoSession", "라운드 세션에 연결되지 않았습니다.");
+    const bool bAccepted = IsRoundInputEnabled() && IsValid(Coordinator) && Coordinator->CancelMove(this, CombatId, RoundNumber, Revision, UnitId, Error);
+    ClientReceiveRoundResponse(bAccepted, bAccepted ? NSLOCTEXT("CombatRound", "CancelMoveAccepted", "이동 예약을 취소했습니다. AP 행동 계획을 확인해 주세요.") : Error);
 }
 
 void ACombatRoundPlayerController::ServerSetRoundReady_Implementation(FGuid CombatId, int32 RoundNumber, int32 Revision, bool bReady)

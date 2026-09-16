@@ -77,6 +77,9 @@ private:
     void HandleMove();
 
     UFUNCTION()
+    void HandleCancelMovePlan();
+
+    UFUNCTION()
     void HandleReady();
 
     UFUNCTION()
@@ -90,6 +93,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> UnitDetails;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> MovePlanDetails;
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> TargetDetails;
@@ -111,6 +117,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UButton> MoveButton;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> CancelMovePlanButton;
 
     UPROPERTY(Transient)
     TObjectPtr<UButton> ReadyButton;

@@ -17,6 +17,7 @@
 #include "EngineUtils.h"
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Run/RunParticipationLibrary.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GAS/Ability/GA_DefaultAttack.h"
 #include "GAS/Effect/GE_Damage.h"
 #include "Grid/Combat/CombatGridManager.h"
@@ -369,6 +370,12 @@ namespace CombatRoundTests
             return Round->SubmitMove(Controllers[ControllerIndex], View.CombatId, View.RoundNumber, View.PlanRevision, Unit->UnitIndex, Destination, Error);
         }
 
+        bool CancelMove(int32 ControllerIndex, AUnitBase* Unit)
+        {
+            const FCombatRoundView& View = Round->GetView();
+            return Round->CancelMove(Controllers[ControllerIndex], View.CombatId, View.RoundNumber, View.PlanRevision, Unit->UnitIndex, Error);
+        }
+
         bool AdvanceUntilNextRound(int32 InitialRound)
         {
             for (int32 Step = 0; Step < 1000 && Round->GetView().RoundNumber == InitialRound && Round->IsRoundSessionActive(); ++Step)
@@ -529,7 +536,7 @@ bool FCombatRoundPlanningMoveTest::RunTest(const FString& Parameters)
     ACombatGridTile* Destination = Fixture.Grid->GetTileAtCoord(FIntPoint(1, 1));
     const FVector OriginalLocation = Source->GetActorLocation();
     const FRotator OriginalRotation = Source->GetActorRotation();
-    if (!TestTrue(TEXT("Movement fixture starts with zero AP and one SUP"), Source->ConsumeActionPoint(2) && Source->ConsumeSubActionPoint(1))) return false;
+    if (!TestTrue(TEXT("Movement fixture starts with zero AP and one SAP"), Source->ConsumeActionPoint(2) && Source->ConsumeSubActionPoint(1))) return false;
     FText Error;
     TestTrue(TEXT("A diagonal empty allied tile is reachable with the default one-tile range"), Round->CanMoveUnit(Source->UnitIndex, Destination->GridCoord, Error));
     TestFalse(TEXT("The current tile is not a movement destination"), Round->CanMoveUnit(Source->UnitIndex, Origin->GridCoord, Error));
@@ -541,15 +548,30 @@ bool FCombatRoundPlanningMoveTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("The mover applies a zero-cost wait"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Wait")))) || !TestTrue(TEXT("The second owner applies a wait"), Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait")))) || !TestTrue(TEXT("The second owner can ready before repositioning"), Fixture.Ready(1))) return false;
     TestTrue(TEXT("The second owner is ready while the mover is still planning"), Round->GetView().Units[1].bReady && Round->GetView().Phase == ECombatRoundPhase::Planning);
     const int32 Revision = Round->GetView().PlanRevision;
-    if (!TestTrue(TEXT("The original owner can reposition with zero AP and one SUP"), Fixture.Move(0, Source, Destination->GridCoord))) return false;
-    TestTrue(TEXT("Accepted movement starts immediately and changes the plan revision"), Round->IsPlanningMoveInProgress() && Round->GetView().PlanRevision > Revision);
-    TestEqual(TEXT("SUP movement never consumes AP"), Source->GetCurrentActionPoint(), 0);
-    TestEqual(TEXT("Movement consumes exactly one SUP on approval"), Source->GetCurrentSubActionPoint(), 0);
-    TestTrue(TEXT("Repositioning clears every human participant's ready state"), !Round->GetView().Units[0].bReady && !Round->GetView().Units[1].bReady);
-    TestFalse(TEXT("Commands cannot change during repositioning"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Wait"))));
-    TestFalse(TEXT("The moving participant cannot ready early"), Fixture.Ready(0));
-    TestFalse(TEXT("Another participant cannot ready during repositioning"), Fixture.Ready(1));
-    TestFalse(TEXT("Only one planning movement can run at a time"), Fixture.Move(1, Friend, FIntPoint(3, 1)));
+    if (!TestTrue(TEXT("The original owner can reserve movement with zero AP and one SAP"), Fixture.Move(0, Source, Destination->GridCoord))) return false;
+    TestTrue(TEXT("The reservation is published without starting movement"), Round->GetView().Units[0].bHasMovePlan && Round->GetView().Units[0].MoveDestinationCoord == Destination->GridCoord && !Round->IsPlanningMoveInProgress() && Round->GetView().PlanRevision > Revision);
+    TestEqual(TEXT("Reserving movement never consumes AP"), Source->GetCurrentActionPoint(), 0);
+    TestEqual(TEXT("Reserving movement does not consume SAP"), Source->GetCurrentSubActionPoint(), 1);
+    TestTrue(TEXT("Reserving movement clears every human participant's ready state"), !Round->GetView().Units[0].bReady && !Round->GetView().Units[1].bReady);
+    Round->Tick(0.5f);
+    TestTrue(TEXT("An unready reservation leaves the actor and occupancy at its origin"), Source->GetActorLocation().Equals(OriginalLocation, 0.1f) && Source->GetCurrentTile() == Origin && Origin->GetOccupyingUnit() == Source && Round->GetView().Phase == ECombatRoundPhase::Planning);
+    TestFalse(TEXT("A stale move request cannot replace the reservation"), Round->SubmitMove(Fixture.Controllers[0], Round->GetView().CombatId, Round->GetView().RoundNumber, Revision, Source->UnitIndex, FIntPoint(0, 1), Error));
+    TestFalse(TEXT("Another participant cannot cancel the reservation"), Fixture.CancelMove(1, Source));
+    if (!TestTrue(TEXT("The owner can edit the reservation"), Fixture.Move(0, Source, FIntPoint(0, 1)))) return false;
+    TestTrue(TEXT("Editing changes only the destination, not the actor or resources"), Round->GetView().Units[0].MoveDestinationCoord == FIntPoint(0, 1) && Source->GetActorLocation().Equals(OriginalLocation, 0.1f) && Source->GetCurrentSubActionPoint() == 1);
+    TestFalse(TEXT("A stale cancellation cannot clear the edited reservation"), Round->CancelMove(Fixture.Controllers[0], Round->GetView().CombatId, Round->GetView().RoundNumber, Revision, Source->UnitIndex, Error));
+    if (!TestTrue(TEXT("The owner can cancel before locking"), Fixture.CancelMove(0, Source))) return false;
+    TestTrue(TEXT("Cancellation clears the reservation without moving or spending SAP"), !Round->GetView().Units[0].bHasMovePlan && Source->GetActorLocation().Equals(OriginalLocation, 0.1f) && Source->GetCurrentSubActionPoint() == 1);
+    if (!TestTrue(TEXT("The owner can reserve the original destination again"), Fixture.Move(0, Source, Destination->GridCoord)) || !TestTrue(TEXT("The first owner readies the reserved action"), Fixture.Ready(0))) return false;
+    TestTrue(TEXT("One ready participant does not start the move"), !Round->IsPlanningMoveInProgress() && Source->GetActorLocation().Equals(OriginalLocation, 0.1f));
+    if (!TestTrue(TEXT("The final participant locks the movement and action plans"), Fixture.Ready(1))) return false;
+    TestTrue(TEXT("All participants ready starts the SAP stage inside resolving"), Round->IsPlanningMoveInProgress() && Round->GetView().Phase == ECombatRoundPhase::Resolving);
+    TestEqual(TEXT("Locking consumes exactly one SAP for the move"), Source->GetCurrentSubActionPoint(), 0);
+    TestEqual(TEXT("A movement and wait plan still works with zero AP"), Source->GetCurrentActionPoint(), 0);
+    TestFalse(TEXT("Commands cannot change after locking"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Wait"))));
+    TestFalse(TEXT("Ready cannot change after locking"), Fixture.Ready(0));
+    TestFalse(TEXT("Movement cannot change after locking"), Fixture.Move(0, Source, FIntPoint(0, 1)));
+    TestFalse(TEXT("Movement cannot be cancelled after locking"), Fixture.CancelMove(0, Source));
     Round->Tick(0.05f);
     TestTrue(TEXT("Movement advances through world space before reaching its destination"), !Source->GetActorLocation().Equals(OriginalLocation, 1.0f) && Round->IsPlanningMoveInProgress());
     TestTrue(TEXT("The origin remains occupied until movement completes"), Origin->GetOccupyingUnit() == Source && Source->GetCurrentTile() == Origin && Destination->GetOccupyingUnit() == nullptr);
@@ -559,14 +581,13 @@ bool FCombatRoundPlanningMoveTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Arrival transfers grid occupancy and the unit's tile together"), Origin->GetOccupyingUnit() == nullptr && Destination->GetOccupyingUnit() == Source && Source->GetCurrentTile() == Destination);
     TestTrue(TEXT("Arrival publishes the new home coordinate"), Round->GetView().Units[0].HomeCoord == Destination->GridCoord);
     TestTrue(TEXT("Arrival preserves height and restores the original facing"), Source->GetActorLocation().Equals(NewHome, 2.0f) && Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
-    TestFalse(TEXT("A second move is unavailable after SUP is spent"), Round->CanMoveUnit(Source->UnitIndex, Origin->GridCoord, Error));
-    if (!TestTrue(TEXT("The mover reapplies a wait at the new home"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Wait")))) || !TestTrue(TEXT("The second owner reapplies its wait"), Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait")))) || !TestTrue(TEXT("The mover readies after arriving"), Fixture.Ready(0)) || !TestTrue(TEXT("The second owner readies after arriving"), Fixture.Ready(1))) return false;
+    TestFalse(TEXT("A second move cannot be added during the AP stage"), Round->CanMoveUnit(Source->UnitIndex, Origin->GridCoord, Error));
     if (!TestTrue(TEXT("Repositioning does not prevent the round from settling"), Fixture.AdvanceUntilNextRound(1))) return false;
     TestEqual(TEXT("Planning movement does not deal attack damage"), Enemy->GetAttributeSet()->GetHP(), 100.0f);
     if (!TestTrue(TEXT("A later attack starts from the repositioned home"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Strike"), Enemy))) || !TestTrue(TEXT("The second owner waits for the attack"), Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait")))) || !TestTrue(TEXT("The attacking owner readies"), Fixture.Ready(0)) || !TestTrue(TEXT("The waiting owner readies"), Fixture.Ready(1))) return false;
     if (!TestTrue(TEXT("The attack approaches, releases, and returns within a bounded round"), Fixture.AdvanceUntilNextRound(2))) return false;
     TestEqual(TEXT("The attack still applies its authored damage once"), Enemy->GetAttributeSet()->GetHP(), 75.0f);
-    TestTrue(TEXT("The attack returns to the SUP destination rather than the previous home"), Source->GetActorLocation().Equals(NewHome, 2.0f) && Source->GetCurrentTile() == Destination && Round->GetView().Units[0].HomeCoord == Destination->GridCoord);
+    TestTrue(TEXT("The attack returns to the SAP destination rather than the previous home"), Source->GetActorLocation().Equals(NewHome, 2.0f) && Source->GetCurrentTile() == Destination && Round->GetView().Units[0].HomeCoord == Destination->GridCoord);
     return true;
 }
 
@@ -592,15 +613,146 @@ bool FCombatRoundPlanningMoveCancellationTest::RunTest(const FString& Parameters
     TestTrue(TEXT("Opening one diagonal route restores reachability"), Round->CanMoveUnit(Source->UnitIndex, Destination->GridCoord, Error));
     const FVector OriginalLocation = Source->GetActorLocation();
     const FRotator OriginalRotation = Source->GetActorRotation();
-    const int32 OriginalSUP = Source->GetCurrentSubActionPoint();
-    if (!TestTrue(TEXT("The reachable route starts moving"), Fixture.Move(0, Source, Destination->GridCoord))) return false;
+    const int32 OriginalSAP = Source->GetCurrentSubActionPoint();
+    if (!TestTrue(TEXT("The mover applies its AP wait"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Wait")))) || !TestTrue(TEXT("The reachable route can be reserved"), Fixture.Move(0, Source, Destination->GridCoord)) || !TestTrue(TEXT("Ready begins the reserved route"), Fixture.Ready(0))) return false;
     Round->Tick(0.05f);
     if (!TestTrue(TEXT("Suspension happens during real movement"), Round->IsPlanningMoveInProgress() && !Source->GetActorLocation().Equals(OriginalLocation, 1.0f))) return false;
     Round->SuspendRound();
     TestTrue(TEXT("Suspension ends the active move"), Round->GetView().Phase == ECombatRoundPhase::Suspended && !Round->IsPlanningMoveInProgress());
     TestTrue(TEXT("Interrupted movement restores the original position and facing"), Source->GetActorLocation().Equals(OriginalLocation, 0.1f) && Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
     TestTrue(TEXT("Interrupted movement retains its original home and occupancy"), Source->GetCurrentTile() == Origin && Origin->GetOccupyingUnit() == Source && Destination->GetOccupyingUnit() == nullptr && Round->GetView().Units[0].HomeCoord == Origin->GridCoord);
-    TestEqual(TEXT("An interrupted move does not refund the spent SUP"), Source->GetCurrentSubActionPoint(), OriginalSUP - 1);
+    TestEqual(TEXT("An interrupted locked move does not refund the spent SAP"), Source->GetCurrentSubActionPoint(), OriginalSAP - 1);
+    FFixture Standalone;
+    if (!TestTrue(TEXT("The standalone companion fixture initializes"), Standalone.InitializeStandalone(false))) return false;
+    AUnitBase* Companion = Standalone.Humans[0];
+    TestFalse(TEXT("An AI companion has no human SAP move preview"), Standalone.Round->CanMoveUnit(Companion->UnitIndex, FIntPoint(1, 1), Error));
+    TestFalse(TEXT("The local owner cannot reserve movement for an AI companion"), Standalone.Move(0, Companion, FIntPoint(1, 1)));
+    TestFalse(TEXT("The local owner cannot cancel an AI companion's movement"), Standalone.CancelMove(0, Companion));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundMoveBudgetTest, "ProjectA.Combat.Round.ReservedMovementBudgetsAndConflicts", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundMoveBudgetTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FCombatRoundSkill Attack;
+    Attack.SubActionPointCost = 1;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("The movement budget fixture initializes"), Fixture.Initialize(2, 10.0f, nullptr, FIntPoint(0, 3), 1, &Attack))) return false;
+    AUnitBase* Source = Fixture.Humans[0];
+    AUnitBase* Friend = Fixture.Humans[1];
+    AUnitBase* Enemy = Fixture.Enemies[0];
+    ACombatRoundCoordinator* Round = Fixture.Round;
+    const FIntPoint Destination(1, 1);
+    const FCombatRoundCommand AuthoredAttack = Fixture.Command(Source, Fixture.HumanSkillId, Enemy);
+    if (!TestTrue(TEXT("The fixture can retain only one SAP"), Source->ConsumeSubActionPoint(1)) || !TestTrue(TEXT("The authored SAP attack is affordable without a move"), Fixture.Submit(0, AuthoredAttack))) return false;
+    FText Error;
+    TestFalse(TEXT("Move preview includes the already planned attack's SAP cost"), Round->CanMoveUnit(Source->UnitIndex, Destination, Error));
+    TestFalse(TEXT("The server rejects an attack-plus-move budget above available SAP"), Fixture.Move(0, Source, Destination));
+    TestTrue(TEXT("An over-budget reservation preserves the existing attack and SAP"), !Round->GetView().Units[0].bHasMovePlan && SameCommand(Round->GetView().Units[0].Command, AuthoredAttack) && Source->GetCurrentSubActionPoint() == 1);
+    if (!TestTrue(TEXT("A free wait releases the attack's reserved SAP budget"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Wait")))) || !TestTrue(TEXT("The freed SAP can reserve movement"), Fixture.Move(0, Source, Destination))) return false;
+    TestFalse(TEXT("Attack preview includes an existing movement reservation"), Round->CanPlanCommand(AuthoredAttack, Error));
+    TestFalse(TEXT("The reverse submission order also rejects the combined excess cost"), Fixture.Submit(0, AuthoredAttack));
+    Source->ResetSubActionPoint();
+    if (!TestTrue(TEXT("Two SAP cover both the movement and authored attack"), Round->CanPlanCommand(AuthoredAttack, Error)) || !TestTrue(TEXT("The combined affordable plan is accepted"), Fixture.Submit(0, AuthoredAttack))) return false;
+    TestTrue(TEXT("Planning reserves both costs without spending either resource"), Round->GetView().Units[0].bHasMovePlan && Source->GetCurrentActionPoint() == 2 && Source->GetCurrentSubActionPoint() == 2);
+    TestFalse(TEXT("A second participant cannot reserve the same SAP destination"), Fixture.Move(1, Friend, Destination));
+    FCombatRoundCommand ResidentAttack = Fixture.Command(Friend, TEXT("MoveShot"), Enemy);
+    ResidentAttack.DestinationCoord = Destination;
+    TestFalse(TEXT("An AP action that remains on a reserved SAP destination is rejected"), Fixture.Submit(1, ResidentAttack));
+    if (!TestTrue(TEXT("Cancelling the first move releases its destination"), Fixture.CancelMove(0, Source)) || !TestTrue(TEXT("The resident AP action can claim the released tile"), Fixture.Submit(1, ResidentAttack))) return false;
+    TestFalse(TEXT("A SAP move cannot claim another unit's resident AP destination"), Fixture.Move(0, Source, Destination));
+    if (!TestTrue(TEXT("Replacing the resident action releases its destination"), Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait")))) || !TestTrue(TEXT("The SAP destination becomes reservable again"), Fixture.Move(0, Source, Destination)) || !TestTrue(TEXT("The first participant readies both affordable costs"), Fixture.Ready(0)) || !TestTrue(TEXT("The second participant locks the round"), Fixture.Ready(1))) return false;
+    TestEqual(TEXT("Locking charges the authored AP cost once"), Source->GetCurrentActionPoint(), 1);
+    TestEqual(TEXT("Locking charges movement SAP and attack SAP together"), Source->GetCurrentSubActionPoint(), 0);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundMoveBarrierTest, "ProjectA.Combat.Round.MovementBarrierBeforeAttacks", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundMoveBarrierTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("The two-owner movement barrier fixture initializes"), Fixture.Initialize(2))) return false;
+    ACombatRoundCoordinator* Round = Fixture.Round;
+    AUnitBase* Source = Fixture.Humans[0];
+    AUnitBase* Friend = Fixture.Humans[1];
+    AUnitBase* Enemy = Fixture.Enemies[0];
+    ACombatGridTile* SourceDestination = Fixture.Grid->GetTileAtCoord(FIntPoint(1, 1));
+    ACombatGridTile* FriendDestination = Fixture.Grid->GetTileAtCoord(FIntPoint(3, 1));
+    const FVector NewHome = SourceDestination->GetActorLocation() + FVector(0.0f, 0.0f, Source->GetActorLocation().Z);
+    Friend->GetCharacterMovement()->MaxWalkSpeed = 100.0f;
+    if (!TestTrue(TEXT("The first participant applies an attack"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Strike"), Enemy))) || !TestTrue(TEXT("The second participant applies a wait"), Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait")))) || !TestTrue(TEXT("The first participant reserves a move"), Fixture.Move(0, Source, SourceDestination->GridCoord)) || !TestTrue(TEXT("The second participant reserves a distinct move"), Fixture.Move(1, Friend, FriendDestination->GridCoord)) || !TestTrue(TEXT("The first participant readies"), Fixture.Ready(0)) || !TestTrue(TEXT("The last participant locks the staged round"), Fixture.Ready(1))) return false;
+    TestTrue(TEXT("The round begins with its reserved SAP stage"), Round->IsPlanningMoveInProgress());
+    TestEqual(TEXT("AP timing starts at zero before any SAP movement"), Round->GetView().ElapsedSeconds, 0.0f);
+    bool bObservedFirstArrival = false;
+    bool bAPClockPaused = true;
+    bool bNoEarlyDamage = true;
+    bool bFirstArrivalWaited = true;
+    for (int32 Step = 0; Step < 600 && Round->IsPlanningMoveInProgress(); ++Step)
+    {
+        Round->Tick(0.01f);
+        if (!Round->IsPlanningMoveInProgress()) break;
+        bAPClockPaused &= Round->GetView().ElapsedSeconds == 0.0f;
+        bNoEarlyDamage &= Enemy->GetAttributeSet()->GetHP() == 100.0f;
+        if (Source->GetCurrentTile() == SourceDestination && Friend->GetCurrentTile() != FriendDestination)
+        {
+            bObservedFirstArrival = true;
+            bFirstArrivalWaited &= Source->GetActorLocation().Equals(NewHome, 2.0f);
+        }
+    }
+    TestTrue(TEXT("SAP movement does not advance the AP simulation clock"), bAPClockPaused);
+    TestTrue(TEXT("No attack releases before every SAP movement ends"), bNoEarlyDamage);
+    TestTrue(TEXT("The faster arrival waits at its new home for the remaining move"), bFirstArrivalWaited);
+    if (!TestTrue(TEXT("One participant arrives while the other is still moving"), bObservedFirstArrival) || !TestFalse(TEXT("Every reserved move finishes in bounded time"), Round->IsPlanningMoveInProgress())) return false;
+    TestTrue(TEXT("The AP stage starts only after both new homes are occupied"), Source->GetCurrentTile() == SourceDestination && Friend->GetCurrentTile() == FriendDestination && SourceDestination->GetOccupyingUnit() == Source && FriendDestination->GetOccupyingUnit() == Friend);
+    TestEqual(TEXT("Completing movement does not release the wound-up attack immediately"), Enemy->GetAttributeSet()->GetHP(), 100.0f);
+    TestTrue(TEXT("AP speed delays remain based on the planned Dexterity values"), FMath::IsNearlyEqual(Round->GetView().Units[0].StartDelay, 0.0f) && FMath::IsNearlyEqual(Round->GetView().Units[1].StartDelay, 0.2f) && FMath::IsNearlyEqual(Round->GetView().Units[2].StartDelay, 1.0f));
+    Round->Tick(0.05f);
+    TestTrue(TEXT("The attack approaches its enemy only after the complete movement stage"), !Source->GetActorLocation().Equals(NewHome, 2.0f));
+    if (!TestTrue(TEXT("The staged movement and attack round settles"), Fixture.AdvanceUntilNextRound(1))) return false;
+    TestEqual(TEXT("The staged attack applies its damage exactly once"), Enemy->GetAttributeSet()->GetHP(), 75.0f);
+    TestTrue(TEXT("The attack returns to the home established by its SAP move"), Source->GetActorLocation().Equals(NewHome, 2.0f) && Source->GetCurrentTile() == SourceDestination && Round->GetView().Units[0].HomeCoord == SourceDestination->GridCoord);
+    TestTrue(TEXT("The next round clears both old movement reservations"), !Round->GetView().Units[0].bHasMovePlan && !Round->GetView().Units[1].bHasMovePlan);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundMoveFailureTest, "ProjectA.Combat.Round.MovementFailureDoesNotBlockSurvivors", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundMoveFailureTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Case = 0; Case < 2; ++Case)
+    {
+        FFixture Fixture;
+        if (!TestTrue(TEXT("The failed-movement fixture initializes"), Fixture.Initialize(2))) return false;
+        ACombatRoundCoordinator* Round = Fixture.Round;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Friend = Fixture.Humans[1];
+        AUnitBase* Enemy = Fixture.Enemies[0];
+        ACombatGridTile* Origin = Source->GetCurrentTile();
+        const FVector OriginalLocation = Source->GetActorLocation();
+        const FCombatRoundCommand FriendCommand = Fixture.Command(Friend, Case == 0 ? FName(TEXT("Wait")) : FName(TEXT("Strike")), Case == 0 ? nullptr : Enemy);
+        if (!TestTrue(TEXT("The mover reserves an attack"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Strike"), Enemy))) || !TestTrue(TEXT("The second participant applies its action"), Fixture.Submit(1, FriendCommand)) || !TestTrue(TEXT("The mover reserves an allied destination"), Fixture.Move(0, Source, FIntPoint(1, 1))) || !TestTrue(TEXT("The mover readies"), Fixture.Ready(0)) || !TestTrue(TEXT("The second participant locks the stage"), Fixture.Ready(1))) return false;
+        Round->Tick(0.05f);
+        if (!TestTrue(TEXT("The failure occurs during actual SAP movement"), Round->IsPlanningMoveInProgress() && !Source->GetActorLocation().Equals(OriginalLocation, 1.0f))) return false;
+        if (Case == 0) Source->GetCharacterMovement()->MaxWalkSpeed = 0.0f;
+        else Source->Die();
+        Round->Tick(0.01f);
+        TestFalse(TEXT("A failed or dead mover does not block the AP stage"), Round->IsPlanningMoveInProgress());
+        TestTrue(TEXT("The AP stage preserves the failed movement's no-refund explanation"), Round->GetView().Message.ToString().Contains(TEXT("환불")));
+        if (Case == 0)
+        {
+            TestTrue(TEXT("A living failed mover returns to its reserved origin before its attack"), Source->GetActorLocation().Equals(OriginalLocation, 0.1f) && Source->GetCurrentTile() == Origin && Origin->GetOccupyingUnit() == Source);
+            TestEqual(TEXT("Failure preserves the already charged movement SAP"), Source->GetCurrentSubActionPoint(), 1);
+        }
+        else TestTrue(TEXT("The dead mover's planned AP action is cancelled"), Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Cancelled);
+        if (!TestTrue(TEXT("Surviving AP actions finish despite the movement failure"), Fixture.AdvanceUntilNextRound(1))) return false;
+        TestEqual(TEXT("Exactly the living planned attack applies damage"), Enemy->GetAttributeSet()->GetHP(), 75.0f);
+        if (Case == 0) TestTrue(TEXT("The failed mover's attack returns to the restored original home"), Source->GetActorLocation().Equals(OriginalLocation, 2.0f) && Source->GetCurrentTile() == Origin && Round->GetView().Units[0].HomeCoord == Origin->GridCoord);
+    }
     return true;
 }
 

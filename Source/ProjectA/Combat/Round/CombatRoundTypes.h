@@ -184,6 +184,14 @@ struct PROJECTA_API FCombatRoundUnitView
     UPROPERTY(BlueprintReadOnly)
     FCombatRoundCommand Command;
 
+    // Movement is a separate SAP reservation executed before every AP action.
+    // 이동은 모든 AP 행동보다 먼저 실행하는 별도의 SAP 예약입니다.
+    UPROPERTY(BlueprintReadOnly)
+    bool bHasMovePlan = false;
+
+    UPROPERTY(BlueprintReadOnly)
+    FIntPoint MoveDestinationCoord = FIntPoint::ZeroValue;
+
     UPROPERTY(BlueprintReadOnly)
     bool bReady = false;
 

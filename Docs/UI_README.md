@@ -108,7 +108,7 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 | PreviewStage | MainMenu의 월드 Actor·카메라 사용. SceneCapture2D·RenderTarget 미사용 |
 | GameplayRoot | CommonUserWidget. RunLayer·CombatLayer·ModalLayer는 CommonActivatableWidgetStack |
 | Gameplay 화면 | RunMap·RoundPlanning·Result는 CommonActivatableWidget. 스폰은 EncounterManager가 담당. 이전 CombatHUD WBP는 참조만 보존 |
-| 입력 | RoundPlanning·RunMap·Result: Menu/NoCapture. 커서 표시 유지, CommonUI가 입력 모드 관리 |
+| 입력 | RoundPlanning: All/CaptureDuringMouseDown. RunMap·Result: Menu/NoCapture. 커서 표시 유지, CommonUI가 입력 모드 관리 |
 
 프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 Warrior/Mage/Archer/Rogue 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
@@ -128,15 +128,15 @@ GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메
 
 `UGameplayRootWidget`의 CombatLayer는 `UCombatRoundPlanningWidget`을 사용한다. 기존 `CombatHUDWidgetClass`와 `UCombatHUDWidget`은 Blueprint 참조를 위한 외형이며 순차 명령 버튼을 실행하지 않는다. 새 화면은 native 생성으로 동작하므로 WBP/JSON 재생성·기존 맵 재배치·Config 변경이 필요 없다. C++ 빌드 후 UE 재시작으로 리플렉션 변경을 반영한다.
 
-전장에서 **적 또는 스킬이 요구하는 타일 클릭 → 실제 장착 스킬 버튼 클릭 → 준비 완료** 순서로 행동한다. 스킬 버튼을 누르면 자원·대상·좌표를 검사하고 바로 계획 적용을 요청한다. 하단에는 현재 조작 캐릭터의 HP/AP/SUP·속도, 선택 대상과 적용된 행동을 표시한다. 인간 조작 가능한 캐릭터가 여럿인 기존 파티는 아군 클릭 또는 조작 캐릭터 목록으로 전환한다. 상단에는 아군/적 HP·계획·준비 상태를 표시한다.
+전장에서 **적 또는 스킬이 요구하는 타일 한 번 클릭 → 실제 장착 스킬 버튼 클릭 → 준비 완료** 순서로 행동한다. 스킬 버튼을 누르면 자원·대상·좌표를 검사하고 바로 계획 적용을 요청한다. 하단에는 현재 조작 캐릭터의 HP/AP/SAP·속도, 선택 대상과 적용된 행동을 표시한다. 인간 조작 가능한 캐릭터가 여럿인 기존 파티는 아군 클릭 또는 조작 캐릭터 목록으로 전환한다. 상단에는 아군/적 HP·계획·준비 상태를 표시한다.
 
 스킬 버튼은 선택한 캐릭터에게 실제 장착된 DA만 사용한다. 공통 시험 행동 6종·무장착 시 자동 기본 공격·Encounter 진입 시 추가 스킬 자동 추첨은 제거했다. 현재 기본 콘텐츠에는 사용자가 작성한 기본 공격 DA만 표시한다. 미작성 DA의 내용을 채우거나 임의로 장착하지 않는다. `CanPlanCommand`가 거절하는 버튼은 비활성화하고 사유를 제공한다. 인간 조작이 허용된 모든 생존 유닛의 적용된 계획이 유효해야 준비 완료할 수 있다.
 
-**이동 · SUP 1**을 누르면 이동 가능한 아군 빈칸을 강조한다. 빈칸 클릭 시 이동 요청을 보내며 같은 버튼을 다시 누르면 선택을 취소한다. 승인된 이동은 SUP 1을 사용하고 AP는 사용하지 않는다. 기존 이동 범위 내 8방향 빈 아군 칸을 따라 이동하고 도착 위치를 새 복귀 칸으로 사용한다. 이동·행동 실행·서버 응답 대기 중 입력을 잠그며 실패·중단 시 살아 있는 유닛은 출발점으로 복원하고 SUP는 환불하지 않는다.
+**이동 예약 · SAP 1**을 누른 뒤 강조된 아군 빈칸을 한 번 클릭하면 목적지를 예약한다. 계획 중에는 위치·자원 소모가 없으며 예약 좌표를 표시한다. `이동 예약 변경`으로 목적지를 바꾸고 `이동 예약 취소`로 제거한다. `목적지 선택 닫기`는 클릭 선택 모드만 닫고 기존 예약은 유지한다. 전원 준비 후 SAP 이동을 먼저 끝내고 AP 공격을 실행하며 도착 위치를 새 복귀 칸으로 사용한다. 상단에 SAP 이동 실행/AP 행동 실행 단계를 구분한다. 실행·서버 응답 대기 중 입력 잠금, 실패·중단 시 출발점 복원과 잠금 이후 자원 미환불은 유지한다.
 
-입력은 `All / NoCapture`를 사용하고 화면/빈 루트는 `SelfHitTestInvisible`, 조작 패널은 hit-test를 유지한다. Controller는 실제 뷰포트의 클릭만 전달하므로 패널 뒤 유닛·타일을 함께 선택하지 않는다. 현재 전투에 등록된 유닛과 Grid만 허용하며 이전 순차 타일 행동 API는 재활성화하지 않는다.
+입력은 `All / CaptureDuringMouseDown`을 사용하고 화면/빈 루트는 `SelfHitTestInvisible`, 조작 패널은 hit-test를 유지한다. Controller는 실제 뷰포트의 클릭만 전달하므로 패널 뒤 유닛·타일을 함께 선택하지 않는다. 현재 전투에 등록된 유닛과 Grid만 허용하며 이전 순차 타일 행동 API는 재활성화하지 않는다.
 
-`ACombatRoundPlayerController`는 소유 연결의 계획/준비/이동 RPC와 서버 응답을 관리한다. 최신 복제 수정 번호 도착 전 중복 요청을 막으며 이전 라운드 요청은 거절한다. 계획 수정 시 팀 준비 해제·복귀 칸 충돌 거절은 [기획 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 확인 대기 임시 정책이다. 이번 변경의 UHT 포함 Editor 컴파일·문서/프로젝트 항목 정적 검사는 통과했으며 실제 작동·자동화는 미실행이다. 확인 절차는 [TEST_REPORT 26절](TEST_REPORT.md#26-전장-대상-선택과-sup-이동-복구)을 따른다. 이전 [17절 검증](TEST_REPORT.md#17-계획-입력-검사와-장착-tile-공격-ai)은 당시 구현 기준의 이력으로 구분한다.
+`ACombatRoundPlayerController`는 소유 연결의 계획/준비/이동 RPC와 서버 응답을 관리한다. 최신 복제 수정 번호 도착 전 중복 요청을 막으며 이전 라운드 요청은 거절한다. 계획 수정 시 팀 준비 해제·복귀 칸 충돌 거절은 [기획 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 확인 대기 임시 정책이다. 단일 클릭·SAP 예약 변경의 최신 검증과 확인 절차는 [TEST_REPORT 27절](TEST_REPORT.md#27-단일-클릭과-sap-이동-예약)을 따른다. 실제 작동·자동화는 미실행이다. 이전 [17절 검증](TEST_REPORT.md#17-계획-입력-검사와-장착-tile-공격-ai)은 당시 구현 기준의 이력으로 구분한다.
 
 ## 8 시작 메뉴 설정
 
@@ -190,7 +190,7 @@ MainMenu의 Options는 native `UOptionsWidget`으로 화면·그래픽 설정을
 | RunMap | Designer/native 경로의 배경·경로 패널·노드 버튼·안내. 동적 `UGameplayActionButton::Configure`에서도 테마 적용 |
 | 상점 선택·상점 | 선택 목록·상점 이름·나가기·안내. Host 진행 권한 유지 |
 | 전투 결과 | Designer/native 경로의 배경·승리/패배 결과·Continue·메뉴 복귀. 결과별 기존 진행 조건 유지 |
-| 라운드 계획 | 상단 아군/적 현황·하단 대상/장착 스킬 버튼·SUP 이동·준비/취소. 전장 타일/유닛 클릭과 해결·이동 중 입력 잠금 |
+| 라운드 계획 | 상단 아군/적 현황·하단 대상/장착 스킬 버튼·SAP 이동 예약/취소·준비/취소. 전장 타일/유닛 클릭과 해결·이동 중 입력 잠금 |
 | GameplayRoot 안내 | 저장 복구 안내·저장 다시 시도, 게임 중 협동 상태·나가기. 기존 표시 조건·저장 재시도·퇴장 동작과 안내 바깥 클릭 통과 유지 |
 
 ### 9-3 반영과 검증

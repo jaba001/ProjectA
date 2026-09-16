@@ -31,6 +31,7 @@ public:
     virtual bool IsRoundInputEnabled() const { return true; }
     void SubmitRoundPlan(const FCombatRoundCommand& Command);
     void SubmitRoundMove(int32 UnitId, FIntPoint Destination);
+    void CancelRoundMove(int32 UnitId);
     void SetRoundReady(bool bReady);
     FOnRoundWorldUnitClicked OnRoundWorldUnitClicked;
     FOnRoundWorldTileClicked OnRoundWorldTileClicked;
@@ -52,6 +53,9 @@ private:
 
     UFUNCTION(Server, Reliable)
     void ServerSubmitRoundMove(FGuid CombatId, int32 RoundNumber, int32 Revision, int32 UnitId, FIntPoint Destination);
+
+    UFUNCTION(Server, Reliable)
+    void ServerCancelRoundMove(FGuid CombatId, int32 RoundNumber, int32 Revision, int32 UnitId);
 
     UFUNCTION(Server, Reliable)
     void ServerSetRoundReady(FGuid CombatId, int32 RoundNumber, int32 Revision, bool bReady);

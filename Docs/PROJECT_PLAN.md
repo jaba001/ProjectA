@@ -21,7 +21,7 @@ T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 현재는
 1. 기본 시작 맵인 `/Game/User_JeHoon/LEVEL/MainMenu`를 연다.
 2. 게임 시작 → 싱글플레이 → CharacterCreation에서 1~4명의 캐릭터를 생성하고 직접 조작할 한 명을 선택한다. 직업 화살표와 Edit로 직업·이름을 바꾼다. 멀티플레이는 기존 같은 PC·LAN 개발용 방으로 연결한다.
 3. Start Game → `/Game/User_JeHoon/LEVEL/Gameplay` → Run Map에서 첫 Combat 노드를 선택한다.
-4. 전장에서 적 또는 스킬이 요구하는 타일을 클릭하고 하단의 실제 장착 스킬 버튼으로 계획을 적용한 뒤 준비 완료한다. 위치 이동은 이동 버튼 → 아군 빈칸 클릭으로 SUP 1을 사용한다. 나머지 생성 동료는 서버 AI가 계획·실행한다.
+4. 전장에서 적 또는 스킬이 요구하는 타일을 클릭하고 하단의 실제 장착 스킬 버튼으로 계획을 적용한 뒤 준비 완료한다. 위치 이동은 이동 예약 → 아군 빈칸 한 번 클릭으로 예약한다. 전원 준비 후 SAP 이동을 먼저 끝내고 AP 행동을 실행한다. 나머지 생성 동료는 서버 AI가 계획·실행한다.
 5. 속도차 대기·이동·시전·피격·복귀를 관찰한다. 남은 유효 투사체까지 정리되면 다음 라운드 계획으로 돌아간다. 해결 중 새 행동을 입력할 수 없다.
 6. 첫 Victory → Continue → 상점1·상점2·상점3 중 하나 선택 → 나가기 → 두 번째 Combat 노드를 진행한다. 두 번째 Victory 뒤 Continue는 완료된 Run Map을 표시한다.
 7. 잔여 공격까지 정리된 단독 패배는 Defeat 화면을 유지한다. 양 팀 전멸은 정책 미확정으로 세션을 중단하며 결과 화면을 확정하지 않는다.
@@ -113,13 +113,13 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 준비 취소의 지도 저장이 실패하면 `AEncounterManager`가 취소 대기와 원래 준비 오류를 보존한다. `URunStateSubsystem::AbortEncounter`는 일반·관리 Run 모두 저장 실패 시 기존 단계·노드를 복구한다. Host의 기존 **저장 다시 시도**로 취소를 반복하며 저장 성공 후 Map으로 돌아간다. 저장 중 동기 Map 통지와 취소 대기 중 새 노드 시작·중복 스폰은 허용하지 않는다. 화면의 전투 입력은 Combat 단계뿐 아니라 실제 전투 활성 상태도 요구한다. 로컬·복제 표시 모두 준비·저장 오류를 중복 없이 함께 유지한다. 상세 검증은 [TEST_REPORT 18절](TEST_REPORT.md#18-준비-취소-복구와-파티-데이터-사전-검사)을 따른다.
 
-`ACombatRoundCoordinator`가 계획·준비·잠금·해결을 관리한다. 서버가 Planning 진입 시 양 팀 생존자의 `GetCombatSpeed()`로 현재 GAS 민첩을 읽어 속도·시작 지연을 고정하며 라운드마다 AP/SubAP를 초기화한다. 복제용 `RoundView.Speed`는 float로 소수 값을 유지한다. 서버가 명령의 소유권·전투 ID·라운드·수정 번호·부여 스킬·자원·대상·최종 배치를 검증하고 공격 비용은 잠금 시 한 번 차감한다. 별도 위치 이동의 SUP는 승인 시 차감한다.
+`ACombatRoundCoordinator`가 계획·준비·잠금·해결을 관리한다. 서버가 Planning 진입 시 양 팀 생존자의 `GetCombatSpeed()`로 현재 GAS 민첩을 읽어 속도·시작 지연을 고정하며 라운드마다 AP/SubAP를 초기화한다. 복제용 `RoundView.Speed`는 float로 소수 값을 유지한다. 서버가 명령의 소유권·전투 ID·라운드·수정 번호·부여 스킬·자원·대상·최종 배치를 검증한다. 이동 예약 SAP 1과 공격 SubAP 비용을 합산 검사하고 AP와 함께 전체 준비 잠금 시 한 번 차감한다. 예약·변경·취소는 비용을 차감하지 않는다.
 
 `CanPlanCommand`는 Planning 단계에서 서버의 `ValidateCommand`와 같은 명령 조건을 검사한다. UI는 적용 전 AP/SubAP·타일·대상을 검사하고, 자신에게 인간 조작이 허용된 모든 생존 유닛에 적용된 계획이 유효한지 확인한 뒤 준비 요청을 허용한다. 이 사전 검사는 소유권·수정 번호·관리 lease·최종 목적지 예약 충돌에 대한 서버 검증을 대체하지 않는다.
 
 해결은 0.01초 서버 진행 단위에서 접근·시전·공격 충돌·복귀를 처리한다. 근접은 전방 sphere sweep, 지점 공격은 3D sphere overlap과 벽 차폐, 투사체는 이동 구간 sphere sweep을 사용한다. 현재 전투에 등록된 생존 적의 Capsule을 검사하며 대상 선택이나 중심점 거리만으로 피해를 확정하지 않는다. 세부 범위·장애물 조건은 [GAME_DESIGN 8-5절](GAME_DESIGN.md#8-5-발동과-피격)을 따른다. 느린 프레임의 누적 시간을 보존하지만 서버 순서·실시간 충돌을 사용하므로 원자적 동시 판정이나 전체 결정성 보장을 주장하지 않는다. 피해는 즉시 HP·사망에 반영하며 시전자 사망 후 이미 발사한 투사체는 유지한다. 최신 충돌 판정의 사용자 작동 확인은 미실행이다.
 
-UnitBase의 기존 순차 이동/행동 수명·유닛 체크포인트 capture/restore와 UnitAIController의 경로 완료 루프는 제거했다. 계획 단계의 독립 이동은 Coordinator의 `CanMoveUnit → SubmitMove` 경로로 복구했다. 기존 8방향 BFS와 이동 범위를 사용하되 빈 아군 칸만 통과하며 승인 시 SUP 1·AP 0을 사용한다. 전투당 진행 중인 계획 이동은 한 건으로 제한하고 이동 중 모든 계획·준비 변경을 막는다. 완료 시 실제 점유·`HomeCoord`를 갱신해 이후 공격이 새 위치로 복귀한다. 실패·중단 시 살아 있는 유닛을 출발점으로 복원하며 사용한 SUP는 환불하지 않는다.
+UnitBase의 기존 순차 이동/행동 수명·유닛 체크포인트 capture/restore와 UnitAIController의 경로 완료 루프는 제거했다. Coordinator의 `CanMoveUnit → SubmitMove`는 SAP 이동 예약·변경이며 `CancelMove`는 예약 취소다. 캐릭터별 목적지 하나를 복제하고 예약 단계에서는 위치·자원을 유지한다. 기존 8방향 BFS·MoveRange·빈 아군 칸 조건과 다른 출발/예약 칸 중복 금지를 유지한다. 잠금 후 서버가 모든 예약 SAP 이동을 처리하고, 도착 위치·방향을 AP 행동의 새 복귀점으로 저장한 뒤 AP 시간차 실행을 시작한다. AP 시계는 SAP 단계 뒤 0초부터 시작한다. 실행 중 입력을 막고 실패·중단 시 생존자를 출발점으로 복원하며 잠금 시 차감한 자원은 환불하지 않는다.
 
 기존 GA/SkillActor의 즉시 실행과 순차 `StartSkill`·TurnManager·AI 연속 판단·End Turn은 실행하지 않는다. 모든 예약 행동과 복귀·잔여 투사체가 종료된 뒤에만 결과를 Encounter로 전달한다. 양 팀 전멸은 `Suspended`이며 정식 결과 정책 대기다. 현재 지원 범위와 임시 정책은 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)을 기준으로 한다.
 
@@ -127,7 +127,7 @@ Standalone은 결과 저장 성공 후 유닛·전투 상태를 정리한다. �
 
 ### 입력
 
-활성 CommonUI 화면이 입력 모드를 소유한다. Combat 계획은 `All / NoCapture`로 전장 유닛·타일 클릭을 받고 RunMap/Result는 `Menu / NoCapture`를 유지한다. Controller는 실제 게임 뷰포트에 닿은 로컬 클릭만 전달하며 UI 패널 뒤 월드 선택·실행 중 입력·타인 조작을 막는다. 이전 타일 즉시 행동/End Turn HUD는 사용하지 않는다.
+활성 CommonUI 화면이 입력 모드를 소유한다. Combat 계획은 `All / CaptureDuringMouseDown`으로 최초 한 번 클릭부터 전장 유닛·타일을 선택하고 RunMap/Result는 `Menu / NoCapture`를 유지한다. Controller는 실제 게임 뷰포트에 닿은 로컬 클릭만 전달하며 UI 패널 뒤 월드 선택·실행 중 입력·타인 조작을 막는다. 이전 타일 즉시 행동/End Turn HUD는 사용하지 않는다.
 
 MainMenu·Gameplay GameMode는 `InitializeHUDForPlayer`에서 HUDClass가 있을 때만 엔진 기본 AHUD 초기화를 호출한다. HUDClass=None인 CommonUI 화면은 빈 클래스 생성 요청을 생략한다.
 
@@ -267,10 +267,10 @@ DA 7개의 폴더 변경은 Unreal AssetTools로 수행했으며 이동 시 객�
 |---|---|
 | GameplayRoot | `RootOverlay`, `RunLayer`, `CombatLayer`, `ModalLayer`; 세 레이어는 `CommonActivatableWidgetStack` |
 | RunMap | `Text_Progress`, `Text_Party`, `Text_FlowMessage`, `NodeList`(`VerticalBox`); 노드 버튼은 런타임 생성 |
-| RoundPlanning | Native CommonUI 상단 현황·하단 조작 패널. 전장 대상 선택·장착 스킬 버튼 적용·SUP 이동·준비/취소. 필수 WBP 바인딩 없음 |
+| RoundPlanning | Native CommonUI 상단 현황·하단 조작 패널. 전장 대상 선택·장착 스킬 버튼 적용·SAP 이동 예약/취소·준비/취소. 필수 WBP 바인딩 없음 |
 | Result | `Text_Result`, `Button_Continue` |
 
-새 계획 화면의 스킬 목록은 실제 장착 DA에서 해석한 서버 라운드 프로필로 구성한다. 적을 클릭하면 스킬 버튼이 나타나며 버튼 클릭이 계획 적용 요청이다. 시험 스킬·자동 추첨 스킬을 더하지 않는다. UI는 상단 가로 900·최대 높이 145, 하단 가로 900·최대 높이 300 UI 단위를 사용하며 하단 내용은 스크롤한다. 변경의 컴파일·실제 화면/입력 확인은 [TEST_REPORT 26절](TEST_REPORT.md#26-전장-대상-선택과-sup-이동-복구)에서 관리한다.
+새 계획 화면의 스킬 목록은 실제 장착 DA에서 해석한 서버 라운드 프로필로 구성한다. 적을 클릭하면 스킬 버튼이 나타나며 버튼 클릭이 계획 적용 요청이다. 시험 스킬·자동 추첨 스킬을 더하지 않는다. UI는 상단 가로 900·최대 높이 145, 하단 가로 900·최대 높이 300 UI 단위를 사용하며 하단 내용은 스크롤한다. 변경의 컴파일·실제 화면/입력 확인은 [TEST_REPORT 27절](TEST_REPORT.md#27-단일-클릭과-sap-이동-예약)에서 관리한다.
 
 이전 HUD의 선택적 바인딩은 참조 호환용이다. Designer를 수정한 WBP를 덮어쓰기 전에 변경 내용을 확인한다. JSON spec 변경은 실제 생성·Compile·Save를 거쳐 반영하며 DryRun만으로 완료를 기록하지 않는다.
 
