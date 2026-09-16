@@ -42,10 +42,17 @@ if not unreal.EditorAssetLibrary.save_loaded_asset(mode_asset):
 for index, offset in enumerate([-675.0, -225.0, 225.0, 675.0]):
     stage.get_editor_property("slot%d_anchor" % index).set_editor_property("relative_location", unreal.Vector(0, offset, 0))
 mesh_component = unreal.get_default_object(preview.generated_class()).get_editor_property("skeletal_mesh_component")
+idle = unreal.load_asset("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle")
+mesh = mesh_component.get_editor_property("skeletal_mesh_asset")
+if not idle or not mesh or idle.get_editor_property("skeleton") != mesh.get_editor_property("skeleton") or idle.get_editor_property("additive_anim_type") != unreal.AdditiveAnimationType.AAT_NONE or idle.get_editor_property("sequence_length") <= 0.0:
+    raise RuntimeError("Menu preview requires a compatible non-additive Idle sequence.")
+# Persist the looping Idle on the component defaults so every newly spawned preview starts playing.
+# 새로 생성하는 모든 프리뷰가 재생되도록 반복 Idle을 컴포넌트 기본값에 저장합니다.
+mesh_component.override_animation_data(idle, True, True, 0.0, 1.0)
 mesh_component.set_editor_property("relative_rotation", unreal.Rotator(pitch=0.0, yaw=90.0, roll=0.0))
 unreal.BlueprintEditorLibrary.compile_blueprint(preview)
 if not unreal.EditorAssetLibrary.save_loaded_asset(preview):
-    raise RuntimeError("Could not save menu preview orientation.")
+    raise RuntimeError("Could not save menu preview Idle and orientation.")
 if not unreal.EditorLoadingAndSavingUtils.save_map(world, root + "/LEVEL/MainMenu"):
     raise RuntimeError("Could not save MainMenu stage placement.")
 unreal.log("T12: MainMenu stage and four visual-only profession previews configured.")

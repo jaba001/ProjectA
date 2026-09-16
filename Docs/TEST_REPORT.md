@@ -851,6 +851,29 @@ Development Editor / Win64 빌드는 UHT를 포함해 성공했다(25.42초, 컴
 
 직업 기본값/검증·저장 거절·Snapshot 직렬화 회귀를 작성·확장했다. 관련 항목은 `ProjectA.Party.ProfessionLoadout`, `ProjectA.Party.ProfessionDataValidation`, `ProjectA.Persistence.Checkpoints`, `ProjectA.Snapshot.Validation`, `ProjectA.Snapshot.SaveGameRoundTrip`이다. 회귀 소스의 컴파일과 자동화 실행은 구분하며 자동화·PIE·전투·Continue·2인/4인 작동 검증은 미실행이다. 최종 정적 검사는 문서 10개·로컬 링크 300개·앵커 206개·표 109개와 Python 5개 구문·UI JSON·프로젝트/필터 항목 94개·diff를 통과했다. 근거는 `Saved/Automation/FourProfessionsStatic.json`이다.
 
+### 22-4 캐릭터 생성 프리뷰 Idle
+
+목적: 캐릭터 생성 화면의 정지된 프리뷰에 기존 Idle 애니메이션을 연결한다. 실제 에셋 메타데이터에서 `BP_PartyMenuPreview`의 메시가 `SKM_Manny_Simple`이고 AnimationMode는 Blueprint지만 `AnimClass`와 `AnimToPlay`가 모두 비어 있는 것을 확인했다.
+
+변경 대상은 `/Game/User_JeHoon/Blueprint/UI/BP_PartyMenuPreview`의 메시 기본값과 `ConfigureMenuPreview.py`의 생성 경로다. 메시와 같은 Skeleton의 `/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle`(길이 약 7.5667초, 비가산)을 SingleNode 모드·재생 속도 1·반복·자동재생으로 저장한다. 생성 스크립트도 `OverrideAnimationData`를 사용한다. C++·Config·맵·전투 코드는 변경하지 않는다.
+
+BP 컴파일·저장과 독립 재로드에 성공했다. `ConfigureMenuIdle.log`와 `VerifyMenuIdle.log`는 각각 오류·경고 0이며, `Saved/Automation/MenuIdleVerification.json`에서 같은 Skeleton의 길이 7.5666666초 Idle, SingleNode·반복/자동재생 true·시작 0·속도 1, 컴포넌트 Tick 활성·Pause false를 확인했다. 기존 메시·상대 위치 (0,0,0)·회전 (0,90,0)·스케일 (1,1,1)·NoCollision과 네 직업의 동일 프리뷰 BP 연결을 보존했다.
+
+Python 구문과 문서 10개·로컬 링크 305개·앵커 211개·표 110개, 전체 diff 정적 검사를 통과했다. 근거는 `Saved/Automation/MenuIdleStatic.json`이다.
+
+C++·Config·맵 변경이나 파일 추가가 없어 C++ 빌드·VS 프로젝트 재생성은 필요하지 않다. 에디터 정상 종료 후 다시 열어 초기화 11.36초·`Startup complete`·ProjectA 창 응답을 확인하고 열어 두었다(`Saved/Logs/ProjectA_MenuIdle.log`). 기존 `Condition failed` 4건과 엔진 PNG/Menu 경고는 남아 있다. 프리뷰 스폰·애니메이션 Tick·PIE·게임 플레이·자동화는 실행하지 않았으며 이전 22-3의 검증 결과로 이번 화면 재생 성공을 대체하지 않는다.
+
+준비 조건: 에셋 저장과 독립 재로드 확인 후 다시 연 에디터에서 MainMenu의 New Game → CharacterCreation으로 진입한다. 한 주기보다 긴 10초 이상 관찰하여 반복 재생을 확인한다.
+
+| ID | 사용자 실행 절차 | 기대 결과 | 상태 |
+|---|---|---|---|
+| 22-8 | 슬롯 1개부터 4개까지 생성하고 각각 10초 이상 관찰 | 모든 프리뷰에서 Idle 자동·반복 재생. 앵커 위치·회전·크기 유지 | 미실행 |
+| 22-9 | 각 슬롯의 직업을 전사·마법사·궁수·도적으로 변경 | 교체한 프리뷰도 Idle 반복 재생. 이전 프리뷰 중복·위치 이탈 없음 | 미실행 |
+| 22-10 | 슬롯의 캐릭터를 삭제하고 같은 슬롯에 다시 생성 | 삭제된 프리뷰 제거. 새 프리뷰 한 개만 원래 위치에서 Idle 재생 | 미실행 |
+| 22-11 | Back/X로 화면을 나간 뒤 재진입하고 캐릭터 재생성 | 이전 프리뷰 잔존 없음. 빈 슬롯 상태에서 다시 생성한 프리뷰 정상 재생 | 미실행 |
+
+실패 시 슬롯 번호·직업·최초 생성/교체/재진입 구분, 정지 또는 중복이 시작된 시점, 실제 프리뷰 BP와 메시 애니메이션 설정·최초 로그를 기록한다. 에셋 로드·저장 성공은 실제 화면 재생 확인과 구분한다.
+
 ## 사용자 결과 기록
 
 결과 제출 형식은 다음과 같다. 미실행 항목은 대기로 유지한다.

@@ -111,6 +111,8 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 
 프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 Warrior/Mage/Archer/Rogue 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
+`BP_PartyMenuPreview`의 `SKM_Manny_Simple` 메시에는 같은 Skeleton의 `/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle`을 SingleNode 모드·속도 1·반복·자동재생으로 연결한다. `ConfigureMenuPreview.py`도 `OverrideAnimationData`로 같은 기본값을 저장한다. BP 컴파일·저장과 독립 재로드에서 재생 설정·기존 메시/배치/NoCollision 보존을 확인했다. 실제 화면의 반복 재생·위치 유지·삭제/재진입 정리는 [TEST_REPORT 22-4](TEST_REPORT.md#22-4-캐릭터-생성-프리뷰-idle)에서 확인한다.
+
 GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메뉴 travel의 잔여 IgnoreInput·초기 포커스만 복구한다. CharacterCreation의 Text_StartGameStatus는 선택 바인딩이며 누락 시 Native 표시 영역을 추가한다. 상세 배치·바인딩은 [PROJECT_PLAN](PROJECT_PLAN.md#gameplay-에셋과-배치)을 따른다.
 
 ## 검증·문제 해결
