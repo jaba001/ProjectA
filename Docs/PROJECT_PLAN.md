@@ -19,7 +19,7 @@ T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 현재는
 실행 환경은 UE 5.7의 `ProjectA.uproject`다.
 
 1. 기본 시작 맵인 `/Game/User_JeHoon/LEVEL/MainMenu`를 연다.
-2. Play → New Game → CharacterCreation에서 1~4명의 캐릭터를 생성한다. 직업 화살표와 Edit로 직업·이름을 바꾼다.
+2. 게임 시작 → 싱글플레이 → CharacterCreation에서 1~4명의 캐릭터를 생성한다. 직업 화살표와 Edit로 직업·이름을 바꾼다. 멀티플레이는 기존 같은 PC·LAN 개발용 방으로 연결한다.
 3. Start Game → `/Game/User_JeHoon/LEVEL/Gameplay` → Run Map에서 첫 Combat 노드를 선택한다.
 4. 계획 화면에서 조작할 아군·스킬·대상 유닛/공격 타일·접근 목적지를 선택하고 계획 적용한다. 각 소유 아군의 계획을 지정한 뒤 준비 완료한다.
 5. 속도차 대기·이동·시전·피격·복귀를 관찰한다. 남은 유효 투사체까지 정리되면 다음 라운드 계획으로 돌아간다. 해결 중 새 행동을 입력할 수 없다.
@@ -32,8 +32,12 @@ T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 현재는
 
 ```mermaid
 flowchart LR
-    A[MainMenu] --> B[CharacterCreation]
+    A[MainMenu] -->|게임 시작| M[모드 선택]
+    M -->|싱글플레이| B[CharacterCreation]
+    M -->|멀티플레이| L[LAN 방 생성/참가]
     B -->|OpenLevel 1회| C[Gameplay]
+    L --> R[Gameplay 대기실]
+    R -->|전원 준비 후 Host 시작| D[Run Map UI]
     C --> D[Run Map UI]
     D --> E[Encounter 준비]
     E --> F[Grid Combat]
@@ -131,7 +135,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 ### 개발용 협동 진입
 
-Non-Shipping MainMenu의 **개발용 협동**은 새 방 전용이다. Host는 `OpenLevel(..., listen?ProjectADevCoop=2~4)`, Client는 정규화한 IPv4:포트로 `ClientTravel`을 사용한다. 기본 포트는 7777이며 별도 세션 검색·온라인 인증은 없다.
+Non-Shipping MainMenu의 **게임 시작 → 멀티플레이**는 같은 PC·LAN의 새 2~4인 개발용 방으로 연결한다. 첫 화면의 별도 개발용 협동 버튼은 제거했다. `UGameModeSelectionWidget`은 싱글플레이 선택 시 기존 CharacterCreation, 멀티플레이 선택 시 `UDevelopmentCoopWidget`을 연다. Host는 `OpenLevel(..., listen?ProjectADevCoop=2~4)`, Client는 정규화한 IPv4:포트로 `ClientTravel`을 사용한다. 기본 포트는 7777이며 별도 세션 검색·온라인 인증은 없다.
 
 `UDevelopmentCoopSubsystem`은 GameInstance 단위 연결 대기·실패 메시지를 관리한다. `ADevelopmentCoopLobby`가 참가 번호·연결·준비 상태를 복제하고, GameMode의 PreLogin/PostLogin에서 정원·시작 여부와 서버 배정을 확인한다. 준비 RPC는 요청한 연결에만 적용하며 시작·노드·Continue는 Host만 허용한다.
 
@@ -150,6 +154,8 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 적·아군 AI | 기존 스킬 순서·가까운 적 기준으로 인간 초안 전에 단일 명령 고정. 장착된 복귀형 Tile 공격은 적 HomeCoord를 공격/접근 좌표로 선택 가능. 공통 시험 GroundStrike·MoveShot·Guard의 추가 선택과 지원/잔류 전술은 보류하며 불가능하면 Wait |
 | 메뉴 프리뷰 | MainMenuPreviewStage의 카메라·4개 앵커·ClassId별 BP_PartyMenuPreview 사용. 기존 메시와 같은 Skeleton의 MM_Idle 자동·반복 재생 연결 및 BP 재로드 확인. 전투 Pawn 생성 없음. [사용자 확인](TEST_REPORT.md#22-4-캐릭터-생성-프리뷰-idle) |
 | 생성 화면 종료 | Back/X는 초안·프리뷰 정리. 재진입 시 빈 4슬롯. 상세 패널이 열려 있으면 먼저 패널만 닫음. 최소 슬롯 높이로 ClassInfo 표시 유지 |
+| 모드 선택 | 게임 시작 → 싱글플레이/멀티플레이. 캐릭터 생성·접속 시작 전 멀티 화면에서 돌아오면 모드 선택 복원, 모드 선택의 뒤로가기는 첫 화면 복원. 연결 이후 나가기는 기존 세션 정리/메뉴 복귀 |
+| 싱글 여정 항복 | 이어하기 옆 104×40 버튼·`URunSurrenderWidget` 확인창. 돌아가기 기본 포커스, 확인된 현재 일반 싱글 저장만 삭제. 취소·실패·저장 변경은 원본/현재 Run 보존 |
 | 옵션·종료 | MainMenu의 native `UOptionsWidget`에서 해상도·화면 모드·품질·VSync를 편집. 화면 변경은 15초 확인 후 `GameUserSettings.ini`에 저장하며 취소·시간 초과·미확인 종료 시 전체 변경 복원. 품질·VSync만 변경하면 적용 시 저장. Quit는 게임 종료 요청 |
 | 공통 UI 외형 | `UDemonicUITheme`이 기존 DemonicUI 텍스처를 참조하여 메뉴·설정·캐릭터 생성·협동·Run·상점·결과·라운드 계획과 저장/협동 안내를 꾸민다. 기존 입력·바인딩·권한 조건 유지 |
 | 공통 UI 배율 | `UserInterfaceSettings`의 1920×1080 기준 `ScaleToFit`·`ApplicationScale=1` 사용. 화면별 추가 축소 제거, 전투 좌우 패널의 바깥 가로 여백 0·세로 여백 12 유지 |
@@ -186,6 +192,8 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 `CommitCombatCheckpoint`와 `RestoreSavedCombat`은 이전 호출을 명시적으로 거절하는 어댑터다. 턴 경계 builder·commit 바인딩·Actor 복원 실행은 제거했다. 기존 저장 버전을 임의로 낮추거나 내용을 삭제하지 않는다.
 
 일반 Continue의 지원 계정 범위, 관리 메뉴의 신뢰 C++ 호출자/재개 대상, 현재 인간 참가자와 원래 소유권 조건을 유지한다. 저장·실행 권위는 [MULTIPLAYER](MULTIPLAYER.md), 새 저장 거절 테스트는 [TEST_REPORT 12절](TEST_REPORT.md#12-시간차-자동-전투-기획-검토)을 따른다.
+
+현재 메뉴 항복은 별도 정책 선택 응답이 없어 기존 자율 진행 위임 범위에서 **확인 후 현재 일반 싱글 Run의 저장을 포기하는 기본안**으로 적용했다. 유효한 Standalone Continue 대상만 허용하고 확인창을 연 시점의 저장과 실제 삭제 직전의 슬롯·내용이 일치해야 한다. 취소는 무변경이며 삭제 실패는 파일·메모리를 보존하고 재시도한다. 성공 후 해당 슬롯과 현재 Run 메모리를 정리하여 이어하기를 비활성화한다. 지원하지 않는 협동·관리·계정 제공자 저장, 완료/패배 저장, 이전 Combat 저장을 이 버튼으로 삭제하지 않는다. 패배 결과 보존·랭크 반영 정책은 추가하지 않았다. [확인 절차](TEST_REPORT.md#23-시작-모드-선택과-싱글-여정-항복)
 
 현재 네 직업 외의 이전 테스트 ClassId는 파티 해석에서 거절하며 Continue 오류에 해당 ID와 원인을 표시한다. 저장 원본과 현재 Run은 유지하고 새 직업으로 자동 대응하지 않는다. Snapshot 카탈로그도 새 ClassId 4개만 허용하며 힘·민첩·지능은 Snapshot 값 데이터와 GAS 속성으로 전달한다. DA 폴더의 PackageRedirect는 객체 경로만 연결하므로 구직업 저장을 수용하는 근거가 아니다. [네 직업·저장 확인](TEST_REPORT.md#22-네-직업과-기본-능력치)
 

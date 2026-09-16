@@ -111,6 +111,10 @@ public:
     // 메뉴는 Standalone으로 열리며 협동 또는 인증 세션의 계정을 연결할 수 없습니다.
     bool CanContinueStandaloneSavedRun(FText& OutError) const;
     bool LoadStandaloneCheckpoint(FText& OutError);
+    // Confirmation binds surrender to the currently eligible Standalone save, including its exact contents.
+    // 확인은 현재 이어갈 수 있는 싱글플레이 저장의 정확한 내용에 진행 포기를 연결합니다.
+    bool GetStandaloneSurrenderToken(FString& OutToken, FText& OutError) const;
+    bool SurrenderStandaloneSavedRun(const FString& ExpectedToken, FText& OutError);
     void EnableCheckpointSaving(const FString& Slot = FString());
     // Clear only transient development-room state without writing or deleting any save.
     // 저장을 기록하거나 삭제하지 않고 개발용 방의 일시적인 상태만 비웁니다.

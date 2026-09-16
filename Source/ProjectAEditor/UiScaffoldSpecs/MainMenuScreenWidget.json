@@ -49,23 +49,54 @@
 			"name": "Text_NewGame",
 			"type": "TextBlock",
 			"parent": "Button_NewGame",
-			"text": "New Game",
+			"text": "게임 시작",
 			"padding": [24.0, 12.0, 24.0, 12.0]
+		},
+		{
+			"name": "ContinueRow",
+			"type": "HorizontalBox",
+			"parent": "MenuBox",
+			"horizontalAlignment": "Fill",
+			"padding": [0.0, 4.0, 0.0, 4.0]
 		},
 		{
 			"name": "Button_Continue",
 			"type": "Button",
-			"parent": "MenuBox",
+			"parent": "ContinueRow",
 			"bind": true,
-			"horizontalAlignment": "Fill",
-			"padding": [0.0, 4.0, 0.0, 4.0]
+			"sizeRule": "Fill",
+			"fill": 1.0,
+			"verticalAlignment": "Center"
 		},
 		{
 			"name": "Text_Continue",
 			"type": "TextBlock",
 			"parent": "Button_Continue",
-			"text": "Continue",
+			"text": "이어하기",
 			"padding": [24.0, 12.0, 24.0, 12.0]
+		},
+		{
+			"name": "SurrenderSize",
+			"type": "SizeBox",
+			"parent": "ContinueRow",
+			"sizeRule": "Auto",
+			"widthOverride": 104.0,
+			"heightOverride": 40.0,
+			"verticalAlignment": "Center",
+			"padding": [8.0, 0.0, 0.0, 0.0]
+		},
+		{
+			"name": "Button_Surrender",
+			"type": "Button",
+			"parent": "SurrenderSize",
+			"bind": true
+		},
+		{
+			"name": "Text_Surrender",
+			"type": "TextBlock",
+			"parent": "Button_Surrender",
+			"text": "항복하기",
+			"padding": [10.0, 8.0, 10.0, 8.0]
 		},
 		{
 			"name": "Button_Options",

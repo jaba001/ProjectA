@@ -18,11 +18,13 @@
 #include "Misc/ScopeExit.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "UI/MainMenu/CharacterCreationWidget.h"
+#include "UI/MainMenu/GameModeSelectionWidget.h"
 #include "UI/MainMenu/MainMenuPreviewStage.h"
 #include "UI/MainMenu/MainMenuRootWidget.h"
 #include "UI/MainMenu/MainMenuScreenWidget.h"
 #include "UI/MainMenu/OptionsWidget.h"
 #include "UnrealClient.h"
+#include "Widgets/CommonActivatableWidgetContainer.h"
 
 namespace ProjectAVerticalSliceTests
 {
@@ -63,14 +65,16 @@ public:
         {
             return false;
         }
+        AMainMenuPlayerController* Menu = Cast<AMainMenuPlayerController>(World->GetFirstPlayerController());
+        if (!Menu || !Menu->GetMainMenuRootWidget()) return false;
+        UCommonActivatableWidgetStack* MainStack = Cast<UCommonActivatableWidgetStack>(Menu->GetMainMenuRootWidget()->GetWidgetFromName(TEXT("MainStack")));
+        UCommonActivatableWidgetStack* MenuStack = Cast<UCommonActivatableWidgetStack>(Menu->GetMainMenuRootWidget()->GetWidgetFromName(TEXT("MenuStack")));
+        if (!Require(MainStack && MenuStack, TEXT("The saved menu exposes its actual main and flow stacks."))) return true;
 
         if (Stage == 0)
         {
-            AMainMenuPlayerController* Menu = Cast<AMainMenuPlayerController>(World->GetFirstPlayerController());
-            if (!Menu || !Menu->GetMainMenuRootWidget())
-            {
-                return false;
-            }
+            UMainMenuScreenWidget* FirstMenu = Cast<UMainMenuScreenWidget>(MainStack->GetActiveWidget());
+            if (!FirstMenu || !FirstMenu->IsActivated()) return false;
             if (!CheckMenuLifecycle(Menu))
             {
                 return true;
@@ -79,14 +83,27 @@ public:
             {
                 return true;
             }
-            Menu->ShowCharacterCreationScreen();
+            FirstMenu->RequestNewGame();
             Advance();
             return false;
         }
         if (Stage == 1)
         {
-            UCharacterCreationWidget* Creation = FindActiveWidget<UCharacterCreationWidget>(World);
-            if (!Creation)
+            UGameModeSelectionWidget* Selection = Cast<UGameModeSelectionWidget>(MenuStack->GetActiveWidget());
+            if (!Selection || !Selection->IsActivated()) return false;
+            UButton* SinglePlayer = Cast<UButton>(Selection->GetWidgetFromName(TEXT("Button_SinglePlayer")));
+            UButton* Multiplayer = Cast<UButton>(Selection->GetWidgetFromName(TEXT("Button_Multiplayer")));
+            if (!Require(SinglePlayer && Multiplayer && SinglePlayer->GetIsEnabled(), TEXT("Starting a game offers separate single-player and multiplayer choices."))) return true;
+            Test->TestTrue(TEXT("Mode selection hides the first menu."), MainStack->GetVisibility() == ESlateVisibility::Hidden);
+            Test->TestTrue(TEXT("Mode selection initially focuses single-player."), Selection->GetDesiredFocusTarget() == SinglePlayer);
+            SinglePlayer->OnClicked.Broadcast();
+            Advance();
+            return false;
+        }
+        if (Stage == 2)
+        {
+            UCharacterCreationWidget* Creation = Cast<UCharacterCreationWidget>(MenuStack->GetActiveWidget());
+            if (!Creation || !Creation->IsActivated())
             {
                 return false;
             }
@@ -183,6 +200,25 @@ public:
             }
             Creation->RequestBack();
             Test->TestFalse(TEXT("Completed character draft closes without starting a Run."), Creation->IsActivated());
+            Advance();
+            return false;
+        }
+        if (Stage == 3)
+        {
+            UGameModeSelectionWidget* Selection = Cast<UGameModeSelectionWidget>(MenuStack->GetActiveWidget());
+            if (!Selection || !Selection->IsActivated()) return false;
+            Test->TestTrue(TEXT("Closing character creation restores mode selection while the first menu stays hidden."), MainStack->GetVisibility() == ESlateVisibility::Hidden);
+            UButton* Back = Cast<UButton>(Selection->GetWidgetFromName(TEXT("Button_GameModeBack")));
+            if (!Require(Back != nullptr, TEXT("Mode selection provides a way back to the first menu."))) return true;
+            Back->OnClicked.Broadcast();
+            Advance();
+            return false;
+        }
+        if (Stage == 4)
+        {
+            if (MenuStack->GetActiveWidget()) return false;
+            UMainMenuScreenWidget* FirstMenu = Cast<UMainMenuScreenWidget>(MainStack->GetActiveWidget());
+            Test->TestTrue(TEXT("Leaving mode selection restores the active visible first menu."), FirstMenu && FirstMenu->IsActivated() && MainStack->GetVisibility() == ESlateVisibility::Visible);
             return true;
         }
 

@@ -15,7 +15,7 @@
 
 기존 Designer WBP를 화면 구조의 기준으로 유지한다. 새 라운드 계획 화면은 7절의 native CommonUI 생성 경로를 사용한다. JSON은 초기 생성·바인딩 검증·누락 보완에 사용하며 결과 WidgetTree는 WBP에 저장된다. 9절의 공통 버튼·배경·글자색은 native 테마가 실행 시 적용하며 나머지 배치·폰트·세부 스타일은 Designer에서 편집한다. Editor API·의존성은 ProjectAEditor에 한정한다.
 
-개발용 협동은 기존 MainMenu에 native 버튼을 추가하고 `UDevelopmentCoopWidget`으로 방 생성·주소 참가·대기실을 표시한다. Gameplay는 전용 CommonUI 레이어에 대기실을 표시하고 시작 시 닫아 새 라운드 계획 화면으로 전환한다. 전투 중에는 상태·나가기 영역을 유지한다. 기존 WBP 재생성은 필요 없으며 새 영구 에셋은 생성하지 않는다. 작동 확인은 [TEST_REPORT 9절](TEST_REPORT.md#9-개발용-협동-ui)을 따른다.
+첫 화면의 게임 시작은 native `UGameModeSelectionWidget`을 연다. 싱글플레이는 기존 CharacterCreation, 멀티플레이는 `UDevelopmentCoopWidget`의 같은 PC·LAN 방 생성·주소 참가·대기실로 연결한다. 첫 화면의 별도 개발용 협동 버튼은 제거한다. Gameplay의 CommonUI 대기실·전투 중 상태/나가기 영역은 유지한다. [메뉴 흐름](TEST_REPORT.md#23-시작-모드-선택과-싱글-여정-항복)과 [협동](TEST_REPORT.md#9-개발용-협동-ui)을 확인한다.
 
 ## 실행과 옵션
 
@@ -103,6 +103,7 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 | 대상 | 동작 |
 |---|---|
 | MainMenuRoot | MainStack·MenuStack·ModalStack. MenuStack 활성 시 MainStack을 Hidden 처리하고 Back/X 또는 Clear 시 복원 |
+| GameModeSelection | 게임 시작에서 MenuStack에 표시. 싱글은 CharacterCreation, 멀티는 기존 개발용 방. 캐릭터 생성·접속 전 멀티 화면 뒤로가기는 모드 선택, 모드 선택 뒤로가기는 첫 화면 복원 |
 | CharacterCreation | 슬롯 생성 시 편집 패널·프리뷰 표시. 슬롯 X는 해당 캐릭터 제거. 화면 Back/X는 초안·프리뷰 정리 |
 | PreviewStage | MainMenu의 월드 Actor·카메라 사용. SceneCapture2D·RenderTarget 미사용 |
 | GameplayRoot | CommonUserWidget. RunLayer·CombatLayer·ModalLayer는 CommonActivatableWidgetStack |
@@ -179,7 +180,8 @@ MainMenu의 Options는 native `UOptionsWidget`으로 화면·그래픽 설정을
 
 | 화면 | 적용 범위·보존 계약 |
 |---|---|
-| MainMenu | 성 배경·제목·메뉴 버튼·관리 이어가기 패널. 두 패널 동시 표시 시 나란히 배치하고 공통 DPI 적용. Continue의 저장 상태별 활성화 유지 |
+| MainMenu | 성 배경·제목·게임 시작/이어하기·관리 이어가기 패널. 두 패널 동시 표시 시 나란히 배치하고 공통 DPI 적용. 이어하기 옆 104×40 항복 버튼과 저장 상태별 활성화 |
+| 모드 선택·항복 확인 | 공통 테마의 native 화면. 모드 선택은 MenuStack, 항복 확인은 ModalStack. 항복은 돌아가기 기본 포커스와 배경 클릭 차단 적용 |
 | Options | 설정 패널·해상도/화면 모드/품질 목록·VSync·적용/닫기·15초 확인 패널. [8절](#8-시작-메뉴-설정)의 저장·복원·포커스 계약 유지 |
 | 캐릭터 생성 | 슬롯 카드·이름 입력·직업 선택·직업 상세·저장/취소/시작 버튼. 월드 프리뷰 표시와 투명 차단 영역 유지 |
 | 개발용 협동 | 방 생성·주소 입력·참가·대기실·준비/시작/나가기. Host와 원래 소유권의 버튼 활성화 조건 유지 |
@@ -229,3 +231,9 @@ C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / 
 표시 정보의 기준은 `UProfessionBase`와 네 C++ 자식 클래스다. 기본 UI·캐릭터 생성 명세를 갱신하고 실사용 및 `Validation/T12` WBP의 슬롯 제목/직업 이름 16개만 변경한다. 기존 WidgetTree·배치·스타일·바인딩은 유지한다. MainMenu 프리뷰 맵은 새 ID 4개에 기존 공통 `BP_PartyMenuPreview` 외형을 연결하며 직업별 새 외형을 생성하지 않는다. 개발용 협동은 참가자마다 궁수 한 명을 생성한다.
 
 지원하지 않는 이전 직업의 Continue는 해당 ID와 오류를 표시하고 저장 원본·현재 Run을 유지한다. 새 직업으로 자동 변환하지 않는다. Editor 빌드와 저장 후 에셋 재로드에서 새 직업 맵·16개 라벨을 확인했으며 실제 클릭·상세 표시·전투·Continue·협동은 [TEST_REPORT 22절](TEST_REPORT.md#22-네-직업과-기본-능력치)의 사용자 검증을 따른다.
+
+## 12 시작 모드 선택과 항복 확인
+
+게임 시작은 `UGameModeSelectionWidget`의 싱글플레이/멀티플레이 선택을 거친다. 첫 포커스는 싱글플레이이며 멀티는 기존 지원 조건에 맞을 때만 활성화한다. 같은 PC·LAN의 2~4인 개발용 방과 Steam 미지원 안내를 표시한다. 모드 선택·하위 화면 전환 중 첫 화면이 중복 노출되지 않아야 하며 뒤로가기 후 다시 진입할 수 있어야 한다. 멀티 접속을 시작한 뒤 취소/나가기는 기존 세션 정리·MainMenu 복귀를 따른다.
+
+이어하기 옆 항복 버튼은 104×40 UI 단위이며 공통 DPI를 따른다. `URunSurrenderWidget`은 현재 싱글 여정을 포기하면 이어갈 수 없음을 알리고, 돌아가기에 기본 포커스를 둔다. 취소·CommonUI 뒤로가기는 저장을 변경하지 않는다. 모달 배경은 아래 메뉴의 클릭을 막고 제출 중 중복 확인을 차단한다. 오류는 확인창에 표시하며 저장이 바뀐 경우 창을 닫고 최신 대상으로 다시 확인해야 한다. 삭제 성공 후에는 창을 닫고 이어하기/항복을 비활성화한다. 저장 범위와 기본안의 근거는 [PROJECT_PLAN](PROJECT_PLAN.md#저장과-멀티플레이-연결-경계), 검증은 [TEST_REPORT 23절](TEST_REPORT.md#23-시작-모드-선택과-싱글-여정-항복)을 따른다.

@@ -2,6 +2,7 @@
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
+#include "Components/ButtonSlot.h"
 #include "Components/Border.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
@@ -19,14 +20,9 @@
 #include "Engine/GameInstance.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Game/Development/DevelopmentCoopSubsystem.h"
-#include "UI/MainMenu/DevelopmentCoopWidget.h"
+#include "UI/MainMenu/GameModeSelectionWidget.h"
+#include "UI/MainMenu/RunSurrenderWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
-
-void UMainMenuScreenWidget::HandleDevelopmentCoopClicked()
-{
-    if (!UDevelopmentCoopSubsystem::IsAvailable()) return;
-    if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer())) Controller->GetMainMenuRootWidget()->PushMenuScreen(UDevelopmentCoopWidget::StaticClass());
-}
 
 void UMainMenuScreenWidget::NativeOnInitialized()
 {
@@ -44,13 +40,18 @@ void UMainMenuScreenWidget::NativeOnInitialized()
 
     if (Button_NewGame)
     {
+        if (UTextBlock* Label = Cast<UTextBlock>(Button_NewGame->GetContent())) Label->SetText(NSLOCTEXT("MainMenu", "StartGame", "게임 시작"));
         Button_NewGame->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleNewGameClicked);
     }
 
     if (Button_Continue)
     {
+        if (UTextBlock* Label = Cast<UTextBlock>(Button_Continue->GetContent())) Label->SetText(NSLOCTEXT("MainMenu", "Continue", "이어하기"));
         Button_Continue->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleContinueClicked);
     }
+
+    EnsureContinueRow();
+    if (Button_Surrender) Button_Surrender->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleSurrenderClicked);
 
     if (Button_Options)
     {
@@ -100,16 +101,6 @@ void UMainMenuScreenWidget::NativeOnInitialized()
         CreateButtonText(ResumeSoloButton, NSLOCTEXT("ManagedRunMenu", "Resume", "싱글 진행 이어하기"));
         ResumeContent->AddChildToVerticalBox(ResumeSoloButton)->SetPadding(FMargin(0.0f, 4.0f));
         ResumeSoloButton->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleResumeSoloClicked);
-        if (UDevelopmentCoopSubsystem::IsAvailable())
-        {
-            UButton* DevelopmentButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_DevelopmentCoop"));
-            CreateButtonText(DevelopmentButton, FText::FromString(TEXT("개발용 협동")));
-            DevelopmentButton->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleDevelopmentCoopClicked);
-            UOverlaySlot* DevelopmentSlot = Root->AddChildToOverlay(DevelopmentButton);
-            DevelopmentSlot->SetHorizontalAlignment(HAlign_Left);
-            DevelopmentSlot->SetVerticalAlignment(VAlign_Top);
-            DevelopmentSlot->SetPadding(FMargin(24.f));
-        }
     }
     ApplyDemonicStyle();
 }
@@ -122,6 +113,16 @@ void UMainMenuScreenWidget::ApplyDemonicStyle()
     Theme.StylePanel(ManagedResumePanel);
     Theme.StyleText(Text_Title, true, 40);
     Theme.StyleText(SaveStatus, false, 14);
+    if (Button_Surrender)
+    {
+        UTextBlock* Label = Cast<UTextBlock>(Button_Surrender->GetContent());
+        Theme.StyleText(Label, false, 14);
+        if (Label)
+        {
+            Label->SetJustification(ETextJustify::Center);
+            if (UButtonSlot* LabelSlot = Cast<UButtonSlot>(Label->Slot)) LabelSlot->SetPadding(FMargin(10.0f, 8.0f));
+        }
+    }
     UVerticalBox* MenuBox = Button_NewGame ? Cast<UVerticalBox>(Button_NewGame->GetParent()) : nullptr;
     UOverlay* MenuOverlay = MenuBox ? Cast<UOverlay>(MenuBox->GetParent()) : nullptr;
     if (!MenuOverlay) return;
@@ -155,11 +156,29 @@ void UMainMenuScreenWidget::ApplyDemonicStyle()
 void UMainMenuScreenWidget::NativeOnActivated()
 {
     Super::NativeOnActivated();
+    URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+    Run->OnRunStateChanged.RemoveAll(this);
+    Run->OnRunStateChanged.AddUObject(this, &UMainMenuScreenWidget::RefreshResumeActions);
+    RefreshResumeActions();
+}
+
+void UMainMenuScreenWidget::RefreshSavedActions()
+{
+    const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     FText Error;
-    const bool bCanContinue = GetGameInstance()->GetSubsystem<URunStateSubsystem>()->CanContinueStandaloneSavedRun(Error);
+    const bool bCanContinue = Run && Run->CanContinueStandaloneSavedRun(Error);
     if (Button_Continue)
     {
         Button_Continue->SetIsEnabled(bCanContinue);
+    }
+    if (Button_Surrender)
+    {
+        FString Token;
+        FText SurrenderError;
+        const AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer());
+        const bool bCanSurrender = bCanContinue && Controller && Controller->GetSurrenderToken(Token, SurrenderError);
+        Button_Surrender->SetIsEnabled(bCanSurrender);
+        Button_Surrender->SetToolTipText(bCanSurrender ? NSLOCTEXT("MainMenu", "SurrenderHint", "확인 후 저장된 싱글플레이 여정을 포기합니다.") : SurrenderError.IsEmpty() ? Error : SurrenderError);
     }
     if (SaveStatus)
     {
@@ -167,10 +186,6 @@ void UMainMenuScreenWidget::NativeOnActivated()
         const FText& DevelopmentStatus = GetGameInstance()->GetSubsystem<UDevelopmentCoopSubsystem>()->GetStatus();
         if (!DevelopmentStatus.IsEmpty()) SaveStatus->SetText(DevelopmentStatus);
     }
-    URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
-    Run->OnRunStateChanged.RemoveAll(this);
-    Run->OnRunStateChanged.AddUObject(this, &UMainMenuScreenWidget::RefreshResumeActions);
-    RefreshResumeActions();
 }
 
 void UMainMenuScreenWidget::NativeOnDeactivated()
@@ -184,6 +199,7 @@ void UMainMenuScreenWidget::NativeOnDeactivated()
 
 void UMainMenuScreenWidget::RefreshResumeActions()
 {
+    RefreshSavedActions();
     if (!ManagedResumePanel || !ManagedResumeText || !ConvertToSoloButton || !ResumeSoloButton) return;
     const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     const bool bSelected = Run && Run->GetManagedResumeTarget().IsValid();
@@ -278,10 +294,37 @@ void UMainMenuScreenWidget::EnsureCodeGeneratedLayout()
         }
     }
 
-    Button_NewGame = CreateMenuButton(MenuBox, FText::FromString(TEXT("New Game")));
-    Button_Continue = CreateMenuButton(MenuBox, FText::FromString(TEXT("Continue")));
+    Button_NewGame = CreateMenuButton(MenuBox, NSLOCTEXT("MainMenu", "StartGame", "게임 시작"));
+    Button_Continue = CreateMenuButton(MenuBox, NSLOCTEXT("MainMenu", "Continue", "이어하기"));
     Button_Options = CreateMenuButton(MenuBox, FText::FromString(TEXT("Options")));
     Button_Quit = CreateMenuButton(MenuBox, FText::FromString(TEXT("Quit")));
+}
+
+void UMainMenuScreenWidget::EnsureContinueRow()
+{
+    if (Button_Surrender || !WidgetTree || !Button_Continue) return;
+    UVerticalBox* Menu = Cast<UVerticalBox>(Button_Continue->GetParent());
+    UVerticalBoxSlot* PreviousSlot = Cast<UVerticalBoxSlot>(Button_Continue->Slot);
+    if (!Menu || !PreviousSlot) return;
+    const int32 Index = Menu->GetChildIndex(Button_Continue);
+    const FMargin RowPadding = PreviousSlot->GetPadding();
+    UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("ContinueRow"));
+    Button_Continue->RemoveFromParent();
+    UVerticalBoxSlot* RowSlot = CastChecked<UVerticalBoxSlot>(Menu->InsertChildAt(Index, Row));
+    RowSlot->SetPadding(RowPadding);
+    RowSlot->SetHorizontalAlignment(HAlign_Fill);
+    UHorizontalBoxSlot* ContinueSlot = Row->AddChildToHorizontalBox(Button_Continue);
+    ContinueSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    ContinueSlot->SetVerticalAlignment(VAlign_Center);
+    USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("SurrenderSize"));
+    Size->SetWidthOverride(104.0f);
+    Size->SetHeightOverride(40.0f);
+    UHorizontalBoxSlot* SurrenderSlot = Row->AddChildToHorizontalBox(Size);
+    SurrenderSlot->SetPadding(FMargin(8.0f, 0.0f, 0.0f, 0.0f));
+    SurrenderSlot->SetVerticalAlignment(VAlign_Center);
+    Button_Surrender = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_Surrender"));
+    Size->SetContent(Button_Surrender);
+    CreateButtonText(Button_Surrender, NSLOCTEXT("MainMenu", "Surrender", "항복하기"));
 }
 
 void UMainMenuScreenWidget::ConfigureBackgroundImage()
@@ -358,6 +401,32 @@ void UMainMenuScreenWidget::HandleContinueClicked()
     }
 }
 
+void UMainMenuScreenWidget::HandleSurrenderClicked()
+{
+    AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer());
+    UMainMenuRootWidget* Root = Controller ? Controller->GetMainMenuRootWidget() : nullptr;
+    FString Token;
+    FText Error;
+    if (!Root || !Controller->GetSurrenderToken(Token, Error))
+    {
+        RefreshSavedActions();
+        if (SaveStatus) SaveStatus->SetText(Error);
+        return;
+    }
+    if (URunSurrenderWidget* Confirmation = Cast<URunSurrenderWidget>(Root->PushModalScreen(URunSurrenderWidget::StaticClass())))
+    {
+        Confirmation->ConfigureConfirmation(Token);
+        Confirmation->OnSurrendered.RemoveAll(this);
+        Confirmation->OnSurrendered.AddUObject(this, &UMainMenuScreenWidget::HandleSurrendered);
+    }
+}
+
+void UMainMenuScreenWidget::HandleSurrendered()
+{
+    RefreshResumeActions();
+    if (SaveStatus) SaveStatus->SetText(NSLOCTEXT("MainMenu", "Surrendered", "현재 여정을 포기했습니다. 게임 시작에서 새 여정을 만들 수 있습니다."));
+}
+
 void UMainMenuScreenWidget::HandleConvertToSoloClicked()
 {
     if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
@@ -407,7 +476,7 @@ void UMainMenuScreenWidget::RequestNewGame()
         return;
     }
 
-    MainMenuPlayerController->ShowCharacterCreationScreen();
+    if (UMainMenuRootWidget* Root = MainMenuPlayerController->GetMainMenuRootWidget()) Root->PushMenuScreen(UGameModeSelectionWidget::StaticClass());
 }
 
 void UMainMenuScreenWidget::RequestQuitGame()

@@ -57,6 +57,11 @@ public:
 
     bool ContinueSavedGame(FText& OutError);
 
+    // Confirm only the standalone checkpoint shown by the first menu.
+    // 첫 메뉴에 표시된 싱글플레이 체크포인트만 확인하여 포기합니다.
+    bool GetSurrenderToken(FString& OutToken, FText& OutError) const;
+    bool SurrenderSavedGame(const FString& ExpectedToken, FText& OutError);
+
     // Read the selected shared development record using the configured caller, never an account supplied by UI.
     // UI가 입력한 계정 대신 설정된 호출자로 선택된 개발용 공유 기록을 읽습니다.
     bool GetManagedResumePreview(FManagedRunPreview& OutPreview, FText& OutError) const;

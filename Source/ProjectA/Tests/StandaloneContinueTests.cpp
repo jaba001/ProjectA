@@ -15,6 +15,10 @@
 #include "Unit/PlayerUnit.h"
 #include "UObject/StrongObjectPtr.h"
 
+#if PLATFORM_WINDOWS
+#include "Windows/WindowsHWrapper.h"
+#endif
+
 namespace
 {
     struct FStandaloneContinueFixture
@@ -258,6 +262,182 @@ bool FStandaloneContinueFileReplacementTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("The second replacement is a supported local save"), NewLocal.Get()) || !TestTrue(TEXT("A different eligible local save replaces the displayed file"), FRunCheckpointStorage::Save(NewLocal.Get(), Fixture.Slot, Error))) return false;
     TestTrue(TEXT("The menu may load a newly validated eligible file"), Fixture.Run->LoadStandaloneCheckpoint(Error));
     TestEqual(TEXT("Load applies the newly validated object instead of stale menu data"), Fixture.Run->GetRunIdentity().RunId, NewLocal->Identity.RunId);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FStandaloneSurrenderEligibilityTest, "ProjectA.Persistence.StandaloneSurrenderEligibility", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FStandaloneSurrenderEligibilityTest::RunTest(const FString& Parameters)
+{
+    struct FCase
+    {
+        ERunIdentityOrigin Origin;
+        int32 Participants;
+        bool bCombat;
+        bool bAllowed;
+    };
+    const TArray<FCase> Cases = {
+        {ERunIdentityOrigin::LegacyOffline, 0, false, true},
+        {ERunIdentityOrigin::LocalDevelopment, 1, false, true},
+        {ERunIdentityOrigin::LocalDevelopment, 1, true, false},
+        {ERunIdentityOrigin::LocalDevelopment, 2, false, false},
+        {ERunIdentityOrigin::AccountProvider, 1, false, false},
+        {ERunIdentityOrigin::AccountProvider, 2, false, false}
+    };
+    for (const FCase& Case : Cases)
+    {
+        FStandaloneContinueFixture Fixture;
+        FText Error;
+        TStrongObjectPtr<URunSaveGame> Save = Fixture.MakeSave(Case.Origin, Case.Participants, 4, Case.bCombat);
+        if (!TestNotNull(TEXT("The surrender candidate is valid"), Save.Get()) || !TestTrue(TEXT("The isolated candidate is saved"), FRunCheckpointStorage::Save(Save.Get(), Fixture.Slot, Error))) return false;
+        const TArray<uint8> BeforeDisk = Fixture.ReadBytes();
+        const TArray<uint8> BeforeRuntime = Fixture.CaptureRuntime();
+        int32 Events = 0;
+        const FDelegateHandle Observer = Fixture.Run->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
+        ON_SCOPE_EXIT { Fixture.Run->OnRunStateChanged.Remove(Observer); };
+        FString Token = TEXT("StaleToken");
+        TestEqual(TEXT("Surrender uses the normal Standalone Continue scope"), Fixture.Run->GetStandaloneSurrenderToken(Token, Error), Case.bAllowed);
+        TestEqual(TEXT("Only an eligible save produces a confirmation token"), !Token.IsEmpty(), Case.bAllowed);
+        if (!Case.bAllowed) TestFalse(TEXT("A rejected identity cannot surrender through a direct confirmation call"), Fixture.Run->SurrenderStandaloneSavedRun(TEXT("StaleToken"), Error));
+        TestTrue(TEXT("Preview or rejected confirmation preserves disk memory autosave and events"), Fixture.ReadBytes() == BeforeDisk && Fixture.CaptureRuntime() == BeforeRuntime && Fixture.Run->IsCheckpointSavingEnabled() && Events == 0);
+        if (Case.bAllowed && Case.Origin == ERunIdentityOrigin::LegacyOffline)
+        {
+            TestTrue(TEXT("A legacy offline save can be surrendered without inventing a Run ID"), Fixture.Run->SurrenderStandaloneSavedRun(Token, Error));
+            TestFalse(TEXT("A surrendered legacy save cannot continue"), Fixture.Run->CanContinueStandaloneSavedRun(Error));
+        }
+    }
+    for (int32 Case = 0; Case < 3; ++Case)
+    {
+        FStandaloneContinueFixture Fixture;
+        FText Error;
+        TStrongObjectPtr<URunSaveGame> Save = Fixture.MakeSave(ERunIdentityOrigin::LocalDevelopment, Case == 0 ? 2 : 1, 2, false);
+        if (!Save) return false;
+        if (Case == 0)
+        {
+            Save->Version = 4;
+            Save->Identity.SchemaVersion = 2;
+            for (int32 Index = 0; Index < Save->Identity.OriginalParticipants.Num(); ++Index)
+            {
+                Save->Identity.OriginalParticipants[Index].JoinOrdinal = Index + 1;
+                Save->Participation.HumanParticipants.Add(Save->Identity.OriginalParticipants[Index].AccountId);
+            }
+        }
+        else if (Case == 1)
+        {
+            Save->Phase = ERunPhase::Complete;
+            Save->Result = ECombatResult::Victory;
+            for (const FRunNodeDefinition& Node : Save->Nodes) Save->CompletedNodes.Add(Node.NodeId);
+            Save->CurrentNode = Save->Nodes.Last().NodeId;
+        }
+        else
+        {
+            Save->Phase = ERunPhase::Defeat;
+            Save->Result = ECombatResult::Defeat;
+            Save->CurrentNode = Save->Nodes[0].NodeId;
+            Save->CurrentEncounter = Save->Nodes[0].EncounterId;
+            for (FRunPartyMember& Member : Save->Party) Member.CurrentHP = 0.0f;
+        }
+        if (!TestTrue(TEXT("The managed or completed fixture is saved"), FRunCheckpointStorage::Save(Save.Get(), Fixture.Slot, Error))) return false;
+        const TArray<uint8> Before = Fixture.ReadBytes();
+        FString Token;
+        TestFalse(TEXT("Managed and already completed saves cannot be surrendered from the ordinary menu"), Fixture.Run->GetStandaloneSurrenderToken(Token, Error));
+        TestFalse(TEXT("Managed and completed confirmation cannot bypass the preview guard"), Fixture.Run->SurrenderStandaloneSavedRun(TEXT("Unconfirmed"), Error));
+        TestTrue(TEXT("The ineligible saved record remains unchanged"), Fixture.ReadBytes() == Before);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FStandaloneSurrenderCommitTest, "ProjectA.Persistence.StandaloneSurrenderCommit", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FStandaloneSurrenderCommitTest::RunTest(const FString& Parameters)
+{
+    FStandaloneContinueFixture Fixture;
+    FStandaloneContinueFixture OtherSlot;
+    FText Error;
+    TStrongObjectPtr<URunSaveGame> Save = Fixture.MakeSave(ERunIdentityOrigin::LocalDevelopment, 1, 4, false);
+    if (!Save || !FRunCheckpointStorage::Save(Save.Get(), Fixture.Slot, Error) || !FRunCheckpointStorage::Save(Save.Get(), OtherSlot.Slot, Error) || !Fixture.Run->LoadStandaloneCheckpoint(Error)) return false;
+    const TArray<uint8> BeforeDisk = Fixture.ReadBytes();
+    const TArray<uint8> OtherBytes = OtherSlot.ReadBytes();
+    const TArray<uint8> BeforeRuntime = Fixture.CaptureRuntime();
+    const FText BeforeError = Fixture.Run->GetSaveError();
+    int32 Events = 0;
+    bool bPublishedClearedState = false;
+    const FDelegateHandle Observer = Fixture.Run->OnRunStateChanged.AddLambda([&Fixture, &Events, &bPublishedClearedState]()
+    {
+        ++Events;
+        bPublishedClearedState = Fixture.Run->GetPhase() == ERunPhase::None && Fixture.Run->GetPartyMembers().IsEmpty() && !Fixture.Run->IsCheckpointSavingEnabled();
+    });
+    ON_SCOPE_EXIT { Fixture.Run->OnRunStateChanged.Remove(Observer); };
+    FString Token;
+    if (!TestTrue(TEXT("An eligible save produces a confirmation token"), Fixture.Run->GetStandaloneSurrenderToken(Token, Error))) return false;
+    TestTrue(TEXT("Opening and cancelling confirmation has no persistence side effects"), Fixture.ReadBytes() == BeforeDisk && Fixture.CaptureRuntime() == BeforeRuntime && Events == 0);
+    TestFalse(TEXT("An empty token cannot confirm surrender"), Fixture.Run->SurrenderStandaloneSavedRun(FString(), Error));
+    TestFalse(TEXT("A token cannot delete an identical save in a different slot"), FRunCheckpointStorage::DeleteIfUnchanged(OtherSlot.Slot, Token, Error));
+    TestFalse(TEXT("Unsafe slot paths are rejected before deletion"), FRunCheckpointStorage::DeleteIfUnchanged(TEXT("../ProjectA_Run"), Token, Error));
+    FRunCheckpointStorage::FailNextDeleteForTesting();
+    TestFalse(TEXT("An injected storage failure leaves surrender retryable"), Fixture.Run->SurrenderStandaloneSavedRun(Token, Error));
+    TestFalse(TEXT("Delete failure provides an actionable error"), Error.IsEmpty());
+    TestTrue(TEXT("Failed deletion preserves every runtime value file and persistence flag"), Fixture.ReadBytes() == BeforeDisk && Fixture.CaptureRuntime() == BeforeRuntime && Fixture.Run->GetSaveError().EqualTo(BeforeError) && Fixture.Run->IsCheckpointSavingEnabled() && Events == 0);
+#if PLATFORM_WINDOWS
+    const FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("SaveGames") / (Fixture.Slot + TEXT(".sav")));
+    HANDLE Reader = ::CreateFileW(*Path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (!TestTrue(TEXT("A reader can hold the isolated save without granting delete access"), Reader != INVALID_HANDLE_VALUE)) return false;
+    TestFalse(TEXT("An incompatible open handle prevents deletion"), Fixture.Run->SurrenderStandaloneSavedRun(Token, Error));
+    ::CloseHandle(Reader);
+    TestTrue(TEXT("A sharing violation also preserves disk memory and events"), Fixture.ReadBytes() == BeforeDisk && Fixture.CaptureRuntime() == BeforeRuntime && Events == 0);
+    HANDLE DeleteSharingReader = ::CreateFileW(*Path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (!TestTrue(TEXT("A reader can hold the isolated save while permitting shared deletion"), DeleteSharingReader != INVALID_HANDLE_VALUE)) return false;
+    TestFalse(TEXT("A delete-sharing reader cannot leave surrender pending after reported success"), Fixture.Run->SurrenderStandaloneSavedRun(Token, Error));
+    TestTrue(TEXT("A delete-sharing reader rejection preserves disk memory autosave and events"), Fixture.ReadBytes() == BeforeDisk && Fixture.CaptureRuntime() == BeforeRuntime && Fixture.Run->GetSaveError().EqualTo(BeforeError) && Fixture.Run->IsCheckpointSavingEnabled() && Events == 0);
+    ::CloseHandle(DeleteSharingReader);
+#endif
+    TestTrue(TEXT("Retry with the same unchanged confirmation commits surrender"), Fixture.Run->SurrenderStandaloneSavedRun(Token, Error));
+    TestTrue(TEXT("Successful deletion clears its error and publishes cleared state once"), Error.IsEmpty() && Fixture.Run->GetSaveError().IsEmpty() && Events == 1 && bPublishedClearedState);
+    TestTrue(TEXT("Surrender clears identity encounter progress and combat state"), !Fixture.Run->GetRunIdentity().RunId.IsValid() && Fixture.Run->GetNodes().IsEmpty() && Fixture.Run->GetCompletedNodes().IsEmpty() && Fixture.Run->GetCurrentNodeId().IsNone() && Fixture.Run->GetCurrentEncounterId().IsNone() && Fixture.Run->GetLastResult() == ECombatResult::None && !Fixture.Run->HasCombatCheckpoint());
+    TestFalse(TEXT("The surrendered checkpoint no longer exists"), UGameplayStatics::DoesSaveGameExist(Fixture.Slot, 0));
+    TestFalse(TEXT("Continue becomes unavailable after surrender"), Fixture.Run->CanContinueStandaloneSavedRun(Error));
+    TestFalse(TEXT("An already consumed confirmation cannot publish another surrender"), Fixture.Run->SurrenderStandaloneSavedRun(Token, Error));
+    TestEqual(TEXT("Repeated confirmation does not publish another event"), Events, 1);
+    TStrongObjectPtr<URunSaveGame> NewSave = Fixture.MakeSave(ERunIdentityOrigin::LocalDevelopment, 1, 1, false);
+    if (!TestNotNull(TEXT("A new Run can be prepared after surrender"), NewSave.Get())) return false;
+    TestTrue(TEXT("The same slot immediately accepts a new save after the reader closes and surrender succeeds"), FRunCheckpointStorage::Save(NewSave.Get(), Fixture.Slot, Error));
+    TestTrue(TEXT("The newly saved Run can continue from the reused slot"), Fixture.Run->CanContinueStandaloneSavedRun(Error));
+    TestTrue(TEXT("The other isolated save remains byte-identical"), OtherSlot.ReadBytes() == OtherBytes);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FStandaloneSurrenderReplacementTest, "ProjectA.Persistence.StandaloneSurrenderReplacement", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FStandaloneSurrenderReplacementTest::RunTest(const FString& Parameters)
+{
+    FStandaloneContinueFixture Fixture;
+    FText Error;
+    TStrongObjectPtr<URunSaveGame> Original = Fixture.MakeSave(ERunIdentityOrigin::LocalDevelopment, 1, 1, false);
+    if (!Original || !FRunCheckpointStorage::Save(Original.Get(), Fixture.Slot, Error) || !Fixture.Run->LoadStandaloneCheckpoint(Error)) return false;
+    const TArray<uint8> BeforeRuntime = Fixture.CaptureRuntime();
+    int32 Events = 0;
+    const FDelegateHandle Observer = Fixture.Run->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
+    ON_SCOPE_EXIT { Fixture.Run->OnRunStateChanged.Remove(Observer); };
+    FString Token;
+    if (!Fixture.Run->GetStandaloneSurrenderToken(Token, Error)) return false;
+    Original->Party[0].CurrentHP = 75.0f;
+    if (!FRunCheckpointStorage::Save(Original.Get(), Fixture.Slot, Error)) return false;
+    TArray<uint8> ReplacedBytes = Fixture.ReadBytes();
+    TestFalse(TEXT("Even the same Run ID with changed contents invalidates confirmation"), Fixture.Run->SurrenderStandaloneSavedRun(Token, Error));
+    TestFalse(TEXT("The storage handle independently rejects changed bytes"), FRunCheckpointStorage::DeleteIfUnchanged(Fixture.Slot, Token, Error));
+    TestTrue(TEXT("Changed contents are preserved along with current runtime"), Fixture.ReadBytes() == ReplacedBytes && Fixture.CaptureRuntime() == BeforeRuntime && Events == 0);
+    TStrongObjectPtr<URunSaveGame> Cooperative = Fixture.MakeSave(ERunIdentityOrigin::AccountProvider, 2, 2, false);
+    if (!Cooperative || !FRunCheckpointStorage::Save(Cooperative.Get(), Fixture.Slot, Error)) return false;
+    ReplacedBytes = Fixture.ReadBytes();
+    TestFalse(TEXT("A cooperative replacement fails a fresh ownership check"), Fixture.Run->SurrenderStandaloneSavedRun(Token, Error));
+    TestTrue(TEXT("Cooperative replacement and local runtime remain untouched"), Fixture.ReadBytes() == ReplacedBytes && Fixture.CaptureRuntime() == BeforeRuntime && Events == 0);
+    const FString Path = FPaths::ProjectSavedDir() / TEXT("SaveGames") / (Fixture.Slot + TEXT(".sav"));
+    const TArray<uint8> CorruptBytes;
+    if (!TestTrue(TEXT("The isolated corruption fixture is truncated"), FFileHelper::SaveArrayToFile(CorruptBytes, *Path))) return false;
+    TestFalse(TEXT("Corrupted files cannot be discarded through stale confirmation"), Fixture.Run->SurrenderStandaloneSavedRun(Token, Error));
+    FString ClearedToken = Token;
+    TestFalse(TEXT("Corrupted files cannot produce a fresh token"), Fixture.Run->GetStandaloneSurrenderToken(ClearedToken, Error));
+    TestTrue(TEXT("Corruption rejection clears the token without touching disk memory or events"), ClearedToken.IsEmpty() && Fixture.ReadBytes() == CorruptBytes && Fixture.CaptureRuntime() == BeforeRuntime && Events == 0);
     return true;
 }
 

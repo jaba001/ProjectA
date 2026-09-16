@@ -17,11 +17,14 @@ class PROJECTA_API UDevelopmentCoopWidget : public UCommonActivatableWidget
     GENERATED_BODY()
 
 public:
+    UDevelopmentCoopWidget();
     virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
     void RefreshLobby(ADevelopmentCoopLobby* Lobby);
 
 protected:
     virtual void NativeOnInitialized() override;
+    virtual bool NativeOnHandleBackAction() override;
+    virtual UWidget* NativeGetDesiredFocusTarget() const override;
     virtual void NativeTick(const FGeometry& Geometry, float DeltaTime) override;
 
 private:

@@ -23,6 +23,12 @@
 #include "UI/MainMenu/MainMenuRootWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
 
+UDevelopmentCoopWidget::UDevelopmentCoopWidget()
+{
+    bIsBackHandler = true;
+    bAutoRestoreFocus = true;
+}
+
 TOptional<FUIInputConfig> UDevelopmentCoopWidget::GetDesiredInputConfig() const
 {
     return FUIInputConfig(ECommonInputMode::Menu, EMouseCaptureMode::NoCapture, false);
@@ -61,11 +67,11 @@ void UDevelopmentCoopWidget::NativeOnInitialized()
     Size->SetContent(Frame);
     Frame->SetContent(Box);
     UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>();
-    Title->SetText(FText::FromString(TEXT("개발용 협동")));
+    Title->SetText(FText::FromString(TEXT("멀티플레이")));
     Box->AddChildToVerticalBox(Title)->SetPadding(FMargin(0.f, 0.f, 0.f, 16.f));
     UTextBlock* Notice = WidgetTree->ConstructWidget<UTextBlock>();
     Notice->SetAutoWrapText(true);
-    Notice->SetText(FText::FromString(TEXT("같은 PC 또는 LAN에서 새 전투를 확인하는 개발용 방입니다.\n각자 궁수 1명을 조작합니다. 저장 이어하기·Steam 초대는 지원하지 않습니다.")));
+    Notice->SetText(FText::FromString(TEXT("같은 PC 또는 LAN에서 2~4명이 함께 플레이합니다.\n각자 궁수 1명을 조작합니다. 현재 저장 이어하기·Steam 초대는 지원하지 않습니다.")));
     Box->AddChildToVerticalBox(Notice)->SetPadding(FMargin(0.f, 0.f, 0.f, 16.f));
     if (Cast<AMainMenuPlayerController>(GetOwningPlayer()))
     {
@@ -94,10 +100,21 @@ void UDevelopmentCoopWidget::NativeOnInitialized()
     Status = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_DevCoopStatus"));
     Status->SetAutoWrapText(true);
     Box->AddChildToVerticalBox(Status)->SetPadding(FMargin(0.f, 12.f));
-    AddButton(Box, TEXT("Button_DevCoopBack"), FText::FromString(TEXT("취소 / 메뉴로 돌아가기")))->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleBack);
+    AddButton(Box, TEXT("Button_DevCoopBack"), FText::FromString(HostButton ? TEXT("뒤로가기 / 연결 취소") : TEXT("메뉴로 돌아가기")))->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleBack);
     UDemonicUITheme::Get().ApplyControls(WidgetTree);
     UDemonicUITheme::Get().StyleText(Title, true, 28);
     UDemonicUITheme::Get().StyleButton(HostButton ? HostButton.Get() : StartButton.Get(), true);
+}
+
+bool UDevelopmentCoopWidget::NativeOnHandleBackAction()
+{
+    HandleBack();
+    return true;
+}
+
+UWidget* UDevelopmentCoopWidget::NativeGetDesiredFocusTarget() const
+{
+    return HostButton ? HostButton.Get() : ReadyButton.Get();
 }
 
 void UDevelopmentCoopWidget::NativeTick(const FGeometry& Geometry, float DeltaTime)
@@ -160,7 +177,7 @@ void UDevelopmentCoopWidget::HandleBack()
 {
     UDevelopmentCoopSubsystem* Session = GetGameInstance()->GetSubsystem<UDevelopmentCoopSubsystem>();
     AMainMenuPlayerController* Menu = Cast<AMainMenuPlayerController>(GetOwningPlayer());
-    if (Menu && !Session->IsPending()) Menu->GetMainMenuRootWidget()->ClearMenuStack();
+    if (Menu && !Session->IsPending()) DeactivateWidget();
     else Session->Leave(GetOwningPlayer());
 }
 

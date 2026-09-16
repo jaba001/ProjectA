@@ -168,6 +168,23 @@ bool AMainMenuPlayerController::ContinueSavedGame(FText& OutError)
     return true;
 }
 
+bool AMainMenuPlayerController::GetSurrenderToken(FString& OutToken, FText& OutError) const
+{
+    OutToken.Reset();
+    OutError = NSLOCTEXT("MainMenu", "SurrenderUnavailable", "현재 메뉴에서는 저장된 싱글플레이 여정을 포기할 수 없습니다.");
+    const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    if (!HasAuthority() || !IsLocalController() || GetNetMode() != NM_Standalone || !Run) return false;
+    return Run->GetStandaloneSurrenderToken(OutToken, OutError);
+}
+
+bool AMainMenuPlayerController::SurrenderSavedGame(const FString& ExpectedToken, FText& OutError)
+{
+    OutError = NSLOCTEXT("MainMenu", "SurrenderUnavailable", "현재 메뉴에서는 저장된 싱글플레이 여정을 포기할 수 없습니다.");
+    URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    if (!HasAuthority() || !IsLocalController() || GetNetMode() != NM_Standalone || !Run) return false;
+    return Run->SurrenderStandaloneSavedRun(ExpectedToken, OutError);
+}
+
 bool AMainMenuPlayerController::GetManagedResumePreview(FManagedRunPreview& OutPreview, FText& OutError) const
 {
     OutError = NSLOCTEXT("ManagedRunMenu", "Unavailable", "이어갈 파티 저장과 본인 참가 정보가 필요합니다.");

@@ -404,6 +404,54 @@ bool URunStateSubsystem::LoadStandaloneCheckpoint(FText& OutError)
     return LoadCheckpointInternal(true, OutError);
 }
 
+bool URunStateSubsystem::GetStandaloneSurrenderToken(FString& OutToken, FText& OutError) const
+{
+    OutToken.Reset();
+    if (bManagedRun || ManagedLease || (GetWorld() && GetWorld()->GetNetMode() != NM_Standalone))
+    {
+        OutError = NSLOCTEXT("RunSurrender", "Session", "현재 싱글플레이 메뉴에서 이어갈 수 있는 진행만 포기할 수 있습니다.");
+        return false;
+    }
+    if ((Phase != ERunPhase::None || !PartyMembers.IsEmpty()) && RunIdentity.Origin != ERunIdentityOrigin::LegacyOffline && (RunIdentity.Origin != ERunIdentityOrigin::LocalDevelopment || RunIdentity.OriginalParticipants.Num() != 1))
+    {
+        OutError = NSLOCTEXT("RunSurrender", "ActiveIdentity", "협동 또는 계정 세션의 진행은 싱글플레이 메뉴에서 포기할 수 없습니다.");
+        return false;
+    }
+    FString Token;
+    TStrongObjectPtr<URunSaveGame> Save(Cast<URunSaveGame>(FRunCheckpointStorage::Load(SaveSlot, OutError, &Token)));
+    if (!ValidateContinuableSave(Save.Get(), true, OutError)) return false;
+    OutToken = MoveTemp(Token);
+    return true;
+}
+
+bool URunStateSubsystem::SurrenderStandaloneSavedRun(const FString& ExpectedToken, FText& OutError)
+{
+    FString CurrentToken;
+    if (!GetStandaloneSurrenderToken(CurrentToken, OutError)) return false;
+    if (ExpectedToken.IsEmpty() || CurrentToken != ExpectedToken)
+    {
+        OutError = NSLOCTEXT("RunSurrender", "Changed", "확인 후 저장이 변경되었습니다. 최신 진행을 확인한 뒤 다시 포기해 주세요.");
+        return false;
+    }
+    if (!FRunCheckpointStorage::DeleteIfUnchanged(SaveSlot, ExpectedToken, OutError)) return false;
+    // Publish cleared memory only after the confirmed file is deleted, preventing automatic save resurrection.
+    // 확인한 파일이 삭제된 뒤에만 메모리 초기화를 공개하여 자동 저장으로 진행이 되살아나지 않게 합니다.
+    bCheckpointSaving = false;
+    RunIdentity = FRunIdentityData();
+    Participation = FRunParticipationData();
+    EncounterProgress = FRunEncounterProgress();
+    PartyMembers.Reset();
+    Nodes.Reset();
+    CompletedNodes.Reset();
+    CurrentNodeId = CurrentEncounterId = NAME_None;
+    Phase = ERunPhase::None;
+    LastResult = ECombatResult::None;
+    CombatCheckpoint = FCombatCheckpointData();
+    SaveError = FText::GetEmpty();
+    OnRunStateChanged.Broadcast();
+    return true;
+}
+
 bool URunStateSubsystem::LoadCheckpointInternal(bool bStandaloneOnly, FText& OutError)
 {
     if (bManagedRun || ManagedLease)

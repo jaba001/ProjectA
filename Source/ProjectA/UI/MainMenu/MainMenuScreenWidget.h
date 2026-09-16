@@ -18,8 +18,8 @@ class PROJECTA_API UMainMenuScreenWidget : public UCommonActivatableWidget
     GENERATED_BODY()
 
 public:
-    // Requests transition to character creation.
-    // 캐릭터 생성 화면으로 전환을 요청합니다.
+    // Requests the single-player and multiplayer selection screen.
+    // 싱글플레이와 멀티플레이 선택 화면을 요청합니다.
     UFUNCTION(BlueprintCallable, Category = "MainMenu")
     void RequestNewGame();
 
@@ -70,6 +70,11 @@ protected:
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_Continue;
 
+    // A compact action beside Continue for the same saved single-player run.
+    // 이어하기와 같은 싱글플레이 저장을 대상으로 하는 작은 보조 버튼입니다.
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Surrender;
+
     // Options button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 옵션 버튼입니다.
     // T12: Verified Button_Options binding in the saved Designer WBP.
@@ -85,8 +90,6 @@ protected:
     TObjectPtr<UButton> Button_Quit;
 
 private:
-    UFUNCTION()
-    void HandleDevelopmentCoopClicked();
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> SaveStatus;
     UPROPERTY(Transient)
@@ -100,6 +103,10 @@ private:
     // Creates the fallback main menu layout in C++.
     // C++에서 대체 메인메뉴 레이아웃을 생성합니다.
     void EnsureCodeGeneratedLayout();
+
+    void EnsureContinueRow();
+    void RefreshSavedActions();
+    void HandleSurrendered();
 
     // Styles existing Designer bindings and the native fallback with the shared Demonic art.
     // 기존 Designer 바인딩과 네이티브 대체 화면에 공통 Demonic 아트를 적용합니다.
@@ -122,6 +129,9 @@ private:
 
     UFUNCTION()
     void HandleContinueClicked();
+
+    UFUNCTION()
+    void HandleSurrenderClicked();
 
     UFUNCTION()
     void HandleConvertToSoloClicked();
