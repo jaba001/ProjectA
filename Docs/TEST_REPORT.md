@@ -129,6 +129,10 @@ $reportPath = Join-Path (Get-Location) ('Saved/Automation/UserManagedRun_' + (Ge
 
 검증: AssetTools 이동·저장 후 별도 프로세스에서 위젯 3종 로드, 이전 경로 에셋/Redirector 0개 확인(오류·경고 0). 추가 정리 명령은 빈 폴더로 대상 없음 경고 1건. Editor 빌드 성공(`Saved/Automation/ContentRootBuild.log`), 콘텐츠 변경의 작동 검증은 미실행이다.
 
+2026-09-16 기존 삭제 이력 반영: 작업 폴더에 이미 없던 `Blueprint/Controller/BP_PartyPlayerController`, `Blueprint/Game/TestGameModebase`, `LEVEL/TestMap` 3개의 Git 삭제를 함께 커밋한다. 추가 파일 삭제·에셋 이동·C++ 변경은 없다. 제작 에셋 44개의 ASCII·UTF-16 문자열을 확인했으며 현재 Gameplay·MainMenu와 각각의 GameMode·Controller는 존재하고 별도 경로를 참조한다. Config·게임 Source에는 삭제 대상 참조가 없으며, 최초 생성·Audit 도구의 TestMap 의존은 유지한다.
+
+잔존 참조 경고 1건: `/Game/User_JeHoon/Blueprint/TestGameModebase`에 ObjectRedirector와 삭제된 `/Game/User_JeHoon/Blueprint/Game/TestGameModebase` 목적지 문자열이 남아 있다. 엔진 의존성 그래프·로드·cook는 미검증이므로 전체 참조 무결성을 확정하지 않는다. 목적은 기존 삭제 기록의 반영이며 새 게임 동작을 검증한 결과가 아니다. 문서·diff 정적 검사는 통과했고, 준비된 기존 빌드에서 Reference Viewer로 잔존 Redirector의 참조자를 확인한 뒤 Unreal 에셋 기능으로 정리하고 MainMenu → Gameplay의 누락 참조를 확인한다. 기대 결과는 삭제 대상에 대한 활성 참조 없이 기존 진입 흐름 유지이며 사용자 확인 상태는 미실행이다. 이전 위젯 경로 정리 성공은 이 잔존 참조의 검증 근거로 사용하지 않는다.
+
 ## 6. 2인 전투 동기화
 
 이 절은 순차 전투 당시 실행 이력이다. 현재 계획/시간차 전투 검증은 12절에서 별도로 수행한다.
