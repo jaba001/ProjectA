@@ -49,6 +49,12 @@ UAbilitySystemComponent* AUnitBase::GetAbilitySystemComponent() const
     return AbilitySystem;
 }
 
+float AUnitBase::GetCombatSpeed() const
+{
+    const float Dexterity = AttributeSet ? AttributeSet->GetDexterity() : 0.0f;
+    return FMath::IsFinite(Dexterity) ? FMath::Max(0.0f, Dexterity) : 0.0f;
+}
+
 void AUnitBase::BeginPlay()
 {
     Super::BeginPlay();
@@ -101,7 +107,6 @@ void AUnitBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 
     DOREPLIFETIME(AUnitBase, Team);
     DOREPLIFETIME(AUnitBase, UnitIndex);
-    DOREPLIFETIME(AUnitBase, CombatSpeed);
     DOREPLIFETIME(AUnitBase, RuntimeCharacterName);
     DOREPLIFETIME(AUnitBase, bIsActiveTurn);
     DOREPLIFETIME(AUnitBase, bTurnMustEndAfterCurrentAction);

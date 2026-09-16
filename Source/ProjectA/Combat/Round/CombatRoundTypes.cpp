@@ -1,8 +1,9 @@
 #include "Combat/Round/CombatRoundTypes.h"
 
-float CombatRoundRules::StartDelay(int32 HighestSpeed, int32 UnitSpeed)
+float CombatRoundRules::StartDelay(float HighestSpeed, float UnitSpeed)
 {
-    return static_cast<float>(FMath::Max(static_cast<int64>(HighestSpeed) - UnitSpeed, static_cast<int64>(0))) * 0.1f;
+    if (!FMath::IsFinite(HighestSpeed) || !FMath::IsFinite(UnitSpeed)) return 0.0f;
+    return static_cast<float>(FMath::Max(static_cast<double>(HighestSpeed) - UnitSpeed, 0.0) * 0.1);
 }
 
 bool CombatRoundRules::IsTerminal(ECombatRoundActionPhase Phase)

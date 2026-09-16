@@ -167,7 +167,7 @@ struct PROJECTA_API FCombatRoundUnitView
     TObjectPtr<AUnitBase> Unit = nullptr;
 
     UPROPERTY(BlueprintReadOnly)
-    int32 Speed = 20;
+    float Speed = 0.0f;
 
     UPROPERTY(BlueprintReadOnly)
     TArray<FName> SkillIds;
@@ -229,7 +229,7 @@ struct PROJECTA_API FCombatRoundView
 
 namespace CombatRoundRules
 {
-    PROJECTA_API float StartDelay(int32 HighestSpeed, int32 UnitSpeed);
+    PROJECTA_API float StartDelay(float HighestSpeed, float UnitSpeed);
     PROJECTA_API bool IsTerminal(ECombatRoundActionPhase Phase);
     PROJECTA_API bool IsOwnTerritory(bool bEnemy, FIntPoint Coord);
     PROJECTA_API bool IsValidSkill(const FCombatRoundSkill& Skill);

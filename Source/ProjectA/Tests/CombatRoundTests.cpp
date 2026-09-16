@@ -116,7 +116,7 @@ namespace CombatRoundTests
             return Unit->ConfigureProfession(100.0f, 2, 2, {Skill});
         }
 
-        bool Initialize(int32 HumanCount = 1, int32 EnemySpeed = 10, const FCombatRoundSkill* EnemySkill = nullptr, FIntPoint EnemyCoord = FIntPoint(0, 3), int32 EnemyCount = 1, const FCombatRoundSkill* FirstHumanSkill = nullptr)
+        bool Initialize(int32 HumanCount = 1, float EnemySpeed = 10.0f, const FCombatRoundSkill* EnemySkill = nullptr, FIntPoint EnemyCoord = FIntPoint(0, 3), int32 EnemyCount = 1, const FCombatRoundSkill* FirstHumanSkill = nullptr, float FirstHumanSpeed = 20.0f)
         {
             if (!World.IsValid() || !Combat || !Arena || !Grid || Grid->TileMap.Num() != 16 || EnemyCount < 1 || EnemyCount > 4) return false;
             FRunIdentityData Identity;
@@ -132,7 +132,7 @@ namespace CombatRoundTests
                 APartyPlayerController* Controller = World->SpawnActor<APartyPlayerController>();
                 if (!Unit || !Controller) return false;
                 if (Index == 0 && FirstHumanSkill && !GiveRoundSkill(Unit, FirstHumanSkill, HumanSkillId)) return false;
-                Unit->CombatSpeed = 20 - Index * 2;
+                Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), FirstHumanSpeed - Index * 2.0f);
                 World->AddController(Controller);
                 Controller->SetCombatContext(Combat, true);
                 if (Index == 0) Controller->SetAsLocalPlayerController();
@@ -156,7 +156,7 @@ namespace CombatRoundTests
             {
                 AUnitBase* Enemy = AddUnit(EnemyCoord + FIntPoint(Index, 0), ETeam::Enemy);
                 if (!Enemy || !GiveRoundSkill(Enemy, EnemySkill, EnemySkillId)) return false;
-                Enemy->CombatSpeed = EnemySpeed;
+                Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), EnemySpeed);
                 Enemies.Add(Enemy);
                 Units.Add(Enemy);
             }
@@ -412,6 +412,51 @@ bool FCombatRoundPlanOwnershipTest::RunTest(const FString& Parameters)
     Round->Tick(0.02f);
     TestTrue(TEXT("Slower action begins after its configured delay"), Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Complete);
     TestTrue(TEXT("Resolution does not mutate the locked command"), SameCommand(FirstPlan, Round->GetView().Units[0].Command));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundDexterityScheduleTest, "ProjectA.Combat.Round.DexteritySchedulesRoundActions", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundDexterityScheduleTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("The ten versus five Dexterity fixture initializes"), Fixture.Initialize(1, 5.0f, nullptr, FIntPoint(0, 3), 1, nullptr, 10.0f))) return false;
+    ACombatRoundCoordinator* Round = Fixture.Round;
+    AUnitBase* Human = Fixture.Humans[0];
+    AUnitBase* Enemy = Fixture.Enemies[0];
+    TestEqual(TEXT("One human Dexterity point provides one combat speed point"), Human->GetCombatSpeed(), 10.0f);
+    TestEqual(TEXT("Enemy combat speed uses its own Dexterity"), Enemy->GetCombatSpeed(), 5.0f);
+    TestEqual(TEXT("The planning view exposes human Dexterity as speed"), Round->GetView().Units[0].Speed, 10.0f);
+    TestEqual(TEXT("The planning view exposes enemy Dexterity as speed"), Round->GetView().Units[1].Speed, 5.0f);
+    TestEqual(TEXT("The fastest planned action starts immediately"), Round->GetView().Units[0].StartDelay, 0.0f);
+    TestEqual(TEXT("A five-point Dexterity difference schedules half a second"), Round->GetView().Units[1].StartDelay, 0.5f);
+
+    // Attribute changes take effect in the next planning snapshot, preserving already scheduled actions.
+    // 어트리뷰트 변경은 다음 계획 스냅샷에 반영하여 이미 예약한 행동 시각을 유지합니다.
+    Human->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 21.25f);
+    TestEqual(TEXT("Live combat speed preserves fractional Dexterity"), Human->GetCombatSpeed(), 21.25f);
+    if (!TestTrue(TEXT("The owner submits a wait through the public planning API"), Fixture.Submit(0, Fixture.Command(Human, TEXT("Wait")))) || !TestTrue(TEXT("The owner locks the planned actions"), Fixture.Ready(0))) return false;
+    TestEqual(TEXT("Planning edits do not replace the human speed snapshot"), Round->GetView().Units[0].Speed, 10.0f);
+    TestTrue(TEXT("The scheduled fastest wait completes at time zero"), Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Complete);
+    TestTrue(TEXT("The slower enemy remains scheduled"), Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
+    Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 10.0f);
+    Round->Tick(0.49f);
+    TestEqual(TEXT("Resolution keeps the original enemy speed snapshot"), Round->GetView().Units[1].Speed, 5.0f);
+    TestEqual(TEXT("Resolution keeps the original half-second start time"), Round->GetView().Units[1].StartDelay, 0.5f);
+    TestTrue(TEXT("The enemy has not started before its half-second deadline"), Round->GetView().RoundNumber == 1 && Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
+    Round->Tick(0.02f);
+    if (!TestTrue(TEXT("The enemy wait settles the round immediately after its original deadline"), Round->GetView().RoundNumber == 2 && Round->GetView().Phase == ECombatRoundPhase::Planning)) return false;
+    TestEqual(TEXT("The next planning snapshot keeps all fractional human Dexterity"), Round->GetView().Units[0].Speed, 21.25f);
+    TestEqual(TEXT("The next planning snapshot includes the enemy Dexterity change"), Round->GetView().Units[1].Speed, 10.0f);
+    TestEqual(TEXT("Fractional Dexterity contributes to the next scheduled delay"), Round->GetView().Units[1].StartDelay, 1.125f);
+    if (!TestTrue(TEXT("The owner submits the next wait"), Fixture.Submit(0, Fixture.Command(Human, TEXT("Wait")))) || !TestTrue(TEXT("The next round locks successfully"), Fixture.Ready(0))) return false;
+    Round->Tick(0.5f);
+    Round->Tick(0.5f);
+    Round->Tick(0.12f);
+    TestTrue(TEXT("Fractional speed is not truncated to an earlier 1.1 second action"), Round->GetView().RoundNumber == 2 && Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
+    Round->Tick(0.02f);
+    TestTrue(TEXT("The next action starts on the simulation step after 1.125 seconds"), Round->GetView().RoundNumber == 3 && Round->GetView().Phase == ECombatRoundPhase::Planning);
     return true;
 }
 

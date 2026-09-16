@@ -39,8 +39,8 @@ public:
     FGameplayAttributeData Strength;
     ATTRIBUTE_ACCESSORS(UAS_Unit, Strength)
 
-    // Base dexterity is independent from action points and combat speed.
-    // 기본 민첩은 행동력 및 전투 속도와 독립적입니다.
+    // Current dexterity determines round initiative at one speed point per point without changing action points.
+    // 현재 민첩 1당 라운드 시작 속도 1을 사용하며 행동력은 변경하지 않습니다.
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Dexterity, Category = "Attributes")
     FGameplayAttributeData Dexterity;
     ATTRIBUTE_ACCESSORS(UAS_Unit, Dexterity)

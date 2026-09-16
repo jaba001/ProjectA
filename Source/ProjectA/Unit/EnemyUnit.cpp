@@ -4,6 +4,11 @@ AEnemyUnit::AEnemyUnit()
 {
     InitMaxHP = 150.0f;
     MaxActionPoint = 2;
+    // Training enemies use five-point defaults; snapshot configuration replaces them after spawning.
+    // 테스트 적은 기본 능력치 5를 사용하며 스냅샷 설정은 생성 후 저장된 값으로 교체합니다.
+    AttributeSet->InitStrength(5.0f);
+    AttributeSet->InitDexterity(5.0f);
+    AttributeSet->InitIntelligence(5.0f);
 }
 
 void AEnemyUnit::OnTurnStart()

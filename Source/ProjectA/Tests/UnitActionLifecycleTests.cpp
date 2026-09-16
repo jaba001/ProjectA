@@ -19,6 +19,7 @@
 #include "Profession/MageProfession.h"
 #include "Profession/ArcherProfession.h"
 #include "Profession/RogueProfession.h"
+#include "Unit/EnemyUnit.h"
 #include "Unit/PlayerUnit.h"
 #include "Unit/UnitBase.h"
 #include <limits>
@@ -308,6 +309,13 @@ bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
     FProfessionDefinition& Override = Custom->Professions.FindChecked(TEXT("Mage"));
     FProfessionDefinition Base;
     Catalog->ResolveProfession(TEXT("Mage"), Base);
+    AEnemyUnit* Enemy = Scope.SpawnUnit<AEnemyUnit>(FVector::ZeroVector);
+    TestTrue(TEXT("The native enemy keeps its HP 150 and AP 2 defaults"), Enemy->GetInitialMaxHP() == 150.0f && Enemy->GetMaxActionPoint() == 2);
+    TestTrue(TEXT("The native enemy starts with strength dexterity and intelligence at five"), Enemy->GetAttributeSet()->GetStrength() == 5.0f && Enemy->GetAttributeSet()->GetDexterity() == 5.0f && Enemy->GetAttributeSet()->GetIntelligence() == 5.0f);
+    TestEqual(TEXT("Native enemy combat speed follows its default dexterity"), Enemy->GetCombatSpeed(), 5.0f);
+    if (!TestTrue(TEXT("Snapshot configuration replaces the native enemy defaults"), Enemy->ConfigureProfession(150.0f, 2, 1, Base.StartingSkills, 13.0f, 17.0f, 19.0f))) return false;
+    TestTrue(TEXT("Snapshot enemy attributes preserve their supplied values"), Enemy->GetAttributeSet()->GetStrength() == 13.0f && Enemy->GetAttributeSet()->GetDexterity() == 17.0f && Enemy->GetAttributeSet()->GetIntelligence() == 19.0f);
+    TestEqual(TEXT("Snapshot enemy combat speed follows its supplied dexterity"), Enemy->GetCombatSpeed(), 17.0f);
     Override.bUseUnitClassDefaults = false;
     Override.StartingSkills = Base.StartingSkills;
     Override.MaxHP = 137.0f;

@@ -175,5 +175,6 @@ FText UPartyDefinitionDataAsset::GetProfessionDetails(FName ClassId) const
         FText Error;
         if (Skill->ResolveRoundSkill(Resolved, Error)) Skills += FString::Printf(TEXT("\n• %s (AP %d · 보조 AP %d)"), *Skill->SkillName.ToString(), Resolved.ActionPointCost, Resolved.SubActionPointCost);
     }
-    return FText::FromString(FString::Printf(TEXT("%s\n%s\n\nHP %.0f · 힘 %.0f · 민첩 %.0f · 지능 %.0f\nAP %d · 보조 AP %d\n\n시작 스킬%s"), *Definition.DisplayName.ToString(), *Definition.Description.ToString(), Definition.MaxHP, Definition.Strength, Definition.Dexterity, Definition.Intelligence, Definition.ActionPoints, Definition.SubActionPoints, *Skills));
+    const FString Dexterity = FText::AsNumber(Definition.Dexterity).ToString();
+    return FText::FromString(FString::Printf(TEXT("%s\n%s\n\nHP %.0f · 힘 %.0f · 민첩 %s · 지능 %.0f\n속도 %s (민첩 1당 1)\nAP %d · 보조 AP %d\n\n시작 스킬%s"), *Definition.DisplayName.ToString(), *Definition.Description.ToString(), Definition.MaxHP, Definition.Strength, *Dexterity, Definition.Intelligence, *Dexterity, Definition.ActionPoints, Definition.SubActionPoints, *Skills));
 }

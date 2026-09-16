@@ -128,7 +128,7 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
     UnreadyButton = AddButton(Controls, TEXT("준비 취소"));
     UnreadyButton->OnClicked.AddDynamic(this, &UCombatRoundPlanningWidget::HandleUnready);
     Status = AddText(Controls, TEXT("세션에 연결하고 있습니다."), 14);
-    AddText(Controls, TEXT("속도 차 1당 시작 지연 0.1초\n모든 행동·복귀·투사체 처리가 끝나면 다음 계획을 시작합니다."), 13);
+    AddText(Controls, TEXT("민첩 1당 속도 1 · 속도 차 1당 시작 지연 0.1초\n모든 행동·복귀·투사체 처리가 끝나면 다음 계획을 시작합니다."), 13);
 
     USizeBox* RosterSize = WidgetTree->ConstructWidget<USizeBox>();
     RosterSize->SetWidthOverride(310.f);
@@ -274,7 +274,7 @@ void UCombatRoundPlanningWidget::RefreshView()
         {
             const FCombatRoundSkill* Skill = Coordinator->FindSkill(Unit.Command.SkillId);
             const FString Owner = Unit.bEnemy ? TEXT("적 AI") : Unit.OwnerSlot == 0 ? TEXT("아군 AI") : Unit.OwnerSlot == Controller->GetRoundParticipantSlot() ? TEXT("아군 / 나") : TEXT("아군 / 팀원");
-            RosterText += FString::Printf(TEXT("%s #%d\nHP %.0f · 보호 %.0f · 속도 %d\n기준 칸 (%d,%d) · 시작 +%.1f초\n%s · %s\n"), *Owner, Unit.UnitId, Unit.HP, Unit.Guard, Unit.Speed, Unit.HomeCoord.X, Unit.HomeCoord.Y, Unit.StartDelay, Unit.bReady ? TEXT("준비 완료") : TEXT("준비 전"), *ActionPhaseName(Unit.ActionPhase));
+            RosterText += FString::Printf(TEXT("%s #%d\nHP %.0f · 보호 %.0f · 속도 %s\n기준 칸 (%d,%d) · 시작 +%s초\n%s · %s\n"), *Owner, Unit.UnitId, Unit.HP, Unit.Guard, *FText::AsNumber(Unit.Speed).ToString(), Unit.HomeCoord.X, Unit.HomeCoord.Y, *FText::AsNumber(Unit.StartDelay).ToString(), Unit.bReady ? TEXT("준비 완료") : TEXT("준비 전"), *ActionPhaseName(Unit.ActionPhase));
             if (Skill)
             {
                 RosterText += Skill->Name.ToString();

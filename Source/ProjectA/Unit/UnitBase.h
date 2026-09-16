@@ -106,10 +106,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "UnitBase")
     int32 UnitIndex = 0;
 
-    // Round initiative only; movement and projectile speeds are authored separately.
-    // 라운드 시작 시각에만 사용하며 이동과 투사체 속도는 별도로 지정합니다.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "UnitBase|Round", meta = (ClampMin = "0"))
-    int32 CombatSpeed = 20;
+    // Current dexterity gives one point of round initiative per point; movement speeds remain separate.
+    // 현재 민첩 1당 라운드 시작 속도 1을 사용하며 이동 속도는 별도로 지정합니다.
+    UFUNCTION(BlueprintPure, Category = "UnitBase|Round")
+    float GetCombatSpeed() const;
 
     // Display name copied from the run party without owning persistent state.
     // 영구 상태를 소유하지 않고 런 파티에서 복사한 표시 이름입니다.

@@ -296,7 +296,7 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
         Entry.Unit = Unit;
         Entry.bEnemy = Unit->GetTeam() == ETeam::Enemy;
         Entry.HomeCoord = Unit->GetCurrentTile()->GridCoord;
-        Entry.Speed = Unit->CombatSpeed;
+        Entry.Speed = Unit->GetCombatSpeed();
         Entry.HP = Unit->GetAttributeSet()->GetHP();
         Entry.SkillIds = {TEXT("Guard"), TEXT("Wait"), TEXT("MoveShot"), TEXT("GroundStrike")};
         for (USkillDefinitionDataAsset* Definition : Unit->GetEquippedSkillDataAssets())
@@ -463,14 +463,14 @@ void ACombatRoundCoordinator::BeginPlanning()
     View.Phase = ECombatRoundPhase::Planning;
     SimulationTime = 0.0;
     Accumulator = 0.0;
-    int32 HighestSpeed = 0;
+    float HighestSpeed = 0.0f;
     for (FCombatRoundUnitView& Entry : View.Units)
     {
         Entry.HP = 0.f;
         if (IsValid(Entry.Unit) && Entry.Unit->GetAttributeSet()) Entry.HP = Entry.Unit->GetAttributeSet()->GetHP();
         if (IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive())
         {
-            Entry.Speed = FMath::Max(0, Entry.Unit->CombatSpeed);
+            Entry.Speed = Entry.Unit->GetCombatSpeed();
             HighestSpeed = FMath::Max(HighestSpeed, Entry.Speed);
             Entry.Unit->ResetActionPoint();
             Entry.Unit->ResetSubActionPoint();
