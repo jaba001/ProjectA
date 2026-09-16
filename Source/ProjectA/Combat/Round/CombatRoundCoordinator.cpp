@@ -323,7 +323,12 @@ void ACombatRoundCoordinator::SuspendRound()
     bSAPMovementInProgress = false;
     for (const FCombatRoundUnitView& Entry : View.Units)
     {
-        if (IsValid(Entry.Unit)) Entry.Unit->SetRoundCastMontage(nullptr);
+        if (IsValid(Entry.Unit))
+        {
+            Entry.Unit->SetRoundCastMontage(nullptr);
+            Entry.Unit->SetRoundMovementVelocity(FVector::ZeroVector);
+            Entry.Unit->ForceNetUpdate();
+        }
     }
     View.Phase = ECombatRoundPhase::Suspended;
     View.Message = RoundText(TEXT("전투가 중단되었습니다. 시간차 전투의 중간 복구는 아직 지원하지 않습니다."));
@@ -355,7 +360,12 @@ void ACombatRoundCoordinator::CleanupUnits()
     bSAPMovementInProgress = false;
     for (const FCombatRoundUnitView& Entry : View.Units)
     {
-        if (IsValid(Entry.Unit)) Entry.Unit->SetRoundCastMontage(nullptr);
+        if (IsValid(Entry.Unit))
+        {
+            Entry.Unit->SetRoundCastMontage(nullptr);
+            Entry.Unit->SetRoundMovementVelocity(FVector::ZeroVector);
+            Entry.Unit->ForceNetUpdate();
+        }
     }
     for (ACombatRoundProjectile* Projectile : Projectiles)
     {
@@ -760,7 +770,7 @@ void ACombatRoundCoordinator::FinishPlanningMove(bool bSucceeded)
                 // 실패한 SAP 이동은 지불한 비용을 유지하고 생존 AP 행동 전에 출발점을 복원합니다.
                 Unit->SetActorLocation(PlanningMoveOrigin, false);
             }
-            Unit->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+            Unit->SetRoundMovementVelocity(FVector::ZeroVector);
             Unit->SetActorRotation(PlanningMoveRotation);
             Unit->ForceNetUpdate();
         }
@@ -1108,14 +1118,14 @@ bool ACombatRoundCoordinator::MoveUnitToward(int32 Index, FVector Destination, f
     if (Difference.SizeSquared2D() <= 4.f)
     {
         Unit->SetActorLocation(Destination, false);
-        Unit->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+        Unit->SetRoundMovementVelocity(FVector::ZeroVector);
         return true;
     }
     const FVector Delta = Difference.GetClampedToMaxSize(Speed * StepSeconds);
     FHitResult Hit;
     Unit->SetActorLocation(Current + Delta, true, &Hit);
     if (!Difference.IsNearlyZero()) Unit->SetActorRotation(Difference.Rotation());
-    if (StepSeconds > 0.f) Unit->GetCharacterMovement()->Velocity = (Unit->GetActorLocation() - Current) / StepSeconds;
+    if (StepSeconds > 0.f) Unit->SetRoundMovementVelocity((Unit->GetActorLocation() - Current) / StepSeconds);
     return FVector::DistSquared2D(Unit->GetActorLocation(), Destination) <= 4.f;
 }
 
@@ -1204,7 +1214,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
                 Action.bMontageStarted = true;
                 Action.MontageStartedAt = MontageClock;
                 Action.MontageRecoverySeconds = MontageRecoveryBudget(Skill->CastMontage);
-                Entry.Unit->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+                Entry.Unit->SetRoundMovementVelocity(FVector::ZeroVector);
                 Entry.Unit->SetRoundCastMontage(Skill->CastMontage);
                 Action.bTrackMontageCompletion = Entry.Unit->HasRoundCastMontageInstance();
             }
@@ -1244,7 +1254,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
         {
             return;
         }
-        Entry.Unit->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+        Entry.Unit->SetRoundMovementVelocity(FVector::ZeroVector);
         // Return travel faces home; restore the pre-action facing once the return has settled.
         // 복귀 이동 중에는 원위치를 바라보고 복귀가 끝나면 행동 전 방향을 복원합니다.
         Entry.Unit->SetActorRotation(Action.OriginalRotation);
@@ -1298,7 +1308,7 @@ void ACombatRoundCoordinator::StartReturn(int32 Index, bool bFailed, const FText
     }
     if (FVector::DistSquared2D(Entry.Unit->GetActorLocation(), Action.OriginalLocation) <= 4.f)
     {
-        Entry.Unit->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+        Entry.Unit->SetRoundMovementVelocity(FVector::ZeroVector);
         Entry.Unit->SetActorRotation(Action.OriginalRotation);
         Entry.Unit->ForceNetUpdate();
         Entry.ActionPhase = ECombatRoundActionPhase::Complete;

@@ -756,6 +756,69 @@ bool FCombatRoundMoveFailureTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundLocomotionInputsTest, "ProjectA.Combat.Round.LocomotionAnimationInputs", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundLocomotionInputsTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    // Verify the native inputs consumed by the animation blueprint, not animation playback or visual quality.
+    // 애니메이션 재생이나 시각 품질이 아니라 애니메이션 블루프린트가 사용하는 네이티브 입력을 검증합니다.
+    const auto HasMotionInputs = [](AUnitBase* Unit)
+    {
+        const UCharacterMovementComponent* Movement = Unit->GetCharacterMovement();
+        return Movement->Velocity.SizeSquared2D() > 1.0f && Movement->GetCurrentAcceleration().SizeSquared2D() > 1.0f && FVector::DotProduct(Movement->Velocity, Movement->GetCurrentAcceleration()) > 0.0f;
+    };
+    const auto HasStoppedInputs = [](AUnitBase* Unit)
+    {
+        const UCharacterMovementComponent* Movement = Unit->GetCharacterMovement();
+        return Movement->Velocity.IsNearlyZero(0.01f) && Movement->GetCurrentAcceleration().IsNearlyZero(0.01f);
+    };
+    {
+        FFixture Fixture;
+        if (!TestTrue(TEXT("The locomotion input fixture initializes"), Fixture.Initialize(2))) return false;
+        ACombatRoundCoordinator* Round = Fixture.Round;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Friend = Fixture.Humans[1];
+        Friend->GetCharacterMovement()->MaxWalkSpeed = 100.0f;
+        if (!TestTrue(TEXT("The first participant plans an attack"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Strike"), Fixture.Enemies[0]))) || !TestTrue(TEXT("The second participant plans a wait"), Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait")))) || !TestTrue(TEXT("The first participant reserves SAP movement"), Fixture.Move(0, Source, FIntPoint(1, 1))) || !TestTrue(TEXT("The second participant reserves SAP movement"), Fixture.Move(1, Friend, FIntPoint(3, 1))) || !TestTrue(TEXT("The first participant readies"), Fixture.Ready(0)) || !TestTrue(TEXT("The last participant starts resolution"), Fixture.Ready(1))) return false;
+        Round->Tick(0.05f);
+        if (!TestTrue(TEXT("SAP movement supplies velocity and forward acceleration together"), Round->IsSAPMovementInProgress() && HasMotionInputs(Source))) return false;
+        TestTrue(TEXT("A participant still waiting for SAP movement has stopped inputs"), HasStoppedInputs(Friend));
+        for (int32 Step = 0; Step < 200 && Source->GetCurrentTile()->GridCoord != FIntPoint(1, 1); ++Step) Round->Tick(0.01f);
+        if (!TestTrue(TEXT("The first mover arrives while another SAP move is pending"), Source->GetCurrentTile()->GridCoord == FIntPoint(1, 1) && Round->IsSAPMovementInProgress())) return false;
+        TestTrue(TEXT("Arrival clears both motion inputs while waiting for other movers"), HasStoppedInputs(Source));
+        Round->Tick(0.05f);
+        TestTrue(TEXT("The next SAP mover receives both motion inputs"), HasMotionInputs(Friend));
+        TestTrue(TEXT("The arrived participant stays stopped during the next move"), HasStoppedInputs(Source));
+        for (int32 Step = 0; Step < 600 && Round->IsSAPMovementInProgress(); ++Step) Round->Tick(0.01f);
+        if (!TestFalse(TEXT("SAP motion settles before the attack phase"), Round->IsSAPMovementInProgress())) return false;
+        Round->Tick(0.05f);
+        TestTrue(TEXT("AP approach supplies both locomotion inputs"), Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching && HasMotionInputs(Source));
+        for (int32 Step = 0; Step < 200 && Round->GetView().Units[0].ActionPhase != ECombatRoundActionPhase::Casting; ++Step) Round->Tick(0.01f);
+        if (!TestTrue(TEXT("The attack reaches its windup"), Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Casting)) return false;
+        TestTrue(TEXT("Casting clears velocity and acceleration together"), HasStoppedInputs(Source));
+        for (int32 Step = 0; Step < 100 && Round->GetView().Units[0].ActionPhase != ECombatRoundActionPhase::Returning; ++Step) Round->Tick(0.01f);
+        if (!TestTrue(TEXT("The released attack enters return movement"), Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Returning)) return false;
+        Round->Tick(0.01f);
+        TestTrue(TEXT("AP return supplies both locomotion inputs"), Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Returning && HasMotionInputs(Source));
+        if (!TestTrue(TEXT("The completed return reaches the next planning phase"), Fixture.AdvanceUntilNextRound(1))) return false;
+        TestTrue(TEXT("Completed SAP and AP movement leave both participants stopped"), HasStoppedInputs(Source) && HasStoppedInputs(Friend));
+    }
+    for (int32 Case = 0; Case < 2; ++Case)
+    {
+        FFixture Fixture;
+        if (!TestTrue(TEXT("The interrupted locomotion fixture initializes"), Fixture.Initialize(2))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        if (!TestTrue(TEXT("The mover plans an attack before interruption"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Strike"), Fixture.Enemies[0]))) || !TestTrue(TEXT("The other participant waits before interruption"), Fixture.Submit(1, Fixture.Command(Fixture.Humans[1], TEXT("Wait")))) || !TestTrue(TEXT("The mover reserves its route before interruption"), Fixture.Move(0, Source, FIntPoint(1, 1))) || !TestTrue(TEXT("The mover readies before interruption"), Fixture.Ready(0)) || !TestTrue(TEXT("The other participant locks the movement"), Fixture.Ready(1))) return false;
+        Fixture.Round->Tick(0.05f);
+        if (!TestTrue(TEXT("Interruption happens with active movement inputs"), Fixture.Round->IsSAPMovementInProgress() && HasMotionInputs(Source))) return false;
+        if (Case == 0) Fixture.Round->SuspendRound();
+        else Source->Die();
+        TestTrue(Case == 0 ? TEXT("Suspension immediately clears velocity and acceleration") : TEXT("Death immediately clears velocity and acceleration"), HasStoppedInputs(Source));
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundAuthoredTileAITest, "ProjectA.Combat.Round.AuthoredTileAIPlan", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FCombatRoundAuthoredTileAITest::RunTest(const FString& Parameters)

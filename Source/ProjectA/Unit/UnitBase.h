@@ -63,7 +63,7 @@ class PROJECTA_API AUnitBase
 public:
     // Construction and base interface
     // 생성과 기본 인터페이스 처리입니다.
-    AUnitBase();
+    AUnitBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
     // Returns the ability system component for GAS integration.
     // GAS 연동에 사용할 어빌리티 시스템 컴포넌트를 반환합니다.
@@ -83,6 +83,10 @@ public:
     // Network replication
     // 네트워크 복제 속성을 등록합니다.
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+    // Update locomotion inputs without enabling a second movement simulation.
+    // 별도 이동 시뮬레이션을 활성화하지 않고 보행 입력을 갱신합니다.
+    void SetRoundMovementVelocity(const FVector& InVelocity);
 
     // The server starts cosmetic round montages; null stops only the previous round montage.
     // 서버가 라운드 표현용 몽타주를 시작하며 null은 이전 라운드 몽타주만 중지합니다.

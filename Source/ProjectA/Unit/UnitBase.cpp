@@ -1,4 +1,5 @@
 #include "UnitBase.h"
+#include "Unit/UnitCharacterMovementComponent.h"
 
 #include "Kismet/GameplayStatics.h"
 #include "Components/CapsuleComponent.h"
@@ -18,7 +19,8 @@
 #include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
 
-AUnitBase::AUnitBase()
+AUnitBase::AUnitBase(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer.SetDefaultSubobjectClass<UUnitCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
     PrimaryActorTick.bCanEverTick = false;
 
@@ -123,6 +125,11 @@ void AUnitBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
     DOREPLIFETIME(AUnitBase, CurrentActionPoint);
     DOREPLIFETIME(AUnitBase, MaxSubActionPoint);
     DOREPLIFETIME(AUnitBase, CurrentSubActionPoint);
+}
+
+void AUnitBase::SetRoundMovementVelocity(const FVector& InVelocity)
+{
+    if (UUnitCharacterMovementComponent* Movement = Cast<UUnitCharacterMovementComponent>(GetCharacterMovement())) Movement->SetRoundMovementVelocity(IsUnitAlive() ? InVelocity : FVector::ZeroVector);
 }
 
 void AUnitBase::SetRoundCastMontage(UAnimMontage* Montage, bool bImmediateStop)
@@ -366,6 +373,7 @@ void AUnitBase::ApplyDeathPresentation()
     bDeathPresentationApplied = true;
     StopRoundCastMontage();
     GetCharacterMovement()->DisableMovement();
+    SetRoundMovementVelocity(FVector::ZeroVector);
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
     GetMesh()->SetAllBodiesSimulatePhysics(true);
@@ -384,6 +392,7 @@ void AUnitBase::CancelCurrentAction()
         AI->StopMovement();
     }
     GetCharacterMovement()->StopMovementImmediately();
+    SetRoundMovementVelocity(FVector::ZeroVector);
     if (AbilitySystem)
     {
         AbilitySystem->CancelAllAbilities();
