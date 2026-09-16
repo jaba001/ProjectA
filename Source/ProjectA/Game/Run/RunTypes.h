@@ -43,6 +43,11 @@ struct PROJECTA_API FRunPartyMember
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Run")
     bool bCreated = false;
 
+    // Selects direct control only in ordinary single-player runs without changing the original owner.
+    // 원래 소유자를 변경하지 않고 일반 싱글플레이에서 직접 조작할 캐릭터만 선택합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Run")
+    bool bPlayerControlled = false;
+
     // Ownership survives travel and does not change when a host or controller changes.
     // 소유권은 레벨 이동 후에도 유지하며 Host나 조작 주체가 바뀌어도 변경하지 않습니다.
     UPROPERTY(BlueprintReadOnly, Category = "Run|Identity")

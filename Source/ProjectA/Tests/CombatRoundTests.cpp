@@ -16,11 +16,13 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Game/Encounter/CombatArena.h"
+#include "Game/Run/RunParticipationLibrary.h"
 #include "GAS/Ability/GA_DefaultAttack.h"
 #include "GAS/Effect/GE_Damage.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Unit/UnitBase.h"
+#include "Unit/PlayerUnit.h"
 #include "UObject/StrongObjectPtr.h"
 #include <limits>
 
@@ -81,13 +83,13 @@ namespace CombatRoundTests
             World->DestroyWorld(false);
         }
 
-        AUnitBase* AddUnit(FIntPoint Coord, ETeam Team)
+        AUnitBase* AddUnit(FIntPoint Coord, ETeam Team, TSubclassOf<AUnitBase> UnitClass = AUnitBase::StaticClass())
         {
             ACombatGridTile* Tile = Grid ? Grid->GetTileAtCoord(Coord) : nullptr;
             if (!Tile) return nullptr;
             FActorSpawnParameters Params;
             Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-            AUnitBase* Unit = World->SpawnActor<AUnitBase>(Tile->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), FRotator::ZeroRotator, Params);
+            AUnitBase* Unit = World->SpawnActor<AUnitBase>(UnitClass, Tile->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), FRotator::ZeroRotator, Params);
             if (!Unit) return nullptr;
             Unit->SetTeam(Team);
             Unit->SetCurrentTile(Tile);
@@ -181,6 +183,71 @@ namespace CombatRoundTests
             Result.TargetCoord = Target ? Target->GetCurrentTile()->GridCoord : Result.DestinationCoord;
             Result.TargetUnitId = Target ? Target->UnitIndex : INDEX_NONE;
             return Result;
+        }
+
+        bool InitializeStandalone(bool bSelectedCharacterDead)
+        {
+            if (!World.IsValid() || !Combat || !Arena || !Grid || Grid->TileMap.Num() != 16) return false;
+            APartyPlayerController* Controller = World->SpawnActor<APartyPlayerController>();
+            if (!Controller) return false;
+            World->AddController(Controller);
+            Controller->SetAsLocalPlayerController();
+            Controller->SetCombatContext(Combat, true);
+            Controllers.Add(Controller);
+            FRunIdentityData Identity;
+            Identity.Origin = ERunIdentityOrigin::LocalDevelopment;
+            Identity.RunId = FGuid::NewGuid();
+            Identity.HostEpoch = 1;
+            FRunParticipantData& Participant = Identity.OriginalParticipants.AddDefaulted_GetRef();
+            Participant.AccountId.Provider = TEXT("Development");
+            Participant.AccountId.Subject = TEXT("round-single-owner");
+            Identity.HostAccountId = Participant.AccountId;
+            FCombatRoundSkill Skill;
+            Skill.Kind = ECombatRoundSkillKind::GroundAttack;
+            Skill.Approach = ECombatRoundApproach::None;
+            Skill.HitRange = 1000.0f;
+            Skill.Power = 7.0f;
+            Skill.WindupSeconds = 0.1f;
+            TArray<FRunPartyMember> Members;
+            TMap<int32, TObjectPtr<AUnitBase>> PartyActors;
+            TArray<AUnitBase*> Units;
+            Humans.SetNumZeroed(2);
+            for (int32 Index = 0; Index < 2; ++Index)
+            {
+                FRunPartyMember& Member = Members.AddDefaulted_GetRef();
+                Member.SlotIndex = Index;
+                Member.bCreated = true;
+                Member.bPlayerControlled = Index == 1;
+                Member.ClassId = TEXT("Archer");
+                Member.CharacterName = FText::FromString(FString::Printf(TEXT("Single party %d"), Index));
+                Member.CharacterId = FGuid::NewGuid();
+                Member.OwnerAccountId = Participant.AccountId;
+                Member.CurrentHP = bSelectedCharacterDead && Member.bPlayerControlled ? 0.0f : 100.0f;
+                if (Member.CurrentHP == 0.0f) continue;
+                AUnitBase* Unit = AddUnit(FIntPoint(Index * 2, 0), ETeam::Player, APlayerUnit::StaticClass());
+                if (!Unit || !GiveRoundSkill(Unit, &Skill, HumanSkillId)) return false;
+                Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 20.0f);
+                Humans[Index] = Unit;
+                PartyActors.Add(Index, Unit);
+                Units.Add(Unit);
+            }
+            AUnitBase* Enemy = AddUnit(FIntPoint(0, 3), ETeam::Enemy);
+            if (!Enemy || !GiveRoundSkill(Enemy, nullptr, EnemySkillId)) return false;
+            Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 0.0f);
+            Enemies.Add(Enemy);
+            Units.Add(Enemy);
+            Combat->RegisterUnits(Units);
+            UCombatActionAuthority* Authority = Combat->GetActionAuthority();
+            int32 SelectedSlot = INDEX_NONE;
+            if (!URunParticipationLibrary::ResolveStandalonePlayerSlot(Members, SelectedSlot, Error) || !Authority->ConfigureRun(Identity, Members, PartyActors, Error)) return false;
+            for (const TPair<int32, TObjectPtr<AUnitBase>>& Entry : PartyActors)
+            {
+                if (!Authority->SetPartyControlMode(Cast<APlayerUnit>(Entry.Value), Entry.Key == SelectedSlot ? EPartyControlMode::Human : EPartyControlMode::ServerAI, Error)) return false;
+            }
+            if (!Authority->BindParticipant(Controller, Participant.AccountId)) return false;
+            Combat->StartCombat_Internal();
+            Round = Combat->GetRoundCoordinator();
+            return Round && Round->GetView().CombatId.IsValid() && Round->GetView().Phase == ECombatRoundPhase::Planning;
         }
 
         UBoxComponent* AddObstacle(FVector Location, FVector HalfExtent, ECollisionResponse Response = ECR_Block, ECollisionChannel ObjectType = ECC_WorldStatic)
@@ -457,6 +524,50 @@ bool FCombatRoundDexterityScheduleTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Fractional speed is not truncated to an earlier 1.1 second action"), Round->GetView().RoundNumber == 2 && Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
     Round->Tick(0.02f);
     TestTrue(TEXT("The next action starts on the simulation step after 1.125 seconds"), Round->GetView().RoundNumber == 3 && Round->GetView().Phase == ECombatRoundPhase::Planning);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundStandaloneCompanionsTest, "ProjectA.Combat.Round.StandaloneCompanionsKeepAIControl", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundStandaloneCompanionsTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("One local owner starts with a selected character and an AI companion"), Fixture.InitializeStandalone(false))) return false;
+    AUnitBase* Companion = Fixture.Humans[0];
+    AUnitBase* Human = Fixture.Humans[1];
+    UCombatActionAuthority* Authority = Fixture.Combat->GetActionAuthority();
+    const FGuid CompanionCharacter = Authority->GetCharacterId(Companion);
+    const FRunAccountId CompanionOwner = Authority->GetOwnerAccountId(Companion);
+    TestTrue(TEXT("Both characters retain the same original owner"), CompanionOwner == Authority->GetOwnerAccountId(Human));
+    TestTrue(TEXT("Only the explicitly selected later slot is directly controllable"), Authority->CanControllerControl(Fixture.Controllers[0], Human) && !Authority->CanControllerControl(Fixture.Controllers[0], Companion));
+    TestTrue(TEXT("The companion already has a ready AI plan before player input"), Fixture.Round->GetView().Units[0].OwnerSlot == 0 && Fixture.Round->GetView().Units[0].bReady);
+    TestEqual(TEXT("The selected character belongs to the sole input participant"), Fixture.Round->GetView().Units[1].OwnerSlot, 1);
+    const FCombatRoundCommand CompanionPlan = Fixture.Round->GetView().Units[0].Command;
+    const int32 Revision = Fixture.Round->GetView().PlanRevision;
+    TestFalse(TEXT("The original owner cannot submit commands for an AI companion"), Fixture.Submit(0, Fixture.Command(Companion, TEXT("Wait"))));
+    TestTrue(TEXT("Rejected companion input preserves its AI plan and revision"), SameCommand(CompanionPlan, Fixture.Round->GetView().Units[0].Command) && Fixture.Round->GetView().PlanRevision == Revision);
+    if (!TestTrue(TEXT("The player submits only the selected character's wait"), Fixture.Submit(0, Fixture.Command(Human, TEXT("Wait")))) || !TestTrue(TEXT("One human readiness resolves the entire party"), Fixture.Ready(0))) return false;
+    if (!TestTrue(TEXT("The first round settles through the real AI action"), Fixture.AdvanceUntilNextRound(1))) return false;
+    TestEqual(TEXT("The companion independently damages the opposing team once"), Fixture.Enemies[0]->GetAttributeSet()->GetHP(), 93.0f);
+
+    Human->Die();
+    Fixture.Round->Tick(0.01f);
+    TestTrue(TEXT("Surviving AI starts the next round without readiness from the dead character"), Fixture.Round->GetView().Phase == ECombatRoundPhase::Resolving);
+    TestFalse(TEXT("Death never transfers human input to the companion"), Authority->CanControllerControl(Fixture.Controllers[0], Companion));
+    if (!TestTrue(TEXT("AI-only survivors complete another round without human input"), Fixture.AdvanceUntilNextRound(2))) return false;
+    TestEqual(TEXT("The surviving companion continues attacking once per round"), Fixture.Enemies[0]->GetAttributeSet()->GetHP(), 86.0f);
+    TestTrue(TEXT("Continued AI combat preserves original character ownership"), Authority->GetCharacterId(Companion) == CompanionCharacter && Authority->GetOwnerAccountId(Companion) == CompanionOwner && CastChecked<APlayerUnit>(Companion)->IsServerAIControlled());
+
+    // A following encounter omits the dead selected actor but must not promote another party member.
+    // 다음 전투에서 사망한 선택 액터가 생성되지 않아도 다른 파티원을 인간 조작으로 승격하지 않습니다.
+    FFixture FollowingEncounter;
+    if (!TestTrue(TEXT("A fresh encounter initializes with the chosen character already dead"), FollowingEncounter.InitializeStandalone(true))) return false;
+    TestNull(TEXT("The dead selected character is not spawned"), FollowingEncounter.Humans[1]);
+    TestTrue(TEXT("The fresh companion retains AI control with no input owner slot"), CastChecked<APlayerUnit>(FollowingEncounter.Humans[0])->IsServerAIControlled() && FollowingEncounter.Round->GetView().Units[0].OwnerSlot == 0);
+    TestFalse(TEXT("The local owner still cannot command the fresh AI actor"), FollowingEncounter.Combat->GetActionAuthority()->CanControllerControl(FollowingEncounter.Controllers[0], FollowingEncounter.Humans[0]));
+    if (!TestTrue(TEXT("The next encounter progresses with no living human input character"), FollowingEncounter.AdvanceUntilNextRound(1))) return false;
+    TestEqual(TEXT("A fresh AI-only encounter still executes the companion's attack"), FollowingEncounter.Enemies[0]->GetAttributeSet()->GetHP(), 93.0f);
     return true;
 }
 

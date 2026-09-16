@@ -153,6 +153,20 @@ bool AEncounterManager::ConfigureCombatParticipants(FText& OutError)
     APartyPlayerController* LocalController = Cast<APartyPlayerController>(GetWorld()->GetFirstPlayerController());
     if (GetNetMode() == NM_Standalone && LocalController && LocalController->IsLocalController() && Identity.Origin == ERunIdentityOrigin::LocalDevelopment && Identity.OriginalParticipants.Num() == 1)
     {
+        int32 PlayerSlot = INDEX_NONE;
+        if (!URunParticipationLibrary::ResolveStandalonePlayerSlot(RunState->GetPartyMembers(), PlayerSlot, OutError)) return false;
+        // A dead selected character does not transfer human control to a surviving AI companion.
+        // 선택한 캐릭터가 사망해도 살아 있는 AI 동료에게 인간 조작을 넘기지 않습니다.
+        for (const TPair<int32, TObjectPtr<AUnitBase>>& Entry : PartyActors)
+        {
+            APlayerUnit* Player = Cast<APlayerUnit>(Entry.Value);
+            if (!Player)
+            {
+                OutError = NSLOCTEXT("Encounter", "StandalonePlayerClass", "싱글플레이 파티원에 올바른 플레이어 유닛이 필요합니다.");
+                return false;
+            }
+            if (!Authority->SetPartyControlMode(Player, Entry.Key == PlayerSlot ? EPartyControlMode::Human : EPartyControlMode::ServerAI, OutError)) return false;
+        }
         if (!Authority->BindParticipant(LocalController, Identity.OriginalParticipants[0].AccountId))
         {
             OutError = FText::FromString(TEXT("로컬 참가자를 전투에 연결하지 못했습니다."));

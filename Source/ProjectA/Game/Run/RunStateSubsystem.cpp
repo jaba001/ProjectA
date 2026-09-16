@@ -170,6 +170,16 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
         OutError = IdentityError;
         return false;
     }
+    if (!bManaged && Save->Identity.Origin == ERunIdentityOrigin::LocalDevelopment && Save->Identity.OriginalParticipants.Num() == 1)
+    {
+        int32 PlayerSlot = INDEX_NONE;
+        FText SelectionError;
+        if (!URunParticipationLibrary::ResolveStandalonePlayerSlot(Save->Party, PlayerSlot, SelectionError))
+        {
+            OutError = SelectionError;
+            return false;
+        }
+    }
     UPartyDefinitionDataAsset* Catalog = Cast<UPartyDefinitionDataAsset>(Save->Catalog.TryLoad());
     if (!Catalog)
     {
@@ -480,6 +490,17 @@ void URunStateSubsystem::ApplySaveData(const URunSaveGame* Save)
     EncounterProgress = Save->EncounterProgress;
     bManagedRun = Save->Version == 4;
     PartyMembers = Save->Party;
+    // Upgrade only ordinary single-player selection in memory; the next normal save retains it.
+    // 일반 싱글플레이 선택만 메모리에서 보완하며 다음 정상 저장에 유지합니다.
+    if (!bManagedRun && RunIdentity.Origin == ERunIdentityOrigin::LocalDevelopment && RunIdentity.OriginalParticipants.Num() == 1)
+    {
+        int32 PlayerSlot = INDEX_NONE;
+        FText SelectionError;
+        if (URunParticipationLibrary::ResolveStandalonePlayerSlot(PartyMembers, PlayerSlot, SelectionError))
+        {
+            for (FRunPartyMember& Member : PartyMembers) Member.bPlayerControlled = Member.bCreated && Member.SlotIndex == PlayerSlot;
+        }
+    }
     Nodes = Save->Nodes;
     CompletedNodes = Save->CompletedNodes;
     CurrentNodeId = Save->CurrentNode;
@@ -517,6 +538,12 @@ URunSaveGame* URunStateSubsystem::CreateInitialSaveData(const TArray<FRunPartyMe
     Save->EncounterProgress.SchemaVersion = 1;
     Save->Identity = Identity;
     Save->Party = Members;
+    if (Identity.Origin == ERunIdentityOrigin::LocalDevelopment && Identity.OriginalParticipants.Num() == 1)
+    {
+        int32 PlayerSlot = INDEX_NONE;
+        if (!URunParticipationLibrary::ResolveStandalonePlayerSlot(Save->Party, PlayerSlot, OutError)) return nullptr;
+        for (FRunPartyMember& Member : Save->Party) Member.bPlayerControlled = Member.bCreated && Member.SlotIndex == PlayerSlot;
+    }
     Save->Party.Sort([](const FRunPartyMember& Left, const FRunPartyMember& Right) { return Left.SlotIndex < Right.SlotIndex; });
     for (FRunPartyMember& Member : Save->Party)
     {
@@ -742,6 +769,8 @@ void URunStateSubsystem::CloseManagedRun()
 
 bool URunStateSubsystem::InitializeRun(const TArray<FRunPartyMember>& Members, FText& OutError)
 {
+    int32 PlayerSlot = INDEX_NONE;
+    if (!URunParticipationLibrary::ResolveStandalonePlayerSlot(Members, PlayerSlot, OutError)) return false;
     // Standalone runs use a per-run development identity until an authenticated provider is integrated.
     // 인증 공급자 연동 전까지 싱글플레이는 Run마다 별도의 개발용 식별자를 사용합니다.
     FRunIdentityData Identity;
@@ -757,6 +786,7 @@ bool URunStateSubsystem::InitializeRun(const TArray<FRunPartyMember>& Members, F
     TArray<FRunPartyMember> OwnedMembers = Members;
     for (FRunPartyMember& Member : OwnedMembers)
     {
+        Member.bPlayerControlled = Member.bCreated && Member.SlotIndex == PlayerSlot;
         Member.CharacterId = Member.bCreated ? FGuid::NewGuid() : FGuid();
         Member.OwnerAccountId = Member.bCreated ? Participant.AccountId : FRunAccountId();
     }

@@ -35,6 +35,9 @@ bool FRunParticipationValidationTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("An omitted original owner needs no prior consent in the AI roster data"), URunParticipationLibrary::Validate(Participation, Identity, Members, Error));
     EPartyControlMode Mode = EPartyControlMode::Human;
     TestTrue(TEXT("Unknown legacy consent resolves the omitted owner's character as AI"), URunParticipationLibrary::ResolveControlMode(Participation, Identity, Members, Members[1].CharacterId, Mode, Error) && Mode == EPartyControlMode::ServerAI);
+    Members[1].bPlayerControlled = true;
+    TestTrue(TEXT("A single-player selection flag cannot restore an absent cooperative owner to Human"), URunParticipationLibrary::ResolveControlMode(Participation, Identity, Members, Members[1].CharacterId, Mode, Error) && Mode == EPartyControlMode::ServerAI);
+    TestTrue(TEXT("An unselected cooperative host retains Human control from the participant roster"), URunParticipationLibrary::ResolveControlMode(Participation, Identity, Members, Members[0].CharacterId, Mode, Error) && Mode == EPartyControlMode::Human);
     Identity.OriginalParticipants[1].AIConsent = ERunAIConsent::Granted;
     Identity.OriginalParticipants[1].ConsentPolicyVersion = 1;
     TestTrue(TEXT("Legacy Granted metadata remains compatible with the AI roster"), URunParticipationLibrary::Validate(Participation, Identity, Members, Error));

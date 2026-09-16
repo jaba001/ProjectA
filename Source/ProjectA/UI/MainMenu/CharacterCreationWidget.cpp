@@ -60,6 +60,7 @@ void UCharacterCreationWidget::NativeOnInitialized()
     }
 
     InitializeClassSlotWidgetArrays();
+    BuildPlayerControlButtons();
     InitializeClassSlots();
     BuildDetailPanel();
 
@@ -391,6 +392,12 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
     }
 
     CreateButtonText(Button_Close, FText::FromString(TEXT("X")));
+
+    Text_StartGameStatus = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_StartGameStatus"));
+    UOverlaySlot* StatusSlot = RootOverlay->AddChildToOverlay(Text_StartGameStatus);
+    StatusSlot->SetHorizontalAlignment(HAlign_Center);
+    StatusSlot->SetVerticalAlignment(VAlign_Top);
+    StatusSlot->SetPadding(FMargin(24.0f, 96.0f, 24.0f, 0.0f));
 
     auto AddTextToVerticalBox = [this](UVerticalBox* ParentBox, const FName& WidgetName, const FText& Text, const FMargin& SlotPadding, EHorizontalAlignment HorizontalAlignment) -> UTextBlock*
     {
@@ -741,6 +748,7 @@ void UCharacterCreationWidget::InitializeClassSlotWidgetArrays()
 
 void UCharacterCreationWidget::InitializeClassSlots()
 {
+    PlayerControlledSlotIndex = INDEX_NONE;
     SlotClassIds = GetAvailablePartyClassIds();
     SlotCharacterNames.SetNum(SlotClassIds.Num());
     SlotCreationStates.Empty();
@@ -761,6 +769,58 @@ void UCharacterCreationWidget::InitializeClassSlots()
     if (SlotClassIds.Num() > 0)
     {
         CurrentCharacterClassId = SlotClassIds[0];
+    }
+}
+
+void UCharacterCreationWidget::BuildPlayerControlButtons()
+{
+    if (!WidgetTree || !PlayerControlButtons.IsEmpty()) return;
+    for (int32 SlotIndex = 0; SlotIndex < SlotEditorBoxes.Num(); ++SlotIndex)
+    {
+        UHorizontalBox* Actions = EditButtons.IsValidIndex(SlotIndex) && EditButtons[SlotIndex] ? Cast<UHorizontalBox>(EditButtons[SlotIndex]->GetParent()) : nullptr;
+        UButton* Button = Actions ? WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*FString::Printf(TEXT("Button_Slot%d_PlayerControl"), SlotIndex))) : nullptr;
+        PlayerControlButtons.Add(Button);
+        if (!Button) continue;
+        CreateButtonText(Button, FText::FromString(TEXT("직접 조작")));
+        Actions->AddChildToHorizontalBox(Button)->SetPadding(FMargin(2.0f, 0.0f));
+    }
+    if (PlayerControlButtons.IsValidIndex(0) && PlayerControlButtons[0]) PlayerControlButtons[0]->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot0ControlClicked);
+    if (PlayerControlButtons.IsValidIndex(1) && PlayerControlButtons[1]) PlayerControlButtons[1]->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot1ControlClicked);
+    if (PlayerControlButtons.IsValidIndex(2) && PlayerControlButtons[2]) PlayerControlButtons[2]->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot2ControlClicked);
+    if (PlayerControlButtons.IsValidIndex(3) && PlayerControlButtons[3]) PlayerControlButtons[3]->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot3ControlClicked);
+}
+
+bool UCharacterCreationWidget::SelectPlayerControlledSlot(int32 SlotIndex)
+{
+    if (DetailSlot != INDEX_NONE || !IsSlotCreated(SlotIndex)) return false;
+    PlayerControlledSlotIndex = SlotIndex;
+    RefreshPlayerControlSelection();
+    return true;
+}
+
+void UCharacterCreationWidget::RefreshPlayerControlSelection()
+{
+    const bool bHasSelection = IsSlotCreated(PlayerControlledSlotIndex);
+    for (int32 SlotIndex = 0; SlotIndex < SlotClassIds.Num(); ++SlotIndex)
+    {
+        const bool bSelected = bHasSelection && PlayerControlledSlotIndex == SlotIndex;
+        if (PlayerControlButtons.IsValidIndex(SlotIndex) && PlayerControlButtons[SlotIndex])
+        {
+            UButton* Button = PlayerControlButtons[SlotIndex];
+            Button->SetIsEnabled(IsSlotCreated(SlotIndex) && !bSelected);
+            if (UTextBlock* Label = Cast<UTextBlock>(Button->GetChildAt(0))) Label->SetText(FText::FromString(bSelected ? TEXT("선택됨") : TEXT("직접 조작")));
+        }
+        if (ClassNameTexts.IsValidIndex(SlotIndex) && ClassNameTexts[SlotIndex])
+        {
+            ClassNameTexts[SlotIndex]->SetText(FText::FromString(FString::Printf(TEXT("%s · %s"), *GetDisplayNameForClassId(SlotClassIds[SlotIndex]).ToString(), bSelected ? TEXT("직접 조작") : TEXT("AI"))));
+        }
+    }
+    const FText Status = bHasSelection ? FText::FromString(FString::Printf(TEXT("직접 조작: 슬롯 %d · 나머지 동료는 AI가 조작합니다."), PlayerControlledSlotIndex + 1)) : FText::FromString(TEXT("캐릭터를 생성한 뒤 직접 조작할 1명을 선택하세요. 나머지 동료는 AI가 조작합니다."));
+    if (Text_StartGameStatus) Text_StartGameStatus->SetText(Status);
+    if (Button_StartGame)
+    {
+        Button_StartGame->SetIsEnabled(bHasSelection);
+        Button_StartGame->SetToolTipText(Status);
     }
 }
 
@@ -838,6 +898,7 @@ void UCharacterCreationWidget::SetSlotClass(int32 SlotIndex, FName ClassId)
     {
         ClearPreviewStageSlot(SlotIndex);
     }
+    RefreshPlayerControlSelection();
 }
 
 void UCharacterCreationWidget::CreateCharacterInSlot(int32 SlotIndex)
@@ -860,6 +921,7 @@ void UCharacterCreationWidget::ClearCharacterSlot(int32 SlotIndex)
     }
 
     SlotCreationStates[SlotIndex] = 0;
+    if (PlayerControlledSlotIndex == SlotIndex) PlayerControlledSlotIndex = INDEX_NONE;
 
     if (SlotCharacterNames.IsValidIndex(SlotIndex))
     {
@@ -868,6 +930,7 @@ void UCharacterCreationWidget::ClearCharacterSlot(int32 SlotIndex)
 
     ClearPreviewStageSlot(SlotIndex);
     RefreshSlotVisibility(SlotIndex);
+    RefreshPlayerControlSelection();
     UE_LOG(LogTemp, Log, TEXT("[CharacterCreationWidget] Character creation panel closed. SlotIndex: %d"), SlotIndex);
 }
 
@@ -1130,6 +1193,26 @@ void UCharacterCreationWidget::HandleStartGameClicked()
     RequestStartGame();
 }
 
+void UCharacterCreationWidget::HandleSlot0ControlClicked()
+{
+    SelectPlayerControlledSlot(0);
+}
+
+void UCharacterCreationWidget::HandleSlot1ControlClicked()
+{
+    SelectPlayerControlledSlot(1);
+}
+
+void UCharacterCreationWidget::HandleSlot2ControlClicked()
+{
+    SelectPlayerControlledSlot(2);
+}
+
+void UCharacterCreationWidget::HandleSlot3ControlClicked()
+{
+    SelectPlayerControlledSlot(3);
+}
+
 void UCharacterCreationWidget::HandleSlot0CreateClicked()
 {
     CreateCharacterInSlot(0);
@@ -1274,6 +1357,7 @@ TArray<FRunPartyMember> UCharacterCreationWidget::GetPartyMembers() const
         Member.SlotIndex = SlotIndex;
         Member.ClassId = SlotClassIds[SlotIndex];
         Member.bCreated = IsSlotCreated(SlotIndex);
+        Member.bPlayerControlled = Member.bCreated && PlayerControlledSlotIndex == SlotIndex;
 
         if (SlotCharacterNames.IsValidIndex(SlotIndex))
         {
@@ -1348,6 +1432,11 @@ void UCharacterCreationWidget::RequestStartGame()
 
     if (DetailSlot != INDEX_NONE || !PartyDefinition)
     {
+        return;
+    }
+    if (!IsSlotCreated(PlayerControlledSlotIndex))
+    {
+        RefreshPlayerControlSelection();
         return;
     }
     for (const FRunPartyMember& Member : GetPartyMembers())

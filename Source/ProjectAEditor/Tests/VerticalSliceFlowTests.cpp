@@ -268,7 +268,11 @@ private:
                 for (const FRunPartyMember& Member : Draft->GetPartyMembers())
                 {
                     Test->TestFalse(TEXT("Every new visit starts with an empty draft."), Member.bCreated);
+                    Test->TestFalse(TEXT("Every new visit clears the direct-control selection."), Member.bPlayerControlled);
                 }
+                UButton* Start = Cast<UButton>(Draft->GetWidgetFromName(TEXT("Button_StartGame")));
+                if (!Require(Start && !Start->GetIsEnabled(), TEXT("A fresh draft requires a direct-control selection before starting."))) return false;
+                Test->TestFalse(TEXT("An empty slot cannot receive direct control."), Draft->SelectPlayerControlledSlot(2));
                 TArray<TWeakObjectPtr<AActor>> PreviousPreviews;
                 for (int32 Index = 0; Index < 4; ++Index)
                 {
@@ -283,6 +287,25 @@ private:
                     Test->TestNull(TEXT("Preview cannot execute pawn AI or combat."), Cast<APawn>(Actor));
                     PreviousPreviews.Add(Actor);
                 }
+                UButton* ThirdControl = Cast<UButton>(Draft->GetWidgetFromName(TEXT("Button_Slot2_PlayerControl")));
+                UButton* FourthControl = Cast<UButton>(Draft->GetWidgetFromName(TEXT("Button_Slot3_PlayerControl")));
+                UButton* DeleteThird = Cast<UButton>(Draft->GetWidgetFromName(TEXT("Button_Slot2_Delete")));
+                if (!Require(ThirdControl && FourthControl && DeleteThird, TEXT("Native and Designer cards expose direct-control selection."))) return false;
+                Test->TestFalse(TEXT("Creating companions does not silently select a player character."), Start->GetIsEnabled());
+                ThirdControl->OnClicked.Broadcast();
+                Test->TestTrue(TEXT("Selecting the third card enables starting with one player character."), Start->GetIsEnabled() && Draft->GetPartyMembers()[2].bPlayerControlled);
+                FourthControl->OnClicked.Broadcast();
+                Test->TestTrue(TEXT("Selecting a different card replaces the single selection."), !Draft->GetPartyMembers()[2].bPlayerControlled && Draft->GetPartyMembers()[3].bPlayerControlled);
+                Draft->ShowSlotDetails(3, true);
+                Test->TestFalse(TEXT("The detail modal prevents changing direct control behind it."), Draft->SelectPlayerControlledSlot(0));
+                Draft->CloseSlotDetails();
+                Test->TestTrue(TEXT("Closing details preserves the selected character."), Draft->GetPartyMembers()[3].bPlayerControlled);
+                ThirdControl->OnClicked.Broadcast();
+                DeleteThird->OnClicked.Broadcast();
+                Test->TestFalse(TEXT("Deleting the selected character requires an explicit replacement selection."), Start->GetIsEnabled());
+                Test->TestFalse(TEXT("Deleting a character clears its saved selection flag."), Draft->GetPartyMembers()[2].bPlayerControlled);
+                FourthControl->OnClicked.Broadcast();
+                Test->TestTrue(TEXT("A surviving companion can be selected before starting."), Start->GetIsEnabled() && Draft->GetPartyMembers()[3].bPlayerControlled);
                 if (Cycle == 0)
                 {
                     UButton* Close = Cast<UButton>(Draft->GetWidgetFromName(TEXT("Button_Close")));

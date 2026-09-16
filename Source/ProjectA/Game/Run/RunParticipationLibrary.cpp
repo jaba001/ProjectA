@@ -1,6 +1,40 @@
 #include "Game/Run/RunParticipationLibrary.h"
 #include "Game/Run/RunIdentityLibrary.h"
 
+bool URunParticipationLibrary::ResolveStandalonePlayerSlot(const TArray<FRunPartyMember>& Members, int32& OutSlot, FText& OutError)
+{
+    int32 SelectedSlot = INDEX_NONE;
+    int32 FirstCreatedSlot = INDEX_NONE;
+    TSet<int32> SeenSlots;
+    for (const FRunPartyMember& Member : Members)
+    {
+        if (Member.SlotIndex < 0 || Member.SlotIndex >= 4 || SeenSlots.Contains(Member.SlotIndex))
+        {
+            OutError = NSLOCTEXT("RunParticipation", "StandaloneSlots", "파티 슬롯은 중복 없이 0~3번을 사용해야 합니다.");
+            return false;
+        }
+        SeenSlots.Add(Member.SlotIndex);
+        if (Member.bPlayerControlled)
+        {
+            if (!Member.bCreated || SelectedSlot != INDEX_NONE)
+            {
+                OutError = NSLOCTEXT("RunParticipation", "StandaloneSelection", "직접 조작할 캐릭터는 생성한 파티원 중 한 명만 선택할 수 있습니다.");
+                return false;
+            }
+            SelectedSlot = Member.SlotIndex;
+        }
+        if (Member.bCreated && (FirstCreatedSlot == INDEX_NONE || Member.SlotIndex < FirstCreatedSlot)) FirstCreatedSlot = Member.SlotIndex;
+    }
+    if (FirstCreatedSlot == INDEX_NONE)
+    {
+        OutError = NSLOCTEXT("RunParticipation", "StandaloneEmpty", "직접 조작할 캐릭터를 생성해 주세요.");
+        return false;
+    }
+    OutSlot = SelectedSlot == INDEX_NONE ? FirstCreatedSlot : SelectedSlot;
+    OutError = FText::GetEmpty();
+    return true;
+}
+
 bool URunParticipationLibrary::Validate(const FRunParticipationData& Participation, const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, FText& OutError)
 {
     if (!URunIdentityLibrary::ValidateIdentity(Identity, Members, OutError))

@@ -5,6 +5,7 @@
 #include "DataAsset/RunEncounterPoolDataAsset.h"
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunParticipationLibrary.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Kismet/GameplayStatics.h"
@@ -132,6 +133,87 @@ bool FRunEncounterPersistenceTest::RunTest(const FString& Parameters)
     Legacy->EncounterProgress = FRunEncounterProgress();
     if (!TestTrue(TEXT("Pre-feature defaults remain loadable"), FRunCheckpointStorage::Save(Legacy.Get(), Slot.Name, Error) && Run->LoadStandaloneCheckpoint(Error))) return false;
     TestTrue(TEXT("An old Run preserves its original route without new encounters"), WinFirstBattle(Run.Get()) && Run->ContinueRun() && Run->CanStartNode(TEXT("Combat_02")));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunStandaloneControlPersistenceTest, "ProjectA.Run.Encounter.StandaloneControlSelectionPersists", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunStandaloneControlPersistenceTest::RunTest(const FString& Parameters)
+{
+    struct FScopedSlot
+    {
+        FString Name = TEXT("StandaloneControl_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+        ~FScopedSlot() { UGameplayStatics::DeleteGameInSlot(Name, 0); }
+    } Slot;
+    FRunPartyMember Selected = MakeShopMember();
+    Selected.SlotIndex = 3;
+    Selected.bPlayerControlled = true;
+    FRunPartyMember Companion = MakeShopMember();
+    Companion.SlotIndex = 1;
+    FRunPartyMember Empty;
+    Empty.SlotIndex = 0;
+    TArray<FRunPartyMember> Members{Selected, Empty, Companion};
+    FText Error;
+    int32 SelectedSlot = INDEX_NONE;
+    TestTrue(TEXT("Explicit selection can choose a later slot regardless of input order"), URunParticipationLibrary::ResolveStandalonePlayerSlot(Members, SelectedSlot, Error) && SelectedSlot == 3);
+    Members[0].CurrentHP = 0.0f;
+    TestTrue(TEXT("A dead selected character never transfers control to its living companion"), URunParticipationLibrary::ResolveStandalonePlayerSlot(Members, SelectedSlot, Error) && SelectedSlot == 3);
+    Members[2].bPlayerControlled = true;
+    SelectedSlot = 42;
+    TestFalse(TEXT("Multiple direct-control selections are rejected"), URunParticipationLibrary::ResolveStandalonePlayerSlot(Members, SelectedSlot, Error));
+    TestEqual(TEXT("A rejected selection preserves the caller's previous result"), SelectedSlot, 42);
+    Members[2].bPlayerControlled = false;
+    Members[0].bPlayerControlled = false;
+    Members[1].bPlayerControlled = true;
+    TestFalse(TEXT("An empty party slot cannot be selected for direct control"), URunParticipationLibrary::ResolveStandalonePlayerSlot(Members, SelectedSlot, Error));
+    Members[1].bPlayerControlled = false;
+    Members[2].CurrentHP = 0.0f;
+    TestTrue(TEXT("An older unselected party keeps its lowest created slot even if that character died"), URunParticipationLibrary::ResolveStandalonePlayerSlot(Members, SelectedSlot, Error) && SelectedSlot == 1);
+
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<URunStateSubsystem> Run(NewObject<URunStateSubsystem>(Instance.Get()));
+    TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Instance.Get()));
+    Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+    Run->EnableCheckpointSaving(Slot.Name);
+    Restored->EnableCheckpointSaving(Slot.Name);
+    if (!TestNotNull(TEXT("Selection persistence uses the saved profession catalog"), Run->PartyDefinition.Get()) || !TestTrue(TEXT("A selected single-player party initializes and saves"), Run->InitializeRun({Selected, Empty, Companion}, Error) && Run->GetSaveError().IsEmpty())) return false;
+    const FRunIdentityData Identity = Run->GetRunIdentity();
+    const TArray<FRunPartyMember> OriginalParty = Run->GetPartyMembers();
+    if (!TestTrue(TEXT("Standalone Continue loads the explicitly selected character"), Restored->LoadStandaloneCheckpoint(Error) && URunParticipationLibrary::ResolveStandalonePlayerSlot(Restored->GetPartyMembers(), SelectedSlot, Error) && SelectedSlot == 3)) return false;
+    for (const FRunPartyMember& Member : Restored->GetPartyMembers())
+    {
+        TestEqual(TEXT("The selection flag survives native SaveGame serialization"), Member.bPlayerControlled, Member.bCreated && Member.SlotIndex == 3);
+        if (Member.bCreated) TestTrue(TEXT("AI companions retain the same original local owner"), Member.OwnerAccountId == Identity.HostAccountId);
+    }
+    if (!TestTrue(TEXT("The selected party enters its first combat"), Restored->BeginEncounter(TEXT("Combat_01")) && Restored->MarkCombatStarted())) return false;
+    Restored->UpdatePartyMemberHP(3, 0.0f);
+    Restored->UpdatePartyMemberHP(1, 73.0f);
+    if (!TestTrue(TEXT("A surviving companion carries the same party through victory and the shop"), Restored->CompleteEncounter(ECombatResult::Victory) && Restored->ContinueRun() && Restored->SelectRunEncounter(TEXT("Shop_02")) && Restored->LeaveRunEncounter())) return false;
+    if (!TestTrue(TEXT("The next battle's checkpoint restores after the chosen character died"), Run->LoadStandaloneCheckpoint(Error) && Run->CanStartNode(TEXT("Combat_02")))) return false;
+    TestTrue(TEXT("The next encounter keeps the dead selected slot instead of promoting its companion"), URunParticipationLibrary::ResolveStandalonePlayerSlot(Run->GetPartyMembers(), SelectedSlot, Error) && SelectedSlot == 3);
+    TestTrue(TEXT("Selection and death preserve the complete Run identity"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Run->GetRunIdentity(), 0));
+    for (int32 Index = 0; Index < OriginalParty.Num(); ++Index)
+    {
+        const FRunPartyMember& Member = Run->GetPartyMembers()[Index];
+        TestTrue(TEXT("The next encounter preserves character identity ownership and control selection"), Member.CharacterId == OriginalParty[Index].CharacterId && Member.OwnerAccountId == OriginalParty[Index].OwnerAccountId && Member.bPlayerControlled == OriginalParty[Index].bPlayerControlled);
+        if (Member.SlotIndex == 3) TestEqual(TEXT("The selected character remains dead after reload"), Member.CurrentHP, 0.0f);
+    }
+    TestTrue(TEXT("The AI-only surviving party can enter the second combat"), Run->BeginEncounter(TEXT("Combat_02")) && Run->MarkCombatStarted());
+
+    // Old single-player saves have no explicit flag; restore their stable slot without rewriting ownership.
+    // 명시 플래그가 없는 기존 싱글 저장은 소유권을 다시 쓰지 않고 고정 슬롯을 복원합니다.
+    TStrongObjectPtr<URunSaveGame> OlderSave(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Slot.Name, Error)));
+    if (!TestNotNull(TEXT("The pre-combat map checkpoint remains readable"), OlderSave.Get())) return false;
+    for (FRunPartyMember& Member : OlderSave->Party)
+    {
+        Member.bPlayerControlled = false;
+        if (Member.SlotIndex == 1) Member.CurrentHP = 0.0f;
+        if (Member.SlotIndex == 3) Member.CurrentHP = 73.0f;
+    }
+    if (!TestTrue(TEXT("A flag-free historical single-player save remains loadable"), FRunCheckpointStorage::Save(OlderSave.Get(), Slot.Name, Error) && Restored->LoadStandaloneCheckpoint(Error))) return false;
+    TestTrue(TEXT("Historical selection stays with the lowest created dead slot"), URunParticipationLibrary::ResolveStandalonePlayerSlot(Restored->GetPartyMembers(), SelectedSlot, Error) && SelectedSlot == 1);
+    for (const FRunPartyMember& Member : Restored->GetPartyMembers()) TestEqual(TEXT("Historical selection is normalized to exactly one stored flag"), Member.bPlayerControlled, Member.bCreated && Member.SlotIndex == 1);
+    TestTrue(TEXT("Compatibility selection does not replace participant identity"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Restored->GetRunIdentity(), 0));
     return true;
 }
 

@@ -86,6 +86,11 @@ public:
     UFUNCTION(BlueprintCallable, Category = "CharacterCreation|Party Slots")
     void SetSlotCharacterName(int32 SlotIndex, const FText& NewName);
 
+    // Select one created character for direct control in a new standalone run.
+    // 새 싱글플레이에서 직접 조작할 생성된 캐릭터 한 명을 선택합니다.
+    UFUNCTION(BlueprintCallable, Category = "CharacterCreation|Party Slots")
+    bool SelectPlayerControlledSlot(int32 SlotIndex);
+
 protected:
     // Initializes fallback character creation layout and events.
     // 대체 캐릭터 생성 레이아웃과 이벤트를 초기화합니다.
@@ -357,6 +362,8 @@ private:
     // 파티 슬롯 바인딩과 상태 및 표시 클래스 데이터를 초기화합니다.
     void InitializeClassSlotWidgetArrays();
     void InitializeClassSlots();
+    void BuildPlayerControlButtons();
+    void RefreshPlayerControlSelection();
     void RefreshClassSlotWidgets();
     void ChangeSlotClass(int32 SlotIndex, int32 Direction);
     void SetSlotClass(int32 SlotIndex, FName ClassId);
@@ -406,6 +413,15 @@ private:
 
     UFUNCTION()
     void HandleStartGameClicked();
+
+    UFUNCTION()
+    void HandleSlot0ControlClicked();
+    UFUNCTION()
+    void HandleSlot1ControlClicked();
+    UFUNCTION()
+    void HandleSlot2ControlClicked();
+    UFUNCTION()
+    void HandleSlot3ControlClicked();
 
     UFUNCTION()
     void HandleSlot0CreateClicked();
@@ -531,6 +547,11 @@ private:
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UButton>> ClassInfoButtons;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UButton>> PlayerControlButtons;
+    int32 PlayerControlledSlotIndex = INDEX_NONE;
+
     void BuildDetailPanel();
     UFUNCTION()
     void HandleDetailClassChanged(FString SelectedItem, ESelectInfo::Type SelectionType);

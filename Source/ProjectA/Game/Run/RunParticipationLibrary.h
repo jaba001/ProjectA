@@ -13,6 +13,10 @@ class PROJECTA_API URunParticipationLibrary : public UBlueprintFunctionLibrary
     GENERATED_BODY()
 
 public:
+    // Missing selection uses the lowest created slot for compatibility, including a dead selected character.
+    // 선택이 없으면 호환을 위해 가장 앞 생성 슬롯을 사용하며 사망한 선택 캐릭터도 유지합니다.
+    static bool ResolveStandalonePlayerSlot(const TArray<FRunPartyMember>& Members, int32& OutSlot, FText& OutError);
+
     // Structural validation does not authenticate accounts or approve a resume, start or return policy.
     // 구조 검증은 계정 인증이나 재개·시작·복귀 정책의 승인을 대신하지 않습니다.
     UFUNCTION(BlueprintCallable, Category = "Run|Participation")
