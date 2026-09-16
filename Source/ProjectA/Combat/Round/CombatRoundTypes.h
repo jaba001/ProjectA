@@ -4,6 +4,7 @@
 #include "CombatRoundTypes.generated.h"
 
 class AUnitBase;
+class UAnimMontage;
 
 UENUM(BlueprintType)
 enum class ECombatRoundPhase : uint8
@@ -53,8 +54,8 @@ enum class ECombatRoundTargetLoss : uint8
     NearestEnemy
 };
 
-// Prototype skill values are independent of the existing GAS skill catalogue.
-// 프로토타입 스킬 수치는 기존 GAS 스킬 카탈로그와 별도로 관리합니다.
+// Round execution values and optional presentation are resolved without activating legacy abilities.
+// 기존 어빌리티를 활성화하지 않고 라운드 실행 수치와 선택적 표현을 해석합니다.
 USTRUCT(BlueprintType)
 struct PROJECTA_API FCombatRoundSkill
 {
@@ -65,6 +66,11 @@ struct PROJECTA_API FCombatRoundSkill
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FText Name;
+
+    // Presentation does not control authoritative release timing or damage.
+    // 표현은 서버의 발동 시점이나 피해 판정을 제어하지 않습니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation")
+    TObjectPtr<UAnimMontage> CastMontage = nullptr;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     ECombatRoundSkillKind Kind = ECombatRoundSkillKind::Melee;

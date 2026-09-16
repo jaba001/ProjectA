@@ -20,9 +20,10 @@ class PROJECTA_API UGA_AttackBase : public UGameplayAbility
 public:
     UGA_AttackBase();
 
-    // Read authored attack power without executing a legacy ability.
-    // 기존 어빌리티를 실행하지 않고 제작된 공격 수치를 읽습니다.
+    // Read authored attack power and presentation without executing a legacy ability.
+    // 기존 어빌리티를 실행하지 않고 제작된 공격 수치와 표현을 읽습니다.
     float GetAuthoredDamageAmount() const { return DamageAmount; }
+    UAnimMontage* GetAuthoredAttackMontage() const { return AttackMontage; }
     EUnitActionResult GetActionResult() const { return EUnitActionResult::Failed; }
     virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 

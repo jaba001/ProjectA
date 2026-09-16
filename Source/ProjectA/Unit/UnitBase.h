@@ -13,6 +13,8 @@ class AUnitAIController;
 class UGameplayAbility;
 class USkillDefinitionDataAsset;
 class AUnitBase;
+class UAnimInstance;
+class UAnimMontage;
 
 // Team affiliation used by combat units.
 // 전투 유닛의 소속 팀을 나타냅니다.
@@ -81,6 +83,18 @@ public:
     // Network replication
     // 네트워크 복제 속성을 등록합니다.
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+    // The server starts cosmetic round montages; null stops only the previous round montage.
+    // 서버가 라운드 표현용 몽타주를 시작하며 null은 이전 라운드 몽타주만 중지합니다.
+    void SetRoundCastMontage(UAnimMontage* Montage);
+
+protected:
+    UFUNCTION(NetMulticast, Reliable)
+    void MulticastSetRoundCastMontage(UAnimMontage* Montage);
+
+    void StopRoundCastMontage();
+    TWeakObjectPtr<UAnimInstance> RoundMontageAnimInstance;
+    int32 RoundMontageInstanceId = INDEX_NONE;
 
 public:
     // Unit identifier

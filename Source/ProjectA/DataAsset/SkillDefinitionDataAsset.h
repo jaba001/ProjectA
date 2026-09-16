@@ -55,8 +55,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
     TObjectPtr<UTexture2D> SkillIcon = nullptr;
 
-    // Legacy attack metadata source; authored round profiles do not execute or require this class.
-    // 기존 공격 메타데이터 원본이며 직접 작성한 라운드 프로필은 이 클래스를 실행하거나 요구하지 않습니다.
+    // Legacy damage and montage source; an empty round montage may reuse this class without activating it.
+    // 기존 피해와 몽타주 원본이며 라운드 몽타주가 비어 있으면 활성화 없이 이 클래스의 표현을 재사용합니다.
+    // Authored round profiles remain valid without an ability class or a montage.
+    // 직접 작성한 라운드 프로필은 어빌리티 클래스나 몽타주 없이도 유효합니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
     TSubclassOf<UGameplayAbility> AbilityClass = nullptr;
 

@@ -46,6 +46,10 @@
 
 - [ ] **삭제된 GameMode를 가리키는 이전 경로 Redirector를 정리한다.** `/Game/User_JeHoon/Blueprint/TestGameModebase`에 삭제된 `Blueprint/Game/TestGameModebase` 참조가 남아 있다. 현재 Gameplay·MainMenu는 별도 GameMode를 사용한다. Unreal 참조 확인과 에셋 기능으로 정리하고 일반 메뉴·게임 진입을 확인한다. 파일만 임의 삭제하지 않는다. [정적 근거와 미실행 확인 절차](TEST_REPORT.md#5-엔진-콘텐츠-경로-통일)
 
+### 2-4 DA 시전 몽타주 연결
+
+- [ ] **DA의 시전 몽타주를 실제 전투에서 확인한다.** 라운드 경로의 애니메이션 연결 누락을 수정했다. 명시 `CastMontage` 우선·공격 Ability fallback, Casting 1회 재생과 사망·취소 정리, root motion·알림 중복 피해 방지를 확인한다. Editor 빌드·에디터 재시작은 성공했으며 수정 후 실제 재생·자동화는 미실행이다. 싱글에서 기본·범위 공격과 override를 확인한 뒤 2인·4인으로 확대한다. [검증 절차와 로그](TEST_REPORT.md#21-da-시전-몽타주-연결)
+
 ## 3 게임 규칙 결정
 
 **이 절은 구현 전에 결정할 기획이다.** 시간차 전투와 집중 자원 제외를 유지하며, 집중 효과를 AP 회복이나 추가 행동으로 자동 치환하지 않는다. 현재 시험값을 최종 규칙으로 간주하지 않는다.

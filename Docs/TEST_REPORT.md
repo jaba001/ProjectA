@@ -22,6 +22,8 @@
 | 계획 입력 검사·장착 Tile 공격 AI / 17 | 합법 대상·적용 전 검사·준비 조건과 장착된 복귀형 Tile 공격 AI 보완. 회귀 코드 4건과 최종 초안 보존 수정 포함 Editor 컴파일 성공, 최종 코드·문서 정적 검사 통과. 자동화·사용자 작동 검증 8항목 미실행 |
 | 준비 취소 복구·파티 데이터 사전 검사 / 18 | 취소 저장 재시도와 원래 오류 보존, Unreal Data Validation 연결. 최신 컴파일·정적 검사 결과는 18-3절, 작동 확인은 미실행 |
 | 서버 공격 충돌 판정 / 19 | 근접·지점 공격의 실제 캡슐 충돌 전환, 투사체 장애물·전투 참가자 제한. 개발 검사 결과는 19-3절, 작동 확인은 미실행 |
+| 그래픽 드라이버 복구와 에디터 시작 / 20 | NVIDIA 596.21 복구 후 기본 D3D12 SM6 에디터 시작 2회 확인. 시작 오류·경고 잔존, 전체 전투 검증과 구분 |
+| DA 시전 몽타주 연결 / 21 | 명시 CastMontage와 기존 공격 Ability의 몽타주 연결·시전 재생 구현. UHT 포함 Editor 빌드 성공, 수정 후 실제 재생·자동화는 미실행 |
 
 2·6·7절과 이전 관리/턴 복구 성공은 당시 순차 전투 이력이다. 현재 실행 경로와 테스트 계약이 바뀌었으므로 최신 라운드 성공 근거 또는 그대로 실행할 절차로 사용하지 않는다.
 
@@ -678,6 +680,65 @@ GameplayCue의 Game 설정·DeveloperSettings 객체·Globals 최종 경로 검�
 코드·문서 검토와 9개 문서의 로컬 링크·앵커·표·코드 블록, 라운드 회귀 이름 중복 및 19-1~19-6의 미실행 상태, `git diff --check` 정적 검사를 통과했다. 결과는 `Saved/Automation/AttackCollisionStatic.json`에 기록했다. 사용자 에셋 삭제 3건은 보존하며 이번 변경에 포함하지 않는다.
 
 PIE·게임 플레이·Unreal 자동화·패키지 실행은 수행하지 않았으며 19-1~19-6은 사용자 검증 대기다. 컴파일 성공은 작동 성공을 의미하지 않는다. 이전 거리 판정 또는 전투 실행 이력은 이번 충돌 변경의 성공 근거로 사용하지 않는다.
+
+## 20 그래픽 드라이버 복구와 에디터 시작
+
+### 20-1 문제와 복구 범위
+
+2026-09-16 사용자가 그래픽 드라이버 복구와 에디터 실행 확인을 명시적으로 요청했다. NVIDIA GeForce RTX 3070 Ti의 드라이버 616.92(`32.0.16.1692`) 환경에서 에디터 로그가 D3D12 SM6 지원 검사 단계에 머물렀다. 근거는 `Saved/Logs/ProjectA_D3D12StartupBlocked.log`와 재시도 로그 `ProjectA_D3D12UserRetry.log`다. 이 관찰만으로 드라이버 내부의 정확한 결함을 확정하지 않는다.
+
+Windows의 `UpdateDriverForPlugAndPlayDevices` API로 보관된 NVIDIA 596.21 INF를 적용했다. 드라이버 복구 과정에서 프로젝트 C++·Config·엔진 콘텐츠는 변경하지 않았다. 이후 몽타주 코드 수정과 검증은 [21절](#21-da-시전-몽타주-연결)로 구분한다.
+
+### 20-2 복구와 실행 근거
+
+| 확인 대상 | 실제 결과 | 근거 |
+|---|---|---|
+| 드라이버 교체 호출 | `NativeSucceeded=true`, `NativeError=0`, `NeedReboot=false` | `Saved/Logs/NvidiaDriverRollback.json` |
+| 호출 직후 WMI 조회 | 이전 버전 616.92를 반환하여 최초 기록의 `Status`는 `Failed` | 위 JSON의 `After`와 `Error`. API 실패와 구분 |
+| 후속 활성 버전 확인 | PnP·레지스트리 `32.0.15.9621`, 활성 NVIDIA 드라이버 `596.21`, INF `oem35.inf` | `Saved/Logs/NvidiaDriverRestoreVerification.json`, 12:42:29 KST 확인 |
+| 복구 후 첫 에디터 | 기본 D3D12 SM6 지원·596.21 사용·MainMenu 로드·`Startup complete`, 엔진 초기화 30.00초 | `Saved/Logs/ProjectA_AfterDriverRollback.log` |
+| 사용자 전투 진입 | 사용자가 전투 검수 중 몽타주 문제를 보고. 첫 에디터는 12:45:32 KST 정상 종료 | 사용자 보고와 위 로그의 `LogExit: Exiting` |
+| 몽타주 빌드 후 에디터 | 기본 D3D12·596.21 유지, `Startup complete`, 엔진 초기화 13.10초. 확인 시 PID 24772가 응답하며 열려 있음 | `Saved/Logs/ProjectA_RoundCastMontage.log`, 12:53 KST 재실행 |
+
+에디터 시작 성공은 로그와 프로세스 응답, 첫 실행의 사용자 전투 진입 보고로 확인했다. 자동 화면 캡처 도구는 GPU 복구 후에도 자체 `deviceRemoved` 오류로 화면을 확인하지 못했으며, 캡처 성공으로 기록하지 않는다. 마지막 에디터 재실행에서는 Codex가 PIE를 시작하지 않았다.
+
+### 20-3 잔여 오류와 확인 범위
+
+두 에디터 시작 로그에 `LogAutomationTest: Error: Condition failed`가 각각 4건 남는다. 엔진 PNG 리소스 누락과 `EditorPerf` 메뉴 경고도 남으며 첫 실행에는 HTTP 연결 시간 초과 경고가 있었다. 이번 복구는 시작 정지 해소이며 오류·경고가 없는 실행을 의미하지 않는다. 이전 분류와 후속 진단은 [8절](#8-hudgameplaycue-경고-수정)을 따른다.
+
+Codex의 ProjectA 자동화·패키지 실행·통합 전투 검증은 수행하지 않았다. 사용자의 전투 진입은 확인했지만 [1절](#1-직접-플레이-확인)의 전체 Run·설정 복원이나 개별 회귀 통과로 대체하지 않는다. 다시 시작 단계에서 멈추면 사용한 드라이버 버전, 실행 명령과 해당 시작 로그의 마지막 진행 구간을 기록한다.
+
+## 21 DA 시전 몽타주 연결
+
+### 21-1 문제와 대상 변경
+
+사용자가 전투 검수 중 DA의 애니메이션이 적용되지 않는다고 보고했다. 기존 `BPDA_DefaulatAttack` → `BPGA_DefaultAttack` → `MM_Attack_01_Montage`와 범위 공격의 `MM_Attack_03_Montage` 연결은 존재했지만, 라운드 스킬 해석은 공격 Ability의 피해 수치만 가져오고 몽타주 재생 경로를 연결하지 않았다.
+
+- `bUseRoundDefinition`을 켠 명시 프로필은 선택적 `RoundDefinition.CastMontage`를 우선 사용한다. 미지정 명시 프로필과 기존 자동 변환은 공격 Ability의 `GetAuthoredAttackMontage`를 사용한다.
+- Casting 진입 시 시전 몽타주를 한 번 재생한다. 서버 multicast는 표현을 전달하며 재생 시작 실패는 `[RoundAnimation]` 경고로 유닛·몽타주·AnimInstance를 기록한다.
+- 기존 서버 `WindupSeconds`·충돌·AP·복귀 시점을 유지한다. 정상 발동과 복귀가 몽타주를 즉시 끊지 않으며 사망·중단·발동 전 취소·다음 행동에서는 해당 재생 인스턴스를 정리한다.
+- 재생 인스턴스의 root motion을 비활성화하여 서버 이동을 덮어쓰지 않는다. `AN_SkillRelease` 알림이 별도 피해 이벤트를 보내지 않으므로 애니메이션 알림과 서버 공격이 중복 타격하지 않는다.
+
+### 21-2 사용자 확인 절차
+
+최신 빌드 후 다시 연 에디터를 사용한다. 기존 기본·범위 공격 에셋은 재생 연결 확인을 위해 다시 생성할 필요가 없다. 명시 override나 잘못된 Skeleton·Slot 비교가 필요하면 Unreal 에셋 기능으로 `/Game/User_JeHoon/Validation/` 아래 작업 사본을 만들고 실제 검증 유닛에 장착한다. 표시 이름이 같더라도 실제 장착 DA·Ability·몽타주 경로를 구분한다.
+
+| ID | 사용자 확인 절차 | 기대 결과 | 상태 |
+|---|---|---|---|
+| 21-1 | 실제 장착된 기본 공격으로 계획·준비를 진행하고 Casting 진입 관찰 | 연결된 기본 공격 몽타주가 한 번 시작. 접근 중 조기 재생이나 연속 재시작 없음 | 미실행 |
+| 21-2 | 실제 장착된 범위 공격으로 같은 절차 진행 | 범위 공격의 연결 몽타주 재생. 피해 범위·발동 시점은 기존 서버 프로필 유지 | 미실행 |
+| 21-3 | 검증용 명시 프로필의 CastMontage를 다른 호환 몽타주로 지정하고 실행. 미지정으로 되돌려 반복 | 명시값 우선, 미지정 시 공격 Ability 몽타주 fallback | 미실행 |
+| 21-4 | 몽타주 없음, Skeleton 불일치, AnimBP Slot 미연결을 작업 사본에서 각각 확인 | 몽타주 없음은 표현 없이 기존 공격 진행. 재생 시작 실패는 경고 기록. 시작 로그가 있어도 Slot 미연결로 동작이 안 보이면 표현 실패로 기록 | 미실행 |
+| 21-5 | 시전 중 사망·발동 전 취소·세션 중단과 다음 행동을 확인하고 정상 발동·복귀와 비교 | 취소 경로의 해당 몽타주 정리, 정상 재생의 불필요한 조기 종료 없음. root motion에 따른 서버 좌표 변경·알림 중복 피해 없음 | 미실행 |
+| 21-6 | 싱글 확인 후 2인 협동에서 동일 시전을 관찰하고 4인으로 확대 | 각 창에서 대상 유닛의 표현 전달. HP·발동·복귀의 최종 권위는 서버 유지 | 미실행 |
+
+실패 시 실제 장착 DA·Ability·몽타주·Skeleton·AnimBP Slot 경로, 스킬의 WindupSeconds, 화면에서 보인 동작, `[RoundAnimation]` 로그와 피해 전후 HP를 기록한다. 재생 시작 로그는 몽타주가 화면에 올바르게 합성됐다는 보장이 아니며, 동작 표현과 실제 피해 시점을 각각 확인한다. 시작 로그가 있으나 동작이 보이지 않으면 Skeleton과 AnimGraph Slot 연결을 우선 확인한다.
+
+### 21-3 개발 확인과 제한
+
+Development Editor / Win64 빌드는 UHT를 포함해 성공했다(25.42초, 컴파일 오류·경고 0, `Saved/Logs/RoundCastMontageBuild.log`). 기존 `ProjectA.Combat.Content.RoundSkillMigrationValidation`과 `ProjectA.Combat.Actions.RetiredExecutionIsInert` 회귀를 확장했으며 실행하지 않았다. 독립 코드 검토와 문서 10개·링크/앵커·표 구조 검사를 통과했다. 수정 C++ 10개의 `.vcxproj`·`.filters` 항목 20개를 확인했으며 파일 추가·삭제·이름 변경이 없어 프로젝트 재생성은 필요하지 않았다. Visual Studio는 실행하지 않았다. Config·콘텐츠 무변경과 드라이버 복구 전후 프로젝트 설정 해시 2개 일치, TODO 3절 이후 보존도 확인했다. 정적 근거는 `Saved/Automation/RoundCastMontageStatic.json`이다.
+
+빌드 후 기본 D3D12·NVIDIA 596.21로 에디터를 다시 열었으며 초기화 13.10초와 프로세스 응답을 확인했다. 로그는 `Saved/Logs/ProjectA_RoundCastMontage.log`다. 재실행에서 PIE·게임·자동화를 시작하지 않았고, 수정 후 몽타주의 실제 재생·네트워크 표현·피해 시점 일치는 사용자 검증 대기다. 수정 전 사용자 전투 진입과 에디터 시작 성공을 이 항목의 통과 근거로 사용하지 않는다.
 
 ## 사용자 결과 기록
 

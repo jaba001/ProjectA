@@ -1,4 +1,5 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Animation/AnimMontage.h"
 #include "GAS/Ability/GA_AttackBase.h"
 
 bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, FText& OutError) const
@@ -14,6 +15,8 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
     if (!AssetId.IsValid()) return Fail(NSLOCTEXT("SkillRound", "MissingId", "A valid primary asset ID is required. / 유효한 기본 에셋 식별자가 필요합니다."));
 
     FCombatRoundSkill Skill = RoundDefinition;
+    const UGA_AttackBase* Attack = nullptr;
+    if ((!bUseRoundDefinition || !Skill.CastMontage) && AbilityClass && AbilityClass->IsChildOf(UGA_AttackBase::StaticClass())) Attack = AbilityClass->GetDefaultObject<UGA_AttackBase>();
     if (!bUseRoundDefinition)
     {
         const bool bSupportedArea = AreaType == ESkillAreaType::Single || AreaType == ESkillAreaType::AroundTarget;
@@ -21,14 +24,13 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
         {
             return Fail(NSLOCTEXT("SkillRound", "ExplicitProfileRequired", "Automatic migration supports EnemyUnit with Single or AroundTarget, a nonnegative radius and positive AP cost. Enable bUseRoundDefinition and author RoundDefinition for other semantics. / 자동 이행은 EnemyUnit의 Single·AroundTarget, 0 이상의 반경과 양수 AP 비용만 지원합니다. 그 외 의미는 bUseRoundDefinition을 켜고 RoundDefinition을 직접 작성하세요."));
         }
-        const UGA_AttackBase* Attack = AbilityClass ? Cast<UGA_AttackBase>(AbilityClass->GetDefaultObject()) : nullptr;
         if (!Attack)
         {
             return Fail(NSLOCTEXT("SkillRound", "ExplicitAbilityProfileRequired", "Automatic migration requires an attack derived from UGA_AttackBase. Custom abilities need an explicit RoundDefinition. / 자동 이행에는 UGA_AttackBase를 상속한 공격이 필요합니다. 사용자 어빌리티는 RoundDefinition을 직접 작성하세요."));
         }
 
-        // Only the authored damage value is reused; no legacy ability is activated.
-        // 작성된 피해 수치만 재사용하며 기존 어빌리티를 활성화하지 않습니다.
+        // Reuse authored damage and optional presentation without activating the legacy ability.
+        // 기존 어빌리티를 활성화하지 않고 작성된 피해 수치와 선택적 표현을 재사용합니다.
         Skill = FCombatRoundSkill();
         Skill.ActionPointCost = ActionPointCost;
         Skill.Power = Attack->GetAuthoredDamageAmount();
@@ -44,6 +46,7 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
             Skill.HitRange = FMath::Max(150.f, static_cast<float>(AreaRadius) * 200.f);
         }
     }
+    if (!Skill.CastMontage && Attack) Skill.CastMontage = Attack->GetAuthoredAttackMontage();
     Skill.SkillId = FName(*AssetId.ToString());
     Skill.Name = SkillName;
     if (!CombatRoundRules::IsValidSkill(Skill)) return Fail(NSLOCTEXT("SkillRound", "InvalidProfile", "RoundDefinition contains invalid timing, power, range, cost or approach settings. / RoundDefinition의 시간·위력·범위·비용·접근 설정이 유효하지 않습니다."));

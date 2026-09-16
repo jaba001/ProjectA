@@ -3,6 +3,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "AIController.h"
 
@@ -76,6 +78,7 @@ void AUnitBase::Tick(float DeltaTime)
 
 void AUnitBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    StopRoundCastMontage();
     if (HasAuthority())
     {
         bIsActiveTurn = false;
@@ -115,6 +118,45 @@ void AUnitBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
     DOREPLIFETIME(AUnitBase, CurrentActionPoint);
     DOREPLIFETIME(AUnitBase, MaxSubActionPoint);
     DOREPLIFETIME(AUnitBase, CurrentSubActionPoint);
+}
+
+void AUnitBase::SetRoundCastMontage(UAnimMontage* Montage)
+{
+    if (HasAuthority()) MulticastSetRoundCastMontage(Montage);
+}
+
+void AUnitBase::MulticastSetRoundCastMontage_Implementation(UAnimMontage* Montage)
+{
+    StopRoundCastMontage();
+    if (!Montage || bIsDead || GetNetMode() == NM_DedicatedServer) return;
+    UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+    if (!AnimInstance || AnimInstance->Montage_Play(Montage, 1.f, EMontagePlayReturnType::MontageLength, 0.f, false) <= 0.f)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[RoundAnimation] Montage playback failed Unit=%s Montage=%s AnimInstance=%s / 몽타주 재생 실패: AnimBP, Skeleton, Slot 확인"), *GetPathName(), *GetPathNameSafe(Montage), *GetPathNameSafe(AnimInstance));
+        return;
+    }
+    if (FAnimMontageInstance* Instance = AnimInstance->GetActiveInstanceForMontage(Montage))
+    {
+        // Keep movement and damage under the round simulation for the entire cosmetic instance, including blend-out.
+        // 블렌드 아웃을 포함한 표현 인스턴스 전체 수명 동안 이동과 피해는 라운드 시뮬레이션이 결정합니다.
+        Instance->PushDisableRootMotion();
+        RoundMontageAnimInstance = AnimInstance;
+        RoundMontageInstanceId = Instance->GetInstanceID();
+        UE_LOG(LogTemp, Log, TEXT("[RoundAnimation] Started Unit=%s Montage=%s / 시전 몽타주 시작"), *GetPathName(), *GetPathNameSafe(Montage));
+    }
+}
+
+void AUnitBase::StopRoundCastMontage()
+{
+    if (UAnimInstance* AnimInstance = RoundMontageAnimInstance.Get())
+    {
+        if (FAnimMontageInstance* Instance = AnimInstance->GetMontageInstanceForID(RoundMontageInstanceId))
+        {
+            Instance->Stop(FAlphaBlend(0.1f));
+        }
+    }
+    RoundMontageAnimInstance.Reset();
+    RoundMontageInstanceId = INDEX_NONE;
 }
 
 void AUnitBase::OnRep_Team()
@@ -305,6 +347,7 @@ void AUnitBase::ApplyDeathPresentation()
     }
 
     bDeathPresentationApplied = true;
+    StopRoundCastMontage();
     GetCharacterMovement()->DisableMovement();
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
@@ -318,6 +361,7 @@ void AUnitBase::CancelCurrentAction()
     {
         return;
     }
+    SetRoundCastMontage(nullptr);
     if (AAIController* AI = Cast<AAIController>(GetController()))
     {
         AI->StopMovement();

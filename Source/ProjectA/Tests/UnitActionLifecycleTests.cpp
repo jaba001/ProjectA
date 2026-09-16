@@ -1,7 +1,10 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/Notify/AN_SkillRelease.h"
 #include "Combat/SkillActor/AttackSkillActorBase.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
@@ -102,6 +105,29 @@ bool FUnitRetiredActionTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Retired movement cannot relocate actors"), Unit->GetActorLocation(), Location);
     TestFalse(TEXT("Default legacy ability rejects activation"), GetDefault<UGA_DefaultAttack>()->CanActivateAbility(FGameplayAbilitySpecHandle(), nullptr));
     TestFalse(TEXT("Area legacy ability rejects activation"), GetDefault<UGA_AreaAttack>()->CanActivateAbility(FGameplayAbilitySpecHandle(), nullptr));
+
+    // Prove the event observer works before verifying that cosmetic montage notifies cannot release attacks.
+    // 표현용 몽타주 알림이 공격을 발동하지 못하는지 검사하기 전에 이벤트 관찰자가 동작하는지 확인합니다.
+    const FGameplayTag ReleaseTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Event.Attack.Release")));
+    UAbilitySystemComponent* AbilitySystem = Unit->GetAbilitySystemComponent();
+    int32 ReleaseEvents = 0;
+    const FDelegateHandle ReleaseHandle = AbilitySystem->GenericGameplayEventCallbacks.FindOrAdd(ReleaseTag).AddLambda([&ReleaseEvents](const FGameplayEventData*) { ++ReleaseEvents; });
+    FGameplayEventData ReleasePayload;
+    ReleasePayload.Instigator = Unit;
+    ReleasePayload.EventTag = ReleaseTag;
+    UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(Unit, ReleaseTag, ReleasePayload);
+    TestEqual(TEXT("The fixture observes a directly delivered release event"), ReleaseEvents, 1);
+    ReleaseEvents = 0;
+    UAN_SkillRelease* ReleaseNotify = NewObject<UAN_SkillRelease>(Unit);
+    ReleaseNotify->Notify(Unit->GetMesh(), nullptr);
+    ReleaseNotify->Notify(Unit->GetMesh(), nullptr);
+    TestEqual(TEXT("Repeated legacy montage notifies emit no release events for round units"), ReleaseEvents, 0);
+    TestEqual(TEXT("Legacy montage notifies preserve source HP"), Unit->GetAttributeSet()->GetHP(), 100.0f);
+    TestEqual(TEXT("Legacy montage notifies preserve target HP"), Target->GetAttributeSet()->GetHP(), 100.0f);
+    TestEqual(TEXT("Legacy montage notifies preserve AP"), Unit->GetCurrentActionPoint(), AP);
+    TestEqual(TEXT("Legacy montage notifies preserve sub AP"), Unit->GetCurrentSubActionPoint(), SubAP);
+    AbilitySystem->GenericGameplayEventCallbacks.FindChecked(ReleaseTag).Remove(ReleaseHandle);
+
     AAttackSkillActorBase* LegacyActor = Scope.World->SpawnActor<AAttackSkillActorBase>();
     int32 Resolutions = 0;
     bool bSucceeded = true;
@@ -155,7 +181,44 @@ bool FCombatRoundSkillMigrationTest::RunTest(const FString& Parameters)
     FCombatRoundSkill Resolved;
     FText Error;
     TestTrue(TEXT("Supported old single enemy attack resolves"), Skill->ResolveRoundSkill(Resolved, Error));
-    TestEqual(TEXT("Migration reads authored CDO damage only"), Resolved.Power, GetDefault<UGA_DefaultAttack>()->GetAuthoredDamageAmount());
+    TestEqual(TEXT("Migration reads authored CDO damage"), Resolved.Power, GetDefault<UGA_DefaultAttack>()->GetAuthoredDamageAmount());
+    TestNull(TEXT("Migration keeps an unauthored montage optional"), Resolved.CastMontage.Get());
+
+    // Inspect saved ability defaults while changing only transient skill definitions.
+    // 저장된 어빌리티 기본값을 읽으며 임시 스킬 정의만 변경합니다.
+    const TPair<const TCHAR*, const TCHAR*> AuthoredMontages[] = {{TEXT("BPDA_DefaulatAttack"), TEXT("MM_Attack_01_Montage")}, {TEXT("BPDA_AreaAttack"), TEXT("MM_Attack_03_Montage")}};
+    for (const TPair<const TCHAR*, const TCHAR*>& Authored : AuthoredMontages)
+    {
+        const FString AssetPath = FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/%s.%s"), Authored.Key, Authored.Key);
+        const USkillDefinitionDataAsset* AuthoredSkill = LoadObject<USkillDefinitionDataAsset>(nullptr, *AssetPath);
+        if (!TestNotNull(TEXT("The authored skill data asset exists"), AuthoredSkill)) return false;
+        const UGA_AttackBase* AuthoredAttack = AuthoredSkill->AbilityClass ? Cast<UGA_AttackBase>(AuthoredSkill->AbilityClass->GetDefaultObject()) : nullptr;
+        if (!TestNotNull(TEXT("The authored skill retains its legacy attack metadata"), AuthoredAttack)) return false;
+        const FString MontagePath = FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/Unit/Animation/Montage/%s.%s"), Authored.Value, Authored.Value);
+        UAnimMontage* AuthoredMontage = LoadObject<UAnimMontage>(nullptr, *MontagePath);
+        if (!TestNotNull(TEXT("The authored attack montage exists"), AuthoredMontage)) return false;
+        TestEqual(TEXT("Saved attack defaults reference the expected montage"), AuthoredAttack->GetAuthoredAttackMontage(), AuthoredMontage);
+        TestTrue(TEXT("The authored skill resolves without activating its ability"), AuthoredSkill->ResolveRoundSkill(Resolved, Error));
+        TestEqual(TEXT("Migration retains the authored attack montage"), Resolved.CastMontage.Get(), AuthoredMontage);
+
+        USkillDefinitionDataAsset* PresentationSkill = MakeSkill(GetTransientPackage(), AuthoredSkill->AbilityClass);
+        PresentationSkill->bUseRoundDefinition = true;
+        TestTrue(TEXT("An explicit profile can reuse the legacy montage"), PresentationSkill->ResolveRoundSkill(Resolved, Error));
+        TestEqual(TEXT("An empty explicit montage falls back to the authored attack"), Resolved.CastMontage.Get(), AuthoredMontage);
+        UAnimMontage* OverrideMontage = NewObject<UAnimMontage>(PresentationSkill);
+        PresentationSkill->RoundDefinition.CastMontage = OverrideMontage;
+        TestTrue(TEXT("An explicit montage override resolves"), PresentationSkill->ResolveRoundSkill(Resolved, Error));
+        TestEqual(TEXT("The explicit montage takes precedence over the legacy montage"), Resolved.CastMontage.Get(), OverrideMontage);
+        PresentationSkill->AbilityClass = nullptr;
+        TestTrue(TEXT("An explicit montage needs no ability class"), PresentationSkill->ResolveRoundSkill(Resolved, Error));
+        TestEqual(TEXT("The explicit montage remains active without a legacy class"), Resolved.CastMontage.Get(), OverrideMontage);
+        PresentationSkill->RoundDefinition.CastMontage = nullptr;
+        TestTrue(TEXT("A fully authored profile needs no montage"), PresentationSkill->ResolveRoundSkill(Resolved, Error));
+        TestNull(TEXT("An omitted optional montage remains empty"), Resolved.CastMontage.Get());
+        PresentationSkill->AbilityClass = UGameplayAbility::StaticClass();
+        TestTrue(TEXT("An unrelated legacy ability does not invalidate an explicit profile"), PresentationSkill->ResolveRoundSkill(Resolved, Error));
+        TestNull(TEXT("An unrelated legacy ability provides no attack montage"), Resolved.CastMontage.Get());
+    }
     Skill->AreaType = ESkillAreaType::AroundSelf;
     TestFalse(TEXT("Legacy self-centered area requires explicit semantics"), Skill->ResolveRoundSkill(Resolved, Error));
     Skill->AreaType = ESkillAreaType::Single;

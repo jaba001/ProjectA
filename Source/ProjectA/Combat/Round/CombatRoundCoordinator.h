@@ -53,6 +53,7 @@ private:
         FVector Destination = FVector::ZeroVector;
         double PhaseStarted = 0.0;
         bool bReleased = false;
+        bool bMontageStarted = false;
         bool bFailed = false;
         int32 EffectiveTargetUnitId = INDEX_NONE;
     };

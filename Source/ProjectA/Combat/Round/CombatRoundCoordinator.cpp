@@ -335,6 +335,10 @@ bool ACombatRoundCoordinator::IsRoundSessionActive() const
 void ACombatRoundCoordinator::SuspendRound()
 {
     if (!HasAuthority()) return;
+    for (const FCombatRoundUnitView& Entry : View.Units)
+    {
+        if (IsValid(Entry.Unit)) Entry.Unit->SetRoundCastMontage(nullptr);
+    }
     View.Phase = ECombatRoundPhase::Suspended;
     View.Message = RoundText(TEXT("전투가 중단되었습니다. 시간차 전투의 중간 복구는 아직 지원하지 않습니다."));
     PublishState();
@@ -361,6 +365,10 @@ int32 ACombatRoundCoordinator::GetParticipantSlot(const APlayerController* Contr
 void ACombatRoundCoordinator::CleanupUnits()
 {
     TGuardValue<bool> CleanupGuard(bCleaningUp, true);
+    for (const FCombatRoundUnitView& Entry : View.Units)
+    {
+        if (IsValid(Entry.Unit)) Entry.Unit->SetRoundCastMontage(nullptr);
+    }
     for (ACombatRoundProjectile* Projectile : Projectiles)
     {
         if (IsValid(Projectile))
@@ -836,6 +844,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
     if (Entry.ActionPhase == ECombatRoundActionPhase::Waiting)
     {
         if (SimulationTime + 0.00001 < Entry.StartDelay) return;
+        Entry.Unit->SetRoundCastMontage(nullptr);
         Action.PhaseStarted = SimulationTime;
         Entry.ActionPhase = ECombatRoundActionPhase::Casting;
         Entry.Status = RoundText(TEXT("시전 중"));
@@ -895,6 +904,12 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
             FVector Facing = Action.AimLocation - Entry.Unit->GetActorLocation();
             Facing.Z = 0.f;
             if (!Facing.IsNearlyZero()) Entry.Unit->SetActorRotation(Facing.Rotation());
+            if (!Action.bMontageStarted)
+            {
+                Action.bMontageStarted = true;
+                Entry.Unit->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+                Entry.Unit->SetRoundCastMontage(Skill->CastMontage);
+            }
             if (SimulationTime + 0.00001 < Action.PhaseStarted + Skill->WindupSeconds) return;
             ReleaseSkill(Index, *Skill);
             return;
@@ -935,6 +950,7 @@ void ACombatRoundCoordinator::StartReturn(int32 Index, bool bFailed, const FText
         return;
     }
     const FCombatRoundSkill* Skill = FindSkill(Entry.Command.SkillId);
+    if (bFailed && !Action.bReleased) Entry.Unit->SetRoundCastMontage(nullptr);
     if (Skill && Skill->bRemainAtDestination && !bFailed)
     {
         ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Entry.Command.DestinationCoord);
