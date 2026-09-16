@@ -1,6 +1,7 @@
 #include "Combat/Round/CombatRoundProjectile.h"
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/HitResult.h"
 #include "Engine/OverlapResult.h"
@@ -53,6 +54,17 @@ void ACombatRoundProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
     DOREPLIFETIME(ACombatRoundProjectile, VisualRadius);
 }
 
+void ACombatRoundProjectile::SetAllowedTargets(const TArray<AUnitBase*>& Targets)
+{
+    if (!HasAuthority() || bInitialized || bResolved) return;
+    bRestrictTargets = true;
+    AllowedTargets.Reset();
+    for (AUnitBase* Unit : Targets)
+    {
+        if (IsValid(Unit) && Unit->GetWorld() == GetWorld()) AllowedTargets.Add(Unit);
+    }
+}
+
 void ACombatRoundProjectile::InitializeProjectile(AUnitBase* Source, AUnitBase* Target, FVector AimPoint, float Speed, float Damage, float Radius, float Lifetime, bool bHoming, bool bTargetOnly)
 {
     if (!HasAuthority() || bInitialized || bResolved)
@@ -87,7 +99,7 @@ void ACombatRoundProjectile::InitializeProjectile(AUnitBase* Source, AUnitBase* 
 
 bool ACombatRoundProjectile::IsEligibleTarget(AUnitBase* Unit) const
 {
-    return IsValid(Unit) && Unit->GetWorld() == GetWorld() && Unit != SourceUnit.Get() && Unit->IsUnitAlive() && Unit->GetTeam() != SourceTeam && (!bOnlyTarget || Unit == TargetUnit.Get());
+    return IsValid(Unit) && Unit->GetWorld() == GetWorld() && Unit != SourceUnit.Get() && Unit->IsUnitAlive() && Unit->GetTeam() != SourceTeam && (!bOnlyTarget || Unit == TargetUnit.Get()) && (!bRestrictTargets || AllowedTargets.Contains(TWeakObjectPtr<AUnitBase>(Unit)));
 }
 
 void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
@@ -127,6 +139,11 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
 
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CombatRoundProjectile), false, this);
     QueryParams.bFindInitialOverlaps = true;
+    FCollisionQueryParams WorldQueryParams(QueryParams);
+    WorldQueryParams.bIgnoreTouches = true;
+    FCollisionResponseParams WorldResponses(ECR_Ignore);
+    WorldResponses.CollisionResponse.SetResponse(ECC_WorldStatic, ECR_Block);
+    WorldResponses.CollisionResponse.SetResponse(ECC_WorldDynamic, ECR_Block);
     FCollisionObjectQueryParams ObjectParams;
     ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
     const FCollisionShape Shape = FCollisionShape::MakeSphere(CollisionRadius);
@@ -136,6 +153,7 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
     // 부적격 폰이 뒤쪽 유효 피격을 가리지 않도록 스윕 전에 제외합니다.
     for (TActorIterator<APawn> It(GetWorld()); It; ++It)
     {
+        WorldQueryParams.AddIgnoredActor(*It);
         if (IsEligibleTarget(Cast<AUnitBase>(*It)))
         {
             ++CandidateLimit;
@@ -146,21 +164,33 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
         }
     }
 
+    // World geometry must block WorldDynamic; visibility-only grid boxes and overlap sensors are not walls.
+    // 월드 지형은 WorldDynamic을 Block해야 하며 Visibility 전용 그리드 박스와 Overlap 센서는 벽이 아닙니다.
+    if (GetWorld()->OverlapBlockingTestByChannel(Start, FQuat::Identity, ECC_WorldDynamic, Shape, WorldQueryParams, WorldResponses))
+    {
+        ResolveProjectile();
+        return;
+    }
+    FHitResult WorldHit;
+    const bool bHitWorld = GetWorld()->SweepSingleByChannel(WorldHit, Start, End, FQuat::Identity, ECC_WorldDynamic, Shape, WorldQueryParams, WorldResponses);
+
+    // Only the combat capsule receives hits; character meshes and attached sensors do not expand the target.
+    // 전투 캡슐만 피격되며 캐릭터 메시와 부착 센서는 대상의 피격 범위를 넓히지 않습니다.
     TArray<FProjectileCandidate> Candidates;
     TArray<FOverlapResult> InitialOverlaps;
     GetWorld()->OverlapMultiByObjectType(InitialOverlaps, Start, FQuat::Identity, ObjectParams, Shape, QueryParams);
     for (const FOverlapResult& Overlap : InitialOverlaps)
     {
         AUnitBase* Unit = Cast<AUnitBase>(Overlap.GetActor());
-        if (IsEligibleTarget(Unit))
+        if (IsEligibleTarget(Unit) && Overlap.GetComponent() == Unit->GetCapsuleComponent())
         {
             Candidates.Add({Unit, Start, 0.0f});
             QueryParams.AddIgnoredActor(Unit);
         }
     }
 
-    // Repeat the bounded query to collect ties even when a sweep reports only its first blocker.
-    // 스윕이 첫 차단 대상만 반환해도 동률을 모을 수 있도록 유닛 수 안에서 조회를 반복합니다.
+    // Collect contacts before resolving and ignore each accepted unit in subsequent bounded queries.
+    // 종료 전에 접촉을 수집하고 유닛 수로 제한한 후속 조회에서 이미 수집한 유닛을 제외합니다.
     for (int32 QueryIndex = 0; QueryIndex < CandidateLimit; ++QueryIndex)
     {
         TArray<FHitResult> Hits;
@@ -169,7 +199,7 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
         for (const FHitResult& Hit : Hits)
         {
             AUnitBase* Unit = Cast<AUnitBase>(Hit.GetActor());
-            if (IsEligibleTarget(Unit))
+            if (IsEligibleTarget(Unit) && Hit.GetComponent() == Unit->GetCapsuleComponent())
             {
                 Candidates.Add({Unit, Hit.bStartPenetrating ? Start : FVector(Hit.Location), Hit.bStartPenetrating ? 0.0f : Hit.Time});
                 QueryParams.AddIgnoredActor(Unit);
@@ -193,6 +223,15 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
         }
         return Left.Unit->GetFName().LexicalLess(Right.Unit->GetFName());
     });
+    // A blocking wall wins an equal-time contact so an overlapping capsule cannot receive damage through it.
+    // 차단 벽은 동시 접촉에서 우선하므로 겹친 캡슐이 벽 너머 피해를 받지 않습니다.
+    const float WorldHitTime = WorldHit.bStartPenetrating ? 0.0f : WorldHit.Time;
+    if (bHitWorld && (Candidates.IsEmpty() || WorldHitTime <= Candidates[0].Time))
+    {
+        SetActorLocation(WorldHit.bStartPenetrating ? Start : FVector(WorldHit.Location), false, nullptr, ETeleportType::TeleportPhysics);
+        ResolveProjectile();
+        return;
+    }
     if (!Candidates.IsEmpty())
     {
         const FProjectileCandidate& Hit = Candidates[0];

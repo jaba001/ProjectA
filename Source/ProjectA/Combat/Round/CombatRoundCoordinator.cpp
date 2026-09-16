@@ -7,6 +7,8 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Combat/Library/CombatEffectLibrary.h"
 #include "Combat/Round/CombatRoundProjectile.h"
+#include "CollisionQueryParams.h"
+#include "CollisionShape.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "Game/Encounter/CombatArena.h"
@@ -26,6 +28,91 @@ namespace
     FText RoundText(const TCHAR* Value)
     {
         return FText::FromString(Value);
+    }
+
+    FCollisionResponseParams AttackWorldResponses()
+    {
+        FCollisionResponseParams Responses(ECR_Ignore);
+        Responses.CollisionResponse.SetResponse(ECC_WorldStatic, ECR_Block);
+        Responses.CollisionResponse.SetResponse(ECC_WorldDynamic, ECR_Block);
+        return Responses;
+    }
+
+    FCollisionQueryParams AttackWorldQuery(UWorld* World, AUnitBase* Source)
+    {
+        FCollisionQueryParams Params(SCENE_QUERY_STAT(CombatRoundAttack), false, Source);
+        Params.bFindInitialOverlaps = true;
+        Params.bIgnoreTouches = true;
+        for (TActorIterator<APawn> It(World); It; ++It) Params.AddIgnoredActor(*It);
+        return Params;
+    }
+
+    UCapsuleComponent* AttackTargetCapsule(AUnitBase* Source, const FCombatRoundUnitView& Candidate)
+    {
+        AUnitBase* Unit = Candidate.Unit;
+        if (!IsValid(Unit) || Unit == Source || !Unit->IsUnitAlive() || Unit->GetTeam() == Source->GetTeam() || !Unit->GetActorEnableCollision()) return nullptr;
+        UCapsuleComponent* Capsule = Unit->GetCapsuleComponent();
+        return IsValid(Capsule) && Capsule->IsQueryCollisionEnabled() ? Capsule : nullptr;
+    }
+
+    AUnitBase* FindMeleeCollision(UWorld* World, AUnitBase* Source, const TArray<FCombatRoundUnitView>& Units, const FCombatRoundSkill& Skill)
+    {
+        const float Radius = FMath::Min(Skill.MeleeRadius, Skill.HitRange * 0.5f);
+        const FVector Origin = Source->GetCapsuleComponent()->GetComponentLocation();
+        const FVector Forward = Source->GetActorForwardVector();
+        const FVector Start = Origin + Forward * Radius;
+        const FVector End = Origin + Forward * (Skill.HitRange - Radius);
+        const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
+        const FCollisionQueryParams Params = AttackWorldQuery(World, Source);
+        const FCollisionResponseParams Responses = AttackWorldResponses();
+        if (World->OverlapBlockingTestByChannel(Start, FQuat::Identity, ECC_WorldDynamic, Shape, Params, Responses)) return nullptr;
+        FHitResult WallHit;
+        const bool bHitWall = World->SweepSingleByChannel(WallHit, Start, End, FQuat::Identity, ECC_WorldDynamic, Shape, Params, Responses);
+        const float WallTime = WallHit.bStartPenetrating ? 0.f : WallHit.Time;
+        AUnitBase* FirstUnit = nullptr;
+        int32 FirstUnitId = MAX_int32;
+        float FirstTime = 1.f;
+
+        // Query registered capsules directly so pawn movement responses and cosmetic meshes cannot change a hit.
+        // 등록된 캡슐을 직접 조회하여 폰 이동 응답이나 표현용 메시가 피격 판정을 바꾸지 않도록 합니다.
+        for (const FCombatRoundUnitView& Candidate : Units)
+        {
+            UCapsuleComponent* Capsule = AttackTargetCapsule(Source, Candidate);
+            if (!Capsule) continue;
+            FHitResult Hit;
+            const bool bInitialOverlap = Capsule->OverlapComponent(Start, FQuat::Identity, Shape);
+            if (!bInitialOverlap && !Capsule->SweepComponent(Hit, Start, End, FQuat::Identity, Shape)) continue;
+            const float HitTime = bInitialOverlap || Hit.bStartPenetrating ? 0.f : Hit.Time;
+            if (bHitWall && WallTime <= HitTime) continue;
+            if (!FirstUnit || HitTime < FirstTime || (HitTime == FirstTime && Candidate.UnitId < FirstUnitId))
+            {
+                FirstUnit = Candidate.Unit;
+                FirstUnitId = Candidate.UnitId;
+                FirstTime = HitTime;
+            }
+        }
+        return FirstUnit;
+    }
+
+    TArray<AUnitBase*> FindGroundCollisions(UWorld* World, AUnitBase* Source, const TArray<FCombatRoundUnitView>& Units, FVector Center, float Radius)
+    {
+        TArray<AUnitBase*> Hits;
+        const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
+        const FCollisionQueryParams Params = AttackWorldQuery(World, Source);
+        const FCollisionResponseParams Responses = AttackWorldResponses();
+        if (World->OverlapBlockingTestByChannel(Center, FQuat::Identity, ECC_WorldDynamic, FCollisionShape::MakeSphere(0.1f), Params, Responses)) return Hits;
+        for (const FCombatRoundUnitView& Candidate : Units)
+        {
+            UCapsuleComponent* Capsule = AttackTargetCapsule(Source, Candidate);
+            if (!Capsule || !Capsule->OverlapComponent(Center, FQuat::Identity, Shape)) continue;
+            FVector Contact;
+            if (Capsule->GetClosestPointOnCollision(Center, Contact) < 0.f) continue;
+            // Occlude the real capsule contact, not its actor center, so exposed capsule edges remain hittable.
+            // 실제 캡슐 접촉점까지 차폐를 검사하여 노출된 캡슐 가장자리는 피격될 수 있게 합니다.
+            if (World->LineTraceTestByChannel(Center, Contact, ECC_WorldDynamic, Params, Responses)) continue;
+            Hits.AddUnique(Candidate.Unit);
+        }
+        return Hits;
     }
 }
 
@@ -900,6 +987,9 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
         Projectiles.Add(Projectile);
         Projectile->OnImpact.AddUObject(this, &ACombatRoundCoordinator::ApplyHit);
         Projectile->OnResolved.AddUObject(this, &ACombatRoundCoordinator::HandleProjectileResolved);
+        TArray<AUnitBase*> AllowedTargets;
+        for (const FCombatRoundUnitView& Candidate : View.Units) AllowedTargets.Add(Candidate.Unit);
+        Projectile->SetAllowedTargets(AllowedTargets);
         Projectile->InitializeProjectile(Entry.Unit, Target, Action.AimLocation, Skill.ProjectileSpeed, Skill.Power, Skill.ProjectileRadius, Skill.ProjectileLifetime, Skill.bHoming, Skill.bTargetOnly);
         StartReturn(Index, false, RoundText(TEXT("발사 완료")));
         return;
@@ -907,31 +997,25 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
     bool bHit = false;
     if (Skill.Kind == ECombatRoundSkillKind::GroundAttack)
     {
-        if (Skill.Approach == ECombatRoundApproach::None || FVector::Dist2D(Entry.Unit->GetActorLocation(), Action.AimLocation) <= Skill.HitRange)
+        if (Skill.Approach == ECombatRoundApproach::None || FVector::Dist(Entry.Unit->GetActorLocation(), Action.AimLocation) <= Skill.HitRange)
         {
-            for (const FCombatRoundUnitView& Candidate : View.Units)
+            for (AUnitBase* HitUnit : FindGroundCollisions(GetWorld(), Entry.Unit, View.Units, Action.AimLocation, Skill.HitRange))
             {
-                if (Candidate.bEnemy == Entry.bEnemy || !IsValid(Candidate.Unit) || !Candidate.Unit->IsUnitAlive()) continue;
-                if (FVector::Dist2D(Candidate.Unit->GetActorLocation(), Action.AimLocation) <= Skill.HitRange)
-                {
-                    ApplyHit(Entry.Unit, Candidate.Unit, Skill.Power);
-                    bHit = true;
-                }
+                ApplyHit(Entry.Unit, HitUnit, Skill.Power);
+                bHit = true;
             }
         }
     }
-    else if (IsValid(Target) && Target->IsUnitAlive())
+    else if (Skill.Kind == ECombatRoundSkillKind::Melee)
     {
-        const FVector Offset = Target->GetActorLocation() - Entry.Unit->GetActorLocation();
-        const double FacingDot = FVector::DotProduct(Entry.Unit->GetActorForwardVector(), Offset.GetSafeNormal2D());
-        if (Offset.Size2D() <= Skill.HitRange && FacingDot >= 0.5)
+        if (AUnitBase* HitUnit = FindMeleeCollision(GetWorld(), Entry.Unit, View.Units, Skill))
         {
-            ApplyHit(Entry.Unit, Target, Skill.Power);
+            ApplyHit(Entry.Unit, HitUnit, Skill.Power);
             bHit = true;
         }
     }
     if (bHit) StartReturn(Index, false, RoundText(TEXT("타격 완료")));
-    else StartReturn(Index, true, RoundText(TEXT("타격 시점의 실제 거리·범위에서 벗어남")));
+    else StartReturn(Index, true, RoundText(TEXT("공격 충돌 없음 또는 장애물에 차단됨")));
 }
 
 void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, float Damage)

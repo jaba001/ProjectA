@@ -7,6 +7,7 @@
 #include "Combat/Library/CombatEffectLibrary.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "Combat/Round/CombatRoundProjectile.h"
+#include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
@@ -19,6 +20,7 @@
 #include "Grid/Combat/CombatGridTile.h"
 #include "Unit/UnitBase.h"
 #include "UObject/StrongObjectPtr.h"
+#include <limits>
 
 namespace CombatRoundTests
 {
@@ -35,6 +37,7 @@ namespace CombatRoundTests
         TArray<AUnitBase*> Enemies;
         TArray<APartyPlayerController*> Controllers;
         FName EnemySkillId;
+        FName HumanSkillId;
         FText Error;
 
         FFixture()
@@ -96,7 +99,7 @@ namespace CombatRoundTests
             return Unit;
         }
 
-        bool GiveEnemySkill(AUnitBase* Unit, const FCombatRoundSkill* Definition)
+        bool GiveRoundSkill(AUnitBase* Unit, const FCombatRoundSkill* Definition, FName& OutSkillId)
         {
             USkillDefinitionDataAsset* Skill = NewObject<USkillDefinitionDataAsset>(Unit);
             Skill->AbilityClass = UGA_DefaultAttack::StaticClass();
@@ -107,13 +110,13 @@ namespace CombatRoundTests
             Skill->RoundDefinition.ActionPointCost = 0;
             Skill->RoundDefinition.Power = 0.0f;
             if (Definition) Skill->RoundDefinition = *Definition;
-            EnemySkillId = FName(*Skill->GetPrimaryAssetId().ToString());
+            OutSkillId = FName(*Skill->GetPrimaryAssetId().ToString());
             return Unit->ConfigureProfession(100.0f, 2, 2, {Skill});
         }
 
-        bool Initialize(int32 HumanCount = 1, int32 EnemySpeed = 10, const FCombatRoundSkill* EnemySkill = nullptr, FIntPoint EnemyCoord = FIntPoint(0, 3))
+        bool Initialize(int32 HumanCount = 1, int32 EnemySpeed = 10, const FCombatRoundSkill* EnemySkill = nullptr, FIntPoint EnemyCoord = FIntPoint(0, 3), int32 EnemyCount = 1, const FCombatRoundSkill* FirstHumanSkill = nullptr)
         {
-            if (!World.IsValid() || !Combat || !Arena || !Grid || Grid->TileMap.Num() != 16) return false;
+            if (!World.IsValid() || !Combat || !Arena || !Grid || Grid->TileMap.Num() != 16 || EnemyCount < 1 || EnemyCount > 4) return false;
             FRunIdentityData Identity;
             Identity.Origin = ERunIdentityOrigin::AccountProvider;
             Identity.RunId = FGuid::NewGuid();
@@ -126,6 +129,7 @@ namespace CombatRoundTests
                 AUnitBase* Unit = AddUnit(FIntPoint(Index * 2, 0), ETeam::Player);
                 APartyPlayerController* Controller = World->SpawnActor<APartyPlayerController>();
                 if (!Unit || !Controller) return false;
+                if (Index == 0 && FirstHumanSkill && !GiveRoundSkill(Unit, FirstHumanSkill, HumanSkillId)) return false;
                 Unit->CombatSpeed = 20 - Index * 2;
                 World->AddController(Controller);
                 Controller->SetCombatContext(Combat, true);
@@ -146,11 +150,14 @@ namespace CombatRoundTests
                 PartyActors.Add(Index, Unit);
             }
             Identity.HostAccountId = Identity.OriginalParticipants[0].AccountId;
-            AUnitBase* Enemy = AddUnit(EnemyCoord, ETeam::Enemy);
-            if (!Enemy || !GiveEnemySkill(Enemy, EnemySkill)) return false;
-            Enemy->CombatSpeed = EnemySpeed;
-            Enemies.Add(Enemy);
-            Units.Add(Enemy);
+            for (int32 Index = 0; Index < EnemyCount; ++Index)
+            {
+                AUnitBase* Enemy = AddUnit(EnemyCoord + FIntPoint(Index, 0), ETeam::Enemy);
+                if (!Enemy || !GiveRoundSkill(Enemy, EnemySkill, EnemySkillId)) return false;
+                Enemy->CombatSpeed = EnemySpeed;
+                Enemies.Add(Enemy);
+                Units.Add(Enemy);
+            }
             Combat->RegisterUnits(Units);
             UCombatActionAuthority* Authority = Combat->GetActionAuthority();
             if (!Authority->ConfigureRun(Identity, Members, PartyActors, Error)) return false;
@@ -172,6 +179,36 @@ namespace CombatRoundTests
             Result.TargetCoord = Target ? Target->GetCurrentTile()->GridCoord : Result.DestinationCoord;
             Result.TargetUnitId = Target ? Target->UnitIndex : INDEX_NONE;
             return Result;
+        }
+
+        UBoxComponent* AddObstacle(FVector Location, FVector HalfExtent, ECollisionResponse Response = ECR_Block, ECollisionChannel ObjectType = ECC_WorldStatic)
+        {
+            AActor* Actor = World->SpawnActor<AActor>();
+            if (!Actor) return nullptr;
+            UBoxComponent* Shape = NewObject<UBoxComponent>(Actor);
+            Actor->SetRootComponent(Shape);
+            Shape->SetBoxExtent(HalfExtent);
+            Shape->SetCollisionObjectType(ObjectType);
+            Shape->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+            Shape->SetCollisionResponseToAllChannels(ECR_Ignore);
+            Shape->SetCollisionResponseToChannel(ECC_Pawn, Response);
+            Shape->SetCollisionResponseToChannel(ECC_WorldDynamic, Response);
+            Shape->RegisterComponent();
+            Actor->SetActorLocation(Location);
+            return Shape;
+        }
+
+        UBoxComponent* AddPawnSensor(AUnitBase* Unit, FVector RelativeLocation, FVector HalfExtent)
+        {
+            UBoxComponent* Sensor = NewObject<UBoxComponent>(Unit);
+            Sensor->SetupAttachment(Unit->GetRootComponent());
+            Sensor->SetRelativeLocation(RelativeLocation);
+            Sensor->SetBoxExtent(HalfExtent);
+            Sensor->SetCollisionObjectType(ECC_Pawn);
+            Sensor->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+            Sensor->SetCollisionResponseToAllChannels(ECR_Block);
+            Sensor->RegisterComponent();
+            return Sensor;
         }
 
         bool Submit(int32 ControllerIndex, const FCombatRoundCommand& Command)
@@ -398,6 +435,122 @@ bool FCombatRoundMovementTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundMeleeCollisionTest, "ProjectA.Combat.Round.MeleePhysicalContacts", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundMeleeCollisionTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Case = 0; Case < 9; ++Case)
+    {
+        FCombatRoundSkill Skill;
+        Skill.Approach = ECombatRoundApproach::None;
+        Skill.WindupSeconds = 0.05f;
+        Skill.Power = 17.0f;
+        FFixture Fixture;
+        if (!TestTrue(TEXT("The physical melee fixture initializes"), Fixture.Initialize(2, 10, nullptr, FIntPoint(0, 3), 2, &Skill))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Friend = Fixture.Humans[1];
+        AUnitBase* Selected = Fixture.Enemies[0];
+        AUnitBase* Interceptor = Fixture.Enemies[1];
+        AUnitBase* OtherCombat = Fixture.AddUnit(FIntPoint(3, 2), ETeam::Enemy);
+        if (!OtherCombat) return false;
+        OtherCombat->UnitIndex = Interceptor->UnitIndex;
+        OtherCombat->SetActorLocation(FVector(0.0f, 75.0f, 100.0f), false);
+        Friend->SetActorLocation(FVector(0.0f, 40.0f, 100.0f), false);
+        Selected->SetActorLocation(FVector(0.0f, Case == 7 ? 145.0f : Case == 8 ? 130.0f : 600.0f, 100.0f), false);
+        const float InterceptorDistance = Case == 1 ? Skill.HitRange + Interceptor->GetCapsuleComponent()->GetScaledCapsuleRadius() * 0.5f : Case == 8 ? 600.0f : 130.0f;
+        Interceptor->SetActorLocation(FVector(0.0f, InterceptorDistance, Case == 2 ? 400.0f : 100.0f), false);
+        Fixture.AddPawnSensor(Interceptor, FVector::ZeroVector, FVector(90.0f));
+        if (Case == 3 || Case == 4)
+        {
+            if (!Fixture.AddObstacle(FVector(0.0f, Case == 3 ? 75.0f : 120.0f, 100.0f), FVector(120.0f, 2.0f, 120.0f))) return false;
+        }
+        if (Case == 5) Interceptor->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        if (Case == 6)
+        {
+            Interceptor->Die();
+            Interceptor->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        }
+        const float BeforeInterceptorHP = Interceptor->GetAttributeSet()->GetHP();
+        const bool bExpectedHit = Case == 0 || Case == 1 || Case == 4 || Case == 7;
+        if (!Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Selected)) || !Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait"))) || !Fixture.Ready(0) || !Fixture.Ready(1)) return false;
+        if (Case == 8) Selected->SetActorLocation(FVector(0.0f, 600.0f, 100.0f), false);
+        Fixture.Round->Tick(0.1f);
+        const FString Context = FString::Printf(TEXT("Melee collision case %d"), Case);
+        TestTrue(Context + TEXT(" damages only an intersecting living capsule before a wall"), FMath::IsNearlyEqual(Interceptor->GetAttributeSet()->GetHP(), BeforeInterceptorHP - (bExpectedHit ? Skill.Power : 0.0f)));
+        TestTrue(Context + TEXT(" does not guarantee the selected target or pierce the first enemy"), FMath::IsNearlyEqual(Selected->GetAttributeSet()->GetHP(), 100.0f));
+        TestTrue(Context + TEXT(" excludes the caster, ally and another combat's same-index enemy"), FMath::IsNearlyEqual(Source->GetAttributeSet()->GetHP(), 100.0f) && FMath::IsNearlyEqual(Friend->GetAttributeSet()->GetHP(), 100.0f) && FMath::IsNearlyEqual(OtherCombat->GetAttributeSet()->GetHP(), 100.0f));
+        if (!TestTrue(Context + TEXT(" settles after the attack"), Fixture.AdvanceUntilNextRound(1))) return false;
+        TestTrue(Context + TEXT(" delivers at most one damage event despite multiple pawn components"), FMath::IsNearlyEqual(Interceptor->GetAttributeSet()->GetHP(), BeforeInterceptorHP - (bExpectedHit ? Skill.Power : 0.0f)));
+    }
+    FCombatRoundSkill Invalid;
+    Invalid.SkillId = TEXT("InvalidMeleeRadius");
+    for (float Radius : {-1.0f, 0.0f, 1001.0f, std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()})
+    {
+        Invalid.MeleeRadius = Radius;
+        TestFalse(TEXT("Nonpositive, oversized and nonfinite melee collision radii are rejected"), CombatRoundRules::IsValidSkill(Invalid));
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundGroundCollisionTest, "ProjectA.Combat.Round.GroundPhysicalContacts", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundGroundCollisionTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Case = 0; Case < 7; ++Case)
+    {
+        FCombatRoundSkill Skill;
+        Skill.Kind = ECombatRoundSkillKind::GroundAttack;
+        Skill.Approach = ECombatRoundApproach::None;
+        Skill.TargetLoss = ECombatRoundTargetLoss::KeepLocation;
+        Skill.HitRange = 100.0f;
+        Skill.WindupSeconds = 0.05f;
+        Skill.Power = 17.0f;
+        FFixture Fixture;
+        if (!TestTrue(TEXT("The physical ground attack fixture initializes"), Fixture.Initialize(2, 10, nullptr, FIntPoint(0, 3), 3, &Skill))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Friend = Fixture.Humans[1];
+        AUnitBase* Boundary = Fixture.Enemies[0];
+        AUnitBase* Second = Fixture.Enemies[1];
+        AUnitBase* Dead = Fixture.Enemies[2];
+        AUnitBase* OtherCombat = Fixture.AddUnit(FIntPoint(3, 2), ETeam::Enemy);
+        if (!OtherCombat) return false;
+        ACombatGridTile* AimTile = Fixture.Grid->GetTileAtCoord(FIntPoint(1, 2));
+        const FVector Center = AimTile->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f);
+        AimTile->SetActorEnableCollision(true);
+        Boundary->SetActorLocation(Center + FVector(125.0f, 0.0f, 0.0f), false);
+        Second->SetActorLocation(Center + FVector(-60.0f, 0.0f, Case == 1 ? 350.0f : 0.0f), false);
+        Friend->SetActorLocation(Center + FVector(0.0f, -30.0f, 0.0f), false);
+        OtherCombat->SetActorLocation(Center + FVector(0.0f, 30.0f, 0.0f), false);
+        OtherCombat->UnitIndex = Boundary->UnitIndex;
+        Dead->SetActorLocation(Center, false);
+        Dead->Die();
+        Dead->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        const float DeadHP = Dead->GetAttributeSet()->GetHP();
+        Fixture.AddPawnSensor(Boundary, FVector::ZeroVector, FVector(120.0f));
+        if (Case >= 2 && Case <= 4)
+        {
+            if (!Fixture.AddObstacle(Center + FVector(60.0f, 0.0f, 0.0f), FVector(2.0f, 25.0f, 90.0f), Case == 4 ? ECR_Overlap : ECR_Block, Case == 3 ? ECC_WorldDynamic : ECC_WorldStatic)) return false;
+        }
+        if (Case == 5) Boundary->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        if (Case == 6 && !Fixture.AddObstacle(Center, FVector(10.0f))) return false;
+        FCombatRoundCommand Attack = Fixture.Command(Source, Fixture.HumanSkillId);
+        Attack.TargetCoord = AimTile->GridCoord;
+        if (!Fixture.Submit(0, Attack) || !Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait"))) || !Fixture.Ready(0) || !Fixture.Ready(1)) return false;
+        Fixture.Round->Tick(0.1f);
+        const FString Context = FString::Printf(TEXT("Ground collision case %d"), Case);
+        const float ExpectedBoundaryHP = Case == 2 || Case == 3 || Case == 5 || Case == 6 ? 100.0f : 83.0f;
+        const float ExpectedSecondHP = Case == 1 || Case == 6 ? 100.0f : 83.0f;
+        TestTrue(Context + TEXT(" uses the exposed capsule edge beyond the center-distance radius"), FMath::IsNearlyEqual(Boundary->GetAttributeSet()->GetHP(), ExpectedBoundaryHP));
+        TestTrue(Context + TEXT(" overlaps a second capsule in three dimensions independently of the first"), FMath::IsNearlyEqual(Second->GetAttributeSet()->GetHP(), ExpectedSecondHP));
+        TestTrue(Context + TEXT(" excludes allies, dead capsules and other combat rosters"), FMath::IsNearlyEqual(Friend->GetAttributeSet()->GetHP(), 100.0f) && FMath::IsNearlyEqual(Dead->GetAttributeSet()->GetHP(), DeadHP) && FMath::IsNearlyEqual(OtherCombat->GetAttributeSet()->GetHP(), 100.0f));
+        if (!TestTrue(Context + TEXT(" settles after one attack"), Fixture.AdvanceUntilNextRound(1))) return false;
+        TestTrue(Context + TEXT(" does not repeat damage for extra pawn components or later steps"), FMath::IsNearlyEqual(Boundary->GetAttributeSet()->GetHP(), ExpectedBoundaryHP) && FMath::IsNearlyEqual(Second->GetAttributeSet()->GetHP(), ExpectedSecondHP));
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundPendingProjectileTest, "ProjectA.Combat.Round.PendingProjectileBlocksNextRound", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FCombatRoundPendingProjectileTest::RunTest(const FString& Parameters)
@@ -514,6 +667,125 @@ bool FCombatRoundProjectileCollisionTest::RunTest(const FString& Parameters)
     Expiring->AdvanceProjectile(1.0f);
     TestEqual(TEXT("Missed projectile has a bounded lifetime"), Expired, 1);
     TestEqual(TEXT("Expiration never fabricates a hit"), UnexpectedHits, 0);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundProjectileObstacleTest, "ProjectA.Combat.Round.ProjectileWorldObstacles", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundProjectileObstacleTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Case = 0; Case < 4; ++Case)
+    {
+        FFixture Fixture;
+        AUnitBase* Source = Fixture.AddUnit(FIntPoint(0, 0), ETeam::Player);
+        AUnitBase* Target = Fixture.AddUnit(FIntPoint(0, 3), ETeam::Enemy);
+        if (!Source || !Target) return false;
+        const bool bTargetBeforeWall = Case == 2;
+        const bool bInitialWallOverlap = Case == 3;
+        const FVector WallLocation(0.0f, bInitialWallOverlap ? 0.0f : bTargetBeforeWall ? 580.0f : 300.0f, 100.0f);
+        if (!TestNotNull(TEXT("The physical obstacle exists"), Fixture.AddObstacle(WallLocation, FVector(120.0f, 5.0f, 120.0f), ECR_Block, Case == 1 ? ECC_WorldDynamic : ECC_WorldStatic))) return false;
+        ACombatRoundProjectile* Projectile = Fixture.World->SpawnActor<ACombatRoundProjectile>(Source->GetActorLocation(), FRotator::ZeroRotator);
+        if (!Projectile) return false;
+        int32 Impacts = 0;
+        int32 Resolutions = 0;
+        Projectile->OnImpact.AddLambda([&Impacts](AUnitBase* Caster, AUnitBase* Hit, float Damage)
+        {
+            ++Impacts;
+            UCombatEffectLibrary::ApplyDamageToUnit(Caster, Hit, UGE_Damage::StaticClass(), Damage);
+        });
+        Projectile->OnResolved.AddLambda([&Resolutions](ACombatRoundProjectile*) { ++Resolutions; });
+        Projectile->InitializeProjectile(Source, Target, Target->GetActorLocation(), 1000.0f, 17.0f, 12.0f, 2.0f, false, false);
+        Projectile->AdvanceProjectile(1.0f);
+        TestEqual(TEXT("The earliest unit or world obstruction resolves the projectile once"), Resolutions, 1);
+        TestEqual(TEXT("Only a capsule contact before the wall delivers damage"), Impacts, bTargetBeforeWall ? 1 : 0);
+        TestTrue(TEXT("Static, dynamic and initial-overlap walls preserve the protected target's HP"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), bTargetBeforeWall ? 83.0f : 100.0f));
+        if (bInitialWallOverlap) TestTrue(TEXT("A projectile already inside a wall does not advance"), Projectile->GetActorLocation().Equals(Source->GetActorLocation()));
+        Projectile->AdvanceProjectile(1.0f);
+        TestEqual(TEXT("Settled collision never repeats completion"), Resolutions, 1);
+        TestEqual(TEXT("Settled collision never repeats damage"), Impacts, bTargetBeforeWall ? 1 : 0);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundProjectileShapeTest, "ProjectA.Combat.Round.ProjectileCapsuleAndNonblockingShapes", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundProjectileShapeTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Case = 0; Case < 4; ++Case)
+    {
+        FFixture Fixture;
+        AUnitBase* Source = Fixture.AddUnit(FIntPoint(0, 0), ETeam::Player);
+        AUnitBase* Target = Fixture.AddUnit(FIntPoint(0, 3), ETeam::Enemy);
+        if (!Source || !Target) return false;
+        const bool bOnlySensorInPath = Case == 2;
+        if (!Fixture.AddObstacle(FVector(0.0f, 200.0f, 100.0f), FVector(60.0f, 10.0f, 80.0f), Case == 0 ? ECR_Ignore : ECR_Overlap)) return false;
+        ACombatGridTile* PickingTile = Fixture.Grid->GetTileAtCoord(FIntPoint(2, 2));
+        PickingTile->SetActorLocation(FVector(0.0f, 300.0f, 100.0f));
+        PickingTile->SetActorEnableCollision(true);
+        if (bOnlySensorInPath)
+        {
+            Target->SetActorLocation(FVector(250.0f, 600.0f, 100.0f), false);
+            Fixture.AddPawnSensor(Target, FVector(-250.0f, -200.0f, 0.0f), FVector(40.0f));
+        }
+        if (Case == 3) Fixture.AddPawnSensor(Target, FVector(0.0f, -200.0f, 0.0f), FVector(40.0f));
+        ACombatRoundProjectile* Projectile = Fixture.World->SpawnActor<ACombatRoundProjectile>(Source->GetActorLocation(), FRotator::ZeroRotator);
+        if (!Projectile) return false;
+        AUnitBase* HitUnit = nullptr;
+        int32 Resolutions = 0;
+        Projectile->OnImpact.AddLambda([&HitUnit](AUnitBase*, AUnitBase* Hit, float) { HitUnit = Hit; });
+        Projectile->OnResolved.AddLambda([&Resolutions](ACombatRoundProjectile*) { ++Resolutions; });
+        Projectile->InitializeProjectile(Source, Target, FVector(0.0f, 700.0f, 100.0f), 1000.0f, 17.0f, 12.0f, 2.0f, false, false);
+        Projectile->AdvanceProjectile(1.0f);
+        TestEqual(TEXT("Ignored shapes, trigger overlaps and visibility-only tiles do not block a capsule hit"), HitUnit, bOnlySensorInPath ? nullptr : Target);
+        TestEqual(TEXT("A sensor without a capsule intersection cannot create extra impacts"), Resolutions, 1);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundProjectileRosterTest, "ProjectA.Combat.Round.ProjectileRosterIsolation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundProjectileRosterTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Case = 0; Case < 3; ++Case)
+    {
+        FFixture Fixture;
+        AUnitBase* Source = Fixture.AddUnit(FIntPoint(0, 0), ETeam::Player);
+        AUnitBase* Friend = Fixture.AddUnit(FIntPoint(0, 1), ETeam::Player);
+        AUnitBase* OtherCombat = Fixture.AddUnit(FIntPoint(0, 2), ETeam::Enemy);
+        AUnitBase* Target = Fixture.AddUnit(FIntPoint(0, 3), ETeam::Enemy);
+        AUnitBase* Dead = Fixture.AddUnit(FIntPoint(1, 2), ETeam::Enemy);
+        if (!Source || !Friend || !OtherCombat || !Target || !Dead) return false;
+        Target->UnitIndex = OtherCombat->UnitIndex = 10;
+        Dead->SetActorLocation(FVector(0.0f, 300.0f, 100.0f), false);
+        Dead->Die();
+        Dead->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        OtherCombat->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+        Dead->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+        const float DeadHP = Dead->GetAttributeSet()->GetHP();
+        ACombatRoundProjectile* Projectile = Fixture.World->SpawnActor<ACombatRoundProjectile>(Source->GetActorLocation(), FRotator::ZeroRotator);
+        if (!Projectile) return false;
+        TArray<AUnitBase*> Allowed;
+        if (Case != 1) Allowed = {Source, Friend, Dead, Target};
+        Projectile->SetAllowedTargets(Allowed);
+        AUnitBase* HitUnit = nullptr;
+        int32 Resolutions = 0;
+        Projectile->OnImpact.AddLambda([&HitUnit](AUnitBase* Caster, AUnitBase* Hit, float Damage)
+        {
+            HitUnit = Hit;
+            UCombatEffectLibrary::ApplyDamageToUnit(Caster, Hit, UGE_Damage::StaticClass(), Damage);
+        });
+        Projectile->OnResolved.AddLambda([&Resolutions](ACombatRoundProjectile*) { ++Resolutions; });
+        Projectile->InitializeProjectile(Source, Target, FVector(0.0f, 700.0f, 100.0f), 1000.0f, 17.0f, 12.0f, 2.0f, false, false);
+        if (Case == 2) Projectile->SetAllowedTargets({OtherCombat});
+        Projectile->AdvanceProjectile(1.0f);
+        TestEqual(TEXT("Only the frozen encounter roster can receive the projectile"), HitUnit, Case == 1 ? nullptr : Target);
+        TestEqual(TEXT("A restricted or empty roster still resolves flight once"), Resolutions, 1);
+        TestTrue(TEXT("A same-index external enemy and eligible-roster ally or corpse never absorb the attack"), FMath::IsNearlyEqual(OtherCombat->GetAttributeSet()->GetHP(), 100.0f) && FMath::IsNearlyEqual(Friend->GetAttributeSet()->GetHP(), 100.0f) && FMath::IsNearlyEqual(Dead->GetAttributeSet()->GetHP(), DeadHP));
+        TestTrue(TEXT("The permitted capsule receives damage once and an empty roster receives none"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), Case == 1 ? 100.0f : 83.0f));
+    }
     return true;
 }
 

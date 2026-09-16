@@ -81,7 +81,9 @@ struct PROJECTA_API FCombatRoundSkill
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     bool bHoming = false;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    // Restrict projectile collisions to the aimed unit only when the skill explicitly requires it.
+    // 스킬이 명시적으로 요구하는 경우에만 투사체 충돌을 조준 유닛으로 제한합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "Kind == ECombatRoundSkillKind::Projectile"))
     bool bTargetOnly = true;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -92,6 +94,11 @@ struct PROJECTA_API FCombatRoundSkill
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     float HitRange = 150.f;
+
+    // The melee sweep radius is capped at half the forward reach to keep its volume in front of the caster.
+    // 근접 스윕 반경은 전방 사거리의 절반으로 제한하여 판정 범위를 시전자 앞에 유지합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.1", ClampMax = "1000.0", EditCondition = "Kind == ECombatRoundSkillKind::Melee"))
+    float MeleeRadius = 35.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     float MoveSpeed = 700.f;

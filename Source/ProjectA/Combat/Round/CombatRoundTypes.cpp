@@ -23,6 +23,7 @@ bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
     if (!FMath::IsFinite(Skill.WindupSeconds) || Skill.WindupSeconds < 0.f || Skill.WindupSeconds > 60.f) return false;
     if (!FMath::IsFinite(Skill.Power) || Skill.Power < 0.f || Skill.Power > 1000000.f) return false;
     if (!FMath::IsFinite(Skill.HitRange) || Skill.HitRange <= 0.f || Skill.HitRange > 100000.f) return false;
+    if (!FMath::IsFinite(Skill.MeleeRadius) || Skill.MeleeRadius <= 0.f || Skill.MeleeRadius > 1000.f) return false;
     if (!FMath::IsFinite(Skill.MoveSpeed) || Skill.MoveSpeed <= 0.f || Skill.MoveSpeed > 100000.f) return false;
     if (!FMath::IsFinite(Skill.ProjectileSpeed) || Skill.ProjectileSpeed <= 0.f || Skill.ProjectileSpeed > 100000.f) return false;
     if (!FMath::IsFinite(Skill.ProjectileRadius) || Skill.ProjectileRadius <= 0.f || Skill.ProjectileRadius > 1000.f) return false;
