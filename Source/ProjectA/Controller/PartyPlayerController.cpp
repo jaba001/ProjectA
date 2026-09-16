@@ -119,7 +119,7 @@ void APartyPlayerController::ClientReceiveCombatActionResponse_Implementation(co
 
 void APartyPlayerController::HandleTileClicked(ACombatGridTile* Tile)
 {
-    SetSelectedTile(Tile);
+    if (HandleRoundWorldTileClicked(Tile)) SetSelectedTile(Tile);
 }
 
 bool APartyPlayerController::CanUseActiveUnitAction() const

@@ -370,11 +370,12 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         }
         SpawnedUnits.Add(Unit);
         PartyActors.Add(Member.SlotIndex, Unit);
+        // Combat starts with the configured profession skills; prototype pool rewards are not granted implicitly.
+        // 전투는 설정된 직업 시작 스킬로 시작하며 시험용 풀 보상을 임의로 추가하지 않습니다.
         if (!Unit->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, Profession.StartingSkills, Profession.Strength, Profession.Dexterity, Profession.Intelligence))
         {
             return false;
         }
-        Unit->AcquireSkillFromPool(PartyDefinition->EncounterSkillPool);
         Unit->RuntimeCharacterName = Member.CharacterName;
         Unit->SetTeam(ETeam::Player);
         Unit->SetCurrentTile(Tile);

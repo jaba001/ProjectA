@@ -2,17 +2,41 @@
 
 #include "CoreMinimal.h"
 #include "CommonActivatableWidget.h"
+#include "Components/Button.h"
 #include "Components/ComboBoxString.h"
 #include "Combat/Round/CombatRoundTypes.h"
 #include "CombatRoundPlanningWidget.generated.h"
 
 class ACombatRoundCoordinator;
-class UButton;
+class ACombatRoundPlayerController;
+class ACombatGridTile;
 class UTextBlock;
 class UVerticalBox;
+class UWrapBox;
 
-// Native planning controls require no generated Widget Blueprint assets.
-// 생성된 Widget Blueprint 에셋이 필요하지 않은 native 계획 입력 화면입니다.
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnCombatRoundSkillPicked, FName);
+
+// Each equipped skill button carries its stable identifier instead of a display-name lookup.
+// 장착 스킬 버튼은 표시 이름 검색 대신 고유 식별자를 전달합니다.
+UCLASS()
+class PROJECTA_API UCombatRoundSkillButton : public UButton
+{
+    GENERATED_BODY()
+
+public:
+    void InitializeSkill(FName InSkillId);
+    FName GetSkillId() const { return SkillId; }
+    FOnCombatRoundSkillPicked OnSkillPicked;
+
+private:
+    UFUNCTION()
+    void HandleClicked();
+
+    FName SkillId;
+};
+
+// World target selection and equipped skills share the existing authoritative round planner.
+// 전장 대상 선택과 장착 스킬은 기존 서버 권위 라운드 계획을 함께 사용합니다.
 UCLASS()
 class PROJECTA_API UCombatRoundPlanningWidget : public UCommonActivatableWidget
 {
@@ -23,32 +47,34 @@ public:
 
 protected:
     virtual void NativeOnInitialized() override;
+    virtual void NativeOnActivated() override;
+    virtual void NativeOnDeactivated() override;
+    virtual void NativeDestruct() override;
     virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
     UTextBlock* AddText(UVerticalBox* Box, const FString& Text, int32 FontSize = 15);
     UButton* AddButton(UVerticalBox* Box, const FString& Text);
-    UComboBoxString* AddCombo(UVerticalBox* Box, const FString& Label);
     void RefreshView();
     bool RefreshOptions(const ACombatRoundCoordinator* Coordinator, int32 OwnerSlot);
-    void RefreshTargetOptions();
     void LoadSelectedCommand();
-    void RefreshSkillDescription();
-    void RefreshDestinationOptions();
+    void RefreshHighlights();
+    void ClearHighlights();
+    void UnbindWorldInput();
+    bool CanEdit() const;
     const FCombatRoundSkill* GetSelectedSkill() const;
     int32 GetSelectedUnitId() const;
-    FCombatRoundCommand BuildSelectedCommand() const;
-    bool HasUnappliedChanges() const;
+    FCombatRoundCommand BuildCommand(FName SkillId) const;
     bool CanReadyPlans(FText& OutError) const;
+    void HandleWorldUnitClicked(int32 UnitId);
+    void HandleWorldTileClicked(FIntPoint Coord);
+    void HandleSkillPicked(FName SkillId);
 
     UFUNCTION()
     void HandleUnitChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
 
     UFUNCTION()
-    void HandleSkillChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
-
-    UFUNCTION()
-    void HandleApplyPlan();
+    void HandleMove();
 
     UFUNCTION()
     void HandleReady();
@@ -63,6 +89,12 @@ private:
     TObjectPtr<UTextBlock> Roster;
 
     UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> UnitDetails;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> TargetDetails;
+
+    UPROPERTY(Transient)
     TObjectPtr<UTextBlock> SkillDescription;
 
     UPROPERTY(Transient)
@@ -72,19 +104,13 @@ private:
     TObjectPtr<UComboBoxString> UnitChoice;
 
     UPROPERTY(Transient)
-    TObjectPtr<UComboBoxString> SkillChoice;
+    TObjectPtr<UWrapBox> SkillList;
 
     UPROPERTY(Transient)
-    TObjectPtr<UComboBoxString> TargetChoice;
+    TArray<TObjectPtr<UCombatRoundSkillButton>> SkillButtons;
 
     UPROPERTY(Transient)
-    TObjectPtr<UComboBoxString> TargetTileChoice;
-
-    UPROPERTY(Transient)
-    TObjectPtr<UComboBoxString> DestinationChoice;
-
-    UPROPERTY(Transient)
-    TObjectPtr<UButton> ApplyButton;
+    TObjectPtr<UButton> MoveButton;
 
     UPROPERTY(Transient)
     TObjectPtr<UButton> ReadyButton;
@@ -92,11 +118,16 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<UButton> UnreadyButton;
 
+    TWeakObjectPtr<ACombatRoundPlayerController> BoundController;
+    TArray<TWeakObjectPtr<ACombatGridTile>> HighlightedTiles;
     TArray<int32> OwnUnitIds;
-    TArray<int32> TargetUnitIds;
     TArray<FName> SkillIds;
-    TArray<FIntPoint> TargetCoords;
-    TArray<FIntPoint> DestinationCoords;
+    FName SelectedSkillId;
+    int32 SelectedTargetId = INDEX_NONE;
+    FIntPoint SelectedTargetCoord = FIntPoint::ZeroValue;
+    bool bHasTargetTile = false;
+    bool bChoosingMove = false;
+    FText LocalStatus;
     FGuid ObservedCombatId;
     int32 ObservedRound = INDEX_NONE;
     float RefreshElapsed = 0.f;

@@ -39,6 +39,11 @@ public:
     bool SubmitPlan(APlayerController* Controller, FGuid CombatId, int32 RoundNumber, int32 Revision, const FCombatRoundCommand& Command, FText& OutError);
     bool SetParticipantReady(APlayerController* Controller, FGuid CombatId, int32 RoundNumber, int32 Revision, bool bReady, FText& OutError);
     bool CanPlanCommand(const FCombatRoundCommand& Command, FText& OutError) const;
+    // Reposition during planning with SUP without adding a fabricated combat skill.
+    // 가상 전투 스킬을 추가하지 않고 계획 단계에서 SUP로 위치를 옮깁니다.
+    bool SubmitMove(APlayerController* Controller, FGuid CombatId, int32 RoundNumber, int32 Revision, int32 UnitId, FIntPoint Destination, FText& OutError);
+    bool CanMoveUnit(int32 UnitId, FIntPoint Destination, FText& OutError) const;
+    bool IsPlanningMoveInProgress() const { return bPlanningMoveInProgress; }
     bool IsValidUnitTarget(int32 SourceUnitId, FName SkillId, int32 TargetUnitId) const;
     const FCombatRoundView& GetView() const { return View; }
     const TArray<FCombatRoundSkill>& GetSkills() const { return Skills; }
@@ -69,6 +74,9 @@ private:
     TArray<FCombatRoundSkill> Skills;
 
     UPROPERTY(Replicated)
+    bool bPlanningMoveInProgress = false;
+
+    UPROPERTY(Replicated)
     TObjectPtr<ACombatArena> Arena = nullptr;
 
     UPROPERTY()
@@ -85,8 +93,19 @@ private:
     double MontageClock = 0.0;
     double Accumulator = 0.0;
     bool bCleaningUp = false;
+    int32 PlanningMoveIndex = INDEX_NONE;
+    TArray<FIntPoint> PlanningMovePath;
+    int32 PlanningMoveStep = 0;
+    double PlanningMoveElapsed = 0.0;
+    FVector PlanningMoveOrigin = FVector::ZeroVector;
+    FRotator PlanningMoveRotation = FRotator::ZeroRotator;
 
-    void BuildPrototypeSkills();
+    // Resolve server-only AI idling separately from the equipped skill catalogue.
+    // 서버 전용 AI 대기는 장착 스킬 목록과 분리하여 해석합니다.
+    const FCombatRoundSkill* FindCommandSkill(const FCombatRoundCommand& Command) const;
+    bool BuildPlanningMovePath(int32 UnitId, FIntPoint Destination, TArray<FIntPoint>& OutPath, FText& OutError) const;
+    void AdvancePlanningMove(float DeltaSeconds);
+    void FinishPlanningMove(bool bSucceeded);
     void CleanupUnits();
     void BeginPlanning();
     void LockPlans();

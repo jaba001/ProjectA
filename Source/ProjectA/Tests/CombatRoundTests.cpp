@@ -42,6 +42,7 @@ namespace CombatRoundTests
         TArray<APartyPlayerController*> Controllers;
         FName EnemySkillId;
         FName HumanSkillId;
+        TMap<TWeakObjectPtr<AUnitBase>, TMap<FName, FName>> SkillAliases;
         FText Error;
 
         FFixture()
@@ -103,22 +104,87 @@ namespace CombatRoundTests
             return Unit;
         }
 
-        bool GiveRoundSkill(AUnitBase* Unit, const FCombatRoundSkill* Definition, FName& OutSkillId)
+        USkillDefinitionDataAsset* MakeSkill(AUnitBase* Unit, FName Alias, const FCombatRoundSkill& Definition)
         {
-            USkillDefinitionDataAsset* Skill = NewObject<USkillDefinitionDataAsset>(Unit);
+            USkillDefinitionDataAsset* Skill = NewObject<USkillDefinitionDataAsset>(Unit, FName(*(TEXT("RoundFixture_") + FGuid::NewGuid().ToString(EGuidFormats::Digits))));
             Skill->AbilityClass = UGA_DefaultAttack::StaticClass();
-            Skill->SkillName = FText::FromString(Definition ? TEXT("Fixture authored action") : TEXT("Fixture wait"));
+            Skill->SkillName = FText::FromName(Alias);
             Skill->bUseRoundDefinition = true;
-            Skill->RoundDefinition.Kind = ECombatRoundSkillKind::Wait;
-            Skill->RoundDefinition.Approach = ECombatRoundApproach::None;
-            Skill->RoundDefinition.ActionPointCost = 0;
-            Skill->RoundDefinition.Power = 0.0f;
-            if (Definition) Skill->RoundDefinition = *Definition;
-            OutSkillId = FName(*Skill->GetPrimaryAssetId().ToString());
-            return Unit->ConfigureProfession(100.0f, 2, 2, {Skill});
+            Skill->RoundDefinition = Definition;
+            SkillAliases.FindOrAdd(Unit).Add(Alias, FName(*Skill->GetPrimaryAssetId().ToString()));
+            return Skill;
         }
 
-        bool Initialize(int32 HumanCount = 1, float EnemySpeed = 10.0f, const FCombatRoundSkill* EnemySkill = nullptr, FIntPoint EnemyCoord = FIntPoint(0, 3), int32 EnemyCount = 1, const FCombatRoundSkill* FirstHumanSkill = nullptr, float FirstHumanSpeed = 20.0f)
+        FCombatRoundSkill WaitDefinition() const
+        {
+            FCombatRoundSkill Skill;
+            Skill.Kind = ECombatRoundSkillKind::Wait;
+            Skill.Approach = ECombatRoundApproach::None;
+            Skill.ActionPointCost = 0;
+            Skill.Power = 0.0f;
+            return Skill;
+        }
+
+        FName SkillId(AUnitBase* Unit, FName Alias) const
+        {
+            const TMap<FName, FName>* Aliases = SkillAliases.Find(Unit);
+            const FName* Id = Aliases ? Aliases->Find(Alias) : nullptr;
+            return Id ? *Id : Alias;
+        }
+
+        bool GiveRoundSkill(AUnitBase* Unit, const FCombatRoundSkill* Definition, FName& OutSkillId, bool bIncludeWait = false)
+        {
+            USkillDefinitionDataAsset* Skill = MakeSkill(Unit, Definition ? FName(TEXT("Authored")) : FName(TEXT("Wait")), Definition ? *Definition : WaitDefinition());
+            OutSkillId = FName(*Skill->GetPrimaryAssetId().ToString());
+            TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills{Skill};
+            if (Definition && bIncludeWait) Skills.Add(MakeSkill(Unit, TEXT("Wait"), WaitDefinition()));
+            return Unit->ConfigureProfession(100.0f, 2, 2, Skills);
+        }
+
+        // Historical test actions are explicit equipped assets, never production coordinator defaults.
+        // 기존 시험 행동은 실전 조정자 기본값이 아니라 명시적으로 장착한 에셋입니다.
+        bool GiveFixtureSkills(AUnitBase* Unit)
+        {
+            TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
+            FCombatRoundSkill Skill;
+            Skills.Add(MakeSkill(Unit, TEXT("Strike"), Skill));
+            Skill = FCombatRoundSkill();
+            Skill.Kind = ECombatRoundSkillKind::Projectile;
+            Skill.Approach = ECombatRoundApproach::None;
+            Skill.TargetLoss = ECombatRoundTargetLoss::KeepLocation;
+            Skill.bTargetOnly = false;
+            Skill.Power = 20.0f;
+            Skill.WindupSeconds = 0.2f;
+            Skills.Add(MakeSkill(Unit, TEXT("Arrow"), Skill));
+            Skill = FCombatRoundSkill();
+            Skill.Kind = ECombatRoundSkillKind::GroundAttack;
+            Skill.Approach = ECombatRoundApproach::Tile;
+            Skill.TargetLoss = ECombatRoundTargetLoss::KeepLocation;
+            Skill.Power = 20.0f;
+            Skill.HitRange = 170.0f;
+            Skill.WindupSeconds = 0.45f;
+            Skills.Add(MakeSkill(Unit, TEXT("GroundStrike"), Skill));
+            Skill = FCombatRoundSkill();
+            Skill.Kind = ECombatRoundSkillKind::Projectile;
+            Skill.Approach = ECombatRoundApproach::Tile;
+            Skill.TargetLoss = ECombatRoundTargetLoss::KeepLocation;
+            Skill.bRemainAtDestination = true;
+            Skill.Power = 15.0f;
+            Skill.bTargetOnly = false;
+            Skill.SubActionPointCost = 1;
+            Skills.Add(MakeSkill(Unit, TEXT("MoveShot"), Skill));
+            Skill = FCombatRoundSkill();
+            Skill.Kind = ECombatRoundSkillKind::Guard;
+            Skill.Approach = ECombatRoundApproach::None;
+            Skill.Power = 25.0f;
+            Skill.WindupSeconds = 0.15f;
+            Skill.HitRange = 1500.0f;
+            Skills.Add(MakeSkill(Unit, TEXT("Guard"), Skill));
+            Skills.Add(MakeSkill(Unit, TEXT("Wait"), WaitDefinition()));
+            return Unit->ConfigureProfession(100.0f, 2, 2, Skills);
+        }
+
+        bool Initialize(int32 HumanCount = 1, float EnemySpeed = 10.0f, const FCombatRoundSkill* EnemySkill = nullptr, FIntPoint EnemyCoord = FIntPoint(0, 3), int32 EnemyCount = 1, const FCombatRoundSkill* FirstHumanSkill = nullptr, float FirstHumanSpeed = 20.0f, bool bUseFixtureSkills = true, bool bEnemyWithoutSkills = false, int32 FirstHumanMoveRange = 1)
         {
             if (!World.IsValid() || !Combat || !Arena || !Grid || Grid->TileMap.Num() != 16 || EnemyCount < 1 || EnemyCount > 4) return false;
             FRunIdentityData Identity;
@@ -133,7 +199,12 @@ namespace CombatRoundTests
                 AUnitBase* Unit = AddUnit(FIntPoint(Index * 2, 0), ETeam::Player);
                 APartyPlayerController* Controller = World->SpawnActor<APartyPlayerController>();
                 if (!Unit || !Controller) return false;
-                if (Index == 0 && FirstHumanSkill && !GiveRoundSkill(Unit, FirstHumanSkill, HumanSkillId)) return false;
+                if (Index == 0 && !Unit->ConfigureMoveRange(FirstHumanMoveRange)) return false;
+                if (Index == 0 && FirstHumanSkill)
+                {
+                    if (!GiveRoundSkill(Unit, FirstHumanSkill, HumanSkillId, bUseFixtureSkills)) return false;
+                }
+                else if (bUseFixtureSkills && !GiveFixtureSkills(Unit)) return false;
                 Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), FirstHumanSpeed - Index * 2.0f);
                 World->AddController(Controller);
                 Controller->SetCombatContext(Combat, true);
@@ -157,7 +228,7 @@ namespace CombatRoundTests
             for (int32 Index = 0; Index < EnemyCount; ++Index)
             {
                 AUnitBase* Enemy = AddUnit(EnemyCoord + FIntPoint(Index, 0), ETeam::Enemy);
-                if (!Enemy || !GiveRoundSkill(Enemy, EnemySkill, EnemySkillId)) return false;
+                if (!Enemy || (!bEnemyWithoutSkills && !GiveRoundSkill(Enemy, EnemySkill, EnemySkillId))) return false;
                 Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), EnemySpeed);
                 Enemies.Add(Enemy);
                 Units.Add(Enemy);
@@ -178,7 +249,7 @@ namespace CombatRoundTests
         {
             FCombatRoundCommand Result;
             Result.UnitId = Unit->UnitIndex;
-            Result.SkillId = Skill;
+            Result.SkillId = SkillId(Unit, Skill);
             Result.DestinationCoord = Unit->GetCurrentTile()->GridCoord;
             Result.TargetCoord = Target ? Target->GetCurrentTile()->GridCoord : Result.DestinationCoord;
             Result.TargetUnitId = Target ? Target->UnitIndex : INDEX_NONE;
@@ -225,7 +296,7 @@ namespace CombatRoundTests
                 Member.CurrentHP = bSelectedCharacterDead && Member.bPlayerControlled ? 0.0f : 100.0f;
                 if (Member.CurrentHP == 0.0f) continue;
                 AUnitBase* Unit = AddUnit(FIntPoint(Index * 2, 0), ETeam::Player, APlayerUnit::StaticClass());
-                if (!Unit || !GiveRoundSkill(Unit, &Skill, HumanSkillId)) return false;
+                if (!Unit || !GiveRoundSkill(Unit, &Skill, HumanSkillId, true)) return false;
                 Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 20.0f);
                 Humans[Index] = Unit;
                 PartyActors.Add(Index, Unit);
@@ -292,6 +363,12 @@ namespace CombatRoundTests
             return Round->SetParticipantReady(Controllers[ControllerIndex], View.CombatId, View.RoundNumber, View.PlanRevision, true, Error);
         }
 
+        bool Move(int32 ControllerIndex, AUnitBase* Unit, FIntPoint Destination)
+        {
+            const FCombatRoundView& View = Round->GetView();
+            return Round->SubmitMove(Controllers[ControllerIndex], View.CombatId, View.RoundNumber, View.PlanRevision, Unit->UnitIndex, Destination, Error);
+        }
+
         bool AdvanceUntilNextRound(int32 InitialRound)
         {
             for (int32 Step = 0; Step < 1000 && Round->GetView().RoundNumber == InitialRound && Round->IsRoundSessionActive(); ++Step)
@@ -319,29 +396,69 @@ bool FCombatRoundPlanningTargetsTest::RunTest(const FString& Parameters)
     AUnitBase* Source = Fixture.Humans[0];
     AUnitBase* Friend = Fixture.Humans[1];
     AUnitBase* Enemy = Fixture.Enemies[0];
-    TestTrue(TEXT("Attack offers a living enemy"), Round->IsValidUnitTarget(Source->UnitIndex, TEXT("Strike"), Enemy->UnitIndex));
-    TestFalse(TEXT("Attack excludes a living ally"), Round->IsValidUnitTarget(Source->UnitIndex, TEXT("Strike"), Friend->UnitIndex));
-    TestTrue(TEXT("Guard offers a living ally"), Round->IsValidUnitTarget(Source->UnitIndex, TEXT("Guard"), Friend->UnitIndex));
-    TestTrue(TEXT("Guard keeps the existing self-target option"), Round->IsValidUnitTarget(Source->UnitIndex, TEXT("Guard"), Source->UnitIndex));
-    TestFalse(TEXT("Guard excludes enemies"), Round->IsValidUnitTarget(Source->UnitIndex, TEXT("Guard"), Enemy->UnitIndex));
-    TestFalse(TEXT("Unknown source cannot produce target candidates"), Round->IsValidUnitTarget(INDEX_NONE, TEXT("Strike"), Enemy->UnitIndex));
+    TestTrue(TEXT("Attack offers a living enemy"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Strike")), Enemy->UnitIndex));
+    TestFalse(TEXT("Attack excludes a living ally"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Strike")), Friend->UnitIndex));
+    TestTrue(TEXT("Guard offers a living ally"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Guard")), Friend->UnitIndex));
+    TestTrue(TEXT("Guard keeps the existing self-target option"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Guard")), Source->UnitIndex));
+    TestFalse(TEXT("Guard excludes enemies"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Guard")), Enemy->UnitIndex));
+    TestFalse(TEXT("Unknown source cannot produce target candidates"), Round->IsValidUnitTarget(INDEX_NONE, Fixture.SkillId(Source, TEXT("Strike")), Enemy->UnitIndex));
     TestFalse(TEXT("Unknown skill cannot produce target candidates"), Round->IsValidUnitTarget(Source->UnitIndex, TEXT("Unknown"), Enemy->UnitIndex));
-    TestFalse(TEXT("Wait has no unit target choices"), Round->IsValidUnitTarget(Source->UnitIndex, TEXT("Wait"), Enemy->UnitIndex));
-    TestFalse(TEXT("Ground attacks have no unit target choices"), Round->IsValidUnitTarget(Source->UnitIndex, TEXT("GroundStrike"), Enemy->UnitIndex));
+    TestFalse(TEXT("Wait has no unit target choices"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Wait")), Enemy->UnitIndex));
+    TestFalse(TEXT("Ground attacks have no unit target choices"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("GroundStrike")), Enemy->UnitIndex));
     FText Error;
     TestTrue(TEXT("Wait is valid without a target"), Round->CanPlanCommand(Fixture.Command(Source, TEXT("Wait")), Error));
     FCombatRoundCommand Ground = Fixture.Command(Source, TEXT("GroundStrike"));
     Ground.TargetCoord = Enemy->GetCurrentTile()->GridCoord;
     Ground.DestinationCoord = Ground.TargetCoord;
     TestTrue(TEXT("Ground attack uses valid coordinates without a unit target"), Round->CanPlanCommand(Ground, Error));
-    TestEqual(TEXT("Common tile prototypes do not replace the passive enemy plan"), Round->GetView().Units.Last().Command.SkillId, FName(TEXT("Wait")));
+    TestTrue(TEXT("Other units' equipped actions do not replace the passive enemy's internal wait"), Round->GetView().Units.Last().Command.SkillId.IsNone());
     const FCombatRoundCommand Attack = Fixture.Command(Source, TEXT("Strike"), Enemy);
     Enemy->Die();
-    TestFalse(TEXT("A dead enemy disappears from attack candidates before another plan is submitted"), Round->IsValidUnitTarget(Source->UnitIndex, TEXT("Strike"), Enemy->UnitIndex));
+    TestFalse(TEXT("A dead enemy disappears from attack candidates before another plan is submitted"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Strike")), Enemy->UnitIndex));
     TestFalse(TEXT("A stale attack draft fails preview after target death"), Round->CanPlanCommand(Attack, Error));
     TestFalse(TEXT("The server also rejects the stale target"), Fixture.Submit(0, Attack));
     Friend->Die();
-    TestFalse(TEXT("A dead ally disappears from guard candidates"), Round->IsValidUnitTarget(Source->UnitIndex, TEXT("Guard"), Friend->UnitIndex));
+    TestFalse(TEXT("A dead ally disappears from guard candidates"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Guard")), Friend->UnitIndex));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundEquippedSkillsTest, "ProjectA.Combat.Round.OnlyEquippedSkillsAreSelectable", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundEquippedSkillsTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FCombatRoundSkill Authored;
+    Authored.Kind = ECombatRoundSkillKind::GroundAttack;
+    Authored.Approach = ECombatRoundApproach::None;
+    Authored.HitRange = 1000.0f;
+    Authored.Power = 7.0f;
+    Authored.WindupSeconds = 0.1f;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("The real-content fixture starts with one equipped attack and an unarmed AI"), Fixture.Initialize(1, 10.0f, nullptr, FIntPoint(0, 3), 1, &Authored, 20.0f, false, true))) return false;
+    AUnitBase* Human = Fixture.Humans[0];
+    AUnitBase* Enemy = Fixture.Enemies[0];
+    ACombatRoundCoordinator* Round = Fixture.Round;
+    TestEqual(TEXT("The coordinator publishes only the actually equipped definition"), Round->GetSkills().Num(), 1);
+    TestEqual(TEXT("The human has exactly its one equipped selection"), Round->GetView().Units[0].SkillIds.Num(), 1);
+    TestTrue(TEXT("The published skill ID is the equipped DataAsset's primary ID"), Round->GetView().Units[0].SkillIds.Contains(Fixture.HumanSkillId) && Round->FindSkill(Fixture.HumanSkillId));
+    TestTrue(TEXT("An unarmed AI receives no synthetic selectable skill"), Round->GetView().Units[1].SkillIds.IsEmpty() && Enemy->GetEquippedSkillDataAssets().IsEmpty());
+    TestNull(TEXT("The private AI wait is absent from the selectable catalog"), Round->FindSkill(NAME_None));
+    FText Error;
+    const FCombatRoundCommand EnemyWait = Round->GetView().Units[1].Command;
+    TestTrue(TEXT("The unarmed AI receives a ready internal wait"), EnemyWait.SkillId.IsNone() && Round->GetView().Units[1].bReady && Round->CanPlanCommand(EnemyWait, Error));
+    TestFalse(TEXT("A human cannot submit the private AI wait"), Fixture.Submit(0, Fixture.Command(Human, NAME_None)));
+    for (const TCHAR* RemovedId : {TEXT("Strike"), TEXT("Arrow"), TEXT("Guard"), TEXT("Wait"), TEXT("MoveShot"), TEXT("GroundStrike")})
+    {
+        TestNull(FString::Printf(TEXT("No implicit %s definition exists"), RemovedId), Round->FindSkill(FName(RemovedId)));
+        const FCombatRoundCommand Removed = Fixture.Command(Human, FName(RemovedId), Enemy);
+        TestFalse(FString::Printf(TEXT("Preview rejects unequipped %s"), RemovedId), Round->CanPlanCommand(Removed, Error));
+        TestFalse(FString::Printf(TEXT("The server rejects unequipped %s"), RemovedId), Fixture.Submit(0, Removed));
+    }
+    if (!TestTrue(TEXT("The actual equipped attack is accepted"), Fixture.Submit(0, Fixture.Command(Human, Fixture.HumanSkillId, Enemy))) || !TestTrue(TEXT("The real attack locks alongside the internal AI wait"), Fixture.Ready(0))) return false;
+    if (!TestTrue(TEXT("An AI without any equipped skill still settles the round"), Fixture.AdvanceUntilNextRound(1))) return false;
+    TestEqual(TEXT("The single equipped attack applies its authored damage once"), Enemy->GetAttributeSet()->GetHP(), 93.0f);
+    TestEqual(TEXT("The unarmed AI does not acquire a hidden attack"), Human->GetAttributeSet()->GetHP(), 100.0f);
+    TestTrue(TEXT("The next round still exposes no added human or AI actions"), Round->GetSkills().Num() == 1 && Round->GetView().Units[0].SkillIds.Num() == 1 && Round->GetView().Units[1].SkillIds.IsEmpty());
     return true;
 }
 
@@ -397,6 +514,96 @@ bool FCombatRoundPlanningValidationTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundPlanningMoveTest, "ProjectA.Combat.Round.PlanningSUPMovement", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundPlanningMoveTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("Two-owner movement fixture initializes"), Fixture.Initialize(2))) return false;
+    ACombatRoundCoordinator* Round = Fixture.Round;
+    AUnitBase* Source = Fixture.Humans[0];
+    AUnitBase* Friend = Fixture.Humans[1];
+    AUnitBase* Enemy = Fixture.Enemies[0];
+    ACombatGridTile* Origin = Source->GetCurrentTile();
+    ACombatGridTile* Destination = Fixture.Grid->GetTileAtCoord(FIntPoint(1, 1));
+    const FVector OriginalLocation = Source->GetActorLocation();
+    const FRotator OriginalRotation = Source->GetActorRotation();
+    if (!TestTrue(TEXT("Movement fixture starts with zero AP and one SUP"), Source->ConsumeActionPoint(2) && Source->ConsumeSubActionPoint(1))) return false;
+    FText Error;
+    TestTrue(TEXT("A diagonal empty allied tile is reachable with the default one-tile range"), Round->CanMoveUnit(Source->UnitIndex, Destination->GridCoord, Error));
+    TestFalse(TEXT("The current tile is not a movement destination"), Round->CanMoveUnit(Source->UnitIndex, Origin->GridCoord, Error));
+    TestFalse(TEXT("An empty tile beyond movement range is rejected"), Round->CanMoveUnit(Source->UnitIndex, FIntPoint(3, 1), Error));
+    TestFalse(TEXT("An empty enemy-territory tile is rejected"), Round->CanMoveUnit(Source->UnitIndex, FIntPoint(0, 2), Error));
+    TestFalse(TEXT("An occupied allied tile is rejected"), Round->CanMoveUnit(Source->UnitIndex, Friend->GetCurrentTile()->GridCoord, Error));
+    TestFalse(TEXT("Another participant cannot move the original owner's character"), Fixture.Move(1, Source, Destination->GridCoord));
+    TestEqual(TEXT("Rejected requests preserve the movement resource"), Source->GetCurrentSubActionPoint(), 1);
+    if (!TestTrue(TEXT("The mover applies a zero-cost wait"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Wait")))) || !TestTrue(TEXT("The second owner applies a wait"), Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait")))) || !TestTrue(TEXT("The second owner can ready before repositioning"), Fixture.Ready(1))) return false;
+    TestTrue(TEXT("The second owner is ready while the mover is still planning"), Round->GetView().Units[1].bReady && Round->GetView().Phase == ECombatRoundPhase::Planning);
+    const int32 Revision = Round->GetView().PlanRevision;
+    if (!TestTrue(TEXT("The original owner can reposition with zero AP and one SUP"), Fixture.Move(0, Source, Destination->GridCoord))) return false;
+    TestTrue(TEXT("Accepted movement starts immediately and changes the plan revision"), Round->IsPlanningMoveInProgress() && Round->GetView().PlanRevision > Revision);
+    TestEqual(TEXT("SUP movement never consumes AP"), Source->GetCurrentActionPoint(), 0);
+    TestEqual(TEXT("Movement consumes exactly one SUP on approval"), Source->GetCurrentSubActionPoint(), 0);
+    TestTrue(TEXT("Repositioning clears every human participant's ready state"), !Round->GetView().Units[0].bReady && !Round->GetView().Units[1].bReady);
+    TestFalse(TEXT("Commands cannot change during repositioning"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Wait"))));
+    TestFalse(TEXT("The moving participant cannot ready early"), Fixture.Ready(0));
+    TestFalse(TEXT("Another participant cannot ready during repositioning"), Fixture.Ready(1));
+    TestFalse(TEXT("Only one planning movement can run at a time"), Fixture.Move(1, Friend, FIntPoint(3, 1)));
+    Round->Tick(0.05f);
+    TestTrue(TEXT("Movement advances through world space before reaching its destination"), !Source->GetActorLocation().Equals(OriginalLocation, 1.0f) && Round->IsPlanningMoveInProgress());
+    TestTrue(TEXT("The origin remains occupied until movement completes"), Origin->GetOccupyingUnit() == Source && Source->GetCurrentTile() == Origin && Destination->GetOccupyingUnit() == nullptr);
+    for (int32 Step = 0; Step < 200 && Round->IsPlanningMoveInProgress(); ++Step) Round->Tick(0.01f);
+    if (!TestFalse(TEXT("The short movement finishes in bounded time"), Round->IsPlanningMoveInProgress())) return false;
+    const FVector NewHome = Destination->GetActorLocation() + FVector(0.0f, 0.0f, OriginalLocation.Z);
+    TestTrue(TEXT("Arrival transfers grid occupancy and the unit's tile together"), Origin->GetOccupyingUnit() == nullptr && Destination->GetOccupyingUnit() == Source && Source->GetCurrentTile() == Destination);
+    TestTrue(TEXT("Arrival publishes the new home coordinate"), Round->GetView().Units[0].HomeCoord == Destination->GridCoord);
+    TestTrue(TEXT("Arrival preserves height and restores the original facing"), Source->GetActorLocation().Equals(NewHome, 2.0f) && Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
+    TestFalse(TEXT("A second move is unavailable after SUP is spent"), Round->CanMoveUnit(Source->UnitIndex, Origin->GridCoord, Error));
+    if (!TestTrue(TEXT("The mover reapplies a wait at the new home"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Wait")))) || !TestTrue(TEXT("The second owner reapplies its wait"), Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait")))) || !TestTrue(TEXT("The mover readies after arriving"), Fixture.Ready(0)) || !TestTrue(TEXT("The second owner readies after arriving"), Fixture.Ready(1))) return false;
+    if (!TestTrue(TEXT("Repositioning does not prevent the round from settling"), Fixture.AdvanceUntilNextRound(1))) return false;
+    TestEqual(TEXT("Planning movement does not deal attack damage"), Enemy->GetAttributeSet()->GetHP(), 100.0f);
+    if (!TestTrue(TEXT("A later attack starts from the repositioned home"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Strike"), Enemy))) || !TestTrue(TEXT("The second owner waits for the attack"), Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait")))) || !TestTrue(TEXT("The attacking owner readies"), Fixture.Ready(0)) || !TestTrue(TEXT("The waiting owner readies"), Fixture.Ready(1))) return false;
+    if (!TestTrue(TEXT("The attack approaches, releases, and returns within a bounded round"), Fixture.AdvanceUntilNextRound(2))) return false;
+    TestEqual(TEXT("The attack still applies its authored damage once"), Enemy->GetAttributeSet()->GetHP(), 75.0f);
+    TestTrue(TEXT("The attack returns to the SUP destination rather than the previous home"), Source->GetActorLocation().Equals(NewHome, 2.0f) && Source->GetCurrentTile() == Destination && Round->GetView().Units[0].HomeCoord == Destination->GridCoord);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundPlanningMoveCancellationTest, "ProjectA.Combat.Round.PlanningSUPMovementCancellation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundPlanningMoveCancellationTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("Movement cancellation fixture initializes with a two-tile range"), Fixture.Initialize(1, 10.0f, nullptr, FIntPoint(0, 3), 1, nullptr, 20.0f, true, false, 2))) return false;
+    ACombatRoundCoordinator* Round = Fixture.Round;
+    AUnitBase* Source = Fixture.Humans[0];
+    ACombatGridTile* Origin = Source->GetCurrentTile();
+    ACombatGridTile* Destination = Fixture.Grid->GetTileAtCoord(FIntPoint(2, 1));
+    FText Error;
+    TestTrue(TEXT("The destination is reachable through empty allied tiles"), Round->CanMoveUnit(Source->UnitIndex, Destination->GridCoord, Error));
+    AUnitBase* BlockerA = Fixture.AddUnit(FIntPoint(1, 0), ETeam::Player);
+    AUnitBase* BlockerB = Fixture.AddUnit(FIntPoint(1, 1), ETeam::Player);
+    if (!TestNotNull(TEXT("The first occupied-path blocker exists"), BlockerA) || !TestNotNull(TEXT("The second occupied-path blocker exists"), BlockerB)) return false;
+    TestFalse(TEXT("Occupied intermediate tiles block every BFS route to an empty destination"), Round->CanMoveUnit(Source->UnitIndex, Destination->GridCoord, Error));
+    TestFalse(TEXT("The server also rejects the blocked route"), Fixture.Move(0, Source, Destination->GridCoord));
+    BlockerB->SetCurrentTile(Fixture.Grid->GetTileAtCoord(FIntPoint(3, 1)));
+    TestTrue(TEXT("Opening one diagonal route restores reachability"), Round->CanMoveUnit(Source->UnitIndex, Destination->GridCoord, Error));
+    const FVector OriginalLocation = Source->GetActorLocation();
+    const FRotator OriginalRotation = Source->GetActorRotation();
+    const int32 OriginalSUP = Source->GetCurrentSubActionPoint();
+    if (!TestTrue(TEXT("The reachable route starts moving"), Fixture.Move(0, Source, Destination->GridCoord))) return false;
+    Round->Tick(0.05f);
+    if (!TestTrue(TEXT("Suspension happens during real movement"), Round->IsPlanningMoveInProgress() && !Source->GetActorLocation().Equals(OriginalLocation, 1.0f))) return false;
+    Round->SuspendRound();
+    TestTrue(TEXT("Suspension ends the active move"), Round->GetView().Phase == ECombatRoundPhase::Suspended && !Round->IsPlanningMoveInProgress());
+    TestTrue(TEXT("Interrupted movement restores the original position and facing"), Source->GetActorLocation().Equals(OriginalLocation, 0.1f) && Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
+    TestTrue(TEXT("Interrupted movement retains its original home and occupancy"), Source->GetCurrentTile() == Origin && Origin->GetOccupyingUnit() == Source && Destination->GetOccupyingUnit() == nullptr && Round->GetView().Units[0].HomeCoord == Origin->GridCoord);
+    TestEqual(TEXT("An interrupted move does not refund the spent SUP"), Source->GetCurrentSubActionPoint(), OriginalSUP - 1);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundAuthoredTileAITest, "ProjectA.Combat.Round.AuthoredTileAIPlan", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FCombatRoundAuthoredTileAITest::RunTest(const FString& Parameters)
@@ -442,7 +649,7 @@ bool FCombatRoundAuthoredAIScopeTest::RunTest(const FString& Parameters)
         Skill.bRemainAtDestination = Case == 0;
         FFixture Fixture;
         if (!TestTrue(TEXT("Deferred AI tactic fixture initializes"), Fixture.Initialize(1, 10, &Skill))) return false;
-        TestEqual(Case == 0 ? TEXT("Authored resident movement is not selected automatically") : TEXT("Authored support is not selected automatically"), Fixture.Round->GetView().Units.Last().Command.SkillId, FName(TEXT("Wait")));
+        TestTrue(Case == 0 ? TEXT("Authored resident movement leaves only an internal AI wait") : TEXT("Authored support leaves only an internal AI wait"), Fixture.Round->GetView().Units.Last().Command.SkillId.IsNone());
     }
     return true;
 }
