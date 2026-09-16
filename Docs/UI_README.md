@@ -1,6 +1,6 @@
 # UI 구조·생성 도구
 
-기준일: 2026-09-16. 화면 구성과 JSON 기반 Widget Blueprint 생성 규칙을 정의한다. 게임 흐름·에셋 연결은 [PROJECT_PLAN](PROJECT_PLAN.md), 실행 결과는 [TEST_REPORT](TEST_REPORT.md)를 따른다.
+기준일: 2026-09-16. 화면 구성과 JSON 기반 Widget Blueprint 생성 규칙을 정의한다. 게임 흐름·에셋 연결은 [PROJECT_PLAN](PROJECT_PLAN.md), 실행 결과는 [HISTORY](HISTORY.md), 남은 확인은 [TODO](TODO.md)를 따른다.
 
 ## 구성과 편집 원칙
 
@@ -15,11 +15,11 @@
 
 기존 Designer WBP를 화면 구조의 기준으로 유지한다. 새 라운드 계획 화면은 7절의 native CommonUI 생성 경로를 사용한다. JSON은 초기 생성·바인딩 검증·누락 보완에 사용하며 결과 WidgetTree는 WBP에 저장된다. 9절의 공통 버튼·배경·글자색은 native 테마가 실행 시 적용하며 나머지 배치·폰트·세부 스타일은 Designer에서 편집한다. Editor API·의존성은 ProjectAEditor에 한정한다.
 
-첫 화면의 게임 시작은 native `UGameModeSelectionWidget`을 연다. 싱글플레이는 기존 CharacterCreation, 멀티플레이는 `UDevelopmentCoopWidget`의 같은 PC·LAN 방 생성·주소 참가·대기실로 연결한다. 첫 화면의 별도 개발용 협동 버튼은 제거한다. Gameplay의 CommonUI 대기실·전투 중 상태/나가기 영역은 유지한다. [메뉴 흐름](TEST_REPORT.md#23-시작-모드-선택과-싱글-여정-항복)과 [협동](TEST_REPORT.md#9-개발용-협동-ui)을 확인한다.
+첫 화면의 게임 시작은 native `UGameModeSelectionWidget`을 연다. 싱글플레이는 기존 CharacterCreation, 멀티플레이는 `UDevelopmentCoopWidget`의 같은 PC·LAN 방 생성·주소 참가·대기실로 연결한다. 첫 화면의 별도 개발용 협동 버튼은 제거한다. Gameplay의 CommonUI 대기실·전투 중 상태/나가기 영역은 유지한다. 추가 확인은 [TODO](TODO.md#1-사용자-작동-확인)에 기록한다.
 
 ## 실행과 옵션
 
-`URunEncounterWidget`은 기존 Gameplay RunLayer에서 선택 화면과 빈 상점을 표시한다. `EncounterChoice`에서 상점1·상점2·상점3 버튼을, `Shop`에서 선택한 상점 이름과 나가기 버튼을 사용한다. Host만 버튼을 활성화하고 Client는 같은 상태를 표시한다. CommonUI 메뉴 입력을 사용하며 기존 WBP 변경·새 영구 에셋 생성은 필요 없다. [TEST_REPORT 10절](TEST_REPORT.md#10-상점-인카운터)에서 확인한다.
+`URunEncounterWidget`은 기존 Gameplay RunLayer에서 선택 화면과 빈 상점을 표시한다. `EncounterChoice`에서 상점1·상점2·상점3 버튼을, `Shop`에서 선택한 상점 이름과 나가기 버튼을 사용한다. Host만 버튼을 활성화하고 Client는 같은 상태를 표시한다. CommonUI 메뉴 입력을 사용하며 기존 WBP 변경·새 영구 에셋 생성은 필요 없다. [남은 확인](TODO.md#1-사용자-작동-확인)에서 확인한다.
 
 Development Editor / Win64 빌드 후 프로젝트 루트 PowerShell에서 실행한다. 빌드·프로젝트 파일 재생성 명령은 [README](../README.md#개발-환경)를 따른다.
 
@@ -112,7 +112,7 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 
 프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 Warrior/Mage/Archer/Rogue 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
-`BP_PartyMenuPreview`의 `SKM_Manny_Simple` 메시에는 같은 Skeleton의 `/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle`을 SingleNode 모드·속도 1·반복·자동재생으로 연결한다. `ConfigureMenuPreview.py`도 `OverrideAnimationData`로 같은 기본값을 저장한다. BP 컴파일·저장과 독립 재로드에서 재생 설정·기존 메시/배치/NoCollision 보존을 확인했다. 실제 화면의 반복 재생·위치 유지·삭제/재진입 정리는 [TEST_REPORT 22-4](TEST_REPORT.md#22-4-캐릭터-생성-프리뷰-idle)에서 확인한다.
+`BP_PartyMenuPreview`의 `SKM_Manny_Simple` 메시에는 같은 Skeleton의 `/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle`을 SingleNode 모드·속도 1·반복·자동재생으로 연결한다. `ConfigureMenuPreview.py`도 `OverrideAnimationData`로 같은 기본값을 저장한다. BP 컴파일·저장과 독립 재로드에서 재생 설정·기존 메시/배치/NoCollision 보존을 확인했다. 실제 화면의 반복 재생·위치 유지·삭제/재진입 정리는 [남은 확인](TODO.md#2-6-캐릭터-생성-프리뷰)에서 확인한다.
 
 GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메뉴 travel의 잔여 IgnoreInput·초기 포커스만 복구한다. CharacterCreation의 Text_StartGameStatus는 선택 바인딩이며 누락 시 Native 표시 영역을 추가한다. 상세 배치·바인딩은 [PROJECT_PLAN](PROJECT_PLAN.md#gameplay-에셋과-배치)을 따른다.
 
@@ -121,7 +121,7 @@ GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메
 - 생성 결과: `Blueprint compile result: true`, `Asset save result: true`와 오류 여부 확인. DryRun 또는 종료 코드 0만으로 생성 완료를 판단하지 않는다.
 - Designer 확인: 부모 클래스·위젯 계층·변수·텍스트·색상·패딩·정렬 확인. Content Browser 미표시 시 경로·필터·에디터 재로드 확인.
 - 바인딩/갱신 실패: Native 빌드·이름/타입·부모 클래스·AddMissing/Overwrite 옵션 확인.
-- 작동 확인: 버튼 동작·CommonUI 화면 전환·프리뷰 교체. 실행은 [작업 규칙](../AGENTS.md#작동-테스트와-보고서), 결과는 [TEST_REPORT](TEST_REPORT.md)에 기록.
+- 작동 확인: 버튼 동작·CommonUI 화면 전환·프리뷰 교체. 실행은 [작업 규칙](../AGENTS.md#작동-테스트와-보고서)을 따르며 결과는 [HISTORY](HISTORY.md), 남은 확인은 [TODO](TODO.md#1-사용자-작동-확인)에 기록.
 - T12 검증: 메뉴 명세 3종을 Validation/T12로 복사 생성한다. MainMenuScreenWidget의 Text_Title 변경과 T12_MissingLabel(TextBlock, parent=RootOverlay) 추가 후 AddMissing을 2회 실행하고 기존 제목 보존·신규 위젯·바인딩을 확인한다. 테스트 필터는 `ProjectA.Menu.AssetContracts`, 생성본 옵션은 `-T12GeneratedAssets`다.
 
 ## 7 기본 라운드 전투 UI
@@ -136,7 +136,7 @@ GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메
 
 입력은 `All / CaptureDuringMouseDown`을 사용하고 화면/빈 루트는 `SelfHitTestInvisible`, 조작 패널은 hit-test를 유지한다. Controller는 실제 뷰포트의 클릭만 전달하므로 패널 뒤 유닛·타일을 함께 선택하지 않는다. 현재 전투에 등록된 유닛과 Grid만 허용하며 이전 순차 타일 행동 API는 재활성화하지 않는다.
 
-`ACombatRoundPlayerController`는 소유 연결의 계획/준비/이동 RPC와 서버 응답을 관리한다. 최신 복제 수정 번호 도착 전 중복 요청을 막으며 이전 라운드 요청은 거절한다. 계획 수정 시 팀 준비 해제·복귀 칸 충돌 거절은 [기획 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 확인 대기 임시 정책이다. 단일 클릭·SAP 예약 변경의 최신 검증과 확인 절차는 [TEST_REPORT 27절](TEST_REPORT.md#27-단일-클릭과-sap-이동-예약)을 따른다. 실제 작동·자동화는 미실행이다. 이전 [17절 검증](TEST_REPORT.md#17-계획-입력-검사와-장착-tile-공격-ai)은 당시 구현 기준의 이력으로 구분한다.
+`ACombatRoundPlayerController`는 소유 연결의 계획/준비/이동 RPC와 서버 응답을 관리한다. 최신 복제 수정 번호 도착 전 중복 요청을 막으며 이전 라운드 요청은 거절한다. 계획 수정 시 팀 준비 해제·복귀 칸 충돌 거절은 [기획 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 확인 대기 임시 정책이다. 단일 클릭·SAP 예약의 남은 확인은 [남은 확인](TODO.md#2-10-전장-대상-선택과-sap-이동-예약)을 따른다. 사용자가 플레이한 범위에서는 이상이 없으며 세부 자동화·협동 실행 기록과 구분한다. 이전 검증은 [HISTORY](HISTORY.md)를 따른다.
 
 ## 8 시작 메뉴 설정
 
@@ -161,7 +161,7 @@ MainMenu의 Options는 native `UOptionsWidget`으로 화면·그래픽 설정을
 - 확인 중에는 미확인 설정을 저장할 수 있는 엔진의 `Alt+Enter`·`F11` 전체 화면 전환을 잠시 비활성화한다. 확정·복원 후 두 단축키의 이전 활성 상태를 복구한다.
 - 확인 시간은 게임 시간 배율과 무관한 실제 경과 시간으로 계산한다. 확인·복원 후 선택값과 포커스를 현재 설정에 맞춰 갱신한다.
 
-해상도와 전체 화면 전환은 사용자가 독립 게임 창에서 확인한다. UI 전환·낮은 해상도 배치·15초 복원·재시작 저장의 검증 절차와 최신 결과는 [TEST_REPORT 14절](TEST_REPORT.md#14-시작-메뉴-화면그래픽-설정)을 따른다.
+해상도와 전체 화면 전환은 사용자가 독립 게임 창에서 확인한다. UI 전환·화면 복원·저장의 추가 확인은 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다.
 
 ## 9 DemonicUI 공통 테마
 
@@ -195,7 +195,7 @@ MainMenu의 Options는 native `UOptionsWidget`으로 화면·그래픽 설정을
 
 ### 9-3 반영과 검증
 
-C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / Win64 빌드 후 UE를 재시작한다. 명령은 [README](../README.md#개발-환경), 현재 검증 상태와 사용자 절차는 [TEST_REPORT 15절](TEST_REPORT.md#15-demonicui-공통-테마)을 따른다. 이전 설정·전투 실행 결과를 새 테마의 가독성·입력·쿠킹 성공 근거로 사용하지 않는다.
+C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / Win64 빌드 후 UE를 재시작한다. 명령은 [README](../README.md#개발-환경), 현재 검증 상태와 사용자 절차는 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다. 이전 설정·전투 실행 결과를 새 테마의 가독성·입력·쿠킹 성공 근거로 사용하지 않는다.
 
 에셋 선정 시 패키지 내부 썸네일과 직렬화된 `SizeX`·`SizeY`를 정적으로 조사했다. Unreal의 PNG 썸네일 저장 방식에 맞춰 조사 이미지의 R/B 채널을 보정했으며 게임 텍스처는 변환하지 않았다. 조사 산출물은 `Saved/Automation/DemonicUI`에 있고 실제 UI 실행 화면은 포함하지 않는다.
 
@@ -224,7 +224,7 @@ C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / 
 
 ### 10-3 반영과 검증
 
-최신 C++ 빌드와 Config 변경을 반영한 뒤 UE를 재시작한다. 기존 WBP·맵을 유지한다. 공통 배율·21:9·4:3·창 크기 변경·전투 클릭·설정 확인/복원의 절차와 최신 결과는 [TEST_REPORT 16절](TEST_REPORT.md#16-공통-dpi와-전투-화면-배치)을 따른다. 9절 테마 변경 당시의 빌드 결과는 이번 배율·카메라 변경의 성공 근거로 사용하지 않는다.
+최신 C++ 빌드와 Config 변경을 반영한 뒤 UE를 재시작한다. 기존 WBP·맵을 유지한다. 화면 비율·창 크기·전투 클릭·설정 복원의 추가 확인은 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다. 9절 테마 변경 당시의 빌드 결과는 이번 배율·카메라 변경의 성공 근거로 사용하지 않는다.
 
 ## 11 네 직업 선택과 기본 능력치
 
@@ -232,14 +232,14 @@ C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / 
 
 표시 정보의 기준은 `UProfessionBase`와 네 C++ 자식 클래스다. 기본 UI·캐릭터 생성 명세를 갱신하고 실사용 및 `Validation/T12` WBP의 슬롯 제목/직업 이름 16개만 변경한다. 기존 WidgetTree·배치·스타일·바인딩은 유지한다. MainMenu 프리뷰 맵은 새 ID 4개에 기존 공통 `BP_PartyMenuPreview` 외형을 연결하며 직업별 새 외형을 생성하지 않는다. 개발용 협동은 참가자마다 궁수 한 명을 생성한다.
 
-지원하지 않는 이전 직업의 Continue는 해당 ID와 오류를 표시하고 저장 원본·현재 Run을 유지한다. 새 직업으로 자동 변환하지 않는다. Editor 빌드와 저장 후 에셋 재로드에서 새 직업 맵·16개 라벨을 확인했으며 실제 클릭·상세 표시·전투·Continue·협동은 [TEST_REPORT 22절](TEST_REPORT.md#22-네-직업과-기본-능력치)의 사용자 검증을 따른다.
+지원하지 않는 이전 직업의 Continue는 해당 ID와 오류를 표시하고 저장 원본·현재 Run을 유지한다. 새 직업으로 자동 변환하지 않는다. Editor 빌드와 저장 후 에셋 재로드에서 새 직업 맵·16개 라벨을 확인했으며 실제 클릭·상세 표시·전투·Continue·협동은 [남은 확인](TODO.md#3-2-아이템과-직업)의 사용자 검증을 따른다.
 
 ## 12 시작 모드 선택과 항복 확인
 
 일반 싱글 새 게임의 CharacterCreation은 첫 진입에 직접 조작 선택이 없으며 안내를 표시하고 시작 버튼을 비활성화한다. 생성 카드의 Edit/X 행에 네이티브 `직접 조작` 버튼을 추가한다. 한 명을 선택하면 해당 버튼은 `선택됨`, 직업명 옆은 `직접 조작`으로 표시하며 다른 생성 카드는 `AI`로 표시한다. 선택 카드 삭제 시 선택을 해제하고 시작을 다시 막는다. 직업·이름 편집은 선택을 유지하고 화면을 나갔다가 다시 들어오면 초안·선택을 초기화한다.
 
-Designer와 native 경로 모두 기존 `SlotActionBox` 행을 사용하므로 WBP·생성 명세 재생성은 필요하지 않다. 선택 저장·AI 전투와 기존 저장 호환은 [PROJECT_PLAN](PROJECT_PLAN.md#저장과-멀티플레이-연결-경계), 실제 클릭·프리뷰·계획·사망 후 진행 확인은 [TEST_REPORT 25절](TEST_REPORT.md#25-싱글플레이-직접-조작-캐릭터-선택)을 따른다.
+Designer와 native 경로 모두 기존 `SlotActionBox` 행을 사용하므로 WBP·생성 명세 재생성은 필요하지 않다. 선택 저장·AI 전투와 기존 저장 호환은 [PROJECT_PLAN](PROJECT_PLAN.md#저장과-멀티플레이-연결-경계), 실제 클릭·프리뷰·계획·사망 후 진행 확인은 [남은 확인](TODO.md#2-9-싱글플레이-직접-조작-캐릭터-선택)을 따른다.
 
 게임 시작은 `UGameModeSelectionWidget`의 싱글플레이/멀티플레이 선택을 거친다. 첫 포커스는 싱글플레이이며 멀티는 기존 지원 조건에 맞을 때만 활성화한다. 같은 PC·LAN의 2~4인 개발용 방과 Steam 미지원 안내를 표시한다. 모드 선택·하위 화면 전환 중 첫 화면이 중복 노출되지 않아야 하며 뒤로가기 후 다시 진입할 수 있어야 한다. 멀티 접속을 시작한 뒤 취소/나가기는 기존 세션 정리·MainMenu 복귀를 따른다.
 
-이어하기 옆 항복 버튼은 104×40 UI 단위이며 공통 DPI를 따른다. `URunSurrenderWidget`은 현재 싱글 여정을 포기하면 이어갈 수 없음을 알리고, 돌아가기에 기본 포커스를 둔다. 취소·CommonUI 뒤로가기는 저장을 변경하지 않는다. 모달 배경은 아래 메뉴의 클릭을 막고 제출 중 중복 확인을 차단한다. 오류는 확인창에 표시하며 저장이 바뀐 경우 창을 닫고 최신 대상으로 다시 확인해야 한다. 삭제 성공 후에는 창을 닫고 이어하기/항복을 비활성화한다. 저장 범위와 기본안의 근거는 [PROJECT_PLAN](PROJECT_PLAN.md#저장과-멀티플레이-연결-경계), 검증은 [TEST_REPORT 23절](TEST_REPORT.md#23-시작-모드-선택과-싱글-여정-항복)을 따른다.
+이어하기 옆 항복 버튼은 104×40 UI 단위이며 공통 DPI를 따른다. `URunSurrenderWidget`은 현재 싱글 여정을 포기하면 이어갈 수 없음을 알리고, 돌아가기에 기본 포커스를 둔다. 취소·CommonUI 뒤로가기는 저장을 변경하지 않는다. 모달 배경은 아래 메뉴의 클릭을 막고 제출 중 중복 확인을 차단한다. 오류는 확인창에 표시하며 저장이 바뀐 경우 창을 닫고 최신 대상으로 다시 확인해야 한다. 삭제 성공 후에는 창을 닫고 이어하기/항복을 비활성화한다. 저장 범위와 기본안의 근거는 [PROJECT_PLAN](PROJECT_PLAN.md#저장과-멀티플레이-연결-경계), 검증은 [남은 확인](TODO.md#2-7-시작-모드-선택과-싱글-여정-항복)을 따른다.

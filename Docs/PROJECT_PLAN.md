@@ -2,16 +2,16 @@
 
 기준일: 2026-09-16. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
 
-기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 새 실행·UI·네트워크의 작동 검증은 미실행이다.
+기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 사용자가 플레이한 범위에서는 이상이 없으며 협동·예외 상황의 세부 확인은 남아 있다.
 
-T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 현재는 이전 Combat 저장과 새 전투 중간 복구를 지원하지 않는다. Steam/PlayFab·MMR은 미구현이며 [TEST_REPORT](TEST_REPORT.md)의 최신 확인 범위를 따른다.
+T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 현재는 이전 Combat 저장과 새 전투 중간 복구를 지원하지 않는다. Steam/PlayFab·MMR은 미구현이며 [남은 확인](TODO.md#1-사용자-작동-확인)의 최신 확인 범위를 따른다.
 
 | 영역 | 기준 문서 |
 |---|---|
 | 게임 목표와 콘텐츠 방향 | [GAME_DESIGN](GAME_DESIGN.md) |
 | 남은 작업과 완료 조건 | [TODO](TODO.md) |
 | Snapshot·Co-op·저장/재개·온라인 계약 | [MULTIPLAYER](MULTIPLAYER.md) |
-| 실제 검증 결과와 사용자 확인 항목 | [TEST_REPORT](TEST_REPORT.md) |
+| 남은 사용자 확인 항목 | [남은 확인](TODO.md#1-사용자-작동-확인) |
 | 변경 과정과 과거 판단 | [HISTORY](HISTORY.md) |
 
 ## 기본 실행 흐름
@@ -28,7 +28,7 @@ T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 현재는
 
 빌드 후 UE를 재시작하여 C++·리플렉션 변경을 반영한다. 이번 전환에는 새 맵·WBP 생성이나 Config 변경이 필요하지 않다.
 
-최초 사용자 실행은 [TEST_REPORT 1절](TEST_REPORT.md#1-직접-플레이-확인)의 싱글 Run과 설정 변경·복원으로 진행한다. 구간별 기대 결과·실패 로그를 기록한 뒤 2인·4인 협동으로 확대한다. 2026-09-16 준비 점검은 컴파일·정적 검사까지 완료했으며 실제 작동은 사용자 검증 대기다.
+2026-09-16 사용자는 지금까지 플레이한 범위에서 이상이 없다고 보고했다. 추가 확인은 [TODO](TODO.md#1-사용자-작동-확인)에 짧게 기록하며 협동은 2인 → 4인 순서로 진행한다.
 
 ```mermaid
 flowchart LR
@@ -92,7 +92,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 향후 확률 제시는 정의와 별도의 `FRunEncounterPoolEntry` USTRUCT에 정의 ID/참조·상대 가중치·출현 구간·조건을 두는 구성을 권장한다. 에디터 중심 편집은 DataAsset의 배열, 대량 수치·CSV 편집이 필요하면 `FTableRowBase` 기반 DataTable을 사용한다. 추첨은 Host에서 확정하고 제시 결과를 Run에 저장한다. 현재 가중치 필드·추첨·재추첨 정책은 미구현이다.
 
-전이 저장 실패 시 선택·퇴장 상태를 되돌리고 같은 버튼으로 재시도한다. 기존 저장의 schema 0은 상점 없는 경로를 유지하며 새 Run의 schema 1과 구분한다. 상점 내부 재개·관리 lease·Host 진행 권한은 [MULTIPLAYER](MULTIPLAYER.md), 사용자 확인은 [TEST_REPORT 10절](TEST_REPORT.md#10-상점-인카운터)을 따른다.
+전이 저장 실패 시 선택·퇴장 상태를 되돌리고 같은 버튼으로 재시도한다. 기존 저장의 schema 0은 상점 없는 경로를 유지하며 새 Run의 schema 1과 구분한다. 상점 내부 재개·관리 lease·Host 진행 권한은 [MULTIPLAYER](MULTIPLAYER.md), 사용자 확인은 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다.
 
 ### 파티
 
@@ -111,7 +111,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 `CanStartNode → BeginEncounter → PrepareArena → SpawnParty/Enemies → ConfigureCombatParticipants → MarkCombatStarted → StartCombat`으로 시작한다. 누락 클래스·잘못된 초기 배치·등록 실패는 부분 스폰을 정리하고 오류를 표시한다.
 
-준비 취소의 지도 저장이 실패하면 `AEncounterManager`가 취소 대기와 원래 준비 오류를 보존한다. `URunStateSubsystem::AbortEncounter`는 일반·관리 Run 모두 저장 실패 시 기존 단계·노드를 복구한다. Host의 기존 **저장 다시 시도**로 취소를 반복하며 저장 성공 후 Map으로 돌아간다. 저장 중 동기 Map 통지와 취소 대기 중 새 노드 시작·중복 스폰은 허용하지 않는다. 화면의 전투 입력은 Combat 단계뿐 아니라 실제 전투 활성 상태도 요구한다. 로컬·복제 표시 모두 준비·저장 오류를 중복 없이 함께 유지한다. 상세 검증은 [TEST_REPORT 18절](TEST_REPORT.md#18-준비-취소-복구와-파티-데이터-사전-검사)을 따른다.
+준비 취소의 지도 저장이 실패하면 `AEncounterManager`가 취소 대기와 원래 준비 오류를 보존한다. `URunStateSubsystem::AbortEncounter`는 일반·관리 Run 모두 저장 실패 시 기존 단계·노드를 복구한다. Host의 기존 **저장 다시 시도**로 취소를 반복하며 저장 성공 후 Map으로 돌아간다. 저장 중 동기 Map 통지와 취소 대기 중 새 노드 시작·중복 스폰은 허용하지 않는다. 화면의 전투 입력은 Combat 단계뿐 아니라 실제 전투 활성 상태도 요구한다. 로컬·복제 표시 모두 준비·저장 오류를 중복 없이 함께 유지한다. 추가 확인 항목은 [남은 확인](TODO.md#2-2-전투-준비-취소와-저장-실패)을 따른다.
 
 `ACombatRoundCoordinator`가 계획·준비·잠금·해결을 관리한다. 서버가 Planning 진입 시 양 팀 생존자의 `GetCombatSpeed()`로 현재 GAS 민첩을 읽어 속도·시작 지연을 고정하며 라운드마다 AP/SubAP를 초기화한다. 복제용 `RoundView.Speed`는 float로 소수 값을 유지한다. 서버가 명령의 소유권·전투 ID·라운드·수정 번호·부여 스킬·자원·대상·최종 배치를 검증한다. 이동 예약 SAP 1과 공격 SubAP 비용을 합산 검사하고 AP와 함께 전체 준비 잠금 시 한 번 차감한다. 예약·변경·취소는 비용을 차감하지 않는다.
 
@@ -121,7 +121,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 UnitBase의 기존 순차 이동/행동 수명·유닛 체크포인트 capture/restore와 UnitAIController의 경로 완료 루프는 제거했다. Coordinator의 `CanMoveUnit → SubmitMove`는 SAP 이동 예약·변경이며 `CancelMove`는 예약 취소다. 캐릭터별 목적지 하나를 복제하고 예약 단계에서는 위치·자원을 유지한다. 기존 8방향 BFS·MoveRange·빈 아군 칸 조건과 다른 출발/예약 칸 중복 금지를 유지한다. 잠금 후 서버가 모든 예약 SAP 이동을 처리하고, 도착 위치·방향을 AP 행동의 새 복귀점으로 저장한 뒤 AP 시간차 실행을 시작한다. AP 시계는 SAP 단계 뒤 0초부터 시작한다. 실행 중 입력을 막고 실패·중단 시 생존자를 출발점으로 복원하며 잠금 시 차감한 자원은 환불하지 않는다.
 
-`AUnitBase`의 기본 CharacterMovement는 `UUnitCharacterMovementComponent`를 사용한다. 조정자의 수동 이동이 SAP·접근·복귀에서 속도와 보행용 가속도를 함께 공급하고 정지·시전·중단·사망에서 초기화한다. 기존 `ABP_Unarmed`의 속도/가속도 조건을 유지하며, 클라이언트 `MOVE_None`의 생략된 가속도 갱신은 기존 복제 속도로 보완한다. 엔진 보간과 서버 위치 권위는 유지한다. [사용자 보행 확인](TEST_REPORT.md#27-4-이동-애니메이션-입력-복구)은 미실행이다.
+`AUnitBase`의 기본 CharacterMovement는 `UUnitCharacterMovementComponent`를 사용한다. 조정자의 수동 이동이 SAP·접근·복귀에서 속도와 보행용 가속도를 함께 공급하고 정지·시전·중단·사망에서 초기화한다. 기존 `ABP_Unarmed`의 속도/가속도 조건을 유지하며, 클라이언트 `MOVE_None`의 생략된 가속도 갱신은 기존 복제 속도로 보완한다. 엔진 보간과 서버 위치 권위는 유지한다. [남은 확인](TODO.md#2-10-전장-대상-선택과-sap-이동-예약)은 미실행이다.
 
 기존 GA/SkillActor의 즉시 실행과 순차 `StartSkill`·TurnManager·AI 연속 판단·End Turn은 실행하지 않는다. 모든 예약 행동과 복귀·잔여 투사체가 종료된 뒤에만 결과를 Encounter로 전달한다. 양 팀 전멸은 `Suspended`이며 정식 결과 정책 대기다. 현재 지원 범위와 임시 정책은 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)을 기준으로 한다.
 
@@ -133,7 +133,7 @@ Standalone은 결과 저장 성공 후 유닛·전투 상태를 정리한다. �
 
 MainMenu·Gameplay GameMode는 `InitializeHUDForPlayer`에서 HUDClass가 있을 때만 엔진 기본 AHUD 초기화를 호출한다. HUDClass=None인 CommonUI 화면은 빈 클래스 생성 요청을 생략한다.
 
-GameplayCue 검색은 `DefaultGame.ini`의 `GameplayAbilitiesDeveloperSettings`와 `AbilitySystemGlobals`에 `GameplayCueNotifyPaths=/Game/User_JeHoon`을 지정한다. UE 5.7은 두 배열을 중복 없이 합친다. DeveloperSettings 배열이 비었던 이전 실행에 대비한 공식 호환 설정 보완이며, 빈값의 최초 원인과 최신 실행의 경고 해소는 아직 확인하지 않았다. 이전 에셋 조사에서는 `/Game`의 GameplayCueNotify 에셋이 0개였으며 외부 Cue 도입 시 의존 경로도 등록한다. 검증 근거는 [TEST_REPORT 8절](TEST_REPORT.md#8-hudgameplaycue-경고-수정)을 따른다.
+GameplayCue 검색은 `DefaultGame.ini`의 `GameplayAbilitiesDeveloperSettings`와 `AbilitySystemGlobals`에 `GameplayCueNotifyPaths=/Game/User_JeHoon`을 지정한다. UE 5.7은 두 배열을 중복 없이 합친다. DeveloperSettings 배열이 비었던 이전 실행에 대비한 공식 호환 설정 보완이며, 빈값의 최초 원인과 최신 실행의 경고 해소는 아직 확인하지 않았다. 이전 에셋 조사에서는 `/Game`의 GameplayCueNotify 에셋이 0개였으며 외부 Cue 도입 시 의존 경로도 등록한다. 남은 실행 확인은 [남은 확인](TODO.md#2-1-gameplaycue-설정과-경고)을 따른다.
 
 GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMenu의 UIOnly 상태에서 travel한 뒤 남는 viewport `IgnoreInput`과 로컬 포커스는 native 진입 코드가 복구한다. 이 입력 수정에는 WBP 재생성이 필요 없다.
 
@@ -158,7 +158,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 기존 추가 스킬 시험값 | DA_SweepingStrike: 이전 반경 1 정의를 실제 지점 반경 200의 GroundAttack으로 초기 변환, 피해 10·AP 1. 시작 스킬 유지. 사용자 제작 완료 공격으로 간주하지 않으며 이번 폴더 정리에서 값·몽타주를 추가하지 않음 |
 | 전투 간 이관 | HP 유지. 새 전투의 추가 스킬 자동 추첨 없음. 전투 중 복구는 미지원. Snapshot 적은 저장된 스킬 구성 사용 |
 | 적·아군 AI | 실제 장착 스킬 순서·가까운 적 기준으로 인간 초안 전에 단일 명령 고정. 장착된 복귀형 Tile 공격은 적 HomeCoord를 공격/접근 좌표로 선택 가능. 합법 공격이 없으면 목록에 노출되지 않는 내부 대기 처리 |
-| 메뉴 프리뷰 | MainMenuPreviewStage의 카메라·4개 앵커·ClassId별 BP_PartyMenuPreview 사용. 기존 메시와 같은 Skeleton의 MM_Idle 자동·반복 재생 연결 및 BP 재로드 확인. 전투 Pawn 생성 없음. [사용자 확인](TEST_REPORT.md#22-4-캐릭터-생성-프리뷰-idle) |
+| 메뉴 프리뷰 | MainMenuPreviewStage의 카메라·4개 앵커·ClassId별 BP_PartyMenuPreview 사용. 기존 메시와 같은 Skeleton의 MM_Idle 자동·반복 재생 연결 및 BP 재로드 확인. 전투 Pawn 생성 없음. [남은 확인](TODO.md#2-6-캐릭터-생성-프리뷰) |
 | 생성 화면 종료 | Back/X는 초안·프리뷰 정리. 재진입 시 빈 4슬롯. 상세 패널이 열려 있으면 먼저 패널만 닫음. 최소 슬롯 높이로 ClassInfo 표시 유지 |
 | 모드 선택 | 게임 시작 → 싱글플레이/멀티플레이. 캐릭터 생성·접속 시작 전 멀티 화면에서 돌아오면 모드 선택 복원, 모드 선택의 뒤로가기는 첫 화면 복원. 연결 이후 나가기는 기존 세션 정리/메뉴 복귀 |
 | 싱글 여정 항복 | 이어하기 옆 104×40 버튼·`URunSurrenderWidget` 확인창. 돌아가기 기본 포커스, 확인된 현재 일반 싱글 저장만 삭제. 취소·실패·저장 변경은 원본/현재 Run 보존 |
@@ -166,17 +166,17 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 공통 UI 외형 | `UDemonicUITheme`이 기존 DemonicUI 텍스처를 참조하여 메뉴·설정·캐릭터 생성·협동·Run·상점·결과·라운드 계획과 저장/협동 안내를 꾸민다. 기존 입력·바인딩·권한 조건 유지 |
 | 공통 UI 배율 | `UserInterfaceSettings`의 1920×1080 기준 `ScaleToFit`·`ApplicationScale=1` 사용. 화면별 추가 축소 제거, 전투 상단 현황·하단 조작 패널의 바깥 여백 12 유지 |
 
-설정은 Unreal `UGameUserSettings`의 화면·Scalability API를 사용한다. 테두리 없는 전체 화면은 게임 창 기준 모니터의 바탕 화면 해상도로 고정하고 기존 혼합 품질은 프리셋을 선택하기 전까지 보존한다. 미확인 화면의 전체 화면 단축키 전환을 차단하고 정상 창 종료 전 복원한다. 새 제작 에셋·Config 변경은 필요하지 않다. 상세 계약은 [UI_README 8절](UI_README.md#8-시작-메뉴-설정), 사용자 확인은 [TEST_REPORT 14절](TEST_REPORT.md#14-시작-메뉴-화면그래픽-설정)을 따른다.
+설정은 Unreal `UGameUserSettings`의 화면·Scalability API를 사용한다. 테두리 없는 전체 화면은 게임 창 기준 모니터의 바탕 화면 해상도로 고정하고 기존 혼합 품질은 프리셋을 선택하기 전까지 보존한다. 미확인 화면의 전체 화면 단축키 전환을 차단하고 정상 창 종료 전 복원한다. 새 제작 에셋·Config 변경은 필요하지 않다. 상세 계약은 [UI_README 8절](UI_README.md#8-시작-메뉴-설정), 사용자 확인은 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다.
 
-공통 테마는 [UI/Theme](../Source/ProjectA/UI/Theme)의 native 클래스 기본 객체가 `UPROPERTY` 텍스처 참조를 유지하고 기존 Designer·native 컨트롤에 브러시·글자색을 적용한다. `/Game/DemonicUI` 원본은 무변경 참조하며 새 WBP·JSON 생성이나 에셋 복사는 필요하지 않다. MainMenu의 메뉴·관리 이어가기 패널은 가로 배치를 유지하고 다른 화면과 동일한 공통 DPI를 적용한다. 프리뷰 투명 영역과 전투 중앙 월드 입력을 유지한다. 적용 기준은 [UI_README 9절](UI_README.md#9-demonicui-공통-테마), 시각·입력·패키지 검증은 [TEST_REPORT 15절](TEST_REPORT.md#15-demonicui-공통-테마)을 따른다.
+공통 테마는 [UI/Theme](../Source/ProjectA/UI/Theme)의 native 클래스 기본 객체가 `UPROPERTY` 텍스처 참조를 유지하고 기존 Designer·native 컨트롤에 브러시·글자색을 적용한다. `/Game/DemonicUI` 원본은 무변경 참조하며 새 WBP·JSON 생성이나 에셋 복사는 필요하지 않다. MainMenu의 메뉴·관리 이어가기 패널은 가로 배치를 유지하고 다른 화면과 동일한 공통 DPI를 적용한다. 프리뷰 투명 영역과 전투 중앙 월드 입력을 유지한다. 적용 기준은 [UI_README 9절](UI_README.md#9-demonicui-공통-테마), 시각·입력·패키지 검증은 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다.
 
-공통 DPI는 [DefaultEngine.ini](../Config/DefaultEngine.ini)에 설정한다. 메뉴·설정·협동·지도·상점·결과의 개별 축소를 제거하며 `CombatArena`의 활성 카메라는 고정 화면 비율을 해제하고 세로 시야각을 유지한다. 에셋 생성 스크립트도 같은 카메라 기본값을 사용하며 기존 맵·WBP를 다시 생성하지 않는다. 배율 공식·카메라 적용 범위는 [UI_README 10절](UI_README.md#10-공통-dpi와-전투-화면-배치), 사용자 확인은 [TEST_REPORT 16절](TEST_REPORT.md#16-공통-dpi와-전투-화면-배치)을 따른다.
+공통 DPI는 [DefaultEngine.ini](../Config/DefaultEngine.ini)에 설정한다. 메뉴·설정·협동·지도·상점·결과의 개별 축소를 제거하며 `CombatArena`의 활성 카메라는 고정 화면 비율을 해제하고 세로 시야각을 유지한다. 에셋 생성 스크립트도 같은 카메라 기본값을 사용하며 기존 맵·WBP를 다시 생성하지 않는다. 배율 공식·카메라 적용 범위는 [UI_README 10절](UI_README.md#10-공통-dpi와-전투-화면-배치), 사용자 확인은 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다.
 
 ### 타겟·행동 세부 규칙
 
-- `GetCombatSpeed()`는 현재 GAS 민첩을 그대로 사용하며 독립 `CombatSpeed=20` 값은 제거했다. 시작 지연은 `(최고 속도 − 해당 속도) × 0.1초`이고 기본 아군 10·일반 적 5에서는 적이 0.5초 늦게 시작한다. 라운드 시각표는 Planning에서 고정하며 이동·시전·투사체 속도 추가 보정은 없다. [확인 절차](TEST_REPORT.md#24-민첩-기반-전투-속도와-일반-적-능력치)
+- `GetCombatSpeed()`는 현재 GAS 민첩을 그대로 사용하며 독립 `CombatSpeed=20` 값은 제거했다. 시작 지연은 `(최고 속도 − 해당 속도) × 0.1초`이고 기본 아군 10·일반 적 5에서는 적이 0.5초 늦게 시작한다. 라운드 시각표는 Planning에서 고정하며 이동·시전·투사체 속도 추가 보정은 없다. [남은 확인](TODO.md#2-8-민첩-기반-전투-속도)
 - `SkillDefinitionDataAsset.bUseRoundDefinition`과 `RoundDefinition`으로 스킬별 실제 시간·범위·접근·복귀·목표 상실·투사체 정책을 편집한다. 미지정 장착 스킬은 [GAME_DESIGN 8-7](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)의 초기 변환을 사용한다.
-- 시전 표현은 명시 프로필의 `RoundDefinition.CastMontage`를 우선하며 비어 있으면 `AbilityClass`의 기존 `AttackMontage`를 사용한다. 서버가 시전 진입 시 한 번 재생을 전달한다. 몽타주 재생 인스턴스의 루트 모션과 유닛의 기존 `AN_SkillRelease` 효과 발동은 차단하며, `WindupSeconds`·충돌·AP 계산과 발동 1회는 유지한다. 발동 후 `Recovery`에서 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝날 때까지 기다린 뒤 복귀한다. 서버의 재생 인스턴스를 사용할 수 없으면 에셋 길이/RateScale·블렌드 아웃·여유 시간 0.25초를 사용하며 시전 시작 기준 최대 60초로 제한한다. 반복·자동 종료 누락·잘못된 길이/속도로 무한 대기하지 않으며 시간 초과 시 남은 표현을 즉시 정리한다. 사망·중단·발동 전 취소·다음 행동 시작도 해당 인스턴스를 정리한다. [사용자 확인](TEST_REPORT.md#21-5-전체-시전-대기와-da-폴더-정리)
+- 시전 표현은 명시 프로필의 `RoundDefinition.CastMontage`를 우선하며 비어 있으면 `AbilityClass`의 기존 `AttackMontage`를 사용한다. 서버가 시전 진입 시 한 번 재생을 전달한다. 몽타주 재생 인스턴스의 루트 모션과 유닛의 기존 `AN_SkillRelease` 효과 발동은 차단하며, `WindupSeconds`·충돌·AP 계산과 발동 1회는 유지한다. 발동 후 `Recovery`에서 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝날 때까지 기다린 뒤 복귀한다. 서버의 재생 인스턴스를 사용할 수 없으면 에셋 길이/RateScale·블렌드 아웃·여유 시간 0.25초를 사용하며 시전 시작 기준 최대 60초로 제한한다. 반복·자동 종료 누락·잘못된 길이/속도로 무한 대기하지 않으며 시간 초과 시 남은 표현을 즉시 정리한다. 사망·중단·발동 전 취소·다음 행동 시작도 해당 인스턴스를 정리한다. [남은 확인](TODO.md#2-4-da-시전-몽타주-연결)
 - 몽타주 대기 시간은 서버가 받은 `DeltaSeconds`를 프레임당 한 번 누적하며 고정 간격 시뮬레이션의 미처리 시간과 분리한다. 프레임 지연 뒤 누적 시뮬레이션을 처리할 때 시전 대기까지 중복 차감하여 조기에 복귀하지 않도록 한다.
 - 기존 GAS 효과·모든 타일 범위·상태효과·회복약이 새 행동으로 완전 변환된 것은 아니다. 공통 시험 행동 6종과 무장착 기본 공격 fallback을 제거하고 실제 장착 DA만 라운드 스킬 목록에 넣는다. 현재 기본 콘텐츠는 사용자 기본 공격 DA만 유지한다.
 - 서버의 실제 공격 충돌로 피격을 검사하며 별도 명중 확률·성공 슬롯·유닛 간 이동 충돌은 사용하지 않는다. 기본 공격 후 복귀하며 잔류 이동은 자기 진영으로 제한한다.
@@ -199,13 +199,13 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 
 `FRunPartyMember::bPlayerControlled`는 기존 저장 버전을 바꾸지 않고 추가한 선택 필드다. 일반 `LocalDevelopment` Run 중 원래 참가자가 한 명인 경우에만 사용한다. 명시 선택 한 명은 그대로 복원하며, 필드가 없거나 모두 false인 이전 데이터는 생성된 멤버 중 가장 낮은 `SlotIndex`를 메모리에서 선택하고 다음 정상 저장에 남긴다. HP 0인 멤버도 이 선택 순서에 포함하며 생존자로 승계하지 않는다. 복수 선택·미생성 슬롯 선택은 거절한다.
 
-`LegacyOffline`은 이 정규화와 AI 전환을 적용하지 않아 기존 전체 인간 조작을 유지한다. 협동·관리 Run·관리 싱글 전환은 기존 소유 계정과 `HumanParticipants` 규칙을 유지한다. 선택 보완이 구직업·지원하지 않는 Combat 저장을 수용하는 근거는 아니다. 새 선택의 컴파일·사용자 작동 확인은 [TEST_REPORT 25절](TEST_REPORT.md#25-싱글플레이-직접-조작-캐릭터-선택)에서 별도로 관리한다.
+`LegacyOffline`은 이 정규화와 AI 전환을 적용하지 않아 기존 전체 인간 조작을 유지한다. 협동·관리 Run·관리 싱글 전환은 기존 소유 계정과 `HumanParticipants` 규칙을 유지한다. 선택 보완이 구직업·지원하지 않는 Combat 저장을 수용하는 근거는 아니다. 저장·조작 선택의 추가 확인은 [남은 확인](TODO.md#2-9-싱글플레이-직접-조작-캐릭터-선택)에서 별도로 관리한다.
 
-일반 Continue의 지원 계정 범위, 관리 메뉴의 신뢰 C++ 호출자/재개 대상, 현재 인간 참가자와 원래 소유권 조건을 유지한다. 저장·실행 권위는 [MULTIPLAYER](MULTIPLAYER.md), 새 저장 거절 테스트는 [TEST_REPORT 12절](TEST_REPORT.md#12-시간차-자동-전투-기획-검토)을 따른다.
+일반 Continue의 지원 계정 범위, 관리 메뉴의 신뢰 C++ 호출자/재개 대상, 현재 인간 참가자와 원래 소유권 조건을 유지한다. 저장·실행 권위는 [MULTIPLAYER](MULTIPLAYER.md), 새 저장 거절 테스트는 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다.
 
-현재 메뉴 항복은 별도 정책 선택 응답이 없어 기존 자율 진행 위임 범위에서 **확인 후 현재 일반 싱글 Run의 저장을 포기하는 기본안**으로 적용했다. 유효한 Standalone Continue 대상만 허용하고 확인창을 연 시점의 저장과 실제 삭제 직전의 슬롯·내용이 일치해야 한다. 취소는 무변경이며 삭제 실패는 파일·메모리를 보존하고 재시도한다. 성공 후 해당 슬롯과 현재 Run 메모리를 정리하여 이어하기를 비활성화한다. 지원하지 않는 협동·관리·계정 제공자 저장, 완료/패배 저장, 이전 Combat 저장을 이 버튼으로 삭제하지 않는다. 패배 결과 보존·랭크 반영 정책은 추가하지 않았다. [확인 절차](TEST_REPORT.md#23-시작-모드-선택과-싱글-여정-항복)
+현재 메뉴 항복은 별도 정책 선택 응답이 없어 기존 자율 진행 위임 범위에서 **확인 후 현재 일반 싱글 Run의 저장을 포기하는 기본안**으로 적용했다. 유효한 Standalone Continue 대상만 허용하고 확인창을 연 시점의 저장과 실제 삭제 직전의 슬롯·내용이 일치해야 한다. 취소는 무변경이며 삭제 실패는 파일·메모리를 보존하고 재시도한다. 성공 후 해당 슬롯과 현재 Run 메모리를 정리하여 이어하기를 비활성화한다. 지원하지 않는 협동·관리·계정 제공자 저장, 완료/패배 저장, 이전 Combat 저장을 이 버튼으로 삭제하지 않는다. 패배 결과 보존·랭크 반영 정책은 추가하지 않았다. [남은 확인](TODO.md#2-7-시작-모드-선택과-싱글-여정-항복)
 
-현재 네 직업 외의 이전 테스트 ClassId는 파티 해석에서 거절하며 Continue 오류에 해당 ID와 원인을 표시한다. 저장 원본과 현재 Run은 유지하고 새 직업으로 자동 대응하지 않는다. Snapshot 카탈로그도 새 ClassId 4개만 허용하며 힘·민첩·지능은 Snapshot 값 데이터와 GAS 속성으로 전달한다. DA 폴더의 PackageRedirect는 객체 경로만 연결하므로 구직업 저장을 수용하는 근거가 아니다. [네 직업·저장 확인](TEST_REPORT.md#22-네-직업과-기본-능력치)
+현재 네 직업 외의 이전 테스트 ClassId는 파티 해석에서 거절하며 Continue 오류에 해당 ID와 원인을 표시한다. 저장 원본과 현재 Run은 유지하고 새 직업으로 자동 대응하지 않는다. Snapshot 카탈로그도 새 ClassId 4개만 허용하며 힘·민첩·지능은 Snapshot 값 데이터와 GAS 속성으로 전달한다. DA 폴더의 PackageRedirect는 객체 경로만 연결하므로 구직업 저장을 수용하는 근거가 아니다. [남은 확인](TODO.md#3-2-아이템과-직업)
 
 Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구 경로에 별도 속도 필드를 만들지 않으며 소수 민첩을 일반 적 기본값 5나 이전 독립 속도 20으로 대체하지 않는다.
 
@@ -241,7 +241,7 @@ DA 7개를 아래 유형별 폴더로 이동하고 독립 재로드에서 참조
 
 클래스는 런타임 Blueprint 문자열 경로 Load 대신 DataAsset과 Blueprint 기본값 참조로 연결한다.
 
-DA 7개의 폴더 변경은 Unreal AssetTools로 수행했으며 이동 시 객체 이름·데이터 값·PrimaryAssetID와 Snapshot 별칭을 보존했다. 이후 별도 사용자 지시로 Party/Snapshot의 직업 정의·맵만 새 직업 4개로 변경했다. C++ 로드 경로·테스트 경로·제작 스크립트도 새 하위 폴더를 사용한다. `[CoreRedirects]`의 7개 정확한 `PackageRedirects`는 이전 `/Blueprint/DataAsset/<이름>`에서 위 경로로 연결한다. 외부 `.sav`의 Catalog 소프트 경로는 에셋 참조 정리로 다시 저장되지 않으므로 이 설정을 유지한다. 구경로 7개 해석과 기존 저장 26개의 해시 보존을 확인했다. 지원되는 직업의 실제 Continue는 사용자 검증 대기이며 [TEST_REPORT 21-5](TEST_REPORT.md#21-5-전체-시전-대기와-da-폴더-정리), [22절](TEST_REPORT.md#22-네-직업과-기본-능력치)에 구분해 기록한다.
+DA 7개의 폴더 변경은 Unreal AssetTools로 수행했으며 이동 시 객체 이름·데이터 값·PrimaryAssetID와 Snapshot 별칭을 보존했다. 이후 별도 사용자 지시로 Party/Snapshot의 직업 정의·맵만 새 직업 4개로 변경했다. C++ 로드 경로·테스트 경로·제작 스크립트도 새 하위 폴더를 사용한다. `[CoreRedirects]`의 7개 정확한 `PackageRedirects`는 이전 `/Blueprint/DataAsset/<이름>`에서 위 경로로 연결한다. 외부 `.sav`의 Catalog 소프트 경로는 에셋 참조 정리로 다시 저장되지 않으므로 이 설정을 유지한다. 구경로 7개 해석과 기존 저장 26개의 해시 보존을 확인했다. 이전 저장의 Continue는 [남은 확인](TODO.md#2-5-da-유형별-폴더와-저장-호환)에 기록한다.
 
 | Gameplay 배치 대상 | 값 |
 |---|---|
@@ -272,7 +272,7 @@ DA 7개의 폴더 변경은 Unreal AssetTools로 수행했으며 이동 시 객�
 | RoundPlanning | Native CommonUI 상단 현황·하단 조작 패널. 전장 대상 선택·장착 스킬 버튼 적용·SAP 이동 예약/취소·준비/취소. 필수 WBP 바인딩 없음 |
 | Result | `Text_Result`, `Button_Continue` |
 
-새 계획 화면의 스킬 목록은 실제 장착 DA에서 해석한 서버 라운드 프로필로 구성한다. 적을 클릭하면 스킬 버튼이 나타나며 버튼 클릭이 계획 적용 요청이다. 시험 스킬·자동 추첨 스킬을 더하지 않는다. UI는 상단 가로 900·최대 높이 145, 하단 가로 900·최대 높이 300 UI 단위를 사용하며 하단 내용은 스크롤한다. 변경의 컴파일·실제 화면/입력 확인은 [TEST_REPORT 27절](TEST_REPORT.md#27-단일-클릭과-sap-이동-예약)에서 관리한다.
+새 계획 화면의 스킬 목록은 실제 장착 DA에서 해석한 서버 라운드 프로필로 구성한다. 적을 클릭하면 스킬 버튼이 나타나며 버튼 클릭이 계획 적용 요청이다. 시험 스킬·자동 추첨 스킬을 더하지 않는다. UI는 상단 가로 900·최대 높이 145, 하단 가로 900·최대 높이 300 UI 단위를 사용하며 하단 내용은 스크롤한다. 화면·입력의 추가 확인은 [남은 확인](TODO.md#2-10-전장-대상-선택과-sap-이동-예약)에서 관리한다.
 
 이전 HUD의 선택적 바인딩은 참조 호환용이다. Designer를 수정한 WBP를 덮어쓰기 전에 변경 내용을 확인한다. JSON spec 변경은 실제 생성·Compile·Save를 거쳐 반영하며 DryRun만으로 완료를 기록하지 않는다.
 
@@ -291,5 +291,5 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 - 2026-09-11부터 작업 폴더에서 삭제된 TestMap·BP_PartyPlayerController·TestGameModebase의 삭제 이력을 2026-09-16 Git에 반영한다. 자동 복원하지 않으며 기존 최초 생성·Audit 도구의 TestMap 입력은 별도 원본 확보가 필요하다. WorldMap 레벨/native class는 deprecated 상태이며 실행 흐름에서 제외한다.
 - WorldMap의 WorldSettings가 참조하는 WorldMapGameModeBase는 호환을 위해 보존한다.
 - 로컬 Snapshot·Listen Server·개발용 관리 저장의 구현을 실제 계정 인증, Steam 연결, PlayFab 운영, 경쟁 결과 검증이나 MMR 완료로 기록하지 않는다.
-- 빌드·자동화 결과와 사용자의 실제 조작 검증을 구분한다. 다음 구현 우선순위와 T14 잔여 조건은 [TODO](TODO.md), 최종 작동 확인은 [TEST_REPORT](TEST_REPORT.md)를 따른다.
-- 2026-09-16 계획 입력·AI 보완의 Editor 컴파일은 최종 초안 보존 수정을 포함해 성공했다. 최종 코드·문서 정적 검사 통과, 작동 검증 미실행이다. 최신 결과·절차는 [TEST_REPORT 17절](TEST_REPORT.md#17-계획-입력-검사와-장착-tile-공격-ai), 디자인 보류 범위와 해제 조건은 [TODO 5절](TODO.md#5-디자인-확정-후-구현할-일)을 따른다.
+- 빌드·자동화 결과와 사용자의 실제 조작 검증을 구분한다. 다음 구현 우선순위와 T14 잔여 조건은 [TODO](TODO.md), 최종 작동 확인은 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다.
+- 2026-09-16 계획 입력·AI 보완의 Editor 컴파일은 최종 초안 보존 수정을 포함해 성공했다. 당시 코드·문서 정적 검사는 통과했고 작동 검증은 미실행이었다. 추가 확인은 [남은 확인](TODO.md#1-사용자-작동-확인), 디자인 보류 범위와 해제 조건은 [TODO 5절](TODO.md#5-디자인-확정-후-구현할-일)을 따른다.

@@ -1,6 +1,6 @@
 # 멀티플레이 설계·개발 계약
 
-[프로젝트 안내](../README.md) · [과거 구현·검증 이력](HISTORY.md) · [사용자 테스트와 결과](TEST_REPORT.md)
+[프로젝트 안내](../README.md) · [과거 구현·검증 이력](HISTORY.md) · [남은 확인](TODO.md#1-사용자-작동-확인)
 
 ## 현재 상태
 
@@ -8,7 +8,7 @@
 
 이전 ff22940의 승계 PIE·관리 계약 성공은 순차 전투 이력이다. 현재 비전투 관리 재개는 유지하지만 저장된 Phase Combat는 본문·Host·참가자·lease 변경 전에 거절한다. 새 전투의 라운드 중간 복구는 미지원이다. 상세 경계는 [12절](#12-시간차-자동-전투의-확장-경계)을 따른다.
 
-Steam/PlayFab 인증·인터넷 P2P·공유 저장·결과 검증·MMR은 미구현이다. 개발용 새 협동 방의 수동 절차는 [TEST_REPORT 9절](TEST_REPORT.md#9-개발용-협동-ui), 최신 라운드 확인은 [12절](TEST_REPORT.md#12-시간차-자동-전투-기획-검토)을 따른다.
+Steam/PlayFab 인증·인터넷 P2P·공유 저장·결과 검증·MMR은 미구현이다. 협동의 추가 확인은 [TODO](TODO.md#1-사용자-작동-확인)에 기록하며 2인 → 4인 순서로 진행한다.
 
 ## 확정 정책
 
@@ -204,11 +204,11 @@ MMR 판정 시점·계산/정산 단위, 이탈·미확정 턴 반복 악용 대
 
 연결 구현 순서는 **명시적인 개발 온라인 설정 → 엔진 OnlineSubsystem 세션·SteamSockets 연결 → 검증된 원래 계정 배정 → 별도 PC의 사용자 접속 확인 → 공유 저장/승계 원자 처리 → 확정된 MMR 정책**으로 둔다. 온라인 초기화 실패를 개발 계정 성공으로 대체하지 않는다. 기본 싱글플레이 진입과 기존 로컬 저장은 계속 지원한다.
 
-사용자가 준비 결과로 전달할 것은 `Steam: 자체 ID 준비/480 개발 연결 희망/보류`, `PlayFab: Title ID 또는 미생성 이유와 표시 모드`, `서로 다른 계정의 테스트 PC 2대 준비 여부`다. 비밀번호·인증 티켓·Web API/Secret Key·은행/세금 정보는 전달 대상이 아니다. 최초 온라인 작동 확인은 서비스 준비와 구현 후 [TEST_REPORT](TEST_REPORT.md)에 추가한다.
+사용자가 준비 결과로 전달할 것은 `Steam: 자체 ID 준비/480 개발 연결 희망/보류`, `PlayFab: Title ID 또는 미생성 이유와 표시 모드`, `서로 다른 계정의 테스트 PC 2대 준비 여부`다. 비밀번호·인증 티켓·Web API/Secret Key·은행/세금 정보는 전달 대상이 아니다. 최초 온라인 작동 확인은 서비스 준비와 구현 후 [남은 확인](TODO.md#1-사용자-작동-확인)에 추가한다.
 
 ## 개발 실행 참조
 
-프로젝트 루트 PowerShell·UE 5.7 기준 명령이다. 실행 대상·결과는 [TEST_REPORT](TEST_REPORT.md)를 따른다. 샘플 생성은 로컬 에셋/저장을 작성하므로 최초 준비 시에만 실행한다.
+프로젝트 루트 PowerShell·UE 5.7 기준 명령이다. 실행 대상은 [TODO](TODO.md), 완료 결과는 [HISTORY](HISTORY.md)를 따른다. 샘플 생성은 로컬 에셋/저장을 작성하므로 최초 준비 시에만 실행한다.
 
 ```powershell
 $editor = 'C:/Program Files/Epic Games/UE_5.7/Engine/Binaries/Win64/UnrealEditor.exe'
@@ -223,7 +223,7 @@ SlotId는 영문·숫자·밑줄 1~64자이며 `ProjectA_Opponent_<SlotId>`로 �
 Snapshot Run은 `ProjectA_SnapshotRun_<SlotId>`, PvE는 `ProjectA_Run`이다. `-ProjectASaveSlot=...`이 우선하며 이어하기는 같은 상대 인자를 사용한다.
 패키지에서 샘플을 쓰려면 그 실행 환경의 저장 API로 먼저 생성해야 한다. 실행 인자를 제거하면 기본 PvE다.
 
-아래 순차 전투·턴 복구용 명령/옵션은 과거 재현 기록이다. 현재 기본 전투의 실행 지침이나 통과 근거로 사용하지 않으며 새 검증은 TEST_REPORT 12절을 따른다.
+아래 순차 전투·턴 복구용 명령/옵션은 과거 재현 기록이다. 현재 기본 전투의 실행 지침이나 통과 근거로 사용하지 않으며 새 확인 항목은 TODO에 간단히 기록한다.
 
 ```powershell
 & $editorCmd $project -unattended -nop4 -RenderOffscreen -nosound '-ExecCmds=Automation RunTests ProjectA.Coop.' '-TestExit=Automation Test Queue Empty'
@@ -237,7 +237,7 @@ Snapshot Run은 `ProjectA_SnapshotRun_<SlotId>`, PvE는 `ProjectA_Run`이다. `-
 | 위 복구 + `-T14CheckpointAI` | 소유자도 연결된 AI 모드 복구. 불참 승계와 구분 |
 | 위 복구 + `-T14CheckpointOpponent=Replace` 또는 `Delete` | 원본 상대 변경/삭제 후 고정 본문 복구 |
 | `ProjectA.ManagedRunPIE.HostSuccession` | 원래 3명 → 2번 Host·3번 Client·1번 AI |
-| `ProjectA.ManagedRunPIE.HostSuccession4Players` | 원래 4명 → 2번 Host·3/4번 Client·1번 AI. 실행 결과는 TEST_REPORT 2절 참조 |
+| `ProjectA.ManagedRunPIE.HostSuccession4Players` | 원래 4명 → 2번 Host·3/4번 Client·1번 AI. 당시 실행 결과는 HISTORY의 검증 이력 참조 |
 | `ProjectA.ManagedRunPIE.SoloMenuConversion` | 4번의 실제 메뉴 단독 전환·영구 AI·이동 실패 후 재개 |
 | `ProjectA.Run.Managed` / `ProjectA.Checkpoint` | 관리 저장/전이/호환과 확정 경계/손상/거절 |
 
@@ -264,4 +264,4 @@ PIE fixture는 고유 저장 namespace/슬롯과 명시적 계정 매핑을 사�
 
 상대 Party Snapshot과 실행 중 라운드/명령은 별도 데이터다. 기존 카탈로그로 스폰한 장착 스킬은 명시 RoundDefinition 또는 초기 변환을 사용한다. 원래 GAS 효과·EquipmentIds/TacticsId·Snapshot Speed가 모두 지원되는 것으로 해석하지 않는다. 적 계획은 인간 초안 이전에 고정한다.
 
-이전 Phase Combat 저장은 로드/관리 재개를 거절하며 파일·현재 상태·lease를 바꾸지 않는다. 새 전투는 마지막 비전투 확정 기록만 재개할 수 있다. 진행 중 라운드의 시전·실제 좌표·투사체·지연 피해·난수·이미 적용된 결과 복구는 미구현이다. 중단만으로 자동 Host 승계나 AI 전환하지 않는다. 상세 결정은 [TODO 3-1절](TODO.md#3-1-전투-규칙), 사용자 확인은 [TEST_REPORT 12절](TEST_REPORT.md#12-시간차-자동-전투-기획-검토)에 둔다.
+이전 Phase Combat 저장은 로드/관리 재개를 거절하며 파일·현재 상태·lease를 바꾸지 않는다. 새 전투는 마지막 비전투 확정 기록만 재개할 수 있다. 진행 중 라운드의 시전·실제 좌표·투사체·지연 피해·난수·이미 적용된 결과 복구는 미구현이다. 중단만으로 자동 Host 승계나 AI 전환하지 않는다. 상세 결정은 [TODO 3-1절](TODO.md#3-1-전투-규칙), 사용자 확인은 [남은 확인](TODO.md#1-사용자-작동-확인)에 둔다.
