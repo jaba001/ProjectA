@@ -44,6 +44,17 @@ struct PROJECTA_API FCombatCheckpointUnit
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     float MaxHP = 100.0f;
 
+    // Older serialized checkpoints receive the original baseline for newly added primary stats.
+    // 기존 직렬화 체크포인트는 새로 추가된 기본 능력치에 최초 기준값을 사용합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    float Strength = 10.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    float Dexterity = 10.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    float Intelligence = 10.0f;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     int32 AP = 0;
 

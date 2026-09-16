@@ -52,7 +52,7 @@ public:
                 {
                     return true;
                 }
-                Test->TestEqual(TEXT("Menu restores name"), Run->GetPartyMembers()[0].CharacterName.ToString(), FString(TEXT("Restart Scholar")));
+                Test->TestEqual(TEXT("Menu restores name"), Run->GetPartyMembers()[0].CharacterName.ToString(), FString(TEXT("Restart Mage")));
                 Test->TestEqual(TEXT("Menu restores HP"), Run->GetPartyMembers()[0].CurrentHP, 61.0f);
                 Continue->OnClicked.Broadcast();
                 Test->TestTrue(TEXT("Result Continue unlocks the next node"), Run->CanStartNode(TEXT("Combat_02")));

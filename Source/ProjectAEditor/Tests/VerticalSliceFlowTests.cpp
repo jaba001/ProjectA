@@ -147,18 +147,18 @@ public:
                 Creation->SaveSlotDetails();
                 Test->TestFalse(TEXT("Blank name cannot be saved."), Creation->GetPartyMembers()[0].CharacterName.ToString().TrimStartAndEnd().IsEmpty());
                 NameInput->SetText(FText::FromString(TEXT("Vertical Slice Hero")));
-                ClassSelect->SetSelectedIndex(3);
+                ClassSelect->SetSelectedIndex(2);
                 Creation->SaveSlotDetails();
-                Test->TestEqual(TEXT("Edited class is stored in slot zero."), Creation->GetPartyMembers()[0].ClassId, FName(TEXT("Hunter")));
+                Test->TestEqual(TEXT("Edited class is stored in slot zero."), Creation->GetPartyMembers()[0].ClassId, FName(TEXT("Archer")));
                 Edit->OnClicked.Broadcast();
                 NameInput->SetText(FText::FromString(TEXT("Discard this name")));
                 ClassSelect->SetSelectedIndex(1);
                 Creation->CloseSlotDetails();
-                Test->TestEqual(TEXT("Cancel preserves the saved class."), Creation->GetPartyMembers()[0].ClassId, FName(TEXT("Hunter")));
+                Test->TestEqual(TEXT("Cancel preserves the saved class."), Creation->GetPartyMembers()[0].ClassId, FName(TEXT("Archer")));
                 Test->TestEqual(TEXT("Cancel preserves the saved name."), Creation->GetPartyMembers()[0].CharacterName.ToString(), FString(TEXT("Vertical Slice Hero")));
                 Info->OnClicked.Broadcast();
                 UTextBlock* Details = Cast<UTextBlock>(Creation->GetWidgetFromName(TEXT("ProfessionDetailText")));
-                Test->TestEqual(TEXT("ClassInfo uses the shared catalog."), Details->GetText().ToString(), Creation->PartyDefinition->GetProfessionDetails(TEXT("Hunter")).ToString());
+                Test->TestEqual(TEXT("ClassInfo uses the shared catalog."), Details->GetText().ToString(), Creation->PartyDefinition->GetProfessionDetails(TEXT("Archer")).ToString());
 
                 bProfessionPanelTested = true;
                 ProfessionPanelTime = FPlatformTime::Seconds();
@@ -270,7 +270,7 @@ private:
             }
             Draft->RemoveFromParent();
         }
-        Preview->SetPreviewActorForSlot(0, TEXT("Hunter"));
+        Preview->SetPreviewActorForSlot(0, TEXT("Archer"));
         Preview->SetPreviewActorForSlot(0, TEXT("MissingProfession"));
         Test->TestNull(TEXT("Missing preview class clears the old actor."), Preview->GetPreviewActorForSlot(0));
         NativeRoot->RemoveFromParent();

@@ -121,7 +121,7 @@ namespace CombatActionRequestTests
                 FRunPartyMember& Member = Party.AddDefaulted_GetRef();
                 Member.SlotIndex = Index;
                 Member.CharacterName = FText::FromString(Participant.AccountId.Subject);
-                Member.ClassId = TEXT("Hunter");
+                Member.ClassId = TEXT("Archer");
                 Member.bCreated = true;
                 Member.CharacterId = FGuid::NewGuid();
                 Member.OwnerAccountId = Participant.AccountId;

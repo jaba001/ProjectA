@@ -23,7 +23,7 @@ check(isinstance(mode, unreal.GameplayGameModeBase), "Gameplay GameMode derives 
 party = check(mode.get_editor_property("party_definition"), "Gameplay GameMode references saved party definition")
 check(party.get_editor_property("fallback_player_unit_class"), "Party fallback PlayerUnit class is assigned")
 player_classes = party.get_editor_property("player_unit_classes")
-check(set(str(key) for key in player_classes) == {"StableHand", "Scholar", "Herbalist", "Hunter"}, "All four ClassIds are mapped")
+check(set(str(key) for key in player_classes) == {"Warrior", "Mage", "Archer", "Rogue"}, "All four ClassIds are mapped")
 check(all(value for value in player_classes.values()), "Every ClassId has a PlayerUnit class")
 encounters = mode.get_editor_property("encounter_definitions")
 check(unreal.Name("DefaultEncounter") in encounters, "DefaultEncounter is mapped")

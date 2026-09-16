@@ -94,12 +94,12 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 - CharacterCreation은 네 슬롯 중 하나 이상 생성하면 시작한다. 빈 슬롯은 스폰하지 않으며 원래 `SlotIndex`를 Arena의 PlayerCoords에 대응한다.
 - 슬롯은 이름·`ClassId`·생성 여부·현재 HP를 전달한다. 식별된 Run은 `CharacterId`와 원래 `OwnerAccountId`도 보존한다.
-- 직업은 `StableHand`, `Scholar`, `Herbalist`, `Hunter`다. `UPartyDefinitionDataAsset::Professions`에서 정의를 찾는다.
+- 직업은 전사 `Warrior`·마법사 `Mage`·궁수 `Archer`·도적 `Rogue` 순서다. `UProfessionBase`의 native 자식 클래스 4개를 `UPartyDefinitionDataAsset::Professions`의 `ProfessionClass`로 연결한다. 직업 정의는 UObject이며 전투 Actor와 분리한다.
 - `CombatClass`가 없으면 기존 `PlayerUnitClasses`와 명시적인 `FallbackPlayerUnitClass`를 사용한다. 현재 네 직업은 공통 `BP_PlayerUnit`을 사용하는 임시 콘텐츠다.
 - 수정하지 않은 이름은 직업 표시명과 슬롯 번호를 사용한다. 개별 이름 변경은 `SetSlotCharacterName`으로 반영한다.
-- 첫 스폰은 직업 정의 HP 또는 클래스 기본 HP, 이후 전투는 저장한 결과 HP를 사용한다. HP 0인 멤버는 다음 전투에 스폰하지 않는다.
+- 네 직업의 현재 시작값은 HP 100·힘/민첩/지능 각 10이다. 첫 스폰은 직업 정의의 HP와 능력치를 사용하고 이후 전투는 저장한 결과 HP를 유지한다. HP 0인 멤버는 다음 전투에 스폰하지 않는다. 최종 밸런스·성장률·능력치의 피해 보정 공식은 별도다.
 
-`UPartyDefinitionDataAsset::IsDataValid`는 Unreal Data Validation에서 동일한 `ResolveProfession` 검사를 사용한다. 에셋 경로·직업 ID와 함께 누락 또는 Abstract/Deprecated 클래스, 유효하지 않은 HP/AP, 빈·누락·중복 시작 스킬과 잘못된 라운드 프로필을 보고한다. 직업 클래스 → `PlayerUnitClasses` → 명시 fallback 순서와 클래스 기본값 사용은 유지한다. 실제 선택된 클래스만 검사하며 잘못된 명시 클래스를 fallback으로 대체하지 않는다. 제작 파티 에셋을 Content Browser에서 선택해 **Validate Assets**로 사전 확인할 수 있으며, 전투 실행 검증과 구분한다.
+`UPartyDefinitionDataAsset::IsDataValid`는 Unreal Data Validation에서 동일한 `ResolveProfession` 검사를 사용한다. 에셋 경로·직업 ID와 함께 누락 또는 Abstract/Deprecated 클래스, 유효하지 않은 HP/AP와 힘·민첩·지능, 빈·누락·중복 시작 스킬과 잘못된 라운드 프로필을 보고한다. 전투 Actor의 `CombatClass` → `PlayerUnitClasses` → 명시 fallback 순서를 유지한다. 직업 정의용 `ProfessionClass`는 별도로 필수이며 목록의 ClassId와 일치해야 한다. 실제 선택된 전투 클래스만 검사하며 잘못된 명시 클래스를 fallback으로 대체하지 않는다. 제작 파티 에셋을 Content Browser에서 선택해 **Validate Assets**로 사전 확인할 수 있으며, 전투 실행 검증과 구분한다.
 
 ### 행동과 결과
 
@@ -135,17 +135,17 @@ Non-Shipping MainMenu의 **개발용 협동**은 새 방 전용이다. Host는 `
 
 `UDevelopmentCoopSubsystem`은 GameInstance 단위 연결 대기·실패 메시지를 관리한다. `ADevelopmentCoopLobby`가 참가 번호·연결·준비 상태를 복제하고, GameMode의 PreLogin/PostLogin에서 정원·시작 여부와 서버 배정을 확인한다. 준비 RPC는 요청한 연결에만 적용하며 시작·노드·Continue는 Host만 허용한다.
 
-Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서버가 LocalDevelopment 식별자·Hunter 한 명씩의 파티를 생성하고 기존 Run/Combat 흐름으로 연결한다. 이탈 시 번호를 재사용하지 않고 방을 닫으며 전투 중에는 기존 중단 처리를 적용한다. 대체 참가·자동 승계·AI 전환은 없다.
+Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서버가 LocalDevelopment 식별자·궁수 `Archer` 한 명씩의 파티를 생성하고 기존 Run/Combat 흐름으로 연결한다. 이탈 시 번호를 재사용하지 않고 방을 닫으며 전투 중에는 기존 중단 처리를 적용한다. 대체 참가·자동 승계·AI 전환은 없다.
 
 체크포인트는 `ProjectA_DevCoop_<RunId>`로 분리한다. 메뉴 복귀 시 메모리와 저장 슬롯 선택을 초기화하고 디스크 기록은 보존한다. 일반 `ProjectA_Run`과 관리 저장은 덮어쓰지 않는다. 개발용 방에는 저장 선택·협동 재접속·Host 승계 UI를 제공하지 않는다.
 
 | 항목 | 현재 규칙 |
 |---|---|
-| 직업 편집 | Edit에서 이름 1~32자·직업 편집. 저장 시 적용, 취소 시 기존 값 유지. ClassInfo는 HP/AP/SubAP·시작 스킬 표시 |
-| 직업 데이터 | `bUseUnitClassDefaults=true`는 클래스 기본값, false는 정의의 MaxHP/ActionPoints/SubActionPoints/StartingSkills 사용. CombatClass 미지정 시 기존 매핑·fallback 사용. 잘못된 직업·수치·중복 스킬 에셋 ID는 거절 |
+| 직업 편집 | Edit에서 이름 1~32자·직업 편집. 저장 시 적용, 취소 시 기존 값 유지. ClassInfo는 HP·힘/민첩/지능·AP/SubAP·시작 스킬 표시 |
+| 직업 데이터 | `bUseUnitClassDefaults=true`는 직업 클래스의 HP/힘/민첩/지능과 전투 클래스의 AP/SubAP/장착 스킬 사용. false는 명시 정의의 수치·시작 스킬 사용. CombatClass 미지정 시 기존 매핑·fallback 사용. 미지원 직업·직업 클래스 ID 불일치·잘못된 수치·중복 스킬 에셋 ID는 거절 |
 | 회복약 | 기존 데이터 프로퍼티만 보존. 즉시 회복 실행과 이전 HUD 버튼은 제거했으며 새 라운드 소비 행동은 미구현 |
 | 추가 스킬 | EncounterSkillPool에서 직업 설정 후 가중 추첨 1개를 부여·장착. 보유 스킬 에셋 ID·잘못된 라운드 정의·가중치 0 이하는 제외. 장착 최대 5개. 전투 계획/해결 중 장착 변경 거절 |
-| 현재 추가 스킬 | DA_SweepingStrike: 이전 반경 1 정의를 실제 지점 반경 200의 GroundAttack으로 초기 변환, 피해 10·AP 1. 시작 스킬 유지 |
+| 기존 추가 스킬 시험값 | DA_SweepingStrike: 이전 반경 1 정의를 실제 지점 반경 200의 GroundAttack으로 초기 변환, 피해 10·AP 1. 시작 스킬 유지. 사용자 제작 완료 공격으로 간주하지 않으며 이번 폴더 정리에서 값·몽타주를 추가하지 않음 |
 | 전투 간 이관 | HP 유지. 추가 스킬은 새 전투에서 추첨. 전투 중 복구는 미지원. Snapshot 적은 회복약·무작위 추가 스킬 제외 |
 | 적·아군 AI | 기존 스킬 순서·가까운 적 기준으로 인간 초안 전에 단일 명령 고정. 장착된 복귀형 Tile 공격은 적 HomeCoord를 공격/접근 좌표로 선택 가능. 공통 시험 GroundStrike·MoveShot·Guard의 추가 선택과 지원/잔류 전술은 보류하며 불가능하면 Wait |
 | 메뉴 프리뷰 | MainMenuPreviewStage의 카메라·4개 앵커·ClassId별 BP_PartyMenuPreview 사용. 기존 메시 재사용, 전투 Pawn 생성 없음 |
@@ -164,7 +164,8 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 
 - `CombatSpeed` 기본값은 20이며 이번 라운드 시작 지연에만 사용한다. 이동·투사체 속도 보정은 미구현이다.
 - `SkillDefinitionDataAsset.bUseRoundDefinition`과 `RoundDefinition`으로 스킬별 실제 시간·범위·접근·복귀·목표 상실·투사체 정책을 편집한다. 미지정 장착 스킬은 [GAME_DESIGN 8-7](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)의 초기 변환을 사용한다.
-- 시전 표현은 명시 프로필의 `RoundDefinition.CastMontage`를 우선하며 비어 있으면 `AbilityClass`의 기존 `AttackMontage`를 사용한다. 서버가 시전 진입 시 한 번 재생을 전달한다. 몽타주 재생 인스턴스의 루트 모션과 유닛의 기존 `AN_SkillRelease` 효과 발동은 차단하며, `WindupSeconds`·충돌·AP·복귀 시각은 기존 계산을 유지한다. 정상 발동 후 애니메이션은 자연 종료할 수 있고 사망·중단·발동 전 취소·다음 행동 시작 시 정리한다. [사용자 확인](TEST_REPORT.md#21-da-시전-몽타주-연결)
+- 시전 표현은 명시 프로필의 `RoundDefinition.CastMontage`를 우선하며 비어 있으면 `AbilityClass`의 기존 `AttackMontage`를 사용한다. 서버가 시전 진입 시 한 번 재생을 전달한다. 몽타주 재생 인스턴스의 루트 모션과 유닛의 기존 `AN_SkillRelease` 효과 발동은 차단하며, `WindupSeconds`·충돌·AP 계산과 발동 1회는 유지한다. 발동 후 `Recovery`에서 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝날 때까지 기다린 뒤 복귀한다. 서버의 재생 인스턴스를 사용할 수 없으면 에셋 길이/RateScale·블렌드 아웃·여유 시간 0.25초를 사용하며 시전 시작 기준 최대 60초로 제한한다. 반복·자동 종료 누락·잘못된 길이/속도로 무한 대기하지 않으며 시간 초과 시 남은 표현을 즉시 정리한다. 사망·중단·발동 전 취소·다음 행동 시작도 해당 인스턴스를 정리한다. [사용자 확인](TEST_REPORT.md#21-5-전체-시전-대기와-da-폴더-정리)
+- 몽타주 대기 시간은 서버가 받은 `DeltaSeconds`를 프레임당 한 번 누적하며 고정 간격 시뮬레이션의 미처리 시간과 분리한다. 프레임 지연 뒤 누적 시뮬레이션을 처리할 때 시전 대기까지 중복 차감하여 조기에 복귀하지 않도록 한다.
 - 기존 GAS 효과·모든 타일 범위·상태효과·회복약이 새 행동으로 완전 변환된 것은 아니다. 기본 시험 엄호/이동 사격/지점 공격/대기를 제공한다.
 - 서버의 실제 공격 충돌로 피격을 검사하며 별도 명중 확률·성공 슬롯·유닛 간 이동 충돌은 사용하지 않는다. 기본 공격 후 복귀하며 잔류 이동은 자기 진영으로 제한한다.
 - 복귀형 행동은 계획 잠금 시 시작 방향을 저장하고 원위치 도착·복귀 시간 초과 복원·제자리 완료 시 해당 방향과 정지 속도를 복원한다. 성공한 잔류 이동은 조준 방향을 유지한다. 서버의 최종 회전은 기존 Actor 이동 복제로 전달한다.
@@ -186,6 +187,8 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 
 일반 Continue의 지원 계정 범위, 관리 메뉴의 신뢰 C++ 호출자/재개 대상, 현재 인간 참가자와 원래 소유권 조건을 유지한다. 저장·실행 권위는 [MULTIPLAYER](MULTIPLAYER.md), 새 저장 거절 테스트는 [TEST_REPORT 12절](TEST_REPORT.md#12-시간차-자동-전투-기획-검토)을 따른다.
 
+현재 네 직업 외의 이전 테스트 ClassId는 파티 해석에서 거절하며 Continue 오류에 해당 ID와 원인을 표시한다. 저장 원본과 현재 Run은 유지하고 새 직업으로 자동 대응하지 않는다. Snapshot 카탈로그도 새 ClassId 4개만 허용하며 힘·민첩·지능은 Snapshot 값 데이터와 GAS 속성으로 전달한다. DA 폴더의 PackageRedirect는 객체 경로만 연결하므로 구직업 저장을 수용하는 근거가 아니다. [네 직업·저장 확인](TEST_REPORT.md#22-네-직업과-기본-능력치)
+
 ## Gameplay 에셋과 배치
 
 사용자·Codex의 모든 제작 에셋은 `Content/User_JeHoon/` 안에 둔다. 외부 리소스·템플릿 원본을 직접 수정할 때는 이 폴더에 작업 사본을 만든다. C++·설정·생성 명세는 기존 Source·Config 위치를 유지한다.
@@ -196,20 +199,29 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 
 아래 에셋 경로는 모두 `/Game/User_JeHoon/` 기준이다. 디스크에서는 `Content/User_JeHoon/`에 대응한다. 기존 에셋에는 필수 수동 재연결 작업이 없다.
 
+DA 7개를 아래 유형별 폴더로 이동하고 독립 재로드에서 참조·구경로 해석을 확인했다. AssetTools가 이전 패키지를 제거했으며 기존 DataAsset 루트의 잔존 DA와 Redirector는 0개다.
+
 | 에셋 경로 | 클래스 / 저장된 연결 |
 |---|---|
 | `LEVEL/MainMenu` | 기본 시작 맵 |
 | `LEVEL/Gameplay` | TestMap geometry·NavMesh·Grid를 복제한 기준 레벨, `BP_GameplayGameMode` Override |
 | `Blueprint/Game/BP_GameplayGameMode` | `AGameplayGameModeBase`, PartyDefinition과 `EncounterDefinitions[DefaultEncounter]` 설정 |
 | `Blueprint/Controller/BP_GameplayPlayerController` | `AGameplayPlayerController`, GameplayRootWidgetClass 설정 |
-| `Blueprint/DataAsset/DA_VerticalSliceParty` | `UPartyDefinitionDataAsset`, 네 직업과 공통 `BP_PlayerUnit` fallback |
-| `Blueprint/DataAsset/DA_DefaultEncounter` | `UEncounterDefinitionDataAsset`, `EnemyUnitClasses[0]=BP_EnemyUnit` |
+| `Blueprint/DataAsset/Parties/DA_VerticalSliceParty` | `UPartyDefinitionDataAsset`, 네 직업과 공통 `BP_PlayerUnit` fallback |
+| `Blueprint/DataAsset/Encounters/DA_DefaultEncounter` | `UEncounterDefinitionDataAsset`, `EnemyUnitClasses[0]=BP_EnemyUnit` |
+| `Blueprint/DataAsset/Skills/BPDA_DefaulatAttack` | `USkillDefinitionDataAsset`, 사용자가 작성한 기본 공격. 객체 이름과 사용자가 저장한 이름·ID 보존 |
+| `Blueprint/DataAsset/Skills/BPDA_AreaAttack` | `USkillDefinitionDataAsset`, 미작성 범위 공격. 기존 EnemyTile 메타데이터 유지, 명시 RoundDefinition 미작성 상태에서는 자동 변환 거절 |
+| `Blueprint/DataAsset/Skills/DA_SweepingStrike` | `USkillDefinitionDataAsset`, 기존 추가 스킬 시험값 보존. 제작 완료·몽타주 연결 완료로 간주하지 않음 |
+| `Blueprint/DataAsset/SkillPools/DA_EncounterSkillPool` | `USkillPoolDataAsset`, 기존 추가 스킬 후보·가중치 유지 |
+| `Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog` | `UOpponentSnapshotCatalogDataAsset`, 새 직업 4개·기존 스킬 별칭 매핑 |
 | `UI/Gameplay/WBP_GameplayRootWidget` | `UGameplayRootWidget`, 기존 RunMap/Result와 native RoundPlanning 화면 연결 |
 | `UI/Gameplay/WBP_RunMapWidget` | `URunMapWidget` |
 | `UI/Gameplay/WBP_CombatHUDWidget` | 이전 순차 HUD 참조만 보존. 현재 Combat에서는 생성하지 않음 |
 | `UI/Gameplay/WBP_EncounterResultWidget` | `UEncounterResultWidget` |
 
 클래스는 런타임 Blueprint 문자열 경로 Load 대신 DataAsset과 Blueprint 기본값 참조로 연결한다.
+
+DA 7개의 폴더 변경은 Unreal AssetTools로 수행했으며 이동 시 객체 이름·데이터 값·PrimaryAssetID와 Snapshot 별칭을 보존했다. 이후 별도 사용자 지시로 Party/Snapshot의 직업 정의·맵만 새 직업 4개로 변경했다. C++ 로드 경로·테스트 경로·제작 스크립트도 새 하위 폴더를 사용한다. `[CoreRedirects]`의 7개 정확한 `PackageRedirects`는 이전 `/Blueprint/DataAsset/<이름>`에서 위 경로로 연결한다. 외부 `.sav`의 Catalog 소프트 경로는 에셋 참조 정리로 다시 저장되지 않으므로 이 설정을 유지한다. 구경로 7개 해석과 기존 저장 26개의 해시 보존을 확인했다. 지원되는 직업의 실제 Continue는 사용자 검증 대기이며 [TEST_REPORT 21-5](TEST_REPORT.md#21-5-전체-시전-대기와-da-폴더-정리), [22절](TEST_REPORT.md#22-네-직업과-기본-능력치)에 구분해 기록한다.
 
 | Gameplay 배치 대상 | 값 |
 |---|---|
@@ -252,7 +264,7 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 
 ## 현재 한계와 보존 대상
 
-- 기본 콘텐츠는 두 노드와 공통 PlayerUnit을 사용한다. 네 직업의 고유 스킬/스탯 완성, 전투 사이 회복·부활·보상, 전체 인벤토리/장비와 여러 Act는 미구현이다.
+- 기본 콘텐츠는 두 노드와 공통 PlayerUnit을 사용한다. 네 직업의 공통 초기값은 구현했으며 직업별 고유 스킬·최종 밸런스, 전투 사이 회복·부활·보상, 전체 인벤토리/장비와 여러 Act는 미구현이다.
 - 4×4 Grid·ASC HP/AP·기존 외형/사망 표현과 시전 몽타주를 연결한다. 순차 턴·AI·기존 GAS/몽타주 알림의 효과 실행은 기본 전투에서 제외하며 장착 스킬은 초기 라운드 변환을 사용한다. 미지원 이전 대상/범위/커스텀 능력은 명시 프로필을 요구하며 자동으로 다른 효과로 바꾸지 않는다. Streaming/Level Instance는 현재 흐름에 없다.
 - 2026-09-11부터 작업 폴더에서 삭제된 TestMap·BP_PartyPlayerController·TestGameModebase의 삭제 이력을 2026-09-16 Git에 반영한다. 자동 복원하지 않으며 기존 최초 생성·Audit 도구의 TestMap 입력은 별도 원본 확보가 필요하다. WorldMap 레벨/native class는 deprecated 상태이며 실행 흐름에서 제외한다.
 - WorldMap의 WorldSettings가 참조하는 WorldMapGameModeBase는 호환을 위해 보존한다.

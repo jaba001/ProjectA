@@ -267,7 +267,7 @@ for ($player = 1; $player -le $count; $player++)
 | 9-7 | 일반 저장을 별도 보존하고 개발 방 전투·메뉴 복귀 후 일반 Continue | `ProjectA_Run` 보존, 개발 저장은 `ProjectA_DevCoop_<RunId>`로 분리. 일반 Continue가 개발 저장을 로드하지 않음 | 미실행 |
 | 9-8 | 주소 검증 및 12절의 라운드/저장 거절 테스트 확인 | 주소 주입 거절, 원래 소유권 유지, 이전 Combat 저장은 무변경 거절. 순차 복구 fixture 성공을 요구하지 않음 | 미실행 |
 
-범위 제한: Hunter 고정 파티·새 방 전용이다. Steam/P2P 인증·초대·공유 저장·협동 재접속·관리 Run 승계·MMR은 구현하지 않는다. 개발용 접속 순서 배정을 인증된 계정 식별로 사용하지 않는다. 개발 슬롯은 자동 삭제하지 않으며 반복 생성 시 Saved에 누적된다. 기존 GameplayCue·종료 NavMesh 경고는 이번 변경으로 해결된 것으로 기록하지 않는다.
+범위 제한: 궁수 `Archer` 고정 파티·새 방 전용이다. Steam/P2P 인증·초대·공유 저장·협동 재접속·관리 Run 승계·MMR은 구현하지 않는다. 개발용 접속 순서 배정을 인증된 계정 식별로 사용하지 않는다. 개발 슬롯은 자동 삭제하지 않으며 반복 생성 시 Saved에 누적된다. 기존 GameplayCue·종료 NavMesh 경고는 이번 변경으로 해결된 것으로 기록하지 않는다.
 
 ## 문서 정적 검증
 
@@ -611,7 +611,7 @@ Development Editor / Win64 컴파일은 [CombatRoundTests.cpp](../Source/Project
 | 18-1 | Session Frontend에서 `ProjectA.Encounter.PreparationAbortRetry` 실행 | Preparing·Combat 실패의 액터·점유 정리와 저장 보존, Controller 재시도·Client 역할 거절, 입력 비활성·복합 오류 표시, 동기 Map 통지 중 새 노드·재시도 거절, 성공 이벤트 1회 | 미실행 |
 | 18-2 | `ProjectA.Run.Managed.OrderedResumeAndProgression` 실행 | 관리 준비 취소와 늦은 Combat 취소의 저장 실패 시 stamp·파일 보존, 재시도 성공 후 revision 1회 증가와 노드 재선택 | 미실행 |
 | 18-3 | 테스트 Run에서 준비 취소 저장 오류가 발생한 경우 Host의 저장 다시 시도를 선택하고, 저장 가능 상태 복구 뒤 다시 선택 | 실패 중 두 오류 원인·버튼 유지·화면 갱신 후에도 입력 차단, 성공 후 버튼 해제·준비 오류 표시·Map 복귀. Client는 Host 저장을 직접 재시도하지 않음 | 미실행 |
-| 18-4 | Content Browser에서 `/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty` 선택 → Asset Actions → Validate Assets | 현재 유효한 직업·스킬 구성이 통과. 실패하면 해당 직업과 클래스·능력치·시작 스킬 원인이 표시됨 | 미실행 |
+| 18-4 | Content Browser에서 `/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty` 선택 → Asset Actions → Validate Assets | 현재 유효한 직업·스킬 구성이 통과. 실패하면 해당 직업과 클래스·능력치·시작 스킬 원인이 표시됨 | 미실행 |
 | 18-5 | `ProjectA.Party.ProfessionDataValidation` 실행 | 기존 카탈로그와 legacy fallback 통과, 비활성 override 무시, 세 클래스 경로의 Abstract/Deprecated·잘못된 HP/AP·누락/중복 스킬·잘못된 프로필 거절, 유효 상위 클래스 우선·복구 후 오류 해제 | 미실행 |
 | 18-6 | 일반 새 Run에서 직업 선택 → 첫 전투 → 결과·상점 → 두 번째 전투 진행 | 기존 캐릭터 생성·시작 스킬·전투 준비·상점 진행 유지. 정상 경로에 취소 재시도 안내가 나타나지 않음 | 미실행 |
 | 18-7 | `ProjectA.Encounter.ContinueSaveRetry` 실행 | 실패 시 Result·저장 파일 보존, 재시도 성공의 동기 표시에서 이전 오류 제거·EncounterChoice 저장, 중복 Continue 거절 | 미실행 |
@@ -716,25 +716,27 @@ Codex의 ProjectA 자동화·패키지 실행·통합 전투 검증은 수행하
 
 - `bUseRoundDefinition`을 켠 명시 프로필은 선택적 `RoundDefinition.CastMontage`를 우선 사용한다. 미지정 명시 프로필과 기존 자동 변환은 공격 Ability의 `GetAuthoredAttackMontage`를 사용한다.
 - Casting 진입 시 시전 몽타주를 한 번 재생한다. 서버 multicast는 표현을 전달하며 재생 시작 실패는 `[RoundAnimation]` 경고로 유닛·몽타주·AnimInstance를 기록한다.
-- 기존 서버 `WindupSeconds`·충돌·AP·복귀 시점을 유지한다. 정상 발동과 복귀가 몽타주를 즉시 끊지 않으며 사망·중단·발동 전 취소·다음 행동에서는 해당 재생 인스턴스를 정리한다.
+- 서버 `WindupSeconds`·충돌·AP와 발동 1회는 유지한다. 후속 복귀 보완은 실제 서버 몽타주 인스턴스가 블렌드 아웃까지 끝난 뒤 복귀하도록 하며, 재생 불가·반복·종료 누락의 제한 대기는 [21-5](#21-5-전체-시전-대기와-da-폴더-정리)를 따른다. 사망·중단·발동 전 취소·다음 행동에서는 해당 재생 인스턴스를 정리한다.
 - 재생 인스턴스의 root motion을 비활성화하여 서버 이동을 덮어쓰지 않는다. `AN_SkillRelease` 알림이 별도 피해 이벤트를 보내지 않으므로 애니메이션 알림과 서버 공격이 중복 타격하지 않는다.
 
 ### 21-2 사용자 확인 절차
 
-최신 빌드 후 다시 연 에디터를 사용한다. 기존 기본·범위 공격 에셋은 재생 연결 확인을 위해 다시 생성할 필요가 없다. 명시 override나 잘못된 Skeleton·Slot 비교가 필요하면 Unreal 에셋 기능으로 `/Game/User_JeHoon/Validation/` 아래 작업 사본을 만들고 실제 검증 유닛에 장착한다. 표시 이름이 같더라도 실제 장착 DA·Ability·몽타주 경로를 구분한다.
+최신 빌드와 DA 폴더 이동 후 다시 연 에디터를 사용한다. 사용자가 작성한 기본 공격 `Skills/BPDA_DefaulatAttack`부터 확인하며 사용자가 저장한 이름·ID를 보존한다. 다른 공격은 아직 작성하지 않았으므로 재생 검사를 위해 임의로 값을 채우지 않는다. `BPDA_AreaAttack`은 기존 EnemyTile 메타데이터와 미작성 RoundDefinition을 유지하며 현재 자동 변환 거절이 기대 결과다. 범위 공격·명시 override·잘못된 Skeleton/Slot 비교는 해당 콘텐츠를 작성한 뒤 선택적으로 확인한다. 검증 작업 사본은 Unreal 에셋 기능으로 `/Game/User_JeHoon/Validation/` 아래 만들고 실제 검증 유닛에 장착한다. 표시 이름이 같더라도 실제 장착 DA·Ability·몽타주 경로를 구분한다.
 
 | ID | 사용자 확인 절차 | 기대 결과 | 상태 |
 |---|---|---|---|
 | 21-1 | 실제 장착된 기본 공격으로 계획·준비를 진행하고 Casting 진입 관찰 | 연결된 기본 공격 몽타주가 한 번 시작. 접근 중 조기 재생이나 연속 재시작 없음 | 미실행 |
-| 21-2 | 실제 장착된 범위 공격으로 같은 절차 진행 | 범위 공격의 연결 몽타주 재생. 피해 범위·발동 시점은 기존 서버 프로필 유지 | 미실행 |
-| 21-3 | 검증용 명시 프로필의 CastMontage를 다른 호환 몽타주로 지정하고 실행. 미지정으로 되돌려 반복 | 명시값 우선, 미지정 시 공격 Ability 몽타주 fallback | 미실행 |
-| 21-4 | 몽타주 없음, Skeleton 불일치, AnimBP Slot 미연결을 작업 사본에서 각각 확인 | 몽타주 없음은 표현 없이 기존 공격 진행. 재생 시작 실패는 경고 기록. 시작 로그가 있어도 Slot 미연결로 동작이 안 보이면 표현 실패로 기록 | 미실행 |
+| 21-2 | 범위 공격의 유효한 명시 프로필과 몽타주를 작성한 뒤 실제 장착하여 확인 | 작성된 프로필로만 범위 공격 재생. 미작성 EnemyTile DA는 임의 변환하지 않고 오류 표시 | 콘텐츠 작성 후 선택 검증·미실행 |
+| 21-3 | 검증용 명시 프로필을 작성한 뒤 CastMontage를 다른 호환 몽타주로 지정하고 실행. 미지정으로 되돌려 반복 | 명시값 우선, 미지정 시 공격 Ability 몽타주 fallback | 콘텐츠 작성 후 선택 검증·미실행 |
+| 21-4 | 검증 작업 사본을 준비한 뒤 몽타주 없음, Skeleton 불일치, AnimBP Slot 미연결을 각각 확인 | 몽타주 없음은 표현 없이 기존 공격 진행. 재생 시작 실패는 경고 기록. 시작 로그가 있어도 Slot 미연결로 동작이 안 보이면 표현 실패로 기록 | 작업 사본 준비 후 선택 검증·미실행 |
 | 21-5 | 시전 중 사망·발동 전 취소·세션 중단과 다음 행동을 확인하고 정상 발동·복귀와 비교 | 취소 경로의 해당 몽타주 정리, 정상 재생의 불필요한 조기 종료 없음. root motion에 따른 서버 좌표 변경·알림 중복 피해 없음 | 미실행 |
 | 21-6 | 싱글 확인 후 2인 협동에서 동일 시전을 관찰하고 4인으로 확대 | 각 창에서 대상 유닛의 표현 전달. HP·발동·복귀의 최종 권위는 서버 유지 | 미실행 |
 
 실패 시 실제 장착 DA·Ability·몽타주·Skeleton·AnimBP Slot 경로, 스킬의 WindupSeconds, 화면에서 보인 동작, `[RoundAnimation]` 로그와 피해 전후 HP를 기록한다. 재생 시작 로그는 몽타주가 화면에 올바르게 합성됐다는 보장이 아니며, 동작 표현과 실제 피해 시점을 각각 확인한다. 시작 로그가 있으나 동작이 보이지 않으면 Skeleton과 AnimGraph Slot 연결을 우선 확인한다.
 
 ### 21-3 개발 확인과 제한
+
+아래는 최초 몽타주 연결 당시의 검증 이력이다. 전체 시전 대기·DA 폴더 이동 이후의 결과는 [21-5](#21-5-전체-시전-대기와-da-폴더-정리)에 별도로 기록한다.
 
 Development Editor / Win64 빌드는 UHT를 포함해 성공했다(25.42초, 컴파일 오류·경고 0, `Saved/Logs/RoundCastMontageBuild.log`). 기존 `ProjectA.Combat.Content.RoundSkillMigrationValidation`과 `ProjectA.Combat.Actions.RetiredExecutionIsInert` 회귀를 확장했으며 실행하지 않았다. 독립 코드 검토와 문서 10개·링크/앵커·표 구조 검사를 통과했다. 수정 C++ 10개의 `.vcxproj`·`.filters` 항목 20개를 확인했으며 파일 추가·삭제·이름 변경이 없어 프로젝트 재생성은 필요하지 않았다. Visual Studio는 실행하지 않았다. Config·콘텐츠 무변경과 드라이버 복구 전후 프로젝트 설정 해시 2개 일치, TODO 3절 이후 보존도 확인했다. 정적 근거는 `Saved/Automation/RoundCastMontageStatic.json`이다.
 
@@ -757,6 +759,97 @@ Development Editor / Win64 빌드는 UHT를 포함해 성공했다(25.42초, 컴
 독립 코드·회귀 검토와 문서 10개·링크/앵커·표·diff 검사를 통과했다. C++ 수정 3개 파일의 VS 프로젝트·필터 항목 6개를 확인했으며 새 파일이 없어 프로젝트 재생성은 필요하지 않았다. Config와 TODO 3절 이후는 변경하지 않았다. 작업 중 사용자가 저장한 `BPDA_DefaulatAttack.uasset`도 보존하여 포함한다. 바이너리 정적 비교에서 표시 문자열 `DA` → `DeafaultAattack` 변경, 패키지 시그니처와 기본 공격 Ability 참조 유지를 확인했다. 엔진 에셋 검증은 실행하지 않았다. 정적 근거는 `Saved/Automation/ReturnFacingStatic.json`이다. 수정 후 복귀 방향의 실제 재생·협동 표현은 사용자 검증 대기다.
 
 일반 DLL 빌드 후 에디터 초기화 11.56초·`Startup complete`·프로세스 응답을 확인했다(`Saved/Logs/ProjectA_ReturnFacing.log`). 에디터를 열어 두었으며 Codex는 PIE를 시작하지 않았다. 기존 초기화 `Condition failed` 4건은 계속 남아 있고 이번 복귀 수정의 결과와 구분한다.
+
+### 21-5 전체 시전 대기와 DA 폴더 정리
+
+목적: 공격 몽타주가 끝나기 전에 복귀 이동이 시작되는 문제를 보완하고 제작 DA를 유형별로 정리한다. 기본 공격 외의 공격은 미작성 상태가 맞다는 사용자 확인을 반영하며 스킬 수치·능력·몽타주를 새로 작성하지 않는다. 사용자가 저장한 이름·ID와 기존 에셋 이름 `BPDA_DefaulatAttack`도 유지한다.
+
+대상 변경:
+
+- 피해·투사체 발사와 AP 처리는 기존 `WindupSeconds`·서버 충돌 판정으로 한 번 실행한다. 발동 뒤 `Recovery`는 해당 서버 몽타주 인스턴스 ID를 추적하여 블렌드 아웃까지 끝난 뒤 복귀로 전환한다. 기다리는 동안 이동 속도는 0이며 애니메이션 알림이 추가 공격을 실행하지 않는다.
+- 서버 재생 인스턴스를 사용할 수 없으면 에셋 길이/RateScale·블렌드 아웃·0.25초 여유 시간을 기준으로 기다린다. 시전 시작 기준 최대 60초의 대기 제한을 두고 반복 섹션·자동 종료 누락·잘못된 길이/속도를 경고한다. 제한 도달 시 남은 표현을 즉시 정리하여 무한 대기를 막는다. 정상 몽타주의 자연 종료와 제한에 의한 종료는 구분해 확인한다.
+- 대기 시간은 실제 서버 프레임의 `DeltaSeconds`를 한 번 누적한다. 고정 간격 시뮬레이션의 미처리 시간과 분리하여 프레임 지연 뒤 누적 시뮬레이션 처리로 복귀 대기가 조기에 끝나지 않게 한다.
+- 사망·중단·발동 전 취소의 정리를 유지한다. 정상 복귀가 끝나면 시작 방향과 정지 속도를 복원하며 성공한 잔류 이동의 조준 방향은 유지한다.
+- DA 7개는 Unreal AssetTools로 이동하고 참조·Redirector를 정리한다. 객체 이름·데이터 값·PrimaryAssetID·Snapshot 별칭을 유지한다. 코드·테스트·제작 스크립트는 새 경로를 사용한다.
+- `DefaultEngine.ini`의 `[CoreRedirects]`에 이전 패키지에서 새 패키지로 가는 정확한 `PackageRedirects` 7개를 둔다. 에셋 참조 정리는 기존 외부 `.sav`의 Catalog 소프트 경로를 다시 쓰지 않으므로 이전 비전투 저장의 Continue 호환을 위해 이 설정을 유지한다. 기존 전투 중 저장의 복구 지원을 추가하는 변경은 아니다.
+
+폴더는 `/Game/User_JeHoon/Blueprint/DataAsset/` 기준이다.
+
+| 폴더 | 이동 대상 |
+|---|---|
+| `Skills` | `BPDA_DefaulatAttack`, `BPDA_AreaAttack`, `DA_SweepingStrike` |
+| `Parties` | `DA_VerticalSliceParty` |
+| `Encounters` | `DA_DefaultEncounter` |
+| `SkillPools` | `DA_EncounterSkillPool` |
+| `Snapshots` | `DA_OpponentSnapshotCatalog` |
+
+준비 조건: 최종 Editor 빌드·이동·참조 검사가 끝난 뒤 에디터를 다시 연다. 우선 작성된 기본 공격만 사용한다. 기존 저장 Continue를 확인하려면 이동 전의 지원되는 일반 비전투 저장 사본을 보존하고 테스트 슬롯에서 확인한다. 반복 몽타주·재생 불가·명시 override 등은 검증용 작업 사본이 있을 때 선택적으로 확인하며 미작성 실사용 DA를 채워 검증하지 않는다.
+
+| ID | 사용자 실행 절차 | 기대 결과 | 상태 |
+|---|---|---|---|
+| 21-10 | 기본 공격의 접근·시전·블렌드 아웃·복귀를 관찰. 같은 공격을 다음 라운드에 반복 | 시전이 한 번 시작하고 전체 재생이 끝난 뒤 복귀. 타격 직후 이동·애니메이션 조기 종료·계속 이동하는 자세 없음 | 미실행 |
+| 21-11 | 같은 기본 공격에서 피해 전후 HP와 AP, 알림 시점과 Windup을 비교 | 기존 발동 시점과 충돌 조건 유지. 한 발동의 중복 피해·AP 중복 소비 없음. 대기 시간이 추가 타격을 만들지 않음 | 미실행 |
+| 21-12 | 아군·적의 복귀 완료 방향을 비교하고 Recovery 중 사망 또는 전투 중단을 확인 | 생존자는 원위치의 행동 전 방향·정지 속도 복원. 사망·중단 유닛은 애니메이션 정리 후 뒤늦은 복귀·재발동 없음 | 미실행 |
+| 21-13 | 작업 사본에서 몽타주 없음·재생 불가·반복 또는 자동 종료 누락을 선택적으로 확인 | 없음은 추가 대기 없음. 재생 불가는 에셋 기반 제한 대기. 반복/종료 누락은 시전 시작 기준 최대 60초 내 정리 후 복귀하며 관련 경고 기록 | 작업 사본 준비 후 선택 검증·미실행 |
+| 21-14 | Content Browser에서 위 5개 폴더·7개 DA와 기본 공격 표시 이름을 확인하고 파티·풀·Snapshot 참조를 확인 | 사용자가 저장한 이름·값·ID 보존. AreaAttack 등 미작성 공격의 빈 설정을 새로 채우지 않음. 연결된 이동 대상 참조 누락 없음 | 미실행 |
+| 21-15 | 새 게임·캐릭터 생성·첫 전투로 진입하고 기본 공격을 사용 | 새 경로의 파티·Encounter·스킬 참조를 읽으며 현재 네 직업/기본 공격 사용 가능. 미작성 AreaAttack을 제작 완료 스킬로 강제 장착하지 않음 | 미실행 |
+| 21-16 | 현재 지원되는 직업 4개와 이전 Catalog 패키지 경로를 사용하는 일반 비전투 저장 사본으로 Continue한 뒤 다시 저장·Continue | 이전 Catalog 소프트 경로가 PackageRedirect로 로드됨. 파티·진행 값 보존과 새 경로 저장 확인. 이전 테스트 직업과 지원하지 않는 Combat 저장은 거절·보존 | 미실행 |
+| 21-17 | 싱글 확인 후 2인 협동에서 기본 공격·Recovery·복귀·사망을 비교하고 4인으로 확대 | 각 창에서 같은 서버 발동·HP·결과와 최종 위치/방향 확인. 복귀 대기 중 추가 공격·이중 복귀 없음 | 미실행 |
+
+`BPDA_AreaAttack`은 `EnemyTile`과 미작성 명시 프로필을 유지하므로 현재 `ResolveRoundSkill` 거절과 RoundDefinition 작성 안내가 정상이다. `RoundSkillMigrationValidation`은 기본 공격의 실제 변환·몽타주 보존을 검사하고, AreaAttack은 이 거절을 검사하도록 맞춘다. 기존 Ability의 몽타주 메타데이터와 임시 명시 프로필의 fallback/override 검사는 유지한다. 이는 AreaAttack의 제작·재생 완료를 뜻하지 않는다.
+
+회귀 `ProjectA.Combat.Round.MontageRecoveryBeforeReturn`은 프레임 지연 사례를 포함한 5개 조건을 검사한다. 회귀 소스·최종 컴파일 결과와 실제 자동화 실행은 구분하며 이번 자동화는 미실행이다.
+
+실패 자료: 항목 ID, 실제 DA·몽타주 경로, Windup과 관찰된 복귀 시작 시점, 피해 전후 HP/AP, 아군/적·Host/Client, `[RoundAnimation]`의 최초 경고를 기록한다. `Bounded montage recovery` 또는 `Recovery timeout`이 나오면 길이·RateScale·섹션 반복·AutoBlendOut과 서버 AnimInstance를 확인한다. Continue 실패는 저장 버전·이동 전 Catalog 경로·최초 로드 오류와 적용된 PackageRedirect를 함께 기록한다. 재생 시작 로그나 패키지 저장 성공을 실제 전투 성공으로 대체하지 않는다.
+
+이번 변경의 개발 확인 기록은 다음과 같다. 실제 플레이 확인은 대기로 유지하며 21-3·21-4의 이전 성공 기록을 이번 변경의 근거로 재사용하지 않는다.
+
+에셋 이동 시 7개 DA의 작성된 값·이름·ID를 보존했다. 이어진 네 직업 반영은 별도 사용자 지시로 Party와 Snapshot DA의 직업 정의/맵만 변경했으며 [22절](#22-네-직업과-기본-능력치)에 기록한다. AssetTools가 이전 패키지를 직접 제거하여 추가 ResavePackages 정리 시도는 누락된 구패키지 7개를 보고했으나, 독립 재로드에서 루트 잔존 DA·Redirector 0개와 새 참조·구경로 해석을 확인했다.
+
+| 확인 대상 | 최신 결과 | 근거 |
+|---|---|---|
+| Unreal DA 이동·참조 갱신·Redirector 정리 | 성공 | `Saved/Automation/DataAssetOrganizationVerification.json` 및 `DataAssetOrganizationVerification.log`. 새 위치 7개·참조 확인, 루트 잔존 DA/Redirector 0개 |
+| 정확한 PackageRedirect 7개·이전 소프트 경로 | 성공 | 이전 객체 경로 7개 로드와 참조 확인. 기존 저장 26개의 해시 동일. 실제 저장 Continue는 별도 사용자 확인 |
+| Development Editor / Win64 | 성공 | UHT 포함 일반 DLL 빌드 25.10초, 컴파일 오류·경고 0. `Saved/Logs/FourProfessionsBuild.log` |
+| 프로젝트 항목·스크립트 | 성공 | 프로젝트 재생성 23.44초. 신규 C++ 10개를 포함한 변경 C++ 47개의 프로젝트/필터 항목 94개 확인. Visual Studio 미실행 |
+| 코드·회귀·문서 정적 검사 | 성공 | 문서 10개·로컬 링크 300개·앵커 206개·표 109개, Python 5개 구문·UI JSON·diff 검사 통과. 후속 사용자 요청의 직업/초기 능력치만 TODO 3-2·5절에 반영 |
+| PIE·게임·자동화·2인/4인·저장 Continue | 미실행 | 사용자 결과 대기 |
+
+## 22 네 직업과 기본 능력치
+
+### 22-1 변경 범위와 준비
+
+2026-09-16 사용자 요청으로 선택 직업을 전사 `Warrior`·마법사 `Mage`·궁수 `Archer`·도적 `Rogue`로 통일했다. `UProfessionBase`와 네 native 자식 클래스가 공통 시작 HP 100·힘/민첩/지능 각 10을 제공한다. Party의 `ProfessionClass`를 연결하고 기본값 사용 시 HP/세 능력치는 직업 정의, AP/SubAP/시작 스킬은 기존 전투 클래스에서 읽는다. 직업별 최종 밸런스·성장 공식·추가 공격은 작성하지 않는다.
+
+캐릭터 생성 순서·상세 정보·제작 명세와 실사용/검증 WBP의 슬롯 텍스트 16개를 변경했다. MainMenu 프리뷰는 기존 공통 외형으로 새 ID 4개를 연결한다. Snapshot은 새 직업 맵과 힘/민첩/지능 값의 직렬화·GAS 전달을 사용한다. 기존 스킬·AP·외형·원래 캐릭터 소유권은 유지한다.
+
+이전 테스트 직업을 새 직업으로 추정 변환하지 않는다. 해당 직업이 있는 Run은 Continue 오류에 ID와 원인을 표시하고 저장 원본 및 현재 Run을 유지한다. Snapshot도 카탈로그에 없는 직업을 거절한다. 패키지 이동의 `CoreRedirects`는 객체 경로 호환만 제공하며 구직업 저장을 지원한다는 의미가 아니다. 기존 샘플 Snapshot 저장도 덮어쓰지 않으므로 구직업 데이터가 있으면 새 직업의 별도 샘플로 검증한다.
+
+준비 조건: 최신 일반 DLL과 설정·에셋으로 에디터를 다시 연다. 새 게임으로 네 직업을 먼저 확인하고 저장 검사는 원본 사본을 보존한 별도 슬롯을 사용한다. 실제 전투·자동화 검증은 아래 항목을 사용자가 실행한다.
+
+### 22-2 사용자 확인
+
+| ID | 사용자 실행 절차 | 기대 결과 | 상태 |
+|---|---|---|---|
+| 22-1 | CharacterCreation에서 모든 직업 화살표·Edit·취소·이름 변경과 ClassInfo 확인 | 전사→마법사→궁수→도적만 선택. HP 100·힘/민첩/지능 각 10 표시, 취소는 원래 선택/이름 보존 | 미실행 |
+| 22-2 | 네 직업으로 새 Run을 만들고 첫 전투에서 능력치·기본 공격 확인 | 각 유닛 HP/MaxHP 100과 세 GAS 능력치 10. 기존 AP·기본 공격·몽타주 연결 유지 | 미실행 |
+| 22-3 | 피해 후 비전투 저장·Continue·다음 전투 진입 | 새 직업 ID·이름·현재 HP·원래 소유권 유지. 다음 전투에서 손실 HP를 100으로 임의 회복하지 않음 | 미실행 |
+| 22-4 | 이전 테스트 직업이 있는 저장 사본으로 Continue | 지원하지 않는 ID와 원인 표시. 저장 파일·현재 Run 유지, 임의 직업 변환/삭제 없음 | 미실행 |
+| 22-5 | 새 직업 4개가 포함된 로컬 Snapshot 저장/로드·전투와 구직업 Snapshot 거절 확인 | 새 직업/세 능력치 보존 및 스폰 전달. 구직업은 명시 오류로 거절하고 일반 적 전투로 대체하지 않음 | 미실행 |
+| 22-6 | Party/Snapshot 직업 맵·MainMenu 프리뷰·실사용 및 검증 WBP 확인 | 각 맵은 새 직업 4개만 포함. 기존 프리뷰 외형 유지, 슬롯 라벨 16개 일치. 배치·스타일·바인딩 유지 | 미실행 |
+| 22-7 | 싱글 확인 후 개발용 협동 2인, 이어서 4인 시작 | 참가자마다 궁수 1명·HP 100·세 능력치 10. Host/Client 상태 일치와 자기 캐릭터 조작권 유지 | 미실행 |
+
+실패 시 항목 ID·선택 ClassId·Party/Snapshot 에셋 경로·표시값과 실제 GAS 값·저장 슬롯·최초 오류를 기록한다. 저장 호환 문제는 직업 ID와 Catalog 경로 실패를 구분한다.
+
+### 22-3 개발 확인과 제한
+
+프로젝트 재생성 23.44초와 UHT 포함 Development Editor / Win64 일반 DLL 빌드 25.10초가 성공했다. 컴파일 오류·경고는 0이며 로그는 `Saved/Logs/FourProfessionsBuild.log`다. 신규 C++ 10개를 포함해 변경 C++ 47개·프로젝트/필터 항목 94개를 확인했고 Visual Studio는 실행하지 않았다.
+
+`ConfigureFourProfessions.log`와 `VerifyFourProfessions.log`는 모두 오류·경고 0으로 완료했다. 저장 후 독립 재로드에서 native 직업 자식 4개의 HP/세 능력치, Party·Snapshot·MainMenu의 정확한 4개 직업 맵, 실사용/검증 WBP 텍스트 16개, 구경로 7개의 CoreRedirect 해석을 확인했다. 기존 `.sav` 26개의 해시는 모두 유지됐다. 근거는 `Saved/Automation/FourProfessionsVerification.json`이다.
+
+일반 DLL 반영 후 기본 에디터 시작 11.54초·`Startup complete`·프로세스 응답을 확인하고 열어 두었다(`Saved/Logs/ProjectA_FourProfessions.log`). 기존 시작 오류 `Condition failed` 4건과 엔진 PNG/Menu 경고는 남아 있으며 이번 직업 설정 검사 결과와 구분한다.
+
+직업 기본값/검증·저장 거절·Snapshot 직렬화 회귀를 작성·확장했다. 관련 항목은 `ProjectA.Party.ProfessionLoadout`, `ProjectA.Party.ProfessionDataValidation`, `ProjectA.Persistence.Checkpoints`, `ProjectA.Snapshot.Validation`, `ProjectA.Snapshot.SaveGameRoundTrip`이다. 회귀 소스의 컴파일과 자동화 실행은 구분하며 자동화·PIE·전투·Continue·2인/4인 작동 검증은 미실행이다. 최종 정적 검사는 문서 10개·로컬 링크 300개·앵커 206개·표 109개와 Python 5개 구문·UI JSON·프로젝트/필터 항목 94개·diff를 통과했다. 근거는 `Saved/Automation/FourProfessionsStatic.json`이다.
 
 ## 사용자 결과 기록
 

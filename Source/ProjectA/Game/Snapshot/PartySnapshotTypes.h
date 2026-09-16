@@ -14,6 +14,17 @@ struct PROJECTA_API FPartySnapshotStats
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
     float CurrentHP = 100.0f;
 
+    // Additive defaults preserve snapshots authored before primary stats were introduced.
+    // 기본 능력치 도입 전에 작성한 스냅샷은 새 필드의 기본값을 사용합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
+    float Strength = 10.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
+    float Dexterity = 10.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
+    float Intelligence = 10.0f;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
     int32 MaxActionPoints = 2;
 

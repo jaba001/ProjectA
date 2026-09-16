@@ -73,6 +73,10 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
         {
             return false;
         }
+        if (!FMath::IsFinite(Unit.Strength) || Unit.Strength < 0.0f || Unit.Strength > 1000000.0f || !FMath::IsFinite(Unit.Dexterity) || Unit.Dexterity < 0.0f || Unit.Dexterity > 1000000.0f || !FMath::IsFinite(Unit.Intelligence) || Unit.Intelligence < 0.0f || Unit.Intelligence > 1000000.0f)
+        {
+            return false;
+        }
         if (Unit.MaxAP < 1 || Unit.MaxAP > 100 || Unit.AP < 0 || Unit.AP > Unit.MaxAP || Unit.MaxSubAP < 0 || Unit.MaxSubAP > 100 || Unit.SubAP < 0 || Unit.SubAP > Unit.MaxSubAP || Unit.MoveRange < 0 || Unit.MoveRange > 32 || Unit.HealingItemCount < 0 || Unit.HealingItemCount > 1000 || !FMath::IsFinite(Unit.HealingItemAmount) || Unit.HealingItemAmount < 0.0f || Unit.HealingItemAmount > 1000000.0f)
         {
             return false;
@@ -174,7 +178,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
             // Current HP, AP and formation can change in combat; the original build stays fixed.
             // 현재 HP, AP와 위치는 전투 중 바뀔 수 있지만 원래 빌드는 고정됩니다.
             const FPartySnapshotMember& Member = Checkpoint.OpponentSnapshot.Members[MemberIndex++];
-            if (Unit.UnitClass != FSoftObjectPath(Catalog->EnemyClasses.FindRef(Member.ClassId).Get()) || Unit.MaxHP != Member.Stats.MaxHP || Unit.MaxAP != Member.Stats.MaxActionPoints || Unit.MaxSubAP != Member.Stats.MaxSubActionPoints || Unit.MoveRange != Member.Stats.MoveRange || Unit.Skills.Num() != Member.SkillIds.Num())
+            if (Unit.UnitClass != FSoftObjectPath(Catalog->EnemyClasses.FindRef(Member.ClassId).Get()) || Unit.MaxHP != Member.Stats.MaxHP || Unit.Strength != Member.Stats.Strength || Unit.Dexterity != Member.Stats.Dexterity || Unit.Intelligence != Member.Stats.Intelligence || Unit.MaxAP != Member.Stats.MaxActionPoints || Unit.MaxSubAP != Member.Stats.MaxSubActionPoints || Unit.MoveRange != Member.Stats.MoveRange || Unit.Skills.Num() != Member.SkillIds.Num())
             {
                 return false;
             }

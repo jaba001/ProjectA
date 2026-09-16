@@ -86,13 +86,17 @@ public:
 
     // The server starts cosmetic round montages; null stops only the previous round montage.
     // 서버가 라운드 표현용 몽타주를 시작하며 null은 이전 라운드 몽타주만 중지합니다.
-    void SetRoundCastMontage(UAnimMontage* Montage);
+    void SetRoundCastMontage(UAnimMontage* Montage, bool bImmediateStop = false);
+
+    // Includes blend-out; inactive montages can still contribute to the final pose.
+    // 비활성 몽타주도 최종 자세에 영향을 줄 수 있으므로 블렌드 아웃까지 포함합니다.
+    bool HasRoundCastMontageInstance() const;
 
 protected:
     UFUNCTION(NetMulticast, Reliable)
-    void MulticastSetRoundCastMontage(UAnimMontage* Montage);
+    void MulticastSetRoundCastMontage(UAnimMontage* Montage, bool bImmediateStop);
 
-    void StopRoundCastMontage();
+    void StopRoundCastMontage(float BlendOutSeconds = 0.1f);
     TWeakObjectPtr<UAnimInstance> RoundMontageAnimInstance;
     int32 RoundMontageInstanceId = INDEX_NONE;
 
@@ -400,7 +404,7 @@ public:
     bool ConfigureMoveRange(int32 InMoveRange);
     // Apply resolved profession data before the spawned unit enters combat.
     // 스폰 유닛이 전투에 들어가기 전에 해석된 직업 데이터를 적용합니다.
-    bool ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills);
+    bool ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Strength = 10.0f, float Dexterity = 10.0f, float Intelligence = 10.0f);
 protected:
     // Initial attributes
     UPROPERTY(EditDefaultsOnly, Category = "UnitBase|GAS|Attribute")

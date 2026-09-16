@@ -18,8 +18,8 @@ namespace
     {
         FRunPartyMember Member;
         Member.SlotIndex = 2;
-        Member.CharacterName = FText::FromString(TEXT("Shop Hunter"));
-        Member.ClassId = TEXT("Hunter");
+        Member.CharacterName = FText::FromString(TEXT("Shop Archer"));
+        Member.ClassId = TEXT("Archer");
         Member.bCreated = true;
         return Member;
     }
@@ -92,7 +92,7 @@ bool FRunEncounterPersistenceTest::RunTest(const FString& Parameters)
     TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
     TStrongObjectPtr<URunStateSubsystem> Run(NewObject<URunStateSubsystem>(Instance.Get()));
     TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Instance.Get()));
-    Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+    Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
     Run->EnableCheckpointSaving(Slot.Name);
     Restored->EnableCheckpointSaving(Slot.Name);
     FText Error;

@@ -21,7 +21,7 @@ namespace
     {
         TStrongObjectPtr<UGameInstance> Instance{NewObject<UGameInstance>()};
         TStrongObjectPtr<URunStateSubsystem> Run{NewObject<URunStateSubsystem>(Instance.Get())};
-        TStrongObjectPtr<UPartyDefinitionDataAsset> Catalog{LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"))};
+        TStrongObjectPtr<UPartyDefinitionDataAsset> Catalog{LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"))};
         FString Slot = TEXT("T14_StandaloneContinue_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
 
         FStandaloneContinueFixture()
@@ -38,7 +38,7 @@ namespace
         TStrongObjectPtr<URunSaveGame> MakeSave(ERunIdentityOrigin Origin, int32 Participants, int32 PartySize, bool bCombat) const
         {
             FProfessionDefinition Profession;
-            if (!Catalog || !Catalog->ResolveProfession(TEXT("Hunter"), Profession) || Profession.StartingSkills.IsEmpty() || !Profession.StartingSkills[0]) return TStrongObjectPtr<URunSaveGame>();
+            if (!Catalog || !Catalog->ResolveProfession(TEXT("Archer"), Profession) || Profession.StartingSkills.IsEmpty() || !Profession.StartingSkills[0]) return TStrongObjectPtr<URunSaveGame>();
             TStrongObjectPtr<URunSaveGame> Save(NewObject<URunSaveGame>());
             Save->Version = bCombat ? 3 : Origin == ERunIdentityOrigin::LegacyOffline ? 1 : 2;
             Save->Catalog = FSoftObjectPath(Catalog.Get());
@@ -61,8 +61,8 @@ namespace
                 FRunPartyMember& Member = Save->Party.AddDefaulted_GetRef();
                 Member.SlotIndex = Index;
                 Member.bCreated = true;
-                Member.ClassId = TEXT("Hunter");
-                Member.CharacterName = FText::FromString(FString::Printf(TEXT("Saved Hunter %d"), Index));
+                Member.ClassId = TEXT("Archer");
+                Member.CharacterName = FText::FromString(FString::Printf(TEXT("Saved Archer %d"), Index));
                 Member.CurrentHP = Profession.MaxHP;
                 if (Origin != ERunIdentityOrigin::LegacyOffline)
                 {

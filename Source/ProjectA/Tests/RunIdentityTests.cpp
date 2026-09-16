@@ -40,8 +40,8 @@ namespace
 
                 FRunPartyMember& Member = Party.AddDefaulted_GetRef();
                 Member.SlotIndex = Index == 0 ? 3 : 1;
-                Member.CharacterName = FText::FromString(Index == 0 ? TEXT("Original Hunter") : TEXT("Original Scholar"));
-                Member.ClassId = Index == 0 ? TEXT("Hunter") : TEXT("Scholar");
+                Member.CharacterName = FText::FromString(Index == 0 ? TEXT("Original Archer") : TEXT("Original Mage"));
+                Member.ClassId = Index == 0 ? TEXT("Archer") : TEXT("Mage");
                 Member.bCreated = true;
                 Member.CharacterId = FGuid::NewGuid();
                 Member.OwnerAccountId = Participant.AccountId;
@@ -59,7 +59,7 @@ namespace
 
         FScopedIdentityRun()
         {
-            Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+            Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
             Run->EnableCheckpointSaving(Slot);
         }
 

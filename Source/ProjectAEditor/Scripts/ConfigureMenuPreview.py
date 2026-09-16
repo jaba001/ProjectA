@@ -26,10 +26,8 @@ if not preview:
 
 stage = stages[0] if stages else actors.spawn_actor_from_class(unreal.MainMenuPreviewStage, unreal.Vector(0, 0, 0))
 stage.set_actor_label("MainMenuPreviewStage")
-classes = dict(stage.get_editor_property("preview_actor_classes"))
-for profession in ["StableHand", "Scholar", "Herbalist", "Hunter"]:
-    if not classes.get(unreal.Name(profession)):
-        classes[unreal.Name(profession)] = preview.generated_class()
+existing_classes = dict(stage.get_editor_property("preview_actor_classes"))
+classes = {unreal.Name(profession): existing_classes.get(unreal.Name(profession)) or preview.generated_class() for profession in ["Warrior", "Mage", "Archer", "Rogue"]}
 stage.set_editor_property("preview_actor_classes", classes)
 
 # Menu camera and previews do not need a combat pawn spawned by GameMode.

@@ -2,6 +2,7 @@
 
 #include "Blueprint/WidgetTree.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
+#include "Profession/ProfessionBase.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "Components/Border.h"
@@ -27,18 +28,17 @@
 
 namespace
 {
-const TArray<FName> AvailablePartyClassIds = {
-    TEXT("StableHand"),
-    TEXT("Scholar"),
-    TEXT("Herbalist"),
-    TEXT("Hunter")
-};
+const TArray<FName>& GetAvailablePartyClassIds()
+{
+    static const TArray<FName> ClassIds = UProfessionBase::GetPlayableIds();
+    return ClassIds;
+}
 
 constexpr float PartySlotsFixedHeight = 260.0f;
 }
 
 UCharacterCreationWidget::UCharacterCreationWidget()
-    : CurrentCharacterClassId(TEXT("StableHand"))
+    : CurrentCharacterClassId(TEXT("Warrior"))
 {
 }
 
@@ -47,7 +47,7 @@ void UCharacterCreationWidget::NativeOnInitialized()
     Super::NativeOnInitialized();
     if (!PartyDefinition)
     {
-        PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+        PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
     }
 
     if (bCreateLayoutInCode)
@@ -89,7 +89,7 @@ void UCharacterCreationWidget::NativeOnInitialized()
     {
         if (UTextBlock* Label = Cast<UTextBlock>(Button_Warrior->GetChildAt(0)))
         {
-            Label->SetText(GetDisplayNameForClassId(TEXT("StableHand")));
+            Label->SetText(GetDisplayNameForClassId(TEXT("Warrior")));
         }
         Button_Warrior->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleWarriorClicked);
     }
@@ -98,7 +98,7 @@ void UCharacterCreationWidget::NativeOnInitialized()
     {
         if (UTextBlock* Label = Cast<UTextBlock>(Button_Archer->GetChildAt(0)))
         {
-            Label->SetText(GetDisplayNameForClassId(TEXT("Hunter")));
+            Label->SetText(GetDisplayNameForClassId(TEXT("Archer")));
         }
         Button_Archer->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleArcherClicked);
     }
@@ -107,9 +107,15 @@ void UCharacterCreationWidget::NativeOnInitialized()
     {
         if (UTextBlock* Label = Cast<UTextBlock>(Button_Mage->GetChildAt(0)))
         {
-            Label->SetText(GetDisplayNameForClassId(TEXT("Scholar")));
+            Label->SetText(GetDisplayNameForClassId(TEXT("Mage")));
         }
         Button_Mage->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleMageClicked);
+    }
+
+    if (Button_Rogue)
+    {
+        if (UTextBlock* Label = Cast<UTextBlock>(Button_Rogue->GetChildAt(0))) Label->SetText(GetDisplayNameForClassId(TEXT("Rogue")));
+        Button_Rogue->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleRogueClicked);
     }
 
     if (Button_Back)
@@ -526,9 +532,9 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
         }
     };
 
-    for (int32 SlotIndex = 0; SlotIndex < AvailablePartyClassIds.Num(); ++SlotIndex)
+    for (int32 SlotIndex = 0; SlotIndex < GetAvailablePartyClassIds().Num(); ++SlotIndex)
     {
-        const FText DisplayName = GetDisplayNameForClassId(AvailablePartyClassIds[SlotIndex]);
+        const FText DisplayName = GetDisplayNameForClassId(GetAvailablePartyClassIds()[SlotIndex]);
         UBorder* SlotPanel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), FName(*FString::Printf(TEXT("SlotPanel_%d"), SlotIndex)));
         UOverlay* SlotContentOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), FName(*FString::Printf(TEXT("SlotContentOverlay_%d"), SlotIndex)));
         UButton* CreateSlotButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*FString::Printf(TEXT("Button_Slot%d_Create"), SlotIndex)));
@@ -630,7 +636,7 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
 
         AssignSlotWidgets(SlotIndex, CreateSlotButton, SlotEditorBox, TitleText, PrevButton, NextButton, ClassIcon, ClassNameText, EditButton, DeleteButton, ClassInfoButton);
 
-        if (SlotIndex < AvailablePartyClassIds.Num() - 1)
+        if (SlotIndex < GetAvailablePartyClassIds().Num() - 1)
         {
             USizeBox* DividerBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), FName(*FString::Printf(TEXT("SlotDividerBox_%d"), SlotIndex)));
             UBorder* Divider = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), FName(*FString::Printf(TEXT("SlotDivider_%d"), SlotIndex)));
@@ -735,7 +741,7 @@ void UCharacterCreationWidget::InitializeClassSlotWidgetArrays()
 
 void UCharacterCreationWidget::InitializeClassSlots()
 {
-    SlotClassIds = AvailablePartyClassIds;
+    SlotClassIds = GetAvailablePartyClassIds();
     SlotCharacterNames.SetNum(SlotClassIds.Num());
     SlotCreationStates.Empty();
     const bool bUseDeferredCreation = HasDeferredSlotCreationWidgets();
@@ -769,12 +775,12 @@ void UCharacterCreationWidget::RefreshClassSlotWidgets()
 
 void UCharacterCreationWidget::ChangeSlotClass(int32 SlotIndex, int32 Direction)
 {
-    if (!SlotClassIds.IsValidIndex(SlotIndex) || AvailablePartyClassIds.IsEmpty() || !IsSlotCreated(SlotIndex))
+    if (!SlotClassIds.IsValidIndex(SlotIndex) || GetAvailablePartyClassIds().IsEmpty() || !IsSlotCreated(SlotIndex))
     {
         return;
     }
 
-    int32 CurrentIndex = AvailablePartyClassIds.IndexOfByKey(SlotClassIds[SlotIndex]);
+    int32 CurrentIndex = GetAvailablePartyClassIds().IndexOfByKey(SlotClassIds[SlotIndex]);
     if (CurrentIndex == INDEX_NONE)
     {
         CurrentIndex = 0;
@@ -783,15 +789,16 @@ void UCharacterCreationWidget::ChangeSlotClass(int32 SlotIndex, int32 Direction)
     int32 NextIndex = CurrentIndex + Direction;
     while (NextIndex < 0)
     {
-        NextIndex += AvailablePartyClassIds.Num();
+        NextIndex += GetAvailablePartyClassIds().Num();
     }
 
-    NextIndex %= AvailablePartyClassIds.Num();
-    SetSlotClass(SlotIndex, AvailablePartyClassIds[NextIndex]);
+    NextIndex %= GetAvailablePartyClassIds().Num();
+    SetSlotClass(SlotIndex, GetAvailablePartyClassIds()[NextIndex]);
 }
 
 void UCharacterCreationWidget::SetSlotClass(int32 SlotIndex, FName ClassId)
 {
+    if (!UProfessionBase::FindProfession(ClassId)) return;
     if (!SlotClassIds.IsValidIndex(SlotIndex))
     {
         return;
@@ -969,7 +976,7 @@ bool UCharacterCreationWidget::HasDeferredSlotCreationWidgets() const
 
 FText UCharacterCreationWidget::GetDisplayNameForClassId(FName ClassId) const
 {
-    const FProfessionDefinition* Definition = PartyDefinition ? PartyDefinition->Professions.Find(ClassId) : nullptr;
+    const UProfessionBase* Definition = UProfessionBase::FindProfession(ClassId);
     return Definition ? Definition->DisplayName : FText::FromName(ClassId);
 }
 
@@ -1087,20 +1094,25 @@ void UCharacterCreationWidget::HandleNameTextChanged(const FText& NewText)
 
 void UCharacterCreationWidget::HandleWarriorClicked()
 {
-    SelectCharacterClass(TEXT("StableHand"));
+    SelectCharacterClass(TEXT("Warrior"));
     RefreshPreview();
 }
 
 void UCharacterCreationWidget::HandleArcherClicked()
 {
-    SelectCharacterClass(TEXT("Hunter"));
+    SelectCharacterClass(TEXT("Archer"));
     RefreshPreview();
 }
 
 void UCharacterCreationWidget::HandleMageClicked()
 {
-    SelectCharacterClass(TEXT("Scholar"));
+    SelectCharacterClass(TEXT("Mage"));
     RefreshPreview();
+}
+
+void UCharacterCreationWidget::HandleRogueClicked()
+{
+    SelectCharacterClass(TEXT("Rogue"));
 }
 
 void UCharacterCreationWidget::HandleBackClicked()
@@ -1281,6 +1293,7 @@ TArray<FRunPartyMember> UCharacterCreationWidget::GetPartyMembers() const
 
 void UCharacterCreationWidget::SelectCharacterClass(FName CharacterClassId)
 {
+    if (!UProfessionBase::FindProfession(CharacterClassId)) return;
     CurrentCharacterClassId = CharacterClassId;
     RefreshPreview();
 }
@@ -1391,7 +1404,7 @@ void UCharacterCreationWidget::BuildDetailPanel()
     DetailName->SetHintText(FText::FromString(TEXT("캐릭터 이름")));
     Content->AddChildToVerticalBox(DetailName)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
     DetailClass = WidgetTree->ConstructWidget<UDemonicComboBoxString>(UDemonicComboBoxString::StaticClass(), TEXT("ProfessionClassSelect"));
-    for (FName ClassId : AvailablePartyClassIds)
+    for (FName ClassId : GetAvailablePartyClassIds())
     {
         DetailClass->AddOption(GetDisplayNameForClassId(ClassId).ToString());
     }
@@ -1421,7 +1434,7 @@ void UCharacterCreationWidget::ShowSlotDetails(int32 SlotIndex, bool bEditable)
     DetailError->SetText(FText::GetEmpty());
     DetailName->SetText(GetPartyMembers()[SlotIndex].CharacterName);
     DetailName->SetIsReadOnly(!bEditable);
-    DetailClass->SetSelectedIndex(AvailablePartyClassIds.IndexOfByKey(SlotClassIds[SlotIndex]));
+    DetailClass->SetSelectedIndex(GetAvailablePartyClassIds().IndexOfByKey(SlotClassIds[SlotIndex]));
     DetailClass->SetIsEnabled(bEditable);
     DetailText->SetText(PartyDefinition ? PartyDefinition->GetProfessionDetails(SlotClassIds[SlotIndex]) : FText::GetEmpty());
     DetailSave->SetVisibility(bEditable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -1436,9 +1449,9 @@ void UCharacterCreationWidget::ShowSlotDetails(int32 SlotIndex, bool bEditable)
 void UCharacterCreationWidget::HandleDetailClassChanged(FString SelectedItem, ESelectInfo::Type SelectionType)
 {
     const int32 Index = DetailClass->GetSelectedIndex();
-    if (AvailablePartyClassIds.IsValidIndex(Index) && PartyDefinition)
+    if (GetAvailablePartyClassIds().IsValidIndex(Index) && PartyDefinition)
     {
-        DetailText->SetText(PartyDefinition->GetProfessionDetails(AvailablePartyClassIds[Index]));
+        DetailText->SetText(PartyDefinition->GetProfessionDetails(GetAvailablePartyClassIds()[Index]));
     }
 }
 
@@ -1456,13 +1469,13 @@ void UCharacterCreationWidget::SaveSlotDetails()
         DetailError->SetText(FText::FromString(TEXT("이름은 1~32자로 입력해 주세요.")));
         return;
     }
-    if (!AvailablePartyClassIds.IsValidIndex(Index) || !PartyDefinition || !PartyDefinition->ResolveProfession(AvailablePartyClassIds[Index], Definition))
+    if (!GetAvailablePartyClassIds().IsValidIndex(Index) || !PartyDefinition || !PartyDefinition->ResolveProfession(GetAvailablePartyClassIds()[Index], Definition))
     {
         DetailError->SetText(FText::FromString(TEXT("직업 전투 설정을 확인해 주세요.")));
         return;
     }
     SetSlotCharacterName(DetailSlot, FText::FromString(Name));
-    SetSlotClass(DetailSlot, AvailablePartyClassIds[Index]);
+    SetSlotClass(DetailSlot, GetAvailablePartyClassIds()[Index]);
     CloseSlotDetails();
 }
 

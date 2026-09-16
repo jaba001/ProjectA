@@ -140,6 +140,11 @@ protected:
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_Mage;
 
+    // Rogue selection for optional Designer layouts.
+    // 선택적 Designer 레이아웃의 도적 선택 버튼입니다.
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Rogue;
+
     // Selected class preview text optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 선택 클래스 표시 텍스트입니다.
     // TODO: Bind a UTextBlock named Text_SelectedClass in WBP_CharacterCreationWidget for selected class display.
@@ -389,6 +394,9 @@ private:
 
     UFUNCTION()
     void HandleMageClicked();
+
+    UFUNCTION()
+    void HandleRogueClicked();
 
     UFUNCTION()
     void HandleBackClicked();

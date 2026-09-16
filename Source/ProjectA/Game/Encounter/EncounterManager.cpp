@@ -356,7 +356,7 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         }
         SpawnedUnits.Add(Unit);
         PartyActors.Add(Member.SlotIndex, Unit);
-        if (!Unit->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, Profession.StartingSkills))
+        if (!Unit->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, Profession.StartingSkills, Profession.Strength, Profession.Dexterity, Profession.Intelligence))
         {
             return false;
         }
@@ -392,7 +392,7 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         SpawnedUnits.Add(Unit);
         if (Member)
         {
-            if (!Unit->ConfigureProfession(Member->Stats.MaxHP, Member->Stats.MaxActionPoints, Member->Stats.MaxSubActionPoints, SnapshotSkills[Index]))
+            if (!Unit->ConfigureProfession(Member->Stats.MaxHP, Member->Stats.MaxActionPoints, Member->Stats.MaxSubActionPoints, SnapshotSkills[Index], Member->Stats.Strength, Member->Stats.Dexterity, Member->Stats.Intelligence))
             {
                 FlowMessage = FText::FromString(TEXT("Opponent Snapshot unit configuration failed. / 상대 스냅샷 유닛 설정에 실패했습니다."));
                 return false;

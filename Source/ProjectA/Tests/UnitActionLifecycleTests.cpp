@@ -14,6 +14,11 @@
 #include "GAS/Ability/GA_AreaAttack.h"
 #include "GAS/Effect/GE_Damage.h"
 #include "Grid/Combat/CombatGridTile.h"
+#include "Profession/ProfessionBase.h"
+#include "Profession/WarriorProfession.h"
+#include "Profession/MageProfession.h"
+#include "Profession/ArcherProfession.h"
+#include "Profession/RogueProfession.h"
 #include "Unit/PlayerUnit.h"
 #include "Unit/UnitBase.h"
 #include <limits>
@@ -189,7 +194,7 @@ bool FCombatRoundSkillMigrationTest::RunTest(const FString& Parameters)
     const TPair<const TCHAR*, const TCHAR*> AuthoredMontages[] = {{TEXT("BPDA_DefaulatAttack"), TEXT("MM_Attack_01_Montage")}, {TEXT("BPDA_AreaAttack"), TEXT("MM_Attack_03_Montage")}};
     for (const TPair<const TCHAR*, const TCHAR*>& Authored : AuthoredMontages)
     {
-        const FString AssetPath = FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/%s.%s"), Authored.Key, Authored.Key);
+        const FString AssetPath = FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/%s.%s"), Authored.Key, Authored.Key);
         const USkillDefinitionDataAsset* AuthoredSkill = LoadObject<USkillDefinitionDataAsset>(nullptr, *AssetPath);
         if (!TestNotNull(TEXT("The authored skill data asset exists"), AuthoredSkill)) return false;
         const UGA_AttackBase* AuthoredAttack = AuthoredSkill->AbilityClass ? Cast<UGA_AttackBase>(AuthoredSkill->AbilityClass->GetDefaultObject()) : nullptr;
@@ -198,8 +203,18 @@ bool FCombatRoundSkillMigrationTest::RunTest(const FString& Parameters)
         UAnimMontage* AuthoredMontage = LoadObject<UAnimMontage>(nullptr, *MontagePath);
         if (!TestNotNull(TEXT("The authored attack montage exists"), AuthoredMontage)) return false;
         TestEqual(TEXT("Saved attack defaults reference the expected montage"), AuthoredAttack->GetAuthoredAttackMontage(), AuthoredMontage);
-        TestTrue(TEXT("The authored skill resolves without activating its ability"), AuthoredSkill->ResolveRoundSkill(Resolved, Error));
-        TestEqual(TEXT("Migration retains the authored attack montage"), Resolved.CastMontage.Get(), AuthoredMontage);
+        // The unfinished tile skill retains its metadata until an explicit round profile is authored.
+        // 미제작 타일 스킬은 명시적 라운드 프로필이 작성될 때까지 기존 메타데이터를 유지합니다.
+        if (!AuthoredSkill->bUseRoundDefinition && AuthoredSkill->TargetRule == ESkillTargetRule::EnemyTile)
+        {
+            TestFalse(TEXT("The unfinished tile skill requires an explicit round profile"), AuthoredSkill->ResolveRoundSkill(Resolved, Error));
+            TestTrue(TEXT("The unfinished tile skill reports the required RoundDefinition"), Error.ToString().Contains(TEXT("RoundDefinition")));
+        }
+        else
+        {
+            TestTrue(TEXT("The authored skill resolves without activating its ability"), AuthoredSkill->ResolveRoundSkill(Resolved, Error));
+            TestEqual(TEXT("Migration retains the authored attack montage"), Resolved.CastMontage.Get(), AuthoredSkill->bUseRoundDefinition && AuthoredSkill->RoundDefinition.CastMontage ? AuthoredSkill->RoundDefinition.CastMontage.Get() : AuthoredMontage);
+        }
 
         USkillDefinitionDataAsset* PresentationSkill = MakeSkill(GetTransientPackage(), AuthoredSkill->AbilityClass);
         PresentationSkill->bUseRoundDefinition = true;
@@ -246,14 +261,23 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfessionLoadoutTest, "ProjectA.Party.Profess
 bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
 {
     using namespace UnitActionLifecycleTests;
-    UPartyDefinitionDataAsset* Catalog = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+    UPartyDefinitionDataAsset* Catalog = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
     if (!TestNotNull(TEXT("Shared party catalog exists"), Catalog))
     {
         return false;
     }
+    const TArray<FName> ExpectedIds = {TEXT("Warrior"), TEXT("Mage"), TEXT("Archer"), TEXT("Rogue")};
+    const TArray<TSubclassOf<UProfessionBase>> ExpectedClasses = {UWarriorProfession::StaticClass(), UMageProfession::StaticClass(), UArcherProfession::StaticClass(), URogueProfession::StaticClass()};
+    const TArray<TSubclassOf<UProfessionBase>> PlayableClasses = UProfessionBase::GetPlayableClasses();
+    if (!TestTrue(TEXT("The playable catalog contains exactly the four ordered native professions"), PlayableClasses == ExpectedClasses && UProfessionBase::GetPlayableIds() == ExpectedIds && Catalog->Professions.Num() == 4)) return false;
     FScopedWorld Scope;
-    for (FName Id : { FName(TEXT("StableHand")), FName(TEXT("Scholar")), FName(TEXT("Herbalist")), FName(TEXT("Hunter")) })
+    for (int32 Index = 0; Index < ExpectedIds.Num(); ++Index)
     {
+        const FName Id = ExpectedIds[Index];
+        const UProfessionBase* Profession = UProfessionBase::FindProfession(Id);
+        if (!TestNotNull(TEXT("Each profession ID resolves a class default definition"), Profession)) return false;
+        TestTrue(TEXT("Each profession is a concrete native UObject child instead of a combat actor"), Profession->GetClass() == ExpectedClasses[Index].Get() && Profession->GetClass()->HasAnyClassFlags(CLASS_Native) && !Profession->GetClass()->HasAnyClassFlags(CLASS_Abstract) && !Profession->GetClass()->IsChildOf(AActor::StaticClass()));
+        TestTrue(TEXT("Every profession starts with HP 100 and three attributes at 10"), Profession->MaxHP == 100.0f && Profession->Strength == 10.0f && Profession->Dexterity == 10.0f && Profession->Intelligence == 10.0f);
         FProfessionDefinition Definition;
         if (!TestTrue(TEXT("Profession resolves combat defaults"), Catalog->ResolveProfession(Id, Definition)))
         {
@@ -261,10 +285,15 @@ bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
         }
         TestFalse(TEXT("Profession has a readable name"), Definition.DisplayName.IsEmpty());
         TestFalse(TEXT("Profession has a description"), Definition.Description.IsEmpty());
-        TestTrue(TEXT("Preview shows actual HP"), Catalog->GetProfessionDetails(Id).ToString().Contains(FString::Printf(TEXT("HP %.0f"), Definition.MaxHP)));
+        TestTrue(TEXT("The authored catalog uses the matching native profession child"), Definition.ProfessionClass == ExpectedClasses[Index]);
+        TestTrue(TEXT("Resolved starting attributes match the profession class"), Definition.MaxHP == 100.0f && Definition.Strength == 10.0f && Definition.Dexterity == 10.0f && Definition.Intelligence == 10.0f);
+        TestTrue(TEXT("Preview shows all actual starting attributes"), Catalog->GetProfessionDetails(Id).ToString().Contains(TEXT("HP 100 · 힘 10 · 민첩 10 · 지능 10")));
         APlayerUnit* Unit = Scope.SpawnUnit<APlayerUnit>(FVector::ZeroVector);
-        Unit->ConfigureProfession(Definition.MaxHP, Definition.ActionPoints, Definition.SubActionPoints, Definition.StartingSkills);
+        if (!TestTrue(TEXT("Spawn configuration accepts the resolved profession"), Unit->ConfigureProfession(Definition.MaxHP, Definition.ActionPoints, Definition.SubActionPoints, Definition.StartingSkills, Definition.Strength, Definition.Dexterity, Definition.Intelligence))) return false;
         TestEqual(TEXT("Spawn HP equals preview"), Unit->GetAttributeSet()->GetHP(), Definition.MaxHP);
+        TestEqual(TEXT("Spawn strength equals preview"), Unit->GetAttributeSet()->GetStrength(), Definition.Strength);
+        TestEqual(TEXT("Spawn dexterity equals preview"), Unit->GetAttributeSet()->GetDexterity(), Definition.Dexterity);
+        TestEqual(TEXT("Spawn intelligence equals preview"), Unit->GetAttributeSet()->GetIntelligence(), Definition.Intelligence);
         TestEqual(TEXT("Spawn AP equals preview"), Unit->GetMaxActionPoint(), Definition.ActionPoints);
         TestEqual(TEXT("Spawn sub AP equals preview"), Unit->GetMaxSubActionPoint(), Definition.SubActionPoints);
         for (USkillDefinitionDataAsset* Skill : Definition.StartingSkills)
@@ -276,28 +305,47 @@ bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
         }
     }
     UPartyDefinitionDataAsset* Custom = DuplicateObject<UPartyDefinitionDataAsset>(Catalog, GetTransientPackage());
-    FProfessionDefinition& Override = Custom->Professions.FindChecked(TEXT("Scholar"));
+    FProfessionDefinition& Override = Custom->Professions.FindChecked(TEXT("Mage"));
     FProfessionDefinition Base;
-    Catalog->ResolveProfession(TEXT("Scholar"), Base);
+    Catalog->ResolveProfession(TEXT("Mage"), Base);
     Override.bUseUnitClassDefaults = false;
     Override.StartingSkills = Base.StartingSkills;
     Override.MaxHP = 137.0f;
+    Override.Strength = 12.0f;
+    Override.Dexterity = 0.0f;
+    Override.Intelligence = 24.0f;
     Override.ActionPoints = 3;
     Override.SubActionPoints = 2;
     FProfessionDefinition Resolved;
-    TestTrue(TEXT("Explicit profession tuning resolves"), Custom->ResolveProfession(TEXT("Scholar"), Resolved));
+    if (!TestTrue(TEXT("Explicit profession tuning resolves including a zero attribute"), Custom->ResolveProfession(TEXT("Mage"), Resolved))) return false;
     APlayerUnit* Tuned = Scope.SpawnUnit<APlayerUnit>(FVector::ZeroVector);
-    Tuned->ConfigureProfession(Resolved.MaxHP, Resolved.ActionPoints, Resolved.SubActionPoints, Resolved.StartingSkills);
+    TestTrue(TEXT("Spawn accepts explicit profession tuning"), Tuned->ConfigureProfession(Resolved.MaxHP, Resolved.ActionPoints, Resolved.SubActionPoints, Resolved.StartingSkills, Resolved.Strength, Resolved.Dexterity, Resolved.Intelligence));
     TestEqual(TEXT("Override applies HP"), Tuned->GetAttributeSet()->GetHP(), 137.0f);
     TestEqual(TEXT("Override applies AP"), Tuned->GetMaxActionPoint(), 3);
-    TestTrue(TEXT("Override also changes preview"), Custom->GetProfessionDetails(TEXT("Scholar")).ToString().Contains(TEXT("HP 137")));
+    TestTrue(TEXT("Explicit attributes reach GAS"), Tuned->GetAttributeSet()->GetStrength() == 12.0f && Tuned->GetAttributeSet()->GetDexterity() == 0.0f && Tuned->GetAttributeSet()->GetIntelligence() == 24.0f);
+    TestTrue(TEXT("Override also changes every preview attribute"), Custom->GetProfessionDetails(TEXT("Mage")).ToString().Contains(TEXT("HP 137 · 힘 12 · 민첩 0 · 지능 24")));
+    for (float InvalidValue : {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(), -1.0f, 1000001.0f})
+    {
+        for (int32 AttributeIndex = 0; AttributeIndex < 3; ++AttributeIndex)
+        {
+            const float Strength = AttributeIndex == 0 ? InvalidValue : 12.0f;
+            const float Dexterity = AttributeIndex == 1 ? InvalidValue : 0.0f;
+            const float Intelligence = AttributeIndex == 2 ? InvalidValue : 24.0f;
+            TestFalse(TEXT("Invalid runtime attributes reject the entire new loadout"), Tuned->ConfigureProfession(999.0f, 1, 0, Resolved.StartingSkills, Strength, Dexterity, Intelligence));
+            TestTrue(TEXT("Rejected configuration preserves HP AP skills and all attributes"), Tuned->GetAttributeSet()->GetHP() == 137.0f && Tuned->GetMaxActionPoint() == 3 && Tuned->GetMaxSubActionPoint() == 2 && Tuned->GetEquippedSkillDataAssets() == Resolved.StartingSkills && Tuned->GetAttributeSet()->GetStrength() == 12.0f && Tuned->GetAttributeSet()->GetDexterity() == 0.0f && Tuned->GetAttributeSet()->GetIntelligence() == 24.0f);
+        }
+    }
     const TObjectPtr<USkillDefinitionDataAsset> DuplicateSkill = Override.StartingSkills[0];
     Override.StartingSkills.Add(DuplicateSkill);
-    TestFalse(TEXT("Duplicate skill asset is rejected"), Custom->ResolveProfession(TEXT("Scholar"), Resolved));
+    TestFalse(TEXT("Duplicate skill asset is rejected"), Custom->ResolveProfession(TEXT("Mage"), Resolved));
     Override.StartingSkills.Pop();
     Override.MaxHP = -1.0f;
-    TestFalse(TEXT("Invalid tuning is rejected"), Custom->ResolveProfession(TEXT("Scholar"), Resolved));
-    TestFalse(TEXT("Unknown professions do not silently use fallback"), Custom->ResolveProfession(TEXT("Warrior"), Resolved));
+    TestFalse(TEXT("Invalid tuning is rejected"), Custom->ResolveProfession(TEXT("Mage"), Resolved));
+    for (FName PreviousId : {FName(TEXT("Hunter")), FName(TEXT("StableHand"))})
+    {
+        TestNull(TEXT("Previous test IDs are not in the playable profession hierarchy"), UProfessionBase::FindProfession(PreviousId));
+        TestFalse(TEXT("Previous test professions do not silently use the combat fallback"), Custom->ResolveProfession(PreviousId, Resolved));
+    }
     return true;
 }
 
@@ -306,19 +354,19 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfessionDataValidationTest, "ProjectA.Party.
 
 bool FProfessionDataValidationTest::RunTest(const FString& Parameters)
 {
-    UPartyDefinitionDataAsset* Catalog = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+    UPartyDefinitionDataAsset* Catalog = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
     if (!TestNotNull(TEXT("Shared party catalog exists"), Catalog)) return false;
     FDataValidationContext ExistingContext;
     TestTrue(TEXT("Existing catalog passes editor validation"), Catalog->IsDataValid(ExistingContext) == EDataValidationResult::Valid);
     FProfessionDefinition Base;
-    if (!TestTrue(TEXT("Existing Hunter provides a valid loadout"), Catalog->ResolveProfession(TEXT("Hunter"), Base))) return false;
+    if (!TestTrue(TEXT("Existing Archer provides a valid loadout"), Catalog->ResolveProfession(TEXT("Archer"), Base))) return false;
 
     UPartyDefinitionDataAsset* Custom = NewObject<UPartyDefinitionDataAsset>();
     Custom->Professions.Reset();
-    FProfessionDefinition& Definition = Custom->Professions.Add(TEXT("Hunter"), Base);
+    FProfessionDefinition& Definition = Custom->Professions.Add(TEXT("Archer"), Base);
     Definition.bUseUnitClassDefaults = false;
     Definition.CombatClass = nullptr;
-    Custom->PlayerUnitClasses.Add(TEXT("Hunter"), Base.CombatClass);
+    Custom->PlayerUnitClasses.Add(TEXT("Archer"), Base.CombatClass);
     const auto Validate = [this, Custom](const TCHAR* Label, bool bExpected, const TCHAR* ExpectedDetail = nullptr)
     {
         FDataValidationContext Context;
@@ -335,9 +383,17 @@ bool FProfessionDataValidationTest::RunTest(const FString& Parameters)
     Custom->FallbackPlayerUnitClass = Base.CombatClass;
     Validate(TEXT("Legacy shared fallback remains valid"), true);
     Custom->FallbackPlayerUnitClass = nullptr;
-    Validate(TEXT("Missing all class sources reports the profession"), false, TEXT("Hunter"));
+    Validate(TEXT("Missing all class sources reports the profession"), false, TEXT("Archer"));
     Definition.CombatClass = Base.CombatClass;
     Validate(TEXT("Direct profession class needs no fallback"), true);
+    Definition.ProfessionClass = nullptr;
+    Validate(TEXT("A missing profession definition class is rejected"), false, TEXT("ProfessionClass"));
+    Definition.ProfessionClass = UProfessionBase::StaticClass();
+    Validate(TEXT("An abstract profession definition class is rejected"), false, TEXT("ProfessionClass"));
+    Definition.ProfessionClass = UWarriorProfession::StaticClass();
+    Validate(TEXT("A profession definition class must match the catalog ID"), false, TEXT("ClassId"));
+    Definition.ProfessionClass = Base.ProfessionClass;
+    Validate(TEXT("Restoring the matching profession class restores validity"), true);
     // Use transient class metadata without changing production classes or spawning an invalid actor.
     // 실제 클래스를 바꾸거나 잘못된 액터를 스폰하지 않고 임시 클래스 메타데이터를 사용합니다.
     UClass* UnspawnableClass = NewObject<UClass>();
@@ -346,21 +402,21 @@ bool FProfessionDataValidationTest::RunTest(const FString& Parameters)
     {
         UnspawnableClass->ClassFlags = Flag;
         Definition.CombatClass = UnspawnableClass;
-        Custom->PlayerUnitClasses.Add(TEXT("Hunter"), Base.CombatClass);
+        Custom->PlayerUnitClasses.Add(TEXT("Archer"), Base.CombatClass);
         Custom->FallbackPlayerUnitClass = Base.CombatClass;
         Validate(TEXT("An unspawnable direct class does not silently fall back"), false, *UnspawnableClass->GetPathName());
         FProfessionDefinition Rejected;
         FText ClassError;
-        TestFalse(TEXT("Runtime profession resolution also rejects an unspawnable class"), Custom->ResolveProfession(TEXT("Hunter"), Rejected, ClassError));
+        TestFalse(TEXT("Runtime profession resolution also rejects an unspawnable class"), Custom->ResolveProfession(TEXT("Archer"), Rejected, ClassError));
         Definition.CombatClass = nullptr;
-        Custom->PlayerUnitClasses[TEXT("Hunter")] = UnspawnableClass;
+        Custom->PlayerUnitClasses[TEXT("Archer")] = UnspawnableClass;
         Validate(TEXT("An unspawnable legacy mapping does not silently use shared fallback"), false, TEXT("CombatClass"));
         Custom->PlayerUnitClasses.Reset();
         Custom->FallbackPlayerUnitClass = UnspawnableClass;
         Validate(TEXT("An unspawnable shared fallback is rejected"), false, TEXT("CombatClass"));
-        Custom->PlayerUnitClasses.Add(TEXT("Hunter"), Base.CombatClass);
+        Custom->PlayerUnitClasses.Add(TEXT("Archer"), Base.CombatClass);
         Validate(TEXT("A valid legacy mapping takes precedence over an unused invalid fallback"), true);
-        Custom->PlayerUnitClasses[TEXT("Hunter")] = UnspawnableClass;
+        Custom->PlayerUnitClasses[TEXT("Archer")] = UnspawnableClass;
         Definition.CombatClass = Base.CombatClass;
         Validate(TEXT("A valid direct class takes precedence over unused invalid fallback sources"), true);
         Custom->PlayerUnitClasses.Reset();
@@ -369,6 +425,21 @@ bool FProfessionDataValidationTest::RunTest(const FString& Parameters)
     Definition.MaxHP = std::numeric_limits<float>::quiet_NaN();
     Validate(TEXT("Nonfinite explicit HP is rejected"), false, TEXT("MaxHP"));
     Definition.MaxHP = Base.MaxHP;
+    for (float InvalidValue : {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(), -1.0f, 1000001.0f})
+    {
+        for (float* Attribute : {&Definition.Strength, &Definition.Dexterity, &Definition.Intelligence})
+        {
+            const float PreviousValue = *Attribute;
+            *Attribute = InvalidValue;
+            Validate(TEXT("Each explicit profession attribute must be finite and within range"), false, TEXT("Strength"));
+            *Attribute = PreviousValue;
+        }
+    }
+    Definition.Strength = 0.0f;
+    Definition.Dexterity = 1000000.0f;
+    Validate(TEXT("Attribute range boundaries are inclusive"), true);
+    Definition.Strength = Base.Strength;
+    Definition.Dexterity = Base.Dexterity;
     Definition.ActionPoints = 0;
     Validate(TEXT("Nonpositive explicit AP is rejected"), false, TEXT("ActionPoints"));
     Definition.ActionPoints = Base.ActionPoints;
@@ -394,8 +465,11 @@ bool FProfessionDataValidationTest::RunTest(const FString& Parameters)
     // 사용하지 않는 명시 설정을 실제 데이터로 취급하지 않고 동일한 클래스 기본값과 비교합니다.
     Definition.bUseUnitClassDefaults = true;
     FProfessionDefinition Resolved;
-    const bool bClassDefaultsValid = Custom->ResolveProfession(TEXT("Hunter"), Resolved);
+    const bool bClassDefaultsValid = Custom->ResolveProfession(TEXT("Archer"), Resolved);
     Definition.MaxHP = std::numeric_limits<float>::quiet_NaN();
+    Definition.Strength = std::numeric_limits<float>::quiet_NaN();
+    Definition.Dexterity = -1.0f;
+    Definition.Intelligence = 1000001.0f;
     Definition.ActionPoints = 0;
     Definition.SubActionPoints = -1;
     Definition.StartingSkills.Reset();
@@ -404,8 +478,11 @@ bool FProfessionDataValidationTest::RunTest(const FString& Parameters)
     Definition.bUseUnitClassDefaults = false;
     Validate(TEXT("Restored explicit loadout passes again"), true);
     FText Error = FText::FromString(TEXT("stale error"));
-    TestTrue(TEXT("Diagnostic resolver accepts a valid restored loadout"), Custom->ResolveProfession(TEXT("Hunter"), Resolved, Error));
+    TestTrue(TEXT("Diagnostic resolver accepts a valid restored loadout"), Custom->ResolveProfession(TEXT("Archer"), Resolved, Error));
     TestTrue(TEXT("Successful resolution clears old diagnostics"), Error.IsEmpty());
+    Custom->Professions.Add(TEXT("Hunter"), Base);
+    Validate(TEXT("A previous test profession remains invalid even with a copied valid loadout"), false, TEXT("Hunter"));
+    Custom->Professions.Remove(TEXT("Hunter"));
     Custom->Professions.Add(NAME_None, Base);
     Validate(TEXT("None profession IDs cannot be selected by a run"), false, TEXT("None"));
     Custom->Professions.Reset();

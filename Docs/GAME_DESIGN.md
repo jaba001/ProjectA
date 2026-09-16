@@ -73,7 +73,7 @@ For The King의 파티 운영과 The Bazaar·Backpack Battles의 비동기 상�
 
 ### 6-1 직업 역할 보충 제안
 
-현재 공통 캐릭터 콘텐츠를 직업별 명시 스킬 프로필로 확장할 때 사용할 초안이다. 원작 값은 `Characters.json`의 `Stats`, `Things`, `Passives`와 `SkillConfigs.json`·`Langs/en.json`의 `UI_ENCYCLOPEDIA_SKILL_*` 설명을 대조했다. 아래 HP·SPD·능력치를 ProjectA 초기 수치로 채택하지 않는다. 직업의 `Things`는 해당 정의에 직접 연결된 지급품이며 난이도·Loadout까지 반영한 최종 시작 인벤토리가 아니다.
+원작 역할을 검토하기 위한 참조 초안이며 현재 ProjectA의 선택 가능한 직업 목록이 아니다. 현재 네 직업과 초기 능력치는 [6-2절](#6-2-네-직업과-공통-시작-능력치)을 따른다. 원작 값은 `Characters.json`의 `Stats`, `Things`, `Passives`와 `SkillConfigs.json`·`Langs/en.json`의 `UI_ENCYCLOPEDIA_SKILL_*` 설명을 대조했다. 아래 HP·SPD·능력치를 ProjectA 초기 수치로 채택하지 않는다. 직업의 `Things`는 해당 정의에 직접 연결된 지급품이며 난이도·Loadout까지 반영한 최종 시작 인벤토리가 아니다.
 
 | 직업 · 원작 ID | 설치본 정적 근거 | ProjectA 역할 제안 · 미확정 |
 |---|---|---|
@@ -83,6 +83,21 @@ For The King의 파티 운영과 The Bazaar·Backpack Battles의 비동기 상�
 | StableHand · `STABLEBOY` | HP 30·SPD 78·STR 72. `BLADE_STABLEBOY_BASIC_00`와 `HERB_NETTLE_01` 각 1개 | 기동 근접 공격수. 접근·타격·복귀를 활용하며 현행 한 주요 행동 예약을 유지. 고유 효과는 이동·배치 역할을 기준으로 별도 설계 |
 
 네 원작 직업 정의는 모두 `PA=1`, `SA=1`이며 위 네 직업 중 SPD 최댓값은 Stablehand 78이다. 원작 SPD를 ProjectA `CombatSpeed`·이동 속도·투사체 속도 전체에 복사하지 않는다. 패시브의 `PROC_*` 숫자는 실행 수식 확인 없이 최종 발동률로 쓰지 않는다. 이 초안은 직업별 최종 스탯·성장률·추가 행동을 확정하지 않으며 [8절](#8-라운드-계획과-시간차-자동-전투)의 전투 계약을 따른다.
+
+### 6-2 네 직업과 공통 시작 능력치
+
+2026-09-16 사용자 확정: 선택 가능한 직업은 아래 네 개이며 이전 테스트 직업은 선택 화면에서 제거한다. 공통 직업 베이스와 직업별 C++ 자식 클래스로 정의하고 표시 순서를 유지한다.
+
+| 순서 | 직업 | ClassId | 직업 클래스 | HP | 힘 STR | 민첩 DEX | 지능 INT |
+|---|---|---|---|---|---|---|---|
+| 1 | 전사 | `Warrior` | `UWarriorProfession` | 100 | 10 | 10 | 10 |
+| 2 | 마법사 | `Mage` | `UMageProfession` | 100 | 10 | 10 | 10 |
+| 3 | 궁수 | `Archer` | `UArcherProfession` | 100 | 10 | 10 | 10 |
+| 4 | 도적 | `Rogue` | `URogueProfession` | 100 | 10 | 10 | 10 |
+
+현재 시작값이며 직업별 최종 밸런스·성장률·스킬·무기 보정을 확정한 것은 아니다. 공통 전투 Blueprint·외형·기존 AP와 장착 스킬을 유지하며 직업별 공격을 임의로 작성하지 않는다. 힘·민첩·지능을 피해·명중·이동 속도에 자동 연결하지 않는다.
+
+이전 테스트 직업의 저장 데이터를 새 직업으로 추정 변환하지 않는다. 지원하지 않는 직업은 원본 파일을 보존하고 명시적으로 거절한다. 패키지 폴더 이동의 경로 리디렉션과 직업 콘텐츠 호환은 구분한다. 구현과 실행 확인은 [PROJECT_PLAN](PROJECT_PLAN.md#파티), [TEST_REPORT 22절](TEST_REPORT.md#22-네-직업과-기본-능력치)을 따른다.
 
 ## 7 아이템 클론 기획
 

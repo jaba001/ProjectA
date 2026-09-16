@@ -35,7 +35,7 @@ void ADevelopmentCoopLobby::InitializeLobby(int32 Capacity)
     if (!HasAuthority() || !UDevelopmentCoopSubsystem::IsAvailable() || Capacity < 2 || Capacity > 4 || !Members.IsEmpty()) return;
     Members.SetNum(Capacity);
     Connections.SetNum(Capacity);
-    Message = FText::FromString(TEXT("모든 참가자가 준비하면 Host가 시작합니다. 캐릭터는 각자 Hunter 1명입니다."));
+    Message = FText::FromString(TEXT("모든 참가자가 준비하면 Host가 시작합니다. 캐릭터는 각자 궁수 1명입니다."));
     Publish();
 }
 
@@ -96,9 +96,9 @@ bool ADevelopmentCoopLobby::Start(AGameplayPlayerController* Controller)
     AGameplayGameModeBase* Mode = GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
     URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
     FProfessionDefinition Profession;
-    if (!Mode || !Mode->GetEncounterManager() || !Mode->PartyDefinition || !Mode->PartyDefinition->ResolveProfession(TEXT("Hunter"), Profession) || !Run || Run->IsManagedRun())
+    if (!Mode || !Mode->GetEncounterManager() || !Mode->PartyDefinition || !Mode->PartyDefinition->ResolveProfession(TEXT("Archer"), Profession) || !Run || Run->IsManagedRun())
     {
-        Message = FText::FromString(TEXT("Gameplay와 Hunter 파티 설정을 확인해 주세요."));
+        Message = FText::FromString(TEXT("Gameplay와 궁수 파티 설정을 확인해 주세요."));
         Publish();
         return false;
     }
@@ -120,7 +120,7 @@ bool ADevelopmentCoopLobby::Start(AGameplayPlayerController* Controller)
         Member.bCreated = true;
         Member.CharacterId = FGuid::NewGuid();
         Member.OwnerAccountId = Participant.AccountId;
-        Member.ClassId = TEXT("Hunter");
+        Member.ClassId = TEXT("Archer");
         Member.CharacterName = FText::FromString(FString::Printf(TEXT("Player %d"), Index + 1));
     }
     Identity.HostAccountId = Identity.OriginalParticipants[0].AccountId;

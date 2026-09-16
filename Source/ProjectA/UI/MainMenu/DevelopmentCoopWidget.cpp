@@ -65,7 +65,7 @@ void UDevelopmentCoopWidget::NativeOnInitialized()
     Box->AddChildToVerticalBox(Title)->SetPadding(FMargin(0.f, 0.f, 0.f, 16.f));
     UTextBlock* Notice = WidgetTree->ConstructWidget<UTextBlock>();
     Notice->SetAutoWrapText(true);
-    Notice->SetText(FText::FromString(TEXT("같은 PC 또는 LAN에서 새 전투를 확인하는 개발용 방입니다.\n각자 Hunter 1명을 조작합니다. 저장 이어하기·Steam 초대는 지원하지 않습니다.")));
+    Notice->SetText(FText::FromString(TEXT("같은 PC 또는 LAN에서 새 전투를 확인하는 개발용 방입니다.\n각자 궁수 1명을 조작합니다. 저장 이어하기·Steam 초대는 지원하지 않습니다.")));
     Box->AddChildToVerticalBox(Notice)->SetPadding(FMargin(0.f, 0.f, 0.f, 16.f));
     if (Cast<AMainMenuPlayerController>(GetOwningPlayer()))
     {

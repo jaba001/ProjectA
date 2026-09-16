@@ -51,8 +51,8 @@ namespace
                 Participant.JoinOrdinal = Index + 1;
                 FRunPartyMember& Member = Party.AddDefaulted_GetRef();
                 Member.SlotIndex = Index;
-                Member.CharacterName = FText::FromString(FString::Printf(TEXT("Managed Hunter %d"), Index + 1));
-                Member.ClassId = TEXT("Hunter");
+                Member.CharacterName = FText::FromString(FString::Printf(TEXT("Managed Archer %d"), Index + 1));
+                Member.ClassId = TEXT("Archer");
                 Member.bCreated = true;
                 Member.CharacterId = FGuid::NewGuid();
                 Member.OwnerAccountId = Participant.AccountId;
@@ -81,7 +81,7 @@ namespace
         {
             TUniquePtr<FManagedTestSession> Session = MakeUnique<FManagedTestSession>();
             URunStateSubsystem* Run = Session->Run.Get();
-            Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+            Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
             FLocalDevelopmentCallerContext Context;
             Context.StoreNamespace = Namespace;
             Context.AccountId = Account(Ordinal);

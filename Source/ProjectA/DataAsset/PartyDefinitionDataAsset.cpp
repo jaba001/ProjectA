@@ -1,6 +1,7 @@
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Unit/PlayerUnit.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Profession/ProfessionBase.h"
 
 TSubclassOf<APlayerUnit> UPartyDefinitionDataAsset::ResolvePlayerClass(FName ClassId) const
 {
@@ -20,14 +21,17 @@ TSubclassOf<APlayerUnit> UPartyDefinitionDataAsset::ResolvePlayerClass(FName Cla
 
 UPartyDefinitionDataAsset::UPartyDefinitionDataAsset()
 {
-    const TArray<FName> Ids = { TEXT("StableHand"), TEXT("Scholar"), TEXT("Herbalist"), TEXT("Hunter") };
-    const TArray<FString> Names = { TEXT("마구간지기"), TEXT("학자"), TEXT("약초상"), TEXT("사냥꾼") };
-    const TArray<FString> Descriptions = { TEXT("동물을 돌보며 여정을 준비해 온 마구간지기."), TEXT("지식과 관찰로 미지의 세계를 탐구하는 학자."), TEXT("풀과 약초의 쓰임을 익혀 온 약초상."), TEXT("야생에서 흔적을 읽고 먹잇감을 추적하는 사냥꾼.") };
-    for (int32 Index = 0; Index < Ids.Num(); ++Index)
+    for (TSubclassOf<UProfessionBase> ProfessionClass : UProfessionBase::GetPlayableClasses())
     {
-        FProfessionDefinition& Definition = Professions.Add(Ids[Index]);
-        Definition.DisplayName = FText::FromString(Names[Index]);
-        Definition.Description = FText::FromString(Descriptions[Index]);
+        const UProfessionBase* Profession = ProfessionClass->GetDefaultObject<UProfessionBase>();
+        FProfessionDefinition& Definition = Professions.Add(Profession->ClassId);
+        Definition.ProfessionClass = ProfessionClass;
+        Definition.DisplayName = Profession->DisplayName;
+        Definition.Description = Profession->Description;
+        Definition.MaxHP = Profession->MaxHP;
+        Definition.Strength = Profession->Strength;
+        Definition.Dexterity = Profession->Dexterity;
+        Definition.Intelligence = Profession->Intelligence;
     }
 }
 
@@ -45,12 +49,27 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
         OutError = FText::Format(NSLOCTEXT("PartyDefinition", "ProfessionError", "{0} [{1}]: {2}"), FText::FromString(GetPathName()), FText::FromName(ClassId), Reason);
         return false;
     };
+    if (!UProfessionBase::FindProfession(ClassId))
+    {
+        return Fail(NSLOCTEXT("PartyDefinition", "UnsupportedProfession", "Select Warrior, Mage, Archer or Rogue. Start a new game instead of loading previous test professions. / 전사·마법사·궁수·도적 중 선택하세요. 이전 테스트 직업으로 저장했다면 새 게임을 시작해 주세요."));
+    }
     const FProfessionDefinition* Definition = Professions.Find(ClassId);
     if (!Definition)
     {
         return Fail(NSLOCTEXT("PartyDefinition", "MissingProfession", "Profession definition is missing. / 직업 정의가 없습니다."));
     }
     OutDefinition = *Definition;
+    if (!OutDefinition.ProfessionClass || OutDefinition.ProfessionClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated))
+    {
+        return Fail(NSLOCTEXT("PartyDefinition", "MissingProfessionClass", "A concrete ProfessionClass is required. / 생성 가능한 직업 자식 클래스가 필요합니다."));
+    }
+    const UProfessionBase* Profession = OutDefinition.ProfessionClass->GetDefaultObject<UProfessionBase>();
+    if (Profession->ClassId != ClassId)
+    {
+        return Fail(NSLOCTEXT("PartyDefinition", "MismatchedProfessionClass", "ProfessionClass must use the same ClassId as its catalog entry. / 직업 클래스와 목록 항목의 ClassId가 일치해야 합니다."));
+    }
+    OutDefinition.DisplayName = Profession->DisplayName;
+    OutDefinition.Description = Profession->Description;
     OutDefinition.CombatClass = ResolvePlayerClass(ClassId);
     if (!OutDefinition.CombatClass)
     {
@@ -63,7 +82,10 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
     if (OutDefinition.bUseUnitClassDefaults)
     {
         const APlayerUnit* Defaults = OutDefinition.CombatClass->GetDefaultObject<APlayerUnit>();
-        OutDefinition.MaxHP = Defaults->GetInitialMaxHP();
+        OutDefinition.MaxHP = Profession->MaxHP;
+        OutDefinition.Strength = Profession->Strength;
+        OutDefinition.Dexterity = Profession->Dexterity;
+        OutDefinition.Intelligence = Profession->Intelligence;
         OutDefinition.ActionPoints = Defaults->GetMaxActionPoint();
         OutDefinition.SubActionPoints = Defaults->GetMaxSubActionPoint();
         OutDefinition.StartingSkills = Defaults->GetEquippedSkillDataAssets();
@@ -71,6 +93,13 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
     if (!FMath::IsFinite(OutDefinition.MaxHP) || OutDefinition.MaxHP <= 0.0f)
     {
         return Fail(NSLOCTEXT("PartyDefinition", "InvalidHP", "Resolved MaxHP must be finite and positive. / 실제 MaxHP는 유한한 양수여야 합니다."));
+    }
+    for (float Attribute : {OutDefinition.Strength, OutDefinition.Dexterity, OutDefinition.Intelligence})
+    {
+        if (!FMath::IsFinite(Attribute) || Attribute < 0.0f || Attribute > 1000000.0f)
+        {
+            return Fail(NSLOCTEXT("PartyDefinition", "InvalidAttributes", "Strength, Dexterity and Intelligence must be finite values between 0 and 1000000. / 힘·민첩·지능은 0~1000000 범위의 유한한 값이어야 합니다."));
+        }
     }
     if (OutDefinition.ActionPoints <= 0 || OutDefinition.SubActionPoints < 0)
     {
@@ -146,5 +175,5 @@ FText UPartyDefinitionDataAsset::GetProfessionDetails(FName ClassId) const
         FText Error;
         if (Skill->ResolveRoundSkill(Resolved, Error)) Skills += FString::Printf(TEXT("\n• %s (AP %d · 보조 AP %d)"), *Skill->SkillName.ToString(), Resolved.ActionPointCost, Resolved.SubActionPointCost);
     }
-    return FText::FromString(FString::Printf(TEXT("%s\n%s\n\nHP %.0f · AP %d · 보조 AP %d\n\n시작 스킬%s"), *Definition.DisplayName.ToString(), *Definition.Description.ToString(), Definition.MaxHP, Definition.ActionPoints, Definition.SubActionPoints, *Skills));
+    return FText::FromString(FString::Printf(TEXT("%s\n%s\n\nHP %.0f · 힘 %.0f · 민첩 %.0f · 지능 %.0f\nAP %d · 보조 AP %d\n\n시작 스킬%s"), *Definition.DisplayName.ToString(), *Definition.Description.ToString(), Definition.MaxHP, Definition.Strength, Definition.Dexterity, Definition.Intelligence, Definition.ActionPoints, Definition.SubActionPoints, *Skills));
 }

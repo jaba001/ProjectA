@@ -120,15 +120,27 @@ void AUnitBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
     DOREPLIFETIME(AUnitBase, CurrentSubActionPoint);
 }
 
-void AUnitBase::SetRoundCastMontage(UAnimMontage* Montage)
+void AUnitBase::SetRoundCastMontage(UAnimMontage* Montage, bool bImmediateStop)
 {
-    if (HasAuthority()) MulticastSetRoundCastMontage(Montage);
+    if (HasAuthority()) MulticastSetRoundCastMontage(Montage, bImmediateStop);
 }
 
-void AUnitBase::MulticastSetRoundCastMontage_Implementation(UAnimMontage* Montage)
+bool AUnitBase::HasRoundCastMontageInstance() const
 {
-    StopRoundCastMontage();
+    UAnimInstance* AnimInstance = RoundMontageAnimInstance.Get();
+    const FAnimMontageInstance* Instance = AnimInstance ? AnimInstance->GetMontageInstanceForID(RoundMontageInstanceId) : nullptr;
+    return Instance && Instance->IsValid();
+}
+
+void AUnitBase::MulticastSetRoundCastMontage_Implementation(UAnimMontage* Montage, bool bImmediateStop)
+{
+    StopRoundCastMontage(bImmediateStop ? 0.f : 0.1f);
     if (!Montage || bIsDead || GetNetMode() == NM_DedicatedServer) return;
+    if (!FMath::IsFinite(Montage->GetPlayLength()) || Montage->GetPlayLength() <= 0.f || !FMath::IsFinite(Montage->RateScale) || Montage->RateScale <= 0.f)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[RoundAnimation] Invalid montage duration or rate Unit=%s Montage=%s / 몽타주 길이 또는 속도가 유효하지 않아 시간 제한 대기를 사용합니다"), *GetPathName(), *GetPathNameSafe(Montage));
+        return;
+    }
     UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
     if (!AnimInstance || AnimInstance->Montage_Play(Montage, 1.f, EMontagePlayReturnType::MontageLength, 0.f, false) <= 0.f)
     {
@@ -146,13 +158,13 @@ void AUnitBase::MulticastSetRoundCastMontage_Implementation(UAnimMontage* Montag
     }
 }
 
-void AUnitBase::StopRoundCastMontage()
+void AUnitBase::StopRoundCastMontage(float BlendOutSeconds)
 {
     if (UAnimInstance* AnimInstance = RoundMontageAnimInstance.Get())
     {
         if (FAnimMontageInstance* Instance = AnimInstance->GetMontageInstanceForID(RoundMontageInstanceId))
         {
-            Instance->Stop(FAlphaBlend(0.1f));
+            Instance->Stop(FAlphaBlend(BlendOutSeconds));
         }
     }
     RoundMontageAnimInstance.Reset();
@@ -562,9 +574,13 @@ USkillDefinitionDataAsset* AUnitBase::FindSkillDataByAbilityClass(TSubclassOf<UG
     return nullptr;
 }
 
-bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills)
+bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Strength, float Dexterity, float Intelligence)
 {
     if (!HasAuthority() || IsBusy() || IsActiveTurn() || !AbilitySystem || !AttributeSet || !FMath::IsFinite(MaxHP) || MaxHP <= 0.0f || AP <= 0 || SubAP < 0 || Skills.IsEmpty())
+    {
+        return false;
+    }
+    if (!FMath::IsFinite(Strength) || Strength < 0.0f || Strength > 1000000.0f || !FMath::IsFinite(Dexterity) || Dexterity < 0.0f || Dexterity > 1000000.0f || !FMath::IsFinite(Intelligence) || Intelligence < 0.0f || Intelligence > 1000000.0f)
     {
         return false;
     }
@@ -595,6 +611,9 @@ bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TA
     AbilitySystem->ClearAllAbilities();
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetMaxHPAttribute(), MaxHP);
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), MaxHP);
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetStrengthAttribute(), Strength);
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), Dexterity);
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetIntelligenceAttribute(), Intelligence);
     return true;
 }
 

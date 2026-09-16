@@ -17,8 +17,8 @@ bool FRunPartyValidationTest::RunTest(const FString& Parameters)
 
     FRunPartyMember Member;
     Member.SlotIndex = 2;
-    Member.CharacterName = FText::FromString(TEXT("Hunter Two"));
-    Member.ClassId = TEXT("Hunter");
+    Member.CharacterName = FText::FromString(TEXT("Archer Two"));
+    Member.ClassId = TEXT("Archer");
     Member.bCreated = true;
     Members.Add(Member);
 
@@ -29,8 +29,8 @@ bool FRunPartyValidationTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("An empty slot is preserved"), RunState->GetPartyMembers()[0].SlotIndex, 0);
     TestFalse(TEXT("The empty slot remains uncreated"), RunState->GetPartyMembers()[0].bCreated);
     TestEqual(TEXT("Created member retains original slot index"), RunState->GetPartyMembers()[1].SlotIndex, 2);
-    TestEqual(TEXT("Created member retains selected class"), RunState->GetPartyMembers()[1].ClassId, FName(TEXT("Hunter")));
-    TestEqual(TEXT("Created member retains name"), RunState->GetPartyMembers()[1].CharacterName.ToString(), FString(TEXT("Hunter Two")));
+    TestEqual(TEXT("Created member retains selected class"), RunState->GetPartyMembers()[1].ClassId, FName(TEXT("Archer")));
+    TestEqual(TEXT("Created member retains name"), RunState->GetPartyMembers()[1].CharacterName.ToString(), FString(TEXT("Archer Two")));
 
     Members.Add(Member);
     TestFalse(TEXT("Duplicate slots are rejected"), RunState->InitializeRun(Members, Error));
@@ -38,7 +38,7 @@ bool FRunPartyValidationTest::RunTest(const FString& Parameters)
     Members.RemoveAt(2);
     Members[0].ClassId = NAME_None;
     TestFalse(TEXT("Created member without a class is rejected"), RunState->InitializeRun(Members, Error));
-    Members[0].ClassId = TEXT("Hunter");
+    Members[0].ClassId = TEXT("Archer");
     Members[0].CharacterName = FText::FromString(TEXT("  "));
     TestFalse(TEXT("Created member without a readable name is rejected"), RunState->InitializeRun(Members, Error));
     return true;
@@ -52,8 +52,8 @@ bool FRunProgressionTest::RunTest(const FString& Parameters)
     URunStateSubsystem* RunState = NewObject<URunStateSubsystem>(GameInstance);
     FRunPartyMember Member;
     Member.SlotIndex = 3;
-    Member.CharacterName = FText::FromString(TEXT("Scholar"));
-    Member.ClassId = TEXT("Scholar");
+    Member.CharacterName = FText::FromString(TEXT("Mage"));
+    Member.ClassId = TEXT("Mage");
     Member.bCreated = true;
     FText Error;
     TestTrue(TEXT("Initialize a new run"), RunState->InitializeRun({ Member }, Error));

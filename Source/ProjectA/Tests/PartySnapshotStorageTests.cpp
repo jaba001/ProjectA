@@ -17,10 +17,13 @@ namespace
 
         FPartySnapshotMember Member;
         Member.MemberId = TEXT("Member_01");
-        Member.ClassId = TEXT("Hunter");
-        Member.CharacterName = TEXT("저장된 사냥꾼");
+        Member.ClassId = TEXT("Archer");
+        Member.CharacterName = TEXT("저장된 궁수");
         Member.Stats.MaxHP = 185.5f;
         Member.Stats.CurrentHP = 71.25f;
+        Member.Stats.Strength = 13.5f;
+        Member.Stats.Dexterity = 21.25f;
+        Member.Stats.Intelligence = 8.75f;
         Member.Stats.MaxActionPoints = 3;
         Member.Stats.MaxSubActionPoints = 2;
         Member.Stats.MoveRange = 4;
@@ -31,8 +34,8 @@ namespace
         Snapshot.Members.Add(Member);
 
         Member.MemberId = TEXT("Member_02");
-        Member.ClassId = TEXT("Scholar");
-        Member.CharacterName = TEXT("저장된 학자");
+        Member.ClassId = TEXT("Mage");
+        Member.CharacterName = TEXT("저장된 마법사");
         Member.Stats.CurrentHP = 0.0f;
         Member.SkillIds = { TEXT("BasicAttack") };
         Member.EquipmentIds.Empty();
@@ -66,6 +69,8 @@ bool FPartySnapshotValidationTest::RunTest(const FString& Parameters)
     const FPartySnapshot Valid = MakeStorageTestSnapshot();
     TestTrue(TEXT("Valid build accepts opaque equipment and tactics for later catalog resolution"), UPartySnapshotLibrary::ValidateSnapshot(Valid, Error));
     TestTrue(TEXT("Successful validation clears the error"), Error.IsEmpty());
+    const FPartySnapshotStats DefaultStats;
+    TestTrue(TEXT("New primary stat fields default to ten when older data supplies no value"), DefaultStats.Strength == 10.0f && DefaultStats.Dexterity == 10.0f && DefaultStats.Intelligence == 10.0f);
 
     FPartySnapshot Invalid = Valid;
     const auto Reject = [this, &Valid, &Invalid, &Error](const TCHAR* Label)
@@ -119,6 +124,15 @@ bool FPartySnapshotValidationTest::RunTest(const FString& Parameters)
     Reject(TEXT("Negative current HP is rejected"));
     Invalid.Members[0].Stats.CurrentHP = Invalid.Members[0].Stats.MaxHP + 1.0f;
     Reject(TEXT("Current HP above max is rejected"));
+    for (float Value : {-1.0f, 1000001.0f, std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity()})
+    {
+        Invalid.Members[0].Stats.Strength = Value;
+        Reject(*FString::Printf(TEXT("Invalid strength %g is rejected"), Value));
+        Invalid.Members[0].Stats.Dexterity = Value;
+        Reject(*FString::Printf(TEXT("Invalid dexterity %g is rejected"), Value));
+        Invalid.Members[0].Stats.Intelligence = Value;
+        Reject(*FString::Printf(TEXT("Invalid intelligence %g is rejected"), Value));
+    }
     Invalid.Members[0].Stats.MaxActionPoints = 0;
     Reject(TEXT("Zero AP is rejected"));
     Invalid.Members[0].Stats.MaxActionPoints = 101;
@@ -151,11 +165,17 @@ bool FPartySnapshotValidationTest::RunTest(const FString& Parameters)
     FPartySnapshot Boundary = Valid;
     Boundary.Members[0].Stats.MaxHP = 1000000.0f;
     Boundary.Members[0].Stats.CurrentHP = 1000000.0f;
+    Boundary.Members[0].Stats.Strength = 1000000.0f;
+    Boundary.Members[0].Stats.Dexterity = 1000000.0f;
+    Boundary.Members[0].Stats.Intelligence = 1000000.0f;
     Boundary.Members[0].Stats.MaxActionPoints = 100;
     Boundary.Members[0].Stats.MaxSubActionPoints = 100;
     Boundary.Members[0].Stats.MoveRange = 32;
     Boundary.Members[1].Stats.MaxSubActionPoints = 0;
     Boundary.Members[1].Stats.MoveRange = 0;
+    Boundary.Members[1].Stats.Strength = 0.0f;
+    Boundary.Members[1].Stats.Dexterity = 0.0f;
+    Boundary.Members[1].Stats.Intelligence = 0.0f;
     TestTrue(TEXT("Inclusive stat bounds and zero HP are accepted"), UPartySnapshotLibrary::ValidateSnapshot(Boundary, Error));
     TestTrue(TEXT("Valid input clears an earlier validation error"), Error.IsEmpty());
 
@@ -201,12 +221,18 @@ bool FPartySnapshotStorageTest::RunTest(const FString& Parameters)
     }
     TestTrue(TEXT("Every snapshot field survives serialization including equipment, tactics and ordered skills"), AreSnapshotsEqual(Restored, Original));
     TestEqual(TEXT("Formation order remains distinct from array order"), Restored.Members[0].FormationSlot, 3);
-    TestEqual(TEXT("Unicode character name survives serialization"), Restored.Members[0].CharacterName, FString(TEXT("저장된 사냥꾼")));
+    TestEqual(TEXT("Unicode character name survives serialization"), Restored.Members[0].CharacterName, FString(TEXT("저장된 궁수")));
     TestEqual(TEXT("Fractional current HP survives serialization"), Restored.Members[0].Stats.CurrentHP, 71.25f);
+    TestEqual(TEXT("Authored strength survives serialization instead of reverting to ten"), Restored.Members[0].Stats.Strength, 13.5f);
+    TestEqual(TEXT("Authored dexterity survives serialization instead of reverting to ten"), Restored.Members[0].Stats.Dexterity, 21.25f);
+    TestEqual(TEXT("Authored intelligence survives serialization instead of reverting to ten"), Restored.Members[0].Stats.Intelligence, 8.75f);
 
     FPartySnapshot Invalid = Original;
     Invalid.SchemaVersion = 999;
     TestFalse(TEXT("Invalid write is rejected"), UPartySnapshotLibrary::SaveSnapshot(Slot.Id, Invalid, Error));
+    FPartySnapshot InvalidStats = Original;
+    InvalidStats.Members[0].Stats.Strength = std::numeric_limits<float>::infinity();
+    TestFalse(TEXT("Invalid primary stats are rejected before replacing a valid save"), UPartySnapshotLibrary::SaveSnapshot(Slot.Id, InvalidStats, Error));
     TestFalse(TEXT("Invalid slot write is rejected"), UPartySnapshotLibrary::SaveSnapshot(TEXT("../Run"), Original, Error));
     TestTrue(TEXT("Previous save remains readable after rejected writes"), UPartySnapshotLibrary::LoadSnapshot(Slot.Id, Restored, Error));
     TestTrue(TEXT("Rejected writes preserve the previous file"), AreSnapshotsEqual(Restored, Original));
@@ -226,6 +252,12 @@ bool FPartySnapshotStorageTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Invalid data fixture writes directly"), UGameplayStatics::SaveGameToSlot(InvalidSave, SlotName, 0));
     TestFalse(TEXT("Invalid data is rejected on read"), UPartySnapshotLibrary::LoadSnapshot(Slot.Id, Restored, Error));
     TestTrue(TEXT("Invalid data preserves every output field"), AreSnapshotsEqual(Restored, Original));
+
+    InvalidSave->Snapshot = Original;
+    InvalidSave->Snapshot.Members[0].Stats.Dexterity = std::numeric_limits<float>::quiet_NaN();
+    TestTrue(TEXT("Corrupted primary stats fixture writes directly"), UGameplayStatics::SaveGameToSlot(InvalidSave, SlotName, 0));
+    TestFalse(TEXT("Corrupted primary stats are rejected on read"), UPartySnapshotLibrary::LoadSnapshot(Slot.Id, Restored, Error));
+    TestTrue(TEXT("Rejected primary stats preserve every output field"), AreSnapshotsEqual(Restored, Original));
 
     URunSaveGame* WrongSave = Cast<URunSaveGame>(UGameplayStatics::CreateSaveGameObject(URunSaveGame::StaticClass()));
     TestTrue(TEXT("Wrong SaveGame class fixture writes directly"), UGameplayStatics::SaveGameToSlot(WrongSave, SlotName, 0));

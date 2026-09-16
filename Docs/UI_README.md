@@ -109,7 +109,7 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 | Gameplay 화면 | RunMap·RoundPlanning·Result는 CommonActivatableWidget. 스폰은 EncounterManager가 담당. 이전 CombatHUD WBP는 참조만 보존 |
 | 입력 | RoundPlanning·RunMap·Result: Menu/NoCapture. 커서 표시 유지, CommonUI가 입력 모드 관리 |
 
-프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 StableHand/Scholar/Herbalist/Hunter 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
+프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 Warrior/Mage/Archer/Rogue 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
 GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메뉴 travel의 잔여 IgnoreInput·초기 포커스만 복구한다. CharacterCreation의 Text_StartGameStatus는 선택 바인딩이며 누락 시 Native 표시 영역을 추가한다. 상세 배치·바인딩은 [PROJECT_PLAN](PROJECT_PLAN.md#gameplay-에셋과-배치)을 따른다.
 
@@ -219,3 +219,11 @@ C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / 
 ### 10-3 반영과 검증
 
 최신 C++ 빌드와 Config 변경을 반영한 뒤 UE를 재시작한다. 기존 WBP·맵을 유지한다. 공통 배율·21:9·4:3·창 크기 변경·전투 클릭·설정 확인/복원의 절차와 최신 결과는 [TEST_REPORT 16절](TEST_REPORT.md#16-공통-dpi와-전투-화면-배치)을 따른다. 9절 테마 변경 당시의 빌드 결과는 이번 배율·카메라 변경의 성공 근거로 사용하지 않는다.
+
+## 11 네 직업 선택과 기본 능력치
+
+캐릭터 생성의 선택 순서는 전사 `Warrior` → 마법사 `Mage` → 궁수 `Archer` → 도적 `Rogue`다. 이전 테스트 직업은 선택 목록에서 제거한다. 이름 편집·취소·1~4명 생성과 원래 소유권은 유지한다. ClassInfo는 직업 정의의 HP 100·힘/민첩/지능 각 10과 기존 전투 클래스에서 해석한 AP/SubAP·시작 스킬을 표시한다. 이 수치는 현재 시작값이며 최종 직업 밸런스가 아니다.
+
+표시 정보의 기준은 `UProfessionBase`와 네 C++ 자식 클래스다. 기본 UI·캐릭터 생성 명세를 갱신하고 실사용 및 `Validation/T12` WBP의 슬롯 제목/직업 이름 16개만 변경한다. 기존 WidgetTree·배치·스타일·바인딩은 유지한다. MainMenu 프리뷰 맵은 새 ID 4개에 기존 공통 `BP_PartyMenuPreview` 외형을 연결하며 직업별 새 외형을 생성하지 않는다. 개발용 협동은 참가자마다 궁수 한 명을 생성한다.
+
+지원하지 않는 이전 직업의 Continue는 해당 ID와 오류를 표시하고 저장 원본·현재 Run을 유지한다. 새 직업으로 자동 변환하지 않는다. Editor 빌드와 저장 후 에셋 재로드에서 새 직업 맵·16개 라벨을 확인했으며 실제 클릭·상세 표시·전투·Continue·협동은 [TEST_REPORT 22절](TEST_REPORT.md#22-네-직업과-기본-능력치)의 사용자 검증을 따른다.

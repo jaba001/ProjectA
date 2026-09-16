@@ -19,7 +19,7 @@ namespace
 
         FSnapshotCatalogFixture()
         {
-            Catalog->EnemyClasses.Add(TEXT("Hunter"), AEnemyUnit::StaticClass());
+            Catalog->EnemyClasses.Add(TEXT("Archer"), AEnemyUnit::StaticClass());
             BasicAttack->SkillId = TEXT("BasicAttack");
             BasicAttack->AbilityClass = UGA_DefaultAttack::StaticClass();
             AreaAttack->SkillId = TEXT("AreaAttack");
@@ -30,9 +30,9 @@ namespace
             Catalog->Skills.Add(AreaAttack->SkillId, AreaAttack);
             Snapshot.SnapshotId = TEXT("CatalogTest");
             FPartySnapshotMember& Member = Snapshot.Members.AddDefaulted_GetRef();
-            Member.MemberId = TEXT("Hunter_01");
-            Member.ClassId = TEXT("Hunter");
-            Member.CharacterName = TEXT("Snapshot Hunter");
+            Member.MemberId = TEXT("Archer_01");
+            Member.ClassId = TEXT("Archer");
+            Member.CharacterName = TEXT("Snapshot Archer");
             Member.FormationSlot = 2;
             Member.SkillIds = { BasicAttack->SkillId, AreaAttack->SkillId };
         }

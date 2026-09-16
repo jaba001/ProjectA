@@ -20,16 +20,16 @@ if not enemy:
     if not assets.save_loaded_asset(enemy):
         raise RuntimeError("Could not save Snapshot opponent Blueprint")
 
-catalog_path = root + "/DataAsset/DA_OpponentSnapshotCatalog"
+catalog_path = root + "/DataAsset/Snapshots/DA_OpponentSnapshotCatalog"
 catalog = unreal.load_asset(catalog_path) if assets.does_asset_exist(catalog_path) else None
 if not catalog:
     factory = unreal.DataAssetFactory()
     factory.set_editor_property("data_asset_class", unreal.OpponentSnapshotCatalogDataAsset)
-    catalog = tools.create_asset("DA_OpponentSnapshotCatalog", root + "/DataAsset", unreal.OpponentSnapshotCatalogDataAsset, factory)
-    catalog.set_editor_property("enemy_classes", {unreal.Name(name): enemy.generated_class() for name in ["StableHand", "Scholar", "Herbalist", "Hunter"]})
+    catalog = tools.create_asset("DA_OpponentSnapshotCatalog", root + "/DataAsset/Snapshots", unreal.OpponentSnapshotCatalogDataAsset, factory)
+    catalog.set_editor_property("enemy_classes", {unreal.Name(name): enemy.generated_class() for name in ["Warrior", "Mage", "Archer", "Rogue"]})
     catalog.set_editor_property("skills", {
-        unreal.Name("DefaultAttack"): unreal.load_asset(root + "/DataAsset/BPDA_DefaulatAttack"),
-        unreal.Name("SweepingStrike"): unreal.load_asset(root + "/DataAsset/DA_SweepingStrike"),
+        unreal.Name("DefaultAttack"): unreal.load_asset(root + "/DataAsset/Skills/BPDA_DefaulatAttack"),
+        unreal.Name("SweepingStrike"): unreal.load_asset(root + "/DataAsset/Skills/DA_SweepingStrike"),
     })
     if not assets.save_loaded_asset(catalog):
         raise RuntimeError("Could not save Snapshot catalog")
@@ -47,8 +47,8 @@ if not defaults.get_editor_property("local_opponent_catalog"):
 slot_id = "SampleOpponent"
 slot_name = unreal.PartySnapshotLibrary.get_save_slot_name(slot_id)
 if not unreal.GameplayStatics.does_save_game_exist(slot_name, 0):
-    stats = unreal.PartySnapshotStats(max_hp=140.0, current_hp=120.0, max_action_points=2, max_sub_action_points=1, move_range=1)
-    member = unreal.PartySnapshotMember(member_id="SampleHunter", class_id="Hunter", character_name="Snapshot Hunter", stats=stats, skill_ids=["DefaultAttack", "SweepingStrike"], formation_slot=0)
+    stats = unreal.PartySnapshotStats(max_hp=100.0, current_hp=100.0, max_action_points=2, max_sub_action_points=1, move_range=1)
+    member = unreal.PartySnapshotMember(member_id="SampleArcher", class_id="Archer", character_name="Snapshot Archer", stats=stats, skill_ids=["DefaultAttack", "SweepingStrike"], formation_slot=0)
     snapshot = unreal.PartySnapshot(schema_version=1, content_version=1, snapshot_id="SampleOpponentV1", members=[member])
     result = unreal.PartySnapshotLibrary.save_snapshot(slot_id, snapshot)
     unreal.log("Snapshot sample save: " + str(result))

@@ -53,8 +53,11 @@ private:
         FVector AimLocation = FVector::ZeroVector;
         FVector Destination = FVector::ZeroVector;
         double PhaseStarted = 0.0;
+        double MontageStartedAt = 0.0;
+        double MontageRecoverySeconds = 0.0;
         bool bReleased = false;
         bool bMontageStarted = false;
+        bool bTrackMontageCompletion = false;
         bool bFailed = false;
         int32 EffectiveTargetUnitId = INDEX_NONE;
     };
@@ -79,6 +82,7 @@ private:
 
     TArray<FActionRuntime> Actions;
     double SimulationTime = 0.0;
+    double MontageClock = 0.0;
     double Accumulator = 0.0;
     bool bCleaningUp = false;
 
@@ -89,6 +93,7 @@ private:
     void AdvanceSimulation(float StepSeconds);
     void AdvanceAction(int32 Index, float StepSeconds);
     void ReleaseSkill(int32 Index, const FCombatRoundSkill& Skill);
+    void StartRecovery(int32 Index, bool bFailed, const FText& Status);
     void StartReturn(int32 Index, bool bFailed, const FText& Status);
     void FinishRoundIfSettled();
     void PublishState();

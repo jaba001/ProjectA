@@ -39,6 +39,7 @@ namespace
         case ECombatRoundActionPhase::Waiting: return TEXT("시작 대기");
         case ECombatRoundActionPhase::Approaching: return TEXT("접근");
         case ECombatRoundActionPhase::Casting: return TEXT("시전");
+        case ECombatRoundActionPhase::Recovery: return TEXT("동작 마무리");
         case ECombatRoundActionPhase::Returning: return TEXT("복귀");
         case ECombatRoundActionPhase::Complete: return TEXT("완료");
         case ECombatRoundActionPhase::Cancelled: return TEXT("취소");

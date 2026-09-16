@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "AbilitySystemComponent.h"
+#include "Animation/AnimMontage.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Combat/Library/CombatEffectLibrary.h"
@@ -9,6 +10,7 @@
 #include "Combat/Round/CombatRoundProjectile.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/World.h"
@@ -143,7 +145,7 @@ namespace CombatRoundTests
                 FRunPartyMember& Member = Members.AddDefaulted_GetRef();
                 Member.SlotIndex = Index;
                 Member.bCreated = true;
-                Member.ClassId = TEXT("Hunter");
+                Member.ClassId = TEXT("Archer");
                 Member.CharacterName = FText::FromString(Participant.AccountId.Subject);
                 Member.CharacterId = FGuid::NewGuid();
                 Member.OwnerAccountId = Participant.AccountId;
@@ -515,6 +517,103 @@ bool FCombatRoundReturnFacingTest::RunTest(const FString& Parameters)
             TestTrue(Context + TEXT(" restores its original position"), Source->GetActorLocation().Equals(Origin, Case == 0 ? 2.0f : 0.1f));
             TestTrue(Context + TEXT(" restores its original facing"), Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
         }
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundMontageRecoveryTest, "ProjectA.Combat.Round.MontageRecoveryBeforeReturn", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundMontageRecoveryTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    UAnimMontage* AuthoredMontage = LoadObject<UAnimMontage>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/Unit/Animation/Montage/MM_Attack_01_Montage.MM_Attack_01_Montage"));
+    if (!TestNotNull(TEXT("The authored montage supplies real animation metadata"), AuthoredMontage)) return false;
+    TStrongObjectPtr<UAnimMontage> Montage(DuplicateObject<UAnimMontage>(AuthoredMontage, GetTransientPackage()));
+    if (!TestTrue(TEXT("The transient montage has a finite positive length"), Montage.IsValid() && FMath::IsFinite(Montage->GetPlayLength()) && Montage->GetPlayLength() > 0.0f)) return false;
+    // Normalize a transient copy to one second; the server-only fixture has no animated mesh instance.
+    // 임시 복사본을 1초 재생으로 맞추며 서버 픽스처에는 애니메이션 메시 인스턴스가 없습니다.
+    Montage->RateScale = Montage->GetPlayLength();
+    Montage->BlendOut.SetBlendTime(0.1f);
+    Montage->bEnableAutoBlendOut = true;
+    for (FCompositeSection& Section : Montage->CompositeSections) Section.NextSectionName = NAME_None;
+    AddExpectedError(TEXT("[RoundAnimation] Montage playback failed"), EAutomationExpectedErrorFlags::Contains, 4, false);
+    for (int32 Case = 0; Case < 5; ++Case)
+    {
+        const FString Context = Case == 0 ? TEXT("Montage recovery") : Case == 1 ? TEXT("Windup already consumes montage duration") : Case == 2 ? TEXT("No montage") : Case == 3 ? TEXT("Target dies before release") : TEXT("Hitch before montage starts");
+        FCombatRoundSkill Skill;
+        Skill.CastMontage = Case == 2 ? nullptr : Montage.Get();
+        Skill.WindupSeconds = Case == 1 ? 1.5f : 0.1f;
+        Skill.Power = 17.0f;
+        FFixture Fixture;
+        if (!TestTrue(Context + TEXT(" initializes"), Fixture.Initialize(1, 10, nullptr, FIntPoint(0, 3), Case == 3 ? 2 : 1, &Skill))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Target = Fixture.Enemies[0];
+        const FVector Origin = Source->GetActorLocation();
+        const FRotator OriginalRotation(0.0f, 37.0f, 0.0f);
+        Source->SetActorRotation(OriginalRotation);
+        if (!TestNull(Context + TEXT(" uses the no-AnimInstance recovery path"), Source->GetMesh()->GetAnimInstance())) return false;
+        if (!TestTrue(Context + TEXT(" submits"), Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Target))) || !TestTrue(Context + TEXT(" locks"), Fixture.Ready(0))) return false;
+        if (Case == 4)
+        {
+            Fixture.Round->Tick(2.0f);
+            if (!TestTrue(TEXT("The hitch leaves simulation debt while still approaching"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 100.0f))) return false;
+            Fixture.Round->Tick(0.01f);
+            if (!TestTrue(TEXT("Catching up debt can start the montage and release one hit in the next frame"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Recovery && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 83.0f))) return false;
+            const FVector RecoveryLocation = Source->GetActorLocation();
+            const FRotator RecoveryRotation = Source->GetActorRotation();
+            for (int32 Step = 0; Step < 30; ++Step) Fixture.Round->Tick(0.01f);
+            TestTrue(TEXT("Simulation debt does not consume the newly started montage recovery time"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Recovery);
+            TestTrue(TEXT("The hitch recovery keeps the released attack stationary without repeating damage"), Source->GetActorLocation().Equals(RecoveryLocation, 0.1f) && Source->GetActorRotation().Equals(RecoveryRotation, 0.1f) && Source->GetVelocity().IsNearlyZero() && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 83.0f));
+            TestEqual(TEXT("The hitch still charges the action cost only once"), Source->GetCurrentActionPoint(), 1);
+            Fixture.Round->Tick(1.06f);
+            TestTrue(TEXT("Actual elapsed montage time releases the return after the hitch"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Returning);
+            if (!TestTrue(Context + TEXT(" settles into the next planning round"), Fixture.AdvanceUntilNextRound(1))) return false;
+            TestTrue(Context + TEXT(" restores the home position and original facing"), Source->GetActorLocation().Equals(Origin, 2.0f) && Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
+            TestTrue(Context + TEXT(" applies no extra damage while returning"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 83.0f));
+            continue;
+        }
+        for (int32 Step = 0; Step < 200 && Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching; ++Step) Fixture.Round->Tick(0.01f);
+        if (!TestTrue(Context + TEXT(" reaches casting after a real approach"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Casting && FVector::Dist2D(Origin, Source->GetActorLocation()) > 400.0f)) return false;
+        const FVector CastLocation = Source->GetActorLocation();
+        const FRotator CastRotation = Source->GetActorRotation();
+        TestTrue(Context + TEXT(" has not delivered damage before windup"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 100.0f));
+        TestFalse(Context + TEXT(" has no actual montage instance to drive completion"), Source->HasRoundCastMontageInstance());
+        if (Case == 3)
+        {
+            Target->Die();
+            Fixture.Round->Tick(0.01f);
+            TestTrue(TEXT("Pre-release cancellation returns without waiting for montage recovery"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Returning);
+            TestTrue(TEXT("The cancelled attack has not damaged the target or another living enemy"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 100.0f) && FMath::IsNearlyEqual(Fixture.Enemies[1]->GetAttributeSet()->GetHP(), 100.0f));
+        }
+        else
+        {
+            int32 CastingSteps = 0;
+            for (; CastingSteps < 200 && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 100.0f); ++CastingSteps) Fixture.Round->Tick(0.01f);
+            if (!TestTrue(Context + TEXT(" releases exactly one hit at windup rather than montage completion"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 83.0f) && FMath::IsNearlyEqual(CastingSteps * 0.01f, Skill.WindupSeconds, 0.02f))) return false;
+            TestEqual(Context + TEXT(" charges the action cost once"), Source->GetCurrentActionPoint(), 1);
+            if (Case == 0)
+            {
+                TestTrue(TEXT("Released damage enters recovery before movement home"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Recovery);
+                for (; CastingSteps < 130; ++CastingSteps) Fixture.Round->Tick(0.01f);
+                TestTrue(TEXT("Recovery includes the rate-adjusted montage, blend-out and grace from casting start"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Recovery);
+                TestTrue(TEXT("Recovery preserves the attack position and facing with zero movement"), Source->GetActorLocation().Equals(CastLocation, 0.1f) && Source->GetActorRotation().Equals(CastRotation, 0.1f) && Source->GetVelocity().IsNearlyZero());
+                TestTrue(TEXT("Recovery ticks do not repeat the released damage"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 83.0f));
+                Fixture.Round->Tick(0.06f);
+                TestTrue(TEXT("The finite no-AnimInstance deadline releases the return without restarting a full wait"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Returning);
+            }
+            else if (Case == 1)
+            {
+                Fixture.Round->Tick(0.02f);
+                TestTrue(TEXT("A long windup does not add the montage duration again after damage"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Returning);
+            }
+            else
+            {
+                TestTrue(TEXT("A skill without a montage keeps its immediate return behavior"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Returning);
+            }
+        }
+        if (!TestTrue(Context + TEXT(" settles into the next planning round"), Fixture.AdvanceUntilNextRound(1))) return false;
+        TestTrue(Context + TEXT(" restores the home position and original facing"), Source->GetActorLocation().Equals(Origin, 2.0f) && Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
+        TestTrue(Context + TEXT(" applies no extra damage while returning"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), Case == 3 ? 100.0f : 83.0f));
     }
     return true;
 }

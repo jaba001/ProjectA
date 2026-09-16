@@ -28,7 +28,7 @@ namespace
 
         FCheckpointStorageFixture()
         {
-            Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+            Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
             Run->EnableCheckpointSaving(Slot);
         }
 
@@ -41,8 +41,8 @@ namespace
         {
             FRunPartyMember Member;
             Member.SlotIndex = 0;
-            Member.CharacterName = FText::FromString(TEXT("Checkpoint Hunter"));
-            Member.ClassId = TEXT("Hunter");
+            Member.CharacterName = FText::FromString(TEXT("Checkpoint Archer"));
+            Member.ClassId = TEXT("Archer");
             Member.bCreated = true;
             return Run->PartyDefinition && Run->PartyDefinition->ResolveProfession(Member.ClassId, Profession) && Run->InitializeRun({ Member }, OutError) && Run->GetSaveError().IsEmpty() && Run->BeginEncounter(TEXT("Combat_01")) && Run->MarkCombatStarted();
         }
@@ -209,7 +209,7 @@ bool FCombatCheckpointRoundTripTest::RunTest(const FString& Parameters)
         return false;
     }
     FCombatCheckpointData Checkpoint = Fixture.MakeCheckpoint();
-    TStrongObjectPtr<UOpponentSnapshotCatalogDataAsset> OpponentCatalog(LoadObject<UOpponentSnapshotCatalogDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_OpponentSnapshotCatalog.DA_OpponentSnapshotCatalog")));
+    TStrongObjectPtr<UOpponentSnapshotCatalogDataAsset> OpponentCatalog(LoadObject<UOpponentSnapshotCatalogDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog.DA_OpponentSnapshotCatalog")));
     if (!TestTrue(TEXT("Frozen opponent uses real catalog content"), OpponentCatalog.IsValid() && !OpponentCatalog->EnemyClasses.IsEmpty() && !OpponentCatalog->Skills.IsEmpty()))
     {
         return false;

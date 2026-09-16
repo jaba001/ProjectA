@@ -37,7 +37,7 @@ namespace EncounterPreparationTests
             if (!World.IsValid()) return;
             Encounter = World->SpawnActor<AEncounterManager>();
             Combat = World->SpawnActor<ACombatManager>();
-            Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+            Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
             Run->EnableCheckpointSaving(Slot);
         }
 
@@ -53,8 +53,8 @@ namespace EncounterPreparationTests
         {
             FRunPartyMember Member;
             Member.SlotIndex = 0;
-            Member.CharacterName = FText::FromString(TEXT("Preparation Hunter"));
-            Member.ClassId = TEXT("Hunter");
+            Member.CharacterName = FText::FromString(TEXT("Preparation Archer"));
+            Member.ClassId = TEXT("Archer");
             Member.bCreated = true;
             return Encounter && Combat && Run->PartyDefinition && Run->InitializeRun({Member}, OutError) && Run->GetSaveError().IsEmpty();
         }

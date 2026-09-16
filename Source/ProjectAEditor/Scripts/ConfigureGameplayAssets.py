@@ -7,8 +7,8 @@ import unreal
 # PythonScriptPlugin을 명령줄에서 일시 활성화한 PythonScript commandlet으로 실행합니다.
 ROOT = "/Game/User_JeHoon"
 OUTPUTS = {
-    "party": ROOT + "/Blueprint/DataAsset/DA_VerticalSliceParty",
-    "encounter": ROOT + "/Blueprint/DataAsset/DA_DefaultEncounter",
+    "party": ROOT + "/Blueprint/DataAsset/Parties/DA_VerticalSliceParty",
+    "encounter": ROOT + "/Blueprint/DataAsset/Encounters/DA_DefaultEncounter",
     "controller": ROOT + "/Blueprint/Controller/BP_GameplayPlayerController",
     "game_mode": ROOT + "/Blueprint/Game/BP_GameplayGameMode",
     "map": ROOT + "/LEVEL/Gameplay",
@@ -71,7 +71,7 @@ require(any(actor.get_class().get_path_name() == "/Script/NavigationSystem.NavMe
 
 party = create_data_asset(OUTPUTS["party"], party_class)
 party.set_editor_property("fallback_player_unit_class", player_class)
-party.set_editor_property("player_unit_classes", {unreal.Name(name): player_class for name in ["StableHand", "Scholar", "Herbalist", "Hunter"]})
+party.set_editor_property("player_unit_classes", {unreal.Name(name): player_class for name in ["Warrior", "Mage", "Archer", "Rogue"]})
 encounter = create_data_asset(OUTPUTS["encounter"], encounter_class)
 encounter.set_editor_property("enemy_unit_classes", [enemy_class])
 

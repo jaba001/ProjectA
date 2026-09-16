@@ -19,6 +19,8 @@ class PROJECTA_API UAS_Unit : public UAttributeSet
     GENERATED_BODY()
 
 public:
+    UAS_Unit();
+
     // Current hit points.
     // 현재 체력입니다.
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_HP, Category = "Attributes")
@@ -30,6 +32,24 @@ public:
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MaxHP, Category = "Attributes")
     FGameplayAttributeData MaxHP;
     ATTRIBUTE_ACCESSORS(UAS_Unit, MaxHP)
+
+    // Base strength is stored without defining a damage formula.
+    // 피해 공식을 정의하지 않고 기본 힘을 저장합니다.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Strength, Category = "Attributes")
+    FGameplayAttributeData Strength;
+    ATTRIBUTE_ACCESSORS(UAS_Unit, Strength)
+
+    // Base dexterity is independent from action points and combat speed.
+    // 기본 민첩은 행동력 및 전투 속도와 독립적입니다.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Dexterity, Category = "Attributes")
+    FGameplayAttributeData Dexterity;
+    ATTRIBUTE_ACCESSORS(UAS_Unit, Dexterity)
+
+    // Base intelligence is stored without defining a skill scaling formula.
+    // 스킬 계수 공식을 정의하지 않고 기본 지능을 저장합니다.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Intelligence, Category = "Attributes")
+    FGameplayAttributeData Intelligence;
+    ATTRIBUTE_ACCESSORS(UAS_Unit, Intelligence)
 
 public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -46,4 +66,13 @@ protected:
 
     UFUNCTION()
     void OnRep_MaxHP(const FGameplayAttributeData& PreviousMaxHP);
+
+    UFUNCTION()
+    void OnRep_Strength(const FGameplayAttributeData& PreviousStrength);
+
+    UFUNCTION()
+    void OnRep_Dexterity(const FGameplayAttributeData& PreviousDexterity);
+
+    UFUNCTION()
+    void OnRep_Intelligence(const FGameplayAttributeData& PreviousIntelligence);
 };

@@ -90,7 +90,7 @@ public:
         FRunPartyMember Player;
         Player.SlotIndex = 0;
         Player.CharacterName = FText::FromString(TEXT("Snapshot preparation tester"));
-        Player.ClassId = TEXT("Hunter");
+        Player.ClassId = TEXT("Archer");
         Player.bCreated = true;
         FText Error;
         if (!Test->TestTrue(TEXT("A valid player party initializes the failure-test run."), Run->InitializeRun({Player}, Error)))
@@ -103,7 +103,7 @@ public:
         Definition->SnapshotCatalog = Mode->LocalOpponentCatalog;
         // Retain a valid PvE enemy to detect accidental fallback when the snapshot fails.
         // 스냅샷 실패 시 잘못된 대체 실행을 감지하도록 유효한 PvE 적을 남겨 둡니다.
-        Definition->EnemyUnitClasses.Add(Mode->LocalOpponentCatalog->EnemyClasses.FindRef(TEXT("Hunter")));
+        Definition->EnemyUnitClasses.Add(Mode->LocalOpponentCatalog->EnemyClasses.FindRef(TEXT("Archer")));
         TMap<FName, TObjectPtr<UEncounterDefinitionDataAsset>> Definitions;
         Definitions.Add(Run->GetNodes()[0].EncounterId, Definition);
         Combat->OnCombatResult.RemoveAll(Encounter);
@@ -134,7 +134,7 @@ public:
         Snapshot.ContentVersion = Mode->LocalOpponentCatalog->ContentVersion;
         FPartySnapshotMember Member;
         Member.MemberId = TEXT("FirstOpponent");
-        Member.ClassId = TEXT("Hunter");
+        Member.ClassId = TEXT("Archer");
         Member.CharacterName = TEXT("First opponent");
         Member.SkillIds.Add(Mode->LocalOpponentCatalog->Skills.CreateConstIterator().Key());
         Snapshot.Members.Add(Member);

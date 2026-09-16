@@ -1,5 +1,6 @@
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "AbilitySystemComponent.h"
+#include "Animation/AnimMontage.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Controller/PartyPlayerController.h"
@@ -24,6 +25,39 @@ namespace
 {
     constexpr float RoundStep = 0.01f;
     constexpr double MovementTimeout = 6.0;
+    constexpr double MaximumMontageRecoverySeconds = 60.0;
+
+    double MontageRecoveryBudget(const UAnimMontage* Montage)
+    {
+        if (!Montage) return 0.0;
+        const double Length = Montage->GetPlayLength();
+        const double Rate = Montage->RateScale;
+        const double BlendOut = Montage->BlendOut.GetBlendTime();
+        const bool bValidLength = FMath::IsFinite(Length) && Length > 0.0;
+        const bool bValidRate = FMath::IsFinite(Rate) && Rate > 0.0;
+        const bool bValidBlend = FMath::IsFinite(BlendOut) && BlendOut >= 0.0;
+        bool bLooping = false;
+        TSet<int32> VisitedSections;
+        int32 SectionIndex = Montage->GetSectionIndexFromPosition(0.f);
+        while (Montage->IsValidSectionIndex(SectionIndex))
+        {
+            if (VisitedSections.Contains(SectionIndex))
+            {
+                bLooping = true;
+                break;
+            }
+            VisitedSections.Add(SectionIndex);
+            SectionIndex = Montage->GetSectionIndex(Montage->CompositeSections[SectionIndex].NextSectionName);
+        }
+        // Use a conservative full-asset budget when animation cannot tick; actual instances finish naturally first.
+        // 애니메이션을 갱신할 수 없을 때는 전체 에셋 기준의 보수적 시간을 사용하고 실제 인스턴스는 자연 종료를 우선합니다.
+        const double Budget = (bValidLength ? Length : 1.0) / (bValidRate ? Rate : 1.0) + (bValidBlend ? BlendOut : 0.0) + 0.25;
+        if (!bValidLength || !bValidRate || !bValidBlend || bLooping || !Montage->bEnableAutoBlendOut || Budget > MaximumMontageRecoverySeconds)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[RoundAnimation] Bounded montage recovery Montage=%s Length=%.3f Rate=%.3f Budget=%.3f Loop=%d AutoBlendOut=%d / 몽타주 설정의 무한 대기를 방지하기 위해 최대 60초 안에 정리합니다"), *GetPathNameSafe(Montage), Length, Rate, Budget, bLooping, Montage->bEnableAutoBlendOut);
+        }
+        return FMath::Clamp(Budget, 0.01, MaximumMontageRecoverySeconds);
+    }
 
     FText RoundText(const TCHAR* Value)
     {
@@ -741,6 +775,7 @@ void ACombatRoundCoordinator::LockPlans()
     View.Message = RoundText(TEXT("계획 잠금 완료. 속도차에 따라 행동을 실행합니다."));
     Accumulator = 0.0;
     SimulationTime = 0.0;
+    MontageClock = 0.0;
     AdvanceSimulation(0.f);
 }
 
@@ -764,6 +799,9 @@ void ACombatRoundCoordinator::Tick(float DeltaSeconds)
         return;
     }
 
+    // Montage playback advances once per frame; catching up simulation debt must not consume a newly started animation.
+    // 몽타주 재생은 프레임마다 진행하므로 누적 시뮬레이션 시간을 따라잡으며 새로 시작한 애니메이션 시간을 소진하지 않습니다.
+    MontageClock += DeltaSeconds;
     // Retain simulation debt instead of dropping elapsed time when a frame is slow.
     // 프레임이 느릴 때 경과 시간을 버리지 않고 남은 시뮬레이션 시간을 보존합니다.
     Accumulator += DeltaSeconds;
@@ -908,13 +946,31 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
             if (!Action.bMontageStarted)
             {
                 Action.bMontageStarted = true;
+                Action.MontageStartedAt = MontageClock;
+                Action.MontageRecoverySeconds = MontageRecoveryBudget(Skill->CastMontage);
                 Entry.Unit->GetCharacterMovement()->Velocity = FVector::ZeroVector;
                 Entry.Unit->SetRoundCastMontage(Skill->CastMontage);
+                Action.bTrackMontageCompletion = Entry.Unit->HasRoundCastMontageInstance();
             }
             if (SimulationTime + 0.00001 < Action.PhaseStarted + Skill->WindupSeconds) return;
             ReleaseSkill(Index, *Skill);
             return;
         }
+    }
+    if (Entry.ActionPhase == ECombatRoundActionPhase::Recovery)
+    {
+        const bool bHasMontageInstance = Entry.Unit->HasRoundCastMontageInstance();
+        const bool bFinished = Action.bTrackMontageCompletion && !bHasMontageInstance;
+        if (!bFinished && MontageClock + 0.00001 < Action.MontageStartedAt + Action.MontageRecoverySeconds) return;
+        if (!bFinished)
+        {
+            if (bHasMontageInstance) UE_LOG(LogTemp, Warning, TEXT("[RoundAnimation] Recovery timeout Unit=%d Round=%d / 몽타주 종료 대기 시간 초과로 표현을 정리하고 복귀합니다"), Entry.UnitId, View.RoundNumber);
+            // A zero blend stops held or looping poses before return movement begins, including on remote clients.
+            // 원격 클라이언트를 포함하여 복귀 이동 전에 유지되거나 반복되는 자세를 0초 블렌드로 정리합니다.
+            Entry.Unit->SetRoundCastMontage(nullptr, true);
+        }
+        StartReturn(Index, Action.bFailed, Entry.Status);
+        return;
     }
     if (Entry.ActionPhase == ECombatRoundActionPhase::Returning)
     {
@@ -939,6 +995,22 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
         Entry.ActionPhase = ECombatRoundActionPhase::Complete;
         if (Action.bFailed) Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
     }
+}
+
+void ACombatRoundCoordinator::StartRecovery(int32 Index, bool bFailed, const FText& Status)
+{
+    FCombatRoundUnitView& Entry = View.Units[Index];
+    FActionRuntime& Action = Actions[Index];
+    if (Action.MontageRecoverySeconds <= 0.0)
+    {
+        StartReturn(Index, bFailed, Status);
+        return;
+    }
+    // Release remains authoritative and runs once; only the movement home waits for presentation to finish.
+    // 발동은 서버에서 한 번만 실행하며 표현 종료를 기다리는 대상은 원위치 복귀뿐입니다.
+    Action.bFailed = bFailed;
+    Entry.Status = Status;
+    Entry.ActionPhase = ECombatRoundActionPhase::Recovery;
 }
 
 void ACombatRoundCoordinator::StartReturn(int32 Index, bool bFailed, const FText& Status)
@@ -990,11 +1062,11 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
     {
         if (!IsValid(Target) || !Target->IsUnitAlive() || FVector::Dist2D(Entry.Unit->GetActorLocation(), Target->GetActorLocation()) > Skill.HitRange)
         {
-            StartReturn(Index, true, RoundText(TEXT("엄호 대상 또는 거리 조건 불충족")));
+            StartRecovery(Index, true, RoundText(TEXT("엄호 대상 또는 거리 조건 불충족")));
             return;
         }
         View.Units[TargetIndex].Guard = FMath::Max(View.Units[TargetIndex].Guard, Skill.Power);
-        StartReturn(Index, false, RoundText(TEXT("엄호 적용 완료")));
+        StartRecovery(Index, false, RoundText(TEXT("엄호 적용 완료")));
         return;
     }
     if (Skill.Kind == ECombatRoundSkillKind::Projectile)
@@ -1005,7 +1077,7 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
         ACombatRoundProjectile* Projectile = GetWorld()->SpawnActor<ACombatRoundProjectile>(Entry.Unit->GetActorLocation(), FRotator::ZeroRotator, Params);
         if (!Projectile)
         {
-            StartReturn(Index, true, RoundText(TEXT("투사체 생성 실패")));
+            StartRecovery(Index, true, RoundText(TEXT("투사체 생성 실패")));
             return;
         }
         Projectiles.Add(Projectile);
@@ -1015,7 +1087,7 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
         for (const FCombatRoundUnitView& Candidate : View.Units) AllowedTargets.Add(Candidate.Unit);
         Projectile->SetAllowedTargets(AllowedTargets);
         Projectile->InitializeProjectile(Entry.Unit, Target, Action.AimLocation, Skill.ProjectileSpeed, Skill.Power, Skill.ProjectileRadius, Skill.ProjectileLifetime, Skill.bHoming, Skill.bTargetOnly);
-        StartReturn(Index, false, RoundText(TEXT("발사 완료")));
+        StartRecovery(Index, false, RoundText(TEXT("발사 완료")));
         return;
     }
     bool bHit = false;
@@ -1038,8 +1110,8 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
             bHit = true;
         }
     }
-    if (bHit) StartReturn(Index, false, RoundText(TEXT("타격 완료")));
-    else StartReturn(Index, true, RoundText(TEXT("공격 충돌 없음 또는 장애물에 차단됨")));
+    if (bHit) StartRecovery(Index, false, RoundText(TEXT("타격 완료")));
+    else StartRecovery(Index, true, RoundText(TEXT("공격 충돌 없음 또는 장애물에 차단됨")));
 }
 
 void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, float Damage)

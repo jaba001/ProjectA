@@ -3,11 +3,21 @@
 #include "Unit/UnitBase.h"
 #include "Net/UnrealNetwork.h"
 
+UAS_Unit::UAS_Unit()
+{
+    InitStrength(10.0f);
+    InitDexterity(10.0f);
+    InitIntelligence(10.0f);
+}
+
 void UAS_Unit::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME_CONDITION_NOTIFY(UAS_Unit, HP, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(UAS_Unit, MaxHP, COND_None, REPNOTIFY_Always);
+    DOREPLIFETIME_CONDITION_NOTIFY(UAS_Unit, Strength, COND_None, REPNOTIFY_Always);
+    DOREPLIFETIME_CONDITION_NOTIFY(UAS_Unit, Dexterity, COND_None, REPNOTIFY_Always);
+    DOREPLIFETIME_CONDITION_NOTIFY(UAS_Unit, Intelligence, COND_None, REPNOTIFY_Always);
 }
 
 void UAS_Unit::OnRep_HP(const FGameplayAttributeData& PreviousHP)
@@ -18,6 +28,21 @@ void UAS_Unit::OnRep_HP(const FGameplayAttributeData& PreviousHP)
 void UAS_Unit::OnRep_MaxHP(const FGameplayAttributeData& PreviousMaxHP)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UAS_Unit, MaxHP, PreviousMaxHP);
+}
+
+void UAS_Unit::OnRep_Strength(const FGameplayAttributeData& PreviousStrength)
+{
+    GAMEPLAYATTRIBUTE_REPNOTIFY(UAS_Unit, Strength, PreviousStrength);
+}
+
+void UAS_Unit::OnRep_Dexterity(const FGameplayAttributeData& PreviousDexterity)
+{
+    GAMEPLAYATTRIBUTE_REPNOTIFY(UAS_Unit, Dexterity, PreviousDexterity);
+}
+
+void UAS_Unit::OnRep_Intelligence(const FGameplayAttributeData& PreviousIntelligence)
+{
+    GAMEPLAYATTRIBUTE_REPNOTIFY(UAS_Unit, Intelligence, PreviousIntelligence);
 }
 
 void UAS_Unit::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)

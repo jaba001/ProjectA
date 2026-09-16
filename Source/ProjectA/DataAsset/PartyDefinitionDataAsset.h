@@ -8,11 +8,15 @@ class APlayerUnit;
 class UTexture2D;
 class USkillDefinitionDataAsset;
 class URunEncounterPoolDataAsset;
+class UProfessionBase;
 
 USTRUCT(BlueprintType)
 struct PROJECTA_API FProfessionDefinition
 {
     GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TSubclassOf<UProfessionBase> ProfessionClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FText DisplayName;
@@ -22,12 +26,18 @@ struct PROJECTA_API FProfessionDefinition
     TObjectPtr<UTexture2D> Icon;
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TSubclassOf<APlayerUnit> CombatClass;
-    // Preserve existing class balance until explicit profession overrides are authored.
-    // 명시적인 직업 설정을 작성하기 전까지 기존 클래스 밸런스를 유지합니다.
+    // Reuse the unit's AP and starting skills with the profession's initial attributes.
+    // 직업의 초기 능력치와 유닛의 AP 및 시작 스킬 기본값을 사용합니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     bool bUseUnitClassDefaults = true;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
-    float MaxHP = 200.0f;
+    float MaxHP = 100.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0"))
+    float Strength = 10.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0"))
+    float Dexterity = 10.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0"))
+    float Intelligence = 10.0f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
     int32 ActionPoints = 2;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0"))

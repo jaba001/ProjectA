@@ -189,8 +189,14 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
         {
             FProfessionDefinition Definition;
             const bool bInitialHP = Member.CurrentHP == -1.0f && Save->Phase == ERunPhase::Map && Save->CompletedNodes.IsEmpty();
-            if (Member.CharacterName.ToString().TrimStartAndEnd().IsEmpty() || !Catalog->ResolveProfession(Member.ClassId, Definition) || (Member.CurrentHP < 0.0f && !bInitialHP))
+            if (Member.CharacterName.ToString().TrimStartAndEnd().IsEmpty() || (Member.CurrentHP < 0.0f && !bInitialHP))
             {
+                return false;
+            }
+            FText ProfessionError;
+            if (!Catalog->ResolveProfession(Member.ClassId, Definition, ProfessionError))
+            {
+                OutError = FText::Format(NSLOCTEXT("RunCheckpoint", "SavedProfessionUnsupported", "저장된 직업 '{0}'을 현재 직업 설정으로 불러올 수 없습니다. 저장 원본을 유지합니다. {1}"), FText::FromName(Member.ClassId), ProfessionError);
                 return false;
             }
             ++Created;

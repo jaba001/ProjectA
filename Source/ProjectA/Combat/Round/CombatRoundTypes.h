@@ -25,7 +25,8 @@ enum class ECombatRoundActionPhase : uint8
     Casting,
     Returning,
     Complete,
-    Cancelled
+    Cancelled,
+    Recovery
 };
 
 UENUM(BlueprintType)
