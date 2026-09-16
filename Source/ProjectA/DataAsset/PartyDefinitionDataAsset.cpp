@@ -56,6 +56,10 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
     {
         return Fail(NSLOCTEXT("PartyDefinition", "MissingClass", "Set CombatClass, PlayerUnitClasses or FallbackPlayerUnitClass. / CombatClass, PlayerUnitClasses 또는 FallbackPlayerUnitClass를 지정하세요."));
     }
+    if (OutDefinition.CombatClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated))
+    {
+        return Fail(FText::Format(NSLOCTEXT("PartyDefinition", "UnspawnableClass", "Resolved CombatClass cannot be abstract or deprecated: {0}. / 실제 CombatClass는 추상 또는 사용 중단 클래스일 수 없습니다: {0}."), FText::FromString(OutDefinition.CombatClass->GetPathName())));
+    }
     if (OutDefinition.bUseUnitClassDefaults)
     {
         const APlayerUnit* Defaults = OutDefinition.CombatClass->GetDefaultObject<APlayerUnit>();

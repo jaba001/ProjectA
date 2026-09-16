@@ -475,6 +475,9 @@ bool AEncounterManager::ContinueRun()
         OnFlowChanged.Broadcast();
         return false;
     }
+    // Clear an earlier save failure before the successful transition notifies its UI observers.
+    // 성공한 상태 전이가 UI 구독자에게 통지되기 전에 이전 저장 실패 메시지를 지웁니다.
+    FlowMessage = FText::GetEmpty();
     if (!RunState->ContinueRun())
     {
         FlowMessage = RunState->GetSaveError();

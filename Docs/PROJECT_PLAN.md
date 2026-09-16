@@ -28,6 +28,8 @@ T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 현재는
 
 빌드 후 UE를 재시작하여 C++·리플렉션 변경을 반영한다. 이번 전환에는 새 맵·WBP 생성이나 Config 변경이 필요하지 않다.
 
+최초 사용자 실행은 [TEST_REPORT 1절](TEST_REPORT.md#1-직접-플레이-확인)의 싱글 Run과 설정 변경·복원으로 진행한다. 구간별 기대 결과·실패 로그를 기록한 뒤 2인·4인 협동으로 확대한다. 2026-09-16 준비 점검은 컴파일·정적 검사까지 완료했으며 실제 작동은 사용자 검증 대기다.
+
 ```mermaid
 flowchart LR
     A[MainMenu] --> B[CharacterCreation]
@@ -97,7 +99,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 - 수정하지 않은 이름은 직업 표시명과 슬롯 번호를 사용한다. 개별 이름 변경은 `SetSlotCharacterName`으로 반영한다.
 - 첫 스폰은 직업 정의 HP 또는 클래스 기본 HP, 이후 전투는 저장한 결과 HP를 사용한다. HP 0인 멤버는 다음 전투에 스폰하지 않는다.
 
-`UPartyDefinitionDataAsset::IsDataValid`는 Unreal Data Validation에서 동일한 `ResolveProfession` 검사를 사용한다. 에셋 경로·직업 ID와 함께 누락 클래스, 유효하지 않은 HP/AP, 빈·누락·중복 시작 스킬과 잘못된 라운드 프로필을 보고한다. 직업 클래스 → `PlayerUnitClasses` → 명시 fallback 순서와 클래스 기본값 사용은 유지한다. 제작 파티 에셋을 Content Browser에서 선택해 **Validate Assets**로 사전 확인할 수 있으며, 전투 실행 검증과 구분한다.
+`UPartyDefinitionDataAsset::IsDataValid`는 Unreal Data Validation에서 동일한 `ResolveProfession` 검사를 사용한다. 에셋 경로·직업 ID와 함께 누락 또는 Abstract/Deprecated 클래스, 유효하지 않은 HP/AP, 빈·누락·중복 시작 스킬과 잘못된 라운드 프로필을 보고한다. 직업 클래스 → `PlayerUnitClasses` → 명시 fallback 순서와 클래스 기본값 사용은 유지한다. 실제 선택된 클래스만 검사하며 잘못된 명시 클래스를 fallback으로 대체하지 않는다. 제작 파티 에셋을 Content Browser에서 선택해 **Validate Assets**로 사전 확인할 수 있으며, 전투 실행 검증과 구분한다.
 
 ### 행동과 결과
 
@@ -113,7 +115,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 UnitBase의 기존 순차 이동/행동 수명·유닛 체크포인트 capture/restore, UnitAIController의 경로 완료 루프와 기존 이동 BFS를 제거했다. 기존 GA/SkillActor의 즉시 실행과 순차 `StartSkill`·TurnManager·AI 연속 판단·End Turn을 실행하지 않는다. 모든 예약 행동과 복귀·잔여 투사체가 종료된 뒤에만 결과를 Encounter로 전달한다. 양 팀 전멸은 `Suspended`이며 정식 결과 정책 대기다. 현재 지원 범위와 임시 정책은 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)을 기준으로 한다.
 
-Standalone은 결과 저장 성공 후 유닛·전투 상태를 정리한다. 네트워크는 Result 표시 동안 최종 상태를 유지하고 Continue/월드 종료 시 정리한다. 결과/Continue 저장 실패는 기존 단계와 파일을 보존하며 재시도할 수 있다.
+Standalone은 결과 저장 성공 후 유닛·전투 상태를 정리한다. 네트워크는 Result 표시 동안 최종 상태를 유지하고 Continue/월드 종료 시 정리한다. 결과/Continue 저장 실패는 기존 단계와 파일을 보존하며 재시도할 수 있다. Continue 재시도 성공 시 이전 오류를 동기 상태 전이 통지 전에 제거하여 상점 선택 화면에 남기지 않는다.
 
 ### 입력
 

@@ -275,6 +275,34 @@ bool FProfessionDataValidationTest::RunTest(const FString& Parameters)
     Validate(TEXT("Missing all class sources reports the profession"), false, TEXT("Hunter"));
     Definition.CombatClass = Base.CombatClass;
     Validate(TEXT("Direct profession class needs no fallback"), true);
+    // Use transient class metadata without changing production classes or spawning an invalid actor.
+    // 실제 클래스를 바꾸거나 잘못된 액터를 스폰하지 않고 임시 클래스 메타데이터를 사용합니다.
+    UClass* UnspawnableClass = NewObject<UClass>();
+    UnspawnableClass->SetSuperStruct(APlayerUnit::StaticClass());
+    for (EClassFlags Flag : {CLASS_Abstract, CLASS_Deprecated})
+    {
+        UnspawnableClass->ClassFlags = Flag;
+        Definition.CombatClass = UnspawnableClass;
+        Custom->PlayerUnitClasses.Add(TEXT("Hunter"), Base.CombatClass);
+        Custom->FallbackPlayerUnitClass = Base.CombatClass;
+        Validate(TEXT("An unspawnable direct class does not silently fall back"), false, *UnspawnableClass->GetPathName());
+        FProfessionDefinition Rejected;
+        FText ClassError;
+        TestFalse(TEXT("Runtime profession resolution also rejects an unspawnable class"), Custom->ResolveProfession(TEXT("Hunter"), Rejected, ClassError));
+        Definition.CombatClass = nullptr;
+        Custom->PlayerUnitClasses[TEXT("Hunter")] = UnspawnableClass;
+        Validate(TEXT("An unspawnable legacy mapping does not silently use shared fallback"), false, TEXT("CombatClass"));
+        Custom->PlayerUnitClasses.Reset();
+        Custom->FallbackPlayerUnitClass = UnspawnableClass;
+        Validate(TEXT("An unspawnable shared fallback is rejected"), false, TEXT("CombatClass"));
+        Custom->PlayerUnitClasses.Add(TEXT("Hunter"), Base.CombatClass);
+        Validate(TEXT("A valid legacy mapping takes precedence over an unused invalid fallback"), true);
+        Custom->PlayerUnitClasses[TEXT("Hunter")] = UnspawnableClass;
+        Definition.CombatClass = Base.CombatClass;
+        Validate(TEXT("A valid direct class takes precedence over unused invalid fallback sources"), true);
+        Custom->PlayerUnitClasses.Reset();
+        Custom->FallbackPlayerUnitClass = nullptr;
+    }
     Definition.MaxHP = std::numeric_limits<float>::quiet_NaN();
     Validate(TEXT("Nonfinite explicit HP is rejected"), false, TEXT("MaxHP"));
     Definition.MaxHP = Base.MaxHP;

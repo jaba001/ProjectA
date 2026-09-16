@@ -175,4 +175,43 @@ bool FEncounterPreparationRetryTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEncounterContinueRetryTest, "ProjectA.Encounter.ContinueSaveRetry", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEncounterContinueRetryTest::RunTest(const FString& Parameters)
+{
+    EncounterPreparationTests::FFixture Fixture;
+    FText Error;
+    if (!TestTrue(TEXT("The isolated Continue fixture initializes and saves"), Fixture.Initialize(Error))) return false;
+    AEncounterManager* Encounter = Fixture.Encounter;
+    Encounter->RunState = Fixture.Run.Get();
+    Encounter->CombatManager = Fixture.Combat;
+    if (!TestTrue(TEXT("The first victory commits a result checkpoint"), Fixture.Run->BeginEncounter(TEXT("Combat_01")) && Fixture.Run->MarkCombatStarted() && Fixture.Run->CompleteEncounter(ECombatResult::Victory))) return false;
+    const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("Continue reports a failed save and remains retryable"), Encounter->ContinueRun());
+    TestTrue(TEXT("Failed Continue preserves the result and its durable checkpoint"), Fixture.Run->GetPhase() == ERunPhase::Result && Fixture.ReadBytes() == BeforeBytes);
+    TestTrue(TEXT("Failed Continue publishes its storage error"), !Fixture.Run->GetSaveError().IsEmpty() && Encounter->GetFlowMessage().EqualTo(Fixture.Run->GetSaveError()));
+
+    int32 ChoiceEvents = 0;
+    FText ObservedFlowMessage;
+    Fixture.Run->OnRunStateChanged.AddLambda([&]()
+    {
+        if (Fixture.Run->GetPhase() == ERunPhase::EncounterChoice)
+        {
+            ++ChoiceEvents;
+            ObservedFlowMessage = FGameplayViewState::FromRun(Fixture.Run.Get(), Encounter->GetFlowMessage()).FlowMessage;
+        }
+    });
+    TestTrue(TEXT("Continue succeeds once storage recovers"), Encounter->ContinueRun());
+    TestEqual(TEXT("Recovered Continue publishes exactly one encounter choice transition"), ChoiceEvents, 1);
+    TestTrue(TEXT("The synchronous transition view does not retain the earlier save failure"), ObservedFlowMessage.IsEmpty());
+    TestTrue(TEXT("Recovered Continue clears both storage and encounter messages"), Fixture.Run->GetSaveError().IsEmpty() && Encounter->GetFlowMessage().IsEmpty());
+    TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
+    TestTrue(TEXT("Recovered Continue persists the encounter choice phase"), Saved.IsValid() && Saved->Phase == ERunPhase::EncounterChoice && Saved->CurrentEncounter.IsNone());
+    TestFalse(TEXT("Repeated Continue cannot skip encounter selection"), Encounter->ContinueRun());
+    TestEqual(TEXT("Repeated Continue publishes no extra transition"), ChoiceEvents, 1);
+    Fixture.Run->OnRunStateChanged.Clear();
+    return true;
+}
+
 #endif
