@@ -683,10 +683,18 @@ bool FCombatRoundMoveBarrierTest::RunTest(const FString& Parameters)
     ACombatGridTile* SourceDestination = Fixture.Grid->GetTileAtCoord(FIntPoint(1, 1));
     ACombatGridTile* FriendDestination = Fixture.Grid->GetTileAtCoord(FIntPoint(3, 1));
     const FVector NewHome = SourceDestination->GetActorLocation() + FVector(0.0f, 0.0f, Source->GetActorLocation().Z);
-    Friend->GetCharacterMovement()->MaxWalkSpeed = 100.0f;
+    Source->GetCharacterMovement()->MaxWalkSpeed = 100.0f;
     if (!TestTrue(TEXT("The first participant applies an attack"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Strike"), Enemy))) || !TestTrue(TEXT("The second participant applies a wait"), Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait")))) || !TestTrue(TEXT("The first participant reserves a move"), Fixture.Move(0, Source, SourceDestination->GridCoord)) || !TestTrue(TEXT("The second participant reserves a distinct move"), Fixture.Move(1, Friend, FriendDestination->GridCoord)) || !TestTrue(TEXT("The first participant readies"), Fixture.Ready(0)) || !TestTrue(TEXT("The last participant locks the staged round"), Fixture.Ready(1))) return false;
     TestTrue(TEXT("The round begins with its reserved SAP stage"), Round->IsPlanningMoveInProgress());
     TestEqual(TEXT("AP timing starts at zero before any SAP movement"), Round->GetView().ElapsedSeconds, 0.0f);
+    const FVector MoveStart = Source->GetActorLocation();
+    Round->Tick(0.1f);
+    TestTrue(TEXT("SAP movement covers 35 centimeters in 0.1 seconds despite a different MaxWalkSpeed"), FMath::IsNearlyEqual(FVector::Dist2D(MoveStart, Source->GetActorLocation()), 35.0, 0.01));
+    Source->GetCharacterMovement()->MaxWalkSpeed = 0.0f;
+    Source->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 40.0f);
+    const FVector BeforeAttributeChange = Source->GetActorLocation();
+    Round->Tick(0.1f);
+    TestTrue(TEXT("Changing Dexterity and disabling MaxWalkSpeed keeps SAP movement at 350 centimeters per second"), FMath::IsNearlyEqual(FVector::Dist2D(BeforeAttributeChange, Source->GetActorLocation()), 35.0, 0.01) && FMath::IsNearlyEqual(Source->GetVelocity().Size2D(), 350.0, 0.01));
     bool bObservedFirstArrival = false;
     bool bAPClockPaused = true;
     bool bNoEarlyDamage = true;
@@ -705,7 +713,7 @@ bool FCombatRoundMoveBarrierTest::RunTest(const FString& Parameters)
     }
     TestTrue(TEXT("SAP movement does not advance the AP simulation clock"), bAPClockPaused);
     TestTrue(TEXT("No attack releases before every SAP movement ends"), bNoEarlyDamage);
-    TestTrue(TEXT("The faster arrival waits at its new home for the remaining move"), bFirstArrivalWaited);
+    TestTrue(TEXT("The first arrival waits at its new home for the remaining move"), bFirstArrivalWaited);
     if (!TestTrue(TEXT("One participant arrives while the other is still moving"), bObservedFirstArrival) || !TestFalse(TEXT("Every reserved move finishes in bounded time"), Round->IsPlanningMoveInProgress())) return false;
     TestTrue(TEXT("The AP stage starts only after both new homes are occupied"), Source->GetCurrentTile() == SourceDestination && Friend->GetCurrentTile() == FriendDestination && SourceDestination->GetOccupyingUnit() == Source && FriendDestination->GetOccupyingUnit() == Friend);
     TestEqual(TEXT("Completing movement does not release the wound-up attack immediately"), Enemy->GetAttributeSet()->GetHP(), 100.0f);
@@ -738,7 +746,10 @@ bool FCombatRoundMoveFailureTest::RunTest(const FString& Parameters)
         if (!TestTrue(TEXT("The mover reserves an attack"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Strike"), Enemy))) || !TestTrue(TEXT("The second participant applies its action"), Fixture.Submit(1, FriendCommand)) || !TestTrue(TEXT("The mover reserves an allied destination"), Fixture.Move(0, Source, FIntPoint(1, 1))) || !TestTrue(TEXT("The mover readies"), Fixture.Ready(0)) || !TestTrue(TEXT("The second participant locks the stage"), Fixture.Ready(1))) return false;
         Round->Tick(0.05f);
         if (!TestTrue(TEXT("The failure occurs during actual SAP movement"), Round->IsPlanningMoveInProgress() && !Source->GetActorLocation().Equals(OriginalLocation, 1.0f))) return false;
-        if (Case == 0) Source->GetCharacterMovement()->MaxWalkSpeed = 0.0f;
+        if (Case == 0)
+        {
+            if (!TestNotNull(TEXT("A new occupant blocks the destination after movement starts"), Fixture.AddUnit(FIntPoint(1, 1), ETeam::Player))) return false;
+        }
         else Source->Die();
         Round->Tick(0.01f);
         TestFalse(TEXT("A failed or dead mover does not block the AP stage"), Round->IsPlanningMoveInProgress());
@@ -779,7 +790,6 @@ bool FCombatRoundLocomotionInputsTest::RunTest(const FString& Parameters)
         ACombatRoundCoordinator* Round = Fixture.Round;
         AUnitBase* Source = Fixture.Humans[0];
         AUnitBase* Friend = Fixture.Humans[1];
-        Friend->GetCharacterMovement()->MaxWalkSpeed = 100.0f;
         if (!TestTrue(TEXT("The first participant plans an attack"), Fixture.Submit(0, Fixture.Command(Source, TEXT("Strike"), Fixture.Enemies[0]))) || !TestTrue(TEXT("The second participant plans a wait"), Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait")))) || !TestTrue(TEXT("The first participant reserves SAP movement"), Fixture.Move(0, Source, FIntPoint(1, 1))) || !TestTrue(TEXT("The second participant reserves SAP movement"), Fixture.Move(1, Friend, FIntPoint(3, 1))) || !TestTrue(TEXT("The first participant readies"), Fixture.Ready(0)) || !TestTrue(TEXT("The last participant starts resolution"), Fixture.Ready(1))) return false;
         Round->Tick(0.05f);
         if (!TestTrue(TEXT("SAP movement supplies velocity and forward acceleration together"), Round->IsSAPMovementInProgress() && HasMotionInputs(Source))) return false;
@@ -789,6 +799,7 @@ bool FCombatRoundLocomotionInputsTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Arrival clears both motion inputs while waiting for other movers"), HasStoppedInputs(Source));
         Round->Tick(0.05f);
         TestTrue(TEXT("The next SAP mover receives both motion inputs"), HasMotionInputs(Friend));
+        TestTrue(TEXT("The next participant uses the same fixed SAP speed"), FMath::IsNearlyEqual(Friend->GetVelocity().Size2D(), 350.0, 0.01));
         TestTrue(TEXT("The arrived participant stays stopped during the next move"), HasStoppedInputs(Source));
         for (int32 Step = 0; Step < 600 && Round->IsSAPMovementInProgress(); ++Step) Round->Tick(0.01f);
         if (!TestFalse(TEXT("SAP motion settles before the attack phase"), Round->IsSAPMovementInProgress())) return false;

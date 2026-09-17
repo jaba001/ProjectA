@@ -24,6 +24,9 @@
 namespace
 {
     constexpr float RoundStep = 0.01f;
+    // SAP repositioning uses one fixed walking speed for every unit, independent of combat speed.
+    // SAP 위치 이동은 전투 속도와 무관하게 모든 유닛에 동일한 고정 보행 속도를 사용합니다.
+    constexpr float SAPMoveSpeed = 350.f;
     constexpr double MovementTimeout = 6.0;
     constexpr double MaximumMontageRecoverySeconds = 60.0;
 
@@ -734,12 +737,11 @@ void ACombatRoundCoordinator::AdvanceSAPMovement(float DeltaSeconds)
     ACombatGridTile* Next = bCanAdvance ? Arena->Grid->GetTileAtCoord(PlanningMovePath[PlanningMoveStep]) : nullptr;
     ACombatGridTile* Destination = bCanAdvance ? Arena->Grid->GetTileAtCoord(PlanningMovePath.Last()) : nullptr;
     bCanAdvance = bCanAdvance && IsValid(Unit) && Unit->IsUnitAlive() && IsValid(Origin) && Unit->GetCurrentTile() == Origin && Origin->GetOccupyingUnit() == Unit && IsValid(Next) && !Next->GetOccupyingUnit() && IsValid(Destination) && !Destination->GetOccupyingUnit();
-    const float Speed = bCanAdvance ? Unit->GetCharacterMovement()->MaxWalkSpeed : 0.f;
-    if (!bCanAdvance || !FMath::IsFinite(Speed) || Speed <= 0.f)
+    if (!bCanAdvance)
     {
         FinishPlanningMove(false);
     }
-    else if (MoveUnitToward(PlanningMoveIndex, Next->GetActorLocation(), Speed, DeltaSeconds))
+    else if (MoveUnitToward(PlanningMoveIndex, Next->GetActorLocation(), SAPMoveSpeed, DeltaSeconds))
     {
         ++PlanningMoveStep;
         if (PlanningMoveStep == PlanningMovePath.Num()) FinishPlanningMove(true);
