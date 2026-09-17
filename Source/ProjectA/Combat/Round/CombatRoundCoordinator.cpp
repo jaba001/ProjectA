@@ -1199,7 +1199,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
                 StartReturn(Index, true, RoundText(TEXT("접근 시간 초과로 불발")));
                 return;
             }
-            if (!MoveUnitToward(Index, Destination, Skill->MoveSpeed, StepSeconds)) return;
+            if (!MoveUnitToward(Index, Destination, CombatRoundRules::AttackMoveSpeed(*Skill, Entry.Speed), StepSeconds)) return;
             Action.PhaseStarted = SimulationTime;
             Entry.ActionPhase = ECombatRoundActionPhase::Casting;
             Entry.Status = RoundText(TEXT("시전 중"));
@@ -1250,7 +1250,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
             Entry.Status = RoundText(TEXT("복귀 시간 초과: 예약 칸으로 복원"));
             UE_LOG(LogTemp, Warning, TEXT("[Round] Return timeout Unit=%d Round=%d / 복귀 시간 초과"), Entry.UnitId, View.RoundNumber);
         }
-        else if (!MoveUnitToward(Index, Action.OriginalLocation, Skill->MoveSpeed, StepSeconds))
+        else if (!MoveUnitToward(Index, Action.OriginalLocation, CombatRoundRules::AttackMoveSpeed(*Skill, Entry.Speed), StepSeconds))
         {
             return;
         }

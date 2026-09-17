@@ -6,6 +6,15 @@ float CombatRoundRules::StartDelay(float HighestSpeed, float UnitSpeed)
     return static_cast<float>(FMath::Max(static_cast<double>(HighestSpeed) - UnitSpeed, 0.0) * 0.1);
 }
 
+float CombatRoundRules::AttackMoveSpeed(const FCombatRoundSkill& Skill, float RoundSpeed)
+{
+    if (Skill.Kind != ECombatRoundSkillKind::Melee) return Skill.MoveSpeed;
+    // Initial tuning halves the default rate at speed 10 and preserves movement at zero speed.
+    // 초기 조정값은 속도 10에서 기본 이동을 절반으로 낮추고 속도 0에서도 이동을 유지합니다.
+    const double Speed = FMath::IsFinite(RoundSpeed) ? FMath::Max(0.0, static_cast<double>(RoundSpeed)) : 0.0;
+    return static_cast<float>(FMath::Min(static_cast<double>(Skill.MoveSpeed) * (0.25 + Speed / 40.0), 100000.0));
+}
+
 bool CombatRoundRules::IsTerminal(ECombatRoundActionPhase Phase)
 {
     return Phase == ECombatRoundActionPhase::Complete || Phase == ECombatRoundActionPhase::Cancelled;

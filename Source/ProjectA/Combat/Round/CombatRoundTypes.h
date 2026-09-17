@@ -107,6 +107,8 @@ struct PROJECTA_API FCombatRoundSkill
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.1", ClampMax = "1000.0", EditCondition = "Kind == ECombatRoundSkillKind::Melee"))
     float MeleeRadius = 35.f;
 
+    // Melee approach and return apply the round speed scale to this authored movement rate.
+    // 근접 접근과 복귀는 이 작성 이동 속도에 라운드 속도 배율을 적용합니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     float MoveSpeed = 700.f;
 
@@ -238,6 +240,7 @@ struct PROJECTA_API FCombatRoundView
 namespace CombatRoundRules
 {
     PROJECTA_API float StartDelay(float HighestSpeed, float UnitSpeed);
+    PROJECTA_API float AttackMoveSpeed(const FCombatRoundSkill& Skill, float RoundSpeed);
     PROJECTA_API bool IsTerminal(ECombatRoundActionPhase Phase);
     PROJECTA_API bool IsOwnTerritory(bool bEnemy, FIntPoint Coord);
     PROJECTA_API bool IsValidSkill(const FCombatRoundSkill& Skill);

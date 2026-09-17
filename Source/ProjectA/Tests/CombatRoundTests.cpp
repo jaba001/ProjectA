@@ -1021,6 +1021,77 @@ bool FCombatRoundMovementTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundMeleeSpeedTest, "ProjectA.Combat.Round.MeleeMovementUsesRoundSpeed", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundMeleeSpeedTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FCombatRoundSkill BoundarySkill;
+    TestEqual(TEXT("Fractional round speed preserves fractional melee movement"), CombatRoundRules::AttackMoveSpeed(BoundarySkill, 10.5f), 358.75f);
+    TestEqual(TEXT("Extreme finite round speed is bounded before conversion to float"), CombatRoundRules::AttackMoveSpeed(BoundarySkill, std::numeric_limits<float>::max()), 100000.0f);
+    for (float InvalidSpeed : {-1.0f, std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()})
+    {
+        TestEqual(TEXT("Negative or nonfinite round speed retains the zero-speed movement floor"), CombatRoundRules::AttackMoveSpeed(BoundarySkill, InvalidSpeed), 175.0f);
+    }
+
+    // Measure authoritative displacement over fixed elapsed time instead of reproducing the speed formula.
+    // 속도 수식을 다시 계산하지 않고 정해진 경과 시간 동안의 서버 실제 이동 거리를 측정합니다.
+    const float RoundSpeeds[] = {0.0f, 5.0f, 10.0f, 10.0f};
+    const double ExpectedDistances[] = {17.5, 26.25, 35.0, 70.0};
+    for (int32 Case = 0; Case < UE_ARRAY_COUNT(RoundSpeeds); ++Case)
+    {
+        const bool bGroundAttack = Case == 3;
+        const FString Context = bGroundAttack ? TEXT("Non-melee tile movement") : FString::Printf(TEXT("Melee speed %.0f"), RoundSpeeds[Case]);
+        FCombatRoundSkill Skill;
+        Skill.MoveSpeed = 700.0f;
+        if (bGroundAttack)
+        {
+            Skill.Kind = ECombatRoundSkillKind::GroundAttack;
+            Skill.Approach = ECombatRoundApproach::Tile;
+            Skill.HitRange = 1000.0f;
+        }
+        FFixture Fixture;
+        if (!TestTrue(Context + TEXT(" initializes"), Fixture.Initialize(1, 0.0f, nullptr, FIntPoint(0, 3), 1, &Skill, RoundSpeeds[Case]))) return false;
+        ACombatRoundCoordinator* Round = Fixture.Round;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Target = Fixture.Enemies[0];
+        ACombatGridTile* Home = Source->GetCurrentTile();
+        const FVector Origin = Source->GetActorLocation();
+        FCombatRoundCommand Command = Fixture.Command(Source, Fixture.HumanSkillId, Target);
+        if (bGroundAttack) Command.DestinationCoord = FIntPoint(0, 1);
+        if (!TestTrue(Context + TEXT(" submits"), Fixture.Submit(0, Command)) || !TestTrue(Context + TEXT(" locks"), Fixture.Ready(0))) return false;
+        Round->Tick(0.1f);
+        TestTrue(Context + TEXT(" covers its expected approach distance in 0.1 seconds"), FMath::IsNearlyEqual(FVector::Dist2D(Origin, Source->GetActorLocation()), ExpectedDistances[Case], 0.01));
+        TestTrue(Context + TEXT(" keeps damage behind approach and windup"), Target->GetAttributeSet()->GetHP() == 100.0f && Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching);
+        if (Case == 2)
+        {
+            Source->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 20.0f);
+            const FVector BeforeChange = Source->GetActorLocation();
+            Round->Tick(0.1f);
+            TestEqual(TEXT("Live Dexterity changes immediately while the round snapshot stays fixed"), Source->GetCombatSpeed(), 20.0f);
+            TestEqual(TEXT("The active round retains its planned speed"), Round->GetView().Units[0].Speed, 10.0f);
+            TestTrue(TEXT("Changing Dexterity mid-approach does not accelerate the active movement"), FMath::IsNearlyEqual(FVector::Dist2D(BeforeChange, Source->GetActorLocation()), 35.0, 0.01));
+        }
+        for (int32 Step = 0; Step < 400 && Round->GetView().Phase == ECombatRoundPhase::Resolving && Round->GetView().Units[0].ActionPhase != ECombatRoundActionPhase::Returning; ++Step) Round->Tick(0.01f);
+        if (!TestTrue(Context + TEXT(" releases one attack before returning"), Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Returning && Target->GetAttributeSet()->GetHP() == 75.0f)) return false;
+        const FVector ReturnStart = Source->GetActorLocation();
+        Round->Tick(0.1f);
+        TestTrue(Context + TEXT(" uses the same planned speed for 0.1 seconds of return"), FMath::IsNearlyEqual(FVector::Dist2D(ReturnStart, Source->GetActorLocation()), ExpectedDistances[Case], 0.01));
+        TestTrue(Context + TEXT(" moves toward its reserved home during return"), FVector::DistSquared2D(Origin, Source->GetActorLocation()) < FVector::DistSquared2D(Origin, ReturnStart));
+        if (!TestTrue(Context + TEXT(" settles into the next round"), Fixture.AdvanceUntilNextRound(1))) return false;
+        TestTrue(Context + TEXT(" returns to the original tile with one damage application"), Source->GetCurrentTile() == Home && Source->GetActorLocation().Equals(Origin, 2.0f) && Target->GetAttributeSet()->GetHP() == 75.0f);
+        if (Case == 2)
+        {
+            TestEqual(TEXT("The next planning snapshot adopts the changed Dexterity"), Round->GetView().Units[0].Speed, 20.0f);
+            if (!TestTrue(TEXT("The next melee plan submits"), Fixture.Submit(0, Command)) || !TestTrue(TEXT("The next melee round locks"), Fixture.Ready(0))) return false;
+            const FVector NextOrigin = Source->GetActorLocation();
+            Round->Tick(0.1f);
+            TestTrue(TEXT("The next round travels 52.5 units in 0.1 seconds at speed 20"), FMath::IsNearlyEqual(FVector::Dist2D(NextOrigin, Source->GetActorLocation()), 52.5, 0.01));
+        }
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundReturnFacingTest, "ProjectA.Combat.Round.ReturnFacingBoundaries", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FCombatRoundReturnFacingTest::RunTest(const FString& Parameters)
@@ -1135,8 +1206,8 @@ bool FCombatRoundMontageRecoveryTest::RunTest(const FString& Parameters)
         {
             Fixture.Round->Tick(2.0f);
             if (!TestTrue(TEXT("The hitch leaves simulation debt while still approaching"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 100.0f))) return false;
-            Fixture.Round->Tick(0.01f);
-            if (!TestTrue(TEXT("Catching up debt can start the montage and release one hit in the next frame"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Recovery && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 83.0f))) return false;
+            for (int32 Frame = 0; Frame < 3 && Fixture.Round->GetView().Units[0].ActionPhase != ECombatRoundActionPhase::Recovery; ++Frame) Fixture.Round->Tick(0.01f);
+            if (!TestTrue(TEXT("Catching up debt starts the montage and releases one hit after the slower approach"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Recovery && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 83.0f))) return false;
             const FVector RecoveryLocation = Source->GetActorLocation();
             const FRotator RecoveryRotation = Source->GetActorRotation();
             for (int32 Step = 0; Step < 30; ++Step) Fixture.Round->Tick(0.01f);
