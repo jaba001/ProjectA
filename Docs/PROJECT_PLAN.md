@@ -182,7 +182,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 - `SkillDefinitionDataAsset.bUseRoundDefinition`과 `RoundDefinition`으로 스킬별 실제 시간·범위·접근·복귀·목표 상실·투사체 정책을 편집한다. 미지정 장착 스킬은 [GAME_DESIGN 8-7](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)의 초기 변환을 사용한다.
 - 시전 표현은 명시 프로필의 `RoundDefinition.CastMontage`를 우선하며 비어 있으면 `AbilityClass`의 기존 `AttackMontage`를 사용한다. 서버가 시전 진입 시 한 번 재생을 전달한다. 몽타주 재생 인스턴스의 루트 모션과 유닛의 기존 `AN_SkillRelease` 효과 발동은 차단하며, `WindupSeconds`·충돌·AP 계산과 발동 1회는 유지한다. 발동 후 `Recovery`에서 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝날 때까지 기다린 뒤 복귀한다. 서버의 재생 인스턴스를 사용할 수 없으면 에셋 길이/RateScale·블렌드 아웃·여유 시간 0.25초를 사용하며 시전 시작 기준 최대 60초로 제한한다. 반복·자동 종료 누락·잘못된 길이/속도로 무한 대기하지 않으며 시간 초과 시 남은 표현을 즉시 정리한다. 사망·중단·발동 전 취소·다음 행동 시작도 해당 인스턴스를 정리한다. [남은 확인](TODO.md#2-4-da-시전-몽타주-연결)
 - 몽타주 대기 시간은 서버가 받은 `DeltaSeconds`를 프레임당 한 번 누적하며 고정 간격 시뮬레이션의 미처리 시간과 분리한다. 프레임 지연 뒤 누적 시뮬레이션을 처리할 때 시전 대기까지 중복 차감하여 조기에 복귀하지 않도록 한다.
-- 기존 GAS 효과·모든 타일 범위·상태효과·회복약이 새 행동으로 완전 변환된 것은 아니다. 공통 시험 행동 6종과 무장착 기본 공격 fallback을 제거하고 실제 장착 DA만 라운드 스킬 목록에 넣는다. 현재 기본 콘텐츠는 사용자 기본 공격 DA만 유지한다.
+- 기존 GAS 효과·모든 타일 범위·상태효과·회복약이 새 행동으로 완전 변환된 것은 아니다. 공통 시험 행동 6종과 무장착 기본 공격 fallback을 제거하고 실제 장착 DA만 라운드 스킬 목록에 넣는다. 기존 기본 공격 장착은 유지하며 [새 원거리 공격](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)은 장착 연결 선택 대기다.
 - 서버의 실제 공격 충돌로 피격을 검사하며 별도 명중 확률·성공 슬롯·유닛 간 이동 충돌은 사용하지 않는다. 기본 공격 후 복귀하며 잔류 이동은 자기 진영으로 제한한다.
 - 복귀형 행동은 계획 잠금 시 시작 방향을 저장하고 원위치 도착·복귀 시간 초과 복원·제자리 완료 시 해당 방향과 정지 속도를 복원한다. 성공한 잔류 이동은 조준 방향을 유지한다. 서버의 최종 회전은 기존 Actor 이동 복제로 전달한다.
 - 복귀 칸 예약 충돌 거절·같은 시각 서버 순서·팀 준비 초기화는 임시 정책이며 사용자 확정을 기다린다.
@@ -223,7 +223,7 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 
 아래 에셋 경로는 모두 `/Game/User_JeHoon/` 기준이다. 디스크에서는 `Content/User_JeHoon/`에 대응한다. 기존 에셋에는 필수 수동 재연결 작업이 없다.
 
-DA 7개를 아래 유형별 폴더로 이동하고 독립 재로드에서 참조·구경로 해석을 확인했다. AssetTools가 이전 패키지를 제거했으며 기존 DataAsset 루트의 잔존 DA와 Redirector는 0개다.
+기존 DA 7개를 아래 유형별 폴더로 이동하고 독립 재로드에서 참조·구경로 해석을 확인했다. AssetTools가 이전 패키지를 제거했으며 기존 DataAsset 루트의 잔존 DA와 Redirector는 0개다. 새 `BPDA_RangedAttack`을 포함한 제작 DA는 총 8개다.
 
 | 에셋 경로 | 클래스 / 저장된 연결 |
 |---|---|
@@ -234,6 +234,7 @@ DA 7개를 아래 유형별 폴더로 이동하고 독립 재로드에서 참조
 | `Blueprint/DataAsset/Parties/DA_VerticalSliceParty` | `UPartyDefinitionDataAsset`, 네 직업과 공통 `BP_PlayerUnit` fallback |
 | `Blueprint/DataAsset/Encounters/DA_DefaultEncounter` | `UEncounterDefinitionDataAsset`, `EnemyUnitClasses[0]=BP_EnemyUnit` |
 | `Blueprint/DataAsset/Skills/BPDA_DefaulatAttack` | `USkillDefinitionDataAsset`, 사용자가 작성한 기본 공격. 객체 이름과 사용자가 저장한 이름·ID 보존 |
+| `Blueprint/DataAsset/Skills/BPDA_RangedAttack` | `USkillDefinitionDataAsset`, 기본 공격 복제. 별도 `Blueprint/GAS/Ability/BPGA_RangedAttack` 연결, 장착 연결 선택 대기 |
 | `Blueprint/DataAsset/Skills/BPDA_AreaAttack` | `USkillDefinitionDataAsset`, 미작성 범위 공격. 기존 EnemyTile 메타데이터 유지, 명시 RoundDefinition 미작성 상태에서는 자동 변환 거절 |
 | `Blueprint/DataAsset/Skills/DA_SweepingStrike` | `USkillDefinitionDataAsset`, 기존 추가 스킬 시험값 보존. 제작 완료·몽타주 연결 완료로 간주하지 않음 |
 | `Blueprint/DataAsset/SkillPools/DA_EncounterSkillPool` | `USkillPoolDataAsset`, 기존 추가 스킬 후보·가중치 유지 |

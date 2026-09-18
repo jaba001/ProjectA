@@ -43,7 +43,7 @@ C++·리플렉션·프로젝트 설정 변경 반영을 위해 빌드 후 UE를 
 
 장착한 스킬의 기존 `AbilityClass → AttackMontage`는 시전 시작 시 재생한다. `bUseRoundDefinition`을 사용하는 DA는 `RoundDefinition.CastMontage`로 재생할 몽타주를 우선 지정할 수 있다. 피해·발사는 기존 `WindupSeconds`와 서버 충돌 판정으로 한 번 처리하며, 복귀는 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝난 뒤 시작한다. 서버에서 표현을 갱신하지 못하면 에셋 길이·속도·블렌드 시간을 사용하며 시전 시작 기준 최대 60초의 대기 제한으로 반복·종료 누락을 정리한다. 메시·AnimBP의 Skeleton/Slot 연결이 필요하다.
 
-현재 사용자가 작성한 공격 DA는 기본 공격이며 사용자가 저장한 이름·ID를 유지한다. 스킬 목록은 실제 장착한 DA만 사용하고 공통 시험 행동 6종·무장착 시 자동 공격 부여·전투 진입 시 SkillPool 자동 추첨을 제거했다. 미작성 공격은 내용을 보존하며 새 수치·몽타주를 채우지 않는다. 제작 DA 7개는 `Blueprint/DataAsset` 아래 `Skills`·`Parties`·`Encounters`·`SkillPools`·`Snapshots`로 분류한다. 객체 이름·값·ID를 유지하고 기존 저장 파일의 소프트 경로는 정확한 패키지 리디렉션으로 연결한다. 상세는 [폴더 구성](Docs/PROJECT_PLAN.md#gameplay-에셋과-배치)을 따른다.
+기존 기본 공격의 이름·ID와 캐릭터 장착은 유지한다. 기본 공격을 복제한 `BPDA_RangedAttack`·`BPGA_RangedAttack`은 피해 50·AP 1의 제자리 투사체 공격이며 장착 연결은 선택 대기다. [공격 정의](Docs/GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)를 따른다. 스킬 목록은 실제 장착한 DA만 사용하고 공통 시험 행동 6종·무장착 시 자동 공격 부여·전투 진입 시 SkillPool 자동 추첨을 제거했다. 다른 미작성 공격은 내용을 보존한다. 제작 DA 8개는 `Blueprint/DataAsset` 아래 `Skills`·`Parties`·`Encounters`·`SkillPools`·`Snapshots`로 분류한다. 기존 저장 파일의 소프트 경로는 정확한 패키지 리디렉션으로 연결한다. 상세는 [폴더 구성](Docs/PROJECT_PLAN.md#gameplay-에셋과-배치)을 따른다.
 
 SAP 이동은 캐릭터마다 목적지 하나를 예약하며 민첩·`MaxWalkSpeed`와 무관하게 **350cm/s의 고정 속도**로 실행한다. 준비 전에는 변경·취소할 수 있고 실제 위치·자원은 바뀌지 않는다. 전체 준비 잠금 시 이동 SAP 1과 공격 비용을 합산하여 차감하고, 모든 예약 이동 완료 후 기존 속도차에 따라 AP 행동을 시작한다. 이동 완료 위치가 새 공격 복귀 칸이 된다. 8방향 빈 아군 칸 경로·소유권·서버 충돌·시전 몽타주 규칙은 유지한다.
 
