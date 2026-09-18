@@ -5,6 +5,7 @@
 #include "Controller/GameplayPlayerController.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
+#include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "Game/Encounter/CombatArena.h"
@@ -72,7 +73,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEncounterPreparationRetryTest, "ProjectA.Encou
 
 bool FEncounterPreparationRetryTest::RunTest(const FString& Parameters)
 {
-    AddExpectedError(TEXT("[Encounter]"), EAutomationExpectedErrorFlags::Contains, 2);
+    AddExpectedError(TEXT("\\[Encounter\\]"), EAutomationExpectedErrorFlags::Contains, 2);
     for (const ERunPhase FailedPhase : {ERunPhase::Preparing, ERunPhase::Combat})
     {
         EncounterPreparationTests::FFixture Fixture;
@@ -86,7 +87,7 @@ bool FEncounterPreparationRetryTest::RunTest(const FString& Parameters)
         if (!TestNotNull(TEXT("The local gameplay controller exists"), Controller)) return false;
         // Bind a transient local identity without SetPlayer's input, viewport and online initialization.
         // SetPlayer의 입력·뷰포트·온라인 초기화 없이 일시적인 로컬 플레이어 식별자만 연결합니다.
-        ULocalPlayer* LocalPlayer = NewObject<ULocalPlayer>(Fixture.Instance.Get());
+        ULocalPlayer* LocalPlayer = NewObject<ULocalPlayer>(GEngine);
         Controller->Player = LocalPlayer;
         LocalPlayer->PlayerController = Controller;
         if (!TestTrue(TEXT("The fixture controller is local before exercising public Run requests"), Controller->IsLocalController())) return false;
@@ -185,7 +186,9 @@ bool FEncounterContinueRetryTest::RunTest(const FString& Parameters)
     AEncounterManager* Encounter = Fixture.Encounter;
     Encounter->RunState = Fixture.Run.Get();
     Encounter->CombatManager = Fixture.Combat;
-    if (!TestTrue(TEXT("The first victory commits a result checkpoint"), Fixture.Run->BeginEncounter(TEXT("Combat_01")) && Fixture.Run->MarkCombatStarted() && Fixture.Run->CompleteEncounter(ECombatResult::Victory))) return false;
+    if (!TestTrue(TEXT("The Continue fixture enters combat before recording HP"), Fixture.Run->BeginEncounter(TEXT("Combat_01")) && Fixture.Run->MarkCombatStarted())) return false;
+    Fixture.Run->UpdatePartyMemberHP(0, 100.f);
+    if (!TestTrue(TEXT("The first victory commits a result checkpoint"), Fixture.Run->CompleteEncounter(ECombatResult::Victory))) return false;
     const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("Continue reports a failed save and remains retryable"), Encounter->ContinueRun());

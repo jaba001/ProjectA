@@ -8,6 +8,46 @@
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Misc/ScopeExit.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunLegacyCatalogPathTest, "ProjectA.Persistence.LegacyCatalogPath", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunLegacyCatalogPathTest::RunTest(const FString& Parameters)
+{
+    const FString Slot = TEXT("ProjectA_Automation_LegacyCatalog_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    ON_SCOPE_EXIT { UGameplayStatics::DeleteGameInSlot(Slot, 0); };
+    UGameInstance* Instance = NewObject<UGameInstance>();
+    URunStateSubsystem* Run = NewObject<URunStateSubsystem>(Instance);
+    Run->EnableCheckpointSaving(Slot);
+    Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+    FRunPartyMember Member;
+    Member.SlotIndex = 0;
+    Member.ClassId = TEXT("Warrior");
+    Member.CharacterName = FText::FromString(TEXT("Legacy Warrior"));
+    Member.bCreated = true;
+    Member.bPlayerControlled = true;
+    FText Error;
+    if (!TestTrue(TEXT("Create a supported noncombat checkpoint."), Run->InitializeRun({ Member }, Error))) return false;
+    URunSaveGame* Saved = Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
+    if (!TestNotNull(TEXT("Load the isolated legacy fixture."), Saved)) return false;
+    Saved->Catalog = FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+    if (!TestTrue(TEXT("Write the original pre-folder-move catalog path."), UGameplayStatics::SaveGameToSlot(Saved, Slot, 0))) return false;
+    TArray<uint8> Before;
+    UGameplayStatics::LoadDataFromSlot(Before, Slot, 0);
+    URunStateSubsystem* Restored = NewObject<URunStateSubsystem>(Instance);
+    Restored->EnableCheckpointSaving(Slot);
+    if (!TestTrue(TEXT("The supported legacy catalog path continues successfully."), Restored->LoadStandaloneCheckpoint(Error)))
+    {
+        AddError(Error.ToString());
+        return false;
+    }
+    TestEqual(TEXT("Redirect resolves the authored party catalog."), Restored->PartyDefinition.Get(), Run->PartyDefinition.Get());
+    TestTrue(TEXT("Map and direct-control selection survive legacy loading."), Restored->GetPhase() == ERunPhase::Map && Restored->GetPartyMembers()[0].bPlayerControlled);
+    TArray<uint8> After;
+    UGameplayStatics::LoadDataFromSlot(After, Slot, 0);
+    TestTrue(TEXT("Loading the legacy save preserves its exact durable bytes."), Before == After);
+    return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunSnapshotCheckpointIsolationTest, "ProjectA.Persistence.SnapshotCheckpointIsolation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 
@@ -161,10 +201,14 @@ bool FRunRestartTest::RunTest(const FString& Parameters)
     }
     UGameInstance* Instance = NewObject<UGameInstance>();
     URunStateSubsystem* Run = NewObject<URunStateSubsystem>(Instance);
-    Run->EnableCheckpointSaving(TEXT("T11_ProcessRestart"));
+    FString RestartSlot = TEXT("T11_ProcessRestart");
+    FParse::Value(FCommandLine::Get(), TEXT("T11CheckpointSlot="), RestartSlot);
+    if (!TestTrue(TEXT("Cross-process tests use an isolated fixture slot."), RestartSlot == TEXT("T11_ProcessRestart") || RestartSlot.StartsWith(TEXT("ProjectA_Automation_Restart_")))) return false;
+    Run->EnableCheckpointSaving(RestartSlot);
     FText Error;
     if (FParse::Param(FCommandLine::Get(), TEXT("T11WriteCheckpoint")))
     {
+        if (!TestFalse(TEXT("The writer cannot overwrite a pre-existing fixture."), UGameplayStatics::DoesSaveGameExist(RestartSlot, 0))) return false;
         Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
         FRunPartyMember Member;
         Member.SlotIndex = 1;
@@ -192,7 +236,7 @@ bool FRunRestartTest::RunTest(const FString& Parameters)
     }
     else
     {
-        const URunSaveGame* Saved = Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("T11_ProcessRestart"), 0));
+        const URunSaveGame* Saved = Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(RestartSlot, 0));
         if (!TestNotNull(TEXT("Independent process reads the writer's SaveGame"), Saved) || !TestEqual(TEXT("Restart fixture uses save version two"), Saved->Version, 2))
         {
             return false;
@@ -223,7 +267,7 @@ bool FRunRestartTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Restored result continues"), Run->ContinueRun());
         TestTrue(TEXT("Restored choices lead through a shop"), Run->SelectRunEncounter(TEXT("Shop_02")) && Run->LeaveRunEncounter());
         TestTrue(TEXT("Restored progress opens second node"), Run->CanStartNode(TEXT("Combat_02")));
-        UGameplayStatics::DeleteGameInSlot(TEXT("T11_ProcessRestart"), 0);
+        UGameplayStatics::DeleteGameInSlot(RestartSlot, 0);
     }
     return true;
 }

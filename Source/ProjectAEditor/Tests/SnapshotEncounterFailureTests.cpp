@@ -3,6 +3,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Combat/CombatManager.h"
+#include "Combat/Round/CombatRoundCoordinator.h"
 #include "DataAsset/EncounterDefinitionDataAsset.h"
 #include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
 #include "Editor.h"
@@ -136,11 +137,13 @@ public:
         Member.MemberId = TEXT("FirstOpponent");
         Member.ClassId = TEXT("Archer");
         Member.CharacterName = TEXT("First opponent");
+        Member.Stats.Dexterity = 12.5f;
         Member.SkillIds.Add(Mode->LocalOpponentCatalog->Skills.CreateConstIterator().Key());
         Snapshot.Members.Add(Member);
         Member.MemberId = TEXT("SecondOpponent");
         Member.CharacterName = TEXT("Second opponent");
         Member.FormationSlot = 1;
+        Member.Stats.Dexterity = 5.25f;
         Snapshot.Members.Add(Member);
         if (!Test->TestTrue(TEXT("Distinct formation slots pass snapshot/catalog validation."), Mode->LocalOpponentCatalog->ValidateForEncounter(Snapshot, Arena->EnemyCoords.Num(), Error)) || !Test->TestTrue(TEXT("The valid formation fixture is saved."), UPartySnapshotLibrary::SaveSnapshot(SlotId, Snapshot, Error)))
         {
@@ -151,6 +154,13 @@ public:
         const FText FormationError = FText::FromString(TEXT("Opponent Snapshot formation requires distinct empty enemy tiles. / 상대 스냅샷 배치에는 중복되지 않는 빈 적 타일이 필요합니다."));
         CheckRejected(TEXT("Duplicate physical formation tile"), FormationError, Encounter, Combat, Arena, Run);
         Arena->EnemyCoords[1] = OriginalSecondCoord;
+        if (!Test->TestTrue(TEXT("Repairing the formation starts the saved Snapshot encounter."), Encounter->RequestStartNode(Run->GetNodes()[0].NodeId))) return true;
+        ACombatRoundCoordinator* Round = Combat->GetRoundCoordinator();
+        if (!Test->TestNotNull(TEXT("Restored Snapshot units enter the actual round coordinator."), Round)) return true;
+        const FCombatRoundUnitView* Fast = Round->GetView().Units.FindByPredicate([](const auto& Unit) { return Unit.bEnemy && FMath::IsNearlyEqual(Unit.Speed, 12.5f); });
+        const FCombatRoundUnitView* Slow = Round->GetView().Units.FindByPredicate([](const auto& Unit) { return Unit.bEnemy && FMath::IsNearlyEqual(Unit.Speed, 5.25f); });
+        const FCombatRoundUnitView* PlayerView = Round->GetView().Units.FindByPredicate([](const auto& Unit) { return !Unit.bEnemy; });
+        Test->TestTrue(TEXT("Snapshot restoration retains fractional Dexterity and action delays."), Fast && Slow && PlayerView && FMath::IsNearlyZero(Fast->StartDelay) && FMath::IsNearlyEqual(Slow->StartDelay, 0.725f) && FMath::IsNearlyEqual(PlayerView->StartDelay, 0.25f));
         return true;
     }
 

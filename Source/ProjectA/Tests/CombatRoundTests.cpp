@@ -1196,9 +1196,10 @@ bool FCombatRoundMontageRecoveryTest::RunTest(const FString& Parameters)
     Montage->BlendOut.SetBlendTime(0.1f);
     Montage->bEnableAutoBlendOut = true;
     for (FCompositeSection& Section : Montage->CompositeSections) Section.NextSectionName = NAME_None;
-    AddExpectedError(TEXT("[RoundAnimation] Montage playback failed"), EAutomationExpectedErrorFlags::Contains, 4, false);
-    for (int32 Case = 0; Case < 5; ++Case)
+    for (int32 Case = 0; Case < 7; ++Case)
     {
+        Montage->RateScale = Case == 6 ? 0.f : Montage->GetPlayLength();
+        for (FCompositeSection& Section : Montage->CompositeSections) Section.NextSectionName = Case == 5 ? Section.SectionName : NAME_None;
         const FString Context = Case == 0 ? TEXT("Montage recovery") : Case == 1 ? TEXT("Windup already consumes montage duration") : Case == 2 ? TEXT("No montage") : Case == 3 ? TEXT("Target dies before release") : TEXT("Hitch before montage starts");
         FCombatRoundSkill Skill;
         Skill.CastMontage = Case == 2 ? nullptr : Montage.Get();
@@ -1213,6 +1214,12 @@ bool FCombatRoundMontageRecoveryTest::RunTest(const FString& Parameters)
         Source->SetActorRotation(OriginalRotation);
         if (!TestNull(Context + TEXT(" uses the no-AnimInstance recovery path"), Source->GetMesh()->GetAnimInstance())) return false;
         if (!TestTrue(Context + TEXT(" submits"), Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Target))) || !TestTrue(Context + TEXT(" locks"), Fixture.Ready(0))) return false;
+        if (Case >= 5)
+        {
+            if (!TestTrue(TEXT("A looping or invalid-rate montage settles before the finite deadline."), Fixture.AdvanceUntilNextRound(1))) return false;
+            TestTrue(TEXT("Bounded recovery restores home without duplicate damage."), Source->GetActorLocation().Equals(Origin, 2.f) && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 83.f));
+            continue;
+        }
         if (Case == 4)
         {
             Fixture.Round->Tick(2.0f);

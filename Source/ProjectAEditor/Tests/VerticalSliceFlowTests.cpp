@@ -3,6 +3,8 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Animation/AnimSingleNodeInstance.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Blueprint/WidgetTree.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "Components/Button.h"
@@ -17,6 +19,10 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Editor.h"
 #include "Engine/GameInstance.h"
+#include "Engine/GameViewportClient.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SViewport.h"
+#include "Widgets/SWindow.h"
 #include "Engine/World.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "GAS/Attribute/AS_Unit.h"
@@ -27,6 +33,9 @@
 #include "Misc/Paths.h"
 #include "Misc/ScopeExit.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "PlayInEditorDataTypes.h"
+#include "Settings/LevelEditorPlaySettings.h"
+#include "UObject/StrongObjectPtr.h"
 #include "UI/Combat/CombatRoundPlanningWidget.h"
 #include "UI/Gameplay/GameplayActionButton.h"
 #include "UI/Gameplay/RunMapWidget.h"
@@ -152,6 +161,12 @@ public:
                             UWidget* Info = Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_ClassInfo"), Index)));
                             const FGeometry& Geometry = Info->GetCachedGeometry();
                             Test->TestTrue(TEXT("Every ClassInfo button fits inside the creation screen."), Geometry.LocalToAbsolute(Geometry.GetLocalSize()).Y <= ScreenBottom + 1.0f);
+                            AActor* Actor = Menu->GetPreviewStage()->GetPreviewActorForSlot(Index);
+                            USkeletalMeshComponent* Mesh = Actor ? Actor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+                            UAnimSingleNodeInstance* Animation = Mesh ? Mesh->GetSingleNodeInstance() : nullptr;
+                            if (!Require(Animation && Animation->IsPlaying() && Animation->IsLooping(), TEXT("Every preview runs its looping idle animation."))) return true;
+                            Animation->SetPosition(Animation->GetLength() - 0.1f, false);
+                            PreviewAnimationLengths[Index] = Animation->GetLength();
                         }
                         Capture(TEXT("00-FourPreviews.png"));
                         PreviewCaptureStage = 2;
@@ -160,7 +175,12 @@ public:
                     }
                     for (int32 Index = 0; Index < 4; ++Index)
                     {
+                        AActor* Actor = Menu->GetPreviewStage()->GetPreviewActorForSlot(Index);
+                        USkeletalMeshComponent* Mesh = Actor ? Actor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+                        UAnimSingleNodeInstance* Animation = Mesh ? Mesh->GetSingleNodeInstance() : nullptr;
+                        Test->TestTrue(TEXT("Idle animation advances through its loop boundary in the real preview world."), Animation && Animation->IsPlaying() && Animation->GetCurrentTime() < PreviewAnimationLengths[Index] - 0.1f);
                         Cast<UButton>(Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_Delete"), Index))))->OnClicked.Broadcast();
+                        Test->TestNull(TEXT("Deleting the slot removes its animated preview actor."), Menu->GetPreviewStage()->GetPreviewActorForSlot(Index));
                     }
                     PreviewCaptureStage = 3;
                 }
@@ -457,10 +477,11 @@ private:
     int32 PreviewCaptureStage = 0;
     bool bProfessionCaptured = false;
     double ProfessionPanelTime = 0.0;
+    float PreviewAnimationLengths[4] = {};
 };
 
-// Drive saved-menu buttons and the public target delegate; operating-system mouse hit testing is separate.
-// 저장된 메뉴 버튼과 공개 대상 선택 델리게이트를 사용하며 운영체제 마우스 히트 테스트는 별개입니다.
+// Drive saved-menu buttons and send one Slate click through viewport hit testing and controller input.
+// 저장된 메뉴 버튼을 사용하고 Slate 클릭 한 번을 뷰포트 히트 테스트와 컨트롤러 입력으로 전달합니다.
 class FPlaySavedSkillLoadout : public IAutomationLatentCommand
 {
 public:
@@ -471,11 +492,28 @@ public:
     virtual ~FPlaySavedSkillLoadout() override
     {
         if (ObservedTargetASC.IsValid()) ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UAS_Unit::GetHPAttribute()).Remove(HPChangedHandle);
+        if (bMovedCursor && FSlateApplication::IsInitialized()) FSlateApplication::Get().SetCursorPos(PreviousCursor);
     }
 
     virtual bool Update() override
     {
         if (StageStarted == 0.0) StageStarted = FPlatformTime::Seconds();
+        if (!bRequestedPIE)
+        {
+            PlaySettings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
+            PlaySettings->SetPlayNetMode(PIE_Standalone);
+            PlaySettings->SetPlayNumberOfClients(1);
+            const FIntPoint Sizes[] = { FIntPoint(1280, 720), FIntPoint(1024, 768), FIntPoint(1600, 720), FIntPoint(1280, 800) };
+            PlaySettings->NewWindowWidth = Sizes[SkillIndex].X;
+            PlaySettings->NewWindowHeight = Sizes[SkillIndex].Y;
+            FRequestPlaySessionParams Params;
+            Params.EditorPlaySettings = PlaySettings.Get();
+            Params.bAllowOnlineSubsystem = false;
+            Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/MainMenu");
+            GEditor->RequestPlaySession(Params);
+            bRequestedPIE = true;
+            return false;
+        }
         if (FPlatformTime::Seconds() - StageStarted > 60.0)
         {
             Test->AddError(FString::Printf(TEXT("Saved skill PIE timed out at stage %d for %s. %s"), Stage, *Skills[SkillIndex].SkillId.ToString(), *UIReadiness));
@@ -546,6 +584,7 @@ public:
             if (!Run) return false;
             if (Round && Round->GetView().PendingProjectiles > 0) bSawProjectile = true;
             if (Source.IsValid() && Source->GetCurrentActionPoint() == InitialAP - Skills[SkillIndex].ActionPointCost) bSawAPCost = true;
+            if (Source.IsValid() && Skills[SkillIndex].Kind == ECombatRoundSkillKind::Projectile && !Source->GetActorLocation().Equals(ActionOrigin, 0.1f)) bRangedStayedAtOrigin = false;
             const bool bSettled = Run->GetPhase() == ERunPhase::Result || (Round && (Round->GetView().Phase == ECombatRoundPhase::Finished || (Round->GetView().Phase == ECombatRoundPhase::Planning && Round->GetView().RoundNumber > InitialRound)));
             if (!bSettled) return false;
             const float ExpectedHP = FMath::Max(0.f, InitialTargetHP - Skills[SkillIndex].Power);
@@ -553,6 +592,7 @@ public:
             Require(bSawAPCost, TEXT("The selected skill consumes its authored AP cost."));
             Require(!Round || Round->GetView().PendingProjectiles == 0, TEXT("The round settles with no pending projectile."));
             if (Skills[SkillIndex].Kind == ECombatRoundSkillKind::Projectile) Require(bSawProjectile, TEXT("The ranged skill creates an actual in-flight round projectile."));
+            if (Skills[SkillIndex].Kind == ECombatRoundSkillKind::Projectile) Require(bRangedStayedAtOrigin, TEXT("The ranged caster stays at its original position through cast, projectile flight and round completion."));
             Test->AddInfo(FString::Printf(TEXT("Saved skill used: %s (%s), enemy HP %.1f -> %.1f, HP changes %d, projectile observed %s."), *Skills[SkillIndex].Name.ToString(), *Skills[SkillIndex].SkillId.ToString(), InitialTargetHP, LowestTargetHP, HPChangeCount, bSawProjectile ? TEXT("yes") : TEXT("no")));
             return true;
         }
@@ -592,6 +632,28 @@ public:
             TargetId = Target->UnitId;
             TargetCoord = Target->HomeCoord;
             InitialTargetHP = LowestTargetHP = Target->Unit->GetAttributeSet()->GetHP();
+            UGameViewportClient* Viewport = World->GetGameViewport();
+            const TSharedPtr<SViewport> ViewportWidget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
+            FVector2D Pixel;
+            if (!Require(ViewportWidget.IsValid() && Viewport->Viewport && Controller->ProjectWorldLocationToScreen(Target->Unit->GetActorLocation(), Pixel), TEXT("The actual enemy projects into the game viewport."))) return true;
+            FSlateApplication& Slate = FSlateApplication::Get();
+            const FGeometry& Geometry = ViewportWidget->GetCachedGeometry();
+            const FIntPoint Size = Viewport->Viewport->GetSizeXY();
+            const FVector2D Cursor = Geometry.LocalToAbsolute(Pixel * Geometry.GetLocalSize() / FVector2D(Size));
+            if (!bMovedCursor) PreviousCursor = Slate.GetCursorPos();
+            bMovedCursor = true;
+            Slate.SetAllUserFocusToGameViewport(EFocusCause::SetDirectly);
+            Slate.SetCursorPos(Cursor);
+            Viewport->Viewport->SetMouse(FMath::RoundToInt(Pixel.X), FMath::RoundToInt(Pixel.Y));
+            const TSharedPtr<SWindow> Window = Slate.FindWidgetWindow(ViewportWidget.ToSharedRef());
+            if (!Require(Window.IsValid(), TEXT("The game viewport has a Slate window for one real input click."))) return true;
+            const TSet<FKey> Pressed = { EKeys::LeftMouseButton };
+            const TSet<FKey> Released;
+            Slate.ProcessMouseMoveEvent(FPointerEvent(0, Cursor, PreviousCursor, Released, EKeys::Invalid, 0, FModifierKeysState()));
+            const FWidgetPath CursorPath = Slate.LocateWindowUnderMouse(Cursor, Slate.GetInteractiveTopLevelWindows());
+            // CommonUI blocks input during screen transitions; wait for the viewport before the single press.
+            // CommonUI 화면 전환 중에는 입력이 차단되므로 클릭 한 번 전에 뷰포트 입력 준비를 기다립니다.
+            if (!CursorPath.IsValid() || CursorPath.GetLastWidget() != ViewportWidget.ToSharedRef()) return false;
             ObservedTargetASC = Target->Unit->GetAbilitySystemComponent();
             HPChangedHandle = ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UAS_Unit::GetHPAttribute()).AddLambda([this](const FOnAttributeChangeData& Data)
             {
@@ -601,12 +663,22 @@ public:
                     ++HPChangeCount;
                 }
             });
-            Controller->OnRoundWorldTileClicked.Broadcast(TargetCoord);
+            Test->AddInfo(FString::Printf(TEXT("Single click pixel=%s cursor=%s viewport=%s hit=%s"), *Pixel.ToString(), *Cursor.ToString(), *Geometry.GetLocalSize().ToString(), CursorPath.IsValid() ? *CursorPath.GetLastWidget()->GetTypeAsString() : TEXT("none")));
+            Slate.ProcessMouseButtonDownEvent(Window->GetNativeWindow(), FPointerEvent(0, Cursor, Cursor, Pressed, EKeys::LeftMouseButton, 0, FModifierKeysState()));
+            ClickPosition = Cursor;
+            bMousePressed = true;
             Advance();
             return false;
         }
         if (Stage == 5)
         {
+            if (bMousePressed)
+            {
+                const TSet<FKey> Released;
+                FSlateApplication::Get().ProcessMouseButtonUpEvent(FPointerEvent(0, ClickPosition, ClickPosition, Released, EKeys::LeftMouseButton, 0, FModifierKeysState()));
+                bMousePressed = false;
+                return false;
+            }
             if (FPlatformTime::Seconds() - StageStarted < 0.25) return false;
             TArray<UWidget*> Widgets;
             Planning->WidgetTree->GetAllWidgets(Widgets);
@@ -657,6 +729,7 @@ public:
                 if (!Label || Label->GetText().ToString() != TEXT("준비 완료")) continue;
                 if (!Require(Button->GetIsEnabled() && IsDisplayed(Button), TEXT("The actual Ready button accepts the final skill plan."))) return true;
                 InitialAP = Source->GetCurrentActionPoint();
+                ActionOrigin = Source->GetActorLocation();
                 InitialRound = Round->GetView().RoundNumber;
                 Button->OnClicked.Broadcast();
                 bSawAPCost = Source.IsValid() && Source->GetCurrentActionPoint() == InitialAP - Skills[SkillIndex].ActionPointCost;
@@ -739,6 +812,14 @@ private:
     int32 InitialRound = 0;
     bool bSawAPCost = false;
     bool bSawProjectile = false;
+    bool bRangedStayedAtOrigin = true;
+    FVector ActionOrigin;
+    bool bMovedCursor = false;
+    FVector2D PreviousCursor;
+    FVector2D ClickPosition;
+    bool bMousePressed = false;
+    bool bRequestedPIE = false;
+    TStrongObjectPtr<ULevelEditorPlaySettings> PlaySettings;
 };
 
 // Delete only the unique slot whose absence was checked before any PIE command was queued.
@@ -810,11 +891,10 @@ bool FVerticalSliceSavedSkillLoadoutTest::RunTest(const FString& Parameters)
         }
         Skills.Add(Skill);
     }
-    AddInfo(TEXT("Runs four real saved-menu/encounter PIE sessions through button delegates and the public target delegate; does not synthesize operating-system mouse input."));
+    AddInfo(TEXT("Runs four saved-menu/encounter PIE sessions; enemy selection uses one Slate mouse press/release through the viewport and controller, skill/menu buttons use their delegates."));
     for (int32 Index = 0; Index < Skills.Num(); ++Index)
     {
         ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/MainMenu")));
-        ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
         FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectAVerticalSliceTests::FPlaySavedSkillLoadout>(this, Skills, Index));
         ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
     }

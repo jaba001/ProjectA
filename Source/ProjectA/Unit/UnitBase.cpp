@@ -134,6 +134,13 @@ void AUnitBase::SetRoundMovementVelocity(const FVector& InVelocity)
 
 void AUnitBase::SetRoundCastMontage(UAnimMontage* Montage, bool bImmediateStop)
 {
+    // Actor destruction is replicated separately; do not send cosmetic RPCs from a closing actor.
+    // 액터 파괴는 별도로 복제되므로 종료 중인 액터에서 표현 RPC를 보내지 않습니다.
+    if (IsActorBeingDestroyed())
+    {
+        StopRoundCastMontage(0.f);
+        return;
+    }
     if (HasAuthority()) MulticastSetRoundCastMontage(Montage, bImmediateStop);
 }
 
