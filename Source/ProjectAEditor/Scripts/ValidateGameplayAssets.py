@@ -27,15 +27,16 @@ check(set(str(key) for key in player_classes) == {"Warrior", "Mage", "Archer", "
 check(all(value for value in player_classes.values()), "Every ClassId has a PlayerUnit class")
 encounters = mode.get_editor_property("encounter_definitions")
 check(unreal.Name("DefaultEncounter") in encounters, "DefaultEncounter is mapped")
-check(len(encounters[unreal.Name("DefaultEncounter")].get_editor_property("enemy_unit_classes")) == 1, "DefaultEncounter has one configured enemy")
+check(len(encounters[unreal.Name("DefaultEncounter")].get_editor_property("enemy_unit_classes")) == 4, "DefaultEncounter has four configured test enemies")
 controller = unreal.get_default_object(mode.get_editor_property("player_controller_class"))
 check(isinstance(controller, unreal.GameplayPlayerController), "Gameplay controller derives from GameplayPlayerController")
 root_class = check(controller.get_editor_property("gameplay_root_widget_class"), "Gameplay root widget class is assigned")
 root = unreal.get_default_object(root_class)
 check(isinstance(root, unreal.GameplayRootWidget), "Gameplay root derives from GameplayRootWidget")
-for property_name, expected_class in [("run_map_widget_class", unreal.RunMapWidget), ("combat_hud_widget_class", unreal.CombatHUDWidget), ("result_widget_class", unreal.EncounterResultWidget)]:
+for property_name, expected_class in [("run_map_widget_class", unreal.RunMapWidget), ("result_widget_class", unreal.EncounterResultWidget)]:
     widget_class = check(root.get_editor_property(property_name), property_name + " is assigned")
     check(isinstance(unreal.get_default_object(widget_class), expected_class), property_name + " has the expected native parent")
+check(unreal.load_class(None, "/Script/ProjectA.CombatRoundPlanningWidget"), "Native round planning screen is available")
 
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors()
 arenas = [actor for actor in actors if isinstance(actor, unreal.CombatArena)]
@@ -46,6 +47,7 @@ grid = grids[0]
 check(arena.get_editor_property("grid") == grid, "Arena references the Gameplay grid")
 check(isinstance(arena.get_editor_property("camera_anchor"), unreal.CameraActor), "Arena references a placed CameraActor")
 check(len(arena.get_editor_property("player_coords")) == 4, "Arena supports four party slots")
+check([(coord.x, coord.y) for coord in arena.get_editor_property("enemy_coords")] == [(1, 2), (2, 2), (0, 3), (3, 3)], "Test enemies occupy two front and two rear tiles")
 check(grid.get_editor_property("tile_class"), "Grid tile class is assigned")
 check(grid.get_editor_property("row_count") == 4 and grid.get_editor_property("col_count") == 4, "Grid has the expected 4 x 4 dimensions")
 check(any(actor.get_class().get_path_name() == "/Script/NavigationSystem.NavMeshBoundsVolume" for actor in actors), "Gameplay retains navigation bounds")

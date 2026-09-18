@@ -73,7 +73,7 @@ party = create_data_asset(OUTPUTS["party"], party_class)
 party.set_editor_property("fallback_player_unit_class", player_class)
 party.set_editor_property("player_unit_classes", {unreal.Name(name): player_class for name in ["Warrior", "Mage", "Archer", "Rogue"]})
 encounter = create_data_asset(OUTPUTS["encounter"], encounter_class)
-encounter.set_editor_property("enemy_unit_classes", [enemy_class])
+encounter.set_editor_property("enemy_unit_classes", [enemy_class] * 4)
 
 # Designer widgets are optional; native fallbacks remain usable without generated WBP assets.
 # Designer 위젯은 선택 사항이며 WBP 에셋이 없어도 native fallback을 사용할 수 있습니다.
@@ -124,7 +124,7 @@ arena.set_actor_label("GameplayCombatArena")
 arena.set_editor_property("grid", grid)
 arena.set_editor_property("camera_anchor", camera)
 arena.set_editor_property("player_coords", [unreal.IntPoint(index, 1) for index in range(4)])
-arena.set_editor_property("enemy_coords", [unreal.IntPoint(index, 2) for index in range(4)])
+arena.set_editor_property("enemy_coords", [unreal.IntPoint(1, 2), unreal.IntPoint(2, 2), unreal.IntPoint(0, 3), unreal.IntPoint(3, 3)])
 
 for asset in assets_to_save:
     require(unreal.EditorAssetLibrary.save_loaded_asset(asset, only_if_is_dirty=False), "Asset save failed: " + asset.get_path_name())
