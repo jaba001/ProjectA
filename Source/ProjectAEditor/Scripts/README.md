@@ -66,3 +66,12 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateRangedAttack.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateRangedAttack.py") -RangedAttackVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
+
+8. `ConfigureSweepingStrike.py`: 기존 휩쓸기만 근접 `TargetAndSides`(대상과 양옆 한 칸)로 갱신한다. 위력·AP·기존 몽타주는 보존하며 빈 몽타주는 기본공격에서 재사용한다. `-SweepingStrikeVerifyOnly`는 저장 결과만 읽는다. `ConfigureCombatContent.py`의 생성 경로도 같은 설정 함수를 사용한다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureSweepingStrike.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureSweepingStrike.py") -SweepingStrikeVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+```
+
+새 회귀 `ProjectA.Combat.Round.MeleeTargetAndSides`는 범위·가장자리·차폐·근접 왕복을 검사한다. 최신 코드에서 컴파일만 확인했으며 작동 실행은 [TODO](../../../Docs/TODO.md#2-12-휩쓸기-근접-대상과-양옆)에 남긴다.

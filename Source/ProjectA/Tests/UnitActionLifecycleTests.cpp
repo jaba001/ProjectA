@@ -234,6 +234,12 @@ bool FCombatRoundSkillMigrationTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("An unrelated legacy ability does not invalidate an explicit profile"), PresentationSkill->ResolveRoundSkill(Resolved, Error));
         TestNull(TEXT("An unrelated legacy ability provides no attack montage"), Resolved.CastMontage.Get());
     }
+    Skill->AreaType = ESkillAreaType::TargetAndSides;
+    Skill->bMoveToTarget = true;
+    TestTrue(TEXT("Target and adjacent sides migrate as an approaching melee attack"), Skill->ResolveRoundSkill(Resolved, Error));
+    TestTrue(TEXT("Migration retains the side pattern and melee approach"), Resolved.Kind == ECombatRoundSkillKind::Melee && Resolved.MeleeArea == ESkillAreaType::TargetAndSides && Resolved.Approach == ECombatRoundApproach::Unit);
+    Skill->bMoveToTarget = false;
+    TestFalse(TEXT("A stationary legacy side attack requires an explicit profile"), Skill->ResolveRoundSkill(Resolved, Error));
     Skill->AreaType = ESkillAreaType::AroundSelf;
     TestFalse(TEXT("Legacy self-centered area requires explicit semantics"), Skill->ResolveRoundSkill(Resolved, Error));
     Skill->AreaType = ESkillAreaType::AroundTarget;

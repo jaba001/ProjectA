@@ -1,4 +1,10 @@
+import sys
+from pathlib import Path
+
 import unreal
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ConfigureSweepingStrike import configure_sweeping_strike
 
 # Author the encounter-local training reward without replacing existing combat assets.
 # 기존 전투 에셋을 교체하지 않고 전투 한정 훈련 보상을 작성합니다.
@@ -19,13 +25,10 @@ def asset(name, cls, folder):
 skill = asset("DA_SweepingStrike", unreal.SkillDefinitionDataAsset, "Skills")
 skill.set_editor_property("skill_id", "SweepingStrike")
 skill.set_editor_property("skill_name", "휩쓸기")
-skill.set_editor_property("skill_description", "대상 주변 1칸의 적에게 피해 10. AP 1.")
 skill.set_editor_property("ability_class", unreal.GA_AreaAttack)
 skill.set_editor_property("action_point_cost", 1)
 skill.set_editor_property("target_rule", unreal.SkillTargetRule.ENEMY_UNIT)
-skill.set_editor_property("area_type", unreal.SkillAreaType.AROUND_TARGET)
-skill.set_editor_property("area_radius", 1)
-skill.set_editor_property("move_to_target", False)
+configure_sweeping_strike(skill)
 pool = asset("DA_EncounterSkillPool", unreal.SkillPoolDataAsset, "SkillPools")
 entry = unreal.SkillPoolEntry()
 entry.set_editor_property("skill", skill)

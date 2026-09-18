@@ -108,7 +108,7 @@ TArray<AUnitBase*> UCombatTargetingLibrary::CollectUniqueAliveUnitsFromTiles(con
 
 bool UCombatTargetingLibrary::IsSupportedSkillArea(const USkillDefinitionDataAsset* SkillData)
 {
-    return IsValid(SkillData) && SkillData->AreaRadius >= 0 && (SkillData->AreaType == ESkillAreaType::Single || SkillData->AreaType == ESkillAreaType::AroundTarget || SkillData->AreaType == ESkillAreaType::AroundSelf);
+    return IsValid(SkillData) && SkillData->AreaRadius >= 0 && (SkillData->AreaType == ESkillAreaType::Single || SkillData->AreaType == ESkillAreaType::AroundTarget || SkillData->AreaType == ESkillAreaType::AroundSelf || SkillData->AreaType == ESkillAreaType::TargetAndSides);
 }
 
 ACombatGridTile* UCombatTargetingLibrary::ResolveSkillAreaCenter(const AUnitBase* SourceUnit, const USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile)
@@ -165,7 +165,14 @@ TArray<AUnitBase*> UCombatTargetingLibrary::ResolveSkillAreaTargets(AUnitBase* S
         {
             return Result;
         }
-        Tiles = Grid->GetTilesInChebyshevRange(Center, SkillData->AreaRadius);
+        if (SkillData->AreaType == ESkillAreaType::TargetAndSides)
+        {
+            for (int32 Offset = -1; Offset <= 1; ++Offset) Tiles.Add(Grid->GetTileAtCoord(Center->GridCoord + FIntPoint(Offset, 0)));
+        }
+        else
+        {
+            Tiles = Grid->GetTilesInChebyshevRange(Center, SkillData->AreaRadius);
+        }
     }
     for (ACombatGridTile* Tile : Tiles)
     {

@@ -29,5 +29,6 @@ enum class ESkillAreaType : uint8
     DiagonalTarget,
     AroundTarget,
     AroundSelf,
-    AllEnemies
+    AllEnemies,
+    TargetAndSides
 };

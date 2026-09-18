@@ -131,6 +131,36 @@ namespace
         return FirstUnit;
     }
 
+    TArray<AUnitBase*> FindMeleeSideCollisions(UWorld* World, AUnitBase* Source, const TArray<FCombatRoundUnitView>& Units, const FCombatRoundSkill& Skill, ACombatGridManager* Grid, FIntPoint TargetCoord, FVector Center)
+    {
+        TArray<AUnitBase*> Hits;
+        ACombatGridTile* TargetTile = IsValid(Grid) ? Grid->GetTileAtCoord(TargetCoord) : nullptr;
+        if (!IsValid(TargetTile) || FVector::Dist2D(Source->GetActorLocation(), Center) > Skill.HitRange) return Hits;
+        FVector Start = Center;
+        FVector End = Center;
+        if (ACombatGridTile* Left = Grid->GetTileAtCoord(TargetCoord + FIntPoint(-1, 0))) Start += Left->GetActorLocation() - TargetTile->GetActorLocation();
+        if (ACombatGridTile* Right = Grid->GetTileAtCoord(TargetCoord + FIntPoint(1, 0))) End += Right->GetActorLocation() - TargetTile->GetActorLocation();
+        const FCollisionShape Shape = FCollisionShape::MakeSphere(FMath::Min(Skill.MeleeRadius, Skill.HitRange * 0.5f));
+        const FCollisionQueryParams Params = AttackWorldQuery(World, Source);
+        const FCollisionResponseParams Responses = AttackWorldResponses();
+        if (World->OverlapBlockingTestByChannel(Center, FQuat::Identity, ECC_WorldDynamic, FCollisionShape::MakeSphere(0.1f), Params, Responses)) return Hits;
+        if (World->LineTraceTestByChannel(Source->GetCapsuleComponent()->GetComponentLocation(), Center, ECC_WorldDynamic, Params, Responses)) return Hits;
+        // Tiles size the lateral sweep; only current capsule contacts receive damage, once per enemy.
+        // 타일은 횡방향 스윕 길이만 정하며 현재 캡슐이 충돌한 적에게만 한 번씩 피해를 줍니다.
+        for (const FCombatRoundUnitView& Candidate : Units)
+        {
+            UCapsuleComponent* Capsule = AttackTargetCapsule(Source, Candidate);
+            if (!Capsule) continue;
+            FHitResult Hit;
+            if (!Capsule->OverlapComponent(Start, FQuat::Identity, Shape) && !Capsule->SweepComponent(Hit, Start, End, FQuat::Identity, Shape)) continue;
+            FVector Contact;
+            if (Capsule->GetClosestPointOnCollision(Center, Contact) < 0.f) continue;
+            if (World->LineTraceTestByChannel(Center, Contact, ECC_WorldDynamic, Params, Responses)) continue;
+            Hits.AddUnique(Candidate.Unit);
+        }
+        return Hits;
+    }
+
     TArray<AUnitBase*> FindGroundCollisions(UWorld* World, AUnitBase* Source, const TArray<FCombatRoundUnitView>& Units, FVector Center, float Radius)
     {
         TArray<AUnitBase*> Hits;
@@ -1373,7 +1403,16 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
     }
     else if (Skill.Kind == ECombatRoundSkillKind::Melee)
     {
-        if (AUnitBase* HitUnit = FindMeleeCollision(GetWorld(), Entry.Unit, View.Units, Skill))
+        if (Skill.MeleeArea == ESkillAreaType::TargetAndSides)
+        {
+            const FIntPoint TargetCoord = View.Units.IsValidIndex(TargetIndex) ? View.Units[TargetIndex].HomeCoord : Entry.Command.TargetCoord;
+            for (AUnitBase* HitUnit : FindMeleeSideCollisions(GetWorld(), Entry.Unit, View.Units, Skill, IsValid(Arena) ? Arena->Grid.Get() : nullptr, TargetCoord, Action.AimLocation))
+            {
+                ApplyHit(Entry.Unit, HitUnit, Skill.Power);
+                bHit = true;
+            }
+        }
+        else if (AUnitBase* HitUnit = FindMeleeCollision(GetWorld(), Entry.Unit, View.Units, Skill))
         {
             ApplyHit(Entry.Unit, HitUnit, Skill.Power);
             bHit = true;

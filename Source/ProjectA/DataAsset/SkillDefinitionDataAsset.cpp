@@ -19,11 +19,11 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
     if ((!bUseRoundDefinition || !Skill.CastMontage) && AbilityClass && AbilityClass->IsChildOf(UGA_AttackBase::StaticClass())) Attack = AbilityClass->GetDefaultObject<UGA_AttackBase>();
     if (!bUseRoundDefinition)
     {
-        const bool bSupportedArea = AreaType == ESkillAreaType::Single || AreaType == ESkillAreaType::AroundTarget;
+        const bool bSupportedArea = AreaType == ESkillAreaType::Single || AreaType == ESkillAreaType::AroundTarget || (AreaType == ESkillAreaType::TargetAndSides && bMoveToTarget);
         const bool bSupportedTarget = TargetRule == ESkillTargetRule::EnemyUnit || (TargetRule == ESkillTargetRule::EnemyTile && AreaType == ESkillAreaType::AroundTarget);
         if (!bSupportedTarget || !bSupportedArea || AreaRadius < 0 || ActionPointCost <= 0)
         {
-            return Fail(NSLOCTEXT("SkillRound", "ExplicitProfileRequired", "Automatic migration supports EnemyUnit with Single or AroundTarget, or EnemyTile with AroundTarget, a nonnegative radius and positive AP cost. Enable bUseRoundDefinition and author RoundDefinition for other semantics. / 자동 이행은 EnemyUnit의 Single·AroundTarget 또는 EnemyTile의 AroundTarget, 0 이상의 반경과 양수 AP 비용만 지원합니다. 그 외 의미는 bUseRoundDefinition을 켜고 RoundDefinition을 직접 작성하세요."));
+            return Fail(NSLOCTEXT("SkillRound", "ExplicitProfileRequired", "Automatic migration supports EnemyUnit with Single, AroundTarget or approaching TargetAndSides, or EnemyTile with AroundTarget, a nonnegative radius and positive AP cost. Enable bUseRoundDefinition and author RoundDefinition for other semantics. / 자동 이행은 EnemyUnit의 Single·AroundTarget·접근형 TargetAndSides 또는 EnemyTile의 AroundTarget, 0 이상의 반경과 양수 AP 비용만 지원합니다. 그 외 의미는 bUseRoundDefinition을 켜고 RoundDefinition을 직접 작성하세요."));
         }
         if (!Attack)
         {
@@ -39,6 +39,7 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
         Skill.Approach = bMoveToTarget ? ECombatRoundApproach::Unit : ECombatRoundApproach::None;
         Skill.TargetLoss = bMoveToTarget ? ECombatRoundTargetLoss::Cancel : ECombatRoundTargetLoss::KeepLocation;
         Skill.bTargetOnly = false;
+        Skill.MeleeArea = AreaType == ESkillAreaType::TargetAndSides ? ESkillAreaType::TargetAndSides : ESkillAreaType::Single;
         if (AreaType == ESkillAreaType::AroundTarget)
         {
             Skill.Kind = ECombatRoundSkillKind::GroundAttack;

@@ -644,12 +644,13 @@ SAP 이동은 계획 중 캐릭터별 목적지 하나를 예약·변경·취소
 
 `USkillDefinitionDataAsset::bUseRoundDefinition`을 켜면 `RoundDefinition`을 사용한다. 프로필은 공격 종류·유닛/타일 접근·자기 진영 잔류·목표 상실 대응·유도/대상 한정·선딜·위력·근접 반경·이동/투사체 속도·투사체 반경/수명·AP/SubAP 비용을 정의한다. `MoveSpeed`는 스킬의 기준값이며 근접 접근·복귀에만 [8-4절](#8-4-공격-접근과-복귀)의 민첩 보정을 적용한다.
 
-`ResolveRoundSkill`은 명시 프로필 또는 제한된 이전 공격 정의를 검증한다. `bUseRoundDefinition=true`인 스킬은 새 프로필을 기준으로 하며 기존 GAS AbilityClass를 필수 실행 조건으로 요구하지 않는다. 명시 프로필이 없는 스킬은 EnemyUnit·Single/AroundTarget 또는 EnemyTile·AroundTarget과 유효한 `GA_AttackBase` 피해 정의의 지원 조합만 초기 변환한다. 지원하지 않는 대상/범위·커스텀 능력은 명시 프로필이 필요하다는 스킬별 오류로 거절한다.
+`ResolveRoundSkill`은 명시 프로필 또는 제한된 이전 공격 정의를 검증한다. `bUseRoundDefinition=true`인 스킬은 새 프로필을 기준으로 하며 기존 GAS AbilityClass를 필수 실행 조건으로 요구하지 않는다. 명시 프로필이 없는 스킬은 EnemyUnit·Single/AroundTarget/접근형 TargetAndSides 또는 EnemyTile·AroundTarget과 유효한 `GA_AttackBase` 피해 정의의 지원 조합만 초기 변환한다. 지원하지 않는 대상/범위·커스텀 능력은 명시 프로필이 필요하다는 스킬별 오류로 거절한다.
 
 | 지원되는 이전 정의 | 초기 라운드 변환 |
 |---|---|
 | EnemyUnit·Single·제자리 공격 | 투사체, 발동 전 목표 상실 시 마지막 위치 유지 |
 | EnemyUnit·Single·`bMoveToTarget` | 실제 유닛 접근형 근접, 발동 전 목표 상실 시 취소 |
+| EnemyUnit·TargetAndSides·`bMoveToTarget` | 대상과 양옆 한 칸씩을 훑는 근접, 발동 전 목표 상실 시 취소 |
 | EnemyUnit/EnemyTile·AroundTarget | 선택 좌표 중심의 실제 위치 반경으로 적을 판정하는 지점 공격. 반경과 접근 여부를 기존 변환값으로 사용 |
 | 기타 대상·범위·커스텀 능력 | 자동 의미 변경 없이 거절. 명시 RoundDefinition 필요 |
 
@@ -657,7 +658,9 @@ SAP 이동은 계획 중 캐릭터별 목적지 하나를 예약·변경·취소
 
 Snapshot 상대도 같은 `ResolveRoundSkill` 검증을 사용한다. 에셋 ID로 중복을 검사하며 이전 GAS 클래스를 공유하는 서로 다른 명시 스킬은 허용한다.
 
-실전 스킬 목록은 검증된 실제 장착 DA만 사용한다. 공통 시험 `Strike`·`Arrow`·`Guard`·`Wait`·`MoveShot`·`GroundStrike` 주입과 무장착 대체 공격을 제거했다. Encounter 진입 시 시험용 스킬 풀을 자동 추첨·장착하지 않는다. 2026-09-18 요청에 따라 `BP_PlayerUnit`에 실제 DA 기본공격·원거리 공격·AOE·휩쓸기 4개를 명시적으로 장착했다. 공통 시험 구성이며 직업별 최종 스킬 규칙은 미정이다. 기본공격의 사용자 수정과 각 DA의 피해·몽타주를 보존했으며 휩쓸기에는 아직 몽타주가 없다. 기존 Guard 등의 해석 코드가 남아 있는 사실은 해당 콘텐츠 제작 완료를 뜻하지 않는다.
+실전 스킬 목록은 검증된 실제 장착 DA만 사용한다. 공통 시험 `Strike`·`Arrow`·`Guard`·`Wait`·`MoveShot`·`GroundStrike` 주입과 무장착 대체 공격을 제거했다. Encounter 진입 시 시험용 스킬 풀을 자동 추첨·장착하지 않는다. 2026-09-18 요청에 따라 `BP_PlayerUnit`에 실제 DA 기본공격·원거리 공격·AOE·휩쓸기 4개를 명시적으로 장착했다. 공통 시험 구성이며 직업별 최종 스킬 규칙은 미정이다. 기본공격의 사용자 수정과 각 DA의 피해를 보존했다. 휩쓸기는 아래의 근접 대상·양옆 프로필을 사용한다. 기존 Guard 등의 해석 코드가 남아 있는 사실은 해당 콘텐츠 제작 완료를 뜻하지 않는다.
+
+`DA_SweepingStrike`는 사용자 요청으로 `Melee`·`MeleeArea=TargetAndSides`·`Approach=Unit`·`TargetLoss=Cancel`의 명시 프로필을 사용한다. 피해 10·AP 1을 보존하고 미지정 시전 표현은 기본공격의 `MM_Attack_01_Montage`로 연결했다. 대상에게 접근한 후 같은 전열·후열(`GridCoord.Y` 동일)의 대상과 `GridCoord.X ± 1` 위치까지 횡방향 sphere sweep을 적용한다. 가장자리의 없는 칸은 제외하며, 좌표는 범위의 길이만 정하고 실제 생존 적 Capsule 접촉·벽 차폐로 각 적의 피해를 한 번 확정한다. 중심은 발동 시 대상 위치이며 양옆은 인접 타일의 상대 간격을 사용한다. `HitRange=150`은 대상과의 발동 거리, `MeleeRadius=35`는 스윕 두께다. 기존 민첩 기반 근접 이동·몽타주 종료 후 원위치/방향 복귀를 따른다. 전체 `Row`와 별개이며 주변 원형 공격을 유지하는 의미가 아니다. [최신 확인](TODO.md#2-12-휩쓸기-근접-대상과-양옆)
 
 `BPDA_RangedAttack`과 별도 `BPGA_RangedAttack`은 기존 기본 공격을 복제한 제자리 단일 대상 원거리 공격이다. 피해 50·AP 1과 `MM_Attack_01_Montage`를 재사용하며 `EnemyUnit`·`Single`·`bMoveToTarget=false`·`bUseRoundDefinition=false`로 기존 투사체 변환을 사용한다. 투사체는 700cm/s·반경 12cm·최대 수명 5초이며 유도 없이 경로상 최초 실제 적 한 명에게 적중하거나 벽에서 종료한다. 원본의 빈 태그 설정을 보존하며 이 콘텐츠 추가가 GAS 태그 실행 연동 완료를 뜻하지는 않는다.
 

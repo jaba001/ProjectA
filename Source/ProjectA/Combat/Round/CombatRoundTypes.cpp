@@ -30,6 +30,8 @@ bool CombatRoundRules::IsOwnTerritory(bool bEnemy, FIntPoint Coord)
 bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
 {
     if (Skill.SkillId.IsNone() || Skill.Kind > ECombatRoundSkillKind::Wait || Skill.Approach > ECombatRoundApproach::Tile || Skill.TargetLoss > ECombatRoundTargetLoss::NearestEnemy) return false;
+    if (Skill.MeleeArea != ESkillAreaType::Single && Skill.MeleeArea != ESkillAreaType::TargetAndSides) return false;
+    if (Skill.MeleeArea == ESkillAreaType::TargetAndSides && (Skill.Kind != ECombatRoundSkillKind::Melee || Skill.Approach != ECombatRoundApproach::Unit)) return false;
     if (!FMath::IsFinite(Skill.WindupSeconds) || Skill.WindupSeconds < 0.f || Skill.WindupSeconds > 60.f) return false;
     if (!FMath::IsFinite(Skill.Power) || Skill.Power < 0.f || Skill.Power > 1000000.f) return false;
     if (!FMath::IsFinite(Skill.HitRange) || Skill.HitRange <= 0.f || Skill.HitRange > 100000.f) return false;

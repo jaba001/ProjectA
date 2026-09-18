@@ -1343,6 +1343,75 @@ bool FCombatRoundMeleeCollisionTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundMeleeSidesTest, "ProjectA.Combat.Round.MeleeTargetAndSides", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundMeleeSidesTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Case = 0; Case < 10; ++Case)
+    {
+        FCombatRoundSkill Skill;
+        Skill.MeleeArea = ESkillAreaType::TargetAndSides;
+        Skill.Power = 17.f;
+        Skill.WindupSeconds = 0.1f;
+        FFixture Fixture;
+        if (!TestTrue(TEXT("The melee side fixture initializes"), Fixture.Initialize(2, 10, nullptr, FIntPoint(0, 3), 4, &Skill))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Friend = Fixture.Humans[1];
+        const int32 SelectedIndex = Case == 1 ? 0 : Case == 2 ? 3 : 1;
+        AUnitBase* Selected = Fixture.Enemies[SelectedIndex];
+        const FVector Origin = Source->GetActorLocation();
+        const FRotator Facing = Source->GetActorRotation();
+        Friend->SetActorLocation(Selected->GetActorLocation(), false);
+        AUnitBase* OtherCombat = Fixture.AddUnit(FIntPoint(3, 2), ETeam::Enemy);
+        if (!OtherCombat) return false;
+        OtherCombat->SetActorLocation(Selected->GetActorLocation(), false);
+        OtherCombat->UnitIndex = Selected->UnitIndex;
+        if (Case == 3) Fixture.Enemies[0]->AddActorWorldOffset(FVector(0, -200, 0), false);
+        if (Case == 4) Fixture.Enemies[2]->AddActorWorldOffset(FVector(0, 0, 400), false);
+        if (Case == 5 && !Fixture.AddObstacle(FVector(300, 600, 100), FVector(2, 25, 90))) return false;
+        if (Case == 6) Fixture.AddPawnSensor(Fixture.Enemies[3], FVector(-200, 0, 0), FVector(150));
+        if (Case == 7) Fixture.Enemies[2]->Die();
+        if (Case == 8) Fixture.Enemies[2]->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        if (!Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Selected)) || !Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait"))) || !Fixture.Ready(0) || !Fixture.Ready(1)) return false;
+        TestEqual(TEXT("One melee sweep costs one AP regardless of target count"), Source->GetCurrentActionPoint(), 1);
+        if (Case == 9) Selected->Die();
+        bool bApproached = false;
+        bool bReturned = false;
+        for (int32 Step = 0; Step < 1000 && Fixture.Round->GetView().RoundNumber == 1; ++Step)
+        {
+            Fixture.Round->Tick(0.01f);
+            bApproached |= !Source->GetActorLocation().Equals(Origin, 5.f);
+            for (const auto& Unit : Fixture.Round->GetView().Units)
+            {
+                if (Unit.Unit == Source && Unit.ActionPhase == ECombatRoundActionPhase::Returning) bReturned = true;
+            }
+        }
+        const FString Context = FString::Printf(TEXT("Melee sides case %d"), Case);
+        TestEqual(Context + TEXT(" settles at the next planning phase"), Fixture.Round->GetView().RoundNumber, 2);
+        if (Case != 9) TestTrue(Context + TEXT(" approaches and returns through the melee movement flow"), bApproached && bReturned);
+        TestTrue(Context + TEXT(" restores the original position and facing"), Source->GetActorLocation().Equals(Origin, 2.f) && Source->GetActorRotation().Equals(Facing, 0.1f));
+        for (int32 Index = 0; Index < Fixture.Enemies.Num(); ++Index)
+        {
+            const bool bDead = (Case == 7 && Index == 2) || (Case == 9 && Index == SelectedIndex);
+            const bool bExcluded = (Case == 3 && Index == 0) || ((Case == 4 || Case == 5 || Case == 8) && Index == 2);
+            const bool bHit = Case != 9 && !bExcluded && FMath::Abs(Index - SelectedIndex) <= 1;
+            const float Expected = bDead ? 0.f : bHit ? 83.f : 100.f;
+            TestEqual(Context + FString::Printf(TEXT(" enemy %d gets one physical hit only inside the adjacent span"), Index), Fixture.Enemies[Index]->GetAttributeSet()->GetHP(), Expected);
+        }
+        TestEqual(Context + TEXT(" excludes allies"), Friend->GetAttributeSet()->GetHP(), 100.f);
+        TestEqual(Context + TEXT(" excludes another combat's same-index capsule"), OtherCombat->GetAttributeSet()->GetHP(), 100.f);
+    }
+    FCombatRoundSkill Invalid;
+    Invalid.SkillId = TEXT("InvalidSides");
+    Invalid.MeleeArea = ESkillAreaType::Row;
+    TestFalse(TEXT("An unimplemented full row cannot silently become a single attack"), CombatRoundRules::IsValidSkill(Invalid));
+    Invalid.MeleeArea = ESkillAreaType::TargetAndSides;
+    Invalid.Approach = ECombatRoundApproach::None;
+    TestFalse(TEXT("TargetAndSides requires melee approach"), CombatRoundRules::IsValidSkill(Invalid));
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundGroundCollisionTest, "ProjectA.Combat.Round.GroundPhysicalContacts", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FCombatRoundGroundCollisionTest::RunTest(const FString& Parameters)

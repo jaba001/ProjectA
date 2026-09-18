@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Types/SkillTypes.h"
 #include "CombatRoundTypes.generated.h"
 
 class AUnitBase;
@@ -75,6 +76,11 @@ struct PROJECTA_API FCombatRoundSkill
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     ECombatRoundSkillKind Kind = ECombatRoundSkillKind::Melee;
+
+    // TargetAndSides covers the aimed unit and one adjacent tile on each side at the same formation depth.
+    // TargetAndSides는 대상과 같은 전열·후열에서 양옆 한 칸씩을 포함합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "Kind == ECombatRoundSkillKind::Melee"))
+    ESkillAreaType MeleeArea = ESkillAreaType::Single;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     ECombatRoundApproach Approach = ECombatRoundApproach::Unit;
