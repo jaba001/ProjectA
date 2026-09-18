@@ -3,20 +3,33 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Blueprint/WidgetTree.h"
+#include "Combat/Round/CombatRoundCoordinator.h"
 #include "Components/Button.h"
 #include "Components/CheckBox.h"
 #include "Components/ComboBoxString.h"
 #include "Components/EditableTextBox.h"
 #include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+#include "Controller/GameplayPlayerController.h"
 #include "Controller/MainMenuPlayerController.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Editor.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "Game/Run/RunStateSubsystem.h"
+#include "GAS/Attribute/AS_Unit.h"
 #include "GameFramework/GameUserSettings.h"
 #include "GameFramework/Pawn.h"
+#include "Kismet/GameplayStatics.h"
+#include "Misc/CommandLine.h"
 #include "Misc/Paths.h"
 #include "Misc/ScopeExit.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "UI/Combat/CombatRoundPlanningWidget.h"
+#include "UI/Gameplay/GameplayActionButton.h"
+#include "UI/Gameplay/RunMapWidget.h"
 #include "UI/MainMenu/CharacterCreationWidget.h"
 #include "UI/MainMenu/GameModeSelectionWidget.h"
 #include "UI/MainMenu/MainMenuPreviewStage.h"
@@ -24,6 +37,7 @@
 #include "UI/MainMenu/MainMenuScreenWidget.h"
 #include "UI/MainMenu/OptionsWidget.h"
 #include "UnrealClient.h"
+#include "Unit/UnitBase.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
 
 namespace ProjectAVerticalSliceTests
@@ -444,6 +458,309 @@ private:
     bool bProfessionCaptured = false;
     double ProfessionPanelTime = 0.0;
 };
+
+// Drive saved-menu buttons and the public target delegate; operating-system mouse hit testing is separate.
+// 저장된 메뉴 버튼과 공개 대상 선택 델리게이트를 사용하며 운영체제 마우스 히트 테스트는 별개입니다.
+class FPlaySavedSkillLoadout : public IAutomationLatentCommand
+{
+public:
+    FPlaySavedSkillLoadout(FAutomationTestBase* InTest, const TArray<FCombatRoundSkill>& InSkills, int32 InSkillIndex) : Test(InTest), Skills(InSkills), SkillIndex(InSkillIndex)
+    {
+    }
+
+    virtual ~FPlaySavedSkillLoadout() override
+    {
+        if (ObservedTargetASC.IsValid()) ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UAS_Unit::GetHPAttribute()).Remove(HPChangedHandle);
+    }
+
+    virtual bool Update() override
+    {
+        if (StageStarted == 0.0) StageStarted = FPlatformTime::Seconds();
+        if (FPlatformTime::Seconds() - StageStarted > 60.0)
+        {
+            Test->AddError(FString::Printf(TEXT("Saved skill PIE timed out at stage %d for %s. %s"), Stage, *Skills[SkillIndex].SkillId.ToString(), *UIReadiness));
+            return true;
+        }
+        UWorld* World = GEditor->PlayWorld;
+        if (!World || !World->GetFirstPlayerController()) return false;
+        if (Stage == 0)
+        {
+            AMainMenuPlayerController* Menu = Cast<AMainMenuPlayerController>(World->GetFirstPlayerController());
+            UMainMenuScreenWidget* Screen = FindActiveWidget<UMainMenuScreenWidget>(World);
+            if (!Menu || !Screen) return false;
+            UButton* NewGame = Cast<UButton>(Screen->GetWidgetFromName(TEXT("Button_NewGame")));
+            if (!Require(NewGame && NewGame->GetIsEnabled(), TEXT("The saved main menu exposes its actual New Game button."))) return true;
+            NewGame->OnClicked.Broadcast();
+            Advance();
+            return false;
+        }
+        if (Stage == 1)
+        {
+            UGameModeSelectionWidget* Selection = FindActiveWidget<UGameModeSelectionWidget>(World);
+            if (!Selection) return false;
+            UButton* Single = Cast<UButton>(Selection->GetWidgetFromName(TEXT("Button_SinglePlayer")));
+            if (!Require(Single && Single->GetIsEnabled(), TEXT("The saved menu exposes single-player selection."))) return true;
+            Single->OnClicked.Broadcast();
+            Advance();
+            return false;
+        }
+        if (Stage == 2)
+        {
+            UCharacterCreationWidget* Creation = FindActiveWidget<UCharacterCreationWidget>(World);
+            if (!Creation) return false;
+            UButton* Create = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_Create")));
+            if (!Require(Create && Create->GetIsEnabled(), TEXT("The actual creation screen can create slot zero."))) return true;
+            Create->OnClicked.Broadcast();
+            UButton* Control = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_PlayerControl")));
+            UButton* Start = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_StartGame")));
+            if (!Require(Control && Control->GetIsEnabled() && Start, TEXT("The created card exposes direct control and Start."))) return true;
+            Control->OnClicked.Broadcast();
+            const int32 CreatedCount = Creation->GetPartyMembers().FilterByPredicate([](const FRunPartyMember& Member) { return Member.bCreated; }).Num();
+            if (!Require(CreatedCount == 1 && Start->GetIsEnabled(), TEXT("Exactly one controlled character starts without AI companions."))) return true;
+            Start->OnClicked.Broadcast();
+            Advance();
+            return false;
+        }
+        AGameplayPlayerController* Controller = Cast<AGameplayPlayerController>(World->GetFirstPlayerController());
+        if (!Controller) return false;
+        URunStateSubsystem* Run = Controller->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+        if (Stage == 3)
+        {
+            URunMapWidget* Map = FindActiveWidget<URunMapWidget>(World);
+            if (!Map || !Run || Run->GetPhase() != ERunPhase::Map) return false;
+            UVerticalBox* Nodes = Cast<UVerticalBox>(Map->GetWidgetFromName(TEXT("NodeList")));
+            if (!Require(Nodes != nullptr, TEXT("The saved Run map exposes its node buttons."))) return true;
+            for (UWidget* Child : Nodes->GetAllChildren())
+            {
+                UGameplayActionButton* Node = Cast<UGameplayActionButton>(Child);
+                if (!Node || !Node->GetIsEnabled()) continue;
+                Node->OnClicked.Broadcast();
+                Advance();
+                return false;
+            }
+            return !Require(false, TEXT("The new Run has an enabled first encounter button."));
+        }
+        ACombatRoundCoordinator* Round = Controller->GetRoundCoordinator();
+        if (Stage == 7)
+        {
+            if (!Run) return false;
+            if (Round && Round->GetView().PendingProjectiles > 0) bSawProjectile = true;
+            if (Source.IsValid() && Source->GetCurrentActionPoint() == InitialAP - Skills[SkillIndex].ActionPointCost) bSawAPCost = true;
+            const bool bSettled = Run->GetPhase() == ERunPhase::Result || (Round && (Round->GetView().Phase == ECombatRoundPhase::Finished || (Round->GetView().Phase == ECombatRoundPhase::Planning && Round->GetView().RoundNumber > InitialRound)));
+            if (!bSettled) return false;
+            const float ExpectedHP = FMath::Max(0.f, InitialTargetHP - Skills[SkillIndex].Power);
+            Require(HPChangeCount == 1 && FMath::IsNearlyEqual(LowestTargetHP, ExpectedHP, 0.01f), TEXT("The actual target health changes once to the clamped expected value."));
+            Require(bSawAPCost, TEXT("The selected skill consumes its authored AP cost."));
+            Require(!Round || Round->GetView().PendingProjectiles == 0, TEXT("The round settles with no pending projectile."));
+            if (Skills[SkillIndex].Kind == ECombatRoundSkillKind::Projectile) Require(bSawProjectile, TEXT("The ranged skill creates an actual in-flight round projectile."));
+            Test->AddInfo(FString::Printf(TEXT("Saved skill used: %s (%s), enemy HP %.1f -> %.1f, HP changes %d, projectile observed %s."), *Skills[SkillIndex].Name.ToString(), *Skills[SkillIndex].SkillId.ToString(), InitialTargetHP, LowestTargetHP, HPChangeCount, bSawProjectile ? TEXT("yes") : TEXT("no")));
+            return true;
+        }
+        UCombatRoundPlanningWidget* Planning = FindActiveWidget<UCombatRoundPlanningWidget>(World);
+        if (!Round || !Planning || Round->GetView().Phase != ECombatRoundPhase::Planning || Controller->IsRoundRequestPending()) return false;
+        if (Stage == 4)
+        {
+            const FCombatRoundUnitView* Controlled = Round->GetView().Units.FindByPredicate([Controller](const FCombatRoundUnitView& Unit) { return !Unit.bEnemy && Unit.OwnerSlot == Controller->GetRoundParticipantSlot() && Unit.HP > 0.f; });
+            if (!Controlled || !IsValid(Controlled->Unit)) return false;
+            Source = Controlled->Unit;
+            SourceId = Controlled->UnitId;
+            const int32 AllyCount = Round->GetView().Units.FilterByPredicate([](const FCombatRoundUnitView& Unit) { return !Unit.bEnemy; }).Num();
+            if (!Require(AllyCount == 1 && Controlled->SkillIds.Num() == Skills.Num(), TEXT("The real encounter spawns one ally with exactly four authored skills."))) return true;
+            for (const FCombatRoundSkill& Skill : Skills)
+            {
+                if (!Require(Controlled->SkillIds.Contains(Skill.SkillId) && Round->FindSkill(Skill.SkillId), TEXT("Each saved skill belongs to the player's runtime loadout and catalogue."))) return true;
+            }
+            // Wait for the first real UI refresh before delivering one target-selection event.
+            // 대상 선택 이벤트를 한 번 전달하기 전에 실제 UI의 첫 갱신을 기다립니다.
+            const bool bInputReady = Controller->IsRoundInputEnabled() && Controller->OnRoundWorldTileClicked.IsBoundToObject(Planning);
+            bool bButtonsCreated = true;
+            UIReadiness = FString::Printf(TEXT("Input ready=%s; planning %s"), bInputReady ? TEXT("true") : TEXT("false"), *DescribeWidget(Planning));
+            for (const FCombatRoundSkill& Skill : Skills)
+            {
+                UCombatRoundSkillButton* Button = FindSkillButton(Planning, Skill.SkillId);
+                bButtonsCreated = bButtonsCreated && Button != nullptr;
+                UIReadiness += FString::Printf(TEXT("; %s: %s"), *Skill.SkillId.ToString(), *DescribeWidget(Button));
+            }
+            if (!bInputReady || !bButtonsCreated || Planning->GetCachedGeometry().GetLocalSize().IsNearlyZero()) return false;
+            const FCombatRoundUnitView* Target = nullptr;
+            for (const FCombatRoundUnitView& Unit : Round->GetView().Units)
+            {
+                if (!Unit.bEnemy || Unit.HP <= 0.f || !IsValid(Unit.Unit)) continue;
+                if (!Target || FVector::DistSquared(Source->GetActorLocation(), Unit.Unit->GetActorLocation()) < FVector::DistSquared(Source->GetActorLocation(), Target->Unit->GetActorLocation())) Target = &Unit;
+            }
+            if (!Require(Target && Target->Unit->GetAttributeSet() && Target->Unit->GetAbilitySystemComponent(), TEXT("An actual enemy has observable GAS health."))) return true;
+            TargetId = Target->UnitId;
+            TargetCoord = Target->HomeCoord;
+            InitialTargetHP = LowestTargetHP = Target->Unit->GetAttributeSet()->GetHP();
+            ObservedTargetASC = Target->Unit->GetAbilitySystemComponent();
+            HPChangedHandle = ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UAS_Unit::GetHPAttribute()).AddLambda([this](const FOnAttributeChangeData& Data)
+            {
+                if (Data.NewValue < Data.OldValue)
+                {
+                    LowestTargetHP = FMath::Min(LowestTargetHP, FMath::Max(0.f, Data.NewValue));
+                    ++HPChangeCount;
+                }
+            });
+            Controller->OnRoundWorldTileClicked.Broadcast(TargetCoord);
+            Advance();
+            return false;
+        }
+        if (Stage == 5)
+        {
+            if (FPlatformTime::Seconds() - StageStarted < 0.25) return false;
+            TArray<UWidget*> Widgets;
+            Planning->WidgetTree->GetAllWidgets(Widgets);
+            TArray<UCombatRoundSkillButton*> Buttons;
+            for (UWidget* Widget : Widgets)
+            {
+                if (UCombatRoundSkillButton* Button = Cast<UCombatRoundSkillButton>(Widget)) Buttons.Add(Button);
+            }
+            if (!Require(Buttons.Num() == Skills.Num(), TEXT("Selecting the enemy exposes exactly four real skill buttons."))) return true;
+            for (const FCombatRoundSkill& Skill : Skills)
+            {
+                UCombatRoundSkillButton** Match = Buttons.FindByPredicate([&Skill](const UCombatRoundSkillButton* Button) { return Button->GetSkillId() == Skill.SkillId; });
+                const FString State = FString::Printf(TEXT("Saved skill button %s is displayed and enabled for enemy %d: %s"), *Skill.SkillId.ToString(), TargetId, *DescribeWidget(Match ? *Match : nullptr));
+                if (!Require(Match && IsDisplayed(*Match) && (*Match)->GetIsEnabled(), *State)) return true;
+                const UTextBlock* Label = Cast<UTextBlock>((*Match)->GetContent());
+                if (!Require(Label && Label->GetText().ToString().Contains(Skill.Name.ToString()), TEXT("The skill button displays the saved skill name."))) return true;
+            }
+            FScreenshotRequest::RequestScreenshot(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/SkillLoadoutScreenshots"), FString::Printf(TEXT("%d-FourSkills.png"), SkillIndex + 1)), true, false);
+            Advance();
+            return false;
+        }
+        if (Stage == 6)
+        {
+            const FCombatRoundUnitView* Controlled = Round->GetView().Units.FindByPredicate([this](const FCombatRoundUnitView& Unit) { return Unit.UnitId == SourceId; });
+            if (!Require(Controlled != nullptr, TEXT("The selected player remains in the actual encounter."))) return true;
+            if (bAwaitingPlan)
+            {
+                const int32 ExpectedIndex = PlanIndex < Skills.Num() ? PlanIndex : SkillIndex;
+                if (!Require(Controlled->Command.SkillId == Skills[ExpectedIndex].SkillId && Controlled->Command.TargetUnitId == TargetId && Controlled->Command.TargetCoord == TargetCoord, TEXT("Clicking a real skill button submits its skill and selected enemy to the server plan."))) return true;
+                bAwaitingPlan = false;
+                ++PlanIndex;
+            }
+            if (PlanIndex <= Skills.Num())
+            {
+                const int32 NextIndex = PlanIndex < Skills.Num() ? PlanIndex : SkillIndex;
+                UCombatRoundSkillButton* Button = FindSkillButton(Planning, Skills[NextIndex].SkillId);
+                if (!Require(Button && Button->GetIsEnabled() && IsDisplayed(Button), TEXT("The next authored skill can be selected through its visible button."))) return true;
+                Button->OnClicked.Broadcast();
+                bAwaitingPlan = true;
+                return false;
+            }
+            TArray<UWidget*> Widgets;
+            Planning->WidgetTree->GetAllWidgets(Widgets);
+            for (UWidget* Widget : Widgets)
+            {
+                UButton* Button = Cast<UButton>(Widget);
+                const UTextBlock* Label = Button ? Cast<UTextBlock>(Button->GetContent()) : nullptr;
+                if (!Label || Label->GetText().ToString() != TEXT("준비 완료")) continue;
+                if (!Require(Button->GetIsEnabled() && IsDisplayed(Button), TEXT("The actual Ready button accepts the final skill plan."))) return true;
+                InitialAP = Source->GetCurrentActionPoint();
+                InitialRound = Round->GetView().RoundNumber;
+                Button->OnClicked.Broadcast();
+                bSawAPCost = Source.IsValid() && Source->GetCurrentActionPoint() == InitialAP - Skills[SkillIndex].ActionPointCost;
+                Advance();
+                return false;
+            }
+            return !Require(false, TEXT("The active planning screen contains the real Ready button."));
+        }
+        return false;
+    }
+
+private:
+    bool Require(bool bCondition, const TCHAR* Message)
+    {
+        return Test->TestTrue(FString::Printf(TEXT("[%s] %s"), *Skills[SkillIndex].SkillId.ToString(), Message), bCondition);
+    }
+
+    void Advance()
+    {
+        ++Stage;
+        StageStarted = FPlatformTime::Seconds();
+    }
+
+    static bool IsDisplayed(UWidget* Widget)
+    {
+        if (!Widget || Widget->GetCachedGeometry().GetLocalSize().IsNearlyZero()) return false;
+        for (UWidget* Current = Widget; Current; Current = Current->GetParent())
+        {
+            if (Current->GetVisibility() == ESlateVisibility::Collapsed || Current->GetVisibility() == ESlateVisibility::Hidden) return false;
+        }
+        return true;
+    }
+
+    static FString DescribeWidget(UWidget* Widget)
+    {
+        if (!Widget) return TEXT("missing widget");
+        const FVector2D Size = Widget->GetCachedGeometry().GetLocalSize();
+        FString HiddenAncestor = TEXT("none");
+        for (UWidget* Current = Widget; Current; Current = Current->GetParent())
+        {
+            if (Current->GetVisibility() == ESlateVisibility::Collapsed || Current->GetVisibility() == ESlateVisibility::Hidden)
+            {
+                HiddenAncestor = FString::Printf(TEXT("%s(visibility=%d)"), *Current->GetName(), static_cast<int32>(Current->GetVisibility()));
+                break;
+            }
+        }
+        return FString::Printf(TEXT("%s visibility=%d enabled=%s size=%.1fx%.1f hidden ancestor=%s tooltip=%s"), *Widget->GetName(), static_cast<int32>(Widget->GetVisibility()), Widget->GetIsEnabled() ? TEXT("true") : TEXT("false"), Size.X, Size.Y, *HiddenAncestor, *Widget->GetToolTipText().ToString());
+    }
+
+    static UCombatRoundSkillButton* FindSkillButton(UCombatRoundPlanningWidget* Planning, FName SkillId)
+    {
+        TArray<UWidget*> Widgets;
+        Planning->WidgetTree->GetAllWidgets(Widgets);
+        for (UWidget* Widget : Widgets)
+        {
+            UCombatRoundSkillButton* Button = Cast<UCombatRoundSkillButton>(Widget);
+            if (Button && Button->GetSkillId() == SkillId) return Button;
+        }
+        return nullptr;
+    }
+
+    FAutomationTestBase* Test;
+    TArray<FCombatRoundSkill> Skills;
+    int32 SkillIndex;
+    int32 Stage = 0;
+    double StageStarted = 0.0;
+    FString UIReadiness;
+    int32 SourceId = INDEX_NONE;
+    int32 TargetId = INDEX_NONE;
+    FIntPoint TargetCoord = FIntPoint::ZeroValue;
+    int32 PlanIndex = 0;
+    bool bAwaitingPlan = false;
+    TWeakObjectPtr<AUnitBase> Source;
+    TWeakObjectPtr<UAbilitySystemComponent> ObservedTargetASC;
+    FDelegateHandle HPChangedHandle;
+    float InitialTargetHP = 0.f;
+    float LowestTargetHP = 0.f;
+    int32 HPChangeCount = 0;
+    int32 InitialAP = 0;
+    int32 InitialRound = 0;
+    bool bSawAPCost = false;
+    bool bSawProjectile = false;
+};
+
+// Delete only the unique slot whose absence was checked before any PIE command was queued.
+// PIE 명령을 등록하기 전에 없음을 확인한 고유 슬롯만 삭제합니다.
+class FCleanupSkillLoadoutSave : public IAutomationLatentCommand
+{
+public:
+    FCleanupSkillLoadoutSave(FAutomationTestBase* InTest, const FString& InSlot) : Test(InTest), Slot(InSlot)
+    {
+    }
+
+    virtual bool Update() override
+    {
+        if (GEditor->PlayWorld) return false;
+        if (UGameplayStatics::DoesSaveGameExist(Slot, 0)) Test->TestTrue(TEXT("The isolated skill-loadout save is removed after PIE."), UGameplayStatics::DeleteGameInSlot(Slot, 0));
+        return true;
+    }
+
+private:
+    FAutomationTestBase* Test;
+    FString Slot;
+};
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVerticalSliceMenuLifecycleTest, "ProjectA.VerticalSlice.SavedMenuLifecycle", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -454,6 +771,54 @@ bool FVerticalSliceMenuLifecycleTest::RunTest(const FString& Parameters)
     ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectAVerticalSliceTests::FPlayMenuLifecycle>(this));
     ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVerticalSliceSavedSkillLoadoutTest, "ProjectA.VerticalSlice.SavedSkillLoadout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVerticalSliceSavedSkillLoadoutTest::RunTest(const FString& Parameters)
+{
+    const FString Slot = URunStateSubsystem::ResolveCheckpointSlot(FCommandLine::Get());
+    const FString Prefix = TEXT("ProjectA_Automation_SkillLoadout_");
+    bool bValidSuffix = Slot.Len() > Prefix.Len();
+    for (TCHAR Character : Slot.Mid(Prefix.Len()))
+    {
+        if (!FChar::IsAlnum(Character) && Character != TEXT('_')) bValidSuffix = false;
+    }
+    if (!Slot.StartsWith(Prefix) || !bValidSuffix)
+    {
+        AddError(TEXT("Launch with -ProjectASaveSlot=ProjectA_Automation_SkillLoadout_<unique alphanumeric suffix> to protect existing Run saves."));
+        return false;
+    }
+    if (UGameplayStatics::DoesSaveGameExist(Slot, 0))
+    {
+        AddError(TEXT("The requested skill-loadout test slot already exists; choose a fresh suffix. No PIE game was started."));
+        return false;
+    }
+    const TArray<FString> AssetNames = { TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_RangedAttack"), TEXT("BPDA_AreaAttack"), TEXT("DA_SweepingStrike") };
+    TArray<FCombatRoundSkill> Skills;
+    for (const FString& Name : AssetNames)
+    {
+        const FString Path = FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/%s.%s"), *Name, *Name);
+        const USkillDefinitionDataAsset* Asset = LoadObject<USkillDefinitionDataAsset>(nullptr, *Path);
+        FCombatRoundSkill Skill;
+        FText Error;
+        if (!TestNotNull(TEXT("The authored skill asset exists."), Asset) || !Asset->ResolveRoundSkill(Skill, Error))
+        {
+            AddError(FString::Printf(TEXT("Cannot test saved skill %s: %s"), *Path, *Error.ToString()));
+            return false;
+        }
+        Skills.Add(Skill);
+    }
+    AddInfo(TEXT("Runs four real saved-menu/encounter PIE sessions through button delegates and the public target delegate; does not synthesize operating-system mouse input."));
+    for (int32 Index = 0; Index < Skills.Num(); ++Index)
+    {
+        ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/MainMenu")));
+        ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+        FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectAVerticalSliceTests::FPlaySavedSkillLoadout>(this, Skills, Index));
+        ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+    }
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectAVerticalSliceTests::FCleanupSkillLoadoutSave>(this, Slot));
     return true;
 }
 

@@ -20,9 +20,10 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
     if (!bUseRoundDefinition)
     {
         const bool bSupportedArea = AreaType == ESkillAreaType::Single || AreaType == ESkillAreaType::AroundTarget;
-        if (TargetRule != ESkillTargetRule::EnemyUnit || !bSupportedArea || AreaRadius < 0 || ActionPointCost <= 0)
+        const bool bSupportedTarget = TargetRule == ESkillTargetRule::EnemyUnit || (TargetRule == ESkillTargetRule::EnemyTile && AreaType == ESkillAreaType::AroundTarget);
+        if (!bSupportedTarget || !bSupportedArea || AreaRadius < 0 || ActionPointCost <= 0)
         {
-            return Fail(NSLOCTEXT("SkillRound", "ExplicitProfileRequired", "Automatic migration supports EnemyUnit with Single or AroundTarget, a nonnegative radius and positive AP cost. Enable bUseRoundDefinition and author RoundDefinition for other semantics. / 자동 이행은 EnemyUnit의 Single·AroundTarget, 0 이상의 반경과 양수 AP 비용만 지원합니다. 그 외 의미는 bUseRoundDefinition을 켜고 RoundDefinition을 직접 작성하세요."));
+            return Fail(NSLOCTEXT("SkillRound", "ExplicitProfileRequired", "Automatic migration supports EnemyUnit with Single or AroundTarget, or EnemyTile with AroundTarget, a nonnegative radius and positive AP cost. Enable bUseRoundDefinition and author RoundDefinition for other semantics. / 자동 이행은 EnemyUnit의 Single·AroundTarget 또는 EnemyTile의 AroundTarget, 0 이상의 반경과 양수 AP 비용만 지원합니다. 그 외 의미는 bUseRoundDefinition을 켜고 RoundDefinition을 직접 작성하세요."));
         }
         if (!Attack)
         {

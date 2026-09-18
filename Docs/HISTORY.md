@@ -6,6 +6,7 @@
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-09-18 장착 스킬 4개 표시·실행 수정 | `BP_PlayerUnit`에 실제 DA 4개 장착, `EnemyTile·AroundTarget` 제한 변환 허용, CommonUI 기본 입력 데이터 연결. 사용자 기본공격 수정과 네 DA 원본 보존. Development Editor / Win64 최종 빌드 8.02초·정적 검사 통과. 관련 회귀 6개와 `SavedSkillLoadout`의 실제 새 게임 PIE 4회 통과: 네 버튼 표시·선택·서버 계획·AP 1, 적 HP 150→100/100/0/140, 원거리 투사체 관찰. AOE는 치사 결과 검증이며 정확한 초과 피해량 검증은 아님. 최종 PIE 오류 0·종료 시 RecastNavMesh 경고 4. 기존 저장 44개 해시 보존·전용 시험 저장 정리 확인. 버튼/대상 delegate 검사로 실제 마우스 hit-test·애니메이션 육안·협동 확인은 별도. 휩쓸기 몽타주 미지정. 근거: `Saved/Automation/FourSkillRuntime`, `FourSkillFinalRuntime`, `FourSkillStatic.json`; [실행 명령](../Source/ProjectAEditor/Scripts/README.md). C++ 파일 추가 없음·VS 미실행·시험 에디터 종료 |
 | 2026-09-18 단일 대상 원거리 공격 제작 | 기본 공격 DA·GA를 별도 원거리 에셋으로 복제하여 기존 Single·EnemyUnit·제자리 투사체 경로 연결. 피해 50·AP 1·몽타주·태그 설정과 원본 보존. Blueprint 컴파일·저장 및 독립 재로드 확인 통과. C++ 변경·PIE·게임·자동화 실행 없음. 장착 대상 선택과 사용자 작동 확인 대기 |
 | 2026-09-17 일반 SAP 이동 감속 | 사용자 확인에서 근접 접근·복귀 속도는 적절. 일반 SAP 이동만 민첩·MaxWalkSpeed와 무관한 350cm/s 고정값으로 조정하고 기존 회귀 3개 보완. Development Editor / Win64 빌드 6.41초 성공. 에디터 정상 종료 후 재실행·자동화 없음, 변경한 SAP 이동은 사용자 확인 대기 |
 | 2026-09-17 근접 이동 감속·민첩 연동 | 접근·복귀에 라운드 민첩 스냅샷을 적용해 기본 아군 350·적 262.5cm/s로 초기 조정. SAP·비근접·시전·투사체 속도 유지. 회귀 1개 추가·기존 1개 보완, UHT 포함 Development Editor / Win64 빌드 24.61초 성공·정적 검사 통과. 에디터·자동화 미실행, 사용자 작동 확인 대기 |

@@ -41,20 +41,20 @@ $scriptDirectory = Join-Path $projectDirectory 'Source/ProjectAEditor/Scripts'
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ValidateGameplayAssets.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-6. 저장된 메뉴 맵에서 시작하는 PIE 통합 테스트를 실행한다. 이 환경의 UE 5.7에서는 `-NullRHI` 상태의 PIE travel이 `GenericWindow::GetRestoredDimensions` fatal을 일으켜, 실제 렌더러의 `-RenderOffscreen`을 사용한다.
+6. 저장된 메뉴 맵에서 시작하는 스킬 목록 PIE 통합 테스트를 실행한다. 이 환경의 UE 5.7에서는 `-NullRHI` 상태의 PIE travel이 `GenericWindow::GetRestoredDimensions` fatal을 일으켜, 실제 렌더러의 `-RenderOffscreen`을 사용한다. 실행마다 비어 있는 전용 저장 슬롯을 지정한다.
 
 ```powershell
-& $editorExecutable $projectFile -unattended -nop4 -RenderOffscreen -nosound -Windowed -ResX=1280 -ResY=720 -WinX=0 -WinY=0 '-ExecCmds=Automation RunTests ProjectA.VerticalSlice.SavedMapsPIELoop' '-TestExit=Automation Test Queue Empty' ("-ReportExportPath=$projectDirectory/Saved/Automation/VerticalSlicePIE")
+$skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToString('N')
+& $editorExecutable $projectFile -unattended -nop4 -RenderOffscreen -nosound -Windowed -ResX=1280 -ResY=720 -WinX=0 -WinY=0 ("-ProjectASaveSlot=$skillTestSlot") '-ExecCmds=Automation RunTests ProjectA.VerticalSlice.SavedSkillLoadout' '-TestExit=Automation Test Queue Empty' ("-ReportExportPath=$projectDirectory/Saved/Automation/SkillLoadoutPIE")
 ```
 
 검증 범위:
 
-- 캐릭터 생성·노드·Continue는 위젯 delegate, 첫 Move/Skill은 Slate 합성 마우스로 HUD와 타일 입력 검사.
-- 기본 공격·Enemy AI로 첫 Victory 확인, 메모리 SkillData로 제자리 몽타주 실행 확인, 두 번째 Defeat는 치명 피해로 유도.
-- 디스크 에셋·밸런스는 변경하지 않는다. 실제 마우스 사용성·육안 확인은 별도다.
-- 오프스크린 클릭은 위 명령의 창 위치·크기를 유지한다. 기본 창 설정의 과거 hit-test 실패는 같은 빌드에서 창 조건 지정 후 통과했다. 클릭 검사를 함수 호출로 대체하지 않는다.
+- 실제 메뉴·캐릭터 생성·전투 노드에서 시작하며 저장된 DA 4개의 목록·계획·피해 적용을 확인한다.
+- 위젯 버튼과 타일 선택 delegate로 검사한다. 운영체제 마우스 hit-test·첫 클릭 포커스 검증은 포함하지 않는다.
+- 전용 시험 저장만 생성·정리하며 기존 저장과 디스크 에셋·밸런스는 변경하지 않는다.
 
-종료 코드와 함께 JSON의 테스트 상태·오류 및 `Test Completed. Result={Success}`를 확인한다. 화면 캡처 경로는 `Saved/Automation/VerticalSliceScreenshots`다. 작동 테스트는 [작업 규칙](../../../AGENTS.md#작동-테스트와-보고서)을 따르며 남은 확인은 [TODO](../../../Docs/TODO.md), 완료 결과는 [HISTORY](../../../Docs/HISTORY.md)에 짧게 기록한다.
+종료 코드와 함께 JSON의 테스트 상태·오류 및 `Test Completed. Result={Success}`를 확인한다. 화면 캡처 경로는 `Saved/Automation/SkillLoadoutScreenshots`다. 메뉴·설정 검사는 별도 `ProjectA.VerticalSlice.SavedMenuLifecycle`을 사용한다. 작동 테스트는 [작업 규칙](../../../AGENTS.md#작동-테스트와-보고서)을 따르며 남은 확인은 [TODO](../../../Docs/TODO.md), 완료 결과는 [HISTORY](../../../Docs/HISTORY.md)에 짧게 기록한다.
 
 7. `CreateRangedAttack.py`: 기본 공격 DA·GA를 `BPDA_RangedAttack`·`BPGA_RangedAttack`으로 복제하고 기존 단일 대상 투사체 변환을 연결한다. 캐릭터 장착과 기존 에셋은 유지하며 대상이 이미 있으면 덮어쓰지 않는다. `-RangedAttackVerifyOnly`는 제작 직후 저장된 연결·복제 수치만 다시 읽는다. 두 명령 모두 게임을 실행하지 않는다.
 

@@ -204,17 +204,16 @@ bool FCombatRoundSkillMigrationTest::RunTest(const FString& Parameters)
         UAnimMontage* AuthoredMontage = LoadObject<UAnimMontage>(nullptr, *MontagePath);
         if (!TestNotNull(TEXT("The authored attack montage exists"), AuthoredMontage)) return false;
         TestEqual(TEXT("Saved attack defaults reference the expected montage"), AuthoredAttack->GetAuthoredAttackMontage(), AuthoredMontage);
-        // The unfinished tile skill retains its metadata until an explicit round profile is authored.
-        // 미제작 타일 스킬은 명시적 라운드 프로필이 작성될 때까지 기존 메타데이터를 유지합니다.
-        if (!AuthoredSkill->bUseRoundDefinition && AuthoredSkill->TargetRule == ESkillTargetRule::EnemyTile)
+        if (!TestTrue(TEXT("The authored skill resolves without activating its ability"), AuthoredSkill->ResolveRoundSkill(Resolved, Error))) return false;
+        TestEqual(TEXT("Migration retains the authored attack montage"), Resolved.CastMontage.Get(), AuthoredSkill->bUseRoundDefinition && AuthoredSkill->RoundDefinition.CastMontage ? AuthoredSkill->RoundDefinition.CastMontage.Get() : AuthoredMontage);
+        if (FString(Authored.Key) == TEXT("BPDA_AreaAttack"))
         {
-            TestFalse(TEXT("The unfinished tile skill requires an explicit round profile"), AuthoredSkill->ResolveRoundSkill(Resolved, Error));
-            TestTrue(TEXT("The unfinished tile skill reports the required RoundDefinition"), Error.ToString().Contains(TEXT("RoundDefinition")));
-        }
-        else
-        {
-            TestTrue(TEXT("The authored skill resolves without activating its ability"), AuthoredSkill->ResolveRoundSkill(Resolved, Error));
-            TestEqual(TEXT("Migration retains the authored attack montage"), Resolved.CastMontage.Get(), AuthoredSkill->bUseRoundDefinition && AuthoredSkill->RoundDefinition.CastMontage ? AuthoredSkill->RoundDefinition.CastMontage.Get() : AuthoredMontage);
+            TestTrue(TEXT("The saved area attack retains its legacy enemy tile area definition"), !AuthoredSkill->bUseRoundDefinition && AuthoredSkill->TargetRule == ESkillTargetRule::EnemyTile && AuthoredSkill->AreaType == ESkillAreaType::AroundTarget);
+            TestEqual(TEXT("The saved area attack uses its authored damage of 200"), Resolved.Power, 200.f);
+            TestEqual(TEXT("The saved area attack resolves as a ground attack"), Resolved.Kind, ECombatRoundSkillKind::GroundAttack);
+            TestEqual(TEXT("The saved area attack casts without approaching"), Resolved.Approach, ECombatRoundApproach::None);
+            TestEqual(TEXT("The saved area attack retains its selected point"), Resolved.TargetLoss, ECombatRoundTargetLoss::KeepLocation);
+            TestEqual(TEXT("The saved area attack converts its one-tile radius to 200 cm"), Resolved.HitRange, 200.f);
         }
 
         USkillDefinitionDataAsset* PresentationSkill = MakeSkill(GetTransientPackage(), AuthoredSkill->AbilityClass);
@@ -237,9 +236,37 @@ bool FCombatRoundSkillMigrationTest::RunTest(const FString& Parameters)
     }
     Skill->AreaType = ESkillAreaType::AroundSelf;
     TestFalse(TEXT("Legacy self-centered area requires explicit semantics"), Skill->ResolveRoundSkill(Resolved, Error));
-    Skill->AreaType = ESkillAreaType::Single;
+    Skill->AreaType = ESkillAreaType::AroundTarget;
+    Skill->AreaRadius = 2;
+    TestTrue(TEXT("Legacy enemy unit areas remain supported"), Skill->ResolveRoundSkill(Resolved, Error));
     Skill->TargetRule = ESkillTargetRule::EnemyTile;
-    TestFalse(TEXT("Legacy tile targeting requires explicit semantics"), Skill->ResolveRoundSkill(Resolved, Error));
+    TestTrue(TEXT("Legacy enemy tile areas resolve without an explicit profile"), Skill->ResolveRoundSkill(Resolved, Error));
+    TestEqual(TEXT("Enemy tile areas use ground collision"), Resolved.Kind, ECombatRoundSkillKind::GroundAttack);
+    TestEqual(TEXT("Stationary enemy tile areas do not approach"), Resolved.Approach, ECombatRoundApproach::None);
+    TestEqual(TEXT("Enemy tile areas retain their selected location"), Resolved.TargetLoss, ECombatRoundTargetLoss::KeepLocation);
+    TestEqual(TEXT("Enemy tile area radius uses the existing conversion"), Resolved.HitRange, 400.f);
+    Skill->bMoveToTarget = true;
+    TestTrue(TEXT("Moving enemy tile areas resolve"), Skill->ResolveRoundSkill(Resolved, Error));
+    TestEqual(TEXT("Moving enemy tile areas approach a tile instead of tracking a unit"), Resolved.Approach, ECombatRoundApproach::Tile);
+    Skill->bMoveToTarget = false;
+    Skill->AreaRadius = -1;
+    TestFalse(TEXT("Enemy tile areas reject a negative radius"), Skill->ResolveRoundSkill(Resolved, Error));
+    Skill->AreaRadius = 2;
+    Skill->ActionPointCost = 0;
+    TestFalse(TEXT("Enemy tile areas reject zero legacy AP cost"), Skill->ResolveRoundSkill(Resolved, Error));
+    Skill->ActionPointCost = 1;
+    for (ESkillAreaType Area : {ESkillAreaType::Single, ESkillAreaType::Row, ESkillAreaType::AroundSelf})
+    {
+        Skill->AreaType = Area;
+        TestFalse(TEXT("Other enemy tile area combinations still require explicit semantics"), Skill->ResolveRoundSkill(Resolved, Error));
+        TestTrue(TEXT("Unsupported enemy tile combinations report the required RoundDefinition"), Error.ToString().Contains(TEXT("RoundDefinition")));
+    }
+    Skill->AreaType = ESkillAreaType::AroundTarget;
+    for (ESkillTargetRule Target : {ESkillTargetRule::AllyTile, ESkillTargetRule::AnyTile})
+    {
+        Skill->TargetRule = Target;
+        TestFalse(TEXT("Other tile target rules still require explicit semantics"), Skill->ResolveRoundSkill(Resolved, Error));
+    }
     Skill->bUseRoundDefinition = true;
     Skill->AbilityClass = nullptr;
     TestTrue(TEXT("Explicit round definitions do not require an ability class"), Skill->ResolveRoundSkill(Resolved, Error));

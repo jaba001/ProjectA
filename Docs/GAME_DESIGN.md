@@ -644,20 +644,20 @@ SAP 이동은 계획 중 캐릭터별 목적지 하나를 예약·변경·취소
 
 `USkillDefinitionDataAsset::bUseRoundDefinition`을 켜면 `RoundDefinition`을 사용한다. 프로필은 공격 종류·유닛/타일 접근·자기 진영 잔류·목표 상실 대응·유도/대상 한정·선딜·위력·근접 반경·이동/투사체 속도·투사체 반경/수명·AP/SubAP 비용을 정의한다. `MoveSpeed`는 스킬의 기준값이며 근접 접근·복귀에만 [8-4절](#8-4-공격-접근과-복귀)의 민첩 보정을 적용한다.
 
-`ResolveRoundSkill`은 명시 프로필 또는 제한된 이전 공격 정의를 검증한다. `bUseRoundDefinition=true`인 스킬은 새 프로필을 기준으로 하며 기존 GAS AbilityClass를 필수 실행 조건으로 요구하지 않는다. 명시 프로필이 없는 스킬은 EnemyUnit 대상·Single/AroundTarget 범위·유효한 `GA_AttackBase` 피해 정의의 지원 조합만 초기 변환한다. 지원하지 않는 대상/범위·커스텀 능력은 명시 프로필이 필요하다는 스킬별 오류로 거절한다.
+`ResolveRoundSkill`은 명시 프로필 또는 제한된 이전 공격 정의를 검증한다. `bUseRoundDefinition=true`인 스킬은 새 프로필을 기준으로 하며 기존 GAS AbilityClass를 필수 실행 조건으로 요구하지 않는다. 명시 프로필이 없는 스킬은 EnemyUnit·Single/AroundTarget 또는 EnemyTile·AroundTarget과 유효한 `GA_AttackBase` 피해 정의의 지원 조합만 초기 변환한다. 지원하지 않는 대상/범위·커스텀 능력은 명시 프로필이 필요하다는 스킬별 오류로 거절한다.
 
 | 지원되는 이전 정의 | 초기 라운드 변환 |
 |---|---|
 | EnemyUnit·Single·제자리 공격 | 투사체, 발동 전 목표 상실 시 마지막 위치 유지 |
 | EnemyUnit·Single·`bMoveToTarget` | 실제 유닛 접근형 근접, 발동 전 목표 상실 시 취소 |
-| EnemyUnit·AroundTarget | 실제 위치 반경의 지점 공격. 반경과 접근 여부를 검증 가능한 새 값으로 변환 |
+| EnemyUnit/EnemyTile·AroundTarget | 선택 좌표 중심의 실제 위치 반경으로 적을 판정하는 지점 공격. 반경과 접근 여부를 기존 변환값으로 사용 |
 | 기타 대상·범위·커스텀 능력 | 자동 의미 변경 없이 거절. 명시 RoundDefinition 필요 |
 
 변환은 PrimaryAssetId·표시명·AP 비용·authored 공격 위력과 기존 AttackMontage의 시전 표현을 연결하며 나머지 시간·속도는 시험 기본값이다. 명시 프로필의 CastMontage가 있으면 우선 사용한다. 몽타주는 시각 표현이며 루트 모션·알림으로 이동이나 피해를 확정하지 않는다. 기존 GAS 효과·상태효과를 그대로 실행하거나 완전 이식하는 방식이 아니다. 회복 스킬을 자동 엄호로 바꾸지 않는다.
 
 Snapshot 상대도 같은 `ResolveRoundSkill` 검증을 사용한다. 에셋 ID로 중복을 검사하며 이전 GAS 클래스를 공유하는 서로 다른 명시 스킬은 허용한다.
 
-실전 스킬 목록은 검증된 실제 장착 DA만 사용한다. 공통 시험 `Strike`·`Arrow`·`Guard`·`Wait`·`MoveShot`·`GroundStrike` 주입과 무장착 대체 공격을 제거했다. Encounter 진입 시 시험용 스킬 풀을 자동 추첨·장착하지 않는다. 기존 기본 공격의 이름·ID·몽타주와 캐릭터 장착은 유지하며 새 원거리 공격의 장착 연결은 선택 대기다. 시험 정의는 명시적으로 장착하는 C++ 회귀 fixture에서만 사용한다. 기존 Guard 등의 해석 코드가 남아 있는 사실은 해당 콘텐츠 제작 완료를 뜻하지 않는다.
+실전 스킬 목록은 검증된 실제 장착 DA만 사용한다. 공통 시험 `Strike`·`Arrow`·`Guard`·`Wait`·`MoveShot`·`GroundStrike` 주입과 무장착 대체 공격을 제거했다. Encounter 진입 시 시험용 스킬 풀을 자동 추첨·장착하지 않는다. 2026-09-18 요청에 따라 `BP_PlayerUnit`에 실제 DA 기본공격·원거리 공격·AOE·휩쓸기 4개를 명시적으로 장착했다. 공통 시험 구성이며 직업별 최종 스킬 규칙은 미정이다. 기본공격의 사용자 수정과 각 DA의 피해·몽타주를 보존했으며 휩쓸기에는 아직 몽타주가 없다. 기존 Guard 등의 해석 코드가 남아 있는 사실은 해당 콘텐츠 제작 완료를 뜻하지 않는다.
 
 `BPDA_RangedAttack`과 별도 `BPGA_RangedAttack`은 기존 기본 공격을 복제한 제자리 단일 대상 원거리 공격이다. 피해 50·AP 1과 `MM_Attack_01_Montage`를 재사용하며 `EnemyUnit`·`Single`·`bMoveToTarget=false`·`bUseRoundDefinition=false`로 기존 투사체 변환을 사용한다. 투사체는 700cm/s·반경 12cm·최대 수명 5초이며 유도 없이 경로상 최초 실제 적 한 명에게 적중하거나 벽에서 종료한다. 원본의 빈 태그 설정을 보존하며 이 콘텐츠 추가가 GAS 태그 실행 연동 완료를 뜻하지는 않는다.
 
