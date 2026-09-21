@@ -11,12 +11,16 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Combat/Library/CombatWeaponTraceLibrary.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphPin.h"
 #include "Engine/Blueprint.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/SCS_Node.h"
 #include "Engine/SimpleConstructionScript.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshSocket.h"
 #include "GameFramework/Actor.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -28,6 +32,7 @@
 #include "UObject/ObjectRedirector.h"
 #include "UObject/Package.h"
 #include "UObject/UObjectHash.h"
+#include "Unit/UnitBase.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogWarriorAssetLibrary, Log, All);
 
@@ -246,6 +251,25 @@ FName UWarriorAssetLibrary::GetWeaponAttachment(UBlueprint* Blueprint, FName Com
 {
     const USCS_Node* Node = FindComponentNode(Blueprint, ComponentName);
     return Node ? Node->AttachToName : NAME_None;
+}
+
+TArray<FVector> UWarriorAssetLibrary::SampleWeaponBlade(UBlueprint* Blueprint, USkillDefinitionDataAsset* SkillAsset, float MontageSeconds)
+{
+    if (!IsValid(Blueprint) || !Blueprint->GeneratedClass || !IsValid(SkillAsset)) return {};
+    FCombatRoundSkill Skill;
+    FText Error;
+    if (!SkillAsset->ResolveRoundSkill(Skill, Error) || !Skill.bUseWeaponTrace) return {};
+    const AUnitBase* Defaults = Cast<AUnitBase>(Blueprint->GeneratedClass->GetDefaultObject());
+    const USCS_Node* Node = FindComponentNode(Blueprint, Skill.WeaponComponentName);
+    const UStaticMeshComponent* Weapon = Node ? Cast<UStaticMeshComponent>(Node->ComponentTemplate) : nullptr;
+    const USkeletalMeshComponent* Mesh = Defaults ? Defaults->GetMesh() : nullptr;
+    if (!Weapon || !Weapon->GetStaticMesh() || !Mesh) return {};
+    const UStaticMeshSocket* Base = Weapon->GetStaticMesh()->FindSocket(Skill.WeaponBaseSocket);
+    const UStaticMeshSocket* Tip = Weapon->GetStaticMesh()->FindSocket(Skill.WeaponTipSocket);
+    FTransform Hand;
+    if (!Base || !Tip || !CombatWeaponTrace::SampleBoneTransform(Mesh->GetSkeletalMeshAsset(), Defaults->ResolveRoundCastMontage(Skill.CastMontage), Skill.WeaponMontageSlot, Node->AttachToName, MontageSeconds, Hand)) return {};
+    const FTransform WeaponToActor = Weapon->GetRelativeTransform() * Hand * Mesh->GetRelativeTransform();
+    return {WeaponToActor.TransformPosition(Base->RelativeLocation), WeaponToActor.TransformPosition(Tip->RelativeLocation)};
 }
 
 TArray<FName> UWarriorAssetLibrary::GetAnimationSlotNames(UAnimBlueprint* Blueprint)

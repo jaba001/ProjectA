@@ -17,6 +17,12 @@ ASSETS = unreal.EditorAssetLibrary
 HELPER = unreal.WarriorAssetLibrary
 REPORT = {"gameplay_test": "not run", "retargeted": [], "units": []}
 SWORD_WINDUP_SECONDS = 0.23
+SWORD_TRACE_SECONDS = 0.2
+SWORD_TRACE_RADIUS = 4.0
+SWORD_BLADE_BASE = (0.0, 0.0, -22.0)
+SWORD_BLADE_TIP = (0.0, 0.191992, -118.28656)
+SWORD_WARRIOR_GRIP = (-11.095651, 5.605028, -10.0)
+SWORD_ENEMY_GRIP = (-8.5, 5.0, -10.0)
 SWORD_RECOVERY_START_SECONDS = 0.2
 SWORD_MONTAGE_SECONDS = 1.933333
 RETARGET_SETUP_VERSION = "2"
@@ -191,7 +197,7 @@ def project_mesh(source_path):
     return mesh, skeleton
 
 
-def configure_weapon(blueprint, weapon):
+def configure_weapon(blueprint, weapon, grip):
     subsystem = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
     library = unreal.SubobjectDataBlueprintFunctionLibrary
     handles = subsystem.k2_gather_subobject_data_for_blueprint(blueprint)
@@ -213,12 +219,25 @@ def configure_weapon(blueprint, weapon):
     component.set_static_mesh(weapon)
     component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
     component.set_editor_property("can_ever_affect_navigation", False)
-    # The sword mesh points down its local Z axis; align its grip across the right palm.
-    # 검 메시의 날은 로컬 Z 음의 방향이며 오른손 손바닥을 가로지르도록 손잡이를 정렬합니다.
-    component.set_editor_property("relative_location", unreal.Vector(-11.095651, 5.605028, 0.592877))
-    component.set_editor_property("relative_rotation", unreal.Rotator(0.0, 0.0, 180.0))
+    # The pivot is the handle center; place the guard ahead of the thumb with the blade along hand +Z.
+    # 피벗은 손잡이 중앙이므로 검막이를 엄지 앞에 놓고 칼날을 손의 +Z 방향으로 정렬합니다.
+    component.set_editor_property("relative_location", unreal.Vector(*grip))
+    component.set_editor_property("relative_rotation", unreal.Rotator(pitch=0.0, yaw=0.0, roll=180.0))
     component.set_editor_property("relative_scale3d", unreal.Vector(1.0, 1.0, 1.0))
     require(HELPER.set_weapon_attachment(blueprint, "Sword", "hand_r"), "Could not persist sword attachment")
+
+
+def configure_blade_sockets(weapon):
+    for name, location in [("BladeBase", SWORD_BLADE_BASE), ("BladeTip", SWORD_BLADE_TIP)]:
+        socket = weapon.find_socket(name)
+        if not socket:
+            socket = unreal.new_object(unreal.StaticMeshSocket, outer=weapon)
+            socket.set_editor_property("socket_name", name)
+            weapon.add_socket(socket)
+        socket.set_editor_property("relative_location", unreal.Vector(*location))
+        socket.set_editor_property("relative_rotation", unreal.Rotator())
+        socket.set_editor_property("relative_scale", unreal.Vector(1.0, 1.0, 1.0))
+    save(weapon)
 
 
 def configure_unit(blueprint, mesh, animation, skills, overrides, weapon):
@@ -229,7 +248,7 @@ def configure_unit(blueprint, mesh, animation, skills, overrides, weapon):
     defaults.set_editor_property("equipped_skill_data_assets", skills)
     defaults.set_editor_property("round_montage_overrides", overrides)
     unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
-    configure_weapon(blueprint, weapon)
+    configure_weapon(blueprint, weapon, SWORD_WARRIOR_GRIP if mesh == load(mirrored_path(WARRIOR_SOURCE)) else SWORD_ENEMY_GRIP)
     unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
     save(blueprint)
     REPORT["units"].append(blueprint.get_path_name())
@@ -298,6 +317,13 @@ def configure():
     # Kwang's main swing peaks near 0.23 seconds; recovery skips its duplicated first 0.2 seconds.
     # Kwang의 주 타격 구간은 약 0.23초이며 회복 동작의 처음 0.2초는 중복 구간이므로 생략합니다.
     profile.set_editor_property("windup_seconds", SWORD_WINDUP_SECONDS)
+    profile.set_editor_property("use_weapon_trace", True)
+    profile.set_editor_property("weapon_component_name", "Sword")
+    profile.set_editor_property("weapon_base_socket", "BladeBase")
+    profile.set_editor_property("weapon_tip_socket", "BladeTip")
+    profile.set_editor_property("weapon_montage_slot", "DefaultSlot")
+    profile.set_editor_property("weapon_trace_duration", SWORD_TRACE_SECONDS)
+    profile.set_editor_property("weapon_trace_radius", SWORD_TRACE_RADIUS)
     profile.set_editor_property("power", unreal.get_default_object(basic.get_editor_property("ability_class")).get_editor_property("damage_amount"))
     profile.set_editor_property("action_point_cost", basic.get_editor_property("action_point_cost"))
     sword.set_editor_property("round_definition", profile)
@@ -306,10 +332,10 @@ def configure():
     sword.set_editor_property("target_rule", unreal.SkillTargetRule.ENEMY_UNIT)
     sword.set_editor_property("area_type", unreal.SkillAreaType.SINGLE)
     sword.set_editor_property("area_radius", 0)
-    sword.set_editor_property("skill_description", "대상에게 접근해 검으로 공격한 뒤 원래 자리로 복귀합니다.")
+    sword.set_editor_property("skill_description", "대상에게 접근해 칼날이 닿은 첫 적을 한 번 타격한 뒤 원래 자리로 복귀합니다.")
     save(sword)
     weapon = duplicate(WEAPON_SOURCE, mirrored_path(WEAPON_SOURCE))
-    save(weapon)
+    configure_blade_sockets(weapon)
     warrior = duplicate(ROOT + "/Blueprint/Unit/BP_PlayerUnit", ROOT + "/Blueprint/Unit/BP_WarriorUnit")
     configure_unit(warrior, warrior_mesh, warrior_retargets[source_abp], previous + [sword], {key: warrior_retargets[key] for key in montages}, weapon)
     enemy_overrides = {key: enemy_retargets[key] for key in montages}
@@ -357,6 +383,15 @@ def verify():
     montage = profile.get_editor_property("cast_montage")
     require(sword.get_editor_property("use_round_definition") and profile.get_editor_property("kind") == unreal.CombatRoundSkillKind.MELEE, "Sword attack must use a melee profile")
     require(abs(profile.get_editor_property("windup_seconds") - SWORD_WINDUP_SECONDS) < 0.001, "Sword release does not match the Kwang swing")
+    require(profile.get_editor_property("use_weapon_trace") and not profile.get_editor_property("use_melee_area_collision"), "Sword must use blade contact instead of forward area collision")
+    require(abs(profile.get_editor_property("weapon_trace_duration") - SWORD_TRACE_SECONDS) < 0.001 and abs(profile.get_editor_property("weapon_trace_radius") - SWORD_TRACE_RADIUS) < 0.001, "Sword trace window or thickness changed")
+    for field, expected_name in [("weapon_component_name", "Sword"), ("weapon_base_socket", "BladeBase"), ("weapon_tip_socket", "BladeTip"), ("weapon_montage_slot", "DefaultSlot")]:
+        require(str(profile.get_editor_property(field)) == expected_name, "Sword blade binding mismatch: " + field)
+    weapon = load(mirrored_path(WEAPON_SOURCE))
+    for socket_name, expected_location in [("BladeBase", SWORD_BLADE_BASE), ("BladeTip", SWORD_BLADE_TIP)]:
+        socket = require(weapon.find_socket(socket_name), "Missing blade socket")
+        location = socket.get_editor_property("relative_location")
+        require(math.dist((location.x, location.y, location.z), expected_location) < 0.001, "Blade socket does not match sword geometry")
     require(abs(montage.get_editor_property("sequence_length") - SWORD_MONTAGE_SECONDS) < 0.001, "Kwang attack and recovery length changed")
     require(profile.get_editor_property("action_point_cost") == basic.get_editor_property("action_point_cost"), "Sword AP was not preserved")
     expected = [basic, load(SKILLS + "/BPDA_RangedAttack"), load(SKILLS + "/BPDA_AreaAttack"), sweep, sword]
@@ -397,7 +432,20 @@ def verify():
             component = library.get_object_for_blueprint(data, blueprint)
             if isinstance(component, unreal.StaticMeshComponent) and component.get_editor_property("static_mesh"):
                 weapons.append(component.get_editor_property("static_mesh").get_path_name())
+                grip = component.get_editor_property("relative_location")
+                expected_grip = SWORD_WARRIOR_GRIP if name == "BP_WarriorUnit" else SWORD_ENEMY_GRIP
+                require(math.dist((grip.x, grip.y, grip.z), expected_grip) < 0.001, "Sword grip was not saved")
+                rotation = component.get_editor_property("relative_rotation")
+                require(abs(rotation.pitch) < 0.001 and abs(rotation.yaw) < 0.001 and abs(abs(rotation.roll) - 180.0) < 0.001, "Sword blade must face the thumb side")
         require(weapons == [load(mirrored_path(WEAPON_SOURCE)).get_path_name()], "Unexpected weapon mesh list: " + name)
+        blade_samples = []
+        for sample_index in range(math.ceil(SWORD_TRACE_SECONDS / 0.005) + 1):
+            seconds = SWORD_WINDUP_SECONDS + min(sample_index * 0.005, SWORD_TRACE_SECONDS)
+            endpoints = list(HELPER.sample_weapon_blade(blueprint, sword, seconds))
+            require(len(endpoints) == 2 and all(math.isfinite(value) for point in endpoints for value in [point.x, point.y, point.z]), "Runtime blade sampling failed on the saved Blueprint")
+            require(90.0 < math.dist((endpoints[0].x, endpoints[0].y, endpoints[0].z), (endpoints[1].x, endpoints[1].y, endpoints[1].z)) < 100.0, "Blade sample length does not match mesh sockets")
+            blade_samples.append({"seconds": seconds, "base": [endpoints[0].x, endpoints[0].y, endpoints[0].z], "tip": [endpoints[1].x, endpoints[1].y, endpoints[1].z]})
+        REPORT.setdefault("weapon_blade_samples", {})[name] = blade_samples
         REPORT["units"].append({"blueprint": blueprint.get_path_name(), "mesh": mesh.get_path_name(), "animation": animation.get_path_name(), "skills": [skill.get_path_name() for skill in skills], "weapon": weapons[0]})
     party = load(ROOT + "/Blueprint/DataAsset/Parties/DA_VerticalSliceParty")
     warrior_class = load(ROOT + "/Blueprint/Unit/BP_WarriorUnit").generated_class()

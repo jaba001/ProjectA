@@ -36,6 +36,13 @@ bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
     if (Skill.bUseMeleeAreaCollision && (Skill.Kind != ECombatRoundSkillKind::Melee || Skill.MeleeArea != ESkillAreaType::Single)) return false;
     if (Skill.MeleeAreaHalfExtent.ContainsNaN() || Skill.MeleeAreaHalfExtent.GetMin() <= 0.0 || Skill.MeleeAreaHalfExtent.GetMax() > 1000.0) return false;
     if (!FMath::IsFinite(Skill.WindupSeconds) || Skill.WindupSeconds < 0.f || Skill.WindupSeconds > 60.f) return false;
+    if (Skill.bUseWeaponTrace)
+    {
+        if (Skill.Kind != ECombatRoundSkillKind::Melee || Skill.MeleeArea != ESkillAreaType::Single || Skill.bUseMeleeAreaCollision || !Skill.CastMontage) return false;
+        if (Skill.WeaponComponentName.IsNone() || Skill.WeaponBaseSocket.IsNone() || Skill.WeaponTipSocket.IsNone() || Skill.WeaponBaseSocket == Skill.WeaponTipSocket || Skill.WeaponMontageSlot.IsNone()) return false;
+        if (!FMath::IsFinite(Skill.WeaponTraceDuration) || Skill.WeaponTraceDuration <= 0.f || Skill.WeaponTraceDuration > 5.f || Skill.WindupSeconds + Skill.WeaponTraceDuration > 60.f) return false;
+        if (!FMath::IsFinite(Skill.WeaponTraceRadius) || Skill.WeaponTraceRadius <= 0.f || Skill.WeaponTraceRadius > 100.f) return false;
+    }
     if (!FMath::IsFinite(Skill.Power) || Skill.Power < 0.f || Skill.Power > 1000000.f) return false;
     if (!FMath::IsFinite(Skill.HitRange) || Skill.HitRange <= 0.f || Skill.HitRange > 100000.f) return false;
     if (!FMath::IsFinite(Skill.MeleeRadius) || Skill.MeleeRadius <= 0.f || Skill.MeleeRadius > 1000.f) return false;

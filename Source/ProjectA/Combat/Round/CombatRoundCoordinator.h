@@ -69,6 +69,9 @@ private:
         double PhaseStarted = 0.0;
         double MontageStartedAt = 0.0;
         double MontageRecoverySeconds = 0.0;
+        double WeaponTraceTime = -1.0;
+        FVector PreviousBladeBase = FVector::ZeroVector;
+        FVector PreviousBladeTip = FVector::ZeroVector;
         bool bReleased = false;
         bool bMontageStarted = false;
         bool bTrackMontageCompletion = false;
@@ -129,6 +132,7 @@ private:
     void AdvanceSimulation(float StepSeconds);
     void AdvanceAction(int32 Index, float StepSeconds);
     void ReleaseSkill(int32 Index, const FCombatRoundSkill& Skill);
+    void AdvanceWeaponTrace(int32 Index, const FCombatRoundSkill& Skill);
     void StartRecovery(int32 Index, bool bFailed, const FText& Status);
     void StartReturn(int32 Index, bool bFailed, const FText& Status);
     void FinishRoundIfSettled();

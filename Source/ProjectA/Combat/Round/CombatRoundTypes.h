@@ -70,8 +70,8 @@ struct PROJECTA_API FCombatRoundSkill
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FText Name;
 
-    // Presentation does not control authoritative release timing or damage.
-    // 표현은 서버의 발동 시점이나 피해 판정을 제어하지 않습니다.
+    // Weapon traces sample this montage on the server; cosmetic notifies never apply damage.
+    // 무기 궤적은 서버가 이 몽타주에서 샘플링하며 표현용 Notify는 피해를 적용하지 않습니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation")
     TObjectPtr<UAnimMontage> CastMontage = nullptr;
 
@@ -92,6 +92,31 @@ struct PROJECTA_API FCombatRoundSkill
     // cm 단위 박스 반크기이며 전방 깊이·좌우 폭·높이 순서입니다. 뒷면은 시전자 위치에서 시작합니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.1", ClampMax = "1000.0", EditCondition = "bUseMeleeAreaCollision"))
     FVector MeleeAreaHalfExtent = FVector(75.f, 250.f, 100.f);
+
+    // Trace the equipped blade during a bounded swing window instead of a fixed forward volume.
+    // 고정 전방 범위 대신 제한된 휘두르기 구간에 장착한 칼날의 궤적을 검사합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Trace")
+    bool bUseWeaponTrace = false;
+
+    // Component and socket names bind authored geometry, not weapon classifications.
+    // 컴포넌트와 소켓 이름은 무기 분류가 아니라 작성된 판정 지오메트리를 연결합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Trace", meta = (EditCondition = "bUseWeaponTrace"))
+    FName WeaponComponentName;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Trace", meta = (EditCondition = "bUseWeaponTrace"))
+    FName WeaponBaseSocket;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Trace", meta = (EditCondition = "bUseWeaponTrace"))
+    FName WeaponTipSocket;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Trace", meta = (EditCondition = "bUseWeaponTrace"))
+    FName WeaponMontageSlot = TEXT("DefaultSlot");
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Trace", meta = (ClampMin = "0.01", ClampMax = "5.0", EditCondition = "bUseWeaponTrace"))
+    float WeaponTraceDuration = 0.2f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Trace", meta = (ClampMin = "0.1", ClampMax = "100.0", EditCondition = "bUseWeaponTrace"))
+    float WeaponTraceRadius = 4.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     ECombatRoundApproach Approach = ECombatRoundApproach::Unit;

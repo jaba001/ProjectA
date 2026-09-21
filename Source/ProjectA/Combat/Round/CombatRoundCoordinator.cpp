@@ -11,6 +11,7 @@
 #include "EngineUtils.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Combat/Library/CombatEffectLibrary.h"
+#include "Combat/Library/CombatWeaponTraceLibrary.h"
 #include "Combat/Round/CombatRoundProjectile.h"
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
@@ -1366,6 +1367,11 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
                 Entry.Unit->SetRoundCastMontage(Montage);
                 Action.bTrackMontageCompletion = Entry.Unit->HasRoundCastMontageInstance();
             }
+            if (Skill->bUseWeaponTrace)
+            {
+                AdvanceWeaponTrace(Index, *Skill);
+                return;
+            }
             if (SimulationTime + 0.00001 < Action.PhaseStarted + Skill->WindupSeconds) return;
             ReleaseSkill(Index, *Skill);
             return;
@@ -1466,6 +1472,57 @@ void ACombatRoundCoordinator::StartReturn(int32 Index, bool bFailed, const FText
         Entry.Unit->ForceNetUpdate();
         Entry.ActionPhase = ECombatRoundActionPhase::Complete;
         if (bFailed) Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
+    }
+}
+
+void ACombatRoundCoordinator::AdvanceWeaponTrace(int32 Index, const FCombatRoundSkill& Skill)
+{
+    FCombatRoundUnitView& Entry = View.Units[Index];
+    FActionRuntime& Action = Actions[Index];
+    if (Action.bReleased || !HasExecutionAuthority() || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) return;
+    UAnimMontage* Montage = Entry.Unit->ResolveRoundCastMontage(Skill.CastMontage);
+    if (!IsValid(Montage) || !FMath::IsFinite(Montage->RateScale) || Montage->RateScale <= 0.f)
+    {
+        Action.bReleased = true;
+        StartRecovery(Index, true, RoundText(TEXT("검 공격 애니메이션 설정 누락")));
+        return;
+    }
+    // Clip simulation catch-up to animation time so a newly started swing cannot hit within the same stalled frame.
+    // 새 휘두르기가 지연된 동일 프레임에서 타격하지 않도록 누적 시뮬레이션을 애니메이션 시간으로 제한합니다.
+    const double Elapsed = FMath::Min(SimulationTime - Action.PhaseStarted, MontageClock - Action.MontageStartedAt);
+    const double WindowEnd = Skill.WindupSeconds + Skill.WeaponTraceDuration;
+    if (Elapsed + UE_DOUBLE_SMALL_NUMBER < Skill.WindupSeconds) return;
+    const double SampleUntil = FMath::Min(Elapsed, WindowEnd);
+    const bool bFirstSample = Action.WeaponTraceTime < 0.0;
+    if (!bFirstSample && SampleUntil <= Action.WeaponTraceTime + UE_DOUBLE_SMALL_NUMBER) return;
+    double SampleTime = bFirstSample ? Skill.WindupSeconds : FMath::Min(Action.WeaponTraceTime + 0.005, SampleUntil);
+    for (;;)
+    {
+        CombatWeaponTrace::FBladePose Current;
+        if (!CombatWeaponTrace::SampleBlade(Entry.Unit, Skill, Montage, SampleTime * Montage->RateScale, Current))
+        {
+            Action.bReleased = true;
+            StartRecovery(Index, true, RoundText(TEXT("검 장착 또는 칼날 소켓 설정 누락")));
+            return;
+        }
+        const CombatWeaponTrace::FBladePose Previous = Action.WeaponTraceTime < 0.0 ? Current : CombatWeaponTrace::FBladePose{Action.PreviousBladeBase, Action.PreviousBladeTip};
+        Action.WeaponTraceTime = SampleTime;
+        Action.PreviousBladeBase = Current.Base;
+        Action.PreviousBladeTip = Current.Tip;
+        if (AUnitBase* HitUnit = CombatWeaponTrace::FindFirstHit(GetWorld(), Entry.Unit, View.Units, Previous, Current, Skill.WeaponTraceRadius))
+        {
+            Action.bReleased = true;
+            ApplyHit(Entry.Unit, HitUnit, Skill.Power);
+            StartRecovery(Index, false, RoundText(TEXT("검 타격 완료")));
+            return;
+        }
+        if (SampleTime + UE_DOUBLE_SMALL_NUMBER >= SampleUntil) break;
+        SampleTime = FMath::Min(SampleTime + 0.005, SampleUntil);
+    }
+    if (Elapsed + UE_DOUBLE_SMALL_NUMBER >= WindowEnd)
+    {
+        Action.bReleased = true;
+        StartRecovery(Index, true, RoundText(TEXT("칼날 충돌 없음 또는 장애물에 차단됨")));
     }
 }
 
