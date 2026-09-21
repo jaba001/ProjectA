@@ -32,8 +32,8 @@ public:
     bool SelectRunEncounter(FName EncounterId);
     bool LeaveRunEncounter();
 
-    // Legacy combat-save entry points reject unsupported timed-round recovery.
-    // 기존 전투 저장 진입점은 미지원 시간 기반 라운드 복구를 명시적으로 거절합니다.
+    // Rebuild units and ownership from a durable round planning boundary.
+    // 확정 저장된 라운드 계획 경계에서 유닛과 소유권을 재구성합니다.
     bool RestoreSavedCombat(const FRunAccountId& HostAccount, FText& OutError);
     bool ResumeManagedGameplay(FText& OutError);
     bool RetryCombatCheckpoint(FText& OutError);
@@ -56,6 +56,7 @@ private:
 #endif
 
     bool SpawnEncounter(UEncounterDefinitionDataAsset* Definition);
+    void HandleCombatViewChanged();
     void HandleCombatResult(ECombatResult Result);
     void FinishEncounter();
     void CleanupEncounter();
@@ -92,5 +93,6 @@ private:
     FTimerHandle FinishTimer;
     bool bPreparing = false;
     bool bPreparationAbortPending = false;
+    bool bPlanningCheckpointRetryAvailable = false;
     bool bShuttingDown = false;
 };

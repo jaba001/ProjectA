@@ -92,6 +92,13 @@ public:
     // 서버가 라운드 표현용 몽타주를 시작하며 null은 이전 라운드 몽타주만 중지합니다.
     void SetRoundCastMontage(UAnimMontage* Montage, bool bImmediateStop = false);
 
+    // Match shared skill presentation to this unit's skeleton without changing its gameplay definition.
+    // 게임플레이 정의를 바꾸지 않고 공통 스킬 표현을 이 유닛의 스켈레톤에 맞춥니다.
+    UPROPERTY(EditDefaultsOnly, Category = "UnitBase|Round")
+    TMap<TObjectPtr<UAnimMontage>, TObjectPtr<UAnimMontage>> RoundMontageOverrides;
+
+    UAnimMontage* ResolveRoundCastMontage(UAnimMontage* Montage) const;
+
     // Includes blend-out; inactive montages can still contribute to the final pose.
     // 비활성 몽타주도 최종 자세에 영향을 줄 수 있으므로 블렌드 아웃까지 포함합니다.
     bool HasRoundCastMontageInstance() const;

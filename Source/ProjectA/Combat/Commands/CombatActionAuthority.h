@@ -36,6 +36,7 @@ public:
     FCombatActionResponse ExecuteServerAI(APlayerUnit* Unit, const FCombatActionRequest& Request, FGuid ControlSessionId);
     FGuid GetUnitId(const AUnitBase* Unit) const;
     FGuid GetCharacterId(const AUnitBase* Unit) const;
+    int32 GetPartySlot(const AUnitBase* Unit) const;
     FRunAccountId GetOwnerAccountId(const AUnitBase* Unit) const;
     AUnitBase* ResolveUnit(FGuid UnitId) const;
     FGuid GetCombatInstanceId() const { return CombatInstanceId; }
@@ -60,6 +61,7 @@ private:
 
     TMap<FGuid, TWeakObjectPtr<AUnitBase>> UnitsById;
     TMap<TWeakObjectPtr<AUnitBase>, FGuid> CharacterIds;
+    TMap<TWeakObjectPtr<AUnitBase>, int32> PartySlots;
     TMap<TWeakObjectPtr<APartyPlayerController>, FRunAccountId> Participants;
     TMap<TWeakObjectPtr<APartyPlayerController>, FGuid> ParticipantBindingIds;
     FGuid CombatInstanceId;

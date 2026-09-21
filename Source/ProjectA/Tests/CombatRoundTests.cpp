@@ -174,13 +174,6 @@ namespace CombatRoundTests
             Skill.bTargetOnly = false;
             Skill.SubActionPointCost = 1;
             Skills.Add(MakeSkill(Unit, TEXT("MoveShot"), Skill));
-            Skill = FCombatRoundSkill();
-            Skill.Kind = ECombatRoundSkillKind::Guard;
-            Skill.Approach = ECombatRoundApproach::None;
-            Skill.Power = 25.0f;
-            Skill.WindupSeconds = 0.15f;
-            Skill.HitRange = 1500.0f;
-            Skills.Add(MakeSkill(Unit, TEXT("Guard"), Skill));
             Skills.Add(MakeSkill(Unit, TEXT("Wait"), WaitDefinition()));
             return Unit->ConfigureProfession(100.0f, 2, 2, Skills);
         }
@@ -405,9 +398,7 @@ bool FCombatRoundPlanningTargetsTest::RunTest(const FString& Parameters)
     AUnitBase* Enemy = Fixture.Enemies[0];
     TestTrue(TEXT("Attack offers a living enemy"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Strike")), Enemy->UnitIndex));
     TestFalse(TEXT("Attack excludes a living ally"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Strike")), Friend->UnitIndex));
-    TestTrue(TEXT("Guard offers a living ally"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Guard")), Friend->UnitIndex));
-    TestTrue(TEXT("Guard keeps the existing self-target option"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Guard")), Source->UnitIndex));
-    TestFalse(TEXT("Guard excludes enemies"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Guard")), Enemy->UnitIndex));
+    TestFalse(TEXT("Removed support actions have no selectable targets"), Round->IsValidUnitTarget(Source->UnitIndex, TEXT("Guard"), Friend->UnitIndex));
     TestFalse(TEXT("Unknown source cannot produce target candidates"), Round->IsValidUnitTarget(INDEX_NONE, Fixture.SkillId(Source, TEXT("Strike")), Enemy->UnitIndex));
     TestFalse(TEXT("Unknown skill cannot produce target candidates"), Round->IsValidUnitTarget(Source->UnitIndex, TEXT("Unknown"), Enemy->UnitIndex));
     TestFalse(TEXT("Wait has no unit target choices"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Wait")), Enemy->UnitIndex));
@@ -416,7 +407,7 @@ bool FCombatRoundPlanningTargetsTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Wait is valid without a target"), Round->CanPlanCommand(Fixture.Command(Source, TEXT("Wait")), Error));
     FCombatRoundCommand Ground = Fixture.Command(Source, TEXT("GroundStrike"));
     Ground.TargetCoord = Enemy->GetCurrentTile()->GridCoord;
-    Ground.DestinationCoord = Ground.TargetCoord;
+    Ground.DestinationCoord = FIntPoint(0, 2);
     TestTrue(TEXT("Ground attack uses valid coordinates without a unit target"), Round->CanPlanCommand(Ground, Error));
     TestTrue(TEXT("Other units' equipped actions do not replace the passive enemy's internal wait"), Round->GetView().Units.Last().Command.SkillId.IsNone());
     const FCombatRoundCommand Attack = Fixture.Command(Source, TEXT("Strike"), Enemy);
@@ -424,8 +415,6 @@ bool FCombatRoundPlanningTargetsTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("A dead enemy disappears from attack candidates before another plan is submitted"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Strike")), Enemy->UnitIndex));
     TestFalse(TEXT("A stale attack draft fails preview after target death"), Round->CanPlanCommand(Attack, Error));
     TestFalse(TEXT("The server also rejects the stale target"), Fixture.Submit(0, Attack));
-    Friend->Die();
-    TestFalse(TEXT("A dead ally disappears from guard candidates"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Guard")), Friend->UnitIndex));
     return true;
 }
 
@@ -552,19 +541,20 @@ bool FCombatRoundPlanningMoveTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("The reservation is published without starting movement"), Round->GetView().Units[0].bHasMovePlan && Round->GetView().Units[0].MoveDestinationCoord == Destination->GridCoord && !Round->IsPlanningMoveInProgress() && Round->GetView().PlanRevision > Revision);
     TestEqual(TEXT("Reserving movement never consumes AP"), Source->GetCurrentActionPoint(), 0);
     TestEqual(TEXT("Reserving movement does not consume SAP"), Source->GetCurrentSubActionPoint(), 1);
-    TestTrue(TEXT("Reserving movement clears every human participant's ready state"), !Round->GetView().Units[0].bReady && !Round->GetView().Units[1].bReady);
+    TestTrue(TEXT("Reserving movement clears only the editing owner's ready state"), !Round->GetView().Units[0].bReady && Round->GetView().Units[1].bReady);
     Round->Tick(0.5f);
     TestTrue(TEXT("An unready reservation leaves the actor and occupancy at its origin"), Source->GetActorLocation().Equals(OriginalLocation, 0.1f) && Source->GetCurrentTile() == Origin && Origin->GetOccupyingUnit() == Source && Round->GetView().Phase == ECombatRoundPhase::Planning);
     TestFalse(TEXT("A stale move request cannot replace the reservation"), Round->SubmitMove(Fixture.Controllers[0], Round->GetView().CombatId, Round->GetView().RoundNumber, Revision, Source->UnitIndex, FIntPoint(0, 1), Error));
     TestFalse(TEXT("Another participant cannot cancel the reservation"), Fixture.CancelMove(1, Source));
     if (!TestTrue(TEXT("The owner can edit the reservation"), Fixture.Move(0, Source, FIntPoint(0, 1)))) return false;
     TestTrue(TEXT("Editing changes only the destination, not the actor or resources"), Round->GetView().Units[0].MoveDestinationCoord == FIntPoint(0, 1) && Source->GetActorLocation().Equals(OriginalLocation, 0.1f) && Source->GetCurrentSubActionPoint() == 1);
+    TestTrue(TEXT("Editing movement preserves the other participant's readiness"), Round->GetView().Units[1].bReady);
     TestFalse(TEXT("A stale cancellation cannot clear the edited reservation"), Round->CancelMove(Fixture.Controllers[0], Round->GetView().CombatId, Round->GetView().RoundNumber, Revision, Source->UnitIndex, Error));
     if (!TestTrue(TEXT("The owner can cancel before locking"), Fixture.CancelMove(0, Source))) return false;
     TestTrue(TEXT("Cancellation clears the reservation without moving or spending SAP"), !Round->GetView().Units[0].bHasMovePlan && Source->GetActorLocation().Equals(OriginalLocation, 0.1f) && Source->GetCurrentSubActionPoint() == 1);
+    TestTrue(TEXT("Cancelling movement preserves the other participant's readiness"), Round->GetView().Units[1].bReady);
     if (!TestTrue(TEXT("The owner can reserve the original destination again"), Fixture.Move(0, Source, Destination->GridCoord)) || !TestTrue(TEXT("The first owner readies the reserved action"), Fixture.Ready(0))) return false;
-    TestTrue(TEXT("One ready participant does not start the move"), !Round->IsPlanningMoveInProgress() && Source->GetActorLocation().Equals(OriginalLocation, 0.1f));
-    if (!TestTrue(TEXT("The final participant locks the movement and action plans"), Fixture.Ready(1))) return false;
+    TestTrue(TEXT("Preserved teammate readiness lets the editing owner lock without another confirmation"), Round->IsPlanningMoveInProgress() && Source->GetActorLocation().Equals(OriginalLocation, 0.1f));
     TestTrue(TEXT("All participants ready starts the SAP stage inside resolving"), Round->IsPlanningMoveInProgress() && Round->GetView().Phase == ECombatRoundPhase::Resolving);
     TestEqual(TEXT("Locking consumes exactly one SAP for the move"), Source->GetCurrentSubActionPoint(), 0);
     TestEqual(TEXT("A movement and wait plan still works with zero AP"), Source->GetCurrentActionPoint(), 0);
@@ -658,10 +648,19 @@ bool FCombatRoundMoveBudgetTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Two SAP cover both the movement and authored attack"), Round->CanPlanCommand(AuthoredAttack, Error)) || !TestTrue(TEXT("The combined affordable plan is accepted"), Fixture.Submit(0, AuthoredAttack))) return false;
     TestTrue(TEXT("Planning reserves both costs without spending either resource"), Round->GetView().Units[0].bHasMovePlan && Source->GetCurrentActionPoint() == 2 && Source->GetCurrentSubActionPoint() == 2);
     TestFalse(TEXT("A second participant cannot reserve the same SAP destination"), Fixture.Move(1, Friend, Destination));
+    TestFalse(TEXT("The mover cannot exchange places with another unit's reserved home"), Fixture.Move(0, Source, Friend->GetCurrentTile()->GridCoord));
+    TestFalse(TEXT("The other owner cannot reserve the mover's home while its move is pending"), Fixture.Move(1, Friend, Source->GetCurrentTile()->GridCoord));
+    FCombatRoundCommand ReturningAttack = Fixture.Command(Friend, TEXT("GroundStrike"), Enemy);
+    ReturningAttack.DestinationCoord = Source->GetCurrentTile()->GridCoord;
+    TestFalse(TEXT("A returning tile attack cannot enter another unit's home"), Fixture.Submit(1, ReturningAttack));
+    ReturningAttack.DestinationCoord = Destination;
+    TestFalse(TEXT("A returning tile attack cannot enter another SAP destination"), Fixture.Submit(1, ReturningAttack));
     FCombatRoundCommand ResidentAttack = Fixture.Command(Friend, TEXT("MoveShot"), Enemy);
     ResidentAttack.DestinationCoord = Destination;
     TestFalse(TEXT("An AP action that remains on a reserved SAP destination is rejected"), Fixture.Submit(1, ResidentAttack));
-    if (!TestTrue(TEXT("Cancelling the first move releases its destination"), Fixture.CancelMove(0, Source)) || !TestTrue(TEXT("The resident AP action can claim the released tile"), Fixture.Submit(1, ResidentAttack))) return false;
+    if (!TestTrue(TEXT("Cancelling the first move releases its destination"), Fixture.CancelMove(0, Source)) || !TestTrue(TEXT("A returning tile action can reserve the released empty tile"), Fixture.Submit(1, ReturningAttack))) return false;
+    TestFalse(TEXT("A SAP move cannot enter another returning AP destination"), Fixture.Move(0, Source, Destination));
+    if (!TestTrue(TEXT("The resident AP action can replace its owner's returning destination"), Fixture.Submit(1, ResidentAttack))) return false;
     TestFalse(TEXT("A SAP move cannot claim another unit's resident AP destination"), Fixture.Move(0, Source, Destination));
     if (!TestTrue(TEXT("Replacing the resident action releases its destination"), Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait")))) || !TestTrue(TEXT("The SAP destination becomes reservable again"), Fixture.Move(0, Source, Destination)) || !TestTrue(TEXT("The first participant readies both affordable costs"), Fixture.Ready(0)) || !TestTrue(TEXT("The second participant locks the round"), Fixture.Ready(1))) return false;
     TestEqual(TEXT("Locking charges the authored AP cost once"), Source->GetCurrentActionPoint(), 1);
@@ -847,13 +846,14 @@ bool FCombatRoundAuthoredTileAITest::RunTest(const FString& Parameters)
     const FIntPoint NearestEnemyHome = Fixture.Humans[1]->GetCurrentTile()->GridCoord;
     TestEqual(TEXT("AI chooses its equipped authored attack"), EnemyPlan.SkillId, Fixture.EnemySkillId);
     TestTrue(TEXT("AI targets the nearest opponent rather than the first roster entry"), EnemyPlan.TargetCoord == NearestEnemyHome);
-    TestTrue(TEXT("AI approaches that same coordinate before returning"), EnemyPlan.DestinationCoord == NearestEnemyHome);
+    ACombatGridTile* ApproachTile = Fixture.Grid->GetTileAtCoord(EnemyPlan.DestinationCoord);
+    TestTrue(TEXT("AI approaches a vacant tile while preserving the target's return home"), ApproachTile && !ApproachTile->GetOccupyingUnit() && EnemyPlan.DestinationCoord != NearestEnemyHome);
     TestTrue(TEXT("AI plan is ready before human edits"), Round->GetView().Units.Last().bReady);
     FText Error;
     TestTrue(TEXT("The generated enemy plan passes the same planning validation"), Round->CanPlanCommand(EnemyPlan, Error));
     if (!TestTrue(TEXT("Host applies a human wait"), Fixture.Submit(0, Fixture.Command(Fixture.Humans[0], TEXT("Wait"))))) return false;
     TestTrue(TEXT("First human edit leaves the enemy plan fixed"), SameCommand(EnemyPlan, Round->GetView().Units.Last().Command));
-    if (!TestTrue(TEXT("Guest applies a human guard"), Fixture.Submit(1, Fixture.Command(Fixture.Humans[1], TEXT("Guard"), Fixture.Humans[0])))) return false;
+    if (!TestTrue(TEXT("Guest applies a human wait"), Fixture.Submit(1, Fixture.Command(Fixture.Humans[1], TEXT("Wait"))))) return false;
     TestTrue(TEXT("Second human edit leaves the enemy plan fixed"), SameCommand(EnemyPlan, Round->GetView().Units.Last().Command));
     if (!TestTrue(TEXT("Host readies the plan"), Fixture.Ready(0)) || !TestTrue(TEXT("Guest readies the plan"), Fixture.Ready(1))) return false;
     TestTrue(TEXT("Authored tile AI command can be locked with the human plans"), Round->GetView().Phase == ECombatRoundPhase::Resolving);
@@ -867,16 +867,18 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundAuthoredAIScopeTest, "ProjectA.Comb
 bool FCombatRoundAuthoredAIScopeTest::RunTest(const FString& Parameters)
 {
     using namespace CombatRoundTests;
-    for (int32 Case = 0; Case < 2; ++Case)
-    {
-        FCombatRoundSkill Skill;
-        Skill.Kind = Case == 0 ? ECombatRoundSkillKind::GroundAttack : ECombatRoundSkillKind::Guard;
-        Skill.Approach = Case == 0 ? ECombatRoundApproach::Tile : ECombatRoundApproach::None;
-        Skill.bRemainAtDestination = Case == 0;
-        FFixture Fixture;
-        if (!TestTrue(TEXT("Deferred AI tactic fixture initializes"), Fixture.Initialize(1, 10, &Skill))) return false;
-        TestTrue(Case == 0 ? TEXT("Authored resident movement leaves only an internal AI wait") : TEXT("Authored support leaves only an internal AI wait"), Fixture.Round->GetView().Units.Last().Command.SkillId.IsNone());
-    }
+    FCombatRoundSkill Skill;
+    Skill.Kind = ECombatRoundSkillKind::GroundAttack;
+    Skill.Approach = ECombatRoundApproach::Tile;
+    Skill.bRemainAtDestination = true;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("Deferred AI tactic fixture initializes"), Fixture.Initialize(1, 10, &Skill))) return false;
+    TestTrue(TEXT("Authored resident movement leaves only an internal AI wait"), Fixture.Round->GetView().Units.Last().Command.SkillId.IsNone());
+    Skill.SkillId = TEXT("RemovedSupport");
+    Skill.Kind = static_cast<ECombatRoundSkillKind>(3);
+    Skill.Approach = ECombatRoundApproach::None;
+    Skill.bRemainAtDestination = false;
+    TestFalse(TEXT("The removed support enum value cannot become a different valid action"), CombatRoundRules::IsValidSkill(Skill));
     return true;
 }
 
@@ -900,12 +902,14 @@ bool FCombatRoundPlanOwnershipTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Another combat identity is rejected"), Round->SubmitPlan(Fixture.Controllers[0], FGuid::NewGuid(), Round->GetView().RoundNumber, Round->GetView().PlanRevision, FirstPlan, Error));
     if (!TestTrue(TEXT("Guest applies own plan"), Fixture.Submit(1, Fixture.Command(Fixture.Humans[1], TEXT("Wait")))) || !TestTrue(TEXT("Host becomes ready"), Fixture.Ready(0))) return false;
     TestTrue(TEXT("Host readiness is visible"), Round->GetView().Units[0].bReady);
-    if (!TestTrue(TEXT("Guest edit resets human readiness"), Fixture.Submit(1, Fixture.Command(Fixture.Humans[1], TEXT("Wait"))))) return false;
-    TestFalse(TEXT("Earlier human readiness is invalidated"), Round->GetView().Units[0].bReady);
+    if (!TestTrue(TEXT("A ready owner can edit its own plan"), Fixture.Submit(0, FirstPlan))) return false;
+    TestFalse(TEXT("The editing owner's readiness is invalidated"), Round->GetView().Units[0].bReady);
+    if (!TestTrue(TEXT("The editing owner can ready again"), Fixture.Ready(0)) || !TestTrue(TEXT("Guest edits its own plan"), Fixture.Submit(1, Fixture.Command(Fixture.Humans[1], TEXT("Wait"))))) return false;
+    TestTrue(TEXT("Earlier teammate readiness is preserved"), Round->GetView().Units[0].bReady && !Round->GetView().Units[1].bReady);
     TestTrue(TEXT("Human edits never change the fixed enemy command"), SameCommand(EnemyPlan, Round->GetView().Units.Last().Command));
-    if (!Fixture.Ready(0) || !Fixture.Ready(1)) return false;
+    if (!Fixture.Ready(1)) return false;
     TestTrue(TEXT("All ready transitions to real-time resolution"), Round->GetView().Phase == ECombatRoundPhase::Resolving);
-    TestFalse(TEXT("Locked plans reject even current-revision edits"), Fixture.Submit(0, Fixture.Command(Fixture.Humans[0], TEXT("Guard"), Fixture.Humans[1])));
+    TestFalse(TEXT("Locked plans reject even current-revision edits"), Fixture.Submit(0, Fixture.Command(Fixture.Humans[0], TEXT("Strike"), Fixture.Enemies[0])));
     TestTrue(TEXT("Highest speed begins at zero"), Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Complete);
     Round->Tick(0.19f);
     TestTrue(TEXT("Two speed points preserve a 0.2 second delay"), Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
@@ -1343,6 +1347,78 @@ bool FCombatRoundMeleeCollisionTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundMeleeAreaCollisionTest, "ProjectA.Combat.Round.MeleeAreaPhysicalContacts", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundMeleeAreaCollisionTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Case = 0; Case < 9; ++Case)
+    {
+        FCombatRoundSkill Skill;
+        Skill.bUseMeleeAreaCollision = true;
+        Skill.Approach = ECombatRoundApproach::None;
+        Skill.Power = 17.f;
+        Skill.WindupSeconds = 0.05f;
+        if (Case == 7) Skill.MeleeAreaHalfExtent.Y = 75.f;
+        FFixture Fixture;
+        if (!TestTrue(TEXT("Physical area melee initializes"), Fixture.Initialize(2, 10, nullptr, FIntPoint(0, 3), 4, &Skill))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Friend = Fixture.Humans[1];
+        const FQuat Rotation = FRotator(0.f, Case == 1 ? 90.f : 0.f, 0.f).Quaternion();
+        const auto Position = [&Rotation](float X, float Y, float Z = 100.f) { return Rotation.RotateVector(FVector(X, Y, Z)); };
+        // World contacts deliberately differ from reserved tile locations, including for the selected target.
+        // 선택 대상을 포함해 월드 충돌 위치를 예약 타일 위치와 다르게 배치합니다.
+        Fixture.Enemies[0]->SetActorLocation(Position(0, 100), false);
+        Fixture.Enemies[1]->SetActorLocation(Position(200, Case == 2 ? 300 : 100, Case == 3 ? 400 : 100), false);
+        Fixture.Enemies[2]->SetActorLocation(Position(-200, 100), false);
+        Fixture.Enemies[3]->SetActorLocation(Position(400, 100), false);
+        Friend->SetActorLocation(Position(50, 100), false);
+        AUnitBase* OtherCombat = Fixture.AddUnit(FIntPoint(3, 2), ETeam::Enemy);
+        if (!OtherCombat) return false;
+        OtherCombat->SetActorLocation(Position(100, 100), false);
+        OtherCombat->UnitIndex = Fixture.Enemies[0]->UnitIndex;
+        if (Case == 4 && !Fixture.AddObstacle(Position(100, 50), FVector(2, 25, 100))) return false;
+        if (Case == 5) Fixture.Enemies[1]->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        if (Case == 6) Fixture.Enemies[1]->Die();
+        Fixture.AddPawnSensor(Fixture.Enemies[0], FVector::ZeroVector, FVector(150));
+        if (Case == 8) Fixture.AddPawnSensor(Fixture.Enemies[3], FVector(-200, 0, 0), FVector(150));
+        if (!Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Fixture.Enemies[0])) || !Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait"))) || !Fixture.Ready(0) || !Fixture.Ready(1)) return false;
+        TestEqual(TEXT("Multiple physical contacts still consume one AP"), Source->GetCurrentActionPoint(), 1);
+        if (!TestTrue(TEXT("Area melee settles after one release"), Fixture.AdvanceUntilNextRound(1))) return false;
+        const FString Context = FString::Printf(TEXT("Physical melee area case %d"), Case);
+        TestEqual(Context + TEXT(" hits the selected capsule exactly once"), Fixture.Enemies[0]->GetAttributeSet()->GetHP(), 83.f);
+        const float RightHP = Case == 6 ? 0.f : Case >= 2 && Case <= 7 ? 100.f : 83.f;
+        TestEqual(Context + TEXT(" respects depth, height, walls and capsule state"), Fixture.Enemies[1]->GetAttributeSet()->GetHP(), RightHP);
+        TestEqual(Context + TEXT(" width alone controls the other side"), Fixture.Enemies[2]->GetAttributeSet()->GetHP(), Case == 7 ? 100.f : 83.f);
+        TestEqual(Context + TEXT(" excludes out-of-volume capsules despite attached sensors"), Fixture.Enemies[3]->GetAttributeSet()->GetHP(), 100.f);
+        TestEqual(Context + TEXT(" excludes allies"), Friend->GetAttributeSet()->GetHP(), 100.f);
+        TestEqual(Context + TEXT(" excludes other combat rosters"), OtherCombat->GetAttributeSet()->GetHP(), 100.f);
+    }
+    FCombatRoundSkill Moving;
+    Moving.bUseMeleeAreaCollision = true;
+    FFixture Fixture;
+    if (!Fixture.Initialize(1, 10, nullptr, FIntPoint(0, 3), 1, &Moving)) return false;
+    AUnitBase* Source = Fixture.Humans[0];
+    const FVector Origin = Source->GetActorLocation();
+    const FRotator Facing = Source->GetActorRotation();
+    if (!Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Fixture.Enemies[0])) || !Fixture.Ready(0)) return false;
+    Fixture.Round->Tick(0.2f);
+    TestFalse(TEXT("Wide melee still approaches physically"), Source->GetActorLocation().Equals(Origin, 1.f));
+    TestTrue(TEXT("Wide melee completes its approach and return"), Fixture.AdvanceUntilNextRound(1));
+    TestEqual(TEXT("Approaching wide melee delivers the authored damage"), Fixture.Enemies[0]->GetAttributeSet()->GetHP(), 75.f);
+    TestTrue(TEXT("Wide melee restores its home and facing"), Source->GetActorLocation().Equals(Origin, 2.f) && Source->GetActorRotation().Equals(Facing, 0.1f));
+    Moving.SkillId = TEXT("InvalidArea");
+    Moving.MeleeArea = ESkillAreaType::TargetAndSides;
+    TestFalse(TEXT("Tile coverage and physical area collision cannot be mixed implicitly"), CombatRoundRules::IsValidSkill(Moving));
+    Moving.MeleeArea = ESkillAreaType::Single;
+    for (double Extent : {0.0, -1.0, 1001.0, std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()})
+    {
+        Moving.MeleeAreaHalfExtent.Y = Extent;
+        TestFalse(TEXT("Invalid collision dimensions are rejected before execution"), CombatRoundRules::IsValidSkill(Moving));
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundMeleeSidesTest, "ProjectA.Combat.Round.MeleeTargetAndSides", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FCombatRoundMeleeSidesTest::RunTest(const FString& Parameters)
@@ -1467,6 +1543,64 @@ bool FCombatRoundGroundCollisionTest::RunTest(const FString& Parameters)
         if (!TestTrue(Context + TEXT(" settles after one attack"), Fixture.AdvanceUntilNextRound(1))) return false;
         TestTrue(Context + TEXT(" does not repeat damage for extra pawn components or later steps"), FMath::IsNearlyEqual(Boundary->GetAttributeSet()->GetHP(), ExpectedBoundaryHP) && FMath::IsNearlyEqual(Second->GetAttributeSet()->GetHP(), ExpectedSecondHP));
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundSequentialDeathTest, "ProjectA.Combat.Round.SequentialDeathCancelsUnreleasedAction", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundSequentialDeathTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FCombatRoundSkill Skill;
+    Skill.Kind = ECombatRoundSkillKind::GroundAttack;
+    Skill.Approach = ECombatRoundApproach::None;
+    Skill.Power = 100.0f;
+    Skill.HitRange = 1000.0f;
+    Skill.WindupSeconds = 0.1f;
+    Skill.SubActionPointCost = 1;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("Equal-time lethal attacks initialize"), Fixture.Initialize(1, 20.0f, &Skill, FIntPoint(0, 3), 1, &Skill))) return false;
+    AUnitBase* Human = Fixture.Humans[0];
+    AUnitBase* Enemy = Fixture.Enemies[0];
+    if (!TestTrue(TEXT("The human selects its lethal action"), Fixture.Submit(0, Fixture.Command(Human, Fixture.HumanSkillId, Enemy))) || !TestTrue(TEXT("Readiness locks both equal-time attacks"), Fixture.Ready(0))) return false;
+    TestTrue(TEXT("All AP and SAP costs are paid before either release"), Human->GetCurrentActionPoint() == 1 && Human->GetCurrentSubActionPoint() == 1 && Enemy->GetCurrentActionPoint() == 1 && Enemy->GetCurrentSubActionPoint() == 1);
+    for (int32 Step = 0; Step < 100 && Fixture.Round->IsRoundSessionActive(); ++Step) Fixture.Round->Tick(0.01f);
+    TestTrue(TEXT("The first processed lethal hit immediately kills the later caster"), Human->IsUnitAlive() && !Enemy->IsUnitAlive() && FMath::IsNearlyEqual(Human->GetAttributeSet()->GetHP(), 100.0f));
+    TestTrue(TEXT("The dead caster's unreleased action is cancelled"), Fixture.Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Cancelled);
+    TestTrue(TEXT("Death does not refund the cancelled action's paid AP or SAP"), Enemy->GetCurrentActionPoint() == 1 && Enemy->GetCurrentSubActionPoint() == 1);
+    TestTrue(TEXT("The surviving team receives the normal victory result"), Fixture.Combat->GetCombatResult() == ECombatResult::Victory);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundDoubleWipeTest, "ProjectA.Combat.Round.ReleasedProjectilesDoubleWipeIsDefeat", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundDoubleWipeTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FCombatRoundSkill Skill;
+    Skill.Kind = ECombatRoundSkillKind::Projectile;
+    Skill.Approach = ECombatRoundApproach::None;
+    Skill.Power = 100.0f;
+    Skill.WindupSeconds = 0.1f;
+    Skill.ProjectileSpeed = 1000.0f;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("Opposing lethal projectile fixture initializes"), Fixture.Initialize(1, 20.0f, &Skill, FIntPoint(0, 3), 1, &Skill))) return false;
+    int32 ResultCount = 0;
+    ECombatResult Result = ECombatResult::None;
+    Fixture.Combat->OnCombatResult.AddLambda([&ResultCount, &Result](ECombatResult NewResult)
+    {
+        ++ResultCount;
+        Result = NewResult;
+    });
+    if (!TestTrue(TEXT("The human plans the lethal projectile"), Fixture.Submit(0, Fixture.Command(Fixture.Humans[0], Fixture.HumanSkillId, Fixture.Enemies[0]))) || !TestTrue(TEXT("The same-time projectiles are locked"), Fixture.Ready(0))) return false;
+    Fixture.Round->Tick(0.15f);
+    TestEqual(TEXT("Both projectiles are released while both casters live"), Fixture.Round->GetView().PendingProjectiles, 2);
+    for (int32 Step = 0; Step < 200 && Fixture.Round->IsRoundSessionActive(); ++Step) Fixture.Round->Tick(0.01f);
+    TestTrue(TEXT("Already released attacks may kill both teams"), !Fixture.Humans[0]->IsUnitAlive() && !Fixture.Enemies[0]->IsUnitAlive());
+    TestTrue(TEXT("Double wipe finishes with defeat instead of suspending"), Fixture.Round->GetView().Phase == ECombatRoundPhase::Finished && Result == ECombatResult::Defeat && Fixture.Combat->GetCombatResult() == ECombatResult::Defeat);
+    Fixture.Round->Tick(1.0f);
+    TestEqual(TEXT("The defeat result is emitted exactly once"), ResultCount, 1);
+    Fixture.Combat->OnCombatResult.Clear();
     return true;
 }
 

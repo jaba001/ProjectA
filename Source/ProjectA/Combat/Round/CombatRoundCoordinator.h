@@ -12,6 +12,7 @@ class ACombatGridTile;
 class APlayerController;
 class AUnitBase;
 class ACombatManager;
+struct FCombatCheckpointData;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnRoundCombatFinished, ECombatResult);
 DECLARE_MULTICAST_DELEGATE(FOnRoundStateChanged);
@@ -30,6 +31,10 @@ public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
     bool InitializeFromCombat(ACombatManager* InManager, FText& OutError);
+    bool CapturePlanningCheckpoint(FCombatCheckpointData& OutCheckpoint, FText& OutError) const;
+    bool RestorePlanningCheckpoint(const FCombatCheckpointData& Checkpoint, FText& OutError);
+    bool CanRetryPlanningCheckpoint() const { return View.Phase == ECombatRoundPhase::Planning && bLockRetryBlocked; }
+    bool RetryPlanningCheckpoint(FText& OutError);
     bool IsRoundSessionActive() const;
     void SuspendRound();
     void StopRound();
@@ -101,6 +106,7 @@ private:
     int32 PlanningMoveIndex = INDEX_NONE;
     int32 NextMoveIndex = 0;
     bool bSAPMovementFailed = false;
+    bool bLockRetryBlocked = false;
     TArray<FIntPoint> PlanningMovePath;
     int32 PlanningMoveStep = 0;
     double PlanningMoveElapsed = 0.0;
@@ -117,7 +123,9 @@ private:
     void BeginActionResolution();
     void CleanupUnits();
     void BeginPlanning();
-    void LockPlans();
+    bool LockPlans(FText& OutError);
+    bool PersistPlanningCheckpoint(FText& OutError) const;
+    void ClearOwnerReady(int32 OwnerSlot);
     void AdvanceSimulation(float StepSeconds);
     void AdvanceAction(int32 Index, float StepSeconds);
     void ReleaseSkill(int32 Index, const FCombatRoundSkill& Skill);

@@ -29,7 +29,7 @@ if not catalog:
     catalog.set_editor_property("enemy_classes", {unreal.Name(name): enemy.generated_class() for name in ["Warrior", "Mage", "Archer", "Rogue"]})
     catalog.set_editor_property("skills", {
         unreal.Name("DefaultAttack"): unreal.load_asset(root + "/DataAsset/Skills/BPDA_DefaulatAttack"),
-        unreal.Name("SweepingStrike"): unreal.load_asset(root + "/DataAsset/Skills/DA_SweepingStrike"),
+        unreal.Name("SweepingStrike"): unreal.load_asset(root + "/DataAsset/Skills/BPDA_SweepingStrike"),
     })
     if not assets.save_loaded_asset(catalog):
         raise RuntimeError("Could not save Snapshot catalog")

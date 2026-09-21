@@ -22,7 +22,7 @@ def asset(name, cls, folder):
     return tools.create_asset(name, directory, cls, factory)
 
 
-skill = asset("DA_SweepingStrike", unreal.SkillDefinitionDataAsset, "Skills")
+skill = asset("BPDA_SweepingStrike", unreal.SkillDefinitionDataAsset, "Skills")
 skill.set_editor_property("skill_id", "SweepingStrike")
 skill.set_editor_property("skill_name", "휩쓸기")
 skill.set_editor_property("ability_class", unreal.GA_AreaAttack)

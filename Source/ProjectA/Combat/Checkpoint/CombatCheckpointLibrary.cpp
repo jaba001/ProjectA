@@ -2,6 +2,7 @@
 #include "Combat/Library/CombatTargetingLibrary.h"
 #include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Engine/AssetManager.h"
 #include "Game/Run/RunIdentityLibrary.h"
 #include "Unit/EnemyUnit.h"
 #include "Unit/PlayerUnit.h"
@@ -34,19 +35,30 @@ namespace
     }
 }
 
+FName UCombatCheckpointLibrary::ResolveSavedSkillId(FName SkillId)
+{
+    if (SkillId.IsNone() || !UAssetManager::IsInitialized()) return SkillId;
+    const FPrimaryAssetId Redirected = UAssetManager::Get().GetRedirectedPrimaryAssetId(FPrimaryAssetId(SkillId.ToString()));
+    return Redirected.IsValid() ? FName(*Redirected.ToString()) : SkillId;
+}
+
 bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint, const TArray<FRunPartyMember>& Party, FText& OutError)
 {
     OutError = NSLOCTEXT("CombatCheckpoint", "Invalid", "전투 체크포인트가 손상되었거나 현재 콘텐츠와 호환되지 않습니다.");
-    if ((Checkpoint.SchemaVersion != 1 && Checkpoint.SchemaVersion != CurrentSchemaVersion) || Checkpoint.ContentVersion != CurrentContentVersion || !Checkpoint.AttemptId.IsValid() || Checkpoint.Revision < 1 || Checkpoint.Revision == MAX_int64 || Checkpoint.Identity.Origin == ERunIdentityOrigin::LegacyOffline || Checkpoint.NodeId.IsNone() || Checkpoint.EncounterId.IsNone() || Checkpoint.CompletedTurnSerial < 0 || Checkpoint.CompletedTurnSerial == MAX_int32 || Checkpoint.Units.Num() < 2 || Checkpoint.Units.Num() > 8 || !Checkpoint.Units.IsValidIndex(Checkpoint.NextTurnIndex))
+    const bool bRound = Checkpoint.SchemaVersion == CurrentSchemaVersion;
+    const bool bLegacyOffline = Checkpoint.Identity.Origin == ERunIdentityOrigin::LegacyOffline;
+    if (Checkpoint.SchemaVersion < 1 || Checkpoint.SchemaVersion > CurrentSchemaVersion || Checkpoint.ContentVersion != CurrentContentVersion || !Checkpoint.AttemptId.IsValid() || Checkpoint.Revision < 1 || Checkpoint.Revision == MAX_int64 || (bLegacyOffline && !bRound) || Checkpoint.NodeId.IsNone() || Checkpoint.EncounterId.IsNone() || Checkpoint.CompletedTurnSerial < 0 || Checkpoint.CompletedTurnSerial == MAX_int32 || Checkpoint.Units.Num() < 2 || Checkpoint.Units.Num() > 8 || (!bRound && !Checkpoint.Units.IsValidIndex(Checkpoint.NextTurnIndex)))
     {
         return false;
     }
+    if (bRound ? (Checkpoint.RoundNumber < 1 || Checkpoint.RoundNumber == MAX_int32 || Checkpoint.PlanRevision < 1 || Checkpoint.PlanRevision == MAX_int32 || Checkpoint.RoundPlans.Num() != Checkpoint.Units.Num()) : (Checkpoint.RoundNumber != 0 || Checkpoint.PlanRevision != 0 || !Checkpoint.RoundPlans.IsEmpty())) return false;
     if (!URunIdentityLibrary::ValidateIdentity(Checkpoint.Identity, Party, OutError))
     {
         return false;
     }
     OutError = NSLOCTEXT("CombatCheckpoint", "Units", "전투 체크포인트의 유닛·소유권·스탯·장착·점유 정보가 올바르지 않습니다.");
     TSet<FGuid> UnitIds;
+    TSet<int32> RoundUnitIds;
     TSet<int32> PartySlots;
     TSet<FIntPoint> OccupiedCoords;
     int32 LivingPlayers = 0;
@@ -63,6 +75,8 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
             return false;
         }
         UnitIds.Add(Unit.UnitId);
+        if (bRound && (Unit.RoundUnitId < 1 || Unit.RoundUnitId > 8 || RoundUnitIds.Contains(Unit.RoundUnitId))) return false;
+        RoundUnitIds.Add(Unit.RoundUnitId);
         UClass* UnitClass = Cast<UClass>(Unit.UnitClass.TryLoad());
         UClass* ExpectedBase = Unit.Team == ETeam::Player ? APlayerUnit::StaticClass() : AEnemyUnit::StaticClass();
         if (!UnitClass || !UnitClass->IsChildOf(ExpectedBase) || UnitClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
@@ -96,7 +110,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
         if (Unit.Team == ETeam::Player)
         {
             const FRunPartyMember* Member = Party.FindByPredicate([&Unit](const FRunPartyMember& Candidate) { return Candidate.SlotIndex == Unit.PartySlot && Candidate.bCreated; });
-            if (!Member || PartySlots.Contains(Unit.PartySlot) || Member->CharacterId != Unit.CharacterId || Member->OwnerAccountId != Unit.OwnerAccountId || !Unit.CharacterId.IsValid())
+            if (!Member || PartySlots.Contains(Unit.PartySlot) || Member->CharacterId != Unit.CharacterId || Member->OwnerAccountId != Unit.OwnerAccountId || (!bLegacyOffline && !Unit.CharacterId.IsValid()) || (bLegacyOffline && Unit.PartyControlMode != EPartyControlMode::Human))
             {
                 return false;
             }
@@ -111,11 +125,11 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
             }
             LivingEnemies += !Unit.bDead ? 1 : 0;
         }
-        if (Unit.Skills.IsEmpty() || Unit.Skills.Num() > 5 || !IsAssetPath(Unit.DefaultAttackAbility))
+        if (Unit.Skills.Num() > 5 || (!bRound && (Unit.Skills.IsEmpty() || !IsAssetPath(Unit.DefaultAttackAbility))))
         {
             return false;
         }
-        UClass* DefaultAbility = Cast<UClass>(Unit.DefaultAttackAbility.TryLoad());
+        UClass* DefaultAbility = bRound ? nullptr : Cast<UClass>(Unit.DefaultAttackAbility.TryLoad());
         TSet<FSoftObjectPath> SkillPaths;
         TSet<FPrimaryAssetId> SkillIds;
         TSet<UClass*> AbilityClasses;
@@ -126,6 +140,15 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
                 return false;
             }
             USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
+            if (bRound)
+            {
+                FCombatRoundSkill RoundSkill;
+                FText SkillError;
+                if (!Skill || !Skill->ResolveRoundSkill(RoundSkill, SkillError) || SkillIds.Contains(Skill->GetPrimaryAssetId())) return false;
+                SkillPaths.Add(Path);
+                SkillIds.Add(Skill->GetPrimaryAssetId());
+                continue;
+            }
             if (!UCombatTargetingLibrary::IsSupportedSkillArea(Skill) || !Skill->GetPrimaryAssetId().IsValid() || !Skill->AbilityClass || Skill->AbilityClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists) || Skill->ActionPointCost <= 0 || SkillIds.Contains(Skill->GetPrimaryAssetId()) || AbilityClasses.Contains(Skill->AbilityClass))
             {
                 return false;
@@ -140,7 +163,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
             SkillIds.Add(Skill->GetPrimaryAssetId());
             AbilityClasses.Add(Skill->AbilityClass);
         }
-        if (!DefaultAbility || !DefaultAbility->IsChildOf(UGameplayAbility::StaticClass()) || !AbilityClasses.Contains(DefaultAbility))
+        if (!bRound && (!DefaultAbility || !DefaultAbility->IsChildOf(UGameplayAbility::StaticClass()) || !AbilityClasses.Contains(DefaultAbility)))
         {
             return false;
         }
@@ -152,9 +175,70 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
             return false;
         }
     }
-    if (LivingPlayers == 0 || LivingEnemies == 0 || Checkpoint.Units[Checkpoint.NextTurnIndex].bDead)
+    if (LivingPlayers == 0 || LivingEnemies == 0 || (!bRound && Checkpoint.Units[Checkpoint.NextTurnIndex].bDead))
     {
         return false;
+    }
+    if (bRound)
+    {
+        OutError = NSLOCTEXT("CombatCheckpoint", "RoundPlans", "저장된 준비 계획·대상·이동 예약·비용이 현재 전투 상태와 일치하지 않습니다.");
+        TSet<int32> PlannedUnits;
+        TMap<FIntPoint, int32> Destinations;
+        for (const FCombatCheckpointRoundPlan& Plan : Checkpoint.RoundPlans)
+        {
+            const FCombatCheckpointUnit* Unit = Checkpoint.Units.FindByPredicate([&Plan](const FCombatCheckpointUnit& Entry) { return Entry.RoundUnitId == Plan.UnitId; });
+            if (!Unit || PlannedUnits.Contains(Plan.UnitId) || Plan.Command.UnitId != Plan.UnitId || (Plan.Command.TargetUnitId != INDEX_NONE && !RoundUnitIds.Contains(Plan.Command.TargetUnitId))) return false;
+            PlannedUnits.Add(Plan.UnitId);
+            if (Unit->bDead)
+            {
+                if (Plan.bHasMovePlan || !Plan.Command.SkillId.IsNone()) return false;
+                continue;
+            }
+            if (Plan.bReady && Unit->Team == ETeam::Player && Unit->PartyControlMode == EPartyControlMode::Human && Plan.Command.SkillId.IsNone()) return false;
+            int32 APCost = 0;
+            int32 SAPCost = Plan.bHasMovePlan ? 1 : 0;
+            if (!Plan.Command.SkillId.IsNone())
+            {
+                bool bFound = false;
+                for (const FSoftObjectPath& Path : Unit->Skills)
+                {
+                    USkillDefinitionDataAsset* Definition = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
+                    FCombatRoundSkill Skill;
+                    FText SkillError;
+                    if (!Definition || !Definition->ResolveRoundSkill(Skill, SkillError)) return false;
+                    if (Skill.SkillId != ResolveSavedSkillId(Plan.Command.SkillId)) continue;
+                    APCost = Skill.ActionPointCost;
+                    SAPCost += Skill.SubActionPointCost;
+                    if (Skill.Kind != ECombatRoundSkillKind::Wait)
+                    {
+                        const FCombatCheckpointUnit* Target = Checkpoint.Units.FindByPredicate([&Plan](const FCombatCheckpointUnit& Entry) { return Entry.RoundUnitId == Plan.Command.TargetUnitId; });
+                        const FIntPoint TargetCoord = Plan.Command.TargetCoord;
+                        if (Skill.Kind == ECombatRoundSkillKind::GroundAttack ? (TargetCoord.X < 0 || TargetCoord.X > 3 || TargetCoord.Y < 0 || TargetCoord.Y > 3) : (!Target || Target->bDead || Target->Team == Unit->Team)) return false;
+                    }
+                    if (Skill.Approach == ECombatRoundApproach::Tile)
+                    {
+                        const FIntPoint Destination = Plan.Command.DestinationCoord;
+                        if (Destination.X < 0 || Destination.X > 3 || Destination.Y < 0 || Destination.Y > 3 || (OccupiedCoords.Contains(Destination) && Destination != Unit->GridCoord) || (Skill.bRemainAtDestination && !CombatRoundRules::IsOwnTerritory(Unit->Team == ETeam::Enemy, Destination))) return false;
+                        for (const FCombatCheckpointRoundPlan& Other : Checkpoint.RoundPlans)
+                        {
+                            if (Other.UnitId != Plan.UnitId && Other.bHasMovePlan && Other.MoveDestinationCoord == Destination) return false;
+                        }
+                        if (Destinations.Contains(Destination) && Destinations.FindRef(Destination) != Plan.UnitId) return false;
+                        Destinations.Add(Destination, Plan.UnitId);
+                    }
+                    bFound = true;
+                    break;
+                }
+                if (!bFound) return false;
+            }
+            if (Unit->AP < APCost || Unit->SubAP < SAPCost) return false;
+            if (Plan.bHasMovePlan)
+            {
+                const FIntPoint Destination = Plan.MoveDestinationCoord;
+                if (!CombatRoundRules::IsOwnTerritory(Unit->Team == ETeam::Enemy, Destination) || Destination == Unit->GridCoord || (Destinations.Contains(Destination) && Destinations.FindRef(Destination) != Plan.UnitId) || OccupiedCoords.Contains(Destination)) return false;
+                Destinations.Add(Destination, Plan.UnitId);
+            }
+        }
     }
     if (Checkpoint.bHasOpponentSnapshot)
     {
@@ -185,7 +269,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
             for (int32 SkillIndex = 0; SkillIndex < Member.SkillIds.Num(); ++SkillIndex)
             {
                 USkillDefinitionDataAsset* Skill = Catalog->Skills.FindRef(Member.SkillIds[SkillIndex]);
-                if (Unit.Skills[SkillIndex] != FSoftObjectPath(Skill) || (SkillIndex == 0 && Unit.DefaultAttackAbility != FSoftObjectPath(Skill->AbilityClass.Get())))
+                if (Unit.Skills[SkillIndex].TryLoad() != Skill || (SkillIndex == 0 && Unit.DefaultAttackAbility != FSoftObjectPath(Skill->AbilityClass.Get())))
                 {
                     return false;
                 }

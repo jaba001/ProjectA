@@ -1,12 +1,15 @@
 #include "Game/Encounter/EncounterManager.h"
 #include "AbilitySystemComponent.h"
 #include "Combat/CombatManager.h"
+#include "Combat/Checkpoint/CombatCheckpointLibrary.h"
+#include "Combat/Round/CombatRoundCoordinator.h"
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Combat/SkillActor/SkillActorBase.h"
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/EncounterDefinitionDataAsset.h"
 #include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -29,8 +32,14 @@ AEncounterManager::AEncounterManager()
 
 void AEncounterManager::InitializeEncounter(ACombatArena* InArena, ACombatManager* InCombatManager, UPartyDefinitionDataAsset* InPartyDefinition, const TMap<FName, TObjectPtr<UEncounterDefinitionDataAsset>>& InDefinitions)
 {
+    if (CombatManager)
+    {
+        CombatManager->OnCombatResult.RemoveAll(this);
+        CombatManager->OnCombatViewChanged.RemoveAll(this);
+    }
     Arena = InArena;
     CombatManager = InCombatManager;
+    bPlanningCheckpointRetryAvailable = false;
     PartyDefinition = InPartyDefinition;
     Definitions = InDefinitions;
     RunState = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
@@ -41,12 +50,25 @@ void AEncounterManager::InitializeEncounter(ACombatArena* InArena, ACombatManage
     if (CombatManager)
     {
         CombatManager->OnCombatResult.AddUObject(this, &AEncounterManager::HandleCombatResult);
+        CombatManager->OnCombatViewChanged.AddUObject(this, &AEncounterManager::HandleCombatViewChanged);
     }
     if (Arena)
     {
         Arena->CleanupArena();
     }
     SetPlayerCombatInput(false);
+}
+
+void AEncounterManager::HandleCombatViewChanged()
+{
+    if (!HasAuthority() || bShuttingDown) return;
+    const ACombatRoundCoordinator* Coordinator = CombatManager ? CombatManager->GetRoundCoordinator() : nullptr;
+    const bool bCanRetryPlanning = Coordinator && Coordinator->CanRetryPlanningCheckpoint();
+    if (bPlanningCheckpointRetryAvailable == bCanRetryPlanning) return;
+    bPlanningCheckpointRetryAvailable = bCanRetryPlanning;
+    // Publish retry availability after the round changes its failure state, including automatic AI-only locking.
+    // AI만 남은 자동 잠금을 포함해 라운드 실패 상태가 바뀐 뒤 재시도 가능 여부를 게시합니다.
+    OnFlowChanged.Broadcast();
 }
 
 bool AEncounterManager::RequestStartNode(FName NodeId)
@@ -229,14 +251,65 @@ bool AEncounterManager::ResumeManagedGameplay(FText& OutError)
     return true;
 }
 
-bool AEncounterManager::RestoreSavedCombat(const FRunAccountId&, FText& OutError)
+bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FText& OutError)
 {
-    // Keep old callers fail-closed without interpreting sequential saves as timed rounds.
-    // 기존 호출은 명시적으로 거절하며 순차 턴 저장을 시간 기반 라운드로 해석하지 않습니다.
-    OutError = FText::FromString(TEXT("기존 순차 턴 전투 저장은 새 라운드 전투에서 복원할 수 없습니다. 새 전투의 라운드 중간 저장·복구는 아직 지원하지 않으며 기존 저장 파일은 보존됩니다."));
-    FlowMessage = OutError;
+    OutError = FText::FromString(TEXT("유효한 준비 완료 저장과 원래 참가자의 연결이 있어야 전투를 복구할 수 있습니다."));
+    if (!HasAuthority() || bShuttingDown || bPreparing || !SpawnedUnits.IsEmpty() || !RunState || RunState->GetPhase() != ERunPhase::Combat || !Arena || !CombatManager || !RunState->ValidateCheckpointHost(HostAccount, OutError) || !ValidateManagedExecution(OutError, true)) return false;
+    const FCombatCheckpointData& Checkpoint = RunState->GetCombatCheckpoint();
+    if (Checkpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion || !UCombatCheckpointLibrary::Validate(Checkpoint, RunState->GetPartyMembers(), OutError)) return false;
+    TGuardValue<bool> PreparationGuard(bPreparing, true);
+    SetPlayerCombatInput(false);
+    const auto FailRestore = [this, &OutError]()
+    {
+        CleanupEncounter();
+        FlowMessage = OutError.IsEmpty() ? FText::FromString(TEXT("준비 계획 복구를 완료하지 못했습니다. 확정 저장은 유지됩니다.")) : OutError;
+        OutError = FlowMessage;
+        bPreparing = false;
+        OnFlowChanged.Broadcast();
+        return false;
+    };
+    if (!Arena->PrepareArena(OutError)) return FailRestore();
+    FActorSpawnParameters Params;
+    Params.Owner = this;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    for (const FCombatCheckpointUnit& Saved : Checkpoint.Units)
+    {
+        ACombatGridTile* Tile = Saved.bHasTile ? Arena->Grid->GetTileAtCoord(Saved.GridCoord) : nullptr;
+        if (Saved.bHasTile && (!Tile || Tile->GetOccupyingUnit() || Tile->GetTerritory() != (Saved.Team == ETeam::Player ? ETileTerritory::Player : ETileTerritory::Enemy))) return FailRestore();
+        AUnitBase* Unit = GetWorld()->SpawnActor<AUnitBase>(Cast<UClass>(Saved.UnitClass.TryLoad()), Saved.Transform, Params);
+        if (!Unit) return FailRestore();
+        SpawnedUnits.Add(Unit);
+        if (Saved.Team == ETeam::Player) PartyActors.Add(Saved.PartySlot, Unit);
+        TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
+        for (const FSoftObjectPath& Path : Saved.Skills) Skills.Add(Cast<USkillDefinitionDataAsset>(Path.TryLoad()));
+        if (!Unit->ConfigureProfession(Saved.MaxHP, Saved.MaxAP, Saved.MaxSubAP, Skills, Saved.Strength, Saved.Dexterity, Saved.Intelligence) || !Unit->ConfigureMoveRange(Saved.MoveRange)) return FailRestore();
+        Unit->UnitIndex = Saved.RoundUnitId;
+        Unit->RuntimeCharacterName = Saved.CharacterName;
+        Unit->SetTeam(Saved.Team);
+        Unit->HealingItemCount = Saved.HealingItemCount;
+        Unit->HealingItemAmount = Saved.HealingItemAmount;
+        Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), Saved.HP);
+        Unit->ResetActionPoint();
+        Unit->ResetSubActionPoint();
+        if ((Saved.MaxAP > Saved.AP && !Unit->ConsumeActionPoint(Saved.MaxAP - Saved.AP)) || !Unit->ConsumeSubActionPoint(Saved.MaxSubAP - Saved.SubAP)) return FailRestore();
+        if (Saved.bDead) Unit->Die();
+        else Unit->SetCurrentTile(Tile);
+    }
+    CombatManager->SetCombatGrid(Arena->Grid);
+    TArray<AUnitBase*> Units;
+    for (AUnitBase* Unit : SpawnedUnits) Units.Add(Unit);
+    CombatManager->RegisterUnits(Units);
+    if (!ConfigureCombatParticipants(OutError)) return FailRestore();
+    if (RunState->IsManagedRun() && !RunState->ConfirmManagedResumeStarted(OutError)) return FailRestore();
+    Arena->ActivateArena(GetWorld()->GetFirstPlayerController());
+    CombatManager->StartCombat_Internal();
+    if (!CombatManager->IsCombatActive()) return FailRestore();
+    FlowMessage = FText::GetEmpty();
+    OutError = FText::GetEmpty();
+    SetPlayerCombatInput(true);
+    bPreparing = false;
     OnFlowChanged.Broadcast();
-    return false;
+    return true;
 }
 
 bool AEncounterManager::CanRetryCombatCheckpoint() const
@@ -247,7 +320,10 @@ bool AEncounterManager::CanRetryCombatCheckpoint() const
         return false;
     }
     const bool bCanResumeOutsideCombat = RunState->GetPhase() != ERunPhase::Combat && RunState->IsManagedRun() && RunState->IsManagedResumePending() && SpawnedUnits.IsEmpty();
-    return bPreparationAbortPending || bCanResumeOutsideCombat || (PendingResult != ECombatResult::None && !RunState->GetSaveError().IsEmpty());
+    const bool bCanRestoreCombat = RunState->GetPhase() == ERunPhase::Combat && RunState->HasCombatCheckpoint() && SpawnedUnits.IsEmpty();
+    const ACombatRoundCoordinator* Coordinator = CombatManager ? CombatManager->GetRoundCoordinator() : nullptr;
+    const bool bCanRetryPlanning = Coordinator && Coordinator->CanRetryPlanningCheckpoint();
+    return bPreparationAbortPending || bCanResumeOutsideCombat || bCanRestoreCombat || bCanRetryPlanning || (PendingResult != ECombatResult::None && !RunState->GetSaveError().IsEmpty());
 }
 
 bool AEncounterManager::RetryCombatCheckpoint(FText& OutError)
@@ -262,6 +338,16 @@ bool AEncounterManager::RetryCombatCheckpoint(FText& OutError)
         const bool bAborted = TryAbortPreparation();
         OutError = bAborted ? FText::GetEmpty() : FlowMessage;
         return bAborted;
+    }
+    if (RunState->GetPhase() == ERunPhase::Combat && RunState->HasCombatCheckpoint() && SpawnedUnits.IsEmpty()) return RestoreSavedCombat(RunState->GetRunIdentity().HostAccountId, OutError);
+    ACombatRoundCoordinator* Coordinator = CombatManager ? CombatManager->GetRoundCoordinator() : nullptr;
+    if (Coordinator && Coordinator->CanRetryPlanningCheckpoint())
+    {
+        const bool bRetried = Coordinator->RetryPlanningCheckpoint(OutError);
+        FlowMessage = OutError;
+        SetPlayerCombatInput(bRetried && CombatManager->IsCombatActive());
+        OnFlowChanged.Broadcast();
+        return bRetried;
     }
     if (RunState->IsManagedRun() && RunState->IsManagedResumePending() && SpawnedUnits.IsEmpty())
     {
@@ -291,7 +377,7 @@ void AEncounterManager::SuspendForDisconnectedParticipant()
     }
     SetPlayerCombatInput(false);
     CombatManager->SuspendCombatForRecovery();
-    FlowMessage = FText::FromString(TEXT("원래 참가자의 연결이 끊겨 전투를 중단했습니다. 전투 중간 복구는 미지원입니다. 메뉴에서 마지막 전투 외 저장부터 명시적으로 재개해야 하며 자동 Host 승계나 AI 전환은 수행하지 않습니다."));
+    FlowMessage = FText::FromString(TEXT("원래 참가자의 연결이 끊겨 전투를 중단했습니다. 메뉴에서 마지막 확정 준비 계획부터 명시적으로 재개해야 하며 자동 Host 승계나 AI 전환은 수행하지 않습니다."));
     OnFlowChanged.Broadcast();
 }
 
@@ -626,6 +712,7 @@ void AEncounterManager::ShutdownGameplay()
     if (CombatManager)
     {
         CombatManager->OnCombatResult.RemoveAll(this);
+        CombatManager->OnCombatViewChanged.RemoveAll(this);
     }
     CleanupEncounter();
     PendingResult = ECombatResult::None;

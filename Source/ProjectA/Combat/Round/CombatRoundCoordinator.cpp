@@ -3,6 +3,10 @@
 #include "Animation/AnimMontage.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Commands/CombatActionAuthority.h"
+#include "Combat/Checkpoint/CombatCheckpointLibrary.h"
+#include "Engine/GameInstance.h"
+#include "Game/Run/RunStateSubsystem.h"
+#include "Unit/PlayerUnit.h"
 #include "Controller/PartyPlayerController.h"
 #include "EngineUtils.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
@@ -131,6 +135,28 @@ namespace
         return FirstUnit;
     }
 
+    TArray<AUnitBase*> FindMeleeAreaCollisions(UWorld* World, AUnitBase* Source, const TArray<FCombatRoundUnitView>& Units, const FCombatRoundSkill& Skill)
+    {
+        TArray<AUnitBase*> Hits;
+        const FVector Origin = Source->GetCapsuleComponent()->GetComponentLocation();
+        const FQuat Rotation = Source->GetActorQuat();
+        const FVector Center = Origin + Source->GetActorForwardVector() * Skill.MeleeAreaHalfExtent.X;
+        const FCollisionShape Shape = FCollisionShape::MakeBox(Skill.MeleeAreaHalfExtent);
+        const FCollisionQueryParams Params = AttackWorldQuery(World, Source);
+        const FCollisionResponseParams Responses = AttackWorldResponses();
+        if (World->OverlapBlockingTestByChannel(Origin, FQuat::Identity, ECC_WorldDynamic, FCollisionShape::MakeSphere(0.1f), Params, Responses)) return Hits;
+        for (const FCombatRoundUnitView& Candidate : Units)
+        {
+            UCapsuleComponent* Capsule = AttackTargetCapsule(Source, Candidate);
+            if (!Capsule || !Capsule->OverlapComponent(Center, Rotation, Shape)) continue;
+            FVector Contact;
+            if (Capsule->GetClosestPointOnCollision(Origin, Contact) < 0.f) continue;
+            if (World->LineTraceTestByChannel(Origin, Contact, ECC_WorldDynamic, Params, Responses)) continue;
+            Hits.AddUnique(Candidate.Unit);
+        }
+        return Hits;
+    }
+
     TArray<AUnitBase*> FindMeleeSideCollisions(UWorld* World, AUnitBase* Source, const TArray<FCombatRoundUnitView>& Units, const FCombatRoundSkill& Skill, ACombatGridManager* Grid, FIntPoint TargetCoord, FVector Center)
     {
         TArray<AUnitBase*> Hits;
@@ -254,6 +280,8 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
     }
     Skills.Reset();
     View.CombatId = InManager->GetCombatInstanceId();
+    URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    const bool bRestoring = Run && Run->GetPhase() == ERunPhase::Combat && Run->HasCombatCheckpoint();
     for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
         APartyPlayerController* Controller = Cast<APartyPlayerController>(It->Get());
@@ -268,12 +296,12 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
     }
     for (AUnitBase* Unit : InManager->GetRegisteredUnits())
     {
-        if (!IsValid(Unit) || !Unit->IsUnitAlive() || !Unit->GetCurrentTile() || !Unit->GetAttributeSet())
+        if (!IsValid(Unit) || !Unit->GetAttributeSet() || (!Unit->IsUnitAlive() && !bRestoring) || (Unit->IsUnitAlive() && !Unit->GetCurrentTile()))
         {
             OutError = RoundText(TEXT("유닛의 시작 위치 또는 생존 상태가 올바르지 않습니다."));
             return false;
         }
-        if (Arena->Grid->GetTileAtCoord(Unit->GetCurrentTile()->GridCoord) != Unit->GetCurrentTile() || Unit->GetCurrentTile()->GetOccupyingUnit() != Unit || !CombatRoundRules::IsOwnTerritory(Unit->GetTeam() == ETeam::Enemy, Unit->GetCurrentTile()->GridCoord))
+        if (Unit->IsUnitAlive() && (Arena->Grid->GetTileAtCoord(Unit->GetCurrentTile()->GridCoord) != Unit->GetCurrentTile() || Unit->GetCurrentTile()->GetOccupyingUnit() != Unit || !CombatRoundRules::IsOwnTerritory(Unit->GetTeam() == ETeam::Enemy, Unit->GetCurrentTile()->GridCoord)))
         {
             OutError = RoundText(TEXT("유닛의 시작 칸과 전투 Grid·진영·점유가 일치하지 않습니다."));
             return false;
@@ -283,12 +311,12 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
         Unit->GetCharacterMovement()->DisableMovement();
         Unit->GetCharacterMovement()->SetComponentTickEnabled(false);
         Unit->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
-        Unit->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        Unit->GetCapsuleComponent()->SetCollisionEnabled(Unit->IsUnitAlive() ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
         FCombatRoundUnitView Entry;
         Entry.UnitId = View.Units.Num() + 1;
         Entry.Unit = Unit;
         Entry.bEnemy = Unit->GetTeam() == ETeam::Enemy;
-        Entry.HomeCoord = Unit->GetCurrentTile()->GridCoord;
+        Entry.HomeCoord = Unit->GetCurrentTile() ? Unit->GetCurrentTile()->GridCoord : FIntPoint::ZeroValue;
         Entry.Speed = Unit->GetCombatSpeed();
         Entry.HP = Unit->GetAttributeSet()->GetHP();
         for (USkillDefinitionDataAsset* Definition : Unit->GetEquippedSkillDataAssets())
@@ -308,7 +336,7 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
                 break;
             }
         }
-        if (!Entry.bEnemy && !InManager->IsPartyAIControlled(Unit) && Entry.OwnerSlot == 0)
+        if (Unit->IsUnitAlive() && !Entry.bEnemy && !InManager->IsPartyAIControlled(Unit) && Entry.OwnerSlot == 0)
         {
             OutError = RoundText(TEXT("인간 캐릭터의 원래 소유 연결을 확인하지 못했습니다."));
             return false;
@@ -340,6 +368,7 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
     {
         if (APartyPlayerController* Controller = Cast<APartyPlayerController>(Participants[Index])) Controller->SetRoundSession(this, Index + 1);
     }
+    if (bRestoring) return RestorePlanningCheckpoint(Run->GetCombatCheckpoint(), OutError);
     BeginPlanning();
     return true;
 }
@@ -364,7 +393,7 @@ void ACombatRoundCoordinator::SuspendRound()
         }
     }
     View.Phase = ECombatRoundPhase::Suspended;
-    View.Message = RoundText(TEXT("전투가 중단되었습니다. 시간차 전투의 중간 복구는 아직 지원하지 않습니다."));
+    View.Message = RoundText(TEXT("전투가 중단되었습니다. 재개 시 마지막으로 저장한 준비 상태에서 복구합니다."));
     PublishState();
 }
 
@@ -460,6 +489,7 @@ void ACombatRoundCoordinator::BeginPlanning()
     View.Phase = ECombatRoundPhase::Planning;
     SimulationTime = 0.0;
     Accumulator = 0.0;
+    bLockRetryBlocked = false;
     float HighestSpeed = 0.0f;
     for (FCombatRoundUnitView& Entry : View.Units)
     {
@@ -476,7 +506,6 @@ void ACombatRoundCoordinator::BeginPlanning()
     for (int32 Index = 0; Index < View.Units.Num(); ++Index)
     {
         FCombatRoundUnitView& Entry = View.Units[Index];
-        Entry.Guard = 0.f;
         Entry.StartDelay = CombatRoundRules::StartDelay(HighestSpeed, Entry.Speed);
         Entry.Command = FCombatRoundCommand();
         Entry.Command.UnitId = Entry.UnitId;
@@ -515,9 +544,29 @@ void ACombatRoundCoordinator::BeginPlanning()
             for (FName SkillId : Entry.SkillIds)
             {
                 const FCombatRoundSkill* Candidate = FindSkill(SkillId);
-                if (!Candidate || Candidate->Kind == ECombatRoundSkillKind::Wait || Candidate->Kind == ECombatRoundSkillKind::Guard || Candidate->bRemainAtDestination) continue;
+                if (!Candidate || Candidate->Kind == ECombatRoundSkillKind::Wait || Candidate->bRemainAtDestination) continue;
                 Entry.Command.SkillId = SkillId;
-                Entry.Command.DestinationCoord = Candidate->Approach == ECombatRoundApproach::Tile ? View.Units[TargetIndex].HomeCoord : Entry.HomeCoord;
+                Entry.Command.DestinationCoord = Entry.HomeCoord;
+                if (Candidate->Approach == ECombatRoundApproach::Tile)
+                {
+                    int32 BestDistance = MAX_int32;
+                    for (int32 X = 0; X < 4; ++X)
+                    {
+                        for (int32 Y = 0; Y < 4; ++Y)
+                        {
+                            const FIntPoint Coord(X, Y);
+                            ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Coord);
+                            if (!Tile || (Tile->GetOccupyingUnit() && Tile->GetOccupyingUnit() != Entry.Unit) || IsDestinationReservedByOther(Index, Coord)) continue;
+                            const FIntPoint Offset = Coord - View.Units[TargetIndex].HomeCoord;
+                            const int32 Distance = FMath::Abs(Offset.X) + FMath::Abs(Offset.Y);
+                            if (Distance < BestDistance)
+                            {
+                                BestDistance = Distance;
+                                Entry.Command.DestinationCoord = Coord;
+                            }
+                        }
+                    }
+                }
                 FText Error;
                 if (ValidateCommand(Entry.Command, Error)) break;
                 Entry.Command.SkillId = NAME_None;
@@ -528,7 +577,37 @@ void ACombatRoundCoordinator::BeginPlanning()
         Entry.Status = RoundText(TEXT("AI 계획 고정"));
     }
     View.Message = RoundText(TEXT("각 유닛의 행동을 적용한 뒤 준비 완료를 선택하세요. 적 계획은 이미 고정되었습니다."));
+    FText SaveError;
+    if (!PersistPlanningCheckpoint(SaveError)) View.Message = SaveError;
     PublishState();
+}
+
+bool ACombatRoundCoordinator::PersistPlanningCheckpoint(FText& OutError) const
+{
+    URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    // Asset previews and isolated development rooms have no persistent Run to confirm.
+    // 에셋 미리보기와 독립 개발 방에는 확정할 영속 Run이 없습니다.
+    if (!Run || Run->GetPhase() == ERunPhase::None)
+    {
+        OutError = FText::GetEmpty();
+        return true;
+    }
+    FCombatCheckpointData Checkpoint;
+    return CapturePlanningCheckpoint(Checkpoint, OutError) && Run->CommitCombatCheckpoint(Checkpoint, OutError);
+}
+
+bool ACombatRoundCoordinator::RetryPlanningCheckpoint(FText& OutError)
+{
+    if (!HasExecutionAuthority() || !CanRetryPlanningCheckpoint()) return false;
+    if (!LockPlans(OutError))
+    {
+        View.Message = OutError;
+        PublishState();
+        return false;
+    }
+    bLockRetryBlocked = false;
+    PublishState();
+    return true;
 }
 
 bool ACombatRoundCoordinator::ValidateRequest(APlayerController* Controller, FGuid CombatId, int32 RoundNumber, int32 Revision, FText& OutError) const
@@ -616,7 +695,7 @@ bool ACombatRoundCoordinator::IsDestinationReservedByOther(int32 UnitIndex, FInt
         if (Index == UnitIndex || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) continue;
         if (Entry.HomeCoord == Coord || (Entry.bHasMovePlan && Entry.MoveDestinationCoord == Coord)) return true;
         const FCombatRoundSkill* Skill = FindSkill(Entry.Command.SkillId);
-        if (Skill && Skill->bRemainAtDestination && Entry.Command.DestinationCoord == Coord) return true;
+        if (Skill && Skill->Approach == ECombatRoundApproach::Tile && Entry.Command.DestinationCoord == Coord) return true;
     }
     return false;
 }
@@ -691,15 +770,19 @@ bool ACombatRoundCoordinator::SubmitMove(APlayerController* Controller, FGuid Co
         return false;
     }
     if (!CanMoveUnit(UnitId, Destination, OutError)) return false;
+    const FCombatRoundView PreviousView = View;
     View.Units[Index].bHasMovePlan = true;
     View.Units[Index].MoveDestinationCoord = Destination;
     View.Units[Index].Status = RoundText(TEXT("SAP 이동 예약됨"));
-    for (FCombatRoundUnitView& Entry : View.Units)
-    {
-        if (Entry.OwnerSlot > 0 && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive()) Entry.bReady = false;
-    }
+    ClearOwnerReady(GetParticipantSlot(Controller));
     View.Message = RoundText(TEXT("이동을 예약했습니다. 준비 완료 후 SAP 이동부터 실행합니다."));
     ++View.PlanRevision;
+    if (!PersistPlanningCheckpoint(OutError))
+    {
+        View = PreviousView;
+        return false;
+    }
+    bLockRetryBlocked = false;
     PublishState();
     return true;
 }
@@ -713,16 +796,20 @@ bool ACombatRoundCoordinator::CancelMove(APlayerController* Controller, FGuid Co
         OutError = RoundText(TEXT("자신의 살아 있는 캐릭터에게 예약된 이동이 없습니다."));
         return false;
     }
+    const FCombatRoundView PreviousView = View;
     View.Units[Index].bHasMovePlan = false;
     View.Units[Index].MoveDestinationCoord = View.Units[Index].HomeCoord;
     View.Units[Index].Status = RoundText(TEXT("SAP 이동 예약 취소"));
-    for (FCombatRoundUnitView& Entry : View.Units)
-    {
-        if (Entry.OwnerSlot > 0 && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive()) Entry.bReady = false;
-    }
+    ClearOwnerReady(GetParticipantSlot(Controller));
     View.Message = RoundText(TEXT("이동 예약을 취소했습니다. 행동 계획과 준비를 다시 확인하세요."));
     ++View.PlanRevision;
     OutError = FText::GetEmpty();
+    if (!PersistPlanningCheckpoint(OutError))
+    {
+        View = PreviousView;
+        return false;
+    }
+    bLockRetryBlocked = false;
     PublishState();
     return true;
 }
@@ -827,7 +914,7 @@ bool ACombatRoundCoordinator::IsValidUnitTarget(int32 SourceUnitId, FName SkillI
     if (!IsValid(Source.Unit) || !IsValid(Target.Unit) || !Source.Unit->IsUnitAlive() || !Target.Unit->IsUnitAlive()) return false;
     if (!(Source.HP > 0.f) || !(Target.HP > 0.f) || !Source.SkillIds.Contains(SkillId)) return false;
     const bool bAlly = Source.bEnemy == Target.bEnemy;
-    return Skill->Kind == ECombatRoundSkillKind::Guard ? bAlly : !bAlly;
+    return !bAlly;
 }
 
 bool ACombatRoundCoordinator::ValidateCommand(const FCombatRoundCommand& Command, FText& OutError) const
@@ -858,9 +945,10 @@ bool ACombatRoundCoordinator::ValidateCommand(const FCombatRoundCommand& Command
     }
     if (Skill->Approach == ECombatRoundApproach::Tile)
     {
-        if (!Arena->Grid->GetTileAtCoord(Command.DestinationCoord))
+        ACombatGridTile* Destination = Arena->Grid->GetTileAtCoord(Command.DestinationCoord);
+        if (!Destination || (Destination->GetOccupyingUnit() && Destination->GetOccupyingUnit() != Entry.Unit) || IsDestinationReservedByOther(Index, Command.DestinationCoord))
         {
-            OutError = RoundText(TEXT("접근 목적지 칸을 선택하세요."));
+            OutError = RoundText(TEXT("다른 유닛의 복귀 칸이나 예약 목적지가 아닌 빈 접근 칸을 선택하세요."));
             return false;
         }
         if (Skill->bRemainAtDestination && !CombatRoundRules::IsOwnTerritory(Entry.bEnemy, Command.DestinationCoord))
@@ -902,16 +990,20 @@ bool ACombatRoundCoordinator::SubmitPlan(APlayerController* Controller, FGuid Co
         return false;
     }
     if (!CanPlanCommand(Command, OutError)) return false;
+    const FCombatRoundView PreviousView = View;
     View.Units[Index].Command = Command;
     View.Units[Index].Status = RoundText(TEXT("계획 적용됨"));
-    for (FCombatRoundUnitView& Entry : View.Units)
-    {
-        if (Entry.OwnerSlot > 0 && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive()) Entry.bReady = false;
-    }
+    ClearOwnerReady(GetParticipantSlot(Controller));
     ++View.PlanRevision;
-    View.Message = RoundText(TEXT("계획이 변경되었습니다. 팀 준비를 다시 확인하세요."));
+    View.Message = RoundText(TEXT("계획이 변경되어 자신의 준비만 해제되었습니다."));
     FText Conflict;
     if (!ValidateDestinations(Conflict)) View.Message = Conflict;
+    if (!PersistPlanningCheckpoint(OutError))
+    {
+        View = PreviousView;
+        return false;
+    }
+    bLockRetryBlocked = false;
     PublishState();
     return true;
 }
@@ -933,13 +1025,13 @@ bool ACombatRoundCoordinator::ValidateDestinations(FText& OutError, int32 Candid
         TArray<FIntPoint> Destinations;
         if (Index == CandidateIndex && CandidateMove) Destinations.Add(*CandidateMove);
         else if (Entry.bHasMovePlan) Destinations.Add(Entry.MoveDestinationCoord);
-        if (Skill && Skill->bRemainAtDestination) Destinations.Add(Command.DestinationCoord);
+        if (Skill && Skill->Approach == ECombatRoundApproach::Tile) Destinations.Add(Command.DestinationCoord);
         for (FIntPoint Destination : Destinations)
         {
             const int32* Existing = Reserved.Find(Destination);
             if (Existing && *Existing != Entry.UnitId)
             {
-                OutError = RoundText(TEXT("목적지가 다른 유닛의 원래 칸, SAP 이동 또는 AP 잔류 목적지와 겹칩니다."));
+                OutError = RoundText(TEXT("목적지가 다른 유닛의 원래 칸, SAP 이동 또는 AP 접근 목적지와 겹칩니다."));
                 return false;
             }
             Reserved.Add(Destination, Entry.UnitId);
@@ -960,6 +1052,7 @@ bool ACombatRoundCoordinator::SetParticipantReady(APlayerController* Controller,
         }
         if (!ValidateDestinations(OutError)) return false;
     }
+    const FCombatRoundView PreviousView = View;
     for (FCombatRoundUnitView& Entry : View.Units)
     {
         if (Entry.OwnerSlot == Slot && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive()) Entry.bReady = bReady;
@@ -970,39 +1063,40 @@ bool ACombatRoundCoordinator::SetParticipantReady(APlayerController* Controller,
     {
         if (IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive() && !Entry.bReady) bAllReady = false;
     }
-    if (bAllReady) LockPlans();
+    if (!(bAllReady ? LockPlans(OutError) : PersistPlanningCheckpoint(OutError)))
+    {
+        View = PreviousView;
+        return false;
+    }
+    bLockRetryBlocked = false;
     PublishState();
     return true;
 }
 
-void ACombatRoundCoordinator::LockPlans()
+void ACombatRoundCoordinator::ClearOwnerReady(int32 OwnerSlot)
 {
-    FText Error;
-    const auto RejectLock = [this, &Error]()
+    for (FCombatRoundUnitView& Entry : View.Units)
     {
-        for (FCombatRoundUnitView& Entry : View.Units)
-        {
-            if (Entry.OwnerSlot > 0 && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive()) Entry.bReady = false;
-        }
-        View.Message = Error;
-        ++View.PlanRevision;
-        PublishState();
-    };
-    if (!ValidateDestinations(Error))
-    {
-        RejectLock();
-        return;
+        if (Entry.OwnerSlot == OwnerSlot && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive()) Entry.bReady = false;
     }
+}
+
+bool ACombatRoundCoordinator::LockPlans(FText& OutError)
+{
+    if (!ValidateDestinations(OutError)) return false;
     for (int32 Index = 0; Index < View.Units.Num(); ++Index)
     {
         const FCombatRoundUnitView& Entry = View.Units[Index];
         if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) continue;
-        if (!ValidateCommand(Entry.Command, Error) || (Entry.bHasMovePlan && !BuildPlanningMovePath(Entry.UnitId, Entry.MoveDestinationCoord, Actions[Index].MovePath, Error)))
+        if (!ValidateCommand(Entry.Command, OutError) || (Entry.bHasMovePlan && !BuildPlanningMovePath(Entry.UnitId, Entry.MoveDestinationCoord, Actions[Index].MovePath, OutError)))
         {
-            RejectLock();
-            return;
+            return false;
         }
     }
+
+    // Persist the complete ready boundary before charging costs or executing any movement or attack.
+    // 비용 차감이나 이동·공격 실행 전에 준비 완료 경계 전체를 저장합니다.
+    if (!PersistPlanningCheckpoint(OutError)) return false;
 
     // Commit the complete AP and SAP budget only after every reservation passes validation.
     // 모든 예약 검증이 끝난 뒤에만 AP와 SAP 전체 비용을 확정합니다.
@@ -1031,6 +1125,7 @@ void ACombatRoundCoordinator::LockPlans()
         BeginNextMove();
     }
     else BeginActionResolution();
+    return true;
 }
 
 void ACombatRoundCoordinator::BeginActionResolution()
@@ -1088,7 +1183,13 @@ void ACombatRoundCoordinator::Tick(float DeltaSeconds)
         {
             if (IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive() && !Entry.bReady) bAllReady = false;
         }
-        if (bAllReady) LockPlans();
+        FText Error;
+        if (bAllReady && !bLockRetryBlocked && !LockPlans(Error))
+        {
+            bLockRetryBlocked = true;
+            View.Message = Error;
+            PublishState();
+        }
         return;
     }
 
@@ -1203,7 +1304,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
         const bool bNeedsUnit = Skill->Kind != ECombatRoundSkillKind::GroundAttack;
         if (bNeedsUnit && (!View.Units.IsValidIndex(TargetIndex) || !IsValid(View.Units[TargetIndex].Unit) || !View.Units[TargetIndex].Unit->IsUnitAlive()))
         {
-            if (Skill->TargetLoss == ECombatRoundTargetLoss::NearestEnemy && Skill->Kind != ECombatRoundSkillKind::Guard)
+            if (Skill->TargetLoss == ECombatRoundTargetLoss::NearestEnemy)
             {
                 TargetIndex = FindNearestEnemy(Index);
                 if (View.Units.IsValidIndex(TargetIndex)) Action.EffectiveTargetUnitId = View.Units[TargetIndex].UnitId;
@@ -1221,6 +1322,15 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
         if (Entry.ActionPhase == ECombatRoundActionPhase::Approaching)
         {
             FVector Destination = Action.Destination;
+            if (Skill->Approach == ECombatRoundApproach::Tile)
+            {
+                ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Entry.Command.DestinationCoord);
+                if (!Tile || (Tile->GetOccupyingUnit() && Tile->GetOccupyingUnit() != Entry.Unit) || IsDestinationReservedByOther(Index, Entry.Command.DestinationCoord))
+                {
+                    StartReturn(Index, true, RoundText(TEXT("접근 칸 점유 또는 예약 충돌로 불발")));
+                    return;
+                }
+            }
             if (Skill->Approach == ECombatRoundApproach::Unit)
             {
                 const FVector TowardSource = (Entry.Unit->GetActorLocation() - Action.AimLocation).GetSafeNormal2D();
@@ -1243,11 +1353,12 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
             if (!Facing.IsNearlyZero()) Entry.Unit->SetActorRotation(Facing.Rotation());
             if (!Action.bMontageStarted)
             {
+                UAnimMontage* Montage = Entry.Unit->ResolveRoundCastMontage(Skill->CastMontage);
                 Action.bMontageStarted = true;
                 Action.MontageStartedAt = MontageClock;
-                Action.MontageRecoverySeconds = MontageRecoveryBudget(Skill->CastMontage);
+                Action.MontageRecoverySeconds = MontageRecoveryBudget(Montage);
                 Entry.Unit->SetRoundMovementVelocity(FVector::ZeroVector);
-                Entry.Unit->SetRoundCastMontage(Skill->CastMontage);
+                Entry.Unit->SetRoundCastMontage(Montage);
                 Action.bTrackMontageCompletion = Entry.Unit->HasRoundCastMontageInstance();
             }
             if (SimulationTime + 0.00001 < Action.PhaseStarted + Skill->WindupSeconds) return;
@@ -1330,13 +1441,18 @@ void ACombatRoundCoordinator::StartReturn(int32 Index, bool bFailed, const FText
     if (Skill && Skill->bRemainAtDestination && !bFailed)
     {
         ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Entry.Command.DestinationCoord);
-        if (Tile && CombatRoundRules::IsOwnTerritory(Entry.bEnemy, Tile->GridCoord))
+        if (Tile && CombatRoundRules::IsOwnTerritory(Entry.bEnemy, Tile->GridCoord) && (!Tile->GetOccupyingUnit() || Tile->GetOccupyingUnit() == Entry.Unit) && !IsDestinationReservedByOther(Index, Tile->GridCoord))
         {
             Entry.Unit->SetCurrentTile(Tile);
             Entry.HomeCoord = Tile->GridCoord;
+            Entry.Unit->SetRoundMovementVelocity(FVector::ZeroVector);
+            Entry.Unit->ForceNetUpdate();
             Entry.ActionPhase = ECombatRoundActionPhase::Complete;
             return;
         }
+        Action.bFailed = true;
+        bFailed = true;
+        Entry.Status = RoundText(TEXT("최종 배치 실패: 출발 칸으로 복귀"));
     }
     if (FVector::DistSquared2D(Entry.Unit->GetActorLocation(), Action.OriginalLocation) <= 4.f)
     {
@@ -1357,17 +1473,6 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
     const int32 TargetIndex = FindUnitIndex(Action.EffectiveTargetUnitId);
     AUnitBase* Target = nullptr;
     if (View.Units.IsValidIndex(TargetIndex)) Target = View.Units[TargetIndex].Unit;
-    if (Skill.Kind == ECombatRoundSkillKind::Guard)
-    {
-        if (!IsValid(Target) || !Target->IsUnitAlive() || FVector::Dist2D(Entry.Unit->GetActorLocation(), Target->GetActorLocation()) > Skill.HitRange)
-        {
-            StartRecovery(Index, true, RoundText(TEXT("엄호 대상 또는 거리 조건 불충족")));
-            return;
-        }
-        View.Units[TargetIndex].Guard = FMath::Max(View.Units[TargetIndex].Guard, Skill.Power);
-        StartRecovery(Index, false, RoundText(TEXT("엄호 적용 완료")));
-        return;
-    }
     if (Skill.Kind == ECombatRoundSkillKind::Projectile)
     {
         FActorSpawnParameters Params;
@@ -1403,7 +1508,15 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
     }
     else if (Skill.Kind == ECombatRoundSkillKind::Melee)
     {
-        if (Skill.MeleeArea == ESkillAreaType::TargetAndSides)
+        if (Skill.bUseMeleeAreaCollision)
+        {
+            for (AUnitBase* HitUnit : FindMeleeAreaCollisions(GetWorld(), Entry.Unit, View.Units, Skill))
+            {
+                ApplyHit(Entry.Unit, HitUnit, Skill.Power);
+                bHit = true;
+            }
+        }
+        else if (Skill.MeleeArea == ESkillAreaType::TargetAndSides)
         {
             const FIntPoint TargetCoord = View.Units.IsValidIndex(TargetIndex) ? View.Units[TargetIndex].HomeCoord : Entry.Command.TargetCoord;
             for (AUnitBase* HitUnit : FindMeleeSideCollisions(GetWorld(), Entry.Unit, View.Units, Skill, IsValid(Arena) ? Arena->Grid.Get() : nullptr, TargetCoord, Action.AimLocation))
@@ -1428,11 +1541,14 @@ void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, flo
     const int32 Index = View.Units.IndexOfByPredicate([Target](const FCombatRoundUnitView& Entry) { return Entry.Unit == Target; });
     if (!View.Units.IsValidIndex(Index)) return;
     FCombatRoundUnitView& Entry = View.Units[Index];
-    const float Absorbed = FMath::Min(Entry.Guard, Damage);
-    Entry.Guard -= Absorbed;
-    const float AppliedDamage = Damage - Absorbed;
-    if (AppliedDamage > 0.f) UCombatEffectLibrary::ApplyDamageToUnit(Source, Target, UGE_Damage::StaticClass(), AppliedDamage);
-    UE_LOG(LogTemp, Log, TEXT("[Round] Round=%d Time=%.2f Source=%d Target=%d Damage=%.1f Guard=%.1f / 서버 피격"), View.RoundNumber, SimulationTime, Source->UnitIndex, Target->UnitIndex, AppliedDamage, Absorbed);
+    if (Damage > 0.f) UCombatEffectLibrary::ApplyDamageToUnit(Source, Target, UGE_Damage::StaticClass(), Damage);
+    Entry.HP = Target->GetAttributeSet() ? Target->GetAttributeSet()->GetHP() : 0.f;
+    if (!Target->IsUnitAlive())
+    {
+        Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
+        Entry.Status = RoundText(TEXT("사망으로 남은 행동 취소"));
+    }
+    UE_LOG(LogTemp, Log, TEXT("[Round] Round=%d Time=%.2f Source=%d Target=%d Damage=%.1f / 서버 피격"), View.RoundNumber, SimulationTime, Source->UnitIndex, Target->UnitIndex, Damage);
 }
 
 void ACombatRoundCoordinator::HandleProjectileResolved(ACombatRoundProjectile* Projectile)
@@ -1468,13 +1584,6 @@ void ACombatRoundCoordinator::FinishRoundIfSettled()
     {
         View.Message = RoundText(TEXT("승리"));
         Result = ECombatResult::Victory;
-    }
-    if (!bPlayersAlive && !bEnemiesAlive)
-    {
-        View.Phase = ECombatRoundPhase::Suspended;
-        View.Message = RoundText(TEXT("양측 전멸. 정식 결과 정책 확정 전까지 보상·승패를 적용하지 않습니다."));
-        PublishState();
-        return;
     }
     PublishState();
     OnCombatFinished.Broadcast(Result);

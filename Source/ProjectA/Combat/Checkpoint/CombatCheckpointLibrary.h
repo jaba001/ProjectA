@@ -14,7 +14,10 @@ class PROJECTA_API UCombatCheckpointLibrary : public UBlueprintFunctionLibrary
     GENERATED_BODY()
 
 public:
-    static constexpr int32 CurrentSchemaVersion = 2;
+    static constexpr int32 CurrentSchemaVersion = 3;
     static constexpr int32 CurrentContentVersion = 1;
+    // Resolve persisted command identifiers through the engine's configured primary asset redirects.
+    // 엔진에 설정한 기본 에셋 리다이렉트로 저장된 명령 식별자를 해석합니다.
+    static FName ResolveSavedSkillId(FName SkillId);
     static bool Validate(const FCombatCheckpointData& Checkpoint, const TArray<FRunPartyMember>& Party, FText& OutError);
 };

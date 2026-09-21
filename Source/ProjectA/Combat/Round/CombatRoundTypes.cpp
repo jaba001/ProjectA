@@ -30,8 +30,11 @@ bool CombatRoundRules::IsOwnTerritory(bool bEnemy, FIntPoint Coord)
 bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
 {
     if (Skill.SkillId.IsNone() || Skill.Kind > ECombatRoundSkillKind::Wait || Skill.Approach > ECombatRoundApproach::Tile || Skill.TargetLoss > ECombatRoundTargetLoss::NearestEnemy) return false;
+    if (static_cast<uint8>(Skill.Kind) == 3) return false;
     if (Skill.MeleeArea != ESkillAreaType::Single && Skill.MeleeArea != ESkillAreaType::TargetAndSides) return false;
     if (Skill.MeleeArea == ESkillAreaType::TargetAndSides && (Skill.Kind != ECombatRoundSkillKind::Melee || Skill.Approach != ECombatRoundApproach::Unit)) return false;
+    if (Skill.bUseMeleeAreaCollision && (Skill.Kind != ECombatRoundSkillKind::Melee || Skill.MeleeArea != ESkillAreaType::Single)) return false;
+    if (Skill.MeleeAreaHalfExtent.ContainsNaN() || Skill.MeleeAreaHalfExtent.GetMin() <= 0.0 || Skill.MeleeAreaHalfExtent.GetMax() > 1000.0) return false;
     if (!FMath::IsFinite(Skill.WindupSeconds) || Skill.WindupSeconds < 0.f || Skill.WindupSeconds > 60.f) return false;
     if (!FMath::IsFinite(Skill.Power) || Skill.Power < 0.f || Skill.Power > 1000000.f) return false;
     if (!FMath::IsFinite(Skill.HitRange) || Skill.HitRange <= 0.f || Skill.HitRange > 100000.f) return false;
@@ -42,7 +45,6 @@ bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
     if (!FMath::IsFinite(Skill.ProjectileLifetime) || Skill.ProjectileLifetime <= 0.f || Skill.ProjectileLifetime > 60.f) return false;
     if (Skill.ActionPointCost < 0 || Skill.ActionPointCost > 100 || Skill.SubActionPointCost < 0 || Skill.SubActionPointCost > 100) return false;
     if (Skill.bRemainAtDestination && Skill.Approach != ECombatRoundApproach::Tile) return false;
-    if (Skill.Kind == ECombatRoundSkillKind::Guard && Skill.Approach != ECombatRoundApproach::None) return false;
     if (Skill.Kind == ECombatRoundSkillKind::Wait && Skill.Approach != ECombatRoundApproach::None) return false;
     if (Skill.Kind == ECombatRoundSkillKind::GroundAttack && Skill.Approach == ECombatRoundApproach::Unit) return false;
     return true;

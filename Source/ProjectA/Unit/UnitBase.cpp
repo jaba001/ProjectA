@@ -144,6 +144,13 @@ void AUnitBase::SetRoundCastMontage(UAnimMontage* Montage, bool bImmediateStop)
     if (HasAuthority()) MulticastSetRoundCastMontage(Montage, bImmediateStop);
 }
 
+UAnimMontage* AUnitBase::ResolveRoundCastMontage(UAnimMontage* Montage) const
+{
+    if (!Montage) return nullptr;
+    const TObjectPtr<UAnimMontage>* Override = RoundMontageOverrides.Find(Montage);
+    return Override && IsValid(Override->Get()) ? Override->Get() : Montage;
+}
+
 bool AUnitBase::HasRoundCastMontageInstance() const
 {
     UAnimInstance* AnimInstance = RoundMontageAnimInstance.Get();
@@ -597,7 +604,7 @@ USkillDefinitionDataAsset* AUnitBase::FindSkillDataByAbilityClass(TSubclassOf<UG
 
 bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Strength, float Dexterity, float Intelligence)
 {
-    if (!HasAuthority() || IsBusy() || IsActiveTurn() || !AbilitySystem || !AttributeSet || !FMath::IsFinite(MaxHP) || MaxHP <= 0.0f || AP <= 0 || SubAP < 0 || Skills.IsEmpty())
+    if (!HasAuthority() || IsBusy() || IsActiveTurn() || !AbilitySystem || !AttributeSet || !FMath::IsFinite(MaxHP) || MaxHP <= 0.0f || AP <= 0 || SubAP < 0)
     {
         return false;
     }

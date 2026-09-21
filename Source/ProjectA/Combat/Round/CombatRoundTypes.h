@@ -36,8 +36,9 @@ enum class ECombatRoundSkillKind : uint8
     Melee,
     Projectile,
     GroundAttack,
-    Guard,
-    Wait
+    // Preserve the serialized Wait value after removing the former cover entry.
+    // 기존 엄호 항목을 제거한 뒤에도 직렬화된 대기 값을 유지합니다.
+    Wait = 4
 };
 
 UENUM(BlueprintType)
@@ -81,6 +82,16 @@ struct PROJECTA_API FCombatRoundSkill
     // TargetAndSides는 대상과 같은 전열·후열에서 양옆 한 칸씩을 포함합니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "Kind == ECombatRoundSkillKind::Melee"))
     ESkillAreaType MeleeArea = ESkillAreaType::Single;
+
+    // Use a forward box to hit every overlapping enemy without consulting tile coordinates.
+    // 타일 좌표를 참조하지 않고 전방 박스와 겹치는 모든 적을 타격합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "Kind == ECombatRoundSkillKind::Melee"))
+    bool bUseMeleeAreaCollision = false;
+
+    // Box half extents in cm: forward depth, lateral width and height; the rear face starts at the caster.
+    // cm 단위 박스 반크기이며 전방 깊이·좌우 폭·높이 순서입니다. 뒷면은 시전자 위치에서 시작합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.1", ClampMax = "1000.0", EditCondition = "bUseMeleeAreaCollision"))
+    FVector MeleeAreaHalfExtent = FVector(75.f, 250.f, 100.f);
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     ECombatRoundApproach Approach = ECombatRoundApproach::Unit;
@@ -182,9 +193,6 @@ struct PROJECTA_API FCombatRoundUnitView
 
     UPROPERTY(BlueprintReadOnly)
     float HP = 0.f;
-
-    UPROPERTY(BlueprintReadOnly)
-    float Guard = 0.f;
 
     UPROPERTY(BlueprintReadOnly)
     FIntPoint HomeCoord = FIntPoint::ZeroValue;

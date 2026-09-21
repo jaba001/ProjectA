@@ -6,6 +6,8 @@
 #include "Animation/AnimMontage.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
+#include "DataAsset/PartyDefinitionDataAsset.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Editor.h"
 #include "Engine/Engine.h"
 #include "Engine/NetConnection.h"
@@ -157,7 +159,20 @@ public:
             const FCombatRoundUnitView* Unit = Units.FindByPredicate([Controller](const auto& Candidate) { return !Candidate.bEnemy && Candidate.OwnerSlot == Controller->GetRoundParticipantSlot(); });
             const FCombatRoundUnitView* Enemy = Units.FindByPredicate([](const auto& Candidate) { return Candidate.bEnemy && Candidate.HP > 0; });
             if (!Unit || !Enemy || !IsValid(Unit->Unit) || Controller->IsRoundRequestPending()) return false;
-            if (!Check(Unit->SkillIds.Num() == 4 && Unit->HP > 0, TEXT("Each original owner retains its four saved skills and living character."))) return End();
+            AGameplayGameModeBase* Mode = Host->GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
+            const FGuid CharacterId = Mode->GetEncounterManager()->GetCombatManager()->GetCharacterId(Unit->Unit);
+            const FRunPartyMember* Member = Run->GetPartyMembers().FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.CharacterId == CharacterId; });
+            FProfessionDefinition Profession;
+            FText Error;
+            if (!Check(Member && Mode->PartyDefinition->ResolveProfession(Member->ClassId, Profession, Error), *FString::Printf(TEXT("The original character resolves its authored profession loadout: %s"), *Error.ToString()))) return End();
+            TArray<FName> ExpectedSkillIds;
+            for (const USkillDefinitionDataAsset* Skill : Profession.StartingSkills)
+            {
+                FCombatRoundSkill Definition;
+                if (!Check(Skill && Skill->ResolveRoundSkill(Definition, Error), *FString::Printf(TEXT("An authored profession skill resolves for the expected loadout: %s"), *Error.ToString()))) return End();
+                ExpectedSkillIds.Add(Definition.SkillId);
+            }
+            if (!Check(Unit->SkillIds == ExpectedSkillIds && Unit->HP > 0, TEXT("Each original owner retains its ordered profession skills and living character."))) return End();
             FCombatRoundCommand Command;
             Command.UnitId = Unit->UnitId;
             Command.TargetUnitId = Enemy->UnitId;

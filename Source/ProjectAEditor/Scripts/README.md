@@ -50,7 +50,7 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 
 검증 범위:
 
-- 실제 메뉴·캐릭터 생성·전투 노드에서 시작하며 저장된 DA 4개의 목록·계획·피해 적용을 확인한다.
+- 실제 메뉴·전사 생성·전투 노드에서 시작하며 검 공격을 포함한 저장된 DA 5개의 목록·계획·피해 적용을 확인한다.
 - 화면 전환 후 Slate 마우스 누름/해제 한 번을 뷰포트 hit-test·컨트롤러 입력에 전달한다. 메뉴·스킬 버튼은 delegate를 사용하며 물리 마우스 하드웨어 검사는 아니다.
 - 전용 시험 저장만 생성·정리하며 기존 저장과 디스크 에셋·밸런스는 변경하지 않는다.
 
@@ -67,14 +67,14 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateRangedAttack.py") -RangedAttackVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-8. `ConfigureSweepingStrike.py`: 기존 휩쓸기만 근접 `TargetAndSides`(대상과 양옆 한 칸)로 갱신한다. 위력·AP·기존 몽타주는 보존하며 빈 몽타주는 기본공격에서 재사용한다. `-SweepingStrikeVerifyOnly`는 저장 결과만 읽는다. `ConfigureCombatContent.py`의 생성 경로도 같은 설정 함수를 사용한다.
+8. `ConfigureSweepingStrike.py`: 기존 휩쓸기만 근접 전방 박스 충돌로 갱신한다. 타일 범위 분기는 끄고 `bUseMeleeAreaCollision=true`·`MeleeAreaHalfExtent=(75,250,100)`을 사용한다. 위력·AP·기존 몽타주는 보존하며 빈 몽타주는 기본공격에서 재사용한다. `-SweepingStrikeVerifyOnly`는 저장 결과만 읽는다. `ConfigureCombatContent.py`의 생성 경로도 같은 설정 함수를 사용한다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureSweepingStrike.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureSweepingStrike.py") -SweepingStrikeVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-새 회귀 `ProjectA.Combat.Round.MeleeTargetAndSides`는 범위·가장자리·차폐·근접 왕복을 검사한다. 최신 코드에서 컴파일만 확인했으며 작동 실행은 [TODO](../../../Docs/TODO.md#2-12-휩쓸기-근접-대상과-양옆)에 남긴다.
+`ProjectA.Combat.Round.MeleeAreaPhysicalContacts`는 타일과 다른 월드 위치·회전·범위 크기·차폐·복수 피격·근접 왕복을 검사한다. 기존 `MeleeTargetAndSides`는 타일형 경로 회귀로 보존한다. 작동 실행 상태는 [TODO](../../../Docs/TODO.md#2-12-휩쓸기-근접-범위-충돌)에 남긴다.
 
 9. `ConfigureTestEnemies.py`: 기본 PvE 인카운터를 기존 적 클래스 4개로 구성하고 Gameplay Arena를 앞열 `(1,2)`, `(2,2)`·뒷열 `(0,3)`, `(3,3)`으로 배치한다. 유닛 능력치·스킬·Snapshot 정의는 변경하지 않는다. 열린 에디터가 패키지를 잠글 수 있으므로 저장 후 종료하고 실행한다. `-TestEnemiesVerifyOnly`는 저장된 클래스 수·배치만 읽는다.
 
@@ -82,3 +82,14 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureTestEnemies.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureTestEnemies.py") -TestEnemiesVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
+
+10. `ConfigureWarriorContent.py`: GKnight 전사와 Weapon_Pack 검을 작업 폴더에 복제하고 BossyEnemy 제자리 검 휘두르기를 IK 리타깃한다. 전사는 기존 4개에 `BPDA_swoard_attack`을 추가하고 기본 적은 검 공격만 장착한다. 기존 기본공격 ID는 유지하며 표시명을 `비무장 공격`으로 바꾸고, 휩쓸기는 `BPDA_SweepingStrike`로 이름을 변경한다. Snapshot 적의 저장된 장착 규칙은 유지한다.
+
+IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScript`를 사용하며 스크립트 종료 후 에디터도 종료된다. `-WarriorVerifyOnly`는 commandlet에서 저장된 뼈대·몽타주·스킬·소켓·직업·이전 참조만 읽는다. 두 명령 모두 PIE·게임 플레이를 시작하지 않는다. 외부 팩 원본은 설치된 상태여야 하며 수정하지 않는다.
+
+```powershell
+& $editorExecutable $projectFile ("-ExecutePythonScript=$scriptDirectory/ConfigureWarriorContent.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -RenderOffscreen -nosplash
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureWarriorContent.py") -WarriorVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+```
+
+출력은 `/Game/User_JeHoon/Characters/Warrior`, `Characters/SwordEnemy`, `Weapons`와 기존 `Blueprint` 하위다. 재실행은 이 작성 구성을 다시 적용하며 수동으로 변경한 장착·부착·전사 직업 연결을 재설정한다. `RoundMontageOverrides`로 기존 스킬의 유닛별 몽타주를 연결하고, 새 뼈대에 맞지 않는 기존 Manny Foot IK만 제거한다. 검 공격은 원본 5.8667초 재생 길이와 주 휘두르기 구간의 2.15초 발동을 사용한다. 실제 검 위치·타격 표현 확인은 [TODO](../../../Docs/TODO.md)에 남긴다.

@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Abilities/GameplayAbility.h"
+#include "Combat/Checkpoint/CombatCheckpointLibrary.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
@@ -446,6 +447,62 @@ bool FManagedRetiredCombatRejectionTest::RunTest(const FString& Parameters)
     FManagedRunPreview AfterPreview;
     TestTrue(TEXT("The original canonical stamp and ownership remain readable"), Reader->ReadManagedRun(Fixture.Identity.RunId, AfterPreview, Fixture.Error) && AfterPreview.Stamp == Preview.Stamp && ManagedSameIdentity(AfterPreview.Identity, Saved->Identity));
     Reader->OnRunStateChanged.Clear();
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FManagedRoundReadyResumeTest, "ProjectA.Run.Managed.RoundReadyResume", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FManagedRoundReadyResumeTest::RunTest(const FString& Parameters)
+{
+    FManagedFixture Fixture(2);
+    URunStateSubsystem* Host = Fixture.NewSession(1);
+    if (!TestNotNull(TEXT("Original Host session initializes"), Host) || !TestTrue(TEXT("Managed Run is created"), Host->CreateManagedRun(Fixture.Party, Fixture.Identity, Fixture.Error))) return false;
+    FCombatCheckpointData Checkpoint;
+    if (!TestTrue(TEXT("Managed combat fixture starts"), Fixture.StartCombatFixture(Host, Checkpoint))) return false;
+    Checkpoint.SchemaVersion = UCombatCheckpointLibrary::CurrentSchemaVersion;
+    Checkpoint.RoundNumber = 3;
+    Checkpoint.PlanRevision = 9;
+    Checkpoint.CompletedTurnSerial = 0;
+    for (int32 Index = 0; Index < Checkpoint.Units.Num(); ++Index)
+    {
+        FCombatCheckpointUnit& Unit = Checkpoint.Units[Index];
+        Unit.RoundUnitId = Index + 1;
+        Unit.AP = Unit.MaxAP;
+        Unit.SubAP = Unit.MaxSubAP;
+        FCombatCheckpointRoundPlan& Plan = Checkpoint.RoundPlans.AddDefaulted_GetRef();
+        Plan.UnitId = Unit.RoundUnitId;
+        Plan.Command.UnitId = Unit.RoundUnitId;
+        Plan.Command.TargetCoord = Unit.GridCoord;
+        Plan.Command.DestinationCoord = Unit.GridCoord;
+        Plan.MoveDestinationCoord = Unit.GridCoord;
+        Plan.bReady = Index != 0;
+        if (Unit.Team == ETeam::Player)
+        {
+            const USkillDefinitionDataAsset* Definition = Cast<USkillDefinitionDataAsset>(Unit.Skills[0].TryLoad());
+            FCombatRoundSkill Skill;
+            if (!Definition || !Definition->ResolveRoundSkill(Skill, Fixture.Error)) return false;
+            Plan.Command.SkillId = Skill.SkillId;
+            Plan.Command.TargetUnitId = Checkpoint.Units.Num();
+            Plan.Command.TargetCoord = Checkpoint.Units.Last().GridCoord;
+        }
+    }
+    if (!TestTrue(TEXT("Managed Ready boundary publishes under its lease"), Host->CommitCombatCheckpoint(Checkpoint, Fixture.Error))) return false;
+    const FRunAuthorityStamp SavedStamp = Host->GetManagedStamp();
+    const TArray<uint8> SavedBytes = Fixture.FileBytes();
+    Host->CloseManagedRun();
+    URunStateSubsystem* NextHost = Fixture.NewSession(2);
+    if (!TestNotNull(TEXT("Original second participant session initializes"), NextHost)) return false;
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("Failed resume does not confirm new Host or converted readiness"), NextHost->ResumeManagedRun(SavedStamp, { Fixture.Account(2) }, Fixture.Error));
+    TestTrue(TEXT("Failure preserves bytes without retaining a lease or partial combat"), Fixture.FileBytes() == SavedBytes && !NextHost->HasManagedLease() && !NextHost->HasCombatCheckpoint());
+    if (!TestTrue(TEXT("Original participant resumes saved Ready boundary explicitly"), NextHost->ResumeManagedRun(SavedStamp, { Fixture.Account(2) }, Fixture.Error))) return false;
+    const FCombatCheckpointData& Restored = NextHost->GetCombatCheckpoint();
+    TestTrue(TEXT("New Host identity and snapshot identity agree"), NextHost->GetRunIdentity().HostAccountId == Fixture.Account(2) && ManagedSameIdentity(Restored.Identity, NextHost->GetRunIdentity()));
+    TestTrue(TEXT("Round, draft revision and paid-before boundary persist"), Restored.RoundNumber == 3 && Restored.PlanRevision == 9 && Restored.Units[0].AP == Checkpoint.Units[0].AP);
+    TestTrue(TEXT("Absent original owner remains fixed while control becomes permanent AI"), Restored.Units[0].OwnerAccountId == Fixture.Account(1) && Restored.Units[0].CharacterId == Checkpoint.Units[0].CharacterId && Restored.Units[0].PartyControlMode == EPartyControlMode::ServerAI);
+    TStrongObjectPtr<URunSaveGame> Published = Fixture.LoadPayload();
+    TestTrue(TEXT("AI readiness is durable before restore exposes it"), Published.IsValid() && Published->CombatCheckpoint.RoundPlans[0].bReady && Restored.RoundPlans[0].bReady);
+    TestTrue(TEXT("Gameplay reconstruction remains pending with a valid lease"), NextHost->HasManagedLease() && NextHost->IsManagedResumePending());
     return true;
 }
 

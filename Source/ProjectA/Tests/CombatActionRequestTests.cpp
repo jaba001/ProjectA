@@ -183,6 +183,32 @@ bool FCombatRequestOwnershipTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatLegacyPartySlotsTest, "ProjectA.Combat.Requests.LegacyPartySlotIdentity", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatLegacyPartySlotsTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatActionRequestTests;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("Legacy slot fixture initializes"), Fixture.Initialize(false))) return false;
+    Fixture.Identity = FRunIdentityData();
+    for (FRunPartyMember& Member : Fixture.Party)
+    {
+        Member.CharacterId.Invalidate();
+        Member.OwnerAccountId = FRunAccountId();
+        Member.CharacterName = FText::FromString(TEXT("Same legacy name"));
+    }
+    UCombatActionAuthority* Authority = Fixture.Authority();
+    TestEqual(TEXT("Unconfigured actors have no inferred party slot"), Authority->GetPartySlot(Fixture.First), INDEX_NONE);
+    if (!TestTrue(TEXT("Trusted legacy actor slots configure without ownership"), Authority->ConfigureRun(Fixture.Identity, Fixture.Party, Fixture.PartyActors, Fixture.Error))) return false;
+    TestEqual(TEXT("The first unidentified actor retains slot zero"), Authority->GetPartySlot(Fixture.First), 0);
+    TestEqual(TEXT("The second unidentified actor retains its distinct slot"), Authority->GetPartySlot(Fixture.Second), 1);
+    TestEqual(TEXT("Enemies receive no party slot"), Authority->GetPartySlot(Fixture.Enemy), INDEX_NONE);
+    TestTrue(TEXT("Slot mapping creates neither character identity nor ownership"), !Authority->GetCharacterId(Fixture.First).IsValid() && !Authority->GetCharacterId(Fixture.Second).IsValid() && Authority->GetOwnerAccountId(Fixture.Second).IsEmpty());
+    Authority->Reset();
+    TestEqual(TEXT("Reset clears stale actor slot mappings"), Authority->GetPartySlot(Fixture.First), INDEX_NONE);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatLegacyRequestRejectionTest, "ProjectA.Combat.Requests.RetiredImmediateCommandsReject", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FCombatLegacyRequestRejectionTest::RunTest(const FString& Parameters)

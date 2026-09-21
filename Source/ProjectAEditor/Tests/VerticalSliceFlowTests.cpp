@@ -504,8 +504,9 @@ public:
             PlaySettings->SetPlayNetMode(PIE_Standalone);
             PlaySettings->SetPlayNumberOfClients(1);
             const FIntPoint Sizes[] = { FIntPoint(1280, 720), FIntPoint(1024, 768), FIntPoint(1600, 720), FIntPoint(1280, 800) };
-            PlaySettings->NewWindowWidth = Sizes[SkillIndex].X;
-            PlaySettings->NewWindowHeight = Sizes[SkillIndex].Y;
+            const FIntPoint ViewportSize = Sizes[SkillIndex % UE_ARRAY_COUNT(Sizes)];
+            PlaySettings->NewWindowWidth = ViewportSize.X;
+            PlaySettings->NewWindowHeight = ViewportSize.Y;
             FRequestPlaySessionParams Params;
             Params.EditorPlaySettings = PlaySettings.Get();
             Params.bAllowOnlineSubsystem = false;
@@ -605,7 +606,7 @@ public:
             Source = Controlled->Unit;
             SourceId = Controlled->UnitId;
             const int32 AllyCount = Round->GetView().Units.FilterByPredicate([](const FCombatRoundUnitView& Unit) { return !Unit.bEnemy; }).Num();
-            if (!Require(AllyCount == 1 && Controlled->SkillIds.Num() == Skills.Num(), TEXT("The real encounter spawns one ally with exactly four authored skills."))) return true;
+            if (!Require(AllyCount == 1 && Controlled->SkillIds.Num() == Skills.Num(), TEXT("The real encounter spawns one warrior with exactly five authored skills."))) return true;
             for (const FCombatRoundSkill& Skill : Skills)
             {
                 if (!Require(Controlled->SkillIds.Contains(Skill.SkillId) && Round->FindSkill(Skill.SkillId), TEXT("Each saved skill belongs to the player's runtime loadout and catalogue."))) return true;
@@ -687,7 +688,7 @@ public:
             {
                 if (UCombatRoundSkillButton* Button = Cast<UCombatRoundSkillButton>(Widget)) Buttons.Add(Button);
             }
-            if (!Require(Buttons.Num() == Skills.Num(), TEXT("Selecting the enemy exposes exactly four real skill buttons."))) return true;
+            if (!Require(Buttons.Num() == Skills.Num(), TEXT("Selecting the enemy exposes exactly five real skill buttons."))) return true;
             for (const FCombatRoundSkill& Skill : Skills)
             {
                 UCombatRoundSkillButton** Match = Buttons.FindByPredicate([&Skill](const UCombatRoundSkillButton* Button) { return Button->GetSkillId() == Skill.SkillId; });
@@ -876,7 +877,7 @@ bool FVerticalSliceSavedSkillLoadoutTest::RunTest(const FString& Parameters)
         AddError(TEXT("The requested skill-loadout test slot already exists; choose a fresh suffix. No PIE game was started."));
         return false;
     }
-    const TArray<FString> AssetNames = { TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_RangedAttack"), TEXT("BPDA_AreaAttack"), TEXT("DA_SweepingStrike") };
+    const TArray<FString> AssetNames = { TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_RangedAttack"), TEXT("BPDA_AreaAttack"), TEXT("BPDA_SweepingStrike"), TEXT("BPDA_swoard_attack") };
     TArray<FCombatRoundSkill> Skills;
     for (const FString& Name : AssetNames)
     {
@@ -891,7 +892,7 @@ bool FVerticalSliceSavedSkillLoadoutTest::RunTest(const FString& Parameters)
         }
         Skills.Add(Skill);
     }
-    AddInfo(TEXT("Runs four saved-menu/encounter PIE sessions; enemy selection uses one Slate mouse press/release through the viewport and controller, skill/menu buttons use their delegates."));
+    AddInfo(TEXT("Runs five saved-menu/encounter PIE sessions; enemy selection uses one Slate mouse press/release through the viewport and controller, skill/menu buttons use their delegates."));
     for (int32 Index = 0; Index < Skills.Num(); ++Index)
     {
         ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/MainMenu")));

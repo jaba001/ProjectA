@@ -16,12 +16,18 @@ public class ProjectAEditor : ModuleRules
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
+			"AnimGraph",
+			"AnimGraphRuntime",
 			"AssetRegistry",
 			"AssetTools",
 			"BlueprintGraph",
 			"CommonUI",
+			"ControlRig",
+			"ControlRigDeveloper",
 			"GameplayAbilities",
 			"InputCore",
+			"IKRig",
+			"IKRigEditor",
 			"NavigationSystem",
 			"NetCore",
 			"Json",

@@ -132,14 +132,14 @@ bool URunStateSubsystem::ValidateEncounterProgress(const URunSaveGame* Save) con
 bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError) const
 {
     OutError = FText::FromString(TEXT("저장 파일이 손상되었거나 현재 버전·직업 설정과 호환되지 않습니다."));
-    if (!Save || (Save->Version != 1 && Save->Version != 2 && Save->Version != 3 && Save->Version != 4) || Save->Party.IsEmpty() || Save->Party.Num() > 4 || Save->Nodes.Num() != 2 || Save->CompletedNodes.Num() > 2)
+    if (!Save || (Save->Version != 1 && Save->Version != 2 && Save->Version != 3 && Save->Version != 4 && Save->Version != 5 && Save->Version != 6) || Save->Party.IsEmpty() || Save->Party.Num() > 4 || Save->Nodes.Num() != 2 || Save->CompletedNodes.Num() > 2)
     {
         return false;
     }
     if (!ValidateEncounterProgress(Save)) return false;
     // Legacy saves remain offline; missing or damaged ownership must never downgrade a new save.
     // 기존 저장은 오프라인으로 유지하며 새 저장의 누락·손상된 소유권을 구버전으로 우회하지 않습니다.
-    if ((Save->Version == 1) != (Save->Identity.Origin == ERunIdentityOrigin::LegacyOffline))
+    if ((Save->Version == 1 || Save->Version == 6) != (Save->Identity.Origin == ERunIdentityOrigin::LegacyOffline))
     {
         return false;
     }
@@ -160,7 +160,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
         return false;
     }
     const FCombatCheckpointData EmptyCheckpoint;
-    if (Save->Version != 3 && !(bManaged && Save->Phase == ERunPhase::Combat) && !FCombatCheckpointData::StaticStruct()->CompareScriptStruct(&Save->CombatCheckpoint, &EmptyCheckpoint, 0))
+    if (Save->Version != 3 && Save->Version != 5 && Save->Version != 6 && !(bManaged && Save->Phase == ERunPhase::Combat) && !FCombatCheckpointData::StaticStruct()->CompareScriptStruct(&Save->CombatCheckpoint, &EmptyCheckpoint, 0))
     {
         return false;
     }
@@ -228,15 +228,16 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
     const bool bResult = Save->Phase == ERunPhase::Result && Completed > 0 && Save->Result == ECombatResult::Victory && Save->CurrentNode == Save->Nodes[Completed - 1].NodeId && Save->CurrentEncounter == TEXT("DefaultEncounter");
     const bool bComplete = Save->Phase == ERunPhase::Complete && Completed == 2 && Save->Result == ECombatResult::Victory && Save->CurrentNode == Save->Nodes.Last().NodeId && Save->CurrentEncounter.IsNone();
     const bool bDefeat = Save->Phase == ERunPhase::Defeat && Completed < 2 && Save->Result == ECombatResult::Defeat && Living == 0 && Save->CurrentNode == Save->Nodes[Completed].NodeId && Save->CurrentEncounter == TEXT("DefaultEncounter");
-    const bool bCombat = (Save->Version == 3 || bManaged) && Save->Phase == ERunPhase::Combat && Completed < 2 && Save->Result == ECombatResult::None && Save->CurrentNode == Save->Nodes[Completed].NodeId && Save->CurrentEncounter == TEXT("DefaultEncounter");
+    const bool bCombat = (Save->Version == 3 || Save->Version == 5 || Save->Version == 6 || bManaged) && Save->Phase == ERunPhase::Combat && Completed < 2 && Save->Result == ECombatResult::None && Save->CurrentNode == Save->Nodes[Completed].NodeId && Save->CurrentEncounter == TEXT("DefaultEncounter");
     const bool bRunEncounter = Save->Phase == ERunPhase::EncounterChoice || Save->Phase == ERunPhase::Shop;
-    if (Created == 0 || (!bMap && !bResult && !bComplete && !bDefeat && !bCombat && !bRunEncounter) || (!bDefeat && Living == 0) || (Save->Version == 3 && !bCombat))
+    if (Created == 0 || (!bMap && !bResult && !bComplete && !bDefeat && !bCombat && !bRunEncounter) || (!bDefeat && Living == 0) || ((Save->Version == 3 || Save->Version == 5 || Save->Version == 6) && !bCombat))
     {
         return false;
     }
     if (bCombat)
     {
         const FCombatCheckpointData& Checkpoint = Save->CombatCheckpoint;
+        if (((Save->Version == 5 || Save->Version == 6) && Checkpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion) || (Save->Version == 3 && Checkpoint.SchemaVersion == UCombatCheckpointLibrary::CurrentSchemaVersion)) return false;
         if (!FRunIdentityData::StaticStruct()->CompareScriptStruct(&Save->Identity, &Checkpoint.Identity, 0) || Checkpoint.NodeId != Save->CurrentNode || Checkpoint.EncounterId != Save->CurrentEncounter || !UCombatCheckpointLibrary::Validate(Checkpoint, Save->Party, OutError))
         {
             return false;
@@ -267,7 +268,8 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
 URunSaveGame* URunStateSubsystem::CreateSaveData() const
 {
     URunSaveGame* Save = NewObject<URunSaveGame>();
-    Save->Version = bManagedRun ? 4 : RunIdentity.Origin == ERunIdentityOrigin::LegacyOffline ? 1 : 2;
+    const bool bLegacyOffline = RunIdentity.Origin == ERunIdentityOrigin::LegacyOffline;
+    Save->Version = bManagedRun ? 4 : Phase == ERunPhase::Combat ? (bLegacyOffline ? 6 : 5) : bLegacyOffline ? 1 : 2;
     Save->Identity = RunIdentity;
     Save->Participation = Participation;
     Save->EncounterProgress = EncounterProgress;
@@ -279,6 +281,7 @@ URunSaveGame* URunStateSubsystem::CreateSaveData() const
     Save->Phase = Phase;
     Save->Result = LastResult;
     Save->Catalog = FSoftObjectPath(PartyDefinition);
+    if (Phase == ERunPhase::Combat) Save->CombatCheckpoint = CombatCheckpoint;
     return Save;
 }
 
@@ -311,7 +314,7 @@ bool URunStateSubsystem::SaveCheckpoint(FText& OutError)
 {
     if (Phase == ERunPhase::Combat)
     {
-        OutError = NSLOCTEXT("RunCheckpoint", "ExplicitBoundary", "시간 기반 라운드 전투의 중간 저장·복구는 아직 지원하지 않습니다. 마지막 전투 외 저장은 보존됩니다.");
+        OutError = NSLOCTEXT("RunCheckpoint", "ExplicitBoundary", "전투는 준비 계획과 상태를 함께 검증한 명시적 체크포인트로만 저장할 수 있습니다.");
         SaveError = OutError;
         return false;
     }
@@ -325,19 +328,41 @@ bool URunStateSubsystem::SaveCheckpoint(FText& OutError)
     return true;
 }
 
-bool URunStateSubsystem::CommitCombatCheckpoint(const FCombatCheckpointData&, FText& OutError)
+bool URunStateSubsystem::CommitCombatCheckpoint(const FCombatCheckpointData& Checkpoint, FText& OutError)
 {
-    // Sequential checkpoint publication is retired; preserve the last durable non-combat record.
-    // 순차 턴 체크포인트 저장을 폐기하고 마지막 전투 외 확정 기록을 보존합니다.
-    OutError = NSLOCTEXT("RunCheckpoint", "TimedRoundRecoveryUnsupported", "기존 순차 턴 체크포인트를 새 전투에 저장할 수 없습니다. 시간 기반 라운드의 중간 저장·복구는 아직 지원하지 않습니다.");
+    OutError = NSLOCTEXT("RunCheckpoint", "PlanningBoundary", "현재 전투의 유효한 준비 계획과 저장 권한이 필요합니다. 저장 실패 시 준비 완료를 확정하지 않습니다.");
     SaveError = OutError;
-    return false;
+    if (!bCheckpointSaving || !CanMutateManagedRun() || Phase != ERunPhase::Combat || LastResult != ECombatResult::None || Checkpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion || Checkpoint.NodeId != CurrentNodeId || Checkpoint.EncounterId != CurrentEncounterId || !FRunIdentityData::StaticStruct()->CompareScriptStruct(&RunIdentity, &Checkpoint.Identity, 0)) return false;
+    if (Checkpoint.Revision != CombatCheckpoint.Revision + 1 || (HasCombatCheckpoint() && Checkpoint.AttemptId != CombatCheckpoint.AttemptId)) return false;
+    TStrongObjectPtr<URunSaveGame> Save(CreateSaveData());
+    Save->CombatCheckpoint = Checkpoint;
+    for (FRunPartyMember& Member : Save->Party)
+    {
+        if (!Member.bCreated) continue;
+        const FCombatCheckpointUnit* Unit = Checkpoint.Units.FindByPredicate([&Member](const FCombatCheckpointUnit& Entry) { return Entry.Team == ETeam::Player && Entry.PartySlot == Member.SlotIndex; });
+        if (Unit) Member.CurrentHP = Unit->HP;
+    }
+    // Publish memory only after the existing atomic file or managed authority commit succeeds.
+    // 기존 원자적 파일 저장 또는 관리 권위 저장이 성공한 후에만 메모리에 확정합니다.
+    if (!WriteSaveData(Save.Get(), OutError))
+    {
+        SaveError = OutError;
+        return false;
+    }
+    CombatCheckpoint = Checkpoint;
+    PartyMembers = Save->Party;
+    SaveError = FText::GetEmpty();
+    OutError = FText::GetEmpty();
+    OnRunStateChanged.Broadcast();
+    return true;
 }
 
 bool URunStateSubsystem::ValidateCheckpointHost(const FRunAccountId& AccountId, FText& OutError) const
 {
     OutError = NSLOCTEXT("RunCheckpoint", "Host", "기존 Host만 이 전투 체크포인트를 복구할 수 있습니다.");
-    if (!HasCombatCheckpoint() || AccountId.IsEmpty() || AccountId != RunIdentity.HostAccountId || !FRunIdentityData::StaticStruct()->CompareScriptStruct(&RunIdentity, &CombatCheckpoint.Identity, 0))
+    const bool bLegacyOffline = RunIdentity.Origin == ERunIdentityOrigin::LegacyOffline;
+    const bool bValidCaller = bLegacyOffline ? AccountId.IsEmpty() && GetWorld() && GetWorld()->GetNetMode() == NM_Standalone : !AccountId.IsEmpty() && AccountId == RunIdentity.HostAccountId;
+    if (!HasCombatCheckpoint() || !bValidCaller || !FRunIdentityData::StaticStruct()->CompareScriptStruct(&RunIdentity, &CombatCheckpoint.Identity, 0))
     {
         return false;
     }
@@ -381,9 +406,9 @@ bool URunStateSubsystem::ValidateContinuableSave(const URunSaveGame* Save, bool 
     {
         return false;
     }
-    if (Save->Phase == ERunPhase::Combat)
+    if (Save->Phase == ERunPhase::Combat && Save->CombatCheckpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion)
     {
-        OutError = NSLOCTEXT("RunCheckpoint", "RetiredCombatSave", "기존 순차 턴 전투 저장은 새 라운드 전투에서 이어할 수 없습니다. 새 전투의 중간 저장·복구는 아직 지원하지 않으며 기존 저장 파일은 보존됩니다.");
+        OutError = NSLOCTEXT("RunCheckpoint", "RetiredCombatSave", "기존 순차 턴 전투 저장은 준비 계획 체크포인트로 복구할 수 없습니다. 기존 저장 파일은 보존됩니다.");
         return false;
     }
     if (Save->Version == 4)
@@ -662,9 +687,9 @@ bool URunStateSubsystem::ResumeManagedRun(const FRunAuthorityStamp& ExpectedStam
     }
     // Reject old combat payloads before changing participants, Host epochs, leases or stored bytes.
     // 참가자·Host 세대·lease·저장 바이트를 바꾸기 전에 기존 전투 본문을 거절합니다.
-    if (Save->Phase == ERunPhase::Combat)
+    if (Save->Phase == ERunPhase::Combat && Save->CombatCheckpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion)
     {
-        OutError = NSLOCTEXT("ManagedRun", "RetiredCombatSave", "기존 순차 턴 관리 전투는 새 라운드 전투에서 재개할 수 없습니다. 새 전투의 중간 복구는 아직 지원하지 않으며 기준 저장과 실행 권한은 변경하지 않습니다.");
+        OutError = NSLOCTEXT("ManagedRun", "RetiredCombatSave", "기존 순차 턴 관리 전투는 준비 계획 체크포인트로 재개할 수 없습니다. 기준 저장과 실행 권한은 변경하지 않습니다.");
         return false;
     }
     FRunParticipationData NextParticipation;
@@ -675,6 +700,20 @@ bool URunStateSubsystem::ResumeManagedRun(const FRunAuthorityStamp& ExpectedStam
     if (!URunParticipationLibrary::ValidateTransition(Save->Participation, Save->Identity, NextParticipation, NextIdentity, Save->Party, OutError)) return false;
     Save->Identity = NextIdentity;
     Save->Participation = NextParticipation;
+    if (Save->Phase == ERunPhase::Combat)
+    {
+        Save->CombatCheckpoint.Identity = NextIdentity;
+        for (FCombatCheckpointUnit& Unit : Save->CombatCheckpoint.Units)
+        {
+            if (Unit.Team == ETeam::Player && !URunParticipationLibrary::ResolveControlMode(NextParticipation, NextIdentity, Save->Party, Unit.CharacterId, Unit.PartyControlMode, OutError)) return false;
+            if (Unit.Team == ETeam::Player && Unit.PartyControlMode == EPartyControlMode::ServerAI)
+            {
+                FCombatCheckpointRoundPlan* Plan = Save->CombatCheckpoint.RoundPlans.FindByPredicate([&Unit](const FCombatCheckpointRoundPlan& Entry) { return Entry.UnitId == Unit.RoundUnitId; });
+                if (!Plan) return false;
+                Plan->bReady = true;
+            }
+        }
+    }
     if (!ValidateSave(Save.Get(), OutError)) return false;
     TArray<uint8> Payload;
     if (!UGameplayStatics::SaveGameToMemory(Save.Get(), Payload))
@@ -881,6 +920,7 @@ bool URunStateSubsystem::BeginEncounter(FName NodeId)
     const FRunNodeDefinition& Node = Nodes[CompletedNodes.Num()];
     CurrentNodeId = Node.NodeId;
     CurrentEncounterId = Node.EncounterId;
+    CombatCheckpoint = FCombatCheckpointData();
     LastResult = ECombatResult::None;
     Phase = ERunPhase::Preparing;
     AutoSaveCheckpoint();

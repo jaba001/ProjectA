@@ -96,6 +96,39 @@ namespace
             return Checkpoint;
         }
 
+        FCombatCheckpointData MakeRoundCheckpoint() const
+        {
+            FCombatCheckpointData Checkpoint = MakeCheckpoint();
+            Checkpoint.SchemaVersion = UCombatCheckpointLibrary::CurrentSchemaVersion;
+            Checkpoint.RoundNumber = 2;
+            Checkpoint.PlanRevision = 7;
+            Checkpoint.CompletedTurnSerial = 0;
+            Checkpoint.NextTurnIndex = 0;
+            for (int32 Index = 0; Index < Checkpoint.Units.Num(); ++Index)
+            {
+                FCombatCheckpointUnit& Unit = Checkpoint.Units[Index];
+                Unit.RoundUnitId = Index + 1;
+                Unit.AP = Unit.MaxAP;
+                Unit.SubAP = Unit.MaxSubAP;
+                FCombatCheckpointRoundPlan& Plan = Checkpoint.RoundPlans.AddDefaulted_GetRef();
+                Plan.UnitId = Unit.RoundUnitId;
+                Plan.Command.UnitId = Unit.RoundUnitId;
+                Plan.Command.TargetCoord = Unit.GridCoord;
+                Plan.Command.DestinationCoord = Unit.GridCoord;
+                Plan.MoveDestinationCoord = Unit.GridCoord;
+                Plan.bReady = Index != 0;
+                if (Unit.Team == ETeam::Player)
+                {
+                    FCombatRoundSkill Skill;
+                    FText Error;
+                    if (Profession.StartingSkills[0]->ResolveRoundSkill(Skill, Error)) Plan.Command.SkillId = Skill.SkillId;
+                    Plan.Command.TargetUnitId = 2;
+                    Plan.Command.TargetCoord = Checkpoint.Units[1].GridCoord;
+                }
+            }
+            return Checkpoint;
+        }
+
         // Install an old serialized payload directly; production code must never publish it again.
         // 이전 직렬화 본문을 직접 준비하며 제품 코드는 이 형식을 다시 저장하면 안 됩니다.
         bool WriteRetiredCombat(const FCombatCheckpointData& Checkpoint, FText& OutError) const
@@ -158,7 +191,7 @@ bool FCombatCheckpointValueTest::RunTest(const FString& Parameters)
         TestFalse(FString(Label) + TEXT(" reports why"), Error.IsEmpty());
         Invalid = Valid;
     };
-    Invalid.SchemaVersion = 3;
+    Invalid.SchemaVersion = UCombatCheckpointLibrary::CurrentSchemaVersion + 1;
     Reject(TEXT("Unknown checkpoint schema is rejected"));
     Invalid.ContentVersion = 2;
     Reject(TEXT("Unknown content version is rejected"));
@@ -490,6 +523,145 @@ bool FCombatCheckpointAIControlTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("AI historical battle cannot replace a current Run"), Restored->LoadCheckpoint(Error));
         TestTrue(TEXT("Rejected AI load preserves empty runtime and exact file bytes"), Restored->GetPhase() == ERunPhase::None && !Restored->HasCombatCheckpoint() && Fixture.ReadBytes() == BeforeBytes);
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundCheckpointReadyCommitTest, "ProjectA.Checkpoint.RoundReadyAtomicCommit", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundCheckpointReadyCommitTest::RunTest(const FString& Parameters)
+{
+    FCheckpointStorageFixture Fixture;
+    FText Error;
+    if (!TestTrue(TEXT("Round fixture initializes"), Fixture.Initialize(Error))) return false;
+    FCombatCheckpointData Draft = Fixture.MakeRoundCheckpoint();
+    if (!TestTrue(TEXT("Planning checkpoint commits"), Fixture.Run->CommitCombatCheckpoint(Draft, Error))) return false;
+    const TArray<uint8> DraftBytes = Fixture.ReadBytes();
+    FCombatCheckpointData Ready = Draft;
+    ++Ready.Revision;
+    ++Ready.PlanRevision;
+    Ready.RoundPlans[0].bReady = true;
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("Failed storage cannot confirm ready"), Fixture.Run->CommitCombatCheckpoint(Ready, Error));
+    TestTrue(TEXT("Failure keeps exact previous bytes and in-memory planning state"), Fixture.ReadBytes() == DraftBytes && SameCheckpoint(Fixture.Run->GetCombatCheckpoint(), Draft));
+    if (!TestTrue(TEXT("Retry commits ready and the complete unit state"), Fixture.Run->CommitCombatCheckpoint(Ready, Error))) return false;
+    TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
+    Restored->EnableCheckpointSaving(Fixture.Slot);
+    TestTrue(TEXT("Standalone Continue recognizes round readiness"), Restored->CanContinueStandaloneSavedRun(Error));
+    TestTrue(TEXT("A fresh Run loads committed readiness after process loss"), Restored->LoadStandaloneCheckpoint(Error));
+    TestTrue(TEXT("Readiness, plans, HP, costs and round numbers round-trip together"), SameCheckpoint(Restored->GetCombatCheckpoint(), Ready));
+    TestEqual(TEXT("Snapshot retains AP before Ready-end payment"), Restored->GetCombatCheckpoint().Units[0].AP, Ready.Units[0].MaxAP);
+    TestFalse(TEXT("A stale revision cannot overwrite saved readiness"), Fixture.Run->CommitCombatCheckpoint(Draft, Error));
+    FCombatCheckpointData Invalidated = Ready;
+    ++Invalidated.Revision;
+    ++Invalidated.PlanRevision;
+    Invalidated.RoundPlans[0].bReady = false;
+    TestTrue(TEXT("Editing readiness commits its invalidation"), Fixture.Run->CommitCombatCheckpoint(Invalidated, Error));
+    TestTrue(TEXT("Reload sees the invalidation instead of an obsolete ready plan"), Restored->LoadStandaloneCheckpoint(Error) && !Restored->GetCombatCheckpoint().RoundPlans[0].bReady);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatLegacyRoundCheckpointTest, "ProjectA.Checkpoint.LegacyOfflineReadyRecovery", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatLegacyRoundCheckpointTest::RunTest(const FString& Parameters)
+{
+    FCheckpointStorageFixture Fixture;
+    FText Error;
+    if (!TestTrue(TEXT("Legacy fixture initializes"), Fixture.Initialize(Error))) return false;
+    TStrongObjectPtr<URunSaveGame> Legacy(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
+    if (!TestNotNull(TEXT("The existing map save loads"), Legacy.Get())) return false;
+    Legacy->Version = 1;
+    Legacy->Identity = FRunIdentityData();
+    Legacy->EncounterProgress = FRunEncounterProgress();
+    for (FRunPartyMember& Member : Legacy->Party)
+    {
+        Member.CharacterId.Invalidate();
+        Member.OwnerAccountId = FRunAccountId();
+    }
+    if (!TestTrue(TEXT("A metadata-free map checkpoint is installed"), FRunCheckpointStorage::Save(Legacy.Get(), Fixture.Slot, Error)) || !TestTrue(TEXT("Legacy Continue retains offline identity"), Fixture.Run->LoadStandaloneCheckpoint(Error)) || !TestTrue(TEXT("Legacy progression enters a new encounter"), Fixture.Run->BeginEncounter(TEXT("Combat_01")) && Fixture.Run->MarkCombatStarted())) return false;
+    FCombatCheckpointData Ready = Fixture.MakeRoundCheckpoint();
+    Ready.RoundPlans[0].bReady = true;
+    const TArray<uint8> Before = Fixture.ReadBytes();
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("Failed conversion does not confirm legacy readiness"), Fixture.Run->CommitCombatCheckpoint(Ready, Error));
+    TestTrue(TEXT("Failed conversion preserves the original v1 file"), Fixture.ReadBytes() == Before && !Fixture.Run->HasCombatCheckpoint());
+    if (!TestTrue(TEXT("Legacy ready state commits without inventing owners"), Fixture.Run->CommitCombatCheckpoint(Ready, Error))) return false;
+    Legacy.Reset(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
+    if (!TestNotNull(TEXT("Legacy combat save loads"), Legacy.Get())) return false;
+    TestEqual(TEXT("Legacy round payload has a distinct combat-only outer version"), Legacy->Version, 6);
+    TestTrue(TEXT("Legacy identity and player ownership remain absent"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Legacy->Identity, &Ready.Identity, 0) && !Legacy->Party[0].CharacterId.IsValid() && Legacy->Party[0].OwnerAccountId.IsEmpty());
+    TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
+    Restored->EnableCheckpointSaving(Fixture.Slot);
+    TestTrue(TEXT("Standalone Continue recognizes durable legacy readiness"), Restored->CanContinueStandaloneSavedRun(Error));
+    TestTrue(TEXT("Legacy round state survives process loss"), Restored->LoadStandaloneCheckpoint(Error) && SameCheckpoint(Restored->GetCombatCheckpoint(), Ready));
+    FCombatCheckpointData Invalid = Ready;
+    Invalid.Units[0].CharacterId = FGuid::NewGuid();
+    TestFalse(TEXT("Legacy payload cannot acquire an inferred character identity"), UCombatCheckpointLibrary::Validate(Invalid, Restored->GetPartyMembers(), Error));
+    Invalid = Ready;
+    Invalid.Units[0].PartyControlMode = EPartyControlMode::ServerAI;
+    TestFalse(TEXT("Legacy restore cannot silently transfer human control to AI"), UCombatCheckpointLibrary::Validate(Invalid, Restored->GetPartyMembers(), Error));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundCheckpointValidationTest, "ProjectA.Checkpoint.RoundPlanValidation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundCheckpointValidationTest::RunTest(const FString& Parameters)
+{
+    FCheckpointStorageFixture Fixture;
+    FText Error;
+    if (!TestTrue(TEXT("Round fixture initializes"), Fixture.Initialize(Error))) return false;
+    const FCombatCheckpointData Valid = Fixture.MakeRoundCheckpoint();
+    TestTrue(TEXT("Actor-free round boundary validates"), UCombatCheckpointLibrary::Validate(Valid, Fixture.Run->GetPartyMembers(), Error));
+    FCombatCheckpointData Invalid = Valid;
+    Invalid.RoundPlans[0].Command.TargetUnitId = 8;
+    TestFalse(TEXT("Missing command target is rejected"), UCombatCheckpointLibrary::Validate(Invalid, Fixture.Run->GetPartyMembers(), Error));
+    Invalid = Valid;
+    Invalid.RoundPlans[1].UnitId = Invalid.RoundPlans[0].UnitId;
+    TestFalse(TEXT("Duplicate command ownership is rejected"), UCombatCheckpointLibrary::Validate(Invalid, Fixture.Run->GetPartyMembers(), Error));
+    Invalid = Valid;
+    Invalid.RoundPlans[0].bHasMovePlan = true;
+    Invalid.RoundPlans[0].MoveDestinationCoord = Invalid.Units[1].GridCoord;
+    TestFalse(TEXT("Reserved movement cannot overwrite another home tile"), UCombatCheckpointLibrary::Validate(Invalid, Fixture.Run->GetPartyMembers(), Error));
+    Invalid = Valid;
+    Invalid.RoundPlans[0].Command.SkillId = TEXT("UnknownSkill");
+    TestFalse(TEXT("An unequipped action cannot be recovered"), UCombatCheckpointLibrary::Validate(Invalid, Fixture.Run->GetPartyMembers(), Error));
+    Invalid = Valid;
+    Invalid.RoundPlans[0].bReady = true;
+    Invalid.RoundPlans[0].Command.SkillId = NAME_None;
+    TestFalse(TEXT("A ready human cannot persist an unselected action"), UCombatCheckpointLibrary::Validate(Invalid, Fixture.Run->GetPartyMembers(), Error));
+    FCombatCheckpointData IdleEnemy = Valid;
+    IdleEnemy.Units[1].Skills.Reset();
+    IdleEnemy.Units[1].DefaultAttackAbility.Reset();
+    TestTrue(TEXT("A native idle enemy does not require retired GAS ability metadata"), UCombatCheckpointLibrary::Validate(IdleEnemy, Fixture.Run->GetPartyMembers(), Error));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundCheckpointSkillRenameTest, "ProjectA.Checkpoint.RoundSkillRenameCompatibility", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundCheckpointSkillRenameTest::RunTest(const FString& Parameters)
+{
+    const FName PreviousId(TEXT("SkillDefinitionDataAsset:DA_SweepingStrike"));
+    const FName CurrentId(TEXT("SkillDefinitionDataAsset:BPDA_SweepingStrike"));
+    TestEqual(TEXT("Saved commands use the configured primary asset redirect"), UCombatCheckpointLibrary::ResolveSavedSkillId(PreviousId), CurrentId);
+    TestEqual(TEXT("The current command identifier remains unchanged"), UCombatCheckpointLibrary::ResolveSavedSkillId(CurrentId), CurrentId);
+    TestEqual(TEXT("Internal AI wait remains empty"), UCombatCheckpointLibrary::ResolveSavedSkillId(NAME_None), NAME_None);
+    const FName UnrelatedId(TEXT("SkillDefinitionDataAsset:BPDA_DefaulatAttack"));
+    TestEqual(TEXT("Other existing skill identifiers are preserved"), UCombatCheckpointLibrary::ResolveSavedSkillId(UnrelatedId), UnrelatedId);
+    const FSoftObjectPath CurrentPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_SweepingStrike.BPDA_SweepingStrike"));
+    USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(CurrentPath.TryLoad());
+    if (!TestNotNull(TEXT("The renamed skill asset exists"), Skill)) return false;
+    const FSoftObjectPath PreviousPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DA_SweepingStrike.DA_SweepingStrike"));
+    const FSoftObjectPath OriginalPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_SweepingStrike.DA_SweepingStrike"));
+    TestTrue(TEXT("Both historical soft references load the renamed asset"), PreviousPath.TryLoad() == Skill && OriginalPath.TryLoad() == Skill);
+    FCheckpointStorageFixture Fixture;
+    FText Error;
+    if (!TestTrue(TEXT("A real-content checkpoint fixture initializes"), Fixture.Initialize(Error))) return false;
+    FCombatCheckpointData Checkpoint = Fixture.MakeRoundCheckpoint();
+    Checkpoint.Units[0].Skills = {PreviousPath};
+    Checkpoint.RoundPlans[0].Command.SkillId = PreviousId;
+    Checkpoint.RoundPlans[0].Command.TargetUnitId = Checkpoint.Units[1].RoundUnitId;
+    Checkpoint.RoundPlans[0].Command.TargetCoord = Checkpoint.Units[1].GridCoord;
+    Checkpoint.RoundPlans[0].bReady = true;
+    TestTrue(TEXT("An existing ready save validates with its old path and command identifier"), UCombatCheckpointLibrary::Validate(Checkpoint, Fixture.Run->GetPartyMembers(), Error));
     return true;
 }
 

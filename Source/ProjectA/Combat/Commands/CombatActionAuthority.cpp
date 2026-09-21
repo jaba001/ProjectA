@@ -55,6 +55,7 @@ void UCombatActionAuthority::Reset()
     }
     UnitsById.Reset();
     CharacterIds.Reset();
+    PartySlots.Reset();
     Participants.Reset();
     ParticipantBindingIds.Reset();
     CombatInstanceId.Invalidate();
@@ -111,6 +112,7 @@ bool UCombatActionAuthority::ConfigureRun(const FRunIdentityData& Identity, cons
     bRequiresRunConfiguration = true;
     bRunConfigured = false;
     CharacterIds.Reset();
+    PartySlots.Reset();
     const URunStateSubsystem* Run = Manager->GetGameInstance() ? Manager->GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     bManagedExecution = bManagedExecution || bManaged || (Run && Run->IsManagedRun());
     ManagedSessionId.Invalidate();
@@ -138,6 +140,7 @@ bool UCombatActionAuthority::ConfigureRun(const FRunIdentityData& Identity, cons
         return false;
     }
     TMap<TWeakObjectPtr<AUnitBase>, FGuid> NewCharacterIds;
+    TMap<TWeakObjectPtr<AUnitBase>, int32> NewPartySlots;
     for (const FRunPartyMember& Member : Members)
     {
         AUnitBase* Unit = PartyActors.FindRef(Member.SlotIndex);
@@ -161,6 +164,7 @@ bool UCombatActionAuthority::ConfigureRun(const FRunIdentityData& Identity, cons
             return false;
         }
         NewCharacterIds.Add(UnitKey, Member.CharacterId);
+        NewPartySlots.Add(UnitKey, Member.SlotIndex);
     }
     if (NewCharacterIds.Num() != PartyActors.Num())
     {
@@ -178,6 +182,7 @@ bool UCombatActionAuthority::ConfigureRun(const FRunIdentityData& Identity, cons
     RunIdentity = Identity;
     PartyMembers = Members;
     CharacterIds = MoveTemp(NewCharacterIds);
+    PartySlots = MoveTemp(NewPartySlots);
     bRunConfigured = true;
     ManagedSessionId = bManagedExecution ? Run->GetManagedStamp().SessionId : FGuid();
     OutError = FText::GetEmpty();
@@ -276,6 +281,13 @@ FGuid UCombatActionAuthority::GetCharacterId(const AUnitBase* Unit) const
         return FGuid();
     }
     return CharacterIds.FindRef(TWeakObjectPtr<AUnitBase>(const_cast<AUnitBase*>(Unit)));
+}
+
+int32 UCombatActionAuthority::GetPartySlot(const AUnitBase* Unit) const
+{
+    if (!bRunConfigured || !IsValid(Unit)) return INDEX_NONE;
+    const int32* Slot = PartySlots.Find(TWeakObjectPtr<AUnitBase>(const_cast<AUnitBase*>(Unit)));
+    return Slot ? *Slot : INDEX_NONE;
 }
 
 FRunAccountId UCombatActionAuthority::GetOwnerAccountId(const AUnitBase* Unit) const

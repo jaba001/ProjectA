@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Combat/AI/PartyControlTypes.h"
+#include "Combat/Round/CombatRoundTypes.h"
 #include "Game/Run/RunIdentityTypes.h"
 #include "Game/Snapshot/PartySnapshotTypes.h"
 #include "Unit/UnitBase.h"
@@ -16,6 +17,9 @@ struct PROJECTA_API FCombatCheckpointUnit
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     FGuid UnitId;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    int32 RoundUnitId = INDEX_NONE;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     FGuid CharacterId;
@@ -95,8 +99,31 @@ struct PROJECTA_API FCombatCheckpointUnit
     FSoftObjectPath DefaultAttackAbility;
 };
 
-// Store an idle boundary before the next turn starts; array order is the turn order.
-// 다음 턴 시작 전 유휴 경계를 저장하며 배열 순서가 턴 순서입니다.
+// Commands reference round-local identifiers instead of live actors or network authority tokens.
+// 명령은 실행 액터나 네트워크 권위 토큰 대신 라운드 내부 식별자를 참조합니다.
+USTRUCT(BlueprintType)
+struct PROJECTA_API FCombatCheckpointRoundPlan
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    int32 UnitId = INDEX_NONE;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    FCombatRoundCommand Command;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    bool bHasMovePlan = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    FIntPoint MoveDestinationCoord = FIntPoint::ZeroValue;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    bool bReady = false;
+};
+
+// Schema 3 stores a planning boundary before costs; older sequential schemas remain identifiable.
+// 스키마 3은 비용 차감 전 계획 경계를 저장하며 이전 순차 턴 스키마와 구분합니다.
 USTRUCT(BlueprintType)
 struct PROJECTA_API FCombatCheckpointData
 {
@@ -131,6 +158,15 @@ struct PROJECTA_API FCombatCheckpointData
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     TArray<FCombatCheckpointUnit> Units;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    int32 RoundNumber = 0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    int32 PlanRevision = 0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    TArray<FCombatCheckpointRoundPlan> RoundPlans;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     bool bHasOpponentSnapshot = false;
