@@ -1,4 +1,4 @@
-#include "UI/Combat/CombatUnitHealthDebugWidget.h"
+#include "UI/Debug/CombatUnitHealthDebugWidget.h"
 
 #if !UE_BUILD_SHIPPING && !UE_BUILD_TEST
 #include "Blueprint/SlateBlueprintLibrary.h"

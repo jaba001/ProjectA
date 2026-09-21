@@ -21,7 +21,7 @@
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "UI/Theme/DemonicUITheme.h"
-#include "UI/Combat/CombatUnitHealthDebugWidget.h"
+#include "UI/Debug/CombatUnitHealthDebugWidget.h"
 #include "Unit/UnitBase.h"
 
 namespace

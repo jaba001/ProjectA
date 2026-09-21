@@ -142,6 +142,8 @@ GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메
 
 ### 7-1 개발용 유닛 HP 표시
 
+디버그 전용 UI 코드는 `Source/ProjectA/UI/Debug/`에서 관리한다. 개발용 HP 위젯의 헤더·소스도 이 폴더에 두며 전투 화면은 해당 위젯을 참조한다.
+
 `UCombatUnitHealthDebugWidget`은 라운드 UI의 배경 레이어에서 전투에 참여한 아군·적의 캡슐 상단 24cm 위에 현재/최대 HP 숫자와 작은 체력바를 표시한다. 그리기 갱신마다 GAS AttributeSet의 실제 HP/MaxHP를 읽어 최대 소수 한 자리로 표시하고 유닛 이동·카메라·공통 DPI를 따라 위치를 갱신한다. 어두운 배경과 아군 청록색·적 주황색을 사용하며 마우스 입력을 통과시킨다.
 
 Debug/Development에서 기본 활성화하며 콘솔 `projecta.Debug.UnitHP 0`으로 숨기고 `projecta.Debug.UnitHP 1`로 표시한다. Shipping/Test에서는 표시 생성과 명령 등록을 제외한다. 카메라 뒤·숨김·파괴 유닛은 제외하고 사망 후 Actor가 남아 있으면 HP 0을 표시한다. 구현·컴파일·실제 화면 확인 상태는 [TODO](TODO.md#2-18-개발용-유닛-hp-표시)를 따른다.
