@@ -21,6 +21,7 @@
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "UI/Theme/DemonicUITheme.h"
+#include "UI/Combat/CombatUnitHealthDebugWidget.h"
 #include "Unit/UnitBase.h"
 
 namespace
@@ -93,6 +94,14 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
     UOverlay* Root = WidgetTree->ConstructWidget<UOverlay>();
     WidgetTree->RootWidget = Root;
     Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+
+#if !UE_BUILD_SHIPPING && !UE_BUILD_TEST
+    UCombatUnitHealthDebugWidget* UnitHealth = WidgetTree->ConstructWidget<UCombatUnitHealthDebugWidget>();
+    UnitHealth->SetOwningPlayer(GetOwningPlayer());
+    UOverlaySlot* HealthSlot = Root->AddChildToOverlay(UnitHealth);
+    HealthSlot->SetHorizontalAlignment(HAlign_Fill);
+    HealthSlot->SetVerticalAlignment(VAlign_Fill);
+#endif
 
     USizeBox* RosterSize = WidgetTree->ConstructWidget<USizeBox>();
     RosterSize->SetWidthOverride(900.f);

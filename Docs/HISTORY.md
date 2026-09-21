@@ -6,6 +6,7 @@
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-09-21 개발용 유닛 HP 표시 | 전투 아군·적 머리 위에 실제 GAS HP/MaxHP 숫자·체력바 표시, 이동·카메라·DPI 추적과 입력 통과. Debug/Development 기본 활성, `projecta.Debug.UnitHP 0`/`1` 전환·Shipping/Test 제외. UHT 포함 Development Editor / Win64 빌드 15.80초 성공·오류/경고 0. 에셋·Config 변경 없음, 실제 화면·플레이·자동화 미실행. 근거: `Saved/Logs/UnitHealthDebugBuild.log`; [사용자 확인](TODO.md#2-18-개발용-유닛-hp-표시) |
 | 2026-09-21 검 방향·그립과 칼날 궤적 판정 | Python Rotator의 위치 인자 해석으로 저장된 Yaw 180도를 명시적 Roll 180도로 수정하고 손잡이 Z를 -10cm로 보정. 검만 서버 몽타주 에셋 포즈·칼날 소켓 궤적을 활성 0.23~0.43초에 검사하여 최초 적에게 피해 50/AP 1 적용. 렌더 재생 종료와 판정 누적을 분리하고 기존 GAS·사망 취소·벽 차폐·복귀 보존. 최종 Development Editor / Win64 빌드 4.99초와 별도 재로드의 칼날 표본 123개·리타깃 48개·이전 참조 73개 통과. 회귀 3개는 컴파일만 수행, 실제 플레이·자동화 미실행. 근거: `Saved/Logs/WeaponBladeTraceBuildFinal.log`, `Saved/Logs/WeaponBladeTraceReload.log`; [사용자 확인](TODO.md#2-15-전사와-검-공격-콘텐츠) |
 | 2026-09-21 전투 상단 현황 배경 | 상단 라운드·명단에 어두운 반투명 배경·둥근 테두리·여백 적용. 높이는 내용에 맞추고 마우스 입력 통과 유지. Development Editor / Win64 컴파일·정적 검사 통과, 실제 화면 확인 대기. 근거: `Saved/Logs/CombatRosterPanelBuild.log`; [사용자 확인](TODO.md#2-17-전투-상단-현황-가독성) |
 | 2026-09-21 보행·공격 리타깃의 과도한 골반 이동 수정 | Retargeter 4개의 중복 연산을 각 11→6개로 정리하고 시퀀스 48개를 기존 경로에 재작성, 원본 Root Motion 설정·참조 보존. 전사 전방 보행의 골반 이동 약 454→8cm. Development Editor / Win64 빌드 12.18초 성공, 별도 재로드 48/48 포즈·길이·골반 이동·Kwang 세그먼트/타이밍·이전 참조 73개 통과. 오류 0·기존 경로 조회 경고 6 후 대상 해석 확인. 사용자 보고의 공격 전 순간이동·흔들림은 수정 후 실제 플레이 확인 대기. 근거: `Saved/Logs/RetargetRootMotionBuild.log`, `Saved/Logs/RetargetRootMotionKwangReload.log`; [사용자 확인](TODO.md#2-15-전사와-검-공격-콘텐츠) |
