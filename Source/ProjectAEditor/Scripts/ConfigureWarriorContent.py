@@ -1,5 +1,6 @@
 import json
 import sys
+import uuid
 from pathlib import Path
 
 import unreal
@@ -7,15 +8,16 @@ import unreal
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ConfigureSweepingStrike import configure_sweeping_strike
+from WarriorContentPaths import ENEMY_RIGS, ENEMY_SOURCE, ROOT, SWORD_FOLDER, SWORD_RECOVERY_SOURCE, SWORD_SOURCE, SWORD_SOURCE_MESH, SWORD_SUFFIX, UNARMED_SOURCE, WARRIOR_MONTAGE, WARRIOR_RIGS, WARRIOR_SOURCE, WEAPON_SOURCE, legacy_moves, migrate_legacy_assets, mirrored_path, retarget_output_path
 
-ROOT = "/Game/User_JeHoon"
 SKILLS = ROOT + "/Blueprint/DataAsset/Skills"
-WARRIOR = ROOT + "/Characters/Warrior"
-ENEMY = ROOT + "/Characters/SwordEnemy"
 TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
 ASSETS = unreal.EditorAssetLibrary
 HELPER = unreal.WarriorAssetLibrary
 REPORT = {"gameplay_test": "not run", "retargeted": [], "units": []}
+SWORD_WINDUP_SECONDS = 0.23
+SWORD_RECOVERY_START_SECONDS = 0.2
+SWORD_MONTAGE_SECONDS = 1.933333
 
 
 def require(value, message):
@@ -67,24 +69,34 @@ def retarget(source_mesh, target_mesh, directory, suffix, inputs):
         controller.auto_map_chains(unreal.AutoMapChainType.FUZZY, True)
         controller.auto_align_all_bones(unreal.RetargetSourceOrTarget.TARGET)
         save(retargeter)
-    pending = [asset for asset in inputs if not ASSETS.does_asset_exist(directory + "/" + asset.get_name() + suffix)]
+    pending = [asset for asset in inputs if not ASSETS.does_asset_exist(mirrored_path(asset.get_path_name(), suffix))]
     if pending:
-        previous_paths = set(ASSETS.list_assets(directory, recursive=False, include_folder=False))
-        require(HELPER.retarget_animations(pending, source_mesh, target_mesh, retargeter, directory, suffix), "IK retarget failed")
-        for path in ASSETS.list_assets(directory, recursive=False, include_folder=False):
+        batch_folder = directory + "/RetargetBatch_" + uuid.uuid4().hex
+        require(HELPER.retarget_animations(pending, source_mesh, target_mesh, retargeter, batch_folder, suffix), "IK retarget failed")
+        moves = []
+        reused = []
+        for path in ASSETS.list_assets(batch_folder, recursive=False, include_folder=False):
             asset = load(path)
-            if path in previous_paths:
-                continue
-            require(asset.get_path_name().startswith(directory + "/"), "Unexpected retarget output path")
-            save(asset)
-            REPORT["retargeted"].append(asset.get_path_name())
-    return {asset: load(directory + "/" + asset.get_name() + suffix) for asset in inputs}
+            require(asset.get_path_name().startswith(batch_folder + "/"), "Unexpected retarget output path")
+            destination = retarget_output_path(asset.get_name(), suffix, inputs)
+            if ASSETS.does_asset_exist(destination):
+                reused.append((load(destination), asset))
+            else:
+                moves.append(unreal.AssetRenameData(asset, destination.rsplit("/", 1)[0], destination.rsplit("/", 1)[1]))
+        for existing, generated in reused:
+            require(ASSETS.consolidate_assets(existing, [generated]), "Could not reuse an existing retargeted dependency")
+        require(not moves or TOOLS.rename_assets(moves), "Could not preserve source folders for retarget output")
+        for move in moves:
+            save(move.asset)
+            REPORT["retargeted"].append(move.asset.get_path_name())
+    return {asset: load(mirrored_path(asset.get_path_name(), suffix)) for asset in inputs}
 
 
-def project_mesh(source_path, directory, mesh_name, skeleton_name):
+def project_mesh(source_path):
     source = load(source_path)
-    skeleton = duplicate(source.get_editor_property("skeleton").get_path_name(), directory + "/" + skeleton_name)
-    mesh = duplicate(source_path, directory + "/" + mesh_name)
+    source_skeleton = source.get_editor_property("skeleton").get_path_name()
+    skeleton = duplicate(source_skeleton, mirrored_path(source_skeleton))
+    mesh = duplicate(source_path, mirrored_path(source_path))
     require(HELPER.assign_mesh_skeleton(mesh, skeleton), "Could not assign copied skeleton")
     save(mesh)
     save(skeleton)
@@ -136,6 +148,7 @@ def configure_unit(blueprint, mesh, animation, skills, overrides, weapon):
 
 
 def configure():
+    REPORT["folder_moves"] = migrate_legacy_assets()
     old_path = SKILLS + "/DA_SweepingStrike"
     new_path = SKILLS + "/BPDA_SweepingStrike"
     if not ASSETS.does_asset_exist(new_path):
@@ -155,29 +168,38 @@ def configure():
             montage = unreal.get_default_object(skill.get_editor_property("ability_class")).get_editor_property("attack_montage")
         if montage and montage not in montages:
             montages.append(montage)
-    warrior_mesh, warrior_skeleton = project_mesh("/Game/GKnight/Meshes/SK_GothicKnight_VA", WARRIOR, "SK_Warrior", "SKEL_Warrior")
-    enemy_mesh, enemy_skeleton = project_mesh("/Game/Skeleton_Guard/Mesh_UE4/Full/SKM_Skeleton_Guard_Body", ENEMY, "SK_SwordEnemy", "SKEL_SwordEnemy")
+    warrior_mesh, warrior_skeleton = project_mesh(WARRIOR_SOURCE)
+    enemy_mesh, enemy_skeleton = project_mesh(ENEMY_SOURCE)
     source_mesh = load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")
-    source_abp = load("/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed")
-    warrior_retargets = retarget(source_mesh, warrior_mesh, WARRIOR, "_Warrior", [source_abp] + montages)
-    enemy_retargets = retarget(source_mesh, enemy_mesh, ENEMY, "_SwordEnemy", [source_abp] + montages)
+    source_abp = load(UNARMED_SOURCE + "/ABP_Unarmed")
+    warrior_retargets = retarget(source_mesh, warrior_mesh, WARRIOR_RIGS, "_Warrior", [source_abp] + montages)
+    enemy_retargets = retarget(source_mesh, enemy_mesh, ENEMY_RIGS, "_SwordEnemy", [source_abp] + montages)
     for animation, skeleton in [(warrior_retargets[source_abp], warrior_skeleton), (enemy_retargets[source_abp], enemy_skeleton)]:
         require(HELPER.remove_legacy_foot_ik(animation), "Could not remove the incompatible Manny foot rig")
         require(HELPER.ensure_output_slot(animation, "DefaultSlot"), "Montage output slot is missing")
         save(animation)
         save(skeleton)
-    source_attack = load("/Game/BossyEnemy/Animations/InPlace/Attacks/Boss_Attack_Swing_InP")
-    attack = retarget(load("/Game/BossyEnemy/SkeletalMesh/SK_Mannequin_UE4_WithWeapon"), warrior_mesh, WARRIOR, "_SwordAttack", [source_attack])[source_attack]
-    montage_path = WARRIOR + "/AM_SwordAttack"
+    source_attack = load(SWORD_SOURCE)
+    source_recovery = load(SWORD_RECOVERY_SOURCE)
+    sword_retargets = retarget(load(SWORD_SOURCE_MESH), warrior_mesh, WARRIOR_RIGS, SWORD_SUFFIX, [source_attack, source_recovery])
+    attack = sword_retargets[source_attack]
+    recovery = sword_retargets[source_recovery]
+    montage_path = WARRIOR_MONTAGE
     if ASSETS.does_asset_exist(montage_path):
         montage = load(montage_path)
     else:
         factory = unreal.AnimMontageFactory()
         factory.set_editor_property("target_skeleton", warrior_skeleton)
         factory.set_editor_property("source_animation", attack)
-        montage = require(TOOLS.create_asset("AM_SwordAttack", WARRIOR, unreal.AnimMontage, factory), "Could not create sword montage")
+        montage = require(TOOLS.create_asset("AM_SwordAttack", SWORD_FOLDER, unreal.AnimMontage, factory), "Could not create sword montage")
+    require(HELPER.configure_sword_montage(montage, attack, recovery, SWORD_RECOVERY_START_SECONDS), "Could not configure Kwang attack and recovery")
+    require(list(HELPER.get_montage_animations(montage)) == [attack, recovery], "Sword montage must play Kwang attack and recovery")
     save(montage)
-    enemy_sword = retarget(warrior_mesh, enemy_mesh, ENEMY, "_Sword", [montage])[montage]
+    enemy_sword = retarget(warrior_mesh, enemy_mesh, ENEMY_RIGS, "_Sword", [montage])[montage]
+    enemy_attack = load(mirrored_path(SWORD_SOURCE, SWORD_SUFFIX + "_Sword"))
+    enemy_recovery = load(mirrored_path(SWORD_RECOVERY_SOURCE, SWORD_SUFFIX + "_Sword"))
+    require(HELPER.configure_sword_montage(enemy_sword, enemy_attack, enemy_recovery, SWORD_RECOVERY_START_SECONDS), "Could not configure enemy Kwang attack and recovery")
+    save(enemy_sword)
     sword = duplicate(basic.get_path_name(), SKILLS + "/BPDA_swoard_attack")
     sword.set_editor_property("skill_id", "SwordAttack")
     sword.set_editor_property("skill_name", "검 공격")
@@ -185,9 +207,9 @@ def configure():
     profile.set_editor_property("cast_montage", montage)
     profile.set_editor_property("kind", unreal.CombatRoundSkillKind.MELEE)
     profile.set_editor_property("approach", unreal.CombatRoundApproach.UNIT)
-    # Source pose samples place the main sword swing at 2.15 seconds without changing playback speed.
-    # 원본 포즈 표본의 주 타격 구간인 2.15초를 사용하며 재생 속도는 변경하지 않습니다.
-    profile.set_editor_property("windup_seconds", 2.15)
+    # Kwang's main swing peaks near 0.23 seconds; recovery skips its duplicated first 0.2 seconds.
+    # Kwang의 주 타격 구간은 약 0.23초이며 회복 동작의 처음 0.2초는 중복 구간이므로 생략합니다.
+    profile.set_editor_property("windup_seconds", SWORD_WINDUP_SECONDS)
     profile.set_editor_property("power", unreal.get_default_object(basic.get_editor_property("ability_class")).get_editor_property("damage_amount"))
     profile.set_editor_property("action_point_cost", basic.get_editor_property("action_point_cost"))
     sword.set_editor_property("round_definition", profile)
@@ -198,7 +220,7 @@ def configure():
     sword.set_editor_property("area_radius", 0)
     sword.set_editor_property("skill_description", "대상에게 접근해 검으로 공격한 뒤 원래 자리로 복귀합니다.")
     save(sword)
-    weapon = duplicate("/Game/Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Sword", ROOT + "/Weapons/SM_Sword")
+    weapon = duplicate(WEAPON_SOURCE, mirrored_path(WEAPON_SOURCE))
     save(weapon)
     warrior = duplicate(ROOT + "/Blueprint/Unit/BP_PlayerUnit", ROOT + "/Blueprint/Unit/BP_WarriorUnit")
     configure_unit(warrior, warrior_mesh, warrior_retargets[source_abp], previous + [sword], {key: warrior_retargets[key] for key in montages}, weapon)
@@ -226,8 +248,13 @@ def configure():
     catalog.set_editor_property("skills", catalog_skills)
     save(catalog)
     REPORT["sword_profile"] = profile.export_text()
-    REPORT["sword_source"] = "/Game/BossyEnemy/Animations/InPlace/Attacks/Boss_Attack_Swing_InP"
-    REPORT["sword_seconds"] = attack.get_editor_property("sequence_length")
+    REPORT["sword_source"] = SWORD_SOURCE
+    REPORT["sword_recovery_source"] = SWORD_RECOVERY_SOURCE
+    REPORT["sword_seconds"] = montage.get_editor_property("sequence_length")
+    dirty_packages = [package for package in unreal.EditorLoadingAndSavingUtils.get_dirty_content_packages() if package.get_name() not in REPORT["folder_moves"]]
+    for package in dirty_packages:
+        require(package.get_name().startswith(ROOT + "/"), "Unexpected dirty external package: " + package.get_name())
+    require(not dirty_packages or unreal.EditorLoadingAndSavingUtils.save_packages(dirty_packages, True), "Could not save moved asset references")
 
 
 def verify():
@@ -241,23 +268,32 @@ def verify():
     profile = sword.get_editor_property("round_definition")
     montage = profile.get_editor_property("cast_montage")
     require(sword.get_editor_property("use_round_definition") and profile.get_editor_property("kind") == unreal.CombatRoundSkillKind.MELEE, "Sword attack must use a melee profile")
-    require(abs(profile.get_editor_property("windup_seconds") - 2.15) < 0.001, "Sword release does not match the authored swing")
-    require(abs(montage.get_editor_property("sequence_length") - 5.866667) < 0.001, "Source attack length changed")
+    require(abs(profile.get_editor_property("windup_seconds") - SWORD_WINDUP_SECONDS) < 0.001, "Sword release does not match the Kwang swing")
+    require(abs(montage.get_editor_property("sequence_length") - SWORD_MONTAGE_SECONDS) < 0.001, "Kwang attack and recovery length changed")
     require(profile.get_editor_property("action_point_cost") == basic.get_editor_property("action_point_cost"), "Sword AP was not preserved")
     expected = [basic, load(SKILLS + "/BPDA_RangedAttack"), load(SKILLS + "/BPDA_AreaAttack"), sweep, sword]
-    for name, directory, skills in [("BP_WarriorUnit", WARRIOR, expected), ("BP_EnemyUnit", ENEMY, [sword]), ("BP_SnapshotOpponent", ENEMY, [sword])]:
+    require(montage == load(WARRIOR_MONTAGE), "Sword montage path does not preserve the Kwang folder")
+    require(list(HELPER.get_montage_animations(montage)) == [load(mirrored_path(source, SWORD_SUFFIX)) for source in [SWORD_SOURCE, SWORD_RECOVERY_SOURCE]], "Warrior sword montage is not the Kwang attack and recovery")
+    require(HELPER.validate_sword_montage(montage, load(mirrored_path(SWORD_SOURCE, SWORD_SUFFIX)), load(mirrored_path(SWORD_RECOVERY_SOURCE, SWORD_SUFFIX)), SWORD_RECOVERY_START_SECONDS), "Saved warrior Kwang segment timing or blending mismatch")
+    for name, suffix, skills in [("BP_WarriorUnit", "_Warrior", expected), ("BP_EnemyUnit", "_SwordEnemy", [sword]), ("BP_SnapshotOpponent", "_SwordEnemy", [sword])]:
         blueprint = load(ROOT + "/Blueprint/Unit/" + name)
         defaults = unreal.get_default_object(blueprint.generated_class())
         mesh_component = defaults.get_editor_property("mesh")
         mesh = mesh_component.get_editor_property("skeletal_mesh_asset")
         skeleton = mesh.get_editor_property("skeleton")
-        animation = load(directory + ("/ABP_Unarmed_Warrior" if name == "BP_WarriorUnit" else "/ABP_Unarmed_SwordEnemy"))
+        expected_mesh = load(mirrored_path(WARRIOR_SOURCE if name == "BP_WarriorUnit" else ENEMY_SOURCE))
+        require(mesh == expected_mesh, "Mesh does not preserve its original pack folder")
+        animation = load(mirrored_path(UNARMED_SOURCE + "/ABP_Unarmed", suffix))
         require(animation.get_editor_property("target_skeleton") == skeleton, "AnimBP skeleton mismatch")
         require(mesh_component.get_editor_property("anim_class") == animation.generated_class(), "Unit AnimBP mismatch")
         require(HELPER.is_output_slot_connected(animation, "DefaultSlot"), "Output montage slot disconnected")
         require(list(defaults.get_editor_property("equipped_skill_data_assets")) == skills, "Unexpected loadout for " + name)
         require(str(HELPER.get_weapon_attachment(blueprint, "Sword")) == "hand_r", "Sword socket was not saved")
         overrides = defaults.get_editor_property("round_montage_overrides")
+        if name != "BP_WarriorUnit":
+            require(list(HELPER.get_montage_animations(overrides[montage])) == [load(mirrored_path(source, SWORD_SUFFIX + "_Sword")) for source in [SWORD_SOURCE, SWORD_RECOVERY_SOURCE]], "Enemy sword montage is not the Kwang attack and recovery")
+            require(abs(overrides[montage].get_editor_property("sequence_length") - SWORD_MONTAGE_SECONDS) < 0.001, "Enemy Kwang montage length changed")
+            require(HELPER.validate_sword_montage(overrides[montage], load(mirrored_path(SWORD_SOURCE, SWORD_SUFFIX + "_Sword")), load(mirrored_path(SWORD_RECOVERY_SOURCE, SWORD_SUFFIX + "_Sword")), SWORD_RECOVERY_START_SECONDS), "Saved enemy Kwang segment timing or blending mismatch")
         for skill in skills:
             skill_montage = skill.get_editor_property("round_definition").get_editor_property("cast_montage") if skill.get_editor_property("use_round_definition") else None
             if not skill_montage:
@@ -273,7 +309,7 @@ def verify():
             component = library.get_object_for_blueprint(data, blueprint)
             if isinstance(component, unreal.StaticMeshComponent) and component.get_editor_property("static_mesh"):
                 weapons.append(component.get_editor_property("static_mesh").get_path_name())
-        require(weapons == [ROOT + "/Weapons/SM_Sword.SM_Sword"], "Unexpected weapon mesh list: " + name)
+        require(weapons == [load(mirrored_path(WEAPON_SOURCE)).get_path_name()], "Unexpected weapon mesh list: " + name)
         REPORT["units"].append({"blueprint": blueprint.get_path_name(), "mesh": mesh.get_path_name(), "animation": animation.get_path_name(), "skills": [skill.get_path_name() for skill in skills], "weapon": weapons[0]})
     party = load(ROOT + "/Blueprint/DataAsset/Parties/DA_VerticalSliceParty")
     warrior_class = load(ROOT + "/Blueprint/Unit/BP_WarriorUnit").generated_class()
@@ -287,7 +323,17 @@ def verify():
         old_reference = unreal.SoftObjectPath(path + ".DA_SweepingStrike")
         require(HELPER.load_saved_asset_reference(old_reference) == sweep, "Historical Sweeping Strike reference does not redirect")
     REPORT["sword_profile"] = profile.export_text()
-    REPORT["verification"] = "Saved asset reload, skeleton, loadout, socket, slot, profession and historical reference checks passed"
+    REPORT["folder_moves"] = legacy_moves()
+    for old, new in REPORT["folder_moves"].items():
+        require(ASSETS.does_asset_exist(new), "Missing mirrored working copy: " + new)
+        entries = unreal.AssetRegistryHelpers.get_asset_registry().get_assets_by_package_name(old)
+        require(not entries, "Old flat folder still contains an asset or redirector: " + old)
+        old_reference = unreal.SoftObjectPath(old + "." + old.rsplit("/", 1)[1])
+        require(HELPER.load_saved_asset_reference(old_reference) == load(new), "Moved working copy reference does not redirect: " + old)
+    REPORT["legacy_references_verified"] = len(REPORT["folder_moves"])
+    REPORT["sword_source"] = SWORD_SOURCE
+    REPORT["sword_recovery_source"] = SWORD_RECOVERY_SOURCE
+    REPORT["verification"] = "Saved asset reload, original folder structure, Kwang attack and recovery segments, skeleton, loadout, socket, slot, profession and historical reference checks passed"
 
 
 if __name__ == "__main__":

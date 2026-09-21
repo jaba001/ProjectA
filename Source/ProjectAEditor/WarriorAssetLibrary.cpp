@@ -1,10 +1,14 @@
 #include "WarriorAssetLibrary.h"
 #include "Animation/AnimBlueprint.h"
+#include "Animation/AnimData/IAnimationDataController.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimSequence.h"
 #include "Animation/Skeleton.h"
 #include "AnimationGraphSchema.h"
 #include "AnimGraphNode_ControlRig.h"
 #include "AnimGraphNode_Root.h"
 #include "AnimGraphNode_Slot.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EdGraph/EdGraph.h"
@@ -16,8 +20,14 @@
 #include "GameFramework/Actor.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "Misc/PackageName.h"
+#include "Modules/ModuleManager.h"
+#include "ObjectTools.h"
 #include "RetargetEditor/IKRetargetBatchOperation.h"
+#include "UObject/CoreRedirects.h"
+#include "UObject/ObjectRedirector.h"
 #include "UObject/Package.h"
+#include "UObject/UObjectHash.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogWarriorAssetLibrary, Log, All);
 
@@ -100,6 +110,38 @@ UObject* UWarriorAssetLibrary::LoadSavedAssetReference(const FSoftObjectPath& Pa
     return Path.TryLoad();
 }
 
+bool UWarriorAssetLibrary::RemoveUnusedAssetRedirector(FName PackageName)
+{
+    const FString PackagePath = PackageName.ToString();
+    if (!PackagePath.StartsWith(TEXT("/Game/User_JeHoon/")) || !FPackageName::IsValidLongPackageName(PackagePath)) return Fail(TEXT("Redirector cleanup requires an exact project-owned package / Redirector 정리에는 정확한 작업 사본 패키지가 필요합니다"));
+    const FCoreRedirectObjectName OriginalPackage(NAME_None, NAME_None, PackageName);
+    if (FCoreRedirects::GetRedirectedName(ECoreRedirectFlags::Type_Package, OriginalPackage) != OriginalPackage) return Fail(TEXT("Remove the package core redirect before cleaning its asset redirector / 에셋 Redirector 정리 전에 해당 패키지의 Core Redirect를 제외해야 합니다"));
+    FString PackageFilename;
+    if (!FPackageName::DoesPackageExist(PackagePath, &PackageFilename)) return true;
+    IAssetRegistry& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
+    Registry.SearchAllAssets(true);
+    Registry.ScanFilesSynchronous({PackageFilename}, true);
+    TArray<FAssetData> Assets;
+    if (!Registry.GetAssetsByPackageName(PackageName, Assets, true, false) || Assets.Num() != 1 || Assets[0].AssetClassPath != UObjectRedirector::StaticClass()->GetClassPathName()) return Fail(TEXT("Only a package containing exactly one asset redirector can be removed / 에셋 Redirector 하나만 포함된 패키지만 제거할 수 있습니다"));
+    TArray<FName> Referencers;
+    if (!Registry.GetReferencers(PackageName, Referencers, UE::AssetRegistry::EDependencyCategory::Package) || !Referencers.IsEmpty()) return Fail(TEXT("The redirector still has package references or its reference data is unavailable / Redirector의 패키지 참조가 남아 있거나 참조 정보를 확인할 수 없습니다"));
+    const FString ObjectPath = Assets[0].GetObjectPathString();
+    const FCoreRedirectObjectName OriginalObject(ObjectPath);
+    if (FCoreRedirects::GetRedirectedName(ECoreRedirectFlags::Type_Object, OriginalObject) != OriginalObject) return Fail(TEXT("Remove the object core redirect before cleaning its asset redirector / 에셋 Redirector 정리 전에 해당 오브젝트의 Core Redirect를 제외해야 합니다"));
+    UObjectRedirector* Redirector = Cast<UObjectRedirector>(StaticLoadObject(UObjectRedirector::StaticClass(), nullptr, *ObjectPath, nullptr, LOAD_NoRedirects));
+    if (!IsValid(Redirector) || Redirector->GetClass() != UObjectRedirector::StaticClass() || Redirector->GetPathName() != ObjectPath || Redirector->GetOutermost()->GetFName() != PackageName) return Fail(TEXT("The exact asset redirector could not be loaded without redirection / 경로 변경 없이 정확한 에셋 Redirector를 불러올 수 없습니다"));
+    UPackage* Package = Redirector->GetOutermost();
+    Package->FullyLoad();
+    TArray<UObject*> PackageObjects;
+    GetObjectsWithPackage(Package, PackageObjects);
+    if (PackageObjects.Num() != 1 || PackageObjects[0] != Redirector) return Fail(TEXT("The loaded package contains objects other than the single redirector / 불러온 패키지에 단일 Redirector 외의 오브젝트가 있습니다"));
+    // Registry and exact package checks replace the transient Python reference check for this redirector only.
+    // 이 Redirector에 한해 레지스트리 및 정확한 패키지 검사로 Python 임시 참조 검사를 대체합니다.
+    if (!ObjectTools::DeleteSingleObject(Redirector, false)) return false;
+    ObjectTools::CleanupAfterSuccessfulDelete({Package}, false);
+    return !FPackageName::DoesPackageExist(PackagePath);
+}
+
 bool UWarriorAssetLibrary::AssignMeshSkeleton(USkeletalMesh* Mesh, USkeleton* Skeleton)
 {
     if (!IsProjectCopy(Mesh) || !IsProjectCopy(Skeleton) || !IsCompatibleReferencePose(Mesh->GetSkeleton(), Skeleton)) return Fail(TEXT("Mesh skeleton assignment requires compatible project copies / 호환되는 메시와 스켈레톤 작업 사본이 필요합니다"));
@@ -108,6 +150,13 @@ bool UWarriorAssetLibrary::AssignMeshSkeleton(USkeletalMesh* Mesh, USkeleton* Sk
     Mesh->PostEditChange();
     Mesh->MarkPackageDirty();
     return Mesh->GetSkeleton() == Skeleton;
+}
+
+bool UWarriorAssetLibrary::SetSkeletonPreviewMesh(USkeleton* Skeleton, USkeletalMesh* Mesh)
+{
+    if (!IsProjectCopy(Skeleton) || !IsProjectCopy(Mesh) || Mesh->GetSkeleton() != Skeleton) return Fail(TEXT("Skeleton preview requires project copies sharing the same skeleton / 스켈레톤 미리보기에는 동일한 스켈레톤을 사용하는 작업 사본이 필요합니다"));
+    Skeleton->SetPreviewMesh(Mesh);
+    return Skeleton->GetPreviewMesh(false) == Mesh;
 }
 
 bool UWarriorAssetLibrary::RetargetAnimations(const TArray<UObject*>& Assets, USkeletalMesh* SourceMesh, USkeletalMesh* TargetMesh, UIKRetargeter* Retargeter, const FString& Destination, const FString& Suffix)
@@ -177,6 +226,77 @@ TArray<FName> UWarriorAssetLibrary::GetAnimationSlotNames(UAnimBlueprint* Bluepr
         }
     }
     return Names;
+}
+
+TArray<UAnimSequenceBase*> UWarriorAssetLibrary::GetMontageAnimations(UAnimMontage* Montage)
+{
+    TArray<UAnimSequenceBase*> Animations;
+    if (!IsValid(Montage)) return Animations;
+    for (const FSlotAnimationTrack& Slot : Montage->SlotAnimTracks)
+    {
+        for (const FAnimSegment& Segment : Slot.AnimTrack.AnimSegments)
+        {
+            UAnimSequenceBase* Animation = Segment.GetAnimReference();
+            if (!IsValid(Animation)) return {};
+            Animations.Add(Animation);
+        }
+    }
+    return Animations;
+}
+
+bool UWarriorAssetLibrary::ConfigureSwordMontage(UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float RecoveryStartTime)
+{
+    if (!IsProjectCopy(Montage) || !IsProjectCopy(Attack) || !IsProjectCopy(Recovery) || !IsProjectCopy(Montage->GetSkeleton())) return Fail(TEXT("Sword montage authoring requires project-owned assets and skeleton / 검 몽타주 작성에는 에셋과 스켈레톤 작업 사본이 필요합니다"));
+    if (Attack->GetSkeleton() != Montage->GetSkeleton() || Recovery->GetSkeleton() != Montage->GetSkeleton()) return Fail(TEXT("Sword montage animations must share its exact skeleton / 검 몽타주 애니메이션은 동일한 스켈레톤을 사용해야 합니다"));
+    const float AttackLength = Attack->GetPlayLength();
+    const float RecoveryLength = Recovery->GetPlayLength();
+    if (!FMath::IsFinite(AttackLength) || AttackLength <= 0.f || !FMath::IsFinite(RecoveryLength) || RecoveryLength <= 0.f || Attack->RateScale != 1.f || Recovery->RateScale != 1.f || !FMath::IsFinite(RecoveryStartTime) || RecoveryStartTime < 0.f || RecoveryStartTime >= RecoveryLength) return Fail(TEXT("Sword montage source lengths, rates or recovery start are invalid / 검 몽타주 원본 길이, 재생 속도 또는 회복 시작점이 유효하지 않습니다"));
+    if (Montage->SlotAnimTracks.Num() != 1 || Montage->SlotAnimTracks[0].SlotName != FAnimSlotGroup::DefaultSlotName || Montage->CompositeSections.Num() != 1 || Montage->CompositeSections[0].SectionName != TEXT("Default")) return Fail(TEXT("Sword montage authoring requires the single default factory slot and section / 검 몽타주 작성에는 팩토리 기본 슬롯과 섹션 각 하나가 필요합니다"));
+    const float ExpectedLength = AttackLength + RecoveryLength - RecoveryStartTime;
+    if (!FMath::IsFinite(ExpectedLength) || !Attack->GetSamplingFrameRate().IsValid() || !Recovery->GetSamplingFrameRate().IsValid()) return Fail(TEXT("Sword montage duration or source frame rates are invalid / 검 몽타주 길이 또는 원본 프레임 레이트가 유효하지 않습니다"));
+    FAnimSegment AttackSegment;
+    AttackSegment.SetAnimReference(Attack, true);
+    FAnimSegment RecoverySegment;
+    RecoverySegment.SetAnimReference(Recovery, true);
+    RecoverySegment.StartPos = AttackLength;
+    RecoverySegment.AnimStartTime = RecoveryStartTime;
+    Montage->Modify();
+    Montage->SlotAnimTracks[0].AnimTrack.AnimSegments = {AttackSegment, RecoverySegment};
+    Montage->CompositeSections.Reset();
+    FCompositeSection& Section = Montage->CompositeSections.AddDefaulted_GetRef();
+    Section.SectionName = TEXT("Default");
+    Section.SetTime(0.f);
+    Section.NextSectionName = NAME_None;
+    Montage->RateScale = 1.f;
+    Montage->BlendModeIn = EMontageBlendMode::Standard;
+    Montage->BlendModeOut = EMontageBlendMode::Standard;
+    Montage->BlendIn.SetBlendTime(0.08f);
+    Montage->BlendOut.SetBlendTime(0.12f);
+    Montage->BlendOutTriggerTime = -1.f;
+    Montage->bEnableAutoBlendOut = true;
+    // Update the common sampling rate before quantizing the combined duration into montage frames.
+    // 합산 길이를 몽타주 프레임으로 변환하기 전에 공통 샘플링 레이트를 갱신합니다.
+    static_cast<UAnimCompositeBase*>(Montage)->UpdateCommonTargetFrameRate();
+    Montage->GetController().SetFrameRate(Montage->GetSamplingFrameRate());
+    Montage->SetCompositeLength(Montage->CalculateSequenceLength());
+    Montage->PostEditChange();
+    Montage->MarkPackageDirty();
+    return ValidateSwordMontage(Montage, Attack, Recovery, RecoveryStartTime);
+}
+
+bool UWarriorAssetLibrary::ValidateSwordMontage(UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float RecoveryStartTime)
+{
+    if (!IsProjectCopy(Montage) || !IsProjectCopy(Attack) || !IsProjectCopy(Recovery) || !IsProjectCopy(Montage->GetSkeleton())) return Fail(TEXT("Sword montage verification requires project-owned assets and skeleton / 검 몽타주 검증에는 에셋과 스켈레톤 작업 사본이 필요합니다"));
+    if (Attack->GetSkeleton() != Montage->GetSkeleton() || Recovery->GetSkeleton() != Montage->GetSkeleton()) return Fail(TEXT("Sword montage skeleton verification failed / 검 몽타주 스켈레톤 검증 실패"));
+    const float AttackLength = Attack->GetPlayLength();
+    const float RecoveryLength = Recovery->GetPlayLength();
+    if (!FMath::IsFinite(AttackLength) || AttackLength <= 0.f || !FMath::IsFinite(RecoveryLength) || RecoveryLength <= 0.f || Attack->RateScale != 1.f || Recovery->RateScale != 1.f || !FMath::IsFinite(RecoveryStartTime) || RecoveryStartTime < 0.f || RecoveryStartTime >= RecoveryLength) return Fail(TEXT("Sword montage source length, rate or recovery start verification failed / 검 몽타주 원본 길이, 재생 속도 또는 회복 시작점 검증 실패"));
+    const float ExpectedLength = AttackLength + RecoveryLength - RecoveryStartTime;
+    if (Montage->SlotAnimTracks.Num() != 1 || Montage->SlotAnimTracks[0].SlotName != FAnimSlotGroup::DefaultSlotName || Montage->SlotAnimTracks[0].AnimTrack.AnimSegments.Num() != 2 || Montage->CompositeSections.Num() != 1 || Montage->CompositeSections[0].SectionName != TEXT("Default") || Montage->CompositeSections[0].GetTime() != 0.f || !Montage->CompositeSections[0].NextSectionName.IsNone()) return Fail(TEXT("Sword montage slot or section verification failed / 검 몽타주 슬롯 또는 섹션 검증 실패"));
+    const TArray<FAnimSegment>& Segments = Montage->SlotAnimTracks[0].AnimTrack.AnimSegments;
+    if (Segments[0].GetAnimReference() != Attack || Segments[1].GetAnimReference() != Recovery || Segments[0].StartPos != 0.f || Segments[0].AnimStartTime != 0.f || Segments[0].AnimEndTime != AttackLength || Segments[1].StartPos != AttackLength || Segments[1].AnimStartTime != RecoveryStartTime || Segments[1].AnimEndTime != RecoveryLength || Segments[0].AnimPlayRate != 1.f || Segments[1].AnimPlayRate != 1.f || Segments[0].LoopingCount != 1 || Segments[1].LoopingCount != 1) return Fail(TEXT("Sword montage animation segment verification failed / 검 몽타주 애니메이션 구간 검증 실패"));
+    if (Montage->BlendModeIn != EMontageBlendMode::Standard || Montage->BlendModeOut != EMontageBlendMode::Standard || !FMath::IsNearlyEqual(Montage->BlendIn.GetBlendTime(), 0.08f, 0.0001f) || !FMath::IsNearlyEqual(Montage->BlendOut.GetBlendTime(), 0.12f, 0.0001f) || Montage->BlendOutTriggerTime != -1.f || !Montage->bEnableAutoBlendOut) return Fail(TEXT("Sword montage blend verification failed / 검 몽타주 블렌드 검증 실패"));
+    return FMath::IsFinite(ExpectedLength) && Montage->RateScale == 1.f && Attack->GetSamplingFrameRate().IsValid() && Recovery->GetSamplingFrameRate().IsValid() && Montage->GetCommonTargetFrameRate().IsValid() && FMath::IsNearlyEqual(Montage->GetPlayLength(), ExpectedLength, 0.0001f) && FMath::IsNearlyEqual(Montage->CalculateSequenceLength(), ExpectedLength, 0.0001f);
 }
 
 bool UWarriorAssetLibrary::IsOutputSlotConnected(UAnimBlueprint* Blueprint, FName SlotName)

@@ -183,6 +183,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 ### 타겟·행동 세부 규칙
 
 - `GetCombatSpeed()`는 현재 GAS 민첩을 그대로 사용하며 독립 `CombatSpeed=20` 값은 제거했다. 시작 지연은 `(최고 속도 − 해당 속도) × 0.1초`이고 기본 아군 10·일반 적 5에서는 적이 0.5초 늦게 시작한다. Planning에서 고정한 속도는 근접 접근·복귀에도 적용한다. [남은 확인](TODO.md#2-8-민첩-기반-전투-속도)
+- 유닛 접근은 현재 위치가 시전 접근 범위에 들어오면 즉시 `Casting`으로 전환한다. 검 공격의 현재 접근 거리 105cm보다 가까워도 정확한 간격을 맞추려고 후퇴하지 않는다. 이동하는 두 유닛의 상호 접근은 [사용자 확인](TODO.md#2-15-전사와-검-공격-콘텐츠) 대상이다.
 - 휩쓸기는 타일 좌표와 무관한 전방 박스 충돌로 전환했다. `RoundDefinition.bUseMeleeAreaCollision`·`MeleeAreaHalfExtent`와 시전 몽타주를 사용하며 근접 접근·복귀·피해 10·AP 1을 유지한다. 타일 기반 `TargetAndSides` 계산과 기존 타일 범위 라이브러리는 보존한다. [공격 정의](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터) · [작동 확인](TODO.md#2-12-휩쓸기-근접-범위-충돌)
 - `SkillDefinitionDataAsset.bUseRoundDefinition`과 `RoundDefinition`으로 스킬별 실제 시간·범위·접근·복귀·목표 상실·투사체 정책을 편집한다. 미지정 장착 스킬은 [GAME_DESIGN 8-7](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)의 초기 변환을 사용한다.
 - 시전 표현은 명시 프로필의 `RoundDefinition.CastMontage`를 우선하며 비어 있으면 `AbilityClass`의 기존 `AttackMontage`를 사용한다. 서버가 시전 진입 시 한 번 재생을 전달한다. 몽타주 재생 인스턴스의 루트 모션과 유닛의 기존 `AN_SkillRelease` 효과 발동은 차단하며, `WindupSeconds`·충돌·AP 계산과 발동 1회는 유지한다. 발동 후 `Recovery`에서 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝날 때까지 기다린 뒤 복귀한다. 서버의 재생 인스턴스를 사용할 수 없으면 에셋 길이/RateScale·블렌드 아웃·여유 시간 0.25초를 사용하며 시전 시작 기준 최대 60초로 제한한다. 반복·자동 종료 누락·잘못된 길이/속도로 무한 대기하지 않으며 시간 초과 시 남은 표현을 즉시 정리한다. 사망·중단·발동 전 취소·다음 행동 시작도 해당 인스턴스를 정리한다. [남은 확인](TODO.md#2-4-da-시전-몽타주-연결)
@@ -223,7 +224,7 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 
 ## Gameplay 에셋과 배치
 
-사용자·Codex의 모든 제작 에셋은 `Content/User_JeHoon/` 안에 둔다. 외부 리소스·템플릿 원본을 직접 수정할 때는 이 폴더에 작업 사본을 만든다. C++·설정·생성 명세는 기존 Source·Config 위치를 유지한다.
+사용자·Codex의 모든 제작 에셋은 `Content/User_JeHoon/` 안에 둔다. 외부 팩의 작업 사본은 원본 팩명·하위 폴더 구조·대소문자를 유지하여 `/Game/<팩/하위폴더>`에서 `/Game/User_JeHoon/<팩/하위폴더>`로 대응시킨다. 외부 원본은 유지하고 기존 사본 이동은 Unreal AssetTools로 수행하여 참조·Redirector를 정리한다. C++·설정·생성 명세는 기존 Source·Config 위치를 유지한다.
 
 2026-09-11: 별도 `/Game/T12Validation`에 있던 메뉴 검증 위젯 3종을 `/Game/User_JeHoon/Validation/T12`로 이동했다. 일반 메뉴의 `UI/MainMenu` 원본과 구분하며 기존 검증 코드·문서·Saved의 T12 생성 명세도 새 경로를 사용한다. UI 생성 도구는 작업 폴더 밖의 assetPath를 거절한다.
 
@@ -245,10 +246,18 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 | `Blueprint/DataAsset/Skills/BPDA_RangedAttack` | `USkillDefinitionDataAsset`, 기본 공격 복제. 별도 `Blueprint/GAS/Ability/BPGA_RangedAttack` 연결, 공통 플레이어 시험 장착에 포함 |
 | `Blueprint/DataAsset/Skills/BPDA_AreaAttack` | `USkillDefinitionDataAsset`, 기존 EnemyTile·AroundTarget을 지점 공격으로 변환. 피해 200·AP 1·Attack03 몽타주 보존, 공통 플레이어 시험 장착에 포함 |
 | `Blueprint/DataAsset/Skills/BPDA_SweepingStrike` | `USkillDefinitionDataAsset`, 근접 전방 박스 충돌·피해 10·AP 1·몽타주와 복귀. 이전 경로·PrimaryAssetId 리디렉션 |
-| `Blueprint/DataAsset/Skills/BPDA_swoard_attack` | `USkillDefinitionDataAsset`, 검 공격·논리 ID `SwordAttack`·단일 근접·피해 50·AP 1·발동 2.15초 |
+| `Blueprint/DataAsset/Skills/BPDA_swoard_attack` | `USkillDefinitionDataAsset`, 검 공격·논리 ID `SwordAttack`·단일 근접·피해 50·AP 1·발동 0.23초 |
 | `Blueprint/Unit/BP_WarriorUnit` | GKnight VA 작업 사본·기존 4스킬+검 공격·유닛별 몽타주·오른손 검 |
-| `Characters/Warrior`, `Characters/SwordEnemy` | 복제 메시/뼈대·리타깃 AnimBP/몽타주. 기존 보행·DefaultSlot 유지, 맞지 않는 Manny Foot IK 노드 제거 |
-| `Weapons/SM_Sword` | Weapon_Pack 검 작업 사본. 전사·기본 적의 `hand_r` 부착 |
+| `GKnight/Meshes/SK_GothicKnight_VA`, `GKnight/Meshes/SK_GothicKnight_Skeleton` | 원본 메시·뼈대 경로를 유지한 전사 사본 |
+| `Skeleton_Guard/Mesh_UE4/Full/SKM_Skeleton_Guard_Body`, `Skeleton_Guard/Demoscene_UE4/Mesh/UE4_Mannequin_Skeleton` | 원본 메시·뼈대 경로를 유지한 적 사본 |
+| `Characters/Mannequins/Anims/Unarmed` | 기존 ABP·BS·Walk/Jog/Jump/Attack 하위 구조를 유지한 리타깃 사본. 유닛별 접미사로 구분 |
+| `Blueprint/Unit/Animation/Montage` | 기존 프로젝트 공격 몽타주와 유닛별 리타깃 사본 |
+| `BossyEnemy/Animations/InPlace/Attacks` | 이전 `Boss_Attack_Swing_InP` 리타깃 시퀀스와 검 몽타주 보존 |
+| `ParagonAnimationsRetargetedToManny/KwangManny/Attack` | 공격·복귀 리타깃 시퀀스(`_KwangSword`/`_KwangSword_Sword`)와 현재 전사/적 `AM_SwordAttack`/`AM_SwordAttack_Sword` 몽타주 |
+| `GKnight/Rigs`, `Skeleton_Guard/Rigs` | 전사/적용 IK Rig·Retargeter |
+| `Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Sword` | 원본 구조를 유지한 검 사본. 전사·기본 적의 `hand_r` 부착 |
+| `Characters/Mannequins/Meshes/SK_Mannequin`, `Characters/Mannequins/Meshes/SKM_Manny_Simple` | Paragon AnimSequence의 Manny 뼈대·프리뷰 메시 작업 사본 |
+| `ParagonAnimationsRetargetedToManny` | 원본 32개 캐릭터/하위 폴더를 유지한 AnimSequence 5,385개. 전체 저장·별도 재로드 확인, Kwang 검 공격용 리타깃은 별도 연결 |
 | `Blueprint/DataAsset/SkillPools/DA_EncounterSkillPool` | `USkillPoolDataAsset`, 기존 추가 스킬 후보·가중치 유지 |
 | `Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog` | `UOpponentSnapshotCatalogDataAsset`, 네 직업·기존 별칭과 `SwordAttack`. Warrior 클래스만 전사 사본으로 연결 |
 | `UI/Gameplay/WBP_GameplayRootWidget` | `UGameplayRootWidget`, 기존 RunMap/Result와 native RoundPlanning 화면 연결 |
@@ -257,6 +266,8 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 | `UI/Gameplay/WBP_EncounterResultWidget` | `UEncounterResultWidget` |
 
 클래스는 런타임 Blueprint 문자열 경로 Load 대신 DataAsset과 Blueprint 기본값 참조로 연결한다.
+
+Paragon의 FBX 원본은 `Content/ParagonAnimationsRetargetedToManny`에 보존하며 32개 캐릭터 폴더·5,385개 파일이다. `ImportParagonAnimations.py`로 AnimSequence 5,385개를 생성·저장하고 최신 저장본의 별도 재로드에서 전체 뼈대·Manny 프리뷰·양수 길이·유효한 본 트랙·원본 FBX 참조를 확인했다. 샘플링률은 자동 판정하고 종료 시간을 프레임 경계에 맞춘다. `Additive`·`MSA` 등 파일명만으로 FBX에 없는 Unreal 전용 설정을 추정 적용하지 않는다. [Animation Editor의 사용자 확인](TODO.md#2-16-paragon-fbx-애니메이션-가져오기)은 대기다.
 
 2026-09-16 DA 7개의 폴더 변경은 Unreal AssetTools로 수행하고 구경로 해석·기존 저장 해시 보존을 확인했다. 2026-09-21 휩쓸기를 `BPDA_SweepingStrike`로 변경하며 루트/Skills의 두 이전 경로에 Package/ObjectRedirects, 기존 PrimaryAssetId에 AssetManager 리디렉션을 연결했다. 표시명·Snapshot 별칭은 유지하고 외부 저장의 소프트 경로도 보존한다. 이번 재로드에서 두 구경로와 새 에셋 연결을 확인했으며 실제 Continue는 [사용자 확인](TODO.md#2-15-전사와-검-공격-콘텐츠)과 구분한다.
 

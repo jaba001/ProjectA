@@ -1036,6 +1036,64 @@ bool FCombatRoundMovementTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundUnitApproachTrackingTest, "ProjectA.Combat.Round.UnitApproachStopsWithinReach", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundUnitApproachTrackingTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Case = 0; Case < 2; ++Case)
+    {
+        const FString Context = Case == 0 ? TEXT("Target already within reach") : TEXT("Moving target enters reach");
+        FCombatRoundSkill Skill;
+        Skill.WindupSeconds = 0.2f;
+        FFixture Fixture;
+        if (!TestTrue(Context + TEXT(" initializes"), Fixture.Initialize(1, 10.f, nullptr, FIntPoint(0, 3), 1, &Skill))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Target = Fixture.Enemies[0];
+        const FVector Origin = Source->GetActorLocation();
+        ACombatGridTile* Home = Source->GetCurrentTile();
+        if (Case == 0) Target->SetActorLocation(Origin + FVector(0.f, 80.f, 0.f), false);
+        if (!TestTrue(Context + TEXT(" submits"), Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Target))) || !TestTrue(Context + TEXT(" locks"), Fixture.Ready(0))) return false;
+        if (Case == 1)
+        {
+            Fixture.Round->Tick(0.1f);
+            if (!TestTrue(TEXT("The initial distant target requires approach"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching)) return false;
+            Target->SetActorLocation(Source->GetActorLocation() + FVector(250.f, 0.f, 0.f), false);
+            const FVector BeforeTracking = Source->GetActorLocation();
+            Fixture.Round->Tick(0.05f);
+            TestTrue(TEXT("Approach follows the target's current position instead of its reserved tile"), Source->GetActorLocation().X > BeforeTracking.X && FMath::IsNearlyEqual(Source->GetActorLocation().Y, BeforeTracking.Y, 0.01));
+            Target->SetActorLocation(Source->GetActorLocation() + FVector(80.f, 0.f, 0.f), false);
+        }
+        const FVector CastLocation = Source->GetActorLocation();
+        Fixture.Round->Tick(0.01f);
+        if (!TestTrue(Context + TEXT(" starts casting without retreating to a fixed separation"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Casting && Source->GetActorLocation().Equals(CastLocation, 0.01f))) return false;
+        TestTrue(Context + TEXT(" stops locomotion and retains the reserved home"), Source->GetVelocity().IsNearlyZero() && Source->GetCurrentTile() == Home);
+        TestEqual(Context + TEXT(" preserves windup before damage"), Target->GetAttributeSet()->GetHP(), 100.f);
+        for (int32 Step = 0; Step < 30 && Target->GetAttributeSet()->GetHP() == 100.f; ++Step) Fixture.Round->Tick(0.01f);
+        TestEqual(Context + TEXT(" releases exactly one close-range hit before returning"), Target->GetAttributeSet()->GetHP(), 75.f);
+        if (!TestTrue(Context + TEXT(" settles into the next round"), Fixture.AdvanceUntilNextRound(1))) return false;
+        TestTrue(Context + TEXT(" returns to the original home without repeating damage"), Source->GetActorLocation().Equals(Origin, 2.f) && Source->GetCurrentTile() == Home && Target->GetAttributeSet()->GetHP() == 75.f);
+    }
+    FCombatRoundSkill EnemySkill;
+    EnemySkill.HitRange = 100.f;
+    EnemySkill.WindupSeconds = 3.f;
+    FCombatRoundSkill HumanSkill;
+    HumanSkill.WindupSeconds = 0.2f;
+    FFixture Mutual;
+    if (!TestTrue(TEXT("Two melee attackers with different start delays initialize"), Mutual.Initialize(1, 20.f, &EnemySkill, FIntPoint(0, 3), 1, &HumanSkill, 0.f))) return false;
+    AUnitBase* Human = Mutual.Humans[0];
+    AUnitBase* Enemy = Mutual.Enemies[0];
+    const FVector HumanOrigin = Human->GetActorLocation();
+    const FVector EnemyOrigin = Enemy->GetActorLocation();
+    if (!TestTrue(TEXT("The slower unit submits its attack"), Mutual.Submit(0, Mutual.Command(Human, Mutual.HumanSkillId, Enemy))) || !TestTrue(TEXT("Both melee plans lock"), Mutual.Ready(0))) return false;
+    for (int32 Step = 0; Step < 210 && Mutual.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Waiting; ++Step) Mutual.Round->Tick(0.01f);
+    TestTrue(TEXT("The faster opponent approaches and casts first"), Mutual.Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Casting && FVector::Dist2D(EnemyOrigin, Enemy->GetActorLocation()) > 500.f);
+    TestTrue(TEXT("The delayed attacker casts in place when the opponent has already approached"), Mutual.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Casting && Human->GetActorLocation().Equals(HumanOrigin, 0.01f));
+    if (!TestTrue(TEXT("Mutual attacks settle through their separate windups and returns"), Mutual.AdvanceUntilNextRound(1))) return false;
+    TestTrue(TEXT("Both attacks release once and both survivors retain their original homes"), Human->GetAttributeSet()->GetHP() == 75.f && Enemy->GetAttributeSet()->GetHP() == 75.f && Human->GetActorLocation().Equals(HumanOrigin, 2.f) && Enemy->GetActorLocation().Equals(EnemyOrigin, 2.f));
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundMeleeSpeedTest, "ProjectA.Combat.Round.MeleeMovementUsesRoundSpeed", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FCombatRoundMeleeSpeedTest::RunTest(const FString& Parameters)

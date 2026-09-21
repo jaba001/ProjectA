@@ -43,9 +43,11 @@ C++·리플렉션·프로젝트 설정 변경 반영을 위해 빌드 후 UE를 
 
 장착한 스킬의 기존 `AbilityClass → AttackMontage`는 시전 시작 시 재생한다. `bUseRoundDefinition`을 사용하는 DA는 `RoundDefinition.CastMontage`로 재생할 몽타주를 우선 지정할 수 있다. 피해·발사는 기존 `WindupSeconds`와 서버 충돌 판정으로 한 번 처리하며, 복귀는 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝난 뒤 시작한다. 서버에서 표현을 갱신하지 못하면 에셋 길이·속도·블렌드 시간을 사용하며 시전 시작 기준 최대 60초의 대기 제한으로 반복·종료 누락을 정리한다. 메시·AnimBP의 Skeleton/Slot 연결이 필요하다.
 
-전사 `BP_WarriorUnit`은 GKnight 메시·Weapon_Pack 검·BossyEnemy의 검 휘두르기 리타깃을 사용한다. 기존 4스킬에 `BPDA_swoard_attack`을 추가하며 기존 기본공격은 ID·경로를 유지하고 표시명만 **비무장 공격**으로 변경했다. 다른 직업은 기존 4개를 유지한다. 기본 적은 검 하나와 검 공격만 장착하며 Snapshot 입력에 저장된 스킬 구성은 유지한다. 검 공격은 피해 50·AP 1, 원본 재생 길이 5.8667초·발동 2.15초를 사용한다. [새 콘텐츠 확인](Docs/TODO.md#2-15-전사와-검-공격-콘텐츠)
+전사 `BP_WarriorUnit`은 GKnight 메시·Weapon_Pack 검을 사용하며 전사와 기본 적의 검 공격을 Kwang의 공격·복귀 클립으로 교체했다. 기존 4스킬에 `BPDA_swoard_attack`을 추가하며 기존 기본공격은 ID·경로를 유지하고 표시명만 **비무장 공격**으로 변경했다. 다른 직업은 기존 4개를 유지한다. 기본 적은 검 하나와 검 공격만 장착하며 Snapshot 입력에 저장된 스킬 구성은 유지한다. 검 공격은 피해 50·AP 1·발동 0.23초이며 중복 복귀 포즈 0.2초를 제외한 몽타주 길이는 1.933333초다. 유닛 접근 범위에 들어오면 간격을 다시 벌리지 않고 시전한다. 최신 빌드·에셋 재로드 검사를 통과했으며 실제 플레이는 [사용자 확인](Docs/TODO.md#2-15-전사와-검-공격-콘텐츠) 대기다.
 
-`BPDA_SweepingStrike`는 근접 접근 후 전방 박스 충돌로 여러 적을 타격한다. `MeleeAreaHalfExtent`로 범위를 조절하며 피해 10·AP 1·몽타주 종료 후 복귀를 유지한다. 이전 `DA_SweepingStrike` 경로·PrimaryAssetId는 리디렉션하고 기존 타일 범위 코드는 보존한다. 제작·수정 사본은 `/Game/User_JeHoon/`에 저장하며 외부 팩 원본은 유지한다. Development Editor / Win64 빌드와 저장 에셋 재로드 검사를 통과했고 실제 플레이는 미실행이다. [스킬 정의](Docs/GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터) · [에셋 구성](Docs/PROJECT_PLAN.md#gameplay-에셋과-배치)
+`BPDA_SweepingStrike`는 근접 접근 후 전방 박스 충돌로 여러 적을 타격한다. `MeleeAreaHalfExtent`로 범위를 조절하며 피해 10·AP 1·몽타주 종료 후 복귀를 유지한다. 이전 `DA_SweepingStrike` 경로·PrimaryAssetId는 리디렉션하고 기존 타일 범위 코드는 보존한다. 외부 팩의 작업 사본은 원본 팩명·하위 폴더 구조를 유지해 `/Game/User_JeHoon/` 아래에 저장하며 원본은 유지한다. 기존 사본 73개의 재배치·이전 참조 검증을 완료했으며 Boss Swing 사본과 호환 경로도 보존한다. 실제 플레이는 [사용자 확인](Docs/TODO.md#2-15-전사와-검-공격-콘텐츠) 대기다. [스킬 정의](Docs/GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터) · [에셋 구성](Docs/PROJECT_PLAN.md#gameplay-에셋과-배치)
+
+Paragon AnimSequence 5,385개를 원본의 32개 캐릭터 폴더 구조대로 `/Game/User_JeHoon/ParagonAnimationsRetargetedToManny`에 저장했다. 복제한 Manny 뼈대·프리뷰 메시를 사용하며 전체 에셋의 별도 재로드 검사를 통과했다. Animation Editor의 실제 재생 확인은 대기이며 Kwang 검 공격 연결은 위 콘텐츠 작업에서 별도로 관리한다. [Animation Editor 확인 방법](Docs/TODO.md#2-16-paragon-fbx-애니메이션-가져오기)
 
 SAP 이동은 캐릭터마다 목적지 하나를 예약하며 민첩·`MaxWalkSpeed`와 무관하게 **350cm/s의 고정 속도**로 실행한다. 준비 전에는 변경·취소할 수 있고 실제 위치·자원은 바뀌지 않는다. Ready Phase 종료 시 이동 SAP 1과 공격 비용을 합산하여 AP/SAP를 즉시 한 번 차감하며 불발에도 환불하지 않는다. 모든 예약 이동 완료 후 기존 속도차에 따라 AP 행동을 시작하며 도착 위치가 새 복귀 칸이 된다. 다른 유닛의 복귀·예약 칸 이동과 자리 교환을 막고 이동 실패 시 출발점으로 복원한다.
 
@@ -85,7 +87,7 @@ UI는 1920×1080을 기준으로 뷰포트에 맞춰 같은 비율로 확대·�
 
 - 엔진: Unreal Engine 5.7, C++, GAS, CommonUI, UMG.
 - 모듈: `Source/ProjectA`는 런타임, `Source/ProjectAEditor`는 에셋 도구·에디터 테스트. Editor 의존성은 런타임 모듈에 추가하지 않는다.
-- 제작 에셋: `Content/User_JeHoon` (`/Game/User_JeHoon`). 외부 리소스·템플릿 원본은 유지하며 편집 사본을 제작 경로에 둔다.
+- 제작 에셋: `Content/User_JeHoon` (`/Game/User_JeHoon`). 외부 리소스·템플릿 원본은 유지하며 편집 사본은 원본 팩명·하위 폴더 구조 그대로 제작 경로에 둔다.
 - UI: [에셋 도구](Source/ProjectAEditor/Scripts/README.md), [위젯·JSON 명세](Docs/UI_README.md).
 
 Development Editor / Win64 빌드:

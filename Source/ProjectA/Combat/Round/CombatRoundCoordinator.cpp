@@ -1322,6 +1322,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
         if (Entry.ActionPhase == ECombatRoundActionPhase::Approaching)
         {
             FVector Destination = Action.Destination;
+            bool bWithinApproachRange = false;
             if (Skill->Approach == ECombatRoundApproach::Tile)
             {
                 ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Entry.Command.DestinationCoord);
@@ -1333,15 +1334,19 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
             }
             if (Skill->Approach == ECombatRoundApproach::Unit)
             {
-                const FVector TowardSource = (Entry.Unit->GetActorLocation() - Action.AimLocation).GetSafeNormal2D();
-                Destination = Action.AimLocation + TowardSource * FMath::Max(20.f, Skill->HitRange * 0.7f);
+                const FVector FromTarget = Entry.Unit->GetActorLocation() - Action.AimLocation;
+                const float ApproachRange = FMath::Max(20.f, Skill->HitRange * 0.7f);
+                // A moving target entering reach ends approach; never retreat to align with a point behind the attacker.
+                // 이동 중인 목표가 접근 범위에 들어오면 접근을 끝내며 공격자 뒤쪽 지점에 맞추려고 후퇴하지 않습니다.
+                bWithinApproachRange = FromTarget.SizeSquared2D() <= FMath::Square(ApproachRange);
+                Destination = Action.AimLocation + FromTarget.GetSafeNormal2D() * ApproachRange;
             }
             if (SimulationTime - Action.PhaseStarted > MovementTimeout)
             {
                 StartReturn(Index, true, RoundText(TEXT("접근 시간 초과로 불발")));
                 return;
             }
-            if (!MoveUnitToward(Index, Destination, CombatRoundRules::AttackMoveSpeed(*Skill, Entry.Speed), StepSeconds)) return;
+            if (!bWithinApproachRange && !MoveUnitToward(Index, Destination, CombatRoundRules::AttackMoveSpeed(*Skill, Entry.Speed), StepSeconds)) return;
             Action.PhaseStarted = SimulationTime;
             Entry.ActionPhase = ECombatRoundActionPhase::Casting;
             Entry.Status = RoundText(TEXT("시전 중"));
