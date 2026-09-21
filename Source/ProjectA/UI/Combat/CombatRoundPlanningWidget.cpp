@@ -1,6 +1,7 @@
 #include "UI/Combat/CombatRoundPlanningWidget.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "CommonInputModeTypes.h"
 #include "Components/Border.h"
@@ -95,14 +96,17 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
 
     USizeBox* RosterSize = WidgetTree->ConstructWidget<USizeBox>();
     RosterSize->SetWidthOverride(900.f);
-    RosterSize->SetMaxDesiredHeight(145.f);
     RosterSize->SetVisibility(ESlateVisibility::HitTestInvisible);
     UOverlaySlot* RosterSlot = Root->AddChildToOverlay(RosterSize);
     RosterSlot->SetHorizontalAlignment(HAlign_Center);
     RosterSlot->SetVerticalAlignment(VAlign_Top);
     RosterSlot->SetPadding(FMargin(12.f));
+    UBorder* RosterPanel = WidgetTree->ConstructWidget<UBorder>();
+    RosterPanel->SetBrush(FSlateRoundedBoxBrush(FLinearColor(0.012f, 0.016f, 0.022f, 0.9f), 8.f, FLinearColor(0.3f, 0.25f, 0.18f, 0.85f), 1.f));
+    RosterPanel->SetPadding(FMargin(14.f, 8.f));
+    RosterSize->SetContent(RosterPanel);
     UVerticalBox* RosterBox = WidgetTree->ConstructWidget<UVerticalBox>();
-    RosterSize->SetContent(RosterBox);
+    RosterPanel->SetContent(RosterBox);
     Header = AddText(RosterBox, TEXT("라운드 전투"), 20);
     Roster = AddText(RosterBox, FString(), 14);
 
