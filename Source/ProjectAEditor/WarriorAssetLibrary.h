@@ -34,7 +34,7 @@ public:
     static bool SetSkeletonPreviewMesh(USkeleton* Skeleton, USkeletalMesh* Mesh);
 
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
-    static bool RetargetAnimations(const TArray<UObject*>& Assets, USkeletalMesh* SourceMesh, USkeletalMesh* TargetMesh, UIKRetargeter* Retargeter, const FString& Destination, const FString& Suffix);
+    static bool RetargetAnimations(const TArray<UObject*>& Assets, USkeletalMesh* SourceMesh, USkeletalMesh* TargetMesh, UIKRetargeter* Retargeter, const FString& Destination, const FString& Suffix, bool bOverwriteExistingFiles = false, bool bIncludeReferencedAssets = true);
 
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
     static bool SetWeaponAttachment(UBlueprint* Blueprint, FName ComponentName, FName SocketName);

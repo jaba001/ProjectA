@@ -159,13 +159,42 @@ bool UWarriorAssetLibrary::SetSkeletonPreviewMesh(USkeleton* Skeleton, USkeletal
     return Skeleton->GetPreviewMesh(false) == Mesh;
 }
 
-bool UWarriorAssetLibrary::RetargetAnimations(const TArray<UObject*>& Assets, USkeletalMesh* SourceMesh, USkeletalMesh* TargetMesh, UIKRetargeter* Retargeter, const FString& Destination, const FString& Suffix)
+bool UWarriorAssetLibrary::RetargetAnimations(const TArray<UObject*>& Assets, USkeletalMesh* SourceMesh, USkeletalMesh* TargetMesh, UIKRetargeter* Retargeter, const FString& Destination, const FString& Suffix, bool bOverwriteExistingFiles, bool bIncludeReferencedAssets)
 {
-    if (IsRunningCommandlet() || !SourceMesh || !IsProjectCopy(TargetMesh) || !IsProjectCopy(Retargeter) || !Destination.StartsWith(TEXT("/Game/User_JeHoon/")) || Destination.Contains(TEXT("..")) || Suffix.IsEmpty() || Suffix.Contains(TEXT("/"))) return Fail(TEXT("IK batch authoring requires the editor and a project-owned output directory / IK 일괄 작성에는 에디터와 작업 사본 출력 폴더가 필요합니다"));
+    if (IsRunningCommandlet() || Assets.IsEmpty() || !IsValid(SourceMesh) || !IsValid(SourceMesh->GetSkeleton()) || !IsProjectCopy(TargetMesh) || !IsProjectCopy(TargetMesh->GetSkeleton()) || !IsProjectCopy(Retargeter) || !Destination.StartsWith(TEXT("/Game/User_JeHoon/")) || !FPackageName::IsValidLongPackageName(Destination) || Destination.Contains(TEXT("..")) || Destination.EndsWith(TEXT("/")) || Suffix.IsEmpty() || Suffix.Contains(TEXT("/"))) return Fail(TEXT("IK batch authoring requires the editor and a project-owned output directory / IK 일괄 작성에는 에디터와 작업 사본 출력 폴더가 필요합니다"));
+    if (bOverwriteExistingFiles && bIncludeReferencedAssets) return Fail(TEXT("Sequence overwrite must exclude referenced assets / 시퀀스 덮어쓰기에는 참조 에셋을 포함할 수 없습니다"));
     FIKRetargetBatchOperationContext Context;
-    for (UObject* Asset : Assets)
+    TSet<FString> InputPaths;
+    TSet<FString> OutputPaths;
+    TMap<FString, TWeakObjectPtr<UAnimSequence>> PreviousOutputs;
+    IAssetRegistry& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
+    for (const UObject* Asset : Assets)
     {
         if (!IsValid(Asset)) return false;
+        InputPaths.Add(Asset->GetPathName());
+    }
+    for (UObject* Asset : Assets)
+    {
+        const FString Name = Asset->GetName() + Suffix;
+        const FString PackagePath = Destination / Name;
+        const FString ObjectPath = PackagePath + TEXT(".") + Name;
+        if (!FPackageName::IsValidObjectPath(ObjectPath) || OutputPaths.Contains(ObjectPath) || InputPaths.Contains(ObjectPath)) return Fail(TEXT("Retarget output names must be valid, unique, and distinct from inputs / 리타깃 출력 이름은 유효하고 고유하며 입력과 달라야 합니다"));
+        OutputPaths.Add(ObjectPath);
+        if (bOverwriteExistingFiles)
+        {
+            if (!Cast<UAnimSequence>(Asset)) return Fail(TEXT("Overwrite accepts animation sequences only / 덮어쓰기에는 애니메이션 시퀀스만 사용할 수 있습니다"));
+            const FCoreRedirectObjectName OriginalPackage(NAME_None, NAME_None, FName(*PackagePath));
+            const FCoreRedirectObjectName OriginalObject(ObjectPath);
+            if (FCoreRedirects::GetRedirectedName(ECoreRedirectFlags::Type_Package, OriginalPackage) != OriginalPackage || FCoreRedirects::GetRedirectedName(ECoreRedirectFlags::Type_Object, OriginalObject) != OriginalObject) return Fail(TEXT("Overwrite requires an output path without core redirects / 덮어쓰기 출력 경로에는 Core Redirect가 없어야 합니다"));
+            const FAssetData ExistingData = Registry.GetAssetByObjectPath(FSoftObjectPath(ObjectPath));
+            UObject* ExistingObject = ExistingData.IsValid() ? ExistingData.GetAsset() : FindObject<UObject>(nullptr, *ObjectPath);
+            if (ExistingData.IsValid() || ExistingObject || FPackageName::DoesPackageExist(PackagePath))
+            {
+                UAnimSequence* ExistingSequence = Cast<UAnimSequence>(ExistingObject);
+                if (!IsProjectCopy(ExistingSequence) || ExistingSequence->GetPathName() != ObjectPath || ExistingSequence->GetClass() != Asset->GetClass() || ExistingSequence->GetSkeleton() != TargetMesh->GetSkeleton()) return Fail(TEXT("Overwrite requires the exact project sequence with the target skeleton / 덮어쓰기에는 대상 스켈레톤을 사용하는 정확한 작업 사본 시퀀스가 필요합니다"));
+                PreviousOutputs.Add(ObjectPath, ExistingSequence);
+            }
+        }
         Context.AssetsToRetarget.Add(Asset);
     }
     Context.SourceMesh = SourceMesh;
@@ -175,14 +204,22 @@ bool UWarriorAssetLibrary::RetargetAnimations(const TArray<UObject*>& Assets, US
     // Python 편의 API는 /Game을 기본값으로 사용하고 Slate를 호출하므로 작업 사본 폴더를 명시합니다.
     Context.NameRule.FolderPath = Destination;
     Context.NameRule.Suffix = Suffix;
+    Context.bOverwriteExistingFiles = bOverwriteExistingFiles;
+    Context.bIncludeReferencedAssets = bIncludeReferencedAssets;
     TStrongObjectPtr<UIKRetargetBatchOperation> Operation(NewObject<UIKRetargetBatchOperation>());
     Operation->RunRetarget(Context);
-    for (UObject* Asset : Assets)
+    for (const FString& ObjectPath : OutputPaths)
     {
-        const FString Name = Asset->GetName() + Suffix;
-        if (!LoadObject<UObject>(nullptr, *(Destination / Name + TEXT(".") + Name))) return false;
+        UObject* Output = LoadObject<UObject>(nullptr, *ObjectPath);
+        if (!IsProjectCopy(Output) || Output->GetPathName() != ObjectPath) return false;
+        if (bOverwriteExistingFiles)
+        {
+            UAnimSequence* Sequence = Cast<UAnimSequence>(Output);
+            const TWeakObjectPtr<UAnimSequence>* Previous = PreviousOutputs.Find(ObjectPath);
+            if (!Sequence || Sequence->GetSkeleton() != TargetMesh->GetSkeleton() || (Previous && Previous->Get() == Sequence)) return Fail(TEXT("Sequence overwrite did not produce the expected replacement / 시퀀스 덮어쓰기에서 예상한 교체 결과가 생성되지 않았습니다"));
+        }
     }
-    return !Assets.IsEmpty();
+    return true;
 }
 
 bool UWarriorAssetLibrary::SetWeaponAttachment(UBlueprint* Blueprint, FName ComponentName, FName SocketName)

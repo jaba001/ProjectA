@@ -94,7 +94,9 @@ IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScri
 
 `WarriorContentPaths.py`는 원본 `/Game/<팩/하위폴더>`를 `/Game/User_JeHoon/<팩/하위폴더>`로 대응시킨다. 메시·뼈대는 GKnight/Skeleton_Guard 원본 경로, 검은 `Weapon_Pack/Mesh/Weapons/Weapons_Kit`에 둔다. 현재 검 시퀀스·몽타주는 `ParagonAnimationsRetargetedToManny/KwangManny/Attack`에 작성하고 기존 `BossyEnemy/Animations/InPlace/Attacks` 사본은 보존한다. 기존 Manny 리타깃은 `Characters/Mannequins/Anims/Unarmed`의 Walk/Jog/Jump/Attack·ABP/BS 구조를 유지하며 프로젝트 몽타주는 기존 `Blueprint/Unit/Animation/Montage`에서 유닛별 접미사로 구분한다. 새 IK 도구는 `GKnight/Rigs`·`Skeleton_Guard/Rigs`를 사용한다. 이전 통합 폴더의 사본 73개는 Unreal AssetTools로 이동하며 외부 팩 원본은 변경하지 않는다.
 
-재실행은 작성 구성을 다시 적용하므로 수동 장착·부착·전사 직업 연결을 재설정한다. 부분 누락 시 고유 임시 폴더에서 리타깃하고 엔진의 에셋 통합으로 기존 의존 참조를 보존한다. `RoundMontageOverrides`와 기존 보행·DefaultSlot을 유지하고 맞지 않는 Manny Foot IK만 제거한다. `-WarriorVerifyOnly`는 원본 폴더 구조·이전 참조 73개와 전사/적 몽타주의 실제 Kwang 공격·복귀 세그먼트를 검사한다. 공격 1.2초에 복귀 0.933333초의 첫 중복 포즈 0.2초를 제외해 총 1.933333초로 연결하며 발동 0.23초·블렌드 인 0.08초/아웃 0.12초를 사용한다. 실제 검 위치·타격 표현 확인은 [TODO](../../../Docs/TODO.md#2-15-전사와-검-공격-콘텐츠)에 남긴다.
+재실행은 작성 구성을 다시 적용하므로 수동 장착·부착·전사 직업 연결을 재설정한다. 부분 누락 시 고유 임시 폴더에서 리타깃하고 엔진의 에셋 통합으로 기존 의존 참조를 보존한다. `RoundMontageOverrides`와 기존 보행·DefaultSlot을 유지하고 맞지 않는 Manny Foot IK만 제거한다. Retargeter의 기본 연산을 중복 추가하지 않으며 Rig 지정 후 유효한 6개 연산을 한 번 구성한다. 설정 버전 변경이나 `-WarriorRebuildRetargets`는 관련 시퀀스 48개를 기존 경로에 다시 작성하고 원본 Root Motion 설정·참조를 보존한다.
+
+`-WarriorVerifyOnly`는 연산 구성·48개 시퀀스의 길이/포즈/유한 좌표/골반 이동 범위, 원본 폴더 구조·이전 참조 73개, 전사/적 몽타주의 실제 Kwang 공격·복귀 세그먼트를 검사한다. 공격 1.2초에 복귀 0.933333초의 첫 중복 포즈 0.2초를 제외해 총 1.933333초로 연결하며 발동 0.23초·블렌드 인 0.08초/아웃 0.12초를 사용한다. 실제 이동·검 위치·타격 표현 확인은 [TODO](../../../Docs/TODO.md#2-15-전사와-검-공격-콘텐츠)에 남긴다.
 
 11. `ImportParagonAnimations.py`: `Content/ParagonAnimationsRetargetedToManny`의 FBX를 `/Game/User_JeHoon/ParagonAnimationsRetargetedToManny`에 원본 하위 폴더대로 가져온다. Manny 뼈대·프리뷰 메시는 `User_JeHoon/Characters/Mannequins/Meshes`에 복제한다. 이 스크립트는 AnimSequence만 가져오며 게임 스킬 연결은 변경하지 않는다. FBX만 압축 해제한 상태와 Content Browser에서 열 수 있는 저장 에셋을 구분한다.
 
