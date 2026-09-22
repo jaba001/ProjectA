@@ -47,6 +47,9 @@ private:
     TArray<TObjectPtr<UGameplayActionButton>> ShopButtons;
 
     UPROPERTY(Transient)
+    TObjectPtr<UGameplayActionButton> RecoveryButton;
+
+    UPROPERTY(Transient)
     TObjectPtr<UVerticalBox> Actions;
 
     UPROPERTY(Transient)

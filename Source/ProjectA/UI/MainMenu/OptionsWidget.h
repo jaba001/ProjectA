@@ -23,6 +23,7 @@ class PROJECTA_API UOptionsWidget : public UCommonActivatableWidget
 public:
     UOptionsWidget();
     virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
+    void RequestBack();
 
     UFUNCTION()
     void ApplyOptions();

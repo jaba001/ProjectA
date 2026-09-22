@@ -1,6 +1,7 @@
 #include "UI/Gameplay/GameplayRootWidget.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "CommonUITypes.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/Border.h"
@@ -15,12 +16,101 @@
 #include "UI/Gameplay/EncounterResultWidget.h"
 #include "UI/Gameplay/RunMapWidget.h"
 #include "UI/Gameplay/RunEncounterWidget.h"
+#include "UI/Gameplay/InventoryWidget.h"
+#include "UI/MainMenu/OptionsWidget.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
 #include "Game/Development/DevelopmentCoopLobby.h"
 #include "Game/Development/DevelopmentCoopSubsystem.h"
 #include "UI/MainMenu/DevelopmentCoopWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
 #include "Engine/GameInstance.h"
+#include "Engine/DataTable.h"
+#include "Input/CommonUIInputTypes.h"
+
+namespace
+{
+    struct FGameplayShortcutAction : public FCommonInputActionDataBase
+    {
+        FGameplayShortcutAction(const FText& Label, FKey Key)
+        {
+            DisplayName = Label;
+            KeyboardInputTypeInfo.SetKey(Key);
+        }
+    };
+}
+
+void UGameplayRootWidget::RegisterGameplayShortcuts()
+{
+    // Persistent CommonUI actions also work on menu-only screens where controller keys are blocked.
+    // 컨트롤러 키가 차단되는 메뉴 전용 화면에서도 동작하도록 CommonUI 지속 액션을 사용합니다.
+    ShortcutActions = NewObject<UDataTable>(this);
+    ShortcutActions->RowStruct = FCommonInputActionDataBase::StaticStruct();
+    ShortcutActions->AddRow(TEXT("Inventory"), FGameplayShortcutAction(NSLOCTEXT("GameplayShortcuts", "Inventory", "인벤토리"), EKeys::I));
+    ShortcutActions->AddRow(TEXT("Settings"), FGameplayShortcutAction(NSLOCTEXT("GameplayShortcuts", "Settings", "설정"), EKeys::Escape));
+    const auto BindShortcut = [this](FName RowName, const FSimpleDelegate& Callback)
+    {
+        FDataTableRowHandle Action;
+        Action.DataTable = ShortcutActions;
+        Action.RowName = RowName;
+        FBindUIActionArgs Args(Action, false, Callback);
+        Args.bIsPersistent = true;
+        Args.bConsumeInput = true;
+        RegisterUIActionBinding(Args);
+    };
+    BindShortcut(TEXT("Inventory"), FSimpleDelegate::CreateUObject(this, &UGameplayRootWidget::ToggleInventory));
+    BindShortcut(TEXT("Settings"), FSimpleDelegate::CreateUObject(this, &UGameplayRootWidget::ToggleSettings));
+}
+
+bool UGameplayRootWidget::IsUtilityMenuOpen() const
+{
+    return UtilityLayer && UtilityLayer->GetActiveWidget() && UtilityLayer->GetActiveWidget()->IsActivated();
+}
+
+void UGameplayRootWidget::HandleUtilityWidgetChanged(UCommonActivatableWidget* ActiveWidget)
+{
+    const bool bOpen = ActiveWidget != nullptr;
+    UtilityLayer->SetVisibility(bOpen ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+    for (UWidget* Layer : { static_cast<UWidget*>(RunLayer.Get()), static_cast<UWidget*>(CombatLayer.Get()), static_cast<UWidget*>(ModalLayer.Get()), static_cast<UWidget*>(DevelopmentLayer.Get()), static_cast<UWidget*>(DevelopmentBar.Get()), static_cast<UWidget*>(CheckpointNotice.Get()) })
+    {
+        if (Layer) Layer->SetIsEnabled(!bOpen);
+    }
+    RefreshInventory();
+}
+
+void UGameplayRootWidget::RefreshInventory()
+{
+    UInventoryWidget* Inventory = UtilityLayer ? Cast<UInventoryWidget>(UtilityLayer->GetActiveWidget()) : nullptr;
+    const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
+    if (Inventory) Inventory->RefreshInventory(CurrentView, Controller ? Controller->GetInventoryCharacterId(CurrentView) : FGuid());
+}
+
+void UGameplayRootWidget::ToggleInventory()
+{
+    if (!UtilityLayer || !bHasDisplayedPhase || DisplayedPhase == ERunPhase::None || (DevelopmentWidget && DevelopmentWidget->IsActivated())) return;
+    UCommonActivatableWidget* Active = UtilityLayer->GetActiveWidget();
+    if (Cast<UOptionsWidget>(Active)) return;
+    if (UInventoryWidget* Inventory = Cast<UInventoryWidget>(Active))
+    {
+        Inventory->DeactivateWidget();
+        return;
+    }
+    UtilityLayer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+    UtilityLayer->AddWidget<UInventoryWidget>(UInventoryWidget::StaticClass());
+    RefreshInventory();
+}
+
+void UGameplayRootWidget::ToggleSettings()
+{
+    if (!UtilityLayer) return;
+    if (UOptionsWidget* Options = Cast<UOptionsWidget>(UtilityLayer->GetActiveWidget()))
+    {
+        Options->RequestBack();
+        return;
+    }
+    UtilityLayer->ClearWidgets();
+    UtilityLayer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+    UtilityLayer->AddWidget<UOptionsWidget>(UOptionsWidget::StaticClass());
+}
 
 void UGameplayRootWidget::HandleLeaveDevelopmentCoop()
 {
@@ -125,6 +215,13 @@ void UGameplayRootWidget::NativeOnInitialized()
     Leave->OnClicked.AddDynamic(this, &UGameplayRootWidget::HandleLeaveDevelopmentCoop);
     DevelopmentContent->AddChildToVerticalBox(Leave);
     DevelopmentBar->SetVisibility(ESlateVisibility::Collapsed);
+    UtilityLayer = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>(UCommonActivatableWidgetStack::StaticClass(), TEXT("GameplayUtilityLayer"));
+    UtilityLayer->SetTransitionDuration(0.f);
+    UtilityLayer->SetVisibility(ESlateVisibility::Collapsed);
+    UtilityLayer->OnDisplayedWidgetChanged().AddUObject(this, &UGameplayRootWidget::HandleUtilityWidgetChanged);
+    UOverlaySlot* UtilitySlot = NoticeRoot->AddChildToOverlay(UtilityLayer);
+    UtilitySlot->SetHorizontalAlignment(HAlign_Fill);
+    UtilitySlot->SetVerticalAlignment(VAlign_Fill);
     const UDemonicUITheme& Theme = UDemonicUITheme::Get();
     Theme.ApplyControls(WidgetTree);
     Theme.StylePanel(CheckpointNotice);
@@ -132,6 +229,7 @@ void UGameplayRootWidget::NativeOnInitialized()
 
     SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     WidgetTree->RootWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+    RegisterGameplayShortcuts();
 }
 
 void UGameplayRootWidget::RefreshFlow(const URunStateSubsystem* RunState, const FText& FlowMessage)
@@ -154,6 +252,7 @@ void UGameplayRootWidget::HandleRetryCheckpoint()
 
 void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands, bool bCanRetryCheckpoint)
 {
+    CurrentView = View;
     const ERunPhase Phase = View.Phase;
     CheckpointNotice->SetVisibility((Phase == ERunPhase::Combat && !View.FlowMessage.IsEmpty()) || bCanRetryCheckpoint ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     CheckpointMessage->SetText(View.FlowMessage);
@@ -208,4 +307,5 @@ void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool b
         ResultWidget->ShowResult(View.LastResult, View.FlowMessage);
         ResultWidget->SetContinueEnabled(bAllowRunCommands);
     }
+    RefreshInventory();
 }

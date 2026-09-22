@@ -25,6 +25,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
     TArray<FRunSkillShopOffer> FixedSkillOffers;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
+    FRunShopRecoveryOffer Recovery;
+
     bool BuildFixedOffers(TArray<FRunEncounterOffer>& OutOffers, FText& OutError) const;
     bool BuildSkillShop(FRunSkillShopState& OutState, FText& OutError) const;
     static bool ValidateSkillShop(const FRunSkillShopState& State, FText& OutError);

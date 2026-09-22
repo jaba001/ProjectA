@@ -527,32 +527,79 @@ bool FManagedRunSkillShopTest::RunTest(const FString& Parameters)
     const TArray<uint8> BeforeBytes = Fixture.FileBytes();
     int32 Events = 0;
     Host->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
-    TestFalse(TEXT("Host authority cannot spend another character's balance"), Host->PurchaseShopSkill(Fixture.Account(1), SecondId, FirstOffer.OfferId, Fixture.Error));
-    TestFalse(TEXT("A guest account cannot acquire skills for the Host character"), Host->PurchaseShopSkill(Fixture.Account(2), FirstId, FirstOffer.OfferId, Fixture.Error));
+    TestFalse(TEXT("Host authority cannot spend another character's balance"), Host->PurchaseShopOffer(Fixture.Account(1), SecondId, FirstOffer.OfferId, Fixture.Error));
+    TestFalse(TEXT("A guest account cannot acquire skills for the Host character"), Host->PurchaseShopOffer(Fixture.Account(2), FirstId, FirstOffer.OfferId, Fixture.Error));
     FRunCheckpointStorage::FailNextWriteForTesting();
-    TestFalse(TEXT("A failed canonical write rejects a managed purchase"), Host->PurchaseShopSkill(Fixture.Account(2), SecondId, FirstOffer.OfferId, Fixture.Error));
+    TestFalse(TEXT("A failed canonical write rejects a managed purchase"), Host->PurchaseShopOffer(Fixture.Account(2), SecondId, FirstOffer.OfferId, Fixture.Error));
     TestTrue(TEXT("Rejected purchases preserve canonical bytes revision balances and notification count"), BeforeBytes == Fixture.FileBytes() && Host->GetManagedStamp() == BeforeStamp && Host->GetPartyMembers()[0].Gold == 10 && Host->GetPartyMembers()[1].Gold == 10 && Host->GetPartyMembers()[1].Skills.Num() == 1 && Events == 0);
-    if (!TestTrue(TEXT("The authority processes the guest owner's own purchase"), Host->PurchaseShopSkill(Fixture.Account(2), SecondId, FirstOffer.OfferId, Fixture.Error))) return false;
+    if (!TestTrue(TEXT("The authority processes the guest owner's own purchase"), Host->PurchaseShopOffer(Fixture.Account(2), SecondId, FirstOffer.OfferId, Fixture.Error))) return false;
     TestTrue(TEXT("A guest purchase debits only the guest and increments the canonical revision once"), Host->GetPartyMembers()[0].Gold == 10 && Host->GetPartyMembers()[1].Gold == 9 && Host->GetManagedStamp().Revision == BeforeStamp.Revision + 1 && Events == 1);
-    TestTrue(TEXT("The same product is independently purchasable by the Host's own character"), Host->PurchaseShopSkill(Fixture.Account(1), FirstId, FirstOffer.OfferId, Fixture.Error));
+    TestTrue(TEXT("The same product is independently purchasable by the Host's own character"), Host->PurchaseShopOffer(Fixture.Account(1), FirstId, FirstOffer.OfferId, Fixture.Error));
     TestTrue(TEXT("Purchase ownership is per character and does not alter identity"), Host->GetPartyMembers()[0].Skills.Contains(FirstOffer.Skill) && Host->GetPartyMembers()[1].Skills.Contains(FirstOffer.Skill) && ManagedSameIdentity(BeforeIdentity, Host->GetRunIdentity()));
     const FRunAuthorityStamp ShopStamp = Host->GetManagedStamp();
     Host->OnRunStateChanged.Clear();
     Host->CloseManagedRun();
     URunStateSubsystem* NextHost = Fixture.NewSession(2);
     if (!NextHost || !TestTrue(TEXT("The original guest can resume the shop alone"), NextHost->ResumeManagedRun(ShopStamp, {Fixture.Account(2)}, Fixture.Error))) return false;
-    TestFalse(TEXT("Purchasing waits for successful gameplay restoration"), NextHost->PurchaseShopSkill(Fixture.Account(2), SecondId, SecondOffer.OfferId, Fixture.Error));
+    TestFalse(TEXT("Purchasing waits for successful gameplay restoration"), NextHost->PurchaseShopOffer(Fixture.Account(2), SecondId, SecondOffer.OfferId, Fixture.Error));
     if (!TestTrue(TEXT("Shop restoration confirms the new Host's session"), NextHost->ConfirmManagedResumeStarted(Fixture.Error))) return false;
     const TArray<uint8> ResumedBytes = Fixture.FileBytes();
-    TestFalse(TEXT("An absent original owner now controlled by AI cannot purchase"), NextHost->PurchaseShopSkill(Fixture.Account(1), FirstId, SecondOffer.OfferId, Fixture.Error));
+    TestFalse(TEXT("An absent original owner now controlled by AI cannot purchase"), NextHost->PurchaseShopOffer(Fixture.Account(1), FirstId, SecondOffer.OfferId, Fixture.Error));
     TestFalse(TEXT("AI purchase rejection retains a visible explanation after control-mode validation"), Fixture.Error.IsEmpty());
-    TestFalse(TEXT("The new Host cannot buy for the absent owner's character"), NextHost->PurchaseShopSkill(Fixture.Account(2), FirstId, SecondOffer.OfferId, Fixture.Error));
-    TestFalse(TEXT("An existing purchase remains owned after managed resume"), NextHost->PurchaseShopSkill(Fixture.Account(2), SecondId, FirstOffer.OfferId, Fixture.Error));
+    TestFalse(TEXT("The new Host cannot buy for the absent owner's character"), NextHost->PurchaseShopOffer(Fixture.Account(2), FirstId, SecondOffer.OfferId, Fixture.Error));
+    TestFalse(TEXT("An existing purchase remains owned after managed resume"), NextHost->PurchaseShopOffer(Fixture.Account(2), SecondId, FirstOffer.OfferId, Fixture.Error));
     TestTrue(TEXT("All rejected resumed requests preserve the canonical save"), ResumedBytes == Fixture.FileBytes());
-    TestTrue(TEXT("The remaining human can spend only their preserved personal balance"), NextHost->PurchaseShopSkill(Fixture.Account(2), SecondId, SecondOffer.OfferId, Fixture.Error));
+    TestTrue(TEXT("The remaining human can spend only their preserved personal balance"), NextHost->PurchaseShopOffer(Fixture.Account(2), SecondId, SecondOffer.OfferId, Fixture.Error));
     TestTrue(TEXT("Host succession preserves both character identities and independent balances"), NextHost->GetPartyMembers()[0].CharacterId == FirstId && NextHost->GetPartyMembers()[1].CharacterId == SecondId && NextHost->GetPartyMembers()[0].OwnerAccountId == Fixture.Account(1) && NextHost->GetPartyMembers()[1].OwnerAccountId == Fixture.Account(2) && NextHost->GetPartyMembers()[0].Gold == 9 && NextHost->GetPartyMembers()[1].Gold == 8);
     TStrongObjectPtr<URunSaveGame> Durable = Fixture.LoadPayload();
     TestTrue(TEXT("Managed storage durably contains personal gold and acquired skills"), Durable && Durable->Party[0].Gold == 9 && Durable->Party[1].Gold == 8 && Durable->Party[1].Skills.Contains(SecondOffer.Skill));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FManagedRunRecoveryTest, "ProjectA.Run.Managed.RecoveryOwnershipAndDurability", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FManagedRunRecoveryTest::RunTest(const FString& Parameters)
+{
+    FManagedFixture Fixture(2);
+    URunStateSubsystem* Host = Fixture.NewSession(1);
+    if (!Host || !TestTrue(TEXT("Two original humans create a recovery-enabled Run"), Host->CreateManagedRun(Fixture.Party, Fixture.Identity, Fixture.Error))) return false;
+    FProfessionDefinition Profession;
+    if (!Host->PartyDefinition->ResolveProfession(Host->GetPartyMembers()[1].ClassId, Profession)) return false;
+    const float WoundedHP = Profession.MaxHP * 0.2f;
+    if (!Host->BeginEncounter(TEXT("Combat_01")) || !Host->MarkCombatStarted()) return false;
+    for (const FRunPartyMember& Member : Host->GetPartyMembers()) Host->UpdatePartyMemberHP(Member.SlotIndex, WoundedHP);
+    if (!TestTrue(TEXT("The wounded managed party reaches a shop"), Host->CompleteEncounter(ECombatResult::Victory) && Host->ContinueRun() && Host->SelectRunEncounter(TEXT("Shop_01")))) return false;
+    const FGuid FirstId = Host->GetPartyMembers()[0].CharacterId;
+    const FGuid SecondId = Host->GetPartyMembers()[1].CharacterId;
+    const FRunIdentityData BeforeIdentity = Host->GetRunIdentity();
+    const FRunAuthorityStamp BeforeStamp = Host->GetManagedStamp();
+    const TArray<uint8> BeforeBytes = Fixture.FileBytes();
+    const TArray<FRunPartyMember> Before = Host->GetPartyMembers();
+    int32 Events = 0;
+    Host->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
+    TestFalse(TEXT("The Host cannot recover another owner's character"), Host->PurchaseShopOffer(Fixture.Account(1), SecondId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
+    TestFalse(TEXT("A guest cannot recover the Host character"), Host->PurchaseShopOffer(Fixture.Account(2), FirstId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("A failed canonical write rejects managed recovery"), Host->PurchaseShopOffer(Fixture.Account(2), SecondId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
+    TestTrue(TEXT("Recovery failure preserves bytes revision gold HP skills and events"), BeforeBytes == Fixture.FileBytes() && Host->GetManagedStamp() == BeforeStamp && FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[0], &Host->GetPartyMembers()[0], 0) && FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[1], &Host->GetPartyMembers()[1], 0) && Events == 0);
+    if (!TestTrue(TEXT("The authority can recover the guest owner's own character"), Host->PurchaseShopOffer(Fixture.Account(2), SecondId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error))) return false;
+    TestTrue(TEXT("Guest recovery changes only personal HP and gold once"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[0], &Host->GetPartyMembers()[0], 0) && Host->GetPartyMembers()[1].Gold == 9 && Host->GetPartyMembers()[1].CurrentHP == Profession.MaxHP && Host->GetPartyMembers()[1].Skills == Before[1].Skills && Host->GetManagedStamp().Revision == BeforeStamp.Revision + 1 && Events == 1);
+    TestTrue(TEXT("Recovery never transfers ownership or Host identity"), ManagedSameIdentity(BeforeIdentity, Host->GetRunIdentity()));
+    TStrongObjectPtr<URunSaveGame> Durable = Fixture.LoadPayload();
+    TestTrue(TEXT("The canonical payload commits HP and gold together"), Durable && Durable->Party[1].CurrentHP == Profession.MaxHP && Durable->Party[1].Gold == 9 && Durable->Party[1].Skills == Before[1].Skills);
+    const FRunAuthorityStamp ShopStamp = Host->GetManagedStamp();
+    Host->OnRunStateChanged.Clear();
+    Host->CloseManagedRun();
+    URunStateSubsystem* NextHost = Fixture.NewSession(2);
+    if (!NextHost || !TestTrue(TEXT("The original guest resumes the recovered shop alone"), NextHost->ResumeManagedRun(ShopStamp, {Fixture.Account(2)}, Fixture.Error))) return false;
+    TestFalse(TEXT("Recovery waits for gameplay restoration"), NextHost->PurchaseShopOffer(Fixture.Account(2), SecondId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
+    if (!NextHost->ConfirmManagedResumeStarted(Fixture.Error)) return false;
+    const TArray<uint8> ResumedBytes = Fixture.FileBytes();
+    TestFalse(TEXT("An absent owner converted to AI cannot recover their wounded character"), NextHost->PurchaseShopOffer(Fixture.Account(1), FirstId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
+    TestFalse(TEXT("AI recovery rejection retains a visible explanation"), Fixture.Error.IsEmpty());
+    TestFalse(TEXT("The new Host cannot recover the absent owner's character"), NextHost->PurchaseShopOffer(Fixture.Account(2), FirstId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
+    TestFalse(TEXT("A recovered guest cannot be charged again after resume"), NextHost->PurchaseShopOffer(Fixture.Account(2), SecondId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
+    TestTrue(TEXT("Resumed recovery rejections preserve canonical bytes and personal state"), ResumedBytes == Fixture.FileBytes() && NextHost->GetPartyMembers()[0].CurrentHP == WoundedHP && NextHost->GetPartyMembers()[0].Gold == 10 && NextHost->GetPartyMembers()[1].CurrentHP == Profession.MaxHP && NextHost->GetPartyMembers()[1].Gold == 9 && NextHost->GetPartyMembers()[1].CharacterId == SecondId && NextHost->GetPartyMembers()[1].OwnerAccountId == Fixture.Account(2));
     return true;
 }
 

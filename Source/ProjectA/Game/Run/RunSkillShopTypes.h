@@ -27,6 +27,15 @@ struct PROJECTA_API FRunSkillShopOffer
 };
 
 USTRUCT(BlueprintType)
+struct PROJECTA_API FRunShopRecoveryOffer
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop", meta = (ClampMin = "1"))
+    int32 Price = 1;
+};
+
+USTRUCT(BlueprintType)
 struct PROJECTA_API FRunSkillShopState
 {
     GENERATED_BODY()
@@ -38,4 +47,11 @@ struct PROJECTA_API FRunSkillShopState
 
     UPROPERTY(BlueprintReadOnly, Category = "Shop")
     TArray<FRunSkillShopOffer> Offers;
+
+    // Existing skill-shop saves inherit the recovery service without replacing their frozen skill offers.
+    // 기존 스킬 상점 저장은 고정된 스킬 상품을 교체하지 않고 회복 서비스를 추가합니다.
+    UPROPERTY(BlueprintReadOnly, Category = "Shop")
+    FRunShopRecoveryOffer Recovery;
+
+    static FName GetRecoveryOfferId() { return TEXT("HPRecovery"); }
 };

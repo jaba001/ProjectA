@@ -63,6 +63,9 @@ void URunEncounterWidget::NativeOnInitialized()
     Actions->AddChildToVerticalBox(ShopHint)->SetPadding(FMargin(0.0f, 5.0f));
     ShopActions = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("ShopActions"));
     Actions->AddChildToVerticalBox(ShopActions);
+    RecoveryButton = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), TEXT("Button_ShopRecovery"));
+    RecoveryButton->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandlePurchase);
+    Actions->AddChildToVerticalBox(RecoveryButton)->SetPadding(FMargin(0.0f, 5.0f));
     LeaveButton = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), TEXT("Button_LeaveShop"));
     LeaveButton->Configure(TEXT("Leave"), NSLOCTEXT("RunEncounter", "Leave", "나가기"));
     LeaveButton->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandleLeave);
@@ -82,13 +85,16 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
     BuyerCharacterId = Controller ? Controller->GetShopBuyerCharacterId(View) : FGuid();
     const FRunPartyMember* Buyer = BuyerCharacterId.IsValid() ? View.PartyMembers.FindByPredicate([this](const FRunPartyMember& Member) { return Member.CharacterId == BuyerCharacterId; }) : nullptr;
+    const FRunShopBuyerView* BuyerView = Buyer ? View.ShopBuyerViews.FindByPredicate([this](const FRunShopBuyerView& Entry) { return Entry.CharacterId == BuyerCharacterId; }) : nullptr;
     const bool bInShop = View.Phase == ERunPhase::Shop;
     ShopBalance->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     ShopHint->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     ShopActions->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    RecoveryButton->SetVisibility(bInShop && View.SkillShopState.SchemaVersion == 1 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     if (bInShop)
     {
         ShopBalance->SetText(Buyer ? FText::Format(NSLOCTEXT("RunSkillShop", "Balance", "{0} · 보유 골드 {1}G"), Buyer->CharacterName, FText::AsNumber(Buyer->Gold)) : NSLOCTEXT("RunSkillShop", "NoBuyer", "구매 가능한 직접 조작 캐릭터가 없습니다."));
+        if (Buyer && BuyerView) ShopBalance->SetText(FText::Format(NSLOCTEXT("RunSkillShop", "BalanceAndHP", "{0} · 보유 골드 {1}G · HP {2}/{3}"), Buyer->CharacterName, FText::AsNumber(Buyer->Gold), FText::AsNumber(Buyer->CurrentHP), FText::AsNumber(BuyerView->MaxHP)));
         ShopHint->SetText(View.SkillShopState.SchemaVersion == 0 ? NSLOCTEXT("RunSkillShop", "LegacyRun", "이전 저장에는 스킬 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다.") : NSLOCTEXT("RunSkillShop", "Rules", "구매한 스킬은 본인 캐릭터에만 적용되며 Run 동안 유지됩니다. 같은 스킬은 한 번만 구매할 수 있습니다."));
         while (ShopButtons.Num() < View.SkillShopState.Offers.Num())
         {
@@ -111,6 +117,12 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             Button->SetToolTipText(Offer.Description);
             Button->SetIsEnabled(!bOwned && bAffordable && Controller && !Controller->IsShopPurchasePending());
         }
+        const bool bCanRecover = Buyer && BuyerView && Buyer->CurrentHP > 0.f && Buyer->CurrentHP < BuyerView->MaxHP;
+        const bool bRecoveryAffordable = Buyer && View.SkillShopState.Recovery.Price > 0 && Buyer->Gold >= View.SkillShopState.Recovery.Price;
+        const FText RecoveryStatus = Buyer && BuyerView && Buyer->CurrentHP >= BuyerView->MaxHP ? NSLOCTEXT("RunSkillShop", "FullHP", "HP 가득 참") : bCanRecover && bRecoveryAffordable ? NSLOCTEXT("RunSkillShop", "Buy", "구매") : NSLOCTEXT("RunSkillShop", "CannotBuy", "구매 불가");
+        RecoveryButton->Configure(FRunSkillShopState::GetRecoveryOfferId(), FText::Format(NSLOCTEXT("RunSkillShop", "RecoveryProduct", "HP 전체 회복 · {0}G · {1}"), FText::AsNumber(View.SkillShopState.Recovery.Price), RecoveryStatus));
+        RecoveryButton->SetToolTipText(NSLOCTEXT("RunSkillShop", "RecoveryDescription", "본인 생존 캐릭터의 HP를 즉시 최대치까지 회복합니다. HP가 가득 차 있으면 구매할 수 없습니다."));
+        RecoveryButton->SetIsEnabled(View.SkillShopState.SchemaVersion == 1 && bCanRecover && bRecoveryAffordable && Controller && !Controller->IsShopPurchasePending());
     }
     for (int32 Index = 0; Index < ChoiceButtons.Num(); ++Index)
     {
@@ -129,7 +141,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     FText DisplayMessage = View.FlowMessage;
     if (bInShop && Controller && !Controller->GetShopPurchaseMessage().IsEmpty()) DisplayMessage = DisplayMessage.IsEmpty() ? Controller->GetShopPurchaseMessage() : FText::Format(NSLOCTEXT("RunSkillShop", "FlowAndPurchaseMessage", "{0}\n{1}"), DisplayMessage, Controller->GetShopPurchaseMessage());
     if (bInShop && Controller && Controller->IsShopPurchasePending()) DisplayMessage = NSLOCTEXT("RunSkillShop", "Pending", "구매를 처리하는 중입니다.");
-    if (DisplayMessage.IsEmpty() && !bAllowRunCommands) DisplayMessage = bInShop ? NSLOCTEXT("RunSkillShop", "HostLeaves", "본인 스킬을 구매할 수 있습니다. 상점 나가기는 Host가 결정합니다.") : NSLOCTEXT("RunEncounter", "HostOnly", "Host의 진행을 기다리는 중입니다.");
+    if (DisplayMessage.IsEmpty() && !bAllowRunCommands) DisplayMessage = bInShop ? NSLOCTEXT("RunSkillShop", "HostLeaves", "본인 캐릭터의 스킬과 HP 회복을 구매할 수 있습니다. 상점 나가기는 Host가 결정합니다.") : NSLOCTEXT("RunEncounter", "HostOnly", "Host의 진행을 기다리는 중입니다.");
     Message->SetText(DisplayMessage);
     if (View.Phase == ERunPhase::EncounterChoice)
     {
@@ -157,5 +169,5 @@ void URunEncounterWidget::HandleLeave(FName)
 void URunEncounterWidget::HandlePurchase(FName OfferId)
 {
     if (!BuyerCharacterId.IsValid()) return;
-    if (AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>()) Controller->RequestPurchaseShopSkill(BuyerCharacterId, OfferId);
+    if (AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>()) Controller->RequestPurchaseShopOffer(BuyerCharacterId, OfferId);
 }

@@ -22,6 +22,8 @@ public:
     void InitializeGameplay(AEncounterManager* InEncounterManager);
     bool CanIssueRunCommands() const;
     void RefreshRunFlowPermissions();
+    virtual bool IsRoundInputEnabled() const override;
+    FGuid GetInventoryCharacterId(const FGameplayViewState& View) const;
 
     UFUNCTION(BlueprintCallable, Category = "Gameplay")
     void RequestStartNode(FName NodeId);
@@ -30,7 +32,7 @@ public:
     void RequestContinueRun();
     void RequestSelectRunEncounter(FName EncounterId);
     void RequestLeaveRunEncounter();
-    void RequestPurchaseShopSkill(FGuid CharacterId, FName OfferId);
+    void RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId);
     FGuid GetShopBuyerCharacterId(const FGameplayViewState& View) const;
     const FText& GetShopPurchaseMessage() const { return ShopPurchaseMessage; }
     bool IsShopPurchasePending() const { return bShopPurchasePending; }
@@ -57,7 +59,7 @@ private:
     void ExecuteShopPurchase(FGuid CharacterId, FName OfferId);
 
     UFUNCTION(Server, Reliable)
-    void ServerPurchaseShopSkill(FGuid CharacterId, FName OfferId);
+    void ServerPurchaseShopOffer(FGuid CharacterId, FName OfferId);
 
     UFUNCTION(Client, Reliable)
     void ClientReceiveShopPurchaseResult(bool bSucceeded, const FText& Message);

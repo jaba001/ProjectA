@@ -229,17 +229,32 @@ FGuid AGameplayPlayerController::GetShopBuyerCharacterId(const FGameplayViewStat
     return Member ? Member->CharacterId : FGuid();
 }
 
-void AGameplayPlayerController::RequestPurchaseShopSkill(FGuid CharacterId, FName OfferId)
+FGuid AGameplayPlayerController::GetInventoryCharacterId(const FGameplayViewState& View) const
+{
+    if (!IsLocalController() || RunParticipantAccount.IsEmpty()) return FGuid();
+    // Inventory remains readable after death; shop eligibility is intentionally separate.
+    // 사망 후에도 인벤토리는 조회할 수 있으며 상점 구매 가능 여부와 분리합니다.
+    const FRunPartyMember* Member = View.PartyMembers.FindByPredicate([this](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.OwnerAccountId == RunParticipantAccount && Candidate.bPlayerControlled; });
+    if (!Member) Member = View.PartyMembers.FindByPredicate([this](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.OwnerAccountId == RunParticipantAccount; });
+    return Member ? Member->CharacterId : FGuid();
+}
+
+bool AGameplayPlayerController::IsRoundInputEnabled() const
+{
+    return Super::IsRoundInputEnabled() && (!GameplayRootWidget || !GameplayRootWidget->IsUtilityMenuOpen());
+}
+
+void AGameplayPlayerController::RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId)
 {
     if (!IsLocalController() || bShopPurchasePending || !CharacterId.IsValid() || OfferId.IsNone()) return;
     ShopPurchaseMessage = FText::GetEmpty();
     bShopPurchasePending = true;
     RefreshGameplayFlow();
     if (HasAuthority()) ExecuteShopPurchase(CharacterId, OfferId);
-    else ServerPurchaseShopSkill(CharacterId, OfferId);
+    else ServerPurchaseShopOffer(CharacterId, OfferId);
 }
 
-void AGameplayPlayerController::ServerPurchaseShopSkill_Implementation(FGuid CharacterId, FName OfferId)
+void AGameplayPlayerController::ServerPurchaseShopOffer_Implementation(FGuid CharacterId, FName OfferId)
 {
     ExecuteShopPurchase(CharacterId, OfferId);
 }
@@ -261,15 +276,16 @@ void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName Off
     if (Mode && Mode->ResolveRunParticipant(this, BuyerAccountId))
     {
         AEncounterManager* Manager = Mode->GetEncounterManager();
-        if (Manager) bSucceeded = Manager->PurchaseShopSkill(BuyerAccountId, CharacterId, OfferId, Error);
+        if (Manager) bSucceeded = Manager->PurchaseShopOffer(BuyerAccountId, CharacterId, OfferId, Error);
     }
+    if (bSucceeded) Error = OfferId == FRunSkillShopState::GetRecoveryOfferId() ? NSLOCTEXT("RunSkillShop", "Recovered", "HP를 회복했습니다.") : NSLOCTEXT("RunSkillShop", "Purchased", "스킬을 구매했습니다. 다음 전투부터 사용할 수 있습니다.");
     ClientReceiveShopPurchaseResult(bSucceeded, Error);
 }
 
 void AGameplayPlayerController::ClientReceiveShopPurchaseResult_Implementation(bool bSucceeded, const FText& Message)
 {
     bShopPurchasePending = false;
-    ShopPurchaseMessage = bSucceeded ? NSLOCTEXT("RunSkillShop", "Purchased", "스킬을 구매했습니다. 다음 전투부터 사용할 수 있습니다.") : Message;
+    ShopPurchaseMessage = Message;
     RefreshGameplayFlow();
 }
 

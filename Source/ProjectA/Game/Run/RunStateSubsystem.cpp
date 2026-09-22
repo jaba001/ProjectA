@@ -1088,15 +1088,18 @@ bool URunStateSubsystem::SelectRunEncounter(FName EncounterId)
     return true;
 }
 
-bool URunStateSubsystem::PurchaseShopSkill(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError)
+bool URunStateSubsystem::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError)
 {
-    OutError = NSLOCTEXT("RunSkillShop", "Unavailable", "현재 상점에서 스킬을 구매할 수 없습니다.");
+    OutError = NSLOCTEXT("RunSkillShop", "Unavailable", "현재 상점에서 구매할 수 없습니다.");
     if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::Shop || EncounterProgress.bCompleted || EncounterProgress.SelectedEncounterId.IsNone() || SkillShopState.SchemaVersion != 1) return false;
+    const bool bRecovery = OfferId == FRunSkillShopState::GetRecoveryOfferId();
     const FRunSkillShopOffer* Offer = SkillShopState.Offers.FindByPredicate([OfferId](const FRunSkillShopOffer& Candidate) { return Candidate.OfferId == OfferId; });
-    if (!Offer || Offer->Price <= 0) return false;
+    if (!bRecovery && !Offer) return false;
+    const int32 Price = bRecovery ? SkillShopState.Recovery.Price : Offer->Price;
+    if (Price <= 0) return false;
     const FRunPartyMember* Member = PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.CharacterId == CharacterId; });
-    OutError = NSLOCTEXT("RunSkillShop", "OwnCharacterOnly", "본인이 직접 조작하는 생존 캐릭터만 스킬을 구매할 수 있습니다.");
-    if (!Member || !Member->bHasSkillLoadout || Member->CurrentHP <= 0.0f || !URunIdentityLibrary::IsCharacterOwner(RunIdentity, PartyMembers, CharacterId, BuyerAccountId)) return false;
+    OutError = NSLOCTEXT("RunSkillShop", "OwnCharacterOnly", "본인이 직접 조작하는 생존 캐릭터만 구매할 수 있습니다.");
+    if (!Member || !Member->bHasSkillLoadout || !FMath::IsFinite(Member->CurrentHP) || Member->CurrentHP <= 0.0f || !URunIdentityLibrary::IsCharacterOwner(RunIdentity, PartyMembers, CharacterId, BuyerAccountId)) return false;
     if (bManagedRun)
     {
         EPartyControlMode Mode = EPartyControlMode::ServerAI;
@@ -1112,37 +1115,54 @@ bool URunStateSubsystem::PurchaseShopSkill(const FRunAccountId& BuyerAccountId, 
     {
         return false;
     }
-    const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer->Skill.TryLoad());
-    FCombatRoundSkill Definition;
-    OutError = NSLOCTEXT("RunSkillShop", "InvalidSkill", "구매할 스킬 데이터가 유효하지 않습니다.");
-    if (!IsValid(Skill) || !Skill->ResolveRoundSkill(Definition, OutError)) return false;
-    for (const FSoftObjectPath& OwnedPath : Member->Skills)
+    float RecoveredHP = Member->CurrentHP;
+    if (bRecovery)
     {
-        const USkillDefinitionDataAsset* Owned = Cast<USkillDefinitionDataAsset>(OwnedPath.TryLoad());
-        FCombatRoundSkill OwnedDefinition;
-        if (!IsValid(Owned) || !Owned->ResolveRoundSkill(OwnedDefinition, OutError)) return false;
-        if (OwnedDefinition.SkillId == Definition.SkillId)
+        const UPartyDefinitionDataAsset* Catalog = PartyDefinition ? PartyDefinition.Get() : GetDefault<UPartyDefinitionDataAsset>();
+        FProfessionDefinition Profession;
+        if (!Catalog->ResolveProfession(Member->ClassId, Profession, OutError)) return false;
+        if (Member->CurrentHP >= Profession.MaxHP)
         {
-            OutError = NSLOCTEXT("RunSkillShop", "AlreadyOwned", "이미 습득한 스킬입니다.");
+            OutError = NSLOCTEXT("RunSkillShop", "AlreadyFullHP", "HP가 이미 가득 차 있습니다.");
+            return false;
+        }
+        RecoveredHP = Profession.MaxHP;
+    }
+    else
+    {
+        const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer->Skill.TryLoad());
+        FCombatRoundSkill Definition;
+        OutError = NSLOCTEXT("RunSkillShop", "InvalidSkill", "구매할 스킬 데이터가 유효하지 않습니다.");
+        if (!IsValid(Skill) || !Skill->ResolveRoundSkill(Definition, OutError)) return false;
+        for (const FSoftObjectPath& OwnedPath : Member->Skills)
+        {
+            const USkillDefinitionDataAsset* Owned = Cast<USkillDefinitionDataAsset>(OwnedPath.TryLoad());
+            FCombatRoundSkill OwnedDefinition;
+            if (!IsValid(Owned) || !Owned->ResolveRoundSkill(OwnedDefinition, OutError)) return false;
+            if (OwnedDefinition.SkillId == Definition.SkillId)
+            {
+                OutError = NSLOCTEXT("RunSkillShop", "AlreadyOwned", "이미 습득한 스킬입니다.");
+                return false;
+            }
+        }
+        if (Member->Skills.Num() >= 5)
+        {
+            OutError = NSLOCTEXT("RunSkillShop", "LoadoutFull", "스킬은 최대 5개까지 습득할 수 있습니다.");
             return false;
         }
     }
-    if (Member->Skills.Num() >= 5)
-    {
-        OutError = NSLOCTEXT("RunSkillShop", "LoadoutFull", "스킬은 최대 5개까지 습득할 수 있습니다.");
-        return false;
-    }
-    if (Member->Gold < Offer->Price)
+    if (Member->Gold < Price)
     {
         OutError = NSLOCTEXT("RunSkillShop", "InsufficientGold", "골드가 부족합니다.");
         return false;
     }
-    // Commit gold and the acquired skill together before publishing either change.
-    // 골드와 습득 스킬을 함께 저장한 뒤 두 변경을 공개합니다.
+    // Commit the balance and purchase effect together before publishing either change.
+    // 잔액과 구매 효과를 함께 저장한 뒤 두 변경을 공개합니다.
     TStrongObjectPtr<URunSaveGame> Save(CreateSaveData());
     FRunPartyMember* PurchasedMember = Save->Party.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.CharacterId == CharacterId; });
-    PurchasedMember->Gold -= Offer->Price;
-    PurchasedMember->Skills.Add(Offer->Skill);
+    PurchasedMember->Gold -= Price;
+    if (bRecovery) PurchasedMember->CurrentHP = RecoveredHP;
+    else PurchasedMember->Skills.Add(Offer->Skill);
     if (bCheckpointSaving && !WriteSaveData(Save.Get(), OutError))
     {
         SaveError = OutError;

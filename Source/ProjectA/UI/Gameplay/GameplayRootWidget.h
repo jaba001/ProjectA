@@ -3,9 +3,12 @@
 #include "CoreMinimal.h"
 #include "CommonUserWidget.h"
 #include "Game/Run/RunTypes.h"
+#include "Game/GameState/GameplayViewTypes.h"
 #include "GameplayRootWidget.generated.h"
 
 class UCommonActivatableWidgetStack;
+class UCommonActivatableWidget;
+class UDataTable;
 class UCombatHUDWidget;
 class UEncounterResultWidget;
 class URunMapWidget;
@@ -27,6 +30,7 @@ public:
     void RefreshFlow(const URunStateSubsystem* RunState, const FText& FlowMessage);
     void RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands, bool bCanRetryCheckpoint = false);
     void RefreshDevelopmentLobby(ADevelopmentCoopLobby* Lobby);
+    bool IsUtilityMenuOpen() const;
 
 protected:
     virtual void NativeOnInitialized() override;
@@ -52,6 +56,21 @@ protected:
     TObjectPtr<UCommonActivatableWidgetStack> ModalLayer;
 
 private:
+    void RegisterGameplayShortcuts();
+    void ToggleInventory();
+    void ToggleSettings();
+    void RefreshInventory();
+    void HandleUtilityWidgetChanged(UCommonActivatableWidget* ActiveWidget);
+
+    UPROPERTY(Transient)
+    TObjectPtr<UDataTable> ShortcutActions;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UCommonActivatableWidgetStack> UtilityLayer;
+
+    UPROPERTY(Transient)
+    FGameplayViewState CurrentView;
+
     UFUNCTION()
     void HandleLeaveDevelopmentCoop();
     UPROPERTY(Transient)

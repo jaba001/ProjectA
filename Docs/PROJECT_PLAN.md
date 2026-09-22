@@ -81,13 +81,13 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 새 Run은 첫 승리 결과의 Continue에서 `EncounterChoice`, 선택 시 `Shop`, 나가기 시 `Map`으로 전환한다. 전투 노드 수는 2개를 유지하며 상점 방문을 전투 완료 수에 더하지 않는다. 선택하지 않은 상점은 방문할 수 없다. 레벨 이동·별도 Arena 스폰 없이 UI로 처리한다.
 
-2026-09-22 확정: 아군 네 직업은 비무장 공격 하나로 시작한다. 직접 조작 캐릭터별 개인 10G, AI 동료 0G이며 상점 3곳은 검·원거리·AOE·휩쓸기를 각 1G에 판매한다. 본인 생존 인간 캐릭터만 구매하고 같은 스킬의 재구매를 거절한다. 습득 즉시 Run 장착 목록에 추가하며 다음 전투부터 사용한다. 10G·1G는 시험값이다.
+2026-09-22 확정: 아군 네 직업은 비무장 공격 하나로 시작한다. 직접 조작 캐릭터별 개인 10G, AI 동료 0G이며 상점 3곳은 검·원거리·AOE·휩쓸기와 HP 전체 회복을 각 1G에 판매한다. 본인 생존 인간 캐릭터만 구매하고 같은 스킬의 재구매를 거절한다. 습득 즉시 Run 장착 목록에 추가하며 다음 전투부터 사용한다. 회복은 직업 설정의 최대 HP까지 즉시 적용하고 만피 구매를 거절한다. 10G·1G는 시험값이다.
 
-`RunEncounterPoolDataAsset.StartingGold/FixedSkillOffers`에서 시험 구성을 관리하고 새 Run에 `FRunSkillShopState`로 복사한다. `FRunPartyMember.Gold/Skills/bHasSkillLoadout`을 골드·스킬의 저장 기준으로 사용한다. 구매는 서버의 신뢰 연결로 소유자를 찾고 상점 단계·소유권·Human 상태·잔액·중복을 검사한 뒤 두 값을 함께 저장한다. 실패하면 메모리와 기존 파일을 보존한다. 일반/관리 저장과 전투 준비 경계 모두 같은 장착 목록을 유지한다. schema 0 상점 저장에는 상품·골드를 소급 지급하지 않으며 명시 장착이 없는 기존 파티는 과거 직업 기본값을 유지한다. [사용자 확인](TODO.md#2-19-비무장-시작과-스킬-상점)
+`RunEncounterPoolDataAsset.StartingGold/FixedSkillOffers/Recovery`에서 시험 구성을 관리하고 새 Run에 `FRunSkillShopState`로 복사한다. `FRunPartyMember.Gold/Skills/bHasSkillLoadout/CurrentHP`를 저장 기준으로 사용한다. 서버가 신뢰 연결의 소유자·상점 단계·Human 상태·잔액과 스킬 중복 또는 부족 HP를 검사하고, 저장 복사본에 잔액과 구매 효과를 함께 반영한 뒤 성공한 변경만 공개한다. 실패하면 메모리와 기존 파일을 보존한다. 기존 schema 1 저장의 회복 필드 누락은 기본값 1G로 읽고 고정 스킬 상품·보유 골드를 유지한다. schema 0에는 상품·골드를 소급 지급하지 않으며 명시 장착이 없는 기존 파티는 과거 직업 기본값을 유지한다. [사용자 확인](TODO.md#2-19-비무장-시작과-스킬-상점)
 
 | 데이터 | 역할 |
 |---|---|
-| `URunEncounterPoolDataAsset` | `FixedOffers`에 상점 3개, `FixedSkillOffers`에 공통 상품·가격, `StartingGold`에 개인 시작 골드 정의. 추첨하지 않음 |
+| `URunEncounterPoolDataAsset` | `FixedOffers`에 상점 3개, `FixedSkillOffers`에 스킬 상품·가격, `Recovery`에 전체 회복 가격, `StartingGold`에 개인 시작 골드 정의. 추첨하지 않음 |
 | `FRunEncounterOffer` | `EncounterId`·`DisplayName`·`Type`의 USTRUCT 값 데이터 |
 | `FRunEncounterProgress` | schema·제시 목록·선택 ID·퇴장 완료 여부. Run 저장과 GameState 표시 뷰에 포함 |
 | `UPartyDefinitionDataAsset::RunEncounterPool` | 새 Run에서 사용할 풀. 미지정 시 native 기본값 상점1·상점2·상점3 사용 |
@@ -183,6 +183,8 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 공통 테마는 [UI/Theme](../Source/ProjectA/UI/Theme)의 native 클래스 기본 객체가 `UPROPERTY` 텍스처 참조를 유지하고 기존 Designer·native 컨트롤에 브러시·글자색을 적용한다. `/Game/DemonicUI` 원본은 무변경 참조하며 새 WBP·JSON 생성이나 에셋 복사는 필요하지 않다. MainMenu의 메뉴·관리 이어가기 패널은 가로 배치를 유지하고 다른 화면과 동일한 공통 DPI를 적용한다. 프리뷰 투명 영역과 전투 중앙 월드 입력을 유지한다. 적용 기준은 [UI_README 9절](UI_README.md#9-demonicui-공통-테마), 시각·입력·패키지 검증은 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다.
 
 공통 DPI는 [DefaultEngine.ini](../Config/DefaultEngine.ini)에 설정한다. 메뉴·설정·협동·지도·상점·결과의 개별 축소를 제거하며 `CombatArena`의 활성 카메라는 고정 화면 비율을 해제하고 세로 시야각을 유지한다. 에셋 생성 스크립트도 같은 카메라 기본값을 사용하며 기존 맵·WBP를 다시 생성하지 않는다. 배율 공식·카메라 적용 범위는 [UI_README 10절](UI_README.md#10-공통-dpi와-전투-화면-배치), 사용자 확인은 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다.
+
+Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이어에서 표시한다. `I`는 개인 골드·스킬 조회, `Esc`는 기존 Options 화면으로 연결하며 창이 열린 동안 로컬 전장 입력을 차단한다. 키·복구 계약은 [UI 단축키](UI_README.md#8-2-gameplay-인벤토리와-설정-단축키)를 따른다.
 
 ### 타겟·행동 세부 규칙
 

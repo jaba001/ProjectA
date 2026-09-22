@@ -50,6 +50,7 @@ int32 GetQualityPreset(const Scalability::FQualityLevels& Quality)
 UOptionsWidget::UOptionsWidget()
 {
     bIsBackHandler = true;
+    bIsModal = true;
 }
 
 TOptional<FUIInputConfig> UOptionsWidget::GetDesiredInputConfig() const
@@ -443,6 +444,12 @@ void UOptionsWidget::UpdateConfirmationText()
 
 bool UOptionsWidget::NativeOnHandleBackAction()
 {
+    RequestBack();
+    return true;
+}
+
+void UOptionsWidget::RequestBack()
+{
     if (bAwaitingConfirmation)
     {
         RevertOptions();
@@ -451,7 +458,6 @@ bool UOptionsWidget::NativeOnHandleBackAction()
     {
         CloseOptions();
     }
-    return true;
 }
 
 UWidget* UOptionsWidget::NativeGetDesiredFocusTarget() const

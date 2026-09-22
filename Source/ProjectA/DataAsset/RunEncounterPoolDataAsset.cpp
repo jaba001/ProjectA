@@ -41,8 +41,9 @@ bool URunEncounterPoolDataAsset::ValidateSkillShop(const FRunSkillShopState& Sta
         OutError = FText::GetEmpty();
         return true;
     }
-    if (State.SchemaVersion != 1 || State.Offers.IsEmpty() || State.Offers.Num() > 32) return false;
+    if (State.SchemaVersion != 1 || State.Offers.IsEmpty() || State.Offers.Num() > 32 || State.Recovery.Price <= 0) return false;
     TSet<FName> OfferIds;
+    OfferIds.Add(FRunSkillShopState::GetRecoveryOfferId());
     TSet<FName> SkillIds;
     for (const FRunSkillShopOffer& Offer : State.Offers)
     {
@@ -64,6 +65,7 @@ bool URunEncounterPoolDataAsset::BuildSkillShop(FRunSkillShopState& OutState, FT
     FRunSkillShopState State;
     State.SchemaVersion = 1;
     State.Offers = FixedSkillOffers;
+    State.Recovery = Recovery;
     for (FRunSkillShopOffer& Offer : State.Offers)
     {
         const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());

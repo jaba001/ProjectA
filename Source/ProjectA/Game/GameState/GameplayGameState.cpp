@@ -1,5 +1,6 @@
 #include "Game/GameState/GameplayGameState.h"
 #include "Combat/CombatManager.h"
+#include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Encounter/EncounterManager.h"
@@ -29,11 +30,20 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
         View.CompletedNodes = Run->GetCompletedNodes();
         View.EncounterProgress = Run->GetEncounterProgress();
         View.SkillShopState = Run->GetSkillShopState();
+        const UPartyDefinitionDataAsset* Catalog = Run->PartyDefinition ? Run->PartyDefinition.Get() : GetDefault<UPartyDefinitionDataAsset>();
         const bool bOrdinarySinglePlayer = !Run->IsManagedRun() && Run->GetRunIdentity().Origin == ERunIdentityOrigin::LocalDevelopment && Run->GetRunIdentity().OriginalParticipants.Num() == 1;
         for (const FRunPartyMember& Member : View.PartyMembers)
         {
             if (!Member.bCreated || Member.CurrentHP <= 0.f || !Member.CharacterId.IsValid() || Member.OwnerAccountId.IsEmpty()) continue;
-            if (bOrdinarySinglePlayer ? Member.bPlayerControlled : !Run->IsManagedRun() || Run->GetParticipation().HumanParticipants.Contains(Member.OwnerAccountId)) View.ShopBuyerCharacterIds.Add(Member.CharacterId);
+            if (!(bOrdinarySinglePlayer ? Member.bPlayerControlled : !Run->IsManagedRun() || Run->GetParticipation().HumanParticipants.Contains(Member.OwnerAccountId))) continue;
+            View.ShopBuyerCharacterIds.Add(Member.CharacterId);
+            FProfessionDefinition Profession;
+            if (Catalog->ResolveProfession(Member.ClassId, Profession) && FMath::IsFinite(Profession.MaxHP) && Profession.MaxHP > 0.f)
+            {
+                FRunShopBuyerView& BuyerView = View.ShopBuyerViews.AddDefaulted_GetRef();
+                BuyerView.CharacterId = Member.CharacterId;
+                BuyerView.MaxHP = Profession.MaxHP;
+            }
         }
         for (const FRunNodeDefinition& Node : View.Nodes)
         {

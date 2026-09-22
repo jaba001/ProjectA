@@ -100,7 +100,7 @@ public:
     bool ContinueRun();
     bool SelectRunEncounter(FName EncounterId);
     bool LeaveRunEncounter();
-    bool PurchaseShopSkill(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError);
+    bool PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError);
     const FRunSkillShopState& GetSkillShopState() const { return SkillShopState; }
     const FRunEncounterProgress& GetEncounterProgress() const { return EncounterProgress; }
     void UpdatePartyMemberHP(int32 SlotIndex, float CurrentHP);

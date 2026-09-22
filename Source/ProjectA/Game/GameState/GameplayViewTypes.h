@@ -9,6 +9,18 @@
 
 class URunStateSubsystem;
 
+USTRUCT()
+struct PROJECTA_API FRunShopBuyerView
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    FGuid CharacterId;
+
+    UPROPERTY()
+    float MaxHP = 0.f;
+};
+
 // Read-only presentation values; clients never restore this projection into an authoritative Run.
 // 읽기 전용 표시 값이며 클라이언트는 이 뷰를 권위 Run으로 복원하지 않습니다.
 USTRUCT()
@@ -48,6 +60,9 @@ struct PROJECTA_API FGameplayViewState
 
     UPROPERTY()
     TArray<FGuid> ShopBuyerCharacterIds;
+
+    UPROPERTY()
+    TArray<FRunShopBuyerView> ShopBuyerViews;
 
     static FGameplayViewState FromRun(const URunStateSubsystem* Run, const FText& Message);
 };
