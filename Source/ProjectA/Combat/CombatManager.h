@@ -152,32 +152,32 @@ private:
 
 public:
     // Move
-    UFUNCTION(BlueprintCallable, Category = "Move")
+    UFUNCTION(BlueprintCallable, Category = "Move", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     void RefreshReachableMoveTiles();
 
-    UFUNCTION(BlueprintCallable, Category = "Move")
+    UFUNCTION(BlueprintCallable, Category = "Move", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     bool IsReachableMoveTile(ACombatGridTile* Tile) const;
 
-    UFUNCTION(BlueprintCallable, Category = "Move")
+    UFUNCTION(BlueprintCallable, Category = "Move", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     void HighlightMovableTiles();
 
-    UFUNCTION(BlueprintCallable, Category = "Move")
+    UFUNCTION(BlueprintCallable, Category = "Move", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     void ClearMovableTilesHighlight();
 
     UFUNCTION(BlueprintCallable, Category = "Move")
     const TArray<ACombatGridTile*>& GetReachableMoveTiles() const { return ReachableMoveTiles; }
 
     // Skill
-    UFUNCTION(BlueprintCallable, Category = "Skill")
+    UFUNCTION(BlueprintCallable, Category = "Skill", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     void RefreshSkillTargetTiles();
 
-    UFUNCTION(BlueprintCallable, Category = "Skill")
+    UFUNCTION(BlueprintCallable, Category = "Skill", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     bool IsSkillTargetTile(ACombatGridTile* Tile) const;
 
-    UFUNCTION(BlueprintCallable, Category = "Skill")
+    UFUNCTION(BlueprintCallable, Category = "Skill", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     void HighlightSkillTargetTiles();
 
-    UFUNCTION(BlueprintCallable, Category = "Skill")
+    UFUNCTION(BlueprintCallable, Category = "Skill", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     void ClearSkillTargetTilesHighlight();
 
     // Tile

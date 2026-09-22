@@ -1,4 +1,6 @@
 #include "Combat/Round/CombatRoundCoordinator.h"
+#include "Combat/Round/CombatPlanValidator.h"
+#include "Combat/Round/CombatAIPlanning.h"
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimMontage.h"
 #include "Combat/CombatManager.h"
@@ -10,17 +12,12 @@
 #include "Controller/PartyPlayerController.h"
 #include "EngineUtils.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
-#include "Combat/Library/CombatEffectLibrary.h"
-#include "Combat/Library/CombatWeaponTraceLibrary.h"
 #include "Combat/Round/CombatRoundProjectile.h"
-#include "CollisionQueryParams.h"
-#include "CollisionShape.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "Game/Encounter/CombatArena.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
-#include "GAS/Effect/GE_Damage.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Net/UnrealNetwork.h"
@@ -72,142 +69,7 @@ namespace
         return FText::FromString(Value);
     }
 
-    FCollisionResponseParams AttackWorldResponses()
-    {
-        FCollisionResponseParams Responses(ECR_Ignore);
-        Responses.CollisionResponse.SetResponse(ECC_WorldStatic, ECR_Block);
-        Responses.CollisionResponse.SetResponse(ECC_WorldDynamic, ECR_Block);
-        return Responses;
-    }
 
-    FCollisionQueryParams AttackWorldQuery(UWorld* World, AUnitBase* Source)
-    {
-        FCollisionQueryParams Params(SCENE_QUERY_STAT(CombatRoundAttack), false, Source);
-        Params.bFindInitialOverlaps = true;
-        Params.bIgnoreTouches = true;
-        for (TActorIterator<APawn> It(World); It; ++It) Params.AddIgnoredActor(*It);
-        return Params;
-    }
-
-    UCapsuleComponent* AttackTargetCapsule(AUnitBase* Source, const FCombatRoundUnitView& Candidate)
-    {
-        AUnitBase* Unit = Candidate.Unit;
-        if (!IsValid(Unit) || Unit == Source || !Unit->IsUnitAlive() || Unit->GetTeam() == Source->GetTeam() || !Unit->GetActorEnableCollision()) return nullptr;
-        UCapsuleComponent* Capsule = Unit->GetCapsuleComponent();
-        return IsValid(Capsule) && Capsule->IsQueryCollisionEnabled() ? Capsule : nullptr;
-    }
-
-    AUnitBase* FindMeleeCollision(UWorld* World, AUnitBase* Source, const TArray<FCombatRoundUnitView>& Units, const FCombatRoundSkill& Skill)
-    {
-        const float Radius = FMath::Min(Skill.MeleeRadius, Skill.HitRange * 0.5f);
-        const FVector Origin = Source->GetCapsuleComponent()->GetComponentLocation();
-        const FVector Forward = Source->GetActorForwardVector();
-        const FVector Start = Origin + Forward * Radius;
-        const FVector End = Origin + Forward * (Skill.HitRange - Radius);
-        const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
-        const FCollisionQueryParams Params = AttackWorldQuery(World, Source);
-        const FCollisionResponseParams Responses = AttackWorldResponses();
-        if (World->OverlapBlockingTestByChannel(Start, FQuat::Identity, ECC_WorldDynamic, Shape, Params, Responses)) return nullptr;
-        FHitResult WallHit;
-        const bool bHitWall = World->SweepSingleByChannel(WallHit, Start, End, FQuat::Identity, ECC_WorldDynamic, Shape, Params, Responses);
-        const float WallTime = WallHit.bStartPenetrating ? 0.f : WallHit.Time;
-        AUnitBase* FirstUnit = nullptr;
-        int32 FirstUnitId = MAX_int32;
-        float FirstTime = 1.f;
-
-        // Query registered capsules directly so pawn movement responses and cosmetic meshes cannot change a hit.
-        // 등록된 캡슐을 직접 조회하여 폰 이동 응답이나 표현용 메시가 피격 판정을 바꾸지 않도록 합니다.
-        for (const FCombatRoundUnitView& Candidate : Units)
-        {
-            UCapsuleComponent* Capsule = AttackTargetCapsule(Source, Candidate);
-            if (!Capsule) continue;
-            FHitResult Hit;
-            const bool bInitialOverlap = Capsule->OverlapComponent(Start, FQuat::Identity, Shape);
-            if (!bInitialOverlap && !Capsule->SweepComponent(Hit, Start, End, FQuat::Identity, Shape)) continue;
-            const float HitTime = bInitialOverlap || Hit.bStartPenetrating ? 0.f : Hit.Time;
-            if (bHitWall && WallTime <= HitTime) continue;
-            if (!FirstUnit || HitTime < FirstTime || (HitTime == FirstTime && Candidate.UnitId < FirstUnitId))
-            {
-                FirstUnit = Candidate.Unit;
-                FirstUnitId = Candidate.UnitId;
-                FirstTime = HitTime;
-            }
-        }
-        return FirstUnit;
-    }
-
-    TArray<AUnitBase*> FindMeleeAreaCollisions(UWorld* World, AUnitBase* Source, const TArray<FCombatRoundUnitView>& Units, const FCombatRoundSkill& Skill)
-    {
-        TArray<AUnitBase*> Hits;
-        const FVector Origin = Source->GetCapsuleComponent()->GetComponentLocation();
-        const FQuat Rotation = Source->GetActorQuat();
-        const FVector Center = Origin + Source->GetActorForwardVector() * Skill.MeleeAreaHalfExtent.X;
-        const FCollisionShape Shape = FCollisionShape::MakeBox(Skill.MeleeAreaHalfExtent);
-        const FCollisionQueryParams Params = AttackWorldQuery(World, Source);
-        const FCollisionResponseParams Responses = AttackWorldResponses();
-        if (World->OverlapBlockingTestByChannel(Origin, FQuat::Identity, ECC_WorldDynamic, FCollisionShape::MakeSphere(0.1f), Params, Responses)) return Hits;
-        for (const FCombatRoundUnitView& Candidate : Units)
-        {
-            UCapsuleComponent* Capsule = AttackTargetCapsule(Source, Candidate);
-            if (!Capsule || !Capsule->OverlapComponent(Center, Rotation, Shape)) continue;
-            FVector Contact;
-            if (Capsule->GetClosestPointOnCollision(Origin, Contact) < 0.f) continue;
-            if (World->LineTraceTestByChannel(Origin, Contact, ECC_WorldDynamic, Params, Responses)) continue;
-            Hits.AddUnique(Candidate.Unit);
-        }
-        return Hits;
-    }
-
-    TArray<AUnitBase*> FindMeleeSideCollisions(UWorld* World, AUnitBase* Source, const TArray<FCombatRoundUnitView>& Units, const FCombatRoundSkill& Skill, ACombatGridManager* Grid, FIntPoint TargetCoord, FVector Center)
-    {
-        TArray<AUnitBase*> Hits;
-        ACombatGridTile* TargetTile = IsValid(Grid) ? Grid->GetTileAtCoord(TargetCoord) : nullptr;
-        if (!IsValid(TargetTile) || FVector::Dist2D(Source->GetActorLocation(), Center) > Skill.HitRange) return Hits;
-        FVector Start = Center;
-        FVector End = Center;
-        if (ACombatGridTile* Left = Grid->GetTileAtCoord(TargetCoord + FIntPoint(-1, 0))) Start += Left->GetActorLocation() - TargetTile->GetActorLocation();
-        if (ACombatGridTile* Right = Grid->GetTileAtCoord(TargetCoord + FIntPoint(1, 0))) End += Right->GetActorLocation() - TargetTile->GetActorLocation();
-        const FCollisionShape Shape = FCollisionShape::MakeSphere(FMath::Min(Skill.MeleeRadius, Skill.HitRange * 0.5f));
-        const FCollisionQueryParams Params = AttackWorldQuery(World, Source);
-        const FCollisionResponseParams Responses = AttackWorldResponses();
-        if (World->OverlapBlockingTestByChannel(Center, FQuat::Identity, ECC_WorldDynamic, FCollisionShape::MakeSphere(0.1f), Params, Responses)) return Hits;
-        if (World->LineTraceTestByChannel(Source->GetCapsuleComponent()->GetComponentLocation(), Center, ECC_WorldDynamic, Params, Responses)) return Hits;
-        // Tiles size the lateral sweep; only current capsule contacts receive damage, once per enemy.
-        // 타일은 횡방향 스윕 길이만 정하며 현재 캡슐이 충돌한 적에게만 한 번씩 피해를 줍니다.
-        for (const FCombatRoundUnitView& Candidate : Units)
-        {
-            UCapsuleComponent* Capsule = AttackTargetCapsule(Source, Candidate);
-            if (!Capsule) continue;
-            FHitResult Hit;
-            if (!Capsule->OverlapComponent(Start, FQuat::Identity, Shape) && !Capsule->SweepComponent(Hit, Start, End, FQuat::Identity, Shape)) continue;
-            FVector Contact;
-            if (Capsule->GetClosestPointOnCollision(Center, Contact) < 0.f) continue;
-            if (World->LineTraceTestByChannel(Center, Contact, ECC_WorldDynamic, Params, Responses)) continue;
-            Hits.AddUnique(Candidate.Unit);
-        }
-        return Hits;
-    }
-
-    TArray<AUnitBase*> FindGroundCollisions(UWorld* World, AUnitBase* Source, const TArray<FCombatRoundUnitView>& Units, FVector Center, float Radius)
-    {
-        TArray<AUnitBase*> Hits;
-        const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
-        const FCollisionQueryParams Params = AttackWorldQuery(World, Source);
-        const FCollisionResponseParams Responses = AttackWorldResponses();
-        if (World->OverlapBlockingTestByChannel(Center, FQuat::Identity, ECC_WorldDynamic, FCollisionShape::MakeSphere(0.1f), Params, Responses)) return Hits;
-        for (const FCombatRoundUnitView& Candidate : Units)
-        {
-            UCapsuleComponent* Capsule = AttackTargetCapsule(Source, Candidate);
-            if (!Capsule || !Capsule->OverlapComponent(Center, FQuat::Identity, Shape)) continue;
-            FVector Contact;
-            if (Capsule->GetClosestPointOnCollision(Center, Contact) < 0.f) continue;
-            // Occlude the real capsule contact, not its actor center, so exposed capsule edges remain hittable.
-            // 실제 캡슐 접촉점까지 차폐를 검사하여 노출된 캡슐 가장자리는 피격될 수 있게 합니다.
-            if (World->LineTraceTestByChannel(Center, Contact, ECC_WorldDynamic, Params, Responses)) continue;
-            Hits.AddUnique(Candidate.Unit);
-        }
-        return Hits;
-    }
 }
 
 ACombatRoundCoordinator::ACombatRoundCoordinator()
@@ -466,25 +328,11 @@ void ACombatRoundCoordinator::PublishState()
 
 int32 ACombatRoundCoordinator::FindNearestEnemy(int32 SourceIndex, FName SkillId) const
 {
-    if (!View.Units.IsValidIndex(SourceIndex) || !IsValid(View.Units[SourceIndex].Unit)) return INDEX_NONE;
-    const FCombatRoundUnitView& Source = View.Units[SourceIndex];
-    int32 Best = INDEX_NONE;
-    double Distance = TNumericLimits<double>::Max();
-    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
+    return CombatAIPlanning::FindNearestEnemy(View, SourceIndex, [this, SourceIndex, SkillId](const FCombatRoundUnitView& Candidate)
     {
-        const FCombatRoundUnitView& Candidate = View.Units[Index];
-        if (Candidate.bEnemy == Source.bEnemy || !IsValid(Candidate.Unit) || !Candidate.Unit->IsUnitAlive()) continue;
-        if (!SkillId.IsNone() && !IsValidUnitTarget(Source.UnitId, SkillId, Candidate.UnitId)) continue;
-        const double CandidateDistance = FVector::DistSquared2D(Source.Unit->GetActorLocation(), Candidate.Unit->GetActorLocation());
-        if (CandidateDistance < Distance)
-        {
-            Distance = CandidateDistance;
-            Best = Index;
-        }
-    }
-    return Best;
+        return SkillId.IsNone() || IsValidUnitTarget(View.Units[SourceIndex].UnitId, SkillId, Candidate.UnitId);
+    });
 }
-
 void ACombatRoundCoordinator::BeginPlanning()
 {
     ++View.RoundNumber;
@@ -538,44 +386,11 @@ void ACombatRoundCoordinator::BeginPlanning()
 
         // AI commands are fixed before any human draft can be submitted.
         // 인간 초안이 제출되기 전에 AI 명령을 고정합니다.
-        const int32 TargetIndex = FindNearestEnemy(Index);
-        Entry.Command.SkillId = NAME_None;
-        if (View.Units.IsValidIndex(TargetIndex))
+        Entry.Command = CombatAIPlanning::ChooseCommand(View, BuildPlanningState(), Index, [this](const FCombatRoundCommand& Command)
         {
-            Entry.Command.TargetUnitId = View.Units[TargetIndex].UnitId;
-            Entry.Command.TargetCoord = View.Units[TargetIndex].HomeCoord;
-            for (FName SkillId : Entry.SkillIds)
-            {
-                const FCombatRoundSkill* Candidate = FindSkill(SkillId);
-                if (!Candidate || Candidate->Kind == ECombatRoundSkillKind::Wait || Candidate->bRemainAtDestination) continue;
-                Entry.Command.SkillId = SkillId;
-                Entry.Command.DestinationCoord = Entry.HomeCoord;
-                if (Candidate->Approach == ECombatRoundApproach::Tile)
-                {
-                    int32 BestDistance = MAX_int32;
-                    for (int32 X = 0; X < 4; ++X)
-                    {
-                        for (int32 Y = 0; Y < 4; ++Y)
-                        {
-                            const FIntPoint Coord(X, Y);
-                            ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Coord);
-                            if (!Tile || (Tile->GetOccupyingUnit() && Tile->GetOccupyingUnit() != Entry.Unit) || IsDestinationReservedByOther(Index, Coord)) continue;
-                            const FIntPoint Offset = Coord - View.Units[TargetIndex].HomeCoord;
-                            const int32 Distance = FMath::Abs(Offset.X) + FMath::Abs(Offset.Y);
-                            if (Distance < BestDistance)
-                            {
-                                BestDistance = Distance;
-                                Entry.Command.DestinationCoord = Coord;
-                            }
-                        }
-                    }
-                }
-                FText Error;
-                if (ValidateCommand(Entry.Command, Error)) break;
-                Entry.Command.SkillId = NAME_None;
-                Entry.Command.DestinationCoord = Entry.HomeCoord;
-            }
-        }
+            FText Error;
+            return ValidateCommand(Command, Error);
+        });
         Entry.bReady = true;
         Entry.Status = RoundText(TEXT("AI 계획 고정"));
     }
@@ -692,15 +507,7 @@ bool ACombatRoundCoordinator::CanMoveUnit(int32 UnitId, FIntPoint Destination, F
 
 bool ACombatRoundCoordinator::IsDestinationReservedByOther(int32 UnitIndex, FIntPoint Coord) const
 {
-    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
-    {
-        const FCombatRoundUnitView& Entry = View.Units[Index];
-        if (Index == UnitIndex || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) continue;
-        if (Entry.HomeCoord == Coord || (Entry.bHasMovePlan && Entry.MoveDestinationCoord == Coord)) return true;
-        const FCombatRoundSkill* Skill = FindSkill(Entry.Command.SkillId);
-        if (Skill && Skill->Approach == ECombatRoundApproach::Tile && Entry.Command.DestinationCoord == Coord) return true;
-    }
-    return false;
+    return View.Units.IsValidIndex(UnitIndex) && CombatPlanValidation::IsReservedByOther(BuildPlanningState(), View.Units[UnitIndex].UnitId, Coord);
 }
 
 bool ACombatRoundCoordinator::BuildPlanningMovePath(int32 UnitId, FIntPoint Destination, TArray<FIntPoint>& OutPath, FText& OutError) const
@@ -720,9 +527,11 @@ bool ACombatRoundCoordinator::BuildPlanningMovePath(int32 UnitId, FIntPoint Dest
         OutError = RoundText(TEXT("살아 있는 캐릭터의 현재 칸을 확인할 수 없습니다."));
         return false;
     }
+    const CombatPlanValidation::FState State = BuildPlanningState();
+    if (!CombatPlanValidation::ValidateMoveDestination(State, State.Units[Index], Destination, OutError)) return false;
     const ETileTerritory Territory = Entry.bEnemy ? ETileTerritory::Enemy : ETileTerritory::Player;
     ACombatGridTile* Target = Arena->Grid->GetTileAtCoord(Destination);
-    if (!IsValid(Target) || Target == Origin || Target->GetOccupyingUnit() || !CombatRoundRules::IsOwnTerritory(Entry.bEnemy, Destination) || Target->GetTerritory() != Territory || IsDestinationReservedByOther(Index, Destination))
+    if (!IsValid(Target) || Target == Origin || Target->GetOccupyingUnit() || !CombatRoundRules::IsOwnTerritory(Entry.bEnemy, Destination) || Target->GetTerritory() != Territory)
     {
         OutError = RoundText(TEXT("이동할 아군 진영의 예약되지 않은 빈칸을 선택하세요."));
         return false;
@@ -745,7 +554,7 @@ bool ACombatRoundCoordinator::BuildPlanningMovePath(int32 UnitId, FIntPoint Dest
             {
                 if (DX == 0 && DY == 0) continue;
                 const FIntPoint Next = Current + FIntPoint(DX, DY);
-                if (Distances.Contains(Next) || !CombatRoundRules::IsOwnTerritory(Entry.bEnemy, Next) || IsDestinationReservedByOther(Index, Next)) continue;
+                if (Distances.Contains(Next) || !CombatRoundRules::IsOwnTerritory(Entry.bEnemy, Next) || CombatPlanValidation::IsReservedByOther(State, UnitId, Next)) continue;
                 ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Next);
                 if (!IsValid(Tile) || Tile->GetTerritory() != Territory || Tile->GetOccupyingUnit()) continue;
                 Distances.Add(Next, Distance + 1);
@@ -917,67 +726,59 @@ bool ACombatRoundCoordinator::IsValidUnitTarget(int32 SourceUnitId, FName SkillI
     if (!IsValid(Source.Unit) || !IsValid(Target.Unit) || !Source.Unit->IsUnitAlive() || !Target.Unit->IsUnitAlive()) return false;
     if (!(Source.HP > 0.f) || !(Target.HP > 0.f) || !Source.SkillIds.Contains(SkillId)) return false;
     const bool bAlly = Source.bEnemy == Target.bEnemy;
-    return !bAlly;
+    return !bAlly && CombatSkillExecution::CanAffectTarget(Target.Unit, *Skill);
+}
+
+CombatPlanValidation::FState ACombatRoundCoordinator::BuildPlanningState() const
+{
+    CombatPlanValidation::FState State;
+    State.Skills = Skills;
+    for (const FCombatRoundUnitView& Entry : View.Units)
+    {
+        CombatPlanValidation::FUnit& Unit = State.Units.AddDefaulted_GetRef();
+        Unit.UnitId = Entry.UnitId;
+        Unit.bAlive = IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive();
+        Unit.bEnemy = Entry.bEnemy;
+        Unit.AP = Unit.bAlive ? Entry.Unit->GetCurrentActionPoint() : 0;
+        Unit.SAP = Unit.bAlive ? Entry.Unit->GetCurrentSubActionPoint() : 0;
+        Unit.HomeCoord = Entry.HomeCoord;
+        Unit.SkillIds = Entry.SkillIds;
+        Unit.Command = Entry.Command;
+        Unit.bHasMovePlan = Entry.bHasMovePlan;
+        Unit.MoveDestinationCoord = Entry.MoveDestinationCoord;
+    }
+    if (IsValid(Arena) && IsValid(Arena->Grid))
+    {
+        for (const auto& Pair : Arena->Grid->TileMap)
+        {
+            if (!IsValid(Pair.Value)) continue;
+            AUnitBase* Occupant = Pair.Value->GetOccupyingUnit();
+            const int32 Index = View.Units.IndexOfByPredicate([Occupant](const FCombatRoundUnitView& Entry) { return Entry.Unit == Occupant; });
+            State.Tiles.Add(Pair.Key, !Occupant ? INDEX_NONE : (View.Units.IsValidIndex(Index) ? View.Units[Index].UnitId : MIN_int32));
+        }
+    }
+    return State;
 }
 
 bool ACombatRoundCoordinator::ValidateCommand(const FCombatRoundCommand& Command, FText& OutError) const
 {
+    if (!CombatPlanValidation::ValidateCommand(BuildPlanningState(), Command, OutError)) return false;
     const int32 Index = FindUnitIndex(Command.UnitId);
     const FCombatRoundSkill* Skill = FindCommandSkill(Command);
-    if (!View.Units.IsValidIndex(Index) || !Skill || !IsValid(View.Units[Index].Unit) || !View.Units[Index].Unit->IsUnitAlive())
-    {
-        OutError = RoundText(TEXT("행동할 유닛 또는 스킬이 올바르지 않습니다."));
-        return false;
-    }
-    const FCombatRoundUnitView& Entry = View.Units[Index];
-    if (!Command.SkillId.IsNone() && !Entry.SkillIds.Contains(Command.SkillId))
-    {
-        OutError = RoundText(TEXT("이 유닛에게 부여된 스킬이 아닙니다."));
-        return false;
-    }
-    if ((Skill->ActionPointCost > 0 && !Entry.Unit->HasEnoughActionPoint(Skill->ActionPointCost)) || !Entry.Unit->HasEnoughSubActionPoint(Skill->SubActionPointCost + (Entry.bHasMovePlan ? 1 : 0)))
-    {
-        OutError = RoundText(TEXT("행동 AP 또는 예약 이동과 스킬의 합산 SAP가 부족합니다."));
-        return false;
-    }
-    if (Skill->Kind == ECombatRoundSkillKind::Wait) return true;
-    if (!Arena || !Arena->Grid)
+    if (Skill->Kind != ECombatRoundSkillKind::Wait && (!IsValid(Arena) || !IsValid(Arena->Grid)))
     {
         OutError = RoundText(TEXT("전투 Grid가 없습니다."));
         return false;
     }
-    if (Skill->Approach == ECombatRoundApproach::Tile)
+    if (!CombatSkillExecution::CanUseSkill(View.Units[Index].Unit, *Skill))
     {
-        ACombatGridTile* Destination = Arena->Grid->GetTileAtCoord(Command.DestinationCoord);
-        if (!Destination || (Destination->GetOccupyingUnit() && Destination->GetOccupyingUnit() != Entry.Unit) || IsDestinationReservedByOther(Index, Command.DestinationCoord))
-        {
-            OutError = RoundText(TEXT("다른 유닛의 복귀 칸이나 예약 목적지가 아닌 빈 접근 칸을 선택하세요."));
-            return false;
-        }
-        if (Skill->bRemainAtDestination && !CombatRoundRules::IsOwnTerritory(Entry.bEnemy, Command.DestinationCoord))
-        {
-            OutError = RoundText(TEXT("이동 공격의 최종 위치는 자기 진영이어야 합니다."));
-            return false;
-        }
-    }
-    if (Skill->Kind == ECombatRoundSkillKind::GroundAttack)
-    {
-        if (!Arena->Grid->GetTileAtCoord(Command.TargetCoord))
-        {
-            OutError = RoundText(TEXT("공격할 지점 칸을 선택하세요."));
-            return false;
-        }
-        return true;
-    }
-    const int32 TargetIndex = FindUnitIndex(Command.TargetUnitId);
-    if (!View.Units.IsValidIndex(TargetIndex) || !IsValid(View.Units[TargetIndex].Unit) || !View.Units[TargetIndex].Unit->IsUnitAlive())
-    {
-        OutError = RoundText(TEXT("살아 있는 대상 유닛을 선택하세요."));
+        OutError = RoundText(TEXT("스킬 발동 태그 조건을 만족하지 않습니다."));
         return false;
     }
+    if (Skill->Kind == ECombatRoundSkillKind::Wait || Skill->Kind == ECombatRoundSkillKind::GroundAttack) return true;
     if (!IsValidUnitTarget(Command.UnitId, Command.SkillId, Command.TargetUnitId))
     {
-        OutError = RoundText(TEXT("스킬의 대상 진영이 올바르지 않습니다."));
+        OutError = RoundText(TEXT("스킬의 대상 진영 또는 태그 조건이 올바르지 않습니다."));
         return false;
     }
     return true;
@@ -1013,34 +814,18 @@ bool ACombatRoundCoordinator::SubmitPlan(APlayerController* Controller, FGuid Co
 
 bool ACombatRoundCoordinator::ValidateDestinations(FText& OutError, int32 CandidateIndex, const FCombatRoundCommand* CandidateCommand, const FIntPoint* CandidateMove) const
 {
-    TMap<FIntPoint, int32> Reserved;
-    for (const FCombatRoundUnitView& Entry : View.Units)
+    CombatPlanValidation::FState State = BuildPlanningState();
+    if (State.Units.IsValidIndex(CandidateIndex))
     {
-        if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) continue;
-        Reserved.Add(Entry.HomeCoord, Entry.UnitId);
-    }
-    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
-    {
-        const FCombatRoundUnitView& Entry = View.Units[Index];
-        if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) continue;
-        const FCombatRoundCommand& Command = Index == CandidateIndex && CandidateCommand ? *CandidateCommand : Entry.Command;
-        const FCombatRoundSkill* Skill = FindSkill(Command.SkillId);
-        TArray<FIntPoint> Destinations;
-        if (Index == CandidateIndex && CandidateMove) Destinations.Add(*CandidateMove);
-        else if (Entry.bHasMovePlan) Destinations.Add(Entry.MoveDestinationCoord);
-        if (Skill && Skill->Approach == ECombatRoundApproach::Tile) Destinations.Add(Command.DestinationCoord);
-        for (FIntPoint Destination : Destinations)
+        CombatPlanValidation::FUnit& Candidate = State.Units[CandidateIndex];
+        if (CandidateCommand) Candidate.Command = *CandidateCommand;
+        if (CandidateMove)
         {
-            const int32* Existing = Reserved.Find(Destination);
-            if (Existing && *Existing != Entry.UnitId)
-            {
-                OutError = RoundText(TEXT("목적지가 다른 유닛의 원래 칸, SAP 이동 또는 AP 접근 목적지와 겹칩니다."));
-                return false;
-            }
-            Reserved.Add(Destination, Entry.UnitId);
+            Candidate.bHasMovePlan = true;
+            Candidate.MoveDestinationCoord = *CandidateMove;
         }
     }
-    return true;
+    return CombatPlanValidation::ValidateDestinations(State, OutError);
 }
 
 bool ACombatRoundCoordinator::SetParticipantReady(APlayerController* Controller, FGuid CombatId, int32 RoundNumber, int32 Revision, bool bReady, FText& OutError)
@@ -1322,9 +1107,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
                     Action.bTrackMontageCompletion = false;
                     Action.MontageStartedAt = 0.0;
                     Action.MontageRecoverySeconds = 0.0;
-                    Action.WeaponTraceTime = -1.0;
-                    Action.PreviousBladeBase = FVector::ZeroVector;
-                    Action.PreviousBladeTip = FVector::ZeroVector;
+                    Action.WeaponTrace = CombatSkillExecution::FWeaponTraceState();
                     if (Skill->Approach == ECombatRoundApproach::Unit) Entry.ActionPhase = ECombatRoundActionPhase::Approaching;
                     Entry.Status = RoundText(TEXT("가까운 적으로 대상 변경"));
                 }
@@ -1499,137 +1282,61 @@ void ACombatRoundCoordinator::AdvanceWeaponTrace(int32 Index, const FCombatRound
     FCombatRoundUnitView& Entry = View.Units[Index];
     FActionRuntime& Action = Actions[Index];
     if (Action.bReleased || !HasExecutionAuthority() || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) return;
-    UAnimMontage* Montage = Entry.Unit->ResolveRoundCastMontage(Skill.CastMontage);
-    if (!IsValid(Montage) || !FMath::IsFinite(Montage->RateScale) || Montage->RateScale <= 0.f)
-    {
-        Action.bReleased = true;
-        StartRecovery(Index, true, RoundText(TEXT("검 공격 애니메이션 설정 누락")));
-        return;
-    }
-    // Clip simulation catch-up to animation time so a newly started swing cannot hit within the same stalled frame.
-    // 새 휘두르기가 지연된 동일 프레임에서 타격하지 않도록 누적 시뮬레이션을 애니메이션 시간으로 제한합니다.
+    // Clip simulation catch-up to presentation time without letting the executor own either clock.
+    // 실행기가 두 시계를 소유하지 않도록 누적 시뮬레이션을 표현 시간으로 제한합니다.
     const double Elapsed = FMath::Min(SimulationTime - Action.PhaseStarted, MontageClock - Action.MontageStartedAt);
-    const double WindowEnd = Skill.WindupSeconds + Skill.WeaponTraceDuration;
-    if (Elapsed + UE_DOUBLE_SMALL_NUMBER < Skill.WindupSeconds) return;
-    const double SampleUntil = FMath::Min(Elapsed, WindowEnd);
-    const bool bFirstSample = Action.WeaponTraceTime < 0.0;
-    if (!bFirstSample && SampleUntil <= Action.WeaponTraceTime + UE_DOUBLE_SMALL_NUMBER) return;
-    double SampleTime = bFirstSample ? Skill.WindupSeconds : FMath::Min(Action.WeaponTraceTime + 0.005, SampleUntil);
-    for (;;)
-    {
-        CombatWeaponTrace::FBladePose Current;
-        if (!CombatWeaponTrace::SampleBlade(Entry.Unit, Skill, Montage, SampleTime * Montage->RateScale, Current))
-        {
-            Action.bReleased = true;
-            StartRecovery(Index, true, RoundText(TEXT("검 장착 또는 칼날 소켓 설정 누락")));
-            return;
-        }
-        const CombatWeaponTrace::FBladePose Previous = Action.WeaponTraceTime < 0.0 ? Current : CombatWeaponTrace::FBladePose{Action.PreviousBladeBase, Action.PreviousBladeTip};
-        Action.WeaponTraceTime = SampleTime;
-        Action.PreviousBladeBase = Current.Base;
-        Action.PreviousBladeTip = Current.Tip;
-        if (AUnitBase* HitUnit = CombatWeaponTrace::FindFirstHit(GetWorld(), Entry.Unit, View.Units, Previous, Current, Skill.WeaponTraceRadius))
-        {
-            Action.bReleased = true;
-            ApplyHit(Entry.Unit, HitUnit, Skill.Power);
-            StartRecovery(Index, false, RoundText(TEXT("검 타격 완료")));
-            return;
-        }
-        if (SampleTime + UE_DOUBLE_SMALL_NUMBER >= SampleUntil) break;
-        SampleTime = FMath::Min(SampleTime + 0.005, SampleUntil);
-    }
-    if (Elapsed + UE_DOUBLE_SMALL_NUMBER >= WindowEnd)
-    {
-        Action.bReleased = true;
-        StartRecovery(Index, true, RoundText(TEXT("칼날 충돌 없음 또는 장애물에 차단됨")));
-    }
+    AUnitBase* Hit = nullptr;
+    FText Status;
+    const CombatSkillExecution::ETraceResult Result = CombatSkillExecution::AdvanceWeaponTrace(Entry.Unit, View.Units, Skill, Elapsed, Action.WeaponTrace, Hit, Status);
+    if (Result == CombatSkillExecution::ETraceResult::Pending) return;
+    Action.bReleased = true;
+    if (Hit) ApplyHit(Entry.Unit, Hit, Skill);
+    StartRecovery(Index, Result != CombatSkillExecution::ETraceResult::Hit, Status);
 }
 
 void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill& Skill)
 {
     FCombatRoundUnitView& Entry = View.Units[Index];
     FActionRuntime& Action = Actions[Index];
-    if (Action.bReleased || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) return;
+    if (Action.bReleased || !HasExecutionAuthority() || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) return;
     Action.bReleased = true;
     const int32 TargetIndex = FindUnitIndex(Action.EffectiveTargetUnitId);
-    AUnitBase* Target = nullptr;
-    if (View.Units.IsValidIndex(TargetIndex)) Target = View.Units[TargetIndex].Unit;
-    if (Skill.Kind == ECombatRoundSkillKind::Projectile)
+    CombatSkillExecution::FReleaseContext Context;
+    Context.Owner = this;
+    Context.Source = Entry.Unit;
+    Context.Target = View.Units.IsValidIndex(TargetIndex) ? View.Units[TargetIndex].Unit.Get() : nullptr;
+    Context.Grid = IsValid(Arena) ? Arena->Grid.Get() : nullptr;
+    Context.AimLocation = Action.AimLocation;
+    Context.TargetCoord = View.Units.IsValidIndex(TargetIndex) ? View.Units[TargetIndex].HomeCoord : Entry.Command.TargetCoord;
+    const CombatSkillExecution::FReleaseResult Result = CombatSkillExecution::Release(Context, View.Units, Skill, [this, &Entry, &Skill](AUnitBase* Hit)
     {
-        FActorSpawnParameters Params;
-        Params.Owner = this;
-        Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        ACombatRoundProjectile* Projectile = GetWorld()->SpawnActor<ACombatRoundProjectile>(Entry.Unit->GetActorLocation(), FRotator::ZeroRotator, Params);
-        if (!Projectile)
-        {
-            StartRecovery(Index, true, RoundText(TEXT("투사체 생성 실패")));
-            return;
-        }
+        ApplyHit(Entry.Unit, Hit, Skill);
+    }, [this, Skill](ACombatRoundProjectile* Projectile)
+    {
         Projectiles.Add(Projectile);
-        Projectile->OnImpact.AddUObject(this, &ACombatRoundCoordinator::ApplyHit);
+        Projectile->OnImpact.AddWeakLambda(this, [this, Skill](AUnitBase* Source, AUnitBase* Target, float Damage)
+        {
+            ApplyHit(Source, Target, Skill);
+        });
         Projectile->OnResolved.AddUObject(this, &ACombatRoundCoordinator::HandleProjectileResolved);
-        TArray<AUnitBase*> AllowedTargets;
-        for (const FCombatRoundUnitView& Candidate : View.Units) AllowedTargets.Add(Candidate.Unit);
-        Projectile->SetAllowedTargets(AllowedTargets);
-        Projectile->InitializeProjectile(Entry.Unit, Target, Action.AimLocation, Skill.ProjectileSpeed, Skill.Power, Skill.ProjectileRadius, Skill.ProjectileLifetime, Skill.bHoming, Skill.bTargetOnly);
-        StartRecovery(Index, false, RoundText(TEXT("발사 완료")));
-        return;
-    }
-    bool bHit = false;
-    if (Skill.Kind == ECombatRoundSkillKind::GroundAttack)
-    {
-        if (Skill.Approach == ECombatRoundApproach::None || FVector::Dist(Entry.Unit->GetActorLocation(), Action.AimLocation) <= Skill.HitRange)
-        {
-            for (AUnitBase* HitUnit : FindGroundCollisions(GetWorld(), Entry.Unit, View.Units, Action.AimLocation, Skill.HitRange))
-            {
-                ApplyHit(Entry.Unit, HitUnit, Skill.Power);
-                bHit = true;
-            }
-        }
-    }
-    else if (Skill.Kind == ECombatRoundSkillKind::Melee)
-    {
-        if (Skill.bUseMeleeAreaCollision)
-        {
-            for (AUnitBase* HitUnit : FindMeleeAreaCollisions(GetWorld(), Entry.Unit, View.Units, Skill))
-            {
-                ApplyHit(Entry.Unit, HitUnit, Skill.Power);
-                bHit = true;
-            }
-        }
-        else if (Skill.MeleeArea == ESkillAreaType::TargetAndSides)
-        {
-            const FIntPoint TargetCoord = View.Units.IsValidIndex(TargetIndex) ? View.Units[TargetIndex].HomeCoord : Entry.Command.TargetCoord;
-            for (AUnitBase* HitUnit : FindMeleeSideCollisions(GetWorld(), Entry.Unit, View.Units, Skill, IsValid(Arena) ? Arena->Grid.Get() : nullptr, TargetCoord, Action.AimLocation))
-            {
-                ApplyHit(Entry.Unit, HitUnit, Skill.Power);
-                bHit = true;
-            }
-        }
-        else if (AUnitBase* HitUnit = FindMeleeCollision(GetWorld(), Entry.Unit, View.Units, Skill))
-        {
-            ApplyHit(Entry.Unit, HitUnit, Skill.Power);
-            bHit = true;
-        }
-    }
-    if (bHit) StartRecovery(Index, false, RoundText(TEXT("타격 완료")));
-    else StartRecovery(Index, true, RoundText(TEXT("공격 충돌 없음 또는 장애물에 차단됨")));
+    });
+    StartRecovery(Index, !Result.bSucceeded, Result.Status);
 }
 
-void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, float Damage)
+void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, const FCombatRoundSkill& Skill)
 {
-    if (!HasAuthority() || View.Phase != ECombatRoundPhase::Resolving || !IsValid(Source) || !IsValid(Target) || !Target->IsUnitAlive() || Source->GetTeam() == Target->GetTeam() || !FMath::IsFinite(Damage) || Damage < 0.f) return;
+    if (!HasAuthority() || View.Phase != ECombatRoundPhase::Resolving || !IsValid(Source) || !IsValid(Target) || !Target->IsUnitAlive() || Source->GetTeam() == Target->GetTeam() || !FMath::IsFinite(Skill.Power) || Skill.Power < 0.f) return;
     const int32 Index = View.Units.IndexOfByPredicate([Target](const FCombatRoundUnitView& Entry) { return Entry.Unit == Target; });
     if (!View.Units.IsValidIndex(Index)) return;
     FCombatRoundUnitView& Entry = View.Units[Index];
-    if (Damage > 0.f) UCombatEffectLibrary::ApplyDamageToUnit(Source, Target, UGE_Damage::StaticClass(), Damage);
+    CombatSkillExecution::ApplyEffect(Source, Target, Skill);
     Entry.HP = Target->GetAttributeSet() ? Target->GetAttributeSet()->GetHP() : 0.f;
     if (!Target->IsUnitAlive())
     {
         Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
         Entry.Status = RoundText(TEXT("사망으로 남은 행동 취소"));
     }
-    UE_LOG(LogTemp, Log, TEXT("[Round] Round=%d Time=%.2f Source=%d Target=%d Damage=%.1f / 서버 피격"), View.RoundNumber, SimulationTime, Source->UnitIndex, Target->UnitIndex, Damage);
+    UE_LOG(LogTemp, Log, TEXT("[Round] Round=%d Time=%.2f Source=%d Target=%d Damage=%.1f / 서버 피격"), View.RoundNumber, SimulationTime, Source->UnitIndex, Target->UnitIndex, Skill.Power);
 }
 
 void ACombatRoundCoordinator::HandleProjectileResolved(ACombatRoundProjectile* Projectile)

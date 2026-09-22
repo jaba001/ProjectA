@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "CommonActivatableWidget.h"
 #include "Game/Run/RunTypes.h"
+#include "UI/MainMenu/CharacterPartyDraft.h"
 #include "Components/ComboBoxString.h"
 #include "CharacterCreationWidget.generated.h"
 
@@ -17,6 +18,49 @@ class UTextBlock;
 class UTexture2D;
 class UVerticalBox;
 class UWidget;
+
+// One slot presentation reuses both saved Designer bindings and the native fallback.
+// 슬롯 표현 하나가 저장된 Designer 바인딩과 네이티브 대체 레이아웃을 함께 사용합니다.
+USTRUCT()
+struct FCharacterCreationSlotWidgets
+{
+    GENERATED_BODY()
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> CreateButton;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UVerticalBox> EditorBox;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> Title;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> PreviousClass;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> NextClass;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UImage> ClassIcon;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> ClassName;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> Edit;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> Delete;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> ClassInfo;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> PlayerControl;
+
+    void SetCharacterVisible(bool bCreated) const;
+};
 
 // Character creation screen widget base with temporary selection data.
 // 임시 선택 데이터를 관리하는 캐릭터 생성 화면 위젯 기반 클래스입니다.
@@ -362,6 +406,7 @@ private:
     // 파티 슬롯 바인딩과 상태 및 표시 클래스 데이터를 초기화합니다.
     void InitializeClassSlotWidgetArrays();
     void InitializeClassSlots();
+    void SyncDraftProperties();
     void BuildPlayerControlButtons();
     void RefreshPlayerControlSelection();
     void RefreshClassSlotWidgets();
@@ -370,7 +415,6 @@ private:
     void CreateCharacterInSlot(int32 SlotIndex);
     void ClearCharacterSlot(int32 SlotIndex);
     void RefreshSlotVisibility(int32 SlotIndex);
-    void SetWidgetVisible(UWidget* Widget, bool bIsVisible) const;
     bool IsSlotCreated(int32 SlotIndex) const;
     bool HasDeferredSlotCreationWidgets() const;
     FText GetDisplayNameForClassId(FName ClassId) const;
@@ -519,38 +563,9 @@ private:
     TArray<uint8> SlotCreationStates;
 
     UPROPERTY(Transient)
-    TArray<TObjectPtr<UButton>> CreateSlotButtons;
+    TArray<FCharacterCreationSlotWidgets> SlotWidgets;
 
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<UVerticalBox>> SlotEditorBoxes;
-
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<UTextBlock>> SlotTitleTexts;
-
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<UButton>> PreviousClassButtons;
-
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<UButton>> NextClassButtons;
-
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<UImage>> ClassIconImages;
-
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<UTextBlock>> ClassNameTexts;
-
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<UButton>> EditButtons;
-
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<UButton>> DeleteButtons;
-
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<UButton>> ClassInfoButtons;
-
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<UButton>> PlayerControlButtons;
-    int32 PlayerControlledSlotIndex = INDEX_NONE;
+    FCharacterPartyDraft PartyDraft;
 
     void BuildDetailPanel();
     UFUNCTION()

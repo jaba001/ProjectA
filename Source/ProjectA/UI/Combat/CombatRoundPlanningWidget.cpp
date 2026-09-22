@@ -1,6 +1,7 @@
 #include "UI/Combat/CombatRoundPlanningWidget.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "AbilitySystemComponent.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "CommonInputModeTypes.h"
@@ -223,6 +224,9 @@ void UCombatRoundPlanningWidget::UnbindWorldInput()
         BoundController->OnRoundWorldTileClicked.RemoveAll(this);
     }
     BoundController.Reset();
+    bHasObservedState = false;
+    ObservedState = FCombatPlanningRefreshState();
+    MovableCoords.Reset();
     bChoosingMove = false;
     ClearHighlights();
 }
@@ -242,10 +246,11 @@ void UCombatRoundPlanningWidget::NativeDestruct()
 void UCombatRoundPlanningWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
     Super::NativeTick(MyGeometry, InDeltaTime);
+    if (!IsActivated()) return;
     RefreshElapsed += InDeltaTime;
     if (RefreshElapsed < 0.1f) return;
     RefreshElapsed = 0.f;
-    RefreshView();
+    RefreshView(false);
 }
 
 bool UCombatRoundPlanningWidget::CanEdit() const
@@ -503,43 +508,49 @@ void UCombatRoundPlanningWidget::HandleUnready()
 
 void UCombatRoundPlanningWidget::ClearHighlights()
 {
-    for (const TWeakObjectPtr<ACombatGridTile>& Tile : HighlightedTiles)
+    for (const auto& Entry : HighlightedTiles)
     {
-        if (Tile.IsValid()) Tile->ClearHighlightVisual();
+        if (Entry.Key.IsValid()) Entry.Key->ClearHighlightVisual();
     }
     HighlightedTiles.Reset();
 }
 
 void UCombatRoundPlanningWidget::RefreshHighlights()
 {
-    ClearHighlights();
-    if (!CanEdit() || !BoundController.IsValid()) return;
-    const ACombatRoundCoordinator* Coordinator = BoundController->GetRoundCoordinator();
-    const ACombatArena* Arena = Coordinator->GetArena();
-    const ACombatGridManager* Grid = Arena ? Arena->Grid.Get() : nullptr;
-    if (!Grid) return;
-    const int32 UnitId = GetSelectedUnitId();
-    const FCombatRoundUnitView* Unit = Coordinator->GetView().Units.FindByPredicate([UnitId](const FCombatRoundUnitView& Entry) { return Entry.UnitId == UnitId; });
-    for (const TPair<FIntPoint, ACombatGridTile*>& Entry : Grid->TileMap)
+    TMap<TWeakObjectPtr<ACombatGridTile>, bool> Desired;
+    if (CanEdit() && BoundController.IsValid())
     {
-        if (!IsValid(Entry.Value)) continue;
-        FText Error;
-        if (bChoosingMove && Coordinator->CanMoveUnit(GetSelectedUnitId(), Entry.Key, Error))
+        const ACombatRoundCoordinator* Coordinator = BoundController->GetRoundCoordinator();
+        const ACombatArena* Arena = Coordinator->GetArena();
+        const ACombatGridManager* Grid = Arena ? Arena->Grid.Get() : nullptr;
+        const int32 UnitId = GetSelectedUnitId();
+        const FCombatRoundUnitView* Unit = Coordinator->GetView().Units.FindByPredicate([UnitId](const FCombatRoundUnitView& Entry) { return Entry.UnitId == UnitId; });
+        if (Grid)
         {
-            Entry.Value->ApplyMovableTileVisual();
-            HighlightedTiles.Add(Entry.Value);
-        }
-        else if (!bChoosingMove && Unit && Unit->bHasMovePlan && Entry.Key == Unit->MoveDestinationCoord)
-        {
-            Entry.Value->ApplyMovableTileVisual();
-            HighlightedTiles.Add(Entry.Value);
-        }
-        else if (!bChoosingMove && bHasTargetTile && Entry.Key == SelectedTargetCoord)
-        {
-            Entry.Value->ApplySkillTargetTileVisual();
-            HighlightedTiles.Add(Entry.Value);
+            for (const TPair<FIntPoint, ACombatGridTile*>& Entry : Grid->TileMap)
+            {
+                if (!IsValid(Entry.Value)) continue;
+                if (bChoosingMove && MovableCoords.Contains(Entry.Key)) Desired.Add(Entry.Value, true);
+                else if (!bChoosingMove && Unit && Unit->bHasMovePlan && Entry.Key == Unit->MoveDestinationCoord) Desired.Add(Entry.Value, true);
+                else if (!bChoosingMove && bHasTargetTile && Entry.Key == SelectedTargetCoord) Desired.Add(Entry.Value, false);
+            }
         }
     }
+    // Change only tiles whose highlight changed; unchanged planning no longer resets their visuals.
+    // 하이라이트가 바뀐 타일만 변경하여 동일한 계획에서 시각 상태를 재설정하지 않습니다.
+    for (const auto& Entry : HighlightedTiles)
+    {
+        const bool* NewKind = Desired.Find(Entry.Key);
+        if (Entry.Key.IsValid() && (!NewKind || *NewKind != Entry.Value)) Entry.Key->ClearHighlightVisual();
+    }
+    for (const auto& Entry : Desired)
+    {
+        const bool* OldKind = HighlightedTiles.Find(Entry.Key);
+        if (OldKind && *OldKind == Entry.Value) continue;
+        if (Entry.Value) Entry.Key->ApplyMovableTileVisual();
+        else Entry.Key->ApplySkillTargetTileVisual();
+    }
+    HighlightedTiles = MoveTemp(Desired);
 }
 
 void UCombatRoundPlanningWidget::RefreshPartyCards(const ACombatRoundCoordinator* Coordinator, int32 OwnerSlot)
@@ -596,8 +607,76 @@ void UCombatRoundPlanningWidget::RefreshPartyCards(const ACombatRoundCoordinator
     }
 }
 
-void UCombatRoundPlanningWidget::RefreshView()
+FCombatPlanningRefreshState UCombatRoundPlanningWidget::CaptureRefreshState() const
 {
+    FCombatPlanningRefreshState State;
+    ACombatRoundPlayerController* Controller = Cast<ACombatRoundPlayerController>(GetOwningPlayer());
+    ACombatRoundCoordinator* Coordinator = Controller ? Controller->GetRoundCoordinator() : nullptr;
+    State.Controller = Controller;
+    State.Coordinator = Coordinator;
+    State.bActivated = IsActivated();
+    State.SelectedUnit = GetSelectedUnitId();
+    State.SelectedTarget = SelectedTargetId;
+    State.TargetCoord = SelectedTargetCoord;
+    State.bChoosingMove = bChoosingMove;
+    State.bHasTarget = bHasTargetTile;
+    State.LocalStatus = LocalStatus.ToString();
+    if (Controller)
+    {
+        State.OwnerSlot = Controller->GetRoundParticipantSlot();
+        State.RequestStatus = Controller->GetRoundRequestStatus().ToString();
+        State.bInputEnabled = Controller->IsRoundInputEnabled();
+        State.bRequestPending = Controller->IsRoundRequestPending();
+    }
+    if (!IsValid(Coordinator)) return State;
+    State.View = Coordinator->GetView();
+    State.Skills = Coordinator->GetSkills();
+    State.bSAPMovement = Coordinator->IsSAPMovementInProgress();
+    for (const FCombatRoundUnitView& Unit : State.View.Units)
+    {
+        FCombatPlanningUnitObservation& Observation = State.Units.AddDefaulted_GetRef();
+        Observation.Unit = Unit.Unit.Get();
+        Observation.Name = UnitLabel(Unit);
+        if (!IsValid(Unit.Unit)) continue;
+        Observation.bAlive = Unit.Unit->IsUnitAlive();
+        Observation.AP = Unit.Unit->GetCurrentActionPoint();
+        Observation.SAP = Unit.Unit->GetCurrentSubActionPoint();
+        Observation.MoveRange = Unit.Unit->GetMoveRange();
+        Observation.CurrentTile = Unit.Unit->GetCurrentTile();
+        if (UAbilitySystemComponent* ASC = Unit.Unit->GetAbilitySystemComponent())
+        {
+            Observation.AbilitySystem = ASC;
+            ASC->GetOwnedGameplayTags(Observation.Tags);
+            ASC->GetBlockedAbilityTags(Observation.BlockedAbilityTags);
+        }
+    }
+    ACombatArena* Arena = Coordinator->GetArena();
+    ACombatGridManager* Grid = IsValid(Arena) ? Arena->Grid.Get() : nullptr;
+    State.Arena = Arena;
+    State.Grid = Grid;
+    if (IsValid(Grid))
+    {
+        for (const TPair<FIntPoint, ACombatGridTile*>& Entry : Grid->TileMap)
+        {
+            FCombatPlanningTileObservation& Tile = State.Tiles.AddDefaulted_GetRef();
+            Tile.Coord = Entry.Key;
+            Tile.Tile = Entry.Value;
+            Tile.bValid = IsValid(Entry.Value);
+            if (!Tile.bValid) continue;
+            Tile.TileCoord = Entry.Value->GridCoord;
+            Tile.Occupant = Entry.Value->GetOccupyingUnit();
+            Tile.Territory = static_cast<uint8>(Entry.Value->GetTerritory());
+            Tile.bProtected = Entry.Value->GetProtectedByFront();
+        }
+        State.Tiles.Sort([](const FCombatPlanningTileObservation& Left, const FCombatPlanningTileObservation& Right) { return Left.Coord.X == Right.Coord.X ? Left.Coord.Y < Right.Coord.Y : Left.Coord.X < Right.Coord.X; });
+    }
+    return State;
+}
+
+void UCombatRoundPlanningWidget::RefreshView(bool bForce)
+{
+    if (!bForce && bHasObservedState && ObservedState == CaptureRefreshState()) return;
+    MovableCoords.Reset();
     ACombatRoundPlayerController* Controller = Cast<ACombatRoundPlayerController>(GetOwningPlayer());
     ACombatRoundCoordinator* Coordinator = Controller ? Controller->GetRoundCoordinator() : nullptr;
     const bool bConnected = IsValid(Coordinator);
@@ -661,7 +740,7 @@ void UCombatRoundPlanningWidget::RefreshView()
             bHasMovePlan = SelectedUnit->bHasMovePlan;
             MovePlanDetails->SetText(FText::FromString(bHasMovePlan ? FString::Printf(TEXT("SAP 이동: (%d,%d) · 비용 1"), SelectedUnit->MoveDestinationCoord.X, SelectedUnit->MoveDestinationCoord.Y) : TEXT("SAP 이동: 예약 없음")));
             const ACombatArena* Arena = Coordinator->GetArena();
-            if (Arena && Arena->Grid)
+            if (bEditable && Arena && Arena->Grid)
             {
                 for (const TPair<FIntPoint, ACombatGridTile*>& Tile : Arena->Grid->TileMap)
                 {
@@ -669,7 +748,7 @@ void UCombatRoundPlanningWidget::RefreshView()
                     if (Coordinator->CanMoveUnit(SelectedUnit->UnitId, Tile.Key, Error))
                     {
                         bCanMove = true;
-                        break;
+                        MovableCoords.Add(Tile.Key);
                     }
                 }
             }
@@ -723,4 +802,6 @@ void UCombatRoundPlanningWidget::RefreshView()
     UnreadyButton->SetVisibility(bAnyReady ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     UnreadyButton->SetIsEnabled(bEditable && bAnyReady);
     RefreshHighlights();
+    ObservedState = CaptureRefreshState();
+    bHasObservedState = true;
 }

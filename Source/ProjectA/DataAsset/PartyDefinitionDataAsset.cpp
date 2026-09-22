@@ -3,6 +3,7 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Run/RunTypes.h"
 #include "Profession/ProfessionBase.h"
+#include "Unit/UnitDataRules.h"
 
 TSubclassOf<APlayerUnit> UPartyDefinitionDataAsset::ResolvePlayerClass(FName ClassId) const
 {
@@ -92,42 +93,23 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
         OutDefinition.SubActionPoints = Defaults->GetMaxSubActionPoint();
         OutDefinition.StartingSkills = Defaults->GetEquippedSkillDataAssets();
     }
-    if (!FMath::IsFinite(OutDefinition.MaxHP) || OutDefinition.MaxHP <= 0.0f)
+    if (!UnitDataRules::IsValidMaxHP(OutDefinition.MaxHP))
     {
-        return Fail(NSLOCTEXT("PartyDefinition", "InvalidHP", "Resolved MaxHP must be finite and positive. / 실제 MaxHP는 유한한 양수여야 합니다."));
+        return Fail(NSLOCTEXT("PartyDefinition", "InvalidHPRange", "Resolved MaxHP must be finite, positive and at most 1000000. / 실제 MaxHP는 1000000 이하의 유한한 양수여야 합니다."));
     }
     for (float Attribute : {OutDefinition.Strength, OutDefinition.Dexterity, OutDefinition.Intelligence})
     {
-        if (!FMath::IsFinite(Attribute) || Attribute < 0.0f || Attribute > 1000000.0f)
+        if (!UnitDataRules::IsValidAttribute(Attribute))
         {
             return Fail(NSLOCTEXT("PartyDefinition", "InvalidAttributes", "Strength, Dexterity and Intelligence must be finite values between 0 and 1000000. / 힘·민첩·지능은 0~1000000 범위의 유한한 값이어야 합니다."));
         }
     }
-    if (OutDefinition.ActionPoints <= 0 || OutDefinition.SubActionPoints < 0)
+    if (!UnitDataRules::IsValidActionPoints(OutDefinition.ActionPoints, OutDefinition.SubActionPoints))
     {
-        return Fail(NSLOCTEXT("PartyDefinition", "InvalidAP", "Resolved ActionPoints must be positive and SubActionPoints nonnegative. / 실제 ActionPoints는 양수, SubActionPoints는 0 이상이어야 합니다."));
+        return Fail(NSLOCTEXT("PartyDefinition", "InvalidAPRange", "Resolved ActionPoints must be 1 to 100 and SubActionPoints 0 to 100. / 실제 ActionPoints는 1~100, SubActionPoints는 0~100이어야 합니다."));
     }
-    if (OutDefinition.StartingSkills.IsEmpty())
-    {
-        return Fail(NSLOCTEXT("PartyDefinition", "MissingSkills", "The resolved loadout requires at least one starting skill. / 실제 시작 스킬이 한 개 이상 필요합니다."));
-    }
-    TSet<FName> SkillIds;
-    for (int32 Index = 0; Index < OutDefinition.StartingSkills.Num(); ++Index)
-    {
-        USkillDefinitionDataAsset* Skill = OutDefinition.StartingSkills[Index];
-        if (!IsValid(Skill))
-        {
-            return Fail(FText::Format(NSLOCTEXT("PartyDefinition", "InvalidSkillReference", "StartingSkills[{0}] is missing or invalid. / StartingSkills[{0}] 참조가 없거나 유효하지 않습니다."), FText::AsNumber(Index)));
-        }
-        FCombatRoundSkill Resolved;
-        FText Error;
-        if (!Skill->ResolveRoundSkill(Resolved, Error)) return Fail(Error);
-        if (SkillIds.Contains(Resolved.SkillId))
-        {
-            return Fail(FText::Format(NSLOCTEXT("PartyDefinition", "DuplicateSkill", "Starting skill asset ID is duplicated: {0}. / 시작 스킬 에셋 ID가 중복됩니다: {0}."), FText::FromName(Resolved.SkillId)));
-        }
-        SkillIds.Add(Resolved.SkillId);
-    }
+    FText SkillsError;
+    if (!UnitDataRules::ValidateSkills(OutDefinition.StartingSkills, true, SkillsError)) return Fail(SkillsError);
     return true;
 }
 
@@ -167,31 +149,23 @@ bool UPartyDefinitionDataAsset::ResolveMemberSkills(const FRunPartyMember& Membe
         OutSkills = MoveTemp(Profession.StartingSkills);
         return true;
     }
-    if (Member.Skills.IsEmpty() || Member.Skills.Num() > 5)
+    if (!UnitDataRules::IsValidSkillCount(Member.Skills.Num(), true))
     {
         OutError = NSLOCTEXT("PartyDefinition", "InvalidMemberSkillCount", "캐릭터의 저장된 스킬은 1~5개여야 합니다.");
         return false;
     }
     TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
-    TSet<FName> SkillIds;
     for (const FSoftObjectPath& Path : Member.Skills)
     {
         USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
-        FCombatRoundSkill Definition;
         if (!IsValid(Skill))
         {
             OutError = FText::Format(NSLOCTEXT("PartyDefinition", "MissingMemberSkill", "저장된 스킬 에셋을 불러올 수 없습니다: {0}"), FText::FromString(Path.ToString()));
             return false;
         }
-        if (!Skill->ResolveRoundSkill(Definition, OutError)) return false;
-        if (SkillIds.Contains(Definition.SkillId))
-        {
-            OutError = NSLOCTEXT("PartyDefinition", "DuplicateMemberSkill", "캐릭터의 저장된 스킬 식별자가 중복됩니다.");
-            return false;
-        }
-        SkillIds.Add(Definition.SkillId);
         Skills.Add(Skill);
     }
+    if (!UnitDataRules::ValidateSkills(Skills, true, OutError)) return false;
     OutSkills = MoveTemp(Skills);
     return true;
 }

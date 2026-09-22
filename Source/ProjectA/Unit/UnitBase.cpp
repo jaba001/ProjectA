@@ -1,5 +1,6 @@
 #include "UnitBase.h"
 #include "Unit/UnitCharacterMovementComponent.h"
+#include "Unit/UnitDataRules.h"
 
 #include "Kismet/GameplayStatics.h"
 #include "Components/CapsuleComponent.h"
@@ -261,25 +262,6 @@ void AUnitBase::SetTeam(ETeam NewTeam)
     }
 }
 
-void AUnitBase::OnTurnStart()
-{
-    // Only the coordinator can start round actions.
-    // 라운드 행동은 조정자만 시작할 수 있습니다.
-    OnTurnEnd();
-}
-
-void AUnitBase::OnTurnEnd()
-{
-    if (!HasAuthority())
-    {
-        return;
-    }
-
-    bIsActiveTurn = false;
-    bTurnMustEndAfterCurrentAction = false;
-    ForceNetUpdate();
-}
-
 void AUnitBase::ResetActionPoint()
 {
     if (HasAuthority())
@@ -470,121 +452,6 @@ void AUnitBase::SetCurrentTile(ACombatGridTile* NewTile)
 }
 
 
-void AUnitBase::MoveToTile(ACombatGridTile* TargetTile)
-{
-    UE_LOG(LogTemp, Warning, TEXT("[UnitBase] Sequential action entry is retired; submit a round plan."));
-}
-
-void AUnitBase::MoveToTarget(AUnitBase* TargetUnit)
-{
-    UE_LOG(LogTemp, Warning, TEXT("[UnitBase] Sequential action entry is retired; submit a round plan."));
-}
-
-void AUnitBase::ReturnToOriginalTile()
-{
-    UE_LOG(LogTemp, Warning, TEXT("[UnitBase] Sequential action entry is retired; submit a round plan."));
-}
-
-void AUnitBase::SnapToTile(ACombatGridTile* Tile, const FRotator& TargetRotation)
-{
-    UE_LOG(LogTemp, Warning, TEXT("[UnitBase] Sequential action entry is retired; submit a round plan."));
-}
-
-void AUnitBase::OnSnapToTileFinished()
-{
-    // Compatibility callback has no sequential action to advance.
-    // 호환 콜백은 순차 행동을 진행하지 않습니다.
-}
-
-void AUnitBase::OnReturnToOriginalTileFinished()
-{
-    // Compatibility callback has no sequential action to advance.
-    // 호환 콜백은 순차 행동을 진행하지 않습니다.
-}
-
-void AUnitBase::HandleMoveCompleted()
-{
-    // Compatibility callback has no sequential action to advance.
-    // 호환 콜백은 순차 행동을 진행하지 않습니다.
-}
-
-void AUnitBase::HandleMoveFailed(EUnitActionResult Result)
-{
-    // Compatibility callback has no sequential action to advance.
-    // 호환 콜백은 순차 행동을 진행하지 않습니다.
-}
-
-void AUnitBase::StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile)
-{
-    UE_LOG(LogTemp, Warning, TEXT("[UnitBase] Sequential action entry is retired; submit a round plan."));
-}
-
-void AUnitBase::ExecuteSkillAtTarget()
-{
-    UE_LOG(LogTemp, Warning, TEXT("[UnitBase] Sequential action entry is retired; submit a round plan."));
-}
-
-TArray<AUnitBase*> AUnitBase::ResolveSkillTargetUnits()
-{
-    return {};
-}
-
-void AUnitBase::OnSkillFinished()
-{
-    // Compatibility callback has no sequential action to advance.
-    // 호환 콜백은 순차 행동을 진행하지 않습니다.
-}
-
-void AUnitBase::ClearSkillContext()
-{
-    // Compatibility callback has no sequential action to advance.
-    // 호환 콜백은 순차 행동을 진행하지 않습니다.
-}
-
-void AUnitBase::StartMoveAction(ACombatGridTile* TargetTile)
-{
-    UE_LOG(LogTemp, Warning, TEXT("[UnitBase] Sequential action entry is retired; submit a round plan."));
-}
-
-void AUnitBase::OnMoveActionFinished()
-{
-    // Compatibility callback has no sequential action to advance.
-    // 호환 콜백은 순차 행동을 진행하지 않습니다.
-}
-
-void AUnitBase::ClearMoveContext()
-{
-    // Compatibility callback has no sequential action to advance.
-    // 호환 콜백은 순차 행동을 진행하지 않습니다.
-}
-
-bool AUnitBase::CanUseHealingItem(AUnitBase* TargetUnit) const
-{
-    return false;
-}
-
-void AUnitBase::StartItemAction(AUnitBase* TargetUnit)
-{
-    UE_LOG(LogTemp, Warning, TEXT("[UnitBase] Sequential action entry is retired; submit a round plan."));
-}
-
-void AUnitBase::ExecuteItemAtTarget()
-{
-    UE_LOG(LogTemp, Warning, TEXT("[UnitBase] Sequential action entry is retired; submit a round plan."));
-}
-
-void AUnitBase::OnItemFinished()
-{
-    // Compatibility callback has no sequential action to advance.
-    // 호환 콜백은 순차 행동을 진행하지 않습니다.
-}
-
-void AUnitBase::ClearItemContext()
-{
-    // Compatibility callback has no sequential action to advance.
-    // 호환 콜백은 순차 행동을 진행하지 않습니다.
-}
-
 TArray<TSubclassOf<UGameplayAbility>> AUnitBase::GetAvailableSkillAbilityClasses() const
 {
     TArray<TSubclassOf<UGameplayAbility>> Result;
@@ -632,23 +499,16 @@ USkillDefinitionDataAsset* AUnitBase::FindSkillDataByAbilityClass(TSubclassOf<UG
 
 bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Strength, float Dexterity, float Intelligence)
 {
-    if (!HasAuthority() || IsBusy() || IsActiveTurn() || !AbilitySystem || !AttributeSet || !FMath::IsFinite(MaxHP) || MaxHP <= 0.0f || AP <= 0 || SubAP < 0)
+    if (!HasAuthority() || IsBusy() || IsActiveTurn() || !AbilitySystem || !AttributeSet || !UnitDataRules::IsValidMaxHP(MaxHP) || !UnitDataRules::IsValidActionPoints(AP, SubAP))
     {
         return false;
     }
-    if (!FMath::IsFinite(Strength) || Strength < 0.0f || Strength > 1000000.0f || !FMath::IsFinite(Dexterity) || Dexterity < 0.0f || Dexterity > 1000000.0f || !FMath::IsFinite(Intelligence) || Intelligence < 0.0f || Intelligence > 1000000.0f)
+    if (!UnitDataRules::IsValidAttributes(Strength, Dexterity, Intelligence))
     {
         return false;
     }
-    for (USkillDefinitionDataAsset* Skill : Skills)
-    {
-        FCombatRoundSkill Definition;
-        FText Error;
-        if (!IsValid(Skill) || !Skill->ResolveRoundSkill(Definition, Error))
-        {
-            return false;
-        }
-    }
+    FText SkillsError;
+    if (!UnitDataRules::ValidateSkills(Skills, false, SkillsError)) return false;
     InitMaxHP = MaxHP;
     MaxActionPoint = AP;
     MaxSubActionPoint = SubAP;
@@ -676,7 +536,7 @@ bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TA
 
 bool AUnitBase::ConfigureMoveRange(int32 InMoveRange)
 {
-    if (!HasAuthority() || IsBusy() || IsActiveTurn() || InMoveRange < 0 || InMoveRange > 32)
+    if (!HasAuthority() || IsBusy() || IsActiveTurn() || !UnitDataRules::IsValidMoveRange(InMoveRange))
     {
         return false;
     }
@@ -688,7 +548,7 @@ bool AUnitBase::AcquireAndEquipSkill(USkillDefinitionDataAsset* Skill)
 {
     FCombatRoundSkill Definition;
     FText Error;
-    if (!HasAuthority() || IsBusy() || !IsUnitAlive() || !IsValid(Skill) || !Skill->ResolveRoundSkill(Definition, Error) || EquippedSkillDataAssets.Num() >= 5)
+    if (!HasAuthority() || IsBusy() || !IsUnitAlive() || !IsValid(Skill) || !Skill->ResolveRoundSkill(Definition, Error) || !UnitDataRules::IsValidSkillCount(EquippedSkillDataAssets.Num() + 1, true))
     {
         return false;
     }

@@ -274,7 +274,7 @@ void UCharacterCreationWidget::NativeOnInitialized()
     Theme.StylePanel(DetailPanel);
     Theme.StyleButton(Button_StartGame, true);
     Theme.StyleButton(DetailSave, true);
-    for (int32 SlotIndex = 0; SlotIndex < 4; ++SlotIndex)
+    for (int32 SlotIndex = 0; SlotIndex < FCharacterPartyDraft::Capacity; ++SlotIndex)
     {
         Theme.StylePanel(Cast<UBorder>(GetWidgetFromName(FName(*FString::Printf(TEXT("SlotPanel_%d"), SlotIndex)))));
     }
@@ -539,9 +539,10 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
         }
     };
 
-    for (int32 SlotIndex = 0; SlotIndex < GetAvailablePartyClassIds().Num(); ++SlotIndex)
+    for (int32 SlotIndex = 0; SlotIndex < FCharacterPartyDraft::Capacity; ++SlotIndex)
     {
-        const FText DisplayName = GetDisplayNameForClassId(GetAvailablePartyClassIds()[SlotIndex]);
+        const TArray<FName>& Classes = GetAvailablePartyClassIds();
+        const FText DisplayName = Classes.IsEmpty() ? FText::GetEmpty() : GetDisplayNameForClassId(Classes[SlotIndex % Classes.Num()]);
         UBorder* SlotPanel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), FName(*FString::Printf(TEXT("SlotPanel_%d"), SlotIndex)));
         UOverlay* SlotContentOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), FName(*FString::Printf(TEXT("SlotContentOverlay_%d"), SlotIndex)));
         UButton* CreateSlotButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*FString::Printf(TEXT("Button_Slot%d_Create"), SlotIndex)));
@@ -643,7 +644,7 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
 
         AssignSlotWidgets(SlotIndex, CreateSlotButton, SlotEditorBox, TitleText, PrevButton, NextButton, ClassIcon, ClassNameText, EditButton, DeleteButton, ClassInfoButton);
 
-        if (SlotIndex < GetAvailablePartyClassIds().Num() - 1)
+        if (SlotIndex < FCharacterPartyDraft::Capacity - 1)
         {
             USizeBox* DividerBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), FName(*FString::Printf(TEXT("SlotDividerBox_%d"), SlotIndex)));
             UBorder* Divider = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), FName(*FString::Printf(TEXT("SlotDivider_%d"), SlotIndex)));
@@ -734,88 +735,90 @@ void UCharacterCreationWidget::ConfigurePartySlotsFixedHeight()
 
 void UCharacterCreationWidget::InitializeClassSlotWidgetArrays()
 {
-    CreateSlotButtons = { Button_Slot0_Create, Button_Slot1_Create, Button_Slot2_Create, Button_Slot3_Create };
-    SlotEditorBoxes = { SlotEditorBox_0, SlotEditorBox_1, SlotEditorBox_2, SlotEditorBox_3 };
-    SlotTitleTexts = { Text_Slot0_Title, Text_Slot1_Title, Text_Slot2_Title, Text_Slot3_Title };
-    PreviousClassButtons = { Button_Slot0_Prev, Button_Slot1_Prev, Button_Slot2_Prev, Button_Slot3_Prev };
-    NextClassButtons = { Button_Slot0_Next, Button_Slot1_Next, Button_Slot2_Next, Button_Slot3_Next };
-    ClassIconImages = { Image_Slot0_ClassIcon, Image_Slot1_ClassIcon, Image_Slot2_ClassIcon, Image_Slot3_ClassIcon };
-    ClassNameTexts = { Text_Slot0_ClassName, Text_Slot1_ClassName, Text_Slot2_ClassName, Text_Slot3_ClassName };
-    EditButtons = { Button_Slot0_Edit, Button_Slot1_Edit, Button_Slot2_Edit, Button_Slot3_Edit };
-    DeleteButtons = { Button_Slot0_Delete, Button_Slot1_Delete, Button_Slot2_Delete, Button_Slot3_Delete };
-    ClassInfoButtons = { Button_Slot0_ClassInfo, Button_Slot1_ClassInfo, Button_Slot2_ClassInfo, Button_Slot3_ClassInfo };
+    SlotWidgets.SetNum(FCharacterPartyDraft::Capacity);
+    for (int32 Index = 0; Index < SlotWidgets.Num(); ++Index)
+    {
+        FCharacterCreationSlotWidgets& SlotPresentation = SlotWidgets[Index];
+        auto Find = [this, Index](const TCHAR* Pattern) { return GetWidgetFromName(FName(*FString(Pattern).Replace(TEXT("%d"), *FString::FromInt(Index)))); };
+        SlotPresentation.CreateButton = Cast<UButton>(Find(TEXT("Button_Slot%d_Create")));
+        SlotPresentation.EditorBox = Cast<UVerticalBox>(Find(TEXT("SlotEditorBox_%d")));
+        SlotPresentation.Title = Cast<UTextBlock>(Find(TEXT("Text_Slot%d_Title")));
+        SlotPresentation.PreviousClass = Cast<UButton>(Find(TEXT("Button_Slot%d_Prev")));
+        SlotPresentation.NextClass = Cast<UButton>(Find(TEXT("Button_Slot%d_Next")));
+        SlotPresentation.ClassIcon = Cast<UImage>(Find(TEXT("Image_Slot%d_ClassIcon")));
+        SlotPresentation.ClassName = Cast<UTextBlock>(Find(TEXT("Text_Slot%d_ClassName")));
+        SlotPresentation.Edit = Cast<UButton>(Find(TEXT("Button_Slot%d_Edit")));
+        SlotPresentation.Delete = Cast<UButton>(Find(TEXT("Button_Slot%d_Delete")));
+        SlotPresentation.ClassInfo = Cast<UButton>(Find(TEXT("Button_Slot%d_ClassInfo")));
+    }
+}
+
+void UCharacterCreationWidget::SyncDraftProperties()
+{
+    // Keep existing Blueprint property names as read-only projections of the draft.
+    // 기존 Blueprint 속성 이름을 초안의 읽기 전용 표현으로 유지합니다.
+    SlotClassIds.Reset(FCharacterPartyDraft::Capacity);
+    SlotCharacterNames.Reset(FCharacterPartyDraft::Capacity);
+    SlotCreationStates.Reset(FCharacterPartyDraft::Capacity);
+    for (const FRunPartyMember& DraftMember : PartyDraft.ExportParty())
+    {
+        SlotClassIds.Add(DraftMember.ClassId);
+        SlotCharacterNames.Add(DraftMember.CharacterName);
+        SlotCreationStates.Add(DraftMember.bCreated ? 1 : 0);
+    }
 }
 
 void UCharacterCreationWidget::InitializeClassSlots()
 {
-    PlayerControlledSlotIndex = INDEX_NONE;
-    SlotClassIds = GetAvailablePartyClassIds();
-    SlotCharacterNames.SetNum(SlotClassIds.Num());
-    SlotCreationStates.Empty();
-    const bool bUseDeferredCreation = HasDeferredSlotCreationWidgets();
-
-    for (int32 SlotIndex = 0; SlotIndex < SlotClassIds.Num(); ++SlotIndex)
-    {
-        uint8 InitialState = 1;
-
-        if (bUseDeferredCreation)
-        {
-            InitialState = 0;
-        }
-
-        SlotCreationStates.Add(InitialState);
-    }
-
-    if (SlotClassIds.Num() > 0)
-    {
-        CurrentCharacterClassId = SlotClassIds[0];
-    }
+    PartyDraft.Reset(GetAvailablePartyClassIds(), !HasDeferredSlotCreationWidgets());
+    SyncDraftProperties();
+    CurrentCharacterClassId = SlotClassIds[0];
 }
 
 void UCharacterCreationWidget::BuildPlayerControlButtons()
 {
-    if (!WidgetTree || !PlayerControlButtons.IsEmpty()) return;
-    for (int32 SlotIndex = 0; SlotIndex < SlotEditorBoxes.Num(); ++SlotIndex)
+    if (!WidgetTree) return;
+    for (int32 SlotIndex = 0; SlotIndex < SlotWidgets.Num(); ++SlotIndex)
     {
-        UHorizontalBox* Actions = EditButtons.IsValidIndex(SlotIndex) && EditButtons[SlotIndex] ? Cast<UHorizontalBox>(EditButtons[SlotIndex]->GetParent()) : nullptr;
-        UButton* Button = Actions ? WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*FString::Printf(TEXT("Button_Slot%d_PlayerControl"), SlotIndex))) : nullptr;
-        PlayerControlButtons.Add(Button);
-        if (!Button) continue;
-        CreateButtonText(Button, FText::FromString(TEXT("직접 조작")));
-        Actions->AddChildToHorizontalBox(Button)->SetPadding(FMargin(2.0f, 0.0f));
+        FCharacterCreationSlotWidgets& SlotPresentation = SlotWidgets[SlotIndex];
+        if (SlotPresentation.PlayerControl) continue;
+        UHorizontalBox* Actions = SlotPresentation.Edit ? Cast<UHorizontalBox>(SlotPresentation.Edit->GetParent()) : nullptr;
+        if (!Actions) continue;
+        SlotPresentation.PlayerControl = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*FString::Printf(TEXT("Button_Slot%d_PlayerControl"), SlotIndex)));
+        CreateButtonText(SlotPresentation.PlayerControl, FText::FromString(TEXT("직접 조작")));
+        Actions->AddChildToHorizontalBox(SlotPresentation.PlayerControl)->SetPadding(FMargin(2.0f, 0.0f));
     }
-    if (PlayerControlButtons.IsValidIndex(0) && PlayerControlButtons[0]) PlayerControlButtons[0]->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot0ControlClicked);
-    if (PlayerControlButtons.IsValidIndex(1) && PlayerControlButtons[1]) PlayerControlButtons[1]->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot1ControlClicked);
-    if (PlayerControlButtons.IsValidIndex(2) && PlayerControlButtons[2]) PlayerControlButtons[2]->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot2ControlClicked);
-    if (PlayerControlButtons.IsValidIndex(3) && PlayerControlButtons[3]) PlayerControlButtons[3]->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot3ControlClicked);
+    if (SlotWidgets[0].PlayerControl) SlotWidgets[0].PlayerControl->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot0ControlClicked);
+    if (SlotWidgets[1].PlayerControl) SlotWidgets[1].PlayerControl->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot1ControlClicked);
+    if (SlotWidgets[2].PlayerControl) SlotWidgets[2].PlayerControl->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot2ControlClicked);
+    if (SlotWidgets[3].PlayerControl) SlotWidgets[3].PlayerControl->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot3ControlClicked);
 }
 
 bool UCharacterCreationWidget::SelectPlayerControlledSlot(int32 SlotIndex)
 {
-    if (DetailSlot != INDEX_NONE || !IsSlotCreated(SlotIndex)) return false;
-    PlayerControlledSlotIndex = SlotIndex;
+    if (DetailSlot != INDEX_NONE || !PartyDraft.SelectControlled(SlotIndex)) return false;
     RefreshPlayerControlSelection();
     return true;
 }
 
 void UCharacterCreationWidget::RefreshPlayerControlSelection()
 {
-    const bool bHasSelection = IsSlotCreated(PlayerControlledSlotIndex);
+    const bool bHasSelection = IsSlotCreated(PartyDraft.GetControlledSlot());
     for (int32 SlotIndex = 0; SlotIndex < SlotClassIds.Num(); ++SlotIndex)
     {
-        const bool bSelected = bHasSelection && PlayerControlledSlotIndex == SlotIndex;
-        if (PlayerControlButtons.IsValidIndex(SlotIndex) && PlayerControlButtons[SlotIndex])
+        const bool bSelected = bHasSelection && PartyDraft.GetControlledSlot() == SlotIndex;
+        if (SlotWidgets.IsValidIndex(SlotIndex) && SlotWidgets[SlotIndex].PlayerControl)
         {
-            UButton* Button = PlayerControlButtons[SlotIndex];
+            UButton* Button = SlotWidgets[SlotIndex].PlayerControl;
             Button->SetIsEnabled(IsSlotCreated(SlotIndex) && !bSelected);
             if (UTextBlock* Label = Cast<UTextBlock>(Button->GetChildAt(0))) Label->SetText(FText::FromString(bSelected ? TEXT("선택됨") : TEXT("직접 조작")));
         }
-        if (ClassNameTexts.IsValidIndex(SlotIndex) && ClassNameTexts[SlotIndex])
+        if (SlotWidgets.IsValidIndex(SlotIndex) && SlotWidgets[SlotIndex].ClassName)
         {
-            ClassNameTexts[SlotIndex]->SetText(FText::FromString(FString::Printf(TEXT("%s · %s"), *GetDisplayNameForClassId(SlotClassIds[SlotIndex]).ToString(), bSelected ? TEXT("직접 조작") : TEXT("AI"))));
+            SlotWidgets[SlotIndex].ClassName->SetText(FText::FromString(FString::Printf(TEXT("%s · %s"), *GetDisplayNameForClassId(SlotClassIds[SlotIndex]).ToString(), bSelected ? TEXT("직접 조작") : TEXT("AI"))));
         }
     }
-    const FText Status = bHasSelection ? FText::FromString(FString::Printf(TEXT("직접 조작: 슬롯 %d · 나머지 동료는 AI가 조작합니다."), PlayerControlledSlotIndex + 1)) : FText::FromString(TEXT("캐릭터를 생성한 뒤 직접 조작할 1명을 선택하세요. 나머지 동료는 AI가 조작합니다."));
+    const FText Status = bHasSelection ? FText::FromString(FString::Printf(TEXT("직접 조작: 슬롯 %d · 나머지 동료는 AI가 조작합니다."), PartyDraft.GetControlledSlot() + 1)) : FText::FromString(TEXT("캐릭터를 생성한 뒤 직접 조작할 1명을 선택하세요. 나머지 동료는 AI가 조작합니다."));
     if (Text_StartGameStatus) Text_StartGameStatus->SetText(Status);
     if (Button_StartGame)
     {
@@ -864,24 +867,25 @@ void UCharacterCreationWidget::SetSlotClass(int32 SlotIndex, FName ClassId)
         return;
     }
 
-    SlotClassIds[SlotIndex] = ClassId;
+    if (!PartyDraft.SetClass(SlotIndex, ClassId)) return;
+    SyncDraftProperties();
     const FText DisplayName = GetDisplayNameForClassId(ClassId);
 
-    if (SlotTitleTexts.IsValidIndex(SlotIndex) && SlotTitleTexts[SlotIndex])
+    if (SlotWidgets.IsValidIndex(SlotIndex) && SlotWidgets[SlotIndex].Title)
     {
-        SlotTitleTexts[SlotIndex]->SetText(SlotCharacterNames.IsValidIndex(SlotIndex) && !SlotCharacterNames[SlotIndex].IsEmpty() ? SlotCharacterNames[SlotIndex] : DisplayName);
+        SlotWidgets[SlotIndex].Title->SetText(SlotCharacterNames.IsValidIndex(SlotIndex) && !SlotCharacterNames[SlotIndex].IsEmpty() ? SlotCharacterNames[SlotIndex] : DisplayName);
     }
 
-    if (ClassNameTexts.IsValidIndex(SlotIndex) && ClassNameTexts[SlotIndex])
+    if (SlotWidgets.IsValidIndex(SlotIndex) && SlotWidgets[SlotIndex].ClassName)
     {
-        ClassNameTexts[SlotIndex]->SetText(DisplayName);
+        SlotWidgets[SlotIndex].ClassName->SetText(DisplayName);
     }
 
-    if (ClassIconImages.IsValidIndex(SlotIndex) && ClassIconImages[SlotIndex])
+    if (SlotWidgets.IsValidIndex(SlotIndex) && SlotWidgets[SlotIndex].ClassIcon)
     {
         const FProfessionDefinition* Definition = PartyDefinition ? PartyDefinition->Professions.Find(ClassId) : nullptr;
-        ClassIconImages[SlotIndex]->SetBrushFromTexture(Definition ? Definition->Icon.Get() : nullptr);
-        ClassIconImages[SlotIndex]->SetToolTipText(DisplayName);
+        SlotWidgets[SlotIndex].ClassIcon->SetBrushFromTexture(Definition ? Definition->Icon.Get() : nullptr);
+        SlotWidgets[SlotIndex].ClassIcon->SetToolTipText(DisplayName);
     }
     if (SlotIndex == 0)
     {
@@ -903,138 +907,50 @@ void UCharacterCreationWidget::SetSlotClass(int32 SlotIndex, FName ClassId)
 
 void UCharacterCreationWidget::CreateCharacterInSlot(int32 SlotIndex)
 {
-    if (!SlotClassIds.IsValidIndex(SlotIndex) || !SlotCreationStates.IsValidIndex(SlotIndex))
-    {
-        return;
-    }
-
-    SlotCreationStates[SlotIndex] = 1;
+    if (!PartyDraft.Create(SlotIndex)) return;
+    SyncDraftProperties();
     SetSlotClass(SlotIndex, SlotClassIds[SlotIndex]);
     UE_LOG(LogTemp, Log, TEXT("[CharacterCreationWidget] Character creation panel opened. SlotIndex: %d, ClassId: %s"), SlotIndex, *SlotClassIds[SlotIndex].ToString());
 }
 
 void UCharacterCreationWidget::ClearCharacterSlot(int32 SlotIndex)
 {
-    if (!SlotCreationStates.IsValidIndex(SlotIndex))
-    {
-        return;
-    }
-
-    SlotCreationStates[SlotIndex] = 0;
-    if (PlayerControlledSlotIndex == SlotIndex) PlayerControlledSlotIndex = INDEX_NONE;
-
-    if (SlotCharacterNames.IsValidIndex(SlotIndex))
-    {
-        SlotCharacterNames[SlotIndex] = FText::GetEmpty();
-    }
-
+    if (!PartyDraft.Clear(SlotIndex)) return;
+    SyncDraftProperties();
     ClearPreviewStageSlot(SlotIndex);
     RefreshSlotVisibility(SlotIndex);
     RefreshPlayerControlSelection();
     UE_LOG(LogTemp, Log, TEXT("[CharacterCreationWidget] Character creation panel closed. SlotIndex: %d"), SlotIndex);
 }
 
-void UCharacterCreationWidget::RefreshSlotVisibility(int32 SlotIndex)
+void FCharacterCreationSlotWidgets::SetCharacterVisible(bool bCreated) const
 {
-    const bool bCreated = IsSlotCreated(SlotIndex);
-
-    if (CreateSlotButtons.IsValidIndex(SlotIndex))
+    if (CreateButton) CreateButton->SetVisibility(bCreated ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+    if (EditorBox)
     {
-        SetWidgetVisible(CreateSlotButtons[SlotIndex].Get(), !bCreated);
-    }
-
-    if (SlotEditorBoxes.IsValidIndex(SlotIndex) && SlotEditorBoxes[SlotIndex])
-    {
-        SetWidgetVisible(SlotEditorBoxes[SlotIndex].Get(), bCreated);
+        EditorBox->SetVisibility(bCreated ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
         return;
     }
-
-    if (PreviousClassButtons.IsValidIndex(SlotIndex))
+    const TArray<UWidget*> Controls = { PreviousClass.Get(), NextClass.Get(), ClassIcon.Get(), Title.Get(), ClassName.Get(), Edit.Get(), Delete.Get(), ClassInfo.Get(), PlayerControl.Get() };
+    for (UWidget* Control : Controls)
     {
-        SetWidgetVisible(PreviousClassButtons[SlotIndex].Get(), bCreated);
-    }
-
-    if (NextClassButtons.IsValidIndex(SlotIndex))
-    {
-        SetWidgetVisible(NextClassButtons[SlotIndex].Get(), bCreated);
-    }
-
-    if (ClassIconImages.IsValidIndex(SlotIndex))
-    {
-        SetWidgetVisible(ClassIconImages[SlotIndex].Get(), bCreated);
-    }
-
-    if (SlotTitleTexts.IsValidIndex(SlotIndex))
-    {
-        SetWidgetVisible(SlotTitleTexts[SlotIndex].Get(), bCreated);
-    }
-
-    if (ClassNameTexts.IsValidIndex(SlotIndex))
-    {
-        SetWidgetVisible(ClassNameTexts[SlotIndex].Get(), bCreated);
-    }
-
-    if (EditButtons.IsValidIndex(SlotIndex))
-    {
-        SetWidgetVisible(EditButtons[SlotIndex].Get(), bCreated);
-    }
-
-    if (DeleteButtons.IsValidIndex(SlotIndex))
-    {
-        SetWidgetVisible(DeleteButtons[SlotIndex].Get(), bCreated);
-    }
-
-    if (ClassInfoButtons.IsValidIndex(SlotIndex))
-    {
-        SetWidgetVisible(ClassInfoButtons[SlotIndex].Get(), bCreated);
+        if (Control) Control->SetVisibility(bCreated ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     }
 }
 
-void UCharacterCreationWidget::SetWidgetVisible(UWidget* Widget, bool bIsVisible) const
+void UCharacterCreationWidget::RefreshSlotVisibility(int32 SlotIndex)
 {
-    if (!Widget)
-    {
-        return;
-    }
-
-    if (bIsVisible)
-    {
-        Widget->SetVisibility(ESlateVisibility::Visible);
-        return;
-    }
-
-    Widget->SetVisibility(ESlateVisibility::Collapsed);
+    if (SlotWidgets.IsValidIndex(SlotIndex)) SlotWidgets[SlotIndex].SetCharacterVisible(PartyDraft.IsCreated(SlotIndex));
 }
 
 bool UCharacterCreationWidget::IsSlotCreated(int32 SlotIndex) const
 {
-    if (!SlotCreationStates.IsValidIndex(SlotIndex))
-    {
-        return false;
-    }
-
-    return SlotCreationStates[SlotIndex] != 0;
+    return PartyDraft.IsCreated(SlotIndex);
 }
 
 bool UCharacterCreationWidget::HasDeferredSlotCreationWidgets() const
 {
-    for (const TObjectPtr<UButton>& CreateSlotButton : CreateSlotButtons)
-    {
-        if (CreateSlotButton)
-        {
-            return true;
-        }
-    }
-
-    for (const TObjectPtr<UVerticalBox>& SlotEditorBox : SlotEditorBoxes)
-    {
-        if (SlotEditorBox)
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return SlotWidgets.ContainsByPredicate([](const FCharacterCreationSlotWidgets& SlotPresentation) { return SlotPresentation.CreateButton || SlotPresentation.EditorBox; });
 }
 
 FText UCharacterCreationWidget::GetDisplayNameForClassId(FName ClassId) const
@@ -1341,37 +1257,18 @@ void UCharacterCreationWidget::SetCharacterName(const FText& NewName)
 
 void UCharacterCreationWidget::SetSlotCharacterName(int32 SlotIndex, const FText& NewName)
 {
-    if (SlotCharacterNames.IsValidIndex(SlotIndex))
-    {
-        SlotCharacterNames[SlotIndex] = NewName;
-    }
+    if (PartyDraft.SetName(SlotIndex, NewName)) SyncDraftProperties();
 }
 
 TArray<FRunPartyMember> UCharacterCreationWidget::GetPartyMembers() const
 {
-    TArray<FRunPartyMember> PartyMembers;
-
-    for (int32 SlotIndex = 0; SlotIndex < SlotClassIds.Num(); ++SlotIndex)
+    TArray<FRunPartyMember> PartyMembers = PartyDraft.ExportParty();
+    for (FRunPartyMember& Member : PartyMembers)
     {
-        FRunPartyMember& Member = PartyMembers.AddDefaulted_GetRef();
-        Member.SlotIndex = SlotIndex;
-        Member.ClassId = SlotClassIds[SlotIndex];
-        Member.bCreated = IsSlotCreated(SlotIndex);
-        Member.bPlayerControlled = Member.bCreated && PlayerControlledSlotIndex == SlotIndex;
-
-        if (SlotCharacterNames.IsValidIndex(SlotIndex))
-        {
-            Member.CharacterName = SlotCharacterNames[SlotIndex];
-        }
-
-        // Unedited slot names use a stable, readable default until the name editor is expanded.
-        // 이름 편집 확장 전에는 수정하지 않은 슬롯에 알아보기 쉬운 기본 이름을 사용합니다.
-        if (Member.bCreated && Member.CharacterName.ToString().TrimStartAndEnd().IsEmpty())
-        {
-            Member.CharacterName = FText::FromString(FString::Printf(TEXT("%s %d"), *GetDisplayNameForClassId(Member.ClassId).ToString(), SlotIndex + 1));
-        }
+        // Preserve the readable default name until the user edits this slot.
+        // 사용자가 슬롯 이름을 편집하기 전까지 읽기 쉬운 기본 이름을 유지합니다.
+        if (Member.bCreated && Member.CharacterName.ToString().TrimStartAndEnd().IsEmpty()) Member.CharacterName = FText::FromString(FString::Printf(TEXT("%s %d"), *GetDisplayNameForClassId(Member.ClassId).ToString(), Member.SlotIndex + 1));
     }
-
     return PartyMembers;
 }
 
@@ -1434,7 +1331,7 @@ void UCharacterCreationWidget::RequestStartGame()
     {
         return;
     }
-    if (!IsSlotCreated(PlayerControlledSlotIndex))
+    if (!IsSlotCreated(PartyDraft.GetControlledSlot()))
     {
         RefreshPlayerControlSelection();
         return;
@@ -1595,10 +1492,6 @@ void UCharacterCreationWidget::NativeOnActivated()
     // A new visit starts a fresh draft even when CommonUI reuses the widget instance.
     // CommonUI가 위젯 인스턴스를 재사용해도 재진입 시 새 파티 초안으로 시작합니다.
     InitializeClassSlots();
-    for (FText& Name : SlotCharacterNames)
-    {
-        Name = FText::GetEmpty();
-    }
     RefreshClassSlotWidgets();
     RefreshPreview();
 }

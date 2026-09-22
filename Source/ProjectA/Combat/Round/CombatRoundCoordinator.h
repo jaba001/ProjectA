@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Combat/Round/CombatRoundTypes.h"
+#include "Combat/Round/CombatSkillExecutor.h"
 #include "Types/CombatResult.h"
 #include "CombatRoundCoordinator.generated.h"
 
@@ -13,6 +14,10 @@ class APlayerController;
 class AUnitBase;
 class ACombatManager;
 struct FCombatCheckpointData;
+namespace CombatPlanValidation
+{
+    struct FState;
+}
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnRoundCombatFinished, ECombatResult);
 DECLARE_MULTICAST_DELEGATE(FOnRoundStateChanged);
@@ -69,9 +74,7 @@ private:
         double PhaseStarted = 0.0;
         double MontageStartedAt = 0.0;
         double MontageRecoverySeconds = 0.0;
-        double WeaponTraceTime = -1.0;
-        FVector PreviousBladeBase = FVector::ZeroVector;
-        FVector PreviousBladeTip = FVector::ZeroVector;
+        CombatSkillExecution::FWeaponTraceState WeaponTrace;
         bool bReleased = false;
         bool bMontageStarted = false;
         bool bTrackMontageCompletion = false;
@@ -119,6 +122,7 @@ private:
     // Resolve server-only AI idling separately from the equipped skill catalogue.
     // 서버 전용 AI 대기는 장착 스킬 목록과 분리하여 해석합니다.
     const FCombatRoundSkill* FindCommandSkill(const FCombatRoundCommand& Command) const;
+    CombatPlanValidation::FState BuildPlanningState() const;
     bool BuildPlanningMovePath(int32 UnitId, FIntPoint Destination, TArray<FIntPoint>& OutPath, FText& OutError) const;
     void BeginNextMove();
     void AdvanceSAPMovement(float DeltaSeconds);
@@ -145,6 +149,6 @@ private:
     int32 FindUnitIndex(int32 UnitId) const;
     int32 FindNearestEnemy(int32 SourceIndex, FName SkillId = NAME_None) const;
     bool MoveUnitToward(int32 Index, FVector Destination, float Speed, float StepSeconds);
-    void ApplyHit(AUnitBase* Source, AUnitBase* Target, float Damage);
+    void ApplyHit(AUnitBase* Source, AUnitBase* Target, const FCombatRoundSkill& Skill);
     void HandleProjectileResolved(ACombatRoundProjectile* Projectile);
 };

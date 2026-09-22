@@ -4,8 +4,12 @@
 #include "GameplayTagContainer.h"
 #include "Unit/UnitBase.h"
 
-bool UCombatEffectLibrary::ApplyDamageToUnit(AUnitBase* SourceUnit, AUnitBase* TargetUnit,
-    TSubclassOf<UGameplayEffect> DamageEffectClass, float DamageAmount)
+bool UCombatEffectLibrary::ApplyDamageToUnit(AUnitBase* SourceUnit, AUnitBase* TargetUnit, TSubclassOf<UGameplayEffect> DamageEffectClass, float DamageAmount)
+{
+    return ApplyTaggedEffectToUnit(SourceUnit, TargetUnit, DamageEffectClass, DamageAmount, FGameplayTagContainer());
+}
+
+bool UCombatEffectLibrary::ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitBase* TargetUnit, TSubclassOf<UGameplayEffect> DamageEffectClass, float DamageAmount, const FGameplayTagContainer& AssetTags)
 {
     if (!SourceUnit || !TargetUnit)
     {
@@ -47,14 +51,14 @@ bool UCombatEffectLibrary::ApplyDamageToUnit(AUnitBase* SourceUnit, AUnitBase* T
 
     const FGameplayTag DamageTag = FGameplayTag::RequestGameplayTag(FName("Data.Damage"));
 
+    SpecHandle.Data->AppendDynamicAssetTags(AssetTags);
     SpecHandle.Data->SetSetByCallerMagnitude(DamageTag, -DamageAmount);
 
     const FActiveGameplayEffectHandle AppliedHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 
-    const UGameplayEffect* DamageEffectCDO = DamageEffectClass->GetDefaultObject<UGameplayEffect>();
-    const bool bIsInstantEffect = DamageEffectCDO && DamageEffectCDO->DurationPolicy == EGameplayEffectDurationType::Instant;
-
-    if (!AppliedHandle.IsValid() && !bIsInstantEffect)
+    // Instant effects have no active handle; the application result still records rejection by GAS filters.
+    // 즉시 효과에는 활성 핸들이 없지만 적용 결과에는 GAS 조건에 의한 거절 여부가 기록됩니다.
+    if (!AppliedHandle.WasSuccessfullyApplied())
     {
         UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Apply Result Invalid | Source=%s | Target=%s"), *GetNameSafe(SourceUnit), *GetNameSafe(TargetUnit));
         return false;

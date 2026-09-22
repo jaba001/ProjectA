@@ -16,7 +16,7 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
 
     FCombatRoundSkill Skill = RoundDefinition;
     const UGA_AttackBase* Attack = nullptr;
-    if ((!bUseRoundDefinition || !Skill.CastMontage) && AbilityClass && AbilityClass->IsChildOf(UGA_AttackBase::StaticClass())) Attack = AbilityClass->GetDefaultObject<UGA_AttackBase>();
+    if (AbilityClass && AbilityClass->IsChildOf(UGA_AttackBase::StaticClass())) Attack = AbilityClass->GetDefaultObject<UGA_AttackBase>();
     if (!bUseRoundDefinition)
     {
         const bool bSupportedArea = AreaType == ESkillAreaType::Single || AreaType == ESkillAreaType::AroundTarget || (AreaType == ESkillAreaType::TargetAndSides && bMoveToTarget);
@@ -49,8 +49,10 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
         }
     }
     if (!Skill.CastMontage && Attack) Skill.CastMontage = Attack->GetAuthoredAttackMontage();
+    if (Attack) Attack->ExportRoundEffectContract(Skill);
     Skill.SkillId = FName(*AssetId.ToString());
     Skill.Name = SkillName;
+    if (!CombatRoundRules::IsSupportedEffectDuration(Skill)) return Fail(NSLOCTEXT("SkillRound", "UnsupportedEffectDuration", "Unsupported effect duration: round checkpoints support only Instant effects. / 지원하지 않는 효과 지속시간: 현재 라운드 체크포인트는 Instant 효과만 지원합니다."));
     if (!CombatRoundRules::IsValidSkill(Skill)) return Fail(NSLOCTEXT("SkillRound", "InvalidProfile", "RoundDefinition contains invalid timing, power, range, cost or approach settings. / RoundDefinition의 시간·위력·범위·비용·접근 설정이 유효하지 않습니다."));
     // Apply the shared pre-release retarget rule to existing assets without changing their saved profiles or fixed ground attacks.
     // 기존 저장 프로필과 고정 지점 공격을 변경하지 않고 발동 전 공통 재선택 규칙을 기존 에셋에도 적용합니다.

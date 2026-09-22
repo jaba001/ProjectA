@@ -67,13 +67,13 @@ public:
     const FCombatActionResponse& GetLastCombatActionResponse() const { return LastCombatActionResponse; }
     void HandleTileClicked(ACombatGridTile* Tile);
 
-    UFUNCTION(BlueprintCallable, Category = "Combat|Legacy")
+    UFUNCTION(BlueprintCallable, Category = "Combat|Legacy", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     bool CanUseActiveUnitAction() const;
 
-    UFUNCTION(BlueprintCallable, Category = "Combat|Legacy")
+    UFUNCTION(BlueprintCallable, Category = "Combat|Legacy", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     bool CanUseActiveUnitActionPoint(int32 Cost) const;
 
-    UFUNCTION(BlueprintCallable, Category = "Combat|Legacy")
+    UFUNCTION(BlueprintCallable, Category = "Combat|Legacy", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     bool CanUseActiveUnitSubActionPoint(int32 Cost) const;
 
     UFUNCTION(BlueprintCallable, Category = "Tile")
@@ -85,13 +85,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Tile")
     void ClearSelectedTile();
 
-    UFUNCTION(BlueprintCallable, Category = "Tile|Legacy")
+    UFUNCTION(BlueprintCallable, Category = "Tile|Legacy", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     void SetTileInputMode(ETileInputMode NewMode);
 
-    UFUNCTION(BlueprintCallable, Category = "Tile|Legacy")
+    UFUNCTION(BlueprintCallable, Category = "Tile|Legacy", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     void EnterMoveMode();
 
-    UFUNCTION(BlueprintCallable, Category = "Tile|Legacy")
+    UFUNCTION(BlueprintCallable, Category = "Tile|Legacy", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     void EnterSkillMode(USkillDefinitionDataAsset* SkillData);
 
     UFUNCTION(BlueprintCallable, Category = "Tile")

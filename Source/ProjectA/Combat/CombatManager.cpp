@@ -148,23 +148,6 @@ bool ACombatManager::IsPartyAIControlled(const AUnitBase* Unit) const
     return Entry && Entry->PartyControlMode == EPartyControlMode::ServerAI;
 }
 
-bool ACombatManager::IsAwaitingTurnCheckpoint() const
-{
-    return false;
-}
-
-bool ACombatManager::RetryTurnCheckpoint()
-{
-    UE_LOG(LogTemp, Warning, TEXT("[CombatManager] Sequential turn checkpoint retry is unsupported by timed-round combat."));
-    return false;
-}
-
-bool ACombatManager::RestoreCombatFromBoundary(int32 CompletedTurnSerial, int32 NextTurnIndex)
-{
-    UE_LOG(LogTemp, Warning, TEXT("[CombatManager] Sequential turn checkpoint restoration is unsupported by timed-round combat."));
-    return false;
-}
-
 void ACombatManager::SuspendCombatForRecovery()
 {
     if (!HasAuthority())
@@ -346,16 +329,6 @@ void ACombatManager::RegisterUnits(const TArray<AUnitBase*>& Units)
     PublishCombatView();
 }
 
-void ACombatManager::RequestEndTurn()
-{
-    UE_LOG(LogTemp, Warning, TEXT("[CombatManager] End-turn input is unsupported; submit timed-round readiness instead."));
-}
-
-bool ACombatManager::RequestEndTurnForUnit(AUnitBase* RequestingUnit)
-{
-    return false;
-}
-
 void ACombatManager::ClearPlayerSelection()
 {
     for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
@@ -470,94 +443,6 @@ void ACombatManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
     ResetCombat();
     OnCombatResult.Clear();
     Super::EndPlay(EndPlayReason);
-}
-
-void ACombatManager::RefreshReachableMoveTiles()
-{
-    // Old active-turn highlights are inert; the planning widget owns selection previews.
-    // 기존 활성 턴 강조는 비활성화하며 계획 위젯이 선택 미리보기를 소유합니다.
-    ClearMovableTilesHighlight();
-    ReachableMoveTiles.Reset();
-}
-
-bool ACombatManager::IsReachableMoveTile(ACombatGridTile* Tile) const
-{
-    if (!Tile)
-    {
-        return false;
-    }
-
-    return ReachableMoveTiles.Contains(Tile);
-}
-
-void ACombatManager::HighlightMovableTiles()
-{
-    for (ACombatGridTile* Tile : ReachableMoveTiles)
-    {
-        if (!Tile)
-        {
-            continue;
-        }
-
-        Tile->ApplyMovableTileVisual();
-    }
-}
-
-void ACombatManager::ClearMovableTilesHighlight()
-{
-    for (ACombatGridTile* Tile : ReachableMoveTiles)
-    {
-        if (!Tile)
-        {
-            continue;
-        }
-
-        Tile->ClearHighlightVisual();
-    }
-}
-
-void ACombatManager::RefreshSkillTargetTiles()
-{
-    ClearSkillTargetTilesHighlight();
-    SkillTargetTiles.Reset();
-}
-
-bool ACombatManager::IsSkillTargetTile(ACombatGridTile* Tile) const
-{
-    if (!Tile)
-    {
-        return false;
-    }
-
-    return SkillTargetTiles.Contains(Tile);
-}
-
-void ACombatManager::HighlightSkillTargetTiles()
-{
-    for (ACombatGridTile* Tile : SkillTargetTiles)
-    {
-        if (!Tile)
-        {
-            continue;
-        }
-
-        Tile->ApplySkillTargetTileVisual();
-    }
-}
-
-void ACombatManager::ClearSkillTargetTilesHighlight()
-{
-    for (ACombatGridTile* Tile : SkillTargetTiles)
-    {
-        if (!Tile)
-        {
-            continue;
-        }
-
-        Tile->ClearHighlightVisual();
-    }
-
-    SkillTargetTiles.Empty();
 }
 
 ACombatGridTile* ACombatManager::GetTileByCoord(FIntPoint Coord) const

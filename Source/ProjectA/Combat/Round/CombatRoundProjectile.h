@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "GameplayTagContainer.h"
 #include "CombatRoundProjectile.generated.h"
 
 class AUnitBase;
@@ -31,6 +32,7 @@ public:
     // Set the encounter roster before initialization; an empty list permits no unit hits.
     // 초기화 전에 전투 참가 목록을 설정하며 빈 목록은 모든 유닛 피격을 차단합니다.
     void SetAllowedTargets(const TArray<AUnitBase*>& Targets);
+    void SetTargetTagConditions(const FGameplayTagQuery& Query, const FGameplayTagContainer& RequiredTags, const FGameplayTagContainer& BlockedTags);
 
     // Only the server coordinator supplies simulation steps; actor Tick never applies damage.
     // 서버 조정자만 시뮬레이션 간격을 전달하며 액터 Tick은 피해를 적용하지 않습니다.
@@ -56,6 +58,9 @@ private:
     TWeakObjectPtr<AUnitBase> SourceUnit;
     TWeakObjectPtr<AUnitBase> TargetUnit;
     TSet<TWeakObjectPtr<AUnitBase>> AllowedTargets;
+    FGameplayTagQuery TargetTagQuery;
+    FGameplayTagContainer TargetRequiredTags;
+    FGameplayTagContainer TargetBlockedTags;
     ETeam SourceTeam;
     FVector TargetPoint = FVector::ZeroVector;
     float FlightSpeed = 0.0f;

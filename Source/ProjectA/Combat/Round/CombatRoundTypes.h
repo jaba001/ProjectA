@@ -2,10 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "Types/SkillTypes.h"
+#include "GameplayTagContainer.h"
 #include "CombatRoundTypes.generated.h"
 
 class AUnitBase;
 class UAnimMontage;
+class UGameplayEffect;
 
 UENUM(BlueprintType)
 enum class ECombatRoundPhase : uint8
@@ -69,6 +71,36 @@ struct PROJECTA_API FCombatRoundSkill
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FText Name;
+
+    // Empty tag conditions preserve existing content; effects receive these tags through a GAS spec.
+    // 빈 태그 조건은 기존 콘텐츠를 유지하며 효과는 GAS Spec을 통해 이 태그를 받습니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect")
+    FGameplayTagContainer EffectTags;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect")
+    FGameplayTagQuery SourceTagQuery;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect")
+    FGameplayTagQuery TargetTagQuery;
+
+    // Only Instant effects fit the checkpoint contract; an unset effect uses the existing Data.Damage effect.
+    // 체크포인트 계약은 Instant 효과만 지원하며 효과가 비어 있으면 기존 Data.Damage 효과를 사용합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect")
+    TSubclassOf<UGameplayEffect> EffectClass;
+
+    // Retain authored legacy ability requirements without reactivating its retired lifecycle.
+    // 사용 중단된 생명주기를 다시 활성화하지 않고 기존 어빌리티의 제작 조건을 보존합니다.
+    UPROPERTY(BlueprintReadOnly, Category = "Effect")
+    FGameplayTagContainer SourceRequiredTags;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Effect")
+    FGameplayTagContainer SourceBlockedTags;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Effect")
+    FGameplayTagContainer TargetRequiredTags;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Effect")
+    FGameplayTagContainer TargetBlockedTags;
 
     // Weapon traces sample this montage on the server; cosmetic notifies never apply damage.
     // 무기 궤적은 서버가 이 몽타주에서 샘플링하며 표현용 Notify는 피해를 적용하지 않습니다.
@@ -284,5 +316,6 @@ namespace CombatRoundRules
     PROJECTA_API float AttackMoveSpeed(const FCombatRoundSkill& Skill, float RoundSpeed);
     PROJECTA_API bool IsTerminal(ECombatRoundActionPhase Phase);
     PROJECTA_API bool IsOwnTerritory(bool bEnemy, FIntPoint Coord);
+    PROJECTA_API bool IsSupportedEffectDuration(const FCombatRoundSkill& Skill);
     PROJECTA_API bool IsValidSkill(const FCombatRoundSkill& Skill);
 }
