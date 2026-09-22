@@ -5,6 +5,7 @@
 #include "Game/Run/RunTypes.h"
 #include "Game/Run/RunEncounterTypes.h"
 #include "Game/Run/RunSkillShopTypes.h"
+#include "Game/Run/RunGoldRewardTypes.h"
 #include "Game/Run/ManagedRunTypes.h"
 #include "Game/Run/Authority/LocalRunAuthorityStore.h"
 #include "Combat/Checkpoint/CombatCheckpointTypes.h"
@@ -98,6 +99,10 @@ public:
     bool CompleteEncounter(ECombatResult Result);
     bool AbortEncounter();
     bool ContinueRun();
+    bool CanContinueAfterRewards() const;
+    bool SelectGoldReward(const FRunAccountId& AccountId, FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex, FText& OutError);
+    const FRunGoldRewardState& GetGoldRewardState() const { return GoldRewardState; }
+    TArray<FGuid> GetGoldRewardRecipientIds() const;
     bool SelectRunEncounter(FName EncounterId);
     bool LeaveRunEncounter();
     bool PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError);
@@ -132,6 +137,7 @@ public:
 private:
     bool ValidateSave(const URunSaveGame* Save, FText& OutError) const;
     bool ValidateEncounterProgress(const URunSaveGame* Save) const;
+    bool ValidateGoldRewardState(const URunSaveGame* Save) const;
     bool ValidateContinuableSave(const URunSaveGame* Save, bool bStandaloneOnly, FText& OutError) const;
     bool CanContinueSavedRunInternal(bool bStandaloneOnly, FText& OutError) const;
     bool LoadCheckpointInternal(bool bStandaloneOnly, FText& OutError);
@@ -167,6 +173,14 @@ private:
 
     UPROPERTY(Transient)
     FRunSkillShopState SkillShopState;
+
+    UPROPERTY(Transient)
+    FRunGoldRewardState GoldRewardState;
+
+    // Retain unpublished rolls while a terminal checkpoint write is retried.
+    // 종료 체크포인트 저장을 재시도하는 동안 공개하지 않은 추첨 결과를 유지합니다.
+    UPROPERTY(Transient)
+    FRunGoldRewardState PendingGoldRewardState;
 
     UPROPERTY(Transient)
     FCombatCheckpointData CombatCheckpoint;

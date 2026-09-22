@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Tests/RunRewardTestHelpers.h"
 #include "Game/Run/RunSaveGame.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Kismet/GameplayStatics.h"
@@ -157,7 +158,7 @@ bool FRunPersistenceTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Name survives disk serialization"), Restored->GetPartyMembers()[0].CharacterName.ToString(), FString(TEXT("Saved Archer")));
     TestEqual(TEXT("Slot survives disk serialization"), Restored->GetPartyMembers()[0].SlotIndex, 2);
     TestEqual(TEXT("Catalog survives disk serialization"), Restored->PartyDefinition.Get(), Run->PartyDefinition.Get());
-    TestTrue(TEXT("Loaded result can Continue"), Restored->ContinueRun());
+    TestTrue(TEXT("Loaded result can Continue after collecting its reward"), RunRewardTests::CollectPendingGoldRewards(Restored) && Restored->ContinueRun());
     TestTrue(TEXT("Loaded choices lead through a shop"), Restored->SelectRunEncounter(TEXT("Shop_02")) && Restored->LeaveRunEncounter());
     TestTrue(TEXT("Next node is available"), Restored->CanStartNode(TEXT("Combat_02")));
     URunSaveGame* Invalid = Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
@@ -264,7 +265,7 @@ bool FRunRestartTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Restored name"), Run->GetPartyMembers()[0].CharacterName.ToString(), FString(TEXT("Restart Mage")));
         TestEqual(TEXT("Restored HP"), Run->GetPartyMembers()[0].CurrentHP, 61.0f);
         TestEqual(TEXT("Restored profession"), Run->GetPartyMembers()[0].ClassId, FName(TEXT("Mage")));
-        TestTrue(TEXT("Restored result continues"), Run->ContinueRun());
+        TestTrue(TEXT("Restored result continues after collecting its reward"), RunRewardTests::CollectPendingGoldRewards(Run) && Run->ContinueRun());
         TestTrue(TEXT("Restored choices lead through a shop"), Run->SelectRunEncounter(TEXT("Shop_02")) && Run->LeaveRunEncounter());
         TestTrue(TEXT("Restored progress opens second node"), Run->CanStartNode(TEXT("Combat_02")));
         UGameplayStatics::DeleteGameInSlot(RestartSlot, 0);

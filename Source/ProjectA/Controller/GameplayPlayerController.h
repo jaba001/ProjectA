@@ -37,6 +37,11 @@ public:
     const FText& GetShopPurchaseMessage() const { return ShopPurchaseMessage; }
     bool IsShopPurchasePending() const { return bShopPurchasePending; }
 
+    void RequestSelectGoldReward(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex);
+    FGuid GetRewardCharacterId(const FGameplayViewState& View) const;
+    const FText& GetRewardSelectionMessage() const { return RewardSelectionMessage; }
+    bool IsRewardSelectionPending() const { return bRewardSelectionPending; }
+
     void RequestRetryCombatCheckpoint();
     UFUNCTION(Server, Reliable)
     void ServerSetDevelopmentReady(bool bReady);
@@ -57,6 +62,13 @@ private:
 
     void RefreshGameplayFlow();
     void ExecuteShopPurchase(FGuid CharacterId, FName OfferId);
+    void ExecuteGoldRewardSelection(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex);
+
+    UFUNCTION(Server, Reliable)
+    void ServerSelectGoldReward(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex);
+
+    UFUNCTION(Client, Reliable)
+    void ClientReceiveGoldRewardResult(FGuid CharacterId, FName ExpectedNodeId, bool bSucceeded, const FText& Message);
 
     UFUNCTION(Server, Reliable)
     void ServerPurchaseShopOffer(FGuid CharacterId, FName OfferId);
@@ -74,6 +86,11 @@ private:
 
     FText ShopPurchaseMessage;
     bool bShopPurchasePending = false;
+    FText RewardSelectionMessage;
+    FGuid PendingRewardCharacterId;
+    FName PendingRewardNodeId;
+    bool bRewardSelectionPending = false;
+    bool bAwaitingRewardReplication = false;
     bool CanRetryGameplayRecovery() const;
     void TryBindGameplayState();
     FTimerHandle BindStateTimer;

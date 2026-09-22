@@ -30,6 +30,9 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
         View.CompletedNodes = Run->GetCompletedNodes();
         View.EncounterProgress = Run->GetEncounterProgress();
         View.SkillShopState = Run->GetSkillShopState();
+        View.GoldRewardState = Run->GetGoldRewardState();
+        View.GoldRewardRecipientIds = Run->GetGoldRewardRecipientIds();
+        View.bCanContinueAfterRewards = Run->CanContinueAfterRewards();
         const UPartyDefinitionDataAsset* Catalog = Run->PartyDefinition ? Run->PartyDefinition.Get() : GetDefault<UPartyDefinitionDataAsset>();
         const bool bOrdinarySinglePlayer = !Run->IsManagedRun() && Run->GetRunIdentity().Origin == ERunIdentityOrigin::LocalDevelopment && Run->GetRunIdentity().OriginalParticipants.Num() == 1;
         for (const FRunPartyMember& Member : View.PartyMembers)

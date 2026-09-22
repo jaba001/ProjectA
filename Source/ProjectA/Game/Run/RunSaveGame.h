@@ -5,6 +5,7 @@
 #include "Game/Run/RunTypes.h"
 #include "Game/Run/RunEncounterTypes.h"
 #include "Game/Run/RunSkillShopTypes.h"
+#include "Game/Run/RunGoldRewardTypes.h"
 #include "Game/Run/RunParticipationTypes.h"
 #include "Combat/Checkpoint/CombatCheckpointTypes.h"
 #include "Types/CombatResult.h"
@@ -44,4 +45,6 @@ public:
     FRunEncounterProgress EncounterProgress;
     UPROPERTY()
     FRunSkillShopState SkillShopState;
+    UPROPERTY()
+    FRunGoldRewardState GoldRewardState;
 };

@@ -26,6 +26,8 @@ void URunStateSubsystem::ResetDevelopmentRun()
     Participation = FRunParticipationData();
     EncounterProgress = FRunEncounterProgress();
     SkillShopState = FRunSkillShopState();
+    GoldRewardState = FRunGoldRewardState();
+    PendingGoldRewardState = FRunGoldRewardState();
     PartyMembers.Reset();
     Nodes.Reset();
     CompletedNodes.Reset();
@@ -40,6 +42,24 @@ void URunStateSubsystem::ResetDevelopmentRun()
 
 namespace
 {
+    TArray<FGuid> ResolveGoldRewardRecipients(const FRunIdentityData& Identity, const FRunParticipationData& Participation, const TArray<FRunPartyMember>& Members, bool bManaged)
+    {
+        TArray<FGuid> Recipients;
+        const bool bSinglePlayer = !bManaged && Identity.Origin == ERunIdentityOrigin::LocalDevelopment && Identity.OriginalParticipants.Num() == 1;
+        for (const FRunPartyMember& Member : Members)
+        {
+            if (!Member.bCreated || !Member.bHasSkillLoadout || !Member.CharacterId.IsValid() || Member.OwnerAccountId.IsEmpty() || (bSinglePlayer && !Member.bPlayerControlled)) continue;
+            if (bManaged)
+            {
+                EPartyControlMode Mode = EPartyControlMode::ServerAI;
+                FText Error;
+                if (!URunParticipationLibrary::ResolveControlMode(Participation, Identity, Members, Member.CharacterId, Mode, Error) || Mode != EPartyControlMode::Human) continue;
+            }
+            Recipients.Add(Member.CharacterId);
+        }
+        return Recipients;
+    }
+
     bool IsValidLocalCaller(const FLocalDevelopmentCallerContext& Context)
     {
         if (!FLocalRunAuthorityStore(Context.StoreNamespace).IsValid() || Context.AccountId.Provider != TEXT("Development") || Context.AccountId.Subject.IsEmpty() || Context.AccountId.Subject.Len() > 256) return false;
@@ -131,6 +151,37 @@ bool URunStateSubsystem::ValidateEncounterProgress(const URunSaveGame* Save) con
     return Progress.bCompleted;
 }
 
+bool URunStateSubsystem::ValidateGoldRewardState(const URunSaveGame* Save) const
+{
+    const FRunGoldRewardState& Reward = Save->GoldRewardState;
+    const bool bEmpty = Reward.NodeId.IsNone() && Reward.GoldChoices.IsEmpty() && Reward.Claims.IsEmpty();
+    if (Reward.SchemaVersion == 0) return bEmpty;
+    if (Reward.SchemaVersion != 1) return false;
+    const bool bPostVictory = Save->Phase == ERunPhase::Result || Save->Phase == ERunPhase::EncounterChoice || Save->Phase == ERunPhase::Shop || Save->Phase == ERunPhase::Complete;
+    if (bEmpty) return !bPostVictory;
+    if (Save->Result != ECombatResult::Victory || Save->CompletedNodes.IsEmpty() || Reward.NodeId != Save->CompletedNodes.Last() || Reward.NodeId != Save->CurrentNode || Reward.GoldChoices.Num() != 3 || Reward.Claims.Num() > Save->Party.Num() || (!bPostVictory && Save->Phase != ERunPhase::Map)) return false;
+    for (int32 Amount : Reward.GoldChoices)
+    {
+        if (Amount <= 0) return false;
+    }
+    TSet<FGuid> Claimed;
+    const bool bSinglePlayer = Save->Version != 4 && Save->Identity.Origin == ERunIdentityOrigin::LocalDevelopment && Save->Identity.OriginalParticipants.Num() == 1;
+    for (const FRunGoldRewardClaim& Claim : Reward.Claims)
+    {
+        const FRunPartyMember* Member = Save->Party.FindByPredicate([&Claim](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.CharacterId == Claim.CharacterId; });
+        if (!Member || !Member->bHasSkillLoadout || !Claim.CharacterId.IsValid() || Member->OwnerAccountId.IsEmpty() || (bSinglePlayer && !Member->bPlayerControlled) || Claimed.Contains(Claim.CharacterId) || !Reward.GoldChoices.IsValidIndex(Claim.ChoiceIndex)) return false;
+        Claimed.Add(Claim.CharacterId);
+    }
+    if (Save->Phase != ERunPhase::Result)
+    {
+        for (const FGuid& CharacterId : ResolveGoldRewardRecipients(Save->Identity, Save->Participation, Save->Party, Save->Version == 4))
+        {
+            if (!Claimed.Contains(CharacterId)) return false;
+        }
+    }
+    return true;
+}
+
 bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError) const
 {
     OutError = FText::FromString(TEXT("저장 파일이 손상되었거나 현재 버전·직업 설정과 호환되지 않습니다."));
@@ -139,6 +190,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
         return false;
     }
     if (!ValidateEncounterProgress(Save)) return false;
+    if (!ValidateGoldRewardState(Save)) return false;
     FText ShopError;
     if (!URunEncounterPoolDataAsset::ValidateSkillShop(Save->SkillShopState, ShopError))
     {
@@ -296,6 +348,7 @@ URunSaveGame* URunStateSubsystem::CreateSaveData() const
     Save->Participation = Participation;
     Save->EncounterProgress = EncounterProgress;
     Save->SkillShopState = SkillShopState;
+    Save->GoldRewardState = GoldRewardState;
     Save->Party = PartyMembers;
     Save->Nodes = Nodes;
     Save->CompletedNodes = CompletedNodes;
@@ -499,6 +552,8 @@ bool URunStateSubsystem::SurrenderStandaloneSavedRun(const FString& ExpectedToke
     Participation = FRunParticipationData();
     EncounterProgress = FRunEncounterProgress();
     SkillShopState = FRunSkillShopState();
+    GoldRewardState = FRunGoldRewardState();
+    PendingGoldRewardState = FRunGoldRewardState();
     PartyMembers.Reset();
     Nodes.Reset();
     CompletedNodes.Reset();
@@ -538,6 +593,8 @@ void URunStateSubsystem::ApplySaveData(const URunSaveGame* Save)
     Participation = Save->Participation;
     EncounterProgress = Save->EncounterProgress;
     SkillShopState = Save->SkillShopState;
+    GoldRewardState = Save->GoldRewardState;
+    PendingGoldRewardState = FRunGoldRewardState();
     bManagedRun = Save->Version == 4;
     PartyMembers = Save->Party;
     // Upgrade only ordinary single-player selection in memory; the next normal save retains it.
@@ -586,6 +643,8 @@ URunSaveGame* URunStateSubsystem::CreateInitialSaveData(const TArray<FRunPartyMe
     const URunEncounterPoolDataAsset* Pool = PartyDefinition && PartyDefinition->RunEncounterPool ? PartyDefinition->RunEncounterPool.Get() : GetDefault<URunEncounterPoolDataAsset>();
     if (!Pool->BuildFixedOffers(Save->EncounterProgress.Offers, OutError)) return nullptr;
     if (!Pool->BuildSkillShop(Save->SkillShopState, OutError)) return nullptr;
+    if (!Pool->ValidateGoldRewardRange(OutError)) return nullptr;
+    Save->GoldRewardState.SchemaVersion = 1;
     Save->EncounterProgress.SchemaVersion = 1;
     Save->Identity = Identity;
     Save->Party = Members;
@@ -833,6 +892,8 @@ void URunStateSubsystem::CloseManagedRun()
     Participation = FRunParticipationData();
     EncounterProgress = FRunEncounterProgress();
     SkillShopState = FRunSkillShopState();
+    GoldRewardState = FRunGoldRewardState();
+    PendingGoldRewardState = FRunGoldRewardState();
     PartyMembers.Reset();
     Nodes.Reset();
     CompletedNodes.Reset();
@@ -957,6 +1018,9 @@ bool URunStateSubsystem::BeginEncounter(FName NodeId)
     }
 
     const FRunNodeDefinition& Node = Nodes[CompletedNodes.Num()];
+    GoldRewardState = FRunGoldRewardState();
+    if (SkillShopState.SchemaVersion == 1) GoldRewardState.SchemaVersion = 1;
+    PendingGoldRewardState = FRunGoldRewardState();
     CurrentNodeId = Node.NodeId;
     CurrentEncounterId = Node.EncounterId;
     CombatCheckpoint = FCombatCheckpointData();
@@ -982,13 +1046,23 @@ bool URunStateSubsystem::MarkCombatStarted()
 
 bool URunStateSubsystem::CompleteEncounter(ECombatResult Result)
 {
-    if (!CanMutateManagedRun() || Phase != ERunPhase::Combat || (Result != ECombatResult::Victory && Result != ECombatResult::Defeat))
+    if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || Phase != ERunPhase::Combat || (Result != ECombatResult::Victory && Result != ECombatResult::Defeat))
     {
         return false;
     }
 
     const ECombatResult PreviousResult = LastResult;
     const TArray<FName> PreviousCompletedNodes = CompletedNodes;
+    const FRunGoldRewardState PreviousGoldRewardState = GoldRewardState;
+    if (Result == ECombatResult::Victory && (GoldRewardState.SchemaVersion == 1 || SkillShopState.SchemaVersion == 1))
+    {
+        if (PendingGoldRewardState.NodeId != CurrentNodeId)
+        {
+            const URunEncounterPoolDataAsset* Pool = PartyDefinition && PartyDefinition->RunEncounterPool ? PartyDefinition->RunEncounterPool.Get() : GetDefault<URunEncounterPoolDataAsset>();
+            if (!Pool->BuildGoldRewards(CurrentNodeId, PendingGoldRewardState, SaveError)) return false;
+        }
+        GoldRewardState = PendingGoldRewardState;
+    }
     LastResult = Result;
 
     if (Result == ECombatResult::Victory)
@@ -1007,10 +1081,13 @@ bool URunStateSubsystem::CompleteEncounter(ECombatResult Result)
     {
         LastResult = PreviousResult;
         CompletedNodes = PreviousCompletedNodes;
+        GoldRewardState = PreviousGoldRewardState;
         Phase = ERunPhase::Combat;
         return false;
     }
     CombatCheckpoint = FCombatCheckpointData();
+    PendingGoldRewardState = FRunGoldRewardState();
+    SaveError = FText::GetEmpty();
     OnRunStateChanged.Broadcast();
     return true;
 }
@@ -1041,9 +1118,60 @@ bool URunStateSubsystem::AbortEncounter()
     return true;
 }
 
+TArray<FGuid> URunStateSubsystem::GetGoldRewardRecipientIds() const
+{
+    if (GoldRewardState.SchemaVersion != 1 || GoldRewardState.NodeId.IsNone()) return {};
+    return ResolveGoldRewardRecipients(RunIdentity, Participation, PartyMembers, bManagedRun);
+}
+
+bool URunStateSubsystem::CanContinueAfterRewards() const
+{
+    if (Phase != ERunPhase::Result || LastResult != ECombatResult::Victory) return false;
+    if (GoldRewardState.SchemaVersion == 0) return true;
+    if (GoldRewardState.SchemaVersion != 1 || GoldRewardState.NodeId != CurrentNodeId || GoldRewardState.GoldChoices.Num() != 3) return false;
+    for (const FGuid& CharacterId : GetGoldRewardRecipientIds())
+    {
+        if (!GoldRewardState.Claims.ContainsByPredicate([CharacterId](const FRunGoldRewardClaim& Claim) { return Claim.CharacterId == CharacterId; })) return false;
+    }
+    return true;
+}
+
+bool URunStateSubsystem::SelectGoldReward(const FRunAccountId& AccountId, FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex, FText& OutError)
+{
+    OutError = NSLOCTEXT("RunGoldReward", "Unavailable", "현재 전투 보상을 선택할 수 없습니다.");
+    if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::Result || LastResult != ECombatResult::Victory || GoldRewardState.SchemaVersion != 1 || ExpectedNodeId != CurrentNodeId || GoldRewardState.NodeId != ExpectedNodeId || !GoldRewardState.GoldChoices.IsValidIndex(ChoiceIndex)) return false;
+    OutError = NSLOCTEXT("RunGoldReward", "OwnCharacterOnly", "본인이 직접 조작하는 캐릭터의 보상만 선택할 수 있습니다.");
+    if (!GetGoldRewardRecipientIds().Contains(CharacterId) || !URunIdentityLibrary::IsCharacterOwner(RunIdentity, PartyMembers, CharacterId, AccountId)) return false;
+    OutError = NSLOCTEXT("RunGoldReward", "AlreadyClaimed", "이 캐릭터는 전투 보상을 이미 받았습니다.");
+    if (GoldRewardState.Claims.ContainsByPredicate([CharacterId](const FRunGoldRewardClaim& Claim) { return Claim.CharacterId == CharacterId; })) return false;
+    const FRunPartyMember* Member = PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.CharacterId == CharacterId; });
+    const int32 Amount = GoldRewardState.GoldChoices[ChoiceIndex];
+    OutError = NSLOCTEXT("RunGoldReward", "GoldOverflow", "보유 골드가 최대값을 초과하여 보상을 받을 수 없습니다.");
+    if (!Member || Member->Gold < 0 || Amount <= 0 || Member->Gold > MAX_int32 - Amount) return false;
+    // Persist the balance and receipt atomically before exposing the completed choice.
+    // 선택 완료를 공개하기 전에 잔액과 수령 내역을 한 번에 저장합니다.
+    TStrongObjectPtr<URunSaveGame> Save(CreateSaveData());
+    FRunPartyMember* RewardedMember = Save->Party.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.CharacterId == CharacterId; });
+    RewardedMember->Gold += Amount;
+    FRunGoldRewardClaim& Claim = Save->GoldRewardState.Claims.AddDefaulted_GetRef();
+    Claim.CharacterId = CharacterId;
+    Claim.ChoiceIndex = ChoiceIndex;
+    if (bCheckpointSaving && !WriteSaveData(Save.Get(), OutError))
+    {
+        SaveError = OutError;
+        return false;
+    }
+    PartyMembers = Save->Party;
+    GoldRewardState = Save->GoldRewardState;
+    SaveError = FText::GetEmpty();
+    OutError = FText::GetEmpty();
+    OnRunStateChanged.Broadcast();
+    return true;
+}
+
 bool URunStateSubsystem::ContinueRun()
 {
-    if (!CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::Result || LastResult != ECombatResult::Victory)
+    if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || bManagedResumePending || !CanContinueAfterRewards())
     {
         return false;
     }

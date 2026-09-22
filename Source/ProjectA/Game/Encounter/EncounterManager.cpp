@@ -577,6 +577,12 @@ bool AEncounterManager::ContinueRun()
         OnFlowChanged.Broadcast();
         return false;
     }
+    if (!RunState->CanContinueAfterRewards())
+    {
+        FlowMessage = NSLOCTEXT("RunGoldReward", "SelectionsPending", "모든 플레이어가 골드 보상을 선택해야 계속할 수 있습니다.");
+        OnFlowChanged.Broadcast();
+        return false;
+    }
     // Clear an earlier save failure before the successful transition notifies its UI observers.
     // 성공한 상태 전이가 UI 구독자에게 통지되기 전에 이전 저장 실패 메시지를 지웁니다.
     FlowMessage = FText::GetEmpty();
@@ -625,6 +631,17 @@ bool AEncounterManager::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, F
     if (!HasAuthority() || bShuttingDown || bPreparing || bPreparationAbortPending || PendingResult != ECombatResult::None || !RunState || RunState->GetPhase() != ERunPhase::Shop) return false;
     if (!ValidateManagedExecution(OutError)) return false;
     const bool bSucceeded = RunState->PurchaseShopOffer(BuyerAccountId, CharacterId, OfferId, OutError);
+    OnFlowChanged.Broadcast();
+    return bSucceeded;
+}
+
+bool AEncounterManager::SelectGoldReward(const FRunAccountId& AccountId, FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex, FText& OutError)
+{
+    OutError = NSLOCTEXT("RunGoldReward", "Unavailable", "현재 전투 보상을 선택할 수 없습니다.");
+    if (!HasAuthority() || bShuttingDown || bPreparing || bPreparationAbortPending || PendingResult != ECombatResult::None || !RunState || RunState->GetPhase() != ERunPhase::Result) return false;
+    if (!ValidateManagedExecution(OutError)) return false;
+    const bool bSucceeded = RunState->SelectGoldReward(AccountId, CharacterId, ExpectedNodeId, ChoiceIndex, OutError);
+    if (bSucceeded) FlowMessage = FText::GetEmpty();
     OnFlowChanged.Broadcast();
     return bSucceeded;
 }

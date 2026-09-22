@@ -32,6 +32,7 @@ public:
     bool SelectRunEncounter(FName EncounterId);
     bool LeaveRunEncounter();
     bool PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError);
+    bool SelectGoldReward(const FRunAccountId& AccountId, FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex, FText& OutError);
 
     // Rebuild units and ownership from a durable round planning boundary.
     // 확정 저장된 라운드 계획 경계에서 유닛과 소유권을 재구성합니다.

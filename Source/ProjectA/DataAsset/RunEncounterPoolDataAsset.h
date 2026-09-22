@@ -4,6 +4,7 @@
 #include "Engine/DataAsset.h"
 #include "Game/Run/RunEncounterTypes.h"
 #include "Game/Run/RunSkillShopTypes.h"
+#include "Game/Run/RunGoldRewardTypes.h"
 #include "RunEncounterPoolDataAsset.generated.h"
 
 // Author fixed prototype choices here; weighted generation can later produce the same runtime offers.
@@ -28,7 +29,15 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
     FRunShopRecoveryOffer Recovery;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Reward", meta = (ClampMin = "1"))
+    int32 GoldRewardMin = 5;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Reward", meta = (ClampMin = "1"))
+    int32 GoldRewardMax = 15;
+
     bool BuildFixedOffers(TArray<FRunEncounterOffer>& OutOffers, FText& OutError) const;
     bool BuildSkillShop(FRunSkillShopState& OutState, FText& OutError) const;
     static bool ValidateSkillShop(const FRunSkillShopState& State, FText& OutError);
+    bool ValidateGoldRewardRange(FText& OutError) const;
+    bool BuildGoldRewards(FName NodeId, FRunGoldRewardState& OutState, FText& OutError) const;
 };

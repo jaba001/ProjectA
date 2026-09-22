@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Tests/RunRewardTestHelpers.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunPartyValidationTest, "ProjectA.VerticalSlice.Run.PartyValidation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -71,6 +72,7 @@ bool FRunProgressionTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("A completed result cannot be aborted"), RunState->AbortEncounter());
     TestEqual(TEXT("Remaining HP is stored by original slot"), RunState->GetPartyMembers()[0].CurrentHP, 87.0f);
     TestFalse(TEXT("Next combat waits for Continue"), RunState->CanStartNode(SecondNode));
+    TestTrue(TEXT("The first victory reward is collected before Continue"), RunRewardTests::CollectPendingGoldRewards(RunState));
     TestTrue(TEXT("Victory Continue opens encounter choices"), RunState->ContinueRun());
     TestFalse(TEXT("The next battle cannot bypass a Run encounter"), RunState->BeginEncounter(SecondNode));
     TestTrue(TEXT("A shop can be entered and left"), RunState->SelectRunEncounter(TEXT("Shop_02")) && RunState->LeaveRunEncounter());
@@ -78,6 +80,7 @@ bool FRunProgressionTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Second encounter is unlocked"), RunState->BeginEncounter(SecondNode));
     TestTrue(TEXT("Second combat starts"), RunState->MarkCombatStarted());
     TestTrue(TEXT("Second victory is recorded"), RunState->CompleteEncounter(ECombatResult::Victory));
+    TestTrue(TEXT("The final victory reward is collected before completing the Run"), RunRewardTests::CollectPendingGoldRewards(RunState));
     TestTrue(TEXT("Final Continue finishes run"), RunState->ContinueRun());
     TestEqual(TEXT("All nodes completed"), RunState->GetCompletedNodes().Num(), 2);
     TestTrue(TEXT("Run reaches complete phase"), RunState->GetPhase() == ERunPhase::Complete);

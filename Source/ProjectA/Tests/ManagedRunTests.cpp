@@ -12,6 +12,7 @@
 #include "Game/Run/RunParticipationLibrary.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Tests/RunRewardTestHelpers.h"
 #include "Game/Snapshot/PartySnapshotSaveGame.h"
 #include "HAL/FileManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -333,6 +334,7 @@ bool FManagedRunOrderedResumeTest::RunTest(const FString& Parameters)
     TStrongObjectPtr<URunSaveGame> ResultSave = Fixture.LoadPayload();
     if (!TestNotNull(TEXT("Result payload remains available"), ResultSave.Get())) return false;
     TestTrue(TEXT("Result v4 persists participation outside combat"), ResultSave->Version == 4 && ResultSave->Phase == ERunPhase::Result && ResultSave->CombatCheckpoint.Revision == 0 && ResultSave->Participation.HumanParticipants == Humans);
+    if (!TestTrue(TEXT("Current human participants collect their rewards before Continue"), RunRewardTests::CollectPendingGoldRewards(Second))) return false;
     const FRunAuthorityStamp ResultStamp = Second->GetManagedStamp();
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("Failed Continue retains the result for retry"), Second->ContinueRun());
@@ -517,7 +519,8 @@ bool FManagedRunSkillShopTest::RunTest(const FString& Parameters)
     for (const FRunPartyMember& Member : Host->GetPartyMembers()) TestTrue(TEXT("Every original human starts with personal 10G and unarmed only"), Member.Gold == 10 && Member.bHasSkillLoadout && Member.Skills.Num() == 1);
     if (!Host->BeginEncounter(TEXT("Combat_01")) || !Host->MarkCombatStarted()) return false;
     for (const FRunPartyMember& Member : Host->GetPartyMembers()) Host->UpdatePartyMemberHP(Member.SlotIndex, 70.0f);
-    if (!TestTrue(TEXT("The managed Run reaches a durable shop"), Host->CompleteEncounter(ECombatResult::Victory) && Host->ContinueRun() && Host->SelectRunEncounter(TEXT("Shop_02")))) return false;
+    if (!TestTrue(TEXT("The managed Run reaches a durable shop"), Host->CompleteEncounter(ECombatResult::Victory) && RunRewardTests::CollectPendingGoldRewards(Host) && Host->ContinueRun() && Host->SelectRunEncounter(TEXT("Shop_02")))) return false;
+    const TArray<FRunPartyMember> Before = Host->GetPartyMembers();
     const FGuid FirstId = Host->GetPartyMembers()[0].CharacterId;
     const FGuid SecondId = Host->GetPartyMembers()[1].CharacterId;
     const FRunSkillShopOffer FirstOffer = Host->GetSkillShopState().Offers[0];
@@ -531,9 +534,9 @@ bool FManagedRunSkillShopTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("A guest account cannot acquire skills for the Host character"), Host->PurchaseShopOffer(Fixture.Account(2), FirstId, FirstOffer.OfferId, Fixture.Error));
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("A failed canonical write rejects a managed purchase"), Host->PurchaseShopOffer(Fixture.Account(2), SecondId, FirstOffer.OfferId, Fixture.Error));
-    TestTrue(TEXT("Rejected purchases preserve canonical bytes revision balances and notification count"), BeforeBytes == Fixture.FileBytes() && Host->GetManagedStamp() == BeforeStamp && Host->GetPartyMembers()[0].Gold == 10 && Host->GetPartyMembers()[1].Gold == 10 && Host->GetPartyMembers()[1].Skills.Num() == 1 && Events == 0);
+    TestTrue(TEXT("Rejected purchases preserve canonical bytes revision balances and notification count"), BeforeBytes == Fixture.FileBytes() && Host->GetManagedStamp() == BeforeStamp && Host->GetPartyMembers()[0].Gold == Before[0].Gold && Host->GetPartyMembers()[1].Gold == Before[1].Gold && Host->GetPartyMembers()[1].Skills.Num() == 1 && Events == 0);
     if (!TestTrue(TEXT("The authority processes the guest owner's own purchase"), Host->PurchaseShopOffer(Fixture.Account(2), SecondId, FirstOffer.OfferId, Fixture.Error))) return false;
-    TestTrue(TEXT("A guest purchase debits only the guest and increments the canonical revision once"), Host->GetPartyMembers()[0].Gold == 10 && Host->GetPartyMembers()[1].Gold == 9 && Host->GetManagedStamp().Revision == BeforeStamp.Revision + 1 && Events == 1);
+    TestTrue(TEXT("A guest purchase debits only the guest and increments the canonical revision once"), Host->GetPartyMembers()[0].Gold == Before[0].Gold && Host->GetPartyMembers()[1].Gold == Before[1].Gold - 1 && Host->GetManagedStamp().Revision == BeforeStamp.Revision + 1 && Events == 1);
     TestTrue(TEXT("The same product is independently purchasable by the Host's own character"), Host->PurchaseShopOffer(Fixture.Account(1), FirstId, FirstOffer.OfferId, Fixture.Error));
     TestTrue(TEXT("Purchase ownership is per character and does not alter identity"), Host->GetPartyMembers()[0].Skills.Contains(FirstOffer.Skill) && Host->GetPartyMembers()[1].Skills.Contains(FirstOffer.Skill) && ManagedSameIdentity(BeforeIdentity, Host->GetRunIdentity()));
     const FRunAuthorityStamp ShopStamp = Host->GetManagedStamp();
@@ -550,9 +553,9 @@ bool FManagedRunSkillShopTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("An existing purchase remains owned after managed resume"), NextHost->PurchaseShopOffer(Fixture.Account(2), SecondId, FirstOffer.OfferId, Fixture.Error));
     TestTrue(TEXT("All rejected resumed requests preserve the canonical save"), ResumedBytes == Fixture.FileBytes());
     TestTrue(TEXT("The remaining human can spend only their preserved personal balance"), NextHost->PurchaseShopOffer(Fixture.Account(2), SecondId, SecondOffer.OfferId, Fixture.Error));
-    TestTrue(TEXT("Host succession preserves both character identities and independent balances"), NextHost->GetPartyMembers()[0].CharacterId == FirstId && NextHost->GetPartyMembers()[1].CharacterId == SecondId && NextHost->GetPartyMembers()[0].OwnerAccountId == Fixture.Account(1) && NextHost->GetPartyMembers()[1].OwnerAccountId == Fixture.Account(2) && NextHost->GetPartyMembers()[0].Gold == 9 && NextHost->GetPartyMembers()[1].Gold == 8);
+    TestTrue(TEXT("Host succession preserves both character identities and independent balances"), NextHost->GetPartyMembers()[0].CharacterId == FirstId && NextHost->GetPartyMembers()[1].CharacterId == SecondId && NextHost->GetPartyMembers()[0].OwnerAccountId == Fixture.Account(1) && NextHost->GetPartyMembers()[1].OwnerAccountId == Fixture.Account(2) && NextHost->GetPartyMembers()[0].Gold == Before[0].Gold - 1 && NextHost->GetPartyMembers()[1].Gold == Before[1].Gold - 2);
     TStrongObjectPtr<URunSaveGame> Durable = Fixture.LoadPayload();
-    TestTrue(TEXT("Managed storage durably contains personal gold and acquired skills"), Durable && Durable->Party[0].Gold == 9 && Durable->Party[1].Gold == 8 && Durable->Party[1].Skills.Contains(SecondOffer.Skill));
+    TestTrue(TEXT("Managed storage durably contains personal gold and acquired skills"), Durable && Durable->Party[0].Gold == Before[0].Gold - 1 && Durable->Party[1].Gold == Before[1].Gold - 2 && Durable->Party[1].Skills.Contains(SecondOffer.Skill));
     return true;
 }
 
@@ -568,7 +571,7 @@ bool FManagedRunRecoveryTest::RunTest(const FString& Parameters)
     const float WoundedHP = Profession.MaxHP * 0.2f;
     if (!Host->BeginEncounter(TEXT("Combat_01")) || !Host->MarkCombatStarted()) return false;
     for (const FRunPartyMember& Member : Host->GetPartyMembers()) Host->UpdatePartyMemberHP(Member.SlotIndex, WoundedHP);
-    if (!TestTrue(TEXT("The wounded managed party reaches a shop"), Host->CompleteEncounter(ECombatResult::Victory) && Host->ContinueRun() && Host->SelectRunEncounter(TEXT("Shop_01")))) return false;
+    if (!TestTrue(TEXT("The wounded managed party reaches a shop"), Host->CompleteEncounter(ECombatResult::Victory) && RunRewardTests::CollectPendingGoldRewards(Host) && Host->ContinueRun() && Host->SelectRunEncounter(TEXT("Shop_01")))) return false;
     const FGuid FirstId = Host->GetPartyMembers()[0].CharacterId;
     const FGuid SecondId = Host->GetPartyMembers()[1].CharacterId;
     const FRunIdentityData BeforeIdentity = Host->GetRunIdentity();
@@ -583,10 +586,10 @@ bool FManagedRunRecoveryTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("A failed canonical write rejects managed recovery"), Host->PurchaseShopOffer(Fixture.Account(2), SecondId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
     TestTrue(TEXT("Recovery failure preserves bytes revision gold HP skills and events"), BeforeBytes == Fixture.FileBytes() && Host->GetManagedStamp() == BeforeStamp && FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[0], &Host->GetPartyMembers()[0], 0) && FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[1], &Host->GetPartyMembers()[1], 0) && Events == 0);
     if (!TestTrue(TEXT("The authority can recover the guest owner's own character"), Host->PurchaseShopOffer(Fixture.Account(2), SecondId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error))) return false;
-    TestTrue(TEXT("Guest recovery changes only personal HP and gold once"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[0], &Host->GetPartyMembers()[0], 0) && Host->GetPartyMembers()[1].Gold == 9 && Host->GetPartyMembers()[1].CurrentHP == Profession.MaxHP && Host->GetPartyMembers()[1].Skills == Before[1].Skills && Host->GetManagedStamp().Revision == BeforeStamp.Revision + 1 && Events == 1);
+    TestTrue(TEXT("Guest recovery changes only personal HP and gold once"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[0], &Host->GetPartyMembers()[0], 0) && Host->GetPartyMembers()[1].Gold == Before[1].Gold - 1 && Host->GetPartyMembers()[1].CurrentHP == Profession.MaxHP && Host->GetPartyMembers()[1].Skills == Before[1].Skills && Host->GetManagedStamp().Revision == BeforeStamp.Revision + 1 && Events == 1);
     TestTrue(TEXT("Recovery never transfers ownership or Host identity"), ManagedSameIdentity(BeforeIdentity, Host->GetRunIdentity()));
     TStrongObjectPtr<URunSaveGame> Durable = Fixture.LoadPayload();
-    TestTrue(TEXT("The canonical payload commits HP and gold together"), Durable && Durable->Party[1].CurrentHP == Profession.MaxHP && Durable->Party[1].Gold == 9 && Durable->Party[1].Skills == Before[1].Skills);
+    TestTrue(TEXT("The canonical payload commits HP and gold together"), Durable && Durable->Party[1].CurrentHP == Profession.MaxHP && Durable->Party[1].Gold == Before[1].Gold - 1 && Durable->Party[1].Skills == Before[1].Skills);
     const FRunAuthorityStamp ShopStamp = Host->GetManagedStamp();
     Host->OnRunStateChanged.Clear();
     Host->CloseManagedRun();
@@ -599,7 +602,72 @@ bool FManagedRunRecoveryTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("AI recovery rejection retains a visible explanation"), Fixture.Error.IsEmpty());
     TestFalse(TEXT("The new Host cannot recover the absent owner's character"), NextHost->PurchaseShopOffer(Fixture.Account(2), FirstId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
     TestFalse(TEXT("A recovered guest cannot be charged again after resume"), NextHost->PurchaseShopOffer(Fixture.Account(2), SecondId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
-    TestTrue(TEXT("Resumed recovery rejections preserve canonical bytes and personal state"), ResumedBytes == Fixture.FileBytes() && NextHost->GetPartyMembers()[0].CurrentHP == WoundedHP && NextHost->GetPartyMembers()[0].Gold == 10 && NextHost->GetPartyMembers()[1].CurrentHP == Profession.MaxHP && NextHost->GetPartyMembers()[1].Gold == 9 && NextHost->GetPartyMembers()[1].CharacterId == SecondId && NextHost->GetPartyMembers()[1].OwnerAccountId == Fixture.Account(2));
+    TestTrue(TEXT("Resumed recovery rejections preserve canonical bytes and personal state"), ResumedBytes == Fixture.FileBytes() && NextHost->GetPartyMembers()[0].CurrentHP == WoundedHP && NextHost->GetPartyMembers()[0].Gold == Before[0].Gold && NextHost->GetPartyMembers()[1].CurrentHP == Profession.MaxHP && NextHost->GetPartyMembers()[1].Gold == Before[1].Gold - 1 && NextHost->GetPartyMembers()[1].CharacterId == SecondId && NextHost->GetPartyMembers()[1].OwnerAccountId == Fixture.Account(2));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FManagedRunGoldRewardTest, "ProjectA.Run.Managed.GoldRewardOwnershipAndResume", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FManagedRunGoldRewardTest::RunTest(const FString& Parameters)
+{
+    FManagedFixture Fixture(2);
+    URunStateSubsystem* Host = Fixture.NewSession(1);
+    if (!Host || !Host->CreateManagedRun(Fixture.Party, Fixture.Identity, Fixture.Error) || !Host->BeginEncounter(TEXT("Combat_01")) || !Host->MarkCombatStarted()) return false;
+    for (const FRunPartyMember& Member : Host->GetPartyMembers()) Host->UpdatePartyMemberHP(Member.SlotIndex, 70.0f);
+    if (!TestTrue(TEXT("Managed victory persists rewards for both original humans"), Host->CompleteEncounter(ECombatResult::Victory))) return false;
+    const FRunGoldRewardState Offered = Host->GetGoldRewardState();
+    const TArray<FRunPartyMember> Before = Host->GetPartyMembers();
+    if (!TestEqual(TEXT("Both current humans must choose a reward"), Host->GetGoldRewardRecipientIds().Num(), 2) || !TestEqual(TEXT("Managed rewards expose three choices"), Offered.GoldChoices.Num(), 3)) return false;
+    TestFalse(TEXT("Host authority cannot choose a reward for another owner"), Host->SelectGoldReward(Fixture.Account(1), Before[1].CharacterId, Offered.NodeId, 0, Fixture.Error));
+    TestFalse(TEXT("A guest cannot redirect a claim to the Host"), Host->SelectGoldReward(Fixture.Account(2), Before[0].CharacterId, Offered.NodeId, 0, Fixture.Error));
+    if (!TestTrue(TEXT("The Host can collect only its own character's choice"), Host->SelectGoldReward(Fixture.Account(1), Before[0].CharacterId, Offered.NodeId, 0, Fixture.Error))) return false;
+    TestFalse(TEXT("One collected reward cannot bypass another human's pending choice"), Host->CanContinueAfterRewards());
+    TestFalse(TEXT("The server also enforces the second human's pending reward"), Host->ContinueRun());
+    const FRunAuthorityStamp BeforeClaim = Host->GetManagedStamp();
+    const TArray<uint8> BeforeBytes = Fixture.FileBytes();
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("A failed managed claim does not award the guest"), Host->SelectGoldReward(Fixture.Account(2), Before[1].CharacterId, Offered.NodeId, 2, Fixture.Error));
+    TestTrue(TEXT("Failed managed claim preserves stamp bytes gold and the single existing claim"), Host->GetManagedStamp() == BeforeClaim && BeforeBytes == Fixture.FileBytes() && Host->GetPartyMembers()[1].Gold == Before[1].Gold && Host->GetGoldRewardState().Claims.Num() == 1);
+    if (!TestTrue(TEXT("The guest's reward retries through the current Host authority"), Host->SelectGoldReward(Fixture.Account(2), Before[1].CharacterId, Offered.NodeId, 2, Fixture.Error))) return false;
+    TestTrue(TEXT("Guest collection awards only its own chosen amount and advances one revision"), Host->GetPartyMembers()[0].Gold == Before[0].Gold + Offered.GoldChoices[0] && Host->GetPartyMembers()[1].Gold == Before[1].Gold + Offered.GoldChoices[2] && Host->GetManagedStamp().Revision == BeforeClaim.Revision + 1 && Host->CanContinueAfterRewards());
+    TStrongObjectPtr<URunSaveGame> Durable = Fixture.LoadPayload();
+    TestTrue(TEXT("Canonical storage commits both personal claims and balances"), Durable && Durable->GoldRewardState.Claims.Num() == 2 && Durable->Party[0].Gold == Host->GetPartyMembers()[0].Gold && Durable->Party[1].Gold == Host->GetPartyMembers()[1].Gold);
+    const FRunAuthorityStamp ResultStamp = Host->GetManagedStamp();
+    Host->CloseManagedRun();
+    URunStateSubsystem* NextHost = Fixture.NewSession(2);
+    if (!NextHost || !TestTrue(TEXT("A result resumes with the original guest as its only human"), NextHost->ResumeManagedRun(ResultStamp, {Fixture.Account(2)}, Fixture.Error))) return false;
+    TestFalse(TEXT("A pending managed restoration cannot repeat a reward request"), NextHost->SelectGoldReward(Fixture.Account(2), Before[1].CharacterId, Offered.NodeId, 2, Fixture.Error));
+    if (!NextHost->ConfirmManagedResumeStarted(Fixture.Error)) return false;
+    TestTrue(TEXT("Host succession preserves the original frozen offers and claims"), FRunGoldRewardState::StaticStruct()->CompareScriptStruct(&Durable->GoldRewardState, &NextHost->GetGoldRewardState(), 0));
+    TestFalse(TEXT("The absent owner now controlled by AI cannot make a claim"), NextHost->SelectGoldReward(Fixture.Account(1), Before[0].CharacterId, Offered.NodeId, 1, Fixture.Error));
+    TestFalse(TEXT("The remaining human cannot replay its already collected reward"), NextHost->SelectGoldReward(Fixture.Account(2), Before[1].CharacterId, Offered.NodeId, 1, Fixture.Error));
+    TestTrue(TEXT("A resumed paid result can continue normally"), NextHost->ContinueRun());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FManagedRunPendingRewardResumeTest, "ProjectA.Run.Managed.PendingRewardsFollowHumanRoster", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FManagedRunPendingRewardResumeTest::RunTest(const FString& Parameters)
+{
+    FManagedFixture Fixture(2);
+    URunStateSubsystem* Host = Fixture.NewSession(1);
+    if (!Host || !Host->CreateManagedRun(Fixture.Party, Fixture.Identity, Fixture.Error) || !Host->BeginEncounter(TEXT("Combat_01")) || !Host->MarkCombatStarted()) return false;
+    for (const FRunPartyMember& Member : Host->GetPartyMembers()) Host->UpdatePartyMemberHP(Member.SlotIndex, 70.0f);
+    if (!Host->CompleteEncounter(ECombatResult::Victory)) return false;
+    const FRunGoldRewardState Offered = Host->GetGoldRewardState();
+    const TArray<FRunPartyMember> Before = Host->GetPartyMembers();
+    const FRunAuthorityStamp ResultStamp = Host->GetManagedStamp();
+    Host->CloseManagedRun();
+    URunStateSubsystem* NextHost = Fixture.NewSession(2);
+    if (!NextHost || !NextHost->ResumeManagedRun(ResultStamp, {Fixture.Account(2)}, Fixture.Error) || !NextHost->ConfirmManagedResumeStarted(Fixture.Error)) return false;
+    TestTrue(TEXT("An unpaid resumed result retains its exact original choices"), FRunGoldRewardState::StaticStruct()->CompareScriptStruct(&Offered, &NextHost->GetGoldRewardState(), 0));
+    TestTrue(TEXT("Only the continuing human remains a required reward recipient"), NextHost->GetGoldRewardRecipientIds() == TArray<FGuid>{Before[1].CharacterId});
+    TestFalse(TEXT("An absent original owner cannot collect through server AI"), NextHost->SelectGoldReward(Fixture.Account(1), Before[0].CharacterId, Offered.NodeId, 0, Fixture.Error));
+    TestFalse(TEXT("The new Host cannot collect the absent character's reward"), NextHost->SelectGoldReward(Fixture.Account(2), Before[0].CharacterId, Offered.NodeId, 0, Fixture.Error));
+    TestFalse(TEXT("The continuing human still must select its reward"), NextHost->ContinueRun());
+    if (!TestTrue(TEXT("The continuing owner can collect its preserved offer"), NextHost->SelectGoldReward(Fixture.Account(2), Before[1].CharacterId, Offered.NodeId, 1, Fixture.Error))) return false;
+    TestEqual(TEXT("The absent AI character receives no automatic gold"), NextHost->GetPartyMembers()[0].Gold, Before[0].Gold);
+    TestTrue(TEXT("An absent AI character cannot block a resumed Run after its human is paid"), NextHost->CanContinueAfterRewards() && NextHost->ContinueRun());
     return true;
 }
 

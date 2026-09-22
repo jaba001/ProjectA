@@ -1,6 +1,30 @@
 #include "DataAsset/RunEncounterPoolDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 
+bool URunEncounterPoolDataAsset::ValidateGoldRewardRange(FText& OutError) const
+{
+    OutError = NSLOCTEXT("RunGoldReward", "InvalidRange", "골드 보상 범위는 1 이상이며 최소값이 최대값보다 크지 않아야 합니다.");
+    if (GoldRewardMin <= 0 || GoldRewardMax < GoldRewardMin) return false;
+    OutError = FText::GetEmpty();
+    return true;
+}
+
+bool URunEncounterPoolDataAsset::BuildGoldRewards(FName NodeId, FRunGoldRewardState& OutState, FText& OutError) const
+{
+    if (!ValidateGoldRewardRange(OutError)) return false;
+    OutError = NSLOCTEXT("RunGoldReward", "MissingNode", "골드 보상을 생성할 전투 노드가 필요합니다.");
+    if (NodeId.IsNone()) return false;
+    FRunGoldRewardState State;
+    State.SchemaVersion = 1;
+    State.NodeId = NodeId;
+    // Prototype offers roll independently; duplicate amounts are valid choices.
+    // 시험용 선택지는 독립적으로 추첨하며 같은 금액도 유효한 선택지입니다.
+    for (int32 Index = 0; Index < 3; ++Index) State.GoldChoices.Add(FMath::RandRange(GoldRewardMin, GoldRewardMax));
+    OutState = MoveTemp(State);
+    OutError = FText::GetEmpty();
+    return true;
+}
+
 URunEncounterPoolDataAsset::URunEncounterPoolDataAsset()
 {
     for (int32 Index = 1; Index <= 3; ++Index)

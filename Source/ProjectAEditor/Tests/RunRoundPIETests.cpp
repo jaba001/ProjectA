@@ -121,6 +121,10 @@ public:
                 bSawMontage = false;
                 RemoteCosts.Reset();
                 RemoteMontages.Reset();
+                RewardPartyBefore.Reset();
+                RewardChoices.Reset();
+                RewardParticipant = 0;
+                bRewardRequestSent = false;
                 Advance(3);
                 return false;
             }
@@ -236,12 +240,59 @@ public:
             if (!Check(Run->GetLastResult() == ECombatResult::Victory, TEXT("The actual authored attack completes the encounter with victory."))) return End();
             UEncounterResultWidget* Result = Screen<UEncounterResultWidget>(Host);
             UButton* Continue = Result ? Cast<UButton>(Result->GetWidgetFromName(TEXT("Button_Continue"))) : nullptr;
-            if (!Continue || !Continue->GetIsEnabled()) return false;
+            if (!Continue) return false;
+            if (RewardPartyBefore.IsEmpty())
+            {
+                if (!Check(Run->GetGoldRewardState().GoldChoices.Num() == 3 && Run->GetGoldRewardRecipientIds().Num() == Count && Run->GetGoldRewardState().Claims.IsEmpty(), TEXT("Each victory offers three unclaimed gold choices to every human participant."))) return End();
+                RewardPartyBefore = Run->GetPartyMembers();
+                RewardChoices = Run->GetGoldRewardState().GoldChoices;
+                for (int32 Gold : RewardChoices)
+                {
+                    if (!Check(Gold >= 5 && Gold <= 15, TEXT("Authored victory rewards stay within the inclusive five-to-fifteen gold range."))) return End();
+                }
+            }
+            // Each local owner clicks once, then waits for both the authoritative and replicated personal award.
+            // 각 로컬 소유자는 한 번 클릭한 뒤 서버와 복제 화면 양쪽의 개인 보상 반영을 기다립니다.
+            if (RewardParticipant < Count)
+            {
+                AGameplayPlayerController* Controller = RewardParticipant == 0 ? Host : Clients[RewardParticipant - 1];
+                AGameplayGameState* State = Controller->GetWorld()->GetGameState<AGameplayGameState>();
+                UEncounterResultWidget* RewardScreen = Screen<UEncounterResultWidget>(Controller);
+                if (!State || !RewardScreen || State->GetViewState().GoldRewardState.NodeId != Run->GetCurrentNodeId()) return false;
+                const FGameplayViewState& View = State->GetViewState();
+                const FGuid CharacterId = Controller->GetRewardCharacterId(View);
+                const FRunPartyMember* Before = RewardPartyBefore.FindByPredicate([CharacterId](const FRunPartyMember& Member) { return Member.CharacterId == CharacterId; });
+                if (!Check(Before && View.GoldRewardRecipientIds.Contains(CharacterId), TEXT("Each result screen resolves its own original reward recipient."))) return End();
+                const int32 ChoiceIndex = RewardParticipant % 3;
+                UGameplayActionButton* Card = Cast<UGameplayActionButton>(RewardScreen->GetWidgetFromName(FName(*FString::Printf(TEXT("GoldReward%d"), ChoiceIndex + 1))));
+                if (!bRewardRequestSent)
+                {
+                    if (!Card || !Card->GetIsEnabled() || Controller->IsRewardSelectionPending()) return false;
+                    if (!Check(!Continue->GetIsEnabled() && !Run->CanContinueAfterRewards(), TEXT("Host Continue waits until every human has collected a reward."))) return End();
+                    Card->OnClicked.Broadcast();
+                    bRewardRequestSent = true;
+                    return false;
+                }
+                Status = Controller->GetRewardSelectionMessage().ToString();
+                const FRunGoldRewardClaim* ServerClaim = Run->GetGoldRewardState().Claims.FindByPredicate([CharacterId](const FRunGoldRewardClaim& Claim) { return Claim.CharacterId == CharacterId; });
+                const FRunGoldRewardClaim* VisibleClaim = View.GoldRewardState.Claims.FindByPredicate([CharacterId](const FRunGoldRewardClaim& Claim) { return Claim.CharacterId == CharacterId; });
+                if (!ServerClaim || !VisibleClaim || Controller->IsRewardSelectionPending()) return false;
+                const FRunPartyMember* ServerMember = Run->GetPartyMembers().FindByPredicate([CharacterId](const FRunPartyMember& Member) { return Member.CharacterId == CharacterId; });
+                const FRunPartyMember* VisibleMember = View.PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Member) { return Member.CharacterId == CharacterId; });
+                const int32 ExpectedGold = Before->Gold + RewardChoices[ChoiceIndex];
+                if (!Check(ServerMember && VisibleMember && ServerClaim->ChoiceIndex == ChoiceIndex && VisibleClaim->ChoiceIndex == ChoiceIndex && ServerMember->Gold == ExpectedGold && VisibleMember->Gold == ExpectedGold, TEXT("The selected card pays exactly once to its owner and replicates the same personal balance."))) return End();
+                if (!Check(Card && !Card->GetIsEnabled() && Run->GetGoldRewardState().GoldChoices == RewardChoices && View.GoldRewardState.GoldChoices == RewardChoices, TEXT("A claimed card is disabled and reward presentation never rerolls its amounts."))) return End();
+                ++RewardParticipant;
+                bRewardRequestSent = false;
+                return false;
+            }
+            if (!Continue->GetIsEnabled()) return false;
             for (AGameplayPlayerController* Client : Clients)
             {
                 UEncounterResultWidget* RemoteResult = Screen<UEncounterResultWidget>(Client);
                 UButton* RemoteContinue = RemoteResult ? Cast<UButton>(RemoteResult->GetWidgetFromName(TEXT("Button_Continue"))) : nullptr;
-                if (!RemoteContinue) return false;
+                const AGameplayGameState* RemoteState = Client->GetWorld()->GetGameState<AGameplayGameState>();
+                if (!RemoteContinue || !RemoteState || !RemoteState->GetViewState().bCanContinueAfterRewards || RemoteState->GetViewState().GoldRewardState.Claims.Num() != Count) return false;
                 if (!Check(!RemoteContinue->GetIsEnabled() && !Client->CanIssueRunCommands(), TEXT("Only the original host can continue the replicated result."))) return End();
             }
             if (!Check(bSawMontage, TEXT("The authored montage has an active animation instance during real PIE combat."))) return End();
@@ -253,6 +304,12 @@ public:
             Restored->EnableCheckpointSaving(Slot);
             if (!Check(Restored->LoadCheckpoint(Error), *FString::Printf(TEXT("A fresh Run subsystem reloads the durable result: %s"), *Error.ToString()))) return End();
             if (!Check(Restored->GetPhase() == ERunPhase::Result && Restored->GetPartyMembers().Num() == Count && Restored->GetRunIdentity().RunId == Run->GetRunIdentity().RunId, TEXT("Reload preserves phase, party and Run identity."))) return End();
+            if (!Check(Restored->CanContinueAfterRewards() && FRunGoldRewardState::StaticStruct()->CompareScriptStruct(&Run->GetGoldRewardState(), &Restored->GetGoldRewardState(), 0), TEXT("Durable result reload preserves every selected reward and allows Continue."))) return End();
+            for (const FRunPartyMember& Member : Restored->GetPartyMembers())
+            {
+                const FRunPartyMember* Live = Run->GetPartyMembers().FindByPredicate([&Member](const FRunPartyMember& Candidate) { return Candidate.CharacterId == Member.CharacterId; });
+                if (!Check(Live && Live->Gold == Member.Gold, TEXT("The selected personal gold balance survives result reload."))) return End();
+            }
             Continue->OnClicked.Broadcast();
             Advance(6);
             return false;
@@ -269,7 +326,7 @@ public:
             }
             if (Run->GetPhase() != ERunPhase::Complete || !ClientsAt(ERunPhase::Complete)) return false;
             Check(Run->GetCompletedNodes().Num() == 2, TEXT("Both authored encounters and the intermediate shop complete one Run."));
-            Test->AddInfo(FString::Printf(TEXT("%d-player PIE completed two real combats, shop selection/exit, durable result reload and replicated host-only progression."), Count));
+            Test->AddInfo(FString::Printf(TEXT("%d-player PIE completed two real combats, personal reward-card selection, shop selection/exit, durable result reload and replicated host-only progression."), Count));
             if (Count == 1)
             {
                 UClass* UnitClass = LoadClass<AUnitBase>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/Unit/BP_PlayerUnit.BP_PlayerUnit_C"));
@@ -431,12 +488,14 @@ private:
     int32 Stage = 0;
     int32 Active = 0;
     int32 EncounterIndex = 0;
+    int32 RewardParticipant = 0;
     double Started = 0;
     bool bSawMontage = false;
     bool bMoveReserved = false;
     bool bSawServerWalking = false;
     bool bSawRemoteWalking = false;
     bool bSawMoveCommitted = false;
+    bool bRewardRequestSent = false;
     int32 MoveUnitId = INDEX_NONE;
     FIntPoint MoveDestination;
     AGameplayPlayerController* Host = nullptr;
@@ -447,6 +506,8 @@ private:
     AUnitBase* MontageUnit = nullptr;
     TSet<AGameplayPlayerController*> RemoteCosts;
     TSet<AGameplayPlayerController*> RemoteMontages;
+    TArray<FRunPartyMember> RewardPartyBefore;
+    TArray<int32> RewardChoices;
 };
 }
 

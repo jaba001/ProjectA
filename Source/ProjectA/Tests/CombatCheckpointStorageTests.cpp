@@ -9,6 +9,7 @@
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Tests/RunRewardTestHelpers.h"
 #include "Game/Snapshot/PartySnapshotSaveGame.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/FileHelper.h"
@@ -442,18 +443,20 @@ bool FCombatCheckpointTerminalTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Terminal result retains noncombat version two"), Disk->Version, 2);
     TestTrue(TEXT("Terminal file contains no resumable battle"), SameCheckpoint(Disk->CombatCheckpoint, FCombatCheckpointData()));
     TestEqual(TEXT("Terminal file contains final actual HP"), Disk->Party[0].CurrentHP, 61.0f);
+    if (!TestTrue(TEXT("Continue retry starts after collecting the terminal reward"), RunRewardTests::CollectPendingGoldRewards(Fixture.Run.Get()))) return false;
+    const int32 EventsBeforeContinue = Events;
     const TArray<uint8> ResultBytes = Fixture.ReadBytes();
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("Failed Continue write keeps the result screen retryable"), Fixture.Run->ContinueRun());
     TestTrue(TEXT("Failed Continue restores result phase"), Fixture.Run->GetPhase() == ERunPhase::Result);
     TestEqual(TEXT("Failed Continue restores the encounter ID"), Fixture.Run->GetCurrentEncounterId(), FName(TEXT("DefaultEncounter")));
     TestTrue(TEXT("Failed Continue keeps the result file"), Fixture.ReadBytes() == ResultBytes);
-    TestEqual(TEXT("Failed Continue publishes no event"), Events, 1);
+    TestEqual(TEXT("Failed Continue publishes no event"), Events, EventsBeforeContinue);
     TestTrue(TEXT("Continue retries successfully"), Fixture.Run->ContinueRun());
-    TestEqual(TEXT("Committed Continue publishes once"), Events, 2);
+    TestEqual(TEXT("Committed Continue publishes once"), Events, EventsBeforeContinue + 1);
     TestTrue(TEXT("Encounter entry and exit commit after retry"), Fixture.Run->SelectRunEncounter(TEXT("Shop_02")) && Fixture.Run->LeaveRunEncounter());
     TestTrue(TEXT("Committed Continue exposes the next node"), Fixture.Run->CanStartNode(TEXT("Combat_02")));
-    TestEqual(TEXT("Shop entry and exit each publish once"), Events, 4);
+    TestEqual(TEXT("Shop entry and exit each publish once"), Events, EventsBeforeContinue + 3);
     TestTrue(TEXT("Next encounter begins after terminal commit"), Fixture.Run->BeginEncounter(TEXT("Combat_02")) && Fixture.Run->MarkCombatStarted());
     const TArray<uint8> NextMapBytes = Fixture.ReadBytes();
     TestFalse(TEXT("The following timed battle also rejects sequential checkpoints"), Fixture.Run->CommitCombatCheckpoint(Fixture.MakeCheckpoint(), Error));

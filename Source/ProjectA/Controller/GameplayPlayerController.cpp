@@ -239,6 +239,21 @@ FGuid AGameplayPlayerController::GetInventoryCharacterId(const FGameplayViewStat
     return Member ? Member->CharacterId : FGuid();
 }
 
+FGuid AGameplayPlayerController::GetRewardCharacterId(const FGameplayViewState& View) const
+{
+    if (!IsLocalController() || View.Phase != ERunPhase::Result || RunParticipantAccount.IsEmpty()) return FGuid();
+    FGuid FirstCharacterId;
+    for (const FRunPartyMember& Member : View.PartyMembers)
+    {
+        if (!Member.bCreated || Member.OwnerAccountId != RunParticipantAccount || !View.GoldRewardRecipientIds.Contains(Member.CharacterId)) continue;
+        if (!FirstCharacterId.IsValid()) FirstCharacterId = Member.CharacterId;
+        // Offer each owned character its pending reward before returning to an already completed claim.
+        // 이미 수령한 캐릭터로 돌아가기 전에 본인 소유 캐릭터의 미수령 보상을 차례로 표시합니다.
+        if (!View.GoldRewardState.Claims.ContainsByPredicate([&Member](const FRunGoldRewardClaim& Claim) { return Claim.CharacterId == Member.CharacterId; })) return Member.CharacterId;
+    }
+    return FirstCharacterId;
+}
+
 bool AGameplayPlayerController::IsRoundInputEnabled() const
 {
     return Super::IsRoundInputEnabled() && (!GameplayRootWidget || !GameplayRootWidget->IsUtilityMenuOpen());
@@ -289,6 +304,56 @@ void AGameplayPlayerController::ClientReceiveShopPurchaseResult_Implementation(b
     RefreshGameplayFlow();
 }
 
+void AGameplayPlayerController::RequestSelectGoldReward(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex)
+{
+    if (!IsLocalController() || bRewardSelectionPending || !CharacterId.IsValid() || ExpectedNodeId.IsNone() || ChoiceIndex < 0 || ChoiceIndex >= 3) return;
+    RewardSelectionMessage = FText::GetEmpty();
+    PendingRewardCharacterId = CharacterId;
+    PendingRewardNodeId = ExpectedNodeId;
+    bRewardSelectionPending = true;
+    bAwaitingRewardReplication = false;
+    RefreshGameplayFlow();
+    if (HasAuthority()) ExecuteGoldRewardSelection(CharacterId, ExpectedNodeId, ChoiceIndex);
+    else ServerSelectGoldReward(CharacterId, ExpectedNodeId, ChoiceIndex);
+}
+
+void AGameplayPlayerController::ServerSelectGoldReward_Implementation(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex)
+{
+    ExecuteGoldRewardSelection(CharacterId, ExpectedNodeId, ChoiceIndex);
+}
+
+void AGameplayPlayerController::ExecuteGoldRewardSelection(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex)
+{
+    if (!HasAuthority()) return;
+    const AGameplayGameState* State = GetWorld() ? GetWorld()->GetGameState<AGameplayGameState>() : nullptr;
+    const ADevelopmentCoopLobby* Lobby = State ? State->GetDevelopmentLobby() : nullptr;
+    if (Lobby && (!Lobby->HasStarted() || Lobby->GetMembers().ContainsByPredicate([](const FDevelopmentCoopMember& Member) { return !Member.bConnected; })))
+    {
+        ClientReceiveGoldRewardResult(CharacterId, ExpectedNodeId, false, NSLOCTEXT("RunGoldReward", "DisconnectedRecipient", "협동 참가자의 연결 상태를 확인해 주세요."));
+        return;
+    }
+    FText Error = NSLOCTEXT("RunGoldReward", "UnboundRecipient", "현재 연결에 배정된 본인 캐릭터의 보상만 선택할 수 있습니다.");
+    const AGameplayGameModeBase* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGameplayGameModeBase>() : nullptr;
+    FRunAccountId AccountId;
+    bool bSucceeded = false;
+    if (Mode && Mode->ResolveRunParticipant(this, AccountId))
+    {
+        AEncounterManager* Manager = Mode->GetEncounterManager();
+        if (Manager) bSucceeded = Manager->SelectGoldReward(AccountId, CharacterId, ExpectedNodeId, ChoiceIndex, Error);
+    }
+    if (bSucceeded) Error = NSLOCTEXT("RunGoldReward", "Claimed", "선택한 골드를 받았습니다.");
+    ClientReceiveGoldRewardResult(CharacterId, ExpectedNodeId, bSucceeded, Error);
+}
+
+void AGameplayPlayerController::ClientReceiveGoldRewardResult_Implementation(FGuid CharacterId, FName ExpectedNodeId, bool bSucceeded, const FText& Message)
+{
+    if (PendingRewardCharacterId != CharacterId || PendingRewardNodeId != ExpectedNodeId) return;
+    RewardSelectionMessage = Message;
+    bRewardSelectionPending = bSucceeded;
+    bAwaitingRewardReplication = bSucceeded;
+    RefreshGameplayFlow();
+}
+
 void AGameplayPlayerController::RequestRetryCombatCheckpoint()
 {
     // The current local server retries its own storage; this is not a client progression command.
@@ -319,6 +384,25 @@ void AGameplayPlayerController::RefreshGameplayFlow()
     {
         ShopPurchaseMessage = FText::GetEmpty();
         bShopPurchasePending = false;
+    }
+    if (CurrentPhase != ERunPhase::Result)
+    {
+        RewardSelectionMessage = FText::GetEmpty();
+        PendingRewardCharacterId.Invalidate();
+        PendingRewardNodeId = NAME_None;
+        bRewardSelectionPending = false;
+        bAwaitingRewardReplication = false;
+    }
+    else if (bAwaitingRewardReplication)
+    {
+        // Keep choices locked until the saved claim reaches the same local or replicated view as the gold balance.
+        // 저장된 수령 상태가 골드 잔액과 같은 로컬 또는 복제 뷰에 도착할 때까지 선택을 잠급니다.
+        const FRunGoldRewardState* Rewards = HasAuthority() && RunState ? &RunState->GetGoldRewardState() : GameplayState ? &GameplayState->GetViewState().GoldRewardState : nullptr;
+        if (Rewards && Rewards->NodeId == PendingRewardNodeId && Rewards->Claims.ContainsByPredicate([this](const FRunGoldRewardClaim& Claim) { return Claim.CharacterId == PendingRewardCharacterId && Claim.ChoiceIndex != INDEX_NONE; }))
+        {
+            bRewardSelectionPending = false;
+            bAwaitingRewardReplication = false;
+        }
     }
     if (IsLocalController() && GameplayRootWidget && GameplayState)
     {

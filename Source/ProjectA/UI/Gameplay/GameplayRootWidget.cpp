@@ -331,8 +331,8 @@ void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool b
 
     if (ResultWidget)
     {
-        ResultWidget->ShowResult(View.LastResult, View.FlowMessage);
         ResultWidget->SetContinueEnabled(bAllowRunCommands);
+        ResultWidget->RefreshResult(View);
     }
     RefreshInventory();
     RefreshGold();

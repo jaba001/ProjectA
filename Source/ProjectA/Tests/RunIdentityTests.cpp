@@ -8,6 +8,7 @@
 #include "Game/Run/RunIdentityLibrary.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Tests/RunRewardTestHelpers.h"
 #include "Game/Snapshot/PartySnapshotSaveGame.h"
 #include "Kismet/GameplayStatics.h"
 #include "Serialization/MemoryReader.h"
@@ -351,6 +352,7 @@ bool FRunIdentityLifecycleTest::RunTest(const FString& Parameters)
     Fixture.Run->UpdatePartyMemberHP(1, 72.0f);
     Fixture.Run->UpdatePartyMemberHP(3, 86.0f);
     TestTrue(TEXT("First victory completes"), Fixture.Run->CompleteEncounter(ECombatResult::Victory));
+    TestTrue(TEXT("Original owners collect their rewards before continuing"), RunRewardTests::CollectPendingGoldRewards(Fixture.Run.Get()));
     TestTrue(TEXT("Continue returns to the next node"), Fixture.Run->ContinueRun());
     TestTrue(TEXT("An encounter can be selected and completed"), Fixture.Run->SelectRunEncounter(TEXT("Shop_02")) && Fixture.Run->LeaveRunEncounter());
     TestTrue(TEXT("Progression preserves Run, participant, Host and consent identity"), SameIdentity(Fixture.Run->GetRunIdentity(), Identity));

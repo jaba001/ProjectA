@@ -8,6 +8,7 @@
 #include "Game/Run/RunParticipationLibrary.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Tests/RunRewardTestHelpers.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -29,7 +30,7 @@ namespace
     {
         if (!Run->BeginEncounter(TEXT("Combat_01")) || !Run->MarkCombatStarted()) return false;
         Run->UpdatePartyMemberHP(2, 73.f);
-        return Run->CompleteEncounter(ECombatResult::Victory);
+        return Run->CompleteEncounter(ECombatResult::Victory) && RunRewardTests::CollectPendingGoldRewards(Run);
     }
 }
 
@@ -64,7 +65,7 @@ bool FRunEncounterFlowTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("An empty shop preserves HP"), Run->GetPartyMembers()[0].CurrentHP, 73.f);
         TestTrue(TEXT("An empty shop preserves every identity field"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Run->GetRunIdentity(), 0));
         TestTrue(TEXT("The next battle starts"), Run->BeginEncounter(TEXT("Combat_02")) && Run->MarkCombatStarted());
-        TestTrue(TEXT("The final victory finishes without another shop"), Run->CompleteEncounter(ECombatResult::Victory) && Run->ContinueRun() && Run->GetPhase() == ERunPhase::Complete);
+        TestTrue(TEXT("The final victory finishes without another shop"), Run->CompleteEncounter(ECombatResult::Victory) && RunRewardTests::CollectPendingGoldRewards(Run.Get()) && Run->ContinueRun() && Run->GetPhase() == ERunPhase::Complete);
     }
     TStrongObjectPtr<URunEncounterPoolDataAsset> Pool(NewObject<URunEncounterPoolDataAsset>());
     TArray<FRunEncounterOffer> Offers;
@@ -131,6 +132,7 @@ bool FRunEncounterPersistenceTest::RunTest(const FString& Parameters)
     FRunCheckpointStorage::Save(Invalid.Get(), Slot.Name, Error);
     TestFalse(TEXT("A map save cannot bypass an unfinished shop"), Run->LoadCheckpoint(Error));
     Legacy->EncounterProgress = FRunEncounterProgress();
+    Legacy->GoldRewardState = FRunGoldRewardState();
     if (!TestTrue(TEXT("Pre-feature defaults remain loadable"), FRunCheckpointStorage::Save(Legacy.Get(), Slot.Name, Error) && Run->LoadStandaloneCheckpoint(Error))) return false;
     TestTrue(TEXT("An old Run preserves its original route without new encounters"), WinFirstBattle(Run.Get()) && Run->ContinueRun() && Run->CanStartNode(TEXT("Combat_02")));
     return true;
@@ -188,7 +190,7 @@ bool FRunStandaloneControlPersistenceTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("The selected party enters its first combat"), Restored->BeginEncounter(TEXT("Combat_01")) && Restored->MarkCombatStarted())) return false;
     Restored->UpdatePartyMemberHP(3, 0.0f);
     Restored->UpdatePartyMemberHP(1, 73.0f);
-    if (!TestTrue(TEXT("A surviving companion carries the same party through victory and the shop"), Restored->CompleteEncounter(ECombatResult::Victory) && Restored->ContinueRun() && Restored->SelectRunEncounter(TEXT("Shop_02")) && Restored->LeaveRunEncounter())) return false;
+    if (!TestTrue(TEXT("A surviving companion carries the same party through victory and the shop"), Restored->CompleteEncounter(ECombatResult::Victory) && RunRewardTests::CollectPendingGoldRewards(Restored.Get()) && Restored->ContinueRun() && Restored->SelectRunEncounter(TEXT("Shop_02")) && Restored->LeaveRunEncounter())) return false;
     if (!TestTrue(TEXT("The next battle's checkpoint restores after the chosen character died"), Run->LoadStandaloneCheckpoint(Error) && Run->CanStartNode(TEXT("Combat_02")))) return false;
     TestTrue(TEXT("The next encounter keeps the dead selected slot instead of promoting its companion"), URunParticipationLibrary::ResolveStandalonePlayerSlot(Run->GetPartyMembers(), SelectedSlot, Error) && SelectedSlot == 3);
     TestTrue(TEXT("Selection and death preserve the complete Run identity"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Run->GetRunIdentity(), 0));

@@ -14,6 +14,7 @@
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Tests/RunRewardTestHelpers.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Kismet/GameplayStatics.h"
@@ -189,6 +190,7 @@ bool FEncounterContinueRetryTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("The Continue fixture enters combat before recording HP"), Fixture.Run->BeginEncounter(TEXT("Combat_01")) && Fixture.Run->MarkCombatStarted())) return false;
     Fixture.Run->UpdatePartyMemberHP(0, 100.f);
     if (!TestTrue(TEXT("The first victory commits a result checkpoint"), Fixture.Run->CompleteEncounter(ECombatResult::Victory))) return false;
+    if (!TestTrue(TEXT("Continue retry starts after the reward is durable"), RunRewardTests::CollectPendingGoldRewards(Fixture.Run.Get()))) return false;
     const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("Continue reports a failed save and remains retryable"), Encounter->ContinueRun());

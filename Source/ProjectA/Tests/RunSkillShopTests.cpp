@@ -8,6 +8,7 @@
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Tests/RunRewardTestHelpers.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/StrongObjectPtr.h"
 
@@ -55,7 +56,7 @@ namespace
         {
             if (!Run->BeginEncounter(TEXT("Combat_01")) || !Run->MarkCombatStarted()) return false;
             for (const FRunPartyMember& Member : Run->GetPartyMembers()) Run->UpdatePartyMemberHP(Member.SlotIndex, Member.SlotIndex == DeadSlot ? 0.0f : RemainingHP);
-            return Run->CompleteEncounter(ECombatResult::Victory) && Run->ContinueRun() && Run->SelectRunEncounter(ShopId);
+            return Run->CompleteEncounter(ECombatResult::Victory) && RunRewardTests::CollectPendingGoldRewards(Run.Get()) && Run->ContinueRun() && Run->SelectRunEncounter(ShopId);
         }
 
         const FRunPartyMember& Member(int32 SlotIndex) const { return Run->GetPartyMembers()[SlotIndex]; }
@@ -109,12 +110,12 @@ bool FRunSkillShopLoadoutTest::RunTest(const FString& Parameters)
                 TestTrue(TEXT("Every profession can purchase every product"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error));
                 TestFalse(TEXT("A learned skill cannot be bought twice"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error));
             }
-            TestEqual(TEXT("Four successful purchases consume exactly 4G"), Fixture.Member(SelectedSlot).Gold, 6);
+            TestEqual(TEXT("Four successful purchases consume exactly 4G"), Fixture.Member(SelectedSlot).Gold, Before[SelectedSlot].Gold - 4);
             TestEqual(TEXT("The buyer retains unarmed and all four purchases"), Fixture.Member(SelectedSlot).Skills.Num(), 5);
             FProfessionDefinition Profession;
             if (!Fixture.Run->PartyDefinition->ResolveProfession(Fixture.Member(SelectedSlot).ClassId, Profession)) return false;
             TestTrue(TEXT("Every shop can recover every profession even with five equipped skills"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
-            TestTrue(TEXT("Recovery restores all HP for 1G without changing the full loadout"), Fixture.Member(SelectedSlot).CurrentHP == Profession.MaxHP && Fixture.Member(SelectedSlot).Gold == 5 && Fixture.Member(SelectedSlot).Skills.Num() == 5);
+            TestTrue(TEXT("Recovery restores all HP for 1G without changing the full loadout"), Fixture.Member(SelectedSlot).CurrentHP == Profession.MaxHP && Fixture.Member(SelectedSlot).Gold == Before[SelectedSlot].Gold - 5 && Fixture.Member(SelectedSlot).Skills.Num() == 5);
             for (int32 Index = 0; Index < Before.Num(); ++Index)
             {
                 if (Index != SelectedSlot) TestTrue(TEXT("Companion HP balance and loadout remain unchanged"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[Index], &Fixture.Member(Index), 0));
@@ -160,12 +161,14 @@ bool FRunSkillShopRejectionTest::RunTest(const FString& Parameters)
     const FRunPartyMember Dead = DeadFixture.Member(3);
     TestFalse(TEXT("A dead direct-control character cannot purchase"), DeadFixture.Run->PurchaseShopOffer(Dead.OwnerAccountId, Dead.CharacterId, DeadFixture.Run->GetSkillShopState().Offers[0].OfferId, DeadFixture.Error));
     TestFalse(TEXT("Shop recovery cannot resurrect a dead character"), DeadFixture.Run->PurchaseShopOffer(Dead.OwnerAccountId, Dead.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), DeadFixture.Error));
-    TestTrue(TEXT("The rejected dead character retains its gold and unarmed loadout"), DeadFixture.Member(3).Gold == 10 && DeadFixture.Member(3).Skills.Num() == 1);
+    TestTrue(TEXT("The rejected dead character retains its gold and unarmed loadout"), DeadFixture.Member(3).Gold == Dead.Gold && DeadFixture.Member(3).Skills.Num() == 1);
 
     FSkillShopFixture PoorFixture;
     TStrongObjectPtr<UPartyDefinitionDataAsset> Catalog(DuplicateObject<UPartyDefinitionDataAsset>(PoorFixture.Run->PartyDefinition.Get(), GetTransientPackage()));
     TStrongObjectPtr<URunEncounterPoolDataAsset> Pool(NewObject<URunEncounterPoolDataAsset>());
     Pool->StartingGold = 0;
+    for (FRunSkillShopOffer& Offer : Pool->FixedSkillOffers) Offer.Price = 100;
+    Pool->Recovery.Price = 100;
     Catalog->RunEncounterPool = Pool.Get();
     PoorFixture.Run->PartyDefinition = Catalog.Get();
     if (!PoorFixture.Initialize() || !PoorFixture.ReachShop(TEXT("Shop_03"))) return false;
@@ -189,11 +192,11 @@ bool FRunSkillShopAtomicPersistenceTest::RunTest(const FString& Parameters)
     const FRunIdentityData Identity = Fixture.Run->GetRunIdentity();
     int32 Events = 0;
     bool bEventObservedDurablePurchase = false;
-    Fixture.Run->OnRunStateChanged.AddLambda([&Fixture, &Events, &bEventObservedDurablePurchase, &Offer]()
+    Fixture.Run->OnRunStateChanged.AddLambda([&Fixture, &Events, &bEventObservedDurablePurchase, &Offer, &Buyer]()
     {
         ++Events;
         TStrongObjectPtr<URunSaveGame> Durable(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
-        bEventObservedDurablePurchase = Durable && Durable->Party[3].Gold == 9 && Durable->Party[3].Skills.Contains(Offer.Skill) && Fixture.Member(3).Gold == 9 && Fixture.Member(3).Skills.Contains(Offer.Skill);
+        bEventObservedDurablePurchase = Durable && Durable->Party[3].Gold == Buyer.Gold - 1 && Durable->Party[3].Skills.Contains(Offer.Skill) && Fixture.Member(3).Gold == Buyer.Gold - 1 && Fixture.Member(3).Skills.Contains(Offer.Skill);
     });
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("A failed durable write rejects the purchase"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error));
@@ -211,7 +214,7 @@ bool FRunSkillShopAtomicPersistenceTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Restore preserves the frozen catalog"), FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Fixture.Run->GetSkillShopState(), &Restored->GetSkillShopState(), 0));
     TestFalse(TEXT("A reloaded purchase remains owned"), Restored->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error));
     TestTrue(TEXT("Purchased skills survive shop exit and the next combat"), Restored->LeaveRunEncounter() && Restored->BeginEncounter(TEXT("Combat_02")) && Restored->MarkCombatStarted() && Restored->GetPartyMembers()[3].Skills.Contains(Offer.Skill));
-    TestEqual(TEXT("The next encounter never grants another starting balance"), Restored->GetPartyMembers()[3].Gold, 9);
+    TestEqual(TEXT("The next encounter never grants another starting balance"), Restored->GetPartyMembers()[3].Gold, Buyer.Gold - 1);
     return true;
 }
 
@@ -237,7 +240,7 @@ bool FRunShopRecoveryPersistenceTest::RunTest(const FString& Parameters)
     {
         ++Events;
         TStrongObjectPtr<URunSaveGame> Durable(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
-        bEventObservedDurableRecovery = Durable && Durable->Party[3].Gold == 9 && Durable->Party[3].CurrentHP == Profession.MaxHP && Durable->Party[3].Skills == Buyer.Skills && Fixture.Member(3).Gold == 9 && Fixture.Member(3).CurrentHP == Profession.MaxHP;
+        bEventObservedDurableRecovery = Durable && Durable->Party[3].Gold == Buyer.Gold - 1 && Durable->Party[3].CurrentHP == Profession.MaxHP && Durable->Party[3].Skills == Buyer.Skills && Fixture.Member(3).Gold == Buyer.Gold - 1 && Fixture.Member(3).CurrentHP == Profession.MaxHP;
     });
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("Recovery rejects a failed durable write"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
@@ -252,13 +255,13 @@ bool FRunShopRecoveryPersistenceTest::RunTest(const FString& Parameters)
     }
     const TArray<uint8> RecoveredBytes = Fixture.ReadBytes();
     TestFalse(TEXT("A repeated request at full HP cannot charge again"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
-    TestTrue(TEXT("Full HP rejection preserves balance save bytes and notification count"), Fixture.Member(3).Gold == 9 && Fixture.Member(3).CurrentHP == Profession.MaxHP && RecoveredBytes == Fixture.ReadBytes() && Events == 1);
+    TestTrue(TEXT("Full HP rejection preserves balance save bytes and notification count"), Fixture.Member(3).Gold == Buyer.Gold - 1 && Fixture.Member(3).CurrentHP == Profession.MaxHP && RecoveredBytes == Fixture.ReadBytes() && Events == 1);
     Fixture.Run->OnRunStateChanged.Clear();
     TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
     Restored->EnableCheckpointSaving(Fixture.Slot);
     if (!TestTrue(TEXT("Continue restores the recovered shop"), Restored->LoadStandaloneCheckpoint(Fixture.Error))) return false;
     TestTrue(TEXT("Recovery reload preserves party identity and frozen skill products"), SameShopParty(Fixture.Run->GetPartyMembers(), Restored->GetPartyMembers()) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Restored->GetRunIdentity(), 0) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Catalog, &Restored->GetSkillShopState(), 0));
-    TestTrue(TEXT("Recovered HP persists into the next battle without refilling gold"), Restored->LeaveRunEncounter() && Restored->BeginEncounter(TEXT("Combat_02")) && Restored->MarkCombatStarted() && Restored->GetPartyMembers()[3].CurrentHP == Profession.MaxHP && Restored->GetPartyMembers()[3].Gold == 9 && Restored->GetPartyMembers()[3].Skills == Buyer.Skills);
+    TestTrue(TEXT("Recovered HP persists into the next battle without refilling gold"), Restored->LeaveRunEncounter() && Restored->BeginEncounter(TEXT("Combat_02")) && Restored->MarkCombatStarted() && Restored->GetPartyMembers()[3].CurrentHP == Profession.MaxHP && Restored->GetPartyMembers()[3].Gold == Buyer.Gold - 1 && Restored->GetPartyMembers()[3].Skills == Buyer.Skills);
     return true;
 }
 
@@ -271,6 +274,7 @@ bool FRunSkillShopLegacyTest::RunTest(const FString& Parameters)
     TStrongObjectPtr<URunSaveGame> Legacy(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
     if (!TestNotNull(TEXT("A native isolated save is available for legacy defaults"), Legacy.Get())) return false;
     Legacy->SkillShopState = FRunSkillShopState();
+    Legacy->GoldRewardState = FRunGoldRewardState();
     for (FRunPartyMember& Member : Legacy->Party)
     {
         Member.Gold = 0;
