@@ -34,3 +34,17 @@ Content/*
 # Track the imported mage staff without copying its source pack / 원본 팩 복제 없이 임포트한 지팡이 추적
 !Content/MageStaff_FreeWeapons/
 !Content/MageStaff_FreeWeapons/**
+
+# Track montage slots on the original skeletons instead of copying meshes / 메시 복제 대신 원본 뼈대의 몽타주 슬롯 추적
+!Content/GKnight/
+Content/GKnight/*
+!Content/GKnight/Meshes/
+Content/GKnight/Meshes/*
+!Content/GKnight/Meshes/SK_GothicKnight_Skeleton.uasset
+!Content/Skeleton_Guard/
+Content/Skeleton_Guard/*
+!Content/Skeleton_Guard/Demoscene_UE4/
+Content/Skeleton_Guard/Demoscene_UE4/*
+!Content/Skeleton_Guard/Demoscene_UE4/Mesh/
+Content/Skeleton_Guard/Demoscene_UE4/Mesh/*
+!Content/Skeleton_Guard/Demoscene_UE4/Mesh/UE4_Mannequin_Skeleton.uasset

@@ -238,7 +238,7 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 
 ## Gameplay 에셋과 배치
 
-사용자·Codex의 모든 제작 에셋은 `Content/User_JeHoon/` 안에 둔다. 외부 팩의 작업 사본은 원본 팩명·하위 폴더 구조·대소문자를 유지하여 `/Game/<팩/하위폴더>`에서 `/Game/User_JeHoon/<팩/하위폴더>`로 대응시킨다. 외부 원본은 유지하고 기존 사본 이동은 Unreal AssetTools로 수행하여 참조·Redirector를 정리한다. C++·설정·생성 명세는 기존 Source·Config 위치를 유지한다.
+외부 에셋은 원본 경로에서 직접 참조하고 작업 편의를 위한 `User_JeHoon` 복제를 하지 않는다. 새 프로젝트 에셋과 필수 리타깃 결과는 `Content/User_JeHoon/`에 작성하며 외부 팩 기반 파생 결과의 하위 구조·대소문자를 유지한다. 중복 정리는 원본에서 `User_JeHoon`으로 복사한 사본에 한정하며 외부 팩끼리는 비교·통합하지 않는다. 기존 사본은 수정 차이·참조·이전 경로 호환을 확인하고 Unreal 기능으로 통합한다. C++·설정·생성 명세는 기존 Source·Config 위치를 유지한다.
 
 2026-09-11: 별도 `/Game/T12Validation`에 있던 메뉴 검증 위젯 3종을 `/Game/User_JeHoon/Validation/T12`로 이동했다. 일반 메뉴의 `UI/MainMenu` 원본과 구분하며 기존 검증 코드·문서·Saved의 T12 생성 명세도 새 경로를 사용한다. UI 생성 도구는 작업 폴더 밖의 assetPath를 거절한다.
 
@@ -246,7 +246,7 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 
 아래 에셋 경로는 모두 `/Game/User_JeHoon/` 기준이다. 디스크에서는 `Content/User_JeHoon/`에 대응한다. 기존 에셋에는 필수 수동 재연결 작업이 없다.
 
-기존 DA는 유형별 폴더를 사용한다. 파라곤 외형은 사용자 요청에 따라 `/Game/ParagonKwang`·`ParagonSparrow`·`ParagonGideon`·`ParagonCountess`의 메시·재질·뼈대를 복제 없이 직접 참조한다. 기존 전투 동작에 필요한 리타깃 애니메이션·Rig·직업 Blueprint만 `/Game/User_JeHoon/`에 작성한다. 지팡이 FBX 한 개와 공용 PBR 텍스처는 유효한 패키지 이름 `/Game/MageStaff_FreeWeapons`로 직접 임포트한다. 기존 GKnight·적·검 작업 사본은 보존한다. 제작·검사 명령은 [에셋 스크립트](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
+기존 DA는 유형별 폴더를 사용한다. 파라곤 외형은 `/Game/ParagonKwang`·`ParagonSparrow`·`ParagonGideon`·`ParagonCountess`의 원본을 직접 참조하며 팩끼리의 중복 비교·통합은 하지 않는다. 기존 전투 동작에 필요한 리타깃 애니메이션·Rig·직업 Blueprint는 `/Game/User_JeHoon/`에 작성한다. 지팡이 FBX 한 개와 공용 PBR 텍스처는 `/Game/MageStaff_FreeWeapons`로 직접 임포트한다. Manny·GKnight·Skeleton_Guard의 메시·뼈대는 원본으로 통합하고, 필요한 `DefaultGroup.DefaultSlot`은 GKnight·Skeleton_Guard 원본 뼈대에 보존한다. 타격용 `BladeBase`·`BladeTip` 소켓이 추가된 검 수정본은 유지한다. 제작·검사 명령은 [에셋 스크립트](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
 
 `UCharacterAppearanceComponent`는 메시 인스턴스의 내장 무기 본만 숨기며 원본이나 판정을 수정하지 않는다. 별도 `Sword` 표시는 `AUnitBase::RefreshSkillPresentation`에서 저장된 장착에 맞춰 갱신하며 아군과 Snapshot 상대가 공유한다. `Staff`는 왼손에 항상 표시하고 충돌을 비활성화한다. 이전 전투 체크포인트는 저장된 클래스 경로를 복구하므로 새 외형 확인은 새 Run을 기준으로 한다.
 
@@ -265,15 +265,15 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 | `Blueprint/DataAsset/Skills/BPDA_swoard_attack` | `USkillDefinitionDataAsset`, 검 공격·논리 ID `SwordAttack`·칼날 궤적·피해 50·AP 1·활성 0.23~0.43초 |
 | `Blueprint/Unit/BP_WarriorUnit`, `BP_MageUnit`, `BP_ArcherUnit`, `BP_RogueUnit` | Kwang·Gideon·Sparrow·Countess 원본 참조·유닛별 몽타주·오른손 검·마법사 왼손 지팡이 |
 | `Blueprint/Unit/BP_*SnapshotOpponent` | 네 직업의 Snapshot 외형, 저장된 스킬·능력치 적용 유지 |
-| `GKnight/Meshes/SK_GothicKnight_VA`, `GKnight/Meshes/SK_GothicKnight_Skeleton` | 이전 전사 외형 작업 사본 보존 |
-| `Skeleton_Guard/Mesh_UE4/Full/SKM_Skeleton_Guard_Body`, `Skeleton_Guard/Demoscene_UE4/Mesh/UE4_Mannequin_Skeleton` | 원본 메시·뼈대 경로를 유지한 적 사본 |
+| `GKnight/Meshes/SK_GothicKnight_VA`, `GKnight/Meshes/SK_GothicKnight_Skeleton` | 원본 `/Game/GKnight`로 연결하는 작은 Redirector. 메시·뼈대 페이로드 중복 제거 |
+| `Skeleton_Guard/Mesh_UE4/Full/SKM_Skeleton_Guard_Body`, `Skeleton_Guard/Demoscene_UE4/Mesh/UE4_Mannequin_Skeleton` | 원본 `/Game/Skeleton_Guard`로 연결하는 작은 Redirector |
 | `Characters/Mannequins/Anims/Unarmed` | 기존 ABP·BS·Walk/Jog/Jump/Attack 하위 구조를 유지한 리타깃 사본. 유닛별 접미사로 구분 |
 | `Blueprint/Unit/Animation/Montage` | 기존 프로젝트 공격 몽타주와 유닛별 리타깃 사본 |
 | `BossyEnemy/Animations/InPlace/Attacks` | 이전 `Boss_Attack_Swing_InP` 리타깃 시퀀스와 검 몽타주 보존 |
 | `ParagonAnimationsRetargetedToManny/KwangManny/Attack` | 기존 공격·복귀와 적 몽타주 보존, 직업별 `AM_SwordAttack_Manny_<Hero>` 리타깃 |
 | `Paragon*/Characters/Heroes/*/Rigs`, `GKnight/Rigs`, `Skeleton_Guard/Rigs` | 직업별 원본 메시를 참조하는 새 IK Rig·Retargeter와 기존 전사/적 도구 |
 | `Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Sword` | 원본 구조를 유지한 검 사본. 전사·기본 적의 `hand_r` 부착 |
-| `Characters/Mannequins/Meshes/SK_Mannequin`, `Characters/Mannequins/Meshes/SKM_Manny_Simple` | Paragon AnimSequence의 Manny 뼈대·프리뷰 메시 작업 사본 |
+| `Characters/Mannequins/Meshes/SK_Mannequin`, `Characters/Mannequins/Meshes/SKM_Manny_Simple` | 원본 `/Game/Characters/Mannequins/Meshes`로 연결하는 작은 Redirector. AnimSequence는 원본 뼈대·프리뷰 직접 참조 |
 | `ParagonAnimationsRetargetedToManny` | 원본 32개 캐릭터/하위 폴더를 유지한 AnimSequence 5,385개. 전체 저장·별도 재로드 확인, Kwang 검 공격용 리타깃은 별도 연결 |
 | `Blueprint/DataAsset/SkillPools/DA_EncounterSkillPool` | `USkillPoolDataAsset`, 기존 추가 스킬 후보·가중치 유지 |
 | `Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog` | `UOpponentSnapshotCatalogDataAsset`, 네 직업별 Snapshot Blueprint 연결. 기존 스킬 별칭·`SwordAttack`·콘텐츠 버전 보존 |

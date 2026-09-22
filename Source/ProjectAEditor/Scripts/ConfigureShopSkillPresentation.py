@@ -20,11 +20,9 @@ def configure():
     skeleton = mesh.get_editor_property("skeleton")
     previous_skeleton = previous_mesh.get_editor_property("skeleton")
     previous_skills = list(defaults.get_editor_property("equipped_skill_data_assets"))
-    if skeleton != previous_skeleton:
-        # Reuse the identical Manny copy while keeping the original AnimBP and legacy montage references compatible.
-        # 동일한 Manny 작업 사본을 사용하며 기존 AnimBP와 이전 몽타주 참조의 호환을 유지합니다.
-        skeleton.add_compatible_skeleton(previous_skeleton)
-        save(skeleton)
+    # Source references must already be migrated; do not add compatibility to the original skeleton.
+    # 원본 참조 이전이 완료되어 있어야 하며 원본 스켈레톤에 호환 설정을 추가하지 않습니다.
+    require(skeleton == previous_skeleton, "Shared player must already use the original Manny skeleton")
     mesh_component.set_editor_property("skeletal_mesh_asset", mesh)
     attack = load(SWORD_SOURCE)
     recovery = load(SWORD_RECOVERY_SOURCE)

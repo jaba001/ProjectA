@@ -34,6 +34,7 @@ public class ProjectAEditor : ModuleRules
 			"JsonUtilities",
 			"Kismet",
 			"KismetCompiler",
+			"MeshDescription",
 			"Slate",
 			"SlateCore",
 			"ToolMenus",

@@ -83,7 +83,7 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureTestEnemies.py") -TestEnemiesVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-10. `ConfigureWarriorContent.py`: 이전 GKnight 콘텐츠 작성 도구. 현재 직업 외형 작성·검사는 아래 `ConfigureProfessionAppearance.py`를 사용한다. 이 도구를 재실행하면 이전 GKnight 외형과 직업 매핑이 적용된다. 내부 리타깃·부착 함수만 새 도구에서 재사용한다. 이전 작성은 GKnight 전사·Weapon_Pack 검 복제, Kwang 공격·복귀 리타깃과 검/휩쓸기 스킬 구성을 포함한다.
+10. `ConfigureWarriorContent.py`: 이전 GKnight 콘텐츠 작성 도구. 현재 직업 외형 작성·검사는 아래 `ConfigureProfessionAppearance.py`를 사용한다. 이 도구를 재실행하면 이전 GKnight 외형과 직업 매핑이 적용된다. 내부 리타깃·부착 함수만 새 도구에서 재사용한다. 메시·뼈대는 GKnight·Skeleton_Guard 원본을 직접 참조하며, 검은 타격 소켓을 추가한 Weapon_Pack 수정본을 유지한다.
 
 IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScript`를 사용하며 스크립트 종료 후 에디터도 종료된다. `-WarriorVerifyOnly`는 commandlet에서 저장된 뼈대·몽타주·스킬·소켓·직업·이전 참조만 읽는다. 두 명령 모두 PIE·게임 플레이를 시작하지 않는다. 외부 팩 원본은 설치된 상태여야 하며 수정하지 않는다.
 
@@ -92,22 +92,22 @@ IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScri
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureWarriorContent.py") -WarriorVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-`WarriorContentPaths.py`는 원본 `/Game/<팩/하위폴더>`를 `/Game/User_JeHoon/<팩/하위폴더>`로 대응시킨다. 메시·뼈대는 GKnight/Skeleton_Guard 원본 경로, 검은 `Weapon_Pack/Mesh/Weapons/Weapons_Kit`에 둔다. 현재 검 시퀀스·몽타주는 `ParagonAnimationsRetargetedToManny/KwangManny/Attack`에 작성하고 기존 `BossyEnemy/Animations/InPlace/Attacks` 사본은 보존한다. 기존 Manny 리타깃은 `Characters/Mannequins/Anims/Unarmed`의 Walk/Jog/Jump/Attack·ABP/BS 구조를 유지하며 프로젝트 몽타주는 기존 `Blueprint/Unit/Animation/Montage`에서 유닛별 접미사로 구분한다. 새 IK 도구는 `GKnight/Rigs`·`Skeleton_Guard/Rigs`를 사용한다. 이전 통합 폴더의 사본 73개는 Unreal AssetTools로 이동하며 외부 팩 원본은 변경하지 않는다.
+`WarriorContentPaths.py`는 필수 파생 결과의 원본 하위 구조를 `/Game/User_JeHoon/` 아래에 유지한다. Manny·GKnight·Skeleton_Guard 메시·뼈대는 원본을 직접 참조하고 검 수정본은 `Weapon_Pack/Mesh/Weapons/Weapons_Kit`에 둔다. 검 시퀀스·몽타주는 `ParagonAnimationsRetargetedToManny/KwangManny/Attack`에 작성하고 기존 `BossyEnemy/Animations/InPlace/Attacks` 결과는 보존한다. Manny 리타깃은 `Characters/Mannequins/Anims/Unarmed`의 Walk/Jog/Jump/Attack·ABP/BS 구조를 유지하며 프로젝트 몽타주는 `Blueprint/Unit/Animation/Montage`에서 유닛별 접미사로 구분한다. 이전 GKnight·기본 적 IK 도구는 `GKnight/Rigs`·`Skeleton_Guard/Rigs`를 사용한다. 과거에 이동한 경로 73개의 참조 호환은 유지하며 메시·뼈대 경로는 원본으로 해석한다.
 
 재실행은 작성 구성을 다시 적용하므로 수동 장착·부착·전사 직업 연결을 재설정한다. 부분 누락 시 고유 임시 폴더에서 리타깃하고 엔진의 에셋 통합으로 기존 의존 참조를 보존한다. `RoundMontageOverrides`와 기존 보행·DefaultSlot을 유지하고 맞지 않는 Manny Foot IK만 제거한다. Retargeter의 기본 연산을 중복 추가하지 않으며 Rig 지정 후 유효한 6개 연산을 한 번 구성한다. 설정 버전 변경이나 `-WarriorRebuildRetargets`는 관련 시퀀스 48개를 기존 경로에 다시 작성하고 원본 Root Motion 설정·참조를 보존한다.
 
 `-WarriorVerifyOnly`는 연산 구성·48개 시퀀스의 길이/포즈/유한 좌표/골반 이동 범위, 원본 폴더 구조·이전 참조 73개, 전사/적 몽타주의 실제 Kwang 공격·복귀 세그먼트를 검사한다. 공격 1.2초에 복귀 0.933333초의 첫 중복 포즈 0.2초를 제외해 총 1.933333초로 연결하며 블렌드 인 0.08초/아웃 0.12초를 사용한다. 검은 축 순서 혼동을 방지하는 `unreal.Rotator(pitch=0, yaw=0, roll=180)`과 손잡이 부착 위치·`BladeBase`/`BladeTip` 소켓·검 전용 `bUseWeaponTrace`로 작성한다. 활성 0.23~0.43초·반경 4cm와 서버 에셋 포즈 기반 칼날 표본 123개를 검사하며 실제 접촉·피해 실행은 [TODO](../../../Docs/TODO.md#2-15-전사와-검-공격-콘텐츠)에 남긴다.
 
-11. `ImportParagonAnimations.py`: `Content/ParagonAnimationsRetargetedToManny`의 FBX를 `/Game/User_JeHoon/ParagonAnimationsRetargetedToManny`에 원본 하위 폴더대로 가져온다. Manny 뼈대·프리뷰 메시는 `User_JeHoon/Characters/Mannequins/Meshes`에 복제한다. 이 스크립트는 AnimSequence만 가져오며 게임 스킬 연결은 변경하지 않는다. FBX만 압축 해제한 상태와 Content Browser에서 열 수 있는 저장 에셋을 구분한다.
+11. `ImportParagonAnimations.py`: `Content/ParagonAnimationsRetargetedToManny`의 FBX를 `/Game/User_JeHoon/ParagonAnimationsRetargetedToManny`에 원본 하위 폴더대로 가져온다. Manny 뼈대·프리뷰 메시는 `/Game/Characters/Mannequins/Meshes`의 원본을 직접 참조하며 복제하거나 저장하지 않는다. 이 스크립트는 AnimSequence만 가져오며 게임 스킬 연결은 변경하지 않는다. FBX만 압축 해제한 상태와 Content Browser에서 열 수 있는 저장 에셋을 구분한다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ImportParagonAnimations.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ImportParagonAnimations.py") -ParagonVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-`-ParagonImportLimit=<개수>`로 처리 범위를 제한할 수 있다. 기존 목적지 에셋은 검증 후 재사용하고 누락된 에셋을 가져온다. 원본 샘플링률을 자동 판정하고 종료 시간을 프레임 경계에 맞춘다. 검사는 AnimSequence 형식·뼈대·프리뷰·길이·본 트랙·원본 FBX 참조를 대상으로 하며 결과는 `Saved/Automation/ParagonAnimationsImport.json`·`ParagonAnimationsReload.json`에 기록한다. 2026-09-21 전체 5,385개 저장·별도 재로드 검사를 통과했다. 파일명의 Additive/MSA만으로 Unreal 전용 가산 설정을 지정하지 않으며 PIE·게임 플레이를 실행하지 않는다. Animation Editor의 실제 재생 확인은 [TODO](../../../Docs/TODO.md#2-16-paragon-fbx-애니메이션-가져오기)를 따른다.
+`-ParagonImportLimit=<개수>`로 처리 범위를 제한할 수 있다. 기존 목적지 에셋은 검증 후 재사용하고 누락된 에셋을 가져온다. 원본 샘플링률을 자동 판정하고 종료 시간을 프레임 경계에 맞춘다. 신규 애니메이션의 개별 프리뷰에는 원본 Manny 메시를 지정한다. 검사는 원본 Manny 메시·뼈대 연결, AnimSequence 형식·길이·본 트랙·원본 FBX 참조를 대상으로 하며 결과는 `Saved/Automation/ParagonAnimationsImport.json`·`ParagonAnimationsReload.json`에 기록한다. 2026-09-21 전체 5,385개 저장·별도 재로드 검사를 통과했다. 파일명의 Additive/MSA만으로 Unreal 전용 가산 설정을 지정하지 않으며 PIE·게임 플레이를 실행하지 않는다. Animation Editor의 실제 재생 확인은 [TODO](../../../Docs/TODO.md#2-16-paragon-fbx-애니메이션-가져오기)를 따른다.
 
-12. `ConfigureShopSkillPresentation.py`: 공용 `BP_PlayerUnit`에 제작용 Manny 메시·검 부착·`AM_SwordAttack_Manny` 대체 몽타주를 연결한다. 기존 Blueprint의 4스킬 기본값은 보존하고 새 Run의 비무장 시작·구매 장착은 C++ Run 데이터에서 적용한다. 원본 외부 에셋을 수정하지 않으며 제작 결과는 `Saved/Automation/ShopSkillPresentationConfigure.json`에 기록한다. 실제 구매·공격 확인은 [TODO](../../../Docs/TODO.md#2-19-비무장-시작과-스킬-상점)를 따른다.
+12. `ConfigureShopSkillPresentation.py`: 공용 `BP_PlayerUnit`에 원본 Manny 메시·검 부착·`AM_SwordAttack_Manny` 대체 몽타주를 연결한다. 기존 Blueprint의 4스킬 기본값은 보존하고 새 Run의 비무장 시작·구매 장착은 C++ Run 데이터에서 적용한다. 원본 뼈대 참조 이전이 완료되어 있어야 하며 호환 뼈대 추가나 원본 저장은 하지 않는다. 제작 결과는 `Saved/Automation/ShopSkillPresentationConfigure.json`에 기록한다. 실제 구매·공격 확인은 [TODO](../../../Docs/TODO.md#2-19-비무장-시작과-스킬-상점)를 따른다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureShopSkillPresentation.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
@@ -121,3 +121,13 @@ IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScri
 ```
 
 첫 명령은 에셋 작성 후 에디터를 종료한다. 두 번째는 저장된 Blueprint·직업 매핑·뼈대·몽타주 슬롯·검 궤적 샘플·무기 표시 설정·지팡이 부착을 읽는다. 결과는 `Saved/Automation/ProfessionAppearanceConfigure.json`·`ProfessionAppearanceReload.json`이다. 실제 메뉴·이동·공격 확인은 [TODO](../../../Docs/TODO.md#2-25-직업별-파라곤-외형)에서 별도로 진행한다.
+
+14. `ConsolidateCopiedAssets.py`: `User_JeHoon`에 복사한 Manny·GKnight·Skeleton_Guard 메시·뼈대 6개만 원본으로 통합한다. 외부 팩끼리는 비교하지 않는다. 원본 형상·기준 포즈·애니메이션 데이터를 검사하고 GKnight·Skeleton_Guard의 필요한 몽타주 슬롯만 원본에 보존한다. 애니메이션·AnimBP·메시 참조를 갱신하고 옛 경로에는 작은 Redirector를 남긴다. 검 소켓 수정본과 임포트·리타깃 결과는 유지한다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConsolidateCopiedAssets.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConsolidateCopiedAssets.py") -CopiedAssetsApply -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConsolidateCopiedAssets.py") -CopiedAssetsVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+```
+
+기본 실행은 읽기 전용 사전검사다. 적용 결과는 `Saved/Automation/CopiedAssetsMigration.json`, 별도 프로세스 재로드는 `CopiedAssetsReload.json`에 기록한다. VerifyOnly는 적용 기록이 필요하다. 기존 원본 팩의 설치 상태를 유지하며 두 원본 뼈대의 슬롯 설정만 예외적으로 Git에서 추적한다. PIE·게임 플레이를 실행하지 않는다.

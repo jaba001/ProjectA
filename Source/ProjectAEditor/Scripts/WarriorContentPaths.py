@@ -12,7 +12,7 @@ SWING_FOLDER = ROOT + "/BossyEnemy/Animations/InPlace/Attacks"
 SWORD_FOLDER = ROOT + "/ParagonAnimationsRetargetedToManny/KwangManny/Attack"
 SWORD_SOURCE = SWORD_FOLDER + "/PrimaryAttack_A_Slow"
 SWORD_RECOVERY_SOURCE = SWORD_FOLDER + "/PrimaryAttack_A_Slow_Recovery"
-SWORD_SOURCE_MESH = ROOT + "/Characters/Mannequins/Meshes/SKM_Manny_Simple"
+SWORD_SOURCE_MESH = "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"
 SWORD_SUFFIX = "_KwangSword"
 WARRIOR_MONTAGE = SWORD_FOLDER + "/AM_SwordAttack"
 
@@ -43,8 +43,8 @@ def legacy_moves():
         mesh = unreal.load_asset(source)
         if not mesh:
             raise RuntimeError("Missing source mesh: " + source)
-        moves[old_folder + "/" + mesh_name] = mirrored_path(source)
-        moves[old_folder + "/" + skeleton_name] = mirrored_path(mesh.get_editor_property("skeleton").get_path_name())
+        moves[old_folder + "/" + mesh_name] = source
+        moves[old_folder + "/" + skeleton_name] = mesh.get_editor_property("skeleton").get_path_name().split(".")[0]
         for suffix in suffixes:
             for prefix in ["IK_Source", "IK_Target", "RTG"]:
                 moves[old_folder + "/" + prefix + suffix] = rigs + "/" + prefix + suffix

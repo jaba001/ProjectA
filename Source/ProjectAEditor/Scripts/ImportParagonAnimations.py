@@ -10,8 +10,8 @@ PROJECT = Path(unreal.Paths.project_dir()).resolve()
 SOURCE = PROJECT / "Content/ParagonAnimationsRetargetedToManny"
 DESTINATION = "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny"
 MESH_SOURCE = "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"
-MESH_PATH = "/Game/User_JeHoon/Characters/Mannequins/Meshes/SKM_Manny_Simple"
-SKELETON_PATH = "/Game/User_JeHoon/Characters/Mannequins/Meshes/SK_Mannequin"
+MESH_PATH = MESH_SOURCE
+SKELETON_PATH = "/Game/Characters/Mannequins/Meshes/SK_Mannequin"
 LIBRARY = unreal.EditorAssetLibrary
 
 
@@ -22,20 +22,14 @@ def require(value, message):
 
 
 def save(asset):
+    require(asset.get_path_name().startswith(DESTINATION + "/"), "Refusing to save external source " + asset.get_path_name())
     require(LIBRARY.save_loaded_asset(asset, only_if_is_dirty=False), "Could not save " + asset.get_path_name())
 
 
-def copy_manny():
-    source_mesh = require(unreal.load_asset(MESH_SOURCE), "Missing source Manny mesh")
-    source_skeleton = source_mesh.get_editor_property("skeleton")
-    skeleton = unreal.load_asset(SKELETON_PATH) if LIBRARY.does_asset_exist(SKELETON_PATH) else LIBRARY.duplicate_asset(source_skeleton.get_path_name(), SKELETON_PATH)
-    mesh = unreal.load_asset(MESH_PATH) if LIBRARY.does_asset_exist(MESH_PATH) else LIBRARY.duplicate_asset(MESH_SOURCE, MESH_PATH)
-    require(skeleton and mesh, "Could not create Manny working copies")
-    if mesh.get_editor_property("skeleton") != skeleton:
-        require(unreal.WarriorAssetLibrary.assign_mesh_skeleton(mesh, skeleton), "Could not assign copied Manny skeleton")
-    require(unreal.WarriorAssetLibrary.set_skeleton_preview_mesh(skeleton, mesh), "Could not set Manny preview mesh")
-    save(mesh)
-    save(skeleton)
+def load_manny():
+    mesh = require(unreal.load_asset(MESH_PATH), "Missing source Manny mesh")
+    skeleton = require(unreal.load_asset(SKELETON_PATH), "Missing source Manny skeleton")
+    require(mesh.get_editor_property("skeleton") == skeleton, "Source Manny mesh and skeleton do not match")
     return skeleton
 
 
@@ -75,18 +69,25 @@ def import_animation(source, destination, skeleton):
     task.set_editor_property("automated", True)
     task.set_editor_property("async_", False)
     task.set_editor_property("replace_existing", False)
-    task.set_editor_property("save", True)
+    task.set_editor_property("save", False)
     task.set_editor_property("factory", unreal.FbxFactory())
     task.set_editor_property("options", options)
     unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
     imported = task.get_editor_property("imported_object_paths")
     require(len(imported) == 1 and imported[0].split(".")[0] == destination, "Unexpected imported assets: " + str(imported))
-    return require(unreal.load_asset(destination), "Missing imported animation " + destination)
+    asset = require(unreal.load_asset(destination), "Missing imported animation " + destination)
+    # Store the preview on the imported animation without changing the original skeleton or mesh.
+    # 원본 스켈레톤이나 메시를 변경하지 않고 임포트한 애니메이션에 프리뷰를 저장합니다.
+    asset.set_preview_skeletal_mesh(require(unreal.load_asset(MESH_PATH), "Missing source Manny preview mesh"))
+    save(asset)
+    return asset
 
 
-def verify_animation(asset, source, skeleton):
+def verify_animation(asset, source, skeleton, preview_mesh):
     require(isinstance(asset, unreal.AnimSequence), "Not an animation: " + source.name)
     require(asset.get_editor_property("skeleton") == skeleton, "Skeleton mismatch: " + source.name)
+    preview_tag = LIBRARY.find_asset_data(asset.get_path_name()).get_tag_value("PreviewSkeletalMesh")
+    require(preview_tag and preview_mesh.get_path_name() in str(preview_tag), "Preview mesh mismatch: " + source.name)
     require(asset.get_editor_property("sequence_length") > 0.0, "Empty animation: " + source.name)
     tracks = unreal.AnimationLibrary.get_animation_track_names(asset)
     require(tracks, "Missing bone animation tracks: " + source.name)
@@ -103,11 +104,9 @@ def main():
     require(sources, "Extract the Paragon archive under Content first")
     if limit_match:
         sources = sources[:int(limit_match.group(1))]
-    skeleton = require(unreal.load_asset(SKELETON_PATH), "Missing Manny working skeleton") if verify_only else copy_manny()
+    skeleton = load_manny()
     preview_mesh = require(unreal.load_asset(MESH_PATH), "Missing Manny preview mesh")
     require(preview_mesh.get_editor_property("skeleton") == skeleton, "Invalid Manny preview mesh")
-    preview_tag = LIBRARY.find_asset_data(SKELETON_PATH).get_tag_value("PreviewSkeletalMesh")
-    require(preview_tag and MESH_PATH in preview_tag, "Missing saved skeleton preview mesh")
     results = []
     failures = []
     started = time.time()
@@ -124,7 +123,7 @@ def main():
                 require(not verify_only, "Missing imported animation: " + destination)
                 asset = import_animation(source, destination, skeleton)
                 imported += 1
-            results.append(verify_animation(asset, source, skeleton))
+            results.append(verify_animation(asset, source, skeleton, preview_mesh))
         except Exception as error:
             failures.append({"source": str(source), "error": str(error)})
             unreal.log_error("PARAGON_IMPORT_FAILURE " + str(source) + " " + str(error))
@@ -135,8 +134,6 @@ def main():
             unreal.SystemLibrary.collect_garbage()
         if failures:
             break
-    if not verify_only:
-        save(skeleton)
     require(not failures, "Paragon import failures: " + str(len(failures)))
     unreal.log("PARAGON_IMPORT_COMPLETE " + str(len(results)))
 

@@ -57,9 +57,9 @@ C++·리플렉션·프로젝트 설정 변경 반영을 위해 빌드 후 UE를 
 
 새 Run의 네 직업은 **비무장 공격**만 가지며 상점에서 검 공격을 구매하면 검을 표시한다. 파라곤 모델에 포함된 기본 무기는 메시 인스턴스에서 숨기며 마법사 지팡이는 항상 표시한다. 기존 공격·복귀 동작은 각 파라곤 뼈대로 리타깃하고 기존 기본공격·스킬 ID와 기본 적·Snapshot의 저장된 장착 규칙은 유지한다. 검 공격은 피해 50·AP 1, 활성 0.23~0.43초의 서버 칼날 소켓 궤적 판정을 사용한다. 실제 직업별 구매·타격 확인은 [TODO](Docs/TODO.md#2-19-비무장-시작과-스킬-상점)에 남긴다.
 
-`BPDA_SweepingStrike`는 근접 접근 후 전방 박스 충돌로 여러 적을 타격한다. `MeleeAreaHalfExtent`로 범위를 조절하며 피해 10·AP 1·몽타주 종료 후 복귀를 유지한다. 이전 `DA_SweepingStrike` 경로·PrimaryAssetId는 리디렉션하고 기존 타일 범위 코드는 보존한다. 외부 팩의 작업 사본은 원본 팩명·하위 폴더 구조를 유지해 `/Game/User_JeHoon/` 아래에 저장하며 원본은 유지한다. 기존 사본 73개의 재배치·이전 참조 검증을 완료했으며 Boss Swing 사본과 호환 경로도 보존한다. 실제 플레이는 [사용자 확인](Docs/TODO.md#2-15-전사와-검-공격-콘텐츠) 대기다. [스킬 정의](Docs/GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터) · [에셋 구성](Docs/PROJECT_PLAN.md#gameplay-에셋과-배치)
+`BPDA_SweepingStrike`는 근접 접근 후 전방 박스 충돌로 여러 적을 타격한다. `MeleeAreaHalfExtent`로 범위를 조절하며 피해 10·AP 1·몽타주 종료 후 복귀를 유지한다. 이전 `DA_SweepingStrike` 경로·PrimaryAssetId는 리디렉션하고 기존 타일 범위 코드는 보존한다. 외부 에셋은 원본을 직접 참조하며 `User_JeHoon`에 편의상 복제하지 않는다. 새 프로젝트 에셋·필수 리타깃 결과만 해당 폴더에 작성한다. 중복 정리는 원본에서 `User_JeHoon`으로 복사한 사본에 한정하며 외부 팩끼리는 비교하지 않는다. 실제 플레이는 [사용자 확인](Docs/TODO.md#2-15-전사와-검-공격-콘텐츠) 대기다. [스킬 정의](Docs/GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터) · [에셋 구성](Docs/PROJECT_PLAN.md#gameplay-에셋과-배치)
 
-Paragon AnimSequence 5,385개를 원본의 32개 캐릭터 폴더 구조대로 `/Game/User_JeHoon/ParagonAnimationsRetargetedToManny`에 저장했다. 복제한 Manny 뼈대·프리뷰 메시를 사용하며 전체 에셋의 별도 재로드 검사를 통과했다. Animation Editor의 실제 재생 확인은 대기이며 Kwang 검 공격 연결은 위 콘텐츠 작업에서 별도로 관리한다. [Animation Editor 확인 방법](Docs/TODO.md#2-16-paragon-fbx-애니메이션-가져오기)
+Paragon AnimSequence 5,385개를 원본의 32개 캐릭터 폴더 구조대로 `/Game/User_JeHoon/ParagonAnimationsRetargetedToManny`에 저장했다. 이는 원본 FBX를 엔진용으로 임포트한 결과이며 단순 복사본이 아니다. 기존 애니메이션과 신규 임포트 모두 원본 Manny 뼈대·프리뷰 메시를 직접 참조한다. 메시·뼈대 복사본 6개를 통합해 Content 용량을 34.01MiB 줄였다. Animation Editor의 실제 재생 확인은 대기이며 Kwang 검 공격 연결은 별도로 관리한다. [복사본 정리와 사용자 확인](Docs/TODO.md#2-26-user_jehoon-복사본-정리)
 
 SAP 이동은 캐릭터마다 목적지 하나를 예약하며 민첩·`MaxWalkSpeed`와 무관하게 **350cm/s의 고정 속도**로 실행한다. 준비 전에는 변경·취소할 수 있고 실제 위치·자원은 바뀌지 않는다. Ready Phase 종료 시 이동 SAP 1과 공격 비용을 합산하여 AP/SAP를 즉시 한 번 차감하며 불발에도 환불하지 않는다. 모든 예약 이동 완료 후 기존 속도차에 따라 AP 행동을 시작하며 도착 위치가 새 복귀 칸이 된다. 다른 유닛의 복귀·예약 칸 이동과 자리 교환을 막고 이동 실패 시 출발점으로 복원한다.
 
@@ -101,7 +101,7 @@ UI는 1920×1080을 기준으로 뷰포트에 맞춰 같은 비율로 확대·�
 
 - 엔진: Unreal Engine 5.7, C++, GAS, CommonUI, UMG.
 - 모듈: `Source/ProjectA`는 런타임, `Source/ProjectAEditor`는 에셋 도구·에디터 테스트. Editor 의존성은 런타임 모듈에 추가하지 않는다.
-- 제작 에셋: `Content/User_JeHoon` (`/Game/User_JeHoon`). 외부 리소스·템플릿 원본은 유지하며 편집 사본은 원본 팩명·하위 폴더 구조 그대로 제작 경로에 둔다.
+- 제작 에셋: `Content/User_JeHoon` (`/Game/User_JeHoon`). 외부 리소스·템플릿은 원본을 직접 참조한다. 새 프로젝트 에셋과 필수 파생 결과만 제작 경로에 두며 편의를 위한 복제는 하지 않는다.
 - UI: [에셋 도구](Source/ProjectAEditor/Scripts/README.md), [위젯·JSON 명세](Docs/UI_README.md).
 
 Development Editor / Win64 빌드:

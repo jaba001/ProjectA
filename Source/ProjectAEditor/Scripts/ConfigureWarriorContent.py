@@ -187,13 +187,8 @@ def verify_retarget_motion(source_mesh, target_mesh, directory, suffix, inputs):
 
 
 def project_mesh(source_path):
-    source = load(source_path)
-    source_skeleton = source.get_editor_property("skeleton").get_path_name()
-    skeleton = duplicate(source_skeleton, mirrored_path(source_skeleton))
-    mesh = duplicate(source_path, mirrored_path(source_path))
-    require(HELPER.assign_mesh_skeleton(mesh, skeleton), "Could not assign copied skeleton")
-    save(mesh)
-    save(skeleton)
+    mesh = load(source_path)
+    skeleton = require(mesh.get_editor_property("skeleton"), "Source mesh has no skeleton: " + source_path)
     return mesh, skeleton
 
 
@@ -248,7 +243,7 @@ def configure_unit(blueprint, mesh, animation, skills, overrides, weapon):
     defaults.set_editor_property("equipped_skill_data_assets", skills)
     defaults.set_editor_property("round_montage_overrides", overrides)
     unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
-    configure_weapon(blueprint, weapon, SWORD_WARRIOR_GRIP if mesh == load(mirrored_path(WARRIOR_SOURCE)) else SWORD_ENEMY_GRIP)
+    configure_weapon(blueprint, weapon, SWORD_WARRIOR_GRIP if mesh == load(WARRIOR_SOURCE) else SWORD_ENEMY_GRIP)
     unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
     save(blueprint)
     REPORT["units"].append(blueprint.get_path_name())
@@ -281,11 +276,10 @@ def configure():
     source_abp = load(UNARMED_SOURCE + "/ABP_Unarmed")
     warrior_retargets = retarget(source_mesh, warrior_mesh, WARRIOR_RIGS, "_Warrior", [source_abp] + montages)
     enemy_retargets = retarget(source_mesh, enemy_mesh, ENEMY_RIGS, "_SwordEnemy", [source_abp] + montages)
-    for animation, skeleton in [(warrior_retargets[source_abp], warrior_skeleton), (enemy_retargets[source_abp], enemy_skeleton)]:
+    for animation in [warrior_retargets[source_abp], enemy_retargets[source_abp]]:
         require(HELPER.remove_legacy_foot_ik(animation), "Could not remove the incompatible Manny foot rig")
         require(HELPER.ensure_output_slot(animation, "DefaultSlot"), "Montage output slot is missing")
         save(animation)
-        save(skeleton)
     source_attack = load(SWORD_SOURCE)
     source_recovery = load(SWORD_RECOVERY_SOURCE)
     sword_retargets = retarget(load(SWORD_SOURCE_MESH), warrior_mesh, WARRIOR_RIGS, SWORD_SUFFIX, [source_attack, source_recovery])
@@ -404,8 +398,8 @@ def verify():
         mesh_component = defaults.get_editor_property("mesh")
         mesh = mesh_component.get_editor_property("skeletal_mesh_asset")
         skeleton = mesh.get_editor_property("skeleton")
-        expected_mesh = load(mirrored_path(WARRIOR_SOURCE if name == "BP_WarriorUnit" else ENEMY_SOURCE))
-        require(mesh == expected_mesh, "Mesh does not preserve its original pack folder")
+        expected_mesh = load(WARRIOR_SOURCE if name == "BP_WarriorUnit" else ENEMY_SOURCE)
+        require(mesh == expected_mesh, "Mesh does not reference its original pack asset")
         animation = load(mirrored_path(UNARMED_SOURCE + "/ABP_Unarmed", suffix))
         require(animation.get_editor_property("target_skeleton") == skeleton, "AnimBP skeleton mismatch")
         require(mesh_component.get_editor_property("anim_class") == animation.generated_class(), "Unit AnimBP mismatch")
@@ -470,8 +464,8 @@ def verify():
     REPORT["sword_source"] = SWORD_SOURCE
     REPORT["sword_recovery_source"] = SWORD_RECOVERY_SOURCE
     source_mesh = load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")
-    warrior_mesh = load(mirrored_path(WARRIOR_SOURCE))
-    enemy_mesh = load(mirrored_path(ENEMY_SOURCE))
+    warrior_mesh = load(WARRIOR_SOURCE)
+    enemy_mesh = load(ENEMY_SOURCE)
     source_abp = load(UNARMED_SOURCE + "/ABP_Unarmed")
     verify_retarget_motion(source_mesh, warrior_mesh, WARRIOR_RIGS, "_Warrior", [source_abp])
     verify_retarget_motion(source_mesh, enemy_mesh, ENEMY_RIGS, "_SwordEnemy", [source_abp])
