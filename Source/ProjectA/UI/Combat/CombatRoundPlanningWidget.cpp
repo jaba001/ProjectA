@@ -179,6 +179,8 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
     SkillList->SetInnerSlotPadding(FVector2D(6.f, 6.f));
     SkillsBox->AddChildToVerticalBox(SkillList);
     SkillDescription = AddText(SkillsBox, FString(), 14);
+    CancelSkillPlanButton = AddButton(SkillsBox, TEXT("스킬 선택 취소"));
+    CancelSkillPlanButton->OnClicked.AddDynamic(this, &UCombatRoundPlanningWidget::HandleCancelSkillPlan);
     Status = AddText(SkillsBox, FString(), 14);
 
     UVerticalBox* ActionsBox = nullptr;
@@ -194,7 +196,7 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
     ReadyButton->OnClicked.AddDynamic(this, &UCombatRoundPlanningWidget::HandleReady);
     UnreadyButton = AddButton(ActionsBox, TEXT("준비 취소"));
     UnreadyButton->OnClicked.AddDynamic(this, &UCombatRoundPlanningWidget::HandleUnready);
-    AddText(ActionsBox, TEXT("준비 완료 후\n① SAP 이동 → ② AP 행동"), 13);
+    AddText(ActionsBox, TEXT("준비 완료 후\n① SAP 이동 → ② 선택한 스킬\n스킬 미선택 시 턴 넘기기"), 13);
     Theme.ApplyControls(WidgetTree);
     Theme.StyleButton(ReadyButton, true);
     RefreshView();
@@ -456,6 +458,22 @@ void UCombatRoundPlanningWidget::HandleCancelMovePlan()
     RefreshView();
 }
 
+void UCombatRoundPlanningWidget::HandleCancelSkillPlan()
+{
+    if (!CanEdit() || GetSelectedUnitId() == INDEX_NONE || !BoundController.IsValid()) return;
+    const int32 UnitId = GetSelectedUnitId();
+    const FCombatRoundUnitView* Unit = BoundController->GetRoundCoordinator()->GetView().Units.FindByPredicate([UnitId](const FCombatRoundUnitView& Entry) { return Entry.UnitId == UnitId; });
+    if (!Unit) return;
+    FCombatRoundCommand Command;
+    Command.UnitId = UnitId;
+    Command.TargetCoord = Unit->HomeCoord;
+    Command.DestinationCoord = Unit->HomeCoord;
+    bChoosingMove = false;
+    LocalStatus = FText::GetEmpty();
+    BoundController->SubmitRoundPlan(Command);
+    RefreshView();
+}
+
 bool UCombatRoundPlanningWidget::CanReadyPlans(FText& OutError) const
 {
     OutError = FText::GetEmpty();
@@ -570,7 +588,7 @@ void UCombatRoundPlanningWidget::RefreshPartyCards(const ACombatRoundCoordinator
         FString Detail = FString::Printf(TEXT("%s · HP %.0f"), *Control, Unit->HP);
         if (IsValid(Unit->Unit)) Detail += FString::Printf(TEXT("\nAP %d · SAP %d"), Unit->Unit->GetCurrentActionPoint(), Unit->Unit->GetCurrentSubActionPoint());
         const FCombatRoundSkill* Planned = Coordinator->FindSkill(Unit->Command.SkillId);
-        const FString Plan = Unit->HP <= 0.f ? TEXT("사망") : Planned ? Planned->Name.ToString() : Unit->OwnerSlot == 0 ? TEXT("대기") : TEXT("행동 미선택");
+        const FString Plan = Unit->HP <= 0.f ? TEXT("사망") : Planned ? Planned->Name.ToString() : Unit->Command.SkillId.IsNone() ? TEXT("턴 넘기기") : TEXT("스킬 확인 필요");
         Detail += TEXT("\n") + Plan;
         if (Unit->bHasMovePlan) Detail += FString::Printf(TEXT("\n이동 (%d,%d)"), Unit->MoveDestinationCoord.X, Unit->MoveDestinationCoord.Y);
         if (Unit->HP > 0.f && Unit->bReady) Detail += TEXT("\n준비 완료");
@@ -588,6 +606,7 @@ void UCombatRoundPlanningWidget::RefreshView()
     bool bReadyPlans = false;
     bool bAnyReady = false;
     bool bHasMovePlan = false;
+    bool bHasSkillPlan = false;
     FText ReadyError;
     if (bConnected)
     {
@@ -655,8 +674,10 @@ void UCombatRoundPlanningWidget::RefreshView()
                 }
             }
             const FCombatRoundSkill* Applied = Coordinator->FindSkill(SelectedUnit->Command.SkillId);
+            bHasSkillPlan = !SelectedUnit->Command.SkillId.IsNone();
+            SelectedSkillId = SelectedUnit->Command.SkillId;
             const FCombatRoundUnitView* AppliedTarget = View.Units.FindByPredicate([SelectedUnit](const FCombatRoundUnitView& Unit) { return Unit.UnitId == SelectedUnit->Command.TargetUnitId; });
-            SkillDescription->SetText(FText::FromString(Applied ? FString::Printf(TEXT("AP 행동: %s → %s\n모든 SAP 이동이 끝난 뒤 사용합니다."), *Applied->Name.ToString(), AppliedTarget ? *UnitLabel(*AppliedTarget) : TEXT("선택한 타일")) : SkillIds.IsEmpty() ? TEXT("사용 가능한 장착 스킬이 없습니다.") : TEXT("적을 한 번 클릭한 뒤 사용할 스킬을 누르세요.")));
+            SkillDescription->SetText(FText::FromString(Applied ? FString::Printf(TEXT("AP 행동: %s → %s\n모든 SAP 이동이 끝난 뒤 사용합니다."), *Applied->Name.ToString(), AppliedTarget ? *UnitLabel(*AppliedTarget) : TEXT("선택한 타일")) : bHasSkillPlan ? TEXT("선택한 스킬을 확인할 수 없습니다. 스킬을 다시 선택하거나 취소하세요.") : TEXT("스킬 미선택 · 준비 완료 시 턴을 넘깁니다.\n행동 비용 없음 · 예약한 이동은 SAP 1 소모")));
         }
         else
         {
@@ -695,6 +716,8 @@ void UCombatRoundPlanningWidget::RefreshView()
     if (UTextBlock* Label = Cast<UTextBlock>(MoveButton->GetContent())) Label->SetText(FText::FromString(bChoosingMove ? TEXT("목적지 선택 닫기") : bHasMovePlan ? TEXT("이동 예약 변경") : TEXT("이동 예약 · SAP 1")));
     CancelMovePlanButton->SetVisibility(bHasMovePlan ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     CancelMovePlanButton->SetIsEnabled(bEditable && bHasMovePlan);
+    CancelSkillPlanButton->SetVisibility(bHasSkillPlan ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    CancelSkillPlanButton->SetIsEnabled(bEditable && bHasSkillPlan);
     ReadyButton->SetIsEnabled(bEditable && bReadyPlans && !bAnyReady);
     ReadyButton->SetToolTipText(ReadyError);
     UnreadyButton->SetVisibility(bAnyReady ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);

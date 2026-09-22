@@ -235,16 +235,17 @@ const FCombatRoundSkill* ACombatRoundCoordinator::FindSkill(FName SkillId) const
 const FCombatRoundSkill* ACombatRoundCoordinator::FindCommandSkill(const FCombatRoundCommand& Command) const
 {
     const int32 Index = FindUnitIndex(Command.UnitId);
-    if (Command.SkillId.IsNone() && View.Units.IsValidIndex(Index) && View.Units[Index].OwnerSlot == 0)
+    if (Command.SkillId.IsNone() && View.Units.IsValidIndex(Index))
     {
-        // Server AI can safely idle without granting a synthetic skill to any character.
-        // 서버 AI는 어떤 캐릭터에도 가상 스킬을 부여하지 않고 안전하게 대기할 수 있습니다.
+        // An empty command skips the action without granting a synthetic skill or charging action costs.
+        // 빈 명령은 가상 스킬을 부여하거나 행동 비용을 차감하지 않고 행동을 건너뜁니다.
         static const FCombatRoundSkill Idle = []()
         {
             FCombatRoundSkill Skill;
             Skill.Kind = ECombatRoundSkillKind::Wait;
             Skill.Approach = ECombatRoundApproach::None;
             Skill.ActionPointCost = 0;
+            Skill.SubActionPointCost = 0;
             Skill.Power = 0.f;
             return Skill;
         }();
@@ -515,7 +516,7 @@ void ACombatRoundCoordinator::BeginPlanning()
         Entry.bHasMovePlan = false;
         Entry.MoveDestinationCoord = Entry.HomeCoord;
         Entry.bReady = false;
-        Entry.Status = RoundText(TEXT("행동 선택 필요"));
+        Entry.Status = RoundText(TEXT("스킬 미선택 · 턴 넘기기"));
         Entry.ActionPhase = ECombatRoundActionPhase::Planned;
         Actions[Index] = FActionRuntime();
         if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive())
@@ -577,7 +578,7 @@ void ACombatRoundCoordinator::BeginPlanning()
         Entry.bReady = true;
         Entry.Status = RoundText(TEXT("AI 계획 고정"));
     }
-    View.Message = RoundText(TEXT("각 유닛의 행동을 적용한 뒤 준비 완료를 선택하세요. 적 계획은 이미 고정되었습니다."));
+    View.Message = RoundText(TEXT("준비 완료를 누르면 스킬을 선택하지 않은 유닛은 행동을 건너뜁니다. 적 계획은 이미 고정되었습니다."));
     FText SaveError;
     if (!PersistPlanningCheckpoint(SaveError)) View.Message = SaveError;
     PublishState();
@@ -928,7 +929,7 @@ bool ACombatRoundCoordinator::ValidateCommand(const FCombatRoundCommand& Command
         return false;
     }
     const FCombatRoundUnitView& Entry = View.Units[Index];
-    if (!Entry.SkillIds.Contains(Command.SkillId) && !(Entry.OwnerSlot == 0 && Command.SkillId.IsNone()))
+    if (!Command.SkillId.IsNone() && !Entry.SkillIds.Contains(Command.SkillId))
     {
         OutError = RoundText(TEXT("이 유닛에게 부여된 스킬이 아닙니다."));
         return false;

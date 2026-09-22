@@ -83,6 +83,9 @@ private:
     void HandleCancelMovePlan();
 
     UFUNCTION()
+    void HandleCancelSkillPlan();
+
+    UFUNCTION()
     void HandleReady();
 
     UFUNCTION()
@@ -138,6 +141,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UButton> CancelMovePlanButton;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> CancelSkillPlanButton;
 
     UPROPERTY(Transient)
     TObjectPtr<UButton> ReadyButton;

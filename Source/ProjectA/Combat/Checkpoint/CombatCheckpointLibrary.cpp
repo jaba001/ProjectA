@@ -194,7 +194,6 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
                 if (Plan.bHasMovePlan || !Plan.Command.SkillId.IsNone()) return false;
                 continue;
             }
-            if (Plan.bReady && Unit->Team == ETeam::Player && Unit->PartyControlMode == EPartyControlMode::Human && Plan.Command.SkillId.IsNone()) return false;
             int32 APCost = 0;
             int32 SAPCost = Plan.bHasMovePlan ? 1 : 0;
             if (!Plan.Command.SkillId.IsNone())

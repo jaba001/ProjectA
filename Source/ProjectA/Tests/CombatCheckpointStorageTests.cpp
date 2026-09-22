@@ -561,6 +561,36 @@ bool FCombatRoundCheckpointReadyCommitTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundCheckpointSkipReadyTest, "ProjectA.Checkpoint.RoundSkipReadyRecovery", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundCheckpointSkipReadyTest::RunTest(const FString& Parameters)
+{
+    FCheckpointStorageFixture Fixture;
+    FText Error;
+    if (!TestTrue(TEXT("Skip fixture initializes"), Fixture.Initialize(Error))) return false;
+    FCombatCheckpointData Ready = Fixture.MakeRoundCheckpoint();
+    Ready.RoundPlans[0].bReady = true;
+    Ready.RoundPlans[0].Command.SkillId = NAME_None;
+    Ready.RoundPlans[0].Command.TargetUnitId = INDEX_NONE;
+    Ready.RoundPlans[0].Command.TargetCoord = Ready.Units[0].GridCoord;
+    Ready.Units[0].AP = 0;
+    Ready.Units[0].SubAP = 0;
+    if (!TestTrue(TEXT("Ready without a skill or action points commits"), Fixture.Run->CommitCombatCheckpoint(Ready, Error))) return false;
+    TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
+    Restored->EnableCheckpointSaving(Fixture.Slot);
+    TestTrue(TEXT("Standalone Continue recognizes a ready skip"), Restored->CanContinueStandaloneSavedRun(Error));
+    TestTrue(TEXT("A ready skip survives process loss without an invented skill"), Restored->LoadStandaloneCheckpoint(Error) && SameCheckpoint(Restored->GetCombatCheckpoint(), Ready));
+    ++Ready.Revision;
+    ++Ready.PlanRevision;
+    Ready.RoundPlans[0].bHasMovePlan = true;
+    Ready.RoundPlans[0].MoveDestinationCoord = FIntPoint(2, 0);
+    Ready.Units[0].MaxSubAP = FMath::Max(1, Ready.Units[0].MaxSubAP);
+    Ready.Units[0].SubAP = 1;
+    if (!TestTrue(TEXT("A ready skip can retain a reserved SAP move"), Fixture.Run->CommitCombatCheckpoint(Ready, Error))) return false;
+    TestTrue(TEXT("Skip readiness and the unpaid SAP move round-trip together"), Restored->LoadStandaloneCheckpoint(Error) && SameCheckpoint(Restored->GetCombatCheckpoint(), Ready));
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatLegacyRoundCheckpointTest, "ProjectA.Checkpoint.LegacyOfflineReadyRecovery", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 
 bool FCombatLegacyRoundCheckpointTest::RunTest(const FString& Parameters)
@@ -625,10 +655,23 @@ bool FCombatRoundCheckpointValidationTest::RunTest(const FString& Parameters)
     Invalid = Valid;
     Invalid.RoundPlans[0].Command.SkillId = TEXT("UnknownSkill");
     TestFalse(TEXT("An unequipped action cannot be recovered"), UCombatCheckpointLibrary::Validate(Invalid, Fixture.Run->GetPartyMembers(), Error));
-    Invalid = Valid;
-    Invalid.RoundPlans[0].bReady = true;
-    Invalid.RoundPlans[0].Command.SkillId = NAME_None;
-    TestFalse(TEXT("A ready human cannot persist an unselected action"), UCombatCheckpointLibrary::Validate(Invalid, Fixture.Run->GetPartyMembers(), Error));
+    FCombatCheckpointData Skip = Valid;
+    Skip.RoundPlans[0].bReady = true;
+    Skip.RoundPlans[0].Command.SkillId = NAME_None;
+    Skip.RoundPlans[0].Command.TargetUnitId = INDEX_NONE;
+    Skip.Units[0].AP = 0;
+    Skip.Units[0].SubAP = 0;
+    Skip.Units[0].Skills.Reset();
+    Skip.Units[0].DefaultAttackAbility.Reset();
+    TestTrue(TEXT("A ready human may skip without skills, targets or action points"), UCombatCheckpointLibrary::Validate(Skip, Fixture.Run->GetPartyMembers(), Error));
+    Skip.RoundPlans[0].bHasMovePlan = true;
+    Skip.RoundPlans[0].MoveDestinationCoord = FIntPoint(2, 0);
+    TestFalse(TEXT("Skipping a skill does not waive reserved movement SAP"), UCombatCheckpointLibrary::Validate(Skip, Fixture.Run->GetPartyMembers(), Error));
+    Skip.Units[0].MaxSubAP = FMath::Max(1, Skip.Units[0].MaxSubAP);
+    Skip.Units[0].SubAP = 1;
+    TestTrue(TEXT("A ready skip with one SAP can retain a valid move reservation"), UCombatCheckpointLibrary::Validate(Skip, Fixture.Run->GetPartyMembers(), Error));
+    Skip.RoundPlans[0].MoveDestinationCoord = Skip.Units[1].GridCoord;
+    TestFalse(TEXT("Skipping a skill does not waive movement destination validation"), UCombatCheckpointLibrary::Validate(Skip, Fixture.Run->GetPartyMembers(), Error));
     FCombatCheckpointData IdleEnemy = Valid;
     IdleEnemy.Units[1].Skills.Reset();
     IdleEnemy.Units[1].DefaultAttackAbility.Reset();
@@ -644,7 +687,7 @@ bool FCombatRoundCheckpointSkillRenameTest::RunTest(const FString& Parameters)
     const FName CurrentId(TEXT("SkillDefinitionDataAsset:BPDA_SweepingStrike"));
     TestEqual(TEXT("Saved commands use the configured primary asset redirect"), UCombatCheckpointLibrary::ResolveSavedSkillId(PreviousId), CurrentId);
     TestEqual(TEXT("The current command identifier remains unchanged"), UCombatCheckpointLibrary::ResolveSavedSkillId(CurrentId), CurrentId);
-    TestEqual(TEXT("Internal AI wait remains empty"), UCombatCheckpointLibrary::ResolveSavedSkillId(NAME_None), NAME_None);
+    TestEqual(TEXT("Internal wait and human skip remain empty"), UCombatCheckpointLibrary::ResolveSavedSkillId(NAME_None), NAME_None);
     const FName UnrelatedId(TEXT("SkillDefinitionDataAsset:BPDA_DefaulatAttack"));
     TestEqual(TEXT("Other existing skill identifiers are preserved"), UCombatCheckpointLibrary::ResolveSavedSkillId(UnrelatedId), UnrelatedId);
     const FSoftObjectPath CurrentPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_SweepingStrike.BPDA_SweepingStrike"));

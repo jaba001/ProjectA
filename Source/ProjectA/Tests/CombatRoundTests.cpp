@@ -438,11 +438,11 @@ bool FCombatRoundEquippedSkillsTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The human has exactly its one equipped selection"), Round->GetView().Units[0].SkillIds.Num(), 1);
     TestTrue(TEXT("The published skill ID is the equipped DataAsset's primary ID"), Round->GetView().Units[0].SkillIds.Contains(Fixture.HumanSkillId) && Round->FindSkill(Fixture.HumanSkillId));
     TestTrue(TEXT("An unarmed AI receives no synthetic selectable skill"), Round->GetView().Units[1].SkillIds.IsEmpty() && Enemy->GetEquippedSkillDataAssets().IsEmpty());
-    TestNull(TEXT("The private AI wait is absent from the selectable catalog"), Round->FindSkill(NAME_None));
+    TestNull(TEXT("The internal no-skill wait is absent from the selectable catalog"), Round->FindSkill(NAME_None));
     FText Error;
     const FCombatRoundCommand EnemyWait = Round->GetView().Units[1].Command;
     TestTrue(TEXT("The unarmed AI receives a ready internal wait"), EnemyWait.SkillId.IsNone() && Round->GetView().Units[1].bReady && Round->CanPlanCommand(EnemyWait, Error));
-    TestFalse(TEXT("A human cannot submit the private AI wait"), Fixture.Submit(0, Fixture.Command(Human, NAME_None)));
+    TestTrue(TEXT("A human can explicitly skip without acquiring a selectable wait skill"), Fixture.Submit(0, Fixture.Command(Human, NAME_None)));
     for (const TCHAR* RemovedId : {TEXT("Strike"), TEXT("Arrow"), TEXT("Guard"), TEXT("Wait"), TEXT("MoveShot"), TEXT("GroundStrike")})
     {
         TestNull(FString::Printf(TEXT("No implicit %s definition exists"), RemovedId), Round->FindSkill(FName(RemovedId)));
@@ -455,6 +455,111 @@ bool FCombatRoundEquippedSkillsTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The single equipped attack applies its authored damage once"), Enemy->GetAttributeSet()->GetHP(), 93.0f);
     TestEqual(TEXT("The unarmed AI does not acquire a hidden attack"), Human->GetAttributeSet()->GetHP(), 100.0f);
     TestTrue(TEXT("The next round still exposes no added human or AI actions"), Round->GetSkills().Num() == 1 && Round->GetView().Units[0].SkillIds.Num() == 1 && Round->GetView().Units[1].SkillIds.IsEmpty());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundNoSkillReadyTest, "ProjectA.Combat.Round.ReadyWithoutSkill", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundNoSkillReadyTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (const bool bWithoutSkills : {false, true})
+    {
+        FCombatRoundSkill Attack;
+        FFixture Fixture;
+        if (!TestTrue(TEXT("Two owners initialize without a synthetic wait skill"), Fixture.Initialize(2, 10.0f, nullptr, FIntPoint(0, 3), 1, bWithoutSkills ? nullptr : &Attack, 20.0f, false, true))) return false;
+        ACombatRoundCoordinator* Round = Fixture.Round;
+        AUnitBase* Human = Fixture.Humans[0];
+        AUnitBase* Friend = Fixture.Humans[1];
+        AUnitBase* Enemy = Fixture.Enemies[0];
+        if (bWithoutSkills && !TestTrue(TEXT("An unarmed character can exhaust both action resources"), Human->ConsumeActionPoint(Human->GetCurrentActionPoint()) && Human->ConsumeSubActionPoint(Human->GetCurrentSubActionPoint()))) return false;
+        const int32 AP = Human->GetCurrentActionPoint();
+        const int32 SAP = Human->GetCurrentSubActionPoint();
+        const int32 FriendAP = Friend->GetCurrentActionPoint();
+        const int32 FriendSAP = Friend->GetCurrentSubActionPoint();
+        const int32 SkillCount = Round->GetSkills().Num();
+        FText Error;
+        TestTrue(TEXT("A fresh human command has no selected skill or target"), Round->GetView().Units[0].Command.SkillId.IsNone() && Round->GetView().Units[0].Command.TargetUnitId == INDEX_NONE);
+        TestTrue(TEXT("An untouched human plan passes preview without a skill"), Round->CanPlanCommand(Round->GetView().Units[0].Command, Error));
+        TestFalse(TEXT("An unknown nonempty skill is not treated as a skipped action"), Fixture.Submit(0, Fixture.Command(Human, TEXT("Unknown"), Enemy)));
+        TestTrue(TEXT("A rejected skill preserves the empty plan"), Round->GetView().Units[0].Command.SkillId.IsNone());
+        if (!TestTrue(TEXT("The first owner can ready without submitting any skill"), Fixture.Ready(0))) return false;
+        TestTrue(TEXT("A skipped action still waits for the other human owner"), Round->GetView().Phase == ECombatRoundPhase::Planning && Round->GetView().Units[0].bReady && !Round->GetView().Units[1].bReady);
+        if (!TestTrue(TEXT("The unarmed second owner can ready its untouched plan"), Fixture.Ready(1))) return false;
+        TestTrue(TEXT("Both empty human plans lock and resolve"), Round->GetView().Phase == ECombatRoundPhase::Resolving);
+        TestEqual(TEXT("Skipping an AP action consumes no AP"), Human->GetCurrentActionPoint(), AP);
+        TestEqual(TEXT("Skipping without movement consumes no SAP"), Human->GetCurrentSubActionPoint(), SAP);
+        TestEqual(TEXT("The other owner's skipped action consumes no AP"), Friend->GetCurrentActionPoint(), FriendAP);
+        TestEqual(TEXT("The other owner's skipped action consumes no SAP"), Friend->GetCurrentSubActionPoint(), FriendSAP);
+        if (!TestTrue(TEXT("Only skipped actions still advance to the next planning round"), Fixture.AdvanceUntilNextRound(1))) return false;
+        TestEqual(TEXT("Skipping does not damage the enemy"), Enemy->GetAttributeSet()->GetHP(), 100.0f);
+        TestEqual(TEXT("Skipping does not damage the first human"), Human->GetAttributeSet()->GetHP(), 100.0f);
+        TestEqual(TEXT("Skipping does not damage the other human"), Friend->GetAttributeSet()->GetHP(), 100.0f);
+        TestEqual(TEXT("Skipping does not inject a selectable skill"), Round->GetSkills().Num(), SkillCount);
+        TestNull(TEXT("The internal wait remains absent from the selectable catalog"), Round->FindSkill(NAME_None));
+        TestTrue(TEXT("The next round resets both human ready states"), !Round->GetView().Units[0].bReady && !Round->GetView().Units[1].bReady);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundMoveWithoutSkillTest, "ProjectA.Combat.Round.SAPMovementWithoutSkill", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundMoveWithoutSkillTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FCombatRoundSkill Attack;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("A movement-only fixture initializes with an optional equipped attack"), Fixture.Initialize(1, 10.0f, nullptr, FIntPoint(0, 3), 1, &Attack, 20.0f, false, true))) return false;
+    ACombatRoundCoordinator* Round = Fixture.Round;
+    AUnitBase* Human = Fixture.Humans[0];
+    AUnitBase* Enemy = Fixture.Enemies[0];
+    ACombatGridTile* Origin = Human->GetCurrentTile();
+    ACombatGridTile* Destination = Fixture.Grid->GetTileAtCoord(FIntPoint(1, 1));
+    if (!TestTrue(TEXT("The mover starts with no AP and exactly one SAP"), Human->ConsumeActionPoint(2) && Human->ConsumeSubActionPoint(1))) return false;
+    if (!TestTrue(TEXT("SAP movement can be reserved without selecting a skill"), Fixture.Move(0, Human, Destination->GridCoord))) return false;
+    TestTrue(TEXT("Reserving movement keeps the AP action empty and defers its SAP charge"), Round->GetView().Units[0].Command.SkillId.IsNone() && Human->GetCurrentSubActionPoint() == 1);
+    if (!TestTrue(TEXT("Ready accepts movement with no selected AP action"), Fixture.Ready(0))) return false;
+    TestTrue(TEXT("The reserved SAP movement starts in the resolving phase"), Round->IsPlanningMoveInProgress() && Round->GetView().Phase == ECombatRoundPhase::Resolving);
+    TestEqual(TEXT("Movement with a skipped action never charges AP"), Human->GetCurrentActionPoint(), 0);
+    TestEqual(TEXT("Movement with a skipped action charges exactly the reserved SAP"), Human->GetCurrentSubActionPoint(), 0);
+    if (!TestTrue(TEXT("The movement-only round settles without an AP attack"), Fixture.AdvanceUntilNextRound(1))) return false;
+    TestTrue(TEXT("Movement-only resolution transfers occupancy to the reserved tile"), Origin->GetOccupyingUnit() == nullptr && Destination->GetOccupyingUnit() == Human && Human->GetCurrentTile() == Destination && Round->GetView().Units[0].HomeCoord == Destination->GridCoord);
+    TestEqual(TEXT("The equipped attack is not implicitly selected after movement"), Enemy->GetAttributeSet()->GetHP(), 100.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundClearSkillTest, "ProjectA.Combat.Round.ClearSkillPreservesMovementAndOtherReadiness", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundClearSkillTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FCombatRoundSkill Attack;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("Two owners initialize for cancelling a selected attack"), Fixture.Initialize(2, 10.0f, nullptr, FIntPoint(0, 3), 1, &Attack, 20.0f, false, true))) return false;
+    ACombatRoundCoordinator* Round = Fixture.Round;
+    AUnitBase* Human = Fixture.Humans[0];
+    AUnitBase* Enemy = Fixture.Enemies[0];
+    ACombatGridTile* Destination = Fixture.Grid->GetTileAtCoord(FIntPoint(1, 1));
+    const FCombatRoundCommand AppliedAttack = Fixture.Command(Human, Fixture.HumanSkillId, Enemy);
+    const FCombatRoundCommand Skip = Fixture.Command(Human, NAME_None);
+    const int32 AP = Human->GetCurrentActionPoint();
+    const int32 SAP = Human->GetCurrentSubActionPoint();
+    if (!TestTrue(TEXT("The owner applies an attack and reserves movement"), Fixture.Submit(0, AppliedAttack) && Fixture.Move(0, Human, Destination->GridCoord))) return false;
+    if (!TestTrue(TEXT("The owner readies its attack before the other participant"), Fixture.Ready(0))) return false;
+    if (!TestTrue(TEXT("A ready owner can replace its selected attack with an empty command"), Fixture.Submit(0, Skip))) return false;
+    TestTrue(TEXT("Cancelling the selected skill clears its owner's ready state"), !Round->GetView().Units[0].bReady && Round->GetView().Phase == ECombatRoundPhase::Planning);
+    if (!TestTrue(TEXT("The attack can be selected again while the teammate becomes ready"), Fixture.Submit(0, AppliedAttack) && Fixture.Ready(1))) return false;
+    if (!TestTrue(TEXT("The owner can clear the attack while another owner remains ready"), Fixture.Submit(0, Skip))) return false;
+    TestTrue(TEXT("Clearing the attack preserves the other participant's readiness"), !Round->GetView().Units[0].bReady && Round->GetView().Units[1].bReady);
+    TestTrue(TEXT("Clearing the attack removes its skill and target while retaining the SAP reservation"), SameCommand(Round->GetView().Units[0].Command, Skip) && Round->GetView().Units[0].bHasMovePlan && Round->GetView().Units[0].MoveDestinationCoord == Destination->GridCoord);
+    TestTrue(TEXT("Skill changes spend no resources during planning"), Human->GetCurrentActionPoint() == AP && Human->GetCurrentSubActionPoint() == SAP);
+    if (!TestTrue(TEXT("The final ready starts movement without requiring the teammate to ready again"), Fixture.Ready(0))) return false;
+    TestTrue(TEXT("The retained SAP movement starts after readiness locks"), Round->IsPlanningMoveInProgress() && Round->GetView().Phase == ECombatRoundPhase::Resolving);
+    TestEqual(TEXT("The cancelled attack charges no AP"), Human->GetCurrentActionPoint(), AP);
+    TestEqual(TEXT("The retained movement charges exactly one SAP"), Human->GetCurrentSubActionPoint(), SAP - 1);
+    if (!TestTrue(TEXT("The replacement skip and retained movement complete the round"), Fixture.AdvanceUntilNextRound(1))) return false;
+    TestTrue(TEXT("Cancelling the attack does not cancel its independent SAP destination"), Human->GetCurrentTile() == Destination && Destination->GetOccupyingUnit() == Human);
+    TestEqual(TEXT("The cancelled attack never deals damage"), Enemy->GetAttributeSet()->GetHP(), 100.0f);
     return true;
 }
 
