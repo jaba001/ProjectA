@@ -1,6 +1,7 @@
 #include "UI/Gameplay/GameplayRootWidget.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "CommonUITypes.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
@@ -84,6 +85,19 @@ void UGameplayRootWidget::RefreshInventory()
     if (Inventory) Inventory->RefreshInventory(CurrentView, Controller ? Controller->GetInventoryCharacterId(CurrentView) : FGuid());
 }
 
+void UGameplayRootWidget::RefreshGold()
+{
+    if (!GoldPanel || !GoldText) return;
+    const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
+    const FGuid CharacterId = Controller ? Controller->GetInventoryCharacterId(CurrentView) : FGuid();
+    const FRunPartyMember* Member = CharacterId.IsValid() ? CurrentView.PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.CharacterId == CharacterId && Candidate.bCreated; }) : nullptr;
+    const bool bVisible = Member && CurrentView.Phase != ERunPhase::None && !(DevelopmentWidget && DevelopmentWidget->IsActivated());
+    GoldPanel->SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+    // Display only the confirmed personal balance shared with inventory and replicated Run views.
+    // 인벤토리 및 복제 Run 뷰와 같은 확정 개인 잔액만 표시합니다.
+    GoldText->SetText(bVisible ? FText::Format(NSLOCTEXT("GameplayHUD", "PersonalGold", "보유 골드  {0}G"), FText::AsNumber(Member->Gold)) : FText::GetEmpty());
+}
+
 void UGameplayRootWidget::ToggleInventory()
 {
     if (!UtilityLayer || !bHasDisplayedPhase || DisplayedPhase == ERunPhase::None || (DevelopmentWidget && DevelopmentWidget->IsActivated())) return;
@@ -134,6 +148,7 @@ void UGameplayRootWidget::RefreshDevelopmentLobby(ADevelopmentCoopLobby* Lobby)
         DevelopmentWidget = nullptr;
         DevelopmentLayer->SetVisibility(ESlateVisibility::Collapsed);
     }
+    RefreshGold();
 }
 
 void UGameplayRootWidget::NativeOnInitialized()
@@ -173,6 +188,18 @@ void UGameplayRootWidget::NativeOnInitialized()
     UOverlaySlot* ContentSlot = NoticeRoot->AddChildToOverlay(ExistingRoot);
     ContentSlot->SetHorizontalAlignment(HAlign_Fill);
     ContentSlot->SetVerticalAlignment(VAlign_Fill);
+    GoldPanel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("PersonalGoldPanel"));
+    GoldPanel->SetBrush(FSlateRoundedBoxBrush(FLinearColor(0.012f, 0.016f, 0.022f, 0.92f), 8.f, FLinearColor(0.3f, 0.25f, 0.18f, 0.85f), 1.f));
+    GoldPanel->SetPadding(FMargin(16.f, 10.f));
+    GoldPanel->SetVisibility(ESlateVisibility::Collapsed);
+    UOverlaySlot* GoldSlot = NoticeRoot->AddChildToOverlay(GoldPanel);
+    GoldSlot->SetHorizontalAlignment(HAlign_Left);
+    GoldSlot->SetVerticalAlignment(VAlign_Top);
+    GoldSlot->SetPadding(FMargin(24.f, 16.f));
+    GoldText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_PersonalGold"));
+    UDemonicUITheme::Get().StyleText(GoldText, true, 20);
+    GoldText->SetColorAndOpacity(FLinearColor(0.95f, 0.76f, 0.34f));
+    GoldPanel->SetContent(GoldText);
     CheckpointNotice = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("CheckpointNotice"));
     UOverlaySlot* NoticeSlot = NoticeRoot->AddChildToOverlay(CheckpointNotice);
     NoticeSlot->SetHorizontalAlignment(HAlign_Center);
@@ -308,4 +335,5 @@ void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool b
         ResultWidget->SetContinueEnabled(bAllowRunCommands);
     }
     RefreshInventory();
+    RefreshGold();
 }

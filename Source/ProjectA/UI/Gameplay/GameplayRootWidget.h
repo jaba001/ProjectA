@@ -60,7 +60,14 @@ private:
     void ToggleInventory();
     void ToggleSettings();
     void RefreshInventory();
+    void RefreshGold();
     void HandleUtilityWidgetChanged(UCommonActivatableWidget* ActiveWidget);
+
+    UPROPERTY(Transient)
+    TObjectPtr<UBorder> GoldPanel;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> GoldText;
 
     UPROPERTY(Transient)
     TObjectPtr<UDataTable> ShortcutActions;
