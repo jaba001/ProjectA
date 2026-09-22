@@ -25,6 +25,7 @@ public class ProjectAEditor : ModuleRules
 			"ControlRig",
 			"ControlRigDeveloper",
 			"GameplayAbilities",
+			"GameplayTags",
 			"InputCore",
 			"IKRig",
 			"IKRigEditor",

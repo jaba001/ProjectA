@@ -5,19 +5,6 @@
 #include "Grid/Combat/CombatGridTile.h"
 #include "Net/UnrealNetwork.h"
 
-namespace
-{
-    FCombatActionResponse RejectLegacyAction(const FCombatActionRequest& Request)
-    {
-        FCombatActionResponse Response;
-        Response.CombatInstanceId = Request.CombatInstanceId;
-        Response.RequestSequence = Request.RequestSequence;
-        Response.Result = ECombatRequestResult::InvalidContext;
-        Response.Message = FText::FromString(TEXT("개별 턴 즉시 실행은 종료되었습니다. 라운드 계획을 적용한 뒤 준비 완료를 사용하세요."));
-        return Response;
-    }
-}
-
 APartyPlayerController::APartyPlayerController()
 {
     bEnableClickEvents = false;
@@ -77,64 +64,9 @@ void APartyPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
     Super::EndPlay(EndPlayReason);
 }
 
-AUnitBase* APartyPlayerController::GetActiveUnit() const
-{
-    return nullptr;
-}
-
-void APartyPlayerController::RequestEndTurn()
-{
-    SubmitCombatActionRequest(FCombatActionRequest());
-}
-
-void APartyPlayerController::RequestHealingItem()
-{
-    SubmitCombatActionRequest(FCombatActionRequest());
-}
-
-bool APartyPlayerController::BuildCombatActionRequest(ECombatActionKind Kind, USkillDefinitionDataAsset* Skill, ACombatGridTile* TargetTile, FCombatActionRequest& OutRequest)
-{
-    OutRequest = FCombatActionRequest();
-    OutRequest.Kind = Kind;
-    return false;
-}
-
-FCombatActionResponse APartyPlayerController::SubmitCombatActionRequest(const FCombatActionRequest& Request)
-{
-    LastCombatActionResponse = RejectLegacyAction(Request);
-    OnCombatActionResponse.Broadcast(LastCombatActionResponse);
-    return LastCombatActionResponse;
-}
-
-void APartyPlayerController::ServerRequestCombatAction_Implementation(const FCombatActionRequest& Request)
-{
-    ClientReceiveCombatActionResponse(RejectLegacyAction(Request));
-}
-
-void APartyPlayerController::ClientReceiveCombatActionResponse_Implementation(const FCombatActionResponse& Response)
-{
-    LastCombatActionResponse = Response;
-    OnCombatActionResponse.Broadcast(Response);
-}
-
 void APartyPlayerController::HandleTileClicked(ACombatGridTile* Tile)
 {
     if (HandleRoundWorldTileClicked(Tile)) SetSelectedTile(Tile);
-}
-
-bool APartyPlayerController::CanUseActiveUnitAction() const
-{
-    return false;
-}
-
-bool APartyPlayerController::CanUseActiveUnitActionPoint(int32 Cost) const
-{
-    return false;
-}
-
-bool APartyPlayerController::CanUseActiveUnitSubActionPoint(int32 Cost) const
-{
-    return false;
 }
 
 void APartyPlayerController::SetSelectedTile(ACombatGridTile* InTile)
@@ -152,27 +84,7 @@ void APartyPlayerController::ClearSelectedTile()
     SelectedTile = nullptr;
 }
 
-void APartyPlayerController::SetTileInputMode(ETileInputMode NewMode)
-{
-    CancelTileInputMode();
-}
-
-void APartyPlayerController::EnterMoveMode()
-{
-    CancelTileInputMode();
-}
-
-void APartyPlayerController::EnterSkillMode(USkillDefinitionDataAsset* SkillData)
-{
-    CancelTileInputMode();
-}
-
 void APartyPlayerController::CancelTileInputMode()
 {
     ClearSelectedTile();
-}
-
-bool APartyPlayerController::IsValidTileForPendingSkill(ACombatGridTile* Tile) const
-{
-    return false;
 }

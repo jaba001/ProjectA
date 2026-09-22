@@ -7,9 +7,10 @@ import unreal
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ConfigureWarriorContent import ASSETS, HELPER, SKILLS, TOOLS, configure_weapon, duplicate, load, require, retarget, save
+from ConfigureWarriorContent import ASSETS, HELPER, SKILLS, TOOLS, configure_weapon, duplicate, load, require, save
+from RetargetContentLibrary import retarget
 from ImportMageStaff import MESH_PATH as STAFF_PATH, configure as import_staff, describe_bounds
-from WarriorContentPaths import ROOT, SWORD_FOLDER, SWORD_SOURCE, SWORD_RECOVERY_SOURCE, UNARMED_SOURCE, WARRIOR_MONTAGE, WEAPON_SOURCE, mirrored_path
+from WarriorContentPaths import ROOT, SWORD_FOLDER, SWORD_SOURCE, SWORD_RECOVERY_SOURCE, UNARMED_SOURCE, WARRIOR_MONTAGE, WEAPON_SOURCE, animation_sources, mirrored_path, retarget_output_path
 
 
 PROFESSIONS = [("Warrior", "Kwang", "Kwang_GDC"), ("Mage", "Gideon", "Gideon"), ("Archer", "Sparrow", "Sparrow"), ("Rogue", "Countess", "SM_Countess")]
@@ -135,7 +136,7 @@ def configure():
         suffix = "_" + hero
         rigs = mirrored_path(hero_root(hero) + "/Rigs")
         inputs = [source_animation] + montages + [sword_manny, load(SWORD_SOURCE), load(SWORD_RECOVERY_SOURCE)]
-        converted = retarget(source_mesh, mesh, rigs, suffix, inputs)
+        converted = retarget(source_mesh, mesh, rigs, suffix, inputs, report=REPORT, force_rebuild=any(flag in unreal.SystemLibrary.get_command_line() for flag in ("-ProfessionAppearanceRebuildRetargets", "-WarriorRebuildRetargets")), anim_blueprint_sources=animation_sources().values(), mirror_path=mirrored_path, output_path=retarget_output_path, save_asset=save)
         animation = converted[source_animation]
         require(HELPER.remove_legacy_foot_ik(animation), "Could not remove Manny-only foot rig")
         require(HELPER.ensure_output_slot(animation, "DefaultSlot"), "Could not connect montage output slot")

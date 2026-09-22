@@ -7,6 +7,9 @@
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Combat/Library/CombatEffectLibrary.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
+#include "Combat/Round/CombatPlanValidator.h"
+#include "Combat/Checkpoint/CombatCheckpointLibrary.h"
+#include "GameplayEffect.h"
 #include "Combat/Round/CombatRoundProjectile.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -411,6 +414,17 @@ bool FCombatRoundPlanningTargetsTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Ground attack uses valid coordinates without a unit target"), Round->CanPlanCommand(Ground, Error));
     TestTrue(TEXT("Other units' equipped actions do not replace the passive enemy's internal wait"), Round->GetView().Units.Last().Command.SkillId.IsNone());
     const FCombatRoundCommand Attack = Fixture.Command(Source, TEXT("Strike"), Enemy);
+    const FCombatRoundCommand Projectile = Fixture.Command(Source, TEXT("Arrow"), Enemy);
+    Fixture.Arena->Grid = nullptr;
+    TestFalse(TEXT("Missing grid rejects melee commands even without tile approach"), Round->CanPlanCommand(Attack, Error));
+    TestFalse(TEXT("Missing grid rejects direct projectiles"), Round->CanPlanCommand(Projectile, Error));
+    TestFalse(TEXT("Missing grid also rejects ground attacks"), Round->CanPlanCommand(Ground, Error));
+    TestFalse(TEXT("Server submission preserves the missing-grid rejection"), Fixture.Submit(0, Projectile));
+    TestTrue(TEXT("Wait remains valid without a grid when no movement is reserved"), Round->CanPlanCommand(Fixture.Command(Source, TEXT("Wait")), Error));
+    TestTrue(TEXT("An empty skipped command also remains valid without a grid"), Round->CanPlanCommand(Fixture.Command(Source, NAME_None), Error));
+    Fixture.Arena->Grid = Fixture.Grid;
+    TestTrue(TEXT("Restoring the grid restores ordinary melee planning"), Round->CanPlanCommand(Attack, Error));
+    TestTrue(TEXT("Restoring the grid restores ordinary projectile planning"), Round->CanPlanCommand(Projectile, Error));
     Enemy->Die();
     TestFalse(TEXT("A dead enemy disappears from attack candidates before another plan is submitted"), Round->IsValidUnitTarget(Source->UnitIndex, Fixture.SkillId(Source, TEXT("Strike")), Enemy->UnitIndex));
     TestFalse(TEXT("A stale attack draft fails preview after target death"), Round->CanPlanCommand(Attack, Error));
@@ -2180,4 +2194,135 @@ bool FCombatRoundProjectileRosterTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundTagEffectContractTest, "ProjectA.Combat.Round.TagAndEffectContract", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundTagEffectContractTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    const FGameplayTag SourceTag = FGameplayTag::RequestGameplayTag(TEXT("Attack.Ranged"));
+    const FGameplayTag TargetTag = FGameplayTag::RequestGameplayTag(TEXT("Attack.Close"));
+    const FGameplayTag BlockedTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Stunned"));
+    FCombatRoundSkill Skill;
+    Skill.Kind = ECombatRoundSkillKind::Projectile;
+    Skill.Approach = ECombatRoundApproach::None;
+    Skill.WindupSeconds = 0.05f;
+    Skill.ProjectileSpeed = 1000.f;
+    Skill.SourceTagQuery = FGameplayTagQuery::MakeQuery_MatchTag(SourceTag);
+    Skill.TargetTagQuery = FGameplayTagQuery::MakeQuery_MatchTag(TargetTag);
+    Skill.SourceBlockedTags.AddTag(BlockedTag);
+    Skill.EffectTags.AddTag(SourceTag);
+    // A native empty instant effect proves execution uses the selected class instead of fixed damage.
+    // 네이티브 빈 즉시 효과로 실행 시 고정 피해가 아니라 선택한 클래스를 사용하는지 확인합니다.
+    Skill.EffectClass = UGameplayEffect::StaticClass();
+    FFixture Fixture;
+    if (!Fixture.Initialize(1, 0.f, nullptr, FIntPoint(0, 3), 1, &Skill)) return false;
+    AUnitBase* Source = Fixture.Humans[0];
+    AUnitBase* Target = Fixture.Enemies[0];
+    UAbilitySystemComponent* SourceASC = Source->GetAbilitySystemComponent();
+    UAbilitySystemComponent* TargetASC = Target->GetAbilitySystemComponent();
+    const FCombatRoundCommand Command = Fixture.Command(Source, Fixture.HumanSkillId, Target);
+    TestFalse(TEXT("Missing source and target tags prevent planning"), Fixture.Round->CanPlanCommand(Command, Fixture.Error));
+    SourceASC->AddLooseGameplayTag(SourceTag);
+    TestFalse(TEXT("Source tags alone do not bypass target conditions"), Fixture.Round->CanPlanCommand(Command, Fixture.Error));
+    TargetASC->AddLooseGameplayTag(TargetTag);
+    TestTrue(TEXT("Matching source and target tags permit planning"), Fixture.Round->CanPlanCommand(Command, Fixture.Error));
+    SourceASC->AddLooseGameplayTag(BlockedTag);
+    TestFalse(TEXT("Blocked source tags prevent planning"), Fixture.Round->CanPlanCommand(Command, Fixture.Error));
+    SourceASC->RemoveLooseGameplayTag(BlockedTag);
+    SourceASC->BlockAbilitiesWithTags(FGameplayTagContainer(SourceTag));
+    TestFalse(TEXT("GAS ability tag blocking also prevents planning"), Fixture.Round->CanPlanCommand(Command, Fixture.Error));
+    SourceASC->UnBlockAbilitiesWithTags(FGameplayTagContainer(SourceTag));
+    bool bSawEffectTags = false;
+    int32 AppliedEffects = 0;
+    const FDelegateHandle Applied = TargetASC->OnGameplayEffectAppliedDelegateToSelf.AddLambda([&](UAbilitySystemComponent*, const FGameplayEffectSpec& Spec, FActiveGameplayEffectHandle)
+    {
+        FGameplayTagContainer Tags;
+        Spec.GetAllAssetTags(Tags);
+        bSawEffectTags = Tags.HasTag(SourceTag);
+        ++AppliedEffects;
+    });
+    if (!TestTrue(TEXT("Tag-valid plan is accepted"), Fixture.Submit(0, Command)) || !TestTrue(TEXT("Tag-valid round starts"), Fixture.Ready(0))) return false;
+    for (int32 Step = 0; Step < 50 && Fixture.Round->GetView().PendingProjectiles == 0; ++Step) Fixture.Round->Tick(0.01f);
+    TestEqual(TEXT("Release creates one independent projectile"), Fixture.Round->GetView().PendingProjectiles, 1);
+    SourceASC->AddLooseGameplayTag(BlockedTag);
+    Source->Die();
+    TestTrue(TEXT("Released projectile settles after source tag changes and death"), Fixture.AdvanceUntilNextRound(1) || Fixture.Round->GetView().Phase == ECombatRoundPhase::Finished);
+    TestEqual(TEXT("Authored effect executes exactly once after the caster dies"), AppliedEffects, 1);
+    TestTrue(TEXT("Skill tags reach the actual GAS effect spec"), bSawEffectTags);
+    TestTrue(TEXT("Empty authored effect does not fall back to damage"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 100.f));
+    TargetASC->OnGameplayEffectAppliedDelegateToSelf.Remove(Applied);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundPlanningParityTest, "ProjectA.Combat.Round.LiveAndCheckpointPlanningParity", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundPlanningParityTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FCombatRoundSkill Skill;
+    Skill.Kind = ECombatRoundSkillKind::Projectile;
+    Skill.Approach = ECombatRoundApproach::Tile;
+    Skill.SubActionPointCost = 1;
+    FFixture Fixture;
+    if (!Fixture.Initialize(2, 0.f, nullptr, FIntPoint(0, 3), 1, &Skill)) return false;
+    const FCombatRoundView& View = Fixture.Round->GetView();
+    FCombatCheckpointData Checkpoint;
+    for (const FCombatRoundUnitView& Entry : View.Units)
+    {
+        FCombatCheckpointUnit& Unit = Checkpoint.Units.AddDefaulted_GetRef();
+        Unit.RoundUnitId = Entry.UnitId;
+        Unit.Team = Entry.Unit->GetTeam();
+        Unit.bDead = !Entry.Unit->IsUnitAlive();
+        Unit.AP = Entry.Unit->GetCurrentActionPoint();
+        Unit.SubAP = Entry.Unit->GetCurrentSubActionPoint();
+        Unit.GridCoord = Entry.HomeCoord;
+        for (USkillDefinitionDataAsset* Definition : Entry.Unit->GetEquippedSkillDataAssets()) Unit.Skills.Add(FSoftObjectPath(Definition));
+        FCombatCheckpointRoundPlan& Plan = Checkpoint.RoundPlans.AddDefaulted_GetRef();
+        Plan.UnitId = Entry.UnitId;
+        Plan.Command = Entry.Command;
+    }
+    AUnitBase* Source = Fixture.Humans[0];
+    FCombatRoundCommand Command = Fixture.Command(Source, Fixture.HumanSkillId, Fixture.Enemies[0]);
+    for (int32 Case = 0; Case < 4; ++Case)
+    {
+        FCombatCheckpointData Candidate = Checkpoint;
+        Command.DestinationCoord = Case == 1 ? FIntPoint(2, 0) : FIntPoint(1, 0);
+        Command.TargetUnitId = Case == 2 ? Fixture.Humans[1]->UnitIndex : Fixture.Enemies[0]->UnitIndex;
+        Command.SkillId = Case == 3 ? FName(TEXT("NotEquipped")) : Fixture.HumanSkillId;
+        Candidate.RoundPlans[0].Command = Command;
+        FText SavedError;
+        const bool bLive = Fixture.Round->CanPlanCommand(Command, Fixture.Error);
+        const bool bSaved = CombatPlanValidation::ValidateCheckpointPlans(Candidate, SavedError);
+        TestEqual(TEXT("Live and saved plans agree on skill ownership, hostile targets and occupied destinations"), bLive, bSaved);
+        TestEqual(TEXT("Only the valid unoccupied hostile action is accepted"), bLive, Case == 0);
+    }
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundProjectileTagGateTest, "ProjectA.Combat.Round.ProjectileTargetTagChanges", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundProjectileTagGateTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    const FGameplayTag RequiredTag = FGameplayTag::RequestGameplayTag(TEXT("Attack.Close"));
+    for (bool bRemoveTag : {false, true})
+    {
+        FFixture Fixture;
+        AUnitBase* Source = Fixture.AddUnit(FIntPoint(0, 0), ETeam::Player);
+        AUnitBase* Target = Fixture.AddUnit(FIntPoint(0, 3), ETeam::Enemy);
+        if (!Source || !Target) return false;
+        Target->GetAbilitySystemComponent()->AddLooseGameplayTag(RequiredTag);
+        ACombatRoundProjectile* Projectile = Fixture.World->SpawnActor<ACombatRoundProjectile>(Source->GetActorLocation(), FRotator::ZeroRotator);
+        if (!Projectile) return false;
+        Projectile->SetAllowedTargets({Target});
+        Projectile->SetTargetTagConditions(FGameplayTagQuery::MakeQuery_MatchTag(RequiredTag), FGameplayTagContainer(), FGameplayTagContainer());
+        int32 Hits = 0;
+        Projectile->OnImpact.AddLambda([&Hits](AUnitBase*, AUnitBase*, float) { ++Hits; });
+        Projectile->InitializeProjectile(Source, Target, Target->GetActorLocation(), 1000.f, 10.f, 12.f, 2.f, false, true);
+        if (bRemoveTag) Target->GetAbilitySystemComponent()->RemoveLooseGameplayTag(RequiredTag);
+        Projectile->AdvanceProjectile(1.f);
+        TestTrue(TEXT("Tagged projectile always has bounded completion"), Projectile->HasResolved());
+        TestEqual(TEXT("Target eligibility is rechecked at collision after launch"), Hits, bRemoveTag ? 0 : 1);
+    }
+    return true;
+}
 #endif

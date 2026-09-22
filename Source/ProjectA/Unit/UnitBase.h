@@ -172,12 +172,12 @@ public:
 
     // Retired individual turn entry point; never activates the unit.
     // 개별 턴 진입점은 제거되어 유닛을 활성화하지 않습니다.
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Turn")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Turn", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void OnTurnStart();
 
     // Deactivate unit at turn end
     // 턴 종료 시 유닛을 비활성화합니다.
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Turn")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Turn", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void OnTurnEnd();
 
     // Flag indicating turn must end after current action
@@ -260,28 +260,28 @@ public:
 public:
     // Movement logic
     // Move to target tile
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void MoveToTile(ACombatGridTile* TargetTile);
 
     // Move toward a target unit
     // Currently used for melee attack approach
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void MoveToTarget(AUnitBase* TargetUnit);
 
     // Return to original tile after action
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void ReturnToOriginalTile();
 
     // Snap to tile center with interpolation
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void SnapToTile(ACombatGridTile* Tile, const FRotator& TargetRotation);
 
     // Callback after MoveComponentTo completes
-    UFUNCTION(Category = "UnitBase|Movement")
+    UFUNCTION(Category = "UnitBase|Movement", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void OnSnapToTileFinished();
 
     // Callback after returning to original tile completes
-    UFUNCTION(Category = "UnitBase|Movement")
+    UFUNCTION(Category = "UnitBase|Movement", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void OnReturnToOriginalTileFinished();
 
     // Check if unit is currently moving or acting
@@ -297,7 +297,7 @@ public:
     FOnUnitDied OnUnitDied;
 
     // Entry point for AIController movement completion callback
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Movement", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void HandleMoveCompleted();
 
     // Entry point for AIController movement failure callback
@@ -306,24 +306,24 @@ public:
 public:
     // Retired reflected entry points reject immediate execution.
     // 제거된 즉시 실행 진입점은 에셋 참조 호환을 위해 거절만 수행합니다.
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void StartSkill(USkillDefinitionDataAsset* SkillData, ACombatGridTile* TargetTile);
 
     // Execute skill on stored target using GAS Ability
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void ExecuteSkillAtTarget();
 
     // Resolve actual target units affected by the skill
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual TArray<AUnitBase*> ResolveSkillTargetUnits();
 
     // Handle skill completion
     // Default behavior is returning to original tile
-    UFUNCTION(Category = "UnitBase|Skill")
+    UFUNCTION(Category = "UnitBase|Skill", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void OnSkillFinished();
 
     // Clear skill context
-    UFUNCTION(Category = "UnitBase|Skill")
+    UFUNCTION(Category = "UnitBase|Skill", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void ClearSkillContext();
 
 
@@ -336,17 +336,17 @@ public:
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Move")
     int32 GetMoveRange() const { return MoveRange; }
 
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Move")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Move", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void StartMoveAction(ACombatGridTile* TargetTile);
 
-    UFUNCTION(Category = "UnitBase|Move")
+    UFUNCTION(Category = "UnitBase|Move", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void OnMoveActionFinished();
 
-    UFUNCTION(Category = "UnitBase|Move")
+    UFUNCTION(Category = "UnitBase|Move", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void ClearMoveContext();
 
 public:
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Item")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Item", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void StartItemAction(AUnitBase* TargetUnit);
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|Item")
@@ -355,7 +355,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|Item")
     int32 HealingItemCount = 1;
 
-    UFUNCTION(BlueprintPure, Category = "UnitBase|Item")
+    UFUNCTION(BlueprintPure, Category = "UnitBase|Item", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     bool CanUseHealingItem(AUnitBase* TargetUnit) const;
 
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill")
@@ -364,13 +364,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Skill")
     USkillDefinitionDataAsset* AcquireSkillFromPool(class USkillPoolDataAsset* Pool);
 
-    UFUNCTION(BlueprintCallable, Category = "UnitBase|Item")
+    UFUNCTION(BlueprintCallable, Category = "UnitBase|Item", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void ExecuteItemAtTarget();
 
-    UFUNCTION(Category = "UnitBase|Item")
+    UFUNCTION(Category = "UnitBase|Item", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void OnItemFinished();
 
-    UFUNCTION(Category = "UnitBase|Item")
+    UFUNCTION(Category = "UnitBase|Item", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     virtual void ClearItemContext();
 
 protected:

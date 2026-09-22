@@ -83,7 +83,7 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureTestEnemies.py") -TestEnemiesVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-10. `ConfigureWarriorContent.py`: 이전 GKnight 콘텐츠 작성 도구. 현재 직업 외형 작성·검사는 아래 `ConfigureProfessionAppearance.py`를 사용한다. 이 도구를 재실행하면 이전 GKnight 외형과 직업 매핑이 적용된다. 내부 리타깃·부착 함수만 새 도구에서 재사용한다. 이전 작성은 GKnight 전사·Weapon_Pack 검 복제, Kwang 공격·복귀 리타깃과 검/휩쓸기 스킬 구성을 포함한다.
+10. `ConfigureWarriorContent.py`: 이전 GKnight 콘텐츠 작성 도구. 현재 직업 외형 작성·검사는 아래 `ConfigureProfessionAppearance.py`를 사용한다. 이 도구를 재실행하면 이전 GKnight 외형과 직업 매핑이 적용된다. 공통 리타깃은 `RetargetContentLibrary.py`에서, 기존 부착 함수는 이전 도구에서 재사용한다. 이전 작성은 GKnight 전사·Weapon_Pack 검 복제, Kwang 공격·복귀 리타깃과 검/휩쓸기 스킬 구성을 포함한다.
 
 IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScript`를 사용하며 스크립트 종료 후 에디터도 종료된다. `-WarriorVerifyOnly`는 commandlet에서 저장된 뼈대·몽타주·스킬·소켓·직업·이전 참조만 읽는다. 두 명령 모두 PIE·게임 플레이를 시작하지 않는다. 외부 팩 원본은 설치된 상태여야 하며 수정하지 않는다.
 
@@ -121,3 +121,5 @@ IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScri
 ```
 
 첫 명령은 에셋 작성 후 에디터를 종료한다. 두 번째는 저장된 Blueprint·직업 매핑·뼈대·몽타주 슬롯·검 궤적 샘플·무기 표시 설정·지팡이 부착을 읽는다. 결과는 `Saved/Automation/ProfessionAppearanceConfigure.json`·`ProfessionAppearanceReload.json`이다. 실제 메뉴·이동·공격 확인은 [TODO](../../../Docs/TODO.md#2-25-직업별-파라곤-외형)에서 별도로 진행한다.
+
+`RetargetContentLibrary.py`는 Rig·리타깃·골반 이동 검증을 공통 제공한다. 호출 도구가 보고서·재작성 여부·출력 경로 함수를 전달하여 다른 도구의 전역 설정을 참조하지 않는다. 직업 외형의 강제 재작성은 `-ProfessionAppearanceRebuildRetargets`를 사용하며 기존 `-WarriorRebuildRetargets`도 호환한다. 이번 함수 분리는 Python 구문·호출 계약만 정적으로 확인했으며 에셋 재작성은 실행하지 않았다.

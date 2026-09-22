@@ -1,7 +1,6 @@
 import json
 import math
 import sys
-import uuid
 from pathlib import Path
 
 import unreal
@@ -9,6 +8,7 @@ import unreal
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ConfigureSweepingStrike import configure_sweeping_strike
+from RetargetContentLibrary import retarget, verify_retarget_motion
 from WarriorContentPaths import ENEMY_RIGS, ENEMY_SOURCE, ROOT, SWORD_FOLDER, SWORD_RECOVERY_SOURCE, SWORD_SOURCE, SWORD_SOURCE_MESH, SWORD_SUFFIX, UNARMED_SOURCE, WARRIOR_MONTAGE, WARRIOR_RIGS, WARRIOR_SOURCE, WEAPON_SOURCE, animation_sources, legacy_moves, migrate_legacy_assets, mirrored_path, retarget_output_path
 
 SKILLS = ROOT + "/Blueprint/DataAsset/Skills"
@@ -25,8 +25,6 @@ SWORD_WARRIOR_GRIP = (-11.095651, 5.605028, -10.0)
 SWORD_ENEMY_GRIP = (-8.5, 5.0, -10.0)
 SWORD_RECOVERY_START_SECONDS = 0.2
 SWORD_MONTAGE_SECONDS = 1.933333
-RETARGET_SETUP_VERSION = "2"
-RETARGET_OP_CLASSES = ["IKRetargetPelvisMotionController", "IKRetargetFKChainsController", "IKRetargetIKChainsController", "IKRetargetRunIKRigController", "IKRetargetRootMotionController", "IKRetargetCurveRemapController"]
 
 
 def require(value, message):
@@ -47,143 +45,6 @@ def save(asset):
 def duplicate(source, destination):
     require(destination.startswith(ROOT + "/"), "Copies must be project-owned")
     return load(destination) if ASSETS.does_asset_exist(destination) else require(ASSETS.duplicate_asset(source, destination), "Could not duplicate " + source)
-
-
-def rig(mesh, directory, name):
-    path = directory + "/" + name
-    if ASSETS.does_asset_exist(path):
-        return load(path)
-    result = require(unreal.IKRigDefinitionFactory.create_new_ik_rig_asset(directory, name), "Could not create IK Rig")
-    controller = unreal.IKRigController.get_controller(result)
-    require(controller.set_skeletal_mesh(mesh), "IK preview mesh rejected")
-    require(controller.apply_auto_generated_retarget_definition(), "No humanoid retarget template")
-    require(controller.apply_auto_fbik(), "No humanoid FBIK template")
-    save(result)
-    return result
-
-
-def valid_retarget_ops(controller):
-    if controller.get_num_retarget_ops() != len(RETARGET_OP_CLASSES):
-        return False
-    for index, expected in enumerate(RETARGET_OP_CLASSES):
-        op = controller.get_op_controller(index)
-        if not op or op.get_class().get_name() != expected or not controller.get_retarget_op_enabled(index):
-            return False
-        if isinstance(op, unreal.IKRetargetRootMotionController):
-            if str(op.get_source_root_bone()) != "root" or str(op.get_target_root_bone()) != "root" or str(op.get_target_pelvis_bone()) != "pelvis":
-                return False
-            if op.get_settings().get_editor_property("root_motion_source") != unreal.RootMotionSource.COPY_FROM_SOURCE_ROOT:
-                return False
-    return True
-
-
-def retarget_sequences(inputs):
-    sequences = {}
-    for asset in inputs:
-        if isinstance(asset, unreal.AnimBlueprint):
-            referenced = [load(path) for path in animation_sources().values()]
-        elif isinstance(asset, unreal.AnimMontage):
-            referenced = list(HELPER.get_montage_animations(asset))
-        else:
-            referenced = [asset]
-        for sequence in referenced:
-            if isinstance(sequence, unreal.AnimSequence):
-                sequences[sequence.get_path_name()] = sequence
-    return list(sequences.values())
-
-
-def retarget(source_mesh, target_mesh, directory, suffix, inputs):
-    source_rig = rig(source_mesh, directory, "IK_Source" + suffix)
-    target_rig = rig(target_mesh, directory, "IK_Target" + suffix)
-    path = directory + "/RTG" + suffix
-    created = not ASSETS.does_asset_exist(path)
-    if not created:
-        retargeter = load(path)
-    else:
-        retargeter = require(TOOLS.create_asset("RTG" + suffix, directory, unreal.IKRetargeter, unreal.IKRetargetFactory()), "Could not create retargeter")
-    controller = unreal.IKRetargeterController.get_controller(retargeter)
-    for side, selected_rig, mesh in [(unreal.RetargetSourceOrTarget.SOURCE, source_rig, source_mesh), (unreal.RetargetSourceOrTarget.TARGET, target_rig, target_mesh)]:
-        controller.set_ik_rig(side, selected_rig)
-        controller.set_preview_mesh(side, mesh)
-    reset_ops = not valid_retarget_ops(controller)
-    if reset_ops:
-        # The factory already creates ops; rebuild once after assigning rigs to avoid uninitialized duplicate pelvis/root ops.
-        # 팩토리가 이미 연산을 생성하므로 Rig 지정 후 한 번만 재구성하여 초기화되지 않은 골반/루트 연산 중복을 막습니다.
-        controller.remove_all_ops()
-        controller.add_default_ops()
-        controller.auto_map_chains(unreal.AutoMapChainType.FUZZY, True)
-    if created:
-        controller.auto_align_all_bones(unreal.RetargetSourceOrTarget.TARGET)
-    require(valid_retarget_ops(controller), "Retarget operations are duplicated or have unassigned root bones")
-    rebuild = reset_ops or ASSETS.get_metadata_tag(retargeter, "ProjectA.RetargetSetupVersion") != RETARGET_SETUP_VERSION or "-WarriorRebuildRetargets" in unreal.SystemLibrary.get_command_line()
-    if rebuild:
-        groups = {}
-        for sequence in retarget_sequences(inputs):
-            destination = mirrored_path(sequence.get_path_name(), suffix)
-            if ASSETS.does_asset_exist(destination):
-                groups.setdefault(destination.rsplit("/", 1)[0], []).append(sequence)
-        for destination, sequences in groups.items():
-            require(HELPER.retarget_animations(sequences, source_mesh, target_mesh, retargeter, destination, suffix, True, False), "Could not rebuild retargeted sequences with the corrected op stack")
-            for sequence in sequences:
-                rebuilt = load(mirrored_path(sequence.get_path_name(), suffix))
-                save(rebuilt)
-                REPORT.setdefault("rebuilt", []).append(rebuilt.get_path_name())
-    pending = [asset for asset in inputs if not ASSETS.does_asset_exist(mirrored_path(asset.get_path_name(), suffix))]
-    if pending:
-        batch_folder = directory + "/RetargetBatch_" + uuid.uuid4().hex
-        require(HELPER.retarget_animations(pending, source_mesh, target_mesh, retargeter, batch_folder, suffix), "IK retarget failed")
-        moves = []
-        reused = []
-        for path in ASSETS.list_assets(batch_folder, recursive=False, include_folder=False):
-            asset = load(path)
-            require(asset.get_path_name().startswith(batch_folder + "/"), "Unexpected retarget output path")
-            destination = retarget_output_path(asset.get_name(), suffix, inputs)
-            if ASSETS.does_asset_exist(destination):
-                reused.append((load(destination), asset))
-            else:
-                moves.append(unreal.AssetRenameData(asset, destination.rsplit("/", 1)[0], destination.rsplit("/", 1)[1]))
-        for existing, generated in reused:
-            require(ASSETS.consolidate_assets(existing, [generated]), "Could not reuse an existing retargeted dependency")
-        require(not moves or TOOLS.rename_assets(moves), "Could not preserve source folders for retarget output")
-        for move in moves:
-            save(move.asset)
-            REPORT["retargeted"].append(move.asset.get_path_name())
-    ASSETS.set_metadata_tag(retargeter, "ProjectA.RetargetSetupVersion", RETARGET_SETUP_VERSION)
-    save(retargeter)
-    return {asset: load(mirrored_path(asset.get_path_name(), suffix)) for asset in inputs}
-
-
-def pelvis_motion_span(sequence, mesh):
-    options = unreal.AnimPoseEvaluationOptions()
-    options.set_editor_property("evaluation_type", unreal.AnimDataEvalType.COMPRESSED)
-    options.set_editor_property("optional_skeletal_mesh", mesh)
-    options.set_editor_property("incorporate_root_motion_into_pose", False)
-    options.set_editor_property("extract_root_motion", sequence.get_editor_property("enable_root_motion"))
-    length = sequence.get_editor_property("sequence_length")
-    points = []
-    for index in range(math.ceil(length * 30) + 1):
-        pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(sequence, min(index / 30.0, length), options)
-        require(unreal.AnimPoseExtensions.is_valid(pose) and unreal.Name("pelvis") in unreal.AnimPoseExtensions.get_bone_names(pose), "Could not evaluate the pelvis pose: " + sequence.get_path_name())
-        location = unreal.AnimPoseExtensions.get_bone_pose(pose, "pelvis", unreal.AnimPoseSpaces.WORLD).translation
-        require(all(math.isfinite(value) for value in [location.x, location.y, location.z]), "Invalid pelvis transform: " + sequence.get_path_name())
-        points.append((location.x, location.y, location.z))
-    return max(math.dist(point, points[0]) for point in points)
-
-
-def verify_retarget_motion(source_mesh, target_mesh, directory, suffix, inputs):
-    retargeter = load(directory + "/RTG" + suffix)
-    require(valid_retarget_ops(unreal.IKRetargeterController.get_controller(retargeter)), "Invalid retarget op stack: " + retargeter.get_path_name())
-    require(ASSETS.get_metadata_tag(retargeter, "ProjectA.RetargetSetupVersion") == RETARGET_SETUP_VERSION, "Retarget sequence rebuild is incomplete")
-    for source in retarget_sequences(inputs):
-        target = load(mirrored_path(source.get_path_name(), suffix))
-        require(all(target.get_editor_property(flag) == source.get_editor_property(flag) for flag in ["enable_root_motion", "force_root_lock", "root_motion_root_lock"]), "Retargeted root motion policy changed")
-        source_span = pelvis_motion_span(source, source_mesh)
-        target_span = pelvis_motion_span(target, target_mesh)
-        # Allow body proportions and normal pose differences, while rejecting root travel baked into the pelvis.
-        # 체형 및 정상 자세 차이는 허용하면서 골반에 베이크된 루트 이동 궤적은 거부합니다.
-        require(target_span <= source_span * 2.0 + 20.0, "Excessive retargeted pelvis travel: " + target.get_path_name())
-        require(abs(target.get_editor_property("sequence_length") - source.get_editor_property("sequence_length")) < 0.001, "Retargeted animation length changed")
-        REPORT.setdefault("retarget_motion", []).append({"asset": target.get_path_name(), "source_pelvis_span_cm": source_span, "target_pelvis_span_cm": target_span})
 
 
 def project_mesh(source_path):
@@ -279,8 +140,8 @@ def configure():
     enemy_mesh, enemy_skeleton = project_mesh(ENEMY_SOURCE)
     source_mesh = load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")
     source_abp = load(UNARMED_SOURCE + "/ABP_Unarmed")
-    warrior_retargets = retarget(source_mesh, warrior_mesh, WARRIOR_RIGS, "_Warrior", [source_abp] + montages)
-    enemy_retargets = retarget(source_mesh, enemy_mesh, ENEMY_RIGS, "_SwordEnemy", [source_abp] + montages)
+    warrior_retargets = retarget(source_mesh, warrior_mesh, WARRIOR_RIGS, "_Warrior", [source_abp] + montages, report=REPORT, force_rebuild="-WarriorRebuildRetargets" in unreal.SystemLibrary.get_command_line(), anim_blueprint_sources=animation_sources().values(), mirror_path=mirrored_path, output_path=retarget_output_path, save_asset=save)
+    enemy_retargets = retarget(source_mesh, enemy_mesh, ENEMY_RIGS, "_SwordEnemy", [source_abp] + montages, report=REPORT, force_rebuild="-WarriorRebuildRetargets" in unreal.SystemLibrary.get_command_line(), anim_blueprint_sources=animation_sources().values(), mirror_path=mirrored_path, output_path=retarget_output_path, save_asset=save)
     for animation, skeleton in [(warrior_retargets[source_abp], warrior_skeleton), (enemy_retargets[source_abp], enemy_skeleton)]:
         require(HELPER.remove_legacy_foot_ik(animation), "Could not remove the incompatible Manny foot rig")
         require(HELPER.ensure_output_slot(animation, "DefaultSlot"), "Montage output slot is missing")
@@ -288,7 +149,7 @@ def configure():
         save(skeleton)
     source_attack = load(SWORD_SOURCE)
     source_recovery = load(SWORD_RECOVERY_SOURCE)
-    sword_retargets = retarget(load(SWORD_SOURCE_MESH), warrior_mesh, WARRIOR_RIGS, SWORD_SUFFIX, [source_attack, source_recovery])
+    sword_retargets = retarget(load(SWORD_SOURCE_MESH), warrior_mesh, WARRIOR_RIGS, SWORD_SUFFIX, [source_attack, source_recovery], report=REPORT, force_rebuild="-WarriorRebuildRetargets" in unreal.SystemLibrary.get_command_line(), anim_blueprint_sources=animation_sources().values(), mirror_path=mirrored_path, output_path=retarget_output_path, save_asset=save)
     attack = sword_retargets[source_attack]
     recovery = sword_retargets[source_recovery]
     montage_path = WARRIOR_MONTAGE
@@ -302,7 +163,7 @@ def configure():
     require(HELPER.configure_sword_montage(montage, attack, recovery, SWORD_RECOVERY_START_SECONDS), "Could not configure Kwang attack and recovery")
     require(list(HELPER.get_montage_animations(montage)) == [attack, recovery], "Sword montage must play Kwang attack and recovery")
     save(montage)
-    enemy_sword = retarget(warrior_mesh, enemy_mesh, ENEMY_RIGS, "_Sword", [montage])[montage]
+    enemy_sword = retarget(warrior_mesh, enemy_mesh, ENEMY_RIGS, "_Sword", [montage], report=REPORT, force_rebuild="-WarriorRebuildRetargets" in unreal.SystemLibrary.get_command_line(), anim_blueprint_sources=animation_sources().values(), mirror_path=mirrored_path, output_path=retarget_output_path, save_asset=save)[montage]
     enemy_attack = load(mirrored_path(SWORD_SOURCE, SWORD_SUFFIX + "_Sword"))
     enemy_recovery = load(mirrored_path(SWORD_RECOVERY_SOURCE, SWORD_SUFFIX + "_Sword"))
     require(HELPER.configure_sword_montage(enemy_sword, enemy_attack, enemy_recovery, SWORD_RECOVERY_START_SECONDS), "Could not configure enemy Kwang attack and recovery")
@@ -473,10 +334,10 @@ def verify():
     warrior_mesh = load(mirrored_path(WARRIOR_SOURCE))
     enemy_mesh = load(mirrored_path(ENEMY_SOURCE))
     source_abp = load(UNARMED_SOURCE + "/ABP_Unarmed")
-    verify_retarget_motion(source_mesh, warrior_mesh, WARRIOR_RIGS, "_Warrior", [source_abp])
-    verify_retarget_motion(source_mesh, enemy_mesh, ENEMY_RIGS, "_SwordEnemy", [source_abp])
-    verify_retarget_motion(load(SWORD_SOURCE_MESH), warrior_mesh, WARRIOR_RIGS, SWORD_SUFFIX, [load(SWORD_SOURCE), load(SWORD_RECOVERY_SOURCE)])
-    verify_retarget_motion(warrior_mesh, enemy_mesh, ENEMY_RIGS, "_Sword", [montage])
+    verify_retarget_motion(source_mesh, warrior_mesh, WARRIOR_RIGS, "_Warrior", [source_abp], report=REPORT, anim_blueprint_sources=animation_sources().values(), mirror_path=mirrored_path)
+    verify_retarget_motion(source_mesh, enemy_mesh, ENEMY_RIGS, "_SwordEnemy", [source_abp], report=REPORT, anim_blueprint_sources=animation_sources().values(), mirror_path=mirrored_path)
+    verify_retarget_motion(load(SWORD_SOURCE_MESH), warrior_mesh, WARRIOR_RIGS, SWORD_SUFFIX, [load(SWORD_SOURCE), load(SWORD_RECOVERY_SOURCE)], report=REPORT, anim_blueprint_sources=animation_sources().values(), mirror_path=mirrored_path)
+    verify_retarget_motion(warrior_mesh, enemy_mesh, ENEMY_RIGS, "_Sword", [montage], report=REPORT, anim_blueprint_sources=animation_sources().values(), mirror_path=mirrored_path)
     REPORT["verification"] = "Saved asset reload, original folder structure, Kwang segments, retarget op stack and pelvis travel, skeleton, loadout, socket, slot, profession and historical reference checks passed"
 
 

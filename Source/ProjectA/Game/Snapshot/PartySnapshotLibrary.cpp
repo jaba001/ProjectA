@@ -1,6 +1,7 @@
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "Game/Snapshot/PartySnapshotSaveGame.h"
 #include "Kismet/GameplayStatics.h"
+#include "Unit/UnitDataRules.h"
 
 namespace
 {
@@ -94,22 +95,22 @@ bool UPartySnapshotLibrary::ValidateSnapshot(const FPartySnapshot& Snapshot, FTe
         }
 
         const FPartySnapshotStats& Stats = Member.Stats;
-        if (!FMath::IsFinite(Stats.MaxHP) || !FMath::IsFinite(Stats.CurrentHP) || Stats.MaxHP <= 0.0f || Stats.MaxHP > 1000000.0f || Stats.CurrentHP < 0.0f || Stats.CurrentHP > Stats.MaxHP)
+        if (!UnitDataRules::IsValidHealth(Stats.MaxHP, Stats.CurrentHP))
         {
             OutError = NSLOCTEXT("PartySnapshot", "Health", "파티원의 최대 HP 또는 현재 HP가 허용 범위를 벗어났습니다.");
             return false;
         }
-        if (!FMath::IsFinite(Stats.Strength) || Stats.Strength < 0.0f || Stats.Strength > 1000000.0f || !FMath::IsFinite(Stats.Dexterity) || Stats.Dexterity < 0.0f || Stats.Dexterity > 1000000.0f || !FMath::IsFinite(Stats.Intelligence) || Stats.Intelligence < 0.0f || Stats.Intelligence > 1000000.0f)
+        if (!UnitDataRules::IsValidAttributes(Stats.Strength, Stats.Dexterity, Stats.Intelligence))
         {
             OutError = NSLOCTEXT("PartySnapshot", "PrimaryStats", "파티원의 힘, 민첩 또는 지능이 허용 범위를 벗어났습니다.");
             return false;
         }
-        if (Stats.MaxActionPoints < 1 || Stats.MaxActionPoints > 100 || Stats.MaxSubActionPoints < 0 || Stats.MaxSubActionPoints > 100 || Stats.MoveRange < 0 || Stats.MoveRange > 32)
+        if (!UnitDataRules::IsValidActionPoints(Stats.MaxActionPoints, Stats.MaxSubActionPoints) || !UnitDataRules::IsValidMoveRange(Stats.MoveRange))
         {
             OutError = NSLOCTEXT("PartySnapshot", "ActionStats", "파티원의 AP, SubAP 또는 이동 범위가 허용 범위를 벗어났습니다.");
             return false;
         }
-        if (Member.SkillIds.Num() < 1 || Member.SkillIds.Num() > 5 || !HasUniqueIdentifiers(Member.SkillIds))
+        if (!UnitDataRules::IsValidSkillCount(Member.SkillIds.Num(), true) || !HasUniqueIdentifiers(Member.SkillIds))
         {
             OutError = NSLOCTEXT("PartySnapshot", "Skills", "파티원은 중복 없는 스킬 식별자를 1~5개 가져야 합니다.");
             return false;

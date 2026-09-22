@@ -1,4 +1,5 @@
 #include "Combat/Library/CombatWeaponTraceLibrary.h"
+#include "Combat/Library/CombatCollisionPolicy.h"
 
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequence.h"
@@ -126,21 +127,15 @@ AUnitBase* CombatWeaponTrace::FindFirstHit(UWorld* World, AUnitBase* Source, con
     if (!FMath::IsFinite(Intervals) || Intervals < 1.0 || Intervals > 1024.0) return nullptr;
     const int32 PointIntervals = static_cast<int32>(Intervals);
     const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
-    FCollisionQueryParams Params(SCENE_QUERY_STAT(CombatWeaponTrace), false, Source);
-    Params.bFindInitialOverlaps = true;
-    Params.bIgnoreTouches = true;
-    for (TActorIterator<APawn> It(World); It; ++It) Params.AddIgnoredActor(*It);
-    FCollisionResponseParams Responses(ECR_Ignore);
-    Responses.CollisionResponse.SetResponse(ECC_WorldStatic, ECR_Block);
-    Responses.CollisionResponse.SetResponse(ECC_WorldDynamic, ECR_Block);
+    const FCollisionQueryParams Params = CombatCollisionPolicy::WorldQuery(World, Source);
+    const FCollisionResponseParams Responses = CombatCollisionPolicy::WorldResponses();
     TArray<const FCombatRoundUnitView*> Candidates;
     const FVector Origin = Source->GetCapsuleComponent()->GetComponentLocation();
     for (const FCombatRoundUnitView& Candidate : Units)
     {
         AUnitBase* Unit = Candidate.Unit;
-        if (!IsValid(Unit) || Unit == Source || Unit->GetWorld() != World || !Unit->IsUnitAlive() || Unit->GetTeam() == Source->GetTeam() || !Unit->GetActorEnableCollision()) continue;
-        UCapsuleComponent* Capsule = Unit->GetCapsuleComponent();
-        if (!IsValid(Capsule) || !Capsule->IsQueryCollisionEnabled()) continue;
+        UCapsuleComponent* Capsule = CombatCollisionPolicy::TargetCapsule(World, Source, Source->GetTeam(), Unit);
+        if (!Capsule) continue;
         FVector Contact;
         // A blade that crossed a wall in an earlier sample must not hit an occluded target afterward.
         // 이전 표본에서 벽을 통과한 칼날도 이후에 벽으로 가려진 대상을 맞히지 못하게 합니다.
@@ -175,7 +170,7 @@ AUnitBase* CombatWeaponTrace::FindFirstHit(UWorld* World, AUnitBase* Source, con
             const bool bInitialOverlap = Capsule->OverlapComponent(Start, FQuat::Identity, Shape);
             if (!bInitialOverlap && !Capsule->SweepComponent(Hit, Start, End, FQuat::Identity, Shape)) continue;
             const float HitTime = bInitialOverlap || Hit.bStartPenetrating ? 0.f : Hit.Time;
-            if (!FirstUnit || HitTime < FirstTime || (HitTime == FirstTime && Candidate->UnitId < FirstUnitId))
+            if (!FirstUnit || CombatCollisionPolicy::IsEarlierContact(HitTime, Candidate->UnitId, FirstTime, FirstUnitId))
             {
                 FirstUnit = Unit;
                 FirstUnitId = Candidate->UnitId;
@@ -183,5 +178,5 @@ AUnitBase* CombatWeaponTrace::FindFirstHit(UWorld* World, AUnitBase* Source, con
             }
         }
     }
-    return bHitWall && FirstWallTime <= FirstTime ? nullptr : FirstUnit;
+    return CombatCollisionPolicy::IsBlockedByWorld(bHitWall, FirstWallTime, FirstTime) ? nullptr : FirstUnit;
 }

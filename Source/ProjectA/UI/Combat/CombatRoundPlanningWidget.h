@@ -5,6 +5,7 @@
 #include "Components/Button.h"
 #include "Components/ComboBoxString.h"
 #include "Combat/Round/CombatRoundTypes.h"
+#include "UI/Combat/CombatPlanningRefreshState.h"
 #include "CombatRoundPlanningWidget.generated.h"
 
 class ACombatRoundCoordinator;
@@ -57,7 +58,8 @@ protected:
 private:
     UTextBlock* AddText(UVerticalBox* Box, const FString& Text, int32 FontSize = 15);
     UButton* AddButton(UVerticalBox* Box, const FString& Text);
-    void RefreshView();
+    void RefreshView(bool bForce = true);
+    FCombatPlanningRefreshState CaptureRefreshState() const;
     void RefreshPartyCards(const ACombatRoundCoordinator* Coordinator, int32 OwnerSlot);
     bool RefreshOptions(const ACombatRoundCoordinator* Coordinator, int32 OwnerSlot);
     void LoadSelectedCommand();
@@ -152,7 +154,11 @@ private:
     TObjectPtr<UButton> UnreadyButton;
 
     TWeakObjectPtr<ACombatRoundPlayerController> BoundController;
-    TArray<TWeakObjectPtr<ACombatGridTile>> HighlightedTiles;
+    TMap<TWeakObjectPtr<ACombatGridTile>, bool> HighlightedTiles;
+    TSet<FIntPoint> MovableCoords;
+    UPROPERTY(Transient)
+    FCombatPlanningRefreshState ObservedState;
+    bool bHasObservedState = false;
     TArray<int32> OwnUnitIds;
     TArray<int32> PartyUnitIds;
     TArray<FName> SkillIds;

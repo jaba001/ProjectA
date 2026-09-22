@@ -9,6 +9,7 @@
 class AActor;
 class UAnimMontage;
 class UGameplayEffect;
+struct FCombatRoundSkill;
 
 // Existing Blueprint classes retain authored values but cannot execute the retired attack lifecycle.
 // 기존 블루프린트 클래스는 제작 수치를 유지하지만 사용 중단된 공격 생명주기를 실행하지 않습니다.
@@ -24,6 +25,7 @@ public:
     // 기존 어빌리티를 실행하지 않고 제작된 공격 수치와 표현을 읽습니다.
     float GetAuthoredDamageAmount() const { return DamageAmount; }
     UAnimMontage* GetAuthoredAttackMontage() const { return AttackMontage; }
+    void ExportRoundEffectContract(FCombatRoundSkill& Skill) const;
     EUnitActionResult GetActionResult() const { return EUnitActionResult::Failed; }
     virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 

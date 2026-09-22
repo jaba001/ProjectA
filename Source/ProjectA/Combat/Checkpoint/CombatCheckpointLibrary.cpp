@@ -1,4 +1,6 @@
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
+#include "Combat/Round/CombatPlanValidator.h"
+#include "Unit/UnitDataRules.h"
 #include "Combat/Library/CombatTargetingLibrary.h"
 #include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
@@ -83,15 +85,15 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
         {
             return false;
         }
-        if (!FMath::IsFinite(Unit.HP) || !FMath::IsFinite(Unit.MaxHP) || Unit.MaxHP <= 0.0f || Unit.MaxHP > 1000000.0f || Unit.HP < 0.0f || Unit.HP > Unit.MaxHP || Unit.bDead != (Unit.HP == 0.0f))
+        if (!UnitDataRules::IsValidHealth(Unit.MaxHP, Unit.HP) || Unit.bDead != (Unit.HP == 0.0f))
         {
             return false;
         }
-        if (!FMath::IsFinite(Unit.Strength) || Unit.Strength < 0.0f || Unit.Strength > 1000000.0f || !FMath::IsFinite(Unit.Dexterity) || Unit.Dexterity < 0.0f || Unit.Dexterity > 1000000.0f || !FMath::IsFinite(Unit.Intelligence) || Unit.Intelligence < 0.0f || Unit.Intelligence > 1000000.0f)
+        if (!UnitDataRules::IsValidAttributes(Unit.Strength, Unit.Dexterity, Unit.Intelligence))
         {
             return false;
         }
-        if (Unit.MaxAP < 1 || Unit.MaxAP > 100 || Unit.AP < 0 || Unit.AP > Unit.MaxAP || Unit.MaxSubAP < 0 || Unit.MaxSubAP > 100 || Unit.SubAP < 0 || Unit.SubAP > Unit.MaxSubAP || Unit.MoveRange < 0 || Unit.MoveRange > 32 || Unit.HealingItemCount < 0 || Unit.HealingItemCount > 1000 || !FMath::IsFinite(Unit.HealingItemAmount) || Unit.HealingItemAmount < 0.0f || Unit.HealingItemAmount > 1000000.0f)
+        if (!UnitDataRules::IsValidActionPoints(Unit.MaxAP, Unit.MaxSubAP) || Unit.AP < 0 || Unit.AP > Unit.MaxAP || Unit.SubAP < 0 || Unit.SubAP > Unit.MaxSubAP || !UnitDataRules::IsValidMoveRange(Unit.MoveRange) || Unit.HealingItemCount < 0 || Unit.HealingItemCount > 1000 || !UnitDataRules::IsValidAttribute(Unit.HealingItemAmount))
         {
             return false;
         }
@@ -125,7 +127,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
             }
             LivingEnemies += !Unit.bDead ? 1 : 0;
         }
-        if (Unit.Skills.Num() > 5 || (!bRound && (Unit.Skills.IsEmpty() || !IsAssetPath(Unit.DefaultAttackAbility))))
+        if (!UnitDataRules::IsValidSkillCount(Unit.Skills.Num(), !bRound) || (!bRound && !IsAssetPath(Unit.DefaultAttackAbility)))
         {
             return false;
         }
@@ -179,66 +181,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
     {
         return false;
     }
-    if (bRound)
-    {
-        OutError = NSLOCTEXT("CombatCheckpoint", "RoundPlans", "저장된 준비 계획·대상·이동 예약·비용이 현재 전투 상태와 일치하지 않습니다.");
-        TSet<int32> PlannedUnits;
-        TMap<FIntPoint, int32> Destinations;
-        for (const FCombatCheckpointRoundPlan& Plan : Checkpoint.RoundPlans)
-        {
-            const FCombatCheckpointUnit* Unit = Checkpoint.Units.FindByPredicate([&Plan](const FCombatCheckpointUnit& Entry) { return Entry.RoundUnitId == Plan.UnitId; });
-            if (!Unit || PlannedUnits.Contains(Plan.UnitId) || Plan.Command.UnitId != Plan.UnitId || (Plan.Command.TargetUnitId != INDEX_NONE && !RoundUnitIds.Contains(Plan.Command.TargetUnitId))) return false;
-            PlannedUnits.Add(Plan.UnitId);
-            if (Unit->bDead)
-            {
-                if (Plan.bHasMovePlan || !Plan.Command.SkillId.IsNone()) return false;
-                continue;
-            }
-            int32 APCost = 0;
-            int32 SAPCost = Plan.bHasMovePlan ? 1 : 0;
-            if (!Plan.Command.SkillId.IsNone())
-            {
-                bool bFound = false;
-                for (const FSoftObjectPath& Path : Unit->Skills)
-                {
-                    USkillDefinitionDataAsset* Definition = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
-                    FCombatRoundSkill Skill;
-                    FText SkillError;
-                    if (!Definition || !Definition->ResolveRoundSkill(Skill, SkillError)) return false;
-                    if (Skill.SkillId != ResolveSavedSkillId(Plan.Command.SkillId)) continue;
-                    APCost = Skill.ActionPointCost;
-                    SAPCost += Skill.SubActionPointCost;
-                    if (Skill.Kind != ECombatRoundSkillKind::Wait)
-                    {
-                        const FCombatCheckpointUnit* Target = Checkpoint.Units.FindByPredicate([&Plan](const FCombatCheckpointUnit& Entry) { return Entry.RoundUnitId == Plan.Command.TargetUnitId; });
-                        const FIntPoint TargetCoord = Plan.Command.TargetCoord;
-                        if (Skill.Kind == ECombatRoundSkillKind::GroundAttack ? (TargetCoord.X < 0 || TargetCoord.X > 3 || TargetCoord.Y < 0 || TargetCoord.Y > 3) : (!Target || Target->bDead || Target->Team == Unit->Team)) return false;
-                    }
-                    if (Skill.Approach == ECombatRoundApproach::Tile)
-                    {
-                        const FIntPoint Destination = Plan.Command.DestinationCoord;
-                        if (Destination.X < 0 || Destination.X > 3 || Destination.Y < 0 || Destination.Y > 3 || (OccupiedCoords.Contains(Destination) && Destination != Unit->GridCoord) || (Skill.bRemainAtDestination && !CombatRoundRules::IsOwnTerritory(Unit->Team == ETeam::Enemy, Destination))) return false;
-                        for (const FCombatCheckpointRoundPlan& Other : Checkpoint.RoundPlans)
-                        {
-                            if (Other.UnitId != Plan.UnitId && Other.bHasMovePlan && Other.MoveDestinationCoord == Destination) return false;
-                        }
-                        if (Destinations.Contains(Destination) && Destinations.FindRef(Destination) != Plan.UnitId) return false;
-                        Destinations.Add(Destination, Plan.UnitId);
-                    }
-                    bFound = true;
-                    break;
-                }
-                if (!bFound) return false;
-            }
-            if (Unit->AP < APCost || Unit->SubAP < SAPCost) return false;
-            if (Plan.bHasMovePlan)
-            {
-                const FIntPoint Destination = Plan.MoveDestinationCoord;
-                if (!CombatRoundRules::IsOwnTerritory(Unit->Team == ETeam::Enemy, Destination) || Destination == Unit->GridCoord || (Destinations.Contains(Destination) && Destinations.FindRef(Destination) != Plan.UnitId) || OccupiedCoords.Contains(Destination)) return false;
-                Destinations.Add(Destination, Plan.UnitId);
-            }
-        }
-    }
+    if (bRound && !CombatPlanValidation::ValidateCheckpointPlans(Checkpoint, OutError)) return false;
     if (Checkpoint.bHasOpponentSnapshot)
     {
         if (!IsAssetPath(Checkpoint.OpponentCatalog))

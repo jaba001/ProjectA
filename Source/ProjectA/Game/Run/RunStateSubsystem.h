@@ -135,8 +135,11 @@ public:
     bool ValidateCheckpointHost(const FRunAccountId& AccountId, FText& OutError) const;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+    friend class FRunCandidatePublicationTest;
+#endif
+
     bool ValidateSave(const URunSaveGame* Save, FText& OutError) const;
-    bool ValidateEncounterProgress(const URunSaveGame* Save) const;
     bool ValidateGoldRewardState(const URunSaveGame* Save) const;
     bool ValidateContinuableSave(const URunSaveGame* Save, bool bStandaloneOnly, FText& OutError) const;
     bool CanContinueSavedRunInternal(bool bStandaloneOnly, FText& OutError) const;
@@ -144,7 +147,8 @@ private:
     URunSaveGame* CreateSaveData() const;
     URunSaveGame* CreateInitialSaveData(const TArray<FRunPartyMember>& Members, const FRunIdentityData& Identity, FText& OutError) const;
     bool WriteSaveData(URunSaveGame* Save, FText& OutError);
-    void ApplySaveData(const URunSaveGame* Save);
+    bool CommitSaveCandidate(URunSaveGame* Save, FText& OutError, bool bRequirePersistence = false);
+    void ApplySaveData(const URunSaveGame* Save, bool bResetPendingReward = true);
     bool ReadManagedSave(FGuid RunId, FRunAuthorityRecordData& OutRecord, TStrongObjectPtr<URunSaveGame>& OutSave, FText& OutError) const;
     bool CanMutateManagedRun() const;
     void ClearManagedMenuTravel();

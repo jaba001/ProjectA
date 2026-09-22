@@ -1,4 +1,6 @@
 #include "Combat/Round/CombatRoundProjectile.h"
+#include "Combat/Library/CombatCollisionPolicy.h"
+#include "Combat/Round/CombatSkillExecutor.h"
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
 #include "Components/CapsuleComponent.h"
@@ -99,7 +101,16 @@ void ACombatRoundProjectile::InitializeProjectile(AUnitBase* Source, AUnitBase* 
 
 bool ACombatRoundProjectile::IsEligibleTarget(AUnitBase* Unit) const
 {
-    return IsValid(Unit) && Unit->GetWorld() == GetWorld() && Unit != SourceUnit.Get() && Unit->IsUnitAlive() && Unit->GetTeam() != SourceTeam && (!bOnlyTarget || Unit == TargetUnit.Get()) && (!bRestrictTargets || AllowedTargets.Contains(TWeakObjectPtr<AUnitBase>(Unit)));
+    if (!CombatCollisionPolicy::IsLivingEnemy(GetWorld(), SourceUnit.Get(), SourceTeam, Unit) || (bOnlyTarget && Unit != TargetUnit.Get()) || (bRestrictTargets && !AllowedTargets.Contains(TWeakObjectPtr<AUnitBase>(Unit)))) return false;
+    return CombatSkillExecution::MatchesOwnedTags(Unit, TargetTagQuery, TargetRequiredTags, TargetBlockedTags);
+}
+
+void ACombatRoundProjectile::SetTargetTagConditions(const FGameplayTagQuery& Query, const FGameplayTagContainer& RequiredTags, const FGameplayTagContainer& BlockedTags)
+{
+    if (!HasAuthority() || bInitialized || bResolved) return;
+    TargetTagQuery = Query;
+    TargetRequiredTags = RequiredTags;
+    TargetBlockedTags = BlockedTags;
 }
 
 void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
@@ -139,11 +150,8 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
 
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CombatRoundProjectile), false, this);
     QueryParams.bFindInitialOverlaps = true;
-    FCollisionQueryParams WorldQueryParams(QueryParams);
-    WorldQueryParams.bIgnoreTouches = true;
-    FCollisionResponseParams WorldResponses(ECR_Ignore);
-    WorldResponses.CollisionResponse.SetResponse(ECC_WorldStatic, ECR_Block);
-    WorldResponses.CollisionResponse.SetResponse(ECC_WorldDynamic, ECR_Block);
+    const FCollisionQueryParams WorldQueryParams = CombatCollisionPolicy::WorldQuery(GetWorld(), this);
+    const FCollisionResponseParams WorldResponses = CombatCollisionPolicy::WorldResponses();
     FCollisionObjectQueryParams ObjectParams;
     ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
     const FCollisionShape Shape = FCollisionShape::MakeSphere(CollisionRadius);
@@ -153,7 +161,6 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
     // 부적격 폰이 뒤쪽 유효 피격을 가리지 않도록 스윕 전에 제외합니다.
     for (TActorIterator<APawn> It(GetWorld()); It; ++It)
     {
-        WorldQueryParams.AddIgnoredActor(*It);
         if (IsEligibleTarget(Cast<AUnitBase>(*It)))
         {
             ++CandidateLimit;
@@ -226,7 +233,7 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
     // A blocking wall wins an equal-time contact so an overlapping capsule cannot receive damage through it.
     // 차단 벽은 동시 접촉에서 우선하므로 겹친 캡슐이 벽 너머 피해를 받지 않습니다.
     const float WorldHitTime = WorldHit.bStartPenetrating ? 0.0f : WorldHit.Time;
-    if (bHitWorld && (Candidates.IsEmpty() || WorldHitTime <= Candidates[0].Time))
+    if (bHitWorld && (Candidates.IsEmpty() || CombatCollisionPolicy::IsBlockedByWorld(bHitWorld, WorldHitTime, Candidates[0].Time)))
     {
         SetActorLocation(WorldHit.bStartPenetrating ? Start : FVector(WorldHit.Location), false, nullptr, ETeleportType::TeleportPhysics);
         ResolveProjectile();

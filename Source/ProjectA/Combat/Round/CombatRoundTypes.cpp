@@ -1,4 +1,5 @@
 #include "Combat/Round/CombatRoundTypes.h"
+#include "GameplayEffect.h"
 
 float CombatRoundRules::StartDelay(float HighestSpeed, float UnitSpeed)
 {
@@ -27,8 +28,17 @@ bool CombatRoundRules::IsOwnTerritory(bool bEnemy, FIntPoint Coord)
     return Coord.Y < 2;
 }
 
+bool CombatRoundRules::IsSupportedEffectDuration(const FCombatRoundSkill& Skill)
+{
+    if (!Skill.EffectClass) return true;
+    const UGameplayEffect* Effect = Skill.EffectClass->GetDefaultObject<UGameplayEffect>();
+    return Effect && Effect->DurationPolicy == EGameplayEffectDurationType::Instant;
+}
+
 bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
 {
+    if (Skill.EffectClass && Skill.EffectClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists)) return false;
+    if (!IsSupportedEffectDuration(Skill)) return false;
     if (Skill.SkillId.IsNone() || Skill.Kind > ECombatRoundSkillKind::Wait || Skill.Approach > ECombatRoundApproach::Tile || Skill.TargetLoss > ECombatRoundTargetLoss::NearestEnemy) return false;
     if (static_cast<uint8>(Skill.Kind) == 3) return false;
     if (Skill.MeleeArea != ESkillAreaType::Single && Skill.MeleeArea != ESkillAreaType::TargetAndSides) return false;
