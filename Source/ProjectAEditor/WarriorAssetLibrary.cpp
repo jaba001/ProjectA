@@ -15,6 +15,7 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphPin.h"
+#include "EditorAnimUtils.h"
 #include "Engine/Blueprint.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/SCS_Node.h"
@@ -108,6 +109,43 @@ namespace
         }
         return true;
     }
+
+    bool ValidateExternalSkeletonSlots(const TArray<UObject*>& Assets, const USkeleton* Skeleton, bool bIncludeReferencedAssets)
+    {
+        if (IsProjectCopy(Skeleton)) return true;
+        TArray<UAnimationAsset*> Animations;
+        TSet<const UAnimBlueprint*> VisitedBlueprints;
+        for (UObject* Asset : Assets)
+        {
+            if (!IsValid(Asset)) return false;
+            if (UAnimationAsset* Animation = Cast<UAnimationAsset>(Asset)) Animations.AddUnique(Animation);
+            UAnimBlueprint* Blueprint = Cast<UAnimBlueprint>(Asset);
+            while (Blueprint && !VisitedBlueprints.Contains(Blueprint))
+            {
+                VisitedBlueprints.Add(Blueprint);
+                for (FName SlotName : UWarriorAssetLibrary::GetAnimationSlotNames(Blueprint))
+                {
+                    if (!Skeleton->ContainsSlotName(SlotName)) return Fail(TEXT("Retargeting cannot add animation slots to an external skeleton / 리타깃은 외부 스켈레톤에 애니메이션 슬롯을 추가할 수 없습니다"));
+                }
+                if (bIncludeReferencedAssets) EditorAnimUtils::GetAllAnimationSequencesReferredInBlueprint(Blueprint, Animations);
+                Blueprint = Blueprint->ParentClass ? Cast<UAnimBlueprint>(Blueprint->ParentClass->ClassGeneratedBy) : nullptr;
+            }
+        }
+        for (int32 Index = 0; Index < Animations.Num(); ++Index)
+        {
+            UAnimationAsset* Animation = Animations[Index];
+            if (!IsValid(Animation)) return false;
+            if (const UAnimMontage* Montage = Cast<UAnimMontage>(Animation))
+            {
+                for (const FSlotAnimationTrack& Track : Montage->SlotAnimTracks)
+                {
+                    if (!Skeleton->ContainsSlotName(Track.SlotName)) return Fail(TEXT("Retargeting cannot add montage slots to an external skeleton / 리타깃은 외부 스켈레톤에 몽타주 슬롯을 추가할 수 없습니다"));
+                }
+            }
+            if (bIncludeReferencedAssets) Animation->HandleAnimReferenceCollection(Animations, true);
+        }
+        return true;
+    }
 }
 
 UObject* UWarriorAssetLibrary::LoadSavedAssetReference(const FSoftObjectPath& Path)
@@ -166,8 +204,11 @@ bool UWarriorAssetLibrary::SetSkeletonPreviewMesh(USkeleton* Skeleton, USkeletal
 
 bool UWarriorAssetLibrary::RetargetAnimations(const TArray<UObject*>& Assets, USkeletalMesh* SourceMesh, USkeletalMesh* TargetMesh, UIKRetargeter* Retargeter, const FString& Destination, const FString& Suffix, bool bOverwriteExistingFiles, bool bIncludeReferencedAssets)
 {
-    if (IsRunningCommandlet() || Assets.IsEmpty() || !IsValid(SourceMesh) || !IsValid(SourceMesh->GetSkeleton()) || !IsProjectCopy(TargetMesh) || !IsProjectCopy(TargetMesh->GetSkeleton()) || !IsProjectCopy(Retargeter) || !Destination.StartsWith(TEXT("/Game/User_JeHoon/")) || !FPackageName::IsValidLongPackageName(Destination) || Destination.Contains(TEXT("..")) || Destination.EndsWith(TEXT("/")) || Suffix.IsEmpty() || Suffix.Contains(TEXT("/"))) return Fail(TEXT("IK batch authoring requires the editor and a project-owned output directory / IK 일괄 작성에는 에디터와 작업 사본 출력 폴더가 필요합니다"));
+    if (IsRunningCommandlet() || Assets.IsEmpty() || !IsValid(SourceMesh) || !IsValid(SourceMesh->GetSkeleton()) || !IsValid(TargetMesh) || !IsValid(TargetMesh->GetSkeleton()) || !IsProjectCopy(Retargeter) || !Destination.StartsWith(TEXT("/Game/User_JeHoon/")) || !FPackageName::IsValidLongPackageName(Destination) || Destination.Contains(TEXT("..")) || Destination.EndsWith(TEXT("/")) || Suffix.IsEmpty() || Suffix.Contains(TEXT("/"))) return Fail(TEXT("IK batch authoring requires valid meshes, the editor and a project-owned output directory / IK 일괄 작성에는 유효한 메시, 에디터와 작업 사본 출력 폴더가 필요합니다"));
     if (bOverwriteExistingFiles && bIncludeReferencedAssets) return Fail(TEXT("Sequence overwrite must exclude referenced assets / 시퀀스 덮어쓰기에는 참조 에셋을 포함할 수 없습니다"));
+    // Engine compilation registers missing slots, so external skeletons must already contain every required slot.
+    // 엔진 컴파일은 누락 슬롯을 등록하므로 외부 스켈레톤에는 필요한 모든 슬롯이 이미 있어야 합니다.
+    if (!ValidateExternalSkeletonSlots(Assets, TargetMesh->GetSkeleton(), bIncludeReferencedAssets)) return false;
     FIKRetargetBatchOperationContext Context;
     TSet<FString> InputPaths;
     TSet<FString> OutputPaths;
@@ -209,6 +250,7 @@ bool UWarriorAssetLibrary::RetargetAnimations(const TArray<UObject*>& Assets, US
     // Python 편의 API는 /Game을 기본값으로 사용하고 Slate를 호출하므로 작업 사본 폴더를 명시합니다.
     Context.NameRule.FolderPath = Destination;
     Context.NameRule.Suffix = Suffix;
+    Context.bUseSourcePath = false;
     Context.bOverwriteExistingFiles = bOverwriteExistingFiles;
     Context.bIncludeReferencedAssets = bIncludeReferencedAssets;
     TStrongObjectPtr<UIKRetargetBatchOperation> Operation(NewObject<UIKRetargetBatchOperation>());
@@ -307,8 +349,9 @@ TArray<UAnimSequenceBase*> UWarriorAssetLibrary::GetMontageAnimations(UAnimMonta
 
 bool UWarriorAssetLibrary::ConfigureSwordMontage(UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float RecoveryStartTime)
 {
-    if (!IsProjectCopy(Montage) || !IsProjectCopy(Attack) || !IsProjectCopy(Recovery) || !IsProjectCopy(Montage->GetSkeleton())) return Fail(TEXT("Sword montage authoring requires project-owned assets and skeleton / 검 몽타주 작성에는 에셋과 스켈레톤 작업 사본이 필요합니다"));
+    if (!IsProjectCopy(Montage) || !IsValid(Attack) || !IsValid(Recovery) || !IsValid(Montage->GetSkeleton())) return Fail(TEXT("Sword montage authoring requires a project-owned montage and valid source animations and skeleton / 검 몽타주 작성에는 작업 사본 몽타주와 유효한 원본 애니메이션 및 스켈레톤이 필요합니다"));
     if (Attack->GetSkeleton() != Montage->GetSkeleton() || Recovery->GetSkeleton() != Montage->GetSkeleton()) return Fail(TEXT("Sword montage animations must share its exact skeleton / 검 몽타주 애니메이션은 동일한 스켈레톤을 사용해야 합니다"));
+    if (!IsProjectCopy(Montage->GetSkeleton()) && !Montage->GetSkeleton()->ContainsSlotName(FAnimSlotGroup::DefaultSlotName)) return Fail(TEXT("The external sword skeleton must already contain DefaultSlot / 외부 검 스켈레톤에 DefaultSlot이 이미 있어야 합니다"));
     const float AttackLength = Attack->GetPlayLength();
     const float RecoveryLength = Recovery->GetPlayLength();
     if (!FMath::IsFinite(AttackLength) || AttackLength <= 0.f || !FMath::IsFinite(RecoveryLength) || RecoveryLength <= 0.f || Attack->RateScale != 1.f || Recovery->RateScale != 1.f || !FMath::IsFinite(RecoveryStartTime) || RecoveryStartTime < 0.f || RecoveryStartTime >= RecoveryLength) return Fail(TEXT("Sword montage source lengths, rates or recovery start are invalid / 검 몽타주 원본 길이, 재생 속도 또는 회복 시작점이 유효하지 않습니다"));
@@ -347,8 +390,9 @@ bool UWarriorAssetLibrary::ConfigureSwordMontage(UAnimMontage* Montage, UAnimSeq
 
 bool UWarriorAssetLibrary::ValidateSwordMontage(UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float RecoveryStartTime)
 {
-    if (!IsProjectCopy(Montage) || !IsProjectCopy(Attack) || !IsProjectCopy(Recovery) || !IsProjectCopy(Montage->GetSkeleton())) return Fail(TEXT("Sword montage verification requires project-owned assets and skeleton / 검 몽타주 검증에는 에셋과 스켈레톤 작업 사본이 필요합니다"));
+    if (!IsProjectCopy(Montage) || !IsValid(Attack) || !IsValid(Recovery) || !IsValid(Montage->GetSkeleton())) return Fail(TEXT("Sword montage verification requires a project-owned montage and valid source animations and skeleton / 검 몽타주 검증에는 작업 사본 몽타주와 유효한 원본 애니메이션 및 스켈레톤이 필요합니다"));
     if (Attack->GetSkeleton() != Montage->GetSkeleton() || Recovery->GetSkeleton() != Montage->GetSkeleton()) return Fail(TEXT("Sword montage skeleton verification failed / 검 몽타주 스켈레톤 검증 실패"));
+    if (!IsProjectCopy(Montage->GetSkeleton()) && !Montage->GetSkeleton()->ContainsSlotName(FAnimSlotGroup::DefaultSlotName)) return Fail(TEXT("The external sword skeleton must already contain DefaultSlot / 외부 검 스켈레톤에 DefaultSlot이 이미 있어야 합니다"));
     const float AttackLength = Attack->GetPlayLength();
     const float RecoveryLength = Recovery->GetPlayLength();
     if (!FMath::IsFinite(AttackLength) || AttackLength <= 0.f || !FMath::IsFinite(RecoveryLength) || RecoveryLength <= 0.f || Attack->RateScale != 1.f || Recovery->RateScale != 1.f || !FMath::IsFinite(RecoveryStartTime) || RecoveryStartTime < 0.f || RecoveryStartTime >= RecoveryLength) return Fail(TEXT("Sword montage source length, rate or recovery start verification failed / 검 몽타주 원본 길이, 재생 속도 또는 회복 시작점 검증 실패"));
@@ -386,7 +430,9 @@ bool UWarriorAssetLibrary::IsOutputSlotConnected(UAnimBlueprint* Blueprint, FNam
 
 bool UWarriorAssetLibrary::EnsureOutputSlot(UAnimBlueprint* Blueprint, FName SlotName)
 {
-    if (!IsProjectCopy(Blueprint) || !IsProjectCopy(Blueprint->TargetSkeleton) || SlotName.IsNone()) return Fail(TEXT("Output slot changes require project-owned AnimBlueprint and Skeleton copies / 슬롯 변경에는 작업 사본 AnimBlueprint와 Skeleton이 필요합니다"));
+    if (!IsProjectCopy(Blueprint) || !IsValid(Blueprint->TargetSkeleton) || SlotName.IsNone()) return Fail(TEXT("Output slot changes require a project-owned AnimBlueprint and valid skeleton / 슬롯 변경에는 작업 사본 AnimBlueprint와 유효한 스켈레톤이 필요합니다"));
+    if (!IsProjectCopy(Blueprint->TargetSkeleton) && !Blueprint->TargetSkeleton->ContainsSlotName(SlotName)) return Fail(TEXT("Output slots must already exist on an external skeleton / 외부 스켈레톤에는 출력 슬롯이 이미 있어야 합니다"));
+    if (!ValidateExternalSkeletonSlots({Blueprint}, Blueprint->TargetSkeleton, false)) return false;
     if (IsOutputSlotConnected(Blueprint, SlotName)) return true;
     if (GetAnimationSlotNames(Blueprint).Contains(SlotName)) return Fail(TEXT("An unconnected matching slot already exists; preserve it for explicit repair / 연결되지 않은 동일 슬롯이 있어 명시적 수정을 위해 보존합니다"));
     UAnimGraphNode_Root* Root = FindOutputNode(Blueprint);
@@ -414,8 +460,11 @@ bool UWarriorAssetLibrary::EnsureOutputSlot(UAnimBlueprint* Blueprint, FName Slo
         if (PreviousSource) Schema->TryCreateConnection(PreviousSource, ResultPin);
         return Fail(TEXT("Could not insert the montage slot; restored the original pose connection / 몽타주 슬롯 삽입 실패로 원래 포즈 연결을 복구했습니다"));
     }
-    Blueprint->TargetSkeleton->Modify();
-    Blueprint->TargetSkeleton->RegisterSlotNode(SlotName);
+    if (IsProjectCopy(Blueprint->TargetSkeleton) && !Blueprint->TargetSkeleton->ContainsSlotName(SlotName))
+    {
+        Blueprint->TargetSkeleton->Modify();
+        Blueprint->TargetSkeleton->RegisterSlotNode(SlotName);
+    }
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
     return Blueprint->Status != BS_Error && IsOutputSlotConnected(Blueprint, SlotName);

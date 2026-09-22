@@ -399,6 +399,11 @@ protected:
     UFUNCTION()
     void OnRep_EquippedSkills();
 
+    // Authored weapon skills identify the geometry whose visibility follows the saved loadout.
+    // 작성된 무기 스킬로 저장 장착에 따라 표시할 무기 지오메트리를 지정합니다.
+    UPROPERTY(EditDefaultsOnly, Category = "UnitBase|Skill")
+    TArray<TSoftObjectPtr<USkillDefinitionDataAsset>> WeaponPresentationSkills;
+
     // Rebuild skill-dependent visuals after authoritative setup or replicated loadout changes.
     // 권위 설정 또는 복제된 장착 변경 후 스킬에 종속된 외형을 갱신합니다.
     virtual void RefreshSkillPresentation();

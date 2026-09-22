@@ -30,3 +30,7 @@ Content/*
 # Keep user project content / User_JeHoon 콘텐츠만 추적
 !Content/User_JeHoon/
 !Content/User_JeHoon/**
+
+# Track the imported mage staff without copying its source pack / 원본 팩 복제 없이 임포트한 지팡이 추적
+!Content/MageStaff_FreeWeapons/
+!Content/MageStaff_FreeWeapons/**

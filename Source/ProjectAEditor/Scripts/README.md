@@ -2,7 +2,7 @@
 
 UI 구조·생성 옵션·JSON 필드는 [UI_README](../../../Docs/UI_README.md)를 따른다.
 
-Development Editor / Win64 빌드를 사용한다. Python은 `-EnablePlugins=PythonScriptPlugin`으로 해당 프로세스에서만 활성화한다. 제작 경로는 `/Game/User_JeHoon`이다. 최초 생성·Audit는 기존 TestMap을 요구하므로 현재 사용자 삭제 상태에서 실행 전 원본 가용성을 확인한다.
+Development Editor / Win64 빌드를 사용한다. Python은 `-EnablePlugins=PythonScriptPlugin`으로 해당 프로세스에서만 활성화한다. 제작 경로는 `/Game/User_JeHoon`이며 사용자 요청에 따른 지팡이 직접 임포트는 `/Game/MageStaff_FreeWeapons`를 사용한다. 최초 생성·Audit는 기존 TestMap을 요구하므로 현재 사용자 삭제 상태에서 실행 전 원본 가용성을 확인한다.
 
 ```powershell
 $editorExecutable = 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
@@ -83,7 +83,7 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureTestEnemies.py") -TestEnemiesVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-10. `ConfigureWarriorContent.py`: GKnight 전사와 Weapon_Pack 검을 작업 폴더에 복제하고 Paragon Kwang의 `PrimaryAttack_A_Slow`·`PrimaryAttack_A_Slow_Recovery`를 IK 리타깃한다. 전사는 기존 4개에 `BPDA_swoard_attack`을 추가하고 기본 적은 검 공격만 장착한다. 기존 기본공격 ID는 유지하며 표시명을 `비무장 공격`으로 바꾸고, 휩쓸기는 `BPDA_SweepingStrike`로 이름을 변경한다. Snapshot 적의 저장된 장착 규칙은 유지한다.
+10. `ConfigureWarriorContent.py`: 이전 GKnight 콘텐츠 작성 도구. 현재 직업 외형 작성·검사는 아래 `ConfigureProfessionAppearance.py`를 사용한다. 이 도구를 재실행하면 이전 GKnight 외형과 직업 매핑이 적용된다. 내부 리타깃·부착 함수만 새 도구에서 재사용한다. 이전 작성은 GKnight 전사·Weapon_Pack 검 복제, Kwang 공격·복귀 리타깃과 검/휩쓸기 스킬 구성을 포함한다.
 
 IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScript`를 사용하며 스크립트 종료 후 에디터도 종료된다. `-WarriorVerifyOnly`는 commandlet에서 저장된 뼈대·몽타주·스킬·소켓·직업·이전 참조만 읽는다. 두 명령 모두 PIE·게임 플레이를 시작하지 않는다. 외부 팩 원본은 설치된 상태여야 하며 수정하지 않는다.
 
@@ -112,3 +112,12 @@ IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScri
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureShopSkillPresentation.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
+
+13. `ConfigureProfessionAppearance.py`: 네 직업의 Kwang·Gideon·Sparrow·Countess 메시·뼈대·재질을 원본 경로로 직접 참조한다. 기존 전투 애니메이션만 새 뼈대에 리타깃하며 메뉴·플레이어·Snapshot Blueprint와 카탈로그를 연결한다. `ImportMageStaff.py`는 `Mage Staff - Free Weapons/SM_Staff_01.fbx`와 공용 BaseColor/Normal/ORM을 `/Game/MageStaff_FreeWeapons`에 임포트한다. 원본 파일 복제나 외부 팩 수정은 하지 않는다. 파라곤 네 팩은 프로젝트 원본 위치에 설치되어 있어야 한다.
+
+```powershell
+& $editorExecutable $projectFile ("-ExecutePythonScript=$scriptDirectory/ConfigureProfessionAppearance.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -RenderOffscreen -nosplash
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureProfessionAppearance.py") -ProfessionAppearanceVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+```
+
+첫 명령은 에셋 작성 후 에디터를 종료한다. 두 번째는 저장된 Blueprint·직업 매핑·뼈대·몽타주 슬롯·검 궤적 샘플·무기 표시 설정·지팡이 부착을 읽는다. 결과는 `Saved/Automation/ProfessionAppearanceConfigure.json`·`ProfessionAppearanceReload.json`이다. 실제 메뉴·이동·공격 확인은 [TODO](../../../Docs/TODO.md#2-25-직업별-파라곤-외형)에서 별도로 진행한다.

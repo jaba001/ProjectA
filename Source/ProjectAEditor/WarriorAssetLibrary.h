@@ -14,8 +14,8 @@ class USkeletalMesh;
 class UIKRetargeter;
 class USkillDefinitionDataAsset;
 
-// Restrict authored asset changes to project-owned copies while using engine editor APIs.
-// 엔진 에디터 API를 사용하며 작성 에셋 변경을 프로젝트 작업 사본으로 제한합니다.
+// Restrict authored asset changes to project-owned copies while allowing read-only source mesh and skeleton references.
+// 원본 메시와 스켈레톤의 읽기 전용 참조를 허용하며 작성 에셋 변경을 프로젝트 작업 사본으로 제한합니다.
 UCLASS()
 class PROJECTAEDITOR_API UWarriorAssetLibrary : public UBlueprintFunctionLibrary
 {
@@ -34,6 +34,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
     static bool SetSkeletonPreviewMesh(USkeleton* Skeleton, USkeletalMesh* Mesh);
 
+    // Retargeted outputs and IK tools remain project-owned; external target skeleton slots must already exist.
+    // 리타깃 출력과 IK 도구는 작업 사본으로 유지하며 외부 대상 스켈레톤의 슬롯은 이미 있어야 합니다.
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
     static bool RetargetAnimations(const TArray<UObject*>& Assets, USkeletalMesh* SourceMesh, USkeletalMesh* TargetMesh, UIKRetargeter* Retargeter, const FString& Destination, const FString& Suffix, bool bOverwriteExistingFiles = false, bool bIncludeReferencedAssets = true);
 
@@ -56,6 +58,8 @@ public:
     UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
     static TArray<UAnimSequenceBase*> GetMontageAnimations(UAnimMontage* Montage);
 
+    // Author only the destination montage, preserving native source sequences and their skeleton.
+    // 대상 몽타주만 작성하며 원본 시퀀스와 해당 스켈레톤을 보존합니다.
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
     static bool ConfigureSwordMontage(UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float RecoveryStartTime);
 

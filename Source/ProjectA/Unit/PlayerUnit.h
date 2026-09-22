@@ -39,14 +39,6 @@ public:
 	// 플레이어 유닛의 턴 종료 동작을 처리합니다.
     virtual void OnTurnEnd() override;
 
-protected:
-    // Authored weapon skills identify the geometry whose visibility follows the saved loadout.
-    // 작성된 무기 스킬로 저장 장착에 따라 표시할 무기 지오메트리를 지정합니다.
-    UPROPERTY(EditDefaultsOnly, Category = "UnitBase|Skill")
-    TArray<TSoftObjectPtr<USkillDefinitionDataAsset>> WeaponPresentationSkills;
-
-    virtual void RefreshSkillPresentation() override;
-
 private:
     friend class UCombatActionAuthority;
     friend class AUnitBase;

@@ -4,6 +4,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -44,6 +45,7 @@ AUnitBase::AUnitBase(const FObjectInitializer& ObjectInitializer)
     bReplicates = true;
     bAlwaysRelevant = true;
     SetReplicateMovement(true);
+    WeaponPresentationSkills.Add(TSoftObjectPtr<USkillDefinitionDataAsset>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"))));
 }
 
 UAbilitySystemComponent* AUnitBase::GetAbilitySystemComponent() const
@@ -140,6 +142,22 @@ void AUnitBase::OnRep_EquippedSkills()
 
 void AUnitBase::RefreshSkillPresentation()
 {
+    TMap<FName, bool> Visibility;
+    for (const TSoftObjectPtr<USkillDefinitionDataAsset>& Reference : WeaponPresentationSkills)
+    {
+        USkillDefinitionDataAsset* Skill = Reference.LoadSynchronous();
+        FCombatRoundSkill Definition;
+        FText Error;
+        if (!Skill || !Skill->ResolveRoundSkill(Definition, Error) || !Definition.bUseWeaponTrace || Definition.WeaponComponentName.IsNone()) continue;
+        bool& bVisible = Visibility.FindOrAdd(Definition.WeaponComponentName);
+        bVisible |= EquippedSkillDataAssets.ContainsByPredicate([Skill](const USkillDefinitionDataAsset* Equipped) { return Equipped && Equipped->GetPrimaryAssetId() == Skill->GetPrimaryAssetId(); });
+    }
+    for (const TPair<FName, bool>& Entry : Visibility)
+    {
+        const FObjectPropertyBase* Property = FindFProperty<FObjectPropertyBase>(GetClass(), Entry.Key);
+        UStaticMeshComponent* Weapon = Property ? Cast<UStaticMeshComponent>(Property->GetObjectPropertyValue_InContainer(this)) : nullptr;
+        if (Weapon && Weapon->GetOwner() == this) Weapon->SetVisibility(Entry.Value);
+    }
 }
 
 void AUnitBase::SetRoundCastMontage(UAnimMontage* Montage, bool bImmediateStop)

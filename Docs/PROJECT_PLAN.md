@@ -110,7 +110,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 - 빈 슬롯은 스폰하지 않으며 원래 `SlotIndex`를 Arena의 PlayerCoords에 대응한다. 슬롯은 이름·`ClassId`·생성 여부·현재 HP와 `bPlayerControlled` 선택을 전달한다. 식별된 Run은 `CharacterId`와 원래 `OwnerAccountId`도 보존한다.
 - 일반 싱글의 매 전투에서 선택한 슬롯만 `Human`, 나머지 생성 동료는 `ServerAI`로 설정한다. 선택이 사망한 멤버를 가리키면 생존자로 조작권을 옮기지 않는다. 남은 AI가 자동으로 계획·준비하며 전체 아군 생존 상태로 결과를 판정한다.
 - 직업은 전사 `Warrior`·마법사 `Mage`·궁수 `Archer`·도적 `Rogue` 순서다. `UProfessionBase`의 native 자식 클래스 4개를 `UPartyDefinitionDataAsset::Professions`의 `ProfessionClass`로 연결한다. 직업 정의는 UObject이며 전투 Actor와 분리한다.
-- `CombatClass`가 없으면 기존 `PlayerUnitClasses`와 명시적인 `FallbackPlayerUnitClass`를 사용한다. 전사는 `BP_WarriorUnit`의 GKnight 메시·검과 5스킬을 사용하며 마법사·궁수·도적은 기존 `BP_PlayerUnit`의 4스킬을 유지한다.
+- `CombatClass`가 없으면 기존 `PlayerUnitClasses`와 명시적인 `FallbackPlayerUnitClass`를 사용한다. 네 직업은 `BP_WarriorUnit`·`BP_MageUnit`·`BP_ArcherUnit`·`BP_RogueUnit`으로 구분하고 Kwang·Gideon·Sparrow·Countess 원본 메시를 직접 참조한다. Blueprint의 이전 기본 스킬과 별개로 새 Run은 비무장 스킬만 시작한다.
 - 수정하지 않은 이름은 직업 표시명과 슬롯 번호를 사용한다. 개별 이름 변경은 `SetSlotCharacterName`으로 반영한다.
 - 네 직업의 현재 시작값은 HP 100·힘/민첩/지능 각 10이다. 첫 스폰은 직업 정의의 HP와 능력치를 사용하고 이후 전투는 저장한 결과 HP를 유지한다. HP 0인 멤버는 다음 전투에 스폰하지 않는다. 최종 밸런스·성장률·능력치의 피해 보정 공식은 별도다.
 - 전투 속도는 현재 GAS 민첩과 1:1이다. 기본 아군 속도는 10이며 일반 `AEnemyUnit`의 시작 힘/민첩/지능은 각각 5·속도 5다. 일반 적 HP 150·AP 2는 유지하고 Snapshot 적은 스폰 후 저장된 세 능력치로 설정한다.
@@ -176,7 +176,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 휩쓸기 | `BPDA_SweepingStrike`: 근접 전방 박스 충돌·피해 10·AP 1·시전 몽타주·종료 후 복귀. 이전 이름/ID 리디렉션 유지 |
 | 전투 간 이관 | HP 유지. 새 전투의 추가 스킬 자동 추첨 없음. 전투 복구는 저장된 Ready 경계 사용. Snapshot 적은 저장된 스킬 구성 사용 |
 | 적·아군 AI | 실제 장착 스킬 순서·가까운 적 기준으로 인간 초안 전에 단일 명령 고정. 장착된 복귀형 Tile 공격은 적 HomeCoord를 공격/접근 좌표로 선택 가능. 합법 공격이 없으면 목록에 노출되지 않는 내부 대기 처리 |
-| 메뉴 프리뷰 | MainMenuPreviewStage의 카메라·4개 앵커·ClassId별 BP_PartyMenuPreview 사용. 기존 메시와 같은 Skeleton의 MM_Idle 자동·반복 재생 연결 및 BP 재로드 확인. 전투 Pawn 생성 없음. [남은 확인](TODO.md#2-6-캐릭터-생성-프리뷰) |
+| 메뉴 프리뷰 | MainMenuPreviewStage의 카메라·4개 앵커·직업별 `BP_*MenuPreview` 사용. 파라곤 원본 메시와 리타깃 `MM_Idle` 반복 재생, 마법사 왼손 지팡이 연결. 전투 Pawn 생성 없음. [남은 확인](TODO.md#2-25-직업별-파라곤-외형) |
 | 생성 화면 종료 | Back/X는 초안·프리뷰 정리. 재진입 시 빈 4슬롯. 상세 패널이 열려 있으면 먼저 패널만 닫음. 최소 슬롯 높이로 ClassInfo 표시 유지 |
 | 모드 선택 | 게임 시작 → 싱글플레이/멀티플레이. 캐릭터 생성·접속 시작 전 멀티 화면에서 돌아오면 모드 선택 복원, 모드 선택의 뒤로가기는 첫 화면 복원. 연결 이후 나가기는 기존 세션 정리/메뉴 복귀 |
 | 싱글 여정 항복 | 이어하기 옆 104×40 버튼·`URunSurrenderWidget` 확인창. 돌아가기 기본 포커스, 확인된 현재 일반 싱글 저장만 삭제. 취소·실패·저장 변경은 원본/현재 Run 보존 |
@@ -246,7 +246,9 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 
 아래 에셋 경로는 모두 `/Game/User_JeHoon/` 기준이다. 디스크에서는 `Content/User_JeHoon/`에 대응한다. 기존 에셋에는 필수 수동 재연결 작업이 없다.
 
-기존 DA는 유형별 폴더를 사용한다. 전사·적 메시/애니메이션과 검의 작업 사본도 `/Game/User_JeHoon/`에 저장하며 GKnight·Weapon_Pack·BossyEnemy 등 외부 팩 원본은 수정하지 않는다. 제작·검사 명령은 [에셋 스크립트](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
+기존 DA는 유형별 폴더를 사용한다. 파라곤 외형은 사용자 요청에 따라 `/Game/ParagonKwang`·`ParagonSparrow`·`ParagonGideon`·`ParagonCountess`의 메시·재질·뼈대를 복제 없이 직접 참조한다. 기존 전투 동작에 필요한 리타깃 애니메이션·Rig·직업 Blueprint만 `/Game/User_JeHoon/`에 작성한다. 지팡이 FBX 한 개와 공용 PBR 텍스처는 유효한 패키지 이름 `/Game/MageStaff_FreeWeapons`로 직접 임포트한다. 기존 GKnight·적·검 작업 사본은 보존한다. 제작·검사 명령은 [에셋 스크립트](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
+
+`UCharacterAppearanceComponent`는 메시 인스턴스의 내장 무기 본만 숨기며 원본이나 판정을 수정하지 않는다. 별도 `Sword` 표시는 `AUnitBase::RefreshSkillPresentation`에서 저장된 장착에 맞춰 갱신하며 아군과 Snapshot 상대가 공유한다. `Staff`는 왼손에 항상 표시하고 충돌을 비활성화한다. 이전 전투 체크포인트는 저장된 클래스 경로를 복구하므로 새 외형 확인은 새 Run을 기준으로 한다.
 
 | 에셋 경로 | 클래스 / 저장된 연결 |
 |---|---|
@@ -254,26 +256,27 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 | `LEVEL/Gameplay` | TestMap geometry·NavMesh·Grid를 복제한 기준 레벨, `BP_GameplayGameMode` Override |
 | `Blueprint/Game/BP_GameplayGameMode` | `AGameplayGameModeBase`, PartyDefinition과 `EncounterDefinitions[DefaultEncounter]` 설정 |
 | `Blueprint/Controller/BP_GameplayPlayerController` | `AGameplayPlayerController`, GameplayRootWidgetClass 설정 |
-| `Blueprint/DataAsset/Parties/DA_VerticalSliceParty` | `UPartyDefinitionDataAsset`, Warrior는 `BP_WarriorUnit`, 나머지 직업과 fallback은 `BP_PlayerUnit` |
+| `Blueprint/DataAsset/Parties/DA_VerticalSliceParty` | `UPartyDefinitionDataAsset`, 네 직업별 `BP_*Unit` 연결, 일반 fallback은 `BP_PlayerUnit` |
 | `Blueprint/DataAsset/Encounters/DA_DefaultEncounter` | `UEncounterDefinitionDataAsset`, 시험용 `BP_EnemyUnit` 4마리 |
 | `Blueprint/DataAsset/Skills/BPDA_DefaulatAttack` | `USkillDefinitionDataAsset`, 기존 경로·ID·공격값 유지, 표시명만 `비무장 공격` |
 | `Blueprint/DataAsset/Skills/BPDA_RangedAttack` | `USkillDefinitionDataAsset`, 기본 공격 복제. 별도 `Blueprint/GAS/Ability/BPGA_RangedAttack` 연결, 공통 플레이어 시험 장착에 포함 |
 | `Blueprint/DataAsset/Skills/BPDA_AreaAttack` | `USkillDefinitionDataAsset`, 기존 EnemyTile·AroundTarget을 지점 공격으로 변환. 피해 200·AP 1·Attack03 몽타주 보존, 공통 플레이어 시험 장착에 포함 |
 | `Blueprint/DataAsset/Skills/BPDA_SweepingStrike` | `USkillDefinitionDataAsset`, 근접 전방 박스 충돌·피해 10·AP 1·몽타주와 복귀. 이전 경로·PrimaryAssetId 리디렉션 |
 | `Blueprint/DataAsset/Skills/BPDA_swoard_attack` | `USkillDefinitionDataAsset`, 검 공격·논리 ID `SwordAttack`·칼날 궤적·피해 50·AP 1·활성 0.23~0.43초 |
-| `Blueprint/Unit/BP_WarriorUnit` | GKnight VA 작업 사본·기존 4스킬+검 공격·유닛별 몽타주·오른손 검 |
-| `GKnight/Meshes/SK_GothicKnight_VA`, `GKnight/Meshes/SK_GothicKnight_Skeleton` | 원본 메시·뼈대 경로를 유지한 전사 사본 |
+| `Blueprint/Unit/BP_WarriorUnit`, `BP_MageUnit`, `BP_ArcherUnit`, `BP_RogueUnit` | Kwang·Gideon·Sparrow·Countess 원본 참조·유닛별 몽타주·오른손 검·마법사 왼손 지팡이 |
+| `Blueprint/Unit/BP_*SnapshotOpponent` | 네 직업의 Snapshot 외형, 저장된 스킬·능력치 적용 유지 |
+| `GKnight/Meshes/SK_GothicKnight_VA`, `GKnight/Meshes/SK_GothicKnight_Skeleton` | 이전 전사 외형 작업 사본 보존 |
 | `Skeleton_Guard/Mesh_UE4/Full/SKM_Skeleton_Guard_Body`, `Skeleton_Guard/Demoscene_UE4/Mesh/UE4_Mannequin_Skeleton` | 원본 메시·뼈대 경로를 유지한 적 사본 |
 | `Characters/Mannequins/Anims/Unarmed` | 기존 ABP·BS·Walk/Jog/Jump/Attack 하위 구조를 유지한 리타깃 사본. 유닛별 접미사로 구분 |
 | `Blueprint/Unit/Animation/Montage` | 기존 프로젝트 공격 몽타주와 유닛별 리타깃 사본 |
 | `BossyEnemy/Animations/InPlace/Attacks` | 이전 `Boss_Attack_Swing_InP` 리타깃 시퀀스와 검 몽타주 보존 |
-| `ParagonAnimationsRetargetedToManny/KwangManny/Attack` | 공격·복귀 리타깃 시퀀스(`_KwangSword`/`_KwangSword_Sword`)와 현재 전사/적 `AM_SwordAttack`/`AM_SwordAttack_Sword` 몽타주 |
-| `GKnight/Rigs`, `Skeleton_Guard/Rigs` | 전사/적용 IK Rig·Retargeter |
+| `ParagonAnimationsRetargetedToManny/KwangManny/Attack` | 기존 공격·복귀와 적 몽타주 보존, 직업별 `AM_SwordAttack_Manny_<Hero>` 리타깃 |
+| `Paragon*/Characters/Heroes/*/Rigs`, `GKnight/Rigs`, `Skeleton_Guard/Rigs` | 직업별 원본 메시를 참조하는 새 IK Rig·Retargeter와 기존 전사/적 도구 |
 | `Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Sword` | 원본 구조를 유지한 검 사본. 전사·기본 적의 `hand_r` 부착 |
 | `Characters/Mannequins/Meshes/SK_Mannequin`, `Characters/Mannequins/Meshes/SKM_Manny_Simple` | Paragon AnimSequence의 Manny 뼈대·프리뷰 메시 작업 사본 |
 | `ParagonAnimationsRetargetedToManny` | 원본 32개 캐릭터/하위 폴더를 유지한 AnimSequence 5,385개. 전체 저장·별도 재로드 확인, Kwang 검 공격용 리타깃은 별도 연결 |
 | `Blueprint/DataAsset/SkillPools/DA_EncounterSkillPool` | `USkillPoolDataAsset`, 기존 추가 스킬 후보·가중치 유지 |
-| `Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog` | `UOpponentSnapshotCatalogDataAsset`, 네 직업·기존 별칭과 `SwordAttack`. Warrior 클래스만 전사 사본으로 연결 |
+| `Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog` | `UOpponentSnapshotCatalogDataAsset`, 네 직업별 Snapshot Blueprint 연결. 기존 스킬 별칭·`SwordAttack`·콘텐츠 버전 보존 |
 | `UI/Gameplay/WBP_GameplayRootWidget` | `UGameplayRootWidget`, 기존 RunMap/Result와 native RoundPlanning 화면 연결 |
 | `UI/Gameplay/WBP_RunMapWidget` | `URunMapWidget` |
 | `UI/Gameplay/WBP_CombatHUDWidget` | 이전 순차 HUD 참조만 보존. 현재 Combat에서는 생성하지 않음 |
