@@ -17,6 +17,7 @@
 #include "Grid/Combat/CombatGridManager.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Game/GameModes/GameplayGameModeBase.h"
+#include "Game/Run/RunSaveGame.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "PlayInEditorDataTypes.h"
@@ -162,11 +163,11 @@ public:
             AGameplayGameModeBase* Mode = Host->GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
             const FGuid CharacterId = Mode->GetEncounterManager()->GetCombatManager()->GetCharacterId(Unit->Unit);
             const FRunPartyMember* Member = Run->GetPartyMembers().FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.CharacterId == CharacterId; });
-            FProfessionDefinition Profession;
+            TArray<TObjectPtr<USkillDefinitionDataAsset>> MemberSkills;
             FText Error;
-            if (!Check(Member && Mode->PartyDefinition->ResolveProfession(Member->ClassId, Profession, Error), *FString::Printf(TEXT("The original character resolves its authored profession loadout: %s"), *Error.ToString()))) return End();
+            if (!Check(Member && Mode->PartyDefinition->ResolveMemberSkills(*Member, MemberSkills, Error), *FString::Printf(TEXT("The original character resolves its saved acquired loadout: %s"), *Error.ToString()))) return End();
             TArray<FName> ExpectedSkillIds;
-            for (const USkillDefinitionDataAsset* Skill : Profession.StartingSkills)
+            for (const USkillDefinitionDataAsset* Skill : MemberSkills)
             {
                 FCombatRoundSkill Definition;
                 if (!Check(Skill && Skill->ResolveRoundSkill(Definition, Error), *FString::Printf(TEXT("An authored profession skill resolves for the expected loadout: %s"), *Error.ToString()))) return End();
@@ -369,6 +370,17 @@ private:
         FText Error;
         const bool bInitialized = Count == 1 ? Run->InitializeRun(Party, Error) : Run->InitializeRunWithIdentity(Party, Identity, Error);
         if (!Check(bInitialized, *FString::Printf(TEXT("Initialize authored Run: %s"), *Error.ToString()))) return false;
+        // This network combat fixture starts from an explicitly saved purchase; shop transactions have separate coverage.
+        // 이 네트워크 전투 픽스처는 명시적으로 저장한 구매부터 시작하며 상점 거래는 별도로 검사합니다.
+        TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));
+        if (!Check(Saved.IsValid(), TEXT("New Run has a durable save for the acquired-skill fixture."))) return false;
+        for (FRunPartyMember& Member : Saved->Party)
+        {
+            if (!Check(Member.bHasSkillLoadout && Member.Skills.Num() == 1 && Member.Gold == 10, TEXT("Every newly initialized character starts unarmed with ten gold."))) return false;
+            Member.Skills.Add(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_AreaAttack.BPDA_AreaAttack")));
+            Member.Gold = 9;
+        }
+        if (!Check(UGameplayStatics::SaveGameToSlot(Saved.Get(), Slot, 0) && Run->LoadCheckpoint(Error), *FString::Printf(TEXT("Reload explicitly saved area attacks for the network combat fixture: %s"), *Error.ToString()))) return false;
         if (Count > 1)
         {
             if (!Check(Mode->AssignRunParticipant(Host, Identity.HostAccountId), TEXT("Explicitly bind the original host."))) return false;

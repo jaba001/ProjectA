@@ -87,6 +87,7 @@ void UGameplayRootWidget::NativeOnInitialized()
     UOverlaySlot* NoticeSlot = NoticeRoot->AddChildToOverlay(CheckpointNotice);
     NoticeSlot->SetHorizontalAlignment(HAlign_Center);
     NoticeSlot->SetVerticalAlignment(VAlign_Top);
+    NoticeSlot->SetPadding(FMargin(24.f, 128.f, 24.f, 0.f));
     CheckpointNotice->SetPadding(FMargin(16.f));
     UVerticalBox* NoticeContent = WidgetTree->ConstructWidget<UVerticalBox>();
     CheckpointNotice->SetContent(NoticeContent);

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Game/Run/RunEncounterTypes.h"
+#include "Game/Run/RunSkillShopTypes.h"
 #include "RunEncounterPoolDataAsset.generated.h"
 
 // Author fixed prototype choices here; weighted generation can later produce the same runtime offers.
@@ -18,5 +19,13 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Encounter")
     TArray<FRunEncounterOffer> FixedOffers;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop", meta = (ClampMin = "0"))
+    int32 StartingGold = 10;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
+    TArray<FRunSkillShopOffer> FixedSkillOffers;
+
     bool BuildFixedOffers(TArray<FRunEncounterOffer>& OutOffers, FText& OutError) const;
+    bool BuildSkillShop(FRunSkillShopState& OutState, FText& OutError) const;
+    static bool ValidateSkillShop(const FRunSkillShopState& State, FText& OutError);
 };

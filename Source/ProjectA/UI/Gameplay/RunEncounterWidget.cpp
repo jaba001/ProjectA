@@ -55,6 +55,14 @@ void URunEncounterWidget::NativeOnInitialized()
         Actions->AddChildToVerticalBox(Button)->SetPadding(FMargin(0.0f, 5.0f));
         ChoiceButtons.Add(Button);
     }
+    ShopBalance = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_ShopBalance"));
+    Actions->AddChildToVerticalBox(ShopBalance)->SetPadding(FMargin(0.0f, 5.0f));
+    ShopHint = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_ShopHint"));
+    ShopHint->SetAutoWrapText(true);
+    ShopHint->SetWrapTextAt(600.f);
+    Actions->AddChildToVerticalBox(ShopHint)->SetPadding(FMargin(0.0f, 5.0f));
+    ShopActions = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("ShopActions"));
+    Actions->AddChildToVerticalBox(ShopActions);
     LeaveButton = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), TEXT("Button_LeaveShop"));
     LeaveButton->Configure(TEXT("Leave"), NSLOCTEXT("RunEncounter", "Leave", "나가기"));
     LeaveButton->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandleLeave);
@@ -71,6 +79,39 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
 {
     if (!Actions) return;
     bRunCommandsAllowed = bAllowRunCommands;
+    AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
+    BuyerCharacterId = Controller ? Controller->GetShopBuyerCharacterId(View) : FGuid();
+    const FRunPartyMember* Buyer = BuyerCharacterId.IsValid() ? View.PartyMembers.FindByPredicate([this](const FRunPartyMember& Member) { return Member.CharacterId == BuyerCharacterId; }) : nullptr;
+    const bool bInShop = View.Phase == ERunPhase::Shop;
+    ShopBalance->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    ShopHint->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    ShopActions->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    if (bInShop)
+    {
+        ShopBalance->SetText(Buyer ? FText::Format(NSLOCTEXT("RunSkillShop", "Balance", "{0} · 보유 골드 {1}G"), Buyer->CharacterName, FText::AsNumber(Buyer->Gold)) : NSLOCTEXT("RunSkillShop", "NoBuyer", "구매 가능한 직접 조작 캐릭터가 없습니다."));
+        ShopHint->SetText(View.SkillShopState.SchemaVersion == 0 ? NSLOCTEXT("RunSkillShop", "LegacyRun", "이전 저장에는 스킬 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다.") : NSLOCTEXT("RunSkillShop", "Rules", "구매한 스킬은 본인 캐릭터에만 적용되며 Run 동안 유지됩니다. 같은 스킬은 한 번만 구매할 수 있습니다."));
+        while (ShopButtons.Num() < View.SkillShopState.Offers.Num())
+        {
+            UGameplayActionButton* Button = WidgetTree->ConstructWidget<UGameplayActionButton>();
+            Button->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandlePurchase);
+            ShopActions->AddChildToVerticalBox(Button)->SetPadding(FMargin(0.0f, 5.0f));
+            ShopButtons.Add(Button);
+        }
+        for (int32 Index = 0; Index < ShopButtons.Num(); ++Index)
+        {
+            UGameplayActionButton* Button = ShopButtons[Index];
+            const bool bVisible = View.SkillShopState.Offers.IsValidIndex(Index);
+            Button->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+            if (!bVisible) continue;
+            const FRunSkillShopOffer& Offer = View.SkillShopState.Offers[Index];
+            const bool bOwned = Buyer && Buyer->Skills.Contains(Offer.Skill);
+            const bool bAffordable = Buyer && Offer.Price > 0 && Buyer->Gold >= Offer.Price;
+            const FText Status = bOwned ? NSLOCTEXT("RunSkillShop", "Owned", "보유 중") : bAffordable ? NSLOCTEXT("RunSkillShop", "Buy", "구매") : NSLOCTEXT("RunSkillShop", "CannotBuy", "구매 불가");
+            Button->Configure(Offer.OfferId, FText::Format(NSLOCTEXT("RunSkillShop", "Product", "{0} · {1}G · {2}"), Offer.DisplayName, FText::AsNumber(Offer.Price), Status));
+            Button->SetToolTipText(Offer.Description);
+            Button->SetIsEnabled(!bOwned && bAffordable && Controller && !Controller->IsShopPurchasePending());
+        }
+    }
     for (int32 Index = 0; Index < ChoiceButtons.Num(); ++Index)
     {
         UGameplayActionButton* Button = ChoiceButtons[Index];
@@ -85,7 +126,11 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     }
     LeaveButton->SetVisibility(View.Phase == ERunPhase::Shop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     LeaveButton->SetIsEnabled(View.Phase == ERunPhase::Shop && bAllowRunCommands);
-    Message->SetText(View.FlowMessage.IsEmpty() && !bAllowRunCommands ? NSLOCTEXT("RunEncounter", "HostOnly", "Host의 진행을 기다리는 중입니다.") : View.FlowMessage);
+    FText DisplayMessage = View.FlowMessage;
+    if (bInShop && Controller && !Controller->GetShopPurchaseMessage().IsEmpty()) DisplayMessage = DisplayMessage.IsEmpty() ? Controller->GetShopPurchaseMessage() : FText::Format(NSLOCTEXT("RunSkillShop", "FlowAndPurchaseMessage", "{0}\n{1}"), DisplayMessage, Controller->GetShopPurchaseMessage());
+    if (bInShop && Controller && Controller->IsShopPurchasePending()) DisplayMessage = NSLOCTEXT("RunSkillShop", "Pending", "구매를 처리하는 중입니다.");
+    if (DisplayMessage.IsEmpty() && !bAllowRunCommands) DisplayMessage = bInShop ? NSLOCTEXT("RunSkillShop", "HostLeaves", "본인 스킬을 구매할 수 있습니다. 상점 나가기는 Host가 결정합니다.") : NSLOCTEXT("RunEncounter", "HostOnly", "Host의 진행을 기다리는 중입니다.");
+    Message->SetText(DisplayMessage);
     if (View.Phase == ERunPhase::EncounterChoice)
     {
         Title->SetText(NSLOCTEXT("RunEncounter", "Choose", "인카운터 선택"));
@@ -107,4 +152,10 @@ void URunEncounterWidget::HandleLeave(FName)
 {
     if (!bRunCommandsAllowed) return;
     if (AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>()) Controller->RequestLeaveRunEncounter();
+}
+
+void URunEncounterWidget::HandlePurchase(FName OfferId)
+{
+    if (!BuyerCharacterId.IsValid()) return;
+    if (AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>()) Controller->RequestPurchaseShopSkill(BuyerCharacterId, OfferId);
 }

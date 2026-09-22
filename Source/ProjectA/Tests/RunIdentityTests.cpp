@@ -103,7 +103,9 @@ namespace
         for (const FRunPartyMember& Member : Run->GetPartyMembers())
         {
             FProfessionDefinition Profession;
-            if (!Run->PartyDefinition || !Run->PartyDefinition->ResolveProfession(Member.ClassId, Profession) || Profession.StartingSkills.IsEmpty()) return false;
+            TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
+            FText Error;
+            if (!Run->PartyDefinition || !Run->PartyDefinition->ResolveProfession(Member.ClassId, Profession) || !Run->PartyDefinition->ResolveMemberSkills(Member, Skills, Error) || Skills.IsEmpty()) return false;
             FCombatCheckpointUnit& Unit = Checkpoint.Units.AddDefaulted_GetRef();
             Unit.UnitId = FGuid::NewGuid();
             Unit.CharacterId = Member.CharacterId;
@@ -114,12 +116,12 @@ namespace
             Unit.HP = Profession.MaxHP;
             Unit.MaxHP = Profession.MaxHP;
             Unit.GridCoord = FIntPoint(Member.SlotIndex, 0);
-            for (USkillDefinitionDataAsset* Skill : Profession.StartingSkills)
+            for (USkillDefinitionDataAsset* Skill : Skills)
             {
                 if (!Skill) return false;
                 Unit.Skills.Add(FSoftObjectPath(Skill));
             }
-            Unit.DefaultAttackAbility = FSoftObjectPath(Profession.StartingSkills[0]->AbilityClass.Get());
+            Unit.DefaultAttackAbility = FSoftObjectPath(Skills[0]->AbilityClass.Get());
         }
         FCombatCheckpointUnit Enemy = Checkpoint.Units[0];
         Enemy.UnitId = FGuid::NewGuid();

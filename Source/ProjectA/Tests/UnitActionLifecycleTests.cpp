@@ -6,6 +6,8 @@
 #include "Animation/AnimMontage.h"
 #include "Animation/Notify/AN_SkillRelease.h"
 #include "Combat/SkillActor/AttackSkillActorBase.h"
+#include "Combat/Library/CombatWeaponTraceLibrary.h"
+#include "Components/StaticMeshComponent.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "DataAsset/SkillPoolDataAsset.h"
@@ -13,6 +15,7 @@
 #include "GAS/Ability/GA_DefaultAttack.h"
 #include "GAS/Ability/GA_AreaAttack.h"
 #include "GAS/Effect/GE_Damage.h"
+#include "Game/Run/RunTypes.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Profession/ProfessionBase.h"
 #include "Profession/WarriorProfession.h"
@@ -386,6 +389,78 @@ bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
     {
         TestNull(TEXT("Previous test IDs are not in the playable profession hierarchy"), UProfessionBase::FindProfession(PreviousId));
         TestFalse(TEXT("Previous test professions do not silently use the combat fallback"), Custom->ResolveProfession(PreviousId, Resolved));
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunStartingSkillLoadoutTest, "ProjectA.Party.RunStartingSkillLoadout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunStartingSkillLoadoutTest::RunTest(const FString& Parameters)
+{
+    UPartyDefinitionDataAsset* Catalog = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+    USkillDefinitionDataAsset* Unarmed = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_DefaulatAttack.BPDA_DefaulatAttack"));
+    USkillDefinitionDataAsset* Purchased = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_RangedAttack.BPDA_RangedAttack"));
+    if (!TestTrue(TEXT("Authored catalog, unarmed skill and purchasable skill exist"), Catalog && Unarmed && Purchased)) return false;
+    FText Error;
+    for (FName ClassId : UProfessionBase::GetPlayableIds())
+    {
+        TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
+        if (!TestTrue(TEXT("Every new profession resolves the same unarmed-only loadout"), Catalog->ResolveStartingSkills(ClassId, Skills, Error) && Skills == TArray<TObjectPtr<USkillDefinitionDataAsset>>{Unarmed})) return false;
+        TestFalse(TEXT("New-character preview excludes the purchasable ranged skill"), Catalog->GetProfessionDetails(ClassId).ToString().Contains(Purchased->SkillName.ToString()));
+        FRunPartyMember Member;
+        Member.ClassId = ClassId;
+        FProfessionDefinition Legacy;
+        if (!TestTrue(TEXT("An older member preserves historical profession skills"), Catalog->ResolveProfession(ClassId, Legacy, Error) && Catalog->ResolveMemberSkills(Member, Skills, Error) && Skills == Legacy.StartingSkills)) return false;
+        Member.bHasSkillLoadout = true;
+        Member.Skills = {FSoftObjectPath(Unarmed), FSoftObjectPath(Purchased)};
+        TestTrue(TEXT("An explicit saved loadout preserves bought skills and order"), Catalog->ResolveMemberSkills(Member, Skills, Error) && Skills == TArray<TObjectPtr<USkillDefinitionDataAsset>>{Unarmed, Purchased});
+        Member.Skills.Add(FSoftObjectPath(Unarmed));
+        TestFalse(TEXT("Duplicate saved skills are rejected atomically"), Catalog->ResolveMemberSkills(Member, Skills, Error));
+        TestTrue(TEXT("Rejected skills do not expose a partial loadout"), Skills.IsEmpty());
+        Member.Skills = {FSoftObjectPath()};
+        TestFalse(TEXT("A missing saved skill is not replaced by a free starting skill"), Catalog->ResolveMemberSkills(Member, Skills, Error));
+        Member.Skills.Reset();
+        TestFalse(TEXT("An explicitly empty saved loadout is rejected"), Catalog->ResolveMemberSkills(Member, Skills, Error));
+        Member.Skills = {FSoftObjectPath(Unarmed)};
+        Member.bHasSkillLoadout = false;
+        TestFalse(TEXT("Legacy data cannot carry an unmarked explicit skill list"), Catalog->ResolveMemberSkills(Member, Skills, Error));
+    }
+    TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
+    TestTrue(TEXT("Pure Run initialization can resolve unarmed without a combat class catalog"), GetDefault<UPartyDefinitionDataAsset>()->ResolveStartingSkills(TEXT("Warrior"), Skills, Error) && Skills == TArray<TObjectPtr<USkillDefinitionDataAsset>>{Unarmed});
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopSwordPresentationTest, "ProjectA.Party.ShopSwordPresentation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FShopSwordPresentationTest::RunTest(const FString& Parameters)
+{
+    UPartyDefinitionDataAsset* Catalog = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+    USkillDefinitionDataAsset* Sword = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"));
+    FCombatRoundSkill SwordDefinition;
+    FText Error;
+    if (!TestTrue(TEXT("The purchasable sword skill resolves"), Catalog && Sword && Sword->ResolveRoundSkill(SwordDefinition, Error))) return false;
+    UnitActionLifecycleTests::FScopedWorld Scope;
+    for (FName ClassId : UProfessionBase::GetPlayableIds())
+    {
+        FProfessionDefinition Profession;
+        TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
+        if (!TestTrue(TEXT("Every profession resolves its combat class and unarmed start"), Catalog->ResolveProfession(ClassId, Profession, Error) && Catalog->ResolveStartingSkills(ClassId, Skills, Error))) return false;
+        FActorSpawnParameters SpawnParameters;
+        SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        APlayerUnit* Unit = Scope.World->SpawnActor<APlayerUnit>(Profession.CombatClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParameters);
+        if (!TestNotNull(TEXT("Every profession spawns its authored combat class"), Unit)) return false;
+        Unit->GetAbilitySystemComponent()->InitAbilityActorInfo(Unit, Unit);
+        Unit->GetAbilitySystemComponent()->AddAttributeSetSubobject(Unit->GetAttributeSet());
+        const FObjectPropertyBase* Property = FindFProperty<FObjectPropertyBase>(Unit->GetClass(), SwordDefinition.WeaponComponentName);
+        UStaticMeshComponent* Weapon = Property ? Cast<UStaticMeshComponent>(Property->GetObjectPropertyValue_InContainer(Unit)) : nullptr;
+        if (!TestNotNull(TEXT("Every profession has the authored sword geometry"), Weapon)) return false;
+        TestTrue(TEXT("Unarmed-only setup hides the sword"), Unit->ConfigureProfession(100.f, 2, 1, Skills) && !Weapon->IsVisible());
+        Skills.Add(Sword);
+        TestTrue(TEXT("Purchasing sword reveals its geometry for any profession"), Unit->ConfigureProfession(100.f, 2, 1, Skills) && Weapon->IsVisible());
+        CombatWeaponTrace::FBladePose Pose;
+        TestTrue(TEXT("Any profession can sample its skeleton-compatible sword montage"), CombatWeaponTrace::SampleBlade(Unit, SwordDefinition, Unit->ResolveRoundCastMontage(SwordDefinition.CastMontage), SwordDefinition.WindupSeconds, Pose));
+        Skills.Pop();
+        TestTrue(TEXT("Restoring an unarmed-only loadout hides a previously visible sword"), Unit->ConfigureProfession(100.f, 2, 1, Skills) && !Weapon->IsVisible());
     }
     return true;
 }

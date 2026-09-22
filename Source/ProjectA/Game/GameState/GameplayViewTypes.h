@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Game/Run/RunTypes.h"
 #include "Game/Run/RunEncounterTypes.h"
+#include "Game/Run/RunSkillShopTypes.h"
 #include "Types/CombatResult.h"
 #include "GameplayViewTypes.generated.h"
 
@@ -41,6 +42,12 @@ struct PROJECTA_API FGameplayViewState
 
     UPROPERTY()
     FRunEncounterProgress EncounterProgress;
+
+    UPROPERTY()
+    FRunSkillShopState SkillShopState;
+
+    UPROPERTY()
+    TArray<FGuid> ShopBuyerCharacterIds;
 
     static FGameplayViewState FromRun(const URunStateSubsystem* Run, const FText& Message);
 };

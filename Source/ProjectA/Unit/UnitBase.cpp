@@ -77,6 +77,7 @@ void AUnitBase::BeginPlay()
     {
         ApplyDeathPresentation();
     }
+    RefreshSkillPresentation();
 }
 
 void AUnitBase::Tick(float DeltaTime)
@@ -130,6 +131,15 @@ void AUnitBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 void AUnitBase::SetRoundMovementVelocity(const FVector& InVelocity)
 {
     if (UUnitCharacterMovementComponent* Movement = Cast<UUnitCharacterMovementComponent>(GetCharacterMovement())) Movement->SetRoundMovementVelocity(IsUnitAlive() ? InVelocity : FVector::ZeroVector);
+}
+
+void AUnitBase::OnRep_EquippedSkills()
+{
+    RefreshSkillPresentation();
+}
+
+void AUnitBase::RefreshSkillPresentation()
+{
 }
 
 void AUnitBase::SetRoundCastMontage(UAnimMontage* Montage, bool bImmediateStop)
@@ -642,6 +652,7 @@ bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TA
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetStrengthAttribute(), Strength);
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), Dexterity);
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetIntelligenceAttribute(), Intelligence);
+    RefreshSkillPresentation();
     return true;
 }
 
@@ -669,6 +680,7 @@ bool AUnitBase::AcquireAndEquipSkill(USkillDefinitionDataAsset* Skill)
     }
     EquippedSkillDataAssets.Add(Skill);
     if (Skill->AbilityClass) EquippedSkillAbilityClasses.AddUnique(Skill->AbilityClass);
+    RefreshSkillPresentation();
     ForceNetUpdate();
     return true;
 }

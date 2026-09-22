@@ -25,6 +25,7 @@
 #include "Widgets/SWindow.h"
 #include "Engine/World.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/Run/RunSaveGame.h"
 #include "GAS/Attribute/AS_Unit.h"
 #include "GameFramework/GameUserSettings.h"
 #include "GameFramework/Pawn.h"
@@ -567,6 +568,27 @@ public:
         {
             URunMapWidget* Map = FindActiveWidget<URunMapWidget>(World);
             if (!Map || !Run || Run->GetPhase() != ERunPhase::Map) return false;
+            // Preserve full saved-loadout execution coverage without giving new characters free shop skills.
+            // 새 캐릭터에게 상점 스킬을 무료로 주지 않고 저장된 전체 장착의 실행 범위를 검사합니다.
+            if (!bInstalledSavedLoadout)
+            {
+                const FString Slot = URunStateSubsystem::ResolveCheckpointSlot(FCommandLine::Get());
+                TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));
+                if (!Require(Saved.IsValid() && Saved->Party.Num() >= 1, TEXT("A fresh Run has a durable party before preparing the acquired-loadout fixture."))) return true;
+                FRunPartyMember* Member = Saved->Party.FindByPredicate([](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.bPlayerControlled; });
+                if (!Require(Member && Member->bHasSkillLoadout && Member->Skills.Num() == 1 && Member->Gold == 10, TEXT("A new controlled character starts with one unarmed skill and ten gold."))) return true;
+                Member->Skills.Reset();
+                for (const FCombatRoundSkill& Skill : Skills)
+                {
+                    const FString Name = FPrimaryAssetId::FromString(Skill.SkillId.ToString()).PrimaryAssetName.ToString();
+                    Member->Skills.Add(FSoftObjectPath(FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/%s.%s"), *Name, *Name)));
+                }
+                Member->Gold = 6;
+                FText Error;
+                if (!Require(UGameplayStatics::SaveGameToSlot(Saved.Get(), Slot, 0) && Run->LoadCheckpoint(Error), *FString::Printf(TEXT("The acquired-loadout fixture survives actual save and reload: %s"), *Error.ToString()))) return true;
+                bInstalledSavedLoadout = true;
+                return false;
+            }
             UVerticalBox* Nodes = Cast<UVerticalBox>(Map->GetWidgetFromName(TEXT("NodeList")));
             if (!Require(Nodes != nullptr, TEXT("The saved Run map exposes its node buttons."))) return true;
             for (UWidget* Child : Nodes->GetAllChildren())
@@ -606,7 +628,7 @@ public:
             Source = Controlled->Unit;
             SourceId = Controlled->UnitId;
             const int32 AllyCount = Round->GetView().Units.FilterByPredicate([](const FCombatRoundUnitView& Unit) { return !Unit.bEnemy; }).Num();
-            if (!Require(AllyCount == 1 && Controlled->SkillIds.Num() == Skills.Num(), TEXT("The real encounter spawns one warrior with exactly five authored skills."))) return true;
+            if (!Require(AllyCount == 1 && Controlled->SkillIds.Num() == Skills.Num(), TEXT("The real encounter restores one warrior with the five explicitly saved skills."))) return true;
             for (const FCombatRoundSkill& Skill : Skills)
             {
                 if (!Require(Controlled->SkillIds.Contains(Skill.SkillId) && Round->FindSkill(Skill.SkillId), TEXT("Each saved skill belongs to the player's runtime loadout and catalogue."))) return true;
@@ -795,6 +817,7 @@ private:
     FAutomationTestBase* Test;
     TArray<FCombatRoundSkill> Skills;
     int32 SkillIndex;
+    bool bInstalledSavedLoadout = false;
     int32 Stage = 0;
     double StageStarted = 0.0;
     FString UIReadiness;

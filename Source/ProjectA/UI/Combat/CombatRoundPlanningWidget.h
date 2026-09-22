@@ -10,6 +10,8 @@
 class ACombatRoundCoordinator;
 class ACombatRoundPlayerController;
 class ACombatGridTile;
+class UBorder;
+class UHorizontalBox;
 class UTextBlock;
 class UVerticalBox;
 class UWrapBox;
@@ -56,6 +58,7 @@ private:
     UTextBlock* AddText(UVerticalBox* Box, const FString& Text, int32 FontSize = 15);
     UButton* AddButton(UVerticalBox* Box, const FString& Text);
     void RefreshView();
+    void RefreshPartyCards(const ACombatRoundCoordinator* Coordinator, int32 OwnerSlot);
     bool RefreshOptions(const ACombatRoundCoordinator* Coordinator, int32 OwnerSlot);
     void LoadSelectedCommand();
     void RefreshHighlights();
@@ -90,6 +93,21 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> Roster;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> EnemyRoster;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UHorizontalBox> PartyList;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UBorder>> PartyCards;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UTextBlock>> PartyNames;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UTextBlock>> PartyDetails;
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> UnitDetails;
@@ -130,6 +148,7 @@ private:
     TWeakObjectPtr<ACombatRoundPlayerController> BoundController;
     TArray<TWeakObjectPtr<ACombatGridTile>> HighlightedTiles;
     TArray<int32> OwnUnitIds;
+    TArray<int32> PartyUnitIds;
     TArray<FName> SkillIds;
     FName SelectedSkillId;
     int32 SelectedTargetId = INDEX_NONE;

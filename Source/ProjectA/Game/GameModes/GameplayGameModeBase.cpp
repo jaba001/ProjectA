@@ -219,12 +219,34 @@ bool AGameplayGameModeBase::AssignRunParticipant(APartyPlayerController* Control
     RunParticipants.Add(Key, AccountId);
     for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
-        if (AGameplayPlayerController* GameplayController = Cast<AGameplayPlayerController>(It->Get()); GameplayController && GameplayController->IsLocalController())
+        if (AGameplayPlayerController* GameplayController = Cast<AGameplayPlayerController>(It->Get()))
         {
             GameplayController->RefreshRunFlowPermissions();
         }
     }
     return true;
+}
+
+bool AGameplayGameModeBase::ResolveRunParticipant(const APartyPlayerController* Controller, FRunAccountId& OutAccountId) const
+{
+    OutAccountId = FRunAccountId();
+    if (!HasAuthority() || !IsValid(Controller) || !Controller->HasAuthority() || Controller->GetWorld() != GetWorld() || !GetGameInstance()) return false;
+    const URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+    if (!Run) return false;
+    const FRunIdentityData& Identity = Run->GetRunIdentity();
+    if (GetNetMode() == NM_Standalone && !Run->IsManagedRun() && Controller->IsLocalController() && Identity.Origin == ERunIdentityOrigin::LocalDevelopment && Identity.OriginalParticipants.Num() == 1)
+    {
+        OutAccountId = Identity.OriginalParticipants[0].AccountId;
+        return URunIdentityLibrary::IsOriginalParticipant(Identity, OutAccountId);
+    }
+    for (const TPair<TWeakObjectPtr<APartyPlayerController>, FRunAccountId>& Entry : RunParticipants)
+    {
+        if (Entry.Key.Get() != Controller) continue;
+        if (!URunIdentityLibrary::IsOriginalParticipant(Identity, Entry.Value) || (Run->IsManagedRun() && !Run->GetParticipation().HumanParticipants.Contains(Entry.Value))) return false;
+        OutAccountId = Entry.Value;
+        return true;
+    }
+    return false;
 }
 
 bool AGameplayGameModeBase::CanControlRunFlow(const APartyPlayerController* Controller, bool bAllowResumePending) const

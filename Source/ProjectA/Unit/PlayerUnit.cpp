@@ -1,9 +1,32 @@
 #include "Unit/PlayerUnit.h"
+#include "Components/StaticMeshComponent.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Net/UnrealNetwork.h"
 
 APlayerUnit::APlayerUnit()
 {
     InitMaxHP = 200.0f;
+    WeaponPresentationSkills.Add(TSoftObjectPtr<USkillDefinitionDataAsset>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"))));
+}
+
+void APlayerUnit::RefreshSkillPresentation()
+{
+    TMap<FName, bool> Visibility;
+    for (const TSoftObjectPtr<USkillDefinitionDataAsset>& Reference : WeaponPresentationSkills)
+    {
+        USkillDefinitionDataAsset* Skill = Reference.LoadSynchronous();
+        FCombatRoundSkill Definition;
+        FText Error;
+        if (!Skill || !Skill->ResolveRoundSkill(Definition, Error) || !Definition.bUseWeaponTrace || Definition.WeaponComponentName.IsNone()) continue;
+        bool& bVisible = Visibility.FindOrAdd(Definition.WeaponComponentName);
+        bVisible |= EquippedSkillDataAssets.ContainsByPredicate([Skill](const USkillDefinitionDataAsset* Equipped) { return Equipped && Equipped->GetPrimaryAssetId() == Skill->GetPrimaryAssetId(); });
+    }
+    for (const TPair<FName, bool>& Entry : Visibility)
+    {
+        const FObjectPropertyBase* Property = FindFProperty<FObjectPropertyBase>(GetClass(), Entry.Key);
+        UStaticMeshComponent* Weapon = Property ? Cast<UStaticMeshComponent>(Property->GetObjectPropertyValue_InContainer(this)) : nullptr;
+        if (Weapon && Weapon->GetOwner() == this) Weapon->SetVisibility(Entry.Value);
+    }
 }
 
 void APlayerUnit::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

@@ -1,0 +1,288 @@
+#if WITH_DEV_AUTOMATION_TESTS
+
+#include "Misc/AutomationTest.h"
+#include "DataAsset/PartyDefinitionDataAsset.h"
+#include "DataAsset/RunEncounterPoolDataAsset.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Engine/GameInstance.h"
+#include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunSaveGame.h"
+#include "Game/Run/RunStateSubsystem.h"
+#include "Kismet/GameplayStatics.h"
+#include "UObject/StrongObjectPtr.h"
+
+namespace
+{
+    struct FSkillShopFixture
+    {
+        TStrongObjectPtr<UGameInstance> Instance{NewObject<UGameInstance>()};
+        TStrongObjectPtr<URunStateSubsystem> Run{NewObject<URunStateSubsystem>(Instance.Get())};
+        FString Slot = TEXT("SkillShop_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+        FText Error;
+
+        FSkillShopFixture()
+        {
+            Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+        }
+
+        ~FSkillShopFixture()
+        {
+            Run->OnRunStateChanged.Clear();
+            UGameplayStatics::DeleteGameInSlot(Slot, 0);
+        }
+
+        bool Initialize(int32 SelectedSlot = 3, bool bSave = false)
+        {
+            if (!Run->PartyDefinition) return false;
+            if (bSave) Run->EnableCheckpointSaving(Slot);
+            TArray<FRunPartyMember> Members;
+            const TArray<FName> Professions{TEXT("Warrior"), TEXT("Archer"), TEXT("Mage"), TEXT("Rogue")};
+            for (int32 Index = 0; Index < Professions.Num(); ++Index)
+            {
+                FRunPartyMember& Member = Members.AddDefaulted_GetRef();
+                Member.SlotIndex = Index;
+                Member.ClassId = Professions[Index];
+                Member.CharacterName = FText::FromString(FString::Printf(TEXT("Shop Character %d"), Index));
+                Member.bCreated = true;
+                Member.bPlayerControlled = Index == SelectedSlot;
+                Member.Gold = 999;
+                Member.bHasSkillLoadout = true;
+            }
+            return Run->InitializeRun(Members, Error) && Run->GetSaveError().IsEmpty();
+        }
+
+        bool ReachShop(FName ShopId = TEXT("Shop_01"), int32 DeadSlot = INDEX_NONE)
+        {
+            if (!Run->BeginEncounter(TEXT("Combat_01")) || !Run->MarkCombatStarted()) return false;
+            for (const FRunPartyMember& Member : Run->GetPartyMembers()) Run->UpdatePartyMemberHP(Member.SlotIndex, Member.SlotIndex == DeadSlot ? 0.0f : 70.0f);
+            return Run->CompleteEncounter(ECombatResult::Victory) && Run->ContinueRun() && Run->SelectRunEncounter(ShopId);
+        }
+
+        const FRunPartyMember& Member(int32 SlotIndex) const { return Run->GetPartyMembers()[SlotIndex]; }
+
+        TArray<uint8> ReadBytes() const
+        {
+            TArray<uint8> Bytes;
+            UGameplayStatics::LoadDataFromSlot(Bytes, Slot, 0);
+            return Bytes;
+        }
+    };
+
+    bool SameShopParty(const TArray<FRunPartyMember>& Left, const TArray<FRunPartyMember>& Right)
+    {
+        if (Left.Num() != Right.Num()) return false;
+        for (int32 Index = 0; Index < Left.Num(); ++Index)
+        {
+            if (!FRunPartyMember::StaticStruct()->CompareScriptStruct(&Left[Index], &Right[Index], 0)) return false;
+        }
+        return true;
+    }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunSkillShopLoadoutTest, "ProjectA.Run.Shop.UnarmedStartAndEveryProfession", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunSkillShopLoadoutTest::RunTest(const FString& Parameters)
+{
+    for (int32 SelectedSlot = 0; SelectedSlot < 4; ++SelectedSlot)
+    {
+        for (int32 ShopIndex = 1; ShopIndex <= 3; ++ShopIndex)
+        {
+            FSkillShopFixture Fixture;
+            if (!TestTrue(TEXT("Every direct-control profession initializes"), Fixture.Initialize(SelectedSlot))) return false;
+            const FSoftObjectPath Unarmed = Fixture.Run->PartyDefinition->UnarmedStartingSkill.ToSoftObjectPath();
+            for (const FRunPartyMember& Member : Fixture.Run->GetPartyMembers())
+            {
+                TestTrue(TEXT("All allies start with only the shared unarmed attack"), Member.bHasSkillLoadout && Member.Skills.Num() == 1 && Member.Skills[0] == Unarmed);
+                TestEqual(TEXT("Only the selected character receives the fresh 10G balance"), Member.Gold, Member.SlotIndex == SelectedSlot ? 10 : 0);
+            }
+            if (!TestTrue(TEXT("Each shop opens after the first victory"), Fixture.ReachShop(FName(*FString::Printf(TEXT("Shop_%02d"), ShopIndex))))) return false;
+            const TArray<FRunPartyMember> Before = Fixture.Run->GetPartyMembers();
+            const FRunIdentityData Identity = Fixture.Run->GetRunIdentity();
+            const FGuid CharacterId = Fixture.Member(SelectedSlot).CharacterId;
+            const FRunAccountId Account = Fixture.Member(SelectedSlot).OwnerAccountId;
+            const TArray<FRunSkillShopOffer> Offers = Fixture.Run->GetSkillShopState().Offers;
+            if (!TestEqual(TEXT("Every shop sells the four existing skills"), Offers.Num(), 4)) return false;
+            for (const FRunSkillShopOffer& Offer : Offers)
+            {
+                TestEqual(TEXT("Every prototype skill costs 1G"), Offer.Price, 1);
+                TestFalse(TEXT("Products never sell the free unarmed attack"), Offer.Skill == Unarmed);
+                TestTrue(TEXT("Every profession can purchase every product"), Fixture.Run->PurchaseShopSkill(Account, CharacterId, Offer.OfferId, Fixture.Error));
+                TestFalse(TEXT("A learned skill cannot be bought twice"), Fixture.Run->PurchaseShopSkill(Account, CharacterId, Offer.OfferId, Fixture.Error));
+            }
+            TestEqual(TEXT("Four successful purchases consume exactly 4G"), Fixture.Member(SelectedSlot).Gold, 6);
+            TestEqual(TEXT("The buyer retains unarmed and all four purchases"), Fixture.Member(SelectedSlot).Skills.Num(), 5);
+            for (int32 Index = 0; Index < Before.Num(); ++Index)
+            {
+                if (Index != SelectedSlot) TestTrue(TEXT("Companion HP balance and loadout remain unchanged"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[Index], &Fixture.Member(Index), 0));
+            }
+            TestTrue(TEXT("Purchases preserve all participant and host identity fields"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Fixture.Run->GetRunIdentity(), 0));
+            TestTrue(TEXT("The next battle starts with the purchased Run loadout"), Fixture.Run->LeaveRunEncounter() && Fixture.Run->BeginEncounter(TEXT("Combat_02")) && Fixture.Run->MarkCombatStarted());
+            TArray<TObjectPtr<USkillDefinitionDataAsset>> ResolvedSkills;
+            TestTrue(TEXT("Spawn resolution includes the acquired skills"), Fixture.Run->PartyDefinition->ResolveMemberSkills(Fixture.Member(SelectedSlot), ResolvedSkills, Fixture.Error) && ResolvedSkills.Num() == 5);
+        }
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunSkillShopRejectionTest, "ProjectA.Run.Shop.RejectedPurchasePreservesState", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunSkillShopRejectionTest::RunTest(const FString& Parameters)
+{
+    FSkillShopFixture Fixture;
+    if (!TestTrue(TEXT("The rejection fixture saves its initial Run"), Fixture.Initialize(3, true))) return false;
+    const FRunPartyMember Buyer = Fixture.Member(3);
+    const FName OfferId = Fixture.Run->GetSkillShopState().Offers[0].OfferId;
+    TestFalse(TEXT("A purchase cannot bypass the Map phase"), Fixture.Run->PurchaseShopSkill(Buyer.OwnerAccountId, Buyer.CharacterId, OfferId, Fixture.Error));
+    if (!TestTrue(TEXT("The rejection fixture enters a shop"), Fixture.ReachShop())) return false;
+    const TArray<FRunPartyMember> Before = Fixture.Run->GetPartyMembers();
+    const TArray<uint8> DiskBefore = Fixture.ReadBytes();
+    int32 Events = 0;
+    Fixture.Run->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
+    FRunAccountId Outsider = Buyer.OwnerAccountId;
+    Outsider.Subject += TEXT("_Other");
+    TestFalse(TEXT("A foreign account cannot buy for the selected character"), Fixture.Run->PurchaseShopSkill(Outsider, Buyer.CharacterId, OfferId, Fixture.Error));
+    TestFalse(TEXT("The local owner cannot redirect a purchase to an AI companion"), Fixture.Run->PurchaseShopSkill(Buyer.OwnerAccountId, Fixture.Member(0).CharacterId, OfferId, Fixture.Error));
+    TestFalse(TEXT("Unknown characters are rejected"), Fixture.Run->PurchaseShopSkill(Buyer.OwnerAccountId, FGuid::NewGuid(), OfferId, Fixture.Error));
+    TestFalse(TEXT("Unknown products are rejected"), Fixture.Run->PurchaseShopSkill(Buyer.OwnerAccountId, Buyer.CharacterId, TEXT("Missing"), Fixture.Error));
+    TestTrue(TEXT("All rejected requests preserve complete party data and durable bytes"), SameShopParty(Before, Fixture.Run->GetPartyMembers()) && DiskBefore == Fixture.ReadBytes());
+    TestEqual(TEXT("Rejected requests publish no state change"), Events, 0);
+    Fixture.Run->OnRunStateChanged.Clear();
+
+    FSkillShopFixture DeadFixture;
+    if (!DeadFixture.Initialize() || !DeadFixture.ReachShop(TEXT("Shop_02"), 3)) return false;
+    const FRunPartyMember Dead = DeadFixture.Member(3);
+    TestFalse(TEXT("A dead direct-control character cannot purchase"), DeadFixture.Run->PurchaseShopSkill(Dead.OwnerAccountId, Dead.CharacterId, DeadFixture.Run->GetSkillShopState().Offers[0].OfferId, DeadFixture.Error));
+    TestTrue(TEXT("The rejected dead character retains its gold and unarmed loadout"), DeadFixture.Member(3).Gold == 10 && DeadFixture.Member(3).Skills.Num() == 1);
+
+    FSkillShopFixture PoorFixture;
+    TStrongObjectPtr<UPartyDefinitionDataAsset> Catalog(DuplicateObject<UPartyDefinitionDataAsset>(PoorFixture.Run->PartyDefinition.Get(), GetTransientPackage()));
+    TStrongObjectPtr<URunEncounterPoolDataAsset> Pool(NewObject<URunEncounterPoolDataAsset>());
+    Pool->StartingGold = 0;
+    Catalog->RunEncounterPool = Pool.Get();
+    PoorFixture.Run->PartyDefinition = Catalog.Get();
+    if (!PoorFixture.Initialize() || !PoorFixture.ReachShop(TEXT("Shop_03"))) return false;
+    const FRunPartyMember Poor = PoorFixture.Member(3);
+    TestFalse(TEXT("An authored insufficient balance rejects a purchase"), PoorFixture.Run->PurchaseShopSkill(Poor.OwnerAccountId, Poor.CharacterId, PoorFixture.Run->GetSkillShopState().Offers[0].OfferId, PoorFixture.Error));
+    TestTrue(TEXT("Insufficient funds neither subtract gold nor teach a skill"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Poor, &PoorFixture.Member(3), 0));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunSkillShopAtomicPersistenceTest, "ProjectA.Run.Shop.AtomicPurchaseAndReload", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunSkillShopAtomicPersistenceTest::RunTest(const FString& Parameters)
+{
+    FSkillShopFixture Fixture;
+    if (!TestTrue(TEXT("The purchase fixture reaches a durable shop"), Fixture.Initialize(3, true) && Fixture.ReachShop())) return false;
+    const FRunPartyMember Buyer = Fixture.Member(3);
+    const FRunSkillShopOffer Offer = Fixture.Run->GetSkillShopState().Offers[0];
+    const TArray<FRunPartyMember> Before = Fixture.Run->GetPartyMembers();
+    const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
+    const FRunIdentityData Identity = Fixture.Run->GetRunIdentity();
+    int32 Events = 0;
+    bool bEventObservedDurablePurchase = false;
+    Fixture.Run->OnRunStateChanged.AddLambda([&Fixture, &Events, &bEventObservedDurablePurchase, &Offer]()
+    {
+        ++Events;
+        TStrongObjectPtr<URunSaveGame> Durable(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+        bEventObservedDurablePurchase = Durable && Durable->Party[3].Gold == 9 && Durable->Party[3].Skills.Contains(Offer.Skill) && Fixture.Member(3).Gold == 9 && Fixture.Member(3).Skills.Contains(Offer.Skill);
+    });
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("A failed durable write rejects the purchase"), Fixture.Run->PurchaseShopSkill(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error));
+    TestTrue(TEXT("Failed writes preserve every member and the complete original file"), SameShopParty(Before, Fixture.Run->GetPartyMembers()) && BeforeBytes == Fixture.ReadBytes());
+    TestEqual(TEXT("Failed persistence emits no purchase notification"), Events, 0);
+    TestTrue(TEXT("The same purchase can retry after storage recovers"), Fixture.Run->PurchaseShopSkill(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error));
+    TestTrue(TEXT("The single success notification observes committed memory and disk"), Events == 1 && bEventObservedDurablePurchase);
+    TestFalse(TEXT("A retried successful request cannot charge twice"), Fixture.Run->PurchaseShopSkill(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error));
+    TestEqual(TEXT("A duplicate request adds no notification"), Events, 1);
+    Fixture.Run->OnRunStateChanged.Clear();
+    TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
+    Restored->EnableCheckpointSaving(Fixture.Slot);
+    if (!TestTrue(TEXT("Standalone Continue restores the purchased shop"), Restored->LoadStandaloneCheckpoint(Fixture.Error))) return false;
+    TestTrue(TEXT("Restore preserves ownership identity balances and all skill paths"), SameShopParty(Fixture.Run->GetPartyMembers(), Restored->GetPartyMembers()) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Restored->GetRunIdentity(), 0));
+    TestTrue(TEXT("Restore preserves the frozen catalog"), FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Fixture.Run->GetSkillShopState(), &Restored->GetSkillShopState(), 0));
+    TestFalse(TEXT("A reloaded purchase remains owned"), Restored->PurchaseShopSkill(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error));
+    TestTrue(TEXT("Purchased skills survive shop exit and the next combat"), Restored->LeaveRunEncounter() && Restored->BeginEncounter(TEXT("Combat_02")) && Restored->MarkCombatStarted() && Restored->GetPartyMembers()[3].Skills.Contains(Offer.Skill));
+    TestEqual(TEXT("The next encounter never grants another starting balance"), Restored->GetPartyMembers()[3].Gold, 9);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunSkillShopLegacyTest, "ProjectA.Run.Shop.LegacyLoadDoesNotGrantGold", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunSkillShopLegacyTest::RunTest(const FString& Parameters)
+{
+    FSkillShopFixture Fixture;
+    if (!Fixture.Initialize(3, true) || !Fixture.ReachShop()) return false;
+    TStrongObjectPtr<URunSaveGame> Legacy(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+    if (!TestNotNull(TEXT("A native isolated save is available for legacy defaults"), Legacy.Get())) return false;
+    Legacy->SkillShopState = FRunSkillShopState();
+    for (FRunPartyMember& Member : Legacy->Party)
+    {
+        Member.Gold = 0;
+        Member.bHasSkillLoadout = false;
+        Member.Skills.Reset();
+    }
+    if (!TestTrue(TEXT("An older shop checkpoint remains readable"), FRunCheckpointStorage::Save(Legacy.Get(), Fixture.Slot, Fixture.Error) && Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error))) return false;
+    const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
+    TestTrue(TEXT("The old shop receives no retroactive products"), Fixture.Run->GetSkillShopState().SchemaVersion == 0 && Fixture.Run->GetSkillShopState().Offers.IsEmpty());
+    for (const FRunPartyMember& Member : Fixture.Run->GetPartyMembers())
+    {
+        FProfessionDefinition Profession;
+        TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
+        TestTrue(TEXT("Legacy members retain their historical profession loadout and zero gold"), Member.Gold == 0 && !Member.bHasSkillLoadout && Member.Skills.IsEmpty() && Fixture.Run->PartyDefinition->ResolveProfession(Member.ClassId, Profession) && Fixture.Run->PartyDefinition->ResolveMemberSkills(Member, Skills, Fixture.Error) && Skills == Profession.StartingSkills);
+    }
+    const FRunPartyMember Buyer = Fixture.Member(3);
+    TestFalse(TEXT("A legacy shop cannot invent a new purchase"), Fixture.Run->PurchaseShopSkill(Buyer.OwnerAccountId, Buyer.CharacterId, TEXT("BPDA_swoard_attack"), Fixture.Error));
+    TestTrue(TEXT("Rejected legacy purchase leaves the original file untouched"), BeforeBytes == Fixture.ReadBytes());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunSkillShopMalformedSaveTest, "ProjectA.Run.Shop.MalformedSaveReportsReasonWithoutMutation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunSkillShopMalformedSaveTest::RunTest(const FString& Parameters)
+{
+    FSkillShopFixture Fixture;
+    if (!Fixture.Initialize(3, true)) return false;
+    TStrongObjectPtr<URunSaveGame> Valid(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+    if (!TestNotNull(TEXT("Malformed save cases start from a valid native checkpoint"), Valid.Get())) return false;
+    const TArray<FRunPartyMember> BeforeParty = Fixture.Run->GetPartyMembers();
+    const FRunIdentityData BeforeIdentity = Fixture.Run->GetRunIdentity();
+    const FRunSkillShopState BeforeShop = Fixture.Run->GetSkillShopState();
+    int32 Events = 0;
+    Fixture.Run->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
+    for (int32 Case = 0; Case < 4; ++Case)
+    {
+        TStrongObjectPtr<URunSaveGame> Invalid(DuplicateObject<URunSaveGame>(Valid.Get(), GetTransientPackage()));
+        switch (Case)
+        {
+        case 0:
+            Invalid->Party[3].Gold = -1;
+            break;
+        case 1:
+            Invalid->Party[3].Gold = 0;
+            Invalid->Party[3].Skills.Reset();
+            Invalid->Party[3].bHasSkillLoadout = false;
+            break;
+        case 2:
+            Invalid->Party[3].Skills.Add(FSoftObjectPath(Invalid->Party[3].Skills[0]));
+            break;
+        default:
+            Invalid->Phase = static_cast<ERunPhase>(255);
+            break;
+        }
+        if (!TestTrue(TEXT("Each malformed fixture is written only to its isolated test slot"), FRunCheckpointStorage::Save(Invalid.Get(), Fixture.Slot, Fixture.Error))) return false;
+        const TArray<uint8> InvalidBytes = Fixture.ReadBytes();
+        Fixture.Error = FText::GetEmpty();
+        TestFalse(TEXT("Continue eligibility rejects malformed gold loadout or phase"), Fixture.Run->CanContinueStandaloneSavedRun(Fixture.Error));
+        TestFalse(TEXT("Eligibility rejection always supplies a visible reason"), Fixture.Error.IsEmpty());
+        Fixture.Error = FText::GetEmpty();
+        TestFalse(TEXT("Actual loading also rejects the same malformed checkpoint"), Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error));
+        TestFalse(TEXT("Successful helper validation never clears the later rejection reason"), Fixture.Error.IsEmpty());
+        TestTrue(TEXT("Rejected load preserves the active party identity shop and phase"), SameShopParty(BeforeParty, Fixture.Run->GetPartyMembers()) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&BeforeIdentity, &Fixture.Run->GetRunIdentity(), 0) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&BeforeShop, &Fixture.Run->GetSkillShopState(), 0) && Fixture.Run->GetPhase() == ERunPhase::Map && Fixture.Run->GetCompletedNodes().IsEmpty());
+        TestTrue(TEXT("Rejected loading never repairs or overwrites the user's original file"), InvalidBytes == Fixture.ReadBytes());
+    }
+    TestEqual(TEXT("All malformed checkpoint rejections emit no state changes"), Events, 0);
+    Fixture.Run->OnRunStateChanged.Clear();
+    return true;
+}
+
+#endif

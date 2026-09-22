@@ -137,6 +137,7 @@ namespace
             State->Identity = Run->GetRunIdentity();
             State->Participation = Run->GetParticipation();
             State->EncounterProgress = Run->GetEncounterProgress();
+            State->SkillShopState = Run->GetSkillShopState();
             State->Party = Run->GetPartyMembers();
             State->Nodes = Run->GetNodes();
             State->CompletedNodes = Run->GetCompletedNodes();

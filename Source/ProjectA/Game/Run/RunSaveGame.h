@@ -4,6 +4,7 @@
 #include "GameFramework/SaveGame.h"
 #include "Game/Run/RunTypes.h"
 #include "Game/Run/RunEncounterTypes.h"
+#include "Game/Run/RunSkillShopTypes.h"
 #include "Game/Run/RunParticipationTypes.h"
 #include "Combat/Checkpoint/CombatCheckpointTypes.h"
 #include "Types/CombatResult.h"
@@ -41,4 +42,6 @@ public:
     FCombatCheckpointData CombatCheckpoint;
     UPROPERTY()
     FRunEncounterProgress EncounterProgress;
+    UPROPERTY()
+    FRunSkillShopState SkillShopState;
 };

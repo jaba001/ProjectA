@@ -1,11 +1,13 @@
 # ProjectA 완료 작업과 검증 기록
 
-갱신일: 2026-09-21. 완료 범위·기준 커밋·실행 근거를 기록한다. 현재 상태와 간단 확인은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
+갱신일: 2026-09-22. 완료 범위·기준 커밋·실행 근거를 기록한다. 현재 상태와 간단 확인은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
 
 ## 최근 변경
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-09-22 참고 이미지 기반 전투 UI 배치 | 상단 라운드 요약·우측 대상/적·좌하단 파티 카드·하단 중앙 장착 스킬·우하단 이동/준비로 분리. 기존 권한·대상/타일 선택·공통 DPI 유지, 패널별 스크롤·선택 카드 강조와 저장 안내 간격 적용. 상점 변경을 포함한 최종 Development Editor / Win64 빌드 6.05초 성공·오류/경고 0, 독립 코드 검토·문서 링크·diff 검사 통과. UI 에셋 재생성·PIE·실제 화면 확인 미실행. 근거: `Saved/Logs/SkillShopBuildFinal.log`; [사용자 확인](TODO.md#2-17-전투-상단-현황-가독성) |
+| 2026-09-22 비무장 시작·개인 스킬 상점 | 새 Run 아군 비무장 1개·직접 조작 캐릭터별 10G, 모든 상점 기존 공격 4종 각 1G. 본인 Human 구매·중복/잔액/소유권 검사와 골드·스킬 원자 저장, 일반/관리 재개·다음 전투 장착 연결. 전 직업 검 부착·Manny 몽타주 제작, 기존 적/Snapshot/과거 저장 기본값 보존. 프로젝트 파일 재생성·UHT 포함 Development Editor / Win64 통합 빌드와 상품 참조·상점 퇴장 오류 안내 보완 후 최종 증분 빌드 3.92초 성공·오류/경고 0, 회귀 코드는 컴파일만 수행. 제작 commandlet 종료 0·오류/경고 0, 실제 구매·게임·PIE·자동화 미실행. 근거: `Saved/Logs/SkillShopBuildFinal.log`, `Saved/Logs/SkillShopMessageBuildFinal.log`, `Saved/Logs/ShopSkillPresentationAuthoring.log`; [사용자 확인](TODO.md#2-19-비무장-시작과-스킬-상점) |
 | 2026-09-21 디버그 UI 폴더 분리 | HP 위젯 헤더·소스를 `Source/ProjectA/UI/Debug/`로 이동하고 include·관리 기준 갱신. UHT 포함 Development Editor / Win64 빌드 8.90초 성공, 동작 변경 없음·실제 화면 확인 대기. 근거: `Saved/Logs/DebugUIFolderBuild.log` |
 | 2026-09-21 개발용 유닛 HP 표시 | 전투 아군·적 머리 위에 실제 GAS HP/MaxHP 숫자·체력바 표시, 이동·카메라·DPI 추적과 입력 통과. Debug/Development 기본 활성, `projecta.Debug.UnitHP 0`/`1` 전환·Shipping/Test 제외. UHT 포함 Development Editor / Win64 빌드 15.80초 성공·오류/경고 0. 에셋·Config 변경 없음, 실제 화면·플레이·자동화 미실행. 근거: `Saved/Logs/UnitHealthDebugBuild.log`; [사용자 확인](TODO.md#2-18-개발용-유닛-hp-표시) |
 | 2026-09-21 검 방향·그립과 칼날 궤적 판정 | Python Rotator의 위치 인자 해석으로 저장된 Yaw 180도를 명시적 Roll 180도로 수정하고 손잡이 Z를 -10cm로 보정. 검만 서버 몽타주 에셋 포즈·칼날 소켓 궤적을 활성 0.23~0.43초에 검사하여 최초 적에게 피해 50/AP 1 적용. 렌더 재생 종료와 판정 누적을 분리하고 기존 GAS·사망 취소·벽 차폐·복귀 보존. 최종 Development Editor / Win64 빌드 4.99초와 별도 재로드의 칼날 표본 123개·리타깃 48개·이전 참조 73개 통과. 회귀 3개는 컴파일만 수행, 실제 플레이·자동화 미실행. 근거: `Saved/Logs/WeaponBladeTraceBuildFinal.log`, `Saved/Logs/WeaponBladeTraceReload.log`; [사용자 확인](TODO.md#2-15-전사와-검-공격-콘텐츠) |

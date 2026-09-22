@@ -16,6 +16,7 @@
 #include "TimerManager.h"
 #include "Game/Development/DevelopmentCoopLobby.h"
 #include "Game/Development/DevelopmentCoopSubsystem.h"
+#include "Net/UnrealNetwork.h"
 
 void AGameplayPlayerController::ServerSetDevelopmentReady_Implementation(bool bReady)
 {
@@ -148,7 +149,7 @@ void AGameplayPlayerController::InitializeGameplay(AEncounterManager* InEncounte
         EncounterManager->OnFlowChanged.AddUObject(this, &AGameplayPlayerController::RefreshGameplayFlow);
     }
 
-    RefreshGameplayFlow();
+    RefreshRunFlowPermissions();
 }
 
 void AGameplayPlayerController::RequestStartNode(FName NodeId)
@@ -196,6 +197,79 @@ void AGameplayPlayerController::RequestLeaveRunEncounter()
 
 void AGameplayPlayerController::RefreshRunFlowPermissions()
 {
+    if (HasAuthority())
+    {
+        const AGameplayGameModeBase* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGameplayGameModeBase>() : nullptr;
+        FRunAccountId AccountId;
+        if (Mode) Mode->ResolveRunParticipant(this, AccountId);
+        if (RunParticipantAccount != AccountId)
+        {
+            RunParticipantAccount = AccountId;
+            ForceNetUpdate();
+        }
+    }
+    RefreshGameplayFlow();
+}
+
+void AGameplayPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME_CONDITION(AGameplayPlayerController, RunParticipantAccount, COND_OwnerOnly);
+}
+
+void AGameplayPlayerController::OnRep_RunParticipantAccount()
+{
+    RefreshGameplayFlow();
+}
+
+FGuid AGameplayPlayerController::GetShopBuyerCharacterId(const FGameplayViewState& View) const
+{
+    if (!IsLocalController() || View.Phase != ERunPhase::Shop || RunParticipantAccount.IsEmpty()) return FGuid();
+    const FRunPartyMember* Member = View.PartyMembers.FindByPredicate([this, &View](const FRunPartyMember& Candidate) { return Candidate.OwnerAccountId == RunParticipantAccount && View.ShopBuyerCharacterIds.Contains(Candidate.CharacterId); });
+    return Member ? Member->CharacterId : FGuid();
+}
+
+void AGameplayPlayerController::RequestPurchaseShopSkill(FGuid CharacterId, FName OfferId)
+{
+    if (!IsLocalController() || bShopPurchasePending || !CharacterId.IsValid() || OfferId.IsNone()) return;
+    ShopPurchaseMessage = FText::GetEmpty();
+    bShopPurchasePending = true;
+    RefreshGameplayFlow();
+    if (HasAuthority()) ExecuteShopPurchase(CharacterId, OfferId);
+    else ServerPurchaseShopSkill(CharacterId, OfferId);
+}
+
+void AGameplayPlayerController::ServerPurchaseShopSkill_Implementation(FGuid CharacterId, FName OfferId)
+{
+    ExecuteShopPurchase(CharacterId, OfferId);
+}
+
+void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName OfferId)
+{
+    if (!HasAuthority()) return;
+    const AGameplayGameState* State = GetWorld() ? GetWorld()->GetGameState<AGameplayGameState>() : nullptr;
+    const ADevelopmentCoopLobby* Lobby = State ? State->GetDevelopmentLobby() : nullptr;
+    if (Lobby && (!Lobby->HasStarted() || Lobby->GetMembers().ContainsByPredicate([](const FDevelopmentCoopMember& Member) { return !Member.bConnected; })))
+    {
+        ClientReceiveShopPurchaseResult(false, NSLOCTEXT("RunSkillShop", "DisconnectedBuyer", "협동 참가자의 연결 상태를 확인해 주세요."));
+        return;
+    }
+    FText Error = NSLOCTEXT("RunSkillShop", "UnboundBuyer", "현재 연결에 배정된 직접 조작 캐릭터만 구매할 수 있습니다.");
+    const AGameplayGameModeBase* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGameplayGameModeBase>() : nullptr;
+    FRunAccountId BuyerAccountId;
+    bool bSucceeded = false;
+    if (Mode && Mode->ResolveRunParticipant(this, BuyerAccountId))
+    {
+        AEncounterManager* Manager = Mode->GetEncounterManager();
+        if (Manager) bSucceeded = Manager->PurchaseShopSkill(BuyerAccountId, CharacterId, OfferId, Error);
+    }
+    ClientReceiveShopPurchaseResult(bSucceeded, Error);
+}
+
+void AGameplayPlayerController::ClientReceiveShopPurchaseResult_Implementation(bool bSucceeded, const FText& Message)
+{
+    bShopPurchasePending = false;
+    ShopPurchaseMessage = bSucceeded ? NSLOCTEXT("RunSkillShop", "Purchased", "스킬을 구매했습니다. 다음 전투부터 사용할 수 있습니다.") : Message;
     RefreshGameplayFlow();
 }
 
@@ -224,6 +298,12 @@ bool AGameplayPlayerController::CanRetryGameplayRecovery() const
 
 void AGameplayPlayerController::RefreshGameplayFlow()
 {
+    const ERunPhase CurrentPhase = HasAuthority() && RunState ? RunState->GetPhase() : GameplayState ? GameplayState->GetViewState().Phase : ERunPhase::None;
+    if (CurrentPhase != ERunPhase::Shop)
+    {
+        ShopPurchaseMessage = FText::GetEmpty();
+        bShopPurchasePending = false;
+    }
     if (IsLocalController() && GameplayRootWidget && GameplayState)
     {
         GameplayRootWidget->RefreshDevelopmentLobby(GameplayState->GetDevelopmentLobby());

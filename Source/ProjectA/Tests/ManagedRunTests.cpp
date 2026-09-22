@@ -116,7 +116,8 @@ namespace
             for (const FRunPartyMember& Member : Run->GetPartyMembers())
             {
                 FProfessionDefinition Profession;
-                if (!Run->PartyDefinition || !Run->PartyDefinition->ResolveProfession(Member.ClassId, Profession) || Profession.StartingSkills.IsEmpty()) return false;
+                TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
+                if (!Run->PartyDefinition || !Run->PartyDefinition->ResolveProfession(Member.ClassId, Profession) || !Run->PartyDefinition->ResolveMemberSkills(Member, Skills, Error) || Skills.IsEmpty()) return false;
                 FCombatCheckpointUnit& Unit = Checkpoint.Units.AddDefaulted_GetRef();
                 Unit.UnitId = FGuid::NewGuid();
                 Unit.CharacterId = Member.CharacterId;
@@ -130,12 +131,12 @@ namespace
                 Unit.SubAP = 1;
                 Unit.GridCoord = FIntPoint(Member.SlotIndex, 0);
                 if (!URunParticipationLibrary::ResolveControlMode(Run->GetParticipation(), Run->GetRunIdentity(), Run->GetPartyMembers(), Unit.CharacterId, Unit.PartyControlMode, Error)) return false;
-                for (USkillDefinitionDataAsset* Skill : Profession.StartingSkills)
+                for (USkillDefinitionDataAsset* Skill : Skills)
                 {
                     if (!Skill) return false;
                     Unit.Skills.Add(FSoftObjectPath(Skill));
                 }
-                Unit.DefaultAttackAbility = FSoftObjectPath(Profession.StartingSkills[0]->AbilityClass.Get());
+                Unit.DefaultAttackAbility = FSoftObjectPath(Skills[0]->AbilityClass.Get());
             }
             FCombatCheckpointUnit Enemy = Checkpoint.Units[0];
             Enemy.UnitId = FGuid::NewGuid();
@@ -503,6 +504,55 @@ bool FManagedRoundReadyResumeTest::RunTest(const FString& Parameters)
     TStrongObjectPtr<URunSaveGame> Published = Fixture.LoadPayload();
     TestTrue(TEXT("AI readiness is durable before restore exposes it"), Published.IsValid() && Published->CombatCheckpoint.RoundPlans[0].bReady && Restored.RoundPlans[0].bReady);
     TestTrue(TEXT("Gameplay reconstruction remains pending with a valid lease"), NextHost->HasManagedLease() && NextHost->IsManagedResumePending());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FManagedRunSkillShopTest, "ProjectA.Run.Managed.SkillShopOwnershipAndDurability", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FManagedRunSkillShopTest::RunTest(const FString& Parameters)
+{
+    FManagedFixture Fixture(2);
+    URunStateSubsystem* Host = Fixture.NewSession(1);
+    if (!Host || !TestTrue(TEXT("Two original humans create a shop-enabled Run"), Host->CreateManagedRun(Fixture.Party, Fixture.Identity, Fixture.Error))) return false;
+    for (const FRunPartyMember& Member : Host->GetPartyMembers()) TestTrue(TEXT("Every original human starts with personal 10G and unarmed only"), Member.Gold == 10 && Member.bHasSkillLoadout && Member.Skills.Num() == 1);
+    if (!Host->BeginEncounter(TEXT("Combat_01")) || !Host->MarkCombatStarted()) return false;
+    for (const FRunPartyMember& Member : Host->GetPartyMembers()) Host->UpdatePartyMemberHP(Member.SlotIndex, 70.0f);
+    if (!TestTrue(TEXT("The managed Run reaches a durable shop"), Host->CompleteEncounter(ECombatResult::Victory) && Host->ContinueRun() && Host->SelectRunEncounter(TEXT("Shop_02")))) return false;
+    const FGuid FirstId = Host->GetPartyMembers()[0].CharacterId;
+    const FGuid SecondId = Host->GetPartyMembers()[1].CharacterId;
+    const FRunSkillShopOffer FirstOffer = Host->GetSkillShopState().Offers[0];
+    const FRunSkillShopOffer SecondOffer = Host->GetSkillShopState().Offers[1];
+    const FRunIdentityData BeforeIdentity = Host->GetRunIdentity();
+    const FRunAuthorityStamp BeforeStamp = Host->GetManagedStamp();
+    const TArray<uint8> BeforeBytes = Fixture.FileBytes();
+    int32 Events = 0;
+    Host->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
+    TestFalse(TEXT("Host authority cannot spend another character's balance"), Host->PurchaseShopSkill(Fixture.Account(1), SecondId, FirstOffer.OfferId, Fixture.Error));
+    TestFalse(TEXT("A guest account cannot acquire skills for the Host character"), Host->PurchaseShopSkill(Fixture.Account(2), FirstId, FirstOffer.OfferId, Fixture.Error));
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("A failed canonical write rejects a managed purchase"), Host->PurchaseShopSkill(Fixture.Account(2), SecondId, FirstOffer.OfferId, Fixture.Error));
+    TestTrue(TEXT("Rejected purchases preserve canonical bytes revision balances and notification count"), BeforeBytes == Fixture.FileBytes() && Host->GetManagedStamp() == BeforeStamp && Host->GetPartyMembers()[0].Gold == 10 && Host->GetPartyMembers()[1].Gold == 10 && Host->GetPartyMembers()[1].Skills.Num() == 1 && Events == 0);
+    if (!TestTrue(TEXT("The authority processes the guest owner's own purchase"), Host->PurchaseShopSkill(Fixture.Account(2), SecondId, FirstOffer.OfferId, Fixture.Error))) return false;
+    TestTrue(TEXT("A guest purchase debits only the guest and increments the canonical revision once"), Host->GetPartyMembers()[0].Gold == 10 && Host->GetPartyMembers()[1].Gold == 9 && Host->GetManagedStamp().Revision == BeforeStamp.Revision + 1 && Events == 1);
+    TestTrue(TEXT("The same product is independently purchasable by the Host's own character"), Host->PurchaseShopSkill(Fixture.Account(1), FirstId, FirstOffer.OfferId, Fixture.Error));
+    TestTrue(TEXT("Purchase ownership is per character and does not alter identity"), Host->GetPartyMembers()[0].Skills.Contains(FirstOffer.Skill) && Host->GetPartyMembers()[1].Skills.Contains(FirstOffer.Skill) && ManagedSameIdentity(BeforeIdentity, Host->GetRunIdentity()));
+    const FRunAuthorityStamp ShopStamp = Host->GetManagedStamp();
+    Host->OnRunStateChanged.Clear();
+    Host->CloseManagedRun();
+    URunStateSubsystem* NextHost = Fixture.NewSession(2);
+    if (!NextHost || !TestTrue(TEXT("The original guest can resume the shop alone"), NextHost->ResumeManagedRun(ShopStamp, {Fixture.Account(2)}, Fixture.Error))) return false;
+    TestFalse(TEXT("Purchasing waits for successful gameplay restoration"), NextHost->PurchaseShopSkill(Fixture.Account(2), SecondId, SecondOffer.OfferId, Fixture.Error));
+    if (!TestTrue(TEXT("Shop restoration confirms the new Host's session"), NextHost->ConfirmManagedResumeStarted(Fixture.Error))) return false;
+    const TArray<uint8> ResumedBytes = Fixture.FileBytes();
+    TestFalse(TEXT("An absent original owner now controlled by AI cannot purchase"), NextHost->PurchaseShopSkill(Fixture.Account(1), FirstId, SecondOffer.OfferId, Fixture.Error));
+    TestFalse(TEXT("AI purchase rejection retains a visible explanation after control-mode validation"), Fixture.Error.IsEmpty());
+    TestFalse(TEXT("The new Host cannot buy for the absent owner's character"), NextHost->PurchaseShopSkill(Fixture.Account(2), FirstId, SecondOffer.OfferId, Fixture.Error));
+    TestFalse(TEXT("An existing purchase remains owned after managed resume"), NextHost->PurchaseShopSkill(Fixture.Account(2), SecondId, FirstOffer.OfferId, Fixture.Error));
+    TestTrue(TEXT("All rejected resumed requests preserve the canonical save"), ResumedBytes == Fixture.FileBytes());
+    TestTrue(TEXT("The remaining human can spend only their preserved personal balance"), NextHost->PurchaseShopSkill(Fixture.Account(2), SecondId, SecondOffer.OfferId, Fixture.Error));
+    TestTrue(TEXT("Host succession preserves both character identities and independent balances"), NextHost->GetPartyMembers()[0].CharacterId == FirstId && NextHost->GetPartyMembers()[1].CharacterId == SecondId && NextHost->GetPartyMembers()[0].OwnerAccountId == Fixture.Account(1) && NextHost->GetPartyMembers()[1].OwnerAccountId == Fixture.Account(2) && NextHost->GetPartyMembers()[0].Gold == 9 && NextHost->GetPartyMembers()[1].Gold == 8);
+    TStrongObjectPtr<URunSaveGame> Durable = Fixture.LoadPayload();
+    TestTrue(TEXT("Managed storage durably contains personal gold and acquired skills"), Durable && Durable->Party[0].Gold == 9 && Durable->Party[1].Gold == 8 && Durable->Party[1].Skills.Contains(SecondOffer.Skill));
     return true;
 }
 

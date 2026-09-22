@@ -103,74 +103,98 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
     HealthSlot->SetVerticalAlignment(VAlign_Fill);
 #endif
 
-    USizeBox* RosterSize = WidgetTree->ConstructWidget<USizeBox>();
-    RosterSize->SetWidthOverride(900.f);
-    RosterSize->SetVisibility(ESlateVisibility::HitTestInvisible);
+    // Keep the battlefield open between separately bounded information and command panels.
+    // 정보와 조작 패널의 크기를 각각 제한하여 패널 사이 전장 영역을 비워 둡니다.
+    const auto MakePanel = [this](float Width, float MaxHeight, bool bInteractive, UVerticalBox*& Content)
+    {
+        USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
+        if (Width > 0.f) Size->SetWidthOverride(Width);
+        Size->SetMaxDesiredHeight(MaxHeight);
+        Size->SetVisibility(bInteractive ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::HitTestInvisible);
+        UBorder* Panel = WidgetTree->ConstructWidget<UBorder>();
+        Panel->SetBrush(FSlateRoundedBoxBrush(FLinearColor(0.012f, 0.016f, 0.022f, 0.92f), 8.f, FLinearColor(0.3f, 0.25f, 0.18f, 0.85f), 1.f));
+        Panel->SetPadding(FMargin(14.f, 10.f));
+        Size->SetContent(Panel);
+        Content = WidgetTree->ConstructWidget<UVerticalBox>();
+        if (bInteractive)
+        {
+            UScrollBox* Scroll = WidgetTree->ConstructWidget<UScrollBox>();
+            Panel->SetContent(Scroll);
+            Scroll->AddChild(Content);
+        }
+        else Panel->SetContent(Content);
+        return Size;
+    };
+
+    UVerticalBox* RosterBox = nullptr;
+    USizeBox* RosterSize = MakePanel(620.f, 104.f, false, RosterBox);
     UOverlaySlot* RosterSlot = Root->AddChildToOverlay(RosterSize);
     RosterSlot->SetHorizontalAlignment(HAlign_Center);
     RosterSlot->SetVerticalAlignment(VAlign_Top);
-    RosterSlot->SetPadding(FMargin(12.f));
-    UBorder* RosterPanel = WidgetTree->ConstructWidget<UBorder>();
-    RosterPanel->SetBrush(FSlateRoundedBoxBrush(FLinearColor(0.012f, 0.016f, 0.022f, 0.9f), 8.f, FLinearColor(0.3f, 0.25f, 0.18f, 0.85f), 1.f));
-    RosterPanel->SetPadding(FMargin(14.f, 8.f));
-    RosterSize->SetContent(RosterPanel);
-    UVerticalBox* RosterBox = WidgetTree->ConstructWidget<UVerticalBox>();
-    RosterPanel->SetContent(RosterBox);
+    RosterSlot->SetPadding(FMargin(24.f, 16.f));
     Header = AddText(RosterBox, TEXT("라운드 전투"), 20);
     Roster = AddText(RosterBox, FString(), 14);
+    Header->SetJustification(ETextJustify::Center);
+    Roster->SetJustification(ETextJustify::Center);
 
-    USizeBox* PlanningSize = WidgetTree->ConstructWidget<USizeBox>();
-    PlanningSize->SetWidthOverride(900.f);
-    PlanningSize->SetMaxDesiredHeight(300.f);
-    UOverlaySlot* PlanningSlot = Root->AddChildToOverlay(PlanningSize);
-    PlanningSlot->SetHorizontalAlignment(HAlign_Center);
-    PlanningSlot->SetVerticalAlignment(VAlign_Bottom);
-    PlanningSlot->SetPadding(FMargin(12.f));
-    UBorder* PlanningPanel = WidgetTree->ConstructWidget<UBorder>();
-    Theme.StylePanel(PlanningPanel);
-    PlanningPanel->SetPadding(FMargin(14.f, 10.f));
-    PlanningSize->SetContent(PlanningPanel);
-    UScrollBox* PlanningScroll = WidgetTree->ConstructWidget<UScrollBox>();
-    PlanningPanel->SetContent(PlanningScroll);
-    UVerticalBox* Controls = WidgetTree->ConstructWidget<UVerticalBox>();
-    PlanningScroll->AddChild(Controls);
-    UHorizontalBox* Columns = WidgetTree->ConstructWidget<UHorizontalBox>();
-    Controls->AddChildToVerticalBox(Columns);
+    UVerticalBox* EnemyBox = nullptr;
+    USizeBox* EnemySize = MakePanel(340.f, 280.f, true, EnemyBox);
+    UOverlaySlot* EnemySlot = Root->AddChildToOverlay(EnemySize);
+    EnemySlot->SetHorizontalAlignment(HAlign_Right);
+    EnemySlot->SetVerticalAlignment(VAlign_Top);
+    // Reserve the upper-right corner for the existing cooperative session controls.
+    // 기존 협동 세션 조작을 위해 오른쪽 위 모서리에 여유 공간을 둡니다.
+    EnemySlot->SetPadding(FMargin(24.f, 152.f, 24.f, 0.f));
+    AddText(EnemyBox, TEXT("대상 정보"), 18);
+    TargetDetails = AddText(EnemyBox, TEXT("공격할 적을 클릭하세요."), 16);
+    EnemyRoster = AddText(EnemyBox, FString(), 14);
 
-    UVerticalBox* UnitBox = WidgetTree->ConstructWidget<UVerticalBox>();
-    UHorizontalBoxSlot* UnitSlot = Columns->AddChildToHorizontalBox(UnitBox);
-    UnitSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    UnitSlot->SetPadding(FMargin(0.f, 0.f, 14.f, 0.f));
-    UnitDetails = AddText(UnitBox, TEXT("조작할 아군"), 18);
+    UHorizontalBox* BottomRow = WidgetTree->ConstructWidget<UHorizontalBox>();
+    BottomRow->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+    UOverlaySlot* BottomSlot = Root->AddChildToOverlay(BottomRow);
+    BottomSlot->SetHorizontalAlignment(HAlign_Fill);
+    BottomSlot->SetVerticalAlignment(VAlign_Bottom);
+    BottomSlot->SetPadding(FMargin(24.f, 0.f, 24.f, 24.f));
+
+    UVerticalBox* PartyBox = nullptr;
+    USizeBox* PartySize = MakePanel(620.f, 280.f, true, PartyBox);
+    UHorizontalBoxSlot* PartySlot = BottomRow->AddChildToHorizontalBox(PartySize);
+    PartySlot->SetVerticalAlignment(VAlign_Bottom);
+    PartySlot->SetPadding(FMargin(0.f, 0.f, 16.f, 0.f));
+    AddText(PartyBox, TEXT("파티 현황"), 18);
+    PartyList = WidgetTree->ConstructWidget<UHorizontalBox>();
+    PartyBox->AddChildToVerticalBox(PartyList);
+
+    UVerticalBox* SkillsBox = nullptr;
+    USizeBox* SkillsSize = MakePanel(0.f, 300.f, true, SkillsBox);
+    UHorizontalBoxSlot* SkillsSlot = BottomRow->AddChildToHorizontalBox(SkillsSize);
+    SkillsSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    SkillsSlot->SetVerticalAlignment(VAlign_Bottom);
+    SkillsSlot->SetPadding(FMargin(0.f, 0.f, 16.f, 0.f));
+    UnitDetails = AddText(SkillsBox, TEXT("조작할 아군"), 18);
     UnitChoice = WidgetTree->ConstructWidget<UDemonicComboBoxString>(UDemonicComboBoxString::StaticClass(), TEXT("ControlledUnitChoice"));
-    UnitBox->AddChildToVerticalBox(UnitChoice);
+    SkillsBox->AddChildToVerticalBox(UnitChoice);
     UnitChoice->OnSelectionChanged.AddDynamic(this, &UCombatRoundPlanningWidget::HandleUnitChanged);
-    MovePlanDetails = AddText(UnitBox, TEXT("SAP 이동: 예약 없음"), 14);
-    MoveButton = AddButton(UnitBox, TEXT("이동 예약 · SAP 1"));
-    MoveButton->OnClicked.AddDynamic(this, &UCombatRoundPlanningWidget::HandleMove);
-    CancelMovePlanButton = AddButton(UnitBox, TEXT("이동 예약 취소"));
-    CancelMovePlanButton->OnClicked.AddDynamic(this, &UCombatRoundPlanningWidget::HandleCancelMovePlan);
-
-    UVerticalBox* SkillsBox = WidgetTree->ConstructWidget<UVerticalBox>();
-    UHorizontalBoxSlot* SkillsSlot = Columns->AddChildToHorizontalBox(SkillsBox);
-    FSlateChildSize SkillsWidth(ESlateSizeRule::Fill);
-    SkillsWidth.Value = 2.f;
-    SkillsSlot->SetSize(SkillsWidth);
-    SkillsSlot->SetPadding(FMargin(0.f, 0.f, 14.f, 0.f));
-    TargetDetails = AddText(SkillsBox, TEXT("공격할 적을 클릭하세요."), 18);
     SkillList = WidgetTree->ConstructWidget<UWrapBox>();
     SkillList->SetInnerSlotPadding(FVector2D(6.f, 6.f));
     SkillsBox->AddChildToVerticalBox(SkillList);
     SkillDescription = AddText(SkillsBox, FString(), 14);
+    Status = AddText(SkillsBox, FString(), 14);
 
-    UVerticalBox* ActionsBox = WidgetTree->ConstructWidget<UVerticalBox>();
-    Columns->AddChildToHorizontalBox(ActionsBox)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    UVerticalBox* ActionsBox = nullptr;
+    USizeBox* ActionsSize = MakePanel(340.f, 340.f, true, ActionsBox);
+    BottomRow->AddChildToHorizontalBox(ActionsSize)->SetVerticalAlignment(VAlign_Bottom);
+    AddText(ActionsBox, TEXT("행동 계획"), 18);
+    MovePlanDetails = AddText(ActionsBox, TEXT("SAP 이동: 예약 없음"), 14);
+    MoveButton = AddButton(ActionsBox, TEXT("이동 예약 · SAP 1"));
+    MoveButton->OnClicked.AddDynamic(this, &UCombatRoundPlanningWidget::HandleMove);
+    CancelMovePlanButton = AddButton(ActionsBox, TEXT("이동 예약 취소"));
+    CancelMovePlanButton->OnClicked.AddDynamic(this, &UCombatRoundPlanningWidget::HandleCancelMovePlan);
     ReadyButton = AddButton(ActionsBox, TEXT("준비 완료"));
     ReadyButton->OnClicked.AddDynamic(this, &UCombatRoundPlanningWidget::HandleReady);
     UnreadyButton = AddButton(ActionsBox, TEXT("준비 취소"));
     UnreadyButton->OnClicked.AddDynamic(this, &UCombatRoundPlanningWidget::HandleUnready);
     AddText(ActionsBox, TEXT("준비 완료 후\n① SAP 이동 → ② AP 행동"), 13);
-    Status = AddText(Controls, FString(), 13);
     Theme.ApplyControls(WidgetTree);
     Theme.StyleButton(ReadyButton, true);
     RefreshView();
@@ -500,6 +524,60 @@ void UCombatRoundPlanningWidget::RefreshHighlights()
     }
 }
 
+void UCombatRoundPlanningWidget::RefreshPartyCards(const ACombatRoundCoordinator* Coordinator, int32 OwnerSlot)
+{
+    TArray<int32> NewPartyIds;
+    for (const FCombatRoundUnitView& Unit : Coordinator->GetView().Units)
+    {
+        if (!Unit.bEnemy) NewPartyIds.Add(Unit.UnitId);
+    }
+    if (PartyUnitIds != NewPartyIds)
+    {
+        PartyUnitIds = MoveTemp(NewPartyIds);
+        PartyList->ClearChildren();
+        PartyCards.Reset();
+        PartyNames.Reset();
+        PartyDetails.Reset();
+        for (int32 Index = 0; Index < PartyUnitIds.Num(); ++Index)
+        {
+            UBorder* Card = WidgetTree->ConstructWidget<UBorder>();
+            Card->SetPadding(FMargin(8.f));
+            UHorizontalBoxSlot* CardSlot = PartyList->AddChildToHorizontalBox(Card);
+            CardSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+            CardSlot->SetPadding(FMargin(3.f, 4.f));
+            UVerticalBox* Details = WidgetTree->ConstructWidget<UVerticalBox>();
+            Card->SetContent(Details);
+            UTextBlock* Name = AddText(Details, FString(), 16);
+            Name->SetAutoWrapText(false);
+            Name->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);
+            PartyCards.Add(Card);
+            PartyNames.Add(Name);
+            PartyDetails.Add(AddText(Details, FString(), 13));
+        }
+    }
+    for (int32 Index = 0; Index < PartyUnitIds.Num(); ++Index)
+    {
+        const int32 UnitId = PartyUnitIds[Index];
+        const FCombatRoundUnitView* Unit = Coordinator->GetView().Units.FindByPredicate([UnitId](const FCombatRoundUnitView& Entry) { return Entry.UnitId == UnitId; });
+        if (!Unit) continue;
+        const bool bSelected = UnitId == GetSelectedUnitId();
+        const FLinearColor Accent = Unit->HP <= 0.f ? FLinearColor(0.5f, 0.18f, 0.16f) : bSelected ? FLinearColor(0.95f, 0.72f, 0.3f) : FLinearColor(0.16f, 0.5f, 0.42f);
+        PartyCards[Index]->SetBrush(FSlateRoundedBoxBrush(FLinearColor(0.024f, 0.03f, 0.036f, 0.96f), 4.f, Accent, bSelected ? 2.f : 1.f));
+        const FText Name = FText::FromString(UnitLabel(*Unit));
+        PartyNames[Index]->SetText(Name);
+        PartyNames[Index]->SetToolTipText(Name);
+        const FString Control = Unit->OwnerSlot == 0 ? TEXT("AI") : Unit->OwnerSlot == OwnerSlot ? TEXT("나") : TEXT("팀원");
+        FString Detail = FString::Printf(TEXT("%s · HP %.0f"), *Control, Unit->HP);
+        if (IsValid(Unit->Unit)) Detail += FString::Printf(TEXT("\nAP %d · SAP %d"), Unit->Unit->GetCurrentActionPoint(), Unit->Unit->GetCurrentSubActionPoint());
+        const FCombatRoundSkill* Planned = Coordinator->FindSkill(Unit->Command.SkillId);
+        const FString Plan = Unit->HP <= 0.f ? TEXT("사망") : Planned ? Planned->Name.ToString() : Unit->OwnerSlot == 0 ? TEXT("대기") : TEXT("행동 미선택");
+        Detail += TEXT("\n") + Plan;
+        if (Unit->bHasMovePlan) Detail += FString::Printf(TEXT("\n이동 (%d,%d)"), Unit->MoveDestinationCoord.X, Unit->MoveDestinationCoord.Y);
+        if (Unit->HP > 0.f && Unit->bReady) Detail += TEXT("\n준비 완료");
+        PartyDetails[Index]->SetText(FText::FromString(Detail));
+    }
+}
+
 void UCombatRoundPlanningWidget::RefreshView()
 {
     ACombatRoundPlayerController* Controller = Cast<ACombatRoundPlayerController>(GetOwningPlayer());
@@ -524,27 +602,43 @@ void UCombatRoundPlanningWidget::RefreshView()
         if (View.Phase != ECombatRoundPhase::Planning) bChoosingMove = false;
         const FString Phase = Coordinator->IsSAPMovementInProgress() ? TEXT("SAP 이동 실행") : View.Phase == ECombatRoundPhase::Resolving ? TEXT("AP 행동 실행") : RoundPhaseName(View.Phase);
         Header->SetText(FText::FromString(FString::Printf(TEXT("라운드 %d · %s"), View.RoundNumber, *Phase)));
-        FString Allies;
         FString Enemies;
+        int32 LivingAllies = 0;
+        int32 LivingEnemies = 0;
+        int32 ReadyUnits = 0;
+        int32 PlanningUnits = 0;
         const FCombatRoundUnitView* SelectedUnit = nullptr;
         const FCombatRoundUnitView* Target = nullptr;
         for (const FCombatRoundUnitView& Unit : View.Units)
         {
-            const FString Control = Unit.bEnemy || Unit.OwnerSlot == 0 ? TEXT("AI") : Unit.OwnerSlot == Controller->GetRoundParticipantSlot() ? TEXT("나") : TEXT("팀원");
-            const FCombatRoundSkill* Planned = Coordinator->FindSkill(Unit.Command.SkillId);
-            const FString Plan = Unit.HP <= 0.f ? TEXT("사망") : Planned ? Planned->Name.ToString() : Unit.OwnerSlot == 0 ? TEXT("대기") : TEXT("행동 미선택");
-            FString& Line = Unit.bEnemy ? Enemies : Allies;
-            if (!Line.IsEmpty()) Line += TEXT("  |  ");
-            Line += FString::Printf(TEXT("%s [%s] HP %.0f · %s%s"), *UnitLabel(Unit), *Control, Unit.HP, *Plan, Unit.bReady ? TEXT(" ✓") : TEXT(""));
-            if (Unit.bHasMovePlan) Line += FString::Printf(TEXT(" · SAP (%d,%d)"), Unit.MoveDestinationCoord.X, Unit.MoveDestinationCoord.Y);
+            if (Unit.HP > 0.f)
+            {
+                if (Unit.bEnemy) ++LivingEnemies;
+                else ++LivingAllies;
+                if (!Unit.bEnemy && Unit.OwnerSlot > 0)
+                {
+                    ++PlanningUnits;
+                    if (Unit.bReady) ++ReadyUnits;
+                }
+            }
+            if (Unit.bEnemy)
+            {
+                const FCombatRoundSkill* Planned = Coordinator->FindSkill(Unit.Command.SkillId);
+                const FString Plan = Unit.HP <= 0.f ? TEXT("사망") : Planned ? Planned->Name.ToString() : TEXT("대기");
+                if (!Enemies.IsEmpty()) Enemies += TEXT("\n\n");
+                Enemies += FString::Printf(TEXT("%s · HP %.0f\n%s%s"), *UnitLabel(Unit), Unit.HP, *Plan, Unit.bReady ? TEXT(" · 준비 완료") : TEXT(""));
+                if (Unit.bHasMovePlan) Enemies += FString::Printf(TEXT(" · SAP (%d,%d)"), Unit.MoveDestinationCoord.X, Unit.MoveDestinationCoord.Y);
+            }
             if (Unit.UnitId == GetSelectedUnitId()) SelectedUnit = &Unit;
             if (Unit.UnitId == SelectedTargetId && Unit.HP > 0.f) Target = &Unit;
             if (OwnUnitIds.Contains(Unit.UnitId) && Unit.bReady) bAnyReady = true;
         }
-        Roster->SetText(FText::FromString(Allies + TEXT("\n") + Enemies));
+        Roster->SetText(FText::FromString(FString::Printf(TEXT("아군 %d · 적 %d  |  준비 유닛 %d / %d"), LivingAllies, LivingEnemies, ReadyUnits, PlanningUnits)));
+        EnemyRoster->SetText(FText::FromString(Enemies));
+        RefreshPartyCards(Coordinator, Controller->GetRoundParticipantSlot());
         if (SelectedUnit && IsValid(SelectedUnit->Unit))
         {
-            UnitDetails->SetText(FText::FromString(FString::Printf(TEXT("%s\nHP %.0f · AP %d · SAP %d\n속도 %s"), *UnitLabel(*SelectedUnit), SelectedUnit->HP, SelectedUnit->Unit->GetCurrentActionPoint(), SelectedUnit->Unit->GetCurrentSubActionPoint(), *FText::AsNumber(SelectedUnit->Speed).ToString())));
+            UnitDetails->SetText(FText::FromString(FString::Printf(TEXT("%s\nHP %.0f · AP %d · SAP %d · 속도 %s"), *UnitLabel(*SelectedUnit), SelectedUnit->HP, SelectedUnit->Unit->GetCurrentActionPoint(), SelectedUnit->Unit->GetCurrentSubActionPoint(), *FText::AsNumber(SelectedUnit->Speed).ToString())));
             bHasMovePlan = SelectedUnit->bHasMovePlan;
             MovePlanDetails->SetText(FText::FromString(bHasMovePlan ? FString::Printf(TEXT("SAP 이동: (%d,%d) · 비용 1"), SelectedUnit->MoveDestinationCoord.X, SelectedUnit->MoveDestinationCoord.Y) : TEXT("SAP 이동: 예약 없음")));
             const ACombatArena* Arena = Coordinator->GetArena();

@@ -440,7 +440,8 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         }
         ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Arena->PlayerCoords[Member.SlotIndex]);
         FProfessionDefinition Profession;
-        if (!PartyDefinition->ResolveProfession(Member.ClassId, Profession))
+        TArray<TObjectPtr<USkillDefinitionDataAsset>> MemberSkills;
+        if (!PartyDefinition->ResolveProfession(Member.ClassId, Profession, FlowMessage) || !PartyDefinition->ResolveMemberSkills(Member, MemberSkills, FlowMessage))
         {
             return false;
         }
@@ -456,9 +457,9 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         }
         SpawnedUnits.Add(Unit);
         PartyActors.Add(Member.SlotIndex, Unit);
-        // Combat starts with the configured profession skills; prototype pool rewards are not granted implicitly.
-        // 전투는 설정된 직업 시작 스킬로 시작하며 시험용 풀 보상을 임의로 추가하지 않습니다.
-        if (!Unit->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, Profession.StartingSkills, Profession.Strength, Profession.Dexterity, Profession.Intelligence))
+        // Preserve the Run's purchased loadout while applying the profession's combat attributes.
+        // 직업 전투 능력치를 적용하면서 Run에서 구매한 장착 스킬을 유지합니다.
+        if (!Unit->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, MemberSkills, Profession.Strength, Profession.Dexterity, Profession.Intelligence))
         {
             return false;
         }
@@ -614,6 +615,16 @@ bool AEncounterManager::LeaveRunEncounter()
         bSucceeded = RunState->LeaveRunEncounter();
         FlowMessage = RunState->GetSaveError();
     }
+    OnFlowChanged.Broadcast();
+    return bSucceeded;
+}
+
+bool AEncounterManager::PurchaseShopSkill(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError)
+{
+    OutError = NSLOCTEXT("RunSkillShop", "Unavailable", "현재 상점에서 구매할 수 없습니다.");
+    if (!HasAuthority() || bShuttingDown || bPreparing || bPreparationAbortPending || PendingResult != ECombatResult::None || !RunState || RunState->GetPhase() != ERunPhase::Shop) return false;
+    if (!ValidateManagedExecution(OutError)) return false;
+    const bool bSucceeded = RunState->PurchaseShopSkill(BuyerAccountId, CharacterId, OfferId, OutError);
     OnFlowChanged.Broadcast();
     return bSucceeded;
 }

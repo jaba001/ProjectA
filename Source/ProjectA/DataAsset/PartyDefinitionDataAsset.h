@@ -9,6 +9,7 @@ class UTexture2D;
 class USkillDefinitionDataAsset;
 class URunEncounterPoolDataAsset;
 class UProfessionBase;
+struct FRunPartyMember;
 
 USTRUCT(BlueprintType)
 struct PROJECTA_API FProfessionDefinition
@@ -53,6 +54,10 @@ class PROJECTA_API UPartyDefinitionDataAsset : public UDataAsset
 
 public:
     UPartyDefinitionDataAsset();
+    // New characters receive only this shared starting skill; combat and Snapshot defaults remain separate.
+    // 새 캐릭터는 이 공통 시작 스킬만 받으며 전투 클래스와 Snapshot 기본 장착은 별도로 유지합니다.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Party")
+    TSoftObjectPtr<USkillDefinitionDataAsset> UnarmedStartingSkill;
     // An unset pool uses the native three-shop prototype without requiring generated content assets.
     // 풀 미지정 시 별도 에셋 생성 없이 native 상점 3개 시험 구성을 사용합니다.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run")
@@ -66,6 +71,8 @@ public:
 
     bool ResolveProfession(FName ClassId, FProfessionDefinition& OutDefinition) const;
     bool ResolveProfession(FName ClassId, FProfessionDefinition& OutDefinition, FText& OutError) const;
+    bool ResolveStartingSkills(FName ClassId, TArray<TObjectPtr<USkillDefinitionDataAsset>>& OutSkills, FText& OutError) const;
+    bool ResolveMemberSkills(const FRunPartyMember& Member, TArray<TObjectPtr<USkillDefinitionDataAsset>>& OutSkills, FText& OutError) const;
     FText GetProfessionDetails(FName ClassId) const;
 
 #if WITH_EDITOR

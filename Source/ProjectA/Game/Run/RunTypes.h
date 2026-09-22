@@ -60,6 +60,19 @@ struct PROJECTA_API FRunPartyMember
     // 음수 HP는 첫 스폰에서 유닛 클래스의 기본값을 사용함을 뜻합니다.
     UPROPERTY(BlueprintReadOnly, Category = "Run")
     float CurrentHP = -1.0f;
+
+    // Gold belongs to this character for the current Run and is never shared with companions.
+    // 골드는 현재 Run의 이 캐릭터에게 귀속되며 동료와 공유하지 않습니다.
+    UPROPERTY(BlueprintReadOnly, Category = "Run|Shop")
+    int32 Gold = 0;
+
+    // New runs persist their acquired skills; older saves retain the historical profession defaults.
+    // 새 Run은 획득한 스킬을 저장하며 이전 저장은 기존 직업 기본 장착을 유지합니다.
+    UPROPERTY(BlueprintReadOnly, Category = "Run|Skills")
+    bool bHasSkillLoadout = false;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Run|Skills")
+    TArray<FSoftObjectPath> Skills;
 };
 
 USTRUCT(BlueprintType)

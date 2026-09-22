@@ -393,8 +393,15 @@ protected:
     TArray<TSubclassOf<UGameplayAbility>> EquippedSkillAbilityClasses;
 
     // Skill definition data currently equipped by this unit
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|Skill", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_EquippedSkills, Category = "UnitBase|Skill", meta = (AllowPrivateAccess = "true"))
     TArray<TObjectPtr<USkillDefinitionDataAsset>> EquippedSkillDataAssets;
+
+    UFUNCTION()
+    void OnRep_EquippedSkills();
+
+    // Rebuild skill-dependent visuals after authoritative setup or replicated loadout changes.
+    // 권위 설정 또는 복제된 장착 변경 후 스킬에 종속된 외형을 갱신합니다.
+    virtual void RefreshSkillPresentation();
 
 public:
     // Get skill abilities available for AI evaluation

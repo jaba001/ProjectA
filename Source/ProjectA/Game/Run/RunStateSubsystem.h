@@ -4,6 +4,7 @@
 #include "Engine/EngineBaseTypes.h"
 #include "Game/Run/RunTypes.h"
 #include "Game/Run/RunEncounterTypes.h"
+#include "Game/Run/RunSkillShopTypes.h"
 #include "Game/Run/ManagedRunTypes.h"
 #include "Game/Run/Authority/LocalRunAuthorityStore.h"
 #include "Combat/Checkpoint/CombatCheckpointTypes.h"
@@ -99,6 +100,8 @@ public:
     bool ContinueRun();
     bool SelectRunEncounter(FName EncounterId);
     bool LeaveRunEncounter();
+    bool PurchaseShopSkill(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError);
+    const FRunSkillShopState& GetSkillShopState() const { return SkillShopState; }
     const FRunEncounterProgress& GetEncounterProgress() const { return EncounterProgress; }
     void UpdatePartyMemberHP(int32 SlotIndex, float CurrentHP);
 
@@ -161,6 +164,9 @@ private:
 
     UPROPERTY(Transient)
     FRunEncounterProgress EncounterProgress;
+
+    UPROPERTY(Transient)
+    FRunSkillShopState SkillShopState;
 
     UPROPERTY(Transient)
     FCombatCheckpointData CombatCheckpoint;

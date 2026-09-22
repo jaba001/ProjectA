@@ -1,6 +1,7 @@
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Unit/PlayerUnit.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Game/Run/RunTypes.h"
 #include "Profession/ProfessionBase.h"
 
 TSubclassOf<APlayerUnit> UPartyDefinitionDataAsset::ResolvePlayerClass(FName ClassId) const
@@ -21,6 +22,7 @@ TSubclassOf<APlayerUnit> UPartyDefinitionDataAsset::ResolvePlayerClass(FName Cla
 
 UPartyDefinitionDataAsset::UPartyDefinitionDataAsset()
 {
+    UnarmedStartingSkill = TSoftObjectPtr<USkillDefinitionDataAsset>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_DefaulatAttack.BPDA_DefaulatAttack")));
     for (TSubclassOf<UProfessionBase> ProfessionClass : UProfessionBase::GetPlayableClasses())
     {
         const UProfessionBase* Profession = ProfessionClass->GetDefaultObject<UProfessionBase>();
@@ -129,6 +131,71 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
     return true;
 }
 
+bool UPartyDefinitionDataAsset::ResolveStartingSkills(FName ClassId, TArray<TObjectPtr<USkillDefinitionDataAsset>>& OutSkills, FText& OutError) const
+{
+    OutSkills.Reset();
+    OutError = FText::GetEmpty();
+    if (!UProfessionBase::FindProfession(ClassId))
+    {
+        OutError = NSLOCTEXT("PartyDefinition", "UnsupportedStartingProfession", "비무장 시작 스킬을 받을 수 없는 직업입니다.");
+        return false;
+    }
+    USkillDefinitionDataAsset* Skill = UnarmedStartingSkill.LoadSynchronous();
+    FCombatRoundSkill Definition;
+    if (!IsValid(Skill))
+    {
+        OutError = NSLOCTEXT("PartyDefinition", "MissingUnarmedSkill", "비무장 시작 스킬 에셋을 불러올 수 없습니다.");
+        return false;
+    }
+    if (!Skill->ResolveRoundSkill(Definition, OutError)) return false;
+    OutSkills.Add(Skill);
+    return true;
+}
+
+bool UPartyDefinitionDataAsset::ResolveMemberSkills(const FRunPartyMember& Member, TArray<TObjectPtr<USkillDefinitionDataAsset>>& OutSkills, FText& OutError) const
+{
+    OutSkills.Reset();
+    FProfessionDefinition Profession;
+    if (!ResolveProfession(Member.ClassId, Profession, OutError)) return false;
+    if (!Member.bHasSkillLoadout)
+    {
+        if (!Member.Skills.IsEmpty())
+        {
+            OutError = NSLOCTEXT("PartyDefinition", "UnversionedMemberSkills", "이전 저장 형식에 명시되지 않은 스킬 장착 데이터가 있습니다.");
+            return false;
+        }
+        OutSkills = MoveTemp(Profession.StartingSkills);
+        return true;
+    }
+    if (Member.Skills.IsEmpty() || Member.Skills.Num() > 5)
+    {
+        OutError = NSLOCTEXT("PartyDefinition", "InvalidMemberSkillCount", "캐릭터의 저장된 스킬은 1~5개여야 합니다.");
+        return false;
+    }
+    TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
+    TSet<FName> SkillIds;
+    for (const FSoftObjectPath& Path : Member.Skills)
+    {
+        USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
+        FCombatRoundSkill Definition;
+        if (!IsValid(Skill))
+        {
+            OutError = FText::Format(NSLOCTEXT("PartyDefinition", "MissingMemberSkill", "저장된 스킬 에셋을 불러올 수 없습니다: {0}"), FText::FromString(Path.ToString()));
+            return false;
+        }
+        if (!Skill->ResolveRoundSkill(Definition, OutError)) return false;
+        if (SkillIds.Contains(Definition.SkillId))
+        {
+            OutError = NSLOCTEXT("PartyDefinition", "DuplicateMemberSkill", "캐릭터의 저장된 스킬 식별자가 중복됩니다.");
+            return false;
+        }
+        SkillIds.Add(Definition.SkillId);
+        Skills.Add(Skill);
+    }
+    OutSkills = MoveTemp(Skills);
+    return true;
+}
+
 #if WITH_EDITOR
 #include "Misc/DataValidation.h"
 
@@ -156,6 +223,15 @@ EDataValidationResult UPartyDefinitionDataAsset::IsDataValid(FDataValidationCont
             Context.AddError(Error);
             bValid = false;
         }
+        else
+        {
+            TArray<TObjectPtr<USkillDefinitionDataAsset>> StartingSkills;
+            if (!ResolveStartingSkills(Entry.Key, StartingSkills, Error))
+            {
+                Context.AddError(Error);
+                bValid = false;
+            }
+        }
     }
     return bValid ? EDataValidationResult::Valid : EDataValidationResult::Invalid;
 }
@@ -164,15 +240,16 @@ EDataValidationResult UPartyDefinitionDataAsset::IsDataValid(FDataValidationCont
 FText UPartyDefinitionDataAsset::GetProfessionDetails(FName ClassId) const
 {
     FProfessionDefinition Definition;
-    if (!ResolveProfession(ClassId, Definition))
+    TArray<TObjectPtr<USkillDefinitionDataAsset>> StartingSkills;
+    FText Error;
+    if (!ResolveProfession(ClassId, Definition) || !ResolveStartingSkills(ClassId, StartingSkills, Error))
     {
         return FText::FromString(TEXT("직업 전투 설정을 확인해 주세요."));
     }
     FString Skills;
-    for (USkillDefinitionDataAsset* Skill : Definition.StartingSkills)
+    for (USkillDefinitionDataAsset* Skill : StartingSkills)
     {
         FCombatRoundSkill Resolved;
-        FText Error;
         if (Skill->ResolveRoundSkill(Resolved, Error)) Skills += FString::Printf(TEXT("\n• %s (AP %d · 보조 AP %d)"), *Skill->SkillName.ToString(), Resolved.ActionPointCost, Resolved.SubActionPointCost);
     }
     const FString Dexterity = FText::AsNumber(Definition.Dexterity).ToString();

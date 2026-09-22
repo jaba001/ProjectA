@@ -1,6 +1,6 @@
 # ProjectA 구현 구조와 설정
 
-기준일: 2026-09-21. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
+기준일: 2026-09-22. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
 
 기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 위임 실행에서 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀를 통과했다. 실제 서비스·다중 PC·지연/손실 확인은 별도다.
 
@@ -63,7 +63,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 | `AGameplayPlayerController` | `APartyPlayerController` 상속. 로컬 Root UI, 소유 연결의 전투 RPC, 현재 Host의 노드 선택·Continue 요청 |
 | `UGameplayRootWidget` | 해당 플레이어 화면의 CommonUI Run/Combat/Modal 스택과 저장 실패·재시도 안내 |
 | `URunMapWidget` | 노드와 진행 상태 표시, 선택 요청. 직접 Spawn하지 않음 |
-| `URunEncounterWidget` | 상점 3개 선택·선택한 상점 이름·나가기 표시. 기존 RunLayer의 native CommonUI 화면 |
+| `URunEncounterWidget` | 상점 3개 선택·본인 골드·스킬 4종 가격/보유 상태·구매·나가기 표시. 기존 RunLayer의 native CommonUI 화면 |
 | `AEncounterManager` | Encounter 준비·스폰·라운드 전투 연결·종료 HP 추출·정리와 Run 전이. 순차 턴 저장/복원 훅 제거 |
 | `ACombatArena` | 배치된 Grid, 슬롯별 좌표, 카메라, 타일 활성화 관리 |
 | `ACombatManager` / `ACombatRoundCoordinator` | Run 전투 연결, 라운드 계획·시간표·실행·잔여 공격 정리·결과 확정. `UTurnManager`는 참조 호환용 외형만 유지 |
@@ -79,11 +79,15 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 ### 상점 인카운터
 
-새 Run은 첫 승리 결과의 Continue에서 `EncounterChoice`, 선택 시 `Shop`, 나가기 시 `Map`으로 전환한다. 전투 노드 수는 2개를 유지하며 상점 방문을 전투 완료 수에 더하지 않는다. 선택하지 않은 상점은 방문할 수 없고 상품·재화·회복 효과는 없다. 레벨 이동·별도 Arena 스폰 없이 UI로 처리한다.
+새 Run은 첫 승리 결과의 Continue에서 `EncounterChoice`, 선택 시 `Shop`, 나가기 시 `Map`으로 전환한다. 전투 노드 수는 2개를 유지하며 상점 방문을 전투 완료 수에 더하지 않는다. 선택하지 않은 상점은 방문할 수 없다. 레벨 이동·별도 Arena 스폰 없이 UI로 처리한다.
+
+2026-09-22 확정: 아군 네 직업은 비무장 공격 하나로 시작한다. 직접 조작 캐릭터별 개인 10G, AI 동료 0G이며 상점 3곳은 검·원거리·AOE·휩쓸기를 각 1G에 판매한다. 본인 생존 인간 캐릭터만 구매하고 같은 스킬의 재구매를 거절한다. 습득 즉시 Run 장착 목록에 추가하며 다음 전투부터 사용한다. 10G·1G는 시험값이다.
+
+`RunEncounterPoolDataAsset.StartingGold/FixedSkillOffers`에서 시험 구성을 관리하고 새 Run에 `FRunSkillShopState`로 복사한다. `FRunPartyMember.Gold/Skills/bHasSkillLoadout`을 골드·스킬의 저장 기준으로 사용한다. 구매는 서버의 신뢰 연결로 소유자를 찾고 상점 단계·소유권·Human 상태·잔액·중복을 검사한 뒤 두 값을 함께 저장한다. 실패하면 메모리와 기존 파일을 보존한다. 일반/관리 저장과 전투 준비 경계 모두 같은 장착 목록을 유지한다. schema 0 상점 저장에는 상품·골드를 소급 지급하지 않으며 명시 장착이 없는 기존 파티는 과거 직업 기본값을 유지한다. [사용자 확인](TODO.md#2-19-비무장-시작과-스킬-상점)
 
 | 데이터 | 역할 |
 |---|---|
-| `URunEncounterPoolDataAsset` | `FixedOffers`에 상점 3개 정의. 현재는 고정 목록이며 추첨하지 않음 |
+| `URunEncounterPoolDataAsset` | `FixedOffers`에 상점 3개, `FixedSkillOffers`에 공통 상품·가격, `StartingGold`에 개인 시작 골드 정의. 추첨하지 않음 |
 | `FRunEncounterOffer` | `EncounterId`·`DisplayName`·`Type`의 USTRUCT 값 데이터 |
 | `FRunEncounterProgress` | schema·제시 목록·선택 ID·퇴장 완료 여부. Run 저장과 GameState 표시 뷰에 포함 |
 | `UPartyDefinitionDataAsset::RunEncounterPool` | 새 Run에서 사용할 풀. 미지정 시 native 기본값 상점1·상점2·상점3 사용 |
@@ -160,7 +164,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 항목 | 현재 규칙 |
 |---|---|
 | 직업 편집 | Edit에서 이름 1~32자·직업 편집. 저장 시 적용, 취소 시 기존 값 유지. ClassInfo는 HP·힘/민첩/지능·민첩에서 구한 전투 속도·AP/SubAP·시작 스킬 표시 |
-| 직업 데이터 | `bUseUnitClassDefaults=true`는 직업 클래스의 HP/힘/민첩/지능과 전투 클래스의 AP/SubAP/장착 스킬 사용. false는 명시 정의의 수치·시작 스킬 사용. CombatClass 미지정 시 기존 매핑·fallback 사용. 미지원 직업·직업 클래스 ID 불일치·잘못된 수치·중복 스킬 에셋 ID는 거절 |
+| 직업 데이터 | `bUseUnitClassDefaults`의 능력치/AP 해석과 CombatClass fallback 유지. 새 Run은 `UnarmedStartingSkill`을 사용하고 다음 전투는 파티에 저장된 습득 목록을 사용. 명시 스킬 목록이 없는 기존 저장만 과거 직업 기본값 해석 유지. 미지원 직업·잘못된 수치·중복 스킬 ID 거절 |
 | 회복약 | 기존 데이터 프로퍼티만 보존. 즉시 회복 실행과 이전 HUD 버튼은 제거했으며 새 라운드 소비 행동은 미구현 |
 | 추가 스킬 | 전투 진입 시 EncounterSkillPool 자동 추첨·장착 제거. 실제 시작/명시 장착 DA만 사용하며 장착 최대 5개·계획/해결 중 변경 거절 유지. 기존 풀 에셋과 명시 획득 API는 보존 |
 | 휩쓸기 | `BPDA_SweepingStrike`: 근접 전방 박스 충돌·피해 10·AP 1·시전 몽타주·종료 후 복귀. 이전 이름/ID 리디렉션 유지 |
@@ -172,7 +176,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 싱글 여정 항복 | 이어하기 옆 104×40 버튼·`URunSurrenderWidget` 확인창. 돌아가기 기본 포커스, 확인된 현재 일반 싱글 저장만 삭제. 취소·실패·저장 변경은 원본/현재 Run 보존 |
 | 옵션·종료 | MainMenu의 native `UOptionsWidget`에서 해상도·화면 모드·품질·VSync를 편집. 화면 변경은 15초 확인 후 `GameUserSettings.ini`에 저장하며 취소·시간 초과·미확인 종료 시 전체 변경 복원. 품질·VSync만 변경하면 적용 시 저장. Quit는 게임 종료 요청 |
 | 공통 UI 외형 | `UDemonicUITheme`이 기존 DemonicUI 텍스처를 참조하여 메뉴·설정·캐릭터 생성·협동·Run·상점·결과·라운드 계획과 저장/협동 안내를 꾸민다. 기존 입력·바인딩·권한 조건 유지 |
-| 공통 UI 배율 | `UserInterfaceSettings`의 1920×1080 기준 `ScaleToFit`·`ApplicationScale=1` 사용. 화면별 추가 축소 제거, 전투 상단 현황·하단 조작 패널의 바깥 여백 12 유지 |
+| 공통 UI 배율 | `UserInterfaceSettings`의 1920×1080 기준 `ScaleToFit`·`ApplicationScale=1` 사용. 화면별 추가 축소 제거, 전투는 화면 가장자리의 정보·조작 패널과 중앙 전장으로 구성 |
 
 설정은 Unreal `UGameUserSettings`의 화면·Scalability API를 사용한다. 테두리 없는 전체 화면은 게임 창 기준 모니터의 바탕 화면 해상도로 고정하고 기존 혼합 품질은 프리셋을 선택하기 전까지 보존한다. 미확인 화면의 전체 화면 단축키 전환을 차단하고 정상 창 종료 전 복원한다. 새 제작 에셋·Config 변경은 필요하지 않다. 상세 계약은 [UI_README 8절](UI_README.md#8-시작-메뉴-설정), 사용자 확인은 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다.
 
@@ -188,7 +192,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 - `SkillDefinitionDataAsset.bUseRoundDefinition`과 `RoundDefinition`으로 스킬별 실제 시간·범위·접근·복귀·목표 상실·투사체 정책을 편집한다. 미지정 장착 스킬은 [GAME_DESIGN 8-7](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)의 초기 변환을 사용한다.
 - 시전 표현은 명시 프로필의 `RoundDefinition.CastMontage`를 우선하며 비어 있으면 `AbilityClass`의 기존 `AttackMontage`를 사용한다. 서버가 시전 진입 시 한 번 재생을 전달한다. 몽타주 재생 인스턴스의 루트 모션과 유닛의 기존 `AN_SkillRelease` 효과 발동은 차단하며, `WindupSeconds`·충돌·AP 계산과 발동 1회는 유지한다. 발동 후 `Recovery`에서 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝날 때까지 기다린 뒤 복귀한다. 서버의 재생 인스턴스를 사용할 수 없으면 에셋 길이/RateScale·블렌드 아웃·여유 시간 0.25초를 사용하며 시전 시작 기준 최대 60초로 제한한다. 반복·자동 종료 누락·잘못된 길이/속도로 무한 대기하지 않으며 시간 초과 시 남은 표현을 즉시 정리한다. 사망·중단·발동 전 취소·다음 행동 시작도 해당 인스턴스를 정리한다. [남은 확인](TODO.md#2-4-da-시전-몽타주-연결)
 - 몽타주 대기 시간은 서버가 받은 `DeltaSeconds`를 프레임당 한 번 누적하며 고정 간격 시뮬레이션의 미처리 시간과 분리한다. 프레임 지연 뒤 누적 시뮬레이션을 처리할 때 시전 대기까지 중복 차감하여 조기에 복귀하지 않도록 한다.
-- 기존 GAS 효과·모든 타일 범위·상태효과·회복약이 새 행동으로 완전 변환된 것은 아니다. 실제 장착 DA만 라운드 스킬 목록에 넣는다. `BP_PlayerUnit`은 비무장 공격·원거리 공격·AOE·휩쓸기 4개, `BP_WarriorUnit`은 여기에 검 공격을 추가한 5개다. `BP_EnemyUnit`과 `BP_SnapshotOpponent`의 기본 장착은 검 공격 1개이며 Snapshot 입력의 저장된 스킬 구성은 기존 규칙대로 복원한다. [지원 변환](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)에 `EnemyTile·AroundTarget`을 포함한다.
+- 기존 GAS 효과·모든 타일 범위·상태효과·회복약이 새 행동으로 완전 변환된 것은 아니다. 새 Run의 아군은 비무장 1개와 상점에서 본인이 습득한 DA만 사용한다. Blueprint의 과거 기본 4/5개는 이전 저장 fallback으로 보존한다. 기본 적은 검 공격 1개, Snapshot은 입력의 저장된 스킬 구성을 복원한다. [지원 변환](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)에 `EnemyTile·AroundTarget`을 포함한다.
 - `RoundMontageOverrides`는 공통 DA를 변경하지 않고 유닛의 Skeleton에 맞는 몽타주로 바꾼다. 전사의 기존 4스킬과 적의 검 표현에 적용하며 Root Motion·서버 발동 권위·몽타주 종료 후 복귀 규칙을 유지한다. 검은 `hand_r`에 하나만 부착한다.
 - 검만 `bUseWeaponTrace=true`를 사용한다. 서버가 최종 몽타주의 에셋 포즈·메시·무기 부착·소켓을 `GetAnimationPose`로 계산하고 0.23~0.43초를 0.005초 간격·반경 4cm로 검사한다. 렌더 메시 갱신·인스턴스 종료와 독립적으로 누적 구간을 처리하며 행동 취소·사망·대상 상실은 서버 단계에서 처리한다. 최초 적 한 명에게 기존 GAS `Data.Damage`로 1회 피해를 적용한다. `SM_Sword`의 `BladeBase=(0,0,-22)`·`BladeTip=(0,0.191992,-118.28656)`, Pitch/Yaw 0도·Roll 180도, 전사 부착 `(-11.095651,5.605028,-10)`·적 `(-8.5,5,-10)`을 사용한다. 단위는 cm이며 손잡이 위치와 궤적을 함께 관리한다.
 - 리타깃 도구 4개의 중복 연산을 각 6개로 정리하고 보행·공격 시퀀스 48개를 기존 경로에 다시 작성했다. 원본 Root Motion 설정·참조를 보존하며 별도 재로드에서 길이·유효한 포즈·유한 좌표·골반 이동 범위를 검사한다. 전사 전방 보행의 골반 이동은 약 454cm에서 8cm로 줄었으며 실제 순간이동·흔들림 확인은 대기다.
@@ -299,10 +303,10 @@ Paragon의 FBX 원본은 `Content/ParagonAnimationsRetargetedToManny`에 보존�
 |---|---|
 | GameplayRoot | `RootOverlay`, `RunLayer`, `CombatLayer`, `ModalLayer`; 세 레이어는 `CommonActivatableWidgetStack` |
 | RunMap | `Text_Progress`, `Text_Party`, `Text_FlowMessage`, `NodeList`(`VerticalBox`); 노드 버튼은 런타임 생성 |
-| RoundPlanning | Native CommonUI 상단 현황·하단 조작 패널. 전장 대상 선택·장착 스킬 버튼 적용·SAP 이동 예약/취소·준비/취소. 필수 WBP 바인딩 없음 |
+| RoundPlanning | Native CommonUI 상단 요약·우측 대상·좌하단 파티·하단 중앙 스킬·우하단 행동. 전장 대상 선택·장착 스킬 버튼 적용·SAP 이동 예약/취소·준비/취소. 필수 WBP 바인딩 없음 |
 | Result | `Text_Result`, `Button_Continue` |
 
-새 계획 화면의 스킬 목록은 실제 장착 DA에서 해석한 서버 라운드 프로필로 구성한다. 적을 클릭하면 스킬 버튼이 나타나며 버튼 클릭이 계획 적용 요청이다. 시험 스킬·자동 추첨 스킬을 더하지 않는다. UI는 상단 가로 900·최대 높이 145, 하단 가로 900·최대 높이 300 UI 단위를 사용하며 하단 내용은 스크롤한다. 화면·입력의 추가 확인은 [남은 확인](TODO.md#2-10-전장-대상-선택과-sap-이동-예약)에서 관리한다.
+새 계획 화면의 스킬 목록은 실제 장착 DA에서 해석한 서버 라운드 프로필로 구성한다. 적을 클릭하면 스킬 버튼이 나타나며 버튼 클릭이 계획 적용 요청이다. 시험 스킬·자동 추첨 스킬을 더하지 않는다. 파티·선택 캐릭터·행동 패널을 하단에 분리하고 각 내용을 독립 스크롤한다. 배치·크기는 [UI 기준](UI_README.md#10-2-전투-배치와-카메라), 화면·입력의 추가 확인은 [남은 확인](TODO.md#2-17-전투-상단-현황-가독성)에서 관리한다.
 
 이전 HUD의 선택적 바인딩은 참조 호환용이다. Designer를 수정한 WBP를 덮어쓰기 전에 변경 내용을 확인한다. JSON spec 변경은 실제 생성·Compile·Save를 거쳐 반영하며 DryRun만으로 완료를 기록하지 않는다.
 

@@ -28,6 +28,13 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
         View.Nodes = Run->GetNodes();
         View.CompletedNodes = Run->GetCompletedNodes();
         View.EncounterProgress = Run->GetEncounterProgress();
+        View.SkillShopState = Run->GetSkillShopState();
+        const bool bOrdinarySinglePlayer = !Run->IsManagedRun() && Run->GetRunIdentity().Origin == ERunIdentityOrigin::LocalDevelopment && Run->GetRunIdentity().OriginalParticipants.Num() == 1;
+        for (const FRunPartyMember& Member : View.PartyMembers)
+        {
+            if (!Member.bCreated || Member.CurrentHP <= 0.f || !Member.CharacterId.IsValid() || Member.OwnerAccountId.IsEmpty()) continue;
+            if (bOrdinarySinglePlayer ? Member.bPlayerControlled : !Run->IsManagedRun() || Run->GetParticipation().HumanParticipants.Contains(Member.OwnerAccountId)) View.ShopBuyerCharacterIds.Add(Member.CharacterId);
+        }
         for (const FRunNodeDefinition& Node : View.Nodes)
         {
             if (Run->CanStartNode(Node.NodeId))

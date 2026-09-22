@@ -25,6 +25,7 @@ public:
     // Trusted server integration point, never exposed as a client account-claim RPC.
     // 신뢰된 서버 연동 지점이며 클라이언트 계정 주장 RPC로 노출하지 않습니다.
     bool AssignRunParticipant(APartyPlayerController* Controller, const FRunAccountId& AccountId);
+    bool ResolveRunParticipant(const APartyPlayerController* Controller, FRunAccountId& OutAccountId) const;
     bool ApplyCombatParticipantBindings(UCombatActionAuthority* Authority);
     bool HasOriginalHostConnection(const FRunAccountId& HostAccount) const;
     bool CanControlRunFlow(const APartyPlayerController* Controller, bool bAllowResumePending = false) const;

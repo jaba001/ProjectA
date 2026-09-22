@@ -25,6 +25,7 @@ namespace
         TStrongObjectPtr<URunStateSubsystem> Run{NewObject<URunStateSubsystem>(Instance.Get())};
         FString Slot = TEXT("T14_CombatCheckpoint_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
         FProfessionDefinition Profession;
+        TArray<TObjectPtr<USkillDefinitionDataAsset>> MemberSkills;
 
         FCheckpointStorageFixture()
         {
@@ -44,7 +45,7 @@ namespace
             Member.CharacterName = FText::FromString(TEXT("Checkpoint Archer"));
             Member.ClassId = TEXT("Archer");
             Member.bCreated = true;
-            return Run->PartyDefinition && Run->PartyDefinition->ResolveProfession(Member.ClassId, Profession) && Run->InitializeRun({ Member }, OutError) && Run->GetSaveError().IsEmpty() && Run->BeginEncounter(TEXT("Combat_01")) && Run->MarkCombatStarted();
+            return Run->PartyDefinition && Run->PartyDefinition->ResolveProfession(Member.ClassId, Profession) && Run->InitializeRun({ Member }, OutError) && Run->PartyDefinition->ResolveMemberSkills(Run->GetPartyMembers()[0], MemberSkills, OutError) && !MemberSkills.IsEmpty() && Run->GetSaveError().IsEmpty() && Run->BeginEncounter(TEXT("Combat_01")) && Run->MarkCombatStarted();
         }
 
         FCombatCheckpointData MakeCheckpoint() const
@@ -75,11 +76,11 @@ namespace
             Player.HealingItemAmount = 35.0f;
             Player.GridCoord = FIntPoint(2, 1);
             Player.Transform = FTransform(FRotator(0.0f, 90.0f, 0.0f), FVector(-400.0f, 200.0f, 98.15f));
-            for (USkillDefinitionDataAsset* Skill : Profession.StartingSkills)
+            for (USkillDefinitionDataAsset* Skill : MemberSkills)
             {
                 Player.Skills.Add(FSoftObjectPath(Skill));
             }
-            Player.DefaultAttackAbility = FSoftObjectPath(Profession.StartingSkills[0]->AbilityClass.Get());
+            Player.DefaultAttackAbility = FSoftObjectPath(MemberSkills[0]->AbilityClass.Get());
             FCombatCheckpointUnit Enemy = Player;
             Enemy.UnitId = FGuid::NewGuid();
             Enemy.CharacterId.Invalidate();
@@ -121,7 +122,7 @@ namespace
                 {
                     FCombatRoundSkill Skill;
                     FText Error;
-                    if (Profession.StartingSkills[0]->ResolveRoundSkill(Skill, Error)) Plan.Command.SkillId = Skill.SkillId;
+                    if (MemberSkills[0]->ResolveRoundSkill(Skill, Error)) Plan.Command.SkillId = Skill.SkillId;
                     Plan.Command.TargetUnitId = 2;
                     Plan.Command.TargetCoord = Checkpoint.Units[1].GridCoord;
                 }
