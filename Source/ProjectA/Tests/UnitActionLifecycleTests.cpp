@@ -293,6 +293,63 @@ bool FCombatRoundSkillMigrationTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundRetargetPolicyTest, "ProjectA.Combat.Content.UnitTargetRetargetPolicy", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundRetargetPolicyTest::RunTest(const FString& Parameters)
+{
+    using namespace UnitActionLifecycleTests;
+    USkillDefinitionDataAsset* Skill = MakeSkill(GetTransientPackage(), UGA_DefaultAttack::StaticClass());
+    FCombatRoundSkill Resolved;
+    FText Error;
+    for (bool bApproaching : {false, true})
+    {
+        Skill->bMoveToTarget = bApproaching;
+        if (!TestTrue(TEXT("A legacy unit-targeted attack resolves"), Skill->ResolveRoundSkill(Resolved, Error))) return false;
+        TestEqual(TEXT("Both legacy melee and projectile attacks use nearest-enemy fallback before release"), Resolved.TargetLoss, ECombatRoundTargetLoss::NearestEnemy);
+    }
+    Skill->bUseRoundDefinition = true;
+    Skill->AbilityClass = nullptr;
+    for (ECombatRoundSkillKind Kind : {ECombatRoundSkillKind::Melee, ECombatRoundSkillKind::Projectile, ECombatRoundSkillKind::GroundAttack, ECombatRoundSkillKind::Wait})
+    {
+        for (ECombatRoundTargetLoss Policy : {ECombatRoundTargetLoss::Cancel, ECombatRoundTargetLoss::KeepLocation, ECombatRoundTargetLoss::NearestEnemy})
+        {
+            Skill->RoundDefinition = FCombatRoundSkill();
+            Skill->RoundDefinition.Kind = Kind;
+            Skill->RoundDefinition.Approach = Kind == ECombatRoundSkillKind::Melee ? ECombatRoundApproach::Unit : ECombatRoundApproach::None;
+            Skill->RoundDefinition.TargetLoss = Policy;
+            if (!TestTrue(TEXT("A valid explicit target-loss profile resolves"), Skill->ResolveRoundSkill(Resolved, Error))) return false;
+            const ECombatRoundTargetLoss Expected = Kind == ECombatRoundSkillKind::Melee || Kind == ECombatRoundSkillKind::Projectile ? ECombatRoundTargetLoss::NearestEnemy : Policy;
+            TestEqual(TEXT("Unit attacks retarget while ground and wait policies remain authored"), Resolved.TargetLoss, Expected);
+            TestEqual(TEXT("Resolving does not mutate the saved target-loss field"), Skill->RoundDefinition.TargetLoss, Policy);
+        }
+    }
+    Skill->RoundDefinition = FCombatRoundSkill();
+    Skill->RoundDefinition.TargetLoss = static_cast<ECombatRoundTargetLoss>(255);
+    TestFalse(TEXT("An invalid serialized target-loss enum is rejected before normalization"), Skill->ResolveRoundSkill(Resolved, Error));
+    TestFalse(TEXT("Invalid target-loss data reports the asset error"), Error.IsEmpty());
+
+    for (const TCHAR* AssetName : {TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_RangedAttack"), TEXT("BPDA_SweepingStrike"), TEXT("BPDA_swoard_attack"), TEXT("BPDA_AreaAttack")})
+    {
+        const FString AssetPath = FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/%s.%s"), AssetName, AssetName);
+        const USkillDefinitionDataAsset* Authored = LoadObject<USkillDefinitionDataAsset>(nullptr, *AssetPath);
+        if (!TestNotNull(AssetPath + TEXT(" exists"), Authored)) return false;
+        const ECombatRoundTargetLoss SavedPolicy = Authored->RoundDefinition.TargetLoss;
+        if (!TestTrue(AssetPath + TEXT(" resolves"), Authored->ResolveRoundSkill(Resolved, Error))) return false;
+        if (FString(AssetName) == TEXT("BPDA_AreaAttack"))
+        {
+            TestEqual(TEXT("The authored area attack remains a fixed ground attack"), Resolved.Kind, ECombatRoundSkillKind::GroundAttack);
+            TestEqual(TEXT("The authored area attack preserves its selected location"), Resolved.TargetLoss, ECombatRoundTargetLoss::KeepLocation);
+        }
+        else
+        {
+            TestTrue(AssetPath + TEXT(" remains a unit-targeted attack"), Resolved.Kind == ECombatRoundSkillKind::Melee || Resolved.Kind == ECombatRoundSkillKind::Projectile);
+            TestEqual(AssetPath + TEXT(" adopts the common retarget policy"), Resolved.TargetLoss, ECombatRoundTargetLoss::NearestEnemy);
+        }
+        TestEqual(AssetPath + TEXT(" keeps its authored profile unchanged"), Authored->RoundDefinition.TargetLoss, SavedPolicy);
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProfessionLoadoutTest, "ProjectA.Party.ProfessionLoadout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FProfessionLoadoutTest::RunTest(const FString& Parameters)

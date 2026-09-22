@@ -1141,6 +1141,172 @@ bool FCombatRoundMovementTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundDeadTargetRetargetTest, "ProjectA.Combat.Round.DeadTargetRetargetBeforeRelease", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundDeadTargetRetargetTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Case = 0; Case < 4; ++Case)
+    {
+        const FString Context = Case == 0 ? TEXT("Death during approach") : Case == 1 ? TEXT("Death during casting") : Case == 2 ? TEXT("Death before projectile release") : TEXT("Repeated target death");
+        FCombatRoundSkill Skill;
+        Skill.Kind = Case == 2 ? ECombatRoundSkillKind::Projectile : ECombatRoundSkillKind::Melee;
+        Skill.Approach = Case == 2 ? ECombatRoundApproach::None : ECombatRoundApproach::Unit;
+        Skill.TargetLoss = Case == 2 ? ECombatRoundTargetLoss::KeepLocation : ECombatRoundTargetLoss::Cancel;
+        Skill.WindupSeconds = 0.2f;
+        Skill.Power = 17.f;
+        FFixture Fixture;
+        if (!TestTrue(Context + TEXT(" initializes"), Fixture.Initialize(2, 10.f, nullptr, FIntPoint(0, 3), 3, &Skill))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Friend = Fixture.Humans[1];
+        AUnitBase* Original = Fixture.Enemies[0];
+        AUnitBase* Farther = Fixture.Enemies[1];
+        AUnitBase* Nearest = Fixture.Enemies[2];
+        AUnitBase* OtherCombat = Fixture.AddUnit(FIntPoint(3, 2), ETeam::Enemy);
+        if (!TestNotNull(Context + TEXT(" has an external combat enemy"), OtherCombat)) return false;
+        OtherCombat->UnitIndex = Nearest->UnitIndex;
+        const FVector Origin = Source->GetActorLocation();
+        const FRotator Facing(0.f, 37.f, 0.f);
+        Source->SetActorRotation(Facing);
+        ACombatGridTile* Home = Source->GetCurrentTile();
+        // Reverse roster and home-distance order so only the current world position selects the right replacement.
+        // 명단과 홈 거리 순서를 뒤집어 현재 월드 좌표로만 올바른 대체 대상을 선택할 수 있게 합니다.
+        Farther->SetActorLocation(Origin + FVector(1200.f, 100.f, 0.f), false);
+        Nearest->SetActorLocation(Origin + FVector(650.f, 100.f, 0.f), false);
+        const FCombatRoundCommand OriginalCommand = Fixture.Command(Source, Fixture.HumanSkillId, Original);
+        if (!TestTrue(Context + TEXT(" submits"), Fixture.Submit(0, OriginalCommand)) || !TestTrue(Context + TEXT(" locks both owners"), Fixture.Ready(0) && Fixture.Ready(1))) return false;
+        if (Case == 1)
+        {
+            for (int32 Step = 0; Step < 200 && Fixture.Round->GetView().Units[0].ActionPhase != ECombatRoundActionPhase::Casting; ++Step) Fixture.Round->Tick(0.01f);
+            if (!TestTrue(Context + TEXT(" reaches the original casting position"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Casting)) return false;
+            Fixture.Round->Tick(0.15f);
+        }
+        else
+        {
+            Fixture.Round->Tick(0.05f);
+        }
+        Friend->SetActorLocation(Source->GetActorLocation() + FVector(15.f, 0.f, 0.f), false);
+        OtherCombat->SetActorLocation(Source->GetActorLocation() + FVector(10.f, 0.f, 0.f), false);
+        Original->Die();
+        const float OriginalHP = Original->GetAttributeSet()->GetHP();
+        const FVector BeforeRetarget = Source->GetActorLocation();
+        Fixture.Round->Tick(0.01f);
+        TestTrue(Context + TEXT(" preserves the locked command for replay"), SameCommand(OriginalCommand, Fixture.Round->GetView().Units[0].Command));
+        TestTrue(Context + TEXT(" keeps the one paid AP and untouched SAP"), Source->GetCurrentActionPoint() == 1 && Source->GetCurrentSubActionPoint() == 2);
+        TestEqual(Context + TEXT(" applies no remote damage at target replacement"), Nearest->GetAttributeSet()->GetHP(), 100.f);
+        if (Case != 2)
+        {
+            TestTrue(Context + TEXT(" moves toward the replacement before restarting windup"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching && Source->GetActorLocation().X > BeforeRetarget.X);
+            TestEqual(Context + TEXT(" retains the original home reservation"), Source->GetCurrentTile(), Home);
+        }
+        AUnitBase* FinalTarget = Nearest;
+        float NearestHP = 100.f;
+        if (Case == 3)
+        {
+            Nearest->Die();
+            NearestHP = Nearest->GetAttributeSet()->GetHP();
+            FinalTarget = Farther;
+            Fixture.Round->Tick(0.01f);
+            TestTrue(TEXT("A second target loss continues approach without a second cost"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching && Source->GetCurrentActionPoint() == 1);
+        }
+        if (Case != 2)
+        {
+            for (int32 Step = 0; Step < 500 && Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching; ++Step) Fixture.Round->Tick(0.01f);
+            if (!TestTrue(Context + TEXT(" reaches a new casting position"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Casting)) return false;
+            Fixture.Round->Tick(0.15f);
+            TestEqual(Context + TEXT(" waits a full new windup rather than reusing elapsed casting time"), FinalTarget->GetAttributeSet()->GetHP(), 100.f);
+        }
+        for (int32 Step = 0; Step < 200 && FinalTarget->GetAttributeSet()->GetHP() == 100.f; ++Step) Fixture.Round->Tick(0.01f);
+        TestEqual(Context + TEXT(" damages the closest living valid enemy once"), FinalTarget->GetAttributeSet()->GetHP(), 83.f);
+        if (!TestTrue(Context + TEXT(" completes and returns"), Fixture.AdvanceUntilNextRound(1))) return false;
+        TestTrue(Context + TEXT(" restores home position, reservation and facing"), Source->GetActorLocation().Equals(Origin, 2.f) && Source->GetCurrentTile() == Home && Source->GetActorRotation().Equals(Facing, 0.1f));
+        TestTrue(Context + TEXT(" excludes the corpse, ally and another combat roster"), Original->GetAttributeSet()->GetHP() == OriginalHP && Friend->GetAttributeSet()->GetHP() == 100.f && OtherCombat->GetAttributeSet()->GetHP() == 100.f);
+        TestEqual(Context + TEXT(" never damages the farther or newly dead alternative"), (Case == 3 ? Nearest : Farther)->GetAttributeSet()->GetHP(), Case == 3 ? NearestHP : 100.f);
+        TestEqual(Context + TEXT(" never repeats the final hit during recovery or return"), FinalTarget->GetAttributeSet()->GetHP(), 83.f);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundDeadTargetWithoutReplacementTest, "ProjectA.Combat.Round.DeadTargetWithoutReplacementReturns", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundDeadTargetWithoutReplacementTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("The final-target fixture initializes"), Fixture.Initialize())) return false;
+    AUnitBase* Source = Fixture.Humans[0];
+    AUnitBase* Target = Fixture.Enemies[0];
+    const FVector Origin = Source->GetActorLocation();
+    const FRotator Facing(0.f, 37.f, 0.f);
+    Source->SetActorRotation(Facing);
+    if (!Fixture.Submit(0, Fixture.Command(Source, TEXT("Strike"), Target)) || !Fixture.Ready(0)) return false;
+    Fixture.Round->Tick(0.25f);
+    if (!TestTrue(TEXT("The attack leaves home before the last target dies"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching && FVector::Dist2D(Origin, Source->GetActorLocation()) > 50.f)) return false;
+    Target->Die();
+    const float DeadHP = Target->GetAttributeSet()->GetHP();
+    Fixture.Round->Tick(0.01f);
+    TestTrue(TEXT("No eligible replacement cancels the unreleased attack and returns"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Returning);
+    TestEqual(TEXT("An unsuccessful replacement does not charge another AP"), Source->GetCurrentActionPoint(), 1);
+    for (int32 Step = 0; Step < 200 && Fixture.Round->IsRoundSessionActive(); ++Step) Fixture.Round->Tick(0.01f);
+    TestTrue(TEXT("Combat finishes after the surviving caster returns"), Fixture.Round->GetView().Phase == ECombatRoundPhase::Finished && Source->GetActorLocation().Equals(Origin, 2.f) && Source->GetActorRotation().Equals(Facing, 0.1f));
+    TestEqual(TEXT("The dead target never receives the cancelled damage"), Target->GetAttributeSet()->GetHP(), DeadHP);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundTargetLossPreservationTest, "ProjectA.Combat.Round.TargetLossPreservesGroundAndReleasedProjectile", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundTargetLossPreservationTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Case = 0; Case < 2; ++Case)
+    {
+        const bool bGround = Case == 0;
+        const FString Context = bGround ? TEXT("Ground location") : TEXT("Released homing projectile");
+        FCombatRoundSkill Skill;
+        Skill.Kind = bGround ? ECombatRoundSkillKind::GroundAttack : ECombatRoundSkillKind::Projectile;
+        Skill.Approach = ECombatRoundApproach::None;
+        Skill.TargetLoss = ECombatRoundTargetLoss::KeepLocation;
+        Skill.bHoming = !bGround;
+        Skill.WindupSeconds = 0.2f;
+        Skill.Power = 17.f;
+        Skill.HitRange = 100.f;
+        Skill.ProjectileSpeed = 200.f;
+        FFixture Fixture;
+        if (!TestTrue(Context + TEXT(" initializes"), Fixture.Initialize(1, 10.f, nullptr, FIntPoint(0, 3), 3, &Skill))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Original = Fixture.Enemies[0];
+        AUnitBase* AtOriginalLocation = Fixture.Enemies[1];
+        AUnitBase* Nearest = Fixture.Enemies[2];
+        AtOriginalLocation->SetActorLocation(Original->GetActorLocation() + FVector(50.f, 0.f, 0.f), false);
+        Nearest->SetActorLocation(Source->GetActorLocation() + FVector(100.f, 100.f, 0.f), false);
+        if (!Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Original)) || !Fixture.Ready(0)) return false;
+        if (bGround)
+        {
+            Fixture.Round->Tick(0.05f);
+        }
+        else
+        {
+            for (int32 Step = 0; Step < 30 && Fixture.Round->GetView().PendingProjectiles == 0; ++Step) Fixture.Round->Tick(0.01f);
+            if (!TestEqual(TEXT("The projectile is already airborne before target death"), Fixture.Round->GetView().PendingProjectiles, 1)) return false;
+        }
+        Original->Die();
+        const float DeadHP = Original->GetAttributeSet()->GetHP();
+        if (!bGround)
+        {
+            Fixture.Round->Tick(0.1f);
+            for (TActorIterator<ACombatRoundProjectile> It(Fixture.World.Get()); It; ++It)
+            {
+                TestTrue(TEXT("The released projectile continues along its original aim rather than turning to the nearby enemy"), FMath::IsNearlyZero(It->GetActorLocation().X, 0.01f) && It->GetActorLocation().Y > Source->GetActorLocation().Y);
+            }
+        }
+        if (!TestTrue(Context + TEXT(" resolves into the next planning phase"), Fixture.AdvanceUntilNextRound(1))) return false;
+        TestEqual(Context + TEXT(" does not acquire the nearby replacement"), Nearest->GetAttributeSet()->GetHP(), 100.f);
+        TestEqual(Context + TEXT(" preserves its original damage eligibility"), AtOriginalLocation->GetAttributeSet()->GetHP(), bGround ? 83.f : 100.f);
+        TestEqual(Context + TEXT(" never damages the corpse"), Original->GetAttributeSet()->GetHP(), DeadHP);
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundUnitApproachTrackingTest, "ProjectA.Combat.Round.UnitApproachStopsWithinReach", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FCombatRoundUnitApproachTrackingTest::RunTest(const FString& Parameters)
@@ -1416,8 +1582,13 @@ bool FCombatRoundMontageRecoveryTest::RunTest(const FString& Parameters)
         {
             Target->Die();
             Fixture.Round->Tick(0.01f);
-            TestTrue(TEXT("Pre-release cancellation returns without waiting for montage recovery"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Returning);
-            TestTrue(TEXT("The cancelled attack has not damaged the target or another living enemy"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 100.0f) && FMath::IsNearlyEqual(Fixture.Enemies[1]->GetAttributeSet()->GetHP(), 100.0f));
+            if (!TestTrue(TEXT("Target loss interrupts the unreleased montage and starts a new approach"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching)) return false;
+            TestEqual(TEXT("The replacement has no damage during reapproach"), Fixture.Enemies[1]->GetAttributeSet()->GetHP(), 100.f);
+            for (int32 Step = 0; Step < 200 && Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching; ++Step) Fixture.Round->Tick(0.01f);
+            if (!TestTrue(TEXT("The replacement starts a fresh cast within reach"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Casting)) return false;
+            for (int32 Step = 0; Step < 20 && Fixture.Enemies[1]->GetAttributeSet()->GetHP() == 100.f; ++Step) Fixture.Round->Tick(0.01f);
+            TestTrue(TEXT("The replacement receives one hit followed by its own montage recovery"), Fixture.Enemies[1]->GetAttributeSet()->GetHP() == 83.f && Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Recovery);
+            TestEqual(TEXT("Restarting the cast never charges another AP"), Source->GetCurrentActionPoint(), 1);
         }
         else
         {
@@ -1448,6 +1619,7 @@ bool FCombatRoundMontageRecoveryTest::RunTest(const FString& Parameters)
         if (!TestTrue(Context + TEXT(" settles into the next planning round"), Fixture.AdvanceUntilNextRound(1))) return false;
         TestTrue(Context + TEXT(" restores the home position and original facing"), Source->GetActorLocation().Equals(Origin, 2.0f) && Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
         TestTrue(Context + TEXT(" applies no extra damage while returning"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), Case == 3 ? 100.0f : 83.0f));
+        if (Case == 3) TestEqual(TEXT("Replacement recovery and return never repeat the damage"), Fixture.Enemies[1]->GetAttributeSet()->GetHP(), 83.f);
     }
     return true;
 }
@@ -1615,6 +1787,8 @@ bool FCombatRoundMeleeSidesTest::RunTest(const FString& Parameters)
         if (!Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Selected)) || !Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait"))) || !Fixture.Ready(0) || !Fixture.Ready(1)) return false;
         TestEqual(TEXT("One melee sweep costs one AP regardless of target count"), Source->GetCurrentActionPoint(), 1);
         if (Case == 9) Selected->Die();
+        TArray<float> BeforeHP;
+        for (AUnitBase* Enemy : Fixture.Enemies) BeforeHP.Add(Enemy->GetAttributeSet()->GetHP());
         bool bApproached = false;
         bool bReturned = false;
         for (int32 Step = 0; Step < 1000 && Fixture.Round->GetView().RoundNumber == 1; ++Step)
@@ -1628,14 +1802,15 @@ bool FCombatRoundMeleeSidesTest::RunTest(const FString& Parameters)
         }
         const FString Context = FString::Printf(TEXT("Melee sides case %d"), Case);
         TestEqual(Context + TEXT(" settles at the next planning phase"), Fixture.Round->GetView().RoundNumber, 2);
-        if (Case != 9) TestTrue(Context + TEXT(" approaches and returns through the melee movement flow"), bApproached && bReturned);
+        TestTrue(Context + TEXT(" approaches and returns through the melee movement flow"), bApproached && bReturned);
         TestTrue(Context + TEXT(" restores the original position and facing"), Source->GetActorLocation().Equals(Origin, 2.f) && Source->GetActorRotation().Equals(Facing, 0.1f));
         for (int32 Index = 0; Index < Fixture.Enemies.Num(); ++Index)
         {
             const bool bDead = (Case == 7 && Index == 2) || (Case == 9 && Index == SelectedIndex);
             const bool bExcluded = (Case == 3 && Index == 0) || ((Case == 4 || Case == 5 || Case == 8) && Index == 2);
-            const bool bHit = Case != 9 && !bExcluded && FMath::Abs(Index - SelectedIndex) <= 1;
-            const float Expected = bDead ? 0.f : bHit ? 83.f : 100.f;
+            const int32 EffectiveSelectedIndex = Case == 9 ? 0 : SelectedIndex;
+            const bool bHit = !bExcluded && FMath::Abs(Index - EffectiveSelectedIndex) <= 1;
+            const float Expected = bDead ? BeforeHP[Index] : bHit ? 83.f : 100.f;
             TestEqual(Context + FString::Printf(TEXT(" enemy %d gets one physical hit only inside the adjacent span"), Index), Fixture.Enemies[Index]->GetAttributeSet()->GetHP(), Expected);
         }
         TestEqual(Context + TEXT(" excludes allies"), Friend->GetAttributeSet()->GetHP(), 100.f);

@@ -121,8 +121,10 @@ struct PROJECTA_API FCombatRoundSkill
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     ECombatRoundApproach Approach = ECombatRoundApproach::Unit;
 
+    // Preserve serialized policies; resolved unit-targeted attacks always choose the nearest living enemy before release.
+    // 저장된 정책은 보존하며 해석된 유닛 대상 공격은 발동 전에 가장 가까운 생존 적을 다시 선택합니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    ECombatRoundTargetLoss TargetLoss = ECombatRoundTargetLoss::Cancel;
+    ECombatRoundTargetLoss TargetLoss = ECombatRoundTargetLoss::NearestEnemy;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     bool bRemainAtDestination = false;

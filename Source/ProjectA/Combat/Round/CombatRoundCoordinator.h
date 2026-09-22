@@ -143,7 +143,7 @@ private:
     bool ValidateDestinations(FText& OutError, int32 CandidateIndex = INDEX_NONE, const FCombatRoundCommand* CandidateCommand = nullptr, const FIntPoint* CandidateMove = nullptr) const;
     bool IsDestinationReservedByOther(int32 UnitIndex, FIntPoint Coord) const;
     int32 FindUnitIndex(int32 UnitId) const;
-    int32 FindNearestEnemy(int32 SourceIndex) const;
+    int32 FindNearestEnemy(int32 SourceIndex, FName SkillId = NAME_None) const;
     bool MoveUnitToward(int32 Index, FVector Destination, float Speed, float StepSeconds);
     void ApplyHit(AUnitBase* Source, AUnitBase* Target, float Damage);
     void HandleProjectileResolved(ACombatRoundProjectile* Projectile);

@@ -37,7 +37,7 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
         Skill.Power = Attack->GetAuthoredDamageAmount();
         Skill.Kind = bMoveToTarget ? ECombatRoundSkillKind::Melee : ECombatRoundSkillKind::Projectile;
         Skill.Approach = bMoveToTarget ? ECombatRoundApproach::Unit : ECombatRoundApproach::None;
-        Skill.TargetLoss = bMoveToTarget ? ECombatRoundTargetLoss::Cancel : ECombatRoundTargetLoss::KeepLocation;
+        Skill.TargetLoss = ECombatRoundTargetLoss::NearestEnemy;
         Skill.bTargetOnly = false;
         Skill.MeleeArea = AreaType == ESkillAreaType::TargetAndSides ? ESkillAreaType::TargetAndSides : ESkillAreaType::Single;
         if (AreaType == ESkillAreaType::AroundTarget)
@@ -52,6 +52,9 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
     Skill.SkillId = FName(*AssetId.ToString());
     Skill.Name = SkillName;
     if (!CombatRoundRules::IsValidSkill(Skill)) return Fail(NSLOCTEXT("SkillRound", "InvalidProfile", "RoundDefinition contains invalid timing, power, range, cost or approach settings. / RoundDefinition의 시간·위력·범위·비용·접근 설정이 유효하지 않습니다."));
+    // Apply the shared pre-release retarget rule to existing assets without changing their saved profiles or fixed ground attacks.
+    // 기존 저장 프로필과 고정 지점 공격을 변경하지 않고 발동 전 공통 재선택 규칙을 기존 에셋에도 적용합니다.
+    if (Skill.Kind == ECombatRoundSkillKind::Melee || Skill.Kind == ECombatRoundSkillKind::Projectile) Skill.TargetLoss = ECombatRoundTargetLoss::NearestEnemy;
     OutSkill = MoveTemp(Skill);
     return true;
 }

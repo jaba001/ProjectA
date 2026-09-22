@@ -464,7 +464,7 @@ void ACombatRoundCoordinator::PublishState()
     OnRoundStateChanged.Broadcast();
 }
 
-int32 ACombatRoundCoordinator::FindNearestEnemy(int32 SourceIndex) const
+int32 ACombatRoundCoordinator::FindNearestEnemy(int32 SourceIndex, FName SkillId) const
 {
     if (!View.Units.IsValidIndex(SourceIndex) || !IsValid(View.Units[SourceIndex].Unit)) return INDEX_NONE;
     const FCombatRoundUnitView& Source = View.Units[SourceIndex];
@@ -474,6 +474,7 @@ int32 ACombatRoundCoordinator::FindNearestEnemy(int32 SourceIndex) const
     {
         const FCombatRoundUnitView& Candidate = View.Units[Index];
         if (Candidate.bEnemy == Source.bEnemy || !IsValid(Candidate.Unit) || !Candidate.Unit->IsUnitAlive()) continue;
+        if (!SkillId.IsNone() && !IsValidUnitTarget(Source.UnitId, SkillId, Candidate.UnitId)) continue;
         const double CandidateDistance = FVector::DistSquared2D(Source.Unit->GetActorLocation(), Candidate.Unit->GetActorLocation());
         if (CandidateDistance < Distance)
         {
@@ -1308,8 +1309,25 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
         {
             if (Skill->TargetLoss == ECombatRoundTargetLoss::NearestEnemy)
             {
-                TargetIndex = FindNearestEnemy(Index);
-                if (View.Units.IsValidIndex(TargetIndex)) Action.EffectiveTargetUnitId = View.Units[TargetIndex].UnitId;
+                TargetIndex = FindNearestEnemy(Index, Entry.Command.SkillId);
+                if (View.Units.IsValidIndex(TargetIndex))
+                {
+                    Action.EffectiveTargetUnitId = View.Units[TargetIndex].UnitId;
+                    // Restart only the unreleased cast; keep the paid costs, locked command and original return point.
+                    // 미발동 시전만 다시 시작하며 차감한 비용·잠긴 명령·원래 복귀점은 유지합니다.
+                    Entry.Unit->SetRoundCastMontage(nullptr, true);
+                    Entry.Unit->SetRoundMovementVelocity(FVector::ZeroVector);
+                    Action.PhaseStarted = SimulationTime;
+                    Action.bMontageStarted = false;
+                    Action.bTrackMontageCompletion = false;
+                    Action.MontageStartedAt = 0.0;
+                    Action.MontageRecoverySeconds = 0.0;
+                    Action.WeaponTraceTime = -1.0;
+                    Action.PreviousBladeBase = FVector::ZeroVector;
+                    Action.PreviousBladeTip = FVector::ZeroVector;
+                    if (Skill->Approach == ECombatRoundApproach::Unit) Entry.ActionPhase = ECombatRoundActionPhase::Approaching;
+                    Entry.Status = RoundText(TEXT("가까운 적으로 대상 변경"));
+                }
             }
             if (Skill->TargetLoss == ECombatRoundTargetLoss::Cancel || (Skill->TargetLoss == ECombatRoundTargetLoss::NearestEnemy && !View.Units.IsValidIndex(TargetIndex)))
             {

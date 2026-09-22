@@ -32,7 +32,7 @@ def configure_sweeping_strike(skill):
     profile.set_editor_property("use_melee_area_collision", True)
     profile.set_editor_property("melee_area_half_extent", unreal.Vector(75.0, 250.0, 100.0))
     profile.set_editor_property("approach", unreal.CombatRoundApproach.UNIT)
-    profile.set_editor_property("target_loss", unreal.CombatRoundTargetLoss.CANCEL)
+    profile.set_editor_property("target_loss", unreal.CombatRoundTargetLoss.NEAREST_ENEMY)
     profile.set_editor_property("remain_at_destination", False)
     skill.set_editor_property("round_definition", profile)
     skill.set_editor_property("use_round_definition", True)
