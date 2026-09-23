@@ -15,7 +15,6 @@ class USkillDefinitionDataAsset;
 class AUnitBase;
 class UAnimInstance;
 class UAnimMontage;
-class UAnimSequence;
 
 // Team affiliation used by combat units.
 // 전투 유닛의 소속 팀을 나타냅니다.
@@ -239,13 +238,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Death")
     virtual void Die();
 
-    // Allied units play the skeleton-matched death sequence once and hold its final pose.
-    // 아군은 뼈대에 맞는 사망 시퀀스를 한 번 재생하고 마지막 자세를 유지합니다.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UnitBase|Death")
-    TObjectPtr<UAnimSequence> DeathAnimation;
-
-    // Replicated death impulse for enemy ragdolls.
-    // 적 래그돌에 적용하는 복제 사망 충격량입니다.
+    // Replicated death impulse for allied and enemy ragdolls.
+    // 아군과 적 래그돌에 적용하는 복제 사망 충격량입니다.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "UnitBase|Death")
     FVector DeathImpulse;
 

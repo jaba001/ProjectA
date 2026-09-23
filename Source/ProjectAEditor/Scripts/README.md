@@ -83,7 +83,7 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureTestEnemies.py") -TestEnemiesVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-10. `ConfigureWarriorContent.py`: 이전 GKnight 콘텐츠 작성 도구. 현재 직업 외형 작성·검사는 아래 `ConfigureProfessionAppearance.py`를 사용한다. 이 도구를 재실행하면 이전 GKnight 외형과 직업 매핑이 적용된다. 공통 리타깃은 `RetargetContentLibrary.py`에서, 기존 부착 함수는 이전 도구에서 재사용한다. 메시·뼈대는 GKnight·Skeleton_Guard 원본을 직접 참조하며, 검은 타격 소켓을 추가한 Weapon_Pack 수정본을 유지한다.
+10. `ConfigureWarriorContent.py`: GKnight 전사와 Skeleton_Guard 적의 기존 콘텐츠 작성·검사 도구. 파라곤 캐릭터 적용 롤백 후 다시 사용하는 구성이다. 공통 리타깃은 `RetargetContentLibrary.py`에서 제공한다. 메시·뼈대는 원본을 직접 참조하며, 검은 타격 소켓을 추가한 Weapon_Pack 수정본을 유지한다.
 
 IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScript`를 사용하며 스크립트 종료 후 에디터도 종료된다. `-WarriorVerifyOnly`는 commandlet에서 저장된 뼈대·몽타주·스킬·소켓·직업·이전 참조만 읽는다. 두 명령 모두 PIE·게임 플레이를 시작하지 않는다. 외부 팩 원본은 설치된 상태여야 하며 수정하지 않는다.
 
@@ -113,16 +113,9 @@ IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScri
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureShopSkillPresentation.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-13. `ConfigureProfessionAppearance.py`: 네 직업의 Kwang·Gideon·Sparrow·Countess 메시·뼈대·재질을 원본 경로로 직접 참조한다. 기존 전투 애니메이션만 새 뼈대에 리타깃하며 메뉴·플레이어·Snapshot Blueprint와 카탈로그를 연결한다. `ImportMageStaff.py`는 `Mage Staff - Free Weapons/SM_Staff_01.fbx`와 공용 BaseColor/Normal/ORM을 `/Game/MageStaff_FreeWeapons`에 임포트한다. 원본 파일 복제나 외부 팩 수정은 하지 않는다. 파라곤 네 팩은 프로젝트 원본 위치에 설치되어 있어야 한다.
+13. 파라곤 캐릭터 외형과 사망 애니메이션 작성 도구는 롤백에 따라 제거했다. 전사는 GKnight, 공용 직업은 Manny, 적/Snapshot은 Skeleton_Guard, 메뉴는 `BP_PartyMenuPreview`를 사용한다. 기존 직업별 Blueprint 경로도 이전 모델로 연결하여 저장 참조를 유지한다. 미사용 생성 에셋과 사용자 수정 지팡이는 보존하며 `ImportMageStaff.py`는 수동 임포트 도구로만 남긴다. [현재 확인](../../../Docs/TODO.md#2-25-파라곤-적용-롤백)
 
-```powershell
-& $editorExecutable $projectFile ("-ExecutePythonScript=$scriptDirectory/ConfigureProfessionAppearance.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -RenderOffscreen -nosplash
-& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureProfessionAppearance.py") -ProfessionAppearanceVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
-```
-
-첫 명령은 에셋 작성 후 에디터를 종료한다. 두 번째는 저장된 Blueprint·직업 매핑·뼈대·몽타주 슬롯·검 궤적 샘플·무기 표시 설정·지팡이 부착을 읽는다. 결과는 `Saved/Automation/ProfessionAppearanceConfigure.json`·`ProfessionAppearanceReload.json`이다. 실제 메뉴·이동·공격 확인은 [TODO](../../../Docs/TODO.md#2-25-직업별-파라곤-외형)에서 별도로 진행한다.
-
-`RetargetContentLibrary.py`는 Rig·리타깃·골반 이동 검증을 공통 제공한다. 호출 도구가 보고서·재작성 여부·출력 경로 함수를 전달하여 다른 도구의 전역 설정을 참조하지 않는다. 직업 외형의 강제 재작성은 `-ProfessionAppearanceRebuildRetargets`를 사용하며 기존 `-WarriorRebuildRetargets`도 호환한다. 이번 함수 분리는 Python 구문·호출 계약만 정적으로 확인했으며 에셋 재작성은 실행하지 않았다.
+`RetargetContentLibrary.py`는 Rig·리타깃·골반 이동 검증을 공통 제공한다. 호출 도구가 보고서·재작성 여부·출력 경로 함수를 전달하여 다른 도구의 전역 설정을 참조하지 않는다. 기존 전사 콘텐츠의 강제 재작성은 `-WarriorRebuildRetargets`를 사용한다.
 
 14. `ConsolidateCopiedAssets.py`: `User_JeHoon`에 복사한 Manny·GKnight·Skeleton_Guard 메시·뼈대 6개만 원본으로 통합한다. 외부 팩끼리는 비교하지 않는다. 원본 형상·기준 포즈·애니메이션 데이터를 검사하고 GKnight·Skeleton_Guard의 필요한 몽타주 슬롯만 원본에 보존한다. 애니메이션·AnimBP·메시 참조를 갱신하고 옛 경로에는 작은 Redirector를 남긴다. 검 소켓 수정본과 임포트·리타깃 결과는 유지한다.
 
