@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ConfigureWarriorContent import ASSETS, HELPER, SKILLS, TOOLS, configure_weapon, duplicate, load, require, save
 from RetargetContentLibrary import retarget
 from ImportMageStaff import MESH_PATH as STAFF_PATH, configure as import_staff, describe_bounds
+from ConfigureDeathAnimations import hero_death_path
 from WarriorContentPaths import ROOT, SWORD_FOLDER, SWORD_SOURCE, SWORD_RECOVERY_SOURCE, UNARMED_SOURCE, WARRIOR_MONTAGE, WEAPON_SOURCE, animation_sources, mirrored_path, retarget_output_path
 
 
@@ -102,6 +103,7 @@ def configure_combat_blueprint(blueprint, mesh, animation, overrides, hero, idle
     component.set_editor_property("override_materials", [])
     component.set_editor_property("anim_class", animation.generated_class())
     defaults.set_editor_property("round_montage_overrides", overrides)
+    defaults.set_editor_property("death_animation", load(hero_death_path(hero)))
     unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
     configure_weapon(blueprint, weapon, (-11.095651, 5.605028, -10.0))
     configure_embedded_weapons(blueprint, hero)
@@ -227,6 +229,7 @@ def verify():
         require(dict(snapshot_defaults.get_editor_property("round_montage_overrides")) == dict(overrides), "Snapshot montage mapping differs from player")
         for combat_blueprint in [unit, snapshot]:
             combat_defaults = unreal.get_default_object(combat_blueprint.generated_class())
+            require(combat_defaults.get_editor_property("death_animation") == load(hero_death_path(hero)), "Original death animation reference missing")
             references = combat_defaults.get_editor_property("weapon_presentation_skills")
             reference_paths = [reference.get_path_name() if isinstance(reference, unreal.Object) else str(reference) for reference in references]
             require(reference_paths == [sword.get_path_name()], "Inherited sword presentation skill missing: " + str(reference_paths))

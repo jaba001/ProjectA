@@ -8,6 +8,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/AnimSequence.h"
+#include "Engine/SkeletalMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "AIController.h"
 
@@ -359,13 +361,15 @@ void AUnitBase::Die()
         CurrentTile = nullptr;
     }
 
-    // Generate the cosmetic impulse once on the server for every viewer.
-    // 모든 관찰자에게 전달할 시각 임펄스는 서버에서 한 번 생성합니다.
+    // Preserve the previous death impulse generation while animation replaces ragdoll.
+    // 래그돌을 애니메이션으로 대체하는 동안 기존 사망 충격량 생성 코드를 보존합니다.
+    /*
     if (DeathImpulse.IsNearlyZero())
     {
         DeathImpulse = FMath::VRand() * 2000.0f;
         DeathImpulse.Z = FMath::Abs(DeathImpulse.Z) + 500.0f;
     }
+    */
     ApplyDeathPresentation();
     ForceNetUpdate();
 
@@ -395,13 +399,31 @@ void AUnitBase::ApplyDeathPresentation()
     }
 
     bDeathPresentationApplied = true;
-    StopRoundCastMontage();
+    StopRoundCastMontage(0.f);
     GetCharacterMovement()->DisableMovement();
     SetRoundMovementVelocity(FVector::ZeroVector);
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    // Preserve the previous ragdoll and impulse code without enabling death physics.
+    // 사망 물리를 활성화하지 않고 기존 래그돌과 충격량 적용 코드를 보존합니다.
+    /*
     GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
     GetMesh()->SetAllBodiesSimulatePhysics(true);
     GetMesh()->AddImpulse(DeathImpulse, NAME_None, true);
+    */
+
+    USkeletalMeshComponent* UnitMesh = GetMesh();
+    UnitMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    if (!IsValid(DeathAnimation) || !UnitMesh->GetSkeletalMeshAsset() || DeathAnimation->GetSkeleton() != UnitMesh->GetSkeletalMeshAsset()->GetSkeleton())
+    {
+        UnitMesh->bPauseAnims = true;
+        UE_LOG(LogTemp, Warning, TEXT("[DeathAnimation] Missing or incompatible sequence Unit=%s Animation=%s / 사망 애니메이션 누락 또는 뼈대 불일치"), *GetPathName(), *GetPathNameSafe(DeathAnimation));
+        return;
+    }
+
+    // Single-node non-looping playback retains the final pose without returning to locomotion.
+    // 단일 시퀀스를 반복 없이 재생하여 이동 상태로 복귀하지 않고 마지막 자세를 유지합니다.
+    UnitMesh->bPauseAnims = false;
+    UnitMesh->PlayAnimation(DeathAnimation, false);
 }
 
 void AUnitBase::CancelCurrentAction()

@@ -1,11 +1,12 @@
 # ProjectA 완료 작업과 검증 기록
 
-갱신일: 2026-09-22. 완료 범위·기준 커밋·실행 근거를 기록한다. 현재 상태와 간단 확인은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
+갱신일: 2026-09-23. 완료 범위·기준 커밋·실행 근거를 기록한다. 현재 상태와 간단 확인은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
 
 ## 최근 변경
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-09-23 사망 애니메이션 전환 | 기존 래그돌·충격량 생성/적용 코드 주석 보존, 단발 사망 시퀀스·종단 자세 유지. 파라곤 원본 4종과 기본 Manny 직접 참조, 해골 적 리타깃 1개(265,642바이트), 전투 Blueprint 11개 연결. Development Editor / Win64 빌드 6.69초·별도 저장본 재로드/포즈 검사 통과, 재로드 오류 0·기존 Rig 경고 4. 작성용 에디터 시작 시 자동 Smoke 검사 조건 오류 4개와 종료 코드 0xC0000005가 발생했으나 저장 완료 후 별도 commandlet은 종료 코드 0으로 통과. PIE/게임 미실행. 근거: `Saved/Automation/DeathAnimationBuild.txt`, `DeathAnimationsReload.json`, `Saved/Logs/DeathAnimationsReload.log`; [사용자 확인](TODO.md#2-28-사망-애니메이션-전환) |
 | 2026-09-22 공통 검증과 실행 책임 분리 | 능력치/장착·계획 검증 공통화, AI·충돌·GAS 효과 실행 분리와 실제 태그 조건 연결, 즉시 효과 적용 거절·미지원 지속 효과 검증 보완. Run 경로/저장 버전·후보 저장 후 반영, 4슬롯 초안·UI 갱신·구형 호환 코드·에디터 리타깃 공통 함수 분리. 테스트 전용 효과를 Editor 모듈로 분리하고 에셋 정리 결과를 보존하여 통합. 원래 프로젝트의 파일 재생성 10.30초·UHT 포함 Development Editor / Win64 빌드 32.64초 성공, 오류/경고 0. 독립 코드 검토·Python 구문 17개·문서 내부 링크 302개·diff 검사 통과. 추가 회귀 코드는 컴파일만 수행하며 게임·PIE·자동화·에셋 재작성 미실행. 근거: `Saved/Automation/RefactorIntegratedBuild.txt`, `RefactorIntegratedStatic.json`; [사용자 확인](TODO.md#2-27-공통-검증과-실행-책임-분리) |
 | 2026-09-22 User_JeHoon 복사본 정리 | 원본 직접 참조·외부 팩 간 비교 금지 규칙 반영. Manny/GKnight/Skeleton_Guard 사본 6개를 Unreal로 통합하고 애니메이션 참조·원본 두 뼈대의 DefaultSlot·이전 경로 호환 보존. 검 소켓 수정본과 필수 파생 결과 유지. Content 순감소 34.01MiB. Development Editor / Win64 최종 빌드 2.94초, 별도 재로드 5,385개·공용 3종/직업 8종의 검 포즈 샘플·원본 참조 확인. 오류 0·옛 이름 조회 후 해석 경고 4·원본 Rig 경고 4. PIE/게임 미실행. 근거: `Saved/Automation/CopiedAssetsBuild.txt`, `CopiedAssetsDiskResult.json`, `CopiedAssetsReload.json`, `Saved/Logs/CopiedAssetsReloadFinal.log`; [사용자 확인](TODO.md#2-26-user_jehoon-복사본-정리) |
 | 2026-09-22 직업별 파라곤 외형 | 전사 Kwang·궁수 Sparrow·마법사 Gideon·도적 Countess 원본 참조, 메뉴/전투/Snapshot 연결과 `SM_Staff_01` 왼손 부착. 필요한 전투 동작만 리타깃하고 기존 장착·검 판정 유지. Development Editor / Win64 빌드 19.96초 성공, 별도 저장본 재로드에서 직업 매핑·몽타주·플레이어/Snapshot 8종 검 샘플·지팡이/내장 무기 설정 확인. 원본 메시·뼈대 해시 8/8 유지, 재로드 오류 0·원본 구형 Rig 참조 경고 4. 실제 게임 확인 대기. 근거: `Saved/Automation/ProfessionAppearanceBuildFinal.txt`, `Saved/Logs/ProfessionAppearanceReload.log`, `Saved/Automation/ProfessionAppearanceReload.json`; [사용자 확인](TODO.md#2-25-직업별-파라곤-외형) |
