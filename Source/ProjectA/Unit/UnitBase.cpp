@@ -361,15 +361,13 @@ void AUnitBase::Die()
         CurrentTile = nullptr;
     }
 
-    // Preserve the previous death impulse generation while animation replaces ragdoll.
-    // 래그돌을 애니메이션으로 대체하는 동안 기존 사망 충격량 생성 코드를 보존합니다.
-    /*
-    if (DeathImpulse.IsNearlyZero())
+    // Generate the enemy ragdoll impulse once on the server for every viewer.
+    // 적 래그돌 충격량은 모든 관찰자에게 전달하도록 서버에서 한 번 생성합니다.
+    if (Team == ETeam::Enemy && DeathImpulse.IsNearlyZero())
     {
         DeathImpulse = FMath::VRand() * 2000.0f;
         DeathImpulse.Z = FMath::Abs(DeathImpulse.Z) + 500.0f;
     }
-    */
     ApplyDeathPresentation();
     ForceNetUpdate();
 
@@ -403,15 +401,17 @@ void AUnitBase::ApplyDeathPresentation()
     GetCharacterMovement()->DisableMovement();
     SetRoundMovementVelocity(FVector::ZeroVector);
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    // Preserve the previous ragdoll and impulse code without enabling death physics.
-    // 사망 물리를 활성화하지 않고 기존 래그돌과 충격량 적용 코드를 보존합니다.
-    /*
-    GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
-    GetMesh()->SetAllBodiesSimulatePhysics(true);
-    GetMesh()->AddImpulse(DeathImpulse, NAME_None, true);
-    */
-
     USkeletalMeshComponent* UnitMesh = GetMesh();
+    // Keep the original death physics for enemies, including snapshot opponents.
+    // 스냅샷 상대를 포함한 적은 기존 사망 물리 처리를 유지합니다.
+    if (Team == ETeam::Enemy)
+    {
+        UnitMesh->SetCollisionProfileName(TEXT("Ragdoll"));
+        UnitMesh->SetAllBodiesSimulatePhysics(true);
+        UnitMesh->AddImpulse(DeathImpulse, NAME_None, true);
+        return;
+    }
+
     UnitMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     if (!IsValid(DeathAnimation) || !UnitMesh->GetSkeletalMeshAsset() || DeathAnimation->GetSkeleton() != UnitMesh->GetSkeletalMeshAsset()->GetSkeleton())
     {

@@ -176,7 +176,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 휩쓸기 | `BPDA_SweepingStrike`: 근접 전방 박스 충돌·피해 10·AP 1·시전 몽타주·종료 후 복귀. 이전 이름/ID 리디렉션 유지 |
 | 전투 간 이관 | HP 유지. 새 전투의 추가 스킬 자동 추첨 없음. 전투 복구는 저장된 Ready 경계 사용. Snapshot 적은 저장된 스킬 구성 사용 |
 | 적·아군 AI | 실제 장착 스킬 순서·가까운 적 기준으로 인간 초안 전에 단일 명령 고정. 장착된 복귀형 Tile 공격은 적 HomeCoord를 공격/접근 좌표로 선택 가능. 합법 공격이 없으면 목록에 노출되지 않는 내부 대기 처리 |
-| 사망 표현 | `UnitBase.DeathAnimation` 단발 재생·마지막 자세 유지, 캡슐/메시 충돌 해제. 기존 래그돌·충격량 생성/적용 코드는 주석 보존. Kwang/Sparrow `Death_Bwd`, Gideon `Death_Back`, Countess `Death` 원본 직접 참조. 기본 Manny는 `MM_Death_Back_01`, 해골 적은 같은 시퀀스의 필수 리타깃 1개 사용. 설정은 `ConfigureDeathAnimations.py`, 원본 사망 시퀀스·메시 복제 없음. [사용자 확인](TODO.md#2-28-사망-애니메이션-전환) |
+| 사망 표현 | 아군은 `UnitBase.DeathAnimation` 단발 재생·마지막 자세 유지와 캡슐/메시 충돌 해제. `ETeam::Enemy`는 Snapshot을 포함해 기존 래그돌·사망 충격량 적용, 캡슐만 충돌 해제. Kwang/Sparrow `Death_Bwd`, Gideon `Death_Back`, Countess `Death` 원본 직접 참조. 기존 적의 사망 시퀀스 설정은 보존하되 적 진영에서는 미사용. 설정은 `ConfigureDeathAnimations.py`, 원본 사망 시퀀스·메시 복제 없음. [사용자 확인](TODO.md#2-28-사망-애니메이션-전환) |
 | 메뉴 프리뷰 | MainMenuPreviewStage의 카메라·4개 앵커·직업별 `BP_*MenuPreview` 사용. 파라곤 원본 메시와 리타깃 `MM_Idle` 반복 재생, 마법사 왼손 지팡이 연결. 전투 Pawn 생성 없음. [남은 확인](TODO.md#2-25-직업별-파라곤-외형) |
 | 생성 화면 종료 | Back/X는 초안·프리뷰 정리. 재진입 시 빈 4슬롯. 상세 패널이 열려 있으면 먼저 패널만 닫음. 최소 슬롯 높이로 ClassInfo 표시 유지 |
 | 모드 선택 | 게임 시작 → 싱글플레이/멀티플레이. 캐릭터 생성·접속 시작 전 멀티 화면에서 돌아오면 모드 선택 복원, 모드 선택의 뒤로가기는 첫 화면 복원. 연결 이후 나가기는 기존 세션 정리/메뉴 복귀 |
