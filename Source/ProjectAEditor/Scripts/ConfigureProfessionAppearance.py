@@ -21,6 +21,7 @@ MENU_PATH = ROOT + "/LEVEL/MainMenu"
 SWORD_MANNY = SWORD_FOLDER + "/AM_SwordAttack_Manny"
 REPORT = {"gameplay_test": "not run", "original_meshes_referenced_directly": True, "professions": []}
 HIDDEN_WEAPON_BONES = {"Kwang": ["weapon_r"], "Sparrow": ["bow_base", "arrow_nock"], "Gideon": [], "Countess": ["weapon_l", "weapon_r"]}
+STAFF_SOCKET = "hand_lSocket"
 
 
 def hero_root(hero):
@@ -75,11 +76,19 @@ def configure_staff(blueprint, mesh, idle, staff):
     pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(idle, 0.0, options)
     require(unreal.AnimPoseExtensions.is_valid(pose), "Could not evaluate mage idle hand pose")
     hand = unreal.AnimPoseExtensions.get_bone_pose(pose, "hand_l", unreal.AnimPoseSpaces.WORLD)
-    finger = unreal.AnimPoseExtensions.get_bone_pose(pose, "middle_01_l", unreal.AnimPoseSpaces.WORLD)
-    palm = (hand.translation + finger.translation) * 0.5
-    # Align the staff upright at the closed left palm, leaving the right hand available for purchased sword skills.
-    # 지팡이를 왼손 손바닥에서 수직으로 정렬하고 오른손은 구매한 검 스킬에 사용합니다.
-    desired = unreal.Transform(location=palm, rotation=unreal.Rotator(), scale=unreal.Vector(1.0, 1.0, 1.0))
+    thumb = unreal.AnimPoseExtensions.get_bone_pose(pose, "thumb_02_l", unreal.AnimPoseSpaces.WORLD).translation
+    pinky = unreal.AnimPoseExtensions.get_bone_pose(pose, "pinky_02_l", unreal.AnimPoseSpaces.WORLD).translation
+    middle = unreal.AnimPoseExtensions.get_bone_pose(pose, "middle_01_l", unreal.AnimPoseSpaces.WORLD).translation
+    # Seat the shaft across the palm below the finger joints; the source hand socket has an identity bone offset.
+    # 원본 손 소켓의 본 오프셋은 항등 변환이며, 손잡이는 손가락 관절 안쪽에서 손바닥을 가로지르게 배치합니다.
+    palm_offset = unreal.MathLibrary.transform_direction(hand, unreal.Vector(0.0, -2.8, 0.0))
+    grip = (thumb + pinky) * 0.5 + palm_offset
+    rotation = unreal.MathLibrary.make_rot_from_zx(thumb - pinky, middle - hand.translation)
+    desired = unreal.Transform(location=grip, rotation=rotation, scale=unreal.Vector(1.0, 1.0, 1.0))
+    # The imported shaft at mesh Z=0 is off-center; align its center instead of the mesh pivot.
+    # 임포트 메시의 Z=0 손잡이 중심은 피벗에서 벗어나 있으므로 실제 손잡이 중심을 정렬합니다.
+    shaft_center = unreal.MathLibrary.transform_direction(desired, unreal.Vector(-0.476373, 0.000402, 0.0))
+    desired.translation = grip - shaft_center
     relative = unreal.MathLibrary.make_relative_transform(desired, hand)
     component.set_static_mesh(staff)
     component.set_editor_property("relative_location", relative.translation)
@@ -87,7 +96,7 @@ def configure_staff(blueprint, mesh, idle, staff):
     component.set_editor_property("relative_scale3d", relative.scale3d)
     component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
     component.set_editor_property("can_ever_affect_navigation", False)
-    require(HELPER.set_weapon_attachment(blueprint, "Staff", "hand_l"), "Could not save staff hand attachment")
+    require(HELPER.set_weapon_attachment(blueprint, "Staff", STAFF_SOCKET), "Could not save staff hand attachment")
 
 
 def skill_montage(skill):
@@ -252,7 +261,7 @@ def verify():
         if profession == "Mage":
             for blueprint in [unit, preview, snapshot]:
                 staff = next((obj for handle, obj, name in component_templates(blueprint) if name == "Staff"), None)
-                require(staff and staff.get_editor_property("static_mesh") == load(STAFF_PATH) and str(HELPER.get_weapon_attachment(blueprint, "Staff")) == "hand_l", "Mage staff attachment mismatch")
+                require(staff and staff.get_editor_property("static_mesh") == load(STAFF_PATH) and str(HELPER.get_weapon_attachment(blueprint, "Staff")) == STAFF_SOCKET, "Mage staff attachment mismatch")
                 require(staff.get_editor_property("visible") and staff.get_collision_enabled() == unreal.CollisionEnabled.NO_COLLISION, "Staff must stay visible without combat collision")
         REPORT["professions"].append({"profession": profession, "hero": hero, "mesh": mesh.get_path_name(), "unit": unit.get_path_name(), "snapshot": snapshot.get_path_name(), "preview": preview.get_path_name(), "animation": animation.get_path_name(), "sword_samples_per_unit": 41})
 

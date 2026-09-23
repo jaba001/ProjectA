@@ -6,6 +6,7 @@
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-09-23 마법사 지팡이 손 소켓 보정 | 메뉴·전투·Snapshot Blueprint 3개의 `Staff`를 원본 `hand_lSocket`에 연결. 손목 쪽 배치와 손가락 길이 방향 축을 손바닥 안쪽의 가로 축으로 보정하고 메시 피벗과 실제 손잡이 중심의 차이를 반영했다. 생성 명세 갱신, 원본 복제·수정 없음. Blueprint 컴파일·별도 재로드 및 원본 메시/뼈대/지팡이 해시 3개 검사 통과, 재로드 오류 0·기존 Rig 경고 1. PIE/게임 미실행. 근거: `Saved/Automation/MageGrip/Reload.json`; [사용자 확인](TODO.md#2-25-직업별-파라곤-외형) |
 | 2026-09-23 메뉴의 불필요한 지팡이 숨김 | MainMenu에 독립 배치된 `SM_Staff_02·03·04`의 게임 내 표시·충돌 비활성화. 배치·원본 에셋과 마법사 손의 `SM_Staff_01` 유지, 복제·삭제 없음. 별도 저장본 재로드에서 대상 3개 숨김·충돌 해제와 마법사 지팡이 표시 확인, PIE/게임 미실행. 근거: `Saved/Automation/MenuStaffVisibilityReload.json`; [사용자 확인](TODO.md#2-25-직업별-파라곤-외형) |
 | 2026-09-23 적 래그돌 복원 | 사용자 요청에 따라 사망 물리 코드의 주석을 해제하고 `ETeam::Enemy`에 기존 래그돌·서버 충격량 생성/복제/적용 복원. 아군의 단발 사망 애니메이션 유지, Snapshot 상대도 적 물리 분기 사용. 에셋 변경 없음. Development Editor / Win64 빌드 17.43초·정적 검사 통과, PIE/게임 미실행. 근거: `Saved/Automation/EnemyRagdollBuild.txt`; [사용자 확인](TODO.md#2-28-사망-애니메이션-전환) |
 | 2026-09-23 사망 애니메이션 전환 | 기존 래그돌·충격량 생성/적용 코드 주석 보존, 단발 사망 시퀀스·종단 자세 유지. 파라곤 원본 4종과 기본 Manny 직접 참조, 해골 적 리타깃 1개(265,642바이트), 전투 Blueprint 11개 연결. Development Editor / Win64 빌드 6.69초·별도 저장본 재로드/포즈 검사 통과, 재로드 오류 0·기존 Rig 경고 4. 작성용 에디터 시작 시 자동 Smoke 검사 조건 오류 4개와 종료 코드 0xC0000005가 발생했으나 저장 완료 후 별도 commandlet은 종료 코드 0으로 통과. PIE/게임 미실행. 근거: `Saved/Automation/DeathAnimationBuild.txt`, `DeathAnimationsReload.json`, `Saved/Logs/DeathAnimationsReload.log`; [사용자 확인](TODO.md#2-28-사망-애니메이션-전환) |

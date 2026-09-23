@@ -249,7 +249,7 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 
 기존 DA는 유형별 폴더를 사용한다. 파라곤 외형은 `/Game/ParagonKwang`·`ParagonSparrow`·`ParagonGideon`·`ParagonCountess`의 원본을 직접 참조하며 팩끼리의 중복 비교·통합은 하지 않는다. 기존 전투 동작에 필요한 리타깃 애니메이션·Rig·직업 Blueprint는 `/Game/User_JeHoon/`에 작성한다. 지팡이 FBX 한 개와 공용 PBR 텍스처는 `/Game/MageStaff_FreeWeapons`로 직접 임포트한다. Manny·GKnight·Skeleton_Guard의 메시·뼈대는 원본으로 통합하고, 필요한 `DefaultGroup.DefaultSlot`은 GKnight·Skeleton_Guard 원본 뼈대에 보존한다. 타격용 `BladeBase`·`BladeTip` 소켓이 추가된 검 수정본은 유지한다. 제작·검사 명령은 [에셋 스크립트](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
 
-`UCharacterAppearanceComponent`는 메시 인스턴스의 내장 무기 본만 숨기며 원본이나 판정을 수정하지 않는다. 별도 `Sword` 표시는 `AUnitBase::RefreshSkillPresentation`에서 저장된 장착에 맞춰 갱신하며 아군과 Snapshot 상대가 공유한다. `Staff`는 왼손에 항상 표시하고 충돌을 비활성화한다. 이전 전투 체크포인트는 저장된 클래스 경로를 복구하므로 새 외형 확인은 새 Run을 기준으로 한다.
+`UCharacterAppearanceComponent`는 메시 인스턴스의 내장 무기 본만 숨기며 원본이나 판정을 수정하지 않는다. 별도 `Sword` 표시는 `AUnitBase::RefreshSkillPresentation`에서 저장된 장착에 맞춰 갱신하며 아군과 Snapshot 상대가 공유한다. `Staff`는 Gideon 원본 `hand_lSocket`에 항상 표시하고 충돌을 비활성화한다. 메뉴·전투·Snapshot Blueprint의 동일한 상대 변환으로 손잡이 중심과 손바닥을 가로지르는 축을 맞추며 원본 소켓·메시는 수정하거나 복제하지 않는다. 이전 전투 체크포인트는 저장된 클래스 경로를 복구하므로 새 외형 확인은 새 Run을 기준으로 한다.
 
 | 에셋 경로 | 클래스 / 저장된 연결 |
 |---|---|
