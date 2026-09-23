@@ -113,7 +113,7 @@ IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScri
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureShopSkillPresentation.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-13. 파라곤 캐릭터 외형과 사망 애니메이션 작성 도구는 롤백에 따라 제거했다. 전사는 GKnight, 공용 직업은 Manny, 적/Snapshot은 Skeleton_Guard, 메뉴는 `BP_PartyMenuPreview`를 사용한다. 기존 직업별 Blueprint 경로도 이전 모델로 연결하여 저장 참조를 유지한다. 미사용 생성 에셋과 사용자 수정 지팡이는 보존하며 `ImportMageStaff.py`는 수동 임포트 도구로만 남긴다. [현재 확인](../../../Docs/TODO.md#2-25-파라곤-적용-롤백)
+13. 파라곤 캐릭터 외형과 사망 애니메이션 작성 도구는 롤백에 따라 제거했다. 전사는 GKnight, 공용 직업은 Manny, 적/Snapshot은 Skeleton_Guard, 메뉴 전사는 `BP_WarriorMenuPreview`의 GKnight·`MM_Idle_Warrior`, 나머지는 `BP_PartyMenuPreview`를 사용한다. 기존 직업별 Blueprint 경로도 이전 모델로 연결하여 저장 참조를 유지한다. 미사용 파라곤 생성 에셋은 보존하며 `ImportMageStaff.py`는 수동 임포트 도구로만 남긴다. [현재 확인](../../../Docs/TODO.md#2-25-파라곤-적용-롤백)
 
 `RetargetContentLibrary.py`는 Rig·리타깃·골반 이동 검증을 공통 제공한다. 호출 도구가 보고서·재작성 여부·출력 경로 함수를 전달하여 다른 도구의 전역 설정을 참조하지 않는다. 기존 전사 콘텐츠의 강제 재작성은 `-WarriorRebuildRetargets`를 사용한다.
 

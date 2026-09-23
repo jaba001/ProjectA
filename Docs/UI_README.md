@@ -112,7 +112,7 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 
 프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 Warrior/Mage/Archer/Rogue 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
-네 직업 모두 적용 이전의 `BP_PartyMenuPreview`를 사용한다. 같은 뼈대의 `MM_Idle`을 SingleNode 모드·속도 1·반복·자동재생으로 연결하며 기존 카메라·앵커 배치와 NoCollision을 유지한다. 파라곤용 직업별 프리뷰 Blueprint도 공통 프리뷰 모델로 변경하고 지팡이·내장 무기 숨김 컴포넌트는 제거했다. 실제 반복 재생·위치·삭제/재진입은 [남은 확인](TODO.md#2-25-파라곤-적용-롤백)에서 확인한다.
+전사는 GKnight 원본 메시의 `BP_WarriorMenuPreview`와 기존 `MM_Idle_Warrior`를 사용하고 나머지 직업은 `BP_PartyMenuPreview`를 사용한다. 각 뼈대에 맞는 Idle을 SingleNode 모드·속도 1·반복·자동재생으로 연결하며 기존 카메라·앵커 배치와 NoCollision을 유지한다. 파라곤용 직업별 프리뷰 Blueprint도 이전 모델로 변경하고 지팡이·내장 무기 숨김 컴포넌트는 제거했다. 실제 반복 재생·위치·삭제/재진입은 [남은 확인](TODO.md#2-25-파라곤-적용-롤백)에서 확인한다.
 
 GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메뉴 travel의 잔여 IgnoreInput·초기 포커스만 복구한다. CharacterCreation의 Text_StartGameStatus는 선택 바인딩이며 누락 시 Native 표시 영역을 추가한다. 상세 배치·바인딩은 [PROJECT_PLAN](PROJECT_PLAN.md#gameplay-에셋과-배치)을 따른다.
 
@@ -264,7 +264,7 @@ C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / 
 
 캐릭터 생성의 선택 순서는 전사 `Warrior` → 마법사 `Mage` → 궁수 `Archer` → 도적 `Rogue`다. 이전 테스트 직업은 선택 목록에서 제거한다. 이름 편집·취소·1~4명 생성과 원래 소유권은 유지한다. ClassInfo는 직업 정의의 HP 100·힘/민첩/지능 각 10과 기존 전투 클래스에서 해석한 AP/SubAP·시작 스킬을 표시한다. 이 수치는 현재 시작값이며 최종 직업 밸런스가 아니다.
 
-표시 정보의 기준은 `UProfessionBase`와 네 C++ 자식 클래스다. 실사용 및 `Validation/T12` WBP의 기존 WidgetTree·배치·스타일·바인딩을 유지한다. MainMenu 프리뷰 맵은 네 직업 ID를 공통 `BP_PartyMenuPreview`에 연결한다. 개발용 협동은 참가자마다 궁수 한 명을 생성한다.
+표시 정보의 기준은 `UProfessionBase`와 네 C++ 자식 클래스다. 실사용 및 `Validation/T12` WBP의 기존 WidgetTree·배치·스타일·바인딩을 유지한다. MainMenu 프리뷰 맵은 Warrior를 `BP_WarriorMenuPreview`, 나머지 직업 ID를 `BP_PartyMenuPreview`에 연결한다. 개발용 협동은 참가자마다 궁수 한 명을 생성한다.
 
 지원하지 않는 이전 직업의 Continue는 해당 ID와 오류를 표시하고 저장 원본·현재 Run을 유지한다. 새 직업으로 자동 변환하지 않는다. Editor 빌드와 저장 후 에셋 재로드에서 새 직업 맵·16개 라벨을 확인했으며 실제 클릭·상세 표시·전투·Continue·협동은 [남은 확인](TODO.md#3-2-아이템과-직업)의 사용자 검증을 따른다.
 

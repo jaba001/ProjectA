@@ -35,7 +35,7 @@ Unreal Engine 5.7 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 
 기본 아군은 민첩 10·전투 속도 10, 일반 테스트 적은 힘/민첩/지능 각 5·속도 5다. 적 HP 150·AP 2와 0.5초의 행동 시작 차이는 유지한다. 근접 접근·복귀는 [초기 민첩 튜닝](Docs/GAME_DESIGN.md#8-4-공격-접근과-복귀)으로 기본 아군 350·적 262.5cm/s를 사용한다(`MoveSpeed=700` 기준). 비근접 스킬·시전·투사체 속도는 유지하며 Snapshot과 소수 민첩도 같은 규칙을 적용한다.
 
-파라곤 캐릭터 적용을 되돌려 전투의 전사는 **GKnight**, 나머지 직업은 **Manny**, 기본 적·Snapshot 상대는 **Skeleton_Guard**를 사용한다. 메뉴는 공통 `BP_PartyMenuPreview`의 Idle을 반복 재생한다. 메시·뼈대는 원본을 직접 참조하며 복제하지 않는다. 파라곤 적용 중 생성된 Blueprint 경로는 이전 모델로 연결해 기존 저장 호환을 유지한다. [남은 외형 확인](Docs/TODO.md#2-25-파라곤-적용-롤백)
+파라곤 캐릭터 적용을 되돌려 전투의 전사는 **GKnight**, 나머지 직업은 **Manny**, 기본 적·Snapshot 상대는 **Skeleton_Guard**를 사용한다. 메뉴의 전사는 GKnight의 `BP_WarriorMenuPreview`, 나머지는 `BP_PartyMenuPreview`의 Idle을 반복 재생한다. 메시·뼈대는 원본을 직접 참조하며 복제하지 않는다. 파라곤 적용 중 생성된 Blueprint 경로는 이전 모델로 연결해 기존 저장 호환을 유지한다. [남은 외형 확인](Docs/TODO.md#2-25-파라곤-적용-롤백)
 
 ## 실행
 

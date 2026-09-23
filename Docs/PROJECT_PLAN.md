@@ -177,7 +177,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 전투 간 이관 | HP 유지. 새 전투의 추가 스킬 자동 추첨 없음. 전투 복구는 저장된 Ready 경계 사용. Snapshot 적은 저장된 스킬 구성 사용 |
 | 적·아군 AI | 실제 장착 스킬 순서·가까운 적 기준으로 인간 초안 전에 단일 명령 고정. 장착된 복귀형 Tile 공격은 적 HomeCoord를 공격/접근 좌표로 선택 가능. 합법 공격이 없으면 목록에 노출되지 않는 내부 대기 처리 |
 | 사망 표현 | 아군·적·Snapshot 모두 기존 Ragdoll 충돌 프로필·본 물리·서버 생성 사망 충격량 사용. 캡슐 충돌 해제·타일 해제·행동 취소 유지. 단발 사망 애니메이션 분기와 설정 제거. [사용자 확인](TODO.md#2-28-전체-래그돌-복구) |
-| 메뉴 프리뷰 | MainMenuPreviewStage의 기존 카메라·4개 앵커와 공통 `BP_PartyMenuPreview`의 Idle 반복 재생 사용. 별도 배치한 `SM_Staff_02·03·04`의 숨김·충돌 해제 유지. 전투 Pawn 생성 없음. [남은 확인](TODO.md#2-25-파라곤-적용-롤백) |
+| 메뉴 프리뷰 | MainMenuPreviewStage의 기존 카메라·4개 앵커 유지. 전사는 GKnight의 `BP_WarriorMenuPreview`와 `MM_Idle_Warrior`, 나머지는 공통 `BP_PartyMenuPreview`의 Idle 반복 재생 사용. 별도 배치한 `SM_Staff_02·03·04`의 숨김·충돌 해제 유지. 전투 Pawn 생성 없음. [남은 확인](TODO.md#2-25-파라곤-적용-롤백) |
 | 생성 화면 종료 | Back/X는 초안·프리뷰 정리. 재진입 시 빈 4슬롯. 상세 패널이 열려 있으면 먼저 패널만 닫음. 최소 슬롯 높이로 ClassInfo 표시 유지 |
 | 모드 선택 | 게임 시작 → 싱글플레이/멀티플레이. 캐릭터 생성·접속 시작 전 멀티 화면에서 돌아오면 모드 선택 복원, 모드 선택의 뒤로가기는 첫 화면 복원. 연결 이후 나가기는 기존 세션 정리/메뉴 복귀 |
 | 싱글 여정 항복 | 이어하기 옆 104×40 버튼·`URunSurrenderWidget` 확인창. 돌아가기 기본 포커스, 확인된 현재 일반 싱글 저장만 삭제. 취소·실패·저장 변경은 원본/현재 Run 보존 |
@@ -247,7 +247,7 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 
 아래 에셋 경로는 모두 `/Game/User_JeHoon/` 기준이다. 디스크에서는 `Content/User_JeHoon/`에 대응한다. 기존 에셋에는 필수 수동 재연결 작업이 없다.
 
-기존 DA는 유형별 폴더를 사용한다. Manny·GKnight·Skeleton_Guard의 메시·뼈대는 원본을 직접 참조하며 필요한 `DefaultGroup.DefaultSlot`은 GKnight·Skeleton_Guard 원본 뼈대에 보존한다. 타격용 `BladeBase`·`BladeTip` 소켓이 추가된 검 수정본과 기존 전투 리타깃 결과를 유지한다. 파라곤 캐릭터 적용은 롤백했으며 미사용 리타깃·Rig·외부 팩과 사용자 수정 지팡이 에셋은 삭제하지 않았다. 에셋의 `User_JeHoon` 편의 복제와 외부 팩 간 비교·통합은 하지 않는다. 제작·검사 명령은 [에셋 스크립트](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
+기존 DA는 유형별 폴더를 사용한다. Manny·GKnight·Skeleton_Guard의 메시·뼈대는 원본을 직접 참조하며 필요한 `DefaultGroup.DefaultSlot`은 GKnight·Skeleton_Guard 원본 뼈대에 보존한다. 타격용 `BladeBase`·`BladeTip` 소켓이 추가된 검 수정본과 기존 전투 리타깃 결과를 유지한다. 파라곤 캐릭터 적용은 롤백했으며 미사용 리타깃·Rig·외부 팩은 보존하며 별도 지팡이 임포트 결과 5개는 삭제된 상태다. 에셋의 `User_JeHoon` 편의 복제와 외부 팩 간 비교·통합은 하지 않는다. 제작·검사 명령은 [에셋 스크립트](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
 
 별도 `Sword` 표시는 `AUnitBase::RefreshSkillPresentation`에서 저장된 장착에 맞춰 갱신하며 아군과 Snapshot 상대가 공유한다. 파라곤용 내장 무기 숨김 컴포넌트와 `Staff` 부착은 Blueprint에서 제거했다. 적용 중 생성된 직업별 Unit·Snapshot·MenuPreview 경로는 보존하되 기존 모델·애니메이션으로 연결해 이전 체크포인트의 클래스 참조를 유지한다. 저장 데이터와 기존 스킬 장착은 변경하지 않는다.
 
