@@ -35,7 +35,7 @@ def rig(mesh, directory, name, *, save_asset):
     return result
 
 
-def valid_retarget_ops(controller):
+def valid_retarget_ops(controller, target_root="root", target_pelvis="pelvis"):
     if controller.get_num_retarget_ops() != len(RETARGET_OP_CLASSES):
         return False
     for index, expected in enumerate(RETARGET_OP_CLASSES):
@@ -43,7 +43,7 @@ def valid_retarget_ops(controller):
         if not op or op.get_class().get_name() != expected or not controller.get_retarget_op_enabled(index):
             return False
         if isinstance(op, unreal.IKRetargetRootMotionController):
-            if str(op.get_source_root_bone()) != "root" or str(op.get_target_root_bone()) != "root" or str(op.get_target_pelvis_bone()) != "pelvis":
+            if str(op.get_source_root_bone()) != "root" or str(op.get_target_root_bone()) != target_root or str(op.get_target_pelvis_bone()) != target_pelvis:
                 return False
             if op.get_settings().get_editor_property("root_motion_source") != unreal.RootMotionSource.COPY_FROM_SOURCE_ROOT:
                 return False
@@ -65,7 +65,7 @@ def retarget_sequences(inputs, anim_blueprint_sources):
     return list(sequences.values())
 
 
-def retarget(source_mesh, target_mesh, directory, suffix, inputs, *, report, force_rebuild, anim_blueprint_sources, mirror_path, output_path, save_asset):
+def retarget(source_mesh, target_mesh, directory, suffix, inputs, *, report, force_rebuild, anim_blueprint_sources, mirror_path, output_path, save_asset, target_root="root", target_pelvis="pelvis"):
     source_rig = rig(source_mesh, directory, "IK_Source" + suffix, save_asset=save_asset)
     target_rig = rig(target_mesh, directory, "IK_Target" + suffix, save_asset=save_asset)
     path = directory + "/RTG" + suffix
@@ -78,16 +78,21 @@ def retarget(source_mesh, target_mesh, directory, suffix, inputs, *, report, for
     for side, selected_rig, mesh in [(unreal.RetargetSourceOrTarget.SOURCE, source_rig, source_mesh), (unreal.RetargetSourceOrTarget.TARGET, target_rig, target_mesh)]:
         controller.set_ik_rig(side, selected_rig)
         controller.set_preview_mesh(side, mesh)
-    reset_ops = not valid_retarget_ops(controller)
+    reset_ops = not valid_retarget_ops(controller, target_root, target_pelvis)
     if reset_ops:
         # The factory already creates ops; rebuild once after assigning rigs to avoid uninitialized duplicate pelvis/root ops.
         # 팩토리가 이미 연산을 생성하므로 Rig 지정 후 한 번만 재구성하여 초기화되지 않은 골반/루트 연산 중복을 막습니다.
         controller.remove_all_ops()
         controller.add_default_ops()
         controller.auto_map_chains(unreal.AutoMapChainType.FUZZY, True)
+        for index in range(controller.get_num_retarget_ops()):
+            op = controller.get_op_controller(index)
+            if isinstance(op, unreal.IKRetargetRootMotionController):
+                op.set_target_root_bone(target_root)
+                op.set_target_pelvis_bone(target_pelvis)
     if created:
         controller.auto_align_all_bones(unreal.RetargetSourceOrTarget.TARGET)
-    require(valid_retarget_ops(controller), "Retarget operations are duplicated or have unassigned root bones")
+    require(valid_retarget_ops(controller, target_root, target_pelvis), "Retarget operations are duplicated or have unassigned root bones")
     rebuild = reset_ops or ASSETS.get_metadata_tag(retargeter, "ProjectA.RetargetSetupVersion") != RETARGET_SETUP_VERSION or force_rebuild
     if rebuild:
         groups = {}
@@ -109,6 +114,8 @@ def retarget(source_mesh, target_mesh, directory, suffix, inputs, *, report, for
         reused = []
         for path in ASSETS.list_assets(batch_folder, recursive=False, include_folder=False):
             asset = load(path)
+            if isinstance(asset, unreal.Class):
+                continue
             require(asset.get_path_name().startswith(batch_folder + "/"), "Unexpected retarget output path")
             destination = output_path(asset.get_name(), suffix, inputs)
             if ASSETS.does_asset_exist(destination):
@@ -126,7 +133,7 @@ def retarget(source_mesh, target_mesh, directory, suffix, inputs, *, report, for
     return {asset: load(mirror_path(asset.get_path_name(), suffix)) for asset in inputs}
 
 
-def pelvis_motion_span(sequence, mesh):
+def pelvis_motion_span(sequence, mesh, bone_name="pelvis"):
     options = unreal.AnimPoseEvaluationOptions()
     options.set_editor_property("evaluation_type", unreal.AnimDataEvalType.COMPRESSED)
     options.set_editor_property("optional_skeletal_mesh", mesh)
@@ -136,8 +143,8 @@ def pelvis_motion_span(sequence, mesh):
     points = []
     for index in range(math.ceil(length * 30) + 1):
         pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(sequence, min(index / 30.0, length), options)
-        require(unreal.AnimPoseExtensions.is_valid(pose) and unreal.Name("pelvis") in unreal.AnimPoseExtensions.get_bone_names(pose), "Could not evaluate the pelvis pose: " + sequence.get_path_name())
-        location = unreal.AnimPoseExtensions.get_bone_pose(pose, "pelvis", unreal.AnimPoseSpaces.WORLD).translation
+        require(unreal.AnimPoseExtensions.is_valid(pose) and unreal.Name(bone_name) in unreal.AnimPoseExtensions.get_bone_names(pose), "Could not evaluate the pelvis pose: " + sequence.get_path_name())
+        location = unreal.AnimPoseExtensions.get_bone_pose(pose, bone_name, unreal.AnimPoseSpaces.WORLD).translation
         require(all(math.isfinite(value) for value in [location.x, location.y, location.z]), "Invalid pelvis transform: " + sequence.get_path_name())
         points.append((location.x, location.y, location.z))
     return max(math.dist(point, points[0]) for point in points)

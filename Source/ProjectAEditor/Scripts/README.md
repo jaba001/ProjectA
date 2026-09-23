@@ -85,7 +85,7 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 
 10. `ConfigureWarriorContent.py`: GKnight 전사와 Skeleton_Guard 적의 기존 콘텐츠 작성·검사 도구. 파라곤 캐릭터 적용 롤백 후 다시 사용하는 구성이다. 공통 리타깃은 `RetargetContentLibrary.py`에서 제공한다. 메시·뼈대는 원본을 직접 참조하며, 검은 타격 소켓을 추가한 Weapon_Pack 수정본을 유지한다.
 
-IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScript`를 사용하며 스크립트 종료 후 에디터도 종료된다. `-WarriorVerifyOnly`는 commandlet에서 저장된 뼈대·몽타주·스킬·소켓·직업·이전 참조만 읽는다. 두 명령 모두 PIE·게임 플레이를 시작하지 않는다. 외부 팩 원본은 설치된 상태여야 하며 수정하지 않는다.
+IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandlet에서도 지원한다. 아래 기존 전사 제작 명령은 전사·기본 적 콘텐츠를 다시 작성한다. `-WarriorVerifyOnly`는 전사·기본 적과 현재 직업 매핑을 확인하며 마법사·도적의 상세 검사는 `VerifyWitchAssassin.py`를 사용한다. 두 도구 모두 PIE·게임 플레이를 시작하지 않는다.
 
 ```powershell
 & $editorExecutable $projectFile ("-ExecutePythonScript=$scriptDirectory/ConfigureWarriorContent.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -RenderOffscreen -nosplash
@@ -113,7 +113,7 @@ IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScri
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureShopSkillPresentation.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-13. 파라곤 캐릭터 외형과 사망 애니메이션 작성 도구는 롤백에 따라 제거했다. 전사는 GKnight, 공용 직업은 Manny, 적/Snapshot은 Skeleton_Guard, 메뉴 전사는 `BP_WarriorMenuPreview`의 GKnight·`MM_Idle_Warrior`, 나머지는 `BP_PartyMenuPreview`를 사용한다. 기존 직업별 Blueprint 경로도 이전 모델로 연결하여 저장 참조를 유지한다. 미사용 파라곤 생성 에셋은 보존하며 `ImportMageStaff.py`는 수동 임포트 도구로만 남긴다. [현재 확인](../../../Docs/TODO.md#2-25-파라곤-적용-롤백)
+13. 파라곤 캐릭터 외형과 사망 애니메이션 작성 도구는 롤백에 따라 제거했다. 전사 GKnight·궁수 Manny·기본 적 Skeleton_Guard를 유지하며 마법사·도적의 후속 구성은 15번 도구를 사용한다. 기존 Blueprint 경로와 미사용 파라곤 결과는 보존한다. `ImportMageStaff.py`는 원본 FBX가 있을 때만 사용하는 수동 임포트 도구다.
 
 `RetargetContentLibrary.py`는 Rig·리타깃·골반 이동 검증을 공통 제공한다. 호출 도구가 보고서·재작성 여부·출력 경로 함수를 전달하여 다른 도구의 전역 설정을 참조하지 않는다. 기존 전사 콘텐츠의 강제 재작성은 `-WarriorRebuildRetargets`를 사용한다.
 
@@ -126,3 +126,12 @@ IK batch 작성은 Slate가 필요한 에디터 API이므로 `-ExecutePythonScri
 ```
 
 기본 실행은 읽기 전용 사전검사다. 적용 결과는 `Saved/Automation/CopiedAssetsMigration.json`, 별도 프로세스 재로드는 `CopiedAssetsReload.json`에 기록한다. VerifyOnly는 적용 기록이 필요하다. 기존 원본 팩의 설치 상태를 유지하며 두 원본 뼈대의 슬롯 설정만 예외적으로 Git에서 추적한다. PIE·게임 플레이를 실행하지 않는다.
+
+15. `ConfigureWitchAssassin.py`: 마법사 Stylized Dark Witch·도적 Assassin Skin1과 왼손 스태프를 메뉴·전투·Snapshot에 연결한다. 원본 모델을 직접 참조하며 마녀 임포트의 본 배율 100·분리된 변형 계층을 같은 경로에서 정리하고 PhysicsAsset을 재생성한다. 원본 FBX는 보존한다. 필요한 리타깃 결과만 원본 애니메이션 하위 구조와 `_DarkWitch`·`_Assassin` 접미사로 작성한다. 뼈대의 `DefaultSlot` 등록, 마녀 임포트 3개 수정, 기존 스태프 5개 복구는 원래 콘텐츠 경로에서 추적한다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureWitchAssassin.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/VerifyWitchAssassin.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+```
+
+FBX 재임포트 후에는 첫 명령에 `-WitchRebuildRetargets`를 추가해 정규화와 시퀀스 재작성을 수행한다. 두 명령은 에셋 작성·정적 포즈 검사만 수행하며 에디터 창·PIE·게임·자동화 테스트를 실행하지 않는다. 별도 재로드는 직업 매핑·본 배율·몽타주·물리 연결·검 표본·스태프 부착을 확인한다. [실제 화면·사망 확인](../../../Docs/TODO.md#2-29-마녀와-assassin-외형)은 사용자가 수행한다.

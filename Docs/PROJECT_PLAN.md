@@ -110,7 +110,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 - 빈 슬롯은 스폰하지 않으며 원래 `SlotIndex`를 Arena의 PlayerCoords에 대응한다. 슬롯은 이름·`ClassId`·생성 여부·현재 HP와 `bPlayerControlled` 선택을 전달한다. 식별된 Run은 `CharacterId`와 원래 `OwnerAccountId`도 보존한다.
 - 일반 싱글의 매 전투에서 선택한 슬롯만 `Human`, 나머지 생성 동료는 `ServerAI`로 설정한다. 선택이 사망한 멤버를 가리키면 생존자로 조작권을 옮기지 않는다. 남은 AI가 자동으로 계획·준비하며 전체 아군 생존 상태로 결과를 판정한다.
 - 직업은 전사 `Warrior`·마법사 `Mage`·궁수 `Archer`·도적 `Rogue` 순서다. `UProfessionBase`의 native 자식 클래스 4개를 `UPartyDefinitionDataAsset::Professions`의 `ProfessionClass`로 연결한다. 직업 정의는 UObject이며 전투 Actor와 분리한다.
-- `CombatClass`가 없으면 기존 `PlayerUnitClasses`와 명시적인 `FallbackPlayerUnitClass`를 사용한다. 전사는 GKnight의 `BP_WarriorUnit`, 나머지 직업은 Manny의 `BP_PlayerUnit`을 사용한다. Blueprint의 이전 기본 스킬과 별개로 새 Run은 비무장 스킬만 시작한다.
+- `CombatClass`가 없으면 기존 `PlayerUnitClasses`와 명시적인 `FallbackPlayerUnitClass`를 사용한다. 전사는 GKnight의 `BP_WarriorUnit`, 마법사는 Stylized Dark Witch의 `BP_MageUnit`, 도적은 Assassin Skin1의 `BP_RogueUnit`, 궁수는 Manny의 `BP_PlayerUnit`을 사용한다. Blueprint의 이전 기본 스킬과 별개로 새 Run은 비무장 스킬만 시작한다.
 - 수정하지 않은 이름은 직업 표시명과 슬롯 번호를 사용한다. 개별 이름 변경은 `SetSlotCharacterName`으로 반영한다.
 - 네 직업의 현재 시작값은 HP 100·힘/민첩/지능 각 10이다. 첫 스폰은 직업 정의의 HP와 능력치를 사용하고 이후 전투는 저장한 결과 HP를 유지한다. HP 0인 멤버는 다음 전투에 스폰하지 않는다. 최종 밸런스·성장률·능력치의 피해 보정 공식은 별도다.
 - 전투 속도는 현재 GAS 민첩과 1:1이다. 기본 아군 속도는 10이며 일반 `AEnemyUnit`의 시작 힘/민첩/지능은 각각 5·속도 5다. 일반 적 HP 150·AP 2는 유지하고 Snapshot 적은 스폰 후 저장된 세 능력치로 설정한다.
@@ -177,7 +177,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 전투 간 이관 | HP 유지. 새 전투의 추가 스킬 자동 추첨 없음. 전투 복구는 저장된 Ready 경계 사용. Snapshot 적은 저장된 스킬 구성 사용 |
 | 적·아군 AI | 실제 장착 스킬 순서·가까운 적 기준으로 인간 초안 전에 단일 명령 고정. 장착된 복귀형 Tile 공격은 적 HomeCoord를 공격/접근 좌표로 선택 가능. 합법 공격이 없으면 목록에 노출되지 않는 내부 대기 처리 |
 | 사망 표현 | 아군·적·Snapshot 모두 기존 Ragdoll 충돌 프로필·본 물리·서버 생성 사망 충격량 사용. 캡슐 충돌 해제·타일 해제·행동 취소 유지. 단발 사망 애니메이션 분기와 설정 제거. [사용자 확인](TODO.md#2-28-전체-래그돌-복구) |
-| 메뉴 프리뷰 | MainMenuPreviewStage의 기존 카메라·4개 앵커 유지. 전사는 GKnight의 `BP_WarriorMenuPreview`와 `MM_Idle_Warrior`, 나머지는 공통 `BP_PartyMenuPreview`의 Idle 반복 재생 사용. 별도 배치한 `SM_Staff_02·03·04`의 숨김·충돌 해제 유지. 전투 Pawn 생성 없음. [남은 확인](TODO.md#2-25-파라곤-적용-롤백) |
+| 메뉴 프리뷰 | MainMenuPreviewStage의 기존 카메라·4개 앵커 유지. 전사 GKnight·마법사 Stylized Dark Witch·도적 Assassin Skin1의 전용 프리뷰와 궁수 Manny 공통 프리뷰에서 Idle 반복 재생. 마법사 손의 스태프 한 개 표시, 별도 배치한 `SM_Staff_02·03·04` 숨김 유지. 전투 Pawn 생성 없음. [남은 확인](TODO.md#2-29-마녀와-assassin-외형) |
 | 생성 화면 종료 | Back/X는 초안·프리뷰 정리. 재진입 시 빈 4슬롯. 상세 패널이 열려 있으면 먼저 패널만 닫음. 최소 슬롯 높이로 ClassInfo 표시 유지 |
 | 모드 선택 | 게임 시작 → 싱글플레이/멀티플레이. 캐릭터 생성·접속 시작 전 멀티 화면에서 돌아오면 모드 선택 복원, 모드 선택의 뒤로가기는 첫 화면 복원. 연결 이후 나가기는 기존 세션 정리/메뉴 복귀 |
 | 싱글 여정 항복 | 이어하기 옆 104×40 버튼·`URunSurrenderWidget` 확인창. 돌아가기 기본 포커스, 확인된 현재 일반 싱글 저장만 삭제. 취소·실패·저장 변경은 원본/현재 Run 보존 |
@@ -247,9 +247,9 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 
 아래 에셋 경로는 모두 `/Game/User_JeHoon/` 기준이다. 디스크에서는 `Content/User_JeHoon/`에 대응한다. 기존 에셋에는 필수 수동 재연결 작업이 없다.
 
-기존 DA는 유형별 폴더를 사용한다. Manny·GKnight·Skeleton_Guard의 메시·뼈대는 원본을 직접 참조하며 필요한 `DefaultGroup.DefaultSlot`은 GKnight·Skeleton_Guard 원본 뼈대에 보존한다. 타격용 `BladeBase`·`BladeTip` 소켓이 추가된 검 수정본과 기존 전투 리타깃 결과를 유지한다. 파라곤 캐릭터 적용은 롤백했으며 미사용 리타깃·Rig·외부 팩은 보존하며 별도 지팡이 임포트 결과 5개는 삭제된 상태다. 에셋의 `User_JeHoon` 편의 복제와 외부 팩 간 비교·통합은 하지 않는다. 제작·검사 명령은 [에셋 스크립트](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
+기존 DA는 유형별 폴더를 사용한다. Manny·GKnight·Skeleton_Guard·Assassin·Stylized Dark Witch의 메시·뼈대는 원본을 직접 참조하며 필요한 `DefaultGroup.DefaultSlot`만 원본 뼈대에 등록한다. 마녀 임포트는 루트 배율 100을 제거하고 형상·바인드 자세를 0.12배로 정규화해 높이 약 1.87m·본 배율 1로 저장한다. 변형 본과 망토를 몸통 계층에 연결하고 같은 경로의 PhysicsAsset을 재생성한다. 원본 FBX는 보존하며 FBX 재임포트 후에는 작성 스크립트로 정규화와 리타깃을 다시 적용해야 한다. 기존 스태프 한 개의 임포트 결과 5개만 `/Game/MageStaff_FreeWeapons`에 복구했다. `User_JeHoon` 편의 복제와 외부 팩 간 비교·통합은 하지 않는다. 제작·검사 명령은 [에셋 스크립트](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
 
-별도 `Sword` 표시는 `AUnitBase::RefreshSkillPresentation`에서 저장된 장착에 맞춰 갱신하며 아군과 Snapshot 상대가 공유한다. 파라곤용 내장 무기 숨김 컴포넌트와 `Staff` 부착은 Blueprint에서 제거했다. 적용 중 생성된 직업별 Unit·Snapshot·MenuPreview 경로는 보존하되 기존 모델·애니메이션으로 연결해 이전 체크포인트의 클래스 참조를 유지한다. 저장 데이터와 기존 스킬 장착은 변경하지 않는다.
+별도 `Sword` 표시는 `AUnitBase::RefreshSkillPresentation`에서 저장된 장착에 맞춰 갱신하며 아군과 Snapshot 상대가 공유한다. 마법사의 `Staff`는 메뉴·전투·Snapshot에서 `DEF-hand_L`에 항상 표시하며 충돌은 끈다. 기존 직업별 Unit·Snapshot·MenuPreview 경로를 보존해 이전 체크포인트 참조를 유지한다. 저장 데이터·스킬 장착·전체 래그돌 실행 경로는 변경하지 않는다.
 
 | 에셋 경로 | 클래스 / 저장된 연결 |
 |---|---|
@@ -264,8 +264,8 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 | `Blueprint/DataAsset/Skills/BPDA_AreaAttack` | `USkillDefinitionDataAsset`, 기존 EnemyTile·AroundTarget을 지점 공격으로 변환. 피해 200·AP 1·Attack03 몽타주 보존, 공통 플레이어 시험 장착에 포함 |
 | `Blueprint/DataAsset/Skills/BPDA_SweepingStrike` | `USkillDefinitionDataAsset`, 근접 전방 박스 충돌·피해 10·AP 1·몽타주와 복귀. 이전 경로·PrimaryAssetId 리디렉션 |
 | `Blueprint/DataAsset/Skills/BPDA_swoard_attack` | `USkillDefinitionDataAsset`, 검 공격·논리 ID `SwordAttack`·칼날 궤적·피해 50·AP 1·활성 0.23~0.43초 |
-| `Blueprint/Unit/BP_WarriorUnit`, `BP_PlayerUnit` | GKnight 전사·Manny 공용 직업·기존 몽타주·오른손 검. 직업별 파생 경로는 저장 호환용으로 유지 |
-| `Blueprint/Unit/BP_*SnapshotOpponent` | Skeleton_Guard 원본 참조. 직업별 경로는 저장 호환용이며 새 상대는 공통 `BP_SnapshotOpponent` 사용 |
+| `Blueprint/Unit/BP_WarriorUnit`, `BP_PlayerUnit`, `BP_MageUnit`, `BP_RogueUnit` | GKnight 전사·Manny 궁수·Stylized Dark Witch 마법사·Assassin 도적. 기존 몽타주 대체와 오른손 검·마법사 왼손 스태프, 직업별 저장 경로 유지 |
+| `Blueprint/Unit/BP_*SnapshotOpponent` | 마법사·도적은 새 직업 외형을 공유하고 전사·궁수는 공통 Skeleton_Guard를 유지. 기존 직업별 저장 경로 보존 |
 | `GKnight/Meshes/SK_GothicKnight_VA`, `GKnight/Meshes/SK_GothicKnight_Skeleton` | 원본 `/Game/GKnight`로 연결하는 작은 Redirector. 메시·뼈대 페이로드 중복 제거 |
 | `Skeleton_Guard/Mesh_UE4/Full/SKM_Skeleton_Guard_Body`, `Skeleton_Guard/Demoscene_UE4/Mesh/UE4_Mannequin_Skeleton` | 원본 `/Game/Skeleton_Guard`로 연결하는 작은 Redirector |
 | `Characters/Mannequins/Anims/Unarmed` | 기존 ABP·BS·Walk/Jog/Jump/Attack 하위 구조를 유지한 리타깃 사본. 유닛별 접미사로 구분 |

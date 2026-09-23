@@ -112,7 +112,7 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 
 프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 Warrior/Mage/Archer/Rogue 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
-전사는 GKnight 원본 메시의 `BP_WarriorMenuPreview`와 기존 `MM_Idle_Warrior`를 사용하고 나머지 직업은 `BP_PartyMenuPreview`를 사용한다. 각 뼈대에 맞는 Idle을 SingleNode 모드·속도 1·반복·자동재생으로 연결하며 기존 카메라·앵커 배치와 NoCollision을 유지한다. 파라곤용 직업별 프리뷰 Blueprint도 이전 모델로 변경하고 지팡이·내장 무기 숨김 컴포넌트는 제거했다. 실제 반복 재생·위치·삭제/재진입은 [남은 확인](TODO.md#2-25-파라곤-적용-롤백)에서 확인한다.
+전사는 GKnight의 `BP_WarriorMenuPreview`, 마법사는 Stylized Dark Witch의 `BP_MageMenuPreview`, 도적은 Assassin Skin1의 `BP_RogueMenuPreview`를 사용한다. 궁수는 에셋 선정 전까지 Manny의 `BP_PartyMenuPreview`를 유지한다. 각 뼈대에 맞는 Idle을 SingleNode 모드·속도 1·반복·자동재생으로 연결하며 기존 카메라·앵커와 NoCollision을 유지한다. 마법사의 `Staff` 한 개를 왼손 `DEF-hand_L`에 연결한다. 실제 표시·손잡이 위치·재진입은 [남은 확인](TODO.md#2-29-마녀와-assassin-외형)에서 확인한다.
 
 GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메뉴 travel의 잔여 IgnoreInput·초기 포커스만 복구한다. CharacterCreation의 Text_StartGameStatus는 선택 바인딩이며 누락 시 Native 표시 영역을 추가한다. 상세 배치·바인딩은 [PROJECT_PLAN](PROJECT_PLAN.md#gameplay-에셋과-배치)을 따른다.
 

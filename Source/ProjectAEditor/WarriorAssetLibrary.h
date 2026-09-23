@@ -14,14 +14,25 @@ class USkeletalMesh;
 class UIKRetargeter;
 class USkillDefinitionDataAsset;
 
-// Restrict authored asset changes to project-owned copies while allowing read-only source mesh and skeleton references.
-// 원본 메시와 스켈레톤의 읽기 전용 참조를 허용하며 작성 에셋 변경을 프로젝트 작업 사본으로 제한합니다.
+// Author project assets through engine APIs; explicit import repair methods validate the selected original paths.
+// 엔진 API로 프로젝트 에셋을 작성하며 명시적인 임포트 수정 함수는 선택한 원본 경로를 검증합니다.
 UCLASS()
 class PROJECTAEDITOR_API UWarriorAssetLibrary : public UBlueprintFunctionLibrary
 {
     GENERATED_BODY()
 
 public:
+    // Normalize the explicitly selected Witch import in place, including its bind pose and regenerated physics.
+    // 명시적으로 선택한 마녀 임포트의 바인드 자세와 재생성 물리를 포함해 원래 경로에서 배율을 정리합니다.
+    UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
+    static bool NormalizeWitchImport(USkeletalMesh* Mesh);
+
+    UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
+    static bool EnsureSelectedProfessionSlot(USkeleton* Skeleton);
+
+    UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
+    static bool ValidateCharacterPhysics(USkeletalMesh* Mesh);
+
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
     static UObject* LoadSavedAssetReference(const FSoftObjectPath& Path);
 

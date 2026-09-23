@@ -308,7 +308,8 @@ def verify():
     classes = party.get_editor_property("player_unit_classes")
     require(classes[unreal.Name("Warrior")] == warrior_class, "Warrior class map not bound")
     player_class = load(ROOT + "/Blueprint/Unit/BP_PlayerUnit").generated_class()
-    require(all(classes[unreal.Name(name)] == player_class for name in ["Mage", "Archer", "Rogue"]), "Another profession class changed")
+    for profession, blueprint_name in [("Mage", "BP_MageUnit"), ("Archer", "BP_PlayerUnit"), ("Rogue", "BP_RogueUnit")]:
+        require(classes[unreal.Name(profession)] == load(ROOT + "/Blueprint/Unit/" + blueprint_name).generated_class(), "Another profession class changed: " + profession)
     require(len(unreal.get_default_object(player_class).get_editor_property("equipped_skill_data_assets")) == 4, "Shared player loadout changed")
     for path in [SKILLS + "/DA_SweepingStrike", ROOT + "/Blueprint/DataAsset/DA_SweepingStrike"]:
         old_reference = unreal.SoftObjectPath(path + ".DA_SweepingStrike")

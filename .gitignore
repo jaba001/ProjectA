@@ -48,3 +48,15 @@ Content/Skeleton_Guard/Demoscene_UE4/*
 !Content/Skeleton_Guard/Demoscene_UE4/Mesh/
 Content/Skeleton_Guard/Demoscene_UE4/Mesh/*
 !Content/Skeleton_Guard/Demoscene_UE4/Mesh/UE4_Mannequin_Skeleton.uasset
+
+# Keep the selected imports in place when fixing scale and montage slots / 배율 및 몽타주 슬롯 수정은 선택한 임포트의 기존 위치에서 추적
+!Content/Assassin/
+Content/Assassin/*
+!Content/Assassin/Mesh/
+Content/Assassin/Mesh/*
+!Content/Assassin/Mesh/SK_Assassin_Skeleton.uasset
+!Content/stylized_dark_witch_fbx__extracted/
+Content/stylized_dark_witch_fbx__extracted/*
+!Content/stylized_dark_witch_fbx__extracted/Stylized_Dark_Witch.uasset
+!Content/stylized_dark_witch_fbx__extracted/Stylized_Dark_Witch_Skeleton.uasset
+!Content/stylized_dark_witch_fbx__extracted/Stylized_Dark_Witch_PhysicsAsset.uasset

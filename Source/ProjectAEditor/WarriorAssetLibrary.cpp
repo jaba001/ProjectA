@@ -22,6 +22,15 @@
 #include "Engine/SimpleConstructionScript.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshSocket.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Notifications/NotificationManager.h"
+#include "Interfaces/ISlateNullRendererModule.h"
+#include "PhysicsAssetUtils.h"
+#include "PhysicsEngine/PhysicsAsset.h"
+#include "PhysicsEngine/PhysicsConstraintTemplate.h"
+#include "PhysicsEngine/SkeletalBodySetup.h"
+#include "SkeletalMeshAttributes.h"
+#include "SkinnedAssetCompiler.h"
 #include "GameFramework/Actor.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -148,6 +157,155 @@ namespace
     }
 }
 
+bool UWarriorAssetLibrary::ValidateCharacterPhysics(USkeletalMesh* Mesh)
+{
+    if (!IsValid(Mesh) || !IsValid(Mesh->GetPhysicsAsset())) return false;
+    const UPhysicsAsset* Physics = Mesh->GetPhysicsAsset();
+    TSet<FName> Bones;
+    for (const USkeletalBodySetup* Body : Physics->SkeletalBodySetups)
+    {
+        if (!IsValid(Body) || Bones.Contains(Body->BoneName) || Mesh->GetRefSkeleton().FindBoneIndex(Body->BoneName) == INDEX_NONE || Body->AggGeom.GetElementCount() == 0) return false;
+        Bones.Add(Body->BoneName);
+    }
+    if (Bones.Num() < 6) return false;
+    TSet<FName> Connected = {Physics->SkeletalBodySetups[0]->BoneName};
+    for (int32 Pass = 0; Pass < Bones.Num(); ++Pass)
+    {
+        for (const UPhysicsConstraintTemplate* Constraint : Physics->ConstraintSetup)
+        {
+            if (!IsValid(Constraint)) return false;
+            const FConstraintInstance& Instance = Constraint->DefaultInstance;
+            if (!Bones.Contains(Instance.ConstraintBone1) || !Bones.Contains(Instance.ConstraintBone2) || Instance.GetLinearXMotion() != LCM_Locked || Instance.GetLinearYMotion() != LCM_Locked || Instance.GetLinearZMotion() != LCM_Locked) return false;
+            if (Connected.Contains(Instance.ConstraintBone1) || Connected.Contains(Instance.ConstraintBone2))
+            {
+                Connected.Add(Instance.ConstraintBone1);
+                Connected.Add(Instance.ConstraintBone2);
+            }
+        }
+    }
+    UE_LOG(LogWarriorAssetLibrary, Display, TEXT("Physics structure / 물리 구조: %s bodies=%d constraints=%d connected=%d"), *Mesh->GetName(), Bones.Num(), Physics->ConstraintSetup.Num(), Connected.Num());
+    for (FName Bone : Bones)
+    {
+        if (!Connected.Contains(Bone)) UE_LOG(LogWarriorAssetLibrary, Display, TEXT("Disconnected body / 분리된 바디: %s"), *Bone.ToString());
+    }
+    return Connected.Num() == Bones.Num();
+}
+
+bool UWarriorAssetLibrary::EnsureSelectedProfessionSlot(USkeleton* Skeleton)
+{
+    if (!IsValid(Skeleton)) return false;
+    const FString Path = Skeleton->GetPathName();
+    if (Path != TEXT("/Game/Assassin/Mesh/SK_Assassin_Skeleton.SK_Assassin_Skeleton") && Path != TEXT("/Game/stylized_dark_witch_fbx__extracted/Stylized_Dark_Witch_Skeleton.Stylized_Dark_Witch_Skeleton")) return false;
+    if (!Skeleton->ContainsSlotName(TEXT("DefaultSlot")))
+    {
+        Skeleton->Modify();
+        Skeleton->SetSlotGroupName(TEXT("DefaultSlot"), TEXT("DefaultGroup"));
+        Skeleton->MarkPackageDirty();
+    }
+    return true;
+}
+
+bool UWarriorAssetLibrary::NormalizeWitchImport(USkeletalMesh* Mesh)
+{
+    if (!IsValid(Mesh) || Mesh->GetPathName() != TEXT("/Game/stylized_dark_witch_fbx__extracted/Stylized_Dark_Witch.Stylized_Dark_Witch") || !IsValid(Mesh->GetSkeleton()) || !IsValid(Mesh->GetPhysicsAsset())) return Fail(TEXT("Only the selected Witch import can be normalized / 선택한 마녀 임포트만 정규화할 수 있습니다"));
+    FSkinnedAssetCompilingManager::Get().FinishCompilation({Mesh});
+    const FReferenceSkeleton Original = Mesh->GetRefSkeleton();
+    if (Original.GetRawBoneNum() == 0 || Original.GetBoneName(0) != TEXT("rig")) return false;
+    const bool bUnitScale = Original.GetRefBonePose()[0].GetScale3D().Equals(FVector::OneVector, 0.001);
+    const int32 CapeIndex = Original.FindBoneIndex(TEXT("Cape1"));
+    if (bUnitScale && CapeIndex != INDEX_NONE && Original.GetParentIndex(CapeIndex) == Original.FindBoneIndex(TEXT("DEF-spine_003"))) return Mesh->GetBounds().BoxExtent.Z > 80.0 && Mesh->GetBounds().BoxExtent.Z < 110.0;
+    if (!bUnitScale && !Original.GetRefBonePose()[0].GetScale3D().Equals(FVector(100.0), 0.001)) return Fail(TEXT("Unexpected Witch import scale / 예상하지 못한 마녀 임포트 배율입니다"));
+    for (int32 LOD = 0; LOD < Mesh->GetLODNum(); ++LOD)
+    {
+        if (!Mesh->GetMeshDescription(LOD)) return Fail(TEXT("Normalization requires editable source geometry at every LOD / 모든 LOD에 편집 가능한 원본 형상이 필요합니다"));
+    }
+    const double GeometryScale = bUnitScale ? 1.0 : 0.12;
+    TArray<FTransform> OriginalGlobal;
+    TArray<FTransform> NormalizedGlobal;
+    FReferenceSkeleton Normalized;
+    for (int32 Index = 0; Index < Original.GetRawBoneNum(); ++Index)
+    {
+        FMeshBoneInfo Info = Original.GetRawRefBoneInfo()[Index];
+        const FTransform Global = Info.ParentIndex == INDEX_NONE ? Original.GetRefBonePose()[Index] : Original.GetRefBonePose()[Index] * OriginalGlobal[Info.ParentIndex];
+        OriginalGlobal.Add(Global);
+        NormalizedGlobal.Add(FTransform(Global.GetRotation(), Global.GetTranslation() * GeometryScale, FVector::OneVector));
+        // Connect weighted deform bones directly, retaining their world bind pose and all existing names.
+        // 가중치가 있는 변형 본을 직접 연결하며 월드 바인드 자세와 기존 본 이름을 유지합니다.
+        const FString Name = Info.Name.ToString();
+        FName ParentOverride = NAME_None;
+        if (Name == TEXT("DEF-thigh_L") || Name == TEXT("DEF-thigh_R")) ParentOverride = TEXT("DEF-spine");
+        if (Name == TEXT("DEF-pelvis_L") || Name == TEXT("DEF-pelvis_R")) ParentOverride = TEXT("DEF-spine");
+        if (Name == TEXT("DEF-breast_L") || Name == TEXT("DEF-breast_R") || Name == TEXT("Cape1")) ParentOverride = TEXT("DEF-spine_003");
+        if (Name == TEXT("DEF-shoulder_L") || Name == TEXT("DEF-shoulder_R")) ParentOverride = TEXT("DEF-spine_003");
+        if (Name == TEXT("DEF-upper_arm_L")) ParentOverride = TEXT("DEF-shoulder_L");
+        if (Name == TEXT("DEF-upper_arm_R")) ParentOverride = TEXT("DEF-shoulder_R");
+        if (Name == TEXT("Eye_L") || Name == TEXT("Eye_R")) ParentOverride = TEXT("DEF-spine_006");
+        if (!ParentOverride.IsNone()) Info.ParentIndex = Original.FindBoneIndex(ParentOverride);
+        if (Info.ParentIndex >= Index) return Fail(TEXT("Invalid normalized bone ordering / 정규화 본 순서가 올바르지 않습니다"));
+        FTransform Local = Info.ParentIndex == INDEX_NONE ? NormalizedGlobal[Index] : NormalizedGlobal[Index].GetRelativeTransform(NormalizedGlobal[Info.ParentIndex]);
+        Local.NormalizeRotation();
+        FReferenceSkeletonModifier Modifier(Normalized, Mesh->GetSkeleton());
+        Modifier.Add(Info, Local);
+    }
+    Mesh->Modify();
+    Mesh->GetSkeleton()->Modify();
+    for (int32 LOD = 0; LOD < Mesh->GetLODNum(); ++LOD)
+    {
+        Mesh->ModifyMeshDescription(LOD);
+        FMeshDescription* Description = Mesh->GetMeshDescription(LOD);
+        FSkeletalMeshAttributes Attributes(*Description);
+        Attributes.Register();
+        const bool bCreateBoneAttributes = Attributes.Bones().Num() == 0;
+        TVertexAttributesRef<FVector3f> Positions = Attributes.GetVertexPositions();
+        for (FVertexID Vertex : Description->Vertices().GetElementIDs()) Positions[Vertex] *= GeometryScale;
+        for (FName Morph : Attributes.GetMorphTargetNames())
+        {
+            TVertexAttributesRef<FVector3f> Deltas = Attributes.GetVertexMorphPositionDelta(Morph);
+            for (FVertexID Vertex : Description->Vertices().GetElementIDs()) Deltas[Vertex] *= GeometryScale;
+        }
+        for (int32 Index = 0; Index < Normalized.GetRawBoneNum(); ++Index)
+        {
+            const FBoneID Bone(Index);
+            if (bCreateBoneAttributes)
+            {
+                Attributes.CreateBone(Bone);
+                Attributes.GetBoneNames()[Bone] = Normalized.GetBoneName(Index);
+            }
+            if (Attributes.GetBoneNames()[Bone] != Normalized.GetBoneName(Index)) return Fail(TEXT("Source geometry bone order differs / 원본 형상의 본 순서가 다릅니다"));
+            Attributes.GetBonePoses()[Bone] = Normalized.GetRefBonePose()[Index];
+            Attributes.GetBoneParentIndices()[Bone] = Normalized.GetParentIndex(Index);
+        }
+        if (!Mesh->CommitMeshDescription(LOD)) return false;
+    }
+    Mesh->SetRefSkeleton(Normalized);
+    Mesh->GetRefBasesInvMatrix().Reset();
+    Mesh->CalculateInvRefMatrices();
+    Mesh->GetSkeleton()->RecreateBoneTree(Mesh);
+    Mesh->GetSkeleton()->UpdateReferencePoseFromMesh(Mesh);
+    Mesh->SetImportedBounds(FBoxSphereBounds(Mesh->GetImportedBounds().Origin * GeometryScale, Mesh->GetImportedBounds().BoxExtent * GeometryScale, Mesh->GetImportedBounds().SphereRadius * GeometryScale));
+    Mesh->PostEditChange();
+    FSkinnedAssetCompilingManager::Get().FinishCompilation({Mesh});
+    UPhysicsAsset* Physics = Mesh->GetPhysicsAsset();
+    Physics->Modify();
+    Physics->SkeletalBodySetups.Reset();
+    Physics->ConstraintSetup.Reset();
+    Physics->CollisionDisableTable.Reset();
+    Physics->UpdateBodySetupIndexMap();
+    Physics->UpdateBoundsBodiesArray();
+    FPhysAssetCreateParams Params;
+    Params.MinBoneSize = 5.0f;
+    FText Error;
+    if (!FPhysicsAssetUtils::CreateFromSkeletalMesh(Physics, Mesh, Params, Error, true, false))
+    {
+        UE_LOG(LogWarriorAssetLibrary, Error, TEXT("Witch physics creation failed / 마녀 물리 생성 실패: %s"), *Error.ToString());
+        return false;
+    }
+    Physics->MarkPackageDirty();
+    Mesh->GetSkeleton()->MarkPackageDirty();
+    Mesh->MarkPackageDirty();
+    return true;
+}
+
 UObject* UWarriorAssetLibrary::LoadSavedAssetReference(const FSoftObjectPath& Path)
 {
     return Path.TryLoad();
@@ -204,7 +362,7 @@ bool UWarriorAssetLibrary::SetSkeletonPreviewMesh(USkeleton* Skeleton, USkeletal
 
 bool UWarriorAssetLibrary::RetargetAnimations(const TArray<UObject*>& Assets, USkeletalMesh* SourceMesh, USkeletalMesh* TargetMesh, UIKRetargeter* Retargeter, const FString& Destination, const FString& Suffix, bool bOverwriteExistingFiles, bool bIncludeReferencedAssets)
 {
-    if (IsRunningCommandlet() || Assets.IsEmpty() || !IsValid(SourceMesh) || !IsValid(SourceMesh->GetSkeleton()) || !IsValid(TargetMesh) || !IsValid(TargetMesh->GetSkeleton()) || !IsProjectCopy(Retargeter) || !Destination.StartsWith(TEXT("/Game/User_JeHoon/")) || !FPackageName::IsValidLongPackageName(Destination) || Destination.Contains(TEXT("..")) || Destination.EndsWith(TEXT("/")) || Suffix.IsEmpty() || Suffix.Contains(TEXT("/"))) return Fail(TEXT("IK batch authoring requires valid meshes, the editor and a project-owned output directory / IK 일괄 작성에는 유효한 메시, 에디터와 작업 사본 출력 폴더가 필요합니다"));
+    if (Assets.IsEmpty() || !IsValid(SourceMesh) || !IsValid(SourceMesh->GetSkeleton()) || !IsValid(TargetMesh) || !IsValid(TargetMesh->GetSkeleton()) || !IsProjectCopy(Retargeter) || !Destination.StartsWith(TEXT("/Game/User_JeHoon/")) || !FPackageName::IsValidLongPackageName(Destination) || Destination.Contains(TEXT("..")) || Destination.EndsWith(TEXT("/")) || Suffix.IsEmpty() || Suffix.Contains(TEXT("/"))) return Fail(TEXT("IK batch authoring requires valid meshes and a project-owned output directory / IK 일괄 작성에는 유효한 메시와 작업 사본 출력 폴더가 필요합니다"));
     if (bOverwriteExistingFiles && bIncludeReferencedAssets) return Fail(TEXT("Sequence overwrite must exclude referenced assets / 시퀀스 덮어쓰기에는 참조 에셋을 포함할 수 없습니다"));
     // Engine compilation registers missing slots, so external skeletons must already contain every required slot.
     // 엔진 컴파일은 누락 슬롯을 등록하므로 외부 스켈레톤에는 필요한 모든 슬롯이 이미 있어야 합니다.
@@ -253,6 +411,14 @@ bool UWarriorAssetLibrary::RetargetAnimations(const TArray<UObject*>& Assets, US
     Context.bUseSourcePath = false;
     Context.bOverwriteExistingFiles = bOverwriteExistingFiles;
     Context.bIncludeReferencedAssets = bIncludeReferencedAssets;
+    // The engine batch utility accesses Slate even in unattended asset authoring; no editor window or gameplay is needed.
+    // 엔진 일괄 도구의 무인 에셋 작성에도 Slate가 필요하며 에디터 창이나 게임 실행은 필요하지 않습니다.
+    if (IsRunningCommandlet() && !FSlateApplication::IsInitialized())
+    {
+        ISlateNullRendererModule& Renderer = FModuleManager::LoadModuleChecked<ISlateNullRendererModule>(TEXT("SlateNullRenderer"));
+        FSlateApplication::InitializeAsStandaloneApplication(Renderer.CreateSlateNullRenderer());
+        FSlateNotificationManager::Get().SetAllowNotifications(false);
+    }
     TStrongObjectPtr<UIKRetargetBatchOperation> Operation(NewObject<UIKRetargetBatchOperation>());
     Operation->RunRetarget(Context);
     for (const FString& ObjectPath : OutputPaths)
