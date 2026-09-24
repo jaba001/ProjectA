@@ -52,6 +52,11 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MainMenu|Preview")
     TObjectPtr<UCameraComponent> PreviewCamera;
 
+    // Smaller values move the detail camera closer; 1.0 fits the full body height without padding.
+    // 값을 낮추면 상세 카메라가 가까워지며 1.0은 여백 없이 전신 높이를 맞춥니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MainMenu|Preview|Camera", meta = (ClampMin = "0.1", UIMin = "0.5", UIMax = "2.0"))
+    float FocusedCameraDistanceScale = 1.15f;
+
     // Preview actor spawn anchors for party slots zero through three.
     // 파티 슬롯 0부터 3까지의 프리뷰 액터 스폰 앵커입니다.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MainMenu|Preview")

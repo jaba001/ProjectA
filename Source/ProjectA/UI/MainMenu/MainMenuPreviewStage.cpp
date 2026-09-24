@@ -17,24 +17,24 @@ AMainMenuPreviewStage::AMainMenuPreviewStage()
 
     PreviewCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("PreviewCamera"));
     PreviewCamera->SetupAttachment(SceneRoot);
-    PreviewCamera->SetRelativeLocation(FVector(-700.0f, 0.0f, 140.0f));
+    PreviewCamera->SetRelativeLocation(FVector(-600.0f, 0.0f, 140.0f));
     PreviewCamera->SetRelativeRotation(FRotator(-5.0f, 0.0f, 0.0f));
 
     Slot0Anchor = CreateDefaultSubobject<USceneComponent>(TEXT("Slot0Anchor"));
     Slot0Anchor->SetupAttachment(SceneRoot);
-    Slot0Anchor->SetRelativeLocation(FVector(0.0f, -225.0f, 0.0f));
+    Slot0Anchor->SetRelativeLocation(FVector(0.0f, -450.0f, 0.0f));
 
     Slot1Anchor = CreateDefaultSubobject<USceneComponent>(TEXT("Slot1Anchor"));
     Slot1Anchor->SetupAttachment(SceneRoot);
-    Slot1Anchor->SetRelativeLocation(FVector(0.0f, -75.0f, 0.0f));
+    Slot1Anchor->SetRelativeLocation(FVector(0.0f, -150.0f, 0.0f));
 
     Slot2Anchor = CreateDefaultSubobject<USceneComponent>(TEXT("Slot2Anchor"));
     Slot2Anchor->SetupAttachment(SceneRoot);
-    Slot2Anchor->SetRelativeLocation(FVector(0.0f, 75.0f, 0.0f));
+    Slot2Anchor->SetRelativeLocation(FVector(0.0f, 150.0f, 0.0f));
 
     Slot3Anchor = CreateDefaultSubobject<USceneComponent>(TEXT("Slot3Anchor"));
     Slot3Anchor->SetupAttachment(SceneRoot);
-    Slot3Anchor->SetRelativeLocation(FVector(0.0f, 225.0f, 0.0f));
+    Slot3Anchor->SetRelativeLocation(FVector(0.0f, 450.0f, 0.0f));
 }
 
 void AMainMenuPreviewStage::SetPreviewActorForSlot(int32 SlotIndex, FName ClassId)
@@ -153,7 +153,7 @@ void AMainMenuPreviewStage::RefreshPreviewFocus()
     const FVector Forward = Rotation.Vector();
     const FVector Right = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y);
     const float HorizontalTangent = FMath::Tan(FMath::DegreesToRadians(22.5f));
-    const float Distance = HalfHeight * 1.35f * Aspect / HorizontalTangent;
+    const float Distance = HalfHeight * FMath::Max(0.1f, FocusedCameraDistanceScale) * Aspect / HorizontalTangent;
     // Leave the right side of the view available for the character editor panel.
     // 화면 오른쪽은 캐릭터 편집 패널을 위해 비워 둡니다.
     PreviewCamera->SetWorldLocationAndRotation(Center - Forward * Distance + Right * Distance * HorizontalTangent * 0.38f, Rotation);

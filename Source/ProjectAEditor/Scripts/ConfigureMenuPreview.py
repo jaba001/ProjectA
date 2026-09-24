@@ -39,7 +39,8 @@ unreal.BlueprintEditorLibrary.compile_blueprint(mode_asset)
 if not unreal.EditorAssetLibrary.save_loaded_asset(mode_asset):
     raise RuntimeError("Could not save menu GameMode pawn removal.")
 
-for index, offset in enumerate([-675.0, -225.0, 225.0, 675.0]):
+stage.get_editor_property("preview_camera").set_editor_property("relative_location", unreal.Vector(-600.0, 0.0, 140.0))
+for index, offset in enumerate([-450.0, -150.0, 150.0, 450.0]):
     stage.get_editor_property("slot%d_anchor" % index).set_editor_property("relative_location", unreal.Vector(0, offset, 0))
 mesh_component = unreal.get_default_object(preview.generated_class()).get_editor_property("skeletal_mesh_component")
 idle = unreal.load_asset("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle")
