@@ -1,4 +1,9 @@
 #include "Unit/CharacterAppearanceComponent.h"
+#include "Animation/AnimClassInterface.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimSingleNodeInstance.h"
+#include "Animation/AnimationAsset.h"
+#include "Animation/Skeleton.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "DataAsset/CharacterAppearanceCatalog.h"
 #include "Engine/SkeletalMesh.h"
@@ -7,6 +12,7 @@
 #include "GameFramework/Character.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
+#include "PhysicsEngine/PhysicsAsset.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogCharacterAppearance, Log, All);
 
@@ -34,6 +40,8 @@ void UCharacterAppearanceComponent::OnUnregister()
 {
     RemoveModularMeshes();
     RestorePoseLeader();
+    RestoreOriginalBody();
+    bAppearanceApplied = false;
     Super::OnUnregister();
 }
 
@@ -85,6 +93,48 @@ void UCharacterAppearanceComponent::RestorePoseLeader()
     PoseLeader = nullptr;
 }
 
+void UCharacterAppearanceComponent::SaveOriginalBody(USkeletalMeshComponent* Leader)
+{
+    if (OriginalBodyLeader == Leader) return;
+    OriginalBodyLeader = Leader;
+    OriginalBodyMesh = Leader->GetSkeletalMeshAsset();
+    OriginalBodyPhysics = Leader->GetPhysicsAsset();
+    OriginalAnimationClass = Leader->GetAnimClass();
+    OriginalAnimationMode = static_cast<uint8>(Leader->GetAnimationMode());
+    OriginalAnimationData = Leader->AnimationData;
+    if (UAnimSingleNodeInstance* Animation = Leader->GetSingleNodeInstance()) OriginalAnimationData.PopulateFrom(Animation);
+    OriginalMaterialOverrides = Leader->OverrideMaterials;
+    OriginalMeshTransform = Leader->GetRelativeTransform();
+}
+
+void UCharacterAppearanceComponent::RestoreOriginalBody()
+{
+    if (bBodyVariantApplied && IsValid(OriginalBodyLeader))
+    {
+        OriginalBodyLeader->SetSkeletalMeshAsset(OriginalBodyMesh);
+        OriginalBodyLeader->EmptyOverrideMaterials();
+        for (int32 MaterialIndex = 0; MaterialIndex < OriginalMaterialOverrides.Num(); ++MaterialIndex)
+        {
+            OriginalBodyLeader->SetMaterial(MaterialIndex, OriginalMaterialOverrides[MaterialIndex]);
+        }
+        OriginalBodyLeader->SetPhysicsAsset(OriginalBodyPhysics, false);
+        OriginalBodyLeader->SetRelativeTransform(OriginalMeshTransform);
+        OriginalBodyLeader->SetAnimInstanceClass(OriginalAnimationClass);
+        OriginalBodyLeader->SetAnimationMode(static_cast<EAnimationMode::Type>(OriginalAnimationMode));
+        if (OriginalAnimationMode == EAnimationMode::AnimationSingleNode)
+        {
+            OriginalBodyLeader->OverrideAnimationData(OriginalAnimationData.AnimToPlay, OriginalAnimationData.bSavedLooping, OriginalAnimationData.bSavedPlaying, OriginalAnimationData.SavedPosition, OriginalAnimationData.SavedPlayRate);
+        }
+    }
+    bBodyVariantApplied = false;
+    OriginalBodyLeader = nullptr;
+    OriginalBodyMesh = nullptr;
+    OriginalBodyPhysics = nullptr;
+    OriginalAnimationClass = nullptr;
+    OriginalAnimationData = FSingleAnimationPlayData();
+    OriginalMaterialOverrides.Reset();
+}
+
 bool UCharacterAppearanceComponent::SetAppearance(UCharacterAppearanceCatalog* InCatalog, const FCharacterAppearanceSelection& InSelection)
 {
     AActor* Owner = GetOwner();
@@ -113,30 +163,41 @@ bool UCharacterAppearanceComponent::RefreshAppearance()
     // 런타임 프리뷰는 게임 월드 액터이며 저장된 에디터 액터와 템플릿은 변경하지 않습니다.
     if (IsTemplate() || !IsValid(Owner) || Owner->IsTemplate() || !Owner->GetWorld() || !Owner->GetWorld()->IsGameWorld()) return false;
     USkeletalMeshComponent* Leader = FindPoseLeader();
-    if (Leader != PoseLeader)
-    {
-        RemoveModularMeshes();
-        RestorePoseLeader();
-    }
     const auto Fail = [this](const FString& Reason)
     {
-        RemoveModularMeshes();
-        RestorePoseLeader();
-        UE_LOG(LogCharacterAppearance, Warning, TEXT("%s: %s; retaining the base mesh."), *GetPathName(), *Reason);
+        UE_LOG(LogCharacterAppearance, Warning, TEXT("%s: %s; retaining the previous appearance."), *GetPathName(), *Reason);
         return false;
     };
     if (!AppearanceCatalog)
     {
+        if (!Selection.IsEmpty()) return Fail(TEXT("Appearance selection has no catalog"));
         RemoveModularMeshes();
         RestorePoseLeader();
+        RestoreOriginalBody();
+        bAppearanceApplied = false;
         ApplyHiddenMeshBones();
-        return Selection.IsEmpty();
+        return true;
     }
     if (!IsValid(Leader) || Leader->IsTemplate() || !IsValid(Leader->GetSkeletalMeshAsset())) return Fail(TEXT("Appearance pose leader is not ready"));
-    ApplyHiddenMeshBones();
+    // Replication and BeginPlay can repeat the same selection after death; retain animation and physics state.
+    // 복제와 BeginPlay에서 사망 후 같은 선택이 반복되어도 애니메이션과 물리 상태를 유지합니다.
+    if (bAppearanceApplied && Leader == PoseLeader && AppliedCatalog == AppearanceCatalog && AppliedSelection == Selection && Leader->GetSkeletalMeshAsset() == AppliedBodyMesh) return true;
 
     FText Error;
     if (!AppearanceCatalog->ValidateSelection(Selection, Error)) return Fail(Error.ToString());
+    const FCharacterAppearanceBodyVariant* Body = AppearanceCatalog->FindBodyVariant(Selection.BodyId);
+    const bool bCharacterBody = Cast<ACharacter>(Owner) != nullptr;
+    USkeletalMesh* BodyMesh = Body ? Body->Mesh.LoadSynchronous() : OriginalBodyLeader == Leader && bBodyVariantApplied ? OriginalBodyMesh.Get() : Leader->GetSkeletalMeshAsset();
+    if (!IsValid(BodyMesh)) return Fail(TEXT("Cannot load the selected body mesh"));
+    UClass* AnimationClass = Body && bCharacterBody ? Body->AnimationClass.LoadSynchronous() : nullptr;
+    UAnimationAsset* PreviewAnimation = Body && !bCharacterBody ? Body->PreviewAnimation.LoadSynchronous() : nullptr;
+    if (Body && bCharacterBody && !Body->AnimationClass.IsNull() && !IsValid(AnimationClass)) return Fail(TEXT("Cannot load the selected body animation class"));
+    if (Body && !bCharacterBody && !Body->PreviewAnimation.IsNull() && !IsValid(PreviewAnimation)) return Fail(TEXT("Cannot load the selected body preview animation"));
+    if (const IAnimClassInterface* AnimationInterface = IAnimClassInterface::GetFromClass(AnimationClass))
+    {
+        if (!AnimationInterface->GetTargetSkeleton() || !AnimationInterface->GetTargetSkeleton()->IsCompatibleMesh(BodyMesh)) return Fail(TEXT("The body animation class is incompatible with the selected mesh"));
+    }
+    if (PreviewAnimation && (!PreviewAnimation->GetSkeleton() || !PreviewAnimation->GetSkeleton()->IsCompatibleMesh(BodyMesh))) return Fail(TEXT("The preview animation is incompatible with the selected mesh"));
     struct FAppearanceMeshPlan
     {
         TSoftObjectPtr<USkeletalMesh> MeshReference;
@@ -146,15 +207,18 @@ bool UCharacterAppearanceComponent::RefreshAppearance()
     };
     FGameplayTagContainer HiddenParts;
     TArray<FAppearanceMeshPlan> MeshPlans;
-    for (FName ItemId : Selection.ItemIds)
+    if (AppearanceCatalog->bEnableOutfits)
     {
-        const FCharacterAppearanceItem* Item = AppearanceCatalog->FindItem(ItemId);
-        if (!Item) return Fail(TEXT("Selected item was removed from its catalog"));
-        HiddenParts.AppendTags(Item->HiddenBodyParts);
-        for (const TSoftObjectPtr<USkeletalMesh>& Mesh : Item->Meshes)
+        for (FName ItemId : Selection.ItemIds)
         {
-            FAppearanceMeshPlan& Plan = MeshPlans.AddDefaulted_GetRef();
-            Plan.MeshReference = Mesh;
+            const FCharacterAppearanceItem* Item = AppearanceCatalog->FindItem(ItemId);
+            if (!Item) return Fail(TEXT("Selected item was removed from its catalog"));
+            HiddenParts.AppendTags(Item->HiddenBodyParts);
+            for (const TSoftObjectPtr<USkeletalMesh>& Mesh : Item->Meshes)
+            {
+                FAppearanceMeshPlan& Plan = MeshPlans.AddDefaulted_GetRef();
+                Plan.MeshReference = Mesh;
+            }
         }
     }
     const bool bUseModularBody = !HiddenParts.IsEmpty();
@@ -173,7 +237,7 @@ bool UCharacterAppearanceComponent::RefreshAppearance()
 
     // Resolve each part's mesh and materials before replacing the visible appearance.
     // 보이는 외형을 교체하기 전에 각 파츠의 메시와 재질을 로드하고 확인합니다.
-    const FReferenceSkeleton& LeaderBones = Leader->GetSkeletalMeshAsset()->GetRefSkeleton();
+    const FReferenceSkeleton& LeaderBones = BodyMesh->GetRefSkeleton();
     for (FAppearanceMeshPlan& Plan : MeshPlans)
     {
         USkeletalMesh* Mesh = Plan.MeshReference.LoadSynchronous();
@@ -196,7 +260,32 @@ bool UCharacterAppearanceComponent::RefreshAppearance()
     if (bUseModularBody && MeshPlans.IsEmpty()) return Fail(TEXT("Appearance has no visible body or clothing meshes"));
 
     RemoveModularMeshes();
+    if (Leader != PoseLeader)
+    {
+        RestorePoseLeader();
+        RestoreOriginalBody();
+    }
+    if (Body)
+    {
+        SaveOriginalBody(Leader);
+        const bool bMeshChanged = Leader->GetSkeletalMeshAsset() != BodyMesh;
+        const FTransform& MeshTransform = bCharacterBody ? Body->MeshTransform : Body->PreviewMeshTransform;
+        if (bMeshChanged) Leader->SetSkeletalMeshAsset(BodyMesh);
+        if (bMeshChanged || !bBodyVariantApplied) Leader->EmptyOverrideMaterials();
+        if (Leader->GetPhysicsAsset() != BodyMesh->GetPhysicsAsset()) Leader->SetPhysicsAsset(BodyMesh->GetPhysicsAsset(), false);
+        if (!bBodyVariantApplied || !AppliedMeshTransform.Equals(MeshTransform)) Leader->SetRelativeTransform(MeshTransform);
+        if (AnimationClass && (Leader->GetAnimClass() != AnimationClass || Leader->GetAnimationMode() != EAnimationMode::AnimationBlueprint)) Leader->SetAnimInstanceClass(AnimationClass);
+        UAnimSingleNodeInstance* SingleAnimation = Leader->GetSingleNodeInstance();
+        if (PreviewAnimation && (bMeshChanged || !SingleAnimation || SingleAnimation->GetAnimationAsset() != PreviewAnimation)) Leader->PlayAnimation(PreviewAnimation, true);
+        AppliedMeshTransform = MeshTransform;
+        bBodyVariantApplied = true;
+    }
+    else
+    {
+        RestoreOriginalBody();
+    }
     PoseLeader = Leader;
+    ApplyHiddenMeshBones();
     if (!bLeaderVisibilitySaved)
     {
         bLeaderWasVisible = Leader->IsVisible();
@@ -227,6 +316,10 @@ bool UCharacterAppearanceComponent::RefreshAppearance()
     // 원본 표면을 숨겨도 애니메이션과 래그돌을 담당하는 리더는 계속 계산합니다.
     Leader->VisibilityBasedAnimTickOption = MeshPlans.IsEmpty() ? static_cast<EVisibilityBasedAnimTickOption>(LeaderPreviousTickOption) : EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
     Leader->SetVisibility(bUseModularBody ? false : bLeaderWasVisible, false);
+    AppliedCatalog = AppearanceCatalog;
+    AppliedSelection = Selection;
+    AppliedBodyMesh = BodyMesh;
+    bAppearanceApplied = true;
     return true;
 }
 

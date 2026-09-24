@@ -112,9 +112,9 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 
 프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 Warrior/Mage/Archer/Rogue 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
-전사 `BP_WarriorMenuPreview`·마법사 `BP_MageMenuPreview`·도적 `BP_RogueMenuPreview`·궁수 `BP_PartyMenuPreview`는 모두 TopDown의 `SKM_Manny_Simple`과 기본 Manny 재질·공통 Idle을 사용한다. 의상 없는 상태와 액세서리만 고른 상태는 원본 몸체를 표시한다. 신체를 가리는 의상은 ROG 신체 파츠에도 원본 Manny 재질·텍스처를 연결하여 노출 부위의 색·노멀·로고를 유지한다. 마법사의 `Staff` 한 개는 왼손 `hand_l`에 연결한다.
+전사 `BP_WarriorMenuPreview`·마법사 `BP_MageMenuPreview`·도적 `BP_RogueMenuPreview`·궁수 `BP_PartyMenuPreview`는 선택한 Primitive 몸체와 원본 재질·공통 Idle을 사용한다. 남자는 `SKM_Primitive_Charater_01_Body`, 여자는 실제 원본 이름 `SKM_Primitive_02_Body`다. 마법사의 `Staff` 한 개는 왼손 `hand_l`에 연결한다. ROG 의상 UI·착용은 중지하고 기존 103개 항목·원본 에셋은 향후 아이템용으로 보존한다.
 
-캐릭터 **생성/수정**은 오른쪽 스크롤 편집창을 연다. 네 직업 모두 투구·상의/로브·바지·신발·장갑·어깨 장식·손목 보호대·망토의 8부위·103개 항목을 선택하며 기본값은 선택 없음이다. 선택 즉시 같은 월드 프리뷰에 반영하고 회전 버튼으로 좌우 30도씩 돌린다. **저장**은 초안에 반영하고 **취소**는 이전 선택을 복원한다. 새 캐릭터 생성을 취소하면 빈 슬롯으로 복원하며 직업 변경 시 의상을 초기화한다. 기존 Designer WBP에도 C++ 공통 편집창으로 적용한다. [화면·저장 확인](TODO.md#2-30-rog-의상-커스터마이징)
+캐릭터 **생성/수정**의 오른쪽 편집창에서 ◀·▶ 버튼으로 남자·여자 몸체를 순환 선택한다. 순서는 카탈로그 `BodyVariants` 배열을 따르며 기본값은 남자다. 선택 즉시 같은 월드 프리뷰에 반영하고 회전 버튼으로 좌우 30도씩 돌린다. **저장**은 초안에 반영하고 **취소**는 이전 선택을 복원한다. 새 캐릭터 생성을 취소하면 빈 슬롯으로 복원한다. 기존 Designer WBP에도 C++ 공통 편집창을 적용한다. `BodyId`가 없는 이전 저장은 기본 남자로 해석한다. [화면·저장 확인](TODO.md#2-30-rog-의상-커스터마이징)
 
 GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메뉴 travel의 잔여 IgnoreInput·초기 포커스만 복구한다. CharacterCreation의 Text_StartGameStatus는 선택 바인딩이며 누락 시 Native 표시 영역을 추가한다. 상세 배치·바인딩은 [PROJECT_PLAN](PROJECT_PLAN.md#gameplay-에셋과-배치)을 따른다.
 
@@ -266,7 +266,7 @@ C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / 
 
 캐릭터 생성의 선택 순서는 전사 `Warrior` → 마법사 `Mage` → 궁수 `Archer` → 도적 `Rogue`다. 이전 테스트 직업은 선택 목록에서 제거한다. 이름 편집·취소·1~4명 생성과 원래 소유권은 유지한다. ClassInfo는 직업 정의의 HP 100·힘/민첩/지능 각 10과 기존 전투 클래스에서 해석한 AP/SubAP·시작 스킬을 표시한다. 이 수치는 현재 시작값이며 최종 직업 밸런스가 아니다.
 
-표시 정보의 기준은 `UProfessionBase`와 네 C++ 자식 클래스다. 실사용 및 `Validation/T12` WBP의 기존 WidgetTree·배치·스타일·바인딩을 유지한다. MainMenu 프리뷰 맵은 Warrior/Mage/Rogue를 각각 직업별 MenuPreview에, Archer를 기존 `BP_PartyMenuPreview`에 연결한다. 네 직업의 의상 편집은 같은 카탈로그를 사용한다. 개발용 협동은 참가자마다 궁수 한 명을 생성한다.
+표시 정보의 기준은 `UProfessionBase`와 네 C++ 자식 클래스다. 실사용 및 `Validation/T12` WBP의 기존 WidgetTree·배치·스타일·바인딩을 유지한다. MainMenu 프리뷰 맵은 Warrior/Mage/Rogue를 각각 직업별 MenuPreview에, Archer를 기존 `BP_PartyMenuPreview`에 연결한다. 네 직업의 몸체 선택은 같은 카탈로그를 사용한다. 개발용 협동은 참가자마다 궁수 한 명을 생성한다.
 
 지원하지 않는 이전 직업의 Continue는 해당 ID와 오류를 표시하고 저장 원본·현재 Run을 유지한다. 새 직업으로 자동 변환하지 않는다. Editor 빌드와 저장 후 에셋 재로드에서 새 직업 맵·16개 라벨을 확인했으며 실제 클릭·상세 표시·전투·Continue·협동은 [남은 확인](TODO.md#3-2-아이템과-직업)의 사용자 검증을 따른다.
 

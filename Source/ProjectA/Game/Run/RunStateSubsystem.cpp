@@ -234,7 +234,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
             return false;
         }
         Slots.Add(Member.SlotIndex);
-        if (!Member.bCreated && !Member.Appearance.ItemIds.IsEmpty()) return false;
+        if (!Member.bCreated && !Member.Appearance.IsEmpty()) return false;
         if ((!Member.bCreated || !Member.bHasSkillLoadout) && (Member.Gold != 0 || !Member.Skills.IsEmpty())) return false;
         if (Member.bCreated)
         {
@@ -629,7 +629,7 @@ URunSaveGame* URunStateSubsystem::CreateInitialSaveData(const TArray<FRunPartyMe
     Save->Party.Sort([](const FRunPartyMember& Left, const FRunPartyMember& Right) { return Left.SlotIndex < Right.SlotIndex; });
     for (FRunPartyMember& Member : Save->Party)
     {
-        if (!Member.bCreated && !Member.Appearance.ItemIds.IsEmpty())
+        if (!Member.bCreated && !Member.Appearance.IsEmpty())
         {
             OutError = NSLOCTEXT("RunCheckpoint", "EmptySlotAppearance", "빈 캐릭터 슬롯에 의상을 저장할 수 없습니다.");
             return nullptr;

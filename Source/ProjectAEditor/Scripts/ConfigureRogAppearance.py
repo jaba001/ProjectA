@@ -214,6 +214,8 @@ def configure_profession(profession, unit_name, preview_name, catalog):
 
 
 def configure():
+    if ASSETS.does_asset_exist(CATALOG_PATH):
+        require(not load(CATALOG_PATH).get_editor_property("body_variants"), "Body variant selection is active; use ConfigurePrimitiveAppearance.py to preserve the selected base models")
     materials_only = "-RogAppearanceMaterialsOnly" in unreal.SystemLibrary.get_command_line()
     if materials_only:
         catalog = load(CATALOG_PATH)

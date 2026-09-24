@@ -1,4 +1,5 @@
 #include "CharacterAppearanceAssetLibrary.h"
+#include "Animation/Skeleton.h"
 #include "Engine/SkeletalMesh.h"
 #include "MeshDescription.h"
 #include "Rendering/SkeletalMeshLODModel.h"
@@ -215,6 +216,58 @@ namespace
         AppendAttributeHashes(Description.EdgeAttributes(), Result);
         return Result;
     }
+}
+
+bool UCharacterAppearanceAssetLibrary::ValidateBodyAnimationSkeleton(USkeletalMesh* BodyMesh, USkeleton* AnimationSkeleton)
+{
+    if (!IsValid(BodyMesh) || !IsValid(BodyMesh->GetSkeleton()) || !IsValid(AnimationSkeleton)) return Fail(TEXT("Body mesh and animation skeleton are required"));
+    FSkinnedAssetCompilingManager::Get().FinishCompilation({BodyMesh});
+    const FReferenceSkeleton& Source = AnimationSkeleton->GetReferenceSkeleton();
+    const auto Matches = [&Source](const FReferenceSkeleton& Target, bool bAllowBodyProportions)
+    {
+        for (int32 Index = 0; Index < Target.GetRawBoneNum(); ++Index)
+        {
+            const FName Name = Target.GetBoneName(Index);
+            const int32 SourceIndex = Source.FindBoneIndex(Name);
+            if (SourceIndex == INDEX_NONE) return Fail(*FString::Printf(TEXT("Animation skeleton is missing body bone %s"), *Name.ToString()));
+            const int32 Parent = Target.GetParentIndex(Index);
+            const int32 SourceParent = Source.GetParentIndex(SourceIndex);
+            if ((Parent == INDEX_NONE) != (SourceParent == INDEX_NONE) || (Parent != INDEX_NONE && Target.GetBoneName(Parent) != Source.GetBoneName(SourceParent))) return Fail(*FString::Printf(TEXT("Body bone %s has a different parent"), *Name.ToString()));
+            const FTransform& TargetPose = Target.GetRawRefBonePose()[Index];
+            const FTransform& SourcePose = Source.GetRawRefBonePose()[SourceIndex];
+            // Compatible skeleton translation retargeting handles body lengths while rotations and scales stay aligned.
+            // 호환 뼈대의 이동 리타기팅으로 체형별 길이를 처리하며 회전과 배율의 일치는 유지합니다.
+            if (TargetPose.ContainsNaN() || TargetPose.GetTranslation().GetAbsMax() > 500.0 || (!bAllowBodyProportions && !TargetPose.GetTranslation().Equals(SourcePose.GetTranslation(), 0.01)) || !TargetPose.GetRotation().GetNormalized().Equals(SourcePose.GetRotation().GetNormalized(), 0.0001) || !TargetPose.GetScale3D().Equals(SourcePose.GetScale3D(), 0.0001)) return Fail(*FString::Printf(TEXT("Body bone %s has an incompatible bind pose: %s / %s"), *Name.ToString(), *TargetPose.ToString(), *SourcePose.ToString()));
+        }
+        return Target.GetRawBoneNum() > 0;
+    };
+    const FReferenceSkeleton& Target = BodyMesh->GetSkeleton()->GetReferenceSkeleton();
+    if (Target.GetRawBoneNum() != Source.GetRawBoneNum()) return Fail(TEXT("Body and animation skeleton bone counts differ"));
+    if (!Matches(Target, false) || !Matches(BodyMesh->GetRefSkeleton(), true)) return false;
+    if (!AnimationSkeleton->IsCompatibleMesh(BodyMesh)) return Fail(TEXT("The animation skeleton rejects the body mesh hierarchy"));
+    for (FName Bone : {FName(TEXT("ball_r")), FName(TEXT("calf_r")), FName(TEXT("upperarm_l")), FName(TEXT("pelvis"))})
+    {
+        const int32 Index = Source.FindBoneIndex(Bone);
+        if (Index != INDEX_NONE) UE_LOG(LogCharacterAppearanceAssets, Display, TEXT("Translation retarget mode / 이동 리타기팅 모드 %s: %d"), *Bone.ToString(), static_cast<int32>(AnimationSkeleton->GetBoneTranslationRetargetingMode(Index)));
+    }
+    UE_LOG(LogCharacterAppearanceAssets, Display, TEXT("Verified animation skeleton for %s: %d bones / 뼈대 계층과 회전·배율 호환을 확인했으며 이동은 체형별 리타기팅을 사용합니다."), *BodyMesh->GetName(), Target.GetRawBoneNum());
+    return true;
+}
+
+bool UCharacterAppearanceAssetLibrary::ConfigureBodyAnimationSkeleton(USkeletalMesh* BodyMesh, USkeleton* AnimationSkeleton)
+{
+    if (!ValidateBodyAnimationSkeleton(BodyMesh, AnimationSkeleton)) return false;
+    USkeleton* Skeleton = BodyMesh->GetSkeleton();
+    if (Skeleton->GetPathName() != TEXT("/Game/Primitive_Characters_Pack/Demoscene_UE5/Mesh/SKM_Manny_Skeleton.SKM_Manny_Skeleton")) return Fail(TEXT("Only the selected Primitive skeleton can be configured"));
+    if (!Skeleton->GetCompatibleSkeletons().Contains(AnimationSkeleton) || !Skeleton->GetUseRetargetModesFromCompatibleSkeleton() || !Skeleton->ContainsSlotName(TEXT("DefaultSlot")))
+    {
+        Skeleton->Modify();
+        Skeleton->AddCompatibleSkeleton(AnimationSkeleton);
+        Skeleton->SetUseRetargetModesFromCompatibleSkeleton(true);
+        if (!Skeleton->ContainsSlotName(TEXT("DefaultSlot"))) Skeleton->SetSlotGroupName(TEXT("DefaultSlot"), TEXT("DefaultGroup"));
+        Skeleton->MarkPackageDirty();
+    }
+    return true;
 }
 
 TArray<int32> UCharacterAppearanceAssetLibrary::ValidateBodyMaterialSlots(USkeletalMesh* SourceMesh, USkeletalMesh* BodyPart)

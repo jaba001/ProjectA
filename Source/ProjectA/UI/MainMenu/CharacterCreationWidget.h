@@ -1,7 +1,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameplayTagContainer.h"
 #include "CommonActivatableWidget.h"
 #include "Game/Run/RunTypes.h"
 #include "UI/MainMenu/CharacterPartyDraft.h"
@@ -21,26 +20,6 @@ class UTexture2D;
 class UVerticalBox;
 class UWidget;
 class UCharacterAppearanceCatalog;
-class UCharacterCreationWidget;
-
-// Each selector keeps its own slot and stable item identifiers.
-// 각 선택기는 자신의 부위와 안정적인 의상 식별자를 보관합니다.
-UCLASS()
-class UCharacterAppearanceChoiceBinding : public UObject
-{
-    GENERATED_BODY()
-
-public:
-    UPROPERTY(Transient)
-    TObjectPtr<UCharacterCreationWidget> Owner;
-    UPROPERTY(Transient)
-    TObjectPtr<UComboBoxString> Selector;
-    FGameplayTag SlotTag;
-    TArray<FName> ItemIds;
-
-    UFUNCTION()
-    void HandleSelectionChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
-};
 
 // One slot presentation reuses both saved Designer bindings and the native fallback.
 // 슬롯 표현 하나가 저장된 Designer 바인딩과 네이티브 대체 레이아웃을 함께 사용합니다.
@@ -157,8 +136,6 @@ public:
     // 새 싱글플레이에서 직접 조작할 생성된 캐릭터 한 명을 선택합니다.
     UFUNCTION(BlueprintCallable, Category = "CharacterCreation|Party Slots")
     bool SelectPlayerControlledSlot(int32 SlotIndex);
-
-    void SelectAppearanceItem(FGameplayTag SlotTag, FName ItemId);
 
 protected:
     // Initializes fallback character creation layout and events.
@@ -593,13 +570,18 @@ private:
     FCharacterPartyDraft PartyDraft;
 
     void BuildDetailPanel();
-    void RebuildAppearanceSelectors();
+    void RefreshBodySelector();
+    void ChangeBodyVariant(int32 Direction);
     void RefreshDetailPreview(bool bReplaceActor);
     UCharacterAppearanceCatalog* GetAppearanceCatalog(FName ClassId) const;
     UFUNCTION()
     void HandleDetailClassChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
     UFUNCTION()
-    void HandleResetAppearance();
+    void HandleResetBody();
+    UFUNCTION()
+    void HandlePreviousBody();
+    UFUNCTION()
+    void HandleNextBody();
     UFUNCTION()
     void HandlePreviewRotateLeft();
     UFUNCTION()
@@ -621,13 +603,15 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<UButton> DetailSave;
     UPROPERTY(Transient)
-    TObjectPtr<UButton> DetailResetAppearance;
+    TObjectPtr<UButton> DetailResetBody;
     UPROPERTY(Transient)
-    TObjectPtr<UVerticalBox> DetailAppearanceOptions;
+    TObjectPtr<UButton> DetailPreviousBody;
     UPROPERTY(Transient)
-    TObjectPtr<UTextBlock> DetailAppearanceStatus;
+    TObjectPtr<UButton> DetailNextBody;
     UPROPERTY(Transient)
-    TArray<TObjectPtr<UCharacterAppearanceChoiceBinding>> DetailAppearanceBindings;
+    TObjectPtr<UTextBlock> DetailBodyName;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> DetailBodyPosition;
     UPROPERTY(Transient)
     FCharacterAppearanceSelection PendingAppearance;
     FName PendingClassId;

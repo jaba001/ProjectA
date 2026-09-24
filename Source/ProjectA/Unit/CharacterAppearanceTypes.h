@@ -11,9 +11,12 @@ struct PROJECTA_API FCharacterAppearanceSelection
     GENERATED_BODY()
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Appearance")
+    FName BodyId;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Appearance")
     TArray<FName> ItemIds;
 
-    bool IsEmpty() const { return ItemIds.IsEmpty(); }
-    bool operator==(const FCharacterAppearanceSelection& Other) const { return ItemIds == Other.ItemIds; }
+    bool IsEmpty() const { return BodyId.IsNone() && ItemIds.IsEmpty(); }
+    bool operator==(const FCharacterAppearanceSelection& Other) const { return BodyId == Other.BodyId && ItemIds == Other.ItemIds; }
     bool operator!=(const FCharacterAppearanceSelection& Other) const { return !(*this == Other); }
 };

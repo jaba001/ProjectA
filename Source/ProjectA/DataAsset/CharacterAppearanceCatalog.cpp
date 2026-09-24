@@ -24,6 +24,14 @@ const FCharacterAppearanceItem* UCharacterAppearanceCatalog::FindItem(FName Item
     return Items.FindByPredicate([ItemId](const FCharacterAppearanceItem& Item) { return Item.ItemId == ItemId; });
 }
 
+const FCharacterAppearanceBodyVariant* UCharacterAppearanceCatalog::FindBodyVariant(FName BodyId) const
+{
+    if (BodyVariants.Num() > 64) return nullptr;
+    const FName ResolvedBodyId = BodyId.IsNone() ? DefaultBodyId : BodyId;
+    if (ResolvedBodyId.IsNone()) return nullptr;
+    return BodyVariants.FindByPredicate([ResolvedBodyId](const FCharacterAppearanceBodyVariant& Body) { return Body.BodyId == ResolvedBodyId; });
+}
+
 bool UCharacterAppearanceCatalog::ValidateSelection(const FCharacterAppearanceSelection& InSelection, FText& OutError) const
 {
     OutError = FText::GetEmpty();
@@ -32,9 +40,27 @@ bool UCharacterAppearanceCatalog::ValidateSelection(const FCharacterAppearanceSe
         OutError = Reason;
         return false;
     };
-    if (Slots.IsEmpty() || Slots.Num() > 16 || Items.Num() > 512 || BodyParts.IsEmpty() || BodyParts.Num() > 32 || InSelection.ItemIds.Num() > 16)
+    if (BodyVariants.Num() > 64 || Slots.Num() > 16 || Items.Num() > 512 || BodyParts.Num() > 32 || InSelection.ItemIds.Num() > 16 || ((bEnableOutfits || BodyVariants.IsEmpty()) && (Slots.IsEmpty() || BodyParts.IsEmpty())))
     {
         return Fail(NSLOCTEXT("CharacterAppearance", "InvalidCatalogSize", "의상 목록 또는 선택 개수가 올바르지 않습니다."));
+    }
+
+    TSet<FName> BodyIds;
+    for (const FCharacterAppearanceBodyVariant& Body : BodyVariants)
+    {
+        if (Body.BodyId.IsNone() || BodyIds.Contains(Body.BodyId) || Body.Mesh.IsNull() || !Body.MeshTransform.IsValid() || !Body.PreviewMeshTransform.IsValid() || Body.MeshTransform.GetScale3D().GetAbsMin() <= SMALL_NUMBER || Body.PreviewMeshTransform.GetScale3D().GetAbsMin() <= SMALL_NUMBER)
+        {
+            return Fail(NSLOCTEXT("CharacterAppearance", "InvalidBodyVariant", "몸체 식별자·메시·변환 설정이 없거나 올바르지 않습니다."));
+        }
+        BodyIds.Add(Body.BodyId);
+    }
+    if ((!BodyVariants.IsEmpty() && !BodyIds.Contains(DefaultBodyId)) || (BodyVariants.IsEmpty() && !DefaultBodyId.IsNone()))
+    {
+        return Fail(NSLOCTEXT("CharacterAppearance", "InvalidDefaultBody", "기본 몸체가 몸체 목록에 등록되지 않았습니다."));
+    }
+    if (!InSelection.BodyId.IsNone() && !BodyIds.Contains(InSelection.BodyId))
+    {
+        return Fail(NSLOCTEXT("CharacterAppearance", "InvalidSelectedBody", "목록에 없는 몸체가 선택되었습니다."));
     }
 
     TSet<FGameplayTag> SlotTags;

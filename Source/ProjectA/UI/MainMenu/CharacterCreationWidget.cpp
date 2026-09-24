@@ -1433,14 +1433,39 @@ void UCharacterCreationWidget::BuildDetailPanel()
     }
     DetailClass->OnSelectionChanged.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleDetailClassChanged);
     Content->AddChildToVerticalBox(DetailClass)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
-    AddLabel(TEXT("의상"));
-    DetailAppearanceStatus = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("AppearanceSelectionStatus"));
-    DetailAppearanceStatus->SetAutoWrapText(true);
-    Content->AddChildToVerticalBox(DetailAppearanceStatus)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 8.0f));
-    DetailAppearanceOptions = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("AppearanceOptions"));
-    Content->AddChildToVerticalBox(DetailAppearanceOptions);
-    DetailResetAppearance = CreateButton(Content, FText::FromString(TEXT("의상 선택 초기화")));
-    DetailResetAppearance->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleResetAppearance);
+    AddLabel(TEXT("몸체"));
+    UHorizontalBox* BodyControls = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("AppearanceBodyControls"));
+    Content->AddChildToVerticalBox(BodyControls)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 4.0f));
+    DetailPreviousBody = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("AppearanceBodyPrevious"));
+    DetailNextBody = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("AppearanceBodyNext"));
+    CreateButtonText(DetailPreviousBody, FText::FromString(TEXT("◀")));
+    CreateButtonText(DetailNextBody, FText::FromString(TEXT("▶")));
+    DetailPreviousBody->SetToolTipText(FText::FromString(TEXT("이전 몸체")));
+    DetailNextBody->SetToolTipText(FText::FromString(TEXT("다음 몸체")));
+    USizeBox* PreviousBodySize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+    PreviousBodySize->SetWidthOverride(64.0f);
+    PreviousBodySize->SetContent(DetailPreviousBody);
+    BodyControls->AddChildToHorizontalBox(PreviousBodySize);
+    DetailBodyName = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("AppearanceBodyName"));
+    DetailBodyName->SetJustification(ETextJustify::Center);
+    DetailBodyName->SetAutoWrapText(true);
+    UDemonicUITheme::Get().StyleText(DetailBodyName, false, 20);
+    UHorizontalBoxSlot* BodyNameSlot = BodyControls->AddChildToHorizontalBox(DetailBodyName);
+    BodyNameSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    BodyNameSlot->SetVerticalAlignment(VAlign_Center);
+    BodyNameSlot->SetPadding(FMargin(12.0f, 0.0f));
+    USizeBox* NextBodySize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+    NextBodySize->SetWidthOverride(64.0f);
+    NextBodySize->SetContent(DetailNextBody);
+    BodyControls->AddChildToHorizontalBox(NextBodySize);
+    DetailPreviousBody->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandlePreviousBody);
+    DetailNextBody->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleNextBody);
+    DetailBodyPosition = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("AppearanceBodyPosition"));
+    DetailBodyPosition->SetJustification(ETextJustify::Center);
+    UDemonicUITheme::Get().StyleText(DetailBodyPosition, false, 14);
+    Content->AddChildToVerticalBox(DetailBodyPosition)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 8.0f));
+    DetailResetBody = CreateButton(Content, FText::FromString(TEXT("기본 몸체로 초기화")));
+    DetailResetBody->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleResetBody);
     AddLabel(TEXT("미리보기"));
     UHorizontalBox* RotateControls = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
     Content->AddChildToVerticalBox(RotateControls)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
@@ -1490,7 +1515,7 @@ void UCharacterCreationWidget::ShowSlotDetails(int32 SlotIndex, bool bEditable)
     DetailClass->SetIsEnabled(bEditable);
     DetailText->SetText(PartyDefinition ? PartyDefinition->GetProfessionDetails(SlotClassIds[SlotIndex]) : FText::GetEmpty());
     DetailSave->SetVisibility(bEditable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    RebuildAppearanceSelectors();
+    RefreshBodySelector();
     DetailUnderlyingVisibility = DetailUnderlyingRoot->GetVisibility();
     DetailUnderlyingRoot->SetVisibility(ESlateVisibility::Collapsed);
     DetailBackdrop->SetVisibility(ESlateVisibility::Visible);
@@ -1513,11 +1538,11 @@ void UCharacterCreationWidget::HandleDetailClassChanged(FString SelectedItem, ES
     if (GetAvailablePartyClassIds().IsValidIndex(Index) && PartyDefinition)
     {
         const FName ClassId = GetAvailablePartyClassIds()[Index];
-        if (PendingClassId != ClassId) PendingAppearance = FCharacterAppearanceSelection();
+        if (PendingClassId != ClassId) PendingAppearance.ItemIds.Reset();
         PendingClassId = ClassId;
         DetailText->SetText(PartyDefinition->GetProfessionDetails(ClassId));
         DetailError->SetText(FText::GetEmpty());
-        RebuildAppearanceSelectors();
+        RefreshBodySelector();
         RefreshDetailPreview(true);
     }
 }
@@ -1528,78 +1553,52 @@ UCharacterAppearanceCatalog* UCharacterCreationWidget::GetAppearanceCatalog(FNam
     return PartyDefinition && PartyDefinition->ResolveProfession(ClassId, Definition) ? Definition.AppearanceCatalog.Get() : nullptr;
 }
 
-void UCharacterCreationWidget::RebuildAppearanceSelectors()
+void UCharacterCreationWidget::RefreshBodySelector()
 {
-    if (!DetailAppearanceOptions) return;
-    DetailAppearanceOptions->ClearChildren();
-    DetailAppearanceBindings.Reset();
-    UCharacterAppearanceCatalog* Catalog = GetAppearanceCatalog(PendingClassId);
-    const bool bHasOptions = Catalog && !Catalog->Slots.IsEmpty();
-    DetailResetAppearance->SetVisibility(bHasOptions && bDetailEditable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    DetailAppearanceStatus->SetText(bHasOptions ? FText::FromString(FString::Printf(TEXT("%d개 선택 · 부위별로 의상을 골라 주세요."), PendingAppearance.ItemIds.Num())) : FText::FromString(TEXT("이 직업은 기본 외형을 사용합니다.")));
-    if (!bHasOptions) return;
-    for (const FCharacterAppearanceSlot& AppearanceSlot : Catalog->Slots)
-    {
-        UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-        Label->SetText(AppearanceSlot.DisplayName);
-        UDemonicUITheme::Get().StyleText(Label, false, 16);
-        DetailAppearanceOptions->AddChildToVerticalBox(Label)->SetPadding(FMargin(0.0f, 4.0f));
-        UCharacterAppearanceChoiceBinding* Binding = NewObject<UCharacterAppearanceChoiceBinding>(this);
-        Binding->Owner = this;
-        Binding->SlotTag = AppearanceSlot.SlotTag;
-        Binding->Selector = WidgetTree->ConstructWidget<UDemonicComboBoxString>(UDemonicComboBoxString::StaticClass());
-        Binding->Selector->SetMaxListHeight(260.0f);
-        Binding->Selector->AddOption(TEXT("기본 (선택 안 함)"));
-        Binding->ItemIds.Add(NAME_None);
-        int32 SelectedIndex = 0;
-        for (const FCharacterAppearanceItem& Item : Catalog->Items)
-        {
-            if (Item.SlotTag != AppearanceSlot.SlotTag) continue;
-            const int32 ItemIndex = Binding->ItemIds.Add(Item.ItemId);
-            // Numbered labels remain unique even when two items share a translated name.
-            // 두 의상의 번역명이 같아도 번호를 붙인 표시명은 서로 구분됩니다.
-            Binding->Selector->AddOption(FString::Printf(TEXT("%d. %s"), ItemIndex, *Item.DisplayName.ToString()));
-            if (PendingAppearance.ItemIds.Contains(Item.ItemId)) SelectedIndex = ItemIndex;
-        }
-        Binding->Selector->SetSelectedIndex(SelectedIndex);
-        Binding->Selector->SetIsEnabled(bDetailEditable);
-        Binding->Selector->OnSelectionChanged.AddUniqueDynamic(Binding, &UCharacterAppearanceChoiceBinding::HandleSelectionChanged);
-        DetailAppearanceOptions->AddChildToVerticalBox(Binding->Selector)->SetPadding(FMargin(0.0f, 0.0f, 8.0f, 10.0f));
-        DetailAppearanceBindings.Add(Binding);
-    }
+    if (!DetailBodyName || !DetailBodyPosition || !DetailPreviousBody || !DetailNextBody || !DetailResetBody) return;
+    const UCharacterAppearanceCatalog* Catalog = GetAppearanceCatalog(PendingClassId);
+    const FCharacterAppearanceBodyVariant* Body = Catalog ? Catalog->FindBodyVariant(PendingAppearance.BodyId) : nullptr;
+    const int32 BodyCount = Catalog ? Catalog->BodyVariants.Num() : 0;
+    const int32 BodyIndex = Body ? Catalog->BodyVariants.IndexOfByPredicate([Body](const FCharacterAppearanceBodyVariant& Variant) { return Variant.BodyId == Body->BodyId; }) : INDEX_NONE;
+    DetailBodyName->SetText(Body ? Body->DisplayName : FText::FromString(TEXT("기본 몸체")));
+    DetailBodyPosition->SetText(BodyIndex != INDEX_NONE ? FText::FromString(FString::Printf(TEXT("%d / %d"), BodyIndex + 1, BodyCount)) : FText::GetEmpty());
+    DetailPreviousBody->SetIsEnabled(bDetailEditable && BodyCount > 1);
+    DetailNextBody->SetIsEnabled(bDetailEditable && BodyCount > 1);
+    DetailResetBody->SetVisibility(bDetailEditable && BodyCount > 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 }
 
-void UCharacterAppearanceChoiceBinding::HandleSelectionChanged(FString SelectedItem, ESelectInfo::Type SelectionType)
+void UCharacterCreationWidget::ChangeBodyVariant(int32 Direction)
 {
-    if (!Owner || !Selector) return;
-    const int32 Index = Selector->GetSelectedIndex();
-    if (ItemIds.IsValidIndex(Index)) Owner->SelectAppearanceItem(SlotTag, ItemIds[Index]);
-}
-
-void UCharacterCreationWidget::SelectAppearanceItem(FGameplayTag SlotTag, FName ItemId)
-{
-    UCharacterAppearanceCatalog* Catalog = GetAppearanceCatalog(PendingClassId);
-    if (!bDetailEditable || bUpdatingDetail || DetailSlot == INDEX_NONE || !Catalog) return;
-    const FCharacterAppearanceItem* Item = Catalog->FindItem(ItemId);
-    if (!ItemId.IsNone() && (!Item || Item->SlotTag != SlotTag)) return;
+    const UCharacterAppearanceCatalog* Catalog = GetAppearanceCatalog(PendingClassId);
+    if (!bDetailEditable || bUpdatingDetail || DetailSlot == INDEX_NONE || !Catalog || Catalog->BodyVariants.Num() < 2 || Direction == 0) return;
+    const FCharacterAppearanceBodyVariant* Body = Catalog->FindBodyVariant(PendingAppearance.BodyId);
+    const int32 CurrentIndex = Body ? Catalog->BodyVariants.IndexOfByPredicate([Body](const FCharacterAppearanceBodyVariant& Variant) { return Variant.BodyId == Body->BodyId; }) : INDEX_NONE;
+    const int32 BodyCount = Catalog->BodyVariants.Num();
+    // Stable body identifiers and catalog order support adding more body variants without UI changes.
+    // 안정적인 몸체 식별자와 카탈로그 순서를 사용하여 UI 변경 없이 몸체 종류를 추가할 수 있습니다.
+    const int32 NextIndex = CurrentIndex == INDEX_NONE ? 0 : (CurrentIndex + (Direction > 0 ? 1 : -1) + BodyCount) % BodyCount;
     FCharacterAppearanceSelection Selection = PendingAppearance;
-    Selection.ItemIds.RemoveAll([Catalog, SlotTag](FName ExistingId)
-    {
-        const FCharacterAppearanceItem* Existing = Catalog->FindItem(ExistingId);
-        return Existing && Existing->SlotTag == SlotTag;
-    });
-    if (!ItemId.IsNone()) Selection.ItemIds.Add(ItemId);
+    Selection.BodyId = Catalog->BodyVariants[NextIndex].BodyId;
     FText Error;
     if (!Catalog->ValidateSelection(Selection, Error))
     {
         DetailError->SetText(Error);
-        RebuildAppearanceSelectors();
         return;
     }
     PendingAppearance = MoveTemp(Selection);
     DetailError->SetText(FText::GetEmpty());
-    DetailAppearanceStatus->SetText(FText::FromString(FString::Printf(TEXT("%d개 선택 · 부위별로 의상을 골라 주세요."), PendingAppearance.ItemIds.Num())));
+    RefreshBodySelector();
     RefreshDetailPreview(false);
+}
+
+void UCharacterCreationWidget::HandlePreviousBody()
+{
+    ChangeBodyVariant(-1);
+}
+
+void UCharacterCreationWidget::HandleNextBody()
+{
+    ChangeBodyVariant(1);
 }
 
 void UCharacterCreationWidget::RefreshDetailPreview(bool bReplaceActor)
@@ -1609,15 +1608,15 @@ void UCharacterCreationWidget::RefreshDetailPreview(bool bReplaceActor)
     AMainMenuPreviewStage* Stage = Controller ? Controller->GetPreviewStage() : nullptr;
     if (!Stage) return;
     if (bReplaceActor) Stage->SetPreviewActorForSlot(DetailSlot, PendingClassId);
-    if (!Stage->SetPreviewAppearance(DetailSlot, GetAppearanceCatalog(PendingClassId), PendingAppearance)) DetailError->SetText(FText::FromString(TEXT("의상을 표시할 수 없습니다. 선택을 다시 확인해 주세요.")));
+    if (!Stage->SetPreviewAppearance(DetailSlot, GetAppearanceCatalog(PendingClassId), PendingAppearance)) DetailError->SetText(FText::FromString(TEXT("몸체를 표시할 수 없습니다. 선택을 다시 확인해 주세요.")));
 }
 
-void UCharacterCreationWidget::HandleResetAppearance()
+void UCharacterCreationWidget::HandleResetBody()
 {
     if (!bDetailEditable || DetailSlot == INDEX_NONE) return;
-    PendingAppearance = FCharacterAppearanceSelection();
+    PendingAppearance.BodyId = NAME_None;
     DetailError->SetText(FText::GetEmpty());
-    RebuildAppearanceSelectors();
+    RefreshBodySelector();
     RefreshDetailPreview(false);
 }
 

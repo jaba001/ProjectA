@@ -22,7 +22,7 @@ void FCharacterPartyDraft::Reset(const TArray<FName>& AvailableClasses, bool bIn
 bool FCharacterPartyDraft::SetClass(int32 SlotIndex, FName ClassId)
 {
     if (!Slots.IsValidIndex(SlotIndex) || !Classes.Contains(ClassId)) return false;
-    if (Slots[SlotIndex].ClassId != ClassId) Slots[SlotIndex].Appearance = FCharacterAppearanceSelection();
+    if (Slots[SlotIndex].ClassId != ClassId) Slots[SlotIndex].Appearance.ItemIds.Reset();
     Slots[SlotIndex].ClassId = ClassId;
     return true;
 }

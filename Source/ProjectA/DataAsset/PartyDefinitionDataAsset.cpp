@@ -124,11 +124,11 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
 bool UPartyDefinitionDataAsset::ValidateMemberAppearance(const FRunPartyMember& Member, FText& OutError) const
 {
     OutError = FText::GetEmpty();
-    if (Member.Appearance.ItemIds.IsEmpty()) return true;
+    if (Member.Appearance.IsEmpty()) return true;
     FProfessionDefinition Definition;
     if (!ResolveProfession(Member.ClassId, Definition, OutError)) return false;
     if (Definition.AppearanceCatalog) return Definition.AppearanceCatalog->ValidateSelection(Member.Appearance, OutError);
-    OutError = NSLOCTEXT("PartyDefinition", "UnsupportedAppearance", "이 직업에서 사용할 수 없는 의상 선택입니다.");
+    OutError = NSLOCTEXT("PartyDefinition", "UnsupportedAppearance", "이 직업에서 사용할 수 없는 외형 선택입니다.");
     return false;
 }
 

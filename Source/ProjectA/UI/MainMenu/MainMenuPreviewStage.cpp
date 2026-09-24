@@ -114,7 +114,9 @@ bool AMainMenuPreviewStage::SetPreviewAppearance(int32 SlotIndex, UCharacterAppe
         PreviewActor->AddInstanceComponent(Appearance);
         Appearance->RegisterComponent();
     }
-    return Appearance ? Appearance->SetAppearance(Catalog, Selection) : !Catalog && Selection.ItemIds.IsEmpty();
+    const bool bApplied = Appearance ? Appearance->SetAppearance(Catalog, Selection) : !Catalog && Selection.IsEmpty();
+    if (bApplied && FocusedSlot == SlotIndex) RefreshPreviewFocus();
+    return bApplied;
 }
 
 void AMainMenuPreviewStage::SetFocusedPreviewSlot(int32 SlotIndex)
@@ -152,8 +154,8 @@ void AMainMenuPreviewStage::RefreshPreviewFocus()
     const FVector Right = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y);
     const float HorizontalTangent = FMath::Tan(FMath::DegreesToRadians(22.5f));
     const float Distance = HalfHeight * 1.35f * Aspect / HorizontalTangent;
-    // Leave the right side of the view available for the clothing panel.
-    // 화면 오른쪽은 의상 편집 패널을 위해 비워 둡니다.
+    // Leave the right side of the view available for the character editor panel.
+    // 화면 오른쪽은 캐릭터 편집 패널을 위해 비워 둡니다.
     PreviewCamera->SetWorldLocationAndRotation(Center - Forward * Distance + Right * Distance * HorizontalTangent * 0.38f, Rotation);
     PreviewCamera->SetFieldOfView(45.0f);
 }

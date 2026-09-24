@@ -2,11 +2,16 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "SingleAnimationPlayData.h"
 #include "Unit/CharacterAppearanceTypes.h"
 #include "CharacterAppearanceComponent.generated.h"
 
 class UCharacterAppearanceCatalog;
 class USkeletalMeshComponent;
+class USkeletalMesh;
+class UPhysicsAsset;
+class UMaterialInterface;
+struct FCharacterAppearanceBodyVariant;
 
 // Apply instance-only appearance settings without modifying source assets or combat state.
 // 원본 에셋이나 전투 상태를 변경하지 않고 인스턴스의 외형 설정만 적용합니다.
@@ -52,6 +57,38 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<USkeletalMeshComponent> PoseLeader;
 
+    UPROPERTY(Transient)
+    TObjectPtr<USkeletalMeshComponent> OriginalBodyLeader;
+
+    UPROPERTY(Transient)
+    TObjectPtr<USkeletalMesh> OriginalBodyMesh;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UPhysicsAsset> OriginalBodyPhysics;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UClass> OriginalAnimationClass;
+
+    UPROPERTY(Transient)
+    FSingleAnimationPlayData OriginalAnimationData;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UMaterialInterface>> OriginalMaterialOverrides;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UCharacterAppearanceCatalog> AppliedCatalog;
+
+    UPROPERTY(Transient)
+    FCharacterAppearanceSelection AppliedSelection;
+
+    UPROPERTY(Transient)
+    TObjectPtr<USkeletalMesh> AppliedBodyMesh;
+
+    FTransform OriginalMeshTransform = FTransform::Identity;
+    FTransform AppliedMeshTransform = FTransform::Identity;
+    uint8 OriginalAnimationMode = 0;
+    bool bBodyVariantApplied = false;
+    bool bAppearanceApplied = false;
     bool bLeaderVisibilitySaved = false;
     bool bLeaderWasVisible = true;
     uint8 LeaderPreviousTickOption = 0;
@@ -59,5 +96,7 @@ private:
     USkeletalMeshComponent* FindPoseLeader() const;
     void RemoveModularMeshes();
     void RestorePoseLeader();
+    void SaveOriginalBody(USkeletalMeshComponent* Leader);
+    void RestoreOriginalBody();
     void ApplyHiddenMeshBones();
 };

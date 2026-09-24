@@ -76,7 +76,7 @@ bool UOpponentSnapshotCatalogDataAsset::ValidateForEncounter(const FPartySnapsho
         {
             if (!AppearanceCatalog->ValidateSelection(Member.Appearance, OutError)) return false;
         }
-        else if (!Member.Appearance.ItemIds.IsEmpty())
+        else if (!Member.Appearance.IsEmpty())
         {
             OutError = NSLOCTEXT("Snapshot", "UnsupportedAppearance", "상대 직업에서 사용할 수 없는 의상 선택입니다.");
             return false;

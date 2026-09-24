@@ -19,6 +19,9 @@ def accepts(catalog, names):
 
 def verify():
     catalog = load(CATALOG_PATH)
+    if catalog.get_editor_property("body_variants"):
+        from VerifyPrimitiveAppearance import verify as verify_primitive
+        return verify_primitive()
     slots = list(catalog.get_editor_property("slots"))
     items = list(catalog.get_editor_property("items"))
     parts = list(catalog.get_editor_property("body_parts"))

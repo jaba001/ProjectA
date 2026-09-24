@@ -98,7 +98,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
                 return false;
             }
         }
-        else if (!Unit.Appearance.ItemIds.IsEmpty()) return false;
+        else if (!Unit.Appearance.IsEmpty()) return false;
         if (!UnitDataRules::IsValidHealth(Unit.MaxHP, Unit.HP) || Unit.bDead != (Unit.HP == 0.0f))
         {
             return false;

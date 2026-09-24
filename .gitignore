@@ -75,3 +75,12 @@ Content/ROG_Modular_Armor/Characters/UE5_Mannequins/Manny/Body_parts/*
 !Content/ROG_Modular_Armor/Characters/UE5_Mannequins/Manny/Body_parts/SK_Manny_Head.uasset
 !Content/ROG_Modular_Armor/Characters/UE5_Mannequins/Manny/Body_parts/SK_Manny_Arms.uasset
 !Content/ROG_Modular_Armor/Characters/UE5_Mannequins/Manny/Body_parts/SK_Manny_Legs.uasset
+
+# Keep the original skeleton's animation compatibility settings / 원본 뼈대의 애니메이션 호환 설정 보존
+!Content/Primitive_Characters_Pack/
+Content/Primitive_Characters_Pack/*
+!Content/Primitive_Characters_Pack/Demoscene_UE5/
+Content/Primitive_Characters_Pack/Demoscene_UE5/*
+!Content/Primitive_Characters_Pack/Demoscene_UE5/Mesh/
+Content/Primitive_Characters_Pack/Demoscene_UE5/Mesh/*
+!Content/Primitive_Characters_Pack/Demoscene_UE5/Mesh/SKM_Manny_Skeleton.uasset
