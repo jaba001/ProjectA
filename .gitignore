@@ -60,3 +60,18 @@ Content/stylized_dark_witch_fbx__extracted/*
 !Content/stylized_dark_witch_fbx__extracted/Stylized_Dark_Witch.uasset
 !Content/stylized_dark_witch_fbx__extracted/Stylized_Dark_Witch_Skeleton.uasset
 !Content/stylized_dark_witch_fbx__extracted/Stylized_Dark_Witch_PhysicsAsset.uasset
+
+# Restore original material regions in place without copying body meshes / 신체 메시 복제 없이 원래 경로에서 재질 영역 복원
+!Content/ROG_Modular_Armor/
+Content/ROG_Modular_Armor/*
+!Content/ROG_Modular_Armor/Characters/
+Content/ROG_Modular_Armor/Characters/*
+!Content/ROG_Modular_Armor/Characters/UE5_Mannequins/
+Content/ROG_Modular_Armor/Characters/UE5_Mannequins/*
+!Content/ROG_Modular_Armor/Characters/UE5_Mannequins/Manny/
+Content/ROG_Modular_Armor/Characters/UE5_Mannequins/Manny/*
+!Content/ROG_Modular_Armor/Characters/UE5_Mannequins/Manny/Body_parts/
+Content/ROG_Modular_Armor/Characters/UE5_Mannequins/Manny/Body_parts/*
+!Content/ROG_Modular_Armor/Characters/UE5_Mannequins/Manny/Body_parts/SK_Manny_Head.uasset
+!Content/ROG_Modular_Armor/Characters/UE5_Mannequins/Manny/Body_parts/SK_Manny_Arms.uasset
+!Content/ROG_Modular_Armor/Characters/UE5_Mannequins/Manny/Body_parts/SK_Manny_Legs.uasset

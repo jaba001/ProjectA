@@ -136,13 +136,16 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 `-WitchRebuildRetargets`는 이전 마녀 구성을 사용할 때 FBX 재임포트 후 정규화·시퀀스를 재작성하는 옵션이다. 현재 네 직업 구성에 적용하지 않는다. 검증 도구는 의상 카탈로그 활성 시 현행 공통 외형 검사로 연결하며, 이전 구성 검사는 [당시 이력](../../../Docs/TODO.md#2-29-마녀와-assassin-외형)으로 구분한다. 에셋 작성·정적 포즈 검사만 수행하고 에디터 창·PIE·게임·자동화 테스트를 실행하지 않는다.
 
-16. `ConfigureRogAppearance.py`: 네 직업을 TopDown과 같은 `SKM_Manny_Simple`·`MI_Manny_01_New`·`MI_Manny_02_New`로 연결하고 `/Game/User_JeHoon/ROG_Modular_Armor/DA_MannyAppearance`에 공통 8부위·103개 외형 항목을 작성한다. 신체를 가리는 의상이 없으면 원본 몸체·재질을 그대로 표시한다. 신체를 가릴 때는 원본 ROG 파츠 6개에 부위별 색 구분 없는 프로젝트 전용 `Common/Materials/MI_MannyNeutral` 한 개를 공유한다. 부모는 원본 `M_Character_DEMO`이며 중립색은 TopDown 재질의 `Paint Tint`에서 읽는다. ROG 일부 파츠가 원본 Manny의 두 재질 영역을 한 슬롯으로 합치므로 원본 두 MI를 그대로 배정하지 않는다. ROG 원본 메시·데이터 테이블을 직접 참조하고 다른 뼈대의 망토 4개를 제외한다. 원본 메시·텍스처 복제·추가 리타깃은 하지 않는다.
+16. `ConfigureRogAppearance.py`: 네 직업을 TopDown과 같은 `SKM_Manny_Simple`·`MI_Manny_01_New`·`MI_Manny_02_New`로 연결하고 `/Game/User_JeHoon/ROG_Modular_Armor/DA_MannyAppearance`에 공통 8부위·103개 외형 항목을 작성한다. 신체를 가리는 의상이 없으면 원본 몸체를 표시하며 가릴 때도 ROG 신체 파츠 6개에 원본 Manny 재질·텍스처를 직접 참조한다. `UCharacterAppearanceAssetLibrary`는 `Head`·`Arms`·`Legs`의 한 슬롯에 합쳐진 재질 영역을 원본 경로에서 두 슬롯으로 복원하고, 정점 위치·UV·스킨 가중치·뼈대·물리를 보존한다. 두 슬롯의 기본 재질은 기존 ROG MI를 유지하고 카탈로그만 Manny MI로 덮어쓴다. `Chest`·`Hands`·`Feet`는 메시를 수정하지 않고 기존 슬롯에 해당 Manny MI를 연결한다. ROG 원본 메시·데이터 테이블을 직접 참조하고 다른 뼈대의 망토 4개를 제외한다. 모델·텍스처 복제·추가 리타깃은 하지 않는다.
 
 궁수의 실제 클래스·메뉴는 기존 `BP_PlayerUnit`·`BP_PartyMenuPreview`를 유지한다. 네 직업의 전투·Snapshot·프리뷰와 의상 카탈로그를 연결하고 마법사 스태프를 Manny `hand_l`에 맞춘다. 이전 전사·궁수 Skeleton_Guard Snapshot 클래스는 호환 맵에 보존한다. 의상 UI는 기존 WBP의 C++ 공통 편집창을 사용한다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureRogAppearance.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureRogAppearance.py") -RogAppearanceMaterialsOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/VerifyRogAppearance.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-재로드 검사는 네 직업의 기본·개별·전체 부위 선택과 잘못된 ID/중복 거부, 원본 참조·몸체 재질·본 자세·공통 애니메이션·검 표본·스태프 부착·물리 연결을 확인한다. 결과는 `Saved/Automation/RogAppearanceConfigure.json`, `RogAppearanceReload.json`에 저장한다. 화면/플레이 실행은 하지 않으며 [검증 상태와 사용자 확인](../../../Docs/TODO.md#2-30-rog-의상-커스터마이징)을 따른다. 카탈로그 활성 시 이전 GKnight·마녀·Assassin 구성의 재작성을 차단하고 `-WarriorVerifyOnly`는 현재 공통 외형과 기존 적/이전 참조 검사를 함께 수행한다.
+`-RogAppearanceMaterialsOnly`는 기존 직업 매핑·Blueprint·스태프 설정을 유지하고 카탈로그와 신체 파츠 재질 영역만 갱신한다. ROG 신체 파츠를 재임포트했다면 이 옵션으로 슬롯 복원을 다시 적용한다. 미사용 `MI_MannyNeutral`은 참조가 없음을 확인한 뒤 엔진 기능으로 제거한다.
+
+재로드 검사는 네 직업의 기본·개별·전체 부위 선택과 잘못된 ID/중복 거부, 원본 참조·Manny 재질 영역·텍스처·본 자세·공통 애니메이션·검 표본·스태프 부착·물리 연결을 확인한다. 결과는 `Saved/Automation/RogAppearanceConfigure.json`, `RogAppearanceReload.json`에 저장한다. 화면/플레이 실행은 하지 않으며 [검증 상태와 사용자 확인](../../../Docs/TODO.md#2-30-rog-의상-커스터마이징)을 따른다. 카탈로그 활성 시 이전 GKnight·마녀·Assassin 구성의 재작성을 차단하고 `-WarriorVerifyOnly`는 현재 공통 외형과 기존 적/이전 참조 검사를 함께 수행한다.

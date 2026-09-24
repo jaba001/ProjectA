@@ -1,6 +1,6 @@
 # ProjectA 구현 구조와 설정
 
-기준일: 2026-09-22. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
+기준일: 2026-09-25. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
 
 기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 위임 실행에서 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀를 통과했다. 실제 서비스·다중 PC·지연/손실 확인은 별도다.
 
@@ -248,7 +248,7 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 
 아래 에셋 경로는 모두 `/Game/User_JeHoon/` 기준이다. 디스크에서는 `Content/User_JeHoon/`에 대응한다. 기존 에셋에는 필수 수동 재연결 작업이 없다.
 
-기존 DA는 유형별 폴더를 사용한다. 네 직업의 기본 외형은 TopDown Blueprint와 같은 원본 `SKM_Manny_Simple`·`MI_Manny_01_New`·`MI_Manny_02_New`다. 신체를 가리는 의상이 없으면 원본 몸체·재질을 그대로 표시한다. 신체를 가릴 때는 ROG의 6개 신체 파츠를 직접 참조하고 부위별 색 구분 없는 공통 `MI_MannyNeutral`을 적용한다. ROG 일부 파츠는 원본 Manny의 두 재질 영역을 한 슬롯에 합치므로 원본 두 재질을 그대로 배정하지 않는다. 프로젝트 전용 MI 한 개만 `User_JeHoon/ROG_Modular_Armor/Common/Materials`에 작성하며 원본 `M_Character_DEMO`를 부모로 사용하고 TopDown `Paint Tint`에서 읽은 중립색을 지정한다. 의상 메시·재질은 ROG 원본을 사용한다. 메시·텍스처 복제와 외부 팩 간 비교·통합은 하지 않는다. 제작·검사 명령은 [에셋 스크립트](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
+기존 DA는 유형별 폴더를 사용한다. 네 직업의 기본 외형은 TopDown Blueprint와 같은 원본 `SKM_Manny_Simple`·`MI_Manny_01_New`·`MI_Manny_02_New`다. 신체를 가리는 의상이 없으면 원본 몸체를 표시하고, 가릴 때는 ROG의 6개 신체 파츠에 같은 Manny 재질·텍스처를 직접 참조한다. 한 슬롯에 합쳐져 있던 `Head`·`Arms`·`Legs`는 원본 경로에서 Manny의 재질 영역을 두 슬롯으로 복원한다. 정점 위치·UV·스킨 가중치·뼈대·물리는 보존하며 두 슬롯의 기본 재질은 기존 ROG MI로 유지한다. 프로젝트 카탈로그의 재질 덮어쓰기만 원본 Manny 두 MI를 지정한다. `Chest`·`Hands`·`Feet`는 메시 수정 없이 기존 한 슬롯에 해당 Manny MI를 지정한다. 의상 메시·재질도 ROG 원본을 사용하며 모델·텍스처 복제와 외부 팩 간 비교·통합은 하지 않는다. 재질 영역 작성은 `UCharacterAppearanceAssetLibrary`를 사용하며, ROG 재임포트 후에는 기존 직업·Blueprint·스태프 설정을 유지하는 `-RogAppearanceMaterialsOnly` 옵션으로 다시 적용한다. 제작·검사 명령은 [에셋 스크립트](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
 
 GKnight·Assassin·Stylized Dark Witch와 해당 리타깃 자료는 이전 구성 이력으로 보존한다. 마녀 임포트의 본 배율 1·높이 약 1.87m·물리 재생성과 원본 FBX 보존은 당시 수정 결과이며 현재 직업 외형에 사용하지 않는다. `/Game/MageStaff_FreeWeapons`의 스태프 한 개와 필요한 임포트 결과 5개는 계속 직접 참조한다. 현행 의상 카탈로그가 연결된 마법사·도적에 이전 외형 작성 스크립트를 다시 적용하지 못하도록 보호한다.
 
@@ -269,7 +269,7 @@ GKnight·Assassin·Stylized Dark Witch와 해당 리타깃 자료는 이전 구�
 | `Blueprint/DataAsset/Skills/BPDA_swoard_attack` | `USkillDefinitionDataAsset`, 검 공격·논리 ID `SwordAttack`·칼날 궤적·피해 50·AP 1·활성 0.23~0.43초 |
 | `Blueprint/Unit/BP_WarriorUnit`, `BP_PlayerUnit`, `BP_MageUnit`, `BP_RogueUnit` | 네 직업 공통 TopDown Manny+ROG 의상. 공통 애니메이션·몽타주 대체·검·마법사 스태프와 저장 경로 유지 |
 | `Blueprint/Unit/BP_*SnapshotOpponent` | 네 직업 모두 공통 Manny와 저장된 의상 선택을 사용. 이전 전사·궁수의 공통 Skeleton_Guard 체크포인트는 명시적 호환 맵으로 보존 |
-| `ROG_Modular_Armor/DA_MannyAppearance` | 네 직업 공통 8부위·103개 외형 카탈로그. ROG 신체·의상 원본 참조와 신체 파츠의 중립색 `Common/Materials/MI_MannyNeutral` 공유. 모델·텍스처 복제와 추가 리타깃 없음, 다른 뼈대의 망토 4개 제외 |
+| `ROG_Modular_Armor/DA_MannyAppearance` | 네 직업 공통 8부위·103개 외형 카탈로그. ROG 신체·의상 원본 참조와 신체 파츠의 Manny 원본 재질·텍스처 연결. 모델·텍스처 복제와 추가 리타깃 없음, 다른 뼈대의 망토 4개 제외 |
 | `GKnight/Meshes/SK_GothicKnight_VA`, `GKnight/Meshes/SK_GothicKnight_Skeleton` | 원본 `/Game/GKnight`로 연결하는 작은 Redirector. 메시·뼈대 페이로드 중복 제거 |
 | `Skeleton_Guard/Mesh_UE4/Full/SKM_Skeleton_Guard_Body`, `Skeleton_Guard/Demoscene_UE4/Mesh/UE4_Mannequin_Skeleton` | 원본 `/Game/Skeleton_Guard`로 연결하는 작은 Redirector |
 | `Characters/Mannequins/Anims/Unarmed` | 기존 ABP·BS·Walk/Jog/Jump/Attack 하위 구조를 유지한 리타깃 사본. 유닛별 접미사로 구분 |

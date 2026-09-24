@@ -1,6 +1,6 @@
 # UI 구조·생성 도구
 
-기준일: 2026-09-22. 화면 구성과 JSON 기반 Widget Blueprint 생성 규칙을 정의한다. 게임 흐름·에셋 연결은 [PROJECT_PLAN](PROJECT_PLAN.md), 실행 결과는 [HISTORY](HISTORY.md), 남은 확인은 [TODO](TODO.md)를 따른다.
+기준일: 2026-09-25. 화면 구성과 JSON 기반 Widget Blueprint 생성 규칙을 정의한다. 게임 흐름·에셋 연결은 [PROJECT_PLAN](PROJECT_PLAN.md), 실행 결과는 [HISTORY](HISTORY.md), 남은 확인은 [TODO](TODO.md)를 따른다.
 
 ## 구성과 편집 원칙
 
@@ -112,7 +112,7 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 
 프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 Warrior/Mage/Archer/Rogue 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
-전사 `BP_WarriorMenuPreview`·마법사 `BP_MageMenuPreview`·도적 `BP_RogueMenuPreview`·궁수 `BP_PartyMenuPreview`는 모두 TopDown의 `SKM_Manny_Simple`과 기본 Manny 재질·공통 Idle을 사용한다. 의상 없는 상태와 액세서리만 고른 상태는 원본 몸체·재질을 표시한다. 신체를 가리는 의상은 ROG 신체 파츠와 부위별 색 구분 없는 중립 신체 재질로 표시한다. 마법사의 `Staff` 한 개는 왼손 `hand_l`에 연결한다.
+전사 `BP_WarriorMenuPreview`·마법사 `BP_MageMenuPreview`·도적 `BP_RogueMenuPreview`·궁수 `BP_PartyMenuPreview`는 모두 TopDown의 `SKM_Manny_Simple`과 기본 Manny 재질·공통 Idle을 사용한다. 의상 없는 상태와 액세서리만 고른 상태는 원본 몸체를 표시한다. 신체를 가리는 의상은 ROG 신체 파츠에도 원본 Manny 재질·텍스처를 연결하여 노출 부위의 색·노멀·로고를 유지한다. 마법사의 `Staff` 한 개는 왼손 `hand_l`에 연결한다.
 
 캐릭터 **생성/수정**은 오른쪽 스크롤 편집창을 연다. 네 직업 모두 투구·상의/로브·바지·신발·장갑·어깨 장식·손목 보호대·망토의 8부위·103개 항목을 선택하며 기본값은 선택 없음이다. 선택 즉시 같은 월드 프리뷰에 반영하고 회전 버튼으로 좌우 30도씩 돌린다. **저장**은 초안에 반영하고 **취소**는 이전 선택을 복원한다. 새 캐릭터 생성을 취소하면 빈 슬롯으로 복원하며 직업 변경 시 의상을 초기화한다. 기존 Designer WBP에도 C++ 공통 편집창으로 적용한다. [화면·저장 확인](TODO.md#2-30-rog-의상-커스터마이징)
 

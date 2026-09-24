@@ -1,11 +1,12 @@
 # ProjectA 완료 작업과 검증 기록
 
-갱신일: 2026-09-24. 완료 범위·기준 커밋·실행 근거를 기록한다. 현재 상태와 간단 확인은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
+갱신일: 2026-09-25. 완료 범위·기준 커밋·실행 근거를 기록한다. 현재 상태와 간단 확인은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
 
 ## 최근 변경
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-09-25 의상 착용 시 Manny 텍스처 보존 | ROG 신체 파츠에 원본 Manny 두 MI·텍스처를 직접 연결하고 Head/Arms/Legs만 원본 경로에서 두 재질 슬롯으로 복원. 정점 위치·UV·노멀·가중치·뼈대·물리와 기존 ROG 기본 재질 보존, 모델·텍스처 복제 없음. `UCharacterAppearanceAssetLibrary`와 `-RogAppearanceMaterialsOnly`로 기존 직업·Blueprint·스태프 설정을 유지하며 미사용 중립 MI 제거. Development Editor / Win64 빌드 4.35초 성공·별도 재로드 오류/경고 0. 6개 파츠의 93,607개 삼각형 재질 영역, 미수정 3개 파츠 해시와 의상 목록 불변 확인. 작성 시 삭제 참조 수집 전환 경고 1개 후 정상 삭제·독립 재로드 통과. 실제 UI·게임 확인 전. 근거: `Saved/Automation/TexturedMannyBodyBuild.txt`, `RogAppearanceReload.json`, `Saved/Logs/TexturedMannyBodyReload.log`; [사용자 확인](TODO.md#2-30-rog-의상-커스터마이징) |
 | 2026-09-24 네 직업 의상과 TopDown 기본 외형 | ROG 8부위·103개 의상 UI를 네 직업에 공통 연결하고 무의상·액세서리 상태는 TopDown 원본 Manny 몸체·재질 유지. 신체를 가리는 의상은 원본 ROG 파츠와 부위별 색 구분 없는 프로젝트 전용 중립 MI 한 개 공유. 원본 메시·텍스처 복제 없음. 마법사 스태프의 `hand_l` 부착, 기존 궁수 Unit/프리뷰 경로·이전 Snapshot 호환 보존. Development Editor / Win64 컴파일·별도 재로드의 원본 메시 120개·본 161개·검 표본 328개·스태프 부착 3개·물리 연결 22개·재질 저장 검사 통과. 신규 MI는 4,005바이트. UI·게임·자동화 실행 없음. 근거: `Saved/Automation/AllProfessionsAppearanceBuild.txt`, `RogAppearanceReload.json`, `Saved/Logs/AllProfessionsAppearanceReload.log`; [검증 상태와 사용자 확인](TODO.md#2-30-rog-의상-커스터마이징) |
 | 2026-09-24 전사 공통 외형과 ROG 의상 UI | 전사를 Manny 공통 몸체·애니메이션으로 전환하고 원본 ROG 기반 8부위·103개 의상 선택·회전 프리뷰·저장/취소 UI 연결. Run·Snapshot·체크포인트·복제에 외형 ID를 전달하며 이전 빈 선택과 Snapshot 클래스 호환 보존. 원본 복제·추가 리타깃 없음, 기존 래그돌 실행 유지. Development Editor / Win64 빌드·독립 재로드의 메시 120개·본 161개·검 표본 82개·물리 연결 22개 검사 통과. UI·게임·자동화 실행 없음. 근거: `Saved/Automation/RogAppearanceBuild.txt`, `RogAppearanceReload.json`; [사용자 확인](TODO.md#2-30-rog-의상-커스터마이징) |
 | 2026-09-23 마녀·Assassin 외형과 배율 정리 | 마법사 Stylized Dark Witch·도적 Assassin Skin1의 원본 경로를 메뉴·전투·Snapshot에 연결하고 기존 스태프 한 개를 왼손에 부착. 마녀 루트 배율 100을 제거하고 형상·바인드 자세·변형 본 계층·물리를 같은 임포트 경로에서 정리해 높이 187.12cm·본 배율 1·연결된 물리 바디 48개로 저장. 편의 복제 없이 리타깃만 생성, 전사·궁수·래그돌 실행 유지. Development Editor / Win64 컴파일·별도 재로드·시퀀스 48개 포즈/배율·검 표본 164개·물리 연결 검사 통과. 기존 MainMenu 변경 포함, 게임/PIE/자동화 테스트 미실행. 근거: `Saved/Automation/WitchAssassinBuild.txt`, `WitchAssassinReload.json`; [사용자 확인](TODO.md#2-29-마녀와-assassin-외형) |

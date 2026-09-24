@@ -13,8 +13,7 @@ from WarriorContentPaths import ROOT, UNARMED_SOURCE
 
 PACK = "/Game/ROG_Modular_Armor"
 CATALOG_PATH = ROOT + "/ROG_Modular_Armor/DA_MannyAppearance"
-BODY_MATERIAL_PATH = ROOT + "/ROG_Modular_Armor/Common/Materials/MI_MannyNeutral"
-BODY_MATERIAL_PARENT = PACK + "/Common/Materials/M_Character_DEMO"
+LEGACY_BODY_MATERIAL_PATH = ROOT + "/ROG_Modular_Armor/Common/Materials/MI_MannyNeutral"
 MANNY = "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"
 TOPDOWN = "/Game/TopDown/Blueprints/BP_TopDownCharacter"
 BODY = PACK + "/Characters/UE5_Mannequins/Manny"
@@ -29,14 +28,6 @@ def topdown_mesh():
     # 슬롯 이름 조회로 메시 재질 컴파일을 기다려 컴포넌트 조회가 None을 반환하는 것을 방지합니다.
     require(component.get_material_slot_names(), "TopDown body materials are unavailable")
     return component
-
-
-def stored_vector(material, name):
-    # Read authored values before asynchronous material parameter caches are ready.
-    # 비동기 재질 파라미터 캐시 준비 전에도 저장된 설정값을 직접 읽습니다.
-    values = [entry.get_editor_property("parameter_value") for entry in material.get_editor_property("vector_parameter_values") if str(entry.get_editor_property("parameter_info").get_editor_property("name")) == name]
-    require(len(values) == 1, "Missing or ambiguous material vector: " + material.get_path_name() + " / " + name)
-    return values[0]
 
 
 def tag(name):
@@ -70,24 +61,22 @@ def label(path, category):
     return " ".join(part for part in [style, category, design] if part) + (" · " + color if color else "")
 
 
-def create_body_material():
-    if ASSETS.does_asset_exist(BODY_MATERIAL_PATH):
-        material = load(BODY_MATERIAL_PATH)
-    else:
-        material = require(TOOLS.create_asset(BODY_MATERIAL_PATH.rsplit("/", 1)[1], BODY_MATERIAL_PATH.rsplit("/", 1)[0], unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew()), "Could not create neutral body material")
-    editor = unreal.MaterialEditingLibrary
-    editor.set_material_instance_parent(material, load(BODY_MATERIAL_PARENT))
-    color = stored_vector(topdown_mesh().get_material(0), "Paint Tint")
-    # UE 5.7 setters return false even after updating; verify the stored values instead.
-    # UE 5.7 설정 함수는 갱신 후에도 false를 반환하므로 저장된 값으로 확인합니다.
-    editor.set_material_instance_vector_parameter_value(material, "SolidColor", color)
-    editor.set_material_instance_scalar_parameter_value(material, "Roughness", 0.4)
-    actual = stored_vector(material, "SolidColor")
-    require(all(abs(getattr(actual, channel) - getattr(color, channel)) < 0.00001 for channel in ["r", "g", "b", "a"]), "Could not set the neutral body color")
-    require(abs(editor.get_material_instance_scalar_parameter_value(material, "Roughness") - 0.4) < 0.00001, "Could not set the body roughness")
-    editor.update_material_instance(material)
-    save(material)
-    return material
+def create_body_parts():
+    body_parts = []
+    original = topdown_mesh()
+    source_mesh = original.get_editor_property("skeletal_mesh_asset")
+    for name, suffix in [("Head", "Head"), ("Torso", "Chest"), ("Arms", "Arms"), ("Hands", "Hands"), ("Legs", "Legs"), ("Feet", "Feet")]:
+        part = unreal.CharacterAppearanceBodyPart()
+        part.set_editor_property("part_tag", tag("Appearance.Body." + name))
+        body_mesh = load(BODY + "/Body_parts/SK_Manny_" + suffix)
+        material_slots = list(unreal.CharacterAppearanceAssetLibrary.restore_body_material_slots(source_mesh, body_mesh))
+        require(material_slots, "Could not restore original body material sections: " + body_mesh.get_path_name())
+        if len(material_slots) > 1:
+            require(ASSETS.save_loaded_asset(body_mesh, only_if_is_dirty=True), "Could not save restored body material sections")
+        part.set_editor_property("mesh", body_mesh)
+        part.set_editor_property("material_overrides", [original.get_material(index) for index in material_slots])
+        body_parts.append(part)
+    return body_parts
 
 
 def create_catalog():
@@ -103,15 +92,6 @@ def create_catalog():
         slot.set_editor_property("slot_tag", tag("Appearance.Slot." + name))
         slot.set_editor_property("display_name", title)
         slots.append(slot)
-    body_parts = []
-    body_material = create_body_material()
-    for name, suffix in [("Head", "Head"), ("Torso", "Chest"), ("Arms", "Arms"), ("Hands", "Hands"), ("Legs", "Legs"), ("Feet", "Feet")]:
-        part = unreal.CharacterAppearanceBodyPart()
-        part.set_editor_property("part_tag", tag("Appearance.Body." + name))
-        body_mesh = load(BODY + "/Body_parts/SK_Manny_" + suffix)
-        part.set_editor_property("mesh", body_mesh)
-        part.set_editor_property("material_overrides", [body_material])
-        body_parts.append(part)
     expected_skeleton = load(BODY + "/SK_Manny").get_editor_property("skeleton")
     items = []
     excluded = []
@@ -150,7 +130,7 @@ def create_catalog():
             add(slot, title, paths, hidden)
     catalog.set_editor_property("slots", slots)
     catalog.set_editor_property("items", items)
-    catalog.set_editor_property("body_parts", body_parts)
+    catalog.set_editor_property("body_parts", create_body_parts())
     save(catalog)
     return catalog, excluded
 
@@ -234,10 +214,20 @@ def configure_profession(profession, unit_name, preview_name, catalog):
 
 
 def configure():
-    catalog, excluded = create_catalog()
-    for profession, unit_name, preview_name in PROFESSIONS:
-        configure_profession(profession, unit_name, preview_name, catalog)
-    report = {"catalog": catalog.get_path_name(), "professions": [entry[0] for entry in PROFESSIONS], "base_model": topdown_mesh().get_editor_property("skeletal_mesh_asset").get_path_name(), "slots": len(catalog.get_editor_property("slots")), "items": len(catalog.get_editor_property("items")), "excluded_incompatible_meshes": excluded, "source_assets_copied": 0, "gameplay_test": "not run"}
+    materials_only = "-RogAppearanceMaterialsOnly" in unreal.SystemLibrary.get_command_line()
+    if materials_only:
+        catalog = load(CATALOG_PATH)
+        catalog.set_editor_property("body_parts", create_body_parts())
+        save(catalog)
+        excluded = None
+    else:
+        catalog, excluded = create_catalog()
+        for profession, unit_name, preview_name in PROFESSIONS:
+            configure_profession(profession, unit_name, preview_name, catalog)
+    if ASSETS.does_asset_exist(LEGACY_BODY_MATERIAL_PATH):
+        require(not ASSETS.find_package_referencers_for_asset(LEGACY_BODY_MATERIAL_PATH, True), "Obsolete neutral body material is still referenced")
+        require(ASSETS.delete_asset(LEGACY_BODY_MATERIAL_PATH), "Could not remove obsolete neutral body material")
+    report = {"catalog": catalog.get_path_name(), "materials_only": materials_only, "professions": [entry[0] for entry in PROFESSIONS], "base_model": topdown_mesh().get_editor_property("skeletal_mesh_asset").get_path_name(), "slots": len(catalog.get_editor_property("slots")), "items": len(catalog.get_editor_property("items")), "excluded_incompatible_meshes": excluded, "source_assets_copied": 0, "gameplay_test": "not run"}
     Path(unreal.Paths.project_saved_dir(), "Automation/RogAppearanceConfigure.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     unreal.log("ROG_APPEARANCE_CONFIGURED")
 

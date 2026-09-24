@@ -7,7 +7,7 @@ import unreal
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ConfigureRogAppearance import BODY_MATERIAL_PARENT, BODY_MATERIAL_PATH, CATALOG_PATH, MANNY, PROFESSIONS, ROOT, SLOTS, UNARMED_SOURCE, HELPER, components, load, require, stored_vector, topdown_mesh
+from ConfigureRogAppearance import ASSETS, CATALOG_PATH, LEGACY_BODY_MATERIAL_PATH, MANNY, PROFESSIONS, ROOT, SLOTS, UNARMED_SOURCE, HELPER, components, load, require, topdown_mesh
 
 
 def accepts(catalog, names):
@@ -38,15 +38,12 @@ def verify():
     original = topdown_mesh()
     require(original.get_editor_property("skeletal_mesh_asset") == leader, "Base mesh differs from TopDown")
     original_materials = [original.get_material(index) for index in range(original.get_num_materials())]
-    body_material = load(BODY_MATERIAL_PATH)
-    require(body_material.get_editor_property("parent") == load(BODY_MATERIAL_PARENT), "Unexpected body material parent")
-    expected_color = stored_vector(original_materials[0], "Paint Tint")
-    actual_color = stored_vector(body_material, "SolidColor")
-    require(all(abs(getattr(actual_color, channel) - getattr(expected_color, channel)) < 0.00001 for channel in ["r", "g", "b", "a"]), "Body tint differs from TopDown paint tint: " + str(actual_color) + " expected " + str(expected_color))
+    require(not ASSETS.does_asset_exist(LEGACY_BODY_MATERIAL_PATH), "Obsolete untextured body material remains")
     body_materials = {}
     for part in parts:
-        require(len(part.mesh.get_editor_property("materials")) == 1 and list(part.material_overrides) == [body_material], "Missing neutral body material: " + part.mesh.get_name())
-        body_materials[part.mesh.get_name()] = body_material.get_path_name()
+        material_slots = list(unreal.CharacterAppearanceAssetLibrary.validate_body_material_slots(leader, part.mesh))
+        require(material_slots and list(part.material_overrides) == [original_materials[index] for index in material_slots], "Missing original textured body materials: " + part.mesh.get_name())
+        body_materials[part.mesh.get_name()] = [original_materials[index].get_path_name() for index in material_slots]
     reference = unreal.AnimPoseExtensions.get_reference_pose(leader.get_editor_property("skeleton"))
     names = {str(name) for name in unreal.AnimPoseExtensions.get_bone_names(reference)}
     meshes = {part.mesh.get_path_name(): part.mesh for part in parts}

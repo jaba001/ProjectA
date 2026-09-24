@@ -37,6 +37,7 @@ public class ProjectAEditor : ModuleRules
 			"KismetCompiler",
 			"MeshDescription",
 			"SkeletalMeshDescription",
+			"StaticMeshDescription",
 			"PhysicsUtilities",
 			"SlateNullRenderer",
 			"Slate",
