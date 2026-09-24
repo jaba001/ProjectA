@@ -83,9 +83,9 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureTestEnemies.py") -TestEnemiesVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-10. `ConfigureWarriorContent.py`: GKnight 전사와 Skeleton_Guard 적의 기존 콘텐츠 작성·검사 도구. 파라곤 캐릭터 적용 롤백 후 다시 사용하는 구성이다. 공통 리타깃은 `RetargetContentLibrary.py`에서 제공한다. 메시·뼈대는 원본을 직접 참조하며, 검은 타격 소켓을 추가한 Weapon_Pack 수정본을 유지한다.
+10. `ConfigureWarriorContent.py`: 이전 GKnight 전사와 현재 Skeleton_Guard 적의 콘텐츠 작성·검사 도구. 현행 네 직업 의상 구성은 16번 도구를 사용한다. 공통 리타깃은 `RetargetContentLibrary.py`에서 제공한다. 메시·뼈대는 원본을 직접 참조하며, 검은 타격 소켓을 추가한 Weapon_Pack 수정본을 유지한다.
 
-IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandlet에서도 지원한다. 아래 기존 전사 제작 명령은 전사·기본 적 콘텐츠를 다시 작성한다. `-WarriorVerifyOnly`는 전사·기본 적과 현재 직업 매핑을 확인하며 마법사·도적의 상세 검사는 `VerifyWitchAssassin.py`를 사용한다. 두 도구 모두 PIE·게임 플레이를 시작하지 않는다.
+IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandlet에서도 지원한다. 아래 기존 전사 제작 명령은 의상 카탈로그가 활성화되어 있으면 재작성을 차단한다. `-WarriorVerifyOnly`는 공통 외형 검사와 기존 적·직업 매핑을 확인한다. 현행 네 직업의 상세 검사는 `VerifyRogAppearance.py`를 사용한다. 두 도구 모두 PIE·게임 플레이를 시작하지 않는다.
 
 ```powershell
 & $editorExecutable $projectFile ("-ExecutePythonScript=$scriptDirectory/ConfigureWarriorContent.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -RenderOffscreen -nosplash
@@ -113,7 +113,7 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureShopSkillPresentation.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-13. 파라곤 캐릭터 외형과 사망 애니메이션 작성 도구는 롤백에 따라 제거했다. 전사 GKnight·궁수 Manny·기본 적 Skeleton_Guard를 유지하며 마법사·도적의 후속 구성은 15번 도구를 사용한다. 기존 Blueprint 경로와 미사용 파라곤 결과는 보존한다. `ImportMageStaff.py`는 원본 FBX가 있을 때만 사용하는 수동 임포트 도구다.
+13. 파라곤 캐릭터 외형과 사망 애니메이션 작성 도구는 롤백에 따라 제거했다. 당시 GKnight 전사와 이후 마녀·Assassin 구성은 이전 이력이며 현재 네 직업은 16번 공통 의상 구성을 사용한다. 기본 적 Skeleton_Guard·기존 Blueprint 경로·미사용 파라곤 결과는 보존한다. `ImportMageStaff.py`는 원본 FBX가 있을 때만 사용하는 수동 임포트 도구다.
 
 `RetargetContentLibrary.py`는 Rig·리타깃·골반 이동 검증을 공통 제공한다. 호출 도구가 보고서·재작성 여부·출력 경로 함수를 전달하여 다른 도구의 전역 설정을 참조하지 않는다. 기존 전사 콘텐츠의 강제 재작성은 `-WarriorRebuildRetargets`를 사용한다.
 
@@ -127,20 +127,22 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 기본 실행은 읽기 전용 사전검사다. 적용 결과는 `Saved/Automation/CopiedAssetsMigration.json`, 별도 프로세스 재로드는 `CopiedAssetsReload.json`에 기록한다. VerifyOnly는 적용 기록이 필요하다. 기존 원본 팩의 설치 상태를 유지하며 두 원본 뼈대의 슬롯 설정만 예외적으로 Git에서 추적한다. PIE·게임 플레이를 실행하지 않는다.
 
-15. `ConfigureWitchAssassin.py`: 마법사 Stylized Dark Witch·도적 Assassin Skin1과 왼손 스태프를 메뉴·전투·Snapshot에 연결한다. 원본 모델을 직접 참조하며 마녀 임포트의 본 배율 100·분리된 변형 계층을 같은 경로에서 정리하고 PhysicsAsset을 재생성한다. 원본 FBX는 보존한다. 필요한 리타깃 결과만 원본 애니메이션 하위 구조와 `_DarkWitch`·`_Assassin` 접미사로 작성한다. 뼈대의 `DefaultSlot` 등록, 마녀 임포트 3개 수정, 기존 스태프 5개 복구는 원래 콘텐츠 경로에서 추적한다.
+15. `ConfigureWitchAssassin.py`: 이전 마법사 Stylized Dark Witch·도적 Assassin Skin1 구성 도구. 현행 의상 카탈로그가 연결된 직업의 재작성을 차단한다. 이전 구성에서는 원본 모델을 직접 참조하고 마녀 임포트의 본 배율 100·분리된 변형 계층을 같은 경로에서 정리해 PhysicsAsset을 재생성했다. 원본 FBX와 `_DarkWitch`·`_Assassin` 리타깃, 뼈대의 `DefaultSlot`·마녀 임포트 3개·스태프 5개를 기존 경로에 보존한다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureWitchAssassin.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/VerifyWitchAssassin.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-FBX 재임포트 후에는 첫 명령에 `-WitchRebuildRetargets`를 추가해 정규화와 시퀀스 재작성을 수행한다. 두 명령은 에셋 작성·정적 포즈 검사만 수행하며 에디터 창·PIE·게임·자동화 테스트를 실행하지 않는다. 별도 재로드는 직업 매핑·본 배율·몽타주·물리 연결·검 표본·스태프 부착을 확인한다. [실제 화면·사망 확인](../../../Docs/TODO.md#2-29-마녀와-assassin-외형)은 사용자가 수행한다.
+`-WitchRebuildRetargets`는 이전 마녀 구성을 사용할 때 FBX 재임포트 후 정규화·시퀀스를 재작성하는 옵션이다. 현재 네 직업 구성에 적용하지 않는다. 검증 도구는 의상 카탈로그 활성 시 현행 공통 외형 검사로 연결하며, 이전 구성 검사는 [당시 이력](../../../Docs/TODO.md#2-29-마녀와-assassin-외형)으로 구분한다. 에셋 작성·정적 포즈 검사만 수행하고 에디터 창·PIE·게임·자동화 테스트를 실행하지 않는다.
 
-16. `ConfigureRogAppearance.py`: 전사를 공통 Manny 설정으로 연결하고 `/Game/User_JeHoon/ROG_Modular_Armor/DA_MannyAppearance`에 8부위·103개 외형 항목을 작성한다. ROG 원본 데이터 테이블의 메시·6개 신체 파츠를 직접 참조하며 다른 뼈대의 망토 4개를 제외한다. 원본 에셋 복제·추가 리타깃 없이 전투/프리뷰 Blueprint·직업/Snapshot 카탈로그만 갱신한다. 기존 Skeleton_Guard Snapshot 클래스는 호환 맵에 보존한다. 의상 선택 UI는 native C++로 기존 WBP에 확장한다.
+16. `ConfigureRogAppearance.py`: 네 직업을 TopDown과 같은 `SKM_Manny_Simple`·`MI_Manny_01_New`·`MI_Manny_02_New`로 연결하고 `/Game/User_JeHoon/ROG_Modular_Armor/DA_MannyAppearance`에 공통 8부위·103개 외형 항목을 작성한다. 신체를 가리는 의상이 없으면 원본 몸체·재질을 그대로 표시한다. 신체를 가릴 때는 원본 ROG 파츠 6개에 부위별 색 구분 없는 프로젝트 전용 `Common/Materials/MI_MannyNeutral` 한 개를 공유한다. 부모는 원본 `M_Character_DEMO`이며 중립색은 TopDown 재질의 `Paint Tint`에서 읽는다. ROG 일부 파츠가 원본 Manny의 두 재질 영역을 한 슬롯으로 합치므로 원본 두 MI를 그대로 배정하지 않는다. ROG 원본 메시·데이터 테이블을 직접 참조하고 다른 뼈대의 망토 4개를 제외한다. 원본 메시·텍스처 복제·추가 리타깃은 하지 않는다.
+
+궁수의 실제 클래스·메뉴는 기존 `BP_PlayerUnit`·`BP_PartyMenuPreview`를 유지한다. 네 직업의 전투·Snapshot·프리뷰와 의상 카탈로그를 연결하고 마법사 스태프를 Manny `hand_l`에 맞춘다. 이전 전사·궁수 Skeleton_Guard Snapshot 클래스는 호환 맵에 보존한다. 의상 UI는 기존 WBP의 C++ 공통 편집창을 사용한다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureRogAppearance.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/VerifyRogAppearance.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-재로드 검사는 기본·개별·전체 부위 선택과 잘못된 ID/중복 거부, 원본 참조·본 자세·공통 애니메이션·검 표본·물리 연결을 확인한다. 결과는 `Saved/Automation/RogAppearanceConfigure.json`, `RogAppearanceReload.json`에 저장한다. 화면/플레이 실행은 하지 않으며 [사용자 확인](../../../Docs/TODO.md#2-30-rog-의상-커스터마이징)을 따른다. 이 카탈로그가 존재하면 과거 `ConfigureWarriorContent.py`의 GKnight 재작성은 차단하고 `-WarriorVerifyOnly`는 현재 전사 검사와 기존 적/이전 참조 검사를 함께 수행한다.
+재로드 검사는 네 직업의 기본·개별·전체 부위 선택과 잘못된 ID/중복 거부, 원본 참조·몸체 재질·본 자세·공통 애니메이션·검 표본·스태프 부착·물리 연결을 확인한다. 결과는 `Saved/Automation/RogAppearanceConfigure.json`, `RogAppearanceReload.json`에 저장한다. 화면/플레이 실행은 하지 않으며 [검증 상태와 사용자 확인](../../../Docs/TODO.md#2-30-rog-의상-커스터마이징)을 따른다. 카탈로그 활성 시 이전 GKnight·마녀·Assassin 구성의 재작성을 차단하고 `-WarriorVerifyOnly`는 현재 공통 외형과 기존 적/이전 참조 검사를 함께 수행한다.

@@ -19,6 +19,11 @@ def point(vector):
 def verify():
     report = {"gameplay_test": "not run", "professions": [], "poses": {}}
     party = load(ROOT + "/Blueprint/DataAsset/Parties/DA_VerticalSliceParty")
+    if all(party.get_editor_property("professions")[unreal.Name(name)].get_editor_property("appearance_catalog") is not None for name in ["Mage", "Rogue"]):
+        from VerifyRogAppearance import verify as verify_current_appearance
+        verify_current_appearance()
+        unreal.log("WITCH_ASSASSIN_LEGACY_CHECK_DELEGATED_TO_CURRENT_APPEARANCE")
+        return
     catalog = load(ROOT + "/Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog")
     world = unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/MainMenu")
     actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors()

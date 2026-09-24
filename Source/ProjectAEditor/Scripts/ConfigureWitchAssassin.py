@@ -95,6 +95,8 @@ def skill_montage(skill):
 
 
 def configure():
+    definitions = load(ROOT + "/Blueprint/DataAsset/Parties/DA_VerticalSliceParty").get_editor_property("professions")
+    require(all(definitions[unreal.Name(name)].get_editor_property("appearance_catalog") is None for name in ["Mage", "Rogue"]), "Shared outfit customization is active; use ConfigureRogAppearance.py to preserve the current profession appearance")
     source_unit = load(ROOT + "/Blueprint/Unit/BP_PlayerUnit")
     source_defaults = unreal.get_default_object(source_unit.generated_class())
     source_mesh = load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")

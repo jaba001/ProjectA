@@ -50,9 +50,13 @@ bool UCharacterAppearanceCatalog::ValidateSelection(const FCharacterAppearanceSe
     FGameplayTagContainer BodyTags;
     for (const FCharacterAppearanceBodyPart& Part : BodyParts)
     {
-        if (!Part.PartTag.MatchesTag(TAG_AppearanceBody) || Part.PartTag == TAG_AppearanceBody || Part.Mesh.IsNull())
+        if (!Part.PartTag.MatchesTag(TAG_AppearanceBody) || Part.PartTag == TAG_AppearanceBody || Part.Mesh.IsNull() || Part.MaterialOverrides.Num() > 16)
         {
             return Fail(NSLOCTEXT("CharacterAppearance", "InvalidBody", "기본 신체 파츠가 올바르지 않습니다."));
+        }
+        for (const TSoftObjectPtr<UMaterialInterface>& Material : Part.MaterialOverrides)
+        {
+            if (Material.IsNull()) return Fail(NSLOCTEXT("CharacterAppearance", "MissingBodyMaterial", "기본 신체 파츠의 교체 재질이 지정되지 않았습니다."));
         }
         BodyTags.AddTag(Part.PartTag);
     }

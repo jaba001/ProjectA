@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
+#include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogCharacterAppearance, Log, All);
@@ -136,37 +137,63 @@ bool UCharacterAppearanceComponent::RefreshAppearance()
 
     FText Error;
     if (!AppearanceCatalog->ValidateSelection(Selection, Error)) return Fail(Error.ToString());
+    struct FAppearanceMeshPlan
+    {
+        TSoftObjectPtr<USkeletalMesh> MeshReference;
+        TArray<TSoftObjectPtr<UMaterialInterface>> MaterialReferences;
+        USkeletalMesh* Mesh = nullptr;
+        TArray<UMaterialInterface*> Materials;
+    };
     FGameplayTagContainer HiddenParts;
-    TArray<TSoftObjectPtr<USkeletalMesh>> MeshReferences;
+    TArray<FAppearanceMeshPlan> MeshPlans;
     for (FName ItemId : Selection.ItemIds)
     {
         const FCharacterAppearanceItem* Item = AppearanceCatalog->FindItem(ItemId);
         if (!Item) return Fail(TEXT("Selected item was removed from its catalog"));
         HiddenParts.AppendTags(Item->HiddenBodyParts);
-        MeshReferences.Append(Item->Meshes);
+        for (const TSoftObjectPtr<USkeletalMesh>& Mesh : Item->Meshes)
+        {
+            FAppearanceMeshPlan& Plan = MeshPlans.AddDefaulted_GetRef();
+            Plan.MeshReference = Mesh;
+        }
     }
-    for (const FCharacterAppearanceBodyPart& Part : AppearanceCatalog->BodyParts)
+    const bool bUseModularBody = !HiddenParts.IsEmpty();
+    // Use the original body when clothing does not require hiding any body region.
+    // 의상에서 신체 부위를 숨길 필요가 없으면 원본 전체 신체를 표시합니다.
+    if (bUseModularBody)
     {
-        if (!HiddenParts.HasTagExact(Part.PartTag)) MeshReferences.Add(Part.Mesh);
+        for (const FCharacterAppearanceBodyPart& Part : AppearanceCatalog->BodyParts)
+        {
+            if (HiddenParts.HasTagExact(Part.PartTag)) continue;
+            FAppearanceMeshPlan& Plan = MeshPlans.AddDefaulted_GetRef();
+            Plan.MeshReference = Part.Mesh;
+            Plan.MaterialReferences = Part.MaterialOverrides;
+        }
     }
 
-    // Load trusted catalog meshes before replacing the visible appearance.
-    // 보이는 외형을 교체하기 전에 검증된 카탈로그 메시를 로드합니다.
-    TArray<USkeletalMesh*> LoadedMeshes;
+    // Resolve each part's mesh and materials before replacing the visible appearance.
+    // 보이는 외형을 교체하기 전에 각 파츠의 메시와 재질을 로드하고 확인합니다.
     const FReferenceSkeleton& LeaderBones = Leader->GetSkeletalMeshAsset()->GetRefSkeleton();
-    for (const TSoftObjectPtr<USkeletalMesh>& MeshReference : MeshReferences)
+    for (FAppearanceMeshPlan& Plan : MeshPlans)
     {
-        USkeletalMesh* Mesh = MeshReference.LoadSynchronous();
-        if (!IsValid(Mesh)) return Fail(FString::Printf(TEXT("Cannot load %s"), *MeshReference.ToString()));
+        USkeletalMesh* Mesh = Plan.MeshReference.LoadSynchronous();
+        if (!IsValid(Mesh)) return Fail(FString::Printf(TEXT("Cannot load %s"), *Plan.MeshReference.ToString()));
         const FReferenceSkeleton& FollowerBones = Mesh->GetRefSkeleton();
         for (int32 BoneIndex = 0; BoneIndex < FollowerBones.GetRawBoneNum(); ++BoneIndex)
         {
             const FName BoneName = FollowerBones.GetBoneName(BoneIndex);
             if (LeaderBones.FindBoneIndex(BoneName) == INDEX_NONE) return Fail(FString::Printf(TEXT("%s requires missing leader bone %s"), *Mesh->GetName(), *BoneName.ToString()));
         }
-        LoadedMeshes.Add(Mesh);
+        if (Plan.MaterialReferences.Num() > Mesh->GetMaterials().Num()) return Fail(FString::Printf(TEXT("%s has fewer material slots than its body overrides"), *Mesh->GetName()));
+        for (const TSoftObjectPtr<UMaterialInterface>& MaterialReference : Plan.MaterialReferences)
+        {
+            UMaterialInterface* Material = MaterialReference.LoadSynchronous();
+            if (!IsValid(Material)) return Fail(FString::Printf(TEXT("Cannot load %s"), *MaterialReference.ToString()));
+            Plan.Materials.Add(Material);
+        }
+        Plan.Mesh = Mesh;
     }
-    if (LoadedMeshes.IsEmpty()) return Fail(TEXT("Appearance has no visible body or clothing meshes"));
+    if (bUseModularBody && MeshPlans.IsEmpty()) return Fail(TEXT("Appearance has no visible body or clothing meshes"));
 
     RemoveModularMeshes();
     PoseLeader = Leader;
@@ -176,14 +203,18 @@ bool UCharacterAppearanceComponent::RefreshAppearance()
         LeaderPreviousTickOption = static_cast<uint8>(Leader->VisibilityBasedAnimTickOption);
         bLeaderVisibilitySaved = true;
     }
-    for (USkeletalMesh* Mesh : LoadedMeshes)
+    for (const FAppearanceMeshPlan& Plan : MeshPlans)
     {
         USkeletalMeshComponent* Follower = NewObject<USkeletalMeshComponent>(Owner, NAME_None, RF_Transient);
         Owner->AddInstanceComponent(Follower);
         ModularMeshes.Add(Follower);
         Follower->SetupAttachment(Leader);
         Follower->SetRelativeTransform(FTransform::Identity);
-        Follower->SetSkeletalMeshAsset(Mesh);
+        Follower->SetSkeletalMeshAsset(Plan.Mesh);
+        for (int32 MaterialIndex = 0; MaterialIndex < Plan.Materials.Num(); ++MaterialIndex)
+        {
+            Follower->SetMaterial(MaterialIndex, Plan.Materials[MaterialIndex]);
+        }
         Follower->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         Follower->SetGenerateOverlapEvents(false);
         Follower->SetCanEverAffectNavigation(false);
@@ -194,8 +225,8 @@ bool UCharacterAppearanceComponent::RefreshAppearance()
 
     // Keep the original animation and ragdoll leader evaluating even while its surface is hidden.
     // 원본 표면을 숨겨도 애니메이션과 래그돌을 담당하는 리더는 계속 계산합니다.
-    Leader->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
-    Leader->SetVisibility(false, false);
+    Leader->VisibilityBasedAnimTickOption = MeshPlans.IsEmpty() ? static_cast<EVisibilityBasedAnimTickOption>(LeaderPreviousTickOption) : EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+    Leader->SetVisibility(bUseModularBody ? false : bLeaderWasVisible, false);
     return true;
 }
 

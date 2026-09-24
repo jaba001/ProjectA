@@ -7,6 +7,7 @@
 #include "CharacterAppearanceCatalog.generated.h"
 
 class USkeletalMesh;
+class UMaterialInterface;
 
 USTRUCT(BlueprintType)
 struct PROJECTA_API FCharacterAppearanceSlot
@@ -51,6 +52,11 @@ struct PROJECTA_API FCharacterAppearanceBodyPart
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Appearance")
     TSoftObjectPtr<USkeletalMesh> Mesh;
+
+    // Empty overrides retain the source part materials; populated entries follow material slot order.
+    // 빈 재질 목록은 원본 파츠 재질을 유지하며 지정한 재질은 슬롯 순서대로 적용합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Appearance")
+    TArray<TSoftObjectPtr<UMaterialInterface>> MaterialOverrides;
 };
 
 UCLASS(BlueprintType)
