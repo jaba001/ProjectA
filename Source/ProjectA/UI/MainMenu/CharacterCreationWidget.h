@@ -143,6 +143,17 @@ protected:
     virtual void NativeOnInitialized() override;
     virtual void NativeOnDeactivated() override;
     virtual void NativeOnActivated() override;
+    virtual void NativeDestruct() override;
+    virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+    virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+    virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+    virtual FReply NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+    virtual void NativeOnMouseCaptureLost(const FCaptureLostEvent& CaptureLostEvent) override;
+
+    // Rotation sensitivity uses logical UI units so display scaling does not change the drag speed.
+    // 화면 배율에 따라 드래그 속도가 달라지지 않도록 논리 UI 단위당 회전 감도를 사용합니다.
+    UPROPERTY(EditDefaultsOnly, Category = "CharacterCreation|Preview", meta = (ClampMin = "0.01"))
+    float PreviewRotationSensitivity = 0.4f;
 
     // Enables native C++ layout creation when designer widgets are absent.
     // 디자이너 위젯이 없을 때 네이티브 C++ 레이아웃 생성을 활성화합니다.
@@ -573,6 +584,7 @@ private:
     void RefreshBodySelector();
     void ChangeBodyVariant(int32 Direction);
     void RefreshDetailPreview(bool bReplaceActor);
+    void StopPreviewRotation();
     UCharacterAppearanceCatalog* GetAppearanceCatalog(FName ClassId) const;
     UFUNCTION()
     void HandleDetailClassChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
@@ -582,10 +594,6 @@ private:
     void HandlePreviousBody();
     UFUNCTION()
     void HandleNextBody();
-    UFUNCTION()
-    void HandlePreviewRotateLeft();
-    UFUNCTION()
-    void HandlePreviewRotateRight();
     UPROPERTY(Transient)
     TObjectPtr<UBorder> DetailBackdrop;
     UPROPERTY(Transient)
@@ -616,6 +624,7 @@ private:
     FCharacterAppearanceSelection PendingAppearance;
     FName PendingClassId;
     int32 DetailSlot = INDEX_NONE;
+    int32 PreviewDragUserIndex = INDEX_NONE;
     bool bDetailEditable = false;
     bool bUpdatingDetail = false;
     bool bDetailNewCharacter = false;

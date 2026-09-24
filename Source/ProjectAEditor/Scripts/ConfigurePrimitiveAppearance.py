@@ -8,12 +8,38 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ConfigureRogAppearance import CATALOG_PATH, MANNY, PROFESSIONS, ROOT, UNARMED_SOURCE, load, require, save
 from ConfigureWarriorContent import ASSETS, HELPER
+from ConfigureWitchAssassin import components
 
 BODIES = [("Male", "남자", "/Game/Primitive_Characters_Pack/Mesh/Primitive_01/Mesh_UE5/Separate/SKM_Primitive_Charater_01_Body"), ("Female", "여자", "/Game/Primitive_Characters_Pack/Mesh/Primitive_02/Mesh_UE5/Separate/SKM_Primitive_02_Body")]
 
 
 def mesh_transform(component):
     return unreal.Transform(location=component.get_editor_property("relative_location"), rotation=component.get_editor_property("relative_rotation"), scale=unreal.Vector(1.0, 1.0, 1.0))
+
+
+def clear_default_staff(blueprint):
+    # Keep the attachment point and original equipment assets for future item use.
+    # 향후 아이템 사용을 위해 부착 지점과 원본 장비 에셋은 보존합니다.
+    for handle, component, name in components(blueprint):
+        if name == "Staff":
+            require(isinstance(component, unreal.StaticMeshComponent), "Unexpected Staff component type")
+            component.set_static_mesh(None)
+            component.set_editor_property("override_materials", [])
+            component.set_visibility(False)
+            component.set_hidden_in_game(True)
+            component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+
+
+def configure_mage_defaults():
+    paths = [ROOT + "/Blueprint/Unit/BP_MageUnit", ROOT + "/Blueprint/Unit/BP_MageSnapshotOpponent", ROOT + "/Blueprint/UI/BP_MageMenuPreview"]
+    for path in paths:
+        blueprint = load(path)
+        clear_default_staff(blueprint)
+        unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
+        save(blueprint)
+    report = {"blueprints": paths, "default_staffs": 0, "source_assets_copied": 0, "gameplay_test": "not run"}
+    Path(unreal.Paths.project_saved_dir(), "Automation/MageDefaultStaffConfigure.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    unreal.log("MAGE_DEFAULT_STAFF_REMOVED")
 
 
 def configure():
@@ -57,6 +83,8 @@ def configure():
             appearance = defaults.get_editor_property("character_appearance")
             appearance.set_editor_property("appearance_catalog", catalog)
             appearance.set_editor_property("hidden_mesh_bones", [])
+            if profession == "Mage":
+                clear_default_staff(blueprint)
             unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
             save(blueprint)
         blueprint = load(ROOT + "/Blueprint/UI/" + preview_name)
@@ -65,6 +93,8 @@ def configure():
         mesh.set_editor_property("override_materials", [])
         mesh.set_editor_property("physics_asset_override", None)
         mesh.override_animation_data(idle, True, True, 0.0, 1.0)
+        if profession == "Mage":
+            clear_default_staff(blueprint)
         unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
         save(blueprint)
     report = {"catalog": catalog.get_path_name(), "bodies": [{"id": str(entry.body_id), "mesh": entry.mesh.get_path_name()} for entry in variants], "outfits_enabled": False, "preserved_outfit_items": len(preserved["items"]), "source_assets_copied": 0, "retargeted_assets": 0, "gameplay_test": "not run"}
@@ -73,4 +103,7 @@ def configure():
 
 
 if __name__ == "__main__":
-    configure()
+    if "-PrimitiveMageDefaultsOnly" in unreal.SystemLibrary.get_command_line():
+        configure_mage_defaults()
+    else:
+        configure()

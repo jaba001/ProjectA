@@ -21,6 +21,26 @@ def accepts(catalog, body_id, item_ids=()):
     return result[0] if isinstance(result, tuple) else result
 
 
+def verify_default_staff(blueprint):
+    for handle, component, name in components(blueprint):
+        if isinstance(component, unreal.StaticMeshComponent):
+            mesh = component.get_editor_property("static_mesh")
+            require(mesh is None or not mesh.get_path_name().startswith("/Game/MageStaff_FreeWeapons/"), "Mage must not carry a default staff")
+        if name == "Staff":
+            require(component.get_editor_property("static_mesh") is None and not component.get_editor_property("visible") and component.get_editor_property("hidden_in_game"), "Default staff attachment must be empty and hidden")
+            require(component.get_collision_enabled() == unreal.CollisionEnabled.NO_COLLISION, "Empty staff attachment must not collide")
+
+
+def verify_mage_defaults():
+    paths = [ROOT + "/Blueprint/Unit/BP_MageUnit", ROOT + "/Blueprint/Unit/BP_MageSnapshotOpponent", ROOT + "/Blueprint/UI/BP_MageMenuPreview"]
+    for path in paths:
+        verify_default_staff(load(path))
+    require(load("/Game/MageStaff_FreeWeapons/SM_Staff_01"), "Original staff asset must remain available")
+    report = {"blueprints": paths, "default_staffs": 0, "original_staff_preserved": True, "gameplay_test": "not run", "ui_visual_test": "user pending"}
+    Path(unreal.Paths.project_saved_dir(), "Automation/MageDefaultStaffReload.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    unreal.log("MAGE_DEFAULT_STAFF_RELOAD_VERIFIED")
+
+
 def verify():
     catalog = load(CATALOG_PATH)
     require(not catalog.get_editor_property("enable_outfits"), "Outfits must remain disabled")
@@ -38,7 +58,7 @@ def verify():
     sequences = list(dict.fromkeys([load(path) for path in animation_sources().values()] + [load(SWORD_SOURCE)]))
     sequences = [asset for asset in sequences if isinstance(asset, unreal.AnimSequence)]
     require(sequences, "Shared animation sequences are missing")
-    report = {"bodies": [], "professions": [], "preserved_outfits": len(items), "pose_samples": 0, "staff_grips": 0, "gameplay_test": "not run", "ui_visual_test": "user pending"}
+    report = {"bodies": [], "professions": [], "preserved_outfits": len(items), "pose_samples": 0, "unarmed_mage_blueprints": 0, "gameplay_test": "not run", "ui_visual_test": "user pending"}
     for body_id, title, path in BODIES:
         variant = variants[body_id]
         mesh = load(path)
@@ -93,22 +113,15 @@ def verify():
         require(preview.get_editor_property("animation_data").get_editor_property("anim_to_play") == idle, "Incorrect preview animation")
         if profession == "Mage":
             for blueprint in units + [preview_blueprint]:
-                staff = next(component for handle, component, name in components(blueprint) if name == "Staff")
-                require(staff.get_editor_property("static_mesh") == load("/Game/MageStaff_FreeWeapons/SM_Staff_01") and str(HELPER.get_weapon_attachment(blueprint, "Staff")) == "hand_l", "Mage staff attachment changed")
-                relative = unreal.Transform(location=staff.get_editor_property("relative_location"), rotation=staff.get_editor_property("relative_rotation"), scale=staff.get_editor_property("relative_scale3d"))
-                for body_id, title, path in BODIES:
-                    options = unreal.AnimPoseEvaluationOptions()
-                    options.set_editor_property("optional_skeletal_mesh", load(path))
-                    pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(idle, 0.0, options)
-                    hand = unreal.AnimPoseExtensions.get_bone_pose(pose, "hand_l", unreal.AnimPoseSpaces.WORLD)
-                    palm = (unreal.AnimPoseExtensions.get_bone_pose(pose, "thumb_02_l", unreal.AnimPoseSpaces.WORLD).translation + unreal.AnimPoseExtensions.get_bone_pose(pose, "pinky_02_l", unreal.AnimPoseSpaces.WORLD).translation) * 0.5
-                    shaft = unreal.MathLibrary.transform_location(hand, unreal.MathLibrary.transform_location(relative, unreal.Vector(-0.476373, 0.000402, 0.0)))
-                    require((shaft - palm).length() < 0.1, "Staff grip does not match the selected body")
-                    report["staff_grips"] += 1
+                verify_default_staff(blueprint)
+                report["unarmed_mage_blueprints"] += 1
         report["professions"].append(profession)
     Path(unreal.Paths.project_saved_dir(), "Automation/PrimitiveAppearanceReload.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     unreal.log("PRIMITIVE_APPEARANCE_RELOAD_VERIFIED")
 
 
 if __name__ == "__main__":
-    verify()
+    if "-PrimitiveMageDefaultsOnly" in unreal.SystemLibrary.get_command_line():
+        verify_mage_defaults()
+    else:
+        verify()

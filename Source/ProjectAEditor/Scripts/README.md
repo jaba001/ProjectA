@@ -150,7 +150,7 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 이전 Manny 구성의 재로드 검사는 네 직업의 기본·개별·전체 부위 선택과 잘못된 ID/중복 거부, 원본 참조·Manny 재질 영역·텍스처·본 자세·공통 애니메이션·검 표본·스태프 부착·물리 연결을 확인한다. 결과는 `Saved/Automation/RogAppearanceConfigure.json`, `RogAppearanceReload.json`에 저장한다. 현행 몸체 선택에서 호출하면 17번 Primitive 검사를 수행하고 `PrimitiveAppearanceReload.json`에 저장한다. 화면/플레이 실행은 하지 않으며 [검증 상태와 사용자 확인](../../../Docs/TODO.md#2-30-rog-의상-커스터마이징)을 따른다. 카탈로그 활성 시 이전 GKnight·마녀·Assassin 구성의 재작성을 차단하고 `-WarriorVerifyOnly`는 현재 공통 외형과 기존 적/이전 참조 검사를 함께 수행한다.
 
-17. `ConfigurePrimitiveAppearance.py`: 기존 `DA_MannyAppearance`의 `BodyVariants`에 남자 `Male`·여자 `Female`을 등록한다. 남자는 원본 `SKM_Primitive_Charater_01_Body`, 여자는 실제 에셋 이름인 `SKM_Primitive_02_Body`를 직접 참조한다. 원본 공통 뼈대의 Compatible Skeleton·본별 이동 리타기팅·DefaultSlot 설정으로 Manny 애니메이션을 공유하며 메시·텍스처·애니메이션을 복제하지 않는다. 네 직업의 전투·Snapshot·프리뷰 기본 메시를 남자로 연결하고 의상 표시를 비활성화한다. 103개 의상 항목·원본 에셋·기존 저장 ID는 향후 아이템 작업을 위해 보존한다.
+17. `ConfigurePrimitiveAppearance.py`: 기존 `DA_MannyAppearance`의 `BodyVariants`에 남자 `Male`·여자 `Female`을 등록한다. 남자는 원본 `SKM_Primitive_Charater_01_Body`, 여자는 실제 에셋 이름인 `SKM_Primitive_02_Body`를 직접 참조한다. 원본 공통 뼈대의 Compatible Skeleton·본별 이동 리타기팅·DefaultSlot 설정으로 Manny 애니메이션을 공유하며 메시·텍스처·애니메이션을 복제하지 않는다. 네 직업의 전투·Snapshot·프리뷰 기본 메시를 남자로 연결하고 의상 표시를 비활성화한다. 마법사 기본 `Staff` 메시를 비우고 표시·충돌을 끈다. 103개 의상 항목·스태프 원본·기존 저장 ID는 향후 아이템 작업을 위해 보존한다.
 
 캐릭터 생성/수정의 몸체 이름과 좌우 화살표는 카탈로그 순서를 순환한다. 몸체 추가 시 `BodyVariants`에 고유 `BodyId`·이름·메시·애니메이션·전투/프리뷰 변환을 등록한다. 기존 ID는 저장 호환을 위해 유지하며, 작성기를 다시 실행해도 Male/Female 이외 항목은 보존한다. `BodyId`가 없는 이전 저장은 `DefaultBodyId=Male`을 사용한다.
 
@@ -159,4 +159,6 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/VerifyPrimitiveAppearance.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-검사는 네 직업의 기본 메시·몸체 ID와 이전 의상 선택 검증·원본 애니메이션 포즈·스태프 부착·래그돌 구조를 읽기 전용으로 확인한다. 결과는 `Saved/Automation/PrimitiveAppearanceConfigure.json`, `PrimitiveAppearanceReload.json`에 기록한다. 실제 화면·게임 검증은 [TODO 2-30](../../../Docs/TODO.md#2-30-rog-의상-커스터마이징)의 사용자 확인으로 남긴다.
+두 명령에 `-PrimitiveMageDefaultsOnly`를 추가하면 마법사 전투·Snapshot·프리뷰 Blueprint 3개의 기본 스태프만 작성하거나 읽기 전용으로 검사한다. 결과는 `Saved/Automation/MageDefaultStaffConfigure.json`, `MageDefaultStaffReload.json`에 기록하며 스태프 원본 보존도 검사한다.
+
+전체 검사는 네 직업의 기본 메시·몸체 ID와 이전 의상 선택 검증·원본 애니메이션 포즈·마법사 기본 스태프 제거·래그돌 구조를 읽기 전용으로 확인한다. 결과는 `Saved/Automation/PrimitiveAppearanceConfigure.json`, `PrimitiveAppearanceReload.json`에 기록한다. 실제 화면·게임 검증은 [TODO 2-30](../../../Docs/TODO.md#2-30-rog-의상-커스터마이징)의 사용자 확인으로 남긴다.

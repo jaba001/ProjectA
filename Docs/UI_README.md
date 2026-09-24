@@ -112,9 +112,9 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 
 프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 Warrior/Mage/Archer/Rogue 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
-전사 `BP_WarriorMenuPreview`·마법사 `BP_MageMenuPreview`·도적 `BP_RogueMenuPreview`·궁수 `BP_PartyMenuPreview`는 선택한 Primitive 몸체와 원본 재질·공통 Idle을 사용한다. 남자는 `SKM_Primitive_Charater_01_Body`, 여자는 실제 원본 이름 `SKM_Primitive_02_Body`다. 마법사의 `Staff` 한 개는 왼손 `hand_l`에 연결한다. ROG 의상 UI·착용은 중지하고 기존 103개 항목·원본 에셋은 향후 아이템용으로 보존한다.
+전사 `BP_WarriorMenuPreview`·마법사 `BP_MageMenuPreview`·도적 `BP_RogueMenuPreview`·궁수 `BP_PartyMenuPreview`는 선택한 Primitive 몸체와 원본 재질·공통 Idle을 사용한다. 남자는 `SKM_Primitive_Charater_01_Body`, 여자는 실제 원본 이름 `SKM_Primitive_02_Body`다. 마법사의 기본 스태프는 표시하지 않는다. ROG 의상 UI·착용은 중지하고 기존 103개 항목·스태프 원본 에셋은 향후 아이템용으로 보존한다.
 
-캐릭터 **생성/수정**의 오른쪽 편집창에서 ◀·▶ 버튼으로 남자·여자 몸체를 순환 선택한다. 순서는 카탈로그 `BodyVariants` 배열을 따르며 기본값은 남자다. 선택 즉시 같은 월드 프리뷰에 반영하고 회전 버튼으로 좌우 30도씩 돌린다. **저장**은 초안에 반영하고 **취소**는 이전 선택을 복원한다. 새 캐릭터 생성을 취소하면 빈 슬롯으로 복원한다. 기존 Designer WBP에도 C++ 공통 편집창을 적용한다. `BodyId`가 없는 이전 저장은 기본 남자로 해석한다. [화면·저장 확인](TODO.md#2-30-rog-의상-커스터마이징)
+캐릭터 **생성/수정**의 오른쪽 편집창에서 ◀·▶ 버튼으로 남자·여자 몸체를 순환 선택한다. 순서는 카탈로그 `BodyVariants` 배열을 따르며 기본값은 남자다. 선택 즉시 같은 월드 프리뷰에 반영한다. 회전 버튼은 제거하고 미리보기 영역을 **우클릭한 채 좌우로 드래그**하여 캐릭터를 돌린다. 우클릭 해제·화면 닫기·마우스 캡처 상실 시 회전을 중지하며 편집 패널에서는 회전을 시작하지 않는다. **저장**은 초안에 반영하고 **취소**는 이전 선택을 복원한다. 새 캐릭터 생성을 취소하면 빈 슬롯으로 복원한다. 기존 Designer WBP에도 C++ 공통 편집창을 적용한다. `BodyId`가 없는 이전 저장은 기본 남자로 해석한다. [화면·저장 확인](TODO.md#2-30-rog-의상-커스터마이징)
 
 GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메뉴 travel의 잔여 IgnoreInput·초기 포커스만 복구한다. CharacterCreation의 Text_StartGameStatus는 선택 바인딩이며 누락 시 Native 표시 영역을 추가한다. 상세 배치·바인딩은 [PROJECT_PLAN](PROJECT_PLAN.md#gameplay-에셋과-배치)을 따른다.
 

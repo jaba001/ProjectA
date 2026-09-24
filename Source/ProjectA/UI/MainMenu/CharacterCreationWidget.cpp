@@ -24,6 +24,9 @@
 #include "Components/Widget.h"
 #include "Controller/MainMenuPlayerController.h"
 #include "Engine/Texture2D.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/SlateUser.h"
+#include "InputCoreTypes.h"
 #include "UI/MainMenu/MainMenuPreviewStage.h"
 #include "UI/MainMenu/MainMenuRootWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
@@ -1467,16 +1470,11 @@ void UCharacterCreationWidget::BuildDetailPanel()
     DetailResetBody = CreateButton(Content, FText::FromString(TEXT("기본 몸체로 초기화")));
     DetailResetBody->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleResetBody);
     AddLabel(TEXT("미리보기"));
-    UHorizontalBox* RotateControls = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-    Content->AddChildToVerticalBox(RotateControls)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
-    UButton* RotateLeft = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("AppearanceRotateLeft"));
-    UButton* RotateRight = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("AppearanceRotateRight"));
-    CreateButtonText(RotateLeft, FText::FromString(TEXT("왼쪽 회전")));
-    CreateButtonText(RotateRight, FText::FromString(TEXT("오른쪽 회전")));
-    RotateControls->AddChildToHorizontalBox(RotateLeft)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    RotateControls->AddChildToHorizontalBox(RotateRight)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    RotateLeft->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandlePreviewRotateLeft);
-    RotateRight->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandlePreviewRotateRight);
+    UTextBlock* RotationHint = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("AppearanceRotationHint"));
+    RotationHint->SetText(FText::FromString(TEXT("캐릭터가 보이는 영역을 우클릭한 채 좌우로 드래그하여 회전")));
+    RotationHint->SetAutoWrapText(true);
+    UDemonicUITheme::Get().StyleText(RotationHint, false, 14);
+    Content->AddChildToVerticalBox(RotationHint)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
     AddLabel(TEXT("직업 정보"));
     DetailText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ProfessionDetailText"));
     DetailText->SetAutoWrapText(true);
@@ -1620,19 +1618,76 @@ void UCharacterCreationWidget::HandleResetBody()
     RefreshDetailPreview(false);
 }
 
-void UCharacterCreationWidget::HandlePreviewRotateLeft()
+FReply UCharacterCreationWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-    if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
+    // Start on the preview backdrop only; form controls keep their normal mouse behavior.
+    // 미리보기 배경에서만 회전을 시작하고 설정 입력 요소는 기존 마우스 동작을 유지합니다.
+    if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton && !InMouseEvent.IsTouchEvent() && IsActivated() && DetailSlot != INDEX_NONE && DetailPanel && DetailPanel->IsVisible() && InGeometry.IsUnderLocation(InMouseEvent.GetScreenSpacePosition()) && !DetailPanel->GetCachedGeometry().IsUnderLocation(InMouseEvent.GetScreenSpacePosition()))
     {
-        if (AMainMenuPreviewStage* Stage = Controller->GetPreviewStage()) Stage->RotateFocusedPreview(-30.0f);
+        if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
+        {
+            if (Controller->GetPreviewStage())
+            {
+                PreviewDragUserIndex = InMouseEvent.GetUserIndex();
+                return FReply::Handled().CaptureMouse(TakeWidget()).PreventThrottling();
+            }
+        }
     }
+    return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
-void UCharacterCreationWidget::HandlePreviewRotateRight()
+FReply UCharacterCreationWidget::NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
+    // A quick second press must also begin a new rotation gesture.
+    // 빠르게 두 번째로 누른 우클릭도 새 회전 드래그를 시작합니다.
+    if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton) return NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+    return Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
+}
+
+FReply UCharacterCreationWidget::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+    if (PreviewDragUserIndex != INDEX_NONE && InMouseEvent.GetUserIndex() == PreviewDragUserIndex && InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+    {
+        PreviewDragUserIndex = INDEX_NONE;
+        return FReply::Handled().ReleaseMouseCapture();
+    }
+    return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+}
+
+FReply UCharacterCreationWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+    if (PreviewDragUserIndex == INDEX_NONE || InMouseEvent.GetUserIndex() != PreviewDragUserIndex) return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+    if (!IsActivated() || DetailSlot == INDEX_NONE || !InMouseEvent.IsMouseButtonDown(EKeys::RightMouseButton))
+    {
+        PreviewDragUserIndex = INDEX_NONE;
+        return FReply::Handled().ReleaseMouseCapture();
+    }
     if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
     {
-        if (AMainMenuPreviewStage* Stage = Controller->GetPreviewStage()) Stage->RotateFocusedPreview(30.0f);
+        if (AMainMenuPreviewStage* Stage = Controller->GetPreviewStage())
+        {
+            const FVector2D LocalDelta = InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition()) - InGeometry.AbsoluteToLocal(InMouseEvent.GetLastScreenSpacePosition());
+            Stage->RotateFocusedPreview(LocalDelta.X * PreviewRotationSensitivity);
+        }
+    }
+    return FReply::Handled();
+}
+
+void UCharacterCreationWidget::NativeOnMouseCaptureLost(const FCaptureLostEvent& CaptureLostEvent)
+{
+    PreviewDragUserIndex = INDEX_NONE;
+    Super::NativeOnMouseCaptureLost(CaptureLostEvent);
+}
+
+void UCharacterCreationWidget::StopPreviewRotation()
+{
+    const int32 UserIndex = PreviewDragUserIndex;
+    PreviewDragUserIndex = INDEX_NONE;
+    // Release only this gesture's cursor capture when the details close or the widget is removed.
+    // 상세창을 닫거나 위젯을 제거하면 이 드래그가 소유한 커서 캡처만 해제합니다.
+    if (UserIndex != INDEX_NONE && FSlateApplication::IsInitialized() && HasMouseCaptureByUser(UserIndex))
+    {
+        if (const TSharedPtr<FSlateUser> SlateUser = FSlateApplication::Get().GetUser(UserIndex)) SlateUser->ReleaseCursorCapture();
     }
 }
 
@@ -1670,6 +1725,7 @@ void UCharacterCreationWidget::SaveSlotDetails()
 
 void UCharacterCreationWidget::CloseSlotDetails()
 {
+    StopPreviewRotation();
     const int32 PreviousSlot = DetailSlot;
     const bool bDiscardNewCharacter = bDetailNewCharacter;
     DetailSlot = INDEX_NONE;
@@ -1709,4 +1765,10 @@ void UCharacterCreationWidget::NativeOnActivated()
     InitializeClassSlots();
     RefreshClassSlotWidgets();
     RefreshPreview();
+}
+
+void UCharacterCreationWidget::NativeDestruct()
+{
+    StopPreviewRotation();
+    Super::NativeDestruct();
 }
