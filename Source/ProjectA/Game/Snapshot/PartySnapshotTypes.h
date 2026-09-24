@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Unit/CharacterAppearanceTypes.h"
 #include "PartySnapshotTypes.generated.h"
 
 USTRUCT(BlueprintType)
@@ -59,6 +60,11 @@ struct PROJECTA_API FPartySnapshotMember
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
     TArray<FName> EquipmentIds;
+
+    // Cosmetics are independent of equipment effects and use trusted catalog identifiers.
+    // 외형은 장비 효과와 별개이며 신뢰된 목록의 식별자를 사용합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
+    FCharacterAppearanceSelection Appearance;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
     FName TacticsId;

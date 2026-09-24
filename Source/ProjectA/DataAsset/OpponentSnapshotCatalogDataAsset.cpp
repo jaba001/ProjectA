@@ -3,6 +3,18 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "Unit/EnemyUnit.h"
+#include "Unit/CharacterAppearanceComponent.h"
+#include "DataAsset/CharacterAppearanceCatalog.h"
+
+bool UOpponentSnapshotCatalogDataAsset::MatchesSavedUnitClass(const FPartySnapshotMember& Member, const FSoftObjectPath& SavedClass) const
+{
+    const TSubclassOf<AEnemyUnit> CurrentClass = EnemyClasses.FindRef(Member.ClassId);
+    if (!CurrentClass || CurrentClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists)) return false;
+    if (SavedClass == FSoftObjectPath(CurrentClass.Get())) return true;
+    if (!Member.Appearance.IsEmpty()) return false;
+    const TSubclassOf<AEnemyUnit> LegacyClass = LegacyEnemyClasses.FindRef(Member.ClassId);
+    return LegacyClass && !LegacyClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists) && SavedClass == FSoftObjectPath(LegacyClass.Get());
+}
 
 bool UOpponentSnapshotCatalogDataAsset::ResolveSkills(const FPartySnapshotMember& Member, TArray<TObjectPtr<USkillDefinitionDataAsset>>& OutSkills, FText& OutError) const
 {
@@ -53,9 +65,20 @@ bool UOpponentSnapshotCatalogDataAsset::ValidateForEncounter(const FPartySnapsho
     for (const FPartySnapshotMember& Member : Snapshot.Members)
     {
         const TSubclassOf<AEnemyUnit> EnemyClass = EnemyClasses.FindRef(Member.ClassId);
-        if (!EnemyClass || EnemyClass->HasAnyClassFlags(CLASS_Abstract))
+        if (!EnemyClass || EnemyClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
         {
             OutError = FText::Format(NSLOCTEXT("Snapshot", "UnknownClass", "Unknown opponent class: {0}. / 알 수 없는 상대 직업: {0}."), FText::FromName(Member.ClassId));
+            return false;
+        }
+        const AEnemyUnit* Defaults = EnemyClass->GetDefaultObject<AEnemyUnit>();
+        const UCharacterAppearanceCatalog* AppearanceCatalog = Defaults->CharacterAppearance ? Defaults->CharacterAppearance->AppearanceCatalog.Get() : nullptr;
+        if (AppearanceCatalog)
+        {
+            if (!AppearanceCatalog->ValidateSelection(Member.Appearance, OutError)) return false;
+        }
+        else if (!Member.Appearance.ItemIds.IsEmpty())
+        {
+            OutError = NSLOCTEXT("Snapshot", "UnsupportedAppearance", "상대 직업에서 사용할 수 없는 의상 선택입니다.");
             return false;
         }
         // Future equipment and tactics must not silently produce a different opponent build.

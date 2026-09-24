@@ -2,6 +2,7 @@
 
 #include "Blueprint/WidgetTree.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
+#include "DataAsset/CharacterAppearanceCatalog.h"
 #include "Profession/ProfessionBase.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Engine/GameInstance.h"
@@ -16,6 +17,7 @@
 #include "Components/OverlaySlot.h"
 #include "Components/SizeBox.h"
 #include "Components/SizeBoxSlot.h"
+#include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
@@ -910,6 +912,8 @@ void UCharacterCreationWidget::CreateCharacterInSlot(int32 SlotIndex)
     if (!PartyDraft.Create(SlotIndex)) return;
     SyncDraftProperties();
     SetSlotClass(SlotIndex, SlotClassIds[SlotIndex]);
+    ShowSlotDetails(SlotIndex, true);
+    bDetailNewCharacter = DetailSlot == SlotIndex;
     UE_LOG(LogTemp, Log, TEXT("[CharacterCreationWidget] Character creation panel opened. SlotIndex: %d, ClassId: %s"), SlotIndex, *SlotClassIds[SlotIndex].ToString());
 }
 
@@ -971,6 +975,8 @@ void UCharacterCreationWidget::UpdatePreviewStageSlot(int32 SlotIndex, FName Cla
     if (PreviewStage)
     {
         PreviewStage->SetPreviewActorForSlot(SlotIndex, ClassId);
+        const FRunPartyMember* Member = PartyDraft.GetSlot(SlotIndex);
+        if (Member) PreviewStage->SetPreviewAppearance(SlotIndex, GetAppearanceCatalog(ClassId), Member->Appearance);
     }
 }
 
@@ -1338,13 +1344,19 @@ void UCharacterCreationWidget::RequestStartGame()
     }
     for (const FRunPartyMember& Member : GetPartyMembers())
     {
+        if (!Member.bCreated) continue;
         FProfessionDefinition Definition;
-        if (Member.bCreated && !PartyDefinition->ResolveProfession(Member.ClassId, Definition))
+        if (!PartyDefinition->ResolveProfession(Member.ClassId, Definition))
         {
             if (Text_StartGameStatus)
             {
                 Text_StartGameStatus->SetText(FText::FromString(TEXT("직업 전투 설정을 확인해 주세요.")));
             }
+            return;
+        }
+        if (Definition.AppearanceCatalog && !Definition.AppearanceCatalog->ValidateSelection(Member.Appearance, Error))
+        {
+            if (Text_StartGameStatus) Text_StartGameStatus->SetText(Error);
             return;
         }
     }
@@ -1375,20 +1387,45 @@ void UCharacterCreationWidget::BuildDetailPanel()
     UOverlaySlot* UnderlyingSlot = Root->AddChildToOverlay(DetailUnderlyingRoot);
     UnderlyingSlot->SetHorizontalAlignment(HAlign_Fill);
     UnderlyingSlot->SetVerticalAlignment(VAlign_Fill);
+    DetailBackdrop = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("ProfessionDetailBackdrop"));
+    DetailBackdrop->SetBrushColor(FLinearColor::Transparent);
+    UOverlaySlot* BackdropSlot = Root->AddChildToOverlay(DetailBackdrop);
+    BackdropSlot->SetHorizontalAlignment(HAlign_Fill);
+    BackdropSlot->SetVerticalAlignment(VAlign_Fill);
+    DetailBackdrop->SetVisibility(ESlateVisibility::Collapsed);
     DetailPanel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("ProfessionDetailPanel"));
     DetailPanel->SetBrushColor(FLinearColor(0.025f, 0.035f, 0.05f, 0.98f));
-    DetailPanel->SetPadding(FMargin(32.0f));
+    DetailPanel->SetPadding(FMargin(24.0f));
     UOverlaySlot* DetailOverlaySlot = Root->AddChildToOverlay(DetailPanel);
-    DetailOverlaySlot->SetHorizontalAlignment(HAlign_Center);
-    DetailOverlaySlot->SetVerticalAlignment(VAlign_Center);
+    DetailOverlaySlot->SetHorizontalAlignment(HAlign_Right);
+    DetailOverlaySlot->SetVerticalAlignment(VAlign_Fill);
+    DetailOverlaySlot->SetPadding(FMargin(24.0f));
     USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-    Size->SetWidthOverride(520.0f);
+    Size->SetWidthOverride(420.0f);
     DetailPanel->SetContent(Size);
+    UVerticalBox* PanelContent = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+    Size->SetContent(PanelContent);
+    UTextBlock* Heading = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+    Heading->SetText(FText::FromString(TEXT("캐릭터 설정")));
+    UDemonicUITheme::Get().StyleText(Heading, true, 24);
+    PanelContent->AddChildToVerticalBox(Heading)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
+    UScrollBox* Scroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("CharacterDetailScroll"));
+    Scroll->SetConsumeMouseWheel(EConsumeMouseWheel::Always);
+    PanelContent->AddChildToVerticalBox(Scroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-    Size->SetContent(Content);
+    Scroll->AddChild(Content);
+    const auto AddLabel = [this, Content](const TCHAR* Text)
+    {
+        UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+        Label->SetText(FText::FromString(Text));
+        UDemonicUITheme::Get().StyleText(Label, false, 16);
+        Content->AddChildToVerticalBox(Label)->SetPadding(FMargin(0.0f, 6.0f));
+    };
+    AddLabel(TEXT("이름"));
     DetailName = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass(), TEXT("ProfessionNameInput"));
     DetailName->SetHintText(FText::FromString(TEXT("캐릭터 이름")));
     Content->AddChildToVerticalBox(DetailName)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
+    AddLabel(TEXT("직업"));
     DetailClass = WidgetTree->ConstructWidget<UDemonicComboBoxString>(UDemonicComboBoxString::StaticClass(), TEXT("ProfessionClassSelect"));
     for (FName ClassId : GetAvailablePartyClassIds())
     {
@@ -1396,15 +1433,36 @@ void UCharacterCreationWidget::BuildDetailPanel()
     }
     DetailClass->OnSelectionChanged.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleDetailClassChanged);
     Content->AddChildToVerticalBox(DetailClass)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
+    AddLabel(TEXT("의상"));
+    DetailAppearanceStatus = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("AppearanceSelectionStatus"));
+    DetailAppearanceStatus->SetAutoWrapText(true);
+    Content->AddChildToVerticalBox(DetailAppearanceStatus)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 8.0f));
+    DetailAppearanceOptions = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("AppearanceOptions"));
+    Content->AddChildToVerticalBox(DetailAppearanceOptions);
+    DetailResetAppearance = CreateButton(Content, FText::FromString(TEXT("의상 선택 초기화")));
+    DetailResetAppearance->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleResetAppearance);
+    AddLabel(TEXT("미리보기"));
+    UHorizontalBox* RotateControls = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+    Content->AddChildToVerticalBox(RotateControls)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
+    UButton* RotateLeft = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("AppearanceRotateLeft"));
+    UButton* RotateRight = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("AppearanceRotateRight"));
+    CreateButtonText(RotateLeft, FText::FromString(TEXT("왼쪽 회전")));
+    CreateButtonText(RotateRight, FText::FromString(TEXT("오른쪽 회전")));
+    RotateControls->AddChildToHorizontalBox(RotateLeft)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    RotateControls->AddChildToHorizontalBox(RotateRight)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    RotateLeft->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandlePreviewRotateLeft);
+    RotateRight->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandlePreviewRotateRight);
+    AddLabel(TEXT("직업 정보"));
     DetailText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ProfessionDetailText"));
     DetailText->SetAutoWrapText(true);
     Content->AddChildToVerticalBox(DetailText)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 16.0f));
     DetailError = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ProfessionDetailError"));
     DetailError->SetColorAndOpacity(FLinearColor(1.0f, 0.45f, 0.35f));
-    Content->AddChildToVerticalBox(DetailError);
-    DetailSave = CreateButton(Content, FText::FromString(TEXT("저장")));
+    DetailError->SetAutoWrapText(true);
+    PanelContent->AddChildToVerticalBox(DetailError)->SetPadding(FMargin(0.0f, 8.0f));
+    DetailSave = CreateButton(PanelContent, FText::FromString(TEXT("저장")));
     DetailSave->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::SaveSlotDetails);
-    UButton* Close = CreateButton(Content, FText::FromString(TEXT("닫기 / 취소")));
+    UButton* Close = CreateButton(PanelContent, FText::FromString(TEXT("닫기 / 취소")));
     Close->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::CloseSlotDetails);
     DetailPanel->SetVisibility(ESlateVisibility::Collapsed);
 }
@@ -1415,17 +1473,33 @@ void UCharacterCreationWidget::ShowSlotDetails(int32 SlotIndex, bool bEditable)
     {
         return;
     }
+    if (DetailSlot != INDEX_NONE) CloseSlotDetails();
+    const FRunPartyMember* Member = PartyDraft.GetSlot(SlotIndex);
+    if (!Member || !Member->bCreated) return;
     DetailSlot = SlotIndex;
     bDetailEditable = bEditable;
+    bDetailNewCharacter = false;
+    PendingClassId = Member->ClassId;
+    PendingAppearance = Member->Appearance;
     DetailError->SetText(FText::GetEmpty());
     DetailName->SetText(GetPartyMembers()[SlotIndex].CharacterName);
     DetailName->SetIsReadOnly(!bEditable);
-    DetailClass->SetSelectedIndex(GetAvailablePartyClassIds().IndexOfByKey(SlotClassIds[SlotIndex]));
+    bUpdatingDetail = true;
+    DetailClass->SetSelectedIndex(GetAvailablePartyClassIds().IndexOfByKey(PendingClassId));
+    bUpdatingDetail = false;
     DetailClass->SetIsEnabled(bEditable);
     DetailText->SetText(PartyDefinition ? PartyDefinition->GetProfessionDetails(SlotClassIds[SlotIndex]) : FText::GetEmpty());
     DetailSave->SetVisibility(bEditable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    DetailUnderlyingRoot->SetIsEnabled(false);
+    RebuildAppearanceSelectors();
+    DetailUnderlyingVisibility = DetailUnderlyingRoot->GetVisibility();
+    DetailUnderlyingRoot->SetVisibility(ESlateVisibility::Collapsed);
+    DetailBackdrop->SetVisibility(ESlateVisibility::Visible);
     DetailPanel->SetVisibility(ESlateVisibility::Visible);
+    RefreshDetailPreview(true);
+    if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
+    {
+        if (AMainMenuPreviewStage* Stage = Controller->GetPreviewStage()) Stage->SetFocusedPreviewSlot(DetailSlot);
+    }
     if (bEditable)
     {
         DetailName->SetKeyboardFocus();
@@ -1434,10 +1508,132 @@ void UCharacterCreationWidget::ShowSlotDetails(int32 SlotIndex, bool bEditable)
 
 void UCharacterCreationWidget::HandleDetailClassChanged(FString SelectedItem, ESelectInfo::Type SelectionType)
 {
+    if (bUpdatingDetail || !bDetailEditable || DetailSlot == INDEX_NONE) return;
     const int32 Index = DetailClass->GetSelectedIndex();
     if (GetAvailablePartyClassIds().IsValidIndex(Index) && PartyDefinition)
     {
-        DetailText->SetText(PartyDefinition->GetProfessionDetails(GetAvailablePartyClassIds()[Index]));
+        const FName ClassId = GetAvailablePartyClassIds()[Index];
+        if (PendingClassId != ClassId) PendingAppearance = FCharacterAppearanceSelection();
+        PendingClassId = ClassId;
+        DetailText->SetText(PartyDefinition->GetProfessionDetails(ClassId));
+        DetailError->SetText(FText::GetEmpty());
+        RebuildAppearanceSelectors();
+        RefreshDetailPreview(true);
+    }
+}
+
+UCharacterAppearanceCatalog* UCharacterCreationWidget::GetAppearanceCatalog(FName ClassId) const
+{
+    FProfessionDefinition Definition;
+    return PartyDefinition && PartyDefinition->ResolveProfession(ClassId, Definition) ? Definition.AppearanceCatalog.Get() : nullptr;
+}
+
+void UCharacterCreationWidget::RebuildAppearanceSelectors()
+{
+    if (!DetailAppearanceOptions) return;
+    DetailAppearanceOptions->ClearChildren();
+    DetailAppearanceBindings.Reset();
+    UCharacterAppearanceCatalog* Catalog = GetAppearanceCatalog(PendingClassId);
+    const bool bHasOptions = Catalog && !Catalog->Slots.IsEmpty();
+    DetailResetAppearance->SetVisibility(bHasOptions && bDetailEditable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    DetailAppearanceStatus->SetText(bHasOptions ? FText::FromString(FString::Printf(TEXT("%d개 선택 · 부위별로 의상을 골라 주세요."), PendingAppearance.ItemIds.Num())) : FText::FromString(TEXT("이 직업은 기본 외형을 사용합니다.")));
+    if (!bHasOptions) return;
+    for (const FCharacterAppearanceSlot& AppearanceSlot : Catalog->Slots)
+    {
+        UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+        Label->SetText(AppearanceSlot.DisplayName);
+        UDemonicUITheme::Get().StyleText(Label, false, 16);
+        DetailAppearanceOptions->AddChildToVerticalBox(Label)->SetPadding(FMargin(0.0f, 4.0f));
+        UCharacterAppearanceChoiceBinding* Binding = NewObject<UCharacterAppearanceChoiceBinding>(this);
+        Binding->Owner = this;
+        Binding->SlotTag = AppearanceSlot.SlotTag;
+        Binding->Selector = WidgetTree->ConstructWidget<UDemonicComboBoxString>(UDemonicComboBoxString::StaticClass());
+        Binding->Selector->SetMaxListHeight(260.0f);
+        Binding->Selector->AddOption(TEXT("기본 (선택 안 함)"));
+        Binding->ItemIds.Add(NAME_None);
+        int32 SelectedIndex = 0;
+        for (const FCharacterAppearanceItem& Item : Catalog->Items)
+        {
+            if (Item.SlotTag != AppearanceSlot.SlotTag) continue;
+            const int32 ItemIndex = Binding->ItemIds.Add(Item.ItemId);
+            // Numbered labels remain unique even when two items share a translated name.
+            // 두 의상의 번역명이 같아도 번호를 붙인 표시명은 서로 구분됩니다.
+            Binding->Selector->AddOption(FString::Printf(TEXT("%d. %s"), ItemIndex, *Item.DisplayName.ToString()));
+            if (PendingAppearance.ItemIds.Contains(Item.ItemId)) SelectedIndex = ItemIndex;
+        }
+        Binding->Selector->SetSelectedIndex(SelectedIndex);
+        Binding->Selector->SetIsEnabled(bDetailEditable);
+        Binding->Selector->OnSelectionChanged.AddUniqueDynamic(Binding, &UCharacterAppearanceChoiceBinding::HandleSelectionChanged);
+        DetailAppearanceOptions->AddChildToVerticalBox(Binding->Selector)->SetPadding(FMargin(0.0f, 0.0f, 8.0f, 10.0f));
+        DetailAppearanceBindings.Add(Binding);
+    }
+}
+
+void UCharacterAppearanceChoiceBinding::HandleSelectionChanged(FString SelectedItem, ESelectInfo::Type SelectionType)
+{
+    if (!Owner || !Selector) return;
+    const int32 Index = Selector->GetSelectedIndex();
+    if (ItemIds.IsValidIndex(Index)) Owner->SelectAppearanceItem(SlotTag, ItemIds[Index]);
+}
+
+void UCharacterCreationWidget::SelectAppearanceItem(FGameplayTag SlotTag, FName ItemId)
+{
+    UCharacterAppearanceCatalog* Catalog = GetAppearanceCatalog(PendingClassId);
+    if (!bDetailEditable || bUpdatingDetail || DetailSlot == INDEX_NONE || !Catalog) return;
+    const FCharacterAppearanceItem* Item = Catalog->FindItem(ItemId);
+    if (!ItemId.IsNone() && (!Item || Item->SlotTag != SlotTag)) return;
+    FCharacterAppearanceSelection Selection = PendingAppearance;
+    Selection.ItemIds.RemoveAll([Catalog, SlotTag](FName ExistingId)
+    {
+        const FCharacterAppearanceItem* Existing = Catalog->FindItem(ExistingId);
+        return Existing && Existing->SlotTag == SlotTag;
+    });
+    if (!ItemId.IsNone()) Selection.ItemIds.Add(ItemId);
+    FText Error;
+    if (!Catalog->ValidateSelection(Selection, Error))
+    {
+        DetailError->SetText(Error);
+        RebuildAppearanceSelectors();
+        return;
+    }
+    PendingAppearance = MoveTemp(Selection);
+    DetailError->SetText(FText::GetEmpty());
+    DetailAppearanceStatus->SetText(FText::FromString(FString::Printf(TEXT("%d개 선택 · 부위별로 의상을 골라 주세요."), PendingAppearance.ItemIds.Num())));
+    RefreshDetailPreview(false);
+}
+
+void UCharacterCreationWidget::RefreshDetailPreview(bool bReplaceActor)
+{
+    if (DetailSlot == INDEX_NONE) return;
+    AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer());
+    AMainMenuPreviewStage* Stage = Controller ? Controller->GetPreviewStage() : nullptr;
+    if (!Stage) return;
+    if (bReplaceActor) Stage->SetPreviewActorForSlot(DetailSlot, PendingClassId);
+    if (!Stage->SetPreviewAppearance(DetailSlot, GetAppearanceCatalog(PendingClassId), PendingAppearance)) DetailError->SetText(FText::FromString(TEXT("의상을 표시할 수 없습니다. 선택을 다시 확인해 주세요.")));
+}
+
+void UCharacterCreationWidget::HandleResetAppearance()
+{
+    if (!bDetailEditable || DetailSlot == INDEX_NONE) return;
+    PendingAppearance = FCharacterAppearanceSelection();
+    DetailError->SetText(FText::GetEmpty());
+    RebuildAppearanceSelectors();
+    RefreshDetailPreview(false);
+}
+
+void UCharacterCreationWidget::HandlePreviewRotateLeft()
+{
+    if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
+    {
+        if (AMainMenuPreviewStage* Stage = Controller->GetPreviewStage()) Stage->RotateFocusedPreview(-30.0f);
+    }
+}
+
+void UCharacterCreationWidget::HandlePreviewRotateRight()
+{
+    if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
+    {
+        if (AMainMenuPreviewStage* Stage = Controller->GetPreviewStage()) Stage->RotateFocusedPreview(30.0f);
     }
 }
 
@@ -1460,20 +1656,40 @@ void UCharacterCreationWidget::SaveSlotDetails()
         DetailError->SetText(FText::FromString(TEXT("직업 전투 설정을 확인해 주세요.")));
         return;
     }
+    FText AppearanceError;
+    if (Definition.AppearanceCatalog && !Definition.AppearanceCatalog->ValidateSelection(PendingAppearance, AppearanceError))
+    {
+        DetailError->SetText(AppearanceError);
+        return;
+    }
     SetSlotCharacterName(DetailSlot, FText::FromString(Name));
     SetSlotClass(DetailSlot, GetAvailablePartyClassIds()[Index]);
+    PartyDraft.SetAppearance(DetailSlot, PendingAppearance);
+    bDetailNewCharacter = false;
     CloseSlotDetails();
 }
 
 void UCharacterCreationWidget::CloseSlotDetails()
 {
+    const int32 PreviousSlot = DetailSlot;
+    const bool bDiscardNewCharacter = bDetailNewCharacter;
     DetailSlot = INDEX_NONE;
     bDetailEditable = false;
+    bDetailNewCharacter = false;
+    PendingAppearance = FCharacterAppearanceSelection();
+    PendingClassId = NAME_None;
+    if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
+    {
+        if (AMainMenuPreviewStage* Stage = Controller->GetPreviewStage()) Stage->ClearPreviewFocus();
+    }
     if (DetailPanel)
     {
         DetailPanel->SetVisibility(ESlateVisibility::Collapsed);
-        DetailUnderlyingRoot->SetIsEnabled(true);
+        DetailBackdrop->SetVisibility(ESlateVisibility::Collapsed);
+        if (PreviousSlot != INDEX_NONE) DetailUnderlyingRoot->SetVisibility(DetailUnderlyingVisibility);
     }
+    if (bDiscardNewCharacter) ClearCharacterSlot(PreviousSlot);
+    else if (IsSlotCreated(PreviousSlot)) UpdatePreviewStageSlot(PreviousSlot, PartyDraft.GetSlot(PreviousSlot)->ClassId);
 }
 
 void UCharacterCreationWidget::NativeOnDeactivated()

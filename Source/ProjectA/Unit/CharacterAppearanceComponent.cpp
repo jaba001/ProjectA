@@ -1,17 +1,24 @@
 #include "Unit/CharacterAppearanceComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "DataAsset/CharacterAppearanceCatalog.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Character.h"
+#include "Net/UnrealNetwork.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogCharacterAppearance, Log, All);
 
 UCharacterAppearanceComponent::UCharacterAppearanceComponent()
 {
     PrimaryComponentTick.bCanEverTick = false;
+    SetIsReplicatedByDefault(true);
 }
 
 void UCharacterAppearanceComponent::OnRegister()
 {
     Super::OnRegister();
-    ApplyHiddenMeshBones();
+    RefreshAppearance();
 }
 
 void UCharacterAppearanceComponent::BeginPlay()
@@ -19,14 +26,184 @@ void UCharacterAppearanceComponent::BeginPlay()
     Super::BeginPlay();
     // Component registration can precede assignment of the owner's skeletal mesh.
     // 컴포넌트 등록이 소유자의 스켈레탈 메시 지정보다 먼저 실행될 수 있습니다.
+    RefreshAppearance();
+}
+
+void UCharacterAppearanceComponent::OnUnregister()
+{
+    RemoveModularMeshes();
+    RestorePoseLeader();
+    Super::OnUnregister();
+}
+
+void UCharacterAppearanceComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(UCharacterAppearanceComponent, AppearanceCatalog);
+    DOREPLIFETIME(UCharacterAppearanceComponent, Selection);
+}
+
+void UCharacterAppearanceComponent::OnRep_Appearance()
+{
+    RefreshAppearance();
+}
+
+USkeletalMeshComponent* UCharacterAppearanceComponent::FindPoseLeader() const
+{
+    AActor* Owner = GetOwner();
+    if (!IsValid(Owner)) return nullptr;
+    if (const ACharacter* Character = Cast<ACharacter>(Owner)) return Character->GetMesh();
+    if (IsValid(PoseLeader)) return PoseLeader;
+    TInlineComponentArray<USkeletalMeshComponent*> Meshes(Owner);
+    for (USkeletalMeshComponent* Mesh : Meshes)
+    {
+        if (IsValid(Mesh) && !ModularMeshes.Contains(Mesh)) return Mesh;
+    }
+    return nullptr;
+}
+
+void UCharacterAppearanceComponent::RemoveModularMeshes()
+{
+    for (USkeletalMeshComponent* Mesh : ModularMeshes)
+    {
+        if (!IsValid(Mesh)) continue;
+        if (AActor* Owner = GetOwner()) Owner->RemoveInstanceComponent(Mesh);
+        Mesh->DestroyComponent();
+    }
+    ModularMeshes.Reset();
+}
+
+void UCharacterAppearanceComponent::RestorePoseLeader()
+{
+    if (bLeaderVisibilitySaved && IsValid(PoseLeader))
+    {
+        PoseLeader->SetVisibility(bLeaderWasVisible, false);
+        PoseLeader->VisibilityBasedAnimTickOption = static_cast<EVisibilityBasedAnimTickOption>(LeaderPreviousTickOption);
+    }
+    bLeaderVisibilitySaved = false;
+    PoseLeader = nullptr;
+}
+
+bool UCharacterAppearanceComponent::SetAppearance(UCharacterAppearanceCatalog* InCatalog, const FCharacterAppearanceSelection& InSelection)
+{
+    AActor* Owner = GetOwner();
+    if (!IsValid(Owner) || (Owner->GetNetMode() != NM_Standalone && !Owner->HasAuthority())) return false;
+    FText Error;
+    if ((!InCatalog && !InSelection.IsEmpty()) || (InCatalog && !InCatalog->ValidateSelection(InSelection, Error))) return false;
+    UCharacterAppearanceCatalog* PreviousCatalog = AppearanceCatalog;
+    const FCharacterAppearanceSelection PreviousSelection = Selection;
+    AppearanceCatalog = InCatalog;
+    Selection = InSelection;
+    if (!RefreshAppearance())
+    {
+        AppearanceCatalog = PreviousCatalog;
+        Selection = PreviousSelection;
+        RefreshAppearance();
+        return false;
+    }
+    Owner->ForceNetUpdate();
+    return true;
+}
+
+bool UCharacterAppearanceComponent::RefreshAppearance()
+{
+    AActor* Owner = GetOwner();
+    // Runtime previews are game-world actors; leave saved editor actors and templates untouched.
+    // 런타임 프리뷰는 게임 월드 액터이며 저장된 에디터 액터와 템플릿은 변경하지 않습니다.
+    if (IsTemplate() || !IsValid(Owner) || Owner->IsTemplate() || !Owner->GetWorld() || !Owner->GetWorld()->IsGameWorld()) return false;
+    USkeletalMeshComponent* Leader = FindPoseLeader();
+    if (Leader != PoseLeader)
+    {
+        RemoveModularMeshes();
+        RestorePoseLeader();
+    }
+    const auto Fail = [this](const FString& Reason)
+    {
+        RemoveModularMeshes();
+        RestorePoseLeader();
+        UE_LOG(LogCharacterAppearance, Warning, TEXT("%s: %s; retaining the base mesh."), *GetPathName(), *Reason);
+        return false;
+    };
+    if (!AppearanceCatalog)
+    {
+        RemoveModularMeshes();
+        RestorePoseLeader();
+        ApplyHiddenMeshBones();
+        return Selection.IsEmpty();
+    }
+    if (!IsValid(Leader) || Leader->IsTemplate() || !IsValid(Leader->GetSkeletalMeshAsset())) return Fail(TEXT("Appearance pose leader is not ready"));
     ApplyHiddenMeshBones();
+
+    FText Error;
+    if (!AppearanceCatalog->ValidateSelection(Selection, Error)) return Fail(Error.ToString());
+    FGameplayTagContainer HiddenParts;
+    TArray<TSoftObjectPtr<USkeletalMesh>> MeshReferences;
+    for (FName ItemId : Selection.ItemIds)
+    {
+        const FCharacterAppearanceItem* Item = AppearanceCatalog->FindItem(ItemId);
+        if (!Item) return Fail(TEXT("Selected item was removed from its catalog"));
+        HiddenParts.AppendTags(Item->HiddenBodyParts);
+        MeshReferences.Append(Item->Meshes);
+    }
+    for (const FCharacterAppearanceBodyPart& Part : AppearanceCatalog->BodyParts)
+    {
+        if (!HiddenParts.HasTagExact(Part.PartTag)) MeshReferences.Add(Part.Mesh);
+    }
+
+    // Load trusted catalog meshes before replacing the visible appearance.
+    // 보이는 외형을 교체하기 전에 검증된 카탈로그 메시를 로드합니다.
+    TArray<USkeletalMesh*> LoadedMeshes;
+    const FReferenceSkeleton& LeaderBones = Leader->GetSkeletalMeshAsset()->GetRefSkeleton();
+    for (const TSoftObjectPtr<USkeletalMesh>& MeshReference : MeshReferences)
+    {
+        USkeletalMesh* Mesh = MeshReference.LoadSynchronous();
+        if (!IsValid(Mesh)) return Fail(FString::Printf(TEXT("Cannot load %s"), *MeshReference.ToString()));
+        const FReferenceSkeleton& FollowerBones = Mesh->GetRefSkeleton();
+        for (int32 BoneIndex = 0; BoneIndex < FollowerBones.GetRawBoneNum(); ++BoneIndex)
+        {
+            const FName BoneName = FollowerBones.GetBoneName(BoneIndex);
+            if (LeaderBones.FindBoneIndex(BoneName) == INDEX_NONE) return Fail(FString::Printf(TEXT("%s requires missing leader bone %s"), *Mesh->GetName(), *BoneName.ToString()));
+        }
+        LoadedMeshes.Add(Mesh);
+    }
+    if (LoadedMeshes.IsEmpty()) return Fail(TEXT("Appearance has no visible body or clothing meshes"));
+
+    RemoveModularMeshes();
+    PoseLeader = Leader;
+    if (!bLeaderVisibilitySaved)
+    {
+        bLeaderWasVisible = Leader->IsVisible();
+        LeaderPreviousTickOption = static_cast<uint8>(Leader->VisibilityBasedAnimTickOption);
+        bLeaderVisibilitySaved = true;
+    }
+    for (USkeletalMesh* Mesh : LoadedMeshes)
+    {
+        USkeletalMeshComponent* Follower = NewObject<USkeletalMeshComponent>(Owner, NAME_None, RF_Transient);
+        Owner->AddInstanceComponent(Follower);
+        ModularMeshes.Add(Follower);
+        Follower->SetupAttachment(Leader);
+        Follower->SetRelativeTransform(FTransform::Identity);
+        Follower->SetSkeletalMeshAsset(Mesh);
+        Follower->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Follower->SetGenerateOverlapEvents(false);
+        Follower->SetCanEverAffectNavigation(false);
+        Follower->SetSimulatePhysics(false);
+        Follower->SetLeaderPoseComponent(Leader, true, false);
+        Follower->RegisterComponent();
+    }
+
+    // Keep the original animation and ragdoll leader evaluating even while its surface is hidden.
+    // 원본 표면을 숨겨도 애니메이션과 래그돌을 담당하는 리더는 계속 계산합니다.
+    Leader->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+    Leader->SetVisibility(false, false);
+    return true;
 }
 
 void UCharacterAppearanceComponent::ApplyHiddenMeshBones()
 {
     AActor* Owner = GetOwner();
     if (IsTemplate() || !IsValid(Owner) || Owner->IsTemplate() || HiddenMeshBones.IsEmpty()) return;
-    USkeletalMeshComponent* Mesh = Owner->FindComponentByClass<USkeletalMeshComponent>();
+    USkeletalMeshComponent* Mesh = FindPoseLeader();
     if (!IsValid(Mesh) || Mesh->IsTemplate() || !IsValid(Mesh->GetSkeletalMeshAsset())) return;
     for (FName BoneName : HiddenMeshBones)
     {

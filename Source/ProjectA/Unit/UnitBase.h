@@ -15,6 +15,7 @@ class USkillDefinitionDataAsset;
 class AUnitBase;
 class UAnimInstance;
 class UAnimMontage;
+class UCharacterAppearanceComponent;
 
 // Team affiliation used by combat units.
 // 전투 유닛의 소속 팀을 나타냅니다.
@@ -64,6 +65,11 @@ public:
     // Construction and base interface
     // 생성과 기본 인터페이스 처리입니다.
     AUnitBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+
+    // Cosmetic selection follows the unit without changing its attributes or death physics.
+    // 능력치나 사망 물리를 변경하지 않고 유닛에 외형 선택을 적용합니다.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UnitBase|Appearance")
+    TObjectPtr<UCharacterAppearanceComponent> CharacterAppearance;
 
     // Returns the ability system component for GAS integration.
     // GAS 연동에 사용할 어빌리티 시스템 컴포넌트를 반환합니다.

@@ -111,6 +111,7 @@ def configure_unit(blueprint, mesh, animation, skills, overrides, weapon):
 
 
 def configure():
+    require(not ASSETS.does_asset_exist(ROOT + "/ROG_Modular_Armor/DA_MannyAppearance"), "The common appearance catalogue is active; use ConfigureRogAppearance.py instead of rebuilding the historical GKnight setup")
     REPORT["folder_moves"] = migrate_legacy_assets()
     old_path = SKILLS + "/DA_SweepingStrike"
     new_path = SKILLS + "/BPDA_SweepingStrike"
@@ -254,6 +255,10 @@ def verify():
     require(list(HELPER.get_montage_animations(montage)) == [load(mirrored_path(source, SWORD_SUFFIX)) for source in [SWORD_SOURCE, SWORD_RECOVERY_SOURCE]], "Warrior sword montage is not the Kwang attack and recovery")
     require(HELPER.validate_sword_montage(montage, load(mirrored_path(SWORD_SOURCE, SWORD_SUFFIX)), load(mirrored_path(SWORD_RECOVERY_SOURCE, SWORD_SUFFIX)), SWORD_RECOVERY_START_SECONDS), "Saved warrior Kwang segment timing or blending mismatch")
     for name, suffix, skills in [("BP_WarriorUnit", "_Warrior", expected), ("BP_EnemyUnit", "_SwordEnemy", [sword]), ("BP_SnapshotOpponent", "_SwordEnemy", [sword])]:
+        if name == "BP_WarriorUnit" and ASSETS.does_asset_exist(ROOT + "/ROG_Modular_Armor/DA_MannyAppearance"):
+            from VerifyRogAppearance import verify as verify_common_appearance
+            verify_common_appearance()
+            continue
         blueprint = load(ROOT + "/Blueprint/Unit/" + name)
         defaults = unreal.get_default_object(blueprint.generated_class())
         mesh_component = defaults.get_editor_property("mesh")

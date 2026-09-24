@@ -135,3 +135,12 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 ```
 
 FBX 재임포트 후에는 첫 명령에 `-WitchRebuildRetargets`를 추가해 정규화와 시퀀스 재작성을 수행한다. 두 명령은 에셋 작성·정적 포즈 검사만 수행하며 에디터 창·PIE·게임·자동화 테스트를 실행하지 않는다. 별도 재로드는 직업 매핑·본 배율·몽타주·물리 연결·검 표본·스태프 부착을 확인한다. [실제 화면·사망 확인](../../../Docs/TODO.md#2-29-마녀와-assassin-외형)은 사용자가 수행한다.
+
+16. `ConfigureRogAppearance.py`: 전사를 공통 Manny 설정으로 연결하고 `/Game/User_JeHoon/ROG_Modular_Armor/DA_MannyAppearance`에 8부위·103개 외형 항목을 작성한다. ROG 원본 데이터 테이블의 메시·6개 신체 파츠를 직접 참조하며 다른 뼈대의 망토 4개를 제외한다. 원본 에셋 복제·추가 리타깃 없이 전투/프리뷰 Blueprint·직업/Snapshot 카탈로그만 갱신한다. 기존 Skeleton_Guard Snapshot 클래스는 호환 맵에 보존한다. 의상 선택 UI는 native C++로 기존 WBP에 확장한다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureRogAppearance.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/VerifyRogAppearance.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+```
+
+재로드 검사는 기본·개별·전체 부위 선택과 잘못된 ID/중복 거부, 원본 참조·본 자세·공통 애니메이션·검 표본·물리 연결을 확인한다. 결과는 `Saved/Automation/RogAppearanceConfigure.json`, `RogAppearanceReload.json`에 저장한다. 화면/플레이 실행은 하지 않으며 [사용자 확인](../../../Docs/TODO.md#2-30-rog-의상-커스터마이징)을 따른다. 이 카탈로그가 존재하면 과거 `ConfigureWarriorContent.py`의 GKnight 재작성은 차단하고 `-WarriorVerifyOnly`는 현재 전사 검사와 기존 적/이전 참조 검사를 함께 수행한다.

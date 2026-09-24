@@ -234,6 +234,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
             return false;
         }
         Slots.Add(Member.SlotIndex);
+        if (!Member.bCreated && !Member.Appearance.ItemIds.IsEmpty()) return false;
         if ((!Member.bCreated || !Member.bHasSkillLoadout) && (Member.Gold != 0 || !Member.Skills.IsEmpty())) return false;
         if (Member.bCreated)
         {
@@ -249,6 +250,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
                 OutError = FText::Format(NSLOCTEXT("RunCheckpoint", "SavedProfessionUnsupported", "저장된 직업 '{0}'을 현재 직업 설정으로 불러올 수 없습니다. 저장 원본을 유지합니다. {1}"), FText::FromName(Member.ClassId), ProfessionError);
                 return false;
             }
+            if (!Catalog->ValidateMemberAppearance(Member, OutError)) return false;
             TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
             FText SkillsError;
             if (!Catalog->ResolveMemberSkills(Member, Skills, SkillsError))
@@ -627,6 +629,11 @@ URunSaveGame* URunStateSubsystem::CreateInitialSaveData(const TArray<FRunPartyMe
     Save->Party.Sort([](const FRunPartyMember& Left, const FRunPartyMember& Right) { return Left.SlotIndex < Right.SlotIndex; });
     for (FRunPartyMember& Member : Save->Party)
     {
+        if (!Member.bCreated && !Member.Appearance.ItemIds.IsEmpty())
+        {
+            OutError = NSLOCTEXT("RunCheckpoint", "EmptySlotAppearance", "빈 캐릭터 슬롯에 의상을 저장할 수 없습니다.");
+            return nullptr;
+        }
         Member.CurrentHP = -1.0f;
         Member.Gold = 0;
         Member.bHasSkillLoadout = Member.bCreated;
@@ -635,6 +642,7 @@ URunSaveGame* URunStateSubsystem::CreateInitialSaveData(const TArray<FRunPartyMe
         {
             const UPartyDefinitionDataAsset* Catalog = PartyDefinition ? PartyDefinition.Get() : GetDefault<UPartyDefinitionDataAsset>();
             TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
+            if (!Catalog->ValidateMemberAppearance(Member, OutError)) return nullptr;
             if (!Catalog->ResolveStartingSkills(Member.ClassId, Skills, OutError)) return nullptr;
             for (USkillDefinitionDataAsset* Skill : Skills) Member.Skills.Add(FSoftObjectPath(Skill));
             const bool bSinglePlayer = Identity.Origin == ERunIdentityOrigin::LocalDevelopment && Identity.OriginalParticipants.Num() == 1;

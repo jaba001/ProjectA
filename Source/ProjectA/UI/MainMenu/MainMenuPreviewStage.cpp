@@ -2,7 +2,10 @@
 
 #include "Camera/CameraComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
+#include "Unit/CharacterAppearanceComponent.h"
 
 AMainMenuPreviewStage::AMainMenuPreviewStage()
 {
@@ -72,6 +75,7 @@ void AMainMenuPreviewStage::SetPreviewActorForSlot(int32 SlotIndex, FName ClassI
 
     PreviewActor->AttachToComponent(SlotAnchor, FAttachmentTransformRules::KeepWorldTransform);
     SpawnedPreviewActors[SlotIndex] = PreviewActor;
+    RefreshPreviewFocus();
     UE_LOG(LogTemp, Log, TEXT("[MainMenuPreviewStage] Preview actor updated. SlotIndex: %d, ClassId: %s"), SlotIndex, *ClassId.ToString());
 }
 
@@ -92,10 +96,90 @@ void AMainMenuPreviewStage::ClearPreviewActorForSlot(int32 SlotIndex)
 
 void AMainMenuPreviewStage::ClearAllPreviewActors()
 {
+    ClearPreviewFocus();
     for (int32 Index = 0; Index < SpawnedPreviewActors.Num(); ++Index)
     {
         ClearPreviewActorForSlot(Index);
     }
+}
+
+bool AMainMenuPreviewStage::SetPreviewAppearance(int32 SlotIndex, UCharacterAppearanceCatalog* Catalog, const FCharacterAppearanceSelection& Selection)
+{
+    AActor* PreviewActor = GetPreviewActorForSlot(SlotIndex);
+    if (!PreviewActor) return false;
+    UCharacterAppearanceComponent* Appearance = PreviewActor->FindComponentByClass<UCharacterAppearanceComponent>();
+    if (!Appearance && Catalog)
+    {
+        Appearance = NewObject<UCharacterAppearanceComponent>(PreviewActor);
+        PreviewActor->AddInstanceComponent(Appearance);
+        Appearance->RegisterComponent();
+    }
+    return Appearance ? Appearance->SetAppearance(Catalog, Selection) : !Catalog && Selection.ItemIds.IsEmpty();
+}
+
+void AMainMenuPreviewStage::SetFocusedPreviewSlot(int32 SlotIndex)
+{
+    if (!GetPreviewActorForSlot(SlotIndex)) return;
+    if (FocusedSlot == INDEX_NONE)
+    {
+        UnfocusedCameraTransform = PreviewCamera->GetComponentTransform();
+        UnfocusedFieldOfView = PreviewCamera->FieldOfView;
+    }
+    FocusedSlot = SlotIndex;
+    FocusedYawOffset = 0.0f;
+    RefreshPreviewFocus();
+}
+
+void AMainMenuPreviewStage::RefreshPreviewFocus()
+{
+    AActor* FocusedActor = GetPreviewActorForSlot(FocusedSlot);
+    if (!FocusedActor) return;
+    for (int32 Index = 0; Index < SpawnedPreviewActors.Num(); ++Index)
+    {
+        if (AActor* Actor = GetPreviewActorForSlot(Index)) Actor->SetActorHiddenInGame(Index != FocusedSlot);
+    }
+    USceneComponent* Anchor = GetSlotAnchor(FocusedSlot);
+    FocusedActor->SetActorRotation(Anchor->GetComponentRotation() + FRotator(0.0f, FocusedYawOffset, 0.0f));
+    const USkeletalMeshComponent* Mesh = FocusedActor->FindComponentByClass<USkeletalMeshComponent>();
+    const FVector Center = Mesh ? Mesh->Bounds.Origin : FocusedActor->GetActorLocation() + FVector(0.0f, 0.0f, 90.0f);
+    const float HalfHeight = Mesh ? FMath::Max(90.0f, Mesh->Bounds.BoxExtent.Z) : 100.0f;
+    int32 Width = 1920;
+    int32 Height = 1080;
+    if (APlayerController* Controller = GetWorld()->GetFirstPlayerController()) Controller->GetViewportSize(Width, Height);
+    const float Aspect = Height > 0 && Width > 0 ? static_cast<float>(Width) / Height : 16.0f / 9.0f;
+    const FRotator Rotation(0.0f, UnfocusedCameraTransform.Rotator().Yaw, 0.0f);
+    const FVector Forward = Rotation.Vector();
+    const FVector Right = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y);
+    const float HorizontalTangent = FMath::Tan(FMath::DegreesToRadians(22.5f));
+    const float Distance = HalfHeight * 1.35f * Aspect / HorizontalTangent;
+    // Leave the right side of the view available for the clothing panel.
+    // 화면 오른쪽은 의상 편집 패널을 위해 비워 둡니다.
+    PreviewCamera->SetWorldLocationAndRotation(Center - Forward * Distance + Right * Distance * HorizontalTangent * 0.38f, Rotation);
+    PreviewCamera->SetFieldOfView(45.0f);
+}
+
+void AMainMenuPreviewStage::RotateFocusedPreview(float DeltaYaw)
+{
+    if (FocusedSlot == INDEX_NONE) return;
+    FocusedYawOffset = FRotator::NormalizeAxis(FocusedYawOffset + DeltaYaw);
+    RefreshPreviewFocus();
+}
+
+void AMainMenuPreviewStage::ClearPreviewFocus()
+{
+    if (FocusedSlot == INDEX_NONE) return;
+    for (int32 Index = 0; Index < SpawnedPreviewActors.Num(); ++Index)
+    {
+        if (AActor* Actor = GetPreviewActorForSlot(Index))
+        {
+            Actor->SetActorHiddenInGame(false);
+            Actor->SetActorRotation(GetSlotAnchor(Index)->GetComponentRotation());
+        }
+    }
+    PreviewCamera->SetWorldTransform(UnfocusedCameraTransform);
+    PreviewCamera->SetFieldOfView(UnfocusedFieldOfView);
+    FocusedSlot = INDEX_NONE;
+    FocusedYawOffset = 0.0f;
 }
 
 AActor* AMainMenuPreviewStage::GetPreviewActorForSlot(int32 SlotIndex) const

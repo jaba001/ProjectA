@@ -2,10 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Unit/CharacterAppearanceTypes.h"
 #include "MainMenuPreviewStage.generated.h"
 
 class UCameraComponent;
 class USceneComponent;
+class UCharacterAppearanceCatalog;
 
 // World-space preview stage that owns the main menu camera and four character preview slots.
 // 메인메뉴 카메라와 네 개의 캐릭터 프리뷰 슬롯을 소유하는 월드 공간 프리뷰 스테이지입니다.
@@ -32,6 +34,11 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "MainMenu|Preview")
     AActor* GetPreviewActorForSlot(int32 SlotIndex) const;
+
+    bool SetPreviewAppearance(int32 SlotIndex, UCharacterAppearanceCatalog* Catalog, const FCharacterAppearanceSelection& Selection);
+    void SetFocusedPreviewSlot(int32 SlotIndex);
+    void RotateFocusedPreview(float DeltaYaw);
+    void ClearPreviewFocus();
 
 protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -66,6 +73,12 @@ protected:
 
 private:
     USceneComponent* GetSlotAnchor(int32 SlotIndex) const;
+    void RefreshPreviewFocus();
+
+    int32 FocusedSlot = INDEX_NONE;
+    FTransform UnfocusedCameraTransform;
+    float UnfocusedFieldOfView = 90.0f;
+    float FocusedYawOffset = 0.0f;
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<AActor>> SpawnedPreviewActors;

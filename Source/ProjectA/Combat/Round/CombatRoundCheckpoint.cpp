@@ -10,6 +10,7 @@
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Unit/PlayerUnit.h"
+#include "Unit/CharacterAppearanceComponent.h"
 
 bool ACombatRoundCoordinator::CapturePlanningCheckpoint(FCombatCheckpointData& OutCheckpoint, FText& OutError) const
 {
@@ -47,6 +48,7 @@ bool ACombatRoundCoordinator::CapturePlanningCheckpoint(FCombatCheckpointData& O
         Saved.Team = Unit->GetTeam();
         Saved.UnitClass = FSoftObjectPath(Unit->GetClass());
         Saved.CharacterName = Unit->RuntimeCharacterName;
+        if (Unit->CharacterAppearance) Saved.Appearance = Unit->CharacterAppearance->Selection;
         Saved.bDead = !Unit->IsUnitAlive();
         Saved.HP = Saved.bDead ? 0.0f : Attributes->GetHP();
         Saved.MaxHP = Attributes->GetMaxHP();
@@ -120,6 +122,7 @@ bool ACombatRoundCoordinator::RestorePlanningCheckpoint(const FCombatCheckpointD
         const FCombatCheckpointRoundPlan* Plan = Checkpoint.RoundPlans.FindByPredicate([&Saved](const FCombatCheckpointRoundPlan& Candidate) { return Candidate.UnitId == Saved.RoundUnitId; });
         if (!IsValid(Unit) || !Unit->GetAttributeSet() || !Plan || FSoftObjectPath(Unit->GetClass()) != Saved.UnitClass || Unit->GetTeam() != Saved.Team || Unit->IsUnitAlive() == Saved.bDead || !FMath::IsNearlyEqual(Unit->GetAttributeSet()->GetHP(), Saved.HP) || Unit->GetCurrentActionPoint() != Saved.AP || Unit->GetCurrentSubActionPoint() != Saved.SubAP) return false;
         if (Saved.Team == ETeam::Player && (Authority->GetPartySlot(Unit) != Saved.PartySlot || Authority->GetCharacterId(Unit) != Saved.CharacterId || Authority->GetOwnerAccountId(Unit) != Saved.OwnerAccountId)) return false;
+        if (!Unit->CharacterAppearance || !FCharacterAppearanceSelection::StaticStruct()->CompareScriptStruct(&Unit->CharacterAppearance->Selection, &Saved.Appearance, 0)) return false;
         if (Saved.bHasTile && (Unit->GetCurrentTile() != Arena->Grid->GetTileAtCoord(Saved.GridCoord) || !Unit->GetCurrentTile() || Unit->GetCurrentTile()->GetOccupyingUnit() != Unit)) return false;
         if (!Saved.bHasTile && Unit->GetCurrentTile()) return false;
         Entry.UnitId = Saved.RoundUnitId;

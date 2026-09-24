@@ -159,12 +159,13 @@ namespace
 
 bool UWarriorAssetLibrary::ValidateCharacterPhysics(USkeletalMesh* Mesh)
 {
-    if (!IsValid(Mesh) || !IsValid(Mesh->GetPhysicsAsset())) return false;
+    if (!IsValid(Mesh) || !IsValid(Mesh->GetPhysicsAsset())) return Fail(TEXT("Character mesh or physics asset is missing / 캐릭터 메시 또는 물리 에셋이 없습니다"));
     const UPhysicsAsset* Physics = Mesh->GetPhysicsAsset();
     TSet<FName> Bones;
     for (const USkeletalBodySetup* Body : Physics->SkeletalBodySetups)
     {
-        if (!IsValid(Body) || Bones.Contains(Body->BoneName) || Mesh->GetRefSkeleton().FindBoneIndex(Body->BoneName) == INDEX_NONE || Body->AggGeom.GetElementCount() == 0) return false;
+        if (!IsValid(Body)) return Fail(TEXT("Physics body is missing / 물리 바디가 없습니다"));
+        if (Bones.Contains(Body->BoneName) || Mesh->GetRefSkeleton().FindBoneIndex(Body->BoneName) == INDEX_NONE || Body->AggGeom.GetElementCount() == 0) return Fail(*FString::Printf(TEXT("Invalid physics body / 유효하지 않은 물리 바디: %s bone=%s shapes=%d"), *Mesh->GetName(), *Body->BoneName.ToString(), Body->AggGeom.GetElementCount()));
         Bones.Add(Body->BoneName);
     }
     if (Bones.Num() < 6) return false;
@@ -175,7 +176,10 @@ bool UWarriorAssetLibrary::ValidateCharacterPhysics(USkeletalMesh* Mesh)
         {
             if (!IsValid(Constraint)) return false;
             const FConstraintInstance& Instance = Constraint->DefaultInstance;
-            if (!Bones.Contains(Instance.ConstraintBone1) || !Bones.Contains(Instance.ConstraintBone2) || Instance.GetLinearXMotion() != LCM_Locked || Instance.GetLinearYMotion() != LCM_Locked || Instance.GetLinearZMotion() != LCM_Locked) return false;
+            if (!Bones.Contains(Instance.ConstraintBone1) || !Bones.Contains(Instance.ConstraintBone2)) return Fail(*FString::Printf(TEXT("Missing constrained body / 제약의 물리 바디 누락: %s %s -> %s"), *Mesh->GetName(), *Instance.ConstraintBone1.ToString(), *Instance.ConstraintBone2.ToString()));
+            // Auxiliary angular constraints may translate freely; only locked links prove body connectivity.
+            // 보조 각도 제약은 이동이 자유로울 수 있으며 잠긴 연결만 바디 연결성의 근거로 사용합니다.
+            if (Instance.GetLinearXMotion() != LCM_Locked || Instance.GetLinearYMotion() != LCM_Locked || Instance.GetLinearZMotion() != LCM_Locked) continue;
             if (Connected.Contains(Instance.ConstraintBone1) || Connected.Contains(Instance.ConstraintBone2))
             {
                 Connected.Add(Instance.ConstraintBone1);

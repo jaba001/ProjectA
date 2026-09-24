@@ -43,6 +43,9 @@ struct PROJECTA_API FCombatCheckpointUnit
     FText CharacterName;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    FCharacterAppearanceSelection Appearance;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     float HP = 100.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")

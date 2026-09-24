@@ -1,11 +1,12 @@
 # ProjectA 완료 작업과 검증 기록
 
-갱신일: 2026-09-23. 완료 범위·기준 커밋·실행 근거를 기록한다. 현재 상태와 간단 확인은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
+갱신일: 2026-09-24. 완료 범위·기준 커밋·실행 근거를 기록한다. 현재 상태와 간단 확인은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
 
 ## 최근 변경
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-09-24 전사 공통 외형과 ROG 의상 UI | 전사를 Manny 공통 몸체·애니메이션으로 전환하고 원본 ROG 기반 8부위·103개 의상 선택·회전 프리뷰·저장/취소 UI 연결. Run·Snapshot·체크포인트·복제에 외형 ID를 전달하며 이전 빈 선택과 Snapshot 클래스 호환 보존. 원본 복제·추가 리타깃 없음, 기존 래그돌 실행 유지. Development Editor / Win64 빌드·독립 재로드의 메시 120개·본 161개·검 표본 82개·물리 연결 22개 검사 통과. UI·게임·자동화 실행 없음. 근거: `Saved/Automation/RogAppearanceBuild.txt`, `RogAppearanceReload.json`; [사용자 확인](TODO.md#2-30-rog-의상-커스터마이징) |
 | 2026-09-23 마녀·Assassin 외형과 배율 정리 | 마법사 Stylized Dark Witch·도적 Assassin Skin1의 원본 경로를 메뉴·전투·Snapshot에 연결하고 기존 스태프 한 개를 왼손에 부착. 마녀 루트 배율 100을 제거하고 형상·바인드 자세·변형 본 계층·물리를 같은 임포트 경로에서 정리해 높이 187.12cm·본 배율 1·연결된 물리 바디 48개로 저장. 편의 복제 없이 리타깃만 생성, 전사·궁수·래그돌 실행 유지. Development Editor / Win64 컴파일·별도 재로드·시퀀스 48개 포즈/배율·검 표본 164개·물리 연결 검사 통과. 기존 MainMenu 변경 포함, 게임/PIE/자동화 테스트 미실행. 근거: `Saved/Automation/WitchAssassinBuild.txt`, `WitchAssassinReload.json`; [사용자 확인](TODO.md#2-29-마녀와-assassin-외형) |
 | 2026-09-23 선택 화면 전사 외형 보완 | MainMenu의 Warrior만 `BP_WarriorMenuPreview`로 연결하고 GKnight 원본 메시·기존 `MM_Idle_Warrior` 반복 재생 적용. 전투·다른 직업 프리뷰 불변 해시, Blueprint 컴파일·별도 재로드 통과. 작업 중 별도로 삭제된 지팡이 임포트 에셋 5개를 보존하여 함께 반영하며 외부 참조 없음 확인. 에셋 복제·C++ 변경·게임 실행 없음. 근거: `Saved/Automation/WarriorMenuReload.json`, `RemovedStaffReferences.json`; [화면 확인](TODO.md#2-25-파라곤-적용-롤백) |
 | 2026-09-23 파라곤 외형 롤백·전체 래그돌 복구 | 전사 GKnight·나머지 Manny·적/Snapshot Skeleton_Guard·공통 메뉴 프리뷰 복원. 기존 저장의 직업별 Blueprint 경로는 이전 모델로 연결하고 스킬·후속 기능·원본 참조 통합을 유지했다. 전 진영에 기존 래그돌·복제 충격량 복구, 사망 애니메이션 분기·작성 도구 제거. 에셋 일괄 삭제는 자동 승인 검토에서 범위 불명확으로 거절되어 미사용 생성 결과·팩·사용자 수정 에셋을 보존했다. Development Editor / Win64 빌드 22.48초·11개 전투/4개 프리뷰 별도 재로드·검 궤적/기존 리타깃·저장 파일 26개 불변 검사 통과. 복구 저장본 재로드 오류/경고 0, 별도 구경로 호환 검사는 해석 성공 전의 기존 경고 6개·오류 0. 게임·PIE 미실행. 근거: `Saved/Automation/PreParagonRollbackBuild.txt`, `PreParagonRollbackReload.json`, `WarriorContentReload.json`; [외형 확인](TODO.md#2-25-파라곤-적용-롤백)·[래그돌 확인](TODO.md#2-28-전체-래그돌-복구) |

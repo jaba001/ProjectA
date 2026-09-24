@@ -24,6 +24,7 @@
 #include "TimerManager.h"
 #include "Unit/EnemyUnit.h"
 #include "Unit/PlayerUnit.h"
+#include "Unit/CharacterAppearanceComponent.h"
 
 AEncounterManager::AEncounterManager()
 {
@@ -285,6 +286,7 @@ bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FTe
         if (!Unit->ConfigureProfession(Saved.MaxHP, Saved.MaxAP, Saved.MaxSubAP, Skills, Saved.Strength, Saved.Dexterity, Saved.Intelligence) || !Unit->ConfigureMoveRange(Saved.MoveRange)) return FailRestore();
         Unit->UnitIndex = Saved.RoundUnitId;
         Unit->RuntimeCharacterName = Saved.CharacterName;
+        if (!Unit->CharacterAppearance || !Unit->CharacterAppearance->SetAppearance(Unit->CharacterAppearance->AppearanceCatalog, Saved.Appearance)) return FailRestore();
         Unit->SetTeam(Saved.Team);
         Unit->HealingItemCount = Saved.HealingItemCount;
         Unit->HealingItemAmount = Saved.HealingItemAmount;
@@ -441,7 +443,7 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Arena->PlayerCoords[Member.SlotIndex]);
         FProfessionDefinition Profession;
         TArray<TObjectPtr<USkillDefinitionDataAsset>> MemberSkills;
-        if (!PartyDefinition->ResolveProfession(Member.ClassId, Profession, FlowMessage) || !PartyDefinition->ResolveMemberSkills(Member, MemberSkills, FlowMessage))
+        if (!PartyDefinition->ResolveProfession(Member.ClassId, Profession, FlowMessage) || !PartyDefinition->ResolveMemberSkills(Member, MemberSkills, FlowMessage) || !PartyDefinition->ValidateMemberAppearance(Member, FlowMessage))
         {
             return false;
         }
@@ -457,6 +459,11 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         }
         SpawnedUnits.Add(Unit);
         PartyActors.Add(Member.SlotIndex, Unit);
+        if (!Unit->CharacterAppearance || !Unit->CharacterAppearance->SetAppearance(Profession.AppearanceCatalog, Member.Appearance))
+        {
+            FlowMessage = NSLOCTEXT("Encounter", "PartyAppearance", "캐릭터의 선택한 의상을 적용하지 못했습니다.");
+            return false;
+        }
         // Preserve the Run's purchased loadout while applying the profession's combat attributes.
         // 직업 전투 능력치를 적용하면서 Run에서 구매한 장착 스킬을 유지합니다.
         if (!Unit->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, MemberSkills, Profession.Strength, Profession.Dexterity, Profession.Intelligence))
@@ -494,6 +501,11 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         SpawnedUnits.Add(Unit);
         if (Member)
         {
+            if (!Unit->CharacterAppearance || !Unit->CharacterAppearance->SetAppearance(Unit->CharacterAppearance->AppearanceCatalog, Member->Appearance))
+            {
+                FlowMessage = NSLOCTEXT("Encounter", "OpponentAppearance", "상대 캐릭터의 선택한 의상을 적용하지 못했습니다.");
+                return false;
+            }
             if (!Unit->ConfigureProfession(Member->Stats.MaxHP, Member->Stats.MaxActionPoints, Member->Stats.MaxSubActionPoints, SnapshotSkills[Index], Member->Stats.Strength, Member->Stats.Dexterity, Member->Stats.Intelligence))
             {
                 FlowMessage = FText::FromString(TEXT("Opponent Snapshot unit configuration failed. / 상대 스냅샷 유닛 설정에 실패했습니다."));

@@ -1,6 +1,7 @@
 #include "UnitBase.h"
 #include "Unit/UnitCharacterMovementComponent.h"
 #include "Unit/UnitDataRules.h"
+#include "Unit/CharacterAppearanceComponent.h"
 
 #include "Kismet/GameplayStatics.h"
 #include "Components/CapsuleComponent.h"
@@ -37,6 +38,7 @@ AUnitBase::AUnitBase(const FObjectInitializer& ObjectInitializer)
 
     AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystem"));
     AttributeSet = CreateDefaultSubobject<UAS_Unit>(TEXT("AttributeSet"));
+    CharacterAppearance = CreateDefaultSubobject<UCharacterAppearanceComponent>(TEXT("CharacterAppearance"));
 
     AbilitySystem->SetIsReplicated(true);
     // AI-controlled units expose attributes and cues without a player-owned ASC.

@@ -120,6 +120,11 @@ bool UPartySnapshotLibrary::ValidateSnapshot(const FPartySnapshot& Snapshot, FTe
             OutError = NSLOCTEXT("PartySnapshot", "EquipmentTactics", "파티원의 장비 또는 전술 식별자가 올바르지 않습니다.");
             return false;
         }
+        if (Member.Appearance.ItemIds.Num() > 16 || !HasUniqueIdentifiers(Member.Appearance.ItemIds))
+        {
+            OutError = NSLOCTEXT("PartySnapshot", "Appearance", "파티원의 의상 식별자가 올바르지 않거나 중복됩니다.");
+            return false;
+        }
 
         MemberIds.Add(Member.MemberId);
         FormationSlots.Add(Member.FormationSlot);

@@ -14,6 +14,7 @@ public:
     void Reset(const TArray<FName>& AvailableClasses, bool bInitiallyCreated);
     bool SetClass(int32 SlotIndex, FName ClassId);
     bool SetName(int32 SlotIndex, const FText& Name);
+    bool SetAppearance(int32 SlotIndex, const FCharacterAppearanceSelection& Appearance);
     bool Create(int32 SlotIndex);
     bool Clear(int32 SlotIndex);
     bool SelectControlled(int32 SlotIndex);

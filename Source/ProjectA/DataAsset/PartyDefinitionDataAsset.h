@@ -9,6 +9,7 @@ class UTexture2D;
 class USkillDefinitionDataAsset;
 class URunEncounterPoolDataAsset;
 class UProfessionBase;
+class UCharacterAppearanceCatalog;
 struct FRunPartyMember;
 
 USTRUCT(BlueprintType)
@@ -27,6 +28,9 @@ struct PROJECTA_API FProfessionDefinition
     TObjectPtr<UTexture2D> Icon;
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TSubclassOf<APlayerUnit> CombatClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TObjectPtr<UCharacterAppearanceCatalog> AppearanceCatalog;
     // Reuse the unit's AP and starting skills with the profession's initial attributes.
     // 직업의 초기 능력치와 유닛의 AP 및 시작 스킬 기본값을 사용합니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -73,6 +77,7 @@ public:
     bool ResolveProfession(FName ClassId, FProfessionDefinition& OutDefinition, FText& OutError) const;
     bool ResolveStartingSkills(FName ClassId, TArray<TObjectPtr<USkillDefinitionDataAsset>>& OutSkills, FText& OutError) const;
     bool ResolveMemberSkills(const FRunPartyMember& Member, TArray<TObjectPtr<USkillDefinitionDataAsset>>& OutSkills, FText& OutError) const;
+    bool ValidateMemberAppearance(const FRunPartyMember& Member, FText& OutError) const;
     FText GetProfessionDetails(FName ClassId) const;
 
 #if WITH_EDITOR

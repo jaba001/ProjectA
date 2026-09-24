@@ -8,6 +8,8 @@
 #include "Game/Run/RunIdentityLibrary.h"
 #include "Unit/EnemyUnit.h"
 #include "Unit/PlayerUnit.h"
+#include "Unit/CharacterAppearanceComponent.h"
+#include "DataAsset/CharacterAppearanceCatalog.h"
 #include "Abilities/GameplayAbility.h"
 #include "GameplayEffect.h"
 
@@ -85,6 +87,18 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
         {
             return false;
         }
+        const AUnitBase* Defaults = UnitClass->GetDefaultObject<AUnitBase>();
+        const UCharacterAppearanceCatalog* AppearanceCatalog = Defaults->CharacterAppearance ? Defaults->CharacterAppearance->AppearanceCatalog.Get() : nullptr;
+        if (AppearanceCatalog)
+        {
+            FText AppearanceError;
+            if (!AppearanceCatalog->ValidateSelection(Unit.Appearance, AppearanceError))
+            {
+                OutError = AppearanceError;
+                return false;
+            }
+        }
+        else if (!Unit.Appearance.ItemIds.IsEmpty()) return false;
         if (!UnitDataRules::IsValidHealth(Unit.MaxHP, Unit.HP) || Unit.bDead != (Unit.HP == 0.0f))
         {
             return false;
@@ -117,6 +131,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
                 return false;
             }
             PartySlots.Add(Unit.PartySlot);
+            if (!FCharacterAppearanceSelection::StaticStruct()->CompareScriptStruct(&Member->Appearance, &Unit.Appearance, 0)) return false;
             LivingPlayers += !Unit.bDead ? 1 : 0;
         }
         else
@@ -204,7 +219,8 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
             // Current HP, AP and formation can change in combat; the original build stays fixed.
             // 현재 HP, AP와 위치는 전투 중 바뀔 수 있지만 원래 빌드는 고정됩니다.
             const FPartySnapshotMember& Member = Checkpoint.OpponentSnapshot.Members[MemberIndex++];
-            if (Unit.UnitClass != FSoftObjectPath(Catalog->EnemyClasses.FindRef(Member.ClassId).Get()) || Unit.MaxHP != Member.Stats.MaxHP || Unit.Strength != Member.Stats.Strength || Unit.Dexterity != Member.Stats.Dexterity || Unit.Intelligence != Member.Stats.Intelligence || Unit.MaxAP != Member.Stats.MaxActionPoints || Unit.MaxSubAP != Member.Stats.MaxSubActionPoints || Unit.MoveRange != Member.Stats.MoveRange || Unit.Skills.Num() != Member.SkillIds.Num())
+            if (!FCharacterAppearanceSelection::StaticStruct()->CompareScriptStruct(&Member.Appearance, &Unit.Appearance, 0)) return false;
+            if (!Catalog->MatchesSavedUnitClass(Member, Unit.UnitClass) || Unit.MaxHP != Member.Stats.MaxHP || Unit.Strength != Member.Stats.Strength || Unit.Dexterity != Member.Stats.Dexterity || Unit.Intelligence != Member.Stats.Intelligence || Unit.MaxAP != Member.Stats.MaxActionPoints || Unit.MaxSubAP != Member.Stats.MaxSubActionPoints || Unit.MoveRange != Member.Stats.MoveRange || Unit.Skills.Num() != Member.SkillIds.Num())
             {
                 return false;
             }

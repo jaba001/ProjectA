@@ -22,9 +22,15 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snapshot")
     TMap<FName, TSubclassOf<AEnemyUnit>> EnemyClasses;
 
+    // Preserve declared older checkpoint actors only when no cosmetic selection was saved; new encounters use EnemyClasses.
+    // 저장한 의상 선택이 없을 때만 명시한 이전 체크포인트 액터를 허용하며 새 전투는 EnemyClasses를 사용합니다.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snapshot")
+    TMap<FName, TSubclassOf<AEnemyUnit>> LegacyEnemyClasses;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Snapshot")
     TMap<FName, TObjectPtr<USkillDefinitionDataAsset>> Skills;
 
     bool ValidateForEncounter(const FPartySnapshot& Snapshot, int32 FormationSlotCount, FText& OutError) const;
     bool ResolveSkills(const FPartySnapshotMember& Member, TArray<TObjectPtr<USkillDefinitionDataAsset>>& OutSkills, FText& OutError) const;
+    bool MatchesSavedUnitClass(const FPartySnapshotMember& Member, const FSoftObjectPath& SavedClass) const;
 };

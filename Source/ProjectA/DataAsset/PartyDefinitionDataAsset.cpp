@@ -4,6 +4,8 @@
 #include "Game/Run/RunTypes.h"
 #include "Profession/ProfessionBase.h"
 #include "Unit/UnitDataRules.h"
+#include "Unit/CharacterAppearanceComponent.h"
+#include "DataAsset/CharacterAppearanceCatalog.h"
 
 TSubclassOf<APlayerUnit> UPartyDefinitionDataAsset::ResolvePlayerClass(FName ClassId) const
 {
@@ -82,9 +84,15 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
     {
         return Fail(FText::Format(NSLOCTEXT("PartyDefinition", "UnspawnableClass", "Resolved CombatClass cannot be abstract or deprecated: {0}. / 실제 CombatClass는 추상 또는 사용 중단 클래스일 수 없습니다: {0}."), FText::FromString(OutDefinition.CombatClass->GetPathName())));
     }
+    const APlayerUnit* Defaults = OutDefinition.CombatClass->GetDefaultObject<APlayerUnit>();
+    UCharacterAppearanceCatalog* ClassCatalog = Defaults->CharacterAppearance ? Defaults->CharacterAppearance->AppearanceCatalog.Get() : nullptr;
+    if (!OutDefinition.AppearanceCatalog) OutDefinition.AppearanceCatalog = ClassCatalog;
+    if (OutDefinition.AppearanceCatalog != ClassCatalog)
+    {
+        return Fail(NSLOCTEXT("PartyDefinition", "AppearanceCatalogMismatch", "직업과 전투 클래스의 의상 목록이 일치해야 합니다."));
+    }
     if (OutDefinition.bUseUnitClassDefaults)
     {
-        const APlayerUnit* Defaults = OutDefinition.CombatClass->GetDefaultObject<APlayerUnit>();
         OutDefinition.MaxHP = Profession->MaxHP;
         OutDefinition.Strength = Profession->Strength;
         OutDefinition.Dexterity = Profession->Dexterity;
@@ -111,6 +119,17 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
     FText SkillsError;
     if (!UnitDataRules::ValidateSkills(OutDefinition.StartingSkills, true, SkillsError)) return Fail(SkillsError);
     return true;
+}
+
+bool UPartyDefinitionDataAsset::ValidateMemberAppearance(const FRunPartyMember& Member, FText& OutError) const
+{
+    OutError = FText::GetEmpty();
+    if (Member.Appearance.ItemIds.IsEmpty()) return true;
+    FProfessionDefinition Definition;
+    if (!ResolveProfession(Member.ClassId, Definition, OutError)) return false;
+    if (Definition.AppearanceCatalog) return Definition.AppearanceCatalog->ValidateSelection(Member.Appearance, OutError);
+    OutError = NSLOCTEXT("PartyDefinition", "UnsupportedAppearance", "이 직업에서 사용할 수 없는 의상 선택입니다.");
+    return false;
 }
 
 bool UPartyDefinitionDataAsset::ResolveStartingSkills(FName ClassId, TArray<TObjectPtr<USkillDefinitionDataAsset>>& OutSkills, FText& OutError) const

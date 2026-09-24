@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Game/Run/RunIdentityTypes.h"
+#include "Unit/CharacterAppearanceTypes.h"
 #include "RunTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -39,6 +40,11 @@ struct PROJECTA_API FRunPartyMember
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Run")
     FName ClassId;
+
+    // Missing cosmetic fields in older saves retain the class default appearance.
+    // 이전 저장에 외형 필드가 없으면 클래스 기본 외형을 유지합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Run")
+    FCharacterAppearanceSelection Appearance;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Run")
     bool bCreated = false;

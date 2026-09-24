@@ -22,6 +22,7 @@ void FCharacterPartyDraft::Reset(const TArray<FName>& AvailableClasses, bool bIn
 bool FCharacterPartyDraft::SetClass(int32 SlotIndex, FName ClassId)
 {
     if (!Slots.IsValidIndex(SlotIndex) || !Classes.Contains(ClassId)) return false;
+    if (Slots[SlotIndex].ClassId != ClassId) Slots[SlotIndex].Appearance = FCharacterAppearanceSelection();
     Slots[SlotIndex].ClassId = ClassId;
     return true;
 }
@@ -40,11 +41,19 @@ bool FCharacterPartyDraft::Create(int32 SlotIndex)
     return true;
 }
 
+bool FCharacterPartyDraft::SetAppearance(int32 SlotIndex, const FCharacterAppearanceSelection& Appearance)
+{
+    if (!IsCreated(SlotIndex)) return false;
+    Slots[SlotIndex].Appearance = Appearance;
+    return true;
+}
+
 bool FCharacterPartyDraft::Clear(int32 SlotIndex)
 {
     if (!Slots.IsValidIndex(SlotIndex)) return false;
     Slots[SlotIndex].bCreated = false;
     Slots[SlotIndex].CharacterName = FText::GetEmpty();
+    Slots[SlotIndex].Appearance = FCharacterAppearanceSelection();
     if (ControlledSlot == SlotIndex) ControlledSlot = INDEX_NONE;
     return true;
 }
