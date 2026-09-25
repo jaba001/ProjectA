@@ -40,7 +40,7 @@ bool RunProgressRules::ValidateEncounterProgress(const FRunRouteDefinition& Rout
     TSet<FName> Ids;
     for (const FRunEncounterOffer& Offer : Encounter.Offers)
     {
-        if (Offer.EncounterId.IsNone() || Ids.Contains(Offer.EncounterId) || Offer.DisplayName.ToString().TrimStartAndEnd().IsEmpty() || Offer.Type != ERunEncounterType::Shop) return false;
+        if (Offer.EncounterId.IsNone() || Ids.Contains(Offer.EncounterId) || Offer.DisplayName.ToString().TrimStartAndEnd().IsEmpty() || !Offer.IsSupportedShop()) return false;
         Ids.Add(Offer.EncounterId);
     }
     const bool bSelected = !Encounter.SelectedEncounterId.IsNone();

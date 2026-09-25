@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "RunEncounterTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -24,6 +25,16 @@ struct PROJECTA_API FRunEncounterOffer
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter")
     ERunEncounterType Type = ERunEncounterType::Shop;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter", meta = (Categories = "Encounter"))
+    FGameplayTag EncounterTag;
+
+    static FGameplayTag GetSkillShopTag();
+    static FGameplayTag GetItemShopTag();
+    FGameplayTag GetResolvedTag() const;
+    FText GetDisplayName() const;
+    bool IsItemShop() const;
+    bool IsSupportedShop() const;
 };
 
 USTRUCT(BlueprintType)
@@ -44,4 +55,7 @@ struct PROJECTA_API FRunEncounterProgress
 
     UPROPERTY(BlueprintReadOnly, Category = "Encounter")
     bool bCompleted = false;
+
+    const FRunEncounterOffer* FindSelectedOffer() const;
+    bool IsItemShop() const;
 };

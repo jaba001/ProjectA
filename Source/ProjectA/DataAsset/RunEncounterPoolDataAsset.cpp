@@ -32,6 +32,8 @@ URunEncounterPoolDataAsset::URunEncounterPoolDataAsset()
         FRunEncounterOffer& Offer = FixedOffers.AddDefaulted_GetRef();
         Offer.EncounterId = FName(*FString::Printf(TEXT("Shop_%02d"), Index));
         Offer.DisplayName = FText::FromString(FString::Printf(TEXT("상점%d"), Index));
+        Offer.EncounterTag = Index == 2 ? FRunEncounterOffer::GetItemShopTag() : FRunEncounterOffer::GetSkillShopTag();
+        Offer.DisplayName = Offer.GetDisplayName();
     }
     for (const TCHAR* AssetName : {TEXT("BPDA_swoard_attack"), TEXT("BPDA_RangedAttack"), TEXT("BPDA_AreaAttack"), TEXT("BPDA_SweepingStrike")})
     {
@@ -48,10 +50,15 @@ bool URunEncounterPoolDataAsset::BuildFixedOffers(TArray<FRunEncounterOffer>& Ou
     TSet<FName> Ids;
     for (const FRunEncounterOffer& Offer : FixedOffers)
     {
-        if (Offer.EncounterId.IsNone() || Ids.Contains(Offer.EncounterId) || Offer.DisplayName.ToString().TrimStartAndEnd().IsEmpty() || Offer.Type != ERunEncounterType::Shop) return false;
+        if (Offer.EncounterId.IsNone() || Ids.Contains(Offer.EncounterId) || Offer.DisplayName.ToString().TrimStartAndEnd().IsEmpty() || !Offer.IsSupportedShop()) return false;
         Ids.Add(Offer.EncounterId);
     }
     OutOffers = FixedOffers;
+    for (FRunEncounterOffer& Offer : OutOffers)
+    {
+        Offer.EncounterTag = Offer.GetResolvedTag();
+        Offer.DisplayName = Offer.GetDisplayName();
+    }
     OutError = FText::GetEmpty();
     return true;
 }

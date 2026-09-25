@@ -72,7 +72,7 @@ namespace RunEncounterPIE
         if (Phase == ERunPhase::Shop)
         {
             UTextBlock* Title = Cast<UTextBlock>(HostScreen->GetWidgetFromName(TEXT("Text_EncounterTitle")));
-            if (!Test->TestTrue(TEXT("The selected shop title is visible."), Title && Title->GetText().ToString() == TEXT("상점2 · 아이템 상점"))) bFailed = true;
+            if (!Test->TestTrue(TEXT("The selected shop title is visible."), Title && Title->GetText().ToString() == TEXT("아이템상점"))) bFailed = true;
         }
         if (bFailed) return false;
         Button->OnClicked.Broadcast();

@@ -288,7 +288,7 @@ void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName Off
     FText Error = NSLOCTEXT("RunSkillShop", "UnboundBuyer", "현재 연결에 배정된 직접 조작 캐릭터만 구매할 수 있습니다.");
     const AGameplayGameModeBase* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGameplayGameModeBase>() : nullptr;
     const URunStateSubsystem* CurrentRun = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
-    const bool bItemShop = CurrentRun && CurrentRun->GetEncounterProgress().SelectedEncounterId == FRunItemShopState::GetEncounterId();
+    const bool bItemShop = CurrentRun && CurrentRun->GetEncounterProgress().IsItemShop();
     FRunAccountId BuyerAccountId;
     bool bSucceeded = false;
     if (Mode && Mode->ResolveRunParticipant(this, BuyerAccountId))

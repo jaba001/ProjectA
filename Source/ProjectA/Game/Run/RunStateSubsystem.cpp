@@ -183,7 +183,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
         OutError = ShopError;
         return false;
     }
-    const bool bItemShopSelected = Save->EncounterProgress.SelectedEncounterId == FRunItemShopState::GetEncounterId();
+    const bool bItemShopSelected = Save->EncounterProgress.IsItemShop();
     if (Save->ItemShopState.SchemaVersion == 1 && (Save->SkillShopState.SchemaVersion != 1 || Save->EncounterProgress.SchemaVersion != 1 || (Save->ItemShopState.Revision > 0) != bItemShopSelected)) return false;
     TSet<FSoftObjectPath> DisplayedItemAssets;
     for (const FRunItemShopOffer& Offer : Save->ItemShopState.Offers)
@@ -1150,11 +1150,11 @@ bool URunStateSubsystem::SelectRunEncounter(FName EncounterId)
 {
     if (!CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::EncounterChoice || EncounterProgress.bCompleted || !EncounterProgress.SelectedEncounterId.IsNone()) return false;
     const FRunEncounterOffer* Offer = EncounterProgress.Offers.FindByPredicate([EncounterId](const FRunEncounterOffer& Candidate) { return Candidate.EncounterId == EncounterId; });
-    if (!Offer || Offer->Type != ERunEncounterType::Shop) return false;
+    if (!Offer || !Offer->IsSupportedShop()) return false;
     TStrongObjectPtr<URunSaveGame> Save(CreateSaveData());
     Save->EncounterProgress.SelectedEncounterId = EncounterId;
     Save->Phase = ERunPhase::Shop;
-    if (EncounterId == FRunItemShopState::GetEncounterId() && Save->ItemShopState.SchemaVersion == 1 && !RunItemShopCatalog::Roll(Save->ItemShopState, false, FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag()), SaveError)) return false;
+    if (Offer->IsItemShop() && Save->ItemShopState.SchemaVersion == 1 && !RunItemShopCatalog::Roll(Save->ItemShopState, false, FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag()), SaveError)) return false;
     return CommitSaveCandidate(Save.Get(), SaveError);
 }
 
@@ -1162,7 +1162,7 @@ bool URunStateSubsystem::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, 
 {
     OutError = NSLOCTEXT("RunSkillShop", "Unavailable", "현재 상점에서 구매할 수 없습니다.");
     if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::Shop || EncounterProgress.bCompleted || EncounterProgress.SelectedEncounterId.IsNone() || SkillShopState.SchemaVersion != 1) return false;
-    const bool bItemShop = EncounterProgress.SelectedEncounterId == FRunItemShopState::GetEncounterId();
+    const bool bItemShop = EncounterProgress.IsItemShop();
     const bool bReroll = bItemShop && OfferId == FRunItemShopState::GetRerollOfferId();
     const FRunItemShopOffer* ItemOffer = bItemShop ? ItemShopState.Offers.FindByPredicate([OfferId](const FRunItemShopOffer& Candidate) { return Candidate.OfferId == OfferId; }) : nullptr;
     if (bItemShop)

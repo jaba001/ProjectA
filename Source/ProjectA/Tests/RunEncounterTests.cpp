@@ -46,7 +46,8 @@ bool FRunEncounterFlowTest::RunTest(const FString& Parameters)
         if (!TestTrue(TEXT("A fresh Run initializes"), Run->InitializeRun({MakeShopMember()}, Error))) return false;
         TestEqual(TEXT("A fresh Run contains three fixed offers"), Run->GetEncounterProgress().Offers.Num(), 3);
         const FName Choice(*FString::Printf(TEXT("Shop_%02d"), Index));
-        TestEqual(TEXT("The choice has its numbered shop label"), Run->GetEncounterProgress().Offers[Index - 1].DisplayName.ToString(), FString::Printf(TEXT("상점%d"), Index));
+        const FString ExpectedName = Index == 1 ? TEXT("스킬상점") : Index == 2 ? TEXT("아이템상점") : TEXT("상점3");
+        TestEqual(TEXT("The choice has its authored encounter name"), Run->GetEncounterProgress().Offers[Index - 1].DisplayName.ToString(), ExpectedName);
         const FRunIdentityData Identity = Run->GetRunIdentity();
         TestFalse(TEXT("Shops cannot be entered before victory"), Run->SelectRunEncounter(Choice));
         if (!TestTrue(TEXT("Victory reaches the selection screen through Continue"), WinFirstBattle(Run.Get()) && Run->ContinueRun())) return false;

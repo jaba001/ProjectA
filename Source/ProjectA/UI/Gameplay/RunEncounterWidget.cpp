@@ -92,7 +92,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     const FRunPartyMember* Buyer = BuyerCharacterId.IsValid() ? View.PartyMembers.FindByPredicate([this](const FRunPartyMember& Member) { return Member.CharacterId == BuyerCharacterId; }) : nullptr;
     const FRunShopBuyerView* BuyerView = Buyer ? View.ShopBuyerViews.FindByPredicate([this](const FRunShopBuyerView& Entry) { return Entry.CharacterId == BuyerCharacterId; }) : nullptr;
     const bool bInShop = View.Phase == ERunPhase::Shop;
-    const bool bItemShop = bInShop && View.EncounterProgress.SelectedEncounterId == FRunItemShopState::GetEncounterId();
+    const bool bItemShop = bInShop && View.EncounterProgress.IsItemShop();
     ItemShopRevision = bItemShop ? View.ItemShopState.Revision : INDEX_NONE;
     ShopBalance->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     ShopHint->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -174,7 +174,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
         if (bVisible)
         {
             const FRunEncounterOffer& Offer = View.EncounterProgress.Offers[Index];
-            Button->Configure(Offer.EncounterId, Offer.DisplayName);
+            Button->Configure(Offer.EncounterId, Offer.GetDisplayName());
         }
     }
     LeaveButton->SetVisibility(View.Phase == ERunPhase::Shop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -194,8 +194,8 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     }
     else if (View.Phase == ERunPhase::Shop)
     {
-        const FRunEncounterOffer* Selected = View.EncounterProgress.Offers.FindByPredicate([&View](const FRunEncounterOffer& Offer) { return Offer.EncounterId == View.EncounterProgress.SelectedEncounterId; });
-        Title->SetText(bItemShop ? NSLOCTEXT("RunItemShop", "Title", "상점2 · 아이템 상점") : Selected ? Selected->DisplayName : NSLOCTEXT("RunEncounter", "Shop", "상점"));
+        const FRunEncounterOffer* Selected = View.EncounterProgress.FindSelectedOffer();
+        Title->SetText(Selected ? Selected->GetDisplayName() : NSLOCTEXT("RunEncounter", "Shop", "상점"));
     }
 }
 
