@@ -41,6 +41,8 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
         const bool bOrdinarySinglePlayer = !Run->IsManagedRun() && Run->GetRunIdentity().Origin == ERunIdentityOrigin::LocalDevelopment && Run->GetRunIdentity().OriginalParticipants.Num() == 1;
         for (const FRunPartyMember& Member : View.PartyMembers)
         {
+            FText EquipmentError;
+            if (Run->CanChangeEquipment(Member.OwnerAccountId, Member.CharacterId, EquipmentError)) View.EquipmentEditableCharacterIds.Add(Member.CharacterId);
             if (!Member.bCreated || Member.CurrentHP <= 0.f || !Member.CharacterId.IsValid() || Member.OwnerAccountId.IsEmpty()) continue;
             if (!(bOrdinarySinglePlayer ? Member.bPlayerControlled : !Run->IsManagedRun() || Run->GetParticipation().HumanParticipants.Contains(Member.OwnerAccountId))) continue;
             View.ShopBuyerCharacterIds.Add(Member.CharacterId);

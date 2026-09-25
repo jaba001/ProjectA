@@ -12,12 +12,16 @@
 #include "Components/UniformGridSlot.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Controller/GameplayPlayerController.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
 #include "Game/GameState/GameplayViewTypes.h"
+#include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "GameFramework/PlayerController.h"
+#include "UI/Gameplay/EquipmentDragDropOperation.h"
+#include "UI/Gameplay/EquipmentItemSlotWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
 
 UTextBlock* UCharacterInventoryPanel::AddText(UVerticalBox* Parent, const FText& Text, int32 FontSize, float BottomPadding)
@@ -33,6 +37,7 @@ UTextBlock* UCharacterInventoryPanel::AddText(UVerticalBox* Parent, const FText&
 void UCharacterInventoryPanel::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
+    SetVisibility(ESlateVisibility::Visible);
     const UDemonicUITheme& Theme = UDemonicUITheme::Get();
     UBorder* Panel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("CharacterInventoryPanel"));
     Theme.StylePanel(Panel);
@@ -70,37 +75,15 @@ void UCharacterInventoryPanel::NativeOnInitialized()
     Theme.ApplyControls(WidgetTree);
 }
 
-void UCharacterInventoryPanel::AddItem(const FRunItemDefinition& Item, int32 Count, int32 Index)
+void UCharacterInventoryPanel::AddItem(const FRunItemDefinition& Item, int32 ItemIndex, int32 DisplayIndex)
 {
-    const UDemonicUITheme& Theme = UDemonicUITheme::Get();
-    UBorder* Card = WidgetTree->ConstructWidget<UBorder>();
-    Theme.StyleInset(Card);
-    Card->SetPadding(FMargin(8.0f, 10.0f));
-    UUniformGridSlot* GridSlot = ItemGrid->AddChildToUniformGrid(Card, Index / 2, Index % 2);
+    UEquipmentItemSlotWidget* Card = CreateWidget<UEquipmentItemSlotWidget>(GetOwningPlayer());
+    Card->CanAcceptDrop.BindUObject(this, &UCharacterInventoryPanel::CanAcceptDrop);
+    Card->ReceiveDrop.BindUObject(this, &UCharacterInventoryPanel::HandleDrop);
+    Card->RefreshSlot(DisplayedMember.CharacterId, DisplayedMember.Equipment.Revision, ItemIndex, &Item, FGameplayTag(), NAME_None, FText::GetEmpty(), bCanChangeEquipment);
+    UUniformGridSlot* GridSlot = ItemGrid->AddChildToUniformGrid(Card, DisplayIndex / 2, DisplayIndex % 2);
     GridSlot->SetHorizontalAlignment(HAlign_Fill);
     GridSlot->SetVerticalAlignment(VAlign_Fill);
-    UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>();
-    Card->SetContent(Content);
-    USizeBox* IconSize = WidgetTree->ConstructWidget<USizeBox>();
-    IconSize->SetWidthOverride(54.0f);
-    IconSize->SetHeightOverride(54.0f);
-    Content->AddChildToVerticalBox(IconSize)->SetHorizontalAlignment(HAlign_Center);
-    UBorder* Frame = WidgetTree->ConstructWidget<UBorder>();
-    Theme.StyleSlot(Frame, true);
-    Frame->SetPadding(FMargin(9.0f));
-    IconSize->SetContent(Frame);
-    UImage* Icon = WidgetTree->ConstructWidget<UImage>();
-    Theme.SetItemIcon(Icon, Item.Tags);
-    Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
-    Frame->SetContent(Icon);
-    const FText ItemName = Item.DisplayName.IsEmpty() ? FText::FromString(Item.Asset.GetAssetName()) : Item.DisplayName;
-    UTextBlock* Name = AddText(Content, ItemName, 14, 6.0f);
-    Name->SetWrapTextAt(154.0f);
-    Name->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
-    Name->SetJustification(ETextJustify::Center);
-    UTextBlock* Quantity = AddText(Content, FText::Format(NSLOCTEXT("Inventory", "Quantity", "{0}개"), FText::AsNumber(Count)), 14, 0.0f);
-    Quantity->SetJustification(ETextJustify::Center);
-    Card->SetToolTipText(FText::Format(NSLOCTEXT("Inventory", "ItemTooltip", "{0}\n수량 {1}개\n{2}"), ItemName, FText::AsNumber(Count), FText::FromString(Item.Asset.ToString())));
 }
 
 void UCharacterInventoryPanel::AddSkill(const USkillDefinitionDataAsset* Skill)
@@ -145,9 +128,12 @@ void UCharacterInventoryPanel::RefreshInventory(const FGameplayViewState& View, 
     ItemGrid->ClearChildren();
     SkillList->ClearChildren();
     const FRunPartyMember* Member = CharacterId.IsValid() ? View.PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.CharacterId == CharacterId && Candidate.bCreated; }) : nullptr;
+    const AGameplayPlayerController* GameplayController = GetOwningPlayer<AGameplayPlayerController>();
+    DisplayedMember = Member ? *Member : FRunPartyMember();
+    bCanChangeEquipment = Member && GameplayController && GameplayController->CanChangeEquipment(View, CharacterId);
     GoldText->SetVisibility(Member ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     ItemCountText->SetVisibility(Member ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    EmptyItemsText->SetVisibility(Member && Member->Items.IsEmpty() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    EmptyItemsText->SetVisibility(ESlateVisibility::Collapsed);
     StatusText->SetVisibility(ESlateVisibility::Visible);
     SkillStatusText->SetVisibility(ESlateVisibility::Collapsed);
     if (!Member)
@@ -158,21 +144,21 @@ void UCharacterInventoryPanel::RefreshInventory(const FGameplayViewState& View, 
     }
 
     GoldText->SetText(FText::Format(NSLOCTEXT("Inventory", "Gold", "보유 골드 {0}G"), FText::AsNumber(Member->Gold)));
-    StatusText->SetText(Member->CurrentHP == 0.0f ? NSLOCTEXT("Inventory", "DeadInventory", "사망 · 보유 아이템과 스킬 보기") : NSLOCTEXT("Inventory", "ItemPrototype", "구매한 아이템은 보관되며 장착 효과는 아직 없습니다."));
-    ItemCountText->SetText(FText::Format(NSLOCTEXT("Inventory", "Items", "보유 아이템 · {0}개"), FText::AsNumber(Member->Items.Num())));
+    StatusText->SetText(Member->CurrentHP == 0.0f ? NSLOCTEXT("Inventory", "DeadInventory", "사망 · 보유 아이템과 스킬 보기") : bCanChangeEquipment ? NSLOCTEXT("Inventory", "DragEquipmentHint", "슬롯으로 끌어 장착 · 가방으로 끌어 해제") : NSLOCTEXT("Inventory", "ReadOnlyEquipmentHint", "상점에서 장비를 끌어 장착·해제할 수 있습니다."));
+    if (GameplayController && GameplayController->IsEquipmentChangePending()) StatusText->SetText(NSLOCTEXT("Equipment", "Pending", "장비 변경을 저장하고 있습니다."));
+    else if (GameplayController && !GameplayController->GetEquipmentMessage().IsEmpty()) StatusText->SetText(GameplayController->GetEquipmentMessage());
 
-    // Group repeated purchases by their full asset path, preserving distinct assets with the same name.
-    // 전체 에셋 경로로 반복 구매를 묶어 이름이 같은 서로 다른 에셋을 구분합니다.
-    TMap<FSoftObjectPath, int32> ItemCounts;
-    for (const FRunItemDefinition& Item : Member->Items) ++ItemCounts.FindOrAdd(Item.Asset);
-    int32 ItemIndex = 0;
-    for (const FRunItemDefinition& Item : Member->Items)
+    // Each unequipped copy retains its inventory index, including copies with identical asset paths.
+    // 같은 에셋 경로의 사본도 각각 원래 인벤토리 인덱스를 유지하며 미장착 사본만 표시합니다.
+    int32 DisplayIndex = 0;
+    for (int32 ItemIndex = 0; ItemIndex < Member->Items.Num(); ++ItemIndex)
     {
-        const int32* Count = ItemCounts.Find(Item.Asset);
-        if (!Count) continue;
-        AddItem(Item, *Count, ItemIndex++);
-        ItemCounts.Remove(Item.Asset);
+        if (RunEquipmentRules::IsItemEquipped(*Member, ItemIndex)) continue;
+        AddItem(Member->Items[ItemIndex], ItemIndex, DisplayIndex++);
     }
+    ItemCountText->SetText(FText::Format(NSLOCTEXT("Inventory", "EquipmentItemCounts", "보관 {0}개 · 장착 {1}개 · 전체 {2}개"), FText::AsNumber(DisplayIndex), FText::AsNumber(Member->Items.Num() - DisplayIndex), FText::AsNumber(Member->Items.Num())));
+    EmptyItemsText->SetText(NSLOCTEXT("Inventory", "EmptyBag", "가방이 비어 있습니다.\n장착 아이템을 이곳으로 끌어 해제할 수 있습니다."));
+    EmptyItemsText->SetVisibility(DisplayIndex == 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     if (Member->bHasSkillLoadout)
     {
         if (Member->Skills.IsEmpty()) AddText(SkillList, NSLOCTEXT("Inventory", "EmptySkills", "보유한 스킬이 없습니다."), 16);
@@ -197,4 +183,23 @@ void UCharacterInventoryPanel::RefreshInventory(const FGameplayViewState& View, 
     SkillStatusText->SetText(NSLOCTEXT("Inventory", "LegacySkills", "이전 저장의 직업 기본 장착 스킬입니다."));
     for (const USkillDefinitionDataAsset* Skill : Skills) AddSkill(Skill);
     if (Skills.IsEmpty()) AddText(SkillList, NSLOCTEXT("Inventory", "EmptySkills", "보유한 스킬이 없습니다."), 16);
+}
+
+bool UCharacterInventoryPanel::CanAcceptDrop(const UEquipmentDragDropOperation* Operation, FGameplayTag TargetSlot) const
+{
+    FText Error;
+    return FEquipmentDropRequest::CanDrop(GetOwningPlayer<AGameplayPlayerController>(), DisplayedMember, bCanChangeEquipment, Operation, FGameplayTag(), Error);
+}
+
+bool UCharacterInventoryPanel::HandleDrop(const UEquipmentDragDropOperation* Operation, FGameplayTag TargetSlot)
+{
+    FText Error;
+    if (!FEquipmentDropRequest::Submit(GetOwningPlayer<AGameplayPlayerController>(), DisplayedMember, bCanChangeEquipment, Operation, FGameplayTag(), Error)) StatusText->SetText(Error);
+    return Operation != nullptr;
+}
+
+bool UCharacterInventoryPanel::NativeOnDrop(const FGeometry& Geometry, const FDragDropEvent& DragDropEvent, UDragDropOperation* Operation)
+{
+    const UEquipmentDragDropOperation* Drag = Cast<UEquipmentDragDropOperation>(Operation);
+    return Drag && HandleDrop(Drag, FGameplayTag());
 }

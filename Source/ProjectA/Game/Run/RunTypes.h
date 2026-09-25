@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Game/Run/RunIdentityTypes.h"
 #include "Game/Run/RunItemShopTypes.h"
+#include "Game/Run/RunEquipmentTypes.h"
 #include "Unit/CharacterAppearanceTypes.h"
 #include "RunTypes.generated.h"
 
@@ -73,10 +74,13 @@ struct PROJECTA_API FRunPartyMember
     UPROPERTY(BlueprintReadOnly, Category = "Run|Shop")
     int32 Gold = 0;
 
-    // Purchased prototype items persist for this Run without granting equipment effects.
-    // 구매한 시험용 아이템은 장비 효과를 부여하지 않고 현재 Run에 보관합니다.
+    // Starting and purchased copies remain in this array when equipped or unequipped.
+    // 시작 및 구매 아이템 사본은 장착·해제 후에도 이 배열에 유지됩니다.
     UPROPERTY(BlueprintReadOnly, Category = "Run|Items")
     TArray<FRunItemDefinition> Items;
+
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Run|Items")
+    FRunEquipmentState Equipment;
 
     // New runs persist their acquired skills; older saves retain the historical profession defaults.
     // 새 Run은 획득한 스킬을 저장하며 이전 저장은 기존 직업 기본 장착을 유지합니다.

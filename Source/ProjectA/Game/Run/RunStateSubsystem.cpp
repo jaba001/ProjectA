@@ -6,6 +6,7 @@
 #include "Game/Run/RunProgressRules.h"
 #include "Game/Run/RunSaveFormat.h"
 #include "Game/Run/RunItemShopCatalog.h"
+#include "Game/Run/RunEquipmentRules.h"
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
@@ -252,6 +253,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
         if (!Member.bCreated && !Member.Appearance.IsEmpty()) return false;
         if ((!Member.bCreated || !Member.bHasSkillLoadout) && (Member.Gold != 0 || !Member.Skills.IsEmpty() || !Member.Items.IsEmpty())) return false;
         if (Save->ItemShopState.SchemaVersion == 0 && !Member.Items.IsEmpty()) return false;
+        if (!RunEquipmentRules::Validate(Member, OutError)) return false;
         for (const FRunItemDefinition& Item : Member.Items)
         {
             const FRunItemDefinition* CatalogItem = Save->ItemShopState.Catalog.FindByPredicate([&Item](const FRunItemDefinition& Candidate) { return Candidate.Asset == Item.Asset; });
@@ -665,6 +667,7 @@ URunSaveGame* URunStateSubsystem::CreateInitialSaveData(const TArray<FRunPartyMe
         Member.bHasSkillLoadout = Member.bCreated;
         Member.Skills.Reset();
         Member.Items.Reset();
+        Member.Equipment = FRunEquipmentState();
         if (Member.bCreated)
         {
             const UPartyDefinitionDataAsset* Catalog = PartyDefinition ? PartyDefinition.Get() : GetDefault<UPartyDefinitionDataAsset>();
@@ -672,6 +675,7 @@ URunSaveGame* URunStateSubsystem::CreateInitialSaveData(const TArray<FRunPartyMe
             if (!Catalog->ValidateMemberAppearance(Member, OutError)) return nullptr;
             if (!Catalog->ResolveStartingSkills(Member.ClassId, Skills, OutError)) return nullptr;
             for (USkillDefinitionDataAsset* Skill : Skills) Member.Skills.Add(FSoftObjectPath(Skill));
+            RunEquipmentRules::InitializeStartingEquipment(Member, Save->ItemShopState.Catalog);
             const bool bSinglePlayer = Identity.Origin == ERunIdentityOrigin::LocalDevelopment && Identity.OriginalParticipants.Num() == 1;
             if (!bSinglePlayer || Member.bPlayerControlled) Member.Gold = Pool->StartingGold;
         }
@@ -1252,6 +1256,36 @@ bool URunStateSubsystem::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, 
     }
     else if (bRecovery) PurchasedMember->CurrentHP = RecoveredHP;
     else PurchasedMember->Skills.Add(Offer->Skill);
+    return CommitSaveCandidate(Save.Get(), OutError);
+}
+
+bool URunStateSubsystem::CanChangeEquipment(const FRunAccountId& AccountId, FGuid CharacterId, FText& OutError) const
+{
+    OutError = NSLOCTEXT("RunEquipment", "ShopOnly", "장비 변경은 상점 페이즈에서만 가능합니다.");
+    if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::Shop || EncounterProgress.bCompleted) return false;
+    const FRunPartyMember* Member = PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Entry) { return Entry.bCreated && Entry.CharacterId == CharacterId; });
+    OutError = NSLOCTEXT("RunEquipment", "OwnerOnly", "본인이 직접 조작하는 생존 캐릭터의 장비만 변경할 수 있습니다.");
+    if (!Member || !Member->bHasSkillLoadout || !FMath::IsFinite(Member->CurrentHP) || Member->CurrentHP <= 0.0f || !URunIdentityLibrary::IsCharacterOwner(RunIdentity, PartyMembers, CharacterId, AccountId)) return false;
+    if (bManagedRun)
+    {
+        EPartyControlMode Mode = EPartyControlMode::ServerAI;
+        if (!URunParticipationLibrary::ResolveControlMode(Participation, RunIdentity, PartyMembers, CharacterId, Mode, OutError) || Mode != EPartyControlMode::Human) return false;
+    }
+    else if (RunIdentity.Origin == ERunIdentityOrigin::LocalDevelopment && RunIdentity.OriginalParticipants.Num() == 1 && !Member->bPlayerControlled) return false;
+    OutError = FText::GetEmpty();
+    return true;
+}
+
+bool URunStateSubsystem::ChangeEquipment(const FRunAccountId& AccountId, const FRunEquipmentCommand& Command, FText& OutError)
+{
+    if (!CanChangeEquipment(AccountId, Command.CharacterId, OutError)) return false;
+    TStrongObjectPtr<URunSaveGame> Save(CreateSaveData());
+    FRunPartyMember* Member = Save->Party.FindByPredicate([&Command](const FRunPartyMember& Entry) { return Entry.CharacterId == Command.CharacterId; });
+    if (!Member || !RunEquipmentRules::Apply(*Member, Command, OutError)) return false;
+    TArray<FRunEquipmentVisual> Visuals;
+    if (!RunEquipmentRules::BuildVisuals(*Member, Visuals, OutError)) return false;
+    // Commit the complete loadout before publishing the new equipment to UI or future combat actors.
+    // UI 또는 다음 전투 액터에 공개하기 전에 전체 장착 구성을 먼저 저장합니다.
     return CommitSaveCandidate(Save.Get(), OutError);
 }
 

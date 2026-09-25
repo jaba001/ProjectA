@@ -16,6 +16,7 @@ class AUnitBase;
 class UAnimInstance;
 class UAnimMontage;
 class UCharacterAppearanceComponent;
+class UCharacterEquipmentComponent;
 
 // Team affiliation used by combat units.
 // 전투 유닛의 소속 팀을 나타냅니다.
@@ -71,6 +72,9 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UnitBase|Appearance")
     TObjectPtr<UCharacterAppearanceComponent> CharacterAppearance;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UnitBase|Equipment")
+    TObjectPtr<UCharacterEquipmentComponent> CharacterEquipment;
+
     // Returns the ability system component for GAS integration.
     // GAS 연동에 사용할 어빌리티 시스템 컴포넌트를 반환합니다.
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
@@ -110,6 +114,8 @@ public:
     bool HasRoundCastMontageInstance() const;
 
 protected:
+    friend class UCharacterEquipmentComponent;
+
     UFUNCTION(NetMulticast, Reliable)
     void MulticastSetRoundCastMontage(UAnimMontage* Montage, bool bImmediateStop);
 

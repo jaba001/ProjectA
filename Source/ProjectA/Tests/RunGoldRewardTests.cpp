@@ -191,6 +191,11 @@ bool FRunGoldRewardLegacyTest::RunTest(const FString& Parameters)
         if (!Legacy) return false;
         Legacy->GoldRewardState = FRunGoldRewardState();
         Legacy->ItemShopState = FRunItemShopState();
+        for (FRunPartyMember& Member : Legacy->Party)
+        {
+            Member.Items.Reset();
+            Member.Equipment = FRunEquipmentState();
+        }
         if (!bHasShop)
         {
             Legacy->SkillShopState = FRunSkillShopState();

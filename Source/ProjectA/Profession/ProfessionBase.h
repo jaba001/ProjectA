@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "Templates/SubclassOf.h"
+#include "Game/Run/RunEquipmentTypes.h"
 #include "ProfessionBase.generated.h"
 
 // Profession definitions hold class defaults independently of the shared combat actor and its visuals.
@@ -35,6 +36,9 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats")
     float Intelligence;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+    TArray<FRunStartingEquipment> StartingEquipment;
 
     // Keep one ordered catalog for character creation and runtime profession lookup.
     // 캐릭터 생성과 런타임 직업 조회에 동일한 순서의 목록을 사용합니다.

@@ -1,4 +1,5 @@
 #include "Unit/CharacterAppearanceComponent.h"
+#include "Unit/CharacterEquipmentComponent.h"
 #include "Animation/AnimClassInterface.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimSingleNodeInstance.h"
@@ -176,6 +177,7 @@ bool UCharacterAppearanceComponent::RefreshAppearance()
         RestoreOriginalBody();
         bAppearanceApplied = false;
         ApplyHiddenMeshBones();
+        if (UCharacterEquipmentComponent* Equipment = Owner->FindComponentByClass<UCharacterEquipmentComponent>()) Equipment->RefreshEquipment();
         return true;
     }
     if (!IsValid(Leader) || Leader->IsTemplate() || !IsValid(Leader->GetSkeletalMeshAsset())) return Fail(TEXT("Appearance pose leader is not ready"));
@@ -320,6 +322,7 @@ bool UCharacterAppearanceComponent::RefreshAppearance()
     AppliedSelection = Selection;
     AppliedBodyMesh = BodyMesh;
     bAppearanceApplied = true;
+    if (UCharacterEquipmentComponent* Equipment = Owner->FindComponentByClass<UCharacterEquipmentComponent>()) Equipment->RefreshEquipment();
     return true;
 }
 

@@ -106,6 +106,8 @@ public:
     bool SelectRunEncounter(FName EncounterId);
     bool LeaveRunEncounter();
     bool PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError, int32 ExpectedItemShopRevision = INDEX_NONE);
+    bool CanChangeEquipment(const FRunAccountId& AccountId, FGuid CharacterId, FText& OutError) const;
+    bool ChangeEquipment(const FRunAccountId& AccountId, const FRunEquipmentCommand& Command, FText& OutError);
     const FRunSkillShopState& GetSkillShopState() const { return SkillShopState; }
     const FRunItemShopState& GetItemShopState() const { return ItemShopState; }
     const FRunEncounterProgress& GetEncounterProgress() const { return EncounterProgress; }

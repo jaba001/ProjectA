@@ -6,6 +6,7 @@
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-09-25 시작 장비·상점 드래그 장착 | 네 직업 시작 장비·양손 점유·상점 드래그 교체/해제·원자 저장/복구·원본 메시 부착 구현. 기존 스킬·검 판정·이전 저장 보존, 장착 49개 지원·나머지 246개 보관 유지. UHT 포함 Development Editor / Win64 컴파일·최종 증분 빌드 11.22초·원본 경로 295개·문서 링크·diff 정적 검사 통과. 게임·PIE·자동화·cook 미실행. 근거: `Saved/Logs/StartingEquipmentBuildFinal.log`; [사용자 확인](TODO.md#2-33-시작-장비와-상점-드래그-장착) 대기 |
 | 2026-09-25 상점 인카운터 명명·분류 | 상점1·2를 스킬상점·아이템상점으로 명명하고 인카운터 GameplayTag를 진입·구매·리롤·UI 공통 분류에 연결. 기존 저장 ID·사용자 지정 이름·상점3 보존. UHT 포함 Development Editor / Win64 컴파일 17.20초·정적 검사 통과, 게임·자동화 테스트 미실행. [사용자 확인](TODO.md#2-31-아이템상점-시험) 대기 |
 | 2026-09-25 상점2 아이템 시험 | 상점1·3 유지, 무기 CSV 295개 가격 1G·원본명·중복 없는 5개 진열·1G 리롤과 개인 아이템 보관·인벤토리 표시 구현. 구매·리롤은 저장 성공 후 반영하고 이어하기에서 복원. UHT 포함 Development Editor / Win64 컴파일·최종 증분 빌드 5.49초·CSV 원본 3열/행 순서·에셋 경로 295개·정적 검사 통과. 게임·자동화 테스트 미실행, [사용자 확인](TODO.md#2-31-아이템상점-시험) 대기 |
 | 2026-09-25 생성 화면 정면·거리 통일 | 소스·저장 맵의 카메라 X `-500`, 슬롯 앵커 Yaw `90°`, 네 프리뷰 Blueprint·남녀 프리뷰 변환 회전 `0°` 적용. 기본 방향과 임시 드래그 회전을 분리해 편집 종료·몸체 갱신 시 복원하며 슬롯 위치·상세 거리 `1.15` 유지. Development Editor / Win64 컴파일 17.41초·독립 재로드 오류/경고 0. 메시·애니메이션·재질·전투 몸체 변환·의상 103개와 사용자 마법사 Staff 컴포넌트 삭제 보존 확인. 기존 파라곤 리그 12개 삭제도 보존하며 13,084개 패키지·92,614개 의존 관계에서 참조 0개 확인. 원본 복제·실제 UI/게임 실행 없음. 근거: `Saved/Automation/PreviewFacingBuild.txt`, `PreviewFacingReload.json`, `PreviewFacingPreservation.json`, `DeletedParagonRigsAudit.json`, `Saved/Logs/PreviewFacingReload.log`, `DeletedParagonRigsAudit.log`; [사용자 확인](TODO.md#2-30-rog-의상-커스터마이징) |

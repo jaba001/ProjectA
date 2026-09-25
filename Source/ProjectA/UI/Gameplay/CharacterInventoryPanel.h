@@ -2,9 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "CommonUserWidget.h"
+#include "Game/Run/RunTypes.h"
 #include "CharacterInventoryPanel.generated.h"
 
 class USkillDefinitionDataAsset;
+class UEquipmentDragDropOperation;
 class UTextBlock;
 class UUniformGridPanel;
 class UVerticalBox;
@@ -21,11 +23,19 @@ public:
 
 protected:
     virtual void NativeOnInitialized() override;
+    virtual bool NativeOnDrop(const FGeometry& Geometry, const FDragDropEvent& DragDropEvent, UDragDropOperation* Operation) override;
 
 private:
     UTextBlock* AddText(UVerticalBox* Parent, const FText& Text, int32 FontSize, float BottomPadding = 8.0f);
-    void AddItem(const FRunItemDefinition& Item, int32 Count, int32 Index);
+    void AddItem(const FRunItemDefinition& Item, int32 ItemIndex, int32 DisplayIndex);
     void AddSkill(const USkillDefinitionDataAsset* Skill);
+    bool CanAcceptDrop(const UEquipmentDragDropOperation* Operation, FGameplayTag TargetSlot) const;
+    bool HandleDrop(const UEquipmentDragDropOperation* Operation, FGameplayTag TargetSlot);
+
+    UPROPERTY(Transient)
+    FRunPartyMember DisplayedMember;
+
+    bool bCanChangeEquipment = false;
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> GoldText;

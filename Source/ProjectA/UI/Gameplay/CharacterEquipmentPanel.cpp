@@ -13,8 +13,13 @@
 #include "Components/UniformGridSlot.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Controller/GameplayPlayerController.h"
 #include "Game/GameState/GameplayViewTypes.h"
+#include "Game/Run/RunEquipmentCatalog.h"
+#include "Game/Run/RunEquipmentRules.h"
 #include "Profession/ProfessionBase.h"
+#include "UI/Gameplay/EquipmentDragDropOperation.h"
+#include "UI/Gameplay/EquipmentItemSlotWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
 
 UTextBlock* UCharacterEquipmentPanel::AddText(UVerticalBox* Parent, const FText& Text, int32 FontSize, float BottomPadding)
@@ -78,51 +83,51 @@ void UCharacterEquipmentPanel::NativeOnInitialized()
     EquipmentSlot->SetHorizontalAlignment(HAlign_Fill);
     EquipmentSlot->SetVerticalAlignment(VAlign_Fill);
 
-    // Show empty presentation slots until the Run owns actual equipment data.
-    // Run에 실제 장비 데이터가 생기기 전에는 표시용 빈 슬롯만 보여 줍니다.
-    AddEquipmentSlot(TEXT("Weapon"), NSLOCTEXT("Equipment", "WeaponOne", "무기 1"), 0, 0);
-    AddEquipmentSlot(TEXT("Head"), NSLOCTEXT("Equipment", "Head", "투구"), 0, 1);
-    AddEquipmentSlot(TEXT("Weapon"), NSLOCTEXT("Equipment", "WeaponTwo", "무기 2"), 0, 2);
-    AddEquipmentSlot(TEXT("Hands"), NSLOCTEXT("Equipment", "Hands", "장갑"), 1, 0);
-    AddEquipmentSlot(TEXT("Body"), NSLOCTEXT("Equipment", "Body", "갑옷"), 1, 1);
-    AddEquipmentSlot(TEXT("Neck"), NSLOCTEXT("Equipment", "Neck", "목걸이"), 1, 2);
-    AddEquipmentSlot(TEXT("Ring"), NSLOCTEXT("Equipment", "RingOne", "반지 1"), 2, 0);
-    AddEquipmentSlot(TEXT("Feet"), NSLOCTEXT("Equipment", "Feet", "신발"), 2, 1);
-    AddEquipmentSlot(TEXT("Ring"), NSLOCTEXT("Equipment", "RingTwo", "반지 2"), 2, 2);
-    AddText(EquipmentContent, NSLOCTEXT("Equipment", "Prototype", "장착 기능 준비 중\n구매한 아이템은 인벤토리에 보관됩니다."), 15, 8.0f);
+    const TArray<FGameplayTag> Tags = URunEquipmentCatalog::GetSlotTags();
+    AddEquipmentSlot(Tags[0], TEXT("Weapon"), NSLOCTEXT("Equipment", "MainHand", "주 무기"), 0, 0);
+    AddEquipmentSlot(Tags[2], TEXT("Head"), NSLOCTEXT("Equipment", "Head", "투구"), 0, 1);
+    AddEquipmentSlot(Tags[1], TEXT("Weapon"), NSLOCTEXT("Equipment", "OffHand", "보조 무기"), 0, 2);
+    AddEquipmentSlot(Tags[3], TEXT("Hands"), NSLOCTEXT("Equipment", "Hands", "장갑"), 1, 0);
+    AddEquipmentSlot(Tags[5], TEXT("Body"), NSLOCTEXT("Equipment", "Body", "갑옷"), 1, 1);
+    AddEquipmentSlot(Tags[6], TEXT("Neck"), NSLOCTEXT("Equipment", "Neck", "목걸이"), 1, 2);
+    AddEquipmentSlot(Tags[7], TEXT("Ring"), NSLOCTEXT("Equipment", "RingOne", "반지 1"), 2, 0);
+    AddEquipmentSlot(Tags[4], TEXT("Feet"), NSLOCTEXT("Equipment", "Feet", "신발"), 2, 1);
+    AddEquipmentSlot(Tags[8], TEXT("Ring"), NSLOCTEXT("Equipment", "RingTwo", "반지 2"), 2, 2);
+    HintText = AddText(EquipmentContent, FText::GetEmpty(), 15, 8.0f);
     Theme.ApplyControls(WidgetTree);
 }
 
-void UCharacterEquipmentPanel::AddEquipmentSlot(FName SlotId, const FText& Label, int32 Row, int32 Column)
+void UCharacterEquipmentPanel::AddEquipmentSlot(FGameplayTag SlotTag, FName SlotId, const FText& Label, int32 Row, int32 Column)
 {
-    const UDemonicUITheme& Theme = UDemonicUITheme::Get();
-    UVerticalBox* SlotContent = WidgetTree->ConstructWidget<UVerticalBox>();
-    UUniformGridSlot* GridSlot = EquipmentSlots->AddChildToUniformGrid(SlotContent, Row, Column);
+    UEquipmentItemSlotWidget* EquipmentWidget = CreateWidget<UEquipmentItemSlotWidget>(GetOwningPlayer());
+    EquipmentWidget->CanAcceptDrop.BindUObject(this, &UCharacterEquipmentPanel::CanAcceptDrop);
+    EquipmentWidget->ReceiveDrop.BindUObject(this, &UCharacterEquipmentPanel::HandleDrop);
+    EquipmentWidget->RefreshSlot(FGuid(), 0, INDEX_NONE, nullptr, SlotTag, SlotId, Label, false);
+    UUniformGridSlot* GridSlot = EquipmentSlots->AddChildToUniformGrid(EquipmentWidget, Row, Column);
     GridSlot->SetHorizontalAlignment(HAlign_Fill);
     GridSlot->SetVerticalAlignment(VAlign_Top);
-    UTextBlock* SlotLabel = AddText(SlotContent, Label, 14, 5.0f);
-    SlotLabel->SetJustification(ETextJustify::Center);
-    USizeBox* IconSize = WidgetTree->ConstructWidget<USizeBox>();
-    IconSize->SetWidthOverride(66.0f);
-    IconSize->SetHeightOverride(66.0f);
-    SlotContent->AddChildToVerticalBox(IconSize)->SetHorizontalAlignment(HAlign_Center);
-    UBorder* Frame = WidgetTree->ConstructWidget<UBorder>();
-    Theme.StyleSlot(Frame);
-    Frame->SetPadding(FMargin(12.0f));
-    IconSize->SetContent(Frame);
-    UImage* Icon = WidgetTree->ConstructWidget<UImage>();
-    Theme.SetEquipmentIcon(Icon, SlotId);
-    Icon->SetColorAndOpacity(FLinearColor(0.62f, 0.56f, 0.46f, 0.72f));
-    Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
-    Frame->SetContent(Icon);
-    UTextBlock* EmptyLabel = AddText(SlotContent, NSLOCTEXT("Equipment", "Empty", "미장착"), 12, 8.0f);
-    EmptyLabel->SetJustification(ETextJustify::Center);
+    SlotWidgets.Add(EquipmentWidget);
+    SlotTags.Add(SlotTag);
+    SlotIcons.Add(SlotId);
+    SlotLabels.Add(Label);
 }
 
 void UCharacterEquipmentPanel::RefreshEquipment(const FGameplayViewState& View, FGuid CharacterId)
 {
     if (!CharacterText || !StatusText || !EquipmentSlots) return;
     const FRunPartyMember* Member = CharacterId.IsValid() ? View.PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.CharacterId == CharacterId && Candidate.bCreated; }) : nullptr;
+    const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
+    DisplayedMember = Member ? *Member : FRunPartyMember();
+    bCanChangeEquipment = Member && Controller && Controller->CanChangeEquipment(View, CharacterId);
+    for (int32 Index = 0; Index < SlotWidgets.Num(); ++Index)
+    {
+        const int32 ItemIndex = Member ? RunEquipmentRules::FindItemIndexAtSlot(*Member, SlotTags[Index]) : INDEX_NONE;
+        const FRunItemDefinition* Item = Member && Member->Items.IsValidIndex(ItemIndex) ? &Member->Items[ItemIndex] : nullptr;
+        SlotWidgets[Index]->RefreshSlot(CharacterId, DisplayedMember.Equipment.Revision, ItemIndex, Item, SlotTags[Index], SlotIcons[Index], SlotLabels[Index], bCanChangeEquipment);
+    }
+    HintText->SetText(bCanChangeEquipment ? NSLOCTEXT("Equipment", "DragHint", "아이템을 슬롯으로 끌어 장착·교체하세요.\n가방으로 끌면 해제됩니다.\n양손 장비는 두 무기 슬롯을 사용합니다.") : NSLOCTEXT("Equipment", "ReadOnlyHint", "장비 변경은 상점에서만 가능합니다."));
+    if (Controller && Controller->IsEquipmentChangePending()) HintText->SetText(NSLOCTEXT("Equipment", "Pending", "장비 변경을 저장하고 있습니다."));
+    else if (Controller && !Controller->GetEquipmentMessage().IsEmpty()) HintText->SetText(Controller->GetEquipmentMessage());
     EquipmentSlots->SetRenderOpacity(Member ? 1.0f : 0.4f);
     if (!Member)
     {
@@ -135,5 +140,20 @@ void UCharacterEquipmentPanel::RefreshEquipment(const FGameplayViewState& View, 
     const FText ClassName = Profession ? Profession->DisplayName : FText::FromName(Member->ClassId);
     const FText CharacterName = Member->CharacterName.IsEmpty() ? ClassName : Member->CharacterName;
     CharacterText->SetText(FText::Format(NSLOCTEXT("Equipment", "Character", "{0}\n{1}"), CharacterName, ClassName));
-    StatusText->SetText(Member->CurrentHP == 0.0f ? NSLOCTEXT("Equipment", "Dead", "사망 · 보관 정보 보기") : NSLOCTEXT("Equipment", "NoEquippedItems", "장착된 아이템 없음"));
+    TSet<int32> EquippedItems;
+    for (const FRunEquipmentSlot& EquippedSlot : Member->Equipment.Slots) if (Member->Items.IsValidIndex(EquippedSlot.ItemIndex)) EquippedItems.Add(EquippedSlot.ItemIndex);
+    StatusText->SetText(!Member->Equipment.bHasLoadout ? NSLOCTEXT("Equipment", "LegacyEquipment", "이전 저장 · 장비 정보 없음") : Member->CurrentHP == 0.0f ? NSLOCTEXT("Equipment", "Dead", "사망 · 보관 정보 보기") : FText::Format(NSLOCTEXT("Equipment", "EquippedCount", "장착 아이템 {0}개"), FText::AsNumber(EquippedItems.Num())));
+}
+
+bool UCharacterEquipmentPanel::CanAcceptDrop(const UEquipmentDragDropOperation* Operation, FGameplayTag TargetSlot) const
+{
+    FText Error;
+    return FEquipmentDropRequest::CanDrop(GetOwningPlayer<AGameplayPlayerController>(), DisplayedMember, bCanChangeEquipment, Operation, TargetSlot, Error);
+}
+
+bool UCharacterEquipmentPanel::HandleDrop(const UEquipmentDragDropOperation* Operation, FGameplayTag TargetSlot)
+{
+    FText Error;
+    if (!FEquipmentDropRequest::Submit(GetOwningPlayer<AGameplayPlayerController>(), DisplayedMember, bCanChangeEquipment, Operation, TargetSlot, Error)) HintText->SetText(Error);
+    return Operation != nullptr;
 }

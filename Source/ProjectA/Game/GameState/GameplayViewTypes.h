@@ -77,5 +77,8 @@ struct PROJECTA_API FGameplayViewState
     UPROPERTY()
     TArray<FRunShopBuyerView> ShopBuyerViews;
 
+    UPROPERTY()
+    TArray<FGuid> EquipmentEditableCharacterIds;
+
     static FGameplayViewState FromRun(const URunStateSubsystem* Run, const FText& Message);
 };

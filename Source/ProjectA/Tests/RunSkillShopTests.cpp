@@ -6,6 +6,8 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunEquipmentCatalog.h"
+#include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Tests/RunRewardTestHelpers.h"
@@ -281,6 +283,8 @@ bool FRunSkillShopLegacyTest::RunTest(const FString& Parameters)
         Member.Gold = 0;
         Member.bHasSkillLoadout = false;
         Member.Skills.Reset();
+        Member.Items.Reset();
+        Member.Equipment = FRunEquipmentState();
     }
     if (!TestTrue(TEXT("An older shop checkpoint remains readable"), FRunCheckpointStorage::Save(Legacy.Get(), Fixture.Slot, Fixture.Error) && Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error))) return false;
     const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
@@ -377,9 +381,9 @@ bool FRunItemShopPersistenceTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Item shops cannot execute skill products"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Fixture.Run->GetSkillShopState().Offers[0].OfferId, Fixture.Error, Initial.Revision));
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("A failed item write rejects the purchase"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, OfferId, Fixture.Error, Initial.Revision));
-    TestTrue(TEXT("Failed purchase preserves money inventory stock and disk"), Fixture.Member(3).Gold == Buyer.Gold && Fixture.Member(3).Items.IsEmpty() && !Fixture.Run->GetItemShopState().Offers[0].bSold && Fixture.Run->GetItemShopState().Revision == Initial.Revision && Fixture.ReadBytes() == BeforeBytes);
+    TestTrue(TEXT("Failed purchase preserves money inventory stock and disk"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Fixture.Member(3), &Buyer, 0) && !Fixture.Run->GetItemShopState().Offers[0].bSold && Fixture.Run->GetItemShopState().Revision == Initial.Revision && Fixture.ReadBytes() == BeforeBytes);
     if (!TestTrue(TEXT("A valid purchase is saved"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, OfferId, Fixture.Error, Initial.Revision))) return false;
-    TestTrue(TEXT("The item is owned without changing combat skills"), Fixture.Member(3).Gold == Buyer.Gold - 1 && Fixture.Member(3).Items.Num() == 1 && Fixture.Member(3).Items[0].Asset == Initial.Offers[0].Item.Asset && Fixture.Member(3).Skills == Buyer.Skills);
+    TestTrue(TEXT("The item is owned without changing combat skills or starting equipment"), Fixture.Member(3).Gold == Buyer.Gold - 1 && Fixture.Member(3).Items.Num() == Buyer.Items.Num() + 1 && Fixture.Member(3).Items.Last().Asset == Initial.Offers[0].Item.Asset && Fixture.Member(3).Skills == Buyer.Skills && FRunEquipmentState::StaticStruct()->CompareScriptStruct(&Fixture.Member(3).Equipment, &Buyer.Equipment, 0));
     const int32 PurchasedRevision = Fixture.Run->GetItemShopState().Revision;
     TestFalse(TEXT("A sold slot cannot be purchased again"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, OfferId, Fixture.Error, PurchasedRevision));
     TestFalse(TEXT("A stale reroll cannot charge the buyer"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunItemShopState::GetRerollOfferId(), Fixture.Error, Initial.Revision));
@@ -402,6 +406,149 @@ bool FRunItemShopPersistenceTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Zero gold cannot reroll"), Restored->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunItemShopState::GetRerollOfferId(), Fixture.Error, Restored->GetItemShopState().Revision));
     TestFalse(TEXT("Zero gold cannot purchase stock"), Restored->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Restored->GetItemShopState().Offers[0].OfferId, Fixture.Error, Restored->GetItemShopState().Revision));
     TestTrue(TEXT("Insufficient funds leave the save untouched"), Fixture.ReadBytes() == EmptyBalanceBytes);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunStartingEquipmentTest, "ProjectA.Run.Equipment.StartingLoadoutsAndOccupancy", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunStartingEquipmentTest::RunTest(const FString& Parameters)
+{
+    FSkillShopFixture Fixture;
+    if (!TestTrue(TEXT("The four professions initialize with source equipment"), Fixture.Initialize())) return false;
+    const FGameplayTag Main = URunEquipmentCatalog::GetWeaponSlot(0);
+    const FGameplayTag Off = URunEquipmentCatalog::GetWeaponSlot(1);
+    for (int32 Index = 0; Index < 4; ++Index)
+    {
+        const FRunPartyMember& Member = Fixture.Member(Index);
+        TestTrue(TEXT("Human and AI starting equipment is valid and explicit"), Member.Equipment.bHasLoadout && RunEquipmentRules::Validate(Member, Fixture.Error));
+        if (!TestEqual(TEXT("Only the warrior owns two starting copies"), Member.Items.Num(), Index == 0 ? 2 : 1)) return false;
+        TestEqual(TEXT("Every starting item is equipped exactly once"), Member.Equipment.Slots.Num(), Member.Items.Num());
+        TestEqual(TEXT("Equipment does not add starting combat skills"), Member.Skills.Num(), 1);
+    }
+    TestTrue(TEXT("The warrior holds a sword and a separate shield"), Fixture.Member(0).Items[0].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Sword"))) && Fixture.Member(0).Items[1].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Shield"))) && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(0), Main) == 0 && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(0), Off) == 1);
+    TestTrue(TEXT("The archer's single bow occupies both hands"), Fixture.Member(1).Items[0].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Bow"))) && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(1), Main) == 0 && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(1), Off) == 0);
+    TestTrue(TEXT("The mage's single staff occupies both hands"), Fixture.Member(2).Items[0].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.StaffWand"))) && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(2), Main) == 0 && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(2), Off) == 0);
+    TestTrue(TEXT("The rogue holds one dagger with the other hand empty"), Fixture.Member(3).Items[0].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Dagger"))) && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(3), Main) == 0 && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(3), Off) == INDEX_NONE);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunEquipmentSwapTest, "ProjectA.Run.Equipment.SwapUnequipAndTwoHandCollision", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunEquipmentSwapTest::RunTest(const FString& Parameters)
+{
+    FSkillShopFixture Fixture;
+    if (!Fixture.Initialize() || Fixture.Member(0).Items.Num() != 2 || Fixture.Member(1).Items.IsEmpty() || Fixture.Member(3).Items.IsEmpty()) return false;
+    FRunPartyMember Member = Fixture.Member(0);
+    const int32 Dagger = Member.Items.Add(Fixture.Member(3).Items[0]);
+    const int32 Bow = Member.Items.Add(Fixture.Member(1).Items[0]);
+    const FGameplayTag Main = URunEquipmentCatalog::GetWeaponSlot(0);
+    const FGameplayTag Off = URunEquipmentCatalog::GetWeaponSlot(1);
+    const auto Change = [&Member, &Fixture](int32 ItemIndex, FGameplayTag Target)
+    {
+        FRunEquipmentCommand Command;
+        Command.CharacterId = Member.CharacterId;
+        Command.ItemIndex = ItemIndex;
+        Command.TargetSlot = Target;
+        Command.ExpectedRevision = Member.Equipment.Revision;
+        return RunEquipmentRules::Apply(Member, Command, Fixture.Error);
+    };
+    if (!TestTrue(TEXT("A bag dagger can replace the shield"), Change(Dagger, Off))) return false;
+    TestFalse(TEXT("The replaced shield returns to the bag"), RunEquipmentRules::IsItemEquipped(Member, 1));
+    if (!TestTrue(TEXT("Compatible equipped single-hand copies swap"), Change(0, Off))) return false;
+    TestTrue(TEXT("The dagger and sword exchange hands without duplication"), RunEquipmentRules::FindItemIndexAtSlot(Member, Main) == Dagger && RunEquipmentRules::FindItemIndexAtSlot(Member, Off) == 0 && Member.Equipment.Slots.Num() == 2);
+    if (!TestTrue(TEXT("A two-handed bow replaces both held items"), Change(Bow, Main))) return false;
+    TestTrue(TEXT("Both occupied hands resolve to one physical bow copy"), Member.Equipment.Slots.Num() == 1 && RunEquipmentRules::FindItemIndexAtSlot(Member, Main) == Bow && RunEquipmentRules::FindItemIndexAtSlot(Member, Off) == Bow && !RunEquipmentRules::IsItemEquipped(Member, Dagger) && !RunEquipmentRules::IsItemEquipped(Member, 0));
+    FRunPartyMember Overlap = Member;
+    FRunEquipmentSlot& OverlappingSword = Overlap.Equipment.Slots.AddDefaulted_GetRef();
+    OverlappingSword.SlotTag = Main;
+    OverlappingSword.ItemIndex = 0;
+    TestFalse(TEXT("A malformed two-handed overlap is rejected"), RunEquipmentRules::Validate(Overlap, Fixture.Error));
+    if (!TestTrue(TEXT("Dropping equipment into the bag unequips it"), Change(Bow, FGameplayTag()))) return false;
+    TestTrue(TEXT("Unequip clears both hands without deleting owned copies"), Member.Equipment.Slots.IsEmpty() && Member.Items.Num() == 4);
+    Member.Equipment = FRunEquipmentState();
+    TestTrue(TEXT("A saved legacy inventory supports its first explicit equipment command"), Change(0, Main) && Member.Equipment.bHasLoadout);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunEquipmentAuthorityTest, "ProjectA.Run.Equipment.ShopOwnerRevisionAndIndexValidation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunEquipmentAuthorityTest::RunTest(const FString& Parameters)
+{
+    FSkillShopFixture Fixture;
+    if (!Fixture.Initialize(3, true)) return false;
+    const FRunPartyMember Owner = Fixture.Member(3);
+    FRunEquipmentCommand Command;
+    Command.CharacterId = Owner.CharacterId;
+    Command.ItemIndex = 0;
+    Command.ExpectedRevision = Owner.Equipment.Revision;
+    TestFalse(TEXT("Equipment cannot change outside a shop"), Fixture.Run->ChangeEquipment(Owner.OwnerAccountId, Command, Fixture.Error));
+    if (!Fixture.ReachShop()) return false;
+    const TArray<FRunPartyMember> Before = Fixture.Run->GetPartyMembers();
+    const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
+    int32 Events = 0;
+    Fixture.Run->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
+    FRunAccountId Outsider = Owner.OwnerAccountId;
+    Outsider.Subject += TEXT("_EquipmentOutsider");
+    TestFalse(TEXT("A foreign account cannot change another character's equipment"), Fixture.Run->ChangeEquipment(Outsider, Command, Fixture.Error));
+    FRunEquipmentCommand Invalid = Command;
+    Invalid.CharacterId = Fixture.Member(0).CharacterId;
+    Invalid.ExpectedRevision = Fixture.Member(0).Equipment.Revision;
+    TestFalse(TEXT("The owner cannot redirect equipment changes to an AI companion"), Fixture.Run->ChangeEquipment(Owner.OwnerAccountId, Invalid, Fixture.Error));
+    Invalid = Command;
+    ++Invalid.ExpectedRevision;
+    TestFalse(TEXT("A stale drag revision is rejected"), Fixture.Run->ChangeEquipment(Owner.OwnerAccountId, Invalid, Fixture.Error));
+    Invalid = Command;
+    Invalid.ItemIndex = MAX_int32;
+    TestFalse(TEXT("An unknown item copy is rejected"), Fixture.Run->ChangeEquipment(Owner.OwnerAccountId, Invalid, Fixture.Error));
+    Invalid = Command;
+    Invalid.TargetSlot = FGameplayTag::RequestGameplayTag(TEXT("Equipment.Slot.Head"));
+    TestFalse(TEXT("Weapon drops onto nonweapon slots are rejected"), Fixture.Run->ChangeEquipment(Owner.OwnerAccountId, Invalid, Fixture.Error));
+    TestTrue(TEXT("Every rejected request preserves all members and durable bytes"), SameShopParty(Before, Fixture.Run->GetPartyMembers()) && BeforeBytes == Fixture.ReadBytes());
+    TestEqual(TEXT("Rejected equipment commands emit no state changes"), Events, 0);
+    Fixture.Run->OnRunStateChanged.Clear();
+    FSkillShopFixture DeadFixture;
+    if (!DeadFixture.Initialize() || !DeadFixture.ReachShop(TEXT("Shop_01"), 3)) return false;
+    Command.CharacterId = DeadFixture.Member(3).CharacterId;
+    Command.ExpectedRevision = DeadFixture.Member(3).Equipment.Revision;
+    TestFalse(TEXT("A dead owner can inspect equipment but cannot change it"), DeadFixture.Run->ChangeEquipment(DeadFixture.Member(3).OwnerAccountId, Command, DeadFixture.Error));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunEquipmentPersistenceTest, "ProjectA.Run.Equipment.AtomicChangeAndReload", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunEquipmentPersistenceTest::RunTest(const FString& Parameters)
+{
+    FSkillShopFixture Fixture;
+    if (!Fixture.Initialize(3, true) || !Fixture.ReachShop()) return false;
+    const FRunPartyMember Owner = Fixture.Member(3);
+    const TArray<FRunPartyMember> Before = Fixture.Run->GetPartyMembers();
+    const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
+    FRunEquipmentCommand Command;
+    Command.CharacterId = Owner.CharacterId;
+    Command.ItemIndex = 0;
+    Command.ExpectedRevision = Owner.Equipment.Revision;
+    int32 Events = 0;
+    bool bDurableAtNotification = false;
+    Fixture.Run->OnRunStateChanged.AddLambda([&Fixture, &Events, &bDurableAtNotification, &Owner]()
+    {
+        ++Events;
+        TStrongObjectPtr<URunSaveGame> Durable(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+        bDurableAtNotification = Durable && Durable->Party[3].Equipment.Slots.IsEmpty() && Durable->Party[3].Equipment.Revision == Owner.Equipment.Revision + 1 && SameShopParty(Durable->Party, Fixture.Run->GetPartyMembers());
+    });
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("A failed durable write rejects unequip"), Fixture.Run->ChangeEquipment(Owner.OwnerAccountId, Command, Fixture.Error));
+    TestTrue(TEXT("Failed unequip preserves party revisions and exact save bytes"), SameShopParty(Before, Fixture.Run->GetPartyMembers()) && BeforeBytes == Fixture.ReadBytes());
+    TestEqual(TEXT("Failed unequip publishes no state change"), Events, 0);
+    if (!TestTrue(TEXT("The original drag can retry after storage recovers"), Fixture.Run->ChangeEquipment(Owner.OwnerAccountId, Command, Fixture.Error))) return false;
+    TestTrue(TEXT("One notification observes already committed equipment"), Events == 1 && bDurableAtNotification);
+    TestTrue(TEXT("Equipment changes neither consume items nor charge gold or alter skills"), Fixture.Member(3).Items.Num() == Owner.Items.Num() && Fixture.Member(3).Gold == Owner.Gold && Fixture.Member(3).Skills == Owner.Skills);
+    TestFalse(TEXT("Replaying the committed drag is rejected"), Fixture.Run->ChangeEquipment(Owner.OwnerAccountId, Command, Fixture.Error));
+    TestEqual(TEXT("A replay publishes no additional state change"), Events, 1);
+    Fixture.Run->OnRunStateChanged.Clear();
+    TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
+    Restored->EnableCheckpointSaving(Fixture.Slot);
+    if (!TestTrue(TEXT("Continue restores equipment and individual owned copies"), Restored->LoadStandaloneCheckpoint(Fixture.Error))) return false;
+    TestTrue(TEXT("Reload preserves the complete equipment state without granting starts again"), SameShopParty(Fixture.Run->GetPartyMembers(), Restored->GetPartyMembers()));
     return true;
 }
 

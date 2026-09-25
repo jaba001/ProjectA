@@ -67,12 +67,12 @@ void UInventoryWidget::NativeOnInitialized()
     USizeBox* EquipmentSize = WidgetTree->ConstructWidget<USizeBox>();
     EquipmentSize->SetWidthOverride(300.0f);
     Panels->AddChildToHorizontalBox(EquipmentSize)->SetPadding(FMargin(0.0f, 0.0f, 16.0f, 0.0f));
-    EquipmentPanel = WidgetTree->ConstructWidget<UCharacterEquipmentPanel>();
+    EquipmentPanel = CreateWidget<UCharacterEquipmentPanel>(GetOwningPlayer());
     EquipmentSize->SetContent(EquipmentPanel);
     USizeBox* InventorySize = WidgetTree->ConstructWidget<USizeBox>();
     InventorySize->SetWidthOverride(430.0f);
     Panels->AddChildToHorizontalBox(InventorySize);
-    InventoryPanel = WidgetTree->ConstructWidget<UCharacterInventoryPanel>();
+    InventoryPanel = CreateWidget<UCharacterInventoryPanel>(GetOwningPlayer());
     InventorySize->SetContent(InventoryPanel);
 
     UBorder* Footer = WidgetTree->ConstructWidget<UBorder>();

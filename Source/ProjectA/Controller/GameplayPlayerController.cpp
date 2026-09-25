@@ -298,7 +298,7 @@ void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName Off
     }
     if (bSucceeded)
     {
-        if (bItemShop) Error = OfferId == FRunItemShopState::GetRerollOfferId() ? NSLOCTEXT("RunItemShop", "Rerolled", "아이템 상점의 상품을 다시 추첨했습니다.") : NSLOCTEXT("RunItemShop", "Purchased", "아이템을 구매했습니다. 현재는 보관만 하며 장착 효과는 적용되지 않습니다.");
+        if (bItemShop) Error = OfferId == FRunItemShopState::GetRerollOfferId() ? NSLOCTEXT("RunItemShop", "Rerolled", "아이템 상점의 상품을 다시 추첨했습니다.") : NSLOCTEXT("RunItemShop", "PurchasedEquipment", "아이템을 구매했습니다. 장착 가능한 아이템은 장비 슬롯으로 드래그하세요.");
         else Error = OfferId == FRunSkillShopState::GetRecoveryOfferId() ? NSLOCTEXT("RunSkillShop", "Recovered", "HP를 회복했습니다.") : NSLOCTEXT("RunSkillShop", "Purchased", "스킬을 구매했습니다. 다음 전투부터 사용할 수 있습니다.");
     }
     ClientReceiveShopPurchaseResult(bSucceeded, Error, bSucceeded && bItemShop ? CurrentRun->GetItemShopState().Revision : INDEX_NONE);
@@ -309,6 +309,62 @@ void AGameplayPlayerController::ClientReceiveShopPurchaseResult_Implementation(b
     PendingItemShopRevision = bSucceeded ? ConfirmedItemShopRevision : INDEX_NONE;
     bShopPurchasePending = PendingItemShopRevision != INDEX_NONE;
     ShopPurchaseMessage = Message;
+    RefreshGameplayFlow();
+}
+
+bool AGameplayPlayerController::CanChangeEquipment(const FGameplayViewState& View, FGuid CharacterId) const
+{
+    if (!IsLocalController() || View.Phase != ERunPhase::Shop || RunParticipantAccount.IsEmpty() || bEquipmentChangePending || !View.EquipmentEditableCharacterIds.Contains(CharacterId)) return false;
+    return View.PartyMembers.ContainsByPredicate([this, CharacterId](const FRunPartyMember& Member) { return Member.bCreated && Member.CharacterId == CharacterId && Member.OwnerAccountId == RunParticipantAccount; });
+}
+
+void AGameplayPlayerController::RequestChangeEquipment(const FRunEquipmentCommand& Command)
+{
+    if (!IsLocalController() || bEquipmentChangePending || !Command.CharacterId.IsValid() || Command.ItemIndex < 0) return;
+    EquipmentMessage = FText::GetEmpty();
+    PendingEquipmentCharacterId = Command.CharacterId;
+    PendingEquipmentRevision = INDEX_NONE;
+    bEquipmentChangePending = true;
+    RefreshGameplayFlow();
+    if (HasAuthority()) ExecuteEquipmentChange(Command);
+    else ServerChangeEquipment(Command);
+}
+
+void AGameplayPlayerController::ServerChangeEquipment_Implementation(const FRunEquipmentCommand& Command)
+{
+    ExecuteEquipmentChange(Command);
+}
+
+void AGameplayPlayerController::ExecuteEquipmentChange(const FRunEquipmentCommand& Command)
+{
+    if (!HasAuthority()) return;
+    const AGameplayGameState* State = GetWorld() ? GetWorld()->GetGameState<AGameplayGameState>() : nullptr;
+    const ADevelopmentCoopLobby* Lobby = State ? State->GetDevelopmentLobby() : nullptr;
+    if (Lobby && (!Lobby->HasStarted() || Lobby->GetMembers().ContainsByPredicate([](const FDevelopmentCoopMember& Member) { return !Member.bConnected; })))
+    {
+        ClientReceiveEquipmentResult(Command.CharacterId, false, NSLOCTEXT("RunEquipment", "Disconnected", "협동 참가자의 연결 상태를 확인해 주세요."), INDEX_NONE);
+        return;
+    }
+    FText Error = NSLOCTEXT("RunEquipment", "UnboundOwner", "현재 연결에 배정된 캐릭터의 장비만 변경할 수 있습니다.");
+    const AGameplayGameModeBase* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGameplayGameModeBase>() : nullptr;
+    FRunAccountId AccountId;
+    bool bSucceeded = false;
+    if (Mode && Mode->ResolveRunParticipant(this, AccountId))
+    {
+        if (AEncounterManager* Manager = Mode->GetEncounterManager()) bSucceeded = Manager->ChangeEquipment(AccountId, Command, Error);
+    }
+    const URunStateSubsystem* CurrentRun = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    const FRunPartyMember* Member = CurrentRun ? CurrentRun->GetPartyMembers().FindByPredicate([&Command](const FRunPartyMember& Entry) { return Entry.CharacterId == Command.CharacterId; }) : nullptr;
+    if (bSucceeded) Error = NSLOCTEXT("RunEquipment", "Changed", "장비 구성을 저장했습니다.");
+    ClientReceiveEquipmentResult(Command.CharacterId, bSucceeded, Error, bSucceeded && Member ? Member->Equipment.Revision : INDEX_NONE);
+}
+
+void AGameplayPlayerController::ClientReceiveEquipmentResult_Implementation(FGuid CharacterId, bool bSucceeded, const FText& Message, int32 ConfirmedRevision)
+{
+    if (!bEquipmentChangePending || PendingEquipmentCharacterId != CharacterId) return;
+    PendingEquipmentRevision = bSucceeded ? ConfirmedRevision : INDEX_NONE;
+    bEquipmentChangePending = PendingEquipmentRevision != INDEX_NONE;
+    EquipmentMessage = Message;
     RefreshGameplayFlow();
 }
 
@@ -388,6 +444,25 @@ bool AGameplayPlayerController::CanRetryGameplayRecovery() const
 void AGameplayPlayerController::RefreshGameplayFlow()
 {
     const ERunPhase CurrentPhase = HasAuthority() && RunState ? RunState->GetPhase() : GameplayState ? GameplayState->GetViewState().Phase : ERunPhase::None;
+    if (CurrentPhase != ERunPhase::Shop)
+    {
+        EquipmentMessage = FText::GetEmpty();
+        bEquipmentChangePending = false;
+        PendingEquipmentCharacterId.Invalidate();
+        PendingEquipmentRevision = INDEX_NONE;
+    }
+    else if (PendingEquipmentRevision != INDEX_NONE)
+    {
+        // Wait for the committed equipment projection as well as the request result.
+        // 요청 결과와 함께 저장된 장비의 표시 뷰가 도착할 때까지 기다립니다.
+        const TArray<FRunPartyMember>* Members = HasAuthority() && RunState ? &RunState->GetPartyMembers() : GameplayState ? &GameplayState->GetViewState().PartyMembers : nullptr;
+        const FRunPartyMember* Member = Members ? Members->FindByPredicate([this](const FRunPartyMember& Entry) { return Entry.CharacterId == PendingEquipmentCharacterId; }) : nullptr;
+        if (Member && Member->Equipment.Revision >= PendingEquipmentRevision)
+        {
+            bEquipmentChangePending = false;
+            PendingEquipmentRevision = INDEX_NONE;
+        }
+    }
     if (CurrentPhase != ERunPhase::Shop)
     {
         ShopPurchaseMessage = FText::GetEmpty();

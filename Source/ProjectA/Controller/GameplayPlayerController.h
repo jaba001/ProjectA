@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Controller/PartyPlayerController.h"
+#include "Game/Run/RunEquipmentTypes.h"
 #include "GameplayPlayerController.generated.h"
 
 class AEncounterManager;
@@ -36,6 +37,10 @@ public:
     FGuid GetShopBuyerCharacterId(const FGameplayViewState& View) const;
     const FText& GetShopPurchaseMessage() const { return ShopPurchaseMessage; }
     bool IsShopPurchasePending() const { return bShopPurchasePending; }
+    void RequestChangeEquipment(const FRunEquipmentCommand& Command);
+    bool CanChangeEquipment(const FGameplayViewState& View, FGuid CharacterId) const;
+    bool IsEquipmentChangePending() const { return bEquipmentChangePending; }
+    const FText& GetEquipmentMessage() const { return EquipmentMessage; }
 
     void RequestSelectGoldReward(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex);
     FGuid GetRewardCharacterId(const FGameplayViewState& View) const;
@@ -62,6 +67,7 @@ private:
 
     void RefreshGameplayFlow();
     void ExecuteShopPurchase(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision);
+    void ExecuteEquipmentChange(const FRunEquipmentCommand& Command);
     void ExecuteGoldRewardSelection(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex);
 
     UFUNCTION(Server, Reliable)
@@ -76,6 +82,12 @@ private:
     UFUNCTION(Client, Reliable)
     void ClientReceiveShopPurchaseResult(bool bSucceeded, const FText& Message, int32 ConfirmedItemShopRevision);
 
+    UFUNCTION(Server, Reliable)
+    void ServerChangeEquipment(const FRunEquipmentCommand& Command);
+
+    UFUNCTION(Client, Reliable)
+    void ClientReceiveEquipmentResult(FGuid CharacterId, bool bSucceeded, const FText& Message, int32 ConfirmedRevision);
+
     UFUNCTION()
     void OnRep_RunParticipantAccount();
 
@@ -87,6 +99,10 @@ private:
     FText ShopPurchaseMessage;
     bool bShopPurchasePending = false;
     int32 PendingItemShopRevision = INDEX_NONE;
+    FText EquipmentMessage;
+    bool bEquipmentChangePending = false;
+    FGuid PendingEquipmentCharacterId;
+    int32 PendingEquipmentRevision = INDEX_NONE;
     FText RewardSelectionMessage;
     FGuid PendingRewardCharacterId;
     FName PendingRewardNodeId;

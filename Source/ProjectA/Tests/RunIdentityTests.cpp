@@ -185,6 +185,11 @@ namespace
         Save->Version = 1;
         Save->EncounterProgress = FRunEncounterProgress();
         Save->ItemShopState = FRunItemShopState();
+        for (FRunPartyMember& Member : Save->Party)
+        {
+            Member.Items.Reset();
+            Member.Equipment = FRunEquipmentState();
+        }
         TArray<uint8> Bytes;
         if (!UGameplayStatics::SaveGameToMemory(Save, Bytes))
         {

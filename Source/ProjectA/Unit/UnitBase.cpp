@@ -2,6 +2,7 @@
 #include "Unit/UnitCharacterMovementComponent.h"
 #include "Unit/UnitDataRules.h"
 #include "Unit/CharacterAppearanceComponent.h"
+#include "Unit/CharacterEquipmentComponent.h"
 
 #include "Kismet/GameplayStatics.h"
 #include "Components/CapsuleComponent.h"
@@ -39,6 +40,7 @@ AUnitBase::AUnitBase(const FObjectInitializer& ObjectInitializer)
     AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystem"));
     AttributeSet = CreateDefaultSubobject<UAS_Unit>(TEXT("AttributeSet"));
     CharacterAppearance = CreateDefaultSubobject<UCharacterAppearanceComponent>(TEXT("CharacterAppearance"));
+    CharacterEquipment = CreateDefaultSubobject<UCharacterEquipmentComponent>(TEXT("CharacterEquipment"));
 
     AbilitySystem->SetIsReplicated(true);
     // AI-controlled units expose attributes and cues without a player-owned ASC.
@@ -159,7 +161,9 @@ void AUnitBase::RefreshSkillPresentation()
     {
         const FObjectPropertyBase* Property = FindFProperty<FObjectPropertyBase>(GetClass(), Entry.Key);
         UStaticMeshComponent* Weapon = Property ? Cast<UStaticMeshComponent>(Property->GetObjectPropertyValue_InContainer(this)) : nullptr;
-        if (Weapon && Weapon->GetOwner() == this) Weapon->SetVisibility(Entry.Value);
+        // Retain the authored trace proxy while the saved item loadout supplies its visible mesh.
+        // 저장된 아이템 장착이 실제 표시 메시를 제공하되 기존 판정 프록시는 유지합니다.
+        if (Weapon && Weapon->GetOwner() == this) Weapon->SetVisibility(Entry.Value && (!CharacterEquipment || !CharacterEquipment->HasEquipmentLoadout()));
     }
 }
 

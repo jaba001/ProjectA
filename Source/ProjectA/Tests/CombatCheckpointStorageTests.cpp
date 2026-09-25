@@ -385,6 +385,11 @@ bool FCombatCheckpointCorruptLoadTest::RunTest(const FString& Parameters)
     Disk->Version = 1;
     Disk->EncounterProgress = FRunEncounterProgress();
     Disk->ItemShopState = FRunItemShopState();
+    for (FRunPartyMember& Member : Disk->Party)
+    {
+        Member.Items.Reset();
+        Member.Equipment = FRunEquipmentState();
+    }
     Disk->Identity = FRunIdentityData();
     Disk->Party[0].CharacterId.Invalidate();
     Disk->Party[0].OwnerAccountId = FRunAccountId();
@@ -612,6 +617,8 @@ bool FCombatLegacyRoundCheckpointTest::RunTest(const FString& Parameters)
     {
         Member.CharacterId.Invalidate();
         Member.OwnerAccountId = FRunAccountId();
+        Member.Items.Reset();
+        Member.Equipment = FRunEquipmentState();
     }
     if (!TestTrue(TEXT("A metadata-free map checkpoint is installed"), FRunCheckpointStorage::Save(Legacy.Get(), Fixture.Slot, Error)) || !TestTrue(TEXT("Legacy Continue retains offline identity"), Fixture.Run->LoadStandaloneCheckpoint(Error)) || !TestTrue(TEXT("Legacy progression enters a new encounter"), Fixture.Run->BeginEncounter(TEXT("Combat_01")) && Fixture.Run->MarkCombatStarted())) return false;
     FCombatCheckpointData Ready = Fixture.MakeRoundCheckpoint();

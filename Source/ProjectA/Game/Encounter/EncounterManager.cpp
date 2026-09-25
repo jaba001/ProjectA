@@ -15,6 +15,7 @@
 #include "EngineUtils.h"
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunParticipationLibrary.h"
 #include "Game/GameModes/GameplayGameModeBase.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
@@ -25,6 +26,7 @@
 #include "Unit/EnemyUnit.h"
 #include "Unit/PlayerUnit.h"
 #include "Unit/CharacterAppearanceComponent.h"
+#include "Unit/CharacterEquipmentComponent.h"
 
 AEncounterManager::AEncounterManager()
 {
@@ -287,6 +289,16 @@ bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FTe
         Unit->UnitIndex = Saved.RoundUnitId;
         Unit->RuntimeCharacterName = Saved.CharacterName;
         if (!Unit->CharacterAppearance || !Unit->CharacterAppearance->SetAppearance(Unit->CharacterAppearance->AppearanceCatalog, Saved.Appearance)) return FailRestore();
+        if (Saved.Team == ETeam::Player)
+        {
+            const FRunPartyMember* Member = RunState->GetPartyMembers().FindByPredicate([&Saved](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.SlotIndex == Saved.PartySlot && Candidate.CharacterId == Saved.CharacterId && Candidate.OwnerAccountId == Saved.OwnerAccountId; });
+            TArray<FRunEquipmentVisual> Visuals;
+            if (!Member || !RunEquipmentRules::BuildVisuals(*Member, Visuals, OutError) || !Unit->CharacterEquipment || !Unit->CharacterEquipment->SetEquipment(Member->Equipment.bHasLoadout, Visuals))
+            {
+                if (OutError.IsEmpty()) OutError = NSLOCTEXT("Encounter", "RestoreEquipment", "저장된 캐릭터 장비 메시를 복구하지 못했습니다.");
+                return FailRestore();
+            }
+        }
         Unit->SetTeam(Saved.Team);
         Unit->HealingItemCount = Saved.HealingItemCount;
         Unit->HealingItemAmount = Saved.HealingItemAmount;
@@ -470,6 +482,12 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         {
             return false;
         }
+        TArray<FRunEquipmentVisual> EquipmentVisuals;
+        if (!RunEquipmentRules::BuildVisuals(Member, EquipmentVisuals, FlowMessage) || !Unit->CharacterEquipment || !Unit->CharacterEquipment->SetEquipment(Member.Equipment.bHasLoadout, EquipmentVisuals))
+        {
+            if (FlowMessage.IsEmpty()) FlowMessage = NSLOCTEXT("Encounter", "PartyEquipment", "캐릭터의 장착 아이템 메시를 적용하지 못했습니다.");
+            return false;
+        }
         Unit->RuntimeCharacterName = Member.CharacterName;
         Unit->SetTeam(ETeam::Player);
         Unit->SetCurrentTile(Tile);
@@ -643,6 +661,16 @@ bool AEncounterManager::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, F
     if (!HasAuthority() || bShuttingDown || bPreparing || bPreparationAbortPending || PendingResult != ECombatResult::None || !RunState || RunState->GetPhase() != ERunPhase::Shop) return false;
     if (!ValidateManagedExecution(OutError)) return false;
     const bool bSucceeded = RunState->PurchaseShopOffer(BuyerAccountId, CharacterId, OfferId, OutError, ExpectedItemShopRevision);
+    OnFlowChanged.Broadcast();
+    return bSucceeded;
+}
+
+bool AEncounterManager::ChangeEquipment(const FRunAccountId& AccountId, const FRunEquipmentCommand& Command, FText& OutError)
+{
+    OutError = NSLOCTEXT("RunEquipment", "ShopOnly", "장비 변경은 상점 페이즈에서만 가능합니다.");
+    if (!HasAuthority() || bShuttingDown || bPreparing || bPreparationAbortPending || PendingResult != ECombatResult::None || !RunState || RunState->GetPhase() != ERunPhase::Shop) return false;
+    if (!ValidateManagedExecution(OutError)) return false;
+    const bool bSucceeded = RunState->ChangeEquipment(AccountId, Command, OutError);
     OnFlowChanged.Broadcast();
     return bSucceeded;
 }
