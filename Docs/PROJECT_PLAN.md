@@ -174,6 +174,12 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 ## 콘텐츠·UI 설정
 
+### 4-1 스킬 이펙트 에셋 목록
+
+[SKILL_EFFECT_ASSETS.csv](SKILL_EFFECT_ASSETS.csv)는 로컬 Content의 17개 최상위 폴더에서 효과 시스템 489개(NiagaraSystem 343·ParticleSystem 146)와 스킬 구성 Blueprint 88개를 정리한다. `계열·세부 분류·속성/테마·에셋 형식·원본 팩·위치·에셋 이름·분류 근거·확인 사항`을 기록하며 UTF-8 BOM CSV로 저장한다. 원본 팩은 최상위 폴더명이다. Blueprint에는 효과 Actor·생성 래퍼·Trail 애니메이션 알림을 포함하고 기반 BP를 구분한다. 재질·텍스처·메시·하위 NiagaraEmitter·모듈·데모 재생 도구는 제외한다.
+
+클래스·객체명은 엔진을 실행하지 않고 uasset의 AssetRegistry 및 최상위 Export 메타데이터로 확인했다. 시각 형태와 테마는 이름·폴더에서 분류하며 실제 재생·지속 피해·유도 이동·능력치·GAS 태그 연결을 의미하지 않는다. 마법진과 장판, 투사체 본체와 Trail, 시스템과 Blueprint 및 Niagara/Cascade 변형은 별도 항목이다. 동명 에셋은 전체 경로로 구분하고 원본 오타·Old/Charged 변형을 보존한다. `P_Warrior_Swipe`의 패키지 파일명 `P_Warrior_sWIPE` 차이는 확인 사항에 남겼다. [사용자 확인](TODO.md#2-34-스킬-이펙트-csv-분류)
+
 ### 개발용 협동 진입
 
 Non-Shipping MainMenu의 **게임 시작 → 멀티플레이**는 같은 PC·LAN의 새 2~4인 개발용 방으로 연결한다. 첫 화면의 별도 개발용 협동 버튼은 제거했다. `UGameModeSelectionWidget`은 싱글플레이 선택 시 기존 CharacterCreation, 멀티플레이 선택 시 `UDevelopmentCoopWidget`을 연다. Host는 `OpenLevel(..., listen?ProjectADevCoop=2~4)`, Client는 정규화한 IPv4:포트로 `ClientTravel`을 사용한다. 기본 포트는 7777이며 별도 세션 검색·온라인 인증은 없다.

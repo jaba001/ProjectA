@@ -106,6 +106,7 @@ UI는 1920×1080을 기준으로 뷰포트에 맞춰 같은 비율로 확대·�
 | [MULTIPLAYER](Docs/MULTIPLAYER.md) | 식별·소유권·저장·네트워크 계약 |
 | [HISTORY](Docs/HISTORY.md) | 완료 이력·검증 결과·기준 커밋 |
 | [WEAPON_ASSETS.csv](Docs/WEAPON_ASSETS.csv) | 로컬 무기·방패·발사체 메시 295개의 종류·`/Game` 폴더 위치·에셋 이름. 이름·폴더·저장된 미리보기 기준으로 분류하고 사용자 결정으로 14개를 `기타`로 통합. 아이콘·재질·애니메이션·부속품 제외 |
+| [SKILL_EFFECT_ASSETS.csv](Docs/SKILL_EFFECT_ASSETS.csv) | VFX 577개: NiagaraSystem 343·ParticleSystem 146·효과 구성 Blueprint 88. Slash/Trail·마법 투사체·장판·빔·폭발·보호막 등의 시각 형태와 테마·클래스·원본 위치·이름·확인 사항. 이름·경로 기반 분류이며 실제 재생·게임 효과 연결은 미확인 |
 
 [아이템 클론 기획](Docs/GAME_DESIGN.md#7-아이템-클론-기획)은 For The King 1·2를 참고한 42개 항목과 작품별 차이·데이터 변환 항목을 제공한다. 시간차 전투를 유지하며 집중(Focus) 자원·집중초·회복/소모형 효과는 기획에서 제외했다. [FTK2 설치본 Build 24247341](Docs/GAME_DESIGN.md#7-11-ftk2-설치본-근거와-해석-범위)의 JSON으로 무기 판정·장비 보정·회복/방어 파이프·상점·직업 역할을 보충했다. 기획 제안이며 장비·거래·약초 시스템 구현과 원작 작동 검증은 포함하지 않는다. 나머지 채택 정책은 [후속 결정](Docs/TODO.md#3-2-아이템과-직업)에서 관리한다.
 
