@@ -7,11 +7,13 @@
 void UGameplayActionButton::Configure(FName InActionId, const FText& Label)
 {
     ActionId = InActionId;
-    UTextBlock* Text = NewObject<UTextBlock>(this);
+    UTextBlock* Text = Cast<UTextBlock>(GetContent());
+    if (!Text) Text = NewObject<UTextBlock>(this);
     Text->SetText(Label);
     const UDemonicUITheme& Theme = UDemonicUITheme::Get();
     Theme.StyleText(Text, false, 18);
-    UButtonSlot* ButtonSlot = Cast<UButtonSlot>(AddChild(Text));
+    UButtonSlot* ButtonSlot = Cast<UButtonSlot>(Text->Slot);
+    if (!ButtonSlot) ButtonSlot = Cast<UButtonSlot>(AddChild(Text));
 
     if (ButtonSlot)
     {

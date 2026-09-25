@@ -12,6 +12,7 @@ class UTextBlock;
 class UTexture2D;
 class UVerticalBox;
 class UWidgetTree;
+struct FGameplayTagContainer;
 
 UCLASS()
 class PROJECTA_API UDemonicUITheme : public UObject
@@ -26,8 +27,14 @@ public:
     void StyleButton(UButton* Button, bool bPrimary = false) const;
     void StyleText(UTextBlock* Text, bool bHeading = false, int32 FontSize = 0) const;
     void StylePanel(UBorder* Panel) const;
+    void StyleInset(UBorder* Panel) const;
+    void StyleSlot(UBorder* Panel, bool bOccupied = false) const;
+    void StyleSectionHeader(UBorder* Panel) const;
     void StyleBackdrop(UBorder* Background) const;
     void StyleBackgroundImage(UImage* Background) const;
+    void SetEquipmentIcon(UImage* Image, FName SlotId) const;
+    void SetItemIcon(UImage* Image, const FGameplayTagContainer& ItemTags) const;
+    void SetEquipmentBackdrop(UImage* Image) const;
     void AddDivider(UWidgetTree* Tree, UVerticalBox* Parent) const;
 
 private:
@@ -57,6 +64,18 @@ private:
     TObjectPtr<UTexture2D> CheckSelected;
     UPROPERTY()
     TObjectPtr<UTexture2D> DividerTexture;
+    UPROPERTY()
+    TObjectPtr<UTexture2D> SlotTexture;
+    UPROPERTY()
+    TObjectPtr<UTexture2D> SectionHeaderTexture;
+    UPROPERTY()
+    TObjectPtr<UTexture2D> EquipmentBackdropTexture;
+    UPROPERTY()
+    TObjectPtr<UTexture2D> ItemFallbackTexture;
+    UPROPERTY()
+    TMap<FName, TObjectPtr<UTexture2D>> EquipmentIcons;
+    UPROPERTY()
+    TMap<FName, TObjectPtr<UTexture2D>> ItemCategoryIcons;
 };
 
 UCLASS()

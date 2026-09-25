@@ -2,16 +2,24 @@
 #include "Blueprint/WidgetTree.h"
 #include "CommonInputModeTypes.h"
 #include "Components/Border.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/ScaleBox.h"
+#include "Components/ScrollBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Controller/GameplayPlayerController.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/EngineBaseTypes.h"
 #include "Game/GameState/GameplayViewTypes.h"
 #include "UI/Gameplay/GameplayActionButton.h"
+#include "UI/Gameplay/CharacterEquipmentPanel.h"
+#include "UI/Gameplay/CharacterInventoryPanel.h"
 #include "UI/Theme/DemonicUITheme.h"
 
 TOptional<FUIInputConfig> URunEncounterWidget::GetDesiredInputConfig() const
@@ -30,24 +38,45 @@ void URunEncounterWidget::NativeOnInitialized()
     UOverlaySlot* BackgroundSlot = Root->AddChildToOverlay(Background);
     BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
     BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
+    UScaleBox* Fit = WidgetTree->ConstructWidget<UScaleBox>();
+    Fit->SetStretch(EStretch::ScaleToFit);
+    Fit->SetStretchDirection(EStretchDirection::DownOnly);
+    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Fit);
+    ContentSlot->SetHorizontalAlignment(HAlign_Fill);
+    ContentSlot->SetVerticalAlignment(VAlign_Fill);
+    ContentSlot->SetPadding(FMargin(32.0f, 64.0f, 32.0f, 32.0f));
+    UHorizontalBox* Columns = WidgetTree->ConstructWidget<UHorizontalBox>();
+    Fit->SetContent(Columns);
+    EquipmentSize = WidgetTree->ConstructWidget<USizeBox>();
+    EquipmentSize->SetWidthOverride(300.0f);
+    EquipmentSize->SetHeightOverride(840.0f);
+    EquipmentPanel = CreateWidget<UCharacterEquipmentPanel>(GetOwningPlayer());
+    EquipmentSize->SetContent(EquipmentPanel);
+    Columns->AddChildToHorizontalBox(EquipmentSize)->SetPadding(FMargin(0.0f, 0.0f, 16.0f, 0.0f));
+    MerchantSize = WidgetTree->ConstructWidget<USizeBox>();
+    MerchantSize->SetWidthOverride(620.0f);
+    MerchantSize->SetHeightOverride(840.0f);
+    Columns->AddChildToHorizontalBox(MerchantSize);
     UBorder* Panel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("EncounterPanel"));
     Theme.StylePanel(Panel);
-    Panel->SetPadding(FMargin(32.0f));
-    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Panel);
-    ContentSlot->SetHorizontalAlignment(HAlign_Center);
-    ContentSlot->SetVerticalAlignment(VAlign_Center);
-    ContentSlot->SetPadding(FMargin(24.0f));
-    USizeBox* ContentSize = WidgetTree->ConstructWidget<USizeBox>();
-    ContentSize->SetMinDesiredWidth(600.0f);
-    ContentSize->SetMaxDesiredWidth(680.0f);
-    Panel->SetContent(ContentSize);
+    Panel->SetPadding(FMargin(24.0f, 40.0f, 24.0f, 24.0f));
+    MerchantSize->SetContent(Panel);
     UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>();
-    ContentSize->SetContent(Content);
+    Panel->SetContent(Content);
+    UBorder* TitleBar = WidgetTree->ConstructWidget<UBorder>();
+    Theme.StyleSectionHeader(TitleBar);
+    TitleBar->SetPadding(FMargin(20.0f, 8.0f));
+    Content->AddChildToVerticalBox(TitleBar);
     Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_EncounterTitle"));
-    Content->AddChildToVerticalBox(Title);
+    Title->SetJustification(ETextJustify::Center);
+    TitleBar->SetContent(Title);
     Theme.AddDivider(WidgetTree, Content);
+    UScrollBox* MerchantScroll = WidgetTree->ConstructWidget<UScrollBox>();
+    MerchantScroll->SetOrientation(Orient_Vertical);
+    MerchantScroll->SetConsumeMouseWheel(EConsumeMouseWheel::WhenScrollingPossible);
+    Content->AddChildToVerticalBox(MerchantScroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     Actions = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("EncounterActions"));
-    Content->AddChildToVerticalBox(Actions);
+    MerchantScroll->AddChild(Actions);
     for (int32 Index = 0; Index < 3; ++Index)
     {
         UGameplayActionButton* Button = WidgetTree->ConstructWidget<UGameplayActionButton>();
@@ -57,30 +86,39 @@ void URunEncounterWidget::NativeOnInitialized()
     }
     ShopBalance = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_ShopBalance"));
     Actions->AddChildToVerticalBox(ShopBalance)->SetPadding(FMargin(0.0f, 5.0f));
-    ShopInventory = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_ShopInventory"));
-    Actions->AddChildToVerticalBox(ShopInventory)->SetPadding(FMargin(0.0f, 5.0f));
+    ShopBalance->SetAutoWrapText(true);
+    ShopBalance->SetWrapTextAt(540.0f);
     ShopHint = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_ShopHint"));
     ShopHint->SetAutoWrapText(true);
-    ShopHint->SetWrapTextAt(600.f);
+    ShopHint->SetWrapTextAt(540.0f);
     Actions->AddChildToVerticalBox(ShopHint)->SetPadding(FMargin(0.0f, 5.0f));
     ShopActions = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("ShopActions"));
     Actions->AddChildToVerticalBox(ShopActions);
     RecoveryButton = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), TEXT("Button_ShopRecovery"));
     RecoveryButton->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandlePurchase);
-    Actions->AddChildToVerticalBox(RecoveryButton)->SetPadding(FMargin(0.0f, 5.0f));
+    Content->AddChildToVerticalBox(RecoveryButton)->SetPadding(FMargin(0.0f, 5.0f));
     RerollButton = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), TEXT("Button_ShopReroll"));
     RerollButton->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandlePurchase);
-    Actions->AddChildToVerticalBox(RerollButton)->SetPadding(FMargin(0.0f, 5.0f));
+    Content->AddChildToVerticalBox(RerollButton)->SetPadding(FMargin(0.0f, 5.0f));
     LeaveButton = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), TEXT("Button_LeaveShop"));
     LeaveButton->Configure(TEXT("Leave"), NSLOCTEXT("RunEncounter", "Leave", "나가기"));
     LeaveButton->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandleLeave);
-    Actions->AddChildToVerticalBox(LeaveButton)->SetPadding(FMargin(0.0f, 5.0f));
+    Content->AddChildToVerticalBox(LeaveButton)->SetPadding(FMargin(0.0f, 5.0f));
     Message = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_EncounterMessage"));
     Message->SetAutoWrapText(true);
-    Message->SetWrapTextAt(600.f);
-    Content->AddChildToVerticalBox(Message)->SetPadding(FMargin(0.0f, 16.0f, 0.0f, 0.0f));
+    Message->SetWrapTextAt(540.0f);
+    Content->AddChildToVerticalBox(Message)->SetPadding(FMargin(0.0f, 8.0f, 0.0f, 0.0f));
+    InventorySize = WidgetTree->ConstructWidget<USizeBox>();
+    InventorySize->SetWidthOverride(430.0f);
+    InventorySize->SetHeightOverride(840.0f);
+    InventoryPanel = CreateWidget<UCharacterInventoryPanel>(GetOwningPlayer());
+    InventorySize->SetContent(InventoryPanel);
+    Columns->AddChildToHorizontalBox(InventorySize)->SetPadding(FMargin(16.0f, 0.0f, 0.0f, 0.0f));
     Theme.ApplyControls(WidgetTree);
     Theme.StyleText(Title, true, 28);
+    Theme.StyleText(ShopBalance, true, 18);
+    Theme.StyleText(ShopHint, false, 14);
+    Theme.StyleText(Message, false, 14);
 }
 
 void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool bAllowRunCommands)
@@ -93,10 +131,21 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     const FRunShopBuyerView* BuyerView = Buyer ? View.ShopBuyerViews.FindByPredicate([this](const FRunShopBuyerView& Entry) { return Entry.CharacterId == BuyerCharacterId; }) : nullptr;
     const bool bInShop = View.Phase == ERunPhase::Shop;
     const bool bItemShop = bInShop && View.EncounterProgress.IsItemShop();
+    const UDemonicUITheme& Theme = UDemonicUITheme::Get();
+    EquipmentSize->SetVisibility(bInShop ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+    InventorySize->SetVisibility(bInShop ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+    MerchantSize->SetHeightOverride(bInShop ? 840.0f : 440.0f);
+    if (bInShop)
+    {
+        // Reading owned inventory remains available when the character cannot buy, including after death.
+        // 사망 등으로 구매할 수 없어도 본인 캐릭터의 보유 현황은 계속 열람합니다.
+        const FGuid InventoryCharacterId = Controller ? Controller->GetInventoryCharacterId(View) : FGuid();
+        EquipmentPanel->RefreshEquipment(View, InventoryCharacterId);
+        InventoryPanel->RefreshInventory(View, InventoryCharacterId);
+    }
     ItemShopRevision = bItemShop ? View.ItemShopState.Revision : INDEX_NONE;
     ShopBalance->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     ShopHint->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    ShopInventory->SetVisibility(bItemShop && Buyer ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     ShopActions->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     RecoveryButton->SetVisibility(bInShop && !bItemShop && View.SkillShopState.SchemaVersion == 1 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     RerollButton->SetVisibility(bItemShop && View.ItemShopState.SchemaVersion == 1 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -106,42 +155,70 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
         if (Buyer && BuyerView) ShopBalance->SetText(FText::Format(NSLOCTEXT("RunSkillShop", "BalanceAndHP", "{0} · 보유 골드 {1}G · HP {2}/{3}"), Buyer->CharacterName, FText::AsNumber(Buyer->Gold), FText::AsNumber(Buyer->CurrentHP), FText::AsNumber(BuyerView->MaxHP)));
         if (bItemShop)
         {
-            ShopHint->SetText(View.ItemShopState.SchemaVersion == 0 ? NSLOCTEXT("RunItemShop", "LegacyRun", "이전 저장에는 아이템 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다.") : NSLOCTEXT("RunItemShop", "Rules", "중복 없이 5개 추첨 · 리롤로 전체 상품 갱신\n구매한 아이템은 본인 캐릭터에 보관되며 장착 효과는 아직 없습니다."));
-            if (Buyer)
-            {
-                ShopInventory->SetText(FText::Format(NSLOCTEXT("RunItemShop", "Inventory", "보유 아이템 {0}개 · 이름은 마우스를 올려 확인"), FText::AsNumber(Buyer->Items.Num())));
-                TArray<FString> ItemNames;
-                for (const FRunItemDefinition& Item : Buyer->Items) ItemNames.Add(Item.DisplayName.ToString());
-                ShopInventory->SetToolTipText(ItemNames.IsEmpty() ? NSLOCTEXT("RunItemShop", "EmptyInventory", "보유한 아이템이 없습니다.") : FText::FromString(FString::Join(ItemNames, TEXT("\n"))));
-            }
+            ShopHint->SetText(View.ItemShopState.SchemaVersion == 0 ? NSLOCTEXT("RunItemShop", "LegacyRun", "이전 저장에는 아이템 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다.") : NSLOCTEXT("RunItemShop", "InventoryRules", "중복 없이 5개 추첨 · 구매한 아이템은 오른쪽 인벤토리에 보관됩니다."));
         }
         else ShopHint->SetText(View.SkillShopState.SchemaVersion == 0 ? NSLOCTEXT("RunSkillShop", "LegacyRun", "이전 저장에는 스킬 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다.") : NSLOCTEXT("RunSkillShop", "Rules", "구매한 스킬은 본인 캐릭터에만 적용되며 Run 동안 유지됩니다. 같은 스킬은 한 번만 구매할 수 있습니다."));
         const int32 OfferCount = bItemShop ? View.ItemShopState.Offers.Num() : View.SkillShopState.Offers.Num();
         while (ShopButtons.Num() < OfferCount)
         {
+            UBorder* Card = WidgetTree->ConstructWidget<UBorder>();
+            Theme.StyleInset(Card);
+            Card->SetPadding(FMargin(12.0f));
+            ShopActions->AddChildToVerticalBox(Card)->SetPadding(FMargin(0.0f, 4.0f));
+            ShopCards.Add(Card);
+            UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
+            Card->SetContent(Row);
+            USizeBox* IconSize = WidgetTree->ConstructWidget<USizeBox>();
+            IconSize->SetWidthOverride(44.0f);
+            IconSize->SetHeightOverride(44.0f);
+            UHorizontalBoxSlot* IconSlot = Row->AddChildToHorizontalBox(IconSize);
+            IconSlot->SetVerticalAlignment(VAlign_Center);
+            IconSlot->SetPadding(FMargin(0.0f, 0.0f, 10.0f, 0.0f));
+            UImage* Icon = WidgetTree->ConstructWidget<UImage>();
+            IconSize->SetContent(Icon);
+            ShopIcons.Add(Icon);
+            UVerticalBox* Info = WidgetTree->ConstructWidget<UVerticalBox>();
+            UHorizontalBoxSlot* InfoSlot = Row->AddChildToHorizontalBox(Info);
+            InfoSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+            InfoSlot->SetVerticalAlignment(VAlign_Center);
+            InfoSlot->SetPadding(FMargin(0.0f, 0.0f, 8.0f, 0.0f));
+            UTextBlock* Name = WidgetTree->ConstructWidget<UTextBlock>();
+            Name->SetAutoWrapText(true);
+            Name->SetWrapTextAt(320.0f);
+            Name->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
+            Theme.StyleText(Name, true, 17);
+            Info->AddChildToVerticalBox(Name);
+            ShopNames.Add(Name);
+            UTextBlock* Price = WidgetTree->ConstructWidget<UTextBlock>();
+            Theme.StyleText(Price, false, 14);
+            Info->AddChildToVerticalBox(Price)->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 0.0f));
+            ShopPrices.Add(Price);
+            USizeBox* ButtonSize = WidgetTree->ConstructWidget<USizeBox>();
+            ButtonSize->SetWidthOverride(124.0f);
+            Row->AddChildToHorizontalBox(ButtonSize)->SetVerticalAlignment(VAlign_Center);
             UGameplayActionButton* Button = WidgetTree->ConstructWidget<UGameplayActionButton>();
             Button->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandlePurchase);
-            ShopActions->AddChildToVerticalBox(Button)->SetPadding(FMargin(0.0f, 5.0f));
+            ButtonSize->SetContent(Button);
             ShopButtons.Add(Button);
         }
         for (int32 Index = 0; Index < ShopButtons.Num(); ++Index)
         {
             UGameplayActionButton* Button = ShopButtons[Index];
             const bool bVisible = Index < OfferCount;
-            Button->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+            ShopCards[Index]->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
             if (!bVisible) continue;
             if (bItemShop)
             {
                 const FRunItemShopOffer& Offer = View.ItemShopState.Offers[Index];
                 const bool bAffordable = Buyer && Offer.Item.Price > 0 && Buyer->Gold >= Offer.Item.Price;
                 const FText Status = Offer.bSold ? NSLOCTEXT("RunItemShop", "Sold", "판매 완료") : bAffordable ? NSLOCTEXT("RunItemShop", "Buy", "구매") : NSLOCTEXT("RunItemShop", "CannotBuy", "구매 불가");
-                Button->Configure(Offer.OfferId, FText::Format(NSLOCTEXT("RunItemShop", "Product", "{0} · {1}G · {2}"), Offer.Item.DisplayName, FText::AsNumber(Offer.Item.Price), Status));
-                if (UTextBlock* ProductText = Cast<UTextBlock>(Button->GetContent()))
-                {
-                    ProductText->SetAutoWrapText(true);
-                    ProductText->SetWrapTextAt(560.f);
-                    ProductText->SetJustification(ETextJustify::Center);
-                }
+                Button->Configure(Offer.OfferId, Status);
+                ShopNames[Index]->SetText(Offer.Item.DisplayName);
+                ShopPrices[Index]->SetText(FText::Format(NSLOCTEXT("RunItemShop", "Price", "{0}G"), FText::AsNumber(Offer.Item.Price)));
+                Theme.SetItemIcon(ShopIcons[Index], Offer.Item.Tags);
+                ShopIcons[Index]->SetVisibility(ESlateVisibility::HitTestInvisible);
+                ShopCards[Index]->SetRenderOpacity(Offer.bSold ? 0.55f : 1.0f);
+                ShopCards[Index]->SetToolTipText(Offer.Item.DisplayName);
                 Button->SetToolTipText(Offer.Item.DisplayName);
                 Button->SetIsEnabled(View.ItemShopState.SchemaVersion == 1 && !Offer.bSold && bAffordable && Controller && !Controller->IsShopPurchasePending());
                 continue;
@@ -150,7 +227,14 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             const bool bOwned = Buyer && Buyer->Skills.Contains(Offer.Skill);
             const bool bAffordable = Buyer && Offer.Price > 0 && Buyer->Gold >= Offer.Price;
             const FText Status = bOwned ? NSLOCTEXT("RunSkillShop", "Owned", "보유 중") : bAffordable ? NSLOCTEXT("RunSkillShop", "Buy", "구매") : NSLOCTEXT("RunSkillShop", "CannotBuy", "구매 불가");
-            Button->Configure(Offer.OfferId, FText::Format(NSLOCTEXT("RunSkillShop", "Product", "{0} · {1}G · {2}"), Offer.DisplayName, FText::AsNumber(Offer.Price), Status));
+            Button->Configure(Offer.OfferId, Status);
+            ShopNames[Index]->SetText(Offer.DisplayName);
+            ShopPrices[Index]->SetText(FText::Format(NSLOCTEXT("RunSkillShop", "Price", "{0}G"), FText::AsNumber(Offer.Price)));
+            const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());
+            ShopIcons[Index]->SetVisibility(Skill && Skill->SkillIcon ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
+            if (Skill && Skill->SkillIcon) ShopIcons[Index]->SetBrushFromTexture(Skill->SkillIcon);
+            ShopCards[Index]->SetRenderOpacity(bOwned ? 0.55f : 1.0f);
+            ShopCards[Index]->SetToolTipText(Offer.Description);
             Button->SetToolTipText(Offer.Description);
             Button->SetIsEnabled(!bOwned && bAffordable && Controller && !Controller->IsShopPurchasePending());
         }
@@ -188,6 +272,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
         else DisplayMessage = bInShop ? NSLOCTEXT("RunSkillShop", "HostLeaves", "본인 캐릭터의 스킬과 HP 회복을 구매할 수 있습니다. 상점 나가기는 Host가 결정합니다.") : NSLOCTEXT("RunEncounter", "HostOnly", "Host의 진행을 기다리는 중입니다.");
     }
     Message->SetText(DisplayMessage);
+    Message->SetVisibility(DisplayMessage.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
     if (View.Phase == ERunPhase::EncounterChoice)
     {
         Title->SetText(NSLOCTEXT("RunEncounter", "Choose", "인카운터 선택"));

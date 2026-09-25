@@ -5,9 +5,8 @@
 #include "InventoryWidget.generated.h"
 
 class UButton;
-class UTextBlock;
-class UVerticalBox;
-class USkillDefinitionDataAsset;
+class UCharacterEquipmentPanel;
+class UCharacterInventoryPanel;
 struct FGameplayViewState;
 
 UCLASS()
@@ -27,26 +26,14 @@ protected:
     virtual FReply NativeOnMouseButtonUp(const FGeometry& Geometry, const FPointerEvent& MouseEvent) override;
 
 private:
-    UTextBlock* AddText(UVerticalBox* Parent, const FText& Text, int32 FontSize, float BottomPadding = 8.0f);
-    void AddSkill(const USkillDefinitionDataAsset* Skill);
-
     UFUNCTION()
     void HandleClose();
 
     UPROPERTY(Transient)
-    TObjectPtr<UTextBlock> CharacterText;
+    TObjectPtr<UCharacterEquipmentPanel> EquipmentPanel;
 
     UPROPERTY(Transient)
-    TObjectPtr<UTextBlock> GoldText;
-
-    UPROPERTY(Transient)
-    TObjectPtr<UTextBlock> StatusText;
-
-    UPROPERTY(Transient)
-    TObjectPtr<UVerticalBox> SkillList;
-
-    UPROPERTY(Transient)
-    TObjectPtr<UVerticalBox> ItemList;
+    TObjectPtr<UCharacterInventoryPanel> InventoryPanel;
 
     UPROPERTY(Transient)
     TObjectPtr<UButton> CloseButton;

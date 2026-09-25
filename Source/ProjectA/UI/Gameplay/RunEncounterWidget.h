@@ -7,6 +7,11 @@
 class UTextBlock;
 class UVerticalBox;
 class UGameplayActionButton;
+class UBorder;
+class UImage;
+class USizeBox;
+class UCharacterEquipmentPanel;
+class UCharacterInventoryPanel;
 struct FGameplayViewState;
 
 UCLASS()
@@ -42,13 +47,37 @@ private:
     TObjectPtr<UTextBlock> ShopHint;
 
     UPROPERTY(Transient)
-    TObjectPtr<UTextBlock> ShopInventory;
+    TObjectPtr<USizeBox> EquipmentSize;
+
+    UPROPERTY(Transient)
+    TObjectPtr<USizeBox> InventorySize;
+
+    UPROPERTY(Transient)
+    TObjectPtr<USizeBox> MerchantSize;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UCharacterEquipmentPanel> EquipmentPanel;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UCharacterInventoryPanel> InventoryPanel;
 
     UPROPERTY(Transient)
     TObjectPtr<UVerticalBox> ShopActions;
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UGameplayActionButton>> ShopButtons;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UBorder>> ShopCards;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UImage>> ShopIcons;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UTextBlock>> ShopNames;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UTextBlock>> ShopPrices;
 
     UPROPERTY(Transient)
     TObjectPtr<UGameplayActionButton> RecoveryButton;

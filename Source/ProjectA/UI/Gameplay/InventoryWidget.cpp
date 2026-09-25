@@ -6,21 +6,18 @@
 #include "Components/Border.h"
 #include "Components/Button.h"
 #include "Components/ButtonSlot.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
-#include "Components/ScrollBox.h"
+#include "Components/ScaleBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
-#include "DataAsset/PartyDefinitionDataAsset.h"
-#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/EngineBaseTypes.h"
-#include "Engine/GameInstance.h"
-#include "Game/GameState/GameplayViewTypes.h"
-#include "Game/Run/RunStateSubsystem.h"
-#include "GameFramework/PlayerController.h"
-#include "Profession/ProfessionBase.h"
+#include "UI/Gameplay/CharacterEquipmentPanel.h"
+#include "UI/Gameplay/CharacterInventoryPanel.h"
 #include "UI/Theme/DemonicUITheme.h"
 
 UInventoryWidget::UInventoryWidget()
@@ -32,16 +29,6 @@ UInventoryWidget::UInventoryWidget()
 TOptional<FUIInputConfig> UInventoryWidget::GetDesiredInputConfig() const
 {
     return FUIInputConfig(ECommonInputMode::Menu, EMouseCaptureMode::NoCapture, false);
-}
-
-UTextBlock* UInventoryWidget::AddText(UVerticalBox* Parent, const FText& Text, int32 FontSize, float BottomPadding)
-{
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
-    Label->SetText(Text);
-    Label->SetAutoWrapText(true);
-    UDemonicUITheme::Get().StyleText(Label, FontSize >= 22, FontSize);
-    Parent->AddChildToVerticalBox(Label)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, BottomPadding));
-    return Label;
 }
 
 void UInventoryWidget::NativeOnInitialized()
@@ -61,132 +48,62 @@ void UInventoryWidget::NativeOnInitialized()
     BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
     BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
 
-    USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
-    Size->SetWidthOverride(680.0f);
-    Size->SetHeightOverride(620.0f);
-    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Size);
-    ContentSlot->SetHorizontalAlignment(HAlign_Center);
-    ContentSlot->SetVerticalAlignment(VAlign_Center);
+    UScaleBox* Scale = WidgetTree->ConstructWidget<UScaleBox>();
+    Scale->SetStretch(EStretch::ScaleToFit);
+    Scale->SetStretchDirection(EStretchDirection::DownOnly);
+    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Scale);
+    ContentSlot->SetHorizontalAlignment(HAlign_Fill);
+    ContentSlot->SetVerticalAlignment(VAlign_Fill);
     ContentSlot->SetPadding(FMargin(24.0f));
-    UBorder* Panel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("InventoryPanel"));
-    Theme.StylePanel(Panel);
-    Panel->SetPadding(FMargin(32.0f));
-    Size->SetContent(Panel);
+    USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
+    Size->SetWidthOverride(746.0f);
+    Size->SetHeightOverride(840.0f);
+    Scale->SetContent(Size);
     UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>();
-    Panel->SetContent(Content);
-    AddText(Content, NSLOCTEXT("Inventory", "Title", "인벤토리"), 30, 12.0f);
-    CharacterText = AddText(Content, FText::GetEmpty(), 22);
-    GoldText = AddText(Content, FText::GetEmpty(), 20);
-    Theme.AddDivider(WidgetTree, Content);
-    StatusText = AddText(Content, FText::GetEmpty(), 16);
+    Size->SetContent(Content);
+    UHorizontalBox* Panels = WidgetTree->ConstructWidget<UHorizontalBox>();
+    Content->AddChildToVerticalBox(Panels)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 
-    UScrollBox* Scroll = WidgetTree->ConstructWidget<UScrollBox>();
-    Scroll->SetConsumeMouseWheel(EConsumeMouseWheel::Always);
-    Content->AddChildToVerticalBox(Scroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    UVerticalBox* InventoryContent = WidgetTree->ConstructWidget<UVerticalBox>();
-    Scroll->AddChild(InventoryContent);
-    AddText(InventoryContent, NSLOCTEXT("Inventory", "Skills", "보유 · 장착 스킬"), 22);
-    SkillList = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventorySkills"));
-    InventoryContent->AddChildToVerticalBox(SkillList);
-    ItemList = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventoryItems"));
-    InventoryContent->AddChildToVerticalBox(ItemList);
-    AddText(Content, NSLOCTEXT("Inventory", "Shortcuts", "I · 인벤토리 닫기    Esc · 설정 열기"), 16, 12.0f);
+    USizeBox* EquipmentSize = WidgetTree->ConstructWidget<USizeBox>();
+    EquipmentSize->SetWidthOverride(300.0f);
+    Panels->AddChildToHorizontalBox(EquipmentSize)->SetPadding(FMargin(0.0f, 0.0f, 16.0f, 0.0f));
+    EquipmentPanel = WidgetTree->ConstructWidget<UCharacterEquipmentPanel>();
+    EquipmentSize->SetContent(EquipmentPanel);
+    USizeBox* InventorySize = WidgetTree->ConstructWidget<USizeBox>();
+    InventorySize->SetWidthOverride(430.0f);
+    Panels->AddChildToHorizontalBox(InventorySize);
+    InventoryPanel = WidgetTree->ConstructWidget<UCharacterInventoryPanel>();
+    InventorySize->SetContent(InventoryPanel);
 
+    UBorder* Footer = WidgetTree->ConstructWidget<UBorder>();
+    Theme.StyleInset(Footer);
+    Footer->SetPadding(FMargin(12.0f, 8.0f));
+    Content->AddChildToVerticalBox(Footer)->SetPadding(FMargin(0.0f, 8.0f, 0.0f, 0.0f));
+    UHorizontalBox* FooterContent = WidgetTree->ConstructWidget<UHorizontalBox>();
+    Footer->SetContent(FooterContent);
+    UTextBlock* Shortcuts = WidgetTree->ConstructWidget<UTextBlock>();
+    Shortcuts->SetText(NSLOCTEXT("Inventory", "Shortcuts", "I · 인벤토리 닫기    Esc · 설정 열기"));
+    Shortcuts->SetAutoWrapText(true);
+    Theme.StyleText(Shortcuts, false, 15);
+    UHorizontalBoxSlot* ShortcutsSlot = FooterContent->AddChildToHorizontalBox(Shortcuts);
+    ShortcutsSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    ShortcutsSlot->SetVerticalAlignment(VAlign_Center);
+    ShortcutsSlot->SetPadding(FMargin(0.0f, 0.0f, 12.0f, 0.0f));
     CloseButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_CloseInventory"));
     UTextBlock* CloseLabel = WidgetTree->ConstructWidget<UTextBlock>();
     CloseLabel->SetText(NSLOCTEXT("Inventory", "Close", "닫기"));
     CloseLabel->SetJustification(ETextJustify::Center);
     CastChecked<UButtonSlot>(CloseButton->AddChild(CloseLabel))->SetPadding(FMargin(20.0f, 10.0f));
-    Content->AddChildToVerticalBox(CloseButton)->SetHorizontalAlignment(HAlign_Right);
+    FooterContent->AddChildToHorizontalBox(CloseButton)->SetVerticalAlignment(VAlign_Center);
     CloseButton->OnClicked.AddUniqueDynamic(this, &UInventoryWidget::HandleClose);
     Theme.ApplyControls(WidgetTree);
     Theme.StyleButton(CloseButton, true);
 }
 
-void UInventoryWidget::AddSkill(const USkillDefinitionDataAsset* Skill)
-{
-    if (!Skill)
-    {
-        AddText(SkillList, NSLOCTEXT("Inventory", "MissingSkill", "스킬 정보를 불러올 수 없습니다."), 18, 16.0f);
-        return;
-    }
-
-    const FText Name = Skill->SkillName.IsEmpty() ? FText::FromName(Skill->SkillId) : Skill->SkillName;
-    AddText(SkillList, FText::Format(NSLOCTEXT("Inventory", "Skill", "{0} · {1}"), Name, Skill->GetActionPointCostText()), 20, 4.0f);
-    if (!Skill->SkillDescription.IsEmpty()) AddText(SkillList, Skill->SkillDescription, 16, 12.0f);
-    UDemonicUITheme::Get().AddDivider(WidgetTree, SkillList);
-}
-
 void UInventoryWidget::RefreshInventory(const FGameplayViewState& View, FGuid CharacterId)
 {
-    if (!SkillList || !ItemList) return;
-    SkillList->ClearChildren();
-    ItemList->ClearChildren();
-    const FRunPartyMember* Member = CharacterId.IsValid() ? View.PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.CharacterId == CharacterId && Candidate.bCreated; }) : nullptr;
-    GoldText->SetVisibility(Member ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    ItemList->SetVisibility(Member && View.ItemShopState.SchemaVersion == 1 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    StatusText->SetVisibility(ESlateVisibility::Visible);
-    if (!Member)
-    {
-        CharacterText->SetText(NSLOCTEXT("Inventory", "NoCharacter", "직접 조작 캐릭터가 없습니다."));
-        GoldText->SetText(FText::GetEmpty());
-        StatusText->SetText(NSLOCTEXT("Inventory", "NoInventory", "표시할 인벤토리가 없습니다."));
-        return;
-    }
-
-    const UProfessionBase* Profession = UProfessionBase::FindProfession(Member->ClassId);
-    const FText ClassName = Profession ? Profession->DisplayName : FText::FromName(Member->ClassId);
-    const FText CharacterName = Member->CharacterName.IsEmpty() ? ClassName : Member->CharacterName;
-    CharacterText->SetText(FText::Format(NSLOCTEXT("Inventory", "Character", "{0} · {1}"), CharacterName, ClassName));
-    GoldText->SetText(FText::Format(NSLOCTEXT("Inventory", "Gold", "보유 골드 {0}G"), FText::AsNumber(Member->Gold)));
-    StatusText->SetText(FText::GetEmpty());
-    StatusText->SetVisibility(ESlateVisibility::Collapsed);
-    if (View.ItemShopState.SchemaVersion == 1)
-    {
-        UDemonicUITheme::Get().AddDivider(WidgetTree, ItemList);
-        AddText(ItemList, FText::Format(NSLOCTEXT("Inventory", "Items", "보유 아이템 · {0}개"), FText::AsNumber(Member->Items.Num())), 22);
-        if (Member->Items.IsEmpty()) AddText(ItemList, NSLOCTEXT("Inventory", "EmptyItems", "보유한 아이템이 없습니다."), 18);
-        else
-        {
-            AddText(ItemList, NSLOCTEXT("Inventory", "ItemPrototype", "구매한 아이템은 보관만 하며 장착 효과는 아직 없습니다."), 16);
-            // Group repeated purchases by their full asset path, preserving distinct assets with the same name.
-            // 전체 에셋 경로로 반복 구매를 묶어 이름이 같은 서로 다른 에셋을 구분합니다.
-            TMap<FSoftObjectPath, int32> ItemCounts;
-            for (const FRunItemDefinition& Item : Member->Items) ++ItemCounts.FindOrAdd(Item.Asset);
-            for (const FRunItemDefinition& Item : Member->Items)
-            {
-                const int32* Count = ItemCounts.Find(Item.Asset);
-                if (!Count) continue;
-                UTextBlock* ItemText = AddText(ItemList, FText::Format(NSLOCTEXT("Inventory", "Item", "{0} · {1}개"), Item.DisplayName, FText::AsNumber(*Count)), 18);
-                ItemText->SetToolTipText(FText::FromString(Item.Asset.ToString()));
-                ItemCounts.Remove(Item.Asset);
-            }
-        }
-    }
-    if (Member->bHasSkillLoadout)
-    {
-        if (Member->Skills.IsEmpty()) AddText(SkillList, NSLOCTEXT("Inventory", "EmptySkills", "보유한 스킬이 없습니다."), 18);
-        for (const FSoftObjectPath& Path : Member->Skills) AddSkill(Cast<USkillDefinitionDataAsset>(Path.TryLoad()));
-        return;
-    }
-
-    // Only the authoritative Run owns the legacy catalog; clients must not substitute local defaults.
-    // 권위 Run만 이전 저장의 목록을 보유하므로 클라이언트에서 로컬 기본값으로 대체하지 않습니다.
-    const APlayerController* Controller = GetOwningPlayer();
-    const UGameInstance* GameInstance = GetGameInstance();
-    const URunStateSubsystem* Run = Controller && Controller->HasAuthority() && GameInstance ? GameInstance->GetSubsystem<URunStateSubsystem>() : nullptr;
-    const UPartyDefinitionDataAsset* Catalog = Run ? Run->PartyDefinition.Get() : nullptr;
-    TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
-    FText Error;
-    StatusText->SetVisibility(ESlateVisibility::Visible);
-    if (!Catalog || !Catalog->ResolveMemberSkills(*Member, Skills, Error))
-    {
-        StatusText->SetText(NSLOCTEXT("Inventory", "LegacyUnavailable", "이전 저장의 장착 스킬 정보를 불러올 수 없습니다."));
-        return;
-    }
-    StatusText->SetText(NSLOCTEXT("Inventory", "LegacySkills", "이전 저장의 직업 기본 장착 스킬입니다."));
-    for (const USkillDefinitionDataAsset* Skill : Skills) AddSkill(Skill);
-    if (Skills.IsEmpty()) AddText(SkillList, NSLOCTEXT("Inventory", "EmptySkills", "보유한 스킬이 없습니다."), 18);
+    if (EquipmentPanel) EquipmentPanel->RefreshEquipment(View, CharacterId);
+    if (InventoryPanel) InventoryPanel->RefreshInventory(View, CharacterId);
 }
 
 void UInventoryWidget::HandleClose()

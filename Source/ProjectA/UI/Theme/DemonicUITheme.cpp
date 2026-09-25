@@ -13,6 +13,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Engine/Texture2D.h"
+#include "GameplayTagContainer.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -60,6 +61,24 @@ UDemonicUITheme::UDemonicUITheme()
     static ConstructorHelpers::FObjectFinder<UTexture2D> Unchecked(TEXT("/Game/DemonicUI/Red_buttons/Button_tiny_ready.Button_tiny_ready"));
     static ConstructorHelpers::FObjectFinder<UTexture2D> Checked(TEXT("/Game/DemonicUI/Red_buttons/Button_tiny_ok.Button_tiny_ok"));
     static ConstructorHelpers::FObjectFinder<UTexture2D> Divider(TEXT("/Game/DemonicUI/GUI_Elements/Top_frame_m.Top_frame_m"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Slot(TEXT("/Game/DemonicUI/GUI_Elements/Icon_frame.Icon_frame"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> SectionHeader(TEXT("/Game/DemonicUI/GUI_Elements/bar_button_mid.bar_button_mid"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> EquipmentBackdrop(TEXT("/Game/DemonicUI/GUI_Elements/equipment_male.equipment_male"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Weapon(TEXT("/Game/DemonicUI/Equipment_icons/weapon.weapon"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Head(TEXT("/Game/DemonicUI/Equipment_icons/helm.helm"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Hands(TEXT("/Game/DemonicUI/Equipment_icons/glowes.glowes"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Feet(TEXT("/Game/DemonicUI/Equipment_icons/boots.boots"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Body(TEXT("/Game/DemonicUI/Equipment_icons/chest.chest"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Neck(TEXT("/Game/DemonicUI/Equipment_icons/neck.neck"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Ring(TEXT("/Game/DemonicUI/Equipment_icons/ring.ring"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Bow(TEXT("/Game/DemonicUI/Equipment_icons/bow.bow"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Staff(TEXT("/Game/DemonicUI/Equipment_icons/staff.staff"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Book(TEXT("/Game/DemonicUI/Equipment_icons/book.book"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Shield(TEXT("/Game/DemonicUI/Equipment_icons/shield.shield"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Arrow(TEXT("/Game/DemonicUI/Equipment_icons/arrow.arrow"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Firearm(TEXT("/Game/DemonicUI/Menu_icons/Icon_Engineering.Icon_Engineering"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Explosive(TEXT("/Game/DemonicUI/Menu_icons/Icon_alchemy.Icon_alchemy"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Inventory(TEXT("/Game/DemonicUI/Menu_icons/Icon_inventory.Icon_inventory"));
     ButtonReady = Ready.Object;
     ButtonHovered = Hovered.Object;
     ButtonPressed = Pressed.Object;
@@ -71,6 +90,31 @@ UDemonicUITheme::UDemonicUITheme()
     CheckReady = Unchecked.Object;
     CheckSelected = Checked.Object;
     DividerTexture = Divider.Object;
+    SlotTexture = Slot.Object;
+    SectionHeaderTexture = SectionHeader.Object;
+    EquipmentBackdropTexture = EquipmentBackdrop.Object;
+    ItemFallbackTexture = Inventory.Object;
+    EquipmentIcons.Add(TEXT("Weapon"), Weapon.Object);
+    EquipmentIcons.Add(TEXT("Head"), Head.Object);
+    EquipmentIcons.Add(TEXT("Hands"), Hands.Object);
+    EquipmentIcons.Add(TEXT("Feet"), Feet.Object);
+    EquipmentIcons.Add(TEXT("Body"), Body.Object);
+    EquipmentIcons.Add(TEXT("Neck"), Neck.Object);
+    EquipmentIcons.Add(TEXT("Ring"), Ring.Object);
+    // Resolve visual categories from the catalog's gameplay tags when the widget is refreshed.
+    // 위젯 갱신 시 카탈로그의 게임플레이 태그로 표시용 분류를 확인합니다.
+    for (const TCHAR* Category : { TEXT("Sword"), TEXT("Dagger"), TEXT("Axe"), TEXT("Hammer"), TEXT("MaceClub"), TEXT("Spear"), TEXT("Scythe"), TEXT("Thrown") }) ItemCategoryIcons.Add(FName(*FString::Printf(TEXT("Item.Weapon.%s"), Category)), Weapon.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Weapon.Bow"), Bow.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Weapon.Crossbow"), Bow.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Weapon.StaffWand"), Staff.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Weapon.Spellbook"), Book.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Weapon.Shield"), Shield.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Weapon.Gauntlet"), Hands.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Weapon.Firearm"), Firearm.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Weapon.Explosive"), Explosive.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Weapon.ArrowBolt"), Arrow.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Weapon.Bullet"), Arrow.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Weapon.Other"), Inventory.Object);
 }
 
 const UDemonicUITheme& UDemonicUITheme::Get()
@@ -211,6 +255,27 @@ void UDemonicUITheme::StylePanel(UBorder* Panel) const
     Panel->SetBrushColor(FLinearColor::White);
 }
 
+void UDemonicUITheme::StyleInset(UBorder* Panel) const
+{
+    if (!Panel) return;
+    Panel->SetBrush(FSlateColorBrush(FLinearColor::White));
+    Panel->SetBrushColor(FLinearColor(0.018f, 0.014f, 0.012f, 0.96f));
+}
+
+void UDemonicUITheme::StyleSlot(UBorder* Panel, bool bOccupied) const
+{
+    if (!Panel || !SlotTexture) return;
+    Panel->SetBrush(TextureBrush(SlotTexture, FVector2D(80.0f, 80.0f)));
+    Panel->SetBrushColor(bOccupied ? FLinearColor(0.95f, 0.88f, 0.75f) : FLinearColor(0.6f, 0.6f, 0.6f));
+}
+
+void UDemonicUITheme::StyleSectionHeader(UBorder* Panel) const
+{
+    if (!Panel || !SectionHeaderTexture) return;
+    Panel->SetBrush(TextureBrush(SectionHeaderTexture, FVector2D(320.0f, 40.0f)));
+    Panel->SetBrushColor(FLinearColor::White);
+}
+
 void UDemonicUITheme::StyleBackdrop(UBorder* Background) const
 {
     if (!Background || !BackdropTexture) return;
@@ -223,6 +288,53 @@ void UDemonicUITheme::StyleBackgroundImage(UImage* Background) const
     if (!Background || !BackdropTexture) return;
     Background->SetBrush(TextureBrush(BackdropTexture, FVector2D(1920.0f, 1080.0f)));
     Background->SetColorAndOpacity(FLinearColor::White);
+}
+
+void UDemonicUITheme::SetEquipmentIcon(UImage* Image, FName SlotId) const
+{
+    if (!Image) return;
+    const TObjectPtr<UTexture2D>* Texture = EquipmentIcons.Find(SlotId);
+    Image->SetBrush(TextureBrush(Texture ? Texture->Get() : ItemFallbackTexture.Get(), FVector2D(48.0f, 48.0f)));
+    Image->SetColorAndOpacity(FLinearColor::White);
+    Image->SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
+void UDemonicUITheme::SetItemIcon(UImage* Image, const FGameplayTagContainer& ItemTags) const
+{
+    if (!Image) return;
+    UTexture2D* Texture = ItemFallbackTexture;
+    FGameplayTag MatchedTag;
+    FString MatchedCategory;
+    for (const TPair<FName, TObjectPtr<UTexture2D>>& Category : ItemCategoryIcons)
+    {
+        const FGameplayTag CategoryTag = FGameplayTag::RequestGameplayTag(Category.Key, false);
+        if (!CategoryTag.IsValid()) continue;
+        for (const FGameplayTag& ItemTag : ItemTags)
+        {
+            if (!ItemTag.MatchesTag(CategoryTag)) continue;
+            const FString CategoryName = Category.Key.ToString();
+            // Prefer a specific matching tag and a stable order when several visual categories apply.
+            // 표시 분류가 여러 개 일치하면 구체적인 태그와 고정 순서를 우선합니다.
+            if (!MatchedTag.IsValid() || CategoryTag.MatchesTag(MatchedTag) || (!MatchedTag.MatchesTag(CategoryTag) && CategoryName < MatchedCategory))
+            {
+                MatchedTag = CategoryTag;
+                MatchedCategory = CategoryName;
+                Texture = Category.Value;
+            }
+            break;
+        }
+    }
+    Image->SetBrush(TextureBrush(Texture, FVector2D(48.0f, 48.0f)));
+    Image->SetColorAndOpacity(FLinearColor::White);
+    Image->SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
+void UDemonicUITheme::SetEquipmentBackdrop(UImage* Image) const
+{
+    if (!Image || !EquipmentBackdropTexture) return;
+    Image->SetBrush(TextureBrush(EquipmentBackdropTexture, FVector2D(256.0f, 256.0f)));
+    Image->SetColorAndOpacity(FLinearColor(0.75f, 0.75f, 0.75f));
+    Image->SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 
 void UDemonicUITheme::AddDivider(UWidgetTree* Tree, UVerticalBox* Parent) const
