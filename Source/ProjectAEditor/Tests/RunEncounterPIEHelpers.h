@@ -54,11 +54,14 @@ namespace RunEncounterPIE
                 if (Received.Offers[Index].EncounterId != Progress.Offers[Index].EncounterId || Received.Offers[Index].DisplayName.ToString() != Progress.Offers[Index].DisplayName.ToString()) return false;
             }
             UVerticalBox* Actions = Cast<UVerticalBox>(Screen->GetWidgetFromName(TEXT("EncounterActions")));
-            if (!Actions) return false;
-            for (UWidget* Action : Actions->GetAllChildren())
+            if (!Actions || Actions->GetChildrenCount() < 3) return false;
+            for (int32 Index = 0; Index < 3; ++Index)
             {
-                if (!Test->TestFalse(TEXT("Clients cannot activate any encounter choice or shop exit."), Action->GetIsEnabled())) bFailed = true;
+                UButton* Choice = Cast<UButton>(Actions->GetChildAt(Index));
+                if (!Test->TestTrue(TEXT("Clients cannot activate encounter choices."), Choice && !Choice->GetIsEnabled())) bFailed = true;
             }
+            UButton* Exit = Cast<UButton>(Screen->GetWidgetFromName(TEXT("Button_LeaveShop")));
+            if (!Test->TestTrue(TEXT("Clients cannot leave the shop."), Exit && !Exit->GetIsEnabled())) bFailed = true;
             Client->RequestSelectRunEncounter(TEXT("Shop_03"));
             Client->RequestLeaveRunEncounter();
             if (!Test->TestTrue(TEXT("Client encounter commands preserve the server choice and phase."), Run->GetPhase() == Phase && Run->GetEncounterProgress().SelectedEncounterId == Progress.SelectedEncounterId)) bFailed = true;
@@ -69,7 +72,7 @@ namespace RunEncounterPIE
         if (Phase == ERunPhase::Shop)
         {
             UTextBlock* Title = Cast<UTextBlock>(HostScreen->GetWidgetFromName(TEXT("Text_EncounterTitle")));
-            if (!Test->TestTrue(TEXT("The selected shop title is visible."), Title && Title->GetText().ToString() == TEXT("상점2"))) bFailed = true;
+            if (!Test->TestTrue(TEXT("The selected shop title is visible."), Title && Title->GetText().ToString() == TEXT("상점2 · 아이템 상점"))) bFailed = true;
         }
         if (bFailed) return false;
         Button->OnClicked.Broadcast();

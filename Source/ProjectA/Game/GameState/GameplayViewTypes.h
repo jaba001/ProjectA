@@ -60,6 +60,9 @@ struct PROJECTA_API FGameplayViewState
     FRunSkillShopState SkillShopState;
 
     UPROPERTY()
+    FRunItemShopState ItemShopState;
+
+    UPROPERTY()
     FRunGoldRewardState GoldRewardState;
 
     UPROPERTY()

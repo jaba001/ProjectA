@@ -8,6 +8,10 @@ public class ProjectA : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
+        // Stage the authored catalog at the same project-relative path for packaged reads.
+        // 패키지에서도 같은 프로젝트 상대 경로로 읽도록 원본 카탈로그를 포함합니다.
+        RuntimeDependencies.Add("$(ProjectDir)/Docs/WEAPON_ASSETS.csv", StagedFileType.UFS);
+
 		PublicDependencyModuleNames.AddRange(new string[] {
 			"Core",
 			"CoreUObject",

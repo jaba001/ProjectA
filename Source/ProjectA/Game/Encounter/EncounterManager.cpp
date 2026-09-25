@@ -637,12 +637,12 @@ bool AEncounterManager::LeaveRunEncounter()
     return bSucceeded;
 }
 
-bool AEncounterManager::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError)
+bool AEncounterManager::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError, int32 ExpectedItemShopRevision)
 {
     OutError = NSLOCTEXT("RunSkillShop", "Unavailable", "현재 상점에서 구매할 수 없습니다.");
     if (!HasAuthority() || bShuttingDown || bPreparing || bPreparationAbortPending || PendingResult != ECombatResult::None || !RunState || RunState->GetPhase() != ERunPhase::Shop) return false;
     if (!ValidateManagedExecution(OutError)) return false;
-    const bool bSucceeded = RunState->PurchaseShopOffer(BuyerAccountId, CharacterId, OfferId, OutError);
+    const bool bSucceeded = RunState->PurchaseShopOffer(BuyerAccountId, CharacterId, OfferId, OutError, ExpectedItemShopRevision);
     OnFlowChanged.Broadcast();
     return bSucceeded;
 }

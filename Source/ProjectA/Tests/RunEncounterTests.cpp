@@ -132,6 +132,7 @@ bool FRunEncounterPersistenceTest::RunTest(const FString& Parameters)
     FRunCheckpointStorage::Save(Invalid.Get(), Slot.Name, Error);
     TestFalse(TEXT("A map save cannot bypass an unfinished shop"), Run->LoadCheckpoint(Error));
     Legacy->EncounterProgress = FRunEncounterProgress();
+    Legacy->ItemShopState = FRunItemShopState();
     Legacy->GoldRewardState = FRunGoldRewardState();
     if (!TestTrue(TEXT("Pre-feature defaults remain loadable"), FRunCheckpointStorage::Save(Legacy.Get(), Slot.Name, Error) && Run->LoadStandaloneCheckpoint(Error))) return false;
     TestTrue(TEXT("An old Run preserves its original route without new encounters"), WinFirstBattle(Run.Get()) && Run->ContinueRun() && Run->CanStartNode(TEXT("Combat_02")));

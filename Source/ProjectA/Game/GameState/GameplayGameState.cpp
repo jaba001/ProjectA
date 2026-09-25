@@ -30,6 +30,10 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
         View.CompletedNodes = Run->GetCompletedNodes();
         View.EncounterProgress = Run->GetEncounterProgress();
         View.SkillShopState = Run->GetSkillShopState();
+        View.ItemShopState = Run->GetItemShopState();
+        // Replicate only the visible stock; the frozen candidate catalog remains on the server.
+        // 표시 중인 재고만 복제하고 고정된 후보 카탈로그는 서버에 보관합니다.
+        View.ItemShopState.Catalog.Reset();
         View.GoldRewardState = Run->GetGoldRewardState();
         View.GoldRewardRecipientIds = Run->GetGoldRewardRecipientIds();
         View.bCanContinueAfterRewards = Run->CanContinueAfterRewards();

@@ -32,7 +32,7 @@ public:
     void RequestContinueRun();
     void RequestSelectRunEncounter(FName EncounterId);
     void RequestLeaveRunEncounter();
-    void RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId);
+    void RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision = INDEX_NONE);
     FGuid GetShopBuyerCharacterId(const FGameplayViewState& View) const;
     const FText& GetShopPurchaseMessage() const { return ShopPurchaseMessage; }
     bool IsShopPurchasePending() const { return bShopPurchasePending; }
@@ -61,7 +61,7 @@ private:
 #endif
 
     void RefreshGameplayFlow();
-    void ExecuteShopPurchase(FGuid CharacterId, FName OfferId);
+    void ExecuteShopPurchase(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision);
     void ExecuteGoldRewardSelection(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex);
 
     UFUNCTION(Server, Reliable)
@@ -71,10 +71,10 @@ private:
     void ClientReceiveGoldRewardResult(FGuid CharacterId, FName ExpectedNodeId, bool bSucceeded, const FText& Message);
 
     UFUNCTION(Server, Reliable)
-    void ServerPurchaseShopOffer(FGuid CharacterId, FName OfferId);
+    void ServerPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision);
 
     UFUNCTION(Client, Reliable)
-    void ClientReceiveShopPurchaseResult(bool bSucceeded, const FText& Message);
+    void ClientReceiveShopPurchaseResult(bool bSucceeded, const FText& Message, int32 ConfirmedItemShopRevision);
 
     UFUNCTION()
     void OnRep_RunParticipantAccount();
@@ -86,6 +86,7 @@ private:
 
     FText ShopPurchaseMessage;
     bool bShopPurchasePending = false;
+    int32 PendingItemShopRevision = INDEX_NONE;
     FText RewardSelectionMessage;
     FGuid PendingRewardCharacterId;
     FName PendingRewardNodeId;

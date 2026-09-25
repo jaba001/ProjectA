@@ -27,6 +27,7 @@ private:
     void HandlePurchase(FName OfferId);
     bool bRunCommandsAllowed = false;
     FGuid BuyerCharacterId;
+    int32 ItemShopRevision = INDEX_NONE;
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> Title;
@@ -41,6 +42,9 @@ private:
     TObjectPtr<UTextBlock> ShopHint;
 
     UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> ShopInventory;
+
+    UPROPERTY(Transient)
     TObjectPtr<UVerticalBox> ShopActions;
 
     UPROPERTY(Transient)
@@ -48,6 +52,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UGameplayActionButton> RecoveryButton;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UGameplayActionButton> RerollButton;
 
     UPROPERTY(Transient)
     TObjectPtr<UVerticalBox> Actions;

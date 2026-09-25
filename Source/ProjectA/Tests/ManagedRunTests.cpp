@@ -519,7 +519,7 @@ bool FManagedRunSkillShopTest::RunTest(const FString& Parameters)
     for (const FRunPartyMember& Member : Host->GetPartyMembers()) TestTrue(TEXT("Every original human starts with personal 10G and unarmed only"), Member.Gold == 10 && Member.bHasSkillLoadout && Member.Skills.Num() == 1);
     if (!Host->BeginEncounter(TEXT("Combat_01")) || !Host->MarkCombatStarted()) return false;
     for (const FRunPartyMember& Member : Host->GetPartyMembers()) Host->UpdatePartyMemberHP(Member.SlotIndex, 70.0f);
-    if (!TestTrue(TEXT("The managed Run reaches a durable shop"), Host->CompleteEncounter(ECombatResult::Victory) && RunRewardTests::CollectPendingGoldRewards(Host) && Host->ContinueRun() && Host->SelectRunEncounter(TEXT("Shop_02")))) return false;
+    if (!TestTrue(TEXT("The managed Run reaches a durable shop"), Host->CompleteEncounter(ECombatResult::Victory) && RunRewardTests::CollectPendingGoldRewards(Host) && Host->ContinueRun() && Host->SelectRunEncounter(TEXT("Shop_01")))) return false;
     const TArray<FRunPartyMember> Before = Host->GetPartyMembers();
     const FGuid FirstId = Host->GetPartyMembers()[0].CharacterId;
     const FGuid SecondId = Host->GetPartyMembers()[1].CharacterId;

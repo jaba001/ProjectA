@@ -78,14 +78,18 @@ void UInventoryWidget::NativeOnInitialized()
     CharacterText = AddText(Content, FText::GetEmpty(), 22);
     GoldText = AddText(Content, FText::GetEmpty(), 20);
     Theme.AddDivider(WidgetTree, Content);
-    AddText(Content, NSLOCTEXT("Inventory", "Skills", "보유 · 장착 스킬"), 22);
     StatusText = AddText(Content, FText::GetEmpty(), 16);
 
     UScrollBox* Scroll = WidgetTree->ConstructWidget<UScrollBox>();
     Scroll->SetConsumeMouseWheel(EConsumeMouseWheel::Always);
     Content->AddChildToVerticalBox(Scroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    UVerticalBox* InventoryContent = WidgetTree->ConstructWidget<UVerticalBox>();
+    Scroll->AddChild(InventoryContent);
+    AddText(InventoryContent, NSLOCTEXT("Inventory", "Skills", "보유 · 장착 스킬"), 22);
     SkillList = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventorySkills"));
-    Scroll->AddChild(SkillList);
+    InventoryContent->AddChildToVerticalBox(SkillList);
+    ItemList = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventoryItems"));
+    InventoryContent->AddChildToVerticalBox(ItemList);
     AddText(Content, NSLOCTEXT("Inventory", "Shortcuts", "I · 인벤토리 닫기    Esc · 설정 열기"), 16, 12.0f);
 
     CloseButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_CloseInventory"));
@@ -115,10 +119,12 @@ void UInventoryWidget::AddSkill(const USkillDefinitionDataAsset* Skill)
 
 void UInventoryWidget::RefreshInventory(const FGameplayViewState& View, FGuid CharacterId)
 {
-    if (!SkillList) return;
+    if (!SkillList || !ItemList) return;
     SkillList->ClearChildren();
+    ItemList->ClearChildren();
     const FRunPartyMember* Member = CharacterId.IsValid() ? View.PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.CharacterId == CharacterId && Candidate.bCreated; }) : nullptr;
     GoldText->SetVisibility(Member ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    ItemList->SetVisibility(Member && View.ItemShopState.SchemaVersion == 1 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     StatusText->SetVisibility(ESlateVisibility::Visible);
     if (!Member)
     {
@@ -135,6 +141,28 @@ void UInventoryWidget::RefreshInventory(const FGameplayViewState& View, FGuid Ch
     GoldText->SetText(FText::Format(NSLOCTEXT("Inventory", "Gold", "보유 골드 {0}G"), FText::AsNumber(Member->Gold)));
     StatusText->SetText(FText::GetEmpty());
     StatusText->SetVisibility(ESlateVisibility::Collapsed);
+    if (View.ItemShopState.SchemaVersion == 1)
+    {
+        UDemonicUITheme::Get().AddDivider(WidgetTree, ItemList);
+        AddText(ItemList, FText::Format(NSLOCTEXT("Inventory", "Items", "보유 아이템 · {0}개"), FText::AsNumber(Member->Items.Num())), 22);
+        if (Member->Items.IsEmpty()) AddText(ItemList, NSLOCTEXT("Inventory", "EmptyItems", "보유한 아이템이 없습니다."), 18);
+        else
+        {
+            AddText(ItemList, NSLOCTEXT("Inventory", "ItemPrototype", "구매한 아이템은 보관만 하며 장착 효과는 아직 없습니다."), 16);
+            // Group repeated purchases by their full asset path, preserving distinct assets with the same name.
+            // 전체 에셋 경로로 반복 구매를 묶어 이름이 같은 서로 다른 에셋을 구분합니다.
+            TMap<FSoftObjectPath, int32> ItemCounts;
+            for (const FRunItemDefinition& Item : Member->Items) ++ItemCounts.FindOrAdd(Item.Asset);
+            for (const FRunItemDefinition& Item : Member->Items)
+            {
+                const int32* Count = ItemCounts.Find(Item.Asset);
+                if (!Count) continue;
+                UTextBlock* ItemText = AddText(ItemList, FText::Format(NSLOCTEXT("Inventory", "Item", "{0} · {1}개"), Item.DisplayName, FText::AsNumber(*Count)), 18);
+                ItemText->SetToolTipText(FText::FromString(Item.Asset.ToString()));
+                ItemCounts.Remove(Item.Asset);
+            }
+        }
+    }
     if (Member->bHasSkillLoadout)
     {
         if (Member->Skills.IsEmpty()) AddText(SkillList, NSLOCTEXT("Inventory", "EmptySkills", "보유한 스킬이 없습니다."), 18);

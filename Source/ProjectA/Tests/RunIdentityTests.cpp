@@ -184,6 +184,7 @@ namespace
     {
         Save->Version = 1;
         Save->EncounterProgress = FRunEncounterProgress();
+        Save->ItemShopState = FRunItemShopState();
         TArray<uint8> Bytes;
         if (!UGameplayStatics::SaveGameToMemory(Save, Bytes))
         {

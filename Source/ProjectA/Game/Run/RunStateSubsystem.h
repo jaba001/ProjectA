@@ -105,8 +105,9 @@ public:
     TArray<FGuid> GetGoldRewardRecipientIds() const;
     bool SelectRunEncounter(FName EncounterId);
     bool LeaveRunEncounter();
-    bool PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError);
+    bool PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError, int32 ExpectedItemShopRevision = INDEX_NONE);
     const FRunSkillShopState& GetSkillShopState() const { return SkillShopState; }
+    const FRunItemShopState& GetItemShopState() const { return ItemShopState; }
     const FRunEncounterProgress& GetEncounterProgress() const { return EncounterProgress; }
     void UpdatePartyMemberHP(int32 SlotIndex, float CurrentHP);
 
@@ -177,6 +178,9 @@ private:
 
     UPROPERTY(Transient)
     FRunSkillShopState SkillShopState;
+
+    UPROPERTY(Transient)
+    FRunItemShopState ItemShopState;
 
     UPROPERTY(Transient)
     FRunGoldRewardState GoldRewardState;

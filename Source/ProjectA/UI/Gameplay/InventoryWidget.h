@@ -46,5 +46,8 @@ private:
     TObjectPtr<UVerticalBox> SkillList;
 
     UPROPERTY(Transient)
+    TObjectPtr<UVerticalBox> ItemList;
+
+    UPROPERTY(Transient)
     TObjectPtr<UButton> CloseButton;
 };

@@ -128,7 +128,7 @@ bool FRunCandidatePublicationTest::RunTest(const FString& Parameters)
     const FGuid CharacterId = Run->GetPartyMembers()[0].CharacterId;
     if (!VerifyTransaction(TEXT("Reward claim"), [&]() { return Run->SelectGoldReward(Account, CharacterId, TEXT("Combat_01"), 0, Error); })) return false;
     if (!VerifyTransaction(TEXT("Continue"), [&]() { return Run->ContinueRun(); })) return false;
-    if (!VerifyTransaction(TEXT("Shop selection"), [&]() { return Run->SelectRunEncounter(TEXT("Shop_02")); })) return false;
+    if (!VerifyTransaction(TEXT("Shop selection"), [&]() { return Run->SelectRunEncounter(TEXT("Shop_01")); })) return false;
     const FName SkillOffer = Run->GetSkillShopState().Offers[0].OfferId;
     if (!VerifyTransaction(TEXT("Skill purchase"), [&]() { return Run->PurchaseShopOffer(Account, CharacterId, SkillOffer, Error); })) return false;
     if (!VerifyTransaction(TEXT("Recovery purchase"), [&]() { return Run->PurchaseShopOffer(Account, CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Error); })) return false;

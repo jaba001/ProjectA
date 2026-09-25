@@ -31,7 +31,7 @@ public:
     bool ContinueRun();
     bool SelectRunEncounter(FName EncounterId);
     bool LeaveRunEncounter();
-    bool PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError);
+    bool PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError, int32 ExpectedItemShopRevision = INDEX_NONE);
     bool SelectGoldReward(const FRunAccountId& AccountId, FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex, FText& OutError);
 
     // Rebuild units and ownership from a durable round planning boundary.

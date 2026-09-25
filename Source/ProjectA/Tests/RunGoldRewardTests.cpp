@@ -190,6 +190,7 @@ bool FRunGoldRewardLegacyTest::RunTest(const FString& Parameters)
         TStrongObjectPtr<URunSaveGame> Legacy(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
         if (!Legacy) return false;
         Legacy->GoldRewardState = FRunGoldRewardState();
+        Legacy->ItemShopState = FRunItemShopState();
         if (!bHasShop)
         {
             Legacy->SkillShopState = FRunSkillShopState();

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Game/Run/RunIdentityTypes.h"
+#include "Game/Run/RunItemShopTypes.h"
 #include "Unit/CharacterAppearanceTypes.h"
 #include "RunTypes.generated.h"
 
@@ -71,6 +72,11 @@ struct PROJECTA_API FRunPartyMember
     // 골드는 현재 Run의 이 캐릭터에게 귀속되며 동료와 공유하지 않습니다.
     UPROPERTY(BlueprintReadOnly, Category = "Run|Shop")
     int32 Gold = 0;
+
+    // Purchased prototype items persist for this Run without granting equipment effects.
+    // 구매한 시험용 아이템은 장비 효과를 부여하지 않고 현재 Run에 보관합니다.
+    UPROPERTY(BlueprintReadOnly, Category = "Run|Items")
+    TArray<FRunItemDefinition> Items;
 
     // New runs persist their acquired skills; older saves retain the historical profession defaults.
     // 새 Run은 획득한 스킬을 저장하며 이전 저장은 기존 직업 기본 장착을 유지합니다.

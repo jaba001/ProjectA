@@ -46,5 +46,7 @@ public:
     UPROPERTY()
     FRunSkillShopState SkillShopState;
     UPROPERTY()
+    FRunItemShopState ItemShopState;
+    UPROPERTY()
     FRunGoldRewardState GoldRewardState;
 };

@@ -259,47 +259,55 @@ bool AGameplayPlayerController::IsRoundInputEnabled() const
     return Super::IsRoundInputEnabled() && (!GameplayRootWidget || !GameplayRootWidget->IsUtilityMenuOpen());
 }
 
-void AGameplayPlayerController::RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId)
+void AGameplayPlayerController::RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision)
 {
     if (!IsLocalController() || bShopPurchasePending || !CharacterId.IsValid() || OfferId.IsNone()) return;
     ShopPurchaseMessage = FText::GetEmpty();
     bShopPurchasePending = true;
+    PendingItemShopRevision = INDEX_NONE;
     RefreshGameplayFlow();
-    if (HasAuthority()) ExecuteShopPurchase(CharacterId, OfferId);
-    else ServerPurchaseShopOffer(CharacterId, OfferId);
+    if (HasAuthority()) ExecuteShopPurchase(CharacterId, OfferId, ExpectedItemShopRevision);
+    else ServerPurchaseShopOffer(CharacterId, OfferId, ExpectedItemShopRevision);
 }
 
-void AGameplayPlayerController::ServerPurchaseShopOffer_Implementation(FGuid CharacterId, FName OfferId)
+void AGameplayPlayerController::ServerPurchaseShopOffer_Implementation(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision)
 {
-    ExecuteShopPurchase(CharacterId, OfferId);
+    ExecuteShopPurchase(CharacterId, OfferId, ExpectedItemShopRevision);
 }
 
-void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName OfferId)
+void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision)
 {
     if (!HasAuthority()) return;
     const AGameplayGameState* State = GetWorld() ? GetWorld()->GetGameState<AGameplayGameState>() : nullptr;
     const ADevelopmentCoopLobby* Lobby = State ? State->GetDevelopmentLobby() : nullptr;
     if (Lobby && (!Lobby->HasStarted() || Lobby->GetMembers().ContainsByPredicate([](const FDevelopmentCoopMember& Member) { return !Member.bConnected; })))
     {
-        ClientReceiveShopPurchaseResult(false, NSLOCTEXT("RunSkillShop", "DisconnectedBuyer", "협동 참가자의 연결 상태를 확인해 주세요."));
+        ClientReceiveShopPurchaseResult(false, NSLOCTEXT("RunSkillShop", "DisconnectedBuyer", "협동 참가자의 연결 상태를 확인해 주세요."), INDEX_NONE);
         return;
     }
     FText Error = NSLOCTEXT("RunSkillShop", "UnboundBuyer", "현재 연결에 배정된 직접 조작 캐릭터만 구매할 수 있습니다.");
     const AGameplayGameModeBase* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGameplayGameModeBase>() : nullptr;
+    const URunStateSubsystem* CurrentRun = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    const bool bItemShop = CurrentRun && CurrentRun->GetEncounterProgress().SelectedEncounterId == FRunItemShopState::GetEncounterId();
     FRunAccountId BuyerAccountId;
     bool bSucceeded = false;
     if (Mode && Mode->ResolveRunParticipant(this, BuyerAccountId))
     {
         AEncounterManager* Manager = Mode->GetEncounterManager();
-        if (Manager) bSucceeded = Manager->PurchaseShopOffer(BuyerAccountId, CharacterId, OfferId, Error);
+        if (Manager) bSucceeded = Manager->PurchaseShopOffer(BuyerAccountId, CharacterId, OfferId, Error, ExpectedItemShopRevision);
     }
-    if (bSucceeded) Error = OfferId == FRunSkillShopState::GetRecoveryOfferId() ? NSLOCTEXT("RunSkillShop", "Recovered", "HP를 회복했습니다.") : NSLOCTEXT("RunSkillShop", "Purchased", "스킬을 구매했습니다. 다음 전투부터 사용할 수 있습니다.");
-    ClientReceiveShopPurchaseResult(bSucceeded, Error);
+    if (bSucceeded)
+    {
+        if (bItemShop) Error = OfferId == FRunItemShopState::GetRerollOfferId() ? NSLOCTEXT("RunItemShop", "Rerolled", "아이템 상점의 상품을 다시 추첨했습니다.") : NSLOCTEXT("RunItemShop", "Purchased", "아이템을 구매했습니다. 현재는 보관만 하며 장착 효과는 적용되지 않습니다.");
+        else Error = OfferId == FRunSkillShopState::GetRecoveryOfferId() ? NSLOCTEXT("RunSkillShop", "Recovered", "HP를 회복했습니다.") : NSLOCTEXT("RunSkillShop", "Purchased", "스킬을 구매했습니다. 다음 전투부터 사용할 수 있습니다.");
+    }
+    ClientReceiveShopPurchaseResult(bSucceeded, Error, bSucceeded && bItemShop ? CurrentRun->GetItemShopState().Revision : INDEX_NONE);
 }
 
-void AGameplayPlayerController::ClientReceiveShopPurchaseResult_Implementation(bool bSucceeded, const FText& Message)
+void AGameplayPlayerController::ClientReceiveShopPurchaseResult_Implementation(bool bSucceeded, const FText& Message, int32 ConfirmedItemShopRevision)
 {
-    bShopPurchasePending = false;
+    PendingItemShopRevision = bSucceeded ? ConfirmedItemShopRevision : INDEX_NONE;
+    bShopPurchasePending = PendingItemShopRevision != INDEX_NONE;
     ShopPurchaseMessage = Message;
     RefreshGameplayFlow();
 }
@@ -384,6 +392,18 @@ void AGameplayPlayerController::RefreshGameplayFlow()
     {
         ShopPurchaseMessage = FText::GetEmpty();
         bShopPurchasePending = false;
+        PendingItemShopRevision = INDEX_NONE;
+    }
+    else if (PendingItemShopRevision != INDEX_NONE)
+    {
+        // Keep item purchases and rerolls locked until the matching saved offers and gold reach the displayed view.
+        // 저장된 상품과 골드가 표시 뷰에 도착할 때까지 아이템 구매와 리롤을 잠급니다.
+        const FRunItemShopState* Items = HasAuthority() && RunState ? &RunState->GetItemShopState() : GameplayState ? &GameplayState->GetViewState().ItemShopState : nullptr;
+        if (Items && Items->Revision >= PendingItemShopRevision)
+        {
+            bShopPurchasePending = false;
+            PendingItemShopRevision = INDEX_NONE;
+        }
     }
     if (CurrentPhase != ERunPhase::Result)
     {
