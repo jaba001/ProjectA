@@ -93,7 +93,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 `RunEncounterPoolDataAsset.StartingGold/FixedSkillOffers/Recovery`에서 시험 구성을 관리하고 새 Run에 `FRunSkillShopState`로 복사한다. `FRunPartyMember.Gold/Skills/bHasSkillLoadout/CurrentHP`를 저장 기준으로 사용한다. 서버가 신뢰 연결의 소유자·상점 단계·Human 상태·잔액과 스킬 중복 또는 부족 HP를 검사하고, 저장 복사본에 잔액과 구매 효과를 함께 반영한 뒤 성공한 변경만 공개한다. 실패하면 메모리와 기존 파일을 보존한다. 기존 schema 1 저장의 회복 필드 누락은 기본값 1G로 읽고 고정 스킬 상품·보유 골드를 유지한다. schema 0에는 상품·골드를 소급 지급하지 않으며 명시 장착이 없는 기존 파티는 과거 직업 기본값을 유지한다. [사용자 확인](TODO.md#2-19-비무장-시작과-스킬-상점)
 
-2026-09-25 아이템상점 시험: [WEAPON_ASSETS.csv](WEAPON_ASSETS.csv)의 방패·탄환·화살·기타를 포함한 전체 295개를 사용하고 `가격(G)`은 모두 1이다. 원본 에셋 이름을 표시하며 첫 입장과 1G 리롤마다 중복 없는 5개를 추첨한다. 이전 진열·구매 상품은 다음 리롤에서 다시 등장할 수 있다. 구매한 슬롯은 판매 완료로 바뀌고 `FRunPartyMember.Items`의 개인 보유 사본으로 추가한다. 구매와 장착은 별도 명령이다.
+2026-09-25 아이템상점 시험: [WEAPON_ASSETS.csv](WEAPON_ASSETS.csv)의 방패·탄환·화살·기타를 포함한 전체 295개를 사용하고 `가격(G)`은 모두 1이다. 새 Run은 마지막 열 `게임 내 이름`을 표시하며 첫 입장과 1G 리롤마다 중복 없는 5개를 추첨한다. 같은 이름을 시작 장비·인벤토리·장비창에서도 사용하며 기존 저장의 고정 카탈로그·상품·보유 사본은 저장 당시 이름을 유지한다. 이전 4열 CSV는 원본 이름을 사용하고, 새 5열 CSV의 빈 이름은 오류로 처리한다. 표시명은 식별자가 아니며 경로 기반 ID·GameplayTag 분류·장착 프로필은 유지한다. 이전 진열·구매 상품은 다음 리롤에서 다시 등장할 수 있다. 구매한 슬롯은 판매 완료로 바뀌고 `FRunPartyMember.Items`의 개인 보유 사본으로 추가한다. 구매와 장착은 별도 명령이다.
 
 `FRunItemDefinition`의 원본 경로·표시명·GameplayTag·가격과 `FRunItemShopState`의 `Catalog/Offers/Revision/RerollPrice`를 값 데이터로 관리한다. 새 Run에서 카탈로그를 고정하고 아이템상점 진입 시 진열을 확정한다. 구매·리롤은 서버의 소유자·생존 Human·단계·잔액·진열 Revision 검증을 거쳐 골드·아이템·진열을 한 저장 후보로 처리한다. 성공한 변경만 공개하며 재개 시 판매 완료와 리롤 결과를 복원한다. RunSaveGame·GameState에 같은 상태를 전달하되 실제 협동 동작은 사용자 확인 대기다. 아이템 상점 schema 1은 새 Run에만 부여하고 기존 schema 0 저장은 보존하여 새 Run 안내를 표시한다. [사용자 확인](TODO.md#2-31-아이템상점-시험)
 
@@ -176,7 +176,9 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 ### 4-1 스킬 이펙트 에셋 목록
 
-[SKILL_EFFECT_ASSETS.csv](SKILL_EFFECT_ASSETS.csv)는 로컬 Content의 17개 최상위 폴더에서 효과 시스템 489개(NiagaraSystem 343·ParticleSystem 146)와 스킬 구성 Blueprint 88개를 정리한다. `계열·세부 분류·속성/테마·에셋 형식·원본 팩·위치·에셋 이름·분류 근거·확인 사항`을 기록하며 UTF-8 BOM CSV로 저장한다. 원본 팩은 최상위 폴더명이다. Blueprint에는 효과 Actor·생성 래퍼·Trail 애니메이션 알림을 포함하고 기반 BP를 구분한다. 재질·텍스처·메시·하위 NiagaraEmitter·모듈·데모 재생 도구는 제외한다.
+[SKILL_EFFECT_ASSETS.csv](SKILL_EFFECT_ASSETS.csv)는 로컬 Content의 17개 최상위 폴더에서 효과 시스템 489개(NiagaraSystem 343·ParticleSystem 146)와 스킬 구성 Blueprint 88개를 정리한다. `계열·세부 분류·속성/테마·에셋 형식·원본 팩·위치·에셋 이름·분류 근거·확인 사항·게임 내 이름`을 기록하며 UTF-8 BOM CSV로 저장한다. 원본 팩은 최상위 폴더명이다. Blueprint에는 효과 Actor·생성 래퍼·Trail 애니메이션 알림을 포함하고 기반 BP를 구분한다. 재질·텍스처·메시·하위 NiagaraEmitter·모듈·데모 재생 도구는 제외한다.
+
+두 에셋 CSV의 `게임 내 이름`은 원본 이름을 보존한 한국어 표시명이다. 무기는 종류·원본 단서를 바탕으로 작명하고, 이펙트는 테마와 시전·투사체·피격 등 시각적 용도를 구분한다. 같은 효과의 Niagara/Cascade/Blueprint 구현은 표시명을 공유할 수 있으며 전체 경로로 식별한다. 명칭은 희귀도·능력치·피해 속성·손 점유를 확정하지 않는다. 이펙트 이름은 향후 스킬 구성에 사용할 목록 데이터이며 기존 GAS 스킬 이름·실행 효과를 자동 변경하지 않는다. [이름 확인](TODO.md#2-35-에셋-게임-내-이름)
 
 클래스·객체명은 엔진을 실행하지 않고 uasset의 AssetRegistry 및 최상위 Export 메타데이터로 확인했다. 시각 형태와 테마는 이름·폴더에서 분류하며 실제 재생·지속 피해·유도 이동·능력치·GAS 태그 연결을 의미하지 않는다. 마법진과 장판, 투사체 본체와 Trail, 시스템과 Blueprint 및 Niagara/Cascade 변형은 별도 항목이다. 동명 에셋은 전체 경로로 구분하고 원본 오타·Old/Charged 변형을 보존한다. `P_Warrior_Swipe`의 패키지 파일명 `P_Warrior_sWIPE` 차이는 확인 사항에 남겼다. [사용자 확인](TODO.md#2-34-스킬-이펙트-csv-분류)
 

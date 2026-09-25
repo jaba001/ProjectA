@@ -7,6 +7,7 @@ namespace RunItemShopCatalog
 {
     PROJECTA_API FGameplayTag GetWeaponTag();
     PROJECTA_API bool Load(TArray<FRunItemDefinition>& OutCatalog, FText& OutError);
+    PROJECTA_API bool LoadFromString(FString CsvText, TArray<FRunItemDefinition>& OutCatalog, FText& OutError);
     PROJECTA_API bool Roll(FRunItemShopState& State, bool bAllowDuplicates, const FGameplayTagQuery& Query, FText& OutError);
     PROJECTA_API bool Validate(const FRunItemShopState& State, FText& OutError);
     PROJECTA_API bool ValidateItem(const FRunItemDefinition& Item);

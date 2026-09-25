@@ -8,6 +8,7 @@
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunEquipmentRules.h"
+#include "Game/Run/RunItemShopCatalog.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Tests/RunRewardTestHelpers.h"
@@ -357,6 +358,47 @@ bool FRunSkillShopMalformedSaveTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopCatalogNamesTest, "ProjectA.Run.Shop.CatalogDisplayNamesAndLegacyColumns", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunItemShopCatalogNamesTest::RunTest(const FString& Parameters)
+{
+    FString LegacyCsv = TEXT("무기 종류,위치,에셋 이름,가격(G)\n");
+    FString NamedCsv = TEXT("무기 종류,위치,에셋 이름,가격(G),게임 내 이름\n");
+    for (int32 Index = 0; Index < 5; ++Index)
+    {
+        LegacyCsv += FString::Printf(TEXT("검,/Game/Test,Weapon_%d,1\n"), Index);
+        NamedCsv += FString::Printf(TEXT("검,/Game/Test,Weapon_%d,1,\"서약의 검, %d\"\n"), Index, Index);
+    }
+    TArray<FRunItemDefinition> Legacy;
+    TArray<FRunItemDefinition> Named;
+    FText Error;
+    if (!TestTrue(TEXT("The original four-column CSV remains supported"), RunItemShopCatalog::LoadFromString(LegacyCsv, Legacy, Error))) return false;
+    if (!TestTrue(TEXT("The fifth column supports Korean names and quoted commas"), RunItemShopCatalog::LoadFromString(NamedCsv, Named, Error))) return false;
+    if (!TestEqual(TEXT("Names do not change catalog size"), Named.Num(), Legacy.Num())) return false;
+    for (int32 Index = 0; Index < Named.Num(); ++Index)
+    {
+        TestEqual(TEXT("Legacy CSV names still use source asset names"), Legacy[Index].DisplayName.ToString(), Legacy[Index].Asset.GetAssetName());
+        TestEqual(TEXT("The authored name survives CSV parsing exactly"), Named[Index].DisplayName.ToString(), FString::Printf(TEXT("서약의 검, %d"), Index));
+        TestTrue(TEXT("Naming does not change asset identity price or GAS classification"), Named[Index].Asset == Legacy[Index].Asset && Named[Index].Price == Legacy[Index].Price && Named[Index].Tags == Legacy[Index].Tags);
+    }
+    FRunItemShopState LegacyState;
+    LegacyState.SchemaVersion = 1;
+    LegacyState.Catalog = Legacy;
+    TestTrue(TEXT("Frozen original asset names remain valid for rerolls"), RunItemShopCatalog::Roll(LegacyState, false, FGameplayTagQuery(), Error) && RunItemShopCatalog::Validate(LegacyState, Error));
+    FRunItemShopState NamedState;
+    NamedState.SchemaVersion = 1;
+    NamedState.Catalog = Named;
+    if (!TestTrue(TEXT("Authored names remain valid for rerolls"), RunItemShopCatalog::Roll(NamedState, false, FGameplayTagQuery(), Error))) return false;
+    NamedState.Offers[0].Item.DisplayName = FText::FromString(TEXT("카탈로그와 다른 이름"));
+    TestFalse(TEXT("An offer cannot override its frozen catalog name"), RunItemShopCatalog::Validate(NamedState, Error));
+    TArray<FRunItemDefinition> RejectedCatalog;
+    TestFalse(TEXT("Unknown fifth-column headers are rejected"), RunItemShopCatalog::LoadFromString(NamedCsv.Replace(TEXT("게임 내 이름"), TEXT("잘못된 열")), RejectedCatalog, Error));
+    TestFalse(TEXT("Rows must retain the declared column count"), RunItemShopCatalog::LoadFromString(NamedCsv.Replace(TEXT(",\"서약의 검, 0\""), TEXT("")), RejectedCatalog, Error));
+    TestFalse(TEXT("An authored blank name cannot silently fall back to the asset name"), RunItemShopCatalog::LoadFromString(NamedCsv.Replace(TEXT("서약의 검, 0"), TEXT(" ")), RejectedCatalog, Error));
+    TestFalse(TEXT("Display names cannot inject line breaks into the UI"), RunItemShopCatalog::LoadFromString(NamedCsv.Replace(TEXT("서약의 검, 0"), TEXT("이름\n두 번째 줄")), RejectedCatalog, Error));
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopPersistenceTest, "ProjectA.Run.Shop.ItemPurchaseRerollAndReload", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FRunItemShopPersistenceTest::RunTest(const FString& Parameters)
@@ -367,12 +409,15 @@ bool FRunItemShopPersistenceTest::RunTest(const FString& Parameters)
     const FRunItemShopState Initial = Fixture.Run->GetItemShopState();
     if (!TestEqual(TEXT("The item shop displays exactly five offers"), Initial.Offers.Num(), 5)) return false;
     TestEqual(TEXT("The whole authored CSV is available"), Initial.Catalog.Num(), 295);
+    TestTrue(TEXT("New runs load authored gameplay names"), Initial.Catalog.ContainsByPredicate([](const FRunItemDefinition& Item) { return Item.DisplayName.ToString() != Item.Asset.GetAssetName(); }));
     TSet<FSoftObjectPath> Assets;
     for (const FRunItemShopOffer& Offer : Initial.Offers)
     {
         TestFalse(TEXT("Displayed stock contains no duplicate asset"), Assets.Contains(Offer.Item.Asset));
         Assets.Add(Offer.Item.Asset);
-        TestEqual(TEXT("The product uses its asset name"), Offer.Item.DisplayName.ToString(), Offer.Item.Asset.GetAssetName());
+        const FRunItemDefinition* CatalogItem = Initial.Catalog.FindByPredicate([&Offer](const FRunItemDefinition& Item) { return Item.Asset == Offer.Item.Asset; });
+        if (!TestNotNull(TEXT("Every displayed product belongs to the frozen catalog"), CatalogItem)) return false;
+        TestEqual(TEXT("The product keeps its authored catalog name"), Offer.Item.DisplayName.ToString(), CatalogItem->DisplayName.ToString());
         TestEqual(TEXT("Each test item costs 1G"), Offer.Item.Price, 1);
     }
     const FName OfferId = Initial.Offers[0].OfferId;
@@ -398,6 +443,17 @@ bool FRunItemShopPersistenceTest::RunTest(const FString& Parameters)
     Restored->EnableCheckpointSaving(Fixture.Slot);
     if (!TestTrue(TEXT("Continue restores the item shop"), Restored->LoadStandaloneCheckpoint(Fixture.Error))) return false;
     TestTrue(TEXT("Continue keeps exact stock gold and owned items"), FRunItemShopState::StaticStruct()->CompareScriptStruct(&Fixture.Run->GetItemShopState(), &Restored->GetItemShopState(), 0) && SameShopParty(Fixture.Run->GetPartyMembers(), Restored->GetPartyMembers()));
+    TStrongObjectPtr<URunSaveGame> LegacyNames(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+    if (!LegacyNames) return false;
+    for (FRunItemDefinition& Item : LegacyNames->ItemShopState.Catalog) Item.DisplayName = FText::FromString(Item.Asset.GetAssetName());
+    for (FRunItemShopOffer& Offer : LegacyNames->ItemShopState.Offers) Offer.Item.DisplayName = FText::FromString(Offer.Item.Asset.GetAssetName());
+    for (FRunPartyMember& Member : LegacyNames->Party)
+    {
+        for (FRunItemDefinition& Item : Member.Items) Item.DisplayName = FText::FromString(Item.Asset.GetAssetName());
+    }
+    if (!FRunCheckpointStorage::Save(LegacyNames.Get(), Fixture.Slot, Fixture.Error)) return false;
+    if (!TestTrue(TEXT("Continue still accepts original asset names saved before game naming"), Restored->LoadStandaloneCheckpoint(Fixture.Error))) return false;
+    TestTrue(TEXT("Loading legacy names never rewrites the frozen catalog offers or owned copies"), FRunItemShopState::StaticStruct()->CompareScriptStruct(&LegacyNames->ItemShopState, &Restored->GetItemShopState(), 0) && SameShopParty(LegacyNames->Party, Restored->GetPartyMembers()));
     TStrongObjectPtr<URunSaveGame> EmptyBalance(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
     if (!EmptyBalance) return false;
     EmptyBalance->Party[3].Gold = 0;

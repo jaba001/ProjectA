@@ -32,6 +32,19 @@ namespace
 {
     constexpr int32 OfferCount = 5;
     constexpr int32 MaximumCatalogSize = 4096;
+    constexpr int32 MaximumDisplayNameLength = 256;
+
+    // Validate saved display text independently of the current CSV so frozen runs keep their original names.
+    // 저장된 표시 문구는 현재 CSV와 독립적으로 검증하여 기존 Run의 확정된 이름을 보존합니다.
+    bool IsValidDisplayName(const FString& Name)
+    {
+        if (Name.Len() > MaximumDisplayNameLength || Name.TrimStartAndEnd().IsEmpty()) return false;
+        for (const TCHAR Character : Name)
+        {
+            if (Character < TEXT(' ') || Character == 0x7f) return false;
+        }
+        return true;
+    }
 
     // Translate the authored CSV categories once; runtime selection uses GameplayTagQuery.
     // 작성된 CSV 분류를 변환하고 런타임 선택은 GameplayTagQuery로 판정합니다.
@@ -84,7 +97,7 @@ FGameplayTag RunItemShopCatalog::GetWeaponTag()
 bool RunItemShopCatalog::ValidateItem(const FRunItemDefinition& Item)
 {
     const FString AssetPath = Item.Asset.ToString();
-    return Item.Asset.IsValid() && Item.Asset.GetSubPathUtf8String().IsEmpty() && AssetPath.StartsWith(TEXT("/Game/")) && FPackageName::IsValidObjectPath(AssetPath) && Item.DisplayName.ToString() == Item.Asset.GetAssetName() && Item.Tags.HasTag(TAG_ItemWeapon) && Item.Price > 0;
+    return Item.Asset.IsValid() && Item.Asset.GetSubPathUtf8String().IsEmpty() && AssetPath.StartsWith(TEXT("/Game/")) && FPackageName::IsValidObjectPath(AssetPath) && IsValidDisplayName(Item.DisplayName.ToString()) && Item.Tags.HasTag(TAG_ItemWeapon) && Item.Price > 0;
 }
 
 bool RunItemShopCatalog::Load(TArray<FRunItemDefinition>& OutCatalog, FText& OutError)
@@ -96,9 +109,17 @@ bool RunItemShopCatalog::Load(TArray<FRunItemDefinition>& OutCatalog, FText& Out
         OutError = NSLOCTEXT("RunItemShop", "MissingCatalog", "무기 에셋 CSV를 읽을 수 없습니다.");
         return false;
     }
+    return LoadFromString(MoveTemp(CsvText), OutCatalog, OutError);
+}
+
+bool RunItemShopCatalog::LoadFromString(FString CsvText, TArray<FRunItemDefinition>& OutCatalog, FText& OutError)
+{
+    OutError = FText::GetEmpty();
     const FCsvParser Parser(MoveTemp(CsvText));
     const FCsvParser::FRows& Rows = Parser.GetRows();
-    if (Rows.Num() < OfferCount + 1 || Rows.Num() > MaximumCatalogSize + 1 || Rows[0].Num() != 4 || FCString::Strcmp(Rows[0][0], TEXT("무기 종류")) != 0 || FCString::Strcmp(Rows[0][1], TEXT("위치")) != 0 || FCString::Strcmp(Rows[0][2], TEXT("에셋 이름")) != 0 || FCString::Strcmp(Rows[0][3], TEXT("가격(G)")) != 0)
+    const int32 ColumnCount = Rows.IsEmpty() ? 0 : Rows[0].Num();
+    const bool bHasGameName = ColumnCount == 5;
+    if (Rows.Num() < OfferCount + 1 || Rows.Num() > MaximumCatalogSize + 1 || (ColumnCount != 4 && ColumnCount != 5) || FCString::Strcmp(Rows[0][0], TEXT("무기 종류")) != 0 || FCString::Strcmp(Rows[0][1], TEXT("위치")) != 0 || FCString::Strcmp(Rows[0][2], TEXT("에셋 이름")) != 0 || FCString::Strcmp(Rows[0][3], TEXT("가격(G)")) != 0 || (bHasGameName && FCString::Strcmp(Rows[0][4], TEXT("게임 내 이름")) != 0))
     {
         OutError = NSLOCTEXT("RunItemShop", "InvalidCatalogHeader", "무기 에셋 CSV의 열 또는 상품 개수가 올바르지 않습니다.");
         return false;
@@ -109,7 +130,7 @@ bool RunItemShopCatalog::Load(TArray<FRunItemDefinition>& OutCatalog, FText& Out
     for (int32 RowIndex = 1; RowIndex < Rows.Num(); ++RowIndex)
     {
         const TArray<const TCHAR*>& Row = Rows[RowIndex];
-        if (Row.Num() != 4)
+        if (Row.Num() != ColumnCount)
         {
             OutError = FText::Format(NSLOCTEXT("RunItemShop", "InvalidCatalogRow", "무기 에셋 CSV의 {0}행이 올바르지 않습니다."), FText::AsNumber(RowIndex + 1));
             return false;
@@ -117,12 +138,12 @@ bool RunItemShopCatalog::Load(TArray<FRunItemDefinition>& OutCatalog, FText& Out
         FRunItemDefinition Item;
         const FGameplayTag CategoryTag = FindCategoryTag(Row[0]);
         Item.Asset = FSoftObjectPath(FString::Printf(TEXT("%s/%s.%s"), Row[1], Row[2], Row[2]));
-        Item.DisplayName = FText::FromString(Row[2]);
+        Item.DisplayName = FText::FromString(Row[bHasGameName ? 4 : 2]);
         Item.Tags.AddTag(TAG_ItemWeapon);
         if (CategoryTag.IsValid()) Item.Tags.AddTag(CategoryTag);
         if (!CategoryTag.IsValid() || !LexTryParseString(Item.Price, Row[3]) || !ValidateItem(Item))
         {
-            OutError = FText::Format(NSLOCTEXT("RunItemShop", "InvalidCatalogItem", "무기 에셋 CSV의 {0}행 분류·경로·가격이 올바르지 않습니다."), FText::AsNumber(RowIndex + 1));
+            OutError = FText::Format(NSLOCTEXT("RunItemShop", "InvalidCatalogItem", "무기 에셋 CSV의 {0}행 분류·경로·이름·가격이 올바르지 않습니다."), FText::AsNumber(RowIndex + 1));
             return false;
         }
         Catalog.Add(MoveTemp(Item));
