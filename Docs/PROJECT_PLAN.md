@@ -178,7 +178,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 전투 간 이관 | HP 유지. 새 전투의 추가 스킬 자동 추첨 없음. 전투 복구는 저장된 Ready 경계 사용. Snapshot 적은 저장된 스킬 구성 사용 |
 | 적·아군 AI | 실제 장착 스킬 순서·가까운 적 기준으로 인간 초안 전에 단일 명령 고정. 장착된 복귀형 Tile 공격은 적 HomeCoord를 공격/접근 좌표로 선택 가능. 합법 공격이 없으면 목록에 노출되지 않는 내부 대기 처리 |
 | 사망 표현 | 아군·적·Snapshot 모두 기존 Ragdoll 충돌 프로필·본 물리·서버 생성 사망 충격량 사용. 캡슐 충돌 해제·타일 해제·행동 취소 유지. 단발 사망 애니메이션 분기와 설정 제거. [사용자 확인](TODO.md#2-28-전체-래그돌-복구) |
-| 메뉴 프리뷰 | MainMenuPreviewStage의 기존 카메라·4개 앵커 사용. 네 직업 모두 선택한 Primitive 남자·여자 몸체와 공통 Idle을 표시한다. 편집 중 선택 슬롯 확대·우클릭 드래그 회전 후 종료 시 원복. 마법사 기본 스태프 제거·불필요한 배치 무기 숨김 유지. 전투 Pawn 생성 없음. [외형 확인](TODO.md#2-30-rog-의상-커스터마이징) |
+| 메뉴 프리뷰 | MainMenuPreviewStage의 카메라 X `-500`·4개 앵커 Yaw `90°` 사용. 네 직업은 선택한 Primitive 몸체와 공통 Idle을 표시한다. 프리뷰 Blueprint·몸체 회전을 정규화하고 상세 편집 종료 시 슬롯의 기본 방향을 복원한다. 마법사 기본 스태프 없음. 전투 Pawn 생성 없음. [수치 조절](UI_README.md#화면프리뷰)·[외형 확인](TODO.md#2-30-rog-의상-커스터마이징) |
 | 생성 화면 종료 | Back/X는 초안·프리뷰 정리. 재진입 시 빈 4슬롯. 상세 패널이 열려 있으면 먼저 패널만 닫음. 최소 슬롯 높이로 ClassInfo 표시 유지 |
 | 모드 선택 | 게임 시작 → 싱글플레이/멀티플레이. 캐릭터 생성·접속 시작 전 멀티 화면에서 돌아오면 모드 선택 복원, 모드 선택의 뒤로가기는 첫 화면 복원. 연결 이후 나가기는 기존 세션 정리/메뉴 복귀 |
 | 싱글 여정 항복 | 이어하기 옆 104×40 버튼·`URunSurrenderWidget` 확인창. 돌아가기 기본 포커스, 확인된 현재 일반 싱글 저장만 삭제. 취소·실패·저장 변경은 원본/현재 Run 보존 |
@@ -254,7 +254,7 @@ ROG 8부위·103개 항목과 원본 신체/의상 자료는 향후 아이템용
 
 GKnight·Assassin·Stylized Dark Witch와 해당 리타깃 자료는 이전 구성 이력으로 보존한다. 마녀 임포트의 본 배율 1·높이 약 1.87m·물리 재생성과 원본 FBX 보존은 당시 수정 결과이며 현재 직업 외형에 사용하지 않는다. `/Game/MageStaff_FreeWeapons` 원본과 필요한 임포트 결과 5개는 향후 아이템용으로 보존한다. 현행 외형 카탈로그가 연결된 마법사·도적에 이전 외형 작성 스크립트를 다시 적용하지 못하도록 보호한다.
 
-별도 `Sword` 표시는 `AUnitBase::RefreshSkillPresentation`에서 저장된 장착에 맞춰 갱신하며 아군과 Snapshot 상대가 공유한다. 마법사는 기본 스태프를 들지 않는다. 메뉴·전투·Snapshot Blueprint 3개의 `Staff` 메시를 비우고 표시·충돌을 끄며 원본은 변경하지 않는다. 궁수의 실제 Unit·MenuPreview는 기존 `BP_PlayerUnit`·`BP_PartyMenuPreview`를 유지한다. 궁수 Snapshot은 `BP_ArcherSnapshotOpponent`를 사용하며 이전 공통 Snapshot 클래스는 호환 맵에 보존한다. 기존 직업별 저장 경로·스킬 장착·전체 래그돌 실행 경로를 유지한다.
+별도 `Sword` 표시는 `AUnitBase::RefreshSkillPresentation`에서 저장된 장착에 맞춰 갱신하며 아군과 Snapshot 상대가 공유한다. 마법사는 기본 스태프를 들지 않는다. 전투·Snapshot의 `Staff` 메시·표시·충돌은 비활성화하며 메뉴 프리뷰에서 사용자가 제거한 `Staff` 컴포넌트는 복원하지 않는다. 스태프 원본은 변경하지 않는다. 궁수의 실제 Unit·MenuPreview는 기존 `BP_PlayerUnit`·`BP_PartyMenuPreview`를 유지한다. 궁수 Snapshot은 `BP_ArcherSnapshotOpponent`를 사용하며 이전 공통 Snapshot 클래스는 호환 맵에 보존한다. 기존 직업별 저장 경로·스킬 장착·전체 래그돌 실행 경로를 유지한다.
 
 | 에셋 경로 | 클래스 / 저장된 연결 |
 |---|---|
@@ -278,7 +278,7 @@ GKnight·Assassin·Stylized Dark Witch와 해당 리타깃 자료는 이전 구�
 | `Blueprint/Unit/Animation/Montage` | 기존 프로젝트 공격 몽타주와 유닛별 리타깃 사본 |
 | `BossyEnemy/Animations/InPlace/Attacks` | 이전 `Boss_Attack_Swing_InP` 리타깃 시퀀스와 검 몽타주 보존 |
 | `ParagonAnimationsRetargetedToManny/KwangManny/Attack` | 적용 이전부터 사용하던 GKnight·Manny·적의 검 공격·복귀 유지. 파라곤 모델용 추가 리타깃은 미사용 보존 |
-| `Paragon*/Characters/Heroes/*/Rigs`, `GKnight/Rigs`, `Skeleton_Guard/Rigs` | 직업별 원본 메시를 참조하는 새 IK Rig·Retargeter와 기존 전사/적 도구 |
+| `GKnight/Rigs`, `Skeleton_Guard/Rigs` | 기존 전사·적 IK Rig·Retargeter 유지. 사용자가 삭제한 `Paragon*/Characters/Heroes/*/Rigs`의 미사용 IK Rig·Retargeter 12개는 참조 없음 확인 후 삭제 상태 보존 |
 | `Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Sword` | 원본 구조를 유지한 검 사본. 전사·기본 적의 `hand_r` 부착 |
 | `Characters/Mannequins/Meshes/SK_Mannequin`, `Characters/Mannequins/Meshes/SKM_Manny_Simple` | 원본 `/Game/Characters/Mannequins/Meshes`로 연결하는 작은 Redirector. AnimSequence는 원본 뼈대·프리뷰 직접 참조 |
 | `ParagonAnimationsRetargetedToManny` | 원본 32개 캐릭터/하위 폴더를 유지한 AnimSequence 5,385개. 전체 저장·별도 재로드 확인, Kwang 검 공격용 리타깃은 별도 연결 |

@@ -39,9 +39,10 @@ unreal.BlueprintEditorLibrary.compile_blueprint(mode_asset)
 if not unreal.EditorAssetLibrary.save_loaded_asset(mode_asset):
     raise RuntimeError("Could not save menu GameMode pawn removal.")
 
-stage.get_editor_property("preview_camera").set_editor_property("relative_location", unreal.Vector(-600.0, 0.0, 140.0))
+stage.get_editor_property("preview_camera").set_editor_property("relative_location", unreal.Vector(-500.0, 0.0, 140.0))
 for index, offset in enumerate([-450.0, -150.0, 150.0, 450.0]):
     stage.get_editor_property("slot%d_anchor" % index).set_editor_property("relative_location", unreal.Vector(0, offset, 0))
+    stage.get_editor_property("slot%d_anchor" % index).set_editor_property("relative_rotation", unreal.Rotator(pitch=0.0, yaw=90.0, roll=0.0))
 mesh_component = unreal.get_default_object(preview.generated_class()).get_editor_property("skeletal_mesh_component")
 idle = unreal.load_asset("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle")
 mesh = mesh_component.get_editor_property("skeletal_mesh_asset")
@@ -50,7 +51,7 @@ if not idle or not mesh or idle.get_editor_property("skeleton") != mesh.get_edit
 # Persist the looping Idle on the component defaults so every newly spawned preview starts playing.
 # 새로 생성하는 모든 프리뷰가 재생되도록 반복 Idle을 컴포넌트 기본값에 저장합니다.
 mesh_component.override_animation_data(idle, True, True, 0.0, 1.0)
-mesh_component.set_editor_property("relative_rotation", unreal.Rotator(pitch=0.0, yaw=90.0, roll=0.0))
+mesh_component.set_editor_property("relative_rotation", unreal.Rotator())
 unreal.BlueprintEditorLibrary.compile_blueprint(preview)
 if not unreal.EditorAssetLibrary.save_loaded_asset(preview):
     raise RuntimeError("Could not save menu preview Idle and orientation.")

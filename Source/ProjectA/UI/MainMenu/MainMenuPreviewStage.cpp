@@ -11,30 +11,35 @@ AMainMenuPreviewStage::AMainMenuPreviewStage()
 {
     PrimaryActorTick.bCanEverTick = false;
     SpawnedPreviewActors.SetNum(4);
+    PreviewBaseRotations.Init(FQuat::Identity, 4);
 
     SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
     RootComponent = SceneRoot;
 
     PreviewCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("PreviewCamera"));
     PreviewCamera->SetupAttachment(SceneRoot);
-    PreviewCamera->SetRelativeLocation(FVector(-600.0f, 0.0f, 140.0f));
+    PreviewCamera->SetRelativeLocation(FVector(-500.0f, 0.0f, 140.0f));
     PreviewCamera->SetRelativeRotation(FRotator(-5.0f, 0.0f, 0.0f));
 
     Slot0Anchor = CreateDefaultSubobject<USceneComponent>(TEXT("Slot0Anchor"));
     Slot0Anchor->SetupAttachment(SceneRoot);
     Slot0Anchor->SetRelativeLocation(FVector(0.0f, -450.0f, 0.0f));
+    Slot0Anchor->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));
 
     Slot1Anchor = CreateDefaultSubobject<USceneComponent>(TEXT("Slot1Anchor"));
     Slot1Anchor->SetupAttachment(SceneRoot);
     Slot1Anchor->SetRelativeLocation(FVector(0.0f, -150.0f, 0.0f));
+    Slot1Anchor->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));
 
     Slot2Anchor = CreateDefaultSubobject<USceneComponent>(TEXT("Slot2Anchor"));
     Slot2Anchor->SetupAttachment(SceneRoot);
     Slot2Anchor->SetRelativeLocation(FVector(0.0f, 150.0f, 0.0f));
+    Slot2Anchor->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));
 
     Slot3Anchor = CreateDefaultSubobject<USceneComponent>(TEXT("Slot3Anchor"));
     Slot3Anchor->SetupAttachment(SceneRoot);
     Slot3Anchor->SetRelativeLocation(FVector(0.0f, 450.0f, 0.0f));
+    Slot3Anchor->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));
 }
 
 void AMainMenuPreviewStage::SetPreviewActorForSlot(int32 SlotIndex, FName ClassId)
@@ -75,6 +80,7 @@ void AMainMenuPreviewStage::SetPreviewActorForSlot(int32 SlotIndex, FName ClassI
 
     PreviewActor->AttachToComponent(SlotAnchor, FAttachmentTransformRules::KeepWorldTransform);
     SpawnedPreviewActors[SlotIndex] = PreviewActor;
+    if (const USceneComponent* PreviewRoot = PreviewActor->GetRootComponent()) PreviewBaseRotations[SlotIndex] = PreviewRoot->GetRelativeTransform().GetRotation();
     RefreshPreviewFocus();
     UE_LOG(LogTemp, Log, TEXT("[MainMenuPreviewStage] Preview actor updated. SlotIndex: %d, ClassId: %s"), SlotIndex, *ClassId.ToString());
 }
@@ -92,6 +98,7 @@ void AMainMenuPreviewStage::ClearPreviewActorForSlot(int32 SlotIndex)
         PreviewActor->Destroy();
     }
     SpawnedPreviewActors[SlotIndex] = nullptr;
+    PreviewBaseRotations[SlotIndex] = FQuat::Identity;
 }
 
 void AMainMenuPreviewStage::ClearAllPreviewActors()
@@ -107,6 +114,9 @@ bool AMainMenuPreviewStage::SetPreviewAppearance(int32 SlotIndex, UCharacterAppe
 {
     AActor* PreviewActor = GetPreviewActorForSlot(SlotIndex);
     if (!PreviewActor) return false;
+    // Restore the body orientation before applying appearance so repeated refreshes do not accumulate drag rotation.
+    // 외형 적용 전에 몸체 기본 방향을 복원하여 반복 갱신에서 드래그 회전이 누적되지 않게 합니다.
+    PreviewActor->SetActorRelativeRotation(PreviewBaseRotations[SlotIndex]);
     UCharacterAppearanceComponent* Appearance = PreviewActor->FindComponentByClass<UCharacterAppearanceComponent>();
     if (!Appearance && Catalog)
     {
@@ -115,7 +125,8 @@ bool AMainMenuPreviewStage::SetPreviewAppearance(int32 SlotIndex, UCharacterAppe
         Appearance->RegisterComponent();
     }
     const bool bApplied = Appearance ? Appearance->SetAppearance(Catalog, Selection) : !Catalog && Selection.IsEmpty();
-    if (bApplied && FocusedSlot == SlotIndex) RefreshPreviewFocus();
+    if (bApplied && PreviewActor->GetRootComponent()) PreviewBaseRotations[SlotIndex] = PreviewActor->GetRootComponent()->GetRelativeTransform().GetRotation();
+    if (FocusedSlot == SlotIndex) RefreshPreviewFocus();
     return bApplied;
 }
 
@@ -140,8 +151,10 @@ void AMainMenuPreviewStage::RefreshPreviewFocus()
     {
         if (AActor* Actor = GetPreviewActorForSlot(Index)) Actor->SetActorHiddenInGame(Index != FocusedSlot);
     }
-    USceneComponent* Anchor = GetSlotAnchor(FocusedSlot);
-    FocusedActor->SetActorRotation(Anchor->GetComponentRotation() + FRotator(0.0f, FocusedYawOffset, 0.0f));
+    // Rotate around the slot anchor while retaining the selected body's local orientation.
+    // 선택한 몸체의 로컬 방향을 유지한 채 슬롯 앵커를 기준으로 회전합니다.
+    const FQuat RotationOffset(FVector::UpVector, FMath::DegreesToRadians(FocusedYawOffset));
+    FocusedActor->SetActorRelativeRotation(RotationOffset * PreviewBaseRotations[FocusedSlot]);
     const USkeletalMeshComponent* Mesh = FocusedActor->FindComponentByClass<USkeletalMeshComponent>();
     const FVector Center = Mesh ? Mesh->Bounds.Origin : FocusedActor->GetActorLocation() + FVector(0.0f, 0.0f, 90.0f);
     const float HalfHeight = Mesh ? FMath::Max(90.0f, Mesh->Bounds.BoxExtent.Z) : 100.0f;
@@ -175,7 +188,7 @@ void AMainMenuPreviewStage::ClearPreviewFocus()
         if (AActor* Actor = GetPreviewActorForSlot(Index))
         {
             Actor->SetActorHiddenInGame(false);
-            Actor->SetActorRotation(GetSlotAnchor(Index)->GetComponentRotation());
+            Actor->SetActorRelativeRotation(PreviewBaseRotations[Index]);
         }
     }
     PreviewCamera->SetWorldTransform(UnfocusedCameraTransform);

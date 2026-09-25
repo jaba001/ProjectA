@@ -41,6 +41,39 @@ def verify_mage_defaults():
     unreal.log("MAGE_DEFAULT_STAFF_RELOAD_VERIFIED")
 
 
+def verify_preview_facing():
+    catalog = load(CATALOG_PATH)
+    variants = {str(variant.body_id): variant for variant in catalog.get_editor_property("body_variants")}
+    report = {"preview_blueprints": [], "body_ids": [], "anchor_yaw": [], "camera_x": None, "gameplay_test": "not run", "ui_visual_test": "user pending"}
+    for body_id, title, path in BODIES:
+        rotation = variants[body_id].preview_mesh_transform.rotation.rotator()
+        require(max(abs(rotation.pitch), abs(rotation.yaw), abs(rotation.roll)) < 0.001, "Body preview facing must be local identity: " + body_id)
+        report["body_ids"].append(body_id)
+    for profession, unit_name, preview_name in PROFESSIONS:
+        blueprint = load(ROOT + "/Blueprint/UI/" + preview_name)
+        defaults = unreal.get_default_object(blueprint.generated_class())
+        mesh = defaults.get_editor_property("skeletal_mesh_component")
+        rotation = mesh.get_editor_property("relative_rotation")
+        require(max(abs(rotation.pitch), abs(rotation.yaw), abs(rotation.roll)) < 0.001, "Preview Blueprint must not duplicate anchor facing: " + profession)
+        require(defaults.get_editor_property("root_component") == mesh, "Preview root layout changed")
+        if profession == "Mage":
+            verify_default_staff(blueprint)
+        report["preview_blueprints"].append(blueprint.get_path_name())
+    require(unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/MainMenu"), "Missing MainMenu map")
+    stages = [actor for actor in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors() if isinstance(actor, unreal.MainMenuPreviewStage)]
+    require(len(stages) == 1, "MainMenu requires one preview stage")
+    stage = stages[0]
+    camera = stage.get_editor_property("preview_camera")
+    report["camera_x"] = camera.get_editor_property("relative_location").x
+    require(abs(report["camera_x"] + 500.0) < 0.001, "Incorrect preview camera distance")
+    for index in range(4):
+        rotation = stage.get_editor_property("slot%d_anchor" % index).get_editor_property("relative_rotation")
+        require(abs(rotation.yaw - 90.0) < 0.001 and abs(rotation.pitch) < 0.001 and abs(rotation.roll) < 0.001, "Incorrect slot facing")
+        report["anchor_yaw"].append(rotation.yaw)
+    Path(unreal.Paths.project_saved_dir(), "Automation/PreviewFacingReload.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    unreal.log("PRIMITIVE_PREVIEW_FACING_RELOAD_VERIFIED")
+
+
 def verify():
     catalog = load(CATALOG_PATH)
     require(not catalog.get_editor_property("enable_outfits"), "Outfits must remain disabled")
@@ -123,5 +156,7 @@ def verify():
 if __name__ == "__main__":
     if "-PrimitiveMageDefaultsOnly" in unreal.SystemLibrary.get_command_line():
         verify_mage_defaults()
+    elif "-PrimitivePreviewFacingOnly" in unreal.SystemLibrary.get_command_line():
+        verify_preview_facing()
     else:
         verify()

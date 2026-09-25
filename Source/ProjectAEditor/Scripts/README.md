@@ -161,4 +161,6 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 두 명령에 `-PrimitiveMageDefaultsOnly`를 추가하면 마법사 전투·Snapshot·프리뷰 Blueprint 3개의 기본 스태프만 작성하거나 읽기 전용으로 검사한다. 결과는 `Saved/Automation/MageDefaultStaffConfigure.json`, `MageDefaultStaffReload.json`에 기록하며 스태프 원본 보존도 검사한다.
 
+`-PrimitivePreviewFacingOnly`는 네 직업 메뉴 프리뷰 Blueprint와 현재 Male/Female의 `PreviewMeshTransform` 회전을 `0°`, 저장된 MainMenu 카메라 X를 `-500`, 네 슬롯 앵커 Yaw를 `90°`로 맞춘다. 나머지 몸체 설정·슬롯 위치·상세 거리 배율은 보존한다. 같은 옵션의 읽기 전용 검사는 Blueprint 4개·몸체 변환 2개·앵커 4개·카메라를 재로드하여 `Saved/Automation/PreviewFacingReload.json`에 기록한다. 화면·드래그 실행 검증은 포함하지 않는다.
+
 전체 검사는 네 직업의 기본 메시·몸체 ID와 이전 의상 선택 검증·원본 애니메이션 포즈·마법사 기본 스태프 제거·래그돌 구조를 읽기 전용으로 확인한다. 결과는 `Saved/Automation/PrimitiveAppearanceConfigure.json`, `PrimitiveAppearanceReload.json`에 기록한다. 실제 화면·게임 검증은 [TODO 2-30](../../../Docs/TODO.md#2-30-rog-의상-커스터마이징)의 사용자 확인으로 남긴다.

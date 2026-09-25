@@ -112,13 +112,16 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 
 프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 Warrior/Mage/Archer/Rogue 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
-거리·간격은 `/Game/User_JeHoon/LEVEL/MainMenu`의 Outliner에서 `MainMenuPreviewStage`를 선택하여 Details에서 수정하고 레벨을 저장한다. 생성·수정 중 상세 카메라는 자동 계산하므로 별도 거리 배율을 사용한다.
+거리·방향·간격은 `/Game/User_JeHoon/LEVEL/MainMenu`의 Outliner에서 `MainMenuPreviewStage`를 선택하여 Details에서 수정하고 레벨을 저장한다. 생성·수정 중 상세 카메라는 자동 계산하므로 별도 거리 배율을 사용한다.
 
 | 조절 대상 | Details 위치 | 현재값·조절 방향 |
 |---|---|---|
-| 전체 캐릭터 크기 | `PreviewCamera` 컴포넌트 → Transform → Location X | `-600`. `-550`은 더 가깝게, `-650`은 더 멀게 표시 |
+| 전체 캐릭터 크기 | `PreviewCamera` 컴포넌트 → Transform → Location X | `-500`. `-450`은 더 가깝게, `-550`은 더 멀게 표시 |
+| 캐릭터 기본 방향 | `Slot0Anchor`~`Slot3Anchor` → Transform → Rotation Z(Yaw) | 모두 `90°`. 각 슬롯의 기본 정면 방향 |
 | 캐릭터 사이 간격 | `Slot0Anchor`~`Slot3Anchor` → Transform → Location Y | `-450 / -150 / 150 / 450`. 절댓값을 줄이면 가운데로 모임 |
 | 생성·수정 확대 크기 | Actor의 MainMenu → Preview → Camera → `Focused Camera Distance Scale` | `1.15`. `1.05`는 더 가깝게, `1.3`은 더 멀게 표시. `1.0` 미만은 전신이 잘릴 수 있음 |
+
+카메라 X와 앵커 Yaw는 C++ 생성 기본값·작성 스크립트·저장된 MainMenu에 동일하게 적용한다. 네 직업 프리뷰 Blueprint와 현재 남녀 몸체의 `PreviewMeshTransform` 회전은 `0°`로 맞추고 앵커가 정면 방향을 결정한다. Stage는 몸체의 원래 회전에 임시 드래그 회전을 더하며, 편집 종료 시 원래 방향을 복원한다. 몸체 선택을 반복해도 회전 보정이 누적되지 않는다.
 
 전사 `BP_WarriorMenuPreview`·마법사 `BP_MageMenuPreview`·도적 `BP_RogueMenuPreview`·궁수 `BP_PartyMenuPreview`는 선택한 Primitive 몸체와 원본 재질·공통 Idle을 사용한다. 남자는 `SKM_Primitive_Charater_01_Body`, 여자는 실제 원본 이름 `SKM_Primitive_02_Body`다. 마법사의 기본 스태프는 표시하지 않는다. ROG 의상 UI·착용은 중지하고 기존 103개 항목·스태프 원본 에셋은 향후 아이템용으로 보존한다.
 

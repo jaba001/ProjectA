@@ -84,6 +84,7 @@ private:
     FTransform UnfocusedCameraTransform;
     float UnfocusedFieldOfView = 90.0f;
     float FocusedYawOffset = 0.0f;
+    TArray<FQuat> PreviewBaseRotations;
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<AActor>> SpawnedPreviewActors;

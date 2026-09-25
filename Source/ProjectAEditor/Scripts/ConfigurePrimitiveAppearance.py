@@ -42,6 +42,38 @@ def configure_mage_defaults():
     unreal.log("MAGE_DEFAULT_STAFF_REMOVED")
 
 
+def configure_preview_facing():
+    catalog = load(CATALOG_PATH)
+    variants = list(catalog.get_editor_property("body_variants"))
+    for variant in variants:
+        if str(variant.body_id) in {body[0] for body in BODIES}:
+            transform = variant.preview_mesh_transform
+            transform.rotation = unreal.Rotator().quaternion()
+            variant.set_editor_property("preview_mesh_transform", transform)
+    catalog.set_editor_property("body_variants", variants)
+    save(catalog)
+    # Slot anchors own the front-facing yaw; root meshes must not apply the same correction twice.
+    # 정면 Yaw는 슬롯 앵커가 담당하므로 루트 메시에서 같은 보정을 중복 적용하지 않습니다.
+    for profession, unit_name, preview_name in PROFESSIONS:
+        blueprint = load(ROOT + "/Blueprint/UI/" + preview_name)
+        mesh = unreal.get_default_object(blueprint.generated_class()).get_editor_property("skeletal_mesh_component")
+        mesh.set_editor_property("relative_rotation", unreal.Rotator())
+        unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
+        save(blueprint)
+    world = require(unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/MainMenu"), "Missing MainMenu map")
+    stages = [actor for actor in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors() if isinstance(actor, unreal.MainMenuPreviewStage)]
+    require(len(stages) == 1, "MainMenu requires one preview stage")
+    stage = stages[0]
+    camera = stage.get_editor_property("preview_camera")
+    location = camera.get_editor_property("relative_location")
+    location.x = -500.0
+    camera.set_editor_property("relative_location", location)
+    for index in range(4):
+        stage.get_editor_property("slot%d_anchor" % index).set_editor_property("relative_rotation", unreal.Rotator(pitch=0.0, yaw=90.0, roll=0.0))
+    require(unreal.EditorLoadingAndSavingUtils.save_map(world, ROOT + "/LEVEL/MainMenu"), "Could not save preview facing")
+    unreal.log("PRIMITIVE_PREVIEW_FACING_CONFIGURED")
+
+
 def configure():
     catalog = load(CATALOG_PATH)
     preserved = {field: [entry.export_text() for entry in catalog.get_editor_property(field)] for field in ["slots", "items", "body_parts"]}
@@ -50,6 +82,8 @@ def configure():
     idle = load(UNARMED_SOURCE + "/MM_Idle")
     unit = unreal.get_default_object(load(ROOT + "/Blueprint/Unit/BP_PlayerUnit").generated_class()).get_editor_property("mesh")
     preview = unreal.get_default_object(load(ROOT + "/Blueprint/UI/BP_PartyMenuPreview").generated_class()).get_editor_property("skeletal_mesh_component")
+    preview_transform = mesh_transform(preview)
+    preview_transform.rotation = unreal.Rotator().quaternion()
     variants = []
     for body_id, title, path in BODIES:
         mesh = load(path)
@@ -60,7 +94,7 @@ def configure():
         # 메시·뼈대·애니메이션을 복제하지 않고 Unreal의 애니메이션 호환 설정을 등록합니다.
         require(ASSETS.save_loaded_asset(skeleton, only_if_is_dirty=True), "Could not save the original skeleton compatibility")
         variant = unreal.CharacterAppearanceBodyVariant()
-        for field, value in {"body_id": body_id, "display_name": title, "mesh": mesh, "animation_class": animation, "preview_animation": idle, "mesh_transform": mesh_transform(unit), "preview_mesh_transform": mesh_transform(preview)}.items():
+        for field, value in {"body_id": body_id, "display_name": title, "mesh": mesh, "animation_class": animation, "preview_animation": idle, "mesh_transform": mesh_transform(unit), "preview_mesh_transform": preview_transform}.items():
             variant.set_editor_property(field, value)
         variants.append(variant)
     known_ids = {entry[0] for entry in BODIES}
@@ -92,6 +126,7 @@ def configure():
         mesh.set_editor_property("skeletal_mesh_asset", male)
         mesh.set_editor_property("override_materials", [])
         mesh.set_editor_property("physics_asset_override", None)
+        mesh.set_editor_property("relative_rotation", unreal.Rotator())
         mesh.override_animation_data(idle, True, True, 0.0, 1.0)
         if profession == "Mage":
             clear_default_staff(blueprint)
@@ -105,5 +140,7 @@ def configure():
 if __name__ == "__main__":
     if "-PrimitiveMageDefaultsOnly" in unreal.SystemLibrary.get_command_line():
         configure_mage_defaults()
+    elif "-PrimitivePreviewFacingOnly" in unreal.SystemLibrary.get_command_line():
+        configure_preview_facing()
     else:
         configure()
