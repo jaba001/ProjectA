@@ -2,6 +2,8 @@
 #include "AbilitySystemComponent.h"
 #include "GameplayEffect.h"
 #include "GameplayTagContainer.h"
+#include "GAS/Attribute/AS_Unit.h"
+#include "GAS/CombatGameplayTags.h"
 #include "Unit/UnitBase.h"
 
 bool UCombatEffectLibrary::ApplyDamageToUnit(AUnitBase* SourceUnit, AUnitBase* TargetUnit, TSubclassOf<UGameplayEffect> DamageEffectClass, float DamageAmount)
@@ -9,9 +11,9 @@ bool UCombatEffectLibrary::ApplyDamageToUnit(AUnitBase* SourceUnit, AUnitBase* T
     return ApplyTaggedEffectToUnit(SourceUnit, TargetUnit, DamageEffectClass, DamageAmount, FGameplayTagContainer());
 }
 
-bool UCombatEffectLibrary::ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitBase* TargetUnit, TSubclassOf<UGameplayEffect> DamageEffectClass, float DamageAmount, const FGameplayTagContainer& AssetTags)
+bool UCombatEffectLibrary::ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitBase* TargetUnit, TSubclassOf<UGameplayEffect> EffectClass, float Power, const FGameplayTagContainer& AssetTags)
 {
-    if (!SourceUnit || !TargetUnit)
+    if (!IsValid(SourceUnit) || !IsValid(TargetUnit) || !SourceUnit->HasAuthority() || !TargetUnit->HasAuthority() || SourceUnit->GetWorld() != TargetUnit->GetWorld() || !FMath::IsFinite(Power) || Power < 0.0f)
     {
         UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Invalid Source or Target"));
         return false;
@@ -32,7 +34,7 @@ bool UCombatEffectLibrary::ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitB
         return false;
     }
 
-    if (!DamageEffectClass)
+    if (!EffectClass)
     {
         UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | DamageEffectClass is null"));
         return false;
@@ -41,7 +43,7 @@ bool UCombatEffectLibrary::ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitB
     FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
     EffectContext.AddSourceObject(SourceUnit);
 
-    FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, EffectContext);
+    FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(EffectClass, 1.0f, EffectContext);
 
     if (!SpecHandle.IsValid())
     {
@@ -49,10 +51,20 @@ bool UCombatEffectLibrary::ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitB
         return false;
     }
 
-    const FGameplayTag DamageTag = FGameplayTag::RequestGameplayTag(FName("Data.Damage"));
-
     SpecHandle.Data->AppendDynamicAssetTags(AssetTags);
-    SpecHandle.Data->SetSetByCallerMagnitude(DamageTag, -DamageAmount);
+    FGameplayTagContainer EffectTags;
+    SpecHandle.Data->GetAllAssetTags(EffectTags);
+    const bool bHeal = EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Heal);
+    const bool bShield = EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Shield);
+    const bool bDamage = EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Damage);
+    if ((bHeal && bShield) || (bDamage && (bHeal || bShield))) return false;
+    if ((bHeal || bShield) && (!TargetUnit->GetAttributeSet() || TargetUnit->GetAttributeSet()->GetHP() <= 0.0f)) return false;
+
+    // Damage retains its negative contract; positive support power follows authored effect tags.
+    // 피해의 음수 계약을 유지하고 양수 지원 강도는 제작된 효과 태그를 따릅니다.
+    SpecHandle.Data->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(TEXT("Data.Damage")), -Power);
+    SpecHandle.Data->SetSetByCallerMagnitude(ProjectACombatTags::Data_Heal, bHeal ? Power : 0.0f);
+    SpecHandle.Data->SetSetByCallerMagnitude(ProjectACombatTags::Data_Shield, bShield ? Power : 0.0f);
 
     const FActiveGameplayEffectHandle AppliedHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 
@@ -64,6 +76,16 @@ bool UCombatEffectLibrary::ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitB
         return false;
     }
 
+    return true;
+}
+
+bool UCombatEffectLibrary::ClearRoundShield(AUnitBase* Unit)
+{
+    if (!IsValid(Unit) || !Unit->HasAuthority() || !Unit->GetAttributeSet()) return false;
+    UAbilitySystemComponent* ASC = Unit->GetAbilitySystemComponent();
+    if (!ASC) return false;
+    ASC->SetNumericAttributeBase(UAS_Unit::GetShieldAttribute(), 0.0f);
+    Unit->ForceNetUpdate();
     return true;
 }
 

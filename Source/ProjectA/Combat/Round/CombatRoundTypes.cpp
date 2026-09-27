@@ -35,12 +35,40 @@ bool CombatRoundRules::IsSupportedEffectDuration(const FCombatRoundSkill& Skill)
     return Effect && Effect->DurationPolicy == EGameplayEffectDurationType::Instant;
 }
 
+bool CombatRoundRules::UsesUnitTarget(const FCombatRoundSkill& Skill)
+{
+    if (Skill.Kind == ECombatRoundSkillKind::Wait) return false;
+    if (Skill.Kind != ECombatRoundSkillKind::GroundAttack) return true;
+    return Skill.bUseEffectCollision && Skill.TargetRule <= ESkillTargetRule::AnyUnit;
+}
+
+bool CombatRoundRules::MatchesTargetTeam(const FCombatRoundSkill& Skill, bool bSourceEnemy, bool bTargetEnemy)
+{
+    if (Skill.TargetRule == ESkillTargetRule::AllyUnit || Skill.TargetRule == ESkillTargetRule::AllyTile) return bSourceEnemy == bTargetEnemy;
+    if (Skill.TargetRule == ESkillTargetRule::AnyUnit || Skill.TargetRule == ESkillTargetRule::AnyTile) return true;
+    return bSourceEnemy != bTargetEnemy;
+}
+
 bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
 {
     if (Skill.EffectClass && Skill.EffectClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists)) return false;
     if (!IsSupportedEffectDuration(Skill)) return false;
     if (Skill.SkillId.IsNone() || Skill.Kind > ECombatRoundSkillKind::Wait || Skill.Approach > ECombatRoundApproach::Tile || Skill.TargetLoss > ECombatRoundTargetLoss::NearestEnemy) return false;
     if (static_cast<uint8>(Skill.Kind) == 3) return false;
+    if (Skill.TargetRule > ESkillTargetRule::AnyTile) return false;
+    const auto IsValidVfx = [](const FCombatSkillVfx& Vfx)
+    {
+        return (Vfx.Niagara.IsNull() || Vfx.Cascade.IsNull()) && !Vfx.RelativeTransform.ContainsNaN() && Vfx.RelativeTransform.GetRotation().IsNormalized() && Vfx.RelativeTransform.GetScale3D().GetMin() > 0.0;
+    };
+    if (!IsValidVfx(Skill.Vfx) || !IsValidVfx(Skill.ImpactVfx)) return false;
+    if (Skill.bUseEffectCollision)
+    {
+        if (Skill.Kind != ECombatRoundSkillKind::Melee && Skill.Kind != ECombatRoundSkillKind::GroundAttack) return false;
+        if (Skill.bUseWeaponTrace || Skill.bUseMeleeAreaCollision || Skill.MeleeArea != ESkillAreaType::Single) return false;
+        if (Skill.EffectHalfExtent.ContainsNaN() || Skill.EffectHalfExtent.GetMin() <= 0.0 || Skill.EffectHalfExtent.GetMax() > 10000.0) return false;
+        if (Skill.EffectOffset.ContainsNaN() || Skill.EffectTravel.ContainsNaN() || Skill.EffectOffset.GetAbsMax() > 10000.0 || Skill.EffectTravel.GetAbsMax() > 10000.0) return false;
+        if (!FMath::IsFinite(Skill.EffectDuration) || Skill.EffectDuration <= 0.f || Skill.EffectDuration > 10.f) return false;
+    }
     if (Skill.MeleeArea != ESkillAreaType::Single && Skill.MeleeArea != ESkillAreaType::TargetAndSides) return false;
     if (Skill.MeleeArea == ESkillAreaType::TargetAndSides && (Skill.Kind != ECombatRoundSkillKind::Melee || Skill.Approach != ECombatRoundApproach::Unit)) return false;
     if (Skill.bUseMeleeAreaCollision && (Skill.Kind != ECombatRoundSkillKind::Melee || Skill.MeleeArea != ESkillAreaType::Single)) return false;

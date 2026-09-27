@@ -33,6 +33,7 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
         // Reuse authored damage and optional presentation without activating the legacy ability.
         // 기존 어빌리티를 활성화하지 않고 작성된 피해 수치와 선택적 표현을 재사용합니다.
         Skill = FCombatRoundSkill();
+        Skill.TargetRule = TargetRule;
         Skill.ActionPointCost = ActionPointCost;
         Skill.Power = Attack->GetAuthoredDamageAmount();
         Skill.Kind = bMoveToTarget ? ECombatRoundSkillKind::Melee : ECombatRoundSkillKind::Projectile;
@@ -56,7 +57,7 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
     if (!CombatRoundRules::IsValidSkill(Skill)) return Fail(NSLOCTEXT("SkillRound", "InvalidProfile", "RoundDefinition contains invalid timing, power, range, cost or approach settings. / RoundDefinition의 시간·위력·범위·비용·접근 설정이 유효하지 않습니다."));
     // Apply the shared pre-release retarget rule to existing assets without changing their saved profiles or fixed ground attacks.
     // 기존 저장 프로필과 고정 지점 공격을 변경하지 않고 발동 전 공통 재선택 규칙을 기존 에셋에도 적용합니다.
-    if (Skill.Kind == ECombatRoundSkillKind::Melee || Skill.Kind == ECombatRoundSkillKind::Projectile) Skill.TargetLoss = ECombatRoundTargetLoss::NearestEnemy;
+    if ((Skill.Kind == ECombatRoundSkillKind::Melee || Skill.Kind == ECombatRoundSkillKind::Projectile) && Skill.TargetRule == ESkillTargetRule::EnemyUnit) Skill.TargetLoss = ECombatRoundTargetLoss::NearestEnemy;
     OutSkill = MoveTemp(Skill);
     return true;
 }

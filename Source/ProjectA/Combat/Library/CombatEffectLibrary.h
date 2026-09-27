@@ -28,5 +28,10 @@ public:
 
     // Use the same GAS application path for legacy callers and authored round effect tags.
     // 기존 호출과 제작된 라운드 효과 태그가 동일한 GAS 적용 경로를 사용합니다.
-    static bool ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitBase* TargetUnit, TSubclassOf<UGameplayEffect> EffectClass, float DamageAmount, const FGameplayTagContainer& AssetTags);
+    static bool ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitBase* TargetUnit, TSubclassOf<UGameplayEffect> EffectClass, float Power, const FGameplayTagContainer& AssetTags);
+
+    // Clear round-only absorption before planning checkpoints or ending the encounter.
+    // 계획 체크포인트나 인카운터 종료 전에 라운드 전용 흡수량을 제거합니다.
+    UFUNCTION(BlueprintCallable, Category = "Combat|Effect")
+    static bool ClearRoundShield(AUnitBase* Unit);
 };

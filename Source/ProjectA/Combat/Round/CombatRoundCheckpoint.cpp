@@ -18,6 +18,7 @@ bool ACombatRoundCoordinator::CapturePlanningCheckpoint(FCombatCheckpointData& O
     const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     const UCombatActionAuthority* Authority = IsValid(CombatManager) ? CombatManager->GetActionAuthority() : nullptr;
     if (!HasAuthority() || View.Phase != ECombatRoundPhase::Planning || bSAPMovementInProgress || !Projectiles.IsEmpty() || !Run || Run->GetPhase() != ERunPhase::Combat || !Authority || !View.CombatId.IsValid() || !FRunIdentityData::StaticStruct()->CompareScriptStruct(&Run->GetRunIdentity(), &Authority->GetRunIdentity(), 0)) return false;
+    if (!ActiveEffects.IsEmpty()) return false;
     if (Run->GetRunIdentity().Origin == ERunIdentityOrigin::LegacyOffline && GetNetMode() != NM_Standalone) return false;
     const FCombatCheckpointData& Previous = Run->GetCombatCheckpoint();
     if (Previous.Revision >= MAX_int64 - 1) return false;
@@ -42,6 +43,11 @@ bool ACombatRoundCoordinator::CapturePlanningCheckpoint(FCombatCheckpointData& O
         AUnitBase* Unit = Entry.Unit;
         if (!IsValid(Unit) || !Unit->GetAttributeSet()) return false;
         const UAS_Unit* Attributes = Unit->GetAttributeSet();
+        if (Attributes->GetShield() != 0.f)
+        {
+            OutError = FText::FromString(TEXT("라운드 보호막은 준비 상태 저장 전에 제거되어야 합니다."));
+            return false;
+        }
         FCombatCheckpointUnit& Saved = Candidate.Units.AddDefaulted_GetRef();
         Saved.UnitId = Authority->GetUnitId(Unit);
         Saved.RoundUnitId = Entry.UnitId;
@@ -105,6 +111,7 @@ bool ACombatRoundCoordinator::RestorePlanningCheckpoint(const FCombatCheckpointD
     const UCombatActionAuthority* Authority = IsValid(CombatManager) ? CombatManager->GetActionAuthority() : nullptr;
     if (!HasAuthority() || !Run || Run->GetPhase() != ERunPhase::Combat || !Authority || Checkpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion || View.Units.Num() != Checkpoint.Units.Num() || !IsValid(Arena) || !IsValid(Arena->Grid) || !Projectiles.IsEmpty() || !FRunIdentityData::StaticStruct()->CompareScriptStruct(&Run->GetRunIdentity(), &Checkpoint.Identity, 0)) return false;
     if (Checkpoint.Identity.Origin == ERunIdentityOrigin::LegacyOffline && GetNetMode() != NM_Standalone) return false;
+    if (!ActiveEffects.IsEmpty()) return false;
     if (!UCombatCheckpointLibrary::Validate(Checkpoint, Run->GetPartyMembers(), OutError)) return false;
     OutError = FText::FromString(TEXT("저장된 유닛의 소유권·체력·행동력·배치를 복원하지 못했습니다."));
     FCombatRoundView Restored = View;
@@ -113,12 +120,14 @@ bool ACombatRoundCoordinator::RestorePlanningCheckpoint(const FCombatCheckpointD
     Restored.Phase = ECombatRoundPhase::Planning;
     Restored.ElapsedSeconds = 0.0f;
     Restored.PendingProjectiles = 0;
+    Restored.PendingEffects = 0;
     float HighestSpeed = 0.0f;
     for (int32 Index = 0; Index < Restored.Units.Num(); ++Index)
     {
         FCombatRoundUnitView& Entry = Restored.Units[Index];
         const FCombatCheckpointUnit& Saved = Checkpoint.Units[Index];
         AUnitBase* Unit = Entry.Unit;
+        if (IsValid(Unit) && Unit->GetAttributeSet() && Unit->GetAttributeSet()->GetShield() != 0.f) return false;
         const FCombatCheckpointRoundPlan* Plan = Checkpoint.RoundPlans.FindByPredicate([&Saved](const FCombatCheckpointRoundPlan& Candidate) { return Candidate.UnitId == Saved.RoundUnitId; });
         if (!IsValid(Unit) || !Unit->GetAttributeSet() || !Plan || FSoftObjectPath(Unit->GetClass()) != Saved.UnitClass || Unit->GetTeam() != Saved.Team || Unit->IsUnitAlive() == Saved.bDead || !FMath::IsNearlyEqual(Unit->GetAttributeSet()->GetHP(), Saved.HP) || Unit->GetCurrentActionPoint() != Saved.AP || Unit->GetCurrentSubActionPoint() != Saved.SubAP) return false;
         if (Saved.Team == ETeam::Player && (Authority->GetPartySlot(Unit) != Saved.PartySlot || Authority->GetCharacterId(Unit) != Saved.CharacterId || Authority->GetOwnerAccountId(Unit) != Saved.OwnerAccountId)) return false;

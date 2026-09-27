@@ -1,16 +1,19 @@
 #include "Combat/Round/CombatRoundProjectile.h"
 #include "Combat/Library/CombatCollisionPolicy.h"
 #include "Combat/Round/CombatSkillExecutor.h"
+#include "Combat/Round/CombatSkillPresentation.h"
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/SceneComponent.h"
 #include "Engine/HitResult.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
+#include "Particles/ParticleSystemComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Unit/UnitBase.h"
 
@@ -32,8 +35,9 @@ ACombatRoundProjectile::ACombatRoundProjectile()
     SetReplicateMovement(true);
     SourceTeam = ETeam::Player;
 
+    SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("ProjectileOrigin")));
     ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
-    SetRootComponent(ProjectileMesh);
+    ProjectileMesh->SetupAttachment(GetRootComponent());
     ProjectileMesh->SetMobility(EComponentMobility::Movable);
     ProjectileMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     ProjectileMesh->SetGenerateOverlapEvents(false);
@@ -54,6 +58,16 @@ void ACombatRoundProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ACombatRoundProjectile, VisualRadius);
+    DOREPLIFETIME(ACombatRoundProjectile, Visual);
+}
+
+void ACombatRoundProjectile::ConfigurePresentation(const FCombatRoundSkill& Skill)
+{
+    if (!HasAuthority() || bInitialized || bResolved) return;
+    Visual = Skill.Vfx;
+    ImpactVisual = Skill.ImpactVfx;
+    OnRep_Visual();
+    ForceNetUpdate();
 }
 
 void ACombatRoundProjectile::SetAllowedTargets(const TArray<AUnitBase*>& Targets)
@@ -89,6 +103,8 @@ void ACombatRoundProjectile::InitializeProjectile(AUnitBase* Source, AUnitBase* 
         return;
     }
     TargetPoint = AimPoint;
+    const FVector Direction = TargetPoint - GetActorLocation();
+    if (!Direction.IsNearlyZero()) SetActorRotation(Direction.Rotation());
     FlightSpeed = Speed;
     DamageAmount = Damage;
     CollisionRadius = Radius;
@@ -147,6 +163,7 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
     }
     const double Travel = FMath::Min(static_cast<double>(FlightSpeed) * StepSeconds, Distance);
     const FVector End = Distance > UE_SMALL_NUMBER ? Start + Offset * (Travel / Distance) : Start;
+    if (!Offset.IsNearlyZero()) SetActorRotation(Offset.Rotation());
 
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CombatRoundProjectile), false, this);
     QueryParams.bFindInitialOverlaps = true;
@@ -175,6 +192,7 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
     // 월드 지형은 WorldDynamic을 Block해야 하며 Visibility 전용 그리드 박스와 Overlap 센서는 벽이 아닙니다.
     if (GetWorld()->OverlapBlockingTestByChannel(Start, FQuat::Identity, ECC_WorldDynamic, Shape, WorldQueryParams, WorldResponses))
     {
+        if (!ImpactVisual.Niagara.IsNull() || !ImpactVisual.Cascade.IsNull()) MulticastImpact(ImpactVisual, FTransform(GetActorQuat(), Start));
         ResolveProjectile();
         return;
     }
@@ -236,6 +254,7 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
     if (bHitWorld && (Candidates.IsEmpty() || CombatCollisionPolicy::IsBlockedByWorld(bHitWorld, WorldHitTime, Candidates[0].Time)))
     {
         SetActorLocation(WorldHit.bStartPenetrating ? Start : FVector(WorldHit.Location), false, nullptr, ETeleportType::TeleportPhysics);
+        if (!ImpactVisual.Niagara.IsNull() || !ImpactVisual.Cascade.IsNull()) MulticastImpact(ImpactVisual, FTransform(GetActorQuat(), GetActorLocation()));
         ResolveProjectile();
         return;
     }
@@ -267,6 +286,7 @@ void ACombatRoundProjectile::ResolveProjectile(AUnitBase* HitUnit, bool bDestroy
     bResolved = true;
     if (SourceUnit.IsValid() && IsEligibleTarget(HitUnit))
     {
+        if (!ImpactVisual.Niagara.IsNull() || !ImpactVisual.Cascade.IsNull()) MulticastImpact(ImpactVisual, FTransform(GetActorQuat(), GetActorLocation()));
         OnImpact.Broadcast(SourceUnit.Get(), HitUnit, DamageAmount);
     }
     OnImpact.Clear();
@@ -289,5 +309,18 @@ void ACombatRoundProjectile::OnRep_VisualRadius()
 void ACombatRoundProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     ResolveProjectile(nullptr, false);
+    CombatSkillPresentation::Destroy(VisualComponents);
     Super::EndPlay(EndPlayReason);
+}
+
+void ACombatRoundProjectile::OnRep_Visual()
+{
+    if (IsActorBeingDestroyed()) return;
+    CombatSkillPresentation::Attach(this, Visual, VisualComponents);
+    if (ProjectileMesh) ProjectileMesh->SetVisibility(VisualComponents.IsEmpty());
+}
+
+void ACombatRoundProjectile::MulticastImpact_Implementation(const FCombatSkillVfx& ImpactDefinition, const FTransform& Transform)
+{
+    CombatSkillPresentation::Impact(GetWorld(), ImpactDefinition, Transform);
 }

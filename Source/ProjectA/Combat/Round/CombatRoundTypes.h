@@ -8,6 +8,25 @@
 class AUnitBase;
 class UAnimMontage;
 class UGameplayEffect;
+class UNiagaraSystem;
+class UParticleSystem;
+
+// Reference source effects without duplicating their packages or running third-party Blueprint logic.
+// 원본 패키지를 복제하거나 외부 Blueprint 로직을 실행하지 않고 효과를 참조합니다.
+USTRUCT(BlueprintType)
+struct PROJECTA_API FCombatSkillVfx
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TSoftObjectPtr<UNiagaraSystem> Niagara;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TSoftObjectPtr<UParticleSystem> Cascade;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FTransform RelativeTransform = FTransform::Identity;
+};
 
 UENUM(BlueprintType)
 enum class ECombatRoundPhase : uint8
@@ -71,6 +90,35 @@ struct PROJECTA_API FCombatRoundSkill
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FText Name;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Target")
+    ESkillTargetRule TargetRule = ESkillTargetRule::EnemyUnit;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation")
+    FCombatSkillVfx Vfx;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation")
+    FCombatSkillVfx ImpactVfx;
+
+    // A shared actor transform moves the visual and query volume; no rigid-body simulation is used.
+    // 같은 액터 변환으로 연출과 판정 영역을 이동하며 강체 물리 시뮬레이션은 사용하지 않습니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect Collision")
+    bool bUseEffectCollision = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect Collision", meta = (EditCondition = "bUseEffectCollision"))
+    FVector EffectHalfExtent = FVector(150.f, 150.f, 100.f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect Collision", meta = (EditCondition = "bUseEffectCollision"))
+    FVector EffectOffset = FVector(150.f, 0.f, 0.f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect Collision", meta = (EditCondition = "bUseEffectCollision"))
+    FVector EffectTravel = FVector::ZeroVector;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect Collision", meta = (ClampMin = "0.01", ClampMax = "10.0", EditCondition = "bUseEffectCollision"))
+    float EffectDuration = 0.5f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect Collision", meta = (EditCondition = "bUseEffectCollision"))
+    bool bEffectSphere = false;
 
     // Empty tag conditions preserve existing content; effects receive these tags through a GAS spec.
     // 빈 태그 조건은 기존 콘텐츠를 유지하며 효과는 GAS Spec을 통해 이 태그를 받습니다.
@@ -304,6 +352,9 @@ struct PROJECTA_API FCombatRoundView
     int32 PendingProjectiles = 0;
 
     UPROPERTY(BlueprintReadOnly)
+    int32 PendingEffects = 0;
+
+    UPROPERTY(BlueprintReadOnly)
     FText Message;
 
     UPROPERTY(BlueprintReadOnly)
@@ -316,6 +367,8 @@ namespace CombatRoundRules
     PROJECTA_API float AttackMoveSpeed(const FCombatRoundSkill& Skill, float RoundSpeed);
     PROJECTA_API bool IsTerminal(ECombatRoundActionPhase Phase);
     PROJECTA_API bool IsOwnTerritory(bool bEnemy, FIntPoint Coord);
+    PROJECTA_API bool UsesUnitTarget(const FCombatRoundSkill& Skill);
+    PROJECTA_API bool MatchesTargetTeam(const FCombatRoundSkill& Skill, bool bSourceEnemy, bool bTargetEnemy);
     PROJECTA_API bool IsSupportedEffectDuration(const FCombatRoundSkill& Skill);
     PROJECTA_API bool IsValidSkill(const FCombatRoundSkill& Skill);
 }

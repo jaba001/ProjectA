@@ -1,4 +1,5 @@
 #include "UI/Combat/CombatRoundPlanningWidget.h"
+#include "InputCoreTypes.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "AbilitySystemComponent.h"
@@ -147,7 +148,7 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
     // 기존 협동 세션 조작을 위해 오른쪽 위 모서리에 여유 공간을 둡니다.
     EnemySlot->SetPadding(FMargin(24.f, 152.f, 24.f, 0.f));
     AddText(EnemyBox, TEXT("대상 정보"), 18);
-    TargetDetails = AddText(EnemyBox, TEXT("공격할 적을 클릭하세요."), 16);
+    TargetDetails = AddText(EnemyBox, TEXT("대상을 클릭하세요. 내 아군 대상 지정은 Shift+클릭입니다."), 16);
     EnemyRoster = AddText(EnemyBox, FString(), 14);
 
     UHorizontalBox* BottomRow = WidgetTree->ConstructWidget<UHorizontalBox>();
@@ -375,7 +376,9 @@ void UCombatRoundPlanningWidget::HandleUnitChanged(FString SelectedItem, ESelect
 void UCombatRoundPlanningWidget::HandleWorldUnitClicked(int32 UnitId)
 {
     if (!CanEdit()) return;
-    if (OwnUnitIds.Contains(UnitId) && UnitId != GetSelectedUnitId())
+    const APlayerController* PlayerController = GetOwningPlayer();
+    const bool bSelectFriendlyTarget = PlayerController && (PlayerController->IsInputKeyDown(EKeys::LeftShift) || PlayerController->IsInputKeyDown(EKeys::RightShift));
+    if (OwnUnitIds.Contains(UnitId) && UnitId != GetSelectedUnitId() && !bSelectFriendlyTarget)
     {
         UnitChoice->SetSelectedIndex(OwnUnitIds.IndexOfByKey(UnitId));
         return;

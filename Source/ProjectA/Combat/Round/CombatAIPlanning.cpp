@@ -34,7 +34,19 @@ FCombatRoundCommand CombatAIPlanning::ChooseCommand(const FCombatRoundView& View
     {
         const FCombatRoundSkill* Skill = CombatPlanValidation::FindSkill(State, SkillId);
         if (!Skill || Skill->Kind == ECombatRoundSkillKind::Wait || Skill->bRemainAtDestination) continue;
-        const int32 TargetIndex = FindNearestEnemy(View, UnitIndex, [Skill](const FCombatRoundUnitView& Target) { return CombatSkillExecution::CanAffectTarget(Target.Unit, *Skill); });
+        int32 TargetIndex = INDEX_NONE;
+        double TargetDistance = TNumericLimits<double>::Max();
+        for (int32 CandidateIndex = 0; CandidateIndex < View.Units.Num(); ++CandidateIndex)
+        {
+            const FCombatRoundUnitView& Candidate = View.Units[CandidateIndex];
+            if (!CombatSkillExecution::IsValidEffectTarget(Entry.Unit, Candidate.Unit, *Skill)) continue;
+            const double Distance = FVector::DistSquared2D(Entry.Unit->GetActorLocation(), Candidate.Unit->GetActorLocation());
+            if (Distance < TargetDistance)
+            {
+                TargetIndex = CandidateIndex;
+                TargetDistance = Distance;
+            }
+        }
         if (!View.Units.IsValidIndex(TargetIndex)) continue;
         Command.TargetUnitId = View.Units[TargetIndex].UnitId;
         Command.TargetCoord = View.Units[TargetIndex].HomeCoord;

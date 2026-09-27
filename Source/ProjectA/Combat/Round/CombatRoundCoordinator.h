@@ -9,6 +9,7 @@
 
 class ACombatArena;
 class ACombatRoundProjectile;
+class ACombatSkillEffectActor;
 class ACombatGridTile;
 class APlayerController;
 class AUnitBase;
@@ -104,6 +105,9 @@ private:
     UPROPERTY()
     TArray<TObjectPtr<ACombatRoundProjectile>> Projectiles;
 
+    UPROPERTY()
+    TArray<TObjectPtr<ACombatSkillEffectActor>> ActiveEffects;
+
     TArray<FActionRuntime> Actions;
     double SimulationTime = 0.0;
     double MontageClock = 0.0;
@@ -151,4 +155,6 @@ private:
     bool MoveUnitToward(int32 Index, FVector Destination, float Speed, float StepSeconds);
     void ApplyHit(AUnitBase* Source, AUnitBase* Target, const FCombatRoundSkill& Skill);
     void HandleProjectileResolved(ACombatRoundProjectile* Projectile);
+    void HandleEffectResolved(ACombatSkillEffectActor* Effect);
+    void ClearActiveEffects();
 };

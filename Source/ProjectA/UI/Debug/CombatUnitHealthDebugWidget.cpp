@@ -61,7 +61,8 @@ int32 UCombatUnitHealthDebugWidget::NativePaint(const FPaintArgs& Args, const FG
         // DPI와 창 위치를 포함해 뷰포트 픽셀을 Slate 지오메트리로 한 번만 변환합니다.
         USlateBlueprintLibrary::ScreenToWidgetLocal(this, AllottedGeometry, ScreenPosition, Position);
         if (Position.ContainsNaN() || Position.X < 0.0 || Position.Y < 0.0 || Position.X > Bounds.X || Position.Y > Bounds.Y) continue;
-        const FString Label = FString::Printf(TEXT("HP %s / %s"), *FText::AsNumber(HP, &Numbers).ToString(), *FText::AsNumber(MaxHP, &Numbers).ToString());
+        FString Label = FString::Printf(TEXT("HP %s / %s"), *FText::AsNumber(HP, &Numbers).ToString(), *FText::AsNumber(MaxHP, &Numbers).ToString());
+        if (Attributes->GetShield() > 0.f) Label += FString::Printf(TEXT("  보호막 %s"), *FText::AsNumber(Attributes->GetShield(), &Numbers).ToString());
         const FVector2D TextSize = FontMeasure->Measure(Label, Font);
         const FVector2D PanelSize(FMath::Max(116.0, TextSize.X + 16.0), TextSize.Y + 19.0);
         const FVector2D PanelPosition = Position - FVector2D(PanelSize.X * 0.5, PanelSize.Y);

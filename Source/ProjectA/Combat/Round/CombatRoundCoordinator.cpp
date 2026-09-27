@@ -1,4 +1,6 @@
 #include "Combat/Round/CombatRoundCoordinator.h"
+#include "Combat/Round/CombatSkillEffectActor.h"
+#include "Combat/Library/CombatEffectLibrary.h"
 #include "Combat/Round/CombatPlanValidator.h"
 #include "Combat/Round/CombatAIPlanning.h"
 #include "AbilitySystemComponent.h"
@@ -245,6 +247,7 @@ bool ACombatRoundCoordinator::IsRoundSessionActive() const
 void ACombatRoundCoordinator::SuspendRound()
 {
     if (!HasAuthority()) return;
+    ClearActiveEffects();
     FinishPlanningMove(false);
     bSAPMovementInProgress = false;
     for (const FCombatRoundUnitView& Entry : View.Units)
@@ -252,6 +255,7 @@ void ACombatRoundCoordinator::SuspendRound()
         if (IsValid(Entry.Unit))
         {
             Entry.Unit->SetRoundCastMontage(nullptr);
+            UCombatEffectLibrary::ClearRoundShield(Entry.Unit);
             Entry.Unit->SetRoundMovementVelocity(FVector::ZeroVector);
             Entry.Unit->ForceNetUpdate();
         }
@@ -282,10 +286,12 @@ int32 ACombatRoundCoordinator::GetParticipantSlot(const APlayerController* Contr
 void ACombatRoundCoordinator::CleanupUnits()
 {
     TGuardValue<bool> CleanupGuard(bCleaningUp, true);
+    ClearActiveEffects();
     FinishPlanningMove(false);
     bSAPMovementInProgress = false;
     for (const FCombatRoundUnitView& Entry : View.Units)
     {
+        UCombatEffectLibrary::ClearRoundShield(Entry.Unit);
         if (IsValid(Entry.Unit))
         {
             Entry.Unit->SetRoundCastMontage(nullptr);
@@ -322,6 +328,7 @@ void ACombatRoundCoordinator::PublishState()
     }
     View.ElapsedSeconds = static_cast<float>(SimulationTime);
     View.PendingProjectiles = Projectiles.Num();
+    View.PendingEffects = ActiveEffects.Num();
     ForceNetUpdate();
     OnRoundStateChanged.Broadcast();
 }
@@ -335,6 +342,7 @@ int32 ACombatRoundCoordinator::FindNearestEnemy(int32 SourceIndex, FName SkillId
 }
 void ACombatRoundCoordinator::BeginPlanning()
 {
+    for (const FCombatRoundUnitView& Entry : View.Units) UCombatEffectLibrary::ClearRoundShield(Entry.Unit);
     ++View.RoundNumber;
     ++View.PlanRevision;
     View.Phase = ECombatRoundPhase::Planning;
@@ -720,13 +728,12 @@ bool ACombatRoundCoordinator::IsValidUnitTarget(int32 SourceUnitId, FName SkillI
     const int32 TargetIndex = FindUnitIndex(TargetUnitId);
     const FCombatRoundSkill* Skill = FindSkill(SkillId);
     if (!View.Units.IsValidIndex(SourceIndex) || !View.Units.IsValidIndex(TargetIndex) || !Skill) return false;
-    if (Skill->Kind == ECombatRoundSkillKind::Wait || Skill->Kind == ECombatRoundSkillKind::GroundAttack) return false;
+    if (!CombatRoundRules::UsesUnitTarget(*Skill)) return false;
     const FCombatRoundUnitView& Source = View.Units[SourceIndex];
     const FCombatRoundUnitView& Target = View.Units[TargetIndex];
     if (!IsValid(Source.Unit) || !IsValid(Target.Unit) || !Source.Unit->IsUnitAlive() || !Target.Unit->IsUnitAlive()) return false;
     if (!(Source.HP > 0.f) || !(Target.HP > 0.f) || !Source.SkillIds.Contains(SkillId)) return false;
-    const bool bAlly = Source.bEnemy == Target.bEnemy;
-    return !bAlly && CombatSkillExecution::CanAffectTarget(Target.Unit, *Skill);
+    return CombatSkillExecution::IsValidEffectTarget(Source.Unit, Target.Unit, *Skill);
 }
 
 CombatPlanValidation::FState ACombatRoundCoordinator::BuildPlanningState() const
@@ -775,7 +782,7 @@ bool ACombatRoundCoordinator::ValidateCommand(const FCombatRoundCommand& Command
         OutError = RoundText(TEXT("스킬 발동 태그 조건을 만족하지 않습니다."));
         return false;
     }
-    if (Skill->Kind == ECombatRoundSkillKind::Wait || Skill->Kind == ECombatRoundSkillKind::GroundAttack) return true;
+    if (!CombatRoundRules::UsesUnitTarget(*Skill)) return true;
     if (!IsValidUnitTarget(Command.UnitId, Command.SkillId, Command.TargetUnitId))
     {
         OutError = RoundText(TEXT("스킬의 대상 진영 또는 태그 조건이 올바르지 않습니다."));
@@ -942,7 +949,7 @@ void ACombatRoundCoordinator::BeginActionResolution()
         const int32 TargetIndex = FindUnitIndex(Entry.Command.TargetUnitId);
         Action.AimLocation = Action.OriginalLocation;
         if (View.Units.IsValidIndex(TargetIndex) && IsValid(View.Units[TargetIndex].Unit)) Action.AimLocation = View.Units[TargetIndex].Unit->GetActorLocation();
-        if (Skill.Kind == ECombatRoundSkillKind::GroundAttack) Action.AimLocation = Arena->Grid->GetTileAtCoord(Entry.Command.TargetCoord)->GetActorLocation() + FVector(0.f, 0.f, 100.f);
+        if (Skill.Kind == ECombatRoundSkillKind::GroundAttack && !CombatRoundRules::UsesUnitTarget(Skill)) Action.AimLocation = Arena->Grid->GetTileAtCoord(Entry.Command.TargetCoord)->GetActorLocation() + FVector(0.f, 0.f, 100.f);
         Action.Destination = Action.OriginalLocation;
         if (Skill.Approach == ECombatRoundApproach::Tile) Action.Destination = Arena->Grid->GetTileAtCoord(Entry.Command.DestinationCoord)->GetActorLocation() + FVector(0.f, 0.f, 100.f);
         Entry.ActionPhase = ECombatRoundActionPhase::Waiting;
@@ -1019,6 +1026,11 @@ void ACombatRoundCoordinator::AdvanceSimulation(float StepSeconds)
     {
         if (IsValid(Projectile) && !Projectile->HasResolved()) Projectile->AdvanceProjectile(StepSeconds);
     }
+    const TArray<TObjectPtr<ACombatSkillEffectActor>> PendingEffects = ActiveEffects;
+    for (ACombatSkillEffectActor* Effect : PendingEffects)
+    {
+        if (IsValid(Effect) && !Effect->HasResolved()) Effect->AdvanceEffect(StepSeconds);
+    }
     for (FCombatRoundUnitView& Entry : View.Units)
     {
         if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive())
@@ -1089,7 +1101,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
     if (Entry.ActionPhase == ECombatRoundActionPhase::Approaching || Entry.ActionPhase == ECombatRoundActionPhase::Casting)
     {
         int32 TargetIndex = FindUnitIndex(Action.EffectiveTargetUnitId);
-        const bool bNeedsUnit = Skill->Kind != ECombatRoundSkillKind::GroundAttack;
+        const bool bNeedsUnit = CombatRoundRules::UsesUnitTarget(*Skill);
         if (bNeedsUnit && (!View.Units.IsValidIndex(TargetIndex) || !IsValid(View.Units[TargetIndex].Unit) || !View.Units[TargetIndex].Unit->IsUnitAlive()))
         {
             if (Skill->TargetLoss == ECombatRoundTargetLoss::NearestEnemy)
@@ -1118,7 +1130,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
                 return;
             }
         }
-        if (View.Units.IsValidIndex(TargetIndex) && IsValid(View.Units[TargetIndex].Unit) && View.Units[TargetIndex].Unit->IsUnitAlive() && Skill->Kind != ECombatRoundSkillKind::GroundAttack)
+        if (View.Units.IsValidIndex(TargetIndex) && IsValid(View.Units[TargetIndex].Unit) && View.Units[TargetIndex].Unit->IsUnitAlive() && bNeedsUnit)
         {
             Action.AimLocation = View.Units[TargetIndex].Unit->GetActorLocation();
         }
@@ -1319,17 +1331,25 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
             ApplyHit(Source, Target, Skill);
         });
         Projectile->OnResolved.AddUObject(this, &ACombatRoundCoordinator::HandleProjectileResolved);
+    }, [this, Skill](ACombatSkillEffectActor* Effect)
+    {
+        ActiveEffects.Add(Effect);
+        Effect->OnImpact.AddWeakLambda(this, [this, Skill](AUnitBase* Source, AUnitBase* Target, float Power)
+        {
+            ApplyHit(Source, Target, Skill);
+        });
+        Effect->OnResolved.AddUObject(this, &ACombatRoundCoordinator::HandleEffectResolved);
     });
     StartRecovery(Index, !Result.bSucceeded, Result.Status);
 }
 
 void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, const FCombatRoundSkill& Skill)
 {
-    if (!HasAuthority() || View.Phase != ECombatRoundPhase::Resolving || !IsValid(Source) || !IsValid(Target) || !Target->IsUnitAlive() || Source->GetTeam() == Target->GetTeam() || !FMath::IsFinite(Skill.Power) || Skill.Power < 0.f) return;
+    if (!HasAuthority() || View.Phase != ECombatRoundPhase::Resolving || !CombatSkillExecution::IsValidEffectTarget(Source, Target, Skill) || !FMath::IsFinite(Skill.Power) || Skill.Power < 0.f) return;
     const int32 Index = View.Units.IndexOfByPredicate([Target](const FCombatRoundUnitView& Entry) { return Entry.Unit == Target; });
     if (!View.Units.IsValidIndex(Index)) return;
     FCombatRoundUnitView& Entry = View.Units[Index];
-    CombatSkillExecution::ApplyEffect(Source, Target, Skill);
+    if (!CombatSkillExecution::ApplyEffect(Source, Target, Skill)) return;
     Entry.HP = Target->GetAttributeSet() ? Target->GetAttributeSet()->GetHP() : 0.f;
     if (!Target->IsUnitAlive())
     {
@@ -1345,9 +1365,27 @@ void ACombatRoundCoordinator::HandleProjectileResolved(ACombatRoundProjectile* P
     Projectiles.Remove(Projectile);
 }
 
+void ACombatRoundCoordinator::HandleEffectResolved(ACombatSkillEffectActor* Effect)
+{
+    if (!bCleaningUp) ActiveEffects.Remove(Effect);
+}
+
+void ACombatRoundCoordinator::ClearActiveEffects()
+{
+    const TArray<TObjectPtr<ACombatSkillEffectActor>> Pending = MoveTemp(ActiveEffects);
+    ActiveEffects.Reset();
+    for (ACombatSkillEffectActor* Effect : Pending)
+    {
+        if (!IsValid(Effect)) continue;
+        Effect->OnImpact.RemoveAll(this);
+        Effect->OnResolved.RemoveAll(this);
+        Effect->Destroy();
+    }
+}
+
 void ACombatRoundCoordinator::FinishRoundIfSettled()
 {
-    if (View.Phase != ECombatRoundPhase::Resolving || !Projectiles.IsEmpty()) return;
+    if (View.Phase != ECombatRoundPhase::Resolving || !Projectiles.IsEmpty() || !ActiveEffects.IsEmpty()) return;
     for (const FCombatRoundUnitView& Entry : View.Units)
     {
         if (!CombatRoundRules::IsTerminal(Entry.ActionPhase)) return;
@@ -1365,6 +1403,7 @@ void ACombatRoundCoordinator::FinishRoundIfSettled()
         BeginPlanning();
         return;
     }
+    for (const FCombatRoundUnitView& Entry : View.Units) UCombatEffectLibrary::ClearRoundShield(Entry.Unit);
     View.Phase = ECombatRoundPhase::Finished;
     View.Message = RoundText(TEXT("패배"));
     ECombatResult Result = ECombatResult::Defeat;

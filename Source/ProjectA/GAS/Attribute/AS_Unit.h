@@ -33,6 +33,12 @@ public:
     FGameplayAttributeData MaxHP;
     ATTRIBUTE_ACCESSORS(UAS_Unit, MaxHP)
 
+    // Remaining damage absorption is authoritative and expires at the round boundary.
+    // 남은 피해 흡수량은 서버 권위로 관리하며 라운드 경계에서 만료됩니다.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Shield, Category = "Attributes")
+    FGameplayAttributeData Shield;
+    ATTRIBUTE_ACCESSORS(UAS_Unit, Shield)
+
     // Base strength is stored without defining a damage formula.
     // 피해 공식을 정의하지 않고 기본 힘을 저장합니다.
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Strength, Category = "Attributes")
@@ -54,6 +60,11 @@ public:
 public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+    // Absorb incoming HP damage before GAS applies it and reject revival effects.
+    // GAS의 HP 피해 적용 전에 흡수량을 차감하고 부활 효과를 거부합니다.
+    virtual bool PreGameplayEffectExecute(FGameplayEffectModCallbackData& Data) override;
+    virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
+
     // Reacts after gameplay effects modify attributes.
     // 게임플레이 이펙트가 어트리뷰트를 변경한 뒤 후처리합니다.
     virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
@@ -66,6 +77,9 @@ protected:
 
     UFUNCTION()
     void OnRep_MaxHP(const FGameplayAttributeData& PreviousMaxHP);
+
+    UFUNCTION()
+    void OnRep_Shield(const FGameplayAttributeData& PreviousShield);
 
     UFUNCTION()
     void OnRep_Strength(const FGameplayAttributeData& PreviousStrength);

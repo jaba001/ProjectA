@@ -43,13 +43,13 @@ bool CombatPlanValidation::ValidateCommand(const FState& State, const FCombatRou
         if (!Occupant || (*Occupant != INDEX_NONE && *Occupant != Unit->UnitId) || IsReservedByOther(State, Unit->UnitId, Command.DestinationCoord)) return Fail(OutError, TEXT("다른 유닛의 복귀 칸이나 예약 목적지가 아닌 빈 접근 칸을 선택하세요."));
         if (Skill->bRemainAtDestination && !CombatRoundRules::IsOwnTerritory(Unit->bEnemy, Command.DestinationCoord)) return Fail(OutError, TEXT("이동 공격의 최종 위치는 자기 진영이어야 합니다."));
     }
-    if (Skill->Kind == ECombatRoundSkillKind::GroundAttack)
+    if (!CombatRoundRules::UsesUnitTarget(*Skill))
     {
         return State.Tiles.Contains(Command.TargetCoord) || Fail(OutError, TEXT("공격할 지점 칸을 선택하세요."));
     }
     const FUnit* Target = State.Units.FindByPredicate([&Command](const FUnit& Candidate) { return Candidate.UnitId == Command.TargetUnitId; });
     if (!Target || !Target->bAlive) return Fail(OutError, TEXT("살아 있는 대상 유닛을 선택하세요."));
-    return Target->bEnemy != Unit->bEnemy || Fail(OutError, TEXT("스킬의 대상 진영이 올바르지 않습니다."));
+    return CombatRoundRules::MatchesTargetTeam(*Skill, Unit->bEnemy, Target->bEnemy) || Fail(OutError, TEXT("스킬의 대상 진영이 올바르지 않습니다."));
 }
 
 bool CombatPlanValidation::ValidateMoveDestination(const FState& State, const FUnit& Unit, FIntPoint Destination, FText& OutError)

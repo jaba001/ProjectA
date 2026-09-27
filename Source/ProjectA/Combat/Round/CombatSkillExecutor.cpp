@@ -5,11 +5,15 @@
 #include "Combat/Library/CombatEffectLibrary.h"
 #include "Combat/Library/CombatWeaponTraceLibrary.h"
 #include "Combat/Round/CombatRoundProjectile.h"
+#include "Combat/Round/CombatSkillEffectActor.h"
 #include "CollisionShape.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "GameplayEffect.h"
 #include "GAS/Effect/GE_Damage.h"
+#include "GAS/CombatGameplayTags.h"
+#include "GAS/Effect/GE_Heal.h"
+#include "GAS/Effect/GE_Shield.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Unit/UnitBase.h"
@@ -142,6 +146,27 @@ bool CombatSkillExecution::CanAffectTarget(const AUnitBase* Target, const FComba
     return MatchesOwnedTags(Target, Skill.TargetTagQuery, Skill.TargetRequiredTags, Skill.TargetBlockedTags);
 }
 
+bool CombatSkillExecution::IsValidEffectTarget(const AUnitBase* Source, const AUnitBase* Target, const FCombatRoundSkill& Skill)
+{
+    // Released projectiles may outlive the source; ally effects may explicitly target their caster.
+    // 발사된 투사체는 시전자보다 오래 유지될 수 있으며 아군 효과는 시전자 자신을 대상으로 삼을 수 있습니다.
+    if (!IsValid(Source) || !IsValid(Target) || Source->GetWorld() != Target->GetWorld() || !CanAffectTarget(Target, Skill)) return false;
+    switch (Skill.TargetRule)
+    {
+    case ESkillTargetRule::EnemyUnit:
+    case ESkillTargetRule::EnemyTile:
+        return Source != Target && Source->GetTeam() != Target->GetTeam();
+    case ESkillTargetRule::AllyUnit:
+    case ESkillTargetRule::AllyTile:
+        return Source->GetTeam() == Target->GetTeam();
+    case ESkillTargetRule::AnyUnit:
+    case ESkillTargetRule::AnyTile:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool CombatSkillExecution::MatchesOwnedTags(const AUnitBase* Unit, const FGameplayTagQuery& Query, const FGameplayTagContainer& Required, const FGameplayTagContainer& Blocked)
 {
     const UAbilitySystemComponent* ASC = IsValid(Unit) ? Unit->GetAbilitySystemComponent() : nullptr;
@@ -153,15 +178,21 @@ bool CombatSkillExecution::MatchesOwnedTags(const AUnitBase* Unit, const FGamepl
 
 bool CombatSkillExecution::ApplyEffect(AUnitBase* Source, AUnitBase* Target, const FCombatRoundSkill& Skill)
 {
-    if (!IsValid(Source) || !Source->HasAuthority() || !CombatCollisionPolicy::IsLivingEnemy(Source->GetWorld(), Source, Source->GetTeam(), Target) || !CanAffectTarget(Target, Skill)) return false;
+    if (!IsValid(Source) || !Source->HasAuthority() || !IsValidEffectTarget(Source, Target, Skill)) return false;
     // Source requirements are checked at release, never after launch when the caster may have died.
     // 시전자가 사망할 수 있는 발사 이후가 아니라 발동 시점에 시전자 조건을 검사합니다.
     if (!Skill.EffectClass && Skill.Power <= 0.f) return true;
-    const TSubclassOf<UGameplayEffect> EffectClass = Skill.EffectClass ? Skill.EffectClass : TSubclassOf<UGameplayEffect>(UGE_Damage::StaticClass());
+    TSubclassOf<UGameplayEffect> EffectClass = Skill.EffectClass;
+    if (!EffectClass)
+    {
+        if (Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Heal)) EffectClass = UGE_Heal::StaticClass();
+        else if (Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Shield)) EffectClass = UGE_Shield::StaticClass();
+        else EffectClass = UGE_Damage::StaticClass();
+    }
     return UCombatEffectLibrary::ApplyTaggedEffectToUnit(Source, Target, EffectClass, Skill.Power, Skill.EffectTags);
 }
 
-CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleaseContext& Context, const TArray<FCombatRoundUnitView>& Units, const FCombatRoundSkill& Skill, TFunctionRef<void(AUnitBase*)> OnHit, TFunctionRef<void(ACombatRoundProjectile*)> RegisterProjectile)
+CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleaseContext& Context, const TArray<FCombatRoundUnitView>& Units, const FCombatRoundSkill& Skill, TFunctionRef<void(AUnitBase*)> OnHit, TFunctionRef<void(ACombatRoundProjectile*)> RegisterProjectile, TFunction<void(ACombatSkillEffectActor*)> RegisterEffect)
 {
     FReleaseResult Result;
     Result.Status = FText::FromString(TEXT("공격 충돌 없음 또는 장애물에 차단됨"));
@@ -172,6 +203,28 @@ CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleas
     }
     UWorld* World = Context.Owner->GetWorld();
     if (!World || Context.Source->GetWorld() != World) return Result;
+    if (Skill.bUseEffectCollision)
+    {
+        if (!RegisterEffect)
+        {
+            Result.Status = FText::FromString(TEXT("효과 충돌 수명 관리 연결 누락"));
+            return Result;
+        }
+        FActorSpawnParameters Params;
+        Params.Owner = Context.Owner;
+        Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        ACombatSkillEffectActor* Effect = World->SpawnActor<ACombatSkillEffectActor>(Context.Source->GetActorLocation(), FRotator::ZeroRotator, Params);
+        if (!Effect)
+        {
+            Result.Status = FText::FromString(TEXT("효과 충돌 액터 생성 실패"));
+            return Result;
+        }
+        RegisterEffect(Effect);
+        Effect->InitializeEffect(Context.Source, Context.Target, Context.AimLocation, Skill, Units);
+        Result.bSucceeded = true;
+        Result.Status = FText::FromString(TEXT("효과 충돌 발동"));
+        return Result;
+    }
     if (Skill.Kind == ECombatRoundSkillKind::Projectile)
     {
         FActorSpawnParameters Params;
@@ -188,6 +241,7 @@ CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleas
         for (const FCombatRoundUnitView& Candidate : Units) AllowedTargets.Add(Candidate.Unit);
         Projectile->SetAllowedTargets(AllowedTargets);
         Projectile->SetTargetTagConditions(Skill.TargetTagQuery, Skill.TargetRequiredTags, Skill.TargetBlockedTags);
+        Projectile->ConfigurePresentation(Skill);
         Projectile->InitializeProjectile(Context.Source, Context.Target, Context.AimLocation, Skill.ProjectileSpeed, Skill.Power, Skill.ProjectileRadius, Skill.ProjectileLifetime, Skill.bHoming, Skill.bTargetOnly);
         Result.bSucceeded = true;
         Result.Status = FText::FromString(TEXT("발사 완료"));

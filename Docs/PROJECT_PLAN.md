@@ -191,11 +191,17 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 | 물리 + 카오스 | 혈액·어둠 바위·마력 운석 |
 | 불 + 냉기 + 번개 | 원소 혼합·무지개/광채 |
 
-대응표는 카탈로그 활용안이며 원본의 실제 시각 표현·피해 속성 확인 결과가 아니다. 이름·경로·용도로 개별 예외를 구분하며 Phoenix 폴더의 `P_SpeedLines`는 물리로 배정한다. 원본 에셋·게임 내 이름·기존 GAS 코드는 유지하고 피해·저항·상태이상·GAS 태그 실행 연결은 별도 구현 대상이다.
+대응표는 카탈로그 활용안이며 원본의 실제 시각 표현·피해 속성 확인 결과가 아니다. 이름·경로·용도로 개별 예외를 구분하며 Phoenix 폴더의 `P_SpeedLines`는 물리로 배정한다. 원본 에셋·게임 내 이름은 유지한다. 새 카탈로그의 속성 태그는 아래 명세로 GAS Spec에 연결하며 속성별 피해 공식·저항·상태이상은 별도 구현 대상이다.
 
 두 에셋 CSV의 `게임 내 이름`은 원본 이름을 보존한 한국어 표시명이다. 무기는 종류·원본 단서를 바탕으로 작명하고, 이펙트는 테마와 시전·투사체·피격 등 시각적 용도를 구분한다. 각 CSV 내부의 중복 표시명 그룹은 기존 행 순서대로 `이름 1`, `이름 2`처럼 번호를 붙이고 단독 이름은 유지한다. 같은 효과의 Niagara/Cascade/Blueprint 구현도 이 규칙을 따르며 원본 에셋 이름·경로는 변경하지 않는다. 번호는 등급·강화 단계를 뜻하지 않고, 표시명은 희귀도·능력치·피해 속성·손 점유를 확정하지 않는다. 이펙트 이름은 향후 스킬 구성에 사용할 목록 데이터이며 기존 GAS 스킬 이름·실행 효과를 자동 변경하지 않는다. [이름 확인](TODO.md#2-35-에셋-게임-내-이름)
 
 클래스·객체명은 엔진을 실행하지 않고 uasset의 AssetRegistry 및 최상위 Export 메타데이터로 확인했다. 시각 형태는 이름·폴더 기반 분류이며 실제 재생·지속 피해·유도 이동·능력치 연결을 의미하지 않는다. 마법진과 장판, 투사체 본체와 Trail, 시스템과 Blueprint 및 Niagara/Cascade 변형은 별도 항목이다. 동명 에셋은 전체 경로로 구분하고 원본 오타·Old/Charged 변형을 보존한다. `P_Warrior_Swipe`의 패키지 파일명 `P_Warrior_sWIPE` 차이는 확인 사항에 남겼다. [사용자 확인](TODO.md#2-34-스킬-이펙트-csv-분류)
+
+[CatalogSkillSpecs.json](../Source/ProjectAEditor/Scripts/CatalogSkillSpecs.json)은 577개 원본 중 176개를 새 스킬로 구성하고 401개를 보류한다. 생성 대상은 베기·소환 무기 26개, 회전 2개, 단일 투사체 32개, 지점 범위 64개, 빔 5개, 즉시 치유 3개, 보호막 44개다. 외부 Blueprint 88개, Ribbon/AnimTrail 33개, 자체 이동 파라미터 연동이 필요한 6개와 지속 효과·부착·피격·조준 표현 등은 보류하며 [SKILL_CREATION_STATUS.csv](SKILL_CREATION_STATUS.csv)에 각 사유를 기록한다.
+
+[CreateCatalogSkills.py](../Source/ProjectAEditor/Scripts/CreateCatalogSkills.py)는 원본 시스템을 직접 참조하는 명시 RoundDefinition BPDA를 `/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/{원본 팩}/{원본 하위 경로}`에 작성한다. 파일명은 `BPDA_{원본 이름}_{경로 해시 8자리}`로 PrimaryAssetId 중복을 방지하고 CSV 표시명을 유지한다. 별도 `SkillPools/DA_SkillPool_Catalog`만 구성하며 기존 스킬·풀·상점·장착 목록은 변경하지 않는다. 같은 목적지가 있으면 속성을 비교하고 불일치 시 덮어쓰지 않고 중단한다. 원본 CSV·원본 에셋·기존 스킬 패키지 해시와 데이터 검증을 확인하며 `-CatalogSkillsVerifyOnly`는 저장 없이 다시 읽는다.
+
+VFX와 판정은 공통 액터 변환을 사용한다. 투사체는 첫 차단 충돌 시 소멸하고, 베기·범위는 강체 시뮬레이션 없이 대상별 중복 타격을 막는다. 치유·보호막은 아군 한 명을 대상으로 각각 `GE_Heal`·`GE_Shield`와 `Skill.Effect.Heal/Shield`를 사용하며 장벽 형상도 이동 차단을 만들지 않는다. 보호막 재시전은 기존 잔여 수치에 합산하며 해당 라운드 종료 시 제거한다. 지원 스킬의 자기 소유 아군 대상은 Shift+클릭으로 선택한다. 5속성은 `Skill.Element.*`, 공격 형태는 `Skill.Shape.*`로 전달한다. 위력 50·AP 1과 VFX 크기·방향·충돌 영역은 초기값이며 실제 재생·밸런스·협동 검증 상태는 [2-36절](TODO.md#2-36-csv-기반-스킬-생성)을 따른다.
 
 ### 개발용 협동 진입
 
