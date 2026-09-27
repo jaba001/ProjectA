@@ -15,6 +15,7 @@ class UComboBoxString;
 class USizeBox;
 class UBorder;
 class UCombatDebugActionButton;
+class UCommonActivatableWidgetStack;
 
 enum class ECombatDebugAction : uint8
 {
@@ -53,6 +54,7 @@ class PROJECTA_API UCombatDebugWidget : public UCommonUserWidget
 
 protected:
     virtual void NativeOnInitialized() override;
+    virtual void NativeConstruct() override;
     virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
@@ -60,11 +62,26 @@ private:
     UButton* AddButton(UVerticalBox* Box, const FString& Text);
     void AddAction(UVerticalBox* Box, const FString& Label, ECombatDebugAction Action, const FSoftObjectPath& Asset = FSoftObjectPath(), int32 Index = INDEX_NONE, FGameplayTag EquipmentSlot = FGameplayTag());
     void RefreshState();
+    void RefreshReviveState();
+    void RefreshSpawnState();
+    bool RefreshUnitOptions();
+    void RebuildSpawnOptions();
+    void SpawnUnit(bool bEnemy);
     void RebuildLists();
     void HandleAction(UCombatDebugActionButton* Button);
 
     UFUNCTION()
     void TogglePanel();
+    UFUNCTION()
+    void ToggleRevivePanel();
+    UFUNCTION()
+    void ReviveSelectedAlly();
+    UFUNCTION()
+    void ToggleSpawnPanel();
+    UFUNCTION()
+    void SpawnAlly();
+    UFUNCTION()
+    void SpawnEnemy();
     UFUNCTION()
     void ShowSkills();
     UFUNCTION()
@@ -77,11 +94,41 @@ private:
     void HandleUnit(FString Value, ESelectInfo::Type SelectionType);
 
     UPROPERTY(Transient)
+    TObjectPtr<UCommonActivatableWidgetStack> CombatLayer;
+    UPROPERTY(Transient)
     TObjectPtr<UBorder> Panel;
     UPROPERTY(Transient)
     TObjectPtr<USizeBox> PanelSize;
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> Status;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> ReviveToggleButton;
+    UPROPERTY(Transient)
+    TObjectPtr<UBorder> RevivePanel;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> ReviveTarget;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> ReviveStatus;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> ReviveButton;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> SpawnToggleButton;
+    UPROPERTY(Transient)
+    TObjectPtr<UBorder> SpawnPanel;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> SpawnCount;
+    UPROPERTY(Transient)
+    TObjectPtr<UComboBoxString> AllySpawnChoice;
+    UPROPERTY(Transient)
+    TObjectPtr<UComboBoxString> EnemySpawnChoice;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> AllySpawnButton;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> EnemySpawnButton;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> AllySpawnStatus;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> EnemySpawnStatus;
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> CatalogTitle;
     UPROPERTY(Transient)
@@ -96,6 +143,8 @@ private:
     TObjectPtr<UScrollBox> CatalogScroll;
 
     TMap<FString, int32> UnitOptions;
+    TMap<FString, FName> AllySpawnOptions;
+    TMap<FString, FName> EnemySpawnOptions;
     int32 SelectedUnitId = INDEX_NONE;
     FGuid ObservedCombatId;
     int32 ObservedRevision = INDEX_NONE;
@@ -103,4 +152,7 @@ private:
     bool bRefreshingUnits = false;
     float RefreshElapsed = 0.f;
     FText ActionMessage;
+    FText ReviveMessage;
+    FText AllySpawnMessage;
+    FText EnemySpawnMessage;
 };

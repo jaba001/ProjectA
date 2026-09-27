@@ -4,6 +4,7 @@
 #include "Controller/PartyPlayerController.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "Game/GameModes/CombatDebugGameMode.h"
 #include "Game/Run/RunIdentityLibrary.h"
 #include "Game/Run/RunParticipationLibrary.h"
 #include "Game/Run/RunStateSubsystem.h"
@@ -80,6 +81,27 @@ void UCombatActionAuthority::RegisterUnits(const TArray<AUnitBase*>& Units)
             UnitsById.Add(FGuid::NewGuid(), Unit);
         }
     }
+}
+
+bool UCombatActionAuthority::CanRegisterDebugUnit(const APartyPlayerController* Controller) const
+{
+    const ACombatManager* Manager = GetManager();
+    const URunStateSubsystem* Run = IsValid(Manager) && Manager->GetGameInstance() ? Manager->GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    return IsValid(Manager) && Manager->HasAuthority() && ACombatDebugGameMode::IsDebugWorld(Manager->GetWorld()) && !bManagedExecution && !bRequiresRunConfiguration && !bRunConfigured && HasManagedExecutionAuthority(false) && (!Run || (!Run->IsManagedRun() && !Run->HasManagedLease())) && CombatInstanceId.IsValid() && IsValid(Controller) && Controller->GetWorld() == Manager->GetWorld() && Controller->GetCombatManager() == Manager && AllowsStandaloneLegacy(Controller);
+}
+
+bool UCombatActionAuthority::RegisterDebugUnit(AUnitBase* Unit, APartyPlayerController* Controller)
+{
+    ACombatManager* Manager = GetManager();
+    if (!CanRegisterDebugUnit(Controller) || !IsValid(Unit) || Unit->GetWorld() != Manager->GetWorld() || !Manager->GetRegisteredUnits().Contains(Unit) || GetUnitId(Unit).IsValid()) return false;
+    const FGuid UnitId = FGuid::NewGuid();
+    UnitsById.Add(UnitId, Unit);
+    if (Unit->GetTeam() == ETeam::Player && !CanControllerControl(Controller, Unit))
+    {
+        UnitsById.Remove(UnitId);
+        return false;
+    }
+    return true;
 }
 
 void UCombatActionAuthority::BeginCombat()

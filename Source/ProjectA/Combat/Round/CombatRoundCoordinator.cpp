@@ -1,5 +1,6 @@
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "Combat/Round/CombatSkillEffectActor.h"
+#include "Combat/Round/CombatSkillPresentation.h"
 #include "Combat/Library/CombatEffectLibrary.h"
 #include "Combat/Round/CombatPlanValidator.h"
 #include "Combat/Round/CombatAIPlanning.h"
@@ -230,6 +231,7 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
             return false;
         }
     }
+    if (!CombatSkillPresentation::Prepare(GetWorld(), Skills, PreparedSkillVisualAssets, OutError)) return false;
     Actions.SetNum(View.Units.Num());
     for (int32 Index = 0; Index < Participants.Num(); ++Index)
     {
@@ -312,6 +314,7 @@ void ACombatRoundCoordinator::CleanupUnits()
     Projectiles.Reset();
     View.Units.Reset();
     Actions.Reset();
+    PreparedSkillVisualAssets.Reset();
 }
 
 void ACombatRoundCoordinator::EndPlay(const EEndPlayReason::Type EndPlayReason)

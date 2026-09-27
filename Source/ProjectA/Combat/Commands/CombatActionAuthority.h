@@ -22,6 +22,10 @@ class PROJECTA_API UCombatActionAuthority : public UObject
 public:
     void Reset();
     void RegisterUnits(const TArray<AUnitBase*>& Units);
+    // Append one disposable debug actor without replacing existing combat or unit identities.
+    // 기존 전투 및 유닛 식별자를 교체하지 않고 일회성 디버그 액터 하나를 추가합니다.
+    bool CanRegisterDebugUnit(const APartyPlayerController* Controller) const;
+    bool RegisterDebugUnit(AUnitBase* Unit, APartyPlayerController* Controller);
     void BeginCombat();
     bool ConfigureRun(const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, const TMap<int32, TObjectPtr<AUnitBase>>& PartyActors, FText& OutError, bool bManaged = false);
 

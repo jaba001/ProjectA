@@ -2,6 +2,7 @@
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Net/UnrealNetwork.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
+#include "Game/GameModes/CombatDebugGameMode.h"
 #include "Controller/PartyPlayerController.h"
 #include "Unit/UnitBase.h"
 #include "Unit/PlayerUnit.h"
@@ -329,6 +330,21 @@ void ACombatManager::RegisterUnits(const TArray<AUnitBase*>& Units)
     PublishCombatView();
 }
 
+bool ACombatManager::RegisterDebugUnit(AUnitBase* Unit, APartyPlayerController* Controller)
+{
+    if (!HasAuthority() || !ACombatDebugGameMode::IsDebugWorld(GetWorld()) || bSuspendedForRecovery || !IsValid(RoundCoordinator) || !ActionAuthority || CombatUnits.Num() >= 8 || !IsValid(Unit) || Unit->GetWorld() != GetWorld() || !Unit->IsUnitAlive() || CombatUnits.Contains(Unit) || ActionAuthority->GetUnitId(Unit).IsValid()) return false;
+    const ECombatRoundPhase Phase = RoundCoordinator->GetView().Phase;
+    if (Phase != ECombatRoundPhase::Planning && Phase != ECombatRoundPhase::Finished) return false;
+    CombatUnits.Add(Unit);
+    if (!ActionAuthority->RegisterDebugUnit(Unit, Controller))
+    {
+        CombatUnits.RemoveSingle(Unit);
+        return false;
+    }
+    Unit->OnUnitDied.AddUObject(this, &ACombatManager::HandleUnitDied);
+    return true;
+}
+
 void ACombatManager::ClearPlayerSelection()
 {
     for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
@@ -371,6 +387,12 @@ void ACombatManager::HandleCombatResult(ECombatResult Result)
     ClearSkillTargetTilesHighlight();
     PublishCombatView();
     OnCombatResult.Broadcast(Result);
+}
+
+void ACombatManager::ClearDebugCombatResult()
+{
+    if (!HasAuthority() || !ACombatDebugGameMode::IsDebugWorld(GetWorld()) || bSuspendedForRecovery) return;
+    CombatView.CombatResult = ECombatResult::None;
 }
 
 void ACombatManager::EndCombat()

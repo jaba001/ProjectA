@@ -19,6 +19,7 @@
 #include "Game/Development/CombatDebugLoadout.h"
 #include "Game/GameModes/CombatDebugGameMode.h"
 #include "Game/Run/RunEquipmentCatalog.h"
+#include "GAS/Attribute/AS_Unit.h"
 #include "UI/Combat/CombatRoundPlanningWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
 #include "Unit/UnitBase.h"
@@ -82,11 +83,10 @@ void UCombatDebugWidget::NativeOnInitialized()
     UOverlay* Root = WidgetTree->ConstructWidget<UOverlay>();
     Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     WidgetTree->RootWidget = Root;
-    UCommonActivatableWidgetStack* CombatLayer = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>();
+    CombatLayer = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>();
     UOverlaySlot* CombatSlot = Root->AddChildToOverlay(CombatLayer);
     CombatSlot->SetHorizontalAlignment(HAlign_Fill);
     CombatSlot->SetVerticalAlignment(VAlign_Fill);
-    CombatLayer->AddWidget<UCombatRoundPlanningWidget>(UCombatRoundPlanningWidget::StaticClass());
 
     UVerticalBox* Tools = WidgetTree->ConstructWidget<UVerticalBox>();
     UOverlaySlot* ToolsSlot = Root->AddChildToOverlay(Tools);
@@ -112,10 +112,51 @@ void UCombatDebugWidget::NativeOnInitialized()
     UVerticalBox* Body = WidgetTree->ConstructWidget<UVerticalBox>();
     ToolScroll->AddChild(Body);
     AddText(Body, TEXT("전투 디버그 · 저장하지 않음"), 18);
-    AddText(Body, TEXT("계획 단계에서만 변경 · 스킬 최대 5개\n장비는 외형 장착용이며 스킬을 자동 지급하지 않습니다."));
+    AddText(Body, TEXT("스킬·장비는 계획 단계에서 변경 · 스킬 최대 5개\n장비는 외형 장착용이며 스킬을 자동 지급하지 않습니다."));
     UnitChoice = WidgetTree->ConstructWidget<UDemonicComboBoxString>();
     Body->AddChildToVerticalBox(UnitChoice);
     UnitChoice->OnSelectionChanged.AddDynamic(this, &UCombatDebugWidget::HandleUnit);
+    SpawnToggleButton = AddButton(Body, TEXT("캐릭터 추가 창 열기"));
+    SpawnToggleButton->OnClicked.AddDynamic(this, &UCombatDebugWidget::ToggleSpawnPanel);
+    SpawnPanel = WidgetTree->ConstructWidget<UBorder>();
+    SpawnPanel->SetBrush(FSlateRoundedBoxBrush(FLinearColor(0.025f, 0.035f, 0.05f, 0.98f), 6.f));
+    SpawnPanel->SetPadding(FMargin(8.f));
+    SpawnPanel->SetVisibility(ESlateVisibility::Collapsed);
+    Body->AddChildToVerticalBox(SpawnPanel)->SetPadding(FMargin(0.f, 3.f));
+    UVerticalBox* SpawnBody = WidgetTree->ConstructWidget<UVerticalBox>();
+    SpawnPanel->SetContent(SpawnBody);
+    SpawnCount = AddText(SpawnBody, TEXT("전투 준비 중"));
+    AddText(SpawnBody, TEXT("계획 단계 또는 전투 종료 후 추가할 수 있습니다. 기존 캐릭터의 스킬·장비는 유지합니다."), 13);
+    AddText(SpawnBody, TEXT("추가할 아군"));
+    AllySpawnChoice = WidgetTree->ConstructWidget<UDemonicComboBoxString>();
+    SpawnBody->AddChildToVerticalBox(AllySpawnChoice);
+    AllySpawnButton = AddButton(SpawnBody, TEXT("선택 캐릭터를 아군으로 추가"));
+    AllySpawnButton->SetIsEnabled(false);
+    AllySpawnButton->OnClicked.AddDynamic(this, &UCombatDebugWidget::SpawnAlly);
+    AllySpawnStatus = AddText(SpawnBody, TEXT("전투 준비 중"), 13);
+    AddText(SpawnBody, TEXT("추가할 적군"));
+    EnemySpawnChoice = WidgetTree->ConstructWidget<UDemonicComboBoxString>();
+    SpawnBody->AddChildToVerticalBox(EnemySpawnChoice);
+    EnemySpawnButton = AddButton(SpawnBody, TEXT("선택 캐릭터를 적군으로 추가"));
+    EnemySpawnButton->SetIsEnabled(false);
+    EnemySpawnButton->OnClicked.AddDynamic(this, &UCombatDebugWidget::SpawnEnemy);
+    EnemySpawnStatus = AddText(SpawnBody, TEXT("전투 준비 중"), 13);
+    ReviveToggleButton = AddButton(Body, TEXT("아군 부활 창 열기"));
+    ReviveToggleButton->OnClicked.AddDynamic(this, &UCombatDebugWidget::ToggleRevivePanel);
+    // Keep the revival controls inside the outer tool scroll so a small viewport can still reach every action.
+    // 작은 화면에서도 모든 조작에 접근하도록 부활 패널을 도구의 바깥 스크롤 안에 배치합니다.
+    RevivePanel = WidgetTree->ConstructWidget<UBorder>();
+    RevivePanel->SetBrush(FSlateRoundedBoxBrush(FLinearColor(0.025f, 0.035f, 0.05f, 0.98f), 6.f));
+    RevivePanel->SetPadding(FMargin(8.f));
+    RevivePanel->SetVisibility(ESlateVisibility::Collapsed);
+    Body->AddChildToVerticalBox(RevivePanel)->SetPadding(FMargin(0.f, 3.f));
+    UVerticalBox* ReviveBody = WidgetTree->ConstructWidget<UVerticalBox>();
+    RevivePanel->SetContent(ReviveBody);
+    ReviveTarget = AddText(ReviveBody, TEXT("위 목록에서 부활할 아군을 선택하세요."));
+    ReviveButton = AddButton(ReviveBody, TEXT("선택 아군 부활 · HP 전부 회복"));
+    ReviveButton->SetIsEnabled(false);
+    ReviveButton->OnClicked.AddDynamic(this, &UCombatDebugWidget::ReviveSelectedAlly);
+    ReviveStatus = AddText(ReviveBody, TEXT("전투 준비 중"), 13);
     AddButton(Body, TEXT("전투 초기화 · 처음 장착으로 복원"))->OnClicked.AddDynamic(this, &UCombatDebugWidget::RestartCombat);
     Status = AddText(Body, TEXT("전투 준비 중"));
     UHorizontalBox* Tabs = WidgetTree->ConstructWidget<UHorizontalBox>();
@@ -141,6 +182,14 @@ void UCombatDebugWidget::NativeOnInitialized()
     CatalogList = WidgetTree->ConstructWidget<UVerticalBox>();
     CatalogScroll->AddChild(CatalogList);
     UDemonicUITheme::Get().ApplyControls(WidgetTree);
+}
+
+void UCombatDebugWidget::NativeConstruct()
+{
+    Super::NativeConstruct();
+    // Add content after the Slate switcher exists, and restore it after Slate resources are rebuilt.
+    // Slate 스위처가 생성된 뒤 콘텐츠를 추가하고 Slate 리소스 재생성 후에도 복원합니다.
+    if (CombatLayer && CombatLayer->GetNumWidgets() == 0) CombatLayer->AddWidget<UCombatRoundPlanningWidget>(UCombatRoundPlanningWidget::StaticClass());
 }
 
 void UCombatDebugWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -172,6 +221,11 @@ void UCombatDebugWidget::RefreshState()
         CatalogList->SetIsEnabled(false);
         const ACombatDebugGameMode* Mode = GetWorld()->GetAuthGameMode<ACombatDebugGameMode>();
         Status->SetText(Mode ? Mode->GetStatusMessage() : FText::FromString(TEXT("디버그 전투가 없습니다.")));
+        ReviveMessage = FText::GetEmpty();
+        AllySpawnMessage = FText::GetEmpty();
+        EnemySpawnMessage = FText::GetEmpty();
+        RefreshReviveState();
+        RefreshSpawnState();
         return;
     }
     Controller->GetDebugLoadout();
@@ -180,22 +234,15 @@ void UCombatDebugWidget::RefreshState()
     {
         ObservedCombatId = View.CombatId;
         ObservedRevision = INDEX_NONE;
-        bRefreshingUnits = true;
-        UnitOptions.Reset();
-        UnitChoice->ClearOptions();
-        for (const FCombatRoundUnitView& Unit : View.Units)
-        {
-            if (Unit.bEnemy || Unit.OwnerSlot != Controller->GetRoundParticipantSlot() || !IsValid(Unit.Unit)) continue;
-            const FString Label = FString::Printf(TEXT("%d · %s"), Unit.UnitId, *Unit.Unit->RuntimeCharacterName.ToString());
-            UnitOptions.Add(Label, Unit.UnitId);
-            UnitChoice->AddOption(Label);
-        }
-        UnitChoice->SetSelectedIndex(0);
-        SelectedUnitId = UnitOptions.FindRef(UnitChoice->GetSelectedOption());
-        bRefreshingUnits = false;
+        SelectedUnitId = INDEX_NONE;
         ActionMessage = FText::GetEmpty();
+        ReviveMessage = FText::GetEmpty();
+        AllySpawnMessage = FText::GetEmpty();
+        EnemySpawnMessage = FText::GetEmpty();
+        RebuildSpawnOptions();
     }
-    if (ObservedRevision != View.PlanRevision)
+    const bool bUnitsChanged = RefreshUnitOptions();
+    if (bUnitsChanged || ObservedRevision != View.PlanRevision)
     {
         ObservedRevision = View.PlanRevision;
         RebuildLists();
@@ -205,6 +252,168 @@ void UCombatDebugWidget::RefreshState()
     OwnedList->SetIsEnabled(bCanEdit);
     CatalogList->SetIsEnabled(bCanEdit);
     Status->SetText(bCanEdit ? (ActionMessage.IsEmpty() ? FText::FromString(TEXT("추가·제거 즉시 반영 / 해당 유닛의 계획 해제")) : ActionMessage) : Error);
+    RefreshReviveState();
+    RefreshSpawnState();
+}
+
+bool UCombatDebugWidget::RefreshUnitOptions()
+{
+    ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
+    ACombatRoundCoordinator* Round = Controller ? Controller->GetRoundCoordinator() : nullptr;
+    if (!Round) return false;
+    TMap<FString, int32> AvailableOptions;
+    TArray<FString> Labels;
+    FString SelectedLabel;
+    bool bChanged = false;
+    for (const FCombatRoundUnitView& Unit : Round->GetView().Units)
+    {
+        if (Unit.bEnemy || Unit.OwnerSlot != Controller->GetRoundParticipantSlot() || !IsValid(Unit.Unit)) continue;
+        const FString Label = FString::Printf(TEXT("%d · %s"), Unit.UnitId, *Unit.Unit->RuntimeCharacterName.ToString());
+        AvailableOptions.Add(Label, Unit.UnitId);
+        Labels.Add(Label);
+        const int32* PreviousId = UnitOptions.Find(Label);
+        bChanged |= !PreviousId || *PreviousId != Unit.UnitId;
+        if (Unit.UnitId == SelectedUnitId) SelectedLabel = Label;
+    }
+    bChanged |= AvailableOptions.Num() != UnitOptions.Num();
+    if (!bChanged && !SelectedLabel.IsEmpty() && UnitChoice->GetSelectedOption() == SelectedLabel) return false;
+    // Spawning changes the roster without creating another combat; retain the selected ally when it still exists.
+    // 캐릭터 추가는 새 전투를 만들지 않으므로 같은 전투의 명단도 갱신하고 기존 아군 선택을 유지합니다.
+    bRefreshingUnits = true;
+    UnitOptions = MoveTemp(AvailableOptions);
+    UnitChoice->ClearOptions();
+    for (const FString& Label : Labels) UnitChoice->AddOption(Label);
+    if (SelectedLabel.IsEmpty() && !Labels.IsEmpty()) SelectedLabel = Labels[0];
+    if (!SelectedLabel.IsEmpty()) UnitChoice->SetSelectedOption(SelectedLabel);
+    const int32* NewSelectedId = UnitOptions.Find(SelectedLabel);
+    SelectedUnitId = NewSelectedId ? *NewSelectedId : INDEX_NONE;
+    bRefreshingUnits = false;
+    return true;
+}
+
+void UCombatDebugWidget::RefreshReviveState()
+{
+    ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
+    ACombatRoundCoordinator* Round = Controller ? Controller->GetRoundCoordinator() : nullptr;
+    const FCombatRoundUnitView* Selected = Round ? Round->GetView().Units.FindByPredicate([this](const FCombatRoundUnitView& Unit) { return Unit.UnitId == SelectedUnitId; }) : nullptr;
+    if (!Selected || !IsValid(Selected->Unit))
+    {
+        ReviveTarget->SetText(FText::FromString(TEXT("위 목록에서 부활할 아군을 선택하세요.")));
+        ReviveButton->SetIsEnabled(false);
+        ReviveStatus->SetText(FText::FromString(Round ? TEXT("선택한 아군이 없습니다.") : TEXT("디버그 전투 준비 후 사용할 수 있습니다.")));
+        ReviveButton->SetToolTipText(ReviveStatus->GetText());
+        return;
+    }
+    const UAS_Unit* Attributes = Selected->Unit->GetAttributeSet();
+    const FString Health = Attributes ? FString::Printf(TEXT("HP %.0f / %.0f"), Attributes->GetHP(), Attributes->GetMaxHP()) : TEXT("HP 정보 없음");
+    ReviveTarget->SetText(FText::FromString(FString::Printf(TEXT("부활 대상: %d · %s\n%s · %s"), Selected->UnitId, *Selected->Unit->RuntimeCharacterName.ToString(), *Health, Selected->Unit->IsUnitAlive() ? TEXT("생존") : TEXT("사망"))));
+    FText Error;
+    const bool bCanRevive = Round->CanReviveDebugUnit(Controller, SelectedUnitId, Error);
+    ReviveButton->SetIsEnabled(bCanRevive);
+    const FText Availability = bCanRevive ? FText::FromString(TEXT("선택 아군의 스킬·장비를 유지한 채 HP를 전부 회복하고 부활합니다.")) : Error;
+    ReviveButton->SetToolTipText(Availability);
+    // Preserve revival feedback separately from ordinary loadout-edit errors for dead or finished units.
+    // 사망하거나 전투가 끝난 유닛의 일반 장착 편집 오류와 부활 결과를 별도로 유지합니다.
+    ReviveStatus->SetText(ReviveMessage.IsEmpty() || ReviveMessage.EqualTo(Availability) ? Availability : bCanRevive ? ReviveMessage : FText::Format(FText::FromString(TEXT("{0}\n{1}")), ReviveMessage, Availability));
+}
+
+void UCombatDebugWidget::RebuildSpawnOptions()
+{
+    const ACombatDebugGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<ACombatDebugGameMode>() : nullptr;
+    for (int32 TeamIndex = 0; TeamIndex < 2; ++TeamIndex)
+    {
+        const bool bEnemy = TeamIndex == 1;
+        UComboBoxString* Choice = bEnemy ? EnemySpawnChoice : AllySpawnChoice;
+        TMap<FString, FName>& Options = bEnemy ? EnemySpawnOptions : AllySpawnOptions;
+        const FName SelectedId = Options.FindRef(Choice->GetSelectedOption());
+        Options.Reset();
+        Choice->ClearOptions();
+        TArray<FName> Ids;
+        TArray<FText> Names;
+        if (Mode) Mode->GetDebugSpawnOptions(bEnemy, Ids, Names);
+        FString SelectedLabel;
+        for (int32 Index = 0; Index < FMath::Min(Ids.Num(), Names.Num()); ++Index)
+        {
+            if (Ids[Index].IsNone()) continue;
+            const FString Label = FString::Printf(TEXT("%d · %s"), Index + 1, *Names[Index].ToString());
+            Options.Add(Label, Ids[Index]);
+            Choice->AddOption(Label);
+            if (Ids[Index] == SelectedId) SelectedLabel = Label;
+        }
+        if (!SelectedLabel.IsEmpty()) Choice->SetSelectedOption(SelectedLabel);
+        else if (Choice->GetOptionCount() > 0) Choice->SetSelectedIndex(0);
+    }
+}
+
+void UCombatDebugWidget::RefreshSpawnState()
+{
+    ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
+    ACombatRoundCoordinator* Round = Controller ? Controller->GetRoundCoordinator() : nullptr;
+    const ACombatDebugGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<ACombatDebugGameMode>() : nullptr;
+    int32 AllyCount = 0;
+    int32 EnemyCount = 0;
+    if (Round)
+    {
+        for (const FCombatRoundUnitView& Unit : Round->GetView().Units)
+        {
+            if (Unit.bEnemy) ++EnemyCount;
+            else ++AllyCount;
+        }
+    }
+    SpawnCount->SetText(FText::FromString(FString::Printf(TEXT("전체 캐릭터 %d / 8 · 아군 %d · 적군 %d\n사망한 캐릭터도 인원에 포함됩니다."), AllyCount + EnemyCount, AllyCount, EnemyCount)));
+    for (int32 TeamIndex = 0; TeamIndex < 2; ++TeamIndex)
+    {
+        const bool bEnemy = TeamIndex == 1;
+        UComboBoxString* Choice = bEnemy ? EnemySpawnChoice : AllySpawnChoice;
+        UButton* Button = bEnemy ? EnemySpawnButton : AllySpawnButton;
+        UTextBlock* Result = bEnemy ? EnemySpawnStatus : AllySpawnStatus;
+        const TMap<FString, FName>& Options = bEnemy ? EnemySpawnOptions : AllySpawnOptions;
+        const FText& Message = bEnemy ? EnemySpawnMessage : AllySpawnMessage;
+        FText Error;
+        bool bCanSpawn = Mode && Mode->CanSpawnDebugUnit(Controller, bEnemy, Error);
+        if (!Mode) Error = FText::FromString(TEXT("디버그 전투 준비 후 사용할 수 있습니다."));
+        if (bCanSpawn && !Options.Contains(Choice->GetSelectedOption()))
+        {
+            bCanSpawn = false;
+            Error = FText::FromString(TEXT("추가할 캐릭터가 없습니다."));
+        }
+        Button->SetIsEnabled(bCanSpawn);
+        Choice->SetIsEnabled(!Options.IsEmpty());
+        const FText Availability = bCanSpawn ? FText::FromString(bEnemy ? TEXT("선택한 적군을 빈 적 진영 칸에 추가합니다.") : TEXT("선택한 아군을 빈 아군 진영 칸에 추가하고 장착 대상으로 선택합니다.")) : Error;
+        Button->SetToolTipText(Availability);
+        Result->SetText(Message.IsEmpty() || Message.EqualTo(Availability) ? Availability : bCanSpawn ? Message : FText::Format(FText::FromString(TEXT("{0}\n{1}")), Message, Availability));
+    }
+}
+
+void UCombatDebugWidget::SpawnUnit(bool bEnemy)
+{
+    ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
+    ACombatDebugGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<ACombatDebugGameMode>() : nullptr;
+    UComboBoxString* Choice = bEnemy ? EnemySpawnChoice : AllySpawnChoice;
+    const TMap<FString, FName>& Options = bEnemy ? EnemySpawnOptions : AllySpawnOptions;
+    const FName* OptionId = Options.Find(Choice->GetSelectedOption());
+    FText& Message = bEnemy ? EnemySpawnMessage : AllySpawnMessage;
+    int32 NewUnitId = INDEX_NONE;
+    FText Error;
+    if (!Mode || !OptionId)
+    {
+        Message = FText::FromString(TEXT("추가할 캐릭터를 선택하세요."));
+        RefreshSpawnState();
+        return;
+    }
+    if (Mode->SpawnDebugUnit(Controller, bEnemy, *OptionId, NewUnitId, Error))
+    {
+        Message = FText::FromString(FString::Printf(TEXT("%s 추가 완료 · %s"), bEnemy ? TEXT("적군") : TEXT("아군"), *Choice->GetSelectedOption()));
+        if (!bEnemy)
+        {
+            SelectedUnitId = NewUnitId;
+            ActionMessage = FText::GetEmpty();
+            ReviveMessage = FText::GetEmpty();
+        }
+        ObservedRevision = INDEX_NONE;
+    }
+    else Message = Error;
+    RefreshState();
 }
 
 void UCombatDebugWidget::RebuildLists()
@@ -309,6 +518,45 @@ void UCombatDebugWidget::TogglePanel()
     PanelSize->SetVisibility(PanelSize->GetVisibility() == ESlateVisibility::Collapsed ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 }
 
+void UCombatDebugWidget::ToggleRevivePanel()
+{
+    const bool bOpen = RevivePanel->GetVisibility() == ESlateVisibility::Collapsed;
+    RevivePanel->SetVisibility(bOpen ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+    if (UTextBlock* Label = Cast<UTextBlock>(ReviveToggleButton->GetContent())) Label->SetText(FText::FromString(bOpen ? TEXT("아군 부활 창 접기") : TEXT("아군 부활 창 열기")));
+    RefreshReviveState();
+}
+
+void UCombatDebugWidget::ReviveSelectedAlly()
+{
+    ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
+    ACombatRoundCoordinator* Round = Controller ? Controller->GetRoundCoordinator() : nullptr;
+    if (!Round) return;
+    FText Error;
+    const bool bSucceeded = Round->ReviveDebugUnit(Controller, SelectedUnitId, Error);
+    ReviveMessage = bSucceeded ? Round->GetView().Message : Error;
+    RebuildLists();
+    RefreshState();
+}
+
+void UCombatDebugWidget::ToggleSpawnPanel()
+{
+    const bool bOpen = SpawnPanel->GetVisibility() == ESlateVisibility::Collapsed;
+    SpawnPanel->SetVisibility(bOpen ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+    if (UTextBlock* Label = Cast<UTextBlock>(SpawnToggleButton->GetContent())) Label->SetText(FText::FromString(bOpen ? TEXT("캐릭터 추가 창 접기") : TEXT("캐릭터 추가 창 열기")));
+    if (bOpen) RebuildSpawnOptions();
+    RefreshSpawnState();
+}
+
+void UCombatDebugWidget::SpawnAlly()
+{
+    SpawnUnit(false);
+}
+
+void UCombatDebugWidget::SpawnEnemy()
+{
+    SpawnUnit(true);
+}
+
 void UCombatDebugWidget::ShowSkills()
 {
     bEquipment = false;
@@ -329,6 +577,9 @@ void UCombatDebugWidget::RestartCombat()
     {
         Mode->RestartCombat();
         ActionMessage = Mode->GetStatusMessage();
+        ReviveMessage = FText::GetEmpty();
+        AllySpawnMessage = FText::GetEmpty();
+        EnemySpawnMessage = FText::GetEmpty();
         RefreshState();
     }
 }
@@ -342,7 +593,10 @@ void UCombatDebugWidget::HandleSearch(const FText& Text)
 void UCombatDebugWidget::HandleUnit(FString Value, ESelectInfo::Type SelectionType)
 {
     if (bRefreshingUnits) return;
-    SelectedUnitId = UnitOptions.FindRef(Value);
+    const int32* UnitId = UnitOptions.Find(Value);
+    SelectedUnitId = UnitId ? *UnitId : INDEX_NONE;
     ActionMessage = FText::GetEmpty();
+    ReviveMessage = FText::GetEmpty();
     RebuildLists();
+    RefreshReviveState();
 }

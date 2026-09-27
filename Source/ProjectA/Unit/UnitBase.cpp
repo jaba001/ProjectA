@@ -16,6 +16,8 @@
 #include "Combat/CombatManager.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "EngineUtils.h"
+#include "Game/GameModes/CombatDebugGameMode.h"
+#include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "DataAsset/SkillPoolDataAsset.h"
@@ -385,6 +387,60 @@ void AUnitBase::Die()
     OnUnitDied.Broadcast(this);
 }
 
+bool AUnitBase::ReviveForDebug(ACombatGridTile* Tile)
+{
+    if (!HasAuthority() || !ACombatDebugGameMode::IsDebugWorld(GetWorld()) || IsActorBeingDestroyed() || !bIsDead || Team != ETeam::Player || !bHasDebugAlivePresentation) return false;
+    if (!IsValid(Tile) || Tile->GetWorld() != GetWorld() || Tile->GetTerritory() != ETileTerritory::Player || Tile->GetOccupyingUnit() || !IsValid(Tile->GetGridManager()) || Tile->GetGridManager()->GetWorld() != GetWorld() || Tile->GetGridManager()->GetTileAtCoord(Tile->GridCoord) != Tile) return false;
+    USkeletalMeshComponent* UnitMesh = GetMesh();
+    UCapsuleComponent* Capsule = GetCapsuleComponent();
+    UCharacterMovementComponent* Movement = GetCharacterMovement();
+    if (!IsValid(UnitMesh) || !IsValid(Capsule) || !IsValid(Movement) || !IsValid(AbilitySystem) || !IsValid(AttributeSet)) return false;
+    const float MaxHP = AttributeSet->GetMaxHP();
+    const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+    const FVector Location = Tile->GetActorLocation() + FVector(0.f, 0.f, CapsuleHalfHeight);
+    if (!FMath::IsFinite(MaxHP) || MaxHP <= 0.f || !FMath::IsFinite(CapsuleHalfHeight) || CapsuleHalfHeight <= 0.f || Location.ContainsNaN() || DefaultBattleRotation.ContainsNaN() || DebugAliveMeshTransform.ContainsNaN() || !UnitDataRules::IsValidActionPoints(MaxActionPoint, MaxSubActionPoint)) return false;
+
+    // Stop ragdoll simulation before reconnecting the original mesh and restoring its animation state.
+    // 기존 메시를 다시 연결하고 애니메이션 상태를 복원하기 전에 래그돌 시뮬레이션을 중지합니다.
+    StopRoundCastMontage(0.f);
+    UnitMesh->SetAllPhysicsLinearVelocity(FVector::ZeroVector);
+    UnitMesh->SetAllPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+    UnitMesh->SetAllBodiesSimulatePhysics(false);
+    UnitMesh->SetSimulatePhysics(false);
+    UnitMesh->SetAllBodiesPhysicsBlendWeight(0.f);
+    SetActorLocationAndRotation(Location, DefaultBattleRotation, false, nullptr, ETeleportType::TeleportPhysics);
+    UnitMesh->AttachToComponent(Capsule, FAttachmentTransformRules::KeepRelativeTransform);
+    UnitMesh->SetRelativeTransform(DebugAliveMeshTransform, false, nullptr, ETeleportType::TeleportPhysics);
+    UnitMesh->SetCollisionProfileName(DebugAliveMeshCollisionProfile);
+    UnitMesh->SetCollisionObjectType(DebugAliveMeshObjectType);
+    UnitMesh->SetCollisionResponseToChannels(DebugAliveMeshCollisionResponses);
+    UnitMesh->SetCollisionEnabled(DebugAliveMeshCollisionEnabled);
+    Capsule->SetCollisionProfileName(DebugAliveCapsuleCollisionProfile);
+    Capsule->SetCollisionObjectType(DebugAliveCapsuleObjectType);
+    Capsule->SetCollisionResponseToChannels(DebugAliveCapsuleCollisionResponses);
+    Capsule->SetCollisionEnabled(DebugAliveCapsuleCollisionEnabled);
+
+    // Keep round-owned movement disabled while restoring resources through the existing GAS component.
+    // 라운드가 관리하는 이동 비활성 상태를 유지하며 기존 GAS 컴포넌트로 자원을 복원합니다.
+    bIsDead = false;
+    bDeathPresentationApplied = false;
+    bHasDebugAlivePresentation = false;
+    bIsActiveTurn = false;
+    bTurnMustEndAfterCurrentAction = false;
+    DeathImpulse = FVector::ZeroVector;
+    Movement->StopMovementImmediately();
+    SetRoundMovementVelocity(FVector::ZeroVector);
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), MaxHP);
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetShieldAttribute(), 0.f);
+    ResetActionPoint();
+    ResetSubActionPoint();
+    SetCurrentTile(Tile);
+    UnitMesh->InitAnim(true);
+    RefreshSkillPresentation();
+    ForceNetUpdate();
+    return true;
+}
+
 void AUnitBase::OnRep_Death()
 {
     if (bIsDead)
@@ -400,6 +456,19 @@ void AUnitBase::ApplyDeathPresentation()
         return;
     }
 
+    if (HasAuthority() && Team == ETeam::Player && ACombatDebugGameMode::IsDebugWorld(GetWorld()))
+    {
+        DebugAliveMeshTransform = GetMesh()->GetRelativeTransform();
+        DebugAliveMeshCollisionProfile = GetMesh()->GetCollisionProfileName();
+        DebugAliveMeshObjectType = GetMesh()->GetCollisionObjectType();
+        DebugAliveMeshCollisionResponses = GetMesh()->GetCollisionResponseToChannels();
+        DebugAliveMeshCollisionEnabled = GetMesh()->GetCollisionEnabled();
+        DebugAliveCapsuleCollisionProfile = GetCapsuleComponent()->GetCollisionProfileName();
+        DebugAliveCapsuleObjectType = GetCapsuleComponent()->GetCollisionObjectType();
+        DebugAliveCapsuleCollisionResponses = GetCapsuleComponent()->GetCollisionResponseToChannels();
+        DebugAliveCapsuleCollisionEnabled = GetCapsuleComponent()->GetCollisionEnabled();
+        bHasDebugAlivePresentation = true;
+    }
     bDeathPresentationApplied = true;
     StopRoundCastMontage();
     GetCharacterMovement()->DisableMovement();

@@ -3,12 +3,15 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/App.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "Particles/ParticleSystem.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "TimerManager.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogCombatSkillPresentation, Log, All);
 
 namespace
 {
@@ -23,6 +26,62 @@ namespace
         FTimerHandle Handle;
         World->GetTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(Component, [Component]() { Component->DestroyComponent(); }), 5.f, false);
     }
+}
+
+bool CombatSkillPresentation::Prepare(UWorld* World, const TArray<FCombatRoundSkill>& Skills, TArray<TObjectPtr<UObject>>& PreparedAssets, FText& OutError)
+{
+    OutError = FText::GetEmpty();
+    if (!IsValid(World))
+    {
+        OutError = FText::FromString(TEXT("스킬 이펙트를 준비할 월드가 없습니다."));
+        return false;
+    }
+    if (!FApp::CanEverRender() || World->GetNetMode() == NM_DedicatedServer)
+    {
+        PreparedAssets.Reset();
+        return true;
+    }
+    TArray<TObjectPtr<UObject>> Assets;
+    const auto Fail = [&OutError](const FCombatRoundSkill& Skill, const FString& Path, const TCHAR* Reason)
+    {
+        OutError = FText::FromString(FString::Printf(TEXT("%s: %s\n%s"), *Skill.Name.ToString(), Reason, *Path));
+        UE_LOG(LogCombatSkillPresentation, Warning, TEXT("Effect preparation failed Skill=%s Asset=%s Reason=%s / 스킬 효과 준비 실패"), *Skill.SkillId.ToString(), *Path, Reason);
+        return false;
+    };
+    for (const FCombatRoundSkill& Skill : Skills)
+    {
+        for (const FCombatSkillVfx* Visual : {&Skill.Vfx, &Skill.ImpactVfx})
+        {
+            if (!Visual->Niagara.IsNull())
+            {
+                UNiagaraSystem* System = Visual->Niagara.LoadSynchronous();
+                if (!IsValid(System)) return Fail(Skill, Visual->Niagara.ToString(), TEXT("Niagara 이펙트 에셋을 불러오지 못했습니다."));
+                if (!Assets.Contains(System))
+                {
+#if WITH_EDITORONLY_DATA
+                    // Loading the package starts asynchronous Niagara compilation; include GPU shaders before accepting the loadout.
+                    // 패키지 로드가 비동기 Niagara 컴파일을 시작하므로 장착 승인 전에 GPU 셰이더까지 준비합니다.
+                    System->WaitForCompilationComplete(true, false);
+#endif
+                    if (!System->IsReadyToRun()) return Fail(Skill, System->GetPathName(), TEXT("이펙트 실행 준비가 끝나지 않았습니다. 잠시 후 다시 시도하고 계속 실패하면 에셋 컴파일 로그를 확인하세요."));
+                    if (!System->IsValid()) return Fail(Skill, System->GetPathName(), TEXT("Niagara 이펙트의 스크립트 또는 이미터 구성이 유효하지 않습니다. 에셋 컴파일 로그를 확인하세요."));
+                    Assets.Add(System);
+                }
+            }
+            if (!Visual->Cascade.IsNull())
+            {
+                UParticleSystem* System = Visual->Cascade.LoadSynchronous();
+                if (!IsValid(System)) return Fail(Skill, Visual->Cascade.ToString(), TEXT("Cascade 이펙트 에셋을 불러오지 못했습니다."));
+                Assets.AddUnique(System);
+            }
+        }
+    }
+    for (UObject* Asset : Assets)
+    {
+        if (!PreparedAssets.Contains(Asset)) UE_LOG(LogCombatSkillPresentation, Log, TEXT("Effect ready before combat execution Asset=%s / 전투 실행 전 스킬 효과 준비 완료"), *Asset->GetPathName());
+    }
+    PreparedAssets = MoveTemp(Assets);
+    return true;
 }
 
 void CombatSkillPresentation::Attach(AActor* Owner, const FCombatSkillVfx& Visual, TArray<TObjectPtr<UFXSystemComponent>>& Components)

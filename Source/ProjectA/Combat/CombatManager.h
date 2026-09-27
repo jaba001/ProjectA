@@ -12,6 +12,7 @@ class ACombatGridManager;
 class ACombatGridTile;
 class UCombatActionAuthority;
 class ACombatRoundCoordinator;
+class APartyPlayerController;
 
 DECLARE_MULTICAST_DELEGATE(FOnCombatViewChanged);
 
@@ -53,6 +54,9 @@ public:
     // Publish from server state changes; clients can only consume the replicated view.
     // 서버 상태 변경 시 게시하며 클라이언트는 복제된 뷰만 읽습니다.
     void PublishCombatView();
+    // Clear a disposable result before debug revival resumes the same battle.
+    // 디버그 부활로 같은 전투를 재개하기 전에 일회성 결과를 초기화합니다.
+    void ClearDebugCombatResult();
 
     // Sets combat manager defaults.
     // 전투 매니저 기본값을 설정합니다.
@@ -141,6 +145,9 @@ public:
 
     // Register units (server only)
     void RegisterUnits(const TArray<AUnitBase*>& Units);
+    // Add a validated debug actor while preserving the current session and registered actors.
+    // 현재 세션과 등록된 액터를 보존하며 검증된 디버그 액터를 추가합니다.
+    bool RegisterDebugUnit(AUnitBase* Unit, APartyPlayerController* Controller);
 
     int32 GetCurrentTurnIndex() const { return CurrentTurnIndex; }
 

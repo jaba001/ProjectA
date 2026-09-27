@@ -56,6 +56,11 @@ public:
     bool CanEditDebugUnit(APlayerController* Controller, int32 UnitId, FText& OutError) const;
     bool SetDebugUnitSkills(APlayerController* Controller, int32 UnitId, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Definitions, FText& OutError);
     void NotifyDebugEquipmentChanged(APlayerController* Controller, int32 UnitId);
+    bool CanReviveDebugUnit(APlayerController* Controller, int32 UnitId, FText& OutError) const;
+    bool ReviveDebugUnit(APlayerController* Controller, int32 UnitId, FText& OutError);
+    bool CanAddDebugUnit(APlayerController* Controller, bool bEnemy, FText& OutError) const;
+    ACombatGridTile* FindDebugSpawnTile(bool bEnemy) const;
+    bool AddDebugUnit(APlayerController* Controller, AUnitBase* Unit, FText& OutError);
     // Reserve SAP movement during planning and execute it before the round's AP actions.
     // 계획 단계에서 SAP 이동을 예약하고 라운드 AP 행동보다 먼저 실행합니다.
     bool SubmitMove(APlayerController* Controller, FGuid CombatId, int32 RoundNumber, int32 Revision, int32 UnitId, FIntPoint Destination, FText& OutError);
@@ -95,6 +100,11 @@ private:
 
     UPROPERTY(Replicated)
     TArray<FCombatRoundSkill> Skills;
+
+    // Soft references in skill profiles must not release prepared systems before their first cast.
+    // 스킬 프로필의 소프트 참조가 첫 시전 전에 준비된 시스템을 해제하지 않도록 유지합니다.
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UObject>> PreparedSkillVisualAssets;
 
     UPROPERTY(Replicated)
     bool bSAPMovementInProgress = false;
@@ -144,6 +154,8 @@ private:
     bool PersistPlanningCheckpoint(FText& OutError) const;
     void ClearOwnerReady(int32 OwnerSlot);
     void ResetDebugUnitPlan(int32 UnitIndex, const FText& Message);
+    ACombatGridTile* FindDebugReviveTile(int32 UnitIndex) const;
+    bool CanModifyDebugRoster(APlayerController* Controller, FText& OutError) const;
     void AdvanceSimulation(float StepSeconds);
     void AdvanceAction(int32 Index, float StepSeconds);
     void ReleaseSkill(int32 Index, const FCombatRoundSkill& Skill);

@@ -170,6 +170,19 @@ protected:
     void ApplyDeathPresentation();
     bool bDeathPresentationApplied = false;
 
+    // Keep the pre-ragdoll presentation only for reviving this actor in the standalone debug arena.
+    // 독립 디버그 전투에서 같은 액터를 부활시키기 위해 래그돌 이전 표현 상태만 보관합니다.
+    FTransform DebugAliveMeshTransform = FTransform::Identity;
+    FName DebugAliveMeshCollisionProfile;
+    FName DebugAliveCapsuleCollisionProfile;
+    FCollisionResponseContainer DebugAliveMeshCollisionResponses;
+    FCollisionResponseContainer DebugAliveCapsuleCollisionResponses;
+    ECollisionChannel DebugAliveMeshObjectType = ECC_WorldDynamic;
+    ECollisionChannel DebugAliveCapsuleObjectType = ECC_Pawn;
+    ECollisionEnabled::Type DebugAliveMeshCollisionEnabled = ECollisionEnabled::NoCollision;
+    ECollisionEnabled::Type DebugAliveCapsuleCollisionEnabled = ECollisionEnabled::NoCollision;
+    bool bHasDebugAlivePresentation = false;
+
     // Default battle orientation
     // Player uses Yaw 90
     // Enemy uses Yaw -90
@@ -250,6 +263,10 @@ public:
     // Handle unit death
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Death")
     virtual void Die();
+
+    // Restore a dead ally without replacing its actor, skills or equipment; debug worlds only.
+    // 액터·스킬·장비를 교체하지 않고 죽은 아군을 복원하며 디버그 월드에서만 허용합니다.
+    bool ReviveForDebug(ACombatGridTile* Tile);
 
     // Replicated death impulse for allied and enemy ragdolls.
     // 아군과 적 래그돌에 적용하는 복제 사망 충격량입니다.

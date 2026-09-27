@@ -5,6 +5,7 @@
 #include "CombatDebugGameMode.generated.h"
 
 class ACombatArena;
+class ACombatGridTile;
 class ACombatManager;
 class AUnitBase;
 class UEncounterDefinitionDataAsset;
@@ -23,6 +24,9 @@ public:
     ACombatManager* GetCombatManager() const { return CombatManager; }
     const FText& GetStatusMessage() const { return StatusMessage; }
     bool RestartCombat();
+    void GetDebugSpawnOptions(bool bEnemy, TArray<FName>& OutIds, TArray<FText>& OutNames) const;
+    bool CanSpawnDebugUnit(APlayerController* Controller, bool bEnemy, FText& OutError) const;
+    bool SpawnDebugUnit(APlayerController* Controller, bool bEnemy, FName OptionId, int32& OutUnitId, FText& OutError);
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "DebugCombat")
     TObjectPtr<UPartyDefinitionDataAsset> PartyDefinition;
@@ -31,12 +35,14 @@ public:
     TObjectPtr<UEncounterDefinitionDataAsset> EnemyDefinition;
 
 protected:
+    virtual void InitializeHUDForPlayer_Implementation(APlayerController* NewPlayer) override;
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
     void InitializeDebugCombat();
     bool SpawnDebugUnits();
+    AUnitBase* SpawnConfiguredDebugUnit(bool bEnemy, FName OptionId, ACombatGridTile* Tile, FText& OutError);
     void CleanupDebugCombat();
 
     UPROPERTY(Transient)

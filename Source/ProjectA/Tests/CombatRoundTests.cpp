@@ -16,9 +16,11 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Game/Encounter/CombatArena.h"
+#include "Game/GameModes/CombatDebugGameMode.h"
 #include "Game/Run/RunParticipationLibrary.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GAS/Ability/GA_DefaultAttack.h"
@@ -36,6 +38,7 @@ namespace CombatRoundTests
     // 네이티브 픽스처로 제작 맵이나 게임 시작 흐름 없이 실제 서버 런타임을 검증합니다.
     struct FFixture
     {
+        TStrongObjectPtr<UGameInstance> GameInstance;
         TStrongObjectPtr<UWorld> World;
         ACombatManager* Combat = nullptr;
         ACombatGridManager* Grid = nullptr;
@@ -86,6 +89,18 @@ namespace CombatRoundTests
             }
             if (IsValid(Combat)) Combat->ResetCombat();
             World->DestroyWorld(false);
+        }
+
+        // Install the native debug mode without starting gameplay, loading a map or initializing persistent subsystems.
+        // 게임 플레이·맵 로드·영속 서브시스템 초기화 없이 네이티브 디버그 모드만 설치합니다.
+        bool EnableDebugWorld()
+        {
+            if (!World.IsValid()) return false;
+            GameInstance.Reset(NewObject<UGameInstance>());
+            World->SetGameInstance(GameInstance.Get());
+            FURL URL;
+            URL.AddOption(TEXT("game=/Script/ProjectA.CombatDebugGameMode"));
+            return World->SetGameMode(URL) && ACombatDebugGameMode::IsDebugWorld(World.Get());
         }
 
         AUnitBase* AddUnit(FIntPoint Coord, ETeam Team, TSubclassOf<AUnitBase> UnitClass = AUnitBase::StaticClass())
@@ -313,6 +328,29 @@ namespace CombatRoundTests
                 if (!Authority->SetPartyControlMode(Cast<APlayerUnit>(Entry.Value), Entry.Key == SelectedSlot ? EPartyControlMode::Human : EPartyControlMode::ServerAI, Error)) return false;
             }
             if (!Authority->BindParticipant(Controller, Participant.AccountId)) return false;
+            Combat->StartCombat_Internal();
+            Round = Combat->GetRoundCoordinator();
+            return Round && Round->GetView().CombatId.IsValid() && Round->GetView().Phase == ECombatRoundPhase::Planning;
+        }
+
+        // Match the disposable debug session without configuring persistent Run ownership.
+        // 영속 Run 소유권을 설정하지 않고 일회성 디버그 전투와 같은 실행 문맥을 구성합니다.
+        bool InitializeUnconfiguredCombat()
+        {
+            if (!World.IsValid() || !Combat || !Arena || !Grid || Grid->TileMap.Num() != 16) return false;
+            APartyPlayerController* Controller = World->SpawnActor<APartyPlayerController>();
+            AUnitBase* Human = AddUnit(FIntPoint(0, 0), ETeam::Player, APlayerUnit::StaticClass());
+            AUnitBase* Enemy = AddUnit(FIntPoint(0, 3), ETeam::Enemy);
+            if (!Controller || !Human || !Enemy || !GiveFixtureSkills(Human) || !GiveRoundSkill(Enemy, nullptr, EnemySkillId)) return false;
+            World->AddController(Controller);
+            Controller->SetAsLocalPlayerController();
+            Controller->SetCombatContext(Combat, true);
+            Controllers.Add(Controller);
+            Humans.Add(Human);
+            Enemies.Add(Enemy);
+            Human->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 20.f);
+            Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 0.f);
+            Combat->RegisterUnits({Human, Enemy});
             Combat->StartCombat_Internal();
             Round = Combat->GetRoundCoordinator();
             return Round && Round->GetView().CombatId.IsValid() && Round->GetView().Phase == ECombatRoundPhase::Planning;
@@ -2322,6 +2360,259 @@ bool FCombatRoundProjectileTagGateTest::RunTest(const FString& Parameters)
         Projectile->AdvanceProjectile(1.f);
         TestTrue(TEXT("Tagged projectile always has bounded completion"), Projectile->HasResolved());
         TestEqual(TEXT("Target eligibility is rechecked at collision after launch"), Hits, bRemoveTag ? 0 : 1);
+    }
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundDebugRevivePlanningTest, "ProjectA.Combat.Round.DebugRevivePlanningAndReservations", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundDebugRevivePlanningTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    {
+        FFixture Ordinary;
+        if (!TestTrue(TEXT("Ordinary planning fixture initializes"), Ordinary.Initialize())) return false;
+        AUnitBase* Unit = Ordinary.Humans[0];
+        ACombatGridTile* Home = Unit->GetCurrentTile();
+        Unit->Die();
+        TestFalse(TEXT("Ordinary worlds reject coordinator revival"), Ordinary.Round->ReviveDebugUnit(Ordinary.Controllers[0], Unit->UnitIndex, Ordinary.Error));
+        TestFalse(TEXT("Ordinary worlds also reject direct unit revival"), Unit->ReviveForDebug(Home));
+        TestFalse(TEXT("Rejected revival leaves the ordinary unit dead"), Unit->IsUnitAlive());
+    }
+    {
+        FFixture RouteFixture;
+        if (!TestTrue(TEXT("Debug revival route fixture initializes with a three-tile move range"), RouteFixture.EnableDebugWorld() && RouteFixture.Initialize(2, 10.f, nullptr, FIntPoint(0, 3), 1, nullptr, 20.f, true, false, 3))) return false;
+        AUnitBase* Mover = RouteFixture.Humans[0];
+        AUnitBase* DeadAlly = RouteFixture.Humans[1];
+        ACombatGridTile* DeadHome = DeadAlly->GetCurrentTile();
+        RouteFixture.Controllers[1]->SetAsLocalPlayerController();
+        DeadAlly->Die();
+        // Force the surviving unit's valid route through the dead ally's unreserved home tile.
+        // 생존 유닛의 유효한 경로가 목적지로 예약되지 않은 사망 아군의 원래 칸을 지나도록 만듭니다.
+        if (!TestNotNull(TEXT("First alternate route tile is occupied"), RouteFixture.AddUnit(FIntPoint(1, 1), ETeam::Player)) || !TestNotNull(TEXT("Second alternate route tile is occupied"), RouteFixture.AddUnit(FIntPoint(2, 1), ETeam::Player))) return false;
+        const FIntPoint MoveDestination(3, 0);
+        if (!TestTrue(TEXT("A surviving ally reserves a route through the dead ally's home"), RouteFixture.Move(0, Mover, MoveDestination))) return false;
+        const int32 OriginalAP = Mover->GetCurrentActionPoint();
+        const int32 OriginalSAP = Mover->GetCurrentSubActionPoint();
+        if (!TestTrue(TEXT("Revival chooses a fallback outside the existing SAP route"), RouteFixture.Round->ReviveDebugUnit(RouteFixture.Controllers[1], DeadAlly->UnitIndex, RouteFixture.Error))) return false;
+        TestTrue(TEXT("Revival keeps the intermediate home empty and uses the first path-safe fallback"), !DeadHome->GetOccupyingUnit() && DeadAlly->GetCurrentTile() == RouteFixture.Grid->GetTileAtCoord(FIntPoint(0, 1)));
+        TestTrue(TEXT("The original SAP reservation and resources remain unchanged"), RouteFixture.Round->GetView().Units[0].bHasMovePlan && RouteFixture.Round->GetView().Units[0].MoveDestinationCoord == MoveDestination && Mover->GetCurrentActionPoint() == OriginalAP && Mover->GetCurrentSubActionPoint() == OriginalSAP);
+        TestTrue(TEXT("The original SAP route is still valid after revival"), RouteFixture.Round->CanMoveUnit(Mover->UnitIndex, MoveDestination, RouteFixture.Error));
+        TestTrue(TEXT("The surviving owner can ready without changing the preserved movement plan"), RouteFixture.Ready(0));
+    }
+    FFixture Fixture;
+    if (!TestTrue(TEXT("Native debug world and two-owner battle initialize"), Fixture.EnableDebugWorld() && Fixture.Initialize(2))) return false;
+    AUnitBase* Unit = Fixture.Humans[0];
+    AUnitBase* Other = Fixture.Humans[1];
+    ACombatRoundCoordinator* Round = Fixture.Round;
+    ACombatGridTile* Home = Unit->GetCurrentTile();
+    UAbilitySystemComponent* ASC = Unit->GetAbilitySystemComponent();
+    const TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills = Unit->GetEquippedSkillDataAssets();
+    const TArray<FName> SkillIds = Round->GetView().Units[0].SkillIds;
+    const FGuid CombatId = Round->GetView().CombatId;
+    const int32 RoundNumber = Round->GetView().RoundNumber;
+    const FTransform MeshTransform = Unit->GetMesh()->GetRelativeTransform();
+    const ECollisionEnabled::Type CapsuleCollision = Unit->GetCapsuleComponent()->GetCollisionEnabled();
+    if (!TestTrue(TEXT("The owned unit spends both action resources"), Unit->ConsumeActionPoint(Unit->GetCurrentActionPoint()) && Unit->ConsumeSubActionPoint(Unit->GetCurrentSubActionPoint()))) return false;
+    ASC->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), 0.f);
+    ASC->SetNumericAttributeBase(UAS_Unit::GetShieldAttribute(), 17.f);
+    Unit->Die();
+    if (!TestTrue(TEXT("An owned dead ally revives during planning"), Round->ReviveDebugUnit(Fixture.Controllers[0], Unit->UnitIndex, Fixture.Error))) return false;
+    TestTrue(TEXT("Planning revival preserves the actor, ability component and equipped skill assets"), Unit->IsUnitAlive() && Round->GetView().Units[0].Unit == Unit && Unit->GetAbilitySystemComponent() == ASC && Unit->GetEquippedSkillDataAssets() == Skills && Round->GetView().Units[0].SkillIds == SkillIds);
+    TestEqual(TEXT("Revival restores full HP"), Unit->GetAttributeSet()->GetHP(), Unit->GetAttributeSet()->GetMaxHP());
+    TestEqual(TEXT("Revival clears the old shield"), Unit->GetAttributeSet()->GetShield(), 0.f);
+    TestEqual(TEXT("Revival restores AP"), Unit->GetCurrentActionPoint(), Unit->GetMaxActionPoint());
+    TestEqual(TEXT("Revival restores SAP"), Unit->GetCurrentSubActionPoint(), Unit->GetMaxSubActionPoint());
+    TestTrue(TEXT("An available home remains the preferred revive tile"), Unit->GetCurrentTile() == Home && Home->GetOccupyingUnit() == Unit);
+    TestTrue(TEXT("Planning revival preserves combat and round identities and clears the revived draft"), Round->GetView().CombatId == CombatId && Round->GetView().RoundNumber == RoundNumber && Round->GetView().Phase == ECombatRoundPhase::Planning && Round->GetView().Units[0].Command.SkillId.IsNone() && !Round->GetView().Units[0].bReady);
+    TestTrue(TEXT("Revival restores capsule collision and the original mesh attachment and transform"), Unit->GetCapsuleComponent()->GetCollisionEnabled() == CapsuleCollision && Unit->GetMesh()->GetAttachParent() == Unit->GetCapsuleComponent() && Unit->GetMesh()->GetRelativeTransform().Equals(MeshTransform));
+    TestTrue(TEXT("Movement stays under the round coordinator"), Unit->GetCharacterMovement()->MovementMode == MOVE_None && Unit->GetVelocity().IsNearlyZero());
+    TestFalse(TEXT("A living ally cannot be revived twice"), Round->ReviveDebugUnit(Fixture.Controllers[0], Unit->UnitIndex, Fixture.Error));
+
+    // Reserve the dead unit's home for an AP approach and the next free tile for another unit's SAP move.
+    // 사망 유닛의 원래 칸은 AP 접근에, 다음 빈 칸은 다른 유닛의 SAP 이동에 예약합니다.
+    Unit->Die();
+    FCombatRoundCommand Approach = Fixture.Command(Other, TEXT("MoveShot"), Fixture.Enemies[0]);
+    Approach.DestinationCoord = Home->GridCoord;
+    if (!TestTrue(TEXT("Another owner can reserve the vacant home and adjacent SAP tile"), Fixture.Submit(1, Approach) && Fixture.Move(1, Other, FIntPoint(1, 0)))) return false;
+    TArray<AUnitBase*> Blockers;
+    for (FIntPoint Coord : {FIntPoint(3, 0), FIntPoint(0, 1), FIntPoint(1, 1), FIntPoint(2, 1), FIntPoint(3, 1)})
+    {
+        AUnitBase* Blocker = Fixture.AddUnit(Coord, ETeam::Player);
+        if (!TestNotNull(TEXT("Occupied fallback fixture tile exists"), Blocker)) return false;
+        Blockers.Add(Blocker);
+    }
+    TestFalse(TEXT("Occupied tiles and both kinds of reservations prevent revival when no tile remains"), Round->ReviveDebugUnit(Fixture.Controllers[0], Unit->UnitIndex, Fixture.Error));
+    TestFalse(TEXT("No-space rejection leaves the same unit dead"), Unit->IsUnitAlive());
+    ACombatGridTile* Fallback = Blockers[0]->GetCurrentTile();
+    Fallback->SetOccupyingUnit(nullptr);
+    Blockers[0]->Destroy();
+    if (!TestTrue(TEXT("A single unreserved fallback allows repeat revival"), Round->ReviveDebugUnit(Fixture.Controllers[0], Unit->UnitIndex, Fixture.Error))) return false;
+    TestTrue(TEXT("Fallback revival leaves AP and SAP reservations untouched"), Unit->GetCurrentTile() == Fallback && Round->GetView().Units[0].HomeCoord == Fallback->GridCoord && !Home->GetOccupyingUnit() && !Fixture.Grid->GetTileAtCoord(FIntPoint(1, 0))->GetOccupyingUnit() && Round->GetView().Units[1].Command.DestinationCoord == Home->GridCoord && Round->GetView().Units[1].bHasMovePlan && Round->GetView().Units[1].MoveDestinationCoord == FIntPoint(1, 0));
+    Other->Die();
+    TestFalse(TEXT("A local controller cannot revive another owner's dead ally"), Round->ReviveDebugUnit(Fixture.Controllers[0], Other->UnitIndex, Fixture.Error));
+    Fixture.Enemies[0]->Die();
+    TestFalse(TEXT("A local controller cannot revive a dead enemy"), Round->ReviveDebugUnit(Fixture.Controllers[0], Fixture.Enemies[0]->UnitIndex, Fixture.Error));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundDebugReviveFinishedTest, "ProjectA.Combat.Round.DebugReviveFinishedAndReenterCombat", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundDebugReviveFinishedTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    int32 ResultCount = 0;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("Native debug battle initializes"), Fixture.EnableDebugWorld() && Fixture.Initialize())) return false;
+    AUnitBase* Unit = Fixture.Humans[0];
+    AUnitBase* Enemy = Fixture.Enemies[0];
+    ACombatRoundCoordinator* Round = Fixture.Round;
+    const FGuid CombatId = Round->GetView().CombatId;
+    const FGuid ManagerCombatId = Fixture.Combat->GetCombatInstanceId();
+    const FGuid RuntimeUnitId = Fixture.Combat->GetRuntimeUnitId(Unit);
+    const TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills = Unit->GetEquippedSkillDataAssets();
+    Fixture.Combat->OnCombatResult.AddLambda([&ResultCount](ECombatResult) { ++ResultCount; });
+    if (!TestTrue(TEXT("The original battle enters resolution"), Fixture.Ready(0))) return false;
+    Unit->Die();
+    for (int32 Step = 0; Step < 1000 && Round->IsRoundSessionActive(); ++Step) Round->Tick(0.01f);
+    if (!TestTrue(TEXT("The original battle settles as a defeat"), Round->GetView().Phase == ECombatRoundPhase::Finished && Fixture.Combat->GetCombatResult() == ECombatResult::Defeat && !Fixture.Combat->IsCombatActive())) return false;
+    TestEqual(TEXT("The first defeat publishes one result"), ResultCount, 1);
+    const int32 FinishedRound = Round->GetView().RoundNumber;
+    if (!TestTrue(TEXT("Finished revival reopens planning with a living enemy"), Round->ReviveDebugUnit(Fixture.Controllers[0], Unit->UnitIndex, Fixture.Error))) return false;
+    TestTrue(TEXT("Revival keeps combat and runtime unit identities and the equipped assets"), Round->GetView().CombatId == CombatId && Fixture.Combat->GetCombatInstanceId() == ManagerCombatId && Fixture.Combat->GetRuntimeUnitId(Unit) == RuntimeUnitId && Unit->GetEquippedSkillDataAssets() == Skills);
+    TestTrue(TEXT("The next planning round clears the old manager result and becomes active"), Round->GetView().Phase == ECombatRoundPhase::Planning && Round->GetView().RoundNumber == FinishedRound + 1 && Fixture.Combat->GetCombatResult() == ECombatResult::None && Fixture.Combat->IsCombatActive());
+    const float EnemyHP = Enemy->GetAttributeSet()->GetHP();
+    const int32 ResumedRound = Round->GetView().RoundNumber;
+    if (!TestTrue(TEXT("The revived unit can submit and execute an existing equipped attack"), Fixture.Submit(0, Fixture.Command(Unit, TEXT("Arrow"), Enemy)) && Fixture.Ready(0))) return false;
+    if (!TestTrue(TEXT("The revived unit completes another round"), Fixture.AdvanceUntilNextRound(ResumedRound))) return false;
+    TestTrue(TEXT("The resumed attack applies damage through the normal execution path"), Enemy->GetAttributeSet()->GetHP() < EnemyHP);
+    TestEqual(TEXT("Successful resumed rounds do not duplicate the defeat callback"), ResultCount, 1);
+    if (!TestTrue(TEXT("A second defeat can start in the resumed combat"), Fixture.Ready(0))) return false;
+    Unit->Die();
+    for (int32 Step = 0; Step < 1000 && Round->IsRoundSessionActive(); ++Step) Round->Tick(0.01f);
+    TestTrue(TEXT("The same combat can settle as defeat again"), Round->GetView().Phase == ECombatRoundPhase::Finished && Fixture.Combat->GetCombatResult() == ECombatResult::Defeat && Round->GetView().CombatId == CombatId);
+    TestEqual(TEXT("Clearing the previous result permits exactly one second defeat callback"), ResultCount, 2);
+    Round->Tick(1.f);
+    TestEqual(TEXT("Finished ticks do not duplicate the second result"), ResultCount, 2);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundDebugAddGuardsTest, "ProjectA.Combat.Round.DebugAddWorldAndPhaseGuards", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundDebugAddGuardsTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (int32 Scenario = 0; Scenario < 3; ++Scenario)
+    {
+        FFixture Fixture;
+        if (Scenario != 0 && !TestTrue(TEXT("Native debug mode installs for guarded scenarios"), Fixture.EnableDebugWorld())) return false;
+        if (!TestTrue(TEXT("Ordinary, configured Run or disposable debug battle initializes"), Scenario == 1 ? Fixture.Initialize() : Fixture.InitializeUnconfiguredCombat())) return false;
+        if (Scenario == 2 && !TestTrue(TEXT("Disposable debug battle enters resolution"), Fixture.Ready(0))) return false;
+        if (Scenario == 2) TestEqual(TEXT("Phase guard is exercised during resolution"), Fixture.Round->GetView().Phase, ECombatRoundPhase::Resolving);
+        const FGuid CombatId = Fixture.Round->GetView().CombatId;
+        const FGuid HumanId = Fixture.Combat->GetRuntimeUnitId(Fixture.Humans[0]);
+        AUnitBase* Candidate = Fixture.AddUnit(FIntPoint(2, 0), ETeam::Player, APlayerUnit::StaticClass());
+        if (!TestTrue(TEXT("A valid unregistered candidate exists"), Candidate && Fixture.GiveFixtureSkills(Candidate))) return false;
+        TestFalse(TEXT("Ordinary worlds, configured Runs and resolving rounds reject addition in advance"), Fixture.Round->CanAddDebugUnit(Fixture.Controllers[0], false, Fixture.Error));
+        TestFalse(TEXT("Direct addition cannot bypass the world, ownership or phase guard"), Fixture.Round->AddDebugUnit(Fixture.Controllers[0], Candidate, Fixture.Error));
+        TestTrue(TEXT("Rejected addition preserves roster and all existing runtime identities"), Fixture.Round->GetView().Units.Num() == 2 && Fixture.Combat->GetRegisteredUnits().Num() == 2 && Fixture.Round->GetView().CombatId == CombatId && Fixture.Combat->GetRuntimeUnitId(Fixture.Humans[0]) == HumanId && !Fixture.Combat->GetRuntimeUnitId(Candidate).IsValid());
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundDebugAddPlanningTest, "ProjectA.Combat.Round.DebugAddPreservesPlanningAndLimits", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundDebugAddPlanningTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("An unconfigured standalone debug battle initializes"), Fixture.EnableDebugWorld() && Fixture.InitializeUnconfiguredCombat())) return false;
+    ACombatRoundCoordinator* Round = Fixture.Round;
+    AUnitBase* Human = Fixture.Humans[0];
+    AUnitBase* Enemy = Fixture.Enemies[0];
+    Human->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), 73.f);
+    if (!TestTrue(TEXT("Existing ally spends AP before adding characters"), Human->ConsumeActionPoint(1))) return false;
+    FCombatRoundCommand Approach = Fixture.Command(Human, TEXT("MoveShot"), Enemy);
+    Approach.DestinationCoord = FIntPoint(1, 0);
+    if (!TestTrue(TEXT("Existing AP approach and SAP move reserve distinct vacant tiles"), Fixture.Submit(0, Approach) && Fixture.Move(0, Human, FIntPoint(0, 1)))) return false;
+    const FCombatRoundUnitView OriginalHuman = Round->GetView().Units[0];
+    const FCombatRoundUnitView OriginalEnemy = Round->GetView().Units[1];
+    const FGuid CombatId = Round->GetView().CombatId;
+    const FGuid ManagerCombatId = Fixture.Combat->GetCombatInstanceId();
+    const FGuid HumanId = Fixture.Combat->GetRuntimeUnitId(Human);
+    const FGuid EnemyId = Fixture.Combat->GetRuntimeUnitId(Enemy);
+    const int32 RoundNumber = Round->GetView().RoundNumber;
+    const int32 AP = Human->GetCurrentActionPoint();
+    const int32 SubAP = Human->GetCurrentSubActionPoint();
+    const TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills = Human->GetEquippedSkillDataAssets();
+    ACombatGridTile* AllyTile = Round->FindDebugSpawnTile(false);
+    if (!TestNotNull(TEXT("An unoccupied and unreserved allied spawn tile exists"), AllyTile)) return false;
+    TestTrue(TEXT("Automatic placement avoids both the AP and SAP destination"), AllyTile->GridCoord != Approach.DestinationCoord && AllyTile->GridCoord != FIntPoint(0, 1));
+    AUnitBase* AddedAlly = Fixture.AddUnit(AllyTile->GridCoord, ETeam::Player, APlayerUnit::StaticClass());
+    if (!TestTrue(TEXT("The new ally is appended to the existing battle"), AddedAlly && Fixture.GiveFixtureSkills(AddedAlly) && Round->AddDebugUnit(Fixture.Controllers[0], AddedAlly, Fixture.Error))) return false;
+    const FCombatRoundUnitView& AllyEntry = Round->GetView().Units.Last();
+    TestTrue(TEXT("The appended ally has a new stable ID and belongs to the local participant"), AllyEntry.Unit == AddedAlly && AllyEntry.UnitId > OriginalEnemy.UnitId && AllyEntry.OwnerSlot == Round->GetParticipantSlot(Fixture.Controllers[0]) && !AllyEntry.bEnemy && !AllyEntry.bReady && Fixture.Combat->GetActionAuthority()->CanControllerControl(Fixture.Controllers[0], AddedAlly));
+    TestTrue(TEXT("An appended ally is immediately eligible for skill editing"), Round->CanEditDebugUnit(Fixture.Controllers[0], AddedAlly->UnitIndex, Fixture.Error));
+    ACombatGridTile* EnemyTile = Round->FindDebugSpawnTile(true);
+    if (!TestNotNull(TEXT("An enemy spawn tile exists"), EnemyTile)) return false;
+    AUnitBase* AddedEnemy = Fixture.AddUnit(EnemyTile->GridCoord, ETeam::Enemy);
+    FName AddedEnemySkill;
+    if (!TestTrue(TEXT("The new enemy is appended to the same battle"), AddedEnemy && Fixture.GiveRoundSkill(AddedEnemy, nullptr, AddedEnemySkill) && Round->AddDebugUnit(Fixture.Controllers[0], AddedEnemy, Fixture.Error))) return false;
+    const FCombatRoundUnitView& EnemyEntry = Round->GetView().Units.Last();
+    TestTrue(TEXT("The appended enemy receives a ready AI plan and no human ownership"), EnemyEntry.Unit == AddedEnemy && EnemyEntry.bEnemy && EnemyEntry.OwnerSlot == 0 && EnemyEntry.bReady);
+    TestTrue(TEXT("Both additions preserve the combat, round and original unit identifiers"), Round->GetView().CombatId == CombatId && Fixture.Combat->GetCombatInstanceId() == ManagerCombatId && Round->GetView().RoundNumber == RoundNumber && Human->UnitIndex == OriginalHuman.UnitId && Enemy->UnitIndex == OriginalEnemy.UnitId && Fixture.Combat->GetRuntimeUnitId(Human) == HumanId && Fixture.Combat->GetRuntimeUnitId(Enemy) == EnemyId);
+    TestTrue(TEXT("Both additions preserve current HP, spent resources and equipped skill assets"), FMath::IsNearlyEqual(Human->GetAttributeSet()->GetHP(), 73.f) && Human->GetCurrentActionPoint() == AP && Human->GetCurrentSubActionPoint() == SubAP && Human->GetEquippedSkillDataAssets() == Skills && Round->GetView().Units[0].SkillIds == OriginalHuman.SkillIds);
+    TestTrue(TEXT("Existing human and enemy commands and the SAP reservation remain intact"), SameCommand(Round->GetView().Units[0].Command, OriginalHuman.Command) && SameCommand(Round->GetView().Units[1].Command, OriginalEnemy.Command) && Round->GetView().Units[0].bHasMovePlan && Round->GetView().Units[0].MoveDestinationCoord == OriginalHuman.MoveDestinationCoord && !Fixture.Grid->GetTileAtCoord(Approach.DestinationCoord)->GetOccupyingUnit() && !Fixture.Grid->GetTileAtCoord(OriginalHuman.MoveDestinationCoord)->GetOccupyingUnit());
+
+    AddedAlly->Die();
+    for (int32 Index = 0; Index < 4; ++Index)
+    {
+        ACombatGridTile* Tile = Round->FindDebugSpawnTile(true);
+        if (!TestNotNull(TEXT("An enemy tile is available before the total roster limit"), Tile)) return false;
+        AUnitBase* Candidate = Fixture.AddUnit(Tile->GridCoord, ETeam::Enemy);
+        FName SkillId;
+        if (!TestTrue(TEXT("The roster grows to the eight-character limit"), Candidate && Fixture.GiveRoundSkill(Candidate, nullptr, SkillId) && Round->AddDebugUnit(Fixture.Controllers[0], Candidate, Fixture.Error))) return false;
+    }
+    TestEqual(TEXT("Dead characters remain part of the total roster"), Round->GetView().Units.Num(), 8);
+    TestFalse(TEXT("The roster limit prevents another ally"), Round->CanAddDebugUnit(Fixture.Controllers[0], false, Fixture.Error));
+    TestFalse(TEXT("The same roster limit prevents another enemy"), Round->CanAddDebugUnit(Fixture.Controllers[0], true, Fixture.Error));
+    AUnitBase* Overflow = Fixture.AddUnit(AllyTile->GridCoord, ETeam::Player, APlayerUnit::StaticClass());
+    if (!TestTrue(TEXT("A valid overflow candidate exists on the dead ally's vacant tile"), Overflow && Fixture.GiveFixtureSkills(Overflow))) return false;
+    TestFalse(TEXT("Direct addition cannot exceed the roster limit"), Round->AddDebugUnit(Fixture.Controllers[0], Overflow, Fixture.Error));
+    TestTrue(TEXT("Overflow leaves the registered roster and existing identities intact"), Fixture.Combat->GetRegisteredUnits().Num() == 8 && !Fixture.Combat->GetRuntimeUnitId(Overflow).IsValid() && Fixture.Combat->GetRuntimeUnitId(Human) == HumanId && Fixture.Combat->GetRuntimeUnitId(Enemy) == EnemyId);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundDebugAddFinishedTest, "ProjectA.Combat.Round.DebugAddResumesFinishedBattle", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundDebugAddFinishedTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    for (bool bDefeat : {false, true})
+    {
+        FFixture Fixture;
+        if (!TestTrue(TEXT("A disposable debug battle initializes for finished addition"), Fixture.EnableDebugWorld() && Fixture.InitializeUnconfiguredCombat())) return false;
+        ACombatRoundCoordinator* Round = Fixture.Round;
+        const FGuid CombatId = Round->GetView().CombatId;
+        const FGuid HumanId = Fixture.Combat->GetRuntimeUnitId(Fixture.Humans[0]);
+        const FGuid EnemyId = Fixture.Combat->GetRuntimeUnitId(Fixture.Enemies[0]);
+        if (!TestTrue(TEXT("The original battle enters resolution"), Fixture.Ready(0))) return false;
+        AUnitBase* Dead = bDefeat ? Fixture.Humans[0] : Fixture.Enemies[0];
+        Dead->Die();
+        for (int32 Step = 0; Step < 1000 && Round->IsRoundSessionActive(); ++Step) Round->Tick(0.01f);
+        if (!TestTrue(TEXT("The original battle finishes with one defeated side"), Round->GetView().Phase == ECombatRoundPhase::Finished && Fixture.Combat->GetCombatResult() == (bDefeat ? ECombatResult::Defeat : ECombatResult::Victory))) return false;
+        const int32 FinishedRound = Round->GetView().RoundNumber;
+        ACombatGridTile* Tile = Round->FindDebugSpawnTile(!bDefeat);
+        if (!TestNotNull(TEXT("A vacant tile exists for the defeated side"), Tile)) return false;
+        AUnitBase* Added = Fixture.AddUnit(Tile->GridCoord, bDefeat ? ETeam::Player : ETeam::Enemy, bDefeat ? APlayerUnit::StaticClass() : AUnitBase::StaticClass());
+        if (!TestTrue(TEXT("Adding a living character replaces the defeated side without reviving its corpse"), Added && Fixture.GiveFixtureSkills(Added) && Round->AddDebugUnit(Fixture.Controllers[0], Added, Fixture.Error))) return false;
+        TestTrue(TEXT("Both living sides resume the next planning round and clear the previous result"), Round->GetView().Phase == ECombatRoundPhase::Planning && Round->GetView().RoundNumber == FinishedRound + 1 && Fixture.Combat->GetCombatResult() == ECombatResult::None && Fixture.Combat->IsCombatActive());
+        TestTrue(TEXT("Resuming preserves the original actors and runtime IDs, including the corpse"), !Dead->IsUnitAlive() && Round->GetView().Units.Num() == 3 && Round->GetView().CombatId == CombatId && Fixture.Combat->GetRuntimeUnitId(Fixture.Humans[0]) == HumanId && Fixture.Combat->GetRuntimeUnitId(Fixture.Enemies[0]) == EnemyId);
+        AUnitBase* Attacker = bDefeat ? Added : Fixture.Humans[0];
+        AUnitBase* Target = bDefeat ? Fixture.Enemies[0] : Added;
+        const int32 ResumedRound = Round->GetView().RoundNumber;
+        const float TargetHP = Target->GetAttributeSet()->GetHP();
+        if (!TestTrue(TEXT("The resumed roster accepts a normal equipped attack"), Fixture.Submit(0, Fixture.Command(Attacker, TEXT("Arrow"), Target)) && Fixture.Ready(0))) return false;
+        if (!TestTrue(TEXT("The resumed roster completes a normal round"), Fixture.AdvanceUntilNextRound(ResumedRound))) return false;
+        TestTrue(TEXT("Normal combat execution can damage the newly added or surviving enemy"), Target->GetAttributeSet()->GetHP() < TargetHP);
     }
     return true;
 }
