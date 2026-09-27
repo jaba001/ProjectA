@@ -30,12 +30,10 @@ struct PROJECTA_API FRunEncounterOffer
     FGameplayTag EncounterTag;
 
     static FGameplayTag GetSkillShopTag();
-    static FGameplayTag GetTestSkillShopTag();
     static FGameplayTag GetItemShopTag();
     FGameplayTag GetResolvedTag() const;
     FText GetDisplayName() const;
     bool IsItemShop() const;
-    bool IsTestSkillShop() const;
     bool IsSupportedShop() const;
 };
 
@@ -60,5 +58,4 @@ struct PROJECTA_API FRunEncounterProgress
 
     const FRunEncounterOffer* FindSelectedOffer() const;
     bool IsItemShop() const;
-    bool IsTestSkillShop() const;
 };

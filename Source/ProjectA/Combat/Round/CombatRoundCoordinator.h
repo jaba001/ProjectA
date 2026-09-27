@@ -14,6 +14,7 @@ class ACombatGridTile;
 class APlayerController;
 class AUnitBase;
 class ACombatManager;
+class USkillDefinitionDataAsset;
 struct FCombatCheckpointData;
 namespace CombatPlanValidation
 {
@@ -50,6 +51,11 @@ public:
     bool SubmitPlan(APlayerController* Controller, FGuid CombatId, int32 RoundNumber, int32 Revision, const FCombatRoundCommand& Command, FText& OutError);
     bool SetParticipantReady(APlayerController* Controller, FGuid CombatId, int32 RoundNumber, int32 Revision, bool bReady, FText& OutError);
     bool CanPlanCommand(const FCombatRoundCommand& Command, FText& OutError) const;
+    // Edit only a stationary owned unit in the isolated development battle.
+    // 독립 개발 전투에서 정지한 소유 유닛만 편집합니다.
+    bool CanEditDebugUnit(APlayerController* Controller, int32 UnitId, FText& OutError) const;
+    bool SetDebugUnitSkills(APlayerController* Controller, int32 UnitId, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Definitions, FText& OutError);
+    void NotifyDebugEquipmentChanged(APlayerController* Controller, int32 UnitId);
     // Reserve SAP movement during planning and execute it before the round's AP actions.
     // 계획 단계에서 SAP 이동을 예약하고 라운드 AP 행동보다 먼저 실행합니다.
     bool SubmitMove(APlayerController* Controller, FGuid CombatId, int32 RoundNumber, int32 Revision, int32 UnitId, FIntPoint Destination, FText& OutError);
@@ -137,6 +143,7 @@ private:
     bool LockPlans(FText& OutError);
     bool PersistPlanningCheckpoint(FText& OutError) const;
     void ClearOwnerReady(int32 OwnerSlot);
+    void ResetDebugUnitPlan(int32 UnitIndex, const FText& Message);
     void AdvanceSimulation(float StepSeconds);
     void AdvanceAction(int32 Index, float StepSeconds);
     void ReleaseSkill(int32 Index, const FCombatRoundSkill& Skill);

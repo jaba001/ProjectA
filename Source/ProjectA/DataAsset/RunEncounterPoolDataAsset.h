@@ -27,9 +27,6 @@ public:
     TArray<FRunSkillShopOffer> FixedSkillOffers;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
-    TArray<FRunSkillShopOffer> FixedTestSkillOffers;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
     FRunShopRecoveryOffer Recovery;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Reward", meta = (ClampMin = "1"))
@@ -43,8 +40,4 @@ public:
     static bool ValidateSkillShop(const FRunSkillShopState& State, FText& OutError);
     bool ValidateGoldRewardRange(FText& OutError) const;
     bool BuildGoldRewards(FName NodeId, FRunGoldRewardState& OutState, FText& OutError) const;
-
-#if WITH_EDITOR
-    virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
-#endif
 };

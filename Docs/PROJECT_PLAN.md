@@ -87,9 +87,9 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 새 Run은 첫 승리 보상 수령 후 Continue에서 `EncounterChoice`, 선택 시 `Shop`, 나가기 시 `Map`으로 전환한다. 전투 노드 수는 2개를 유지하며 상점 방문을 전투 완료 수에 더하지 않는다. 선택하지 않은 상점은 방문할 수 없다. 레벨 이동·별도 Arena 스폰 없이 UI로 처리한다.
 
-상점1은 **스킬상점**, 상점2는 **아이템상점**, 새 Run의 상점3은 **테스트 스킬상점**으로 관리한다. `FRunEncounterOffer.EncounterTag`의 `Encounter.Shop.Skill`·`Encounter.Shop.Item`·`Encounter.Shop.Skill.Test` 분류로 UI·구매·리롤 실행을 판정하며 표시 이름과 저장 ID를 분리한다. `Shop_01/02/03` ID는 유지한다. 분류 태그가 없는 이전 정의·저장은 공통 해석에서 기존 Shop ID를 분류하며, 기존 상점3은 일반 스킬상점 구성을 유지한다. 사용자 지정 이름과 저장 원본은 보존한다.
+기존 상점1은 **스킬상점**, 상점2는 **아이템상점** 인카운터로 관리한다. `FRunEncounterOffer.EncounterTag`의 `Encounter.Shop.Skill`·`Encounter.Shop.Item` 분류로 UI·구매·리롤 실행을 판정하며 표시 이름과 저장 ID를 분리한다. 저장 호환을 위해 `Shop_01`·`Shop_02` ID를 유지하고 상점3은 기존 시험 구성을 보존한다. 분류 태그가 없는 이전 정의·저장은 공통 해석에서 기존 Shop ID를 분류하며, 기본 이전 이름만 새 이름으로 표시하고 사용자 지정 이름과 저장 원본은 보존한다.
 
-아군 네 직업은 비무장 공격 하나로 시작하고 직접 조작 캐릭터별 개인 10G, AI 동료 0G를 사용한다. 일반 스킬상점은 기존 검·원거리·AOE·휩쓸기와 HP 전체 회복을 각 1G에 판매한다. 본인 생존 인간 캐릭터만 구매하고 같은 스킬의 재구매를 거절한다. 습득 즉시 Run 장착 목록에 추가하며 다음 전투부터 사용한다. 회복은 직업 설정의 최대 HP까지 즉시 적용하고 만피 구매를 거절한다. 10G·1G는 시험값이다.
+아군 네 직업은 비무장 공격 하나로 시작하고 직접 조작 캐릭터별 개인 10G, AI 동료 0G를 사용한다. 스킬상점·상점3은 기존 검·원거리·AOE·휩쓸기와 HP 전체 회복을 각 1G에 판매한다. 본인 생존 인간 캐릭터만 구매하고 같은 스킬의 재구매를 거절한다. 습득 즉시 Run 장착 목록에 추가하며 다음 전투부터 사용한다. 회복은 직업 설정의 최대 HP까지 즉시 적용하고 만피 구매를 거절한다. 10G·1G는 시험값이다.
 
 `RunEncounterPoolDataAsset.StartingGold/FixedSkillOffers/Recovery`에서 시험 구성을 관리하고 새 Run에 `FRunSkillShopState`로 복사한다. `FRunPartyMember.Gold/Skills/bHasSkillLoadout/CurrentHP`를 저장 기준으로 사용한다. 서버가 신뢰 연결의 소유자·상점 단계·Human 상태·잔액과 스킬 중복 또는 부족 HP를 검사하고, 저장 복사본에 잔액과 구매 효과를 함께 반영한 뒤 성공한 변경만 공개한다. 실패하면 메모리와 기존 파일을 보존한다. 기존 schema 1 저장의 회복 필드 누락은 기본값 1G로 읽고 고정 스킬 상품·보유 골드를 유지한다. schema 0에는 상품·골드를 소급 지급하지 않으며 명시 장착이 없는 기존 파티는 과거 직업 기본값을 유지한다. [사용자 확인](TODO.md#2-19-비무장-시작과-스킬-상점)
 
@@ -99,16 +99,14 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 | 데이터 | 역할 |
 |---|---|
-| `URunEncounterPoolDataAsset` | `FixedOffers`에 인카운터 3개, `FixedSkillOffers`에 일반 스킬 상품·가격, `FixedTestSkillOffers`에 0G 테스트 상품, `Recovery`에 전체 회복 가격, `StartingGold`에 개인 시작 골드 정의. 인카운터 후보 3개는 고정 제시 |
-| `FRunEncounterOffer` | `EncounterId`·`DisplayName`·`Type`·`EncounterTag`의 USTRUCT 값 데이터. `GetResolvedTag/IsSupportedShop/IsItemShop/IsTestSkillShop/GetDisplayName`으로 분류·표시 이름 해석 |
+| `URunEncounterPoolDataAsset` | `FixedOffers`에 인카운터 3개, `FixedSkillOffers`에 스킬 상품·가격, `Recovery`에 전체 회복 가격, `StartingGold`에 개인 시작 골드 정의. 인카운터 후보 3개는 고정 제시 |
+| `FRunEncounterOffer` | `EncounterId`·`DisplayName`·`Type`·`EncounterTag`의 USTRUCT 값 데이터. `GetResolvedTag/IsSupportedShop/IsItemShop/GetDisplayName`으로 분류·표시 이름 해석 |
 | `FRunEncounterProgress` | schema·제시 목록·선택 ID·퇴장 완료 여부. Run 저장과 GameState 표시 뷰에 포함 |
 | `UPartyDefinitionDataAsset::RunEncounterPool` | 새 Run에서 사용할 풀. 미지정 시 native 기본값 스킬상점·아이템상점·상점3 사용 |
 
-현재 `DA_VerticalSliceParty.RunEncounterPool`은 `/Game/User_JeHoon/Blueprint/DataAsset/Encounters/DA_RunEncounterPool_TestSkills`를 참조한다. 서로 다른 ID와 이름을 가진 Shop 인카운터 3개에 일반 스킬·아이템·테스트 스킬 태그를 지정한다. 정의는 새 Run 초기화 시 분류 태그·표시 이름을 포함한 값으로 복사하며 진행 중 풀 수정으로 저장된 선택지가 바뀌지 않는다. 풀 미지정 시 native 기본값의 기존 상점3을 유지하며 WBP 재생성은 필요 없다.
+풀을 직접 편집하려면 `Content/User_JeHoon/Blueprint/DataAsset` 아래에 `RunEncounterPoolDataAsset` 유형의 DataAsset을 만들고 `DA_VerticalSliceParty.RunEncounterPool`에 연결한다. 서로 다른 ID와 이름을 가진 Shop 인카운터 3개에 `Encounter.Shop.Skill` 또는 `Encounter.Shop.Item` 태그를 지정한다. 기본 동작에는 에셋 생성·WBP 재생성이 필요 없다. 정의는 새 Run 초기화 시 분류 태그·표시 이름을 포함한 값으로 복사하며 진행 중 풀 수정으로 저장된 선택지가 바뀌지 않는다.
 
-[ConfigureTestSkillShop.py](../Source/ProjectAEditor/Scripts/ConfigureTestSkillShop.py)는 `Skills/`의 BPDA 181종을 직접 참조하는 `FixedTestSkillOffers`를 작성한다. `FRunSkillShopState.TestOffers`에 고정하고 테스트 태그의 선택 상점에서만 조회한다. 테스트 상품은 정확히 0G, 일반 상품·회복은 양수 가격이어야 하며 음수 가격은 거절한다. 테스트 상점의 회복 요청을 거절하고 기본 공격 포함 보유 한도 5개·중복 금지·소유권·원자 저장은 유지한다. 기존 저장의 누락된 `TestOffers`는 빈 배열로 읽고 소급 생성하지 않는다. `-TestSkillShopVerifyOnly`는 에셋 저장 없이 연결·상품·원본 보존을 검사한다. 기존 풀 설정이 다르면 덮어쓰지 않고 중단하므로 목록 변경은 별도 검토한다. [사용자 확인](TODO.md#2-37-무료-테스트-스킬상점)
-
-[ENCOUNTER_POOL.csv](ENCOUNTER_POOL.csv)는 현재 기본 상점 3개와 속성별 무기·스킬 상점 10개를 모은 기획 목록이다. ID·이름·상점 종류·속성·분류 태그·판매 대상·등장 가중치·구현 상태·확인 사항을 기록한다. 신규 속성 상점 ID는 기획 식별자이며 CSV 런타임 로더·상품 필터·후보 추첨은 연결하지 않았다. `Shop_03` 행은 테스트 스킬상점의 실제 작성 구성을 반영하며 미정 가중치는 공란으로 둔다. [확정 범위와 미정 항목](GAME_DESIGN.md#2-3-속성별-상점-인카운터)
+[ENCOUNTER_POOL.csv](ENCOUNTER_POOL.csv)는 기존 기본 상점 3개와 속성별 무기·스킬 상점 10개를 모은 기획 목록이다. ID·이름·상점 종류·속성·분류 태그·판매 대상·등장 가중치·구현 상태·확인 사항을 기록한다. 신규 ID는 기획 식별자이며 CSV 런타임 로더·상품 필터·후보 추첨은 연결하지 않았다. 기존 `Shop_01/02/03`과 분류 태그를 보존하고 미정 가중치는 공란으로 둔다. [확정 범위와 미정 항목](GAME_DESIGN.md#2-3-속성별-상점-인카운터)
 
 향후 인카운터 후보의 확률 제시는 정의와 별도의 `FRunEncounterPoolEntry` USTRUCT에 정의 ID/참조·상대 가중치·출현 구간·조건을 두는 구성을 권장한다. 에디터 중심 편집은 DataAsset의 배열, 대량 수치·CSV 편집이 필요하면 `FTableRowBase` 기반 DataTable을 사용한다. 추첨은 Host에서 확정하고 제시 결과를 Run에 저장한다. 인카운터 후보의 가중치·추첨은 미구현이며 아이템상점 상품의 시험 추첨·리롤과 구분한다.
 
@@ -206,6 +204,16 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 [CreateCatalogSkills.py](../Source/ProjectAEditor/Scripts/CreateCatalogSkills.py)는 원본 시스템을 직접 참조하는 명시 RoundDefinition BPDA를 `/Game/User_JeHoon/Blueprint/DataAsset/Skills/` 바로 아래에 작성한다. 사용자 요청에 따라 파일명 해시를 제거하고 `BPDA_{원본 에셋 이름}`을 사용하며, 대소문자를 구분하지 않는 중복 이름에만 CSV 순서대로 `_1`, `_2`를 붙인다. 중복 대상은 `N_EnergyShield`·`N_Tsunami` 각 2개이며 기존 5개 스킬 이름과 충돌하지 않는다. 내부 `Catalog_<hash>` SkillId·CSV 표시명·스킬 설정은 유지한다. 176개를 Unreal AssetTools로 이동하고 풀 참조를 갱신했으며 Redirector 176개를 정리했다. 이전 Package/Object 경로와 PrimaryAssetId의 리디렉션 설정을 추가했다. 별도 `SkillPools/DA_SkillPool_Catalog`와 기존 상점·장착 목록은 유지한다. 같은 목적지가 있으면 속성을 비교하고 불일치 시 덮어쓰지 않고 중단한다. 원본 CSV·원본 에셋·기존 스킬 패키지 해시와 데이터 검증을 확인하며 `-CatalogSkillsVerifyOnly`는 저장 없이 다시 읽는다. 구경로 로드와 PrimaryAssetId 설정 검사의 범위는 [2-36절](TODO.md#2-36-csv-기반-스킬-생성)을 따른다.
 
 VFX와 판정은 공통 액터 변환을 사용한다. 투사체는 첫 차단 충돌 시 소멸하고, 베기·범위는 강체 시뮬레이션 없이 대상별 중복 타격을 막는다. 치유·보호막은 아군 한 명을 대상으로 각각 `GE_Heal`·`GE_Shield`와 `Skill.Effect.Heal/Shield`를 사용하며 장벽 형상도 이동 차단을 만들지 않는다. 보호막 재시전은 기존 잔여 수치에 합산하며 해당 라운드 종료 시 제거한다. 지원 스킬의 자기 소유 아군 대상은 Shift+클릭으로 선택한다. 5속성은 `Skill.Element.*`, 공격 형태는 `Skill.Shape.*`로 전달한다. 위력 50·AP 1과 VFX 크기·방향·충돌 영역은 초기값이며 실제 재생·밸런스·협동 검증 상태는 [2-36절](TODO.md#2-36-csv-기반-스킬-생성)을 따른다.
+
+### 4-2 전투 디버그 레벨
+
+`/Game/User_JeHoon/LEVEL/DebugCombat`은 프로젝트 소유 Gameplay 맵의 배치·카메라·Grid를 Unreal API로 복제한 독립 개발 레벨이다. `BP_CombatDebugGameMode`는 기존 Party·Enemy 정의를 참조하고 전사 1명·적 4명을 생성한다. `ACombatDebugPlayerController`와 기존 라운드 계획 UI를 사용하며 일반 인카운터 진행·결과·저장 경로에는 연결하지 않는다. 로컬 Standalone·비 Shipping에서만 동작하고 활성 관리 Run이 있으면 시작을 거절한다.
+
+`UCombatDebugLoadout`은 스킬 DataAsset 181종과 태그 장착 프로필이 있는 장비 49종을 제공한다. 장비 후보는 기존 `RunEquipmentRules`로 검증하고 임시 보유 상태에만 기록한다. 획득은 지정 슬롯에 즉시 장착하며 밀려난 장비는 임시 보유 목록에 남는다. 제거는 장착 해제·보유 삭제·참조 인덱스 보정을 함께 수행한다. 장비는 현재 외형만 바꾸며 능력치·스킬은 부여하지 않는다.
+
+스킬 0~5개 변경은 `ACombatRoundCoordinator`에서 소유·생존·Planning·정지 상태를 확인하고 실제 Unit·실행 스킬 캐시를 함께 갱신한다. 해당 유닛의 계획·이동 예약 및 자신의 준비를 해제하며 HP/AP/보호막은 초기화하지 않는다. 전투 초기화는 유닛·투사체·효과를 정리하고 처음 장착으로 다시 생성한다. 일반 Run 메모리·체크포인트는 디버그 변경에 사용하지 않는다.
+
+[ConfigureCombatDebugLevel.py](../Source/ProjectAEditor/Scripts/ConfigureCombatDebugLevel.py)는 위 맵·모드 생성, Party의 테스트 풀 참조 해제, 참조가 없는 테스트 풀 에셋 제거를 Unreal API로 수행한다. `-CombatDebugVerifyOnly`는 저장하지 않고 연결·배치·원본 보존을 재검사한다. `DA_VerticalSliceParty.RunEncounterPool`은 미지정이며 일반 3상점을 사용한다. 이전 저장의 `Encounter.Shop.Skill.Test`는 호환 태그로만 남겨 일반 스킬상점·1G 상품으로 해석하고 무료 목록은 더 이상 사용하지 않는다. [작동 확인](TODO.md#2-37-전투-디버그-레벨)
 
 ### 개발용 협동 진입
 

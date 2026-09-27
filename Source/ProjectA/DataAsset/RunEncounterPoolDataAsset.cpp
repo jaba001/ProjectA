@@ -51,18 +51,13 @@ bool URunEncounterPoolDataAsset::BuildFixedOffers(TArray<FRunEncounterOffer>& Ou
     for (const FRunEncounterOffer& Offer : FixedOffers)
     {
         if (Offer.EncounterId.IsNone() || Ids.Contains(Offer.EncounterId) || Offer.DisplayName.ToString().TrimStartAndEnd().IsEmpty() || !Offer.IsSupportedShop()) return false;
-        if (Offer.IsTestSkillShop() && FixedTestSkillOffers.IsEmpty())
-        {
-            OutError = NSLOCTEXT("RunSkillShop", "MissingTestCatalog", "테스트 스킬 상점에는 무료 스킬 상품 목록이 필요합니다.");
-            return false;
-        }
         Ids.Add(Offer.EncounterId);
     }
     OutOffers = FixedOffers;
     for (FRunEncounterOffer& Offer : OutOffers)
     {
-        Offer.EncounterTag = Offer.GetResolvedTag();
         Offer.DisplayName = Offer.GetDisplayName();
+        Offer.EncounterTag = Offer.GetResolvedTag();
     }
     OutError = FText::GetEmpty();
     return true;
@@ -73,25 +68,22 @@ bool URunEncounterPoolDataAsset::ValidateSkillShop(const FRunSkillShopState& Sta
     OutError = NSLOCTEXT("RunSkillShop", "InvalidCatalog", "스킬 상점의 상품·가격·스킬 데이터가 유효하지 않습니다.");
     if (State.SchemaVersion == 0)
     {
-        if (!State.Offers.IsEmpty() || !State.TestOffers.IsEmpty()) return false;
+        if (!State.Offers.IsEmpty()) return false;
         OutError = FText::GetEmpty();
         return true;
     }
-    if (State.SchemaVersion != 1 || State.Offers.IsEmpty() || State.Offers.Num() > 32 || State.TestOffers.Num() > 1024 || State.Recovery.Price <= 0) return false;
-    for (const bool bTestShop : {false, true})
+    if (State.SchemaVersion != 1 || State.Offers.IsEmpty() || State.Offers.Num() > 32 || State.Recovery.Price <= 0) return false;
+    TSet<FName> OfferIds;
+    OfferIds.Add(FRunSkillShopState::GetRecoveryOfferId());
+    TSet<FName> SkillIds;
+    for (const FRunSkillShopOffer& Offer : State.Offers)
     {
-        TSet<FName> OfferIds;
-        OfferIds.Add(FRunSkillShopState::GetRecoveryOfferId());
-        TSet<FName> SkillIds;
-        for (const FRunSkillShopOffer& Offer : State.GetOffers(bTestShop))
-        {
-            const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());
-            FCombatRoundSkill Definition;
-            FText SkillError;
-            if (Offer.OfferId.IsNone() || OfferIds.Contains(Offer.OfferId) || (bTestShop ? Offer.Price != 0 : Offer.Price <= 0) || Offer.DisplayName.IsEmpty() || !IsValid(Skill) || !Skill->ResolveRoundSkill(Definition, SkillError) || SkillIds.Contains(Definition.SkillId)) return false;
-            OfferIds.Add(Offer.OfferId);
-            SkillIds.Add(Definition.SkillId);
-        }
+        const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());
+        FCombatRoundSkill Definition;
+        FText SkillError;
+        if (Offer.OfferId.IsNone() || OfferIds.Contains(Offer.OfferId) || Offer.Price <= 0 || Offer.DisplayName.IsEmpty() || !IsValid(Skill) || !Skill->ResolveRoundSkill(Definition, SkillError) || SkillIds.Contains(Definition.SkillId)) return false;
+        OfferIds.Add(Offer.OfferId);
+        SkillIds.Add(Definition.SkillId);
     }
     OutError = FText::GetEmpty();
     return true;
@@ -104,58 +96,21 @@ bool URunEncounterPoolDataAsset::BuildSkillShop(FRunSkillShopState& OutState, FT
     FRunSkillShopState State;
     State.SchemaVersion = 1;
     State.Offers = FixedSkillOffers;
-    State.TestOffers = FixedTestSkillOffers;
     State.Recovery = Recovery;
-    if (FixedOffers.ContainsByPredicate([](const FRunEncounterOffer& Offer) { return Offer.IsTestSkillShop(); }) && State.TestOffers.IsEmpty())
+    for (FRunSkillShopOffer& Offer : State.Offers)
     {
-        OutError = NSLOCTEXT("RunSkillShop", "MissingTestCatalog", "테스트 스킬 상점에는 무료 스킬 상품 목록이 필요합니다.");
-        return false;
-    }
-    for (TArray<FRunSkillShopOffer>* Offers : {&State.Offers, &State.TestOffers})
-    {
-        for (FRunSkillShopOffer& Offer : *Offers)
+        const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());
+        FCombatRoundSkill Definition;
+        if (!IsValid(Skill))
         {
-            const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());
-            FCombatRoundSkill Definition;
-            if (!IsValid(Skill))
-            {
-                OutError = FText::Format(NSLOCTEXT("RunSkillShop", "MissingProductSkill", "상품 스킬 에셋을 불러올 수 없습니다: {0}"), FText::FromString(Offer.Skill.ToString()));
-                return false;
-            }
-            if (!Skill->ResolveRoundSkill(Definition, OutError)) return false;
-            Offer.DisplayName = Definition.Name;
-            Offer.Description = FText::Format(NSLOCTEXT("RunSkillShop", "SkillDetails", "{0}\nAP {1} · 위력 {2}"), Skill->SkillDescription, FText::AsNumber(Definition.ActionPointCost), FText::AsNumber(Definition.Power));
+            OutError = FText::Format(NSLOCTEXT("RunSkillShop", "MissingProductSkill", "상품 스킬 에셋을 불러올 수 없습니다: {0}"), FText::FromString(Offer.Skill.ToString()));
+            return false;
         }
+        if (!Skill->ResolveRoundSkill(Definition, OutError)) return false;
+        Offer.DisplayName = Definition.Name;
+        Offer.Description = FText::Format(NSLOCTEXT("RunSkillShop", "SkillDetails", "{0}\nAP {1} · 위력 {2}"), Skill->SkillDescription, FText::AsNumber(Definition.ActionPointCost), FText::AsNumber(Definition.Power));
     }
     if (!ValidateSkillShop(State, OutError)) return false;
     OutState = MoveTemp(State);
     return true;
 }
-
-#if WITH_EDITOR
-#include "Misc/DataValidation.h"
-
-EDataValidationResult URunEncounterPoolDataAsset::IsDataValid(FDataValidationContext& Context) const
-{
-    bool bValid = Super::IsDataValid(Context) != EDataValidationResult::Invalid;
-    FText Error;
-    TArray<FRunEncounterOffer> Offers;
-    FRunSkillShopState Shop;
-    if (!BuildFixedOffers(Offers, Error))
-    {
-        Context.AddError(Error);
-        bValid = false;
-    }
-    if (!BuildSkillShop(Shop, Error))
-    {
-        Context.AddError(Error);
-        bValid = false;
-    }
-    if (!ValidateGoldRewardRange(Error))
-    {
-        Context.AddError(Error);
-        bValid = false;
-    }
-    return bValid ? EDataValidationResult::Valid : EDataValidationResult::Invalid;
-}
-#endif

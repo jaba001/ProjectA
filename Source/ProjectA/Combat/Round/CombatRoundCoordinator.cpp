@@ -10,6 +10,7 @@
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/GameModes/CombatDebugGameMode.h"
 #include "Unit/PlayerUnit.h"
 #include "Controller/PartyPlayerController.h"
 #include "EngineUtils.h"
@@ -146,7 +147,7 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
     }
     Skills.Reset();
     View.CombatId = InManager->GetCombatInstanceId();
-    URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    URunStateSubsystem* Run = !ACombatDebugGameMode::IsDebugWorld(GetWorld()) && GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     const bool bRestoring = Run && Run->GetPhase() == ERunPhase::Combat && Run->HasCombatCheckpoint();
     for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
@@ -410,6 +411,13 @@ void ACombatRoundCoordinator::BeginPlanning()
 
 bool ACombatRoundCoordinator::PersistPlanningCheckpoint(FText& OutError) const
 {
+    // A debug battle must not read or overwrite an existing normal Run checkpoint.
+    // 디버그 전투는 기존 일반 Run 체크포인트를 읽거나 덮어쓰지 않습니다.
+    if (ACombatDebugGameMode::IsDebugWorld(GetWorld()))
+    {
+        OutError = FText::GetEmpty();
+        return true;
+    }
     URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     // Asset previews and isolated development rooms have no persistent Run to confirm.
     // 에셋 미리보기와 독립 개발 방에는 확정할 영속 Run이 없습니다.

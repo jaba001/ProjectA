@@ -569,6 +569,21 @@ bool AUnitBase::AcquireAndEquipSkill(USkillDefinitionDataAsset* Skill)
     return true;
 }
 
+void AUnitBase::SetDebugEquippedSkills(const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills)
+{
+    EquippedSkillDataAssets = Skills;
+    DefaultAttackAbilityClass = Skills.IsEmpty() ? nullptr : Skills[0]->AbilityClass;
+    EquippedSkillAbilityClasses.Reset();
+    for (USkillDefinitionDataAsset* Skill : Skills)
+    {
+        if (Skill->AbilityClass && Skill->AbilityClass != DefaultAttackAbilityClass) EquippedSkillAbilityClasses.AddUnique(Skill->AbilityClass);
+    }
+    // Round execution consumes resolved profiles directly; preserve existing GAS effects and attributes.
+    // 라운드 실행은 해석된 프로필을 직접 사용하므로 기존 GAS 효과와 어트리뷰트를 보존합니다.
+    RefreshSkillPresentation();
+    ForceNetUpdate();
+}
+
 USkillDefinitionDataAsset* AUnitBase::AcquireSkillFromPool(USkillPoolDataAsset* Pool)
 {
     if (!IsValid(Pool) || !HasAuthority() || IsBusy() || !IsUnitAlive())

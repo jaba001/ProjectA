@@ -10,7 +10,6 @@ class UGameplayActionButton;
 class UBorder;
 class UImage;
 class USizeBox;
-class UScrollBox;
 class UCharacterEquipmentPanel;
 class UCharacterInventoryPanel;
 struct FGameplayViewState;
@@ -33,7 +32,6 @@ private:
     void HandlePurchase(FName OfferId);
     bool bRunCommandsAllowed = false;
     FGuid BuyerCharacterId;
-    FName DisplayedShopId;
     int32 ItemShopRevision = INDEX_NONE;
 
     UPROPERTY(Transient)
@@ -56,9 +54,6 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<USizeBox> MerchantSize;
-
-    UPROPERTY(Transient)
-    TObjectPtr<UScrollBox> MerchantScroll;
 
     UPROPERTY(Transient)
     TObjectPtr<UCharacterEquipmentPanel> EquipmentPanel;

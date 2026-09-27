@@ -9,6 +9,7 @@
 #include "UnitBase.generated.h"
 
 class ACombatGridTile;
+class ACombatRoundCoordinator;
 class AUnitAIController;
 class UGameplayAbility;
 class USkillDefinitionDataAsset;
@@ -441,6 +442,11 @@ public:
     // Apply resolved profession data before the spawned unit enters combat.
     // 스폰 유닛이 전투에 들어가기 전에 해석된 직업 데이터를 적용합니다.
     bool ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Strength = 10.0f, float Dexterity = 10.0f, float Intelligence = 10.0f);
+private:
+    friend class ACombatRoundCoordinator;
+    // The coordinator validates debug access and the complete catalog before replacing this loadout.
+    // 조정자가 디버그 권한과 전체 목록을 검증한 후 이 장착을 교체합니다.
+    void SetDebugEquippedSkills(const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills);
 protected:
     // Initial attributes
     UPROPERTY(EditDefaultsOnly, Category = "UnitBase|GAS|Attribute")
