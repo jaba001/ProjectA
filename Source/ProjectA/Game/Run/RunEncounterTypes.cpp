@@ -2,6 +2,7 @@
 #include "NativeGameplayTags.h"
 
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EncounterSkillShop, "Encounter.Shop.Skill");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EncounterTestSkillShop, "Encounter.Shop.Skill.Test");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EncounterItemShop, "Encounter.Shop.Item");
 
 FGameplayTag FRunEncounterOffer::GetSkillShopTag()
@@ -12,6 +13,11 @@ FGameplayTag FRunEncounterOffer::GetSkillShopTag()
 FGameplayTag FRunEncounterOffer::GetItemShopTag()
 {
     return TAG_EncounterItemShop;
+}
+
+FGameplayTag FRunEncounterOffer::GetTestSkillShopTag()
+{
+    return TAG_EncounterTestSkillShop;
 }
 
 FGameplayTag FRunEncounterOffer::GetResolvedTag() const
@@ -42,6 +48,11 @@ bool FRunEncounterOffer::IsSupportedShop() const
     return Type == ERunEncounterType::Shop && (IsItemShop() || GetResolvedTag().MatchesTag(GetSkillShopTag()));
 }
 
+bool FRunEncounterOffer::IsTestSkillShop() const
+{
+    return Type == ERunEncounterType::Shop && GetResolvedTag().MatchesTag(GetTestSkillShopTag());
+}
+
 const FRunEncounterOffer* FRunEncounterProgress::FindSelectedOffer() const
 {
     return SelectedEncounterId.IsNone() ? nullptr : Offers.FindByPredicate([this](const FRunEncounterOffer& Offer) { return Offer.EncounterId == SelectedEncounterId; });
@@ -51,4 +62,10 @@ bool FRunEncounterProgress::IsItemShop() const
 {
     const FRunEncounterOffer* Offer = FindSelectedOffer();
     return Offer && Offer->IsItemShop();
+}
+
+bool FRunEncounterProgress::IsTestSkillShop() const
+{
+    const FRunEncounterOffer* Offer = FindSelectedOffer();
+    return Offer && Offer->IsTestSkillShop();
 }

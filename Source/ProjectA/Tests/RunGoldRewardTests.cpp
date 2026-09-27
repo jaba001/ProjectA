@@ -199,6 +199,12 @@ bool FRunGoldRewardLegacyTest::RunTest(const FString& Parameters)
         if (!bHasShop)
         {
             Legacy->SkillShopState = FRunSkillShopState();
+            // A pre-shop fixture cannot retain the newly authored test-shop tag without its catalog.
+            // 상점 도입 전 저장 모형은 상품 목록 없이 새 테스트 상점 태그를 유지할 수 없습니다.
+            for (FRunEncounterOffer& Offer : Legacy->EncounterProgress.Offers)
+            {
+                if (Offer.IsTestSkillShop()) Offer.EncounterTag = FRunEncounterOffer::GetSkillShopTag();
+            }
             for (FRunPartyMember& Member : Legacy->Party)
             {
                 Member.Gold = 0;

@@ -22,7 +22,7 @@ struct PROJECTA_API FRunSkillShopOffer
     UPROPERTY(BlueprintReadOnly, Category = "Shop")
     FText Description;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop", meta = (ClampMin = "1"))
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop", meta = (ClampMin = "0"))
     int32 Price = 1;
 };
 
@@ -48,10 +48,16 @@ struct PROJECTA_API FRunSkillShopState
     UPROPERTY(BlueprintReadOnly, Category = "Shop")
     TArray<FRunSkillShopOffer> Offers;
 
+    // Only explicitly tagged test shops use this free catalog; older saves leave it empty.
+    // 명시적으로 태그가 지정된 테스트 상점만 무료 목록을 사용하며 이전 저장에서는 비어 있습니다.
+    UPROPERTY(BlueprintReadOnly, Category = "Shop")
+    TArray<FRunSkillShopOffer> TestOffers;
+
     // Existing skill-shop saves inherit the recovery service without replacing their frozen skill offers.
     // 기존 스킬 상점 저장은 고정된 스킬 상품을 교체하지 않고 회복 서비스를 추가합니다.
     UPROPERTY(BlueprintReadOnly, Category = "Shop")
     FRunShopRecoveryOffer Recovery;
 
     static FName GetRecoveryOfferId() { return TEXT("HPRecovery"); }
+    const TArray<FRunSkillShopOffer>& GetOffers(bool bTestShop) const { return bTestShop ? TestOffers : Offers; }
 };

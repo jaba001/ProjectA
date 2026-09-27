@@ -113,6 +113,7 @@ bool FRunEncounterPersistenceTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Failed entry emits no success event"), Events, 0);
     TestTrue(TEXT("Entry can be retried"), Restored->SelectRunEncounter(TEXT("Shop_03")));
     TestTrue(TEXT("An entered shop survives loading"), Run->LoadStandaloneCheckpoint(Error) && Run->GetPhase() == ERunPhase::Shop && Run->GetEncounterProgress().SelectedEncounterId == TEXT("Shop_03"));
+    TestTrue(TEXT("The authored third shop retains its explicit test tag and frozen free products"), Run->GetEncounterProgress().IsTestSkillShop() && !Run->GetSkillShopState().TestOffers.IsEmpty());
     const TArray<uint8> ShopBytes = Slot.Read();
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("Failed exit stays in the shop"), Restored->LeaveRunEncounter());
@@ -133,6 +134,7 @@ bool FRunEncounterPersistenceTest::RunTest(const FString& Parameters)
     FRunCheckpointStorage::Save(Invalid.Get(), Slot.Name, Error);
     TestFalse(TEXT("A map save cannot bypass an unfinished shop"), Run->LoadCheckpoint(Error));
     Legacy->EncounterProgress = FRunEncounterProgress();
+    Legacy->SkillShopState.TestOffers.Reset();
     Legacy->ItemShopState = FRunItemShopState();
     for (FRunPartyMember& Member : Legacy->Party)
     {

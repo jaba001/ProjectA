@@ -179,6 +179,11 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
         OutError = ShopError;
         return false;
     }
+    if (Save->EncounterProgress.Offers.ContainsByPredicate([](const FRunEncounterOffer& Offer) { return Offer.IsTestSkillShop(); }) && Save->SkillShopState.TestOffers.IsEmpty())
+    {
+        OutError = NSLOCTEXT("RunSkillShop", "MissingTestCatalog", "테스트 스킬 상점에는 무료 스킬 상품 목록이 필요합니다.");
+        return false;
+    }
     if (!RunItemShopCatalog::Validate(Save->ItemShopState, ShopError))
     {
         OutError = ShopError;
@@ -1167,6 +1172,7 @@ bool URunStateSubsystem::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, 
     OutError = NSLOCTEXT("RunSkillShop", "Unavailable", "현재 상점에서 구매할 수 없습니다.");
     if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::Shop || EncounterProgress.bCompleted || EncounterProgress.SelectedEncounterId.IsNone() || SkillShopState.SchemaVersion != 1) return false;
     const bool bItemShop = EncounterProgress.IsItemShop();
+    const bool bTestSkillShop = EncounterProgress.IsTestSkillShop();
     const bool bReroll = bItemShop && OfferId == FRunItemShopState::GetRerollOfferId();
     const FRunItemShopOffer* ItemOffer = bItemShop ? ItemShopState.Offers.FindByPredicate([OfferId](const FRunItemShopOffer& Candidate) { return Candidate.OfferId == OfferId; }) : nullptr;
     if (bItemShop)
@@ -1174,11 +1180,11 @@ bool URunStateSubsystem::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, 
         OutError = NSLOCTEXT("RunItemShop", "ChangedStock", "상점 상품이 변경되었거나 구매할 수 없습니다. 최신 목록에서 다시 선택하세요.");
         if (ItemShopState.SchemaVersion != 1 || ItemShopState.Revision <= 0 || ItemShopState.Revision == MAX_int32 || ExpectedItemShopRevision != ItemShopState.Revision || (!bReroll && (!ItemOffer || ItemOffer->bSold))) return false;
     }
-    const bool bRecovery = !bItemShop && OfferId == FRunSkillShopState::GetRecoveryOfferId();
-    const FRunSkillShopOffer* Offer = SkillShopState.Offers.FindByPredicate([OfferId](const FRunSkillShopOffer& Candidate) { return Candidate.OfferId == OfferId; });
+    const bool bRecovery = !bItemShop && !bTestSkillShop && OfferId == FRunSkillShopState::GetRecoveryOfferId();
+    const FRunSkillShopOffer* Offer = SkillShopState.GetOffers(bTestSkillShop).FindByPredicate([OfferId](const FRunSkillShopOffer& Candidate) { return Candidate.OfferId == OfferId; });
     if (!bItemShop && !bRecovery && !Offer) return false;
     const int32 Price = bItemShop ? (bReroll ? ItemShopState.RerollPrice : ItemOffer->Item.Price) : bRecovery ? SkillShopState.Recovery.Price : Offer->Price;
-    if (Price <= 0) return false;
+    if (bTestSkillShop ? Price != 0 : Price <= 0) return false;
     const FRunPartyMember* Member = PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.CharacterId == CharacterId; });
     OutError = NSLOCTEXT("RunSkillShop", "OwnCharacterOnly", "본인이 직접 조작하는 생존 캐릭터만 구매할 수 있습니다.");
     if (!Member || !Member->bHasSkillLoadout || !FMath::IsFinite(Member->CurrentHP) || Member->CurrentHP <= 0.0f || !URunIdentityLibrary::IsCharacterOwner(RunIdentity, PartyMembers, CharacterId, BuyerAccountId)) return false;
