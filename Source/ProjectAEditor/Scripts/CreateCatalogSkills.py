@@ -10,7 +10,7 @@ import unreal
 
 ROOT = Path(unreal.Paths.project_dir()).resolve()
 SPEC_PATH = Path(__file__).resolve().with_name("CatalogSkillSpecs.json")
-CATALOG_ROOT = "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/"
+CATALOG_ROOT = "/Game/User_JeHoon/Blueprint/DataAsset/Skills/"
 VERIFY_ONLY = "-CatalogSkillsVerifyOnly" in unreal.SystemLibrary.get_command_line()
 ASSETS = unreal.EditorAssetLibrary
 TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
@@ -119,16 +119,17 @@ def main():
     for row, entry in zip(source_rows, entries):
         require(row["위치"] + "/" + row["에셋 이름"] == entry["source"] and row["게임 내 이름"] == entry["name"] and row["속성·테마"] == entry["theme"], "Source identity/name/theme changed: " + entry["source"])
     selected = [entry for entry in entries if entry["profile"]]
-    require(len({entry["destination"].rsplit("/", 1)[-1] for entry in selected}) == len(selected), "Duplicate catalog primary asset names")
+    require(len({entry["destination"].rsplit("/", 1)[-1].casefold() for entry in selected}) == len(selected), "Duplicate catalog primary asset names")
     require(len({entry["skill_id"] for entry in selected}) == len(selected), "Duplicate catalog skill IDs")
-    require(all(entry["destination"].startswith(CATALOG_ROOT) for entry in selected), "Catalog destination escaped its dedicated folder")
+    require(all(entry["destination"].rsplit("/", 1)[0] + "/" == CATALOG_ROOT for entry in selected), "Catalog destination must be directly under the Skills folder")
 
     # Hash source packages and existing skill content; only newly authored catalog packages may change.
     # 원본 패키지와 기존 스킬 콘텐츠를 해시 검사하며 새 카탈로그 패키지만 작성합니다.
     protected_files = {package_file(entry["source"]) for entry in entries}
+    catalog_files = {package_file(entry["destination"]) for entry in selected} | {package_file(spec["pool"])}
     for folder in ["Skills", "SkillPools"]:
         for filename in (ROOT / "Content/User_JeHoon/Blueprint/DataAsset" / folder).rglob("*.uasset"):
-            if "Catalog" not in filename.parts and filename != package_file(spec["pool"]):
+            if filename not in catalog_files:
                 protected_files.add(filename)
     protected_hashes = {str(filename.relative_to(ROOT)): file_hash(filename) for filename in sorted(protected_files)}
     spec_hash = file_hash(SPEC_PATH)

@@ -1615,7 +1615,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_247ff7e372edb1d7",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Warrior_Earth_Slam_247ff7e3",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Warrior_Earth_Slam",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -1629,7 +1629,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_ab579d312e3f581d",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Warrior_EarthCrack_ab579d31",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Warrior_EarthCrack",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -1643,7 +1643,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_1d70ac44d44109d9",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Warrior/EarthCrack/BPDA_NS_Warrior_EarthCrack_1d70ac44",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Warrior_EarthCrack",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -1657,7 +1657,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_bb86d2c8e3bfab11",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Warrior/EarthSlam/BPDA_NS_Warrior_EarthSlam_bb86d2c8",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Warrior_EarthSlam",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -1671,7 +1671,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_1733da72f7431a74",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Hack_And_Slash_FX/VFX_Niagara/Slashes/BPDA_NS_Claws_Floor_1733da72",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Claws_Floor",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2385,7 +2385,7 @@
       "theme": "물리",
       "profile": "spin",
       "skill_id": "Catalog_c90a4870a9e45084",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Warrior_Spin_c90a4870",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Warrior_Spin",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2399,7 +2399,7 @@
       "theme": "물리",
       "profile": "spin",
       "skill_id": "Catalog_3b8690284ffa8ecf",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Warrior/Spin/BPDA_NS_Warrior_Spin_3b869028",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Warrior_Spin",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2413,7 +2413,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_b47b18b19bc4dec6",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Hack_And_Slash_FX/VFX_Niagara/Slashes/BPDA_NS_Claws_b47b18b1",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Claws",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2427,7 +2427,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_438db4e2237d4037",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Knife_light/VFX/BPDA_NE_attack01_438db4e2",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NE_attack01",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2441,7 +2441,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_d0de9520dced2ede",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Knife_light/VFX/BPDA_NE_attack02_d0de9520",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NE_attack02",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2455,7 +2455,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_fd6aa6b8a63efdca",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Knife_light/VFX/BPDA_NE_attack03_fd6aa6b8",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NE_attack03",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2469,7 +2469,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_3bc0e6c6d8de6670",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Knife_light/VFX/BPDA_NE_attack04_3bc0e6c6",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NE_attack04",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2483,7 +2483,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_744e2e8e63339d4a",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Knife_light/VFX/BPDA_NE_attack05_744e2e8e",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NE_attack05",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2497,7 +2497,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_7aff1a881521ad04",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Warrior_Swipe_7aff1a88",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Warrior_Swipe",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2511,7 +2511,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_c5fb5217d5c4b66a",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Warrior/Swipe/BPDA_NS_Warrior_Swipe_c5fb5217",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Warrior_Swipe",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2525,7 +2525,7 @@
       "theme": "번개",
       "profile": "slash",
       "skill_id": "Catalog_2e5cf7da0a5c807d",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Hack_And_Slash_FX/VFX_Niagara/Slashes/BPDA_NS_Lightning_Slash_2e5cf7da",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Lightning_Slash",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -2539,7 +2539,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_67d62ff30a5bf48e",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Hack_And_Slash_FX/VFX_Niagara/Slashes/BPDA_NS_Sakura_Slash_67d62ff3",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Sakura_Slash",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2553,7 +2553,7 @@
       "theme": "번개",
       "profile": "slash",
       "skill_id": "Catalog_1e59dbd76e581802",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Hack_And_Slash_FX/VFX_Niagara/Slashes/BPDA_NS_Cyber_Slash_1e59dbd7",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Cyber_Slash",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -2567,7 +2567,7 @@
       "theme": "번개",
       "profile": "slash",
       "skill_id": "Catalog_49a97ce0d7119962",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Hack_And_Slash_FX/VFX_Niagara/Slashes/BPDA_NS_Holy_Slash_49a97ce0",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Holy_Slash",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -2581,7 +2581,7 @@
       "theme": "카오스",
       "profile": "slash",
       "skill_id": "Catalog_31058f6abc61791a",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Hack_And_Slash_FX/VFX_Niagara/Slashes/BPDA_NS_Demon_Slash_31058f6a",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Demon_Slash",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -2595,7 +2595,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_b0ff35dd742b5765",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Hack_And_Slash_FX/VFX_Niagara/Slashes/BPDA_NS_Nature_Slash_b0ff35dd",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Nature_Slash",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -2609,7 +2609,7 @@
       "theme": "카오스",
       "profile": "slash",
       "skill_id": "Catalog_d3bec9fa436278c6",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Hack_And_Slash_FX/VFX_Niagara/Slashes/BPDA_NS_Curse_Slash_d3bec9fa",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Curse_Slash",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -2623,7 +2623,7 @@
       "theme": "불",
       "profile": "slash",
       "skill_id": "Catalog_2734686db4d7ca30",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Hack_And_Slash_FX/VFX_Niagara/Slashes/BPDA_NS_Fire_Slash_2734686d",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Fire_Slash",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -2637,7 +2637,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_a080d1126c4d7ba0",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Hack_And_Slash_FX/VFX_Niagara/Slashes/BPDA_NS_Prestige_Slash_a080d112",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Prestige_Slash",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -3857,7 +3857,7 @@
       "theme": "카오스",
       "profile": "projectile",
       "skill_id": "Catalog_57db2997efcbbaab",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Mage_MagicSphere_57db2997",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Mage_MagicSphere",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -3871,7 +3871,7 @@
       "theme": "카오스",
       "profile": "projectile",
       "skill_id": "Catalog_8b3299827c1171e5",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Mage/MagicSphere/BPDA_NS_Mage_MagicSphere_8b329982",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_MagicSphere",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -3885,7 +3885,7 @@
       "theme": "번개",
       "profile": "projectile",
       "skill_id": "Catalog_9382397cc947a9ec",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Priest_Sphere_9382397c",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Priest_Sphere",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -3899,7 +3899,7 @@
       "theme": "번개",
       "profile": "projectile",
       "skill_id": "Catalog_e810628c86a23b5c",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Priest/Sphere/BPDA_NS_Priest_Sphere_e810628c",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Priest_Sphere",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -3955,7 +3955,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_1a463594cd6c8719",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_lightning1_1a463594",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_lightning1",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -3969,7 +3969,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_2957a75023285e2b",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_lightning2_2957a750",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_lightning2",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -3983,7 +3983,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_cf5bb2c9fb5bde41",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_lightning3_cf5bb2c9",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_lightning3",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -3997,7 +3997,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_a8416c36d4426034",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Lightning/BPDA_Par_4E_LightningStrike_01_a8416c36",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_4E_LightningStrike_01",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4011,7 +4011,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_749afc169ba976f9",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Mixed_Magic_VFX_Pack/VFX/BPDA_NS_Lightning_Strike_749afc16",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Lightning_Strike",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4025,7 +4025,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_e0ceb4ce6c99f0a5",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Mage_Lightning_Bolt_e0ceb4ce",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Mage_Lightning_Bolt",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4039,7 +4039,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_168492246150e12f",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Mage/LightningBolt/BPDA_NS_Mage_LIghtning_Bolt_16849224",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_LIghtning_Bolt",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4053,7 +4053,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_5843b4be953a9d3d",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Vefects/Zap_VFX/VFX/Zap/Particles/BPDA_NS_Zap_01_Red_5843b4be",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Zap_01_Red",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4067,7 +4067,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_c312e00fd9109820",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Vefects/Zap_VFX/VFX/Zap/Particles/BPDA_NS_Zap_02_Blue_c312e00f",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Zap_02_Blue",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4081,7 +4081,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_4f85f4aca3cb315e",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Vefects/Zap_VFX/VFX/Zap/Particles/BPDA_NS_Zap_03_Yellow_4f85f4ac",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Zap_03_Yellow",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4095,7 +4095,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_8cc7d93e2abb16d2",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Vefects/Zap_VFX/VFX/Zap/Particles/BPDA_NS_Zap_04_Green_8cc7d93e",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Zap_04_Green",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4109,7 +4109,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_c60d8d678fab62cc",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Vefects/Zap_VFX/VFX/Zap/Particles/BPDA_NS_Zap_05_Purple_c60d8d67",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Zap_05_Purple",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4123,7 +4123,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_da2682e073c9e9f9",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Vefects/Zap_VFX/VFX/Zap/Particles/BPDA_NS_Zap_06_White_da2682e0",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Zap_06_White",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4137,7 +4137,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_94b4ef3a0f689d2c",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Vefects/Zap_VFX/VFX/Zap/Particles/BPDA_NS_Zap_07_Black_94b4ef3a",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Zap_07_Black",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4151,7 +4151,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_fe9f2460e9b041b1",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Vefects/Zap_VFX/VFX/Zap/Particles/BPDA_PS_Zap_01_fe9f2460",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_PS_Zap_01",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4165,7 +4165,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_597560c67ecaa398",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Vefects/Zap_VFX/VFX/Zap/Particles/BPDA_PS_Zap_02_597560c6",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_PS_Zap_02",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4291,7 +4291,7 @@
       "theme": "물리 + 카오스",
       "profile": "area",
       "skill_id": "Catalog_7701be0e20719e6d",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/MeteorShower/Systems/BPDA_N_MagicalMeteorShower_7701be0e",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_MagicalMeteorShower",
       "element_tags": [
         "Skill.Element.Physical",
         "Skill.Element.Chaos"
@@ -4306,7 +4306,7 @@
       "theme": "물리 + 불",
       "profile": "area",
       "skill_id": "Catalog_1216c98600a491ab",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/MeteorShower/Systems/BPDA_N_MeteorShower_1216c986",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_MeteorShower",
       "element_tags": [
         "Skill.Element.Physical",
         "Skill.Element.Fire"
@@ -4335,7 +4335,7 @@
       "theme": "냉기",
       "profile": "area",
       "skill_id": "Catalog_6b28cac43797ea5a",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_aquaStorm_6b28cac4",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_aquaStorm",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -4363,7 +4363,7 @@
       "theme": "물리",
       "profile": "area",
       "skill_id": "Catalog_19b9f980bad0f9b1",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_storm_19b9f980",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_storm",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -4391,7 +4391,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_c53d1020579e4ba0",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_thunderStorm_c53d1020",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_thunderStorm",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4419,7 +4419,7 @@
       "theme": "카오스",
       "profile": "area",
       "skill_id": "Catalog_ae031d7f7d2f8b35",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_darkStorm_ae031d7f",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_darkStorm",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -4447,7 +4447,7 @@
       "theme": "불",
       "profile": "area",
       "skill_id": "Catalog_d0bb445875e1a9b4",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_fireStorm_d0bb4458",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_fireStorm",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -4489,7 +4489,7 @@
       "theme": "물리",
       "profile": "shield",
       "skill_id": "Catalog_4f3cfb0da6ae9f82",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Earth/BPDA_Par_LMagic_Earth_Def_01_4f3cfb0d",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_Earth_Def_01",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -4503,7 +4503,7 @@
       "theme": "물리",
       "profile": "shield",
       "skill_id": "Catalog_d479d63ba75a0d46",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Earth/BPDA_Par_LMagic_Earth_Def_02_d479d63b",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_Earth_Def_02",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -4517,7 +4517,7 @@
       "theme": "카오스",
       "profile": "shield",
       "skill_id": "Catalog_0d6e2d62d1e3026c",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/PoisonShield/Systems/BPDA_N_PoisonShield_0d6e2d62",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_PoisonShield",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -4531,7 +4531,7 @@
       "theme": "카오스",
       "profile": "shield",
       "skill_id": "Catalog_83cc15f55223e045",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/PoisonWall/Systems/BPDA_N_PoisonWall_83cc15f5",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_PoisonWall",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -4545,7 +4545,7 @@
       "theme": "물리 + 불",
       "profile": "shield",
       "skill_id": "Catalog_bb03af1d465d95cd",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/MagmaShield/Systems/BPDA_N_MagmaShield_bb03af1d",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_MagmaShield",
       "element_tags": [
         "Skill.Element.Physical",
         "Skill.Element.Fire"
@@ -4560,7 +4560,7 @@
       "theme": "물리 + 불",
       "profile": "shield",
       "skill_id": "Catalog_e8815ff65b41d3a8",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/MagmaWall/Systems/BPDA_N_MagmaWall_e8815ff6",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_MagmaWall",
       "element_tags": [
         "Skill.Element.Physical",
         "Skill.Element.Fire"
@@ -4575,7 +4575,7 @@
       "theme": "카오스",
       "profile": "shield",
       "skill_id": "Catalog_2f57875f917e8366",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicAuraVFX/VFX/MagicalBarrier/Systems/BPDA_N_MagicalBarrier_2f57875f",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_MagicalBarrier",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -4603,7 +4603,7 @@
       "theme": "냉기",
       "profile": "shield",
       "skill_id": "Catalog_f73212dbb46531c8",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Aqua/BPDA_Par_LMagic_Aqua_Def_01_f73212db",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_Aqua_Def_01",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -4617,7 +4617,7 @@
       "theme": "냉기",
       "profile": "shield",
       "skill_id": "Catalog_117cbc5a674cb21b",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/AquaShield/Systems/BPDA_N_AquaShield_117cbc5a",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_AquaShield",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -4631,7 +4631,7 @@
       "theme": "냉기",
       "profile": "shield",
       "skill_id": "Catalog_e4a0797ab8aa107f",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/AquaWall/Systems/BPDA_N_AquaWall_e4a0797a",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_AquaWall",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -4659,7 +4659,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_011daaad17579735",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Priest_Shield_011daaad",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Priest_Shield",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4673,7 +4673,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_f9806c26856bc548",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Priest/Shield/BPDA_NS_Preist_Shield_f9806c26",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Preist_Shield",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4701,7 +4701,7 @@
       "theme": "물리",
       "profile": "shield",
       "skill_id": "Catalog_0071530b33ff34aa",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Wind/BPDA_Par_Lmagic_Wind_Def_01_0071530b",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_Lmagic_Wind_Def_01",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -4715,7 +4715,7 @@
       "theme": "물리",
       "profile": "shield",
       "skill_id": "Catalog_e80b480f356b09d1",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Wind/BPDA_Par_Lmagic_Wind_Def_01_Old_e80b480f",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_Lmagic_Wind_Def_01_Old",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -4729,7 +4729,7 @@
       "theme": "물리",
       "profile": "shield",
       "skill_id": "Catalog_572080da0958b7f0",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/WindShield/Systems/BPDA_N_WindShield_572080da",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_WindShield",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -4743,7 +4743,7 @@
       "theme": "물리",
       "profile": "shield",
       "skill_id": "Catalog_8d30baa93142449b",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/WindWall/Systems/BPDA_N_WindWall_8d30baa9",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_WindWall",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -4757,7 +4757,7 @@
       "theme": "물리",
       "profile": "shield",
       "skill_id": "Catalog_1560224f70304e5c",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/StylizedVersions/WindShieldStylized/Systems/BPDA_N_WindShieldStylized_1560224f",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_WindShieldStylized",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -4771,7 +4771,7 @@
       "theme": "",
       "profile": "shield",
       "skill_id": "Catalog_268f761e706c62bb",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/TranslucentShield/Systems/BPDA_N_TranslucentShield_268f761e",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_TranslucentShield",
       "element_tags": [],
       "reason": "아군 대상 피해 흡수 보호막; 해당 라운드 종료 시 제거"
     },
@@ -4783,7 +4783,7 @@
       "theme": "",
       "profile": "shield",
       "skill_id": "Catalog_3424bef4bf4c7902",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/TranslucentWall/Systems/BPDA_N_TranslucentWall_3424bef4",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_TranslucentWall",
       "element_tags": [],
       "reason": "아군 대상 피해 흡수 보호막; 해당 라운드 종료 시 제거"
     },
@@ -4809,7 +4809,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_da3c8656c273dc25",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Lightning/BPDA_Par_4E_Lightning_Def_01_da3c8656",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_4E_Lightning_Def_01",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4823,7 +4823,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_189e0d26c3f669bc",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/LightningShield/Systems/BPDA_N_LightningShield_189e0d26",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_LightningShield",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4837,7 +4837,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_9f0941138ad45214",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/LightningWall/Systems/BPDA_N_LightningWall_9f094113",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_LightningWall",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4851,7 +4851,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_07f015805f1acf70",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/StylizedVersions/LightningShieldStylized/Systems/BPDA_N_LightningShieldStylized_07f01580",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_LightningShieldStylized",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4865,7 +4865,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_102adf826139fe0f",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/StylizedVersions/LightningWallStylized/Systems/BPDA_N_LightningWallStylized_102adf82",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_LightningWallStylized",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4879,7 +4879,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_77f990e05767aa6e",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Mage_Lightning_Shield_77f990e0",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Mage_Lightning_Shield",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4893,7 +4893,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_f2d0654cc533bb82",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Mage/LightningShield/BPDA_NS_Mage_LIghtningShield_f2d0654c",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_LIghtningShield",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4907,7 +4907,7 @@
       "theme": "카오스",
       "profile": "shield",
       "skill_id": "Catalog_03b23b5dfd7853bc",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/ArcaneShield/Systems/BPDA_N_ArcaneShield_03b23b5d",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_ArcaneShield",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -4921,7 +4921,7 @@
       "theme": "카오스",
       "profile": "shield",
       "skill_id": "Catalog_33f91cd815a8eba9",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/ArcaneWall/Systems/BPDA_N_ArcaneWall_33f91cd8",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_ArcaneWall",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -4949,7 +4949,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_f14d2b3f355da2c9",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Light/BPDA_Par_4E_LightDef_01_f14d2b3f",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_4E_LightDef_01",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -4977,7 +4977,7 @@
       "theme": "카오스",
       "profile": "shield",
       "skill_id": "Catalog_f32c5fdef123367a",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Dark/BPDA_Par_4E_Dark_Def_01_f32c5fde",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_4E_Dark_Def_01",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -5005,7 +5005,7 @@
       "theme": "냉기",
       "profile": "shield",
       "skill_id": "Catalog_e5d38656f38cbd51",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Ice/BPDA_Par_4E_Ice_Def_01_e5d38656",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_4E_Ice_Def_01",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -5019,7 +5019,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_81064693935adc64",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicAuraVFX/VFX/EnergyShield/Systems/BPDA_N_EnergyShield_81064693",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_EnergyShield_1",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -5033,7 +5033,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_bf27ea3eadbe5ec3",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/EnergyShield/Systems/BPDA_N_EnergyShield_bf27ea3e",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_EnergyShield_2",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -5047,7 +5047,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_6ecc7d2a24cf6d08",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/EnergyWall/Systems/BPDA_N_EnergyWall_6ecc7d2a",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_EnergyWall",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -5061,7 +5061,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_5f9c02bb49c17776",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/StylizedVersions/EnergyShieldStylized/Systems/BPDA_N_EnergyShieldStylized_5f9c02bb",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_EnergyShieldStylized",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -5075,7 +5075,7 @@
       "theme": "번개",
       "profile": "shield",
       "skill_id": "Catalog_e698157309248b11",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/StylizedVersions/EnergyWallStylized/Systems/BPDA_N_EnergyWallStylized_e6981573",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_EnergyWallStylized",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -5089,7 +5089,7 @@
       "theme": "카오스",
       "profile": "shield",
       "skill_id": "Catalog_5dddd5ac76145590",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/CurseShield/Systems/BPDA_N_CurseShield_5dddd5ac",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_CurseShield",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -5103,7 +5103,7 @@
       "theme": "카오스",
       "profile": "shield",
       "skill_id": "Catalog_9a29ede608134591",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/CurseWall/Systems/BPDA_N_CurseWall_9a29ede6",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_CurseWall",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -5117,7 +5117,7 @@
       "theme": "카오스",
       "profile": "shield",
       "skill_id": "Catalog_35228deba35c06a0",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/StylizedVersions/CurseShieldStylized/Systems/BPDA_N_CurseShieldStylized_35228deb",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_CurseShieldStylized",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -5145,7 +5145,7 @@
       "theme": "불",
       "profile": "shield",
       "skill_id": "Catalog_4d9cfdc5bab57ee2",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Fire/BPDA_Par_LMagic_fire_Def_01_4d9cfdc5",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_fire_Def_01",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -5159,7 +5159,7 @@
       "theme": "불",
       "profile": "shield",
       "skill_id": "Catalog_9306034f5b5e3b1c",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/FlameShield/Systems/BPDA_N_FlameShield_9306034f",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_FlameShield",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -5173,7 +5173,7 @@
       "theme": "불",
       "profile": "shield",
       "skill_id": "Catalog_ea5c58bbc4b71119",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicShieldsVFX/VFX/DefaultVersions/FlameWall/Systems/BPDA_N_FlameWall_ea5c58bb",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_FlameWall",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -5187,7 +5187,7 @@
       "theme": "불",
       "profile": "shield",
       "skill_id": "Catalog_a4e7ec858aa643e1",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Mage_Fire_Shield_a4e7ec85",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Mage_Fire_Shield",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -5201,7 +5201,7 @@
       "theme": "불",
       "profile": "shield",
       "skill_id": "Catalog_ccb6f146252a952c",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Mage/Fireshield/BPDA_NS_Mage_Fire_Shield_ccb6f146",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_Fire_Shield",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -5315,7 +5315,7 @@
       "theme": "번개",
       "profile": "beam",
       "skill_id": "Catalog_03f899584c726558",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_laser01_03f89958",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_laser01",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -5329,7 +5329,7 @@
       "theme": "번개",
       "profile": "beam",
       "skill_id": "Catalog_e015bcff7d5fe1f4",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Priest_Beam_e015bcff",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Priest_Beam",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -5343,7 +5343,7 @@
       "theme": "번개",
       "profile": "beam",
       "skill_id": "Catalog_2c2a696a69a12e2e",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Priest/Beam/BPDA_NS_Priest_Beam_2c2a696a",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Priest_Beam",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -5357,7 +5357,7 @@
       "theme": "번개",
       "profile": "beam",
       "skill_id": "Catalog_6ba83d2da4ba98b2",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Mage_EnergyBeam_6ba83d2d",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Mage_EnergyBeam",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -5371,7 +5371,7 @@
       "theme": "번개",
       "profile": "beam",
       "skill_id": "Catalog_edf6e3dacb31c6ed",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Mage/EnergyBeam/BPDA_NS_Mage_EnergyBeam_edf6e3da",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_EnergyBeam",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -5399,7 +5399,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_84127419e8b718a2",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Mixed_Magic_VFX_Pack/VFX/BPDA_NS_Big_Hammer_84127419",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Big_Hammer",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -5413,7 +5413,7 @@
       "theme": "물리",
       "profile": "slash",
       "skill_id": "Catalog_9071bd78b456cde5",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Mixed_Magic_VFX_Pack/VFX/BPDA_NS_Big_Sword_9071bd78",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Big_Sword",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -5638,7 +5638,7 @@
       "theme": "물리",
       "profile": "area",
       "skill_id": "Catalog_e2af0735962cef81",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_shotShockwave_e2af0735",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_shotShockwave",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -5680,7 +5680,7 @@
       "theme": "물리",
       "profile": "projectile",
       "skill_id": "Catalog_9bb9bc5dea546e1b",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Earth/BPDA_Par_LMagic_Earth_Atk_01_9bb9bc5d",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_Earth_Atk_01",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -5694,7 +5694,7 @@
       "theme": "물리",
       "profile": "projectile",
       "skill_id": "Catalog_ce75432a33dc09ff",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Earth/BPDA_Par_LMagic_Earth_Atk_02_ce75432a",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_Earth_Atk_02",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -5794,7 +5794,7 @@
       "theme": "물리 + 카오스",
       "profile": "projectile",
       "skill_id": "Catalog_7b5cdc649778f528",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicAuraVFX/VFX/MagicalAsteroid/Systems/BPDA_N_MagicalAsteroid_7b5cdc64",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_MagicalAsteroid",
       "element_tags": [
         "Skill.Element.Physical",
         "Skill.Element.Chaos"
@@ -5809,7 +5809,7 @@
       "theme": "카오스",
       "profile": "projectile",
       "skill_id": "Catalog_460eb0ed59c32830",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Mage_MagicBolt_460eb0ed",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Mage_MagicBolt",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -5823,7 +5823,7 @@
       "theme": "카오스",
       "profile": "projectile",
       "skill_id": "Catalog_538006268e540029",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Mage_MagicMissile_53800626",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Mage_MagicMissile",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -5837,7 +5837,7 @@
       "theme": "카오스",
       "profile": "projectile",
       "skill_id": "Catalog_56242b3422d22cb3",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Mage/MagicBolt/BPDA_NS_Mage_MagicBolt_56242b34",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_MagicBolt",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -5851,7 +5851,7 @@
       "theme": "카오스",
       "profile": "projectile",
       "skill_id": "Catalog_6a8c7e38558dc65e",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Mage/MagicMissle/BPDA_NS_Mage_MagicMissle_6a8c7e38",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_MagicMissle",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -5879,7 +5879,7 @@
       "theme": "냉기",
       "profile": "projectile",
       "skill_id": "Catalog_bed94795fb152b90",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_waterBall_bed94795",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_waterBall",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -5907,7 +5907,7 @@
       "theme": "냉기",
       "profile": "projectile",
       "skill_id": "Catalog_87c099365f145e21",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Aqua/BPDA_Par_LMagic_Aqua_Atk_01_87c09936",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_Aqua_Atk_01",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -5936,7 +5936,7 @@
       "theme": "물리 + 불",
       "profile": "projectile",
       "skill_id": "Catalog_b5d81ef6b0a8c2b9",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_shootingStar1_b5d81ef6",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_shootingStar1",
       "element_tags": [
         "Skill.Element.Physical",
         "Skill.Element.Fire"
@@ -5987,7 +5987,7 @@
       "theme": "물리 + 불",
       "profile": "projectile",
       "skill_id": "Catalog_f656b4696a21c18f",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicAuraVFX/VFX/Meteor/Systems/BPDA_N_Meteor_f656b469",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_Meteor",
       "element_tags": [
         "Skill.Element.Physical",
         "Skill.Element.Fire"
@@ -6016,7 +6016,7 @@
       "theme": "물리",
       "profile": "projectile",
       "skill_id": "Catalog_746c60d70368c778",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Wind/BPDA_Par_Lmagic_Wind_Atk_01_746c60d7",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_Lmagic_Wind_Atk_01",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -6044,7 +6044,7 @@
       "theme": "번개",
       "profile": "projectile",
       "skill_id": "Catalog_9d8ca5f5a29362a6",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_thunderBall_9d8ca5f5",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_thunderBall",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -6072,7 +6072,7 @@
       "theme": "번개",
       "profile": "projectile",
       "skill_id": "Catalog_01370ec63d9ae5c9",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Lightning/BPDA_Par_4E_OrbLightning_01_01370ec6",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_4E_OrbLightning_01",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -6100,7 +6100,7 @@
       "theme": "번개",
       "profile": "projectile",
       "skill_id": "Catalog_9991eccce9016703",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Light/BPDA_Par_4E_LightOrb_01_9991eccc",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_4E_LightOrb_01",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -6128,7 +6128,7 @@
       "theme": "카오스",
       "profile": "projectile",
       "skill_id": "Catalog_38145c190f50be14",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Dark/BPDA_Par_4E_Dark_Atk_01_38145c19",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_4E_Dark_Atk_01",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -6142,7 +6142,7 @@
       "theme": "카오스",
       "profile": "projectile",
       "skill_id": "Catalog_2e3f28d985da3ee0",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Mixed_Magic_VFX_Pack/VFX/BPDA_NS_Dark_Solo_Projectile_2e3f28d9",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Dark_Solo_Projectile",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -6170,7 +6170,7 @@
       "theme": "냉기",
       "profile": "projectile",
       "skill_id": "Catalog_10946143a7759d55",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Ice/BPDA_Par_4E_Ice_Atk_01_10946143",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_4E_Ice_Atk_01",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -6198,7 +6198,7 @@
       "theme": "불",
       "profile": "projectile",
       "skill_id": "Catalog_6efcf9bf8a3f4a68",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_fireBall_6efcf9bf",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_fireBall",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -6226,7 +6226,7 @@
       "theme": "불",
       "profile": "projectile",
       "skill_id": "Catalog_2bb418dfacd7d973",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Fire/BPDA_Par_LMagic_Fire_Atk_01_2bb418df",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_Fire_Atk_01",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -6240,7 +6240,7 @@
       "theme": "불",
       "profile": "projectile",
       "skill_id": "Catalog_cc6d92a392d09538",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Mage_Fireball_cc6d92a3",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Mage_Fireball",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -6254,7 +6254,7 @@
       "theme": "불",
       "profile": "projectile",
       "skill_id": "Catalog_22cdd0535b7e6ded",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Mage/Fireball/BPDA_NS_Mage_Fireball_22cdd053",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_Fireball",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -6268,7 +6268,7 @@
       "theme": "냉기",
       "profile": "area",
       "skill_id": "Catalog_3f6a07e460c511b5",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/Tsunami/Systems/BPDA_N_Tsunami_3f6a07e4",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_Tsunami_1",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -6282,7 +6282,7 @@
       "theme": "냉기",
       "profile": "area",
       "skill_id": "Catalog_40fef11f325f78bf",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/Tsunami/Systems/BPDA_N_TsunamiCharged_40fef11f",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_TsunamiCharged",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -6296,7 +6296,7 @@
       "theme": "냉기",
       "profile": "area",
       "skill_id": "Catalog_652af09c2afb65a4",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicAuraVFX/VFX/Tsunami/Systems/BPDA_N_Tsunami_652af09c",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_Tsunami_2",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -6310,7 +6310,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_1a5dce5caa0ee694",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Priest_Wave_1a5dce5c",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Priest_Wave",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -6324,7 +6324,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_2f57c61abecf1ed5",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Priest/Wave/BPDA_NS_Priest_Wave_2f57c61a",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Priest_Wave",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -6338,7 +6338,7 @@
       "theme": "물리",
       "profile": "area",
       "skill_id": "Catalog_4bb19baff5714f8f",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/EarthExplosion/Systems/BPDA_N_EarthExplosion_4bb19baf",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_EarthExplosion",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -6352,7 +6352,7 @@
       "theme": "카오스",
       "profile": "area",
       "skill_id": "Catalog_b4dd517797b5632e",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/PoisonExplosion/Systems/BPDA_N_PoisonExplosion_b4dd5177",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_PoisonExplosion",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -6366,7 +6366,7 @@
       "theme": "카오스",
       "profile": "area",
       "skill_id": "Catalog_d4373279a24f5413",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/PoisonExplosion/Systems/BPDA_N_PoisonExplosionCharged_d4373279",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_PoisonExplosionCharged",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -6380,7 +6380,7 @@
       "theme": "물리 + 불",
       "profile": "area",
       "skill_id": "Catalog_098b104ddd795902",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/MagmaExplosion/Systems/BPDA_N_MagmaExplosion_098b104d",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_MagmaExplosion",
       "element_tags": [
         "Skill.Element.Physical",
         "Skill.Element.Fire"
@@ -6395,7 +6395,7 @@
       "theme": "물리 + 불",
       "profile": "area",
       "skill_id": "Catalog_78a75d34ca3fdcb7",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/MagmaExplosion/Systems/BPDA_N_MagmaExplosionCharged_78a75d34",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_MagmaExplosionCharged",
       "element_tags": [
         "Skill.Element.Physical",
         "Skill.Element.Fire"
@@ -6410,7 +6410,7 @@
       "theme": "카오스",
       "profile": "area",
       "skill_id": "Catalog_26e6776a4e66a96c",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/MagicalExplosion/Systems/BPDA_N_MagicalExplosion_26e6776a",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_MagicalExplosion",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -6424,7 +6424,7 @@
       "theme": "카오스",
       "profile": "area",
       "skill_id": "Catalog_69f0c6545493fee6",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/MagicalExplosion/Systems/BPDA_N_MagicalExplosionCharged_69f0c654",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_MagicalExplosionCharged",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -6438,7 +6438,7 @@
       "theme": "카오스",
       "profile": "area",
       "skill_id": "Catalog_c83f8a2ab879be32",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Mixed_Magic_VFX_Pack/VFX/BPDA_NS_Magic_Big_Bubbles_Explosion_c83f8a2a",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Magic_Big_Bubbles_Explosion",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -6452,7 +6452,7 @@
       "theme": "냉기",
       "profile": "area",
       "skill_id": "Catalog_5e466d58e1bfb890",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Aqua/BPDA_Par_LMagic_Aqua_Explosion_5e466d58",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_Aqua_Explosion",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -6466,7 +6466,7 @@
       "theme": "냉기",
       "profile": "area",
       "skill_id": "Catalog_0e4e9a9939184f93",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Aqua/BPDA_Par_LMagic_Aqua_Explosion_Xaxis_0e4e9a99",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_Aqua_Explosion_Xaxis",
       "element_tags": [
         "Skill.Element.Cold"
       ],
@@ -6494,7 +6494,7 @@
       "theme": "물리",
       "profile": "area",
       "skill_id": "Catalog_998a7baf5cada182",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_explosion_998a7baf",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_explosion",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -6508,7 +6508,7 @@
       "theme": "물리",
       "profile": "area",
       "skill_id": "Catalog_9d3a87d1cf8e41ae",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Wind/BPDA_Par_LMagic_Wind_Explosion_9d3a87d1",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_Wind_Explosion",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -6522,7 +6522,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_148801f8a5bc777a",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/LightningExplosion/Systems/BPDA_N_LightningBlast_148801f8",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_LightningBlast",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -6536,7 +6536,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_ded8d5957ebe7b97",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/LightningExplosion/Systems/BPDA_N_LightningBlastCharged_ded8d595",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_LightningBlastCharged",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -6550,7 +6550,7 @@
       "theme": "카오스",
       "profile": "area",
       "skill_id": "Catalog_b5a090c7524ee072",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/BlackholeExplosion/Systems/BPDA_N_BlackholeExplosion_b5a090c7",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_BlackholeExplosion",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -6564,7 +6564,7 @@
       "theme": "카오스",
       "profile": "area",
       "skill_id": "Catalog_aadcde41b789acda",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/BlackholeExplosion/Systems/BPDA_N_BlackholeExplosionCharged_aadcde41",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_BlackholeExplosionCharged",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -6578,7 +6578,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_f0ff95cdce264906",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Light/BPDA_Par_4E_Light_Explosion_01_f0ff95cd",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_4E_Light_Explosion_01",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -6592,7 +6592,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_5059a61d1f62d713",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/LightBlast/Systems/BPDA_N_LightBlast_5059a61d",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_LightBlast",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -6606,7 +6606,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_b8c2e2a38cff841a",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/LightBlast/Systems/BPDA_N_LightBlastCharged_b8c2e2a3",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_LightBlastCharged",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -6620,7 +6620,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_e6ea66f193ac1481",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/EnergyBlast/Systems/BPDA_N_EnergyBlast_e6ea66f1",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_EnergyBlast",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -6634,7 +6634,7 @@
       "theme": "번개",
       "profile": "area",
       "skill_id": "Catalog_fb45b0cabeb538ef",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/EnergyBlast/Systems/BPDA_N_EnergyBlastCharged_fb45b0ca",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_EnergyBlastCharged",
       "element_tags": [
         "Skill.Element.Lightning"
       ],
@@ -6648,7 +6648,7 @@
       "theme": "물리 + 카오스",
       "profile": "area",
       "skill_id": "Catalog_4efbe124eff0a142",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/BloodExplosion/Systems/BPDA_N_BloodExplosion_4efbe124",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_BloodExplosion",
       "element_tags": [
         "Skill.Element.Physical",
         "Skill.Element.Chaos"
@@ -6663,7 +6663,7 @@
       "theme": "물리 + 카오스",
       "profile": "area",
       "skill_id": "Catalog_9658724cc90118ee",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/BloodExplosion/Systems/BPDA_N_BloodExplosionCharged_9658724c",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_BloodExplosionCharged",
       "element_tags": [
         "Skill.Element.Physical",
         "Skill.Element.Chaos"
@@ -6678,7 +6678,7 @@
       "theme": "카오스",
       "profile": "area",
       "skill_id": "Catalog_92e05e3c3fd3ef6e",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/ChaosExplosion/Systems/BPDA_N_ChaosExplosion_92e05e3c",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_ChaosExplosion",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -6692,7 +6692,7 @@
       "theme": "카오스",
       "profile": "area",
       "skill_id": "Catalog_37a25ab8c1116c65",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/ChaosExplosion/Systems/BPDA_N_ChaosExplosionCharged_37a25ab8",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_ChaosExplosionCharged",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -6706,7 +6706,7 @@
       "theme": "불",
       "profile": "area",
       "skill_id": "Catalog_008cfbf570ab2ed9",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Fire/BPDA_Par_LMagic_Fire_Explosion_008cfbf5",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_Fire_Explosion",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -6720,7 +6720,7 @@
       "theme": "불",
       "profile": "area",
       "skill_id": "Catalog_638f4ec11d90c60c",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Luos8Elements/Particles/Fire/BPDA_Par_LMagic_Fire_Explosion_Xdir_638f4ec1",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Par_LMagic_Fire_Explosion_Xdir",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -6734,7 +6734,7 @@
       "theme": "불",
       "profile": "area",
       "skill_id": "Catalog_ad1618cfb68031f2",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/FlameBlast/Systems/BPDA_N_FlameBlast_ad1618cf",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_FlameBlast",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -6748,7 +6748,7 @@
       "theme": "불",
       "profile": "area",
       "skill_id": "Catalog_8d6e8e455cc3cdc7",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/MegaMagicVFXBundle/VFX/MagicalExplosionsVFX/VFX/FlameBlast/Systems/BPDA_N_FlameBlastCharged_8d6e8e45",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_N_FlameBlastCharged",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -7030,7 +7030,7 @@
       "theme": "물리",
       "profile": "area",
       "skill_id": "Catalog_6d3b03e9fcf69907",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Mage_Whirlwind_6d3b03e9",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Mage_Whirlwind",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -7044,7 +7044,7 @@
       "theme": "물리",
       "profile": "area",
       "skill_id": "Catalog_d5d622a96f60b935",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Mage/Whirlwind/BPDA_NS_Mage_Whirlwind_d5d622a9",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_Whirlwind",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -7058,7 +7058,7 @@
       "theme": "카오스",
       "profile": "slash",
       "skill_id": "Catalog_20d8e5adee5b0949",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Free_Magic/VFX_Niagara/BPDA_NS_Free_Magic_Slash_20d8e5ad",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Free_Magic_Slash",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -7072,7 +7072,7 @@
       "theme": "카오스",
       "profile": "slash",
       "skill_id": "Catalog_ff520baa621c567c",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/Free_Magic/VFX_Niagara/BPDA_NS_Free_Magic_Slash2_ff520baa",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Free_Magic_Slash2",
       "element_tags": [
         "Skill.Element.Chaos"
       ],
@@ -7226,7 +7226,7 @@
       "theme": "물리",
       "profile": "area",
       "skill_id": "Catalog_a96c142f25c911e7",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Archer_Arrow_Hail_a96c142f",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Archer_Arrow_Hail",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -7240,7 +7240,7 @@
       "theme": "물리",
       "profile": "area",
       "skill_id": "Catalog_e05880a5c4f36bb0",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Archer_Arrow_Hail_Burst_e05880a5",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Archer_Arrow_Hail_Burst",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -7254,7 +7254,7 @@
       "theme": "물리",
       "profile": "area",
       "skill_id": "Catalog_f496e8506bd42cac",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Archer/ArrowHail/BPDA_NS_Archer_Arrow_Hail_f496e850",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Archer_Arrow_Hail",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -7268,7 +7268,7 @@
       "theme": "물리",
       "profile": "area",
       "skill_id": "Catalog_73ecff83a3f4decb",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Archer/ArrowHailBurst/BPDA_NS_Archer_Arrow_Hail_Burst_73ecff83",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Archer_Arrow_Hail_Burst",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -7310,7 +7310,7 @@
       "theme": "물리",
       "profile": "projectile",
       "skill_id": "Catalog_d4e9a328510dcfce",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Archer_Arrow_d4e9a328",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Archer_Arrow",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -7324,7 +7324,7 @@
       "theme": "물리",
       "profile": "projectile",
       "skill_id": "Catalog_04ed54b0b0fffef1",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Warrior_ThrowingAxe_04ed54b0",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Warrior_ThrowingAxe",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -7338,7 +7338,7 @@
       "theme": "물리",
       "profile": "projectile",
       "skill_id": "Catalog_1162b2f966eba3d3",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Archer/Arrow/BPDA_NS_Archer_Arrow_1162b2f9",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Archer_Arrow",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -7352,7 +7352,7 @@
       "theme": "물리",
       "profile": "projectile",
       "skill_id": "Catalog_5787be7a56b74f44",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Warrior/ThrowingAxe/BPDA_NS_Warrior_ThrowingAxe_5787be7a",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Warrior_ThrowingAxe",
       "element_tags": [
         "Skill.Element.Physical"
       ],
@@ -7366,7 +7366,7 @@
       "theme": "불",
       "profile": "projectile",
       "skill_id": "Catalog_2cc4ed77fba4e11c",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Archer_Arrow_Fire_2cc4ed77",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Archer_Arrow_Fire",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -7380,7 +7380,7 @@
       "theme": "불",
       "profile": "projectile",
       "skill_id": "Catalog_1dba1b0987c63ecc",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Archer/ArrowFire/BPDA_NS_Archer_Arrow_Fire_1dba1b09",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Archer_Arrow_Fire",
       "element_tags": [
         "Skill.Element.Fire"
       ],
@@ -7800,7 +7800,7 @@
       "theme": "",
       "profile": "heal",
       "skill_id": "Catalog_eeef3916192514b6",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/Particles/BPDA_P_Priest_Heal_Burst_eeef3916",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_Priest_Heal_Burst",
       "element_tags": [],
       "reason": "아군 대상 HP 즉시 회복; 지속 회복으로 해석하지 않음"
     },
@@ -7812,7 +7812,7 @@
       "theme": "",
       "profile": "heal",
       "skill_id": "Catalog_f04ed2c5aa40b8e1",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Priest/HealBurst/BPDA_NS_Priest_Heal_Burst_f04ed2c5",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Priest_Heal_Burst",
       "element_tags": [],
       "reason": "아군 대상 HP 즉시 회복; 지속 회복으로 해석하지 않음"
     },
@@ -7836,7 +7836,7 @@
       "theme": "",
       "profile": "heal",
       "skill_id": "Catalog_cd93c9f2dfa48178",
-      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/FXVarietyPack/Particles/BPDA_P_ky_healAura_cd93c9f2",
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_P_ky_healAura",
       "element_tags": [],
       "reason": "아군 대상 HP 즉시 회복; 지속 회복으로 해석하지 않음"
     },
