@@ -62,9 +62,10 @@ namespace
                     {
                         const UDistributionVectorParticleParameter* Parameter = Cast<UDistributionVectorParticleParameter>(Velocity->StartVelocity.Distribution);
                         if (!Parameter || Parameter->ParameterName.IsNone()) continue;
-                        // Local particles already follow the actor; world particles need its launch velocity exactly once.
-                        // 로컬 입자는 액터를 이미 따라가며 월드 입자는 액터의 발사 속도를 한 번만 적용합니다.
+                        // Velocity-aligned local particles need a direction hint; actor movement supplies their flight speed.
+                        // 속도 정렬 로컬 입자는 방향 힌트가 필요하며 비행 속도는 액터 이동으로 적용합니다.
                         FVector Desired = LOD->RequiredModule->bUseLocalSpace ? FVector::ZeroVector : Projectile.WorldVelocity;
+                        if (LOD->RequiredModule->bUseLocalSpace && LOD->RequiredModule->ScreenAlignment == PSA_Velocity) Desired = Projectile.WorldVelocity.GetSafeNormal() * 0.01f;
                         if (Velocity->bApplyOwnerScale) Desired /= Component->GetComponentScale();
                         if (!Velocity->bInWorldSpace) Desired = (Component->GetComponentQuat() * LOD->RequiredModule->EmitterRotation.Quaternion()).UnrotateVector(Desired);
                         FVector Input;

@@ -74,6 +74,10 @@ def make_profile(spec, entry, source):
     effect_class = require(unreal.load_class(None, "/Script/ProjectA.GE_" + settings["effect"]), "Missing native GameplayEffect: " + settings["effect"])
     profile.set_editor_property("effect_class", effect_class)
     vfx = unreal.CombatSkillVfx()
+    presentation_source = entry.get("direction_source", entry["source"])
+    if presentation_source != entry["source"]:
+        require(presentation_source == "/Game/User_JeHoon/" + entry["source"].removeprefix("/Game/") + "_TargetDirection", "Direction derivative must preserve its source pack and folder: " + presentation_source)
+        source = require(unreal.load_asset(presentation_source), "Missing authored direction derivative: " + presentation_source)
     vfx.set_editor_property("niagara" if entry["source_class"] == "NiagaraSystem" else "cascade", source)
     profile.set_editor_property("vfx", vfx)
     # Optional per-skill timing keeps source visuals intact while authoring their collision and flight clocks.

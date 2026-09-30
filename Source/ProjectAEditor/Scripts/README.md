@@ -164,3 +164,11 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 `-PrimitivePreviewFacingOnly`는 네 직업 메뉴 프리뷰 Blueprint와 현재 Male/Female의 `PreviewMeshTransform` 회전을 `0°`, 저장된 MainMenu 카메라 X를 `-500`, 네 슬롯 앵커 Yaw를 `90°`로 맞춘다. 나머지 몸체 설정·슬롯 위치·상세 거리 배율은 보존한다. 같은 옵션의 읽기 전용 검사는 Blueprint 4개·몸체 변환 2개·앵커 4개·카메라를 재로드하여 `Saved/Automation/PreviewFacingReload.json`에 기록한다. 화면·드래그 실행 검증은 포함하지 않는다.
 
 전체 검사는 네 직업의 기본 메시·몸체 ID와 이전 의상 선택 검증·원본 애니메이션 포즈·마법사 기본 스태프 제거·래그돌 구조를 읽기 전용으로 확인한다. 결과는 `Saved/Automation/PrimitiveAppearanceConfigure.json`, `PrimitiveAppearanceReload.json`에 기록한다. 실제 화면·게임 검증은 [TODO 2-30](../../../Docs/TODO.md#2-30-rog-의상-커스터마이징)의 사용자 확인으로 남긴다.
+
+18. `ConfigureSkillVfxDirection.py`: `CombatVfxAssetLibrary`로 카탈로그의 Niagara 베기 23개·지정 투사체 3개를 조사한다. 본체가 이미 로컬이면 원본을 유지하며 월드 공간 대상 7개만 `/Game/User_JeHoon/{원본 팩/하위 폴더}/{이름}_TargetDirection`으로 파생한다. 원본 메시·재질을 직접 참조하고 기존 BPDA의 VFX와 `CatalogSkillSpecs.json`의 `direction_source`를 연결한다. 도끼·불꽃 화살의 위치 이벤트는 공식 NiagaraEditor 갱신 API로 `GenerateLocationEvent`·`ReceiveLocationEvent` 1.1을 적용해 로컬 본체와 월드 잔상의 좌표를 변환한다. `CreateCatalogSkills.py`도 이 선택적 방향 참조를 사용한다. 대상과 보정 계약은 [PROJECT_PLAN 4-1](../../../Docs/PROJECT_PLAN.md#4-1-스킬-이펙트-에셋-목록)을 따른다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureSkillVfxDirection.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+```
+
+작성 명령은 파생 에셋·대상 BPDA·명세를 저장한다. 기존 파생의 `CombatDirectionSource`가 원본 경로와 정확히 일치해야 하며, 출처 정보가 없거나 다르면 사용자 수정본을 보호하기 위해 중단한다. 대상 스킬에 다른 사용자 지정 VFX가 있으면 보존하고 중단한다. 결과는 `Saved/Automation/CombatVfxDirection/Authoring.json`에 원본 SHA·변경 대상·이미터 공간·파생 용량으로 기록한다. 2026-09-30 결과는 26개 중 7개·약 5.48MiB이며 사전 최대 81MiB 추정과 구분한다. 메타데이터·Niagara 컴파일 확인은 게임 재생·대상 방향 일치 검증을 포함하지 않으며 [사용자 확인](../../../Docs/TODO.md#2-37-전투-디버그-레벨)을 별도로 수행한다.

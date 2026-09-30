@@ -1647,7 +1647,8 @@
       "element_tags": [
         "Skill.Element.Physical"
       ],
-      "reason": "VFX와 함께 생성되는 충돌 영역으로 여러 적을 각각 1회 타격"
+      "reason": "VFX와 함께 생성되는 충돌 영역으로 여러 적을 각각 1회 타격",
+      "direction_source": "/Game/User_JeHoon/RPGEffects/ParticlesNiagara/Warrior/EarthCrack/NS_Warrior_EarthCrack_TargetDirection"
     },
     {
       "source": "/Game/RPGEffects/ParticlesNiagara/Warrior/EarthSlam/NS_Warrior_EarthSlam",
@@ -1661,7 +1662,8 @@
       "element_tags": [
         "Skill.Element.Physical"
       ],
-      "reason": "VFX와 함께 생성되는 충돌 영역으로 여러 적을 각각 1회 타격"
+      "reason": "VFX와 함께 생성되는 충돌 영역으로 여러 적을 각각 1회 타격",
+      "direction_source": "/Game/User_JeHoon/RPGEffects/ParticlesNiagara/Warrior/EarthSlam/NS_Warrior_EarthSlam_TargetDirection"
     },
     {
       "source": "/Game/Hack_And_Slash_FX/VFX_Niagara/Slashes/NS_Claws_Floor",
@@ -2515,7 +2517,8 @@
       "element_tags": [
         "Skill.Element.Physical"
       ],
-      "reason": "VFX와 함께 생성되는 충돌 영역으로 여러 적을 각각 1회 타격"
+      "reason": "VFX와 함께 생성되는 충돌 영역으로 여러 적을 각각 1회 타격",
+      "direction_source": "/Game/User_JeHoon/RPGEffects/ParticlesNiagara/Warrior/Swipe/NS_Warrior_Swipe_TargetDirection"
     },
     {
       "source": "/Game/Hack_And_Slash_FX/VFX_Niagara/Slashes/NS_Lightning_Slash",
@@ -7062,7 +7065,8 @@
       "element_tags": [
         "Skill.Element.Chaos"
       ],
-      "reason": "VFX와 함께 생성되는 충돌 영역으로 여러 적을 각각 1회 타격"
+      "reason": "VFX와 함께 생성되는 충돌 영역으로 여러 적을 각각 1회 타격",
+      "direction_source": "/Game/User_JeHoon/Free_Magic/VFX_Niagara/NS_Free_Magic_Slash_TargetDirection"
     },
     {
       "source": "/Game/Free_Magic/VFX_Niagara/NS_Free_Magic_Slash2",
@@ -7342,7 +7346,8 @@
       "element_tags": [
         "Skill.Element.Physical"
       ],
-      "reason": "처음 차단 충돌한 지점에서 소멸하는 단일 투사체"
+      "reason": "처음 차단 충돌한 지점에서 소멸하는 단일 투사체",
+      "direction_source": "/Game/User_JeHoon/RPGEffects/ParticlesNiagara/Archer/Arrow/NS_Archer_Arrow_TargetDirection"
     },
     {
       "source": "/Game/RPGEffects/ParticlesNiagara/Warrior/ThrowingAxe/NS_Warrior_ThrowingAxe",
@@ -7356,7 +7361,8 @@
       "element_tags": [
         "Skill.Element.Physical"
       ],
-      "reason": "처음 차단 충돌한 지점에서 소멸하는 단일 투사체"
+      "reason": "처음 차단 충돌한 지점에서 소멸하는 단일 투사체",
+      "direction_source": "/Game/User_JeHoon/RPGEffects/ParticlesNiagara/Warrior/ThrowingAxe/NS_Warrior_ThrowingAxe_TargetDirection"
     },
     {
       "source": "/Game/RPGEffects/Particles/P_Archer_Arrow_Fire",
@@ -7384,7 +7390,8 @@
       "element_tags": [
         "Skill.Element.Fire"
       ],
-      "reason": "처음 차단 충돌한 지점에서 소멸하는 단일 투사체"
+      "reason": "처음 차단 충돌한 지점에서 소멸하는 단일 투사체",
+      "direction_source": "/Game/User_JeHoon/RPGEffects/ParticlesNiagara/Archer/ArrowFire/NS_Archer_Arrow_Fire_TargetDirection"
     },
     {
       "source": "/Game/ArrowTrail/FX/NS_ArrowTrail_Basic",

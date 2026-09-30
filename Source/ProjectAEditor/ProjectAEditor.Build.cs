@@ -31,6 +31,7 @@ public class ProjectAEditor : ModuleRules
 			"IKRigEditor",
 			"NavigationSystem",
 			"Niagara",
+			"NiagaraEditor",
 			"NetCore",
 			"Json",
 			"JsonUtilities",

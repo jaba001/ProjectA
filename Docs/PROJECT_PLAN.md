@@ -205,7 +205,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 [CatalogSkillSpecs.json](../Source/ProjectAEditor/Scripts/CatalogSkillSpecs.json)은 577개 원본 중 176개를 새 스킬로 구성하고 401개를 보류한다. 생성 대상은 베기·소환 무기 26개, 회전 2개, 단일 투사체 32개, 지점 범위 64개, 빔 5개, 즉시 치유 3개, 보호막 44개다. 외부 Blueprint 88개, Ribbon/AnimTrail 33개, 자체 이동 파라미터 연동이 필요한 6개와 지속 효과·부착·피격·조준 표현 등은 보류하며 [SKILL_CREATION_STATUS.csv](SKILL_CREATION_STATUS.csv)에 각 사유를 기록한다.
 
-[CreateCatalogSkills.py](../Source/ProjectAEditor/Scripts/CreateCatalogSkills.py)는 원본 시스템을 직접 참조하는 명시 RoundDefinition BPDA를 `/Game/User_JeHoon/Blueprint/DataAsset/Skills/` 바로 아래에 작성한다. 사용자 요청에 따라 파일명 해시를 제거하고 `BPDA_{원본 에셋 이름}`을 사용하며, 대소문자를 구분하지 않는 중복 이름에만 CSV 순서대로 `_1`, `_2`를 붙인다. 중복 대상은 `N_EnergyShield`·`N_Tsunami` 각 2개이며 기존 5개 스킬 이름과 충돌하지 않는다. 내부 `Catalog_<hash>` SkillId·CSV 표시명·스킬 설정은 유지한다. 176개를 Unreal AssetTools로 이동하고 풀 참조를 갱신했으며 Redirector 176개를 정리했다. 이전 Package/Object 경로와 PrimaryAssetId의 리디렉션 설정을 추가했다. 별도 `SkillPools/DA_SkillPool_Catalog`와 기존 상점·장착 목록은 유지한다. 같은 목적지가 있으면 속성을 비교하고 불일치 시 덮어쓰지 않고 중단한다. 원본 CSV·원본 에셋·기존 스킬 패키지 해시와 데이터 검증을 확인하며 `-CatalogSkillsVerifyOnly`는 저장 없이 다시 읽는다. 구경로 로드와 PrimaryAssetId 설정 검사의 범위는 [2-36절](TODO.md#2-36-csv-기반-스킬-생성)을 따른다.
+[CreateCatalogSkills.py](../Source/ProjectAEditor/Scripts/CreateCatalogSkills.py)는 기본적으로 원본 시스템을 참조하고 아래 방향 보정 7개에는 `direction_source` 파생을 사용하는 명시 RoundDefinition BPDA를 `/Game/User_JeHoon/Blueprint/DataAsset/Skills/` 바로 아래에 작성한다. 사용자 요청에 따라 파일명 해시를 제거하고 `BPDA_{원본 에셋 이름}`을 사용하며, 대소문자를 구분하지 않는 중복 이름에만 CSV 순서대로 `_1`, `_2`를 붙인다. 중복 대상은 `N_EnergyShield`·`N_Tsunami` 각 2개이며 기존 5개 스킬 이름과 충돌하지 않는다. 내부 `Catalog_<hash>` SkillId·CSV 표시명·스킬 설정은 유지한다. 176개를 Unreal AssetTools로 이동하고 풀 참조를 갱신했으며 Redirector 176개를 정리했다. 이전 Package/Object 경로와 PrimaryAssetId의 리디렉션 설정을 추가했다. 별도 `SkillPools/DA_SkillPool_Catalog`와 기존 상점·장착 목록은 유지한다. 같은 목적지가 있으면 속성을 비교하고 불일치 시 덮어쓰지 않고 중단한다. 원본 CSV·원본 에셋·기존 스킬 패키지 해시와 데이터 검증을 확인하며 `-CatalogSkillsVerifyOnly`는 저장 없이 다시 읽는다. 구경로 로드와 PrimaryAssetId 설정 검사의 범위는 [2-36절](TODO.md#2-36-csv-기반-스킬-생성)을 따른다.
 
 생성 명세의 `entries[].timing`은 `windup_seconds`·`effect_hit_delay_seconds`·`effect_duration`·`projectile_speed`·`projectile_lifetime`의 선택적 재정의를 지원한다. 생략한 값은 기존 기본값·프로필을 사용하며 잘못된 키·유한하지 않은 숫자·해당 프로필에서 사용하지 않는 필드는 거절한다. 카탈로그는 검 궤적 판정을 사용하지 않으므로 `weapon_trace_duration`은 지원하지 않는다. 디버그 임시 설정은 자동 저장하지 않으며 검토한 수치를 명세에 별도로 반영한다. 기존 목적지 에셋의 설정과 명세가 다르면 생성 도구는 오류로 중단하고 에셋을 보존한다. 이 지원이 기존 스킬의 타이밍을 일괄 조정하거나 모든 원본 VFX의 접촉 프레임을 확정한 것은 아니다.
 
@@ -217,7 +217,16 @@ VFX와 판정은 공통 액터 변환을 사용한다. 투사체는 첫 차단 �
 
 판정 종료 후 VFX는 자연 재생 완료까지 남기되 추가 5초로 제한한다. 남은 표현은 피해·라운드 진행을 연장하지 않고 소유 전투 초기화 시 함께 제거한다. 투사체는 방향을 확정한 뒤 VFX를 활성화한다. 공통 콘솔 변수 `projecta.Combat.ProjectileSpeedScale`의 기본값은 `0.5`, 허용 범위는 `0.1~2.0`이다. 작성 속도 700cm/s는 350cm/s로 적용하며 공통 배율에 대해서만 수명을 역비례 보정해 작성된 최대 이동 거리를 유지한다. 디버그에서 작성값 `ProjectileSpeed` 자체를 바꾸면 최대 이동 거리도 달라진다. 원본 에셋·태그와 서버 최초 차단 충돌 판정을 보존한다.
 
-직선 Cascade 투사체는 원본 Velocity/Lifetime 모듈의 실제 인스턴스 파라미터를 활성화 전에 발사 속도·예상 도달시간에 연결한다. 로컬/월드 좌표와 분포 매핑을 반영하고 이미터·LOD 간 충돌 또는 표현 불가능한 값은 원본을 유지한다. 유도 효과와 노출 파라미터가 없는 Niagara 내부 이동은 원본 동작을 유지하므로 에셋별 화면·속도 일치 여부는 사용자 확인 대상이다.
+직선 Cascade 투사체는 원본 Velocity/Lifetime 모듈의 실제 인스턴스 파라미터를 활성화 전에 발사 속도·예상 도달시간에 연결한다. 로컬/월드 좌표와 분포 매핑을 반영하고 이미터·LOD 간 충돌 또는 표현 불가능한 값은 원본을 유지한다. 로컬 공간의 `PSA_Velocity` 이미터는 독립 비행 속도를 0으로 만들면 방향도 잃으므로 목표 방향의 0.01cm/s 값을 전달하고 실제 이동은 투사체 액터가 담당한다. Cascade 원본은 변경하지 않는다.
+
+Niagara 방향 후보 26개 중 본체가 이미 로컬 공간인 19개는 원본을 유지한다. 나머지 7개는 원본의 월드 공간 이미터가 액터 회전을 따르지 않고 필요한 설정을 런타임 파라미터로 바꿀 수 없어 필수 파생을 작성했다. 경로는 `/Game/User_JeHoon/{원본 팩/하위 폴더}/{이름}_TargetDirection`이며 기존 BPDA 7개의 VFX 참조와 생성 명세의 `direction_source`만 해당 파생에 연결한다. 원본 데이터의 `source`·스킬 ID·태그·효과/충돌 규칙은 유지하고 메시·재질 등 외부 리소스를 직접 참조한다.
+
+| 대상 | 방향 보정 |
+|---|---|
+| 전사의 베기 2·대지의 균열 2·대지 강타 2·비술 베기 | 이미터를 로컬 공간으로 전환하고 원래 속도·회전 값을 보존 |
+| 날아가는 화살 2·투척 도끼 2·불꽃 화살 2 | ArrowTrail 메시를 포함한 본체를 로컬 공간으로 전환하고 원본의 독립 전진 속도를 0으로 설정. 메시가 아닌 Ring·Fire 잔상은 월드 공간을 유지하며 공식 GenerateLocationEvent/ReceiveLocationEvent 1.1의 로컬→월드 좌표 변환 적용 |
+
+실제 추가 에셋은 7개·5,750,319바이트(약 5.48MiB)이며 사전 안내한 최대 81MiB 추정과 구분한다. 오프라인 베기 23개·이미터 162개(로컬 131·월드 31)와 Swipe 메시의 +X 방향 경계를 확인했으며 일괄 90도 회전을 적용하지 않는다. 최종 정적 검사에서 원본 26개 SHA 보존과 도끼·불꽃 화살의 활성 위치 이벤트 5개가 1.1로 저장됨을 확인했다. 이 결과와 컴파일 성공은 화면 정렬의 검증과 구분한다. 위 대상 외의 유도 효과·Niagara 내부 이동은 개별 확인 대상으로 유지한다. [작성 도구 18번](../Source/ProjectAEditor/Scripts/README.md) · [사용자 방향 확인](TODO.md#2-37-전투-디버그-레벨)
 
 ### 4-2 전투 디버그 레벨
 
@@ -321,7 +330,7 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 
 ## Gameplay 에셋과 배치
 
-외부 에셋은 원본 경로에서 직접 참조하고 작업 편의를 위한 `User_JeHoon` 복제를 하지 않는다. 새 프로젝트 에셋과 필수 리타깃 결과는 `Content/User_JeHoon/`에 작성하며 외부 팩 기반 파생 결과의 하위 구조·대소문자를 유지한다. 중복 정리는 원본에서 `User_JeHoon`으로 복사한 사본에 한정하며 외부 팩끼리는 비교·통합하지 않는다. 기존 사본은 수정 차이·참조·이전 경로 호환을 확인하고 Unreal 기능으로 통합한다. C++·설정·생성 명세는 기존 Source·Config 위치를 유지한다.
+외부 에셋은 원본 경로에서 직접 참조하고 작업 편의를 위한 `User_JeHoon` 복제를 하지 않는다. 새 프로젝트 에셋과 필수 파생 결과는 `Content/User_JeHoon/`에 작성하며 외부 팩 기반 파생 결과의 하위 구조·대소문자를 유지한다. 중복 정리는 원본에서 `User_JeHoon`으로 복사한 사본에 한정하며 외부 팩끼리는 비교·통합하지 않는다. 기존 사본은 수정 차이·참조·이전 경로 호환을 확인하고 Unreal 기능으로 통합한다. C++·설정·생성 명세는 기존 Source·Config 위치를 유지한다.
 
 2026-09-11: 별도 `/Game/T12Validation`에 있던 메뉴 검증 위젯 3종을 `/Game/User_JeHoon/Validation/T12`로 이동했다. 일반 메뉴의 `UI/MainMenu` 원본과 구분하며 기존 검증 코드·문서·Saved의 T12 생성 명세도 새 경로를 사용한다. UI 생성 도구는 작업 폴더 밖의 assetPath를 거절한다.
 
