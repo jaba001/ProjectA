@@ -352,6 +352,74 @@ bool ACombatRoundCoordinator::ReviveDebugUnit(APlayerController* Controller, int
     return true;
 }
 
+bool ACombatRoundCoordinator::CanSetDebugUnitHealth(APlayerController* Controller, int32 UnitId, FText& OutError) const
+{
+    OutError = FText::GetEmpty();
+    const APartyPlayerController* PartyController = Cast<APartyPlayerController>(Controller);
+    if (!ACombatDebugGameMode::IsDebugWorld(GetWorld()) || !HasExecutionAuthority() || !IsValid(PartyController) || !PartyController->IsLocalController() || PartyController->GetWorld() != GetWorld() || PartyController->GetCombatManager() != CombatManager || GetParticipantSlot(Controller) <= 0 || !CombatManager->GetActionAuthority()->CanRegisterDebugUnit(PartyController))
+    {
+        OutError = FText::FromString(TEXT("참가 중인 독립 로컬 디버그 전투에서만 체력을 설정할 수 있습니다."));
+        return false;
+    }
+    if (View.Phase != ECombatRoundPhase::Planning || bSAPMovementInProgress || PlanningMoveIndex != INDEX_NONE || !Projectiles.IsEmpty() || !ActiveEffects.IsEmpty())
+    {
+        OutError = FText::FromString(TEXT("계획 단계에서 이동과 효과가 모두 끝난 뒤 체력을 설정하세요."));
+        return false;
+    }
+    const int32 Index = FindUnitIndex(UnitId);
+    if (!View.Units.IsValidIndex(Index) || !Actions.IsValidIndex(Index))
+    {
+        OutError = FText::FromString(TEXT("체력을 설정할 아군 또는 적군을 선택하세요."));
+        return false;
+    }
+    const FCombatRoundUnitView& Entry = View.Units[Index];
+    const AUnitBase* Unit = Entry.Unit;
+    if (!IsValid(Unit) || Unit->IsActorBeingDestroyed() || Unit->GetWorld() != GetWorld() || !Unit->HasAuthority() || !Unit->IsUnitAlive() || !IsValid(Unit->GetAttributeSet()) || !IsValid(Unit->GetAbilitySystemComponent()) || !CombatManager->GetRegisteredUnits().Contains(Unit) || !CombatManager->GetActionAuthority()->GetUnitId(Unit).IsValid())
+    {
+        OutError = FText::FromString(TEXT("등록된 생존 캐릭터만 체력을 설정할 수 있습니다. 사망한 아군은 먼저 부활시키세요."));
+        return false;
+    }
+    if ((Entry.bEnemy && (Unit->GetTeam() != ETeam::Enemy || Entry.OwnerSlot != 0)) || (!Entry.bEnemy && (Unit->GetTeam() != ETeam::Player || Entry.OwnerSlot != GetParticipantSlot(Controller) || !CombatManager->GetActionAuthority()->CanControllerControl(PartyController, Unit))))
+    {
+        OutError = FText::FromString(TEXT("자신이 조작하는 아군 또는 디버그 적군만 체력을 설정할 수 있습니다."));
+        return false;
+    }
+    if (!UnitDataRules::IsValidHealth(Unit->GetAttributeSet()->GetMaxHP(), Unit->GetAttributeSet()->GetHP()) || Unit->GetAttributeSet()->GetHP() <= 0.f || !Unit->GetVelocity().IsNearlyZero() || (Unit->GetCharacterMovement() && !Unit->GetCharacterMovement()->Velocity.IsNearlyZero()))
+    {
+        OutError = FText::FromString(TEXT("현재 체력과 정지 상태가 유효한 생존 캐릭터만 변경할 수 있습니다."));
+        return false;
+    }
+    return true;
+}
+
+bool ACombatRoundCoordinator::SetDebugUnitHealth(APlayerController* Controller, int32 UnitId, float MaxHP, float CurrentHP, FText& OutError)
+{
+    if (!CanSetDebugUnitHealth(Controller, UnitId, OutError)) return false;
+    if (!UnitDataRules::IsValidHealth(MaxHP, CurrentHP) || CurrentHP < 1.f)
+    {
+        OutError = FText::FromString(TEXT("최대 체력은 1~1,000,000, 현재 체력은 1~최대 체력 범위로 입력하세요."));
+        return false;
+    }
+    AUnitBase* Unit = View.Units[FindUnitIndex(UnitId)].Unit;
+    UAS_Unit* Attributes = Unit->GetAttributeSet();
+    if (Attributes->GetMaxHP() == MaxHP && Attributes->GetHP() == CurrentHP) return true;
+    UAbilitySystemComponent* AbilitySystem = Unit->GetAbilitySystemComponent();
+    // Reduce current HP before lowering its ceiling, then use GAS to publish the final attribute values.
+    // 최대 체력을 낮추기 전에 현재 체력을 줄이고 GAS로 최종 속성 값을 갱신합니다.
+    if (Attributes->GetHP() > MaxHP) AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), CurrentHP);
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetMaxHPAttribute(), MaxHP);
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), CurrentHP);
+    // Health changes preserve planned moves and fixed AI commands, but require the human to confirm again.
+    // 체력 변경은 이동 계획과 고정 AI 명령을 유지하며 인간 참가자의 준비 완료를 다시 받습니다.
+    ClearOwnerReady(GetParticipantSlot(Controller));
+    ++View.PlanRevision;
+    bLockRetryBlocked = false;
+    View.Message = FText::FromString(TEXT("체력 설정 완료 · 기존 계획 유지 · 아군 준비 완료를 다시 눌러주세요."));
+    Unit->ForceNetUpdate();
+    PublishState();
+    return true;
+}
+
 bool ACombatRoundCoordinator::CanEditDebugUnit(APlayerController* Controller, int32 UnitId, FText& OutError) const
 {
     OutError = FText::GetEmpty();

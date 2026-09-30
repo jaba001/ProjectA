@@ -20,6 +20,7 @@ class PROJECTA_API ACombatSkillEffectActor : public AActor
 
 public:
     ACombatSkillEffectActor();
+    virtual void Tick(float DeltaSeconds) override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -34,6 +35,9 @@ public:
 
 private:
     void ResolveEffect(bool bDestroyActor = true);
+
+    UFUNCTION()
+    void HandleOwnerDestroyed(AActor* DestroyedActor);
 
     UFUNCTION()
     void OnRep_Visual();

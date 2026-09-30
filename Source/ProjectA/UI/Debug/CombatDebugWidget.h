@@ -45,8 +45,8 @@ private:
     void HandleClicked();
 };
 
-// A compact overlay keeps the native combat planner active underneath the development tools.
-// 작은 오버레이 아래에서 기존 전투 계획 화면을 유지합니다.
+// Collapsible development tools keep the native combat planner available underneath.
+// 접을 수 있는 개발 도구 아래에서 기존 전투 계획 화면을 유지합니다.
 UCLASS()
 class PROJECTA_API UCombatDebugWidget : public UCommonUserWidget
 {
@@ -64,6 +64,8 @@ private:
     void RefreshState();
     void RefreshReviveState();
     void RefreshSpawnState();
+    void RefreshHealthState(bool bResetInput = false);
+    void ApplyHealth(bool bFullHeal);
     bool RefreshUnitOptions();
     void RebuildSpawnOptions();
     void SpawnUnit(bool bEnemy);
@@ -77,7 +79,11 @@ private:
     UFUNCTION()
     void ReviveSelectedAlly();
     UFUNCTION()
-    void ToggleSpawnPanel();
+    void ShowUnitTools();
+    UFUNCTION()
+    void ApplyUnitHealth();
+    UFUNCTION()
+    void HealSelectedUnit();
     UFUNCTION()
     void SpawnAlly();
     UFUNCTION()
@@ -100,6 +106,22 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<USizeBox> PanelSize;
     UPROPERTY(Transient)
+    TObjectPtr<UVerticalBox> LoadoutPanel;
+    UPROPERTY(Transient)
+    TObjectPtr<UScrollBox> UnitToolsPanel;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> HealthTarget;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> HealthStatus;
+    UPROPERTY(Transient)
+    TObjectPtr<UEditableTextBox> MaxHealthInput;
+    UPROPERTY(Transient)
+    TObjectPtr<UEditableTextBox> CurrentHealthInput;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> HealthApplyButton;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> HealButton;
+    UPROPERTY(Transient)
     TObjectPtr<UTextBlock> Status;
     UPROPERTY(Transient)
     TObjectPtr<UButton> ReviveToggleButton;
@@ -111,8 +133,6 @@ private:
     TObjectPtr<UTextBlock> ReviveStatus;
     UPROPERTY(Transient)
     TObjectPtr<UButton> ReviveButton;
-    UPROPERTY(Transient)
-    TObjectPtr<UButton> SpawnToggleButton;
     UPROPERTY(Transient)
     TObjectPtr<UBorder> SpawnPanel;
     UPROPERTY(Transient)
@@ -146,12 +166,14 @@ private:
     TMap<FString, FName> AllySpawnOptions;
     TMap<FString, FName> EnemySpawnOptions;
     int32 SelectedUnitId = INDEX_NONE;
+    int32 HealthInputUnitId = INDEX_NONE;
     FGuid ObservedCombatId;
     int32 ObservedRevision = INDEX_NONE;
     bool bEquipment = false;
     bool bRefreshingUnits = false;
     float RefreshElapsed = 0.f;
     FText ActionMessage;
+    FText HealthMessage;
     FText ReviveMessage;
     FText AllySpawnMessage;
     FText EnemySpawnMessage;

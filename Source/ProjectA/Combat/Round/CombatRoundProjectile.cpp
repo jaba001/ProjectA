@@ -59,6 +59,8 @@ void ACombatRoundProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ACombatRoundProjectile, VisualRadius);
     DOREPLIFETIME(ACombatRoundProjectile, Visual);
+    DOREPLIFETIME(ACombatRoundProjectile, VisualVelocity);
+    DOREPLIFETIME(ACombatRoundProjectile, VisualLifetime);
 }
 
 void ACombatRoundProjectile::ConfigurePresentation(const FCombatRoundSkill& Skill)
@@ -66,7 +68,6 @@ void ACombatRoundProjectile::ConfigurePresentation(const FCombatRoundSkill& Skil
     if (!HasAuthority() || bInitialized || bResolved) return;
     Visual = Skill.Vfx;
     ImpactVisual = Skill.ImpactVfx;
-    OnRep_Visual();
     ForceNetUpdate();
 }
 
@@ -81,7 +82,7 @@ void ACombatRoundProjectile::SetAllowedTargets(const TArray<AUnitBase*>& Targets
     }
 }
 
-void ACombatRoundProjectile::InitializeProjectile(AUnitBase* Source, AUnitBase* Target, FVector AimPoint, float Speed, float Damage, float Radius, float Lifetime, bool bHoming, bool bTargetOnly)
+void ACombatRoundProjectile::InitializeProjectile(AUnitBase* Source, AUnitBase* Target, FVector AimPoint, float Speed, float Damage, float Radius, float Lifetime, bool bHoming, bool bTargetOnly, double PresentationTime)
 {
     if (!HasAuthority() || bInitialized || bResolved)
     {
@@ -111,6 +112,14 @@ void ACombatRoundProjectile::InitializeProjectile(AUnitBase* Source, AUnitBase* 
     VisualRadius = Radius;
     RemainingLifetime = Lifetime;
     bTrackTarget = bHoming;
+    VisualVelocity = Direction.GetSafeNormal() * FlightSpeed;
+    // Straight-flight parameters describe actual travel; homing systems retain their authored behavior.
+    // 직선 비행 파라미터는 실제 이동을 나타내며 유도 시스템은 원본 동작을 유지합니다.
+    VisualLifetime = bHoming ? 0.f : FMath::Min(Lifetime, static_cast<float>(Direction.Size() / FlightSpeed));
+    PresentationStartedAt = FMath::IsFinite(PresentationTime) && PresentationTime >= 0.0 ? PresentationTime : -1.0;
+    // Activate particles only after the launch direction is final, including world-space burst emitters.
+    // 월드 공간 Burst 이미터도 올바른 발사 방향으로 생성되도록 방향 확정 후 파티클을 활성화합니다.
+    OnRep_Visual();
     OnRep_VisualRadius();
     ForceNetUpdate();
 }
@@ -129,7 +138,7 @@ void ACombatRoundProjectile::SetTargetTagConditions(const FGameplayTagQuery& Que
     TargetBlockedTags = BlockedTags;
 }
 
-void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
+void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds, double PresentationTime)
 {
     if (!HasAuthority() || !bInitialized || bResolved || !FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.0f)
     {
@@ -153,7 +162,12 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds)
         ResolveProjectile();
         return;
     }
-    const float StepSeconds = FMath::Min(DeltaSeconds, RemainingLifetime);
+    float StepSeconds = FMath::Min(DeltaSeconds, RemainingLifetime);
+    // Simulation debt from before launch must not consume a newly visible projectile in one rendered frame.
+    // 발사 전부터 쌓인 시뮬레이션 시간이 새 투사체를 한 렌더링 프레임 안에 소진하지 않도록 합니다.
+    if (PresentationStartedAt >= 0.0 && FMath::IsFinite(PresentationTime) && PresentationTime >= 0.0) StepSeconds = FMath::Min(StepSeconds, static_cast<float>(FMath::Max(0.0, PresentationTime - PresentationStartedAt - ElapsedFlightSeconds)));
+    if (StepSeconds <= 0.f) return;
+    ElapsedFlightSeconds += StepSeconds;
     const FVector Offset = TargetPoint - Start;
     const double Distance = Offset.Size();
     if (!FMath::IsFinite(Distance))
@@ -316,7 +330,8 @@ void ACombatRoundProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void ACombatRoundProjectile::OnRep_Visual()
 {
     if (IsActorBeingDestroyed()) return;
-    CombatSkillPresentation::Attach(this, Visual, VisualComponents);
+    const CombatSkillPresentation::FProjectileParameters Parameters{VisualVelocity, VisualLifetime};
+    CombatSkillPresentation::Attach(this, Visual, VisualComponents, false, &Parameters);
     if (ProjectileMesh) ProjectileMesh->SetVisibility(VisualComponents.IsEmpty());
 }
 

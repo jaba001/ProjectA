@@ -16,10 +16,13 @@
 #include "GAS/Effect/GE_Shield.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
+#include "HAL/IConsoleManager.h"
 #include "Unit/UnitBase.h"
 
 namespace
 {
+    TAutoConsoleVariable<float> CVarProjectileSpeedScale(TEXT("projecta.Combat.ProjectileSpeedScale"), 0.5f, TEXT("Projectile flight speed scale (0.1-2.0); lifetime preserves travel range. / 투사체 비행 속도 배율(0.1~2.0), 수명을 보정하여 이동 거리를 유지합니다."));
+
     AUnitBase* FindMeleeCollision(UWorld* World, AUnitBase* Source, const TArray<FCombatRoundUnitView>& Units, const FCombatRoundSkill& Skill)
     {
         const float Radius = FMath::Min(Skill.MeleeRadius, Skill.HitRange * 0.5f);
@@ -242,9 +245,11 @@ CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleas
         Projectile->SetAllowedTargets(AllowedTargets);
         Projectile->SetTargetTagConditions(Skill.TargetTagQuery, Skill.TargetRequiredTags, Skill.TargetBlockedTags);
         Projectile->ConfigurePresentation(Skill);
-        Projectile->InitializeProjectile(Context.Source, Context.Target, Context.AimLocation, Skill.ProjectileSpeed, Skill.Power, Skill.ProjectileRadius, Skill.ProjectileLifetime, Skill.bHoming, Skill.bTargetOnly);
-        Result.bSucceeded = true;
-        Result.Status = FText::FromString(TEXT("발사 완료"));
+        const float RequestedScale = CVarProjectileSpeedScale.GetValueOnGameThread();
+        const float SpeedScale = FMath::IsFinite(RequestedScale) ? FMath::Clamp(RequestedScale, 0.1f, 2.f) : 0.5f;
+        Projectile->InitializeProjectile(Context.Source, Context.Target, Context.AimLocation, Skill.ProjectileSpeed * SpeedScale, Skill.Power, Skill.ProjectileRadius, Skill.ProjectileLifetime / SpeedScale, Skill.bHoming, Skill.bTargetOnly, Context.PresentationTime);
+        Result.bSucceeded = !Projectile->HasResolved();
+        Result.Status = FText::FromString(Result.bSucceeded ? TEXT("발사 완료") : TEXT("발사 대상 또는 투사체 설정이 유효하지 않습니다."));
         return Result;
     }
     TArray<FCombatRoundUnitView> EligibleUnits;

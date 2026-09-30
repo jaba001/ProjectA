@@ -1035,7 +1035,7 @@ void ACombatRoundCoordinator::AdvanceSimulation(float StepSeconds)
     const TArray<TObjectPtr<ACombatRoundProjectile>> Pending = Projectiles;
     for (ACombatRoundProjectile* Projectile : Pending)
     {
-        if (IsValid(Projectile) && !Projectile->HasResolved()) Projectile->AdvanceProjectile(StepSeconds);
+        if (IsValid(Projectile) && !Projectile->HasResolved()) Projectile->AdvanceProjectile(StepSeconds, MontageClock);
     }
     const TArray<TObjectPtr<ACombatSkillEffectActor>> PendingEffects = ActiveEffects;
     for (ACombatSkillEffectActor* Effect : PendingEffects)
@@ -1331,6 +1331,7 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
     Context.Grid = IsValid(Arena) ? Arena->Grid.Get() : nullptr;
     Context.AimLocation = Action.AimLocation;
     Context.TargetCoord = View.Units.IsValidIndex(TargetIndex) ? View.Units[TargetIndex].HomeCoord : Entry.Command.TargetCoord;
+    Context.PresentationTime = MontageClock;
     const CombatSkillExecution::FReleaseResult Result = CombatSkillExecution::Release(Context, View.Units, Skill, [this, &Entry, &Skill](AUnitBase* Hit)
     {
         ApplyHit(Entry.Unit, Hit, Skill);

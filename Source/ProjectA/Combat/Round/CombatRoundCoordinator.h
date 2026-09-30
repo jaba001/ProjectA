@@ -56,6 +56,10 @@ public:
     bool CanEditDebugUnit(APlayerController* Controller, int32 UnitId, FText& OutError) const;
     bool SetDebugUnitSkills(APlayerController* Controller, int32 UnitId, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Definitions, FText& OutError);
     void NotifyDebugEquipmentChanged(APlayerController* Controller, int32 UnitId);
+    // Change a living ally or enemy's health during standalone debug planning without changing its life cycle.
+    // 독립 디버그 계획 단계에서 생존한 아군 또는 적군의 생명주기를 변경하지 않고 체력을 설정합니다.
+    bool CanSetDebugUnitHealth(APlayerController* Controller, int32 UnitId, FText& OutError) const;
+    bool SetDebugUnitHealth(APlayerController* Controller, int32 UnitId, float MaxHP, float CurrentHP, FText& OutError);
     bool CanReviveDebugUnit(APlayerController* Controller, int32 UnitId, FText& OutError) const;
     bool ReviveDebugUnit(APlayerController* Controller, int32 UnitId, FText& OutError);
     bool CanAddDebugUnit(APlayerController* Controller, bool bEnemy, FText& OutError) const;

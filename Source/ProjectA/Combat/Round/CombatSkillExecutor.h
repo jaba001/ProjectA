@@ -20,6 +20,7 @@ namespace CombatSkillExecution
         ACombatGridManager* Grid = nullptr;
         FVector AimLocation = FVector::ZeroVector;
         FIntPoint TargetCoord = FIntPoint::ZeroValue;
+        double PresentationTime = -1.0;
     };
 
     struct PROJECTA_API FReleaseResult

@@ -23,11 +23,21 @@ namespace
 
 ACombatSkillEffectActor::ACombatSkillEffectActor()
 {
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = false;
     bReplicates = true;
     bAlwaysRelevant = true;
     SetReplicateMovement(true);
     SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("EffectOrigin")));
+}
+
+void ACombatSkillEffectActor::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    if (!HasAuthority() || !bResolved) return;
+    // Auto-destroyed components signal actual completion, including deferred Niagara activation.
+    // 자동 삭제된 컴포넌트로 지연된 Niagara 활성화를 포함한 실제 재생 완료를 확인합니다.
+    if (GetNetMode() == NM_Standalone && !VisualComponents.ContainsByPredicate([](const UFXSystemComponent* Component) { return IsValid(Component); })) Destroy();
 }
 
 void ACombatSkillEffectActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -84,6 +94,7 @@ void ACombatSkillEffectActor::InitializeEffect(AUnitBase* Source, AUnitBase* Tar
     }
     Visual = Skill.Vfx;
     OnRep_Visual();
+    if (IsValid(GetOwner())) GetOwner()->OnDestroyed.AddUniqueDynamic(this, &ACombatSkillEffectActor::HandleOwnerDestroyed);
     ForceNetUpdate();
     // Resolve initial overlaps once so stationary areas and support effects require no artificial movement.
     // 정지 영역과 지원 효과에 불필요한 이동이 필요하지 않도록 최초 겹침도 한 번 검사합니다.
@@ -168,12 +179,31 @@ void ACombatSkillEffectActor::ResolveEffect(bool bDestroyActor)
     OnImpact.Clear();
     OnResolved.Broadcast(this);
     OnResolved.Clear();
-    if (bDestroyActor && !IsActorBeingDestroyed()) Destroy();
+    if (bDestroyActor && !IsActorBeingDestroyed())
+    {
+        // Collision completion must not cut off the authored effect before its first rendered frame.
+        // 충돌 판정 완료가 작성된 효과의 첫 렌더링 프레임 이전에 표현을 끊지 않도록 합니다.
+        if (Visual.Niagara.IsNull() && Visual.Cascade.IsNull()) Destroy();
+        else
+        {
+            // Natural completion releases one-shot systems; cap imported loops without extending damage or round locks.
+            // 단발 시스템은 자연 완료로 해제하며 피해나 라운드 잠금을 연장하지 않고 임포트한 반복 효과를 제한합니다.
+            SetLifeSpan(5.f);
+            SetActorTickEnabled(GetNetMode() == NM_Standalone);
+        }
+    }
 }
 
 void ACombatSkillEffectActor::OnRep_Visual()
 {
-    if (!IsActorBeingDestroyed()) CombatSkillPresentation::Attach(this, Visual, VisualComponents);
+    if (!IsActorBeingDestroyed()) CombatSkillPresentation::Attach(this, Visual, VisualComponents, true);
+}
+
+void ACombatSkillEffectActor::HandleOwnerDestroyed(AActor* DestroyedActor)
+{
+    // Resolved visuals are no longer in the active hit list, so explicitly clean them up with their battle owner.
+    // 종료된 표현은 활성 판정 목록에서 빠지므로 소유 전투가 제거될 때 명시적으로 함께 정리합니다.
+    Destroy();
 }
 
 void ACombatSkillEffectActor::MulticastImpact_Implementation(const FCombatSkillVfx& ImpactVisual, const FTransform& Transform)
@@ -184,6 +214,7 @@ void ACombatSkillEffectActor::MulticastImpact_Implementation(const FCombatSkillV
 void ACombatSkillEffectActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     ResolveEffect(false);
+    if (IsValid(GetOwner())) GetOwner()->OnDestroyed.RemoveDynamic(this, &ACombatSkillEffectActor::HandleOwnerDestroyed);
     CombatSkillPresentation::Destroy(VisualComponents);
     Super::EndPlay(EndPlayReason);
 }
