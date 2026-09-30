@@ -32,6 +32,7 @@ void UCombatDebugLoadout::Initialize(ACombatManager* InManager)
         InitializedCombatId.Invalidate();
         SkillAssets.Reset();
         SkillLabels.Reset();
+        SkillTags.Reset();
         EquipmentItems.Reset();
         EquipmentMembers.Reset();
         return;
@@ -45,6 +46,7 @@ void UCombatDebugLoadout::Initialize(ACombatManager* InManager)
         InitializedCombatId = CombatId;
         SkillAssets.Reset();
         SkillLabels.Reset();
+        SkillTags.Reset();
         EquipmentItems.Reset();
         EquipmentMembers.Reset();
 
@@ -69,6 +71,11 @@ void UCombatDebugLoadout::Initialize(ACombatManager* InManager)
             if (Skill) Label = Skill->SkillName.IsEmpty() ? Skill->RoundDefinition.Name : Skill->SkillName;
             if (Label.IsEmpty()) Label = FText::FromString(Asset.GetAssetName());
             SkillLabels.Add(Asset, MoveTemp(Label));
+            // Cache the resolved runtime tags without changing authored content or inferring elements from names.
+            // 제작된 콘텐츠를 변경하거나 이름으로 속성을 추론하지 않고 해석된 실행 태그를 캐시합니다.
+            FCombatRoundSkill Definition;
+            FText Error;
+            SkillTags.Add(Asset, Skill && Skill->ResolveRoundSkill(Definition, Error) ? MoveTemp(Definition.EffectTags) : FGameplayTagContainer());
         }
 
         TArray<FRunItemDefinition> Items;
@@ -117,6 +124,13 @@ FText UCombatDebugLoadout::GetSkillLabel(const FSoftObjectPath& Asset) const
 {
     const FText* Label = SkillLabels.Find(Asset);
     return Label ? *Label : FText::FromString(Asset.GetAssetName());
+}
+
+const FGameplayTagContainer& UCombatDebugLoadout::GetSkillTags(const FSoftObjectPath& Asset) const
+{
+    const FGameplayTagContainer* Tags = SkillTags.Find(Asset);
+    static const FGameplayTagContainer EmptyTags;
+    return Tags ? *Tags : EmptyTags;
 }
 
 const FRunPartyMember* UCombatDebugLoadout::GetEquipmentMember(int32 UnitId) const

@@ -14,6 +14,7 @@ class UEditableTextBox;
 class UComboBoxString;
 class USizeBox;
 class UBorder;
+class UWrapBox;
 class UCombatDebugActionButton;
 class UCommonActivatableWidgetStack;
 
@@ -22,7 +23,8 @@ enum class ECombatDebugAction : uint8
     AddSkill,
     RemoveSkill,
     GrantEquipment,
-    RemoveEquipment
+    RemoveEquipment,
+    SelectSkillCategory
 };
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnCombatDebugAction, UCombatDebugActionButton*);
@@ -70,6 +72,7 @@ private:
     void RebuildSpawnOptions();
     void SpawnUnit(bool bEnemy);
     void RebuildLists();
+    void RefreshSkillCategories(const TArray<int32>& Counts);
     void HandleAction(UCombatDebugActionButton* Button);
 
     UFUNCTION()
@@ -161,12 +164,17 @@ private:
     TObjectPtr<UVerticalBox> CatalogList;
     UPROPERTY(Transient)
     TObjectPtr<UScrollBox> CatalogScroll;
+    UPROPERTY(Transient)
+    TObjectPtr<UWrapBox> SkillCategoryTabs;
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UCombatDebugActionButton>> SkillCategoryButtons;
 
     TMap<FString, int32> UnitOptions;
     TMap<FString, FName> AllySpawnOptions;
     TMap<FString, FName> EnemySpawnOptions;
     int32 SelectedUnitId = INDEX_NONE;
     int32 HealthInputUnitId = INDEX_NONE;
+    int32 SelectedSkillCategory = 0;
     FGuid ObservedCombatId;
     int32 ObservedRevision = INDEX_NONE;
     bool bEquipment = false;

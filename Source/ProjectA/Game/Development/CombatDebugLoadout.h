@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "Game/Run/RunTypes.h"
 #include "UObject/Object.h"
 #include "CombatDebugLoadout.generated.h"
@@ -22,6 +23,7 @@ public:
     void Initialize(ACombatManager* InManager);
     const TArray<FSoftObjectPath>& GetSkillAssets() const { return SkillAssets; }
     FText GetSkillLabel(const FSoftObjectPath& Asset) const;
+    const FGameplayTagContainer& GetSkillTags(const FSoftObjectPath& Asset) const;
     const TArray<FRunItemDefinition>& GetEquipmentItems() const { return EquipmentItems; }
     const FRunPartyMember* GetEquipmentMember(int32 UnitId) const;
     bool GrantEquipment(APlayerController* Controller, int32 UnitId, const FSoftObjectPath& Asset, FGameplayTag Slot, FText& OutError);
@@ -39,6 +41,9 @@ private:
 
     UPROPERTY(Transient)
     TMap<FSoftObjectPath, FText> SkillLabels;
+
+    UPROPERTY(Transient)
+    TMap<FSoftObjectPath, FGameplayTagContainer> SkillTags;
 
     UPROPERTY(Transient)
     TArray<FRunItemDefinition> EquipmentItems;

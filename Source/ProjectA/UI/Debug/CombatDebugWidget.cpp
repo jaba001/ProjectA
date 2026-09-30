@@ -3,6 +3,7 @@
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "Components/Border.h"
+#include "Components/ButtonSlot.h"
 #include "Components/EditableTextBox.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
@@ -13,6 +14,7 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Components/WrapBox.h"
 #include "Controller/CombatDebugPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/World.h"
@@ -20,6 +22,7 @@
 #include "Game/GameModes/CombatDebugGameMode.h"
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "GAS/Attribute/AS_Unit.h"
+#include "GAS/CombatGameplayTags.h"
 #include "Misc/DefaultValueHelper.h"
 #include "UI/Combat/CombatRoundPlanningWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
@@ -28,6 +31,43 @@
 
 namespace
 {
+    struct FDebugSkillCategory
+    {
+        const TCHAR* Label;
+        FGameplayTag Element;
+        int32 MinimumElements = 0;
+        int32 MaximumElements = MAX_int32;
+    };
+
+    const TArray<FDebugSkillCategory>& GetDebugSkillCategories()
+    {
+        static const TArray<FDebugSkillCategory> Categories =
+        {
+            { TEXT("전체"), FGameplayTag() },
+            { TEXT("물리"), ProjectACombatTags::Skill_Element_Physical },
+            { TEXT("화염"), ProjectACombatTags::Skill_Element_Fire },
+            { TEXT("냉기"), ProjectACombatTags::Skill_Element_Cold },
+            { TEXT("번개"), ProjectACombatTags::Skill_Element_Lightning },
+            { TEXT("카오스"), ProjectACombatTags::Skill_Element_Chaos },
+            { TEXT("복합"), FGameplayTag(), 2 },
+            { TEXT("미분류"), FGameplayTag(), 0, 0 }
+        };
+        return Categories;
+    }
+
+    // Match resolved element tags without inferring combat properties from display names or asset paths.
+    // 표시명이나 에셋 경로로 전투 속성을 추론하지 않고 해석된 속성 태그로 분류합니다.
+    bool MatchesDebugSkillCategory(const FGameplayTagContainer& Tags, const FDebugSkillCategory& Category)
+    {
+        if (Category.Element.IsValid()) return Tags.HasTag(Category.Element);
+        int32 ElementCount = 0;
+        for (const FDebugSkillCategory& ElementCategory : GetDebugSkillCategories())
+        {
+            if (ElementCategory.Element.IsValid() && Tags.HasTag(ElementCategory.Element)) ++ElementCount;
+        }
+        return ElementCount >= Category.MinimumElements && ElementCount <= Category.MaximumElements;
+    }
+
     FString GetDebugUnitDisplayName(const AUnitBase* Unit)
     {
         if (!IsValid(Unit)) return FString();
@@ -143,6 +183,22 @@ void UCombatDebugWidget::NativeOnInitialized()
     Body->AddChildToVerticalBox(LoadoutPanel)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     AddText(LoadoutPanel, TEXT("계획 단계에서 무료 추가·제거 · 스킬 최대 5개 · 장비는 외형만 변경"));
     Status = AddText(LoadoutPanel, TEXT("전투 준비 중"));
+    SkillCategoryTabs = WidgetTree->ConstructWidget<UWrapBox>();
+    SkillCategoryTabs->SetInnerSlotPadding(FVector2D(6.f, 4.f));
+    LoadoutPanel->AddChildToVerticalBox(SkillCategoryTabs)->SetPadding(FMargin(0.f, 4.f, 0.f, 6.f));
+    const TArray<FDebugSkillCategory>& Categories = GetDebugSkillCategories();
+    for (int32 Index = 0; Index < Categories.Num(); ++Index)
+    {
+        UCombatDebugActionButton* Button = WidgetTree->ConstructWidget<UCombatDebugActionButton>();
+        Button->Initialize(ECombatDebugAction::SelectSkillCategory, FSoftObjectPath(), Index, FGameplayTag());
+        Button->OnAction.AddUObject(this, &UCombatDebugWidget::HandleAction);
+        Button->SetToolTipText(FText::FromString(Index == Categories.Num() - 1 ? TEXT("등록된 다섯 속성의 태그가 없는 스킬") : Index == Categories.Num() - 2 ? TEXT("두 가지 이상 속성 태그가 있는 스킬 · 해당 속성 탭에도 표시") : TEXT("선택한 속성과 검색어에 맞는 미보유 스킬")));
+        Button->SetContent(WidgetTree->ConstructWidget<UTextBlock>());
+        CastChecked<UButtonSlot>(Button->GetContent()->Slot)->SetPadding(FMargin(8.f, 4.f));
+        SkillCategoryTabs->AddChildToWrapBox(Button);
+        SkillCategoryButtons.Add(Button);
+    }
+    RefreshSkillCategories({});
     // Give owned items and the catalog separate scrolling space so the purchase list stays visible.
     // 구입 목록이 가려지지 않도록 보유 목록과 전체 목록에 독립적인 스크롤 공간을 제공합니다.
     UHorizontalBox* Lists = WidgetTree->ConstructWidget<UHorizontalBox>();
@@ -283,6 +339,7 @@ void UCombatDebugWidget::RefreshState()
         bRefreshingUnits = false;
         OwnedList->ClearChildren();
         CatalogList->ClearChildren();
+        RefreshSkillCategories({});
         OwnedList->SetIsEnabled(false);
         CatalogList->SetIsEnabled(false);
         const ACombatDebugGameMode* Mode = GetWorld()->GetAuthGameMode<ACombatDebugGameMode>();
@@ -566,6 +623,12 @@ void UCombatDebugWidget::SpawnUnit(bool bEnemy)
 void UCombatDebugWidget::RebuildLists()
 {
     if (!OwnedList || !CatalogList) return;
+    const TArray<FDebugSkillCategory>& Categories = GetDebugSkillCategories();
+    if (!Categories.IsValidIndex(SelectedSkillCategory)) SelectedSkillCategory = 0;
+    TArray<int32> CategoryCounts;
+    CategoryCounts.Init(0, Categories.Num());
+    RefreshSkillCategories(CategoryCounts);
+    SkillCategoryTabs->SetVisibility(bEquipment ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
     OwnedList->ClearChildren();
     CatalogList->ClearChildren();
     ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
@@ -596,9 +659,17 @@ void UCombatDebugWidget::RebuildLists()
             if (!Query.IsEmpty() && !Asset.GetAssetName().Contains(Query) && !DisplayName.Contains(Query)) continue;
             const bool bOwned = Skills.ContainsByPredicate([&Asset](const USkillDefinitionDataAsset* Skill) { return Skill && FSoftObjectPath(Skill) == Asset; });
             if (bOwned) continue;
+            const FGameplayTagContainer& Tags = Loadout->GetSkillTags(Asset);
+            for (int32 Index = 0; Index < Categories.Num(); ++Index)
+            {
+                if (MatchesDebugSkillCategory(Tags, Categories[Index])) ++CategoryCounts[Index];
+            }
+            if (!MatchesDebugSkillCategory(Tags, Categories[SelectedSkillCategory])) continue;
             AddAction(CatalogList, TEXT("추가 · ") + DisplayName + TEXT("\n") + Asset.GetAssetName(), ECombatDebugAction::AddSkill, Asset);
             ++Count;
         }
+        RefreshSkillCategories(CategoryCounts);
+        if (Count == 0) AddText(CatalogList, TEXT("이 속성과 검색어에 맞는 미보유 스킬이 없습니다."));
     }
     else
     {
@@ -630,11 +701,35 @@ void UCombatDebugWidget::RebuildLists()
             ++Count;
         }
     }
-    CatalogTitle->SetText(FText::FromString(FString::Printf(TEXT("%s 목록 · %d개"), bEquipment ? TEXT("장비") : TEXT("미보유 스킬"), Count)));
+    CatalogTitle->SetText(FText::FromString(bEquipment ? FString::Printf(TEXT("장비 목록 · %d개"), Count) : FString::Printf(TEXT("%s · 미보유 스킬 %d개"), Categories[SelectedSkillCategory].Label, Count)));
+}
+
+void UCombatDebugWidget::RefreshSkillCategories(const TArray<int32>& Counts)
+{
+    const TArray<FDebugSkillCategory>& Categories = GetDebugSkillCategories();
+    for (int32 Index = 0; Index < SkillCategoryButtons.Num(); ++Index)
+    {
+        UCombatDebugActionButton* Button = SkillCategoryButtons[Index];
+        const bool bSelected = Index == SelectedSkillCategory;
+        UDemonicUITheme::Get().StyleButton(Button, bSelected);
+        if (UTextBlock* Label = Cast<UTextBlock>(Button->GetContent()))
+        {
+            Label->SetText(FText::FromString(FString::Printf(TEXT("%s%s (%d)"), bSelected ? TEXT("✓ ") : TEXT(""), Categories[Index].Label, Counts.IsValidIndex(Index) ? Counts[Index] : 0)));
+            UDemonicUITheme::Get().StyleText(Label, false, 14);
+        }
+    }
 }
 
 void UCombatDebugWidget::HandleAction(UCombatDebugActionButton* Button)
 {
+    if (Button && Button->Action == ECombatDebugAction::SelectSkillCategory)
+    {
+        if (!GetDebugSkillCategories().IsValidIndex(Button->Index)) return;
+        SelectedSkillCategory = Button->Index;
+        CatalogScroll->ScrollToStart();
+        RebuildLists();
+        return;
+    }
     ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
     ACombatRoundCoordinator* Round = Controller ? Controller->GetRoundCoordinator() : nullptr;
     UCombatDebugLoadout* Loadout = Controller ? Controller->GetDebugLoadout() : nullptr;
