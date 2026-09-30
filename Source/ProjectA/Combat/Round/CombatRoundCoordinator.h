@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "Combat/Round/CombatRoundTypes.h"
 #include "Combat/Round/CombatSkillExecutor.h"
+#include "Game/Development/CombatDebugSkillTiming.h"
 #include "Types/CombatResult.h"
 #include "CombatRoundCoordinator.generated.h"
 
@@ -55,6 +56,10 @@ public:
     // 독립 개발 전투에서 정지한 소유 유닛만 편집합니다.
     bool CanEditDebugUnit(APlayerController* Controller, int32 UnitId, FText& OutError) const;
     bool SetDebugUnitSkills(APlayerController* Controller, int32 UnitId, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Definitions, FText& OutError);
+    bool GetDebugSkillTiming(int32 UnitId, FName SkillId, FCombatDebugSkillTiming& OutCurrent, FCombatDebugSkillTiming& OutOriginal, FSoftObjectPath& OutAsset, FText& OutError) const;
+    bool SetDebugSkillTiming(APlayerController* Controller, int32 UnitId, FName SkillId, const FCombatDebugSkillTiming& Timing, FText& OutError);
+    bool ResetDebugSkillTiming(APlayerController* Controller, int32 UnitId, FName SkillId, FText& OutError);
+    void ApplyDebugSkillTimingOverride(FCombatRoundSkill& Skill) const;
     void NotifyDebugEquipmentChanged(APlayerController* Controller, int32 UnitId);
     // Change a living ally or enemy's health during standalone debug planning without changing its life cycle.
     // 독립 디버그 계획 단계에서 생존한 아군 또는 적군의 생명주기를 변경하지 않고 체력을 설정합니다.
@@ -104,6 +109,9 @@ private:
 
     UPROPERTY(Replicated)
     TArray<FCombatRoundSkill> Skills;
+
+    UPROPERTY(Transient)
+    TMap<FName, FCombatDebugSkillTiming> DebugSkillTimingOverrides;
 
     // Soft references in skill profiles must not release prepared systems before their first cast.
     // 스킬 프로필의 소프트 참조가 첫 시전 전에 준비된 시스템을 해제하지 않도록 유지합니다.
@@ -157,7 +165,7 @@ private:
     bool LockPlans(FText& OutError);
     bool PersistPlanningCheckpoint(FText& OutError) const;
     void ClearOwnerReady(int32 OwnerSlot);
-    void ResetDebugUnitPlan(int32 UnitIndex, const FText& Message);
+    void ResetDebugUnitPlan(int32 UnitIndex, const FText& Message, bool bPublish = true);
     ACombatGridTile* FindDebugReviveTile(int32 UnitIndex) const;
     bool CanModifyDebugRoster(APlayerController* Controller, FText& OutError) const;
     void AdvanceSimulation(float StepSeconds);

@@ -1609,8 +1609,12 @@ bool FCombatRoundMontageRecoveryTest::RunTest(const FString& Parameters)
         {
             Fixture.Round->Tick(2.0f);
             if (!TestTrue(TEXT("The hitch leaves simulation debt while still approaching"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 100.0f))) return false;
-            for (int32 Frame = 0; Frame < 3 && Fixture.Round->GetView().Units[0].ActionPhase != ECombatRoundActionPhase::Recovery; ++Frame) Fixture.Round->Tick(0.01f);
-            if (!TestTrue(TEXT("Catching up debt starts the montage and releases one hit after the slower approach"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Recovery && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 83.0f))) return false;
+            for (int32 Frame = 0; Frame < 3 && Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching; ++Frame) Fixture.Round->Tick(0.01f);
+            if (!TestTrue(TEXT("Catching up debt starts the montage without consuming its windup"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Casting && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 100.0f))) return false;
+            for (int32 Frame = 0; Frame < 9; ++Frame) Fixture.Round->Tick(0.01f);
+            TestEqual(TEXT("Simulation debt cannot release before visible windup has elapsed"), Target->GetAttributeSet()->GetHP(), 100.f);
+            for (int32 Frame = 0; Frame < 2 && Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Casting; ++Frame) Fixture.Round->Tick(0.01f);
+            if (!TestTrue(TEXT("Actual windup elapsed releases one hit into montage recovery"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Recovery && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), 83.0f))) return false;
             const FVector RecoveryLocation = Source->GetActorLocation();
             const FRotator RecoveryRotation = Source->GetActorRotation();
             for (int32 Step = 0; Step < 30; ++Step) Fixture.Round->Tick(0.01f);
@@ -1672,6 +1676,46 @@ bool FCombatRoundMontageRecoveryTest::RunTest(const FString& Parameters)
         TestTrue(Context + TEXT(" restores the home position and original facing"), Source->GetActorLocation().Equals(Origin, 2.0f) && Source->GetActorRotation().Equals(OriginalRotation, 0.1f));
         TestTrue(Context + TEXT(" applies no extra damage while returning"), FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), Case == 3 ? 100.0f : 83.0f));
         if (Case == 3) TestEqual(TEXT("Replacement recovery and return never repeat the damage"), Fixture.Enemies[1]->GetAttributeSet()->GetHP(), 83.f);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundHitchWindupTest, "ProjectA.Combat.Round.WindupUsesPresentationTimeAfterHitch", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundHitchWindupTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    UAnimMontage* AuthoredMontage = LoadObject<UAnimMontage>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/Unit/Animation/Montage/MM_Attack_01_Montage.MM_Attack_01_Montage"));
+    if (!TestNotNull(TEXT("A real montage supplies the cast metadata"), AuthoredMontage)) return false;
+    TStrongObjectPtr<UAnimMontage> Montage(DuplicateObject<UAnimMontage>(AuthoredMontage, GetTransientPackage()));
+    if (!TestTrue(TEXT("The transient montage has a finite positive length"), Montage.IsValid() && FMath::IsFinite(Montage->GetPlayLength()) && Montage->GetPlayLength() > 0.f)) return false;
+    Montage->RateScale = Montage->GetPlayLength();
+    Montage->BlendOut.SetBlendTime(0.1f);
+    Montage->bEnableAutoBlendOut = true;
+    for (FCompositeSection& Section : Montage->CompositeSections) Section.NextSectionName = NAME_None;
+    for (const bool bWithMontage : {false, true})
+    {
+        FCombatRoundSkill Skill;
+        Skill.Kind = ECombatRoundSkillKind::GroundAttack;
+        Skill.Approach = ECombatRoundApproach::None;
+        Skill.CastMontage = bWithMontage ? Montage.Get() : nullptr;
+        Skill.WindupSeconds = 0.2f;
+        Skill.Power = 17.f;
+        FFixture Fixture;
+        if (!TestTrue(TEXT("A slower caster waits before starting its authored windup"), Fixture.Initialize(1, 22.f, nullptr, FIntPoint(0, 3), 1, &Skill, 20.f))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Target = Fixture.Enemies[0];
+        if (!TestTrue(TEXT("The delayed cast submits and locks"), Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Target)) && Fixture.Ready(0))) return false;
+        if (!TestTrue(TEXT("The slower caster has not started at the ready boundary"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Waiting)) return false;
+        Fixture.Round->Tick(2.f);
+        TestTrue(TEXT("A slow first frame starts casting without instantly exhausting windup"), Fixture.Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Casting && Target->GetAttributeSet()->GetHP() == 100.f);
+        Fixture.Round->Tick(0.19f);
+        TestEqual(TEXT("Catch-up steps still cannot hit before the original visible windup"), Target->GetAttributeSet()->GetHP(), 100.f);
+        TestEqual(TEXT("The delayed cast charges its AP only at the ready boundary"), Source->GetCurrentActionPoint(), 1);
+        Fixture.Round->Tick(0.02f);
+        TestEqual(TEXT("Passing the original windup applies exactly one authored hit"), Target->GetAttributeSet()->GetHP(), 83.f);
+        if (!TestTrue(TEXT("The finite cast and recovery settle into the next planning round"), Fixture.AdvanceUntilNextRound(1))) return false;
+        TestEqual(TEXT("Remaining simulation debt and recovery cannot repeat the hit"), Target->GetAttributeSet()->GetHP(), 83.f);
     }
     return true;
 }
@@ -2616,4 +2660,98 @@ bool FCombatRoundDebugAddFinishedTest::RunTest(const FString& Parameters)
     }
     return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundDebugSkillTimingTest, "ProjectA.Combat.Round.DebugSkillTimingPreservesDefinitionsAndRebuilds", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundDebugSkillTimingTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    {
+        FCombatRoundSkill Authored;
+        Authored.Kind = ECombatRoundSkillKind::GroundAttack;
+        Authored.Approach = ECombatRoundApproach::None;
+        Authored.bUseEffectCollision = true;
+        Authored.EffectTags.AddTag(FGameplayTag::RequestGameplayTag(FName(TEXT("Data.Damage"))));
+        FFixture Fixture;
+        if (!TestTrue(TEXT("A debug fixture with two planning owners initializes"), Fixture.EnableDebugWorld() && Fixture.Initialize(2, 10.f, nullptr, FIntPoint(0, 3), 1, &Authored))) return false;
+        ACombatRoundCoordinator* Round = Fixture.Round;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Friend = Fixture.Humans[1];
+        AUnitBase* Enemy = Fixture.Enemies[0];
+        const TArray<TObjectPtr<USkillDefinitionDataAsset>> OriginalLoadout = Source->GetEquippedSkillDataAssets();
+        USkillDefinitionDataAsset* Definition = OriginalLoadout[0];
+        const FName SkillId(*Definition->GetPrimaryAssetId().ToString());
+        const FCombatRoundSkill OriginalDefinition = Definition->RoundDefinition;
+        Fixture.Controllers[1]->SetAsLocalPlayerController();
+        if (!TestTrue(TEXT("A second debug owner can equip the same authored asset"), Round->SetDebugUnitSkills(Fixture.Controllers[1], Friend->UnitIndex, {Definition}, Fixture.Error))) return false;
+        if (!TestNotNull(TEXT("The shared authored skill is present in the runtime cache"), Round->FindSkill(SkillId))) return false;
+        const FCombatRoundSkill OriginalRuntime = *Round->FindSkill(SkillId);
+        const FCombatRoundCommand EnemyCommand = Round->GetView().Units[2].Command;
+        if (!TestTrue(TEXT("Both owners plan the shared skill while only the first is ready"), Fixture.Submit(0, Fixture.Command(Source, SkillId, Enemy)) && Fixture.Submit(1, Fixture.Command(Friend, SkillId, Enemy)) && Fixture.Ready(0))) return false;
+        FCombatDebugSkillTiming Current;
+        FCombatDebugSkillTiming Original;
+        FSoftObjectPath Asset;
+        if (!TestTrue(TEXT("The public timing read identifies the original authored asset"), Round->GetDebugSkillTiming(Source->UnitIndex, SkillId, Current, Original, Asset, Fixture.Error) && Asset == FSoftObjectPath(Definition))) return false;
+        FCombatDebugSkillTiming Tuned = Current;
+        Tuned.WindupSeconds = 0.4f;
+        Tuned.EffectHitDelaySeconds = 0.25f;
+        Tuned.EffectDuration = 0.75f;
+        Tuned.ProjectileSpeed = 320.f;
+        Tuned.WeaponTraceDuration = 0.3f;
+        if (!TestTrue(TEXT("The owner can apply temporary timing to the shared skill"), Round->SetDebugSkillTiming(Fixture.Controllers[0], Source->UnitIndex, SkillId, Tuned, Fixture.Error))) return false;
+        FCombatRoundSkill Expected = OriginalRuntime;
+        Expected.WindupSeconds = Tuned.WindupSeconds;
+        Expected.EffectHitDelaySeconds = Tuned.EffectHitDelaySeconds;
+        Expected.EffectDuration = Tuned.EffectDuration;
+        Expected.ProjectileSpeed = Tuned.ProjectileSpeed;
+        Expected.WeaponTraceDuration = Tuned.WeaponTraceDuration;
+        TestTrue(TEXT("Only the requested timing values change; tags costs references and policy remain identical"), FCombatRoundSkill::StaticStruct()->CompareScriptStruct(&Expected, Round->FindSkill(SkillId), 0));
+        TestTrue(TEXT("Applying timing leaves the original data asset untouched"), FCombatRoundSkill::StaticStruct()->CompareScriptStruct(&OriginalDefinition, &Definition->RoundDefinition, 0));
+        TestTrue(TEXT("All human holders lose their plans and readiness while the enemy command remains"), Round->GetView().Units[0].Command.SkillId.IsNone() && Round->GetView().Units[1].Command.SkillId.IsNone() && !Round->GetView().Units[0].bReady && !Round->GetView().Units[1].bReady && SameCommand(EnemyCommand, Round->GetView().Units[2].Command));
+        const int32 Revision = Round->GetView().PlanRevision;
+        for (int32 Case = 0; Case < 5; ++Case)
+        {
+            FCombatDebugSkillTiming Invalid = Tuned;
+            if (Case == 0) Invalid.WindupSeconds = std::numeric_limits<float>::quiet_NaN();
+            else if (Case == 1) Invalid.EffectHitDelaySeconds = 10.5f;
+            else if (Case == 2) Invalid.EffectDuration = 0.f;
+            else if (Case == 3) Invalid.ProjectileSpeed = -1.f;
+            else Invalid.WeaponTraceDuration = std::numeric_limits<float>::infinity();
+            TestFalse(TEXT("Nonfinite and out-of-range timing cannot replace a valid override"), Round->SetDebugSkillTiming(Fixture.Controllers[0], Source->UnitIndex, SkillId, Invalid, Fixture.Error));
+        }
+        TestFalse(TEXT("The caller cannot tune another owner's unit"), Round->SetDebugSkillTiming(Fixture.Controllers[0], Friend->UnitIndex, SkillId, Tuned, Fixture.Error));
+        TestTrue(TEXT("Rejected requests preserve both runtime profile and planning revision"), Round->GetView().PlanRevision == Revision && FCombatRoundSkill::StaticStruct()->CompareScriptStruct(&Expected, Round->FindSkill(SkillId), 0));
+        if (!TestTrue(TEXT("Changing the loadout rebuilds the shared skill cache"), Round->SetDebugUnitSkills(Fixture.Controllers[0], Source->UnitIndex, {Definition}, Fixture.Error))) return false;
+        TestTrue(TEXT("Loadout reconstruction preserves the active temporary timing"), FCombatRoundSkill::StaticStruct()->CompareScriptStruct(&Expected, Round->FindSkill(SkillId), 0));
+        if (!TestTrue(TEXT("The owner restores the original timing through the public reset API"), Round->ResetDebugSkillTiming(Fixture.Controllers[0], Source->UnitIndex, SkillId, Fixture.Error))) return false;
+        TestTrue(TEXT("Reset restores the complete original runtime contract"), FCombatRoundSkill::StaticStruct()->CompareScriptStruct(&OriginalRuntime, Round->FindSkill(SkillId), 0));
+        if (!TestTrue(TEXT("A later cache rebuild keeps the reset values"), Round->SetDebugUnitSkills(Fixture.Controllers[0], Source->UnitIndex, OriginalLoadout, Fixture.Error))) return false;
+        TestTrue(TEXT("Reset removes the override instead of hiding it until rebuild"), FCombatRoundSkill::StaticStruct()->CompareScriptStruct(&OriginalRuntime, Round->FindSkill(SkillId), 0));
+        if (!TestTrue(TEXT("The unchanged skill still starts normal resolution"), Fixture.Submit(0, Fixture.Command(Source, SkillId, Enemy)) && Fixture.Ready(0) && Fixture.Ready(1))) return false;
+        TestFalse(TEXT("Timing changes are rejected after plans lock"), Round->SetDebugSkillTiming(Fixture.Controllers[0], Source->UnitIndex, SkillId, Tuned, Fixture.Error));
+        TestFalse(TEXT("Reset cannot bypass the resolving-phase guard"), Round->ResetDebugSkillTiming(Fixture.Controllers[0], Source->UnitIndex, SkillId, Fixture.Error));
+        TestTrue(TEXT("Resolving rejection preserves runtime and authored data"), FCombatRoundSkill::StaticStruct()->CompareScriptStruct(&OriginalRuntime, Round->FindSkill(SkillId), 0) && FCombatRoundSkill::StaticStruct()->CompareScriptStruct(&OriginalDefinition, &Definition->RoundDefinition, 0));
+    }
+    {
+        FFixture Fixture;
+        if (!TestTrue(TEXT("A disposable debug roster initializes for spawn reconstruction"), Fixture.EnableDebugWorld() && Fixture.InitializeUnconfiguredCombat())) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        const FName SkillId = Fixture.SkillId(Source, TEXT("Strike"));
+        FCombatDebugSkillTiming Current;
+        FCombatDebugSkillTiming Original;
+        FSoftObjectPath Asset;
+        if (!TestTrue(TEXT("The existing skill exposes its debug timing"), Fixture.Round->GetDebugSkillTiming(Source->UnitIndex, SkillId, Current, Original, Asset, Fixture.Error))) return false;
+        Current.WindupSeconds += 0.125f;
+        if (!TestTrue(TEXT("A temporary override is active before spawning"), Fixture.Round->SetDebugSkillTiming(Fixture.Controllers[0], Source->UnitIndex, SkillId, Current, Fixture.Error))) return false;
+        ACombatGridTile* Tile = Fixture.Round->FindDebugSpawnTile(true);
+        if (!TestNotNull(TEXT("The debug enemy has a legal free tile"), Tile)) return false;
+        AUnitBase* Added = Fixture.AddUnit(Tile->GridCoord, ETeam::Enemy);
+        FName AddedSkillId;
+        if (!TestTrue(TEXT("Adding a debug enemy rebuilds the complete skill cache"), Added && Fixture.GiveRoundSkill(Added, nullptr, AddedSkillId) && Fixture.Round->AddDebugUnit(Fixture.Controllers[0], Added, Fixture.Error))) return false;
+        if (!TestNotNull(TEXT("Roster reconstruction retains the existing skill"), Fixture.Round->FindSkill(SkillId))) return false;
+        TestEqual(TEXT("Roster reconstruction retains existing timing overrides"), Fixture.Round->FindSkill(SkillId)->WindupSeconds, Current.WindupSeconds);
+    }
+    return true;
+}
+
 #endif

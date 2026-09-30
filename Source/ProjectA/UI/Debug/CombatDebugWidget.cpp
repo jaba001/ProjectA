@@ -23,6 +23,8 @@
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "GAS/Attribute/AS_Unit.h"
 #include "GAS/CombatGameplayTags.h"
+#include "HAL/IConsoleManager.h"
+#include "HAL/PlatformApplicationMisc.h"
 #include "Misc/DefaultValueHelper.h"
 #include "UI/Combat/CombatRoundPlanningWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
@@ -66,6 +68,61 @@ namespace
             if (ElementCategory.Element.IsValid() && Tags.HasTag(ElementCategory.Element)) ++ElementCount;
         }
         return ElementCount >= Category.MinimumElements && ElementCount <= Category.MaximumElements;
+    }
+
+    struct FDebugSkillMethod
+    {
+        const TCHAR* Label;
+        const TCHAR* Tooltip;
+        FGameplayTagQuery Query;
+    };
+
+    FGameplayTagQuery MakeDebugSkillMethodQuery(const TArray<FGameplayTag>& Included, const TArray<FGameplayTag>& Excluded)
+    {
+        FGameplayTagQueryExpression Root;
+        Root.AllExprMatch();
+        if (!Included.IsEmpty())
+        {
+            FGameplayTagQueryExpression Any;
+            Any.AnyTagsMatch();
+            for (FGameplayTag Tag : Included) Any.AddTag(Tag);
+            Root.AddExpr(Any);
+        }
+        if (!Excluded.IsEmpty())
+        {
+            FGameplayTagQueryExpression None;
+            None.NoTagsMatch();
+            for (FGameplayTag Tag : Excluded) None.AddTag(Tag);
+            Root.AddExpr(None);
+        }
+        return FGameplayTagQuery::BuildQuery(Root);
+    }
+
+    // Support effects take precedence over their area shape; beam attacks remain area skills.
+    // 지원 효과는 범위 형태보다 우선하며 빔 공격은 범위형 스킬로 분류합니다.
+    const TArray<FDebugSkillMethod>& GetDebugSkillMethods()
+    {
+        static const TArray<FDebugSkillMethod> Methods = []
+        {
+            const TArray<FGameplayTag> Support = { ProjectACombatTags::Skill_Effect_Heal, ProjectACombatTags::Skill_Effect_Shield };
+            TArray<FGameplayTag> Classified = Support;
+            Classified.Append({ ProjectACombatTags::Skill_Shape_Projectile, ProjectACombatTags::Skill_Shape_Area, ProjectACombatTags::Skill_Shape_Beam, ProjectACombatTags::Skill_Shape_Slash });
+            return TArray<FDebugSkillMethod>
+            {
+                { TEXT("전체"), TEXT("모든 방식의 스킬 · 선택한 속성과 검색 조건 적용"), FGameplayTagQuery() },
+                { TEXT("투사체"), TEXT("투사체 형태의 공격 스킬"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Projectile }, Support) },
+                { TEXT("범위형"), TEXT("범위·직선 빔 공격 스킬 · 치유·보호막 제외"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Area, ProjectACombatTags::Skill_Shape_Beam }, Support) },
+                { TEXT("근접공격"), TEXT("베기·회전 공격 스킬 · 여러 적을 공격할 수 있음"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Slash }, Support) },
+                { TEXT("지원형"), TEXT("치유·보호막 스킬"), MakeDebugSkillMethodQuery(Support, {}) },
+                { TEXT("미분류"), TEXT("방식·지원 효과 분류 태그가 없는 스킬 · CSV의 보류 에셋과 별개"), MakeDebugSkillMethodQuery({}, Classified) }
+            };
+        }();
+        return Methods;
+    }
+
+    bool MatchesDebugSkillMethod(const FGameplayTagContainer& Tags, const FDebugSkillMethod& Method)
+    {
+        return Method.Query.IsEmpty() || Method.Query.Matches(Tags);
     }
 
     FString GetDebugUnitDisplayName(const AUnitBase* Unit)
@@ -172,37 +229,73 @@ void UCombatDebugWidget::NativeOnInitialized()
     UVerticalBox* SkillTab = WidgetTree->ConstructWidget<UVerticalBox>();
     UVerticalBox* EquipmentTab = WidgetTree->ConstructWidget<UVerticalBox>();
     UVerticalBox* UnitTab = WidgetTree->ConstructWidget<UVerticalBox>();
+    UVerticalBox* TimingTab = WidgetTree->ConstructWidget<UVerticalBox>();
     Tabs->AddChildToHorizontalBox(SkillTab)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     Tabs->AddChildToHorizontalBox(EquipmentTab)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     Tabs->AddChildToHorizontalBox(UnitTab)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    Tabs->AddChildToHorizontalBox(TimingTab)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     AddButton(SkillTab, TEXT("스킬 구입"))->OnClicked.AddDynamic(this, &UCombatDebugWidget::ShowSkills);
     AddButton(EquipmentTab, TEXT("장비"))->OnClicked.AddDynamic(this, &UCombatDebugWidget::ShowEquipment);
     AddButton(UnitTab, TEXT("캐릭터·체력"))->OnClicked.AddDynamic(this, &UCombatDebugWidget::ShowUnitTools);
+    AddButton(TimingTab, TEXT("스킬 타이밍"))->OnClicked.AddDynamic(this, &UCombatDebugWidget::ShowSkillTiming);
 
     LoadoutPanel = WidgetTree->ConstructWidget<UVerticalBox>();
     Body->AddChildToVerticalBox(LoadoutPanel)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    AddText(LoadoutPanel, TEXT("계획 단계에서 무료 추가·제거 · 스킬 최대 5개 · 장비는 외형만 변경"));
-    Status = AddText(LoadoutPanel, TEXT("전투 준비 중"));
+    // Scroll wrapped filters with the lists to keep the catalog reachable in small viewports.
+    // 작은 화면에서도 목록에 접근할 수 있도록 줄바꿈된 분류 영역을 목록과 함께 스크롤합니다.
+    UScrollBox* LoadoutScroll = WidgetTree->ConstructWidget<UScrollBox>();
+    LoadoutPanel->AddChildToVerticalBox(LoadoutScroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    UVerticalBox* LoadoutBody = WidgetTree->ConstructWidget<UVerticalBox>();
+    LoadoutScroll->AddChild(LoadoutBody);
+    AddText(LoadoutBody, TEXT("계획 단계에서 무료 추가·제거 · 스킬 최대 5개 · 장비는 외형만 변경"));
+    Status = AddText(LoadoutBody, TEXT("전투 준비 중"));
     SkillCategoryTabs = WidgetTree->ConstructWidget<UWrapBox>();
     SkillCategoryTabs->SetInnerSlotPadding(FVector2D(6.f, 4.f));
-    LoadoutPanel->AddChildToVerticalBox(SkillCategoryTabs)->SetPadding(FMargin(0.f, 4.f, 0.f, 6.f));
+    LoadoutBody->AddChildToVerticalBox(SkillCategoryTabs)->SetPadding(FMargin(0.f, 4.f, 0.f, 6.f));
+    UTextBlock* ElementLabel = WidgetTree->ConstructWidget<UTextBlock>();
+    ElementLabel->SetText(FText::FromString(TEXT("속성")));
+    UDemonicUITheme::Get().StyleText(ElementLabel, false, 14);
+    SkillCategoryTabs->AddChildToWrapBox(ElementLabel);
     const TArray<FDebugSkillCategory>& Categories = GetDebugSkillCategories();
     for (int32 Index = 0; Index < Categories.Num(); ++Index)
     {
         UCombatDebugActionButton* Button = WidgetTree->ConstructWidget<UCombatDebugActionButton>();
         Button->Initialize(ECombatDebugAction::SelectSkillCategory, FSoftObjectPath(), Index, FGameplayTag());
         Button->OnAction.AddUObject(this, &UCombatDebugWidget::HandleAction);
-        Button->SetToolTipText(FText::FromString(Index == Categories.Num() - 1 ? TEXT("등록된 다섯 속성의 태그가 없는 스킬") : Index == Categories.Num() - 2 ? TEXT("두 가지 이상 속성 태그가 있는 스킬 · 해당 속성 탭에도 표시") : TEXT("선택한 속성과 검색어에 맞는 미보유 스킬")));
+        Button->SetToolTipText(FText::FromString(Index == Categories.Num() - 1 ? TEXT("등록된 다섯 속성의 태그가 없는 스킬") : Index == Categories.Num() - 2 ? TEXT("두 가지 이상 속성 태그가 있는 스킬 · 해당 속성 탭에도 표시") : TEXT("선택한 방식과 검색 조건을 함께 적용하는 속성 필터")));
         Button->SetContent(WidgetTree->ConstructWidget<UTextBlock>());
         CastChecked<UButtonSlot>(Button->GetContent()->Slot)->SetPadding(FMargin(8.f, 4.f));
         SkillCategoryTabs->AddChildToWrapBox(Button);
         SkillCategoryButtons.Add(Button);
     }
     RefreshSkillCategories({});
+    SkillMethodTabs = WidgetTree->ConstructWidget<UWrapBox>();
+    SkillMethodTabs->SetInnerSlotPadding(FVector2D(6.f, 4.f));
+    LoadoutBody->AddChildToVerticalBox(SkillMethodTabs)->SetPadding(FMargin(0.f, 0.f, 0.f, 6.f));
+    UTextBlock* MethodLabel = WidgetTree->ConstructWidget<UTextBlock>();
+    MethodLabel->SetText(FText::FromString(TEXT("방식")));
+    UDemonicUITheme::Get().StyleText(MethodLabel, false, 14);
+    SkillMethodTabs->AddChildToWrapBox(MethodLabel);
+    const TArray<FDebugSkillMethod>& Methods = GetDebugSkillMethods();
+    for (int32 Index = 0; Index < Methods.Num(); ++Index)
+    {
+        UCombatDebugActionButton* Button = WidgetTree->ConstructWidget<UCombatDebugActionButton>();
+        Button->Initialize(ECombatDebugAction::SelectSkillMethod, FSoftObjectPath(), Index, FGameplayTag());
+        Button->OnAction.AddUObject(this, &UCombatDebugWidget::HandleAction);
+        Button->SetToolTipText(FText::FromString(Methods[Index].Tooltip));
+        Button->SetContent(WidgetTree->ConstructWidget<UTextBlock>());
+        CastChecked<UButtonSlot>(Button->GetContent()->Slot)->SetPadding(FMargin(8.f, 4.f));
+        SkillMethodTabs->AddChildToWrapBox(Button);
+        SkillMethodButtons.Add(Button);
+    }
+    RefreshSkillMethods({});
     // Give owned items and the catalog separate scrolling space so the purchase list stays visible.
     // 구입 목록이 가려지지 않도록 보유 목록과 전체 목록에 독립적인 스크롤 공간을 제공합니다.
     UHorizontalBox* Lists = WidgetTree->ConstructWidget<UHorizontalBox>();
-    LoadoutPanel->AddChildToVerticalBox(Lists)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    LoadoutListBounds = WidgetTree->ConstructWidget<USizeBox>();
+    LoadoutListBounds->SetHeightOverride(260.f);
+    LoadoutListBounds->SetContent(Lists);
+    LoadoutBody->AddChildToVerticalBox(LoadoutListBounds)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     UScrollBox* OwnedScroll = WidgetTree->ConstructWidget<UScrollBox>();
     UHorizontalBoxSlot* OwnedSlot = Lists->AddChildToHorizontalBox(OwnedScroll);
     FSlateChildSize OwnedSize(ESlateSizeRule::Fill);
@@ -224,6 +317,41 @@ void UCombatDebugWidget::NativeOnInitialized()
     CatalogBody->AddChildToVerticalBox(CatalogScroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     CatalogList = WidgetTree->ConstructWidget<UVerticalBox>();
     CatalogScroll->AddChild(CatalogList);
+
+    SkillTimingPanel = WidgetTree->ConstructWidget<UScrollBox>();
+    SkillTimingPanel->SetVisibility(ESlateVisibility::Collapsed);
+    Body->AddChildToVerticalBox(SkillTimingPanel)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    UVerticalBox* TimingBody = WidgetTree->ConstructWidget<UVerticalBox>();
+    SkillTimingPanel->AddChild(TimingBody);
+    AddText(TimingBody, TEXT("선택 아군의 보유 스킬 타이밍"), 18);
+    AddText(TimingBody, TEXT("같은 스킬을 쓰는 아군·적군 전체에 임시 적용합니다. 원본 에셋은 저장하지 않으며 전투 초기화 시 복원됩니다."));
+    TimingSkillChoice = WidgetTree->ConstructWidget<UDemonicComboBoxString>();
+    TimingBody->AddChildToVerticalBox(TimingSkillChoice);
+    TimingSkillChoice->OnSelectionChanged.AddDynamic(this, &UCombatDebugWidget::HandleTimingSkill);
+    TimingAssetPath = AddText(TimingBody, TEXT("아군의 보유 스킬을 선택하세요."), 12);
+    TimingOriginalValues = AddText(TimingBody, TEXT(""), 12);
+    const auto AddTimingInput = [this, TimingBody](const TCHAR* Label)
+    {
+        AddText(TimingBody, Label);
+        UEditableTextBox* Input = WidgetTree->ConstructWidget<UEditableTextBox>();
+        Input->SetSelectAllTextWhenFocused(true);
+        Input->SetIsEnabled(false);
+        TimingBody->AddChildToVerticalBox(Input);
+        return Input;
+    };
+    WindupInput = AddTimingInput(TEXT("시전 준비 · 초 (0~60)"));
+    EffectDelayInput = AddTimingInput(TEXT("VFX 발생 뒤 판정 대기 · 초 (0~10, 효과 충돌 스킬)"));
+    EffectDurationInput = AddTimingInput(TEXT("효과 충돌 판정 지속 · 초 (0 초과~10)"));
+    ProjectileSpeedInput = AddTimingInput(TEXT("기본 투사체 속도 · cm/s (0 초과~100,000, 공통 배율 적용 전)"));
+    WeaponDurationInput = AddTimingInput(TEXT("무기 궤적 판정 지속 · 초 (0 초과~5, 준비+지속 60 이하)"));
+    AddText(TimingBody, TEXT("회색 항목은 이 스킬에서 사용하지 않습니다. 투사체 속도 변경은 수명을 바꾸지 않으므로 최대 도달거리도 바뀝니다. 효과 지속은 판정 시간이며 원본 VFX 재생 길이는 유지됩니다."), 12);
+    TimingApplyButton = AddButton(TimingBody, TEXT("입력값 임시 적용"));
+    TimingApplyButton->OnClicked.AddDynamic(this, &UCombatDebugWidget::ApplySkillTiming);
+    TimingResetButton = AddButton(TimingBody, TEXT("원본값으로 복원"));
+    TimingResetButton->OnClicked.AddDynamic(this, &UCombatDebugWidget::ResetSkillTiming);
+    TimingCopyButton = AddButton(TimingBody, TEXT("에셋 경로 + 입력 설정값 복사"));
+    TimingCopyButton->OnClicked.AddDynamic(this, &UCombatDebugWidget::CopySkillTiming);
+    TimingStatus = AddText(TimingBody, TEXT("전투 준비 중"), 13);
 
     UnitToolsPanel = WidgetTree->ConstructWidget<UScrollBox>();
     UnitToolsPanel->SetVisibility(ESlateVisibility::Collapsed);
@@ -301,6 +429,7 @@ void UCombatDebugWidget::NativeOnInitialized()
     ReviveButton->OnClicked.AddDynamic(this, &UCombatDebugWidget::ReviveSelectedAlly);
     ReviveStatus = AddText(ReviveBody, TEXT("전투 준비 중"), 13);
     AddButton(UnitBody, TEXT("전투 초기화 · 처음 장착으로 복원"))->OnClicked.AddDynamic(this, &UCombatDebugWidget::RestartCombat);
+    RefreshSkillTiming();
     UDemonicUITheme::Get().ApplyControls(WidgetTree);
 }
 
@@ -319,7 +448,9 @@ void UCombatDebugWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
     if (RefreshElapsed < 0.15f) return;
     RefreshElapsed = 0.f;
     PanelSize->SetWidthOverride(FMath::Clamp(static_cast<float>(MyGeometry.GetLocalSize().X) - 48.f, 260.f, 920.f));
-    PanelSize->SetHeightOverride(FMath::Clamp(static_cast<float>(MyGeometry.GetLocalSize().Y) - 380.f, 260.f, 760.f));
+    const float PanelHeight = FMath::Clamp(static_cast<float>(MyGeometry.GetLocalSize().Y) - 380.f, 260.f, 760.f);
+    PanelSize->SetHeightOverride(PanelHeight);
+    LoadoutListBounds->SetHeightOverride(FMath::Max(220.f, PanelHeight - 300.f));
     RefreshState();
 }
 
@@ -340,6 +471,7 @@ void UCombatDebugWidget::RefreshState()
         OwnedList->ClearChildren();
         CatalogList->ClearChildren();
         RefreshSkillCategories({});
+        RefreshSkillMethods({});
         OwnedList->SetIsEnabled(false);
         CatalogList->SetIsEnabled(false);
         const ACombatDebugGameMode* Mode = GetWorld()->GetAuthGameMode<ACombatDebugGameMode>();
@@ -348,9 +480,11 @@ void UCombatDebugWidget::RefreshState()
         AllySpawnMessage = FText::GetEmpty();
         EnemySpawnMessage = FText::GetEmpty();
         HealthMessage = FText::GetEmpty();
+        TimingMessage = FText::GetEmpty();
         RefreshReviveState();
         RefreshSpawnState();
         RefreshHealthState();
+        RefreshSkillTiming();
         return;
     }
     Controller->GetDebugLoadout();
@@ -361,11 +495,15 @@ void UCombatDebugWidget::RefreshState()
         ObservedRevision = INDEX_NONE;
         SelectedUnitId = INDEX_NONE;
         HealthInputUnitId = INDEX_NONE;
+        TimingInputUnitId = INDEX_NONE;
+        SelectedTimingSkill = NAME_None;
+        TimingInputSkill = NAME_None;
         ActionMessage = FText::GetEmpty();
         ReviveMessage = FText::GetEmpty();
         AllySpawnMessage = FText::GetEmpty();
         EnemySpawnMessage = FText::GetEmpty();
         HealthMessage = FText::GetEmpty();
+        TimingMessage = FText::GetEmpty();
         RebuildSpawnOptions();
     }
     const bool bUnitsChanged = RefreshUnitOptions();
@@ -382,6 +520,7 @@ void UCombatDebugWidget::RefreshState()
     RefreshReviveState();
     RefreshSpawnState();
     RefreshHealthState();
+    RefreshSkillTiming();
 }
 
 bool UCombatDebugWidget::RefreshUnitOptions()
@@ -513,6 +652,188 @@ void UCombatDebugWidget::ApplyHealth(bool bFullHeal)
     RefreshState();
 }
 
+void UCombatDebugWidget::RefreshSkillTiming(bool bResetInput)
+{
+    ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
+    ACombatRoundCoordinator* Round = Controller ? Controller->GetRoundCoordinator() : nullptr;
+    const FCombatRoundUnitView* Selected = Round ? Round->GetView().Units.FindByPredicate([this](const FCombatRoundUnitView& Unit) { return Unit.UnitId == SelectedUnitId; }) : nullptr;
+    TMap<FString, FName> AvailableOptions;
+    TArray<FString> Labels;
+    FString SelectedLabel;
+    bool bOptionsChanged = false;
+    if (Selected && !Selected->bEnemy && Selected->OwnerSlot == Round->GetParticipantSlot(Controller) && IsValid(Selected->Unit))
+    {
+        for (FName SkillId : Selected->SkillIds)
+        {
+            const FCombatRoundSkill* Skill = Round->FindSkill(SkillId);
+            if (!Skill) continue;
+            const FString Label = FString::Printf(TEXT("%d · %s"), Labels.Num() + 1, Skill->Name.IsEmpty() ? *SkillId.ToString() : *Skill->Name.ToString());
+            Labels.Add(Label);
+            AvailableOptions.Add(Label, SkillId);
+            const FName* PreviousId = TimingSkillOptions.Find(Label);
+            bOptionsChanged |= !PreviousId || *PreviousId != SkillId;
+            if (SelectedTimingSkill == SkillId) SelectedLabel = Label;
+        }
+    }
+    bOptionsChanged |= AvailableOptions.Num() != TimingSkillOptions.Num();
+    if (SelectedLabel.IsEmpty() && !Labels.IsEmpty()) SelectedLabel = Labels[0];
+    if (bOptionsChanged || TimingSkillChoice->GetSelectedOption() != SelectedLabel)
+    {
+        bRefreshingTimingSkills = true;
+        TimingSkillOptions = MoveTemp(AvailableOptions);
+        TimingSkillChoice->ClearOptions();
+        for (const FString& Label : Labels) TimingSkillChoice->AddOption(Label);
+        if (!SelectedLabel.IsEmpty()) TimingSkillChoice->SetSelectedOption(SelectedLabel);
+        bRefreshingTimingSkills = false;
+    }
+    const FName* SelectedId = TimingSkillOptions.Find(SelectedLabel);
+    SelectedTimingSkill = SelectedId ? *SelectedId : NAME_None;
+    TimingSkillChoice->SetIsEnabled(!TimingSkillOptions.IsEmpty());
+    FCombatDebugSkillTiming Current;
+    FCombatDebugSkillTiming Original;
+    FSoftObjectPath Asset;
+    FText Error = FText::FromString(TEXT("위 대상 목록에서 아군을 고르고 보유 스킬을 선택하세요."));
+    const bool bHasSkill = Round && !SelectedTimingSkill.IsNone() && Round->GetDebugSkillTiming(SelectedUnitId, SelectedTimingSkill, Current, Original, Asset, Error);
+    const FCombatRoundSkill* Skill = bHasSkill ? Round->FindSkill(SelectedTimingSkill) : nullptr;
+    const bool bCanEdit = Skill && Round->CanEditDebugUnit(Controller, SelectedUnitId, Error);
+    WindupInput->SetIsEnabled(bCanEdit);
+    EffectDelayInput->SetIsEnabled(bCanEdit && Skill->bUseEffectCollision);
+    EffectDurationInput->SetIsEnabled(bCanEdit && Skill->bUseEffectCollision);
+    ProjectileSpeedInput->SetIsEnabled(bCanEdit && Skill->Kind == ECombatRoundSkillKind::Projectile);
+    WeaponDurationInput->SetIsEnabled(bCanEdit && Skill->bUseWeaponTrace);
+    TimingApplyButton->SetIsEnabled(bCanEdit);
+    TimingResetButton->SetIsEnabled(bCanEdit);
+    TimingCopyButton->SetIsEnabled(bHasSkill);
+    if (!bHasSkill)
+    {
+        TimingInputUnitId = INDEX_NONE;
+        TimingInputSkill = NAME_None;
+        TimingMessage = FText::GetEmpty();
+        TimingAssetPath->SetText(FText::FromString(TEXT("아군의 보유 스킬을 선택하세요.")));
+        TimingOriginalValues->SetText(FText::GetEmpty());
+        for (UEditableTextBox* Input : { WindupInput.Get(), EffectDelayInput.Get(), EffectDurationInput.Get(), ProjectileSpeedInput.Get(), WeaponDurationInput.Get() }) Input->SetText(FText::GetEmpty());
+        TimingStatus->SetText(Error);
+        return;
+    }
+    TimingAssetPath->SetText(FText::FromString(Asset.ToString()));
+    FString OriginalValues = FString::Printf(TEXT("원본값: 준비 %g초 · 효과 대기 %g초 / 지속 %g초 · 투사체 %gcm/s · 무기 판정 %g초"), Original.WindupSeconds, Original.EffectHitDelaySeconds, Original.EffectDuration, Original.ProjectileSpeed, Original.WeaponTraceDuration);
+    if (Skill->Kind == ECombatRoundSkillKind::Projectile)
+    {
+        const IConsoleVariable* SpeedVariable = IConsoleManager::Get().FindConsoleVariable(TEXT("projecta.Combat.ProjectileSpeedScale"));
+        const float RequestedScale = SpeedVariable ? SpeedVariable->GetFloat() : 0.5f;
+        const float SpeedScale = FMath::IsFinite(RequestedScale) ? FMath::Clamp(RequestedScale, 0.1f, 2.f) : 0.5f;
+        OriginalValues += FString::Printf(TEXT("\n현재 전투 비행 속도: %g × %g = %gcm/s"), Current.ProjectileSpeed, SpeedScale, Current.ProjectileSpeed * SpeedScale);
+    }
+    TimingOriginalValues->SetText(FText::FromString(OriginalValues));
+    // Keep drafts stable through polling; only a changed selection or a completed action reloads values.
+    // 주기 갱신 중에는 초안을 유지하고 선택 변경 또는 조작 완료 시에만 값을 다시 읽습니다.
+    if (bResetInput || TimingInputUnitId != SelectedUnitId || TimingInputSkill != SelectedTimingSkill)
+    {
+        if (TimingInputUnitId != SelectedUnitId || TimingInputSkill != SelectedTimingSkill) TimingMessage = FText::GetEmpty();
+        TimingInputUnitId = SelectedUnitId;
+        TimingInputSkill = SelectedTimingSkill;
+        WindupInput->SetText(FText::FromString(FString::SanitizeFloat(Current.WindupSeconds)));
+        EffectDelayInput->SetText(FText::FromString(FString::SanitizeFloat(Current.EffectHitDelaySeconds)));
+        EffectDurationInput->SetText(FText::FromString(FString::SanitizeFloat(Current.EffectDuration)));
+        ProjectileSpeedInput->SetText(FText::FromString(FString::SanitizeFloat(Current.ProjectileSpeed)));
+        WeaponDurationInput->SetText(FText::FromString(FString::SanitizeFloat(Current.WeaponTraceDuration)));
+    }
+    const FText Availability = bCanEdit ? FText::FromString(TEXT("계획 단계에서 적용 · 같은 스킬 보유 아군의 계획/준비 해제 · 적 계획 유지")) : Error;
+    TimingStatus->SetText(TimingMessage.IsEmpty() ? Availability : FText::Format(FText::FromString(TEXT("{0}\n{1}")), TimingMessage, Availability));
+}
+
+bool UCombatDebugWidget::ReadSkillTimingInputs(FCombatDebugSkillTiming& OutTiming, FText& OutError) const
+{
+    const ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
+    const ACombatRoundCoordinator* Round = Controller ? Controller->GetRoundCoordinator() : nullptr;
+    FCombatDebugSkillTiming Original;
+    FSoftObjectPath Asset;
+    if (!Round || !Round->GetDebugSkillTiming(SelectedUnitId, SelectedTimingSkill, OutTiming, Original, Asset, OutError)) return false;
+    const FCombatRoundSkill* Skill = Round->FindSkill(SelectedTimingSkill);
+    if (!Skill) return false;
+    const auto Parse = [](const UEditableTextBox* Input, float& Value)
+    {
+        return FDefaultValueHelper::ParseFloat(Input->GetText().ToString().TrimStartAndEnd(), Value) && FMath::IsFinite(Value);
+    };
+    if (!Parse(WindupInput, OutTiming.WindupSeconds) || (Skill->bUseEffectCollision && (!Parse(EffectDelayInput, OutTiming.EffectHitDelaySeconds) || !Parse(EffectDurationInput, OutTiming.EffectDuration))) || (Skill->Kind == ECombatRoundSkillKind::Projectile && !Parse(ProjectileSpeedInput, OutTiming.ProjectileSpeed)) || (Skill->bUseWeaponTrace && !Parse(WeaponDurationInput, OutTiming.WeaponTraceDuration)))
+    {
+        OutError = FText::FromString(TEXT("사용 중인 항목에 쉼표 없이 올바른 숫자를 입력하세요."));
+        return false;
+    }
+    FCombatRoundSkill Candidate = *Skill;
+    Candidate.WindupSeconds = OutTiming.WindupSeconds;
+    Candidate.EffectHitDelaySeconds = OutTiming.EffectHitDelaySeconds;
+    Candidate.EffectDuration = OutTiming.EffectDuration;
+    Candidate.ProjectileSpeed = OutTiming.ProjectileSpeed;
+    Candidate.WeaponTraceDuration = OutTiming.WeaponTraceDuration;
+    if (!CombatRoundRules::IsValidSkill(Candidate))
+    {
+        OutError = FText::FromString(TEXT("입력값이 항목의 허용 범위를 벗어났습니다. 무기 판정은 준비+지속 60초 이하입니다."));
+        return false;
+    }
+    return true;
+}
+
+void UCombatDebugWidget::ShowSkillTiming()
+{
+    LoadoutPanel->SetVisibility(ESlateVisibility::Collapsed);
+    UnitToolsPanel->SetVisibility(ESlateVisibility::Collapsed);
+    SkillTimingPanel->SetVisibility(ESlateVisibility::Visible);
+    RefreshSkillTiming();
+}
+
+void UCombatDebugWidget::HandleTimingSkill(FString Value, ESelectInfo::Type SelectionType)
+{
+    if (bRefreshingTimingSkills) return;
+    const FName* SkillId = TimingSkillOptions.Find(Value);
+    SelectedTimingSkill = SkillId ? *SkillId : NAME_None;
+    TimingMessage = FText::GetEmpty();
+    RefreshSkillTiming(true);
+}
+
+void UCombatDebugWidget::ApplySkillTiming()
+{
+    ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
+    ACombatRoundCoordinator* Round = Controller ? Controller->GetRoundCoordinator() : nullptr;
+    FCombatDebugSkillTiming Timing;
+    FText Error;
+    const bool bSucceeded = Round && ReadSkillTimingInputs(Timing, Error) && Round->SetDebugSkillTiming(Controller, SelectedUnitId, SelectedTimingSkill, Timing, Error);
+    TimingMessage = bSucceeded ? FText::FromString(TEXT("입력값을 현재 전투에 임시 적용했습니다.")) : Error;
+    RefreshSkillTiming(bSucceeded);
+    RefreshState();
+}
+
+void UCombatDebugWidget::ResetSkillTiming()
+{
+    ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
+    ACombatRoundCoordinator* Round = Controller ? Controller->GetRoundCoordinator() : nullptr;
+    FText Error;
+    const bool bSucceeded = Round && Round->ResetDebugSkillTiming(Controller, SelectedUnitId, SelectedTimingSkill, Error);
+    TimingMessage = bSucceeded ? FText::FromString(TEXT("현재 전투의 타이밍을 원본 에셋 값으로 복원했습니다.")) : Error;
+    RefreshSkillTiming(bSucceeded);
+    RefreshState();
+}
+
+void UCombatDebugWidget::CopySkillTiming()
+{
+    const ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
+    const ACombatRoundCoordinator* Round = Controller ? Controller->GetRoundCoordinator() : nullptr;
+    FCombatDebugSkillTiming Timing;
+    FCombatDebugSkillTiming Original;
+    FSoftObjectPath Asset;
+    FText Error;
+    if (!Round || !Round->GetDebugSkillTiming(SelectedUnitId, SelectedTimingSkill, Timing, Original, Asset, Error) || !ReadSkillTimingInputs(Timing, Error))
+    {
+        TimingMessage = Error;
+        RefreshSkillTiming();
+        return;
+    }
+    const FString Settings = FString::Printf(TEXT("Asset=%s\nSkillId=%s\nWindupSeconds=%.9g\nEffectHitDelaySeconds=%.9g\nEffectDuration=%.9g\nProjectileSpeed=%.9g\nWeaponTraceDuration=%.9g\n"), *Asset.ToString(), *SelectedTimingSkill.ToString(), Timing.WindupSeconds, Timing.EffectHitDelaySeconds, Timing.EffectDuration, Timing.ProjectileSpeed, Timing.WeaponTraceDuration);
+    FPlatformApplicationMisc::ClipboardCopy(*Settings);
+    TimingMessage = FText::FromString(TEXT("에셋 경로와 입력 설정값을 클립보드에 복사했습니다. 원본 에셋은 저장하지 않았습니다."));
+    RefreshSkillTiming();
+}
+
 void UCombatDebugWidget::ApplyUnitHealth()
 {
     ApplyHealth(false);
@@ -625,10 +946,16 @@ void UCombatDebugWidget::RebuildLists()
     if (!OwnedList || !CatalogList) return;
     const TArray<FDebugSkillCategory>& Categories = GetDebugSkillCategories();
     if (!Categories.IsValidIndex(SelectedSkillCategory)) SelectedSkillCategory = 0;
+    const TArray<FDebugSkillMethod>& Methods = GetDebugSkillMethods();
+    if (!Methods.IsValidIndex(SelectedSkillMethod)) SelectedSkillMethod = 0;
     TArray<int32> CategoryCounts;
     CategoryCounts.Init(0, Categories.Num());
+    TArray<int32> MethodCounts;
+    MethodCounts.Init(0, Methods.Num());
     RefreshSkillCategories(CategoryCounts);
+    RefreshSkillMethods(MethodCounts);
     SkillCategoryTabs->SetVisibility(bEquipment ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+    SkillMethodTabs->SetVisibility(bEquipment ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
     OwnedList->ClearChildren();
     CatalogList->ClearChildren();
     ACombatDebugPlayerController* Controller = GetOwningPlayer<ACombatDebugPlayerController>();
@@ -660,16 +987,31 @@ void UCombatDebugWidget::RebuildLists()
             const bool bOwned = Skills.ContainsByPredicate([&Asset](const USkillDefinitionDataAsset* Skill) { return Skill && FSoftObjectPath(Skill) == Asset; });
             if (bOwned) continue;
             const FGameplayTagContainer& Tags = Loadout->GetSkillTags(Asset);
-            for (int32 Index = 0; Index < Categories.Num(); ++Index)
+            const bool bMatchesElement = MatchesDebugSkillCategory(Tags, Categories[SelectedSkillCategory]);
+            const bool bMatchesMethod = MatchesDebugSkillMethod(Tags, Methods[SelectedSkillMethod]);
+            // Count each facet against the other selection so counts describe the next filter result.
+            // 각 분류의 개수에는 다른 분류의 선택을 적용하여 다음 선택의 결과 수를 표시합니다.
+            if (bMatchesMethod)
             {
-                if (MatchesDebugSkillCategory(Tags, Categories[Index])) ++CategoryCounts[Index];
+                for (int32 Index = 0; Index < Categories.Num(); ++Index)
+                {
+                    if (MatchesDebugSkillCategory(Tags, Categories[Index])) ++CategoryCounts[Index];
+                }
             }
-            if (!MatchesDebugSkillCategory(Tags, Categories[SelectedSkillCategory])) continue;
+            if (bMatchesElement)
+            {
+                for (int32 Index = 0; Index < Methods.Num(); ++Index)
+                {
+                    if (MatchesDebugSkillMethod(Tags, Methods[Index])) ++MethodCounts[Index];
+                }
+            }
+            if (!bMatchesElement || !bMatchesMethod) continue;
             AddAction(CatalogList, TEXT("추가 · ") + DisplayName + TEXT("\n") + Asset.GetAssetName(), ECombatDebugAction::AddSkill, Asset);
             ++Count;
         }
         RefreshSkillCategories(CategoryCounts);
-        if (Count == 0) AddText(CatalogList, TEXT("이 속성과 검색어에 맞는 미보유 스킬이 없습니다."));
+        RefreshSkillMethods(MethodCounts);
+        if (Count == 0) AddText(CatalogList, TEXT("이 속성·방식·검색어에 맞는 미보유 스킬이 없습니다."));
     }
     else
     {
@@ -701,7 +1043,7 @@ void UCombatDebugWidget::RebuildLists()
             ++Count;
         }
     }
-    CatalogTitle->SetText(FText::FromString(bEquipment ? FString::Printf(TEXT("장비 목록 · %d개"), Count) : FString::Printf(TEXT("%s · 미보유 스킬 %d개"), Categories[SelectedSkillCategory].Label, Count)));
+    CatalogTitle->SetText(FText::FromString(bEquipment ? FString::Printf(TEXT("장비 목록 · %d개"), Count) : FString::Printf(TEXT("속성 %s · 방식 %s · 미보유 %d개"), Categories[SelectedSkillCategory].Label, Methods[SelectedSkillMethod].Label, Count)));
 }
 
 void UCombatDebugWidget::RefreshSkillCategories(const TArray<int32>& Counts)
@@ -720,12 +1062,36 @@ void UCombatDebugWidget::RefreshSkillCategories(const TArray<int32>& Counts)
     }
 }
 
+void UCombatDebugWidget::RefreshSkillMethods(const TArray<int32>& Counts)
+{
+    const TArray<FDebugSkillMethod>& Methods = GetDebugSkillMethods();
+    for (int32 Index = 0; Index < SkillMethodButtons.Num(); ++Index)
+    {
+        UCombatDebugActionButton* Button = SkillMethodButtons[Index];
+        const bool bSelected = Index == SelectedSkillMethod;
+        UDemonicUITheme::Get().StyleButton(Button, bSelected);
+        if (UTextBlock* Label = Cast<UTextBlock>(Button->GetContent()))
+        {
+            Label->SetText(FText::FromString(FString::Printf(TEXT("%s%s (%d)"), bSelected ? TEXT("✓ ") : TEXT(""), Methods[Index].Label, Counts.IsValidIndex(Index) ? Counts[Index] : 0)));
+            UDemonicUITheme::Get().StyleText(Label, false, 14);
+        }
+    }
+}
+
 void UCombatDebugWidget::HandleAction(UCombatDebugActionButton* Button)
 {
     if (Button && Button->Action == ECombatDebugAction::SelectSkillCategory)
     {
         if (!GetDebugSkillCategories().IsValidIndex(Button->Index)) return;
         SelectedSkillCategory = Button->Index;
+        CatalogScroll->ScrollToStart();
+        RebuildLists();
+        return;
+    }
+    if (Button && Button->Action == ECombatDebugAction::SelectSkillMethod)
+    {
+        if (!GetDebugSkillMethods().IsValidIndex(Button->Index)) return;
+        SelectedSkillMethod = Button->Index;
         CatalogScroll->ScrollToStart();
         RebuildLists();
         return;
@@ -790,6 +1156,7 @@ void UCombatDebugWidget::ReviveSelectedAlly()
 void UCombatDebugWidget::ShowUnitTools()
 {
     LoadoutPanel->SetVisibility(ESlateVisibility::Collapsed);
+    SkillTimingPanel->SetVisibility(ESlateVisibility::Collapsed);
     UnitToolsPanel->SetVisibility(ESlateVisibility::Visible);
     RebuildSpawnOptions();
     RefreshHealthState(true);
@@ -809,6 +1176,7 @@ void UCombatDebugWidget::SpawnEnemy()
 void UCombatDebugWidget::ShowSkills()
 {
     bEquipment = false;
+    SkillTimingPanel->SetVisibility(ESlateVisibility::Collapsed);
     UnitToolsPanel->SetVisibility(ESlateVisibility::Collapsed);
     LoadoutPanel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     CatalogScroll->ScrollToStart();
@@ -818,6 +1186,7 @@ void UCombatDebugWidget::ShowSkills()
 void UCombatDebugWidget::ShowEquipment()
 {
     bEquipment = true;
+    SkillTimingPanel->SetVisibility(ESlateVisibility::Collapsed);
     UnitToolsPanel->SetVisibility(ESlateVisibility::Collapsed);
     LoadoutPanel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     CatalogScroll->ScrollToStart();
@@ -854,4 +1223,5 @@ void UCombatDebugWidget::HandleUnit(FString Value, ESelectInfo::Type SelectionTy
     RebuildLists();
     RefreshReviveState();
     RefreshHealthState(true);
+    RefreshSkillTiming();
 }

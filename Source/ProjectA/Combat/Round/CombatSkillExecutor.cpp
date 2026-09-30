@@ -223,7 +223,7 @@ CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleas
             return Result;
         }
         RegisterEffect(Effect);
-        Effect->InitializeEffect(Context.Source, Context.Target, Context.AimLocation, Skill, Units);
+        Effect->InitializeEffect(Context.Source, Context.Target, Context.AimLocation, Skill, Units, Context.PresentationTime);
         Result.bSucceeded = true;
         Result.Status = FText::FromString(TEXT("효과 충돌 발동"));
         return Result;

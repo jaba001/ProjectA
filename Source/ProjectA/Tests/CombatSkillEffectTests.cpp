@@ -10,6 +10,7 @@
 #include "EngineUtils.h"
 #include "Unit/UnitBase.h"
 #include "UObject/StrongObjectPtr.h"
+#include <limits>
 
 namespace CombatSkillEffectTests
 {
@@ -254,8 +255,8 @@ bool FCombatSkillEffectSupportTest::RunTest(const FString& Parameters)
     Gated->InitializeEffect(Source, Ally, Ally->GetActorLocation(), Skill, Fixture.Roster);
     TestEqual(TEXT("Missing target tags prevent an initial hit"), GatedHits, 0);
     Ally->GetAbilitySystemComponent()->AddLooseGameplayTag(RequiredTag);
-    Gated->AdvanceEffect(0.1f);
-    TestEqual(TEXT("A live tag change admits an overlapping ally"), GatedHits, 1);
+    Gated->AdvanceEffect(0.f);
+    TestEqual(TEXT("An unclocked zero-step recheck still admits a newly eligible overlapping ally"), GatedHits, 1);
     Gated->AdvanceEffect(1.f);
     TestEqual(TEXT("Admitted target still receives only one hit"), GatedHits, 1);
     return true;
@@ -303,6 +304,165 @@ bool FCombatSkillEffectSweepTest::RunTest(const FString& Parameters)
     Invalid->AdvanceEffect(1.f);
     TestTrue(TEXT("Invalid duration resolves during initialization"), Invalid->HasResolved());
     TestEqual(TEXT("Early initialization failure signals completion once"), Resolutions, 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatSkillEffectHitDelayTest, "ProjectA.Combat.EffectCollision.DelayedContactsAndTravel", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatSkillEffectHitDelayTest::RunTest(const FString& Parameters)
+{
+    CombatSkillEffectTests::FFixture Fixture;
+    AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
+    AUnitBase* Departed = Fixture.AddUnit(FVector(100.f, 0.f, 100.f), ETeam::Enemy);
+    AUnitBase* Arrived = Fixture.AddUnit(FVector(700.f, 0.f, 100.f), ETeam::Enemy);
+    AUnitBase* Distant = Fixture.AddUnit(FVector(350.f, 0.f, 100.f), ETeam::Enemy);
+    if (!Source || !Departed || !Arrived || !Distant) return false;
+    FCombatRoundSkill Skill = Fixture.Skill();
+    Skill.EffectHitDelaySeconds = 0.5f;
+    Skill.EffectDuration = 1.f;
+    Skill.EffectHalfExtent = FVector(20.f);
+    Skill.EffectTravel = FVector(400.f, 0.f, 0.f);
+    ACombatSkillEffectActor* Effect = Fixture.World->SpawnActor<ACombatSkillEffectActor>();
+    if (!Effect) return false;
+    TMap<AUnitBase*, int32> Hits;
+    int32 Resolutions = 0;
+    Effect->OnImpact.AddLambda([&Hits](AUnitBase*, AUnitBase* Target, float) { ++Hits.FindOrAdd(Target); });
+    Effect->OnResolved.AddLambda([&Resolutions](ACombatSkillEffectActor*) { ++Resolutions; });
+    Effect->InitializeEffect(Source, Departed, Departed->GetActorLocation(), Skill, Fixture.Roster);
+    const FVector Origin = Effect->GetActorLocation();
+    TestTrue(TEXT("Initialization places the effect without applying delayed contacts"), Origin.Equals(FVector(100.f, 0.f, 100.f)) && Hits.IsEmpty());
+    Effect->AdvanceEffect(0.25f);
+    TestTrue(TEXT("The lead-in neither moves nor hits nor resolves"), Effect->GetActorLocation().Equals(Origin) && Hits.IsEmpty() && !Effect->HasResolved());
+    Departed->SetActorLocation(FVector(100.f, 500.f, 100.f));
+    Arrived->SetActorLocation(Origin);
+    Effect->AdvanceEffect(0.5f);
+    TestTrue(TEXT("A step crossing activation moves for only its active quarter-second"), Effect->GetActorLocation().Equals(FVector(200.f, 0.f, 100.f)));
+    TestEqual(TEXT("A target that left during the lead-in receives no retroactive hit"), Hits.FindRef(Departed), 0);
+    TestEqual(TEXT("The activation sweep begins with current overlapping targets"), Hits.FindRef(Arrived), 1);
+    TestEqual(TEXT("Discarded lead-in time cannot extend the sweep to a distant target"), Hits.FindRef(Distant), 0);
+    Effect->AdvanceEffect(0.25f);
+    TestEqual(TEXT("Later active travel reaches the distant target"), Hits.FindRef(Distant), 1);
+    TestFalse(TEXT("Lead-in time does not shorten the authored active duration"), Effect->HasResolved());
+    Effect->AdvanceEffect(0.5f);
+    Effect->AdvanceEffect(1.f);
+    TestEqual(TEXT("The first eligible target remains limited to one hit"), Hits.FindRef(Arrived), 1);
+    TestEqual(TEXT("The later eligible target remains limited to one hit"), Hits.FindRef(Distant), 1);
+    TestTrue(TEXT("Travel finishes after delay plus the complete active duration"), Effect->HasResolved() && Effect->GetActorLocation().Equals(FVector(500.f, 0.f, 100.f)));
+    TestEqual(TEXT("Delayed completion is broadcast once"), Resolutions, 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatSkillEffectPresentationClockTest, "ProjectA.Combat.EffectCollision.PresentationClockBoundsDelayedTravel", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatSkillEffectPresentationClockTest::RunTest(const FString& Parameters)
+{
+    CombatSkillEffectTests::FFixture Fixture;
+    AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
+    AUnitBase* Target = Fixture.AddUnit(FVector(200.f, 0.f, 100.f), ETeam::Enemy);
+    if (!Source || !Target) return false;
+    FCombatRoundSkill Skill = Fixture.Skill();
+    Skill.EffectHitDelaySeconds = 0.25f;
+    Skill.EffectOffset = FVector::ZeroVector;
+    Skill.EffectHalfExtent = FVector(10.f);
+    Skill.EffectTravel = FVector(400.f, 0.f, 0.f);
+    ACombatSkillEffectActor* Effect = Fixture.World->SpawnActor<ACombatSkillEffectActor>();
+    if (!Effect) return false;
+    int32 Hits = 0;
+    Effect->OnImpact.AddLambda([&Hits](AUnitBase*, AUnitBase*, float) { ++Hits; });
+    Effect->InitializeEffect(Source, Target, Target->GetActorLocation(), Skill, Fixture.Roster, 10.0);
+    const FVector Origin = Effect->GetActorLocation();
+    for (int32 Index = 0; Index < 50; ++Index) Effect->AdvanceEffect(0.01f, 10.0);
+    TestTrue(TEXT("Creation-frame simulation debt cannot consume the lead-in"), Effect->GetActorLocation().Equals(Origin) && Hits == 0 && !Effect->HasResolved());
+    Effect->AdvanceEffect(0.5f, 10.125);
+    Effect->AdvanceEffect(0.5f, 10.125);
+    TestTrue(TEXT("Repeated steps at the same presentation time remain inside the lead-in"), Effect->GetActorLocation().Equals(Origin) && Hits == 0 && !Effect->HasResolved());
+    Effect->AdvanceEffect(0.5f, 10.25);
+    TestTrue(TEXT("Reaching the activation boundary does not consume active travel"), Effect->GetActorLocation().Equals(Origin) && Hits == 0);
+    Effect->AdvanceEffect(0.5f, 10.5);
+    TestTrue(TEXT("Only elapsed presentation time advances the active sweep"), Effect->GetActorLocation().Equals(FVector(200.f, 0.f, 100.f)) && Hits == 1 && !Effect->HasResolved());
+    Effect->AdvanceEffect(0.5f, 10.5);
+    TestFalse(TEXT("Repeated simulation debt cannot expire an active effect"), Effect->HasResolved());
+    Effect->AdvanceEffect(0.5f, 10.75);
+    TestTrue(TEXT("The effect resolves once presentation reaches its complete lifetime"), Effect->HasResolved() && Hits == 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatSkillEffectDelayedGuardsTest, "ProjectA.Combat.EffectCollision.DelayedLiveTagsWallsAndDeath", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatSkillEffectDelayedGuardsTest::RunTest(const FString& Parameters)
+{
+    CombatSkillEffectTests::FFixture Fixture;
+    AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
+    AUnitBase* Target = Fixture.AddUnit(FVector(200.f, 0.f, 100.f), ETeam::Enemy);
+    if (!Source || !Target) return false;
+    FCombatRoundSkill Skill = Fixture.Skill();
+    Skill.EffectHitDelaySeconds = 0.5f;
+    const FGameplayTag RequiredTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Data.Damage")));
+    Skill.TargetRequiredTags.AddTag(RequiredTag);
+    Target->GetAbilitySystemComponent()->AddLooseGameplayTag(RequiredTag);
+    ACombatSkillEffectActor* Gated = Fixture.World->SpawnActor<ACombatSkillEffectActor>();
+    if (!Gated) return false;
+    int32 Hits = 0;
+    Gated->OnImpact.AddLambda([&Hits](AUnitBase*, AUnitBase*, float) { ++Hits; });
+    Gated->InitializeEffect(Source, Target, Target->GetActorLocation(), Skill, Fixture.Roster);
+    Target->GetAbilitySystemComponent()->RemoveLooseGameplayTag(RequiredTag);
+    Gated->AdvanceEffect(0.5f);
+    TestEqual(TEXT("Activation rechecks target tags instead of retaining pre-delay eligibility"), Hits, 0);
+    Target->GetAbilitySystemComponent()->AddLooseGameplayTag(RequiredTag);
+    Gated->AdvanceEffect(0.1f);
+    TestEqual(TEXT("A newly eligible target can be hit during the active window"), Hits, 1);
+    Gated->AdvanceEffect(1.f);
+
+    Skill.Kind = ECombatRoundSkillKind::GroundAttack;
+    Skill.EffectOffset = FVector::ZeroVector;
+    ACombatSkillEffectActor* Occluded = Fixture.World->SpawnActor<ACombatSkillEffectActor>();
+    if (!Occluded) return false;
+    int32 BlockedHits = 0;
+    Occluded->OnImpact.AddLambda([&BlockedHits](AUnitBase*, AUnitBase*, float) { ++BlockedHits; });
+    Occluded->InitializeEffect(Source, Target, Target->GetActorLocation(), Skill, Fixture.Roster);
+    if (!Fixture.AddWall(FVector(100.f, 0.f, 100.f))) return false;
+    Occluded->AdvanceEffect(0.25f);
+    TestFalse(TEXT("A wall does not end the visual lead-in early"), Occluded->HasResolved());
+    Occluded->AdvanceEffect(0.25f);
+    TestTrue(TEXT("A wall introduced during the lead-in blocks ground placement at activation"), Occluded->HasResolved() && BlockedHits == 0);
+
+    ACombatSkillEffectActor* Cancelled = Fixture.World->SpawnActor<ACombatSkillEffectActor>();
+    if (!Cancelled) return false;
+    int32 CancelledHits = 0;
+    Cancelled->OnImpact.AddLambda([&CancelledHits](AUnitBase*, AUnitBase*, float) { ++CancelledHits; });
+    Cancelled->InitializeEffect(Source, Target, Target->GetActorLocation(), Skill, Fixture.Roster);
+    Source->Die();
+    Cancelled->AdvanceEffect(0.1f);
+    TestTrue(TEXT("Caster death during the lead-in cancels all future contacts"), Cancelled->HasResolved() && CancelledHits == 0);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatSkillEffectInvalidTimingTest, "ProjectA.Combat.EffectCollision.RejectsInvalidDirectTiming", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatSkillEffectInvalidTimingTest::RunTest(const FString& Parameters)
+{
+    CombatSkillEffectTests::FFixture Fixture;
+    AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
+    AUnitBase* Target = Fixture.AddUnit(FVector(200.f, 0.f, 100.f), ETeam::Enemy);
+    if (!Source || !Target) return false;
+    for (const bool bDelay : {false, true})
+    {
+        for (float Invalid : {-1.f, 10.5f, std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()})
+        {
+            FCombatRoundSkill Skill = Fixture.Skill();
+            if (bDelay) Skill.EffectHitDelaySeconds = Invalid;
+            else Skill.EffectDuration = Invalid;
+            ACombatSkillEffectActor* Effect = Fixture.World->SpawnActor<ACombatSkillEffectActor>();
+            if (!Effect) return false;
+            int32 Resolutions = 0;
+            int32 Hits = 0;
+            Effect->OnResolved.AddLambda([&Resolutions](ACombatSkillEffectActor*) { ++Resolutions; });
+            Effect->OnImpact.AddLambda([&Hits](AUnitBase*, AUnitBase*, float) { ++Hits; });
+            Effect->InitializeEffect(Source, Target, Target->GetActorLocation(), Skill, Fixture.Roster);
+            Effect->AdvanceEffect(20.f);
+            TestTrue(TEXT("Direct initialization rejects invalid timing without hits or unresolved actors"), Effect->HasResolved() && Resolutions == 1 && Hits == 0);
+        }
+    }
     return true;
 }
 

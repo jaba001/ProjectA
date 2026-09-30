@@ -61,6 +61,7 @@ bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
         return (Vfx.Niagara.IsNull() || Vfx.Cascade.IsNull()) && !Vfx.RelativeTransform.ContainsNaN() && Vfx.RelativeTransform.GetRotation().IsNormalized() && Vfx.RelativeTransform.GetScale3D().GetMin() > 0.0;
     };
     if (!IsValidVfx(Skill.Vfx) || !IsValidVfx(Skill.ImpactVfx)) return false;
+    if (!FMath::IsFinite(Skill.EffectHitDelaySeconds) || Skill.EffectHitDelaySeconds < 0.f || Skill.EffectHitDelaySeconds > 10.f) return false;
     if (Skill.bUseEffectCollision)
     {
         if (Skill.Kind != ECombatRoundSkillKind::Melee && Skill.Kind != ECombatRoundSkillKind::GroundAttack) return false;

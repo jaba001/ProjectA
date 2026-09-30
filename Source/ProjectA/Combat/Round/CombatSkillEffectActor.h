@@ -26,8 +26,8 @@ public:
 
     // Register delegates before initialization because invalid data may resolve synchronously.
     // 잘못된 데이터는 즉시 종료될 수 있으므로 초기화 전에 델리게이트를 등록합니다.
-    void InitializeEffect(AUnitBase* Source, AUnitBase* Target, FVector AimLocation, const FCombatRoundSkill& Skill, const TArray<FCombatRoundUnitView>& Units);
-    void AdvanceEffect(float DeltaSeconds);
+    void InitializeEffect(AUnitBase* Source, AUnitBase* Target, FVector AimLocation, const FCombatRoundSkill& Skill, const TArray<FCombatRoundUnitView>& Units, double PresentationTime = -1.0);
+    void AdvanceEffect(float DeltaSeconds, double PresentationTime = -1.0);
     bool HasResolved() const { return bResolved; }
 
     FOnCombatSkillEffectImpact OnImpact;
@@ -60,9 +60,12 @@ private:
     TSet<TWeakObjectPtr<AUnitBase>> HitOnceUnits;
     FVector StartLocation = FVector::ZeroVector;
     FVector EndLocation = FVector::ZeroVector;
+    FVector InitialSourceLocation = FVector::ZeroVector;
     FVector InitialOcclusionOrigin = FVector::ZeroVector;
-    float ElapsedSeconds = 0.f;
+    double ElapsedSeconds = 0.0;
+    double PresentationStartedAt = -1.0;
     bool bInitialized = false;
     bool bResolved = false;
     bool bOnlyTarget = false;
+    bool bHitWindowStarted = false;
 };

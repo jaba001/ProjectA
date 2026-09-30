@@ -17,6 +17,7 @@ class UBorder;
 class UWrapBox;
 class UCombatDebugActionButton;
 class UCommonActivatableWidgetStack;
+struct FCombatDebugSkillTiming;
 
 enum class ECombatDebugAction : uint8
 {
@@ -24,7 +25,8 @@ enum class ECombatDebugAction : uint8
     RemoveSkill,
     GrantEquipment,
     RemoveEquipment,
-    SelectSkillCategory
+    SelectSkillCategory,
+    SelectSkillMethod
 };
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnCombatDebugAction, UCombatDebugActionButton*);
@@ -67,12 +69,15 @@ private:
     void RefreshReviveState();
     void RefreshSpawnState();
     void RefreshHealthState(bool bResetInput = false);
+    void RefreshSkillTiming(bool bResetInput = false);
+    bool ReadSkillTimingInputs(FCombatDebugSkillTiming& OutTiming, FText& OutError) const;
     void ApplyHealth(bool bFullHeal);
     bool RefreshUnitOptions();
     void RebuildSpawnOptions();
     void SpawnUnit(bool bEnemy);
     void RebuildLists();
     void RefreshSkillCategories(const TArray<int32>& Counts);
+    void RefreshSkillMethods(const TArray<int32>& Counts);
     void HandleAction(UCombatDebugActionButton* Button);
 
     UFUNCTION()
@@ -83,6 +88,16 @@ private:
     void ReviveSelectedAlly();
     UFUNCTION()
     void ShowUnitTools();
+    UFUNCTION()
+    void ShowSkillTiming();
+    UFUNCTION()
+    void ApplySkillTiming();
+    UFUNCTION()
+    void ResetSkillTiming();
+    UFUNCTION()
+    void CopySkillTiming();
+    UFUNCTION()
+    void HandleTimingSkill(FString Value, ESelectInfo::Type SelectionType);
     UFUNCTION()
     void ApplyUnitHealth();
     UFUNCTION()
@@ -111,7 +126,35 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<UVerticalBox> LoadoutPanel;
     UPROPERTY(Transient)
+    TObjectPtr<USizeBox> LoadoutListBounds;
+    UPROPERTY(Transient)
     TObjectPtr<UScrollBox> UnitToolsPanel;
+    UPROPERTY(Transient)
+    TObjectPtr<UScrollBox> SkillTimingPanel;
+    UPROPERTY(Transient)
+    TObjectPtr<UComboBoxString> TimingSkillChoice;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> TimingAssetPath;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> TimingOriginalValues;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> TimingStatus;
+    UPROPERTY(Transient)
+    TObjectPtr<UEditableTextBox> WindupInput;
+    UPROPERTY(Transient)
+    TObjectPtr<UEditableTextBox> EffectDelayInput;
+    UPROPERTY(Transient)
+    TObjectPtr<UEditableTextBox> EffectDurationInput;
+    UPROPERTY(Transient)
+    TObjectPtr<UEditableTextBox> ProjectileSpeedInput;
+    UPROPERTY(Transient)
+    TObjectPtr<UEditableTextBox> WeaponDurationInput;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> TimingApplyButton;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> TimingResetButton;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> TimingCopyButton;
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> HealthTarget;
     UPROPERTY(Transient)
@@ -168,20 +211,31 @@ private:
     TObjectPtr<UWrapBox> SkillCategoryTabs;
     UPROPERTY(Transient)
     TArray<TObjectPtr<UCombatDebugActionButton>> SkillCategoryButtons;
+    UPROPERTY(Transient)
+    TObjectPtr<UWrapBox> SkillMethodTabs;
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UCombatDebugActionButton>> SkillMethodButtons;
 
     TMap<FString, int32> UnitOptions;
     TMap<FString, FName> AllySpawnOptions;
     TMap<FString, FName> EnemySpawnOptions;
+    TMap<FString, FName> TimingSkillOptions;
     int32 SelectedUnitId = INDEX_NONE;
     int32 HealthInputUnitId = INDEX_NONE;
     int32 SelectedSkillCategory = 0;
+    int32 SelectedSkillMethod = 0;
+    int32 TimingInputUnitId = INDEX_NONE;
+    FName SelectedTimingSkill;
+    FName TimingInputSkill;
     FGuid ObservedCombatId;
     int32 ObservedRevision = INDEX_NONE;
     bool bEquipment = false;
     bool bRefreshingUnits = false;
+    bool bRefreshingTimingSkills = false;
     float RefreshElapsed = 0.f;
     FText ActionMessage;
     FText HealthMessage;
+    FText TimingMessage;
     FText ReviveMessage;
     FText AllySpawnMessage;
     FText EnemySpawnMessage;

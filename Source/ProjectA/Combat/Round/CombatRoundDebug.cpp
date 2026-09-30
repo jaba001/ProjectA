@@ -16,6 +16,29 @@
 #include "Unit/UnitDataRules.h"
 #include "Unit/PlayerUnit.h"
 
+namespace
+{
+    FCombatDebugSkillTiming ReadDebugSkillTiming(const FCombatRoundSkill& Skill)
+    {
+        FCombatDebugSkillTiming Timing;
+        Timing.WindupSeconds = Skill.WindupSeconds;
+        Timing.EffectHitDelaySeconds = Skill.EffectHitDelaySeconds;
+        Timing.EffectDuration = Skill.EffectDuration;
+        Timing.ProjectileSpeed = Skill.ProjectileSpeed;
+        Timing.WeaponTraceDuration = Skill.WeaponTraceDuration;
+        return Timing;
+    }
+
+    void WriteDebugSkillTiming(FCombatRoundSkill& Skill, const FCombatDebugSkillTiming& Timing)
+    {
+        Skill.WindupSeconds = Timing.WindupSeconds;
+        Skill.EffectHitDelaySeconds = Timing.EffectHitDelaySeconds;
+        Skill.EffectDuration = Timing.EffectDuration;
+        Skill.ProjectileSpeed = Timing.ProjectileSpeed;
+        Skill.WeaponTraceDuration = Timing.WeaponTraceDuration;
+    }
+}
+
 bool ACombatRoundCoordinator::CanModifyDebugRoster(APlayerController* Controller, FText& OutError) const
 {
     OutError = FText::GetEmpty();
@@ -100,7 +123,7 @@ bool ACombatRoundCoordinator::AddDebugUnit(APlayerController* Controller, AUnitB
     TArray<FCombatRoundSkill> NewSkills;
     TMap<FName, USkillDefinitionDataAsset*> DefinitionsById;
     TArray<FName> AddedSkillIds;
-    const auto ValidateLoadout = [&NewSkills, &DefinitionsById, &OutError](AUnitBase* Candidate, TArray<FName>* OutSkillIds)
+    const auto ValidateLoadout = [this, &NewSkills, &DefinitionsById, &OutError](AUnitBase* Candidate, TArray<FName>* OutSkillIds)
     {
         if (!IsValid(Candidate))
         {
@@ -112,6 +135,12 @@ bool ACombatRoundCoordinator::AddDebugUnit(APlayerController* Controller, AUnitB
         {
             FCombatRoundSkill Skill;
             if (!Definition->ResolveRoundSkill(Skill, OutError)) return false;
+            ApplyDebugSkillTimingOverride(Skill);
+            if (!CombatRoundRules::IsValidSkill(Skill))
+            {
+                OutError = FText::FromString(TEXT("원본 스킬이 변경되어 임시 타이밍을 적용할 수 없습니다. 해당 스킬의 원본값을 복원하거나 전투를 초기화하세요."));
+                return false;
+            }
             if (USkillDefinitionDataAsset* const* Existing = DefinitionsById.Find(Skill.SkillId))
             {
                 if (*Existing != Definition)
@@ -479,6 +508,12 @@ bool ACombatRoundCoordinator::SetDebugUnitSkills(APlayerController* Controller, 
         {
             FCombatRoundSkill Skill;
             if (!Definition->ResolveRoundSkill(Skill, OutError)) return false;
+            ApplyDebugSkillTimingOverride(Skill);
+            if (!CombatRoundRules::IsValidSkill(Skill))
+            {
+                OutError = FText::FromString(TEXT("원본 스킬이 변경되어 임시 타이밍을 적용할 수 없습니다. 해당 스킬의 원본값을 복원하거나 전투를 초기화하세요."));
+                return false;
+            }
             if (USkillDefinitionDataAsset* const* Existing = DefinitionsById.Find(Skill.SkillId))
             {
                 if (*Existing != Definition)
@@ -505,6 +540,79 @@ bool ACombatRoundCoordinator::SetDebugUnitSkills(APlayerController* Controller, 
     return true;
 }
 
+void ACombatRoundCoordinator::ApplyDebugSkillTimingOverride(FCombatRoundSkill& Skill) const
+{
+    if (const FCombatDebugSkillTiming* Timing = DebugSkillTimingOverrides.Find(Skill.SkillId)) WriteDebugSkillTiming(Skill, *Timing);
+}
+
+bool ACombatRoundCoordinator::GetDebugSkillTiming(int32 UnitId, FName SkillId, FCombatDebugSkillTiming& OutCurrent, FCombatDebugSkillTiming& OutOriginal, FSoftObjectPath& OutAsset, FText& OutError) const
+{
+    OutError = FText::FromString(TEXT("아군의 보유 스킬을 선택하세요."));
+    OutAsset.Reset();
+    const int32 UnitIndex = FindUnitIndex(UnitId);
+    const FCombatRoundSkill* Current = FindSkill(SkillId);
+    if (!ACombatDebugGameMode::IsDebugWorld(GetWorld()) || !HasExecutionAuthority() || !View.Units.IsValidIndex(UnitIndex) || !Current) return false;
+    const FCombatRoundUnitView& Entry = View.Units[UnitIndex];
+    if (Entry.bEnemy || !IsValid(Entry.Unit) || !Entry.SkillIds.Contains(SkillId)) return false;
+    for (const USkillDefinitionDataAsset* Definition : Entry.Unit->GetEquippedSkillDataAssets())
+    {
+        if (!IsValid(Definition) || FName(*Definition->GetPrimaryAssetId().ToString()) != SkillId) continue;
+        FCombatRoundSkill Original;
+        if (!Definition->ResolveRoundSkill(Original, OutError)) return false;
+        OutCurrent = ReadDebugSkillTiming(*Current);
+        OutOriginal = ReadDebugSkillTiming(Original);
+        OutAsset = FSoftObjectPath(Definition);
+        OutError = FText::GetEmpty();
+        return true;
+    }
+    return false;
+}
+
+bool ACombatRoundCoordinator::SetDebugSkillTiming(APlayerController* Controller, int32 UnitId, FName SkillId, const FCombatDebugSkillTiming& Timing, FText& OutError)
+{
+    if (!CanEditDebugUnit(Controller, UnitId, OutError)) return false;
+    FCombatDebugSkillTiming Current;
+    FCombatDebugSkillTiming Original;
+    FSoftObjectPath Asset;
+    if (!GetDebugSkillTiming(UnitId, SkillId, Current, Original, Asset, OutError)) return false;
+    FCombatRoundSkill* Skill = Skills.FindByPredicate([SkillId](const FCombatRoundSkill& Entry) { return Entry.SkillId == SkillId; });
+    if (!Skill) return false;
+    // Copy only tuning values so identifiers, tags, costs and effect references cannot be replaced by this request.
+    // 이 요청으로 식별자·태그·비용·효과 참조가 교체되지 않도록 조정 수치만 복사합니다.
+    FCombatRoundSkill Candidate = *Skill;
+    WriteDebugSkillTiming(Candidate, Timing);
+    const bool bValidWindup = FMath::IsFinite(Timing.WindupSeconds) && Timing.WindupSeconds >= 0.f && Timing.WindupSeconds <= 60.f;
+    const bool bValidEffect = FMath::IsFinite(Timing.EffectHitDelaySeconds) && Timing.EffectHitDelaySeconds >= 0.f && Timing.EffectHitDelaySeconds <= 10.f && FMath::IsFinite(Timing.EffectDuration) && Timing.EffectDuration > 0.f && Timing.EffectDuration <= 10.f;
+    const bool bValidProjectile = FMath::IsFinite(Timing.ProjectileSpeed) && Timing.ProjectileSpeed > 0.f && Timing.ProjectileSpeed <= 100000.f;
+    const bool bValidWeapon = FMath::IsFinite(Timing.WeaponTraceDuration) && Timing.WeaponTraceDuration > 0.f && Timing.WeaponTraceDuration <= 5.f;
+    if (!bValidWindup || !bValidEffect || !bValidProjectile || !bValidWeapon || !CombatRoundRules::IsValidSkill(Candidate))
+    {
+        OutError = FText::FromString(TEXT("타이밍 범위를 확인하세요: 준비 0~60초, 효과 지연 0~10초, 효과 지속 0초 초과~10초, 투사체 속도 0 초과~100,000cm/s, 무기 판정 0초 초과~5초(준비+무기 판정은 60초 이하)."));
+        return false;
+    }
+    if (FCombatDebugSkillTiming::StaticStruct()->CompareScriptStruct(&Current, &Timing, 0)) return true;
+    DebugSkillTimingOverrides.Add(SkillId, Timing);
+    *Skill = MoveTemp(Candidate);
+    const FText Message = FText::FromString(TEXT("동일 스킬 전체에 임시 타이밍 적용 · 해당 스킬을 보유한 아군의 계획과 준비 완료 해제 · 적 계획 유지"));
+    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
+    {
+        const FCombatRoundUnitView& Entry = View.Units[Index];
+        if (!Entry.bEnemy && Entry.OwnerSlot > 0 && Entry.SkillIds.Contains(SkillId) && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive()) ResetDebugUnitPlan(Index, Message, false);
+    }
+    PublishState();
+    return true;
+}
+
+bool ACombatRoundCoordinator::ResetDebugSkillTiming(APlayerController* Controller, int32 UnitId, FName SkillId, FText& OutError)
+{
+    FCombatDebugSkillTiming Current;
+    FCombatDebugSkillTiming Original;
+    FSoftObjectPath Asset;
+    if (!CanEditDebugUnit(Controller, UnitId, OutError) || !GetDebugSkillTiming(UnitId, SkillId, Current, Original, Asset, OutError) || !SetDebugSkillTiming(Controller, UnitId, SkillId, Original, OutError)) return false;
+    DebugSkillTimingOverrides.Remove(SkillId);
+    return true;
+}
+
 void ACombatRoundCoordinator::NotifyDebugEquipmentChanged(APlayerController* Controller, int32 UnitId)
 {
     FText Error;
@@ -512,7 +620,7 @@ void ACombatRoundCoordinator::NotifyDebugEquipmentChanged(APlayerController* Con
     ResetDebugUnitPlan(FindUnitIndex(UnitId), FText::FromString(TEXT("장비가 변경되어 해당 유닛의 계획과 자신의 준비가 해제되었습니다.")));
 }
 
-void ACombatRoundCoordinator::ResetDebugUnitPlan(int32 UnitIndex, const FText& Message)
+void ACombatRoundCoordinator::ResetDebugUnitPlan(int32 UnitIndex, const FText& Message, bool bPublish)
 {
     FCombatRoundUnitView& Entry = View.Units[UnitIndex];
     Entry.Command = FCombatRoundCommand();
@@ -529,5 +637,5 @@ void ACombatRoundCoordinator::ResetDebugUnitPlan(int32 UnitIndex, const FText& M
     ++View.PlanRevision;
     View.Message = Message;
     bLockRetryBlocked = false;
-    PublishState();
+    if (bPublish) PublishState();
 }

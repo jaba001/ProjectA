@@ -46,11 +46,11 @@ void ACombatSkillEffectActor::GetLifetimeReplicatedProps(TArray<FLifetimePropert
     DOREPLIFETIME(ACombatSkillEffectActor, Visual);
 }
 
-void ACombatSkillEffectActor::InitializeEffect(AUnitBase* Source, AUnitBase* Target, FVector AimLocation, const FCombatRoundSkill& Skill, const TArray<FCombatRoundUnitView>& Units)
+void ACombatSkillEffectActor::InitializeEffect(AUnitBase* Source, AUnitBase* Target, FVector AimLocation, const FCombatRoundSkill& Skill, const TArray<FCombatRoundUnitView>& Units, double PresentationTime)
 {
     if (!HasAuthority() || bInitialized || bResolved) return;
     bInitialized = true;
-    if (!IsValid(Source) || Source->GetWorld() != GetWorld() || !Source->IsUnitAlive() || !Skill.bUseEffectCollision || AimLocation.ContainsNaN() || Skill.EffectHalfExtent.ContainsNaN() || Skill.EffectHalfExtent.GetMin() <= 0.f || Skill.EffectOffset.ContainsNaN() || Skill.EffectTravel.ContainsNaN() || !FMath::IsFinite(Skill.EffectDuration) || Skill.EffectDuration <= 0.f || !FMath::IsFinite(Skill.Power) || Skill.Power < 0.f)
+    if (!IsValid(Source) || Source->GetWorld() != GetWorld() || !Source->IsUnitAlive() || !Skill.bUseEffectCollision || AimLocation.ContainsNaN() || Skill.EffectHalfExtent.ContainsNaN() || Skill.EffectHalfExtent.GetMin() <= 0.f || Skill.EffectOffset.ContainsNaN() || Skill.EffectTravel.ContainsNaN() || !FMath::IsFinite(Skill.EffectHitDelaySeconds) || Skill.EffectHitDelaySeconds < 0.f || Skill.EffectHitDelaySeconds > 10.f || !FMath::IsFinite(Skill.EffectDuration) || Skill.EffectDuration <= 0.f || Skill.EffectDuration > 10.f || !FMath::IsFinite(Skill.Power) || Skill.Power < 0.f)
     {
         ResolveEffect();
         return;
@@ -58,6 +58,8 @@ void ACombatSkillEffectActor::InitializeEffect(AUnitBase* Source, AUnitBase* Tar
     Definition = Skill;
     SourceUnit = Source;
     const FVector SourceLocation = Source->GetCapsuleComponent()->GetComponentLocation();
+    InitialSourceLocation = SourceLocation;
+    PresentationStartedAt = FMath::IsFinite(PresentationTime) && PresentationTime >= 0.0 ? PresentationTime : -1.0;
     const bool bUnitTarget = Skill.TargetRule == ESkillTargetRule::EnemyUnit || Skill.TargetRule == ESkillTargetRule::AllyUnit || Skill.TargetRule == ESkillTargetRule::AnyUnit;
     TargetUnit = Target;
     bOnlyTarget = bUnitTarget && Skill.bTargetOnly;
@@ -78,15 +80,9 @@ void ACombatSkillEffectActor::InitializeEffect(AUnitBase* Source, AUnitBase* Tar
         ResolveEffect();
         return;
     }
-    const FCollisionQueryParams WorldQuery = CombatCollisionPolicy::WorldQuery(GetWorld(), this);
     // Melee occlusion starts at the captured caster origin, independently of the volume center offset.
     // 근접 차폐는 볼륨 중심 오프셋과 별개로 저장한 시전자 초기 원점에서 시작합니다.
     InitialOcclusionOrigin = Skill.Kind == ECombatRoundSkillKind::Melee ? SourceLocation : StartLocation;
-    if (Skill.Kind != ECombatRoundSkillKind::Melee && GetWorld()->LineTraceTestByChannel(SourceLocation, StartLocation, ECC_WorldDynamic, WorldQuery, CombatCollisionPolicy::WorldResponses()))
-    {
-        ResolveEffect();
-        return;
-    }
     SetActorLocationAndRotation(StartLocation, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
     for (const FCombatRoundUnitView& Entry : Units)
     {
@@ -96,12 +92,12 @@ void ACombatSkillEffectActor::InitializeEffect(AUnitBase* Source, AUnitBase* Tar
     OnRep_Visual();
     if (IsValid(GetOwner())) GetOwner()->OnDestroyed.AddUniqueDynamic(this, &ACombatSkillEffectActor::HandleOwnerDestroyed);
     ForceNetUpdate();
-    // Resolve initial overlaps once so stationary areas and support effects require no artificial movement.
-    // 정지 영역과 지원 효과에 불필요한 이동이 필요하지 않도록 최초 겹침도 한 번 검사합니다.
-    AdvanceEffect(0.f);
+    // Zero-delay effects retain their initial overlap; delayed effects show VFX before enabling any contacts.
+    // 지연이 없으면 최초 겹침을 유지하며 지연 효과는 모든 접촉 판정에 앞서 VFX를 표시합니다.
+    if (Skill.EffectHitDelaySeconds == 0.f) AdvanceEffect(0.f, PresentationTime);
 }
 
-void ACombatSkillEffectActor::AdvanceEffect(float DeltaSeconds)
+void ACombatSkillEffectActor::AdvanceEffect(float DeltaSeconds, double PresentationTime)
 {
     if (!HasAuthority() || !bInitialized || bResolved || !FMath::IsFinite(DeltaSeconds) || DeltaSeconds < 0.f) return;
     AUnitBase* Source = SourceUnit.Get();
@@ -111,13 +107,33 @@ void ACombatSkillEffectActor::AdvanceEffect(float DeltaSeconds)
         ResolveEffect();
         return;
     }
-    const float NextElapsed = FMath::Min(ElapsedSeconds + DeltaSeconds, Definition.EffectDuration);
+    const double TotalDuration = static_cast<double>(Definition.EffectHitDelaySeconds) + Definition.EffectDuration;
+    double StepSeconds = FMath::Min(static_cast<double>(DeltaSeconds), TotalDuration - ElapsedSeconds);
+    const bool bHasPresentationClock = PresentationStartedAt >= 0.0 && FMath::IsFinite(PresentationTime) && PresentationTime >= 0.0;
+    // Old simulation debt cannot consume the visual lead-in or active window before presentation time advances.
+    // 표현 시간이 진행되기 전에 누적된 시뮬레이션 시간이 연출 선행 구간이나 활성 판정 구간을 소진하지 못하게 합니다.
+    if (bHasPresentationClock) StepSeconds = FMath::Min(StepSeconds, FMath::Max(0.0, PresentationTime - PresentationStartedAt - ElapsedSeconds));
+    if (StepSeconds <= 0.0 && ((bHitWindowStarted && bHasPresentationClock) || ElapsedSeconds < Definition.EffectHitDelaySeconds)) return;
+    ElapsedSeconds = FMath::Min(ElapsedSeconds + StepSeconds, TotalDuration);
+    if (ElapsedSeconds < Definition.EffectHitDelaySeconds) return;
+    const double ActiveSeconds = ElapsedSeconds - Definition.EffectHitDelaySeconds;
     const FVector Start = GetActorLocation();
-    FVector End = FMath::Lerp(StartLocation, EndLocation, NextElapsed / Definition.EffectDuration);
+    FVector End = FMath::Lerp(StartLocation, EndLocation, ActiveSeconds / Definition.EffectDuration);
     const FQuat Rotation = GetActorQuat();
     const FCollisionShape Shape = Definition.bEffectSphere ? FCollisionShape::MakeSphere(Definition.EffectHalfExtent.X) : FCollisionShape::MakeBox(Definition.EffectHalfExtent);
     const FCollisionQueryParams Params = CombatCollisionPolicy::WorldQuery(World, this);
     const FCollisionResponseParams Responses = CombatCollisionPolicy::WorldResponses();
+    if (!bHitWindowStarted)
+    {
+        bHitWindowStarted = true;
+        // Check the current world at activation, retaining the captured launch origin and no pre-delay sweep.
+        // 지연 전 궤적을 검사하지 않고 저장한 발동 원점에서 활성화 시점의 현재 월드를 검사합니다.
+        if (Definition.Kind != ECombatRoundSkillKind::Melee && World->LineTraceTestByChannel(InitialSourceLocation, StartLocation, ECC_WorldDynamic, Params, Responses))
+        {
+            ResolveEffect();
+            return;
+        }
+    }
     const FVector OcclusionStart = InitialOcclusionOrigin + Start - StartLocation;
     const FVector OcclusionEnd = InitialOcclusionOrigin + End - StartLocation;
     if (World->OverlapBlockingTestByChannel(OcclusionStart, FQuat::Identity, ECC_WorldDynamic, FCollisionShape::MakeSphere(0.1f), Params, Responses))
@@ -152,7 +168,6 @@ void ACombatSkillEffectActor::AdvanceEffect(float DeltaSeconds)
         return CombatCollisionPolicy::IsEarlierContact(Left.Time, Left.UnitId, Right.Time, Right.UnitId);
     });
     SetActorLocation(End, false, nullptr, ETeleportType::TeleportPhysics);
-    ElapsedSeconds = NextElapsed;
     for (const FEffectContact& Contact : Contacts)
     {
         if (bResolved || IsActorBeingDestroyed()) return;
@@ -169,7 +184,7 @@ void ACombatSkillEffectActor::AdvanceEffect(float DeltaSeconds)
         if (!Definition.ImpactVfx.Niagara.IsNull() || !Definition.ImpactVfx.Cascade.IsNull()) MulticastImpact(Definition.ImpactVfx, FTransform(Rotation, Contact.Point));
         OnImpact.Broadcast(SourceUnit.Get(), Target, Definition.Power);
     }
-    if (bHitWall || ElapsedSeconds >= Definition.EffectDuration) ResolveEffect();
+    if (bHitWall || ElapsedSeconds >= TotalDuration) ResolveEffect();
 }
 
 void ACombatSkillEffectActor::ResolveEffect(bool bDestroyActor)

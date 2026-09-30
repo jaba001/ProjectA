@@ -114,6 +114,13 @@ struct PROJECTA_API FCombatRoundSkill
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect Collision", meta = (EditCondition = "bUseEffectCollision"))
     FVector EffectTravel = FVector::ZeroVector;
 
+    // Start the visual at release, then enable collision after this preparation time.
+    // 발동 시 연출을 시작한 뒤 이 준비 시간이 지나면 충돌 판정을 활성화합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect Collision", meta = (ClampMin = "0.0", ClampMax = "10.0", EditCondition = "bUseEffectCollision"))
+    float EffectHitDelaySeconds = 0.f;
+
+    // Keep the active collision interval independent of the visual preparation delay.
+    // 실제 충돌 판정 기간은 연출 준비 지연과 별개로 유지합니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect Collision", meta = (ClampMin = "0.01", ClampMax = "10.0", EditCondition = "bUseEffectCollision"))
     float EffectDuration = 0.5f;
 

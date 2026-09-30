@@ -1,7 +1,7 @@
 {
   "version": 1,
   "source_csv": "Docs/SKILL_EFFECT_ASSETS.csv",
-  "source_csv_sha256": "8e8ee201983ba1e6494279e311542848444365571a34cc1c056c9eb87e37f4bc",
+  "source_csv_sha256": "eb3b8e9b7eb1b17f09d3fbd26284502087df9b88cabf67f99b4f5e483ed048fd",
   "source_count": 577,
   "notes": [
     "원본 에셋 이름·경로와 CSV 게임 내 이름 보존",

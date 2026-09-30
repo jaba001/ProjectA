@@ -147,6 +147,7 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
         return false;
     }
     Skills.Reset();
+    DebugSkillTimingOverrides.Reset();
     View.CombatId = InManager->GetCombatInstanceId();
     URunStateSubsystem* Run = !ACombatDebugGameMode::IsDebugWorld(GetWorld()) && GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     const bool bRestoring = Run && Run->GetPhase() == ERunPhase::Combat && Run->HasCombatCheckpoint();
@@ -1040,7 +1041,7 @@ void ACombatRoundCoordinator::AdvanceSimulation(float StepSeconds)
     const TArray<TObjectPtr<ACombatSkillEffectActor>> PendingEffects = ActiveEffects;
     for (ACombatSkillEffectActor* Effect : PendingEffects)
     {
-        if (IsValid(Effect) && !Effect->HasResolved()) Effect->AdvanceEffect(StepSeconds);
+        if (IsValid(Effect) && !Effect->HasResolved()) Effect->AdvanceEffect(StepSeconds, MontageClock);
     }
     for (FCombatRoundUnitView& Entry : View.Units)
     {
@@ -1197,7 +1198,10 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
                 AdvanceWeaponTrace(Index, *Skill);
                 return;
             }
-            if (SimulationTime + 0.00001 < Action.PhaseStarted + Skill->WindupSeconds) return;
+            // Match release to visible montage time even while fixed simulation steps catch up after a slow frame.
+            // 느린 프레임 뒤 고정 시뮬레이션이 누적 시간을 처리해도 보이는 몽타주 시간에 맞춰 발동합니다.
+            const double CastElapsed = FMath::Min(SimulationTime - Action.PhaseStarted, MontageClock - Action.MontageStartedAt);
+            if (CastElapsed + 0.00001 < Skill->WindupSeconds) return;
             ReleaseSkill(Index, *Skill);
             return;
         }

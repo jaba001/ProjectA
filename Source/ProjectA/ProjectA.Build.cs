@@ -34,7 +34,7 @@ public class ProjectA : ModuleRules
 			"GameplayTasks"
         });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "AssetRegistry" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "AssetRegistry", "ApplicationCore" });
 
 		PublicIncludePaths.AddRange(new string[] {
 			"ProjectA",

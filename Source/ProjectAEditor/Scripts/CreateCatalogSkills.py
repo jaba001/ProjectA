@@ -1,6 +1,7 @@
 import csv
 import hashlib
 import json
+import math
 import re
 from collections import Counter
 from pathlib import Path
@@ -75,6 +76,18 @@ def make_profile(spec, entry, source):
     vfx = unreal.CombatSkillVfx()
     vfx.set_editor_property("niagara" if entry["source_class"] == "NiagaraSystem" else "cascade", source)
     profile.set_editor_property("vfx", vfx)
+    # Optional per-skill timing keeps source visuals intact while authoring their collision and flight clocks.
+    # 스킬별 선택 시간 설정으로 원본 연출을 유지하며 충돌과 비행 시계를 작성합니다.
+    timing = entry.get("timing", {})
+    require(isinstance(timing, dict), "Skill timing must be an object: " + entry["source"])
+    allowed = {"windup_seconds", "projectile_speed", "projectile_lifetime"} if settings["kind"] == "PROJECTILE" else {"windup_seconds", "effect_hit_delay_seconds", "effect_duration"}
+    for key, value in timing.items():
+        require(key in allowed, "Unsupported timing field for this skill: " + entry["source"] + " / " + key)
+        require(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value), "Skill timing must be a finite number: " + entry["source"] + " / " + key)
+        limits = {"windup_seconds": (0.0, 60.0), "effect_hit_delay_seconds": (0.0, 10.0), "effect_duration": (0.01, 10.0), "projectile_speed": (0.01, 100000.0), "projectile_lifetime": (0.01, 60.0)}
+        minimum, maximum = limits[key]
+        require(minimum <= value <= maximum, "Skill timing is outside its supported range: " + entry["source"] + " / " + key)
+        profile.set_editor_property(key, value)
     return profile
 
 
