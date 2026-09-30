@@ -399,6 +399,37 @@ bool FRunItemShopCatalogNamesTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopCatalogPriceTest, "ProjectA.Run.Shop.CatalogPriceWholeInteger", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunItemShopCatalogPriceTest::RunTest(const FString& Parameters)
+{
+    const auto MakeCsv = [](bool bNamed, const FString& Price)
+    {
+        FString Csv = bNamed ? TEXT("무기 종류,위치,에셋 이름,가격(G),게임 내 이름\n") : TEXT("무기 종류,위치,에셋 이름,가격(G)\n");
+        for (int32 Index = 0; Index < 5; ++Index) Csv += FString::Printf(TEXT("검,/Game/Test,Weapon_%d,\"%s\"%s\n"), Index, Index == 2 ? *Price : TEXT("1"), bNamed ? TEXT(",가격 검증") : TEXT(""));
+        return Csv;
+    };
+    for (const bool bNamed : {false, true})
+    {
+        TArray<FRunItemDefinition> Catalog;
+        FText Error;
+        for (const FString Price : {TEXT("1"), TEXT("0001"), TEXT("+1"), TEXT(" 1 "), TEXT("2147483647")})
+        {
+            if (!TestTrue(TEXT("Both CSV schemas accept whole positive int32 prices"), RunItemShopCatalog::LoadFromString(MakeCsv(bNamed, Price), Catalog, Error))) return false;
+            TestEqual(TEXT("Whole price and int32 upper boundary are retained"), Catalog[2].Price, Price == TEXT("2147483647") ? MAX_int32 : 1);
+        }
+        const TArray<FRunItemDefinition> Before = Catalog;
+        for (const FString Price : {TEXT(""), TEXT(" "), TEXT("+"), TEXT("0"), TEXT("-1"), TEXT("1abc"), TEXT("1.5"), TEXT("1.0"), TEXT("1,000"), TEXT("1e3"), TEXT("1 2"), TEXT("NaN"), TEXT("2147483648"), TEXT("4294967297"), TEXT("999999999999999999999")})
+        {
+            TestFalse(TEXT("Malformed prices cannot silently become a smaller positive cost"), RunItemShopCatalog::LoadFromString(MakeCsv(bNamed, Price), Catalog, Error));
+            TestFalse(TEXT("Invalid prices explain the rejected CSV row"), Error.IsEmpty());
+            if (!TestEqual(TEXT("Failed parsing preserves the previous complete catalog"), Catalog.Num(), Before.Num())) return false;
+            for (int32 Index = 0; Index < Catalog.Num(); ++Index) TestTrue(TEXT("Partial rows never replace existing items or prices"), FRunItemDefinition::StaticStruct()->CompareScriptStruct(&Catalog[Index], &Before[Index], 0));
+        }
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopPersistenceTest, "ProjectA.Run.Shop.ItemPurchaseRerollAndReload", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FRunItemShopPersistenceTest::RunTest(const FString& Parameters)

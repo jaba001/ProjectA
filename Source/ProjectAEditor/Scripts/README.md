@@ -134,7 +134,7 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/VerifyWitchAssassin.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-`-WitchRebuildRetargets`는 이전 마녀 구성을 사용할 때 FBX 재임포트 후 정규화·시퀀스를 재작성하는 옵션이다. 현재 네 직업 구성에 적용하지 않는다. 검증 도구는 의상 카탈로그 활성 시 현행 공통 외형 검사로 연결하며, 이전 구성 검사는 [당시 이력](../../../Docs/TODO.md#2-29-마녀와-assassin-외형)으로 구분한다. 에셋 작성·정적 포즈 검사만 수행하고 에디터 창·PIE·게임·자동화 테스트를 실행하지 않는다.
+`-WitchRebuildRetargets`는 이전 마녀 구성을 사용할 때 FBX 재임포트 후 정규화·시퀀스를 재작성하는 옵션이다. 현재 네 직업 구성에 적용하지 않는다. 검증 도구는 의상 카탈로그 활성 시 현행 공통 외형 검사로 연결하며, 이전 구성 검사는 [당시 이력](../../../Docs/HISTORY.md#9-13-마녀와-assassin-외형)으로 구분한다. 에셋 작성·정적 포즈 검사만 수행하고 에디터 창·PIE·게임·자동화 테스트를 실행하지 않는다.
 
 16. `ConfigureRogAppearance.py` (이전 Manny 의상 구성): 네 직업을 TopDown과 같은 `SKM_Manny_Simple`·`MI_Manny_01_New`·`MI_Manny_02_New`로 연결하고 `/Game/User_JeHoon/ROG_Modular_Armor/DA_MannyAppearance`에 공통 8부위·103개 외형 항목을 작성한다. 신체를 가리는 의상이 없으면 원본 몸체를 표시하며 가릴 때도 ROG 신체 파츠 6개에 원본 Manny 재질·텍스처를 직접 참조한다. `UCharacterAppearanceAssetLibrary`는 `Head`·`Arms`·`Legs`의 한 슬롯에 합쳐진 재질 영역을 원본 경로에서 두 슬롯으로 복원하고, 정점 위치·UV·스킨 가중치·뼈대·물리를 보존한다. 두 슬롯의 기본 재질은 기존 ROG MI를 유지하고 카탈로그만 Manny MI로 덮어쓴다. `Chest`·`Hands`·`Feet`는 메시를 수정하지 않고 기존 슬롯에 해당 Manny MI를 연결한다. ROG 원본 메시·데이터 테이블을 직접 참조하고 다른 뼈대의 망토 4개를 제외한다. 모델·텍스처 복제·추가 리타깃은 하지 않는다.
 

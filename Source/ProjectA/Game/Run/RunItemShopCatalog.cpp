@@ -1,6 +1,5 @@
 #include "Game/Run/RunItemShopCatalog.h"
 #include "Misc/FileHelper.h"
-#include "String/LexFromString.h"
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
 #include "NativeGameplayTags.h"
@@ -33,6 +32,27 @@ namespace
     constexpr int32 OfferCount = 5;
     constexpr int32 MaximumCatalogSize = 4096;
     constexpr int32 MaximumDisplayNameLength = 256;
+
+    // Consume the full price field and reject overflow before arithmetic can wrap a positive cost.
+    // 가격 필드 전체를 해석하고 양수 비용이 뒤집히기 전에 정수 범위 초과를 거절합니다.
+    bool ParsePrice(const TCHAR* Text, int32& OutPrice)
+    {
+        const FString Value = FString(Text).TrimStartAndEnd();
+        int32 Index = Value.StartsWith(TEXT("+")) ? 1 : 0;
+        if (Index >= Value.Len()) return false;
+        int32 Price = 0;
+        for (; Index < Value.Len(); ++Index)
+        {
+            const TCHAR Character = Value[Index];
+            if (Character < TEXT('0') || Character > TEXT('9')) return false;
+            const int32 Digit = Character - TEXT('0');
+            if (Price > (MAX_int32 - Digit) / 10) return false;
+            Price = Price * 10 + Digit;
+        }
+        if (Price <= 0) return false;
+        OutPrice = Price;
+        return true;
+    }
 
     // Validate saved display text independently of the current CSV so frozen runs keep their original names.
     // 저장된 표시 문구는 현재 CSV와 독립적으로 검증하여 기존 Run의 확정된 이름을 보존합니다.
@@ -141,7 +161,7 @@ bool RunItemShopCatalog::LoadFromString(FString CsvText, TArray<FRunItemDefiniti
         Item.DisplayName = FText::FromString(Row[bHasGameName ? 4 : 2]);
         Item.Tags.AddTag(TAG_ItemWeapon);
         if (CategoryTag.IsValid()) Item.Tags.AddTag(CategoryTag);
-        if (!CategoryTag.IsValid() || !LexTryParseString(Item.Price, Row[3]) || !ValidateItem(Item))
+        if (!CategoryTag.IsValid() || !ParsePrice(Row[3], Item.Price) || !ValidateItem(Item))
         {
             OutError = FText::Format(NSLOCTEXT("RunItemShop", "InvalidCatalogItem", "무기 에셋 CSV의 {0}행 분류·경로·이름·가격이 올바르지 않습니다."), FText::AsNumber(RowIndex + 1));
             return false;
