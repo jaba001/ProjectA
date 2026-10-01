@@ -1,6 +1,6 @@
 # ProjectA 구현 구조와 설정
 
-기준일: 2026-09-30. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
+기준일: 2026-10-01. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
 
 기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 위임 실행에서 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀를 통과했다. 실제 서비스·다중 PC·지연/손실 확인은 별도다.
 
@@ -63,7 +63,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 | `AGameplayPlayerController` | `APartyPlayerController` 상속. 로컬 Root UI, 소유 연결의 전투 RPC, 현재 Host의 노드 선택·Continue 요청 |
 | `UGameplayRootWidget` | 해당 플레이어 화면의 CommonUI Run/Combat/Modal 스택과 저장 실패·재시도 안내 |
 | `URunMapWidget` | 노드와 진행 상태 표시, 선택 요청. 직접 Spawn하지 않음 |
-| `URunEncounterWidget` | 인카운터 3개 선택·본인 골드·스킬상점/상점3 스킬·회복 및 아이템상점 상품 5개·판매 완료·리롤·구매·나가기 표시. 기존 RunLayer의 native CommonUI 화면 |
+| `URunEncounterWidget` | 인카운터 3개 선택·본인 골드·스킬상점/상점3 상품 5개·증가형 리롤 비용·회복 및 아이템상점 상품 5개·판매 완료·리롤·구매·나가기 표시. 기존 RunLayer의 native CommonUI 화면 |
 | `AEncounterManager` | Encounter 준비·스폰·라운드 전투 연결·종료 HP 추출·정리와 Run 전이. 순차 턴 저장/복원 훅 제거 |
 | `ACombatArena` | 배치된 Grid, 슬롯별 좌표, 카메라, 타일 활성화 관리 |
 | `ACombatManager` / `ACombatRoundCoordinator` | Run 전투 연결, 라운드 계획·시간표·실행·잔여 공격 정리·결과 확정. `UTurnManager`는 참조 호환용 외형만 유지 |
@@ -87,11 +87,17 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 새 Run은 첫 승리 보상 수령 후 Continue에서 `EncounterChoice`, 선택 시 `Shop`, 나가기 시 `Map`으로 전환한다. 전투 노드 수는 2개를 유지하며 상점 방문을 전투 완료 수에 더하지 않는다. 선택하지 않은 상점은 방문할 수 없다. 레벨 이동·별도 Arena 스폰 없이 UI로 처리한다.
 
-기존 상점1은 **스킬상점**, 상점2는 **아이템상점** 인카운터로 관리한다. `FRunEncounterOffer.EncounterTag`의 `Encounter.Shop.Skill`·`Encounter.Shop.Item` 분류로 UI·구매·리롤 실행을 판정하며 표시 이름과 저장 ID를 분리한다. 저장 호환을 위해 `Shop_01`·`Shop_02` ID를 유지하고 상점3은 기존 시험 구성을 보존한다. 분류 태그가 없는 이전 정의·저장은 공통 해석에서 기존 Shop ID를 분류하며, 기본 이전 이름만 새 이름으로 표시하고 사용자 지정 이름과 저장 원본은 보존한다.
+기존 상점1은 **스킬상점**, 상점2는 **아이템상점** 인카운터로 관리한다. `FRunEncounterOffer.EncounterTag`의 `Encounter.Shop.Skill`·`Encounter.Shop.Item` 분류로 UI·구매·리롤 실행을 판정하며 표시 이름과 저장 ID를 분리한다. 저장 호환을 위해 `Shop_01/02/03` ID를 유지하고 상점3은 스킬상점과 같은 구매·리롤 규칙을 사용한다. 분류 태그가 없는 이전 정의·저장은 공통 해석에서 기존 Shop ID를 분류하며, 기본 이전 이름만 새 이름으로 표시하고 사용자 지정 이름과 저장 원본은 보존한다.
 
-아군 네 직업은 비무장 공격 하나로 시작하고 직접 조작 캐릭터별 개인 10G, AI 동료 0G를 사용한다. 스킬상점·상점3은 기존 검·원거리·AOE·휩쓸기와 HP 전체 회복을 각 1G에 판매한다. 본인 생존 인간 캐릭터만 구매하고 같은 스킬의 재구매를 거절한다. 습득 즉시 Run 장착 목록에 추가하며 다음 전투부터 사용한다. 회복은 직업 설정의 최대 HP까지 즉시 적용하고 만피 구매를 거절한다. 10G·1G는 시험값이다.
+아군 네 직업은 비무장 공격 하나로 시작하고 직접 조작 캐릭터별 개인 10G, AI 동료 0G를 사용한다. 새 Run의 스킬상점·상점3은 기존 검·원거리·AOE·휩쓸기 4종과 `DA_SkillPool_Catalog`의 생성 스킬 176종을 합친 180종에서 중복 없이 5개를 제시하며 각 1G에 판매한다. 기존 스킬 에셋을 직접 참조하고 같은 회차 중복을 거절한다. 리롤은 5칸 전체를 다시 추첨하고 이전 상품의 재등장을 허용한다. 비용은 입장 때 1G로 초기화한 뒤 성공할 때마다 1G씩 증가하며 이어하기에서는 현재 비용을 복원한다.
 
-`RunEncounterPoolDataAsset.StartingGold/FixedSkillOffers/Recovery`에서 시험 구성을 관리하고 새 Run에 `FRunSkillShopState`로 복사한다. `FRunPartyMember.Gold/Skills/bHasSkillLoadout/CurrentHP`를 저장 기준으로 사용한다. 서버가 신뢰 연결의 소유자·상점 단계·Human 상태·잔액과 스킬 중복 또는 부족 HP를 검사하고, 저장 복사본에 잔액과 구매 효과를 함께 반영한 뒤 성공한 변경만 공개한다. 실패하면 메모리와 기존 파일을 보존한다. 기존 schema 1 저장의 회복 필드 누락은 기본값 1G로 읽고 고정 스킬 상품·보유 골드를 유지한다. schema 0에는 상품·골드를 소급 지급하지 않으며 명시 장착이 없는 기존 파티는 과거 직업 기본값을 유지한다. [사용자 확인](TODO.md#2-19-비무장-시작과-스킬-상점)
+본인 생존 인간 캐릭터만 구매·리롤하고 같은 스킬의 재구매와 비무장 공격을 포함한 총 스킬 5개 초과 구매를 거절한다. 습득 즉시 Run 장착 목록에 추가하며 다음 전투부터 사용한다. HP 전체 회복은 1G로 유지하고 직업 설정의 최대 HP까지 즉시 적용하며 만피 구매를 거절한다. 시작 골드·상품 가격·리롤 증가량은 시험값이며 최종 밸런스·확률 가중치는 미확정이다.
+
+`RunEncounterPoolDataAsset.StartingGold/FixedSkillOffers/Recovery/SkillShopPool/SkillShopQuery`에서 시작 골드·기본 상품·회복·추가 풀·태그 조건을 관리한다. 기본 `SkillShopPool`은 기존 `DA_SkillPool_Catalog`를 soft reference로 연결하며 새 풀 상품 가격은 1G, 기존 `FixedSkillOffers.Price`는 보존한다. 후보의 GameplayTag와 기본 가중치는 `FRunSkillShopOffer.Tags/BaseWeight`에 보존하고 기존 4종은 가중치 1, 생성 스킬은 풀의 `Entry.Weight`를 사용한다. 새 Run의 schema 1 `FRunSkillShopState.Catalog/Offers/Query/Revision/RerollPrice`에 값을 고정하며 `OfferCount=5`로 진열한다. 공통 후보 추첨은 저장된 태그 조건·기본 가중치를 사용하되 최종 수치와 태그별 가중치 보정 정책은 미확정이다. `Config/DefaultGame.ini`의 `SkillPools` AlwaysCook 설정으로 기존 풀·종속 스킬의 패키징 참조를 연결한다.
+
+`FRunPartyMember.Gold/Skills/bHasSkillLoadout/CurrentHP`를 저장 기준으로 사용한다. 서버가 신뢰 연결의 소유자·상점 단계·생존 Human·잔액·스킬 중복·보유 한도·부족 HP와 모든 구매·회복·리롤 요청의 Revision을 검사한다. 골드·습득 스킬·HP·진열·현재 리롤 비용·Revision을 하나의 저장 후보에 반영하고 성공한 변경만 공개한다. 실패하면 메모리와 기존 파일을 보존하며 재개 시 저장된 카탈로그·진열·비용을 복원한다.
+
+카탈로그가 없는 기존 schema 1은 저장된 고정 4종 상품·골드를 유지하고 새 진열·리롤을 소급 적용하지 않는다. 회복 필드 누락은 기본값 1G로 읽는다. schema 0에는 상품·골드를 소급 지급하지 않으며 명시 장착이 없는 기존 파티는 과거 직업 기본값을 유지한다. RunSaveGame에는 전체 상태를 저장하고 GameState 표시 뷰에는 현재 진열·비용·Revision 등 표시 상태를 전달하여 후보 `Catalog/Query`를 복제하지 않는다. 실제 협동 동작은 사용자 확인 대기다. [사용자 확인](TODO.md#2-19-비무장-시작과-스킬-상점)
 
 2026-09-25 아이템상점 시험: [WEAPON_ASSETS.csv](WEAPON_ASSETS.csv)의 방패·탄환·화살·기타를 포함한 전체 295개를 사용하고 `가격(G)`은 모두 1이다. 새 Run은 마지막 열 `게임 내 이름`을 표시하며 첫 입장과 1G 리롤마다 중복 없는 5개를 추첨한다. 같은 이름을 시작 장비·인벤토리·장비창에서도 사용하며 기존 저장의 고정 카탈로그·상품·보유 사본은 저장 당시 이름을 유지한다. 이전 4열 CSV는 원본 이름을 사용하고, 새 5열 CSV의 빈 이름은 오류로 처리한다. 표시명은 식별자가 아니며 경로 기반 ID·GameplayTag 분류·장착 프로필은 유지한다. 이전 진열·구매 상품은 다음 리롤에서 다시 등장할 수 있다. 구매한 슬롯은 판매 완료로 바뀌고 `FRunPartyMember.Items`의 개인 보유 사본으로 추가한다. 구매와 장착은 별도 명령이다.
 
@@ -101,7 +107,8 @@ CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한�
 
 | 데이터 | 역할 |
 |---|---|
-| `URunEncounterPoolDataAsset` | `FixedOffers`에 인카운터 3개, `FixedSkillOffers`에 스킬 상품·가격, `Recovery`에 전체 회복 가격, `StartingGold`에 개인 시작 골드 정의. 인카운터 후보 3개는 고정 제시 |
+| `URunEncounterPoolDataAsset` | `FixedOffers`에 인카운터 3개, `FixedSkillOffers/SkillShopPool/SkillShopQuery`에 스킬 후보·태그 조건, `Recovery`에 전체 회복 가격, `StartingGold`에 개인 시작 골드 정의. 인카운터 후보 3개는 고정 제시 |
+| `FRunSkillShopState` | schema 1의 `Catalog/Offers/Query/Revision/RerollPrice`에 스킬 후보·진열 5개·태그 조건·변경 버전·현재 리롤 비용 저장. 이전 카탈로그 없는 고정 상품 저장 보존 |
 | `FRunEncounterOffer` | `EncounterId`·`DisplayName`·`Type`·`EncounterTag`의 USTRUCT 값 데이터. `GetResolvedTag/IsSupportedShop/IsItemShop/GetDisplayName`으로 분류·표시 이름 해석 |
 | `FRunEncounterProgress` | schema·제시 목록·선택 ID·퇴장 완료 여부. Run 저장과 GameState 표시 뷰에 포함 |
 | `UPartyDefinitionDataAsset::RunEncounterPool` | 새 Run에서 사용할 풀. 미지정 시 native 기본값 스킬상점·아이템상점·상점3 사용 |
@@ -110,7 +117,7 @@ CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한�
 
 [ENCOUNTER_POOL.csv](ENCOUNTER_POOL.csv)는 기존 기본 상점 3개와 속성별 무기·스킬 상점 10개를 모은 기획 목록이다. ID·이름·상점 종류·속성·분류 태그·판매 대상·등장 가중치·구현 상태·확인 사항을 기록한다. 신규 ID는 기획 식별자이며 CSV 런타임 로더·상품 필터·후보 추첨은 연결하지 않았다. 기존 `Shop_01/02/03`과 분류 태그를 보존하고 미정 가중치는 공란으로 둔다. [확정 범위와 미정 항목](GAME_DESIGN.md#2-3-속성별-상점-인카운터)
 
-향후 인카운터 후보의 확률 제시는 정의와 별도의 `FRunEncounterPoolEntry` USTRUCT에 정의 ID/참조·상대 가중치·출현 구간·조건을 두는 구성을 권장한다. 에디터 중심 편집은 DataAsset의 배열, 대량 수치·CSV 편집이 필요하면 `FTableRowBase` 기반 DataTable을 사용한다. 추첨은 Host에서 확정하고 제시 결과를 Run에 저장한다. 인카운터 후보의 가중치·추첨은 미구현이며 아이템상점 상품의 시험 추첨·리롤과 구분한다.
+향후 인카운터 후보의 확률 제시는 정의와 별도의 `FRunEncounterPoolEntry` USTRUCT에 정의 ID/참조·상대 가중치·출현 구간·조건을 두는 구성을 권장한다. 에디터 중심 편집은 DataAsset의 배열, 대량 수치·CSV 편집이 필요하면 `FTableRowBase` 기반 DataTable을 사용한다. 추첨은 Host에서 확정하고 제시 결과를 Run에 저장한다. 인카운터 후보의 가중치·추첨은 미구현이며 스킬·아이템상점 상품의 시험 추첨·리롤과 구분한다.
 
 전이는 후보 저장 객체에 계산하고 저장 성공 후 선택·퇴장 상태를 반영한다. 실패하면 기존 상태를 유지하며 같은 버튼으로 재시도한다. 기존 저장의 schema 0은 상점 없는 경로를 유지하며 새 Run의 schema 1과 구분한다. 상점 내부 재개·관리 lease·Host 진행 권한은 [MULTIPLAYER](MULTIPLAYER.md), 사용자 확인은 [남은 확인](TODO.md#1-사용자-작동-확인)을 따른다.
 
@@ -205,7 +212,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 [CatalogSkillSpecs.json](../Source/ProjectAEditor/Scripts/CatalogSkillSpecs.json)은 577개 원본 중 176개를 새 스킬로 구성하고 401개를 보류한다. 생성 대상은 베기·소환 무기 26개, 회전 2개, 단일 투사체 32개, 지점 범위 64개, 빔 5개, 즉시 치유 3개, 보호막 44개다. 외부 Blueprint 88개, Ribbon/AnimTrail 33개, 자체 이동 파라미터 연동이 필요한 6개와 지속 효과·부착·피격·조준 표현 등은 보류하며 [SKILL_CREATION_STATUS.csv](SKILL_CREATION_STATUS.csv)에 각 사유를 기록한다.
 
-[CreateCatalogSkills.py](../Source/ProjectAEditor/Scripts/CreateCatalogSkills.py)는 기본적으로 원본 시스템을 참조하고 아래 방향 보정 7개에는 `direction_source` 파생을 사용하는 명시 RoundDefinition BPDA를 `/Game/User_JeHoon/Blueprint/DataAsset/Skills/` 바로 아래에 작성한다. 사용자 요청에 따라 파일명 해시를 제거하고 `BPDA_{원본 에셋 이름}`을 사용하며, 대소문자를 구분하지 않는 중복 이름에만 CSV 순서대로 `_1`, `_2`를 붙인다. 중복 대상은 `N_EnergyShield`·`N_Tsunami` 각 2개이며 기존 5개 스킬 이름과 충돌하지 않는다. 내부 `Catalog_<hash>` SkillId·CSV 표시명·스킬 설정은 유지한다. 176개를 Unreal AssetTools로 이동하고 풀 참조를 갱신했으며 Redirector 176개를 정리했다. 이전 Package/Object 경로와 PrimaryAssetId의 리디렉션 설정을 추가했다. 별도 `SkillPools/DA_SkillPool_Catalog`와 기존 상점·장착 목록은 유지한다. 같은 목적지가 있으면 속성을 비교하고 불일치 시 덮어쓰지 않고 중단한다. 원본 CSV·원본 에셋·기존 스킬 패키지 해시와 데이터 검증을 확인하며 `-CatalogSkillsVerifyOnly`는 저장 없이 다시 읽는다. 구경로 로드와 PrimaryAssetId 설정 검사의 범위는 [2-36절](TODO.md#2-36-csv-기반-스킬-생성)을 따른다.
+[CreateCatalogSkills.py](../Source/ProjectAEditor/Scripts/CreateCatalogSkills.py)는 기본적으로 원본 시스템을 참조하고 아래 방향 보정 7개에는 `direction_source` 파생을 사용하는 명시 RoundDefinition BPDA를 `/Game/User_JeHoon/Blueprint/DataAsset/Skills/` 바로 아래에 작성한다. 사용자 요청에 따라 파일명 해시를 제거하고 `BPDA_{원본 에셋 이름}`을 사용하며, 대소문자를 구분하지 않는 중복 이름에만 CSV 순서대로 `_1`, `_2`를 붙인다. 중복 대상은 `N_EnergyShield`·`N_Tsunami` 각 2개이며 기존 5개 스킬 이름과 충돌하지 않는다. 내부 `Catalog_<hash>` SkillId·CSV 표시명·스킬 설정은 유지한다. 176개를 Unreal AssetTools로 이동하고 풀 참조를 갱신했으며 Redirector 176개를 정리했다. 이전 Package/Object 경로와 PrimaryAssetId의 리디렉션 설정을 추가했다. 별도 `SkillPools/DA_SkillPool_Catalog`를 유지하며 새 Run 스킬상점은 해당 풀을 기존 에셋 참조로 연결한다. 기존 저장의 상품·장착 목록은 보존한다. 같은 목적지가 있으면 속성을 비교하고 불일치 시 덮어쓰지 않고 중단한다. 원본 CSV·원본 에셋·기존 스킬 패키지 해시와 데이터 검증을 확인하며 `-CatalogSkillsVerifyOnly`는 저장 없이 다시 읽는다. 구경로 로드와 PrimaryAssetId 설정 검사의 범위는 [2-36절](TODO.md#2-36-csv-기반-스킬-생성)을 따른다.
 
 생성 명세의 `entries[].timing`은 `windup_seconds`·`effect_hit_delay_seconds`·`effect_duration`·`projectile_speed`·`projectile_lifetime`의 선택적 재정의를 지원한다. 생략한 값은 기존 기본값·프로필을 사용하며 잘못된 키·유한하지 않은 숫자·해당 프로필에서 사용하지 않는 필드는 거절한다. 카탈로그는 검 궤적 판정을 사용하지 않으므로 `weapon_trace_duration`은 지원하지 않는다. 디버그 임시 설정은 자동 저장하지 않으며 검토한 수치를 명세에 별도로 반영한다. 기존 목적지 에셋의 설정과 명세가 다르면 생성 도구는 오류로 중단하고 에셋을 보존한다. 이 지원이 기존 스킬의 타이밍을 일괄 조정하거나 모든 원본 VFX의 접촉 프레임을 확정한 것은 아니다.
 

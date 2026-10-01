@@ -32,7 +32,7 @@ public:
     bool ContinueRun();
     bool SelectRunEncounter(FName EncounterId);
     bool LeaveRunEncounter();
-    bool PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError, int32 ExpectedItemShopRevision = INDEX_NONE);
+    bool PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError, int32 ExpectedShopRevision = INDEX_NONE);
     bool ChangeEquipment(const FRunAccountId& AccountId, const FRunEquipmentCommand& Command, FText& OutError);
     bool SelectGoldReward(const FRunAccountId& AccountId, FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex, FText& OutError);
 

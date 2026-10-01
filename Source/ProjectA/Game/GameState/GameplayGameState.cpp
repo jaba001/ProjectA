@@ -30,6 +30,10 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
         View.CompletedNodes = Run->GetCompletedNodes();
         View.EncounterProgress = Run->GetEncounterProgress();
         View.SkillShopState = Run->GetSkillShopState();
+        // Replicate displayed stock while keeping selection catalogs and queries on the authority.
+        // 진열 상품만 복제하고 후보 카탈로그와 선택 조건은 권위 측에 유지합니다.
+        View.SkillShopState.Catalog.Reset();
+        View.SkillShopState.Query = FGameplayTagQuery();
         View.ItemShopState = Run->GetItemShopState();
         // Replicate only the visible stock; the frozen candidate catalog remains on the server.
         // 표시 중인 재고만 복제하고 고정된 후보 카탈로그는 서버에 보관합니다.

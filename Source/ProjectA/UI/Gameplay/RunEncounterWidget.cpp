@@ -143,12 +143,12 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
         EquipmentPanel->RefreshEquipment(View, InventoryCharacterId);
         InventoryPanel->RefreshInventory(View, InventoryCharacterId);
     }
-    ItemShopRevision = bItemShop ? View.ItemShopState.Revision : INDEX_NONE;
+    ShopRevision = bInShop ? (bItemShop ? View.ItemShopState.Revision : View.SkillShopState.Revision) : INDEX_NONE;
     ShopBalance->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     ShopHint->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     ShopActions->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     RecoveryButton->SetVisibility(bInShop && !bItemShop && View.SkillShopState.SchemaVersion == 1 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    RerollButton->SetVisibility(bItemShop && View.ItemShopState.SchemaVersion == 1 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    RerollButton->SetVisibility(bInShop && (bItemShop ? View.ItemShopState.SchemaVersion == 1 : View.SkillShopState.SchemaVersion == 1) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     if (bInShop)
     {
         ShopBalance->SetText(Buyer ? FText::Format(NSLOCTEXT("RunSkillShop", "Balance", "{0} · 보유 골드 {1}G"), Buyer->CharacterName, FText::AsNumber(Buyer->Gold)) : NSLOCTEXT("RunSkillShop", "NoBuyer", "구매 가능한 직접 조작 캐릭터가 없습니다."));
@@ -157,7 +157,9 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
         {
             ShopHint->SetText(View.ItemShopState.SchemaVersion == 0 ? NSLOCTEXT("RunItemShop", "LegacyRun", "이전 저장에는 아이템 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다.") : NSLOCTEXT("RunItemShop", "InventoryRules", "중복 없이 5개 추첨 · 구매한 아이템은 오른쪽 인벤토리에 보관됩니다."));
         }
-        else ShopHint->SetText(View.SkillShopState.SchemaVersion == 0 ? NSLOCTEXT("RunSkillShop", "LegacyRun", "이전 저장에는 스킬 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다.") : NSLOCTEXT("RunSkillShop", "Rules", "구매한 스킬은 본인 캐릭터에만 적용되며 Run 동안 유지됩니다. 같은 스킬은 한 번만 구매할 수 있습니다."));
+        else if (View.SkillShopState.SchemaVersion == 0) ShopHint->SetText(NSLOCTEXT("RunSkillShop", "LegacyRun", "이전 저장에는 스킬 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다."));
+        else if (View.SkillShopState.Revision == 0) ShopHint->SetText(NSLOCTEXT("RunSkillShop", "LegacyStock", "이전 저장의 스킬 상품과 HP 회복은 그대로 구매할 수 있습니다. 리롤은 새 Run에서 이용할 수 있습니다."));
+        else ShopHint->SetText(NSLOCTEXT("RunSkillShop", "RerollRules", "중복 없이 스킬 5개 진열 · 전체 리롤 · 비용 1 → 2 → 3G… · 구매한 스킬은 본인에게 Run 동안 적용되며 같은 스킬은 한 번만 구매할 수 있습니다."));
         const int32 OfferCount = bItemShop ? View.ItemShopState.Offers.Num() : View.SkillShopState.Offers.Num();
         while (ShopButtons.Num() < OfferCount)
         {
@@ -225,8 +227,9 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             }
             const FRunSkillShopOffer& Offer = View.SkillShopState.Offers[Index];
             const bool bOwned = Buyer && Buyer->Skills.Contains(Offer.Skill);
+            const bool bLoadoutFull = Buyer && Buyer->Skills.Num() >= 5;
             const bool bAffordable = Buyer && Offer.Price > 0 && Buyer->Gold >= Offer.Price;
-            const FText Status = bOwned ? NSLOCTEXT("RunSkillShop", "Owned", "보유 중") : bAffordable ? NSLOCTEXT("RunSkillShop", "Buy", "구매") : NSLOCTEXT("RunSkillShop", "CannotBuy", "구매 불가");
+            const FText Status = bOwned ? NSLOCTEXT("RunSkillShop", "Owned", "보유 중") : bLoadoutFull ? NSLOCTEXT("RunSkillShop", "FullLoadout", "스킬 5개 보유") : bAffordable ? NSLOCTEXT("RunSkillShop", "Buy", "구매") : NSLOCTEXT("RunSkillShop", "CannotBuy", "구매 불가");
             Button->Configure(Offer.OfferId, Status);
             ShopNames[Index]->SetText(Offer.DisplayName);
             ShopPrices[Index]->SetText(FText::Format(NSLOCTEXT("RunSkillShop", "Price", "{0}G"), FText::AsNumber(Offer.Price)));
@@ -236,7 +239,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             ShopCards[Index]->SetRenderOpacity(bOwned ? 0.55f : 1.0f);
             ShopCards[Index]->SetToolTipText(Offer.Description);
             Button->SetToolTipText(Offer.Description);
-            Button->SetIsEnabled(!bOwned && bAffordable && Controller && !Controller->IsShopPurchasePending());
+            Button->SetIsEnabled(!bOwned && !bLoadoutFull && bAffordable && Controller && !Controller->IsShopPurchasePending());
         }
         const bool bCanRecover = Buyer && BuyerView && Buyer->CurrentHP > 0.f && Buyer->CurrentHP < BuyerView->MaxHP;
         const bool bRecoveryAffordable = Buyer && View.SkillShopState.Recovery.Price > 0 && Buyer->Gold >= View.SkillShopState.Recovery.Price;
@@ -244,10 +247,14 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
         RecoveryButton->Configure(FRunSkillShopState::GetRecoveryOfferId(), FText::Format(NSLOCTEXT("RunSkillShop", "RecoveryProduct", "HP 전체 회복 · {0}G · {1}"), FText::AsNumber(View.SkillShopState.Recovery.Price), RecoveryStatus));
         RecoveryButton->SetToolTipText(NSLOCTEXT("RunSkillShop", "RecoveryDescription", "본인 생존 캐릭터의 HP를 즉시 최대치까지 회복합니다. HP가 가득 차 있으면 구매할 수 없습니다."));
         RecoveryButton->SetIsEnabled(View.SkillShopState.SchemaVersion == 1 && bCanRecover && bRecoveryAffordable && Controller && !Controller->IsShopPurchasePending());
-        const bool bRerollAffordable = Buyer && View.ItemShopState.RerollPrice > 0 && Buyer->Gold >= View.ItemShopState.RerollPrice;
-        RerollButton->Configure(FRunItemShopState::GetRerollOfferId(), FText::Format(NSLOCTEXT("RunItemShop", "Reroll", "리롤 · {0}G"), FText::AsNumber(View.ItemShopState.RerollPrice)));
-        RerollButton->SetToolTipText(NSLOCTEXT("RunItemShop", "RerollDescription", "본인 골드를 사용하여 모두에게 표시되는 5개 상품을 다시 추첨합니다. 이전 상품이 다시 나올 수 있습니다."));
-        RerollButton->SetIsEnabled(bItemShop && View.ItemShopState.SchemaVersion == 1 && bRerollAffordable && Controller && !Controller->IsShopPurchasePending());
+        const int32 RerollPrice = bItemShop ? View.ItemShopState.RerollPrice : View.SkillShopState.RerollPrice;
+        const bool bRerollAvailable = bItemShop ? View.ItemShopState.SchemaVersion == 1 && View.ItemShopState.Revision > 0 : View.SkillShopState.SchemaVersion == 1 && View.SkillShopState.Revision > 0;
+        const bool bRerollAffordable = Buyer && RerollPrice > 0 && Buyer->Gold >= RerollPrice;
+        const FName RerollOfferId = bItemShop ? FRunItemShopState::GetRerollOfferId() : FRunSkillShopState::GetRerollOfferId();
+        const FText RerollLabel = !bItemShop && !bRerollAvailable ? NSLOCTEXT("RunSkillShop", "LegacyReroll", "리롤 · 새 Run에서 이용 가능") : FText::Format(NSLOCTEXT("RunShop", "Reroll", "리롤 · {0}G"), FText::AsNumber(RerollPrice));
+        RerollButton->Configure(RerollOfferId, RerollLabel);
+        RerollButton->SetToolTipText(bItemShop ? NSLOCTEXT("RunItemShop", "RerollDescription", "본인 골드를 사용하여 모두에게 표시되는 5개 상품을 다시 추첨합니다. 이전 상품이 다시 나올 수 있습니다.") : !bRerollAvailable ? NSLOCTEXT("RunSkillShop", "LegacyRerollDescription", "이전 저장의 스킬 상점은 기존 상품을 유지하며 리롤을 지원하지 않습니다. 새 Run에서 이용할 수 있습니다.") : NSLOCTEXT("RunSkillShop", "RerollDescription", "본인 골드로 모두에게 표시되는 스킬 5개를 중복 없이 다시 추첨합니다. 이전 스킬이 다시 나올 수 있으며, 비용은 1G부터 사용마다 1G씩 증가합니다."));
+        RerollButton->SetIsEnabled(bRerollAvailable && bRerollAffordable && Controller && !Controller->IsShopPurchasePending());
     }
     for (int32 Index = 0; Index < ChoiceButtons.Num(); ++Index)
     {
@@ -265,10 +272,11 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     LeaveButton->SetIsEnabled(View.Phase == ERunPhase::Shop && bAllowRunCommands);
     FText DisplayMessage = View.FlowMessage;
     if (bInShop && Controller && !Controller->GetShopPurchaseMessage().IsEmpty()) DisplayMessage = DisplayMessage.IsEmpty() ? Controller->GetShopPurchaseMessage() : FText::Format(NSLOCTEXT("RunSkillShop", "FlowAndPurchaseMessage", "{0}\n{1}"), DisplayMessage, Controller->GetShopPurchaseMessage());
-    if (bInShop && Controller && Controller->IsShopPurchasePending()) DisplayMessage = bItemShop ? NSLOCTEXT("RunItemShop", "Pending", "상점 요청을 처리하는 중입니다.") : NSLOCTEXT("RunSkillShop", "Pending", "구매를 처리하는 중입니다.");
+    if (bInShop && Controller && Controller->IsShopPurchasePending()) DisplayMessage = NSLOCTEXT("RunShop", "Pending", "상점 요청을 처리하는 중입니다.");
     if (DisplayMessage.IsEmpty() && !bAllowRunCommands)
     {
         if (bItemShop) DisplayMessage = NSLOCTEXT("RunItemShop", "HostLeaves", "본인 골드로 아이템 구매와 리롤을 할 수 있습니다. 상점 나가기는 Host가 결정합니다.");
+        else if (bInShop && View.SkillShopState.Revision > 0) DisplayMessage = NSLOCTEXT("RunSkillShop", "HostShopActions", "본인 골드로 스킬 구매, HP 회복과 리롤을 할 수 있습니다. 상점 나가기는 Host가 결정합니다.");
         else DisplayMessage = bInShop ? NSLOCTEXT("RunSkillShop", "HostLeaves", "본인 캐릭터의 스킬과 HP 회복을 구매할 수 있습니다. 상점 나가기는 Host가 결정합니다.") : NSLOCTEXT("RunEncounter", "HostOnly", "Host의 진행을 기다리는 중입니다.");
     }
     Message->SetText(DisplayMessage);
@@ -299,5 +307,5 @@ void URunEncounterWidget::HandleLeave(FName)
 void URunEncounterWidget::HandlePurchase(FName OfferId)
 {
     if (!BuyerCharacterId.IsValid()) return;
-    if (AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>()) Controller->RequestPurchaseShopOffer(BuyerCharacterId, OfferId, ItemShopRevision);
+    if (AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>()) Controller->RequestPurchaseShopOffer(BuyerCharacterId, OfferId, ShopRevision);
 }

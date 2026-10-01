@@ -7,6 +7,8 @@
 #include "Game/Run/RunGoldRewardTypes.h"
 #include "RunEncounterPoolDataAsset.generated.h"
 
+class USkillPoolDataAsset;
+
 // Author fixed prototype choices here; weighted generation can later produce the same runtime offers.
 // 고정된 시험용 선택지를 정의하며 향후 가중치 추첨도 같은 런타임 선택 목록을 생성합니다.
 UCLASS(BlueprintType)
@@ -27,6 +29,12 @@ public:
     TArray<FRunSkillShopOffer> FixedSkillOffers;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
+    TSoftObjectPtr<USkillPoolDataAsset> SkillShopPool;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
+    FGameplayTagQuery SkillShopQuery;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
     FRunShopRecoveryOffer Recovery;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Reward", meta = (ClampMin = "1"))
@@ -38,6 +46,7 @@ public:
     bool BuildFixedOffers(TArray<FRunEncounterOffer>& OutOffers, FText& OutError) const;
     bool BuildSkillShop(FRunSkillShopState& OutState, FText& OutError) const;
     static bool ValidateSkillShop(const FRunSkillShopState& State, FText& OutError);
+    static bool RollSkillShop(FRunSkillShopState& State, bool bResetRerollPrice, FText& OutError);
     bool ValidateGoldRewardRange(FText& OutError) const;
     bool BuildGoldRewards(FName NodeId, FRunGoldRewardState& OutState, FText& OutError) const;
 };

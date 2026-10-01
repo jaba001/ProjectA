@@ -33,7 +33,7 @@ public:
     void RequestContinueRun();
     void RequestSelectRunEncounter(FName EncounterId);
     void RequestLeaveRunEncounter();
-    void RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision = INDEX_NONE);
+    void RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision = INDEX_NONE);
     FGuid GetShopBuyerCharacterId(const FGameplayViewState& View) const;
     const FText& GetShopPurchaseMessage() const { return ShopPurchaseMessage; }
     bool IsShopPurchasePending() const { return bShopPurchasePending; }
@@ -66,7 +66,7 @@ private:
 #endif
 
     void RefreshGameplayFlow();
-    void ExecuteShopPurchase(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision);
+    void ExecuteShopPurchase(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision);
     void ExecuteEquipmentChange(const FRunEquipmentCommand& Command);
     void ExecuteGoldRewardSelection(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex);
 
@@ -77,10 +77,10 @@ private:
     void ClientReceiveGoldRewardResult(FGuid CharacterId, FName ExpectedNodeId, bool bSucceeded, const FText& Message);
 
     UFUNCTION(Server, Reliable)
-    void ServerPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision);
+    void ServerPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision);
 
     UFUNCTION(Client, Reliable)
-    void ClientReceiveShopPurchaseResult(bool bSucceeded, const FText& Message, int32 ConfirmedItemShopRevision);
+    void ClientReceiveShopPurchaseResult(bool bSucceeded, const FText& Message, int32 ConfirmedShopRevision);
 
     UFUNCTION(Server, Reliable)
     void ServerChangeEquipment(const FRunEquipmentCommand& Command);
@@ -98,7 +98,8 @@ private:
 
     FText ShopPurchaseMessage;
     bool bShopPurchasePending = false;
-    int32 PendingItemShopRevision = INDEX_NONE;
+    bool bPendingItemShop = false;
+    int32 PendingShopRevision = INDEX_NONE;
     FText EquipmentMessage;
     bool bEquipmentChangePending = false;
     FGuid PendingEquipmentCharacterId;

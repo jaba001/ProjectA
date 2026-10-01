@@ -32,7 +32,7 @@ private:
     void HandlePurchase(FName OfferId);
     bool bRunCommandsAllowed = false;
     FGuid BuyerCharacterId;
-    int32 ItemShopRevision = INDEX_NONE;
+    int32 ShopRevision = INDEX_NONE;
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> Title;

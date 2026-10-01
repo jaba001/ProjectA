@@ -105,19 +105,35 @@ bool FRunSkillShopLoadoutTest::RunTest(const FString& Parameters)
             const FGuid CharacterId = Fixture.Member(SelectedSlot).CharacterId;
             const FRunAccountId Account = Fixture.Member(SelectedSlot).OwnerAccountId;
             const TArray<FRunSkillShopOffer> Offers = Fixture.Run->GetSkillShopState().Offers;
-            if (!TestEqual(TEXT("Every shop sells the four existing skills"), Offers.Num(), 4)) return false;
-            for (const FRunSkillShopOffer& Offer : Offers)
+            if (!TestEqual(TEXT("Every skill shop displays five offers"), Offers.Num(), 5)) return false;
+            TSet<FName> DisplayedSkillIds;
+            for (int32 Index = 0; Index < Offers.Num(); ++Index)
             {
+                const FRunSkillShopOffer& Offer = Offers[Index];
                 TestEqual(TEXT("Every prototype skill costs 1G"), Offer.Price, 1);
                 TestFalse(TEXT("Products never sell the free unarmed attack"), Offer.Skill == Unarmed);
-                TestTrue(TEXT("Every profession can purchase every product"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error));
-                TestFalse(TEXT("A learned skill cannot be bought twice"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error));
+                const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());
+                FCombatRoundSkill Definition;
+                if (!TestTrue(TEXT("Every displayed skill resolves to valid runtime content"), IsValid(Skill) && Skill->ResolveRoundSkill(Definition, Fixture.Error))) return false;
+                TestFalse(TEXT("Displayed skill identities contain no duplicates"), DisplayedSkillIds.Contains(Definition.SkillId));
+                DisplayedSkillIds.Add(Definition.SkillId);
+                if (Index < 4)
+                {
+                    TestTrue(TEXT("Every profession can purchase four displayed skills"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+                    TestFalse(TEXT("A learned skill cannot be bought twice"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+                }
+                else
+                {
+                    const FRunPartyMember FullBuyer = Fixture.Member(SelectedSlot);
+                    TestFalse(TEXT("The fifth displayed skill cannot exceed the five-skill loadout limit"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+                    TestTrue(TEXT("A full loadout rejection preserves the buyer's balance and skills"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&FullBuyer, &Fixture.Member(SelectedSlot), 0));
+                }
             }
             TestEqual(TEXT("Four successful purchases consume exactly 4G"), Fixture.Member(SelectedSlot).Gold, Before[SelectedSlot].Gold - 4);
-            TestEqual(TEXT("The buyer retains unarmed and all four purchases"), Fixture.Member(SelectedSlot).Skills.Num(), 5);
+            TestEqual(TEXT("The buyer retains unarmed and four purchases"), Fixture.Member(SelectedSlot).Skills.Num(), 5);
             FProfessionDefinition Profession;
             if (!Fixture.Run->PartyDefinition->ResolveProfession(Fixture.Member(SelectedSlot).ClassId, Profession)) return false;
-            TestTrue(TEXT("Every shop can recover every profession even with five equipped skills"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
+            TestTrue(TEXT("Every shop can recover every profession even with five equipped skills"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
             TestTrue(TEXT("Recovery restores all HP for 1G without changing the full loadout"), Fixture.Member(SelectedSlot).CurrentHP == Profession.MaxHP && Fixture.Member(SelectedSlot).Gold == Before[SelectedSlot].Gold - 5 && Fixture.Member(SelectedSlot).Skills.Num() == 5);
             for (int32 Index = 0; Index < Before.Num(); ++Index)
             {
@@ -139,22 +155,23 @@ bool FRunSkillShopRejectionTest::RunTest(const FString& Parameters)
     FSkillShopFixture Fixture;
     if (!TestTrue(TEXT("The rejection fixture saves its initial Run"), Fixture.Initialize(3, true))) return false;
     const FRunPartyMember Buyer = Fixture.Member(3);
-    const FName OfferId = Fixture.Run->GetSkillShopState().Offers[0].OfferId;
-    TestFalse(TEXT("A purchase cannot bypass the Map phase"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, OfferId, Fixture.Error));
-    TestFalse(TEXT("Recovery cannot bypass the Map phase"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
+    const FName InitialOfferId = Fixture.Run->GetSkillShopState().Offers[0].OfferId;
+    TestFalse(TEXT("A purchase cannot bypass the Map phase"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, InitialOfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+    TestFalse(TEXT("Recovery cannot bypass the Map phase"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
     if (!TestTrue(TEXT("The rejection fixture enters a shop"), Fixture.ReachShop())) return false;
+    const FName OfferId = Fixture.Run->GetSkillShopState().Offers[0].OfferId;
     const TArray<FRunPartyMember> Before = Fixture.Run->GetPartyMembers();
     const TArray<uint8> DiskBefore = Fixture.ReadBytes();
     int32 Events = 0;
     Fixture.Run->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
     FRunAccountId Outsider = Buyer.OwnerAccountId;
     Outsider.Subject += TEXT("_Other");
-    TestFalse(TEXT("A foreign account cannot buy for the selected character"), Fixture.Run->PurchaseShopOffer(Outsider, Buyer.CharacterId, OfferId, Fixture.Error));
-    TestFalse(TEXT("A foreign account cannot recover the selected character"), Fixture.Run->PurchaseShopOffer(Outsider, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
-    TestFalse(TEXT("The local owner cannot redirect a purchase to an AI companion"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Fixture.Member(0).CharacterId, OfferId, Fixture.Error));
-    TestFalse(TEXT("Recovery cannot be redirected to an AI companion"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Fixture.Member(0).CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
-    TestFalse(TEXT("Unknown characters are rejected"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, FGuid::NewGuid(), OfferId, Fixture.Error));
-    TestFalse(TEXT("Unknown products are rejected"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, TEXT("Missing"), Fixture.Error));
+    TestFalse(TEXT("A foreign account cannot buy for the selected character"), Fixture.Run->PurchaseShopOffer(Outsider, Buyer.CharacterId, OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+    TestFalse(TEXT("A foreign account cannot recover the selected character"), Fixture.Run->PurchaseShopOffer(Outsider, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+    TestFalse(TEXT("The local owner cannot redirect a purchase to an AI companion"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Fixture.Member(0).CharacterId, OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+    TestFalse(TEXT("Recovery cannot be redirected to an AI companion"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Fixture.Member(0).CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+    TestFalse(TEXT("Unknown characters are rejected"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, FGuid::NewGuid(), OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+    TestFalse(TEXT("Unknown products are rejected"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, TEXT("Missing"), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
     TestTrue(TEXT("All rejected requests preserve complete party data and durable bytes"), SameShopParty(Before, Fixture.Run->GetPartyMembers()) && DiskBefore == Fixture.ReadBytes());
     TestEqual(TEXT("Rejected requests publish no state change"), Events, 0);
     Fixture.Run->OnRunStateChanged.Clear();
@@ -162,8 +179,8 @@ bool FRunSkillShopRejectionTest::RunTest(const FString& Parameters)
     FSkillShopFixture DeadFixture;
     if (!DeadFixture.Initialize() || !DeadFixture.ReachShop(TEXT("Shop_01"), 3)) return false;
     const FRunPartyMember Dead = DeadFixture.Member(3);
-    TestFalse(TEXT("A dead direct-control character cannot purchase"), DeadFixture.Run->PurchaseShopOffer(Dead.OwnerAccountId, Dead.CharacterId, DeadFixture.Run->GetSkillShopState().Offers[0].OfferId, DeadFixture.Error));
-    TestFalse(TEXT("Shop recovery cannot resurrect a dead character"), DeadFixture.Run->PurchaseShopOffer(Dead.OwnerAccountId, Dead.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), DeadFixture.Error));
+    TestFalse(TEXT("A dead direct-control character cannot purchase"), DeadFixture.Run->PurchaseShopOffer(Dead.OwnerAccountId, Dead.CharacterId, DeadFixture.Run->GetSkillShopState().Offers[0].OfferId, DeadFixture.Error, DeadFixture.Run->GetSkillShopState().Revision));
+    TestFalse(TEXT("Shop recovery cannot resurrect a dead character"), DeadFixture.Run->PurchaseShopOffer(Dead.OwnerAccountId, Dead.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), DeadFixture.Error, DeadFixture.Run->GetSkillShopState().Revision));
     TestTrue(TEXT("The rejected dead character retains its gold and unarmed loadout"), DeadFixture.Member(3).Gold == Dead.Gold && DeadFixture.Member(3).Skills.Num() == 1);
 
     FSkillShopFixture PoorFixture;
@@ -174,10 +191,14 @@ bool FRunSkillShopRejectionTest::RunTest(const FString& Parameters)
     Pool->Recovery.Price = 100;
     Catalog->RunEncounterPool = Pool.Get();
     PoorFixture.Run->PartyDefinition = Catalog.Get();
-    if (!PoorFixture.Initialize() || !PoorFixture.ReachShop(TEXT("Shop_03"))) return false;
+    if (!PoorFixture.Initialize(3, true) || !PoorFixture.ReachShop(TEXT("Shop_03"))) return false;
+    TStrongObjectPtr<URunSaveGame> EmptyBalance(Cast<URunSaveGame>(FRunCheckpointStorage::Load(PoorFixture.Slot, PoorFixture.Error)));
+    if (!EmptyBalance) return false;
+    EmptyBalance->Party[3].Gold = 0;
+    if (!FRunCheckpointStorage::Save(EmptyBalance.Get(), PoorFixture.Slot, PoorFixture.Error) || !PoorFixture.Run->LoadStandaloneCheckpoint(PoorFixture.Error)) return false;
     const FRunPartyMember Poor = PoorFixture.Member(3);
-    TestFalse(TEXT("An authored insufficient balance rejects a purchase"), PoorFixture.Run->PurchaseShopOffer(Poor.OwnerAccountId, Poor.CharacterId, PoorFixture.Run->GetSkillShopState().Offers[0].OfferId, PoorFixture.Error));
-    TestFalse(TEXT("Insufficient funds also reject recovery"), PoorFixture.Run->PurchaseShopOffer(Poor.OwnerAccountId, Poor.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), PoorFixture.Error));
+    TestFalse(TEXT("An authored insufficient balance rejects a purchase"), PoorFixture.Run->PurchaseShopOffer(Poor.OwnerAccountId, Poor.CharacterId, PoorFixture.Run->GetSkillShopState().Offers[0].OfferId, PoorFixture.Error, PoorFixture.Run->GetSkillShopState().Revision));
+    TestFalse(TEXT("Insufficient funds also reject recovery"), PoorFixture.Run->PurchaseShopOffer(Poor.OwnerAccountId, Poor.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), PoorFixture.Error, PoorFixture.Run->GetSkillShopState().Revision));
     TestTrue(TEXT("Insufficient funds neither subtract gold nor teach a skill"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Poor, &PoorFixture.Member(3), 0));
     return true;
 }
@@ -202,12 +223,12 @@ bool FRunSkillShopAtomicPersistenceTest::RunTest(const FString& Parameters)
         bEventObservedDurablePurchase = Durable && Durable->Party[3].Gold == Buyer.Gold - 1 && Durable->Party[3].Skills.Contains(Offer.Skill) && Fixture.Member(3).Gold == Buyer.Gold - 1 && Fixture.Member(3).Skills.Contains(Offer.Skill);
     });
     FRunCheckpointStorage::FailNextWriteForTesting();
-    TestFalse(TEXT("A failed durable write rejects the purchase"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error));
+    TestFalse(TEXT("A failed durable write rejects the purchase"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
     TestTrue(TEXT("Failed writes preserve every member and the complete original file"), SameShopParty(Before, Fixture.Run->GetPartyMembers()) && BeforeBytes == Fixture.ReadBytes());
     TestEqual(TEXT("Failed persistence emits no purchase notification"), Events, 0);
-    TestTrue(TEXT("The same purchase can retry after storage recovers"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error));
+    TestTrue(TEXT("The same purchase can retry after storage recovers"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
     TestTrue(TEXT("The single success notification observes committed memory and disk"), Events == 1 && bEventObservedDurablePurchase);
-    TestFalse(TEXT("A retried successful request cannot charge twice"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error));
+    TestFalse(TEXT("A retried successful request cannot charge twice"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
     TestEqual(TEXT("A duplicate request adds no notification"), Events, 1);
     Fixture.Run->OnRunStateChanged.Clear();
     TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
@@ -215,7 +236,7 @@ bool FRunSkillShopAtomicPersistenceTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Standalone Continue restores the purchased shop"), Restored->LoadStandaloneCheckpoint(Fixture.Error))) return false;
     TestTrue(TEXT("Restore preserves ownership identity balances and all skill paths"), SameShopParty(Fixture.Run->GetPartyMembers(), Restored->GetPartyMembers()) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Restored->GetRunIdentity(), 0));
     TestTrue(TEXT("Restore preserves the frozen catalog"), FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Fixture.Run->GetSkillShopState(), &Restored->GetSkillShopState(), 0));
-    TestFalse(TEXT("A reloaded purchase remains owned"), Restored->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error));
+    TestFalse(TEXT("A reloaded purchase remains owned"), Restored->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error, Restored->GetSkillShopState().Revision));
     TestTrue(TEXT("Purchased skills survive shop exit and the next combat"), Restored->LeaveRunEncounter() && Restored->BeginEncounter(TEXT("Combat_02")) && Restored->MarkCombatStarted() && Restored->GetPartyMembers()[3].Skills.Contains(Offer.Skill));
     TestEqual(TEXT("The next encounter never grants another starting balance"), Restored->GetPartyMembers()[3].Gold, Buyer.Gold - 1);
     return true;
@@ -246,25 +267,143 @@ bool FRunShopRecoveryPersistenceTest::RunTest(const FString& Parameters)
         bEventObservedDurableRecovery = Durable && Durable->Party[3].Gold == Buyer.Gold - 1 && Durable->Party[3].CurrentHP == Profession.MaxHP && Durable->Party[3].Skills == Buyer.Skills && Fixture.Member(3).Gold == Buyer.Gold - 1 && Fixture.Member(3).CurrentHP == Profession.MaxHP;
     });
     FRunCheckpointStorage::FailNextWriteForTesting();
-    TestFalse(TEXT("Recovery rejects a failed durable write"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
+    TestFalse(TEXT("Recovery rejects a failed durable write"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
     TestFalse(TEXT("Recovery storage failure supplies a visible reason"), Fixture.Error.IsEmpty());
     TestTrue(TEXT("Failed recovery preserves all HP gold skills and disk bytes"), SameShopParty(Before, Fixture.Run->GetPartyMembers()) && BeforeBytes == Fixture.ReadBytes());
     TestEqual(TEXT("Failed recovery publishes no state change"), Events, 0);
-    if (!TestTrue(TEXT("The same recovery succeeds after storage recovers"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error))) return false;
+    if (!TestTrue(TEXT("The same recovery succeeds after storage recovers"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error, Fixture.Run->GetSkillShopState().Revision))) return false;
     TestTrue(TEXT("Recovery notification observes HP and gold committed together"), Events == 1 && bEventObservedDurableRecovery);
     for (int32 Index = 0; Index < Before.Num(); ++Index)
     {
         if (Index != 3) TestTrue(TEXT("Recovery leaves every companion unchanged"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[Index], &Fixture.Member(Index), 0));
     }
     const TArray<uint8> RecoveredBytes = Fixture.ReadBytes();
-    TestFalse(TEXT("A repeated request at full HP cannot charge again"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
+    TestFalse(TEXT("A repeated request at full HP cannot charge again"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
     TestTrue(TEXT("Full HP rejection preserves balance save bytes and notification count"), Fixture.Member(3).Gold == Buyer.Gold - 1 && Fixture.Member(3).CurrentHP == Profession.MaxHP && RecoveredBytes == Fixture.ReadBytes() && Events == 1);
     Fixture.Run->OnRunStateChanged.Clear();
     TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
     Restored->EnableCheckpointSaving(Fixture.Slot);
     if (!TestTrue(TEXT("Continue restores the recovered shop"), Restored->LoadStandaloneCheckpoint(Fixture.Error))) return false;
-    TestTrue(TEXT("Recovery reload preserves party identity and frozen skill products"), SameShopParty(Fixture.Run->GetPartyMembers(), Restored->GetPartyMembers()) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Restored->GetRunIdentity(), 0) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Catalog, &Restored->GetSkillShopState(), 0));
+    FRunSkillShopState ExpectedShop = Catalog;
+    ++ExpectedShop.Revision;
+    TestTrue(TEXT("Recovery reload preserves party identity and frozen skill products with the committed revision"), SameShopParty(Fixture.Run->GetPartyMembers(), Restored->GetPartyMembers()) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Restored->GetRunIdentity(), 0) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&ExpectedShop, &Restored->GetSkillShopState(), 0));
     TestTrue(TEXT("Recovered HP persists into the next battle without refilling gold"), Restored->LeaveRunEncounter() && Restored->BeginEncounter(TEXT("Combat_02")) && Restored->MarkCombatStarted() && Restored->GetPartyMembers()[3].CurrentHP == Profession.MaxHP && Restored->GetPartyMembers()[3].Gold == Buyer.Gold - 1 && Restored->GetPartyMembers()[3].Skills == Buyer.Skills);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunSkillShopRerollPersistenceTest, "ProjectA.Run.Shop.SkillRerollEscalationAtomicWriteAndReload", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunSkillShopRerollPersistenceTest::RunTest(const FString& Parameters)
+{
+    FSkillShopFixture Fixture;
+    if (!Fixture.Initialize(3, true) || !Fixture.ReachShop()) return false;
+    const FRunPartyMember Buyer = Fixture.Member(3);
+    const FRunSkillShopState Initial = Fixture.Run->GetSkillShopState();
+    const TArray<FRunPartyMember> BeforeParty = Fixture.Run->GetPartyMembers();
+    const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
+    TestEqual(TEXT("New skill shops freeze four existing and 176 catalog skills"), Initial.Catalog.Num(), 180);
+    TestEqual(TEXT("Entering a skill shop resets the first reroll to 1G"), Initial.RerollPrice, 1);
+    TestTrue(TEXT("New skill-shop stock carries a positive revision"), Initial.Revision > 0);
+    const auto CheckOffers = [this, &Fixture](const FRunSkillShopState& State)
+    {
+        if (!TestEqual(TEXT("Every skill reroll retains exactly five displayed products"), State.Offers.Num(), 5)) return false;
+        TSet<FName> SkillIds;
+        TSet<FName> OfferIds;
+        for (const FRunSkillShopOffer& Offer : State.Offers)
+        {
+            const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());
+            FCombatRoundSkill Definition;
+            if (!TestTrue(TEXT("Rerolled products resolve through their existing skill assets"), IsValid(Skill) && Skill->ResolveRoundSkill(Definition, Fixture.Error))) return false;
+            TestFalse(TEXT("Displayed skill identities remain unique"), SkillIds.Contains(Definition.SkillId));
+            TestFalse(TEXT("Displayed offer identities remain unique"), OfferIds.Contains(Offer.OfferId));
+            TestTrue(TEXT("Rerolled products preserve their runtime tags and selection conditions"), Offer.Tags == Definition.EffectTags && (State.Query.IsEmpty() || State.Query.Matches(Offer.Tags)));
+            TestTrue(TEXT("Every displayed skill belongs to the frozen catalog"), State.Catalog.ContainsByPredicate([&Offer](const FRunSkillShopOffer& Product) { return Product.Skill == Offer.Skill && Product.Price == Offer.Price && Product.DisplayName.ToString() == Offer.DisplayName.ToString() && Product.Tags == Offer.Tags && Product.BaseWeight == Offer.BaseWeight; }));
+            SkillIds.Add(Definition.SkillId);
+            OfferIds.Add(Offer.OfferId);
+        }
+        return true;
+    };
+    if (!CheckOffers(Initial)) return false;
+    TestFalse(TEXT("A skill reroll without the displayed revision is rejected"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRerollOfferId(), Fixture.Error));
+    TestFalse(TEXT("A stale skill reroll cannot spend gold"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRerollOfferId(), Fixture.Error, Initial.Revision - 1));
+    TestFalse(TEXT("An AI companion cannot fund a shared skill reroll"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Fixture.Member(0).CharacterId, FRunSkillShopState::GetRerollOfferId(), Fixture.Error, Initial.Revision));
+    int32 Events = 0;
+    bool bDurableAtNotification = false;
+    Fixture.Run->OnRunStateChanged.AddLambda([&Fixture, &Events, &bDurableAtNotification]()
+    {
+        ++Events;
+        TStrongObjectPtr<URunSaveGame> Durable(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+        bDurableAtNotification = Durable && SameShopParty(Durable->Party, Fixture.Run->GetPartyMembers()) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Durable->SkillShopState, &Fixture.Run->GetSkillShopState(), 0);
+    });
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("A failed skill reroll write rejects the entire transaction"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRerollOfferId(), Fixture.Error, Initial.Revision));
+    TestTrue(TEXT("Failed skill rerolls preserve gold stock price revision and durable bytes"), SameShopParty(BeforeParty, Fixture.Run->GetPartyMembers()) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Initial, &Fixture.Run->GetSkillShopState(), 0) && BeforeBytes == Fixture.ReadBytes() && Events == 0);
+    if (!TestTrue(TEXT("The failed skill reroll retries with the original revision"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRerollOfferId(), Fixture.Error, Initial.Revision))) return false;
+    const FRunSkillShopState FirstReroll = Fixture.Run->GetSkillShopState();
+    TestTrue(TEXT("The first skill reroll costs 1G and raises the next cost to 2G"), Fixture.Member(3).Gold == Buyer.Gold - 1 && Fixture.Member(3).Skills == Buyer.Skills && FirstReroll.RerollPrice == 2 && FirstReroll.Revision == Initial.Revision + 1 && Events == 1 && bDurableAtNotification);
+    if (!CheckOffers(FirstReroll)) return false;
+    const TArray<uint8> FirstBytes = Fixture.ReadBytes();
+    TestFalse(TEXT("Replaying a successful skill reroll with its old revision is rejected"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRerollOfferId(), Fixture.Error, Initial.Revision));
+    TestTrue(TEXT("A stale reroll leaves the committed 2G cost and gold unchanged"), FirstBytes == Fixture.ReadBytes() && Fixture.Member(3).Gold == Buyer.Gold - 1 && Events == 1);
+    if (!TestTrue(TEXT("The next skill reroll uses the displayed 2G price"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRerollOfferId(), Fixture.Error, FirstReroll.Revision))) return false;
+    TestTrue(TEXT("Two skill rerolls cost exactly 3G and raise the next price to 3G"), Fixture.Member(3).Gold == Buyer.Gold - 3 && Fixture.Member(3).Skills == Buyer.Skills && Fixture.Run->GetSkillShopState().RerollPrice == 3 && Fixture.Run->GetSkillShopState().Revision == FirstReroll.Revision + 1 && Events == 2 && bDurableAtNotification);
+    if (!CheckOffers(Fixture.Run->GetSkillShopState())) return false;
+    Fixture.Run->OnRunStateChanged.Clear();
+    TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
+    Restored->EnableCheckpointSaving(Fixture.Slot);
+    if (!TestTrue(TEXT("Continue restores the exact skill reroll result"), Restored->LoadStandaloneCheckpoint(Fixture.Error))) return false;
+    TestTrue(TEXT("Continue retains stock escalation catalog skills and gold without rolling again"), SameShopParty(Fixture.Run->GetPartyMembers(), Restored->GetPartyMembers()) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Fixture.Run->GetSkillShopState(), &Restored->GetSkillShopState(), 0));
+    TStrongObjectPtr<URunSaveGame> LimitedCatalog(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+    if (!LimitedCatalog) return false;
+    TArray<FRunSkillShopOffer> FiveProducts;
+    for (const FRunSkillShopOffer& Offer : LimitedCatalog->SkillShopState.Offers)
+    {
+        const FRunSkillShopOffer* Product = LimitedCatalog->SkillShopState.Catalog.FindByPredicate([&Offer](const FRunSkillShopOffer& Candidate) { return Candidate.Skill == Offer.Skill; });
+        if (!Product) return false;
+        FiveProducts.Add(*Product);
+    }
+    // A five-product catalog makes reappearance mandatory without depending on random samples.
+    // 후보를 다섯 개로 제한하여 무작위 표본에 의존하지 않고 이전 상품 재등장을 검증합니다.
+    LimitedCatalog->SkillShopState.Catalog = FiveProducts;
+    if (!FRunCheckpointStorage::Save(LimitedCatalog.Get(), Fixture.Slot, Fixture.Error) || !Restored->LoadStandaloneCheckpoint(Fixture.Error)) return false;
+    const int32 ReappearanceRevision = Restored->GetSkillShopState().Revision;
+    if (!TestTrue(TEXT("Already displayed products remain eligible for the next skill reroll"), Restored->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRerollOfferId(), Fixture.Error, ReappearanceRevision))) return false;
+    if (!CheckOffers(Restored->GetSkillShopState())) return false;
+    TestTrue(TEXT("The third reroll costs 3G and retains every previously displayed skill candidate"), Restored->GetPartyMembers()[3].Gold == Buyer.Gold - 6 && Restored->GetSkillShopState().RerollPrice == 4 && Restored->GetSkillShopState().Catalog.Num() == 5);
+    TStrongObjectPtr<URunSaveGame> EmptyBalance(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+    if (!EmptyBalance) return false;
+    EmptyBalance->Party[3].Gold = 0;
+    if (!FRunCheckpointStorage::Save(EmptyBalance.Get(), Fixture.Slot, Fixture.Error) || !Restored->LoadStandaloneCheckpoint(Fixture.Error)) return false;
+    const TArray<uint8> EmptyBalanceBytes = Fixture.ReadBytes();
+    const FRunSkillShopState UnaffordableShop = Restored->GetSkillShopState();
+    TestFalse(TEXT("Insufficient personal gold rejects the escalating skill reroll"), Restored->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRerollOfferId(), Fixture.Error, UnaffordableShop.Revision));
+    TestTrue(TEXT("An unaffordable reroll preserves its stock next price revision and save file"), EmptyBalanceBytes == Fixture.ReadBytes() && Restored->GetPartyMembers()[3].Gold == 0 && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&UnaffordableShop, &Restored->GetSkillShopState(), 0));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunSkillShopFrozenLegacyTest, "ProjectA.Run.Shop.LegacyFixedCatalogPreservedWithoutReroll", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunSkillShopFrozenLegacyTest::RunTest(const FString& Parameters)
+{
+    FSkillShopFixture Fixture;
+    if (!Fixture.Initialize(3, true) || !Fixture.ReachShop()) return false;
+    TStrongObjectPtr<URunSaveGame> Legacy(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+    if (!Legacy || Legacy->SkillShopState.Catalog.Num() < 4) return false;
+    FRunSkillShopState Frozen;
+    Frozen.SchemaVersion = 1;
+    Frozen.Recovery = Legacy->SkillShopState.Recovery;
+    for (int32 Index = 0; Index < 4; ++Index) Frozen.Offers.Add(Legacy->SkillShopState.Catalog[Index]);
+    Frozen.Offers[0].DisplayName = FText::FromString(TEXT("Legacy Saved Skill Name"));
+    Legacy->SkillShopState = Frozen;
+    const TArray<FRunPartyMember> FrozenParty = Legacy->Party;
+    if (!TestTrue(TEXT("Schema 1 fixed-product saves remain loadable"), FRunCheckpointStorage::Save(Legacy.Get(), Fixture.Slot, Fixture.Error) && Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error))) return false;
+    const TArray<uint8> FrozenBytes = Fixture.ReadBytes();
+    TestTrue(TEXT("Legacy loading retains exact products names loadouts balances and revision zero"), FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Frozen, &Fixture.Run->GetSkillShopState(), 0) && SameShopParty(FrozenParty, Fixture.Run->GetPartyMembers()));
+    const FRunPartyMember Buyer = Fixture.Member(3);
+    TestFalse(TEXT("Legacy fixed-product saves cannot reroll without a frozen candidate catalog"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRerollOfferId(), Fixture.Error));
+    TestTrue(TEXT("A rejected legacy reroll preserves all original saved bytes and balances"), FrozenBytes == Fixture.ReadBytes() && SameShopParty(FrozenParty, Fixture.Run->GetPartyMembers()));
+    if (!TestTrue(TEXT("An existing legacy skill remains purchasable without a new revision argument"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Frozen.Offers[0].OfferId, Fixture.Error))) return false;
+    TestTrue(TEXT("Legacy purchases debit once without converting or replacing fixed stock"), Fixture.Member(3).Gold == Buyer.Gold - Frozen.Offers[0].Price && Fixture.Member(3).Skills.Contains(Frozen.Offers[0].Skill) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Frozen, &Fixture.Run->GetSkillShopState(), 0));
     return true;
 }
 
@@ -297,8 +436,8 @@ bool FRunSkillShopLegacyTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Legacy members retain their historical profession loadout and zero gold"), Member.Gold == 0 && !Member.bHasSkillLoadout && Member.Skills.IsEmpty() && Fixture.Run->PartyDefinition->ResolveProfession(Member.ClassId, Profession) && Fixture.Run->PartyDefinition->ResolveMemberSkills(Member, Skills, Fixture.Error) && Skills == Profession.StartingSkills);
     }
     const FRunPartyMember Buyer = Fixture.Member(3);
-    TestFalse(TEXT("A legacy shop cannot invent a new purchase"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, TEXT("BPDA_swoard_attack"), Fixture.Error));
-    TestFalse(TEXT("A legacy shop without a balance cannot purchase recovery"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error));
+    TestFalse(TEXT("A legacy shop cannot invent a new purchase"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, TEXT("BPDA_swoard_attack"), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+    TestFalse(TEXT("A legacy shop without a balance cannot purchase recovery"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
     TestTrue(TEXT("Rejected legacy purchase leaves the original file untouched"), BeforeBytes == Fixture.ReadBytes());
     return true;
 }
@@ -316,7 +455,7 @@ bool FRunSkillShopMalformedSaveTest::RunTest(const FString& Parameters)
     const FRunSkillShopState BeforeShop = Fixture.Run->GetSkillShopState();
     int32 Events = 0;
     Fixture.Run->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
-    for (int32 Case = 0; Case < 6; ++Case)
+    for (int32 Case = 0; Case < 11; ++Case)
     {
         TStrongObjectPtr<URunSaveGame> Invalid(DuplicateObject<URunSaveGame>(Valid.Get(), GetTransientPackage()));
         switch (Case)
@@ -338,8 +477,23 @@ bool FRunSkillShopMalformedSaveTest::RunTest(const FString& Parameters)
         case 4:
             Invalid->SkillShopState.Offers[0].OfferId = FRunSkillShopState::GetRecoveryOfferId();
             break;
-        default:
+        case 5:
             Invalid->Phase = static_cast<ERunPhase>(255);
+            break;
+        case 6:
+            Invalid->SkillShopState.Revision = -1;
+            break;
+        case 7:
+            Invalid->SkillShopState.RerollPrice = 0;
+            break;
+        case 8:
+            Invalid->SkillShopState.Catalog[0].Price = 0;
+            break;
+        case 9:
+            ++Invalid->SkillShopState.Offers[0].Price;
+            break;
+        default:
+            Invalid->SkillShopState.Catalog.Reset();
             break;
         }
         if (!TestTrue(TEXT("Each malformed fixture is written only to its isolated test slot"), FRunCheckpointStorage::Save(Invalid.Get(), Fixture.Slot, Fixture.Error))) return false;

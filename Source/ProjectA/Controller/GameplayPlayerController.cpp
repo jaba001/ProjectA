@@ -259,23 +259,24 @@ bool AGameplayPlayerController::IsRoundInputEnabled() const
     return Super::IsRoundInputEnabled() && (!GameplayRootWidget || !GameplayRootWidget->IsUtilityMenuOpen());
 }
 
-void AGameplayPlayerController::RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision)
+void AGameplayPlayerController::RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision)
 {
     if (!IsLocalController() || bShopPurchasePending || !CharacterId.IsValid() || OfferId.IsNone()) return;
     ShopPurchaseMessage = FText::GetEmpty();
     bShopPurchasePending = true;
-    PendingItemShopRevision = INDEX_NONE;
+    bPendingItemShop = HasAuthority() && RunState ? RunState->GetEncounterProgress().IsItemShop() : GameplayState && GameplayState->GetViewState().EncounterProgress.IsItemShop();
+    PendingShopRevision = INDEX_NONE;
     RefreshGameplayFlow();
-    if (HasAuthority()) ExecuteShopPurchase(CharacterId, OfferId, ExpectedItemShopRevision);
-    else ServerPurchaseShopOffer(CharacterId, OfferId, ExpectedItemShopRevision);
+    if (HasAuthority()) ExecuteShopPurchase(CharacterId, OfferId, ExpectedShopRevision);
+    else ServerPurchaseShopOffer(CharacterId, OfferId, ExpectedShopRevision);
 }
 
-void AGameplayPlayerController::ServerPurchaseShopOffer_Implementation(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision)
+void AGameplayPlayerController::ServerPurchaseShopOffer_Implementation(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision)
 {
-    ExecuteShopPurchase(CharacterId, OfferId, ExpectedItemShopRevision);
+    ExecuteShopPurchase(CharacterId, OfferId, ExpectedShopRevision);
 }
 
-void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName OfferId, int32 ExpectedItemShopRevision)
+void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision)
 {
     if (!HasAuthority()) return;
     const AGameplayGameState* State = GetWorld() ? GetWorld()->GetGameState<AGameplayGameState>() : nullptr;
@@ -294,20 +295,23 @@ void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName Off
     if (Mode && Mode->ResolveRunParticipant(this, BuyerAccountId))
     {
         AEncounterManager* Manager = Mode->GetEncounterManager();
-        if (Manager) bSucceeded = Manager->PurchaseShopOffer(BuyerAccountId, CharacterId, OfferId, Error, ExpectedItemShopRevision);
+        if (Manager) bSucceeded = Manager->PurchaseShopOffer(BuyerAccountId, CharacterId, OfferId, Error, ExpectedShopRevision);
     }
     if (bSucceeded)
     {
         if (bItemShop) Error = OfferId == FRunItemShopState::GetRerollOfferId() ? NSLOCTEXT("RunItemShop", "Rerolled", "아이템 상점의 상품을 다시 추첨했습니다.") : NSLOCTEXT("RunItemShop", "PurchasedEquipment", "아이템을 구매했습니다. 장착 가능한 아이템은 장비 슬롯으로 드래그하세요.");
+        else if (OfferId == FRunSkillShopState::GetRerollOfferId()) Error = NSLOCTEXT("RunSkillShop", "Rerolled", "스킬 상점의 5개 상품을 다시 추첨했습니다. 다음 리롤 비용이 1G 증가했습니다.");
         else Error = OfferId == FRunSkillShopState::GetRecoveryOfferId() ? NSLOCTEXT("RunSkillShop", "Recovered", "HP를 회복했습니다.") : NSLOCTEXT("RunSkillShop", "Purchased", "스킬을 구매했습니다. 다음 전투부터 사용할 수 있습니다.");
     }
-    ClientReceiveShopPurchaseResult(bSucceeded, Error, bSucceeded && bItemShop ? CurrentRun->GetItemShopState().Revision : INDEX_NONE);
+    const int32 ConfirmedShopRevision = bSucceeded && CurrentRun ? (bItemShop ? CurrentRun->GetItemShopState().Revision : CurrentRun->GetSkillShopState().Revision) : INDEX_NONE;
+    ClientReceiveShopPurchaseResult(bSucceeded, Error, ConfirmedShopRevision);
 }
 
-void AGameplayPlayerController::ClientReceiveShopPurchaseResult_Implementation(bool bSucceeded, const FText& Message, int32 ConfirmedItemShopRevision)
+void AGameplayPlayerController::ClientReceiveShopPurchaseResult_Implementation(bool bSucceeded, const FText& Message, int32 ConfirmedShopRevision)
 {
-    PendingItemShopRevision = bSucceeded ? ConfirmedItemShopRevision : INDEX_NONE;
-    bShopPurchasePending = PendingItemShopRevision != INDEX_NONE;
+    if (!bShopPurchasePending) return;
+    PendingShopRevision = bSucceeded ? ConfirmedShopRevision : INDEX_NONE;
+    bShopPurchasePending = PendingShopRevision != INDEX_NONE;
     ShopPurchaseMessage = Message;
     RefreshGameplayFlow();
 }
@@ -467,17 +471,20 @@ void AGameplayPlayerController::RefreshGameplayFlow()
     {
         ShopPurchaseMessage = FText::GetEmpty();
         bShopPurchasePending = false;
-        PendingItemShopRevision = INDEX_NONE;
+        bPendingItemShop = false;
+        PendingShopRevision = INDEX_NONE;
     }
-    else if (PendingItemShopRevision != INDEX_NONE)
+    else if (PendingShopRevision != INDEX_NONE)
     {
-        // Keep item purchases and rerolls locked until the matching saved offers and gold reach the displayed view.
-        // 저장된 상품과 골드가 표시 뷰에 도착할 때까지 아이템 구매와 리롤을 잠급니다.
-        const FRunItemShopState* Items = HasAuthority() && RunState ? &RunState->GetItemShopState() : GameplayState ? &GameplayState->GetViewState().ItemShopState : nullptr;
-        if (Items && Items->Revision >= PendingItemShopRevision)
+        // Wait for the saved stock and buyer values of the requested shop before allowing another action.
+        // 요청한 상점의 저장된 재고와 구매자 정보가 표시 뷰에 도착한 뒤 다음 행동을 허용합니다.
+        int32 DisplayedShopRevision = INDEX_NONE;
+        if (HasAuthority() && RunState && RunState->GetEncounterProgress().IsItemShop() == bPendingItemShop) DisplayedShopRevision = bPendingItemShop ? RunState->GetItemShopState().Revision : RunState->GetSkillShopState().Revision;
+        else if (GameplayState && GameplayState->GetViewState().EncounterProgress.IsItemShop() == bPendingItemShop) DisplayedShopRevision = bPendingItemShop ? GameplayState->GetViewState().ItemShopState.Revision : GameplayState->GetViewState().SkillShopState.Revision;
+        if (DisplayedShopRevision >= PendingShopRevision)
         {
             bShopPurchasePending = false;
-            PendingItemShopRevision = INDEX_NONE;
+            PendingShopRevision = INDEX_NONE;
         }
     }
     if (CurrentPhase != ERunPhase::Result)

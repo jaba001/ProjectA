@@ -130,8 +130,8 @@ bool FRunCandidatePublicationTest::RunTest(const FString& Parameters)
     if (!VerifyTransaction(TEXT("Continue"), [&]() { return Run->ContinueRun(); })) return false;
     if (!VerifyTransaction(TEXT("Shop selection"), [&]() { return Run->SelectRunEncounter(TEXT("Shop_01")); })) return false;
     const FName SkillOffer = Run->GetSkillShopState().Offers[0].OfferId;
-    if (!VerifyTransaction(TEXT("Skill purchase"), [&]() { return Run->PurchaseShopOffer(Account, CharacterId, SkillOffer, Error); })) return false;
-    if (!VerifyTransaction(TEXT("Recovery purchase"), [&]() { return Run->PurchaseShopOffer(Account, CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Error); })) return false;
+    if (!VerifyTransaction(TEXT("Skill purchase"), [&]() { return Run->PurchaseShopOffer(Account, CharacterId, SkillOffer, Error, Run->GetSkillShopState().Revision); })) return false;
+    if (!VerifyTransaction(TEXT("Recovery purchase"), [&]() { return Run->PurchaseShopOffer(Account, CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Error, Run->GetSkillShopState().Revision); })) return false;
     if (!VerifyTransaction(TEXT("Shop departure"), [&]() { return Run->LeaveRunEncounter(); })) return false;
     if (!Run->BeginEncounter(TEXT("Combat_02")) || !Run->MarkCombatStarted()) return false;
     Run->UpdatePartyMemberHP(0, 0.0f);
