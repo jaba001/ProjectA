@@ -4,10 +4,13 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/Skeleton.h"
 #include "Animation/Notify/AN_SkillRelease.h"
 #include "Combat/SkillActor/AttackSkillActorBase.h"
 #include "Combat/Library/CombatWeaponTraceLibrary.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "DataAsset/CharacterAppearanceCatalog.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "DataAsset/SkillPoolDataAsset.h"
@@ -23,6 +26,7 @@
 #include "Profession/ArcherProfession.h"
 #include "Profession/RogueProfession.h"
 #include "Unit/EnemyUnit.h"
+#include "Unit/CharacterAppearanceComponent.h"
 #include "Unit/PlayerUnit.h"
 #include "Unit/UnitBase.h"
 #include <limits>
@@ -496,8 +500,27 @@ bool FShopSwordPresentationTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Unarmed-only setup hides the sword"), Unit->ConfigureProfession(100.f, 2, 1, Skills) && !Weapon->IsVisible());
         Skills.Add(Sword);
         TestTrue(TEXT("Purchasing sword reveals its geometry for any profession"), Unit->ConfigureProfession(100.f, 2, 1, Skills) && Weapon->IsVisible());
-        CombatWeaponTrace::FBladePose Pose;
-        TestTrue(TEXT("Any profession can sample its skeleton-compatible sword montage"), CombatWeaponTrace::SampleBlade(Unit, SwordDefinition, Unit->ResolveRoundCastMontage(SwordDefinition.CastMontage), SwordDefinition.WindupSeconds, Pose));
+        // Sample both authored body variants through the same appearance path used by live characters.
+        // 실제 캐릭터와 같은 외형 적용 경로로 제작된 남녀 몸체 변형의 칼날을 모두 추출합니다.
+        for (FName BodyId : {FName(TEXT("Male")), FName(TEXT("Female"))})
+        {
+            FCharacterAppearanceSelection Selection;
+            Selection.BodyId = BodyId;
+            UCharacterAppearanceComponent* Appearance = Unit->CharacterAppearance;
+            const FCharacterAppearanceBodyVariant* Body = Profession.AppearanceCatalog ? Profession.AppearanceCatalog->FindBodyVariant(BodyId) : nullptr;
+            if (!TestTrue(FString::Printf(TEXT("%s applies the authored %s body without changing the sword loadout"), *ClassId.ToString(), *BodyId.ToString()), Appearance && Body && Appearance->SetAppearance(Profession.AppearanceCatalog, Selection) && Unit->GetMesh()->GetSkeletalMeshAsset() == Body->Mesh.LoadSynchronous() && Weapon->IsVisible())) return false;
+            UAnimMontage* Montage = Unit->ResolveRoundCastMontage(SwordDefinition.CastMontage);
+            if (!TestNotNull(TEXT("Every body keeps its authored sword montage mapping"), Montage)) return false;
+            for (double Seconds : {double(SwordDefinition.WindupSeconds), double(SwordDefinition.WindupSeconds + SwordDefinition.WeaponTraceDuration * 0.5f), double(SwordDefinition.WindupSeconds + SwordDefinition.WeaponTraceDuration)})
+            {
+                CombatWeaponTrace::FBladePose Pose;
+                TestTrue(FString::Printf(TEXT("%s %s samples its compatible sword blade at %.3f seconds"), *ClassId.ToString(), *BodyId.ToString(), Seconds), CombatWeaponTrace::SampleBlade(Unit, SwordDefinition, Montage, Seconds, Pose));
+            }
+            UAnimMontage* Incompatible = DuplicateObject<UAnimMontage>(Montage, GetTransientPackage());
+            Incompatible->SetSkeleton(NewObject<USkeleton>(Incompatible));
+            CombatWeaponTrace::FBladePose RejectedPose;
+            TestFalse(TEXT("A montage with an incompatible skeleton cannot sample a blade"), CombatWeaponTrace::SampleBlade(Unit, SwordDefinition, Incompatible, SwordDefinition.WindupSeconds, RejectedPose));
+        }
         Skills.Pop();
         TestTrue(TEXT("Restoring an unarmed-only loadout hides a previously visible sword"), Unit->ConfigureProfession(100.f, 2, 1, Skills) && !Weapon->IsVisible());
     }

@@ -256,11 +256,16 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
         if (!Member.bCreated && !Member.Appearance.IsEmpty()) return false;
         if ((!Member.bCreated || !Member.bHasSkillLoadout) && (Member.Gold != 0 || !Member.Skills.IsEmpty() || !Member.Items.IsEmpty())) return false;
         if (Save->ItemShopState.SchemaVersion == 0 && !Member.Items.IsEmpty()) return false;
-        if (!RunEquipmentRules::Validate(Member, OutError)) return false;
+        FText MemberError;
+        if (!RunEquipmentRules::Validate(Member, MemberError))
+        {
+            if (!MemberError.IsEmpty()) OutError = MemberError;
+            return false;
+        }
         for (const FRunItemDefinition& Item : Member.Items)
         {
             const FRunItemDefinition* CatalogItem = Save->ItemShopState.Catalog.FindByPredicate([&Item](const FRunItemDefinition& Candidate) { return Candidate.Asset == Item.Asset; });
-            if (!CatalogItem || !FRunItemDefinition::StaticStruct()->CompareScriptStruct(CatalogItem, &Item, 0)) return false;
+            if (!CatalogItem || !RunItemShopCatalog::IsSameDefinition(*CatalogItem, Item)) return false;
         }
         if (Member.bCreated)
         {
@@ -276,7 +281,11 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
                 OutError = FText::Format(NSLOCTEXT("RunCheckpoint", "SavedProfessionUnsupported", "저장된 직업 '{0}'을 현재 직업 설정으로 불러올 수 없습니다. 저장 원본을 유지합니다. {1}"), FText::FromName(Member.ClassId), ProfessionError);
                 return false;
             }
-            if (!Catalog->ValidateMemberAppearance(Member, OutError)) return false;
+            if (!Catalog->ValidateMemberAppearance(Member, MemberError))
+            {
+                if (!MemberError.IsEmpty()) OutError = MemberError;
+                return false;
+            }
             TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
             FText SkillsError;
             if (!Catalog->ResolveMemberSkills(Member, Skills, SkillsError))
@@ -298,8 +307,14 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
     {
         const FCombatCheckpointData& Checkpoint = Save->CombatCheckpoint;
         if ((Format.bRequiresCurrentCheckpoint && Checkpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion) || (Format.bRejectsCurrentCheckpoint && Checkpoint.SchemaVersion == UCombatCheckpointLibrary::CurrentSchemaVersion)) return false;
-        if (!FRunIdentityData::StaticStruct()->CompareScriptStruct(&Save->Identity, &Checkpoint.Identity, 0) || Checkpoint.NodeId != Save->CurrentNode || Checkpoint.EncounterId != Save->CurrentEncounter || !UCombatCheckpointLibrary::Validate(Checkpoint, Save->Party, OutError))
+        if (!FRunIdentityData::StaticStruct()->CompareScriptStruct(&Save->Identity, &Checkpoint.Identity, 0) || Checkpoint.NodeId != Save->CurrentNode || Checkpoint.EncounterId != Save->CurrentEncounter)
         {
+            return false;
+        }
+        FText CheckpointError;
+        if (!UCombatCheckpointLibrary::Validate(Checkpoint, Save->Party, CheckpointError))
+        {
+            if (!CheckpointError.IsEmpty()) OutError = CheckpointError;
             return false;
         }
         for (const FCombatCheckpointUnit& Unit : Checkpoint.Units)

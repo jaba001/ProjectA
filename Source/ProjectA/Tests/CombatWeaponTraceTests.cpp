@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "AbilitySystemComponent.h"
 #include "Animation/AnimMontage.h"
 #include "Combat/Library/CombatWeaponTraceLibrary.h"
 #include "Combat/Round/CombatRoundTypes.h"
@@ -40,6 +41,8 @@ namespace CombatWeaponTraceTests
             AUnitBase* Unit = World->SpawnActor<AUnitBase>(Location, FRotator::ZeroRotator, Params);
             if (!Unit) return nullptr;
             Unit->SetTeam(bEnemy ? ETeam::Enemy : ETeam::Player);
+            Unit->GetAbilitySystemComponent()->InitAbilityActorInfo(Unit, Unit);
+            Unit->GetAbilitySystemComponent()->AddAttributeSetSubobject(Unit->GetAttributeSet());
             Unit->GetAttributeSet()->InitMaxHP(100.f);
             Unit->GetAttributeSet()->InitHP(100.f);
             Unit->GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -106,6 +109,7 @@ bool FCombatWeaponTraceContactsTest::RunTest(const FString& Parameters)
             Target->GetAttributeSet()->SetHP(0.f);
             Target->Die();
             Target->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+            if (!TestTrue(TEXT("The dead target has zero GAS HP while its capsule remains queryable"), !Target->IsUnitAlive() && Target->GetAttributeSet()->GetHP() == 0.f && Target->GetCapsuleComponent()->IsQueryCollisionEnabled())) return false;
         }
         if (Case == 7) Fixture.Units.RemoveAt(1);
         AUnitBase* Hit = CombatWeaponTrace::FindFirstHit(Fixture.World.Get(), Source, Fixture.Units, Previous, Current, 4.f);

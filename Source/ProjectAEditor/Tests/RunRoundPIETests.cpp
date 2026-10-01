@@ -103,7 +103,19 @@ public:
             Advance(2);
             return false;
         }
-        URunStateSubsystem* Run = Host->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+        if (!HostHandle.IsValid() || !IsValid(HostHandle->GetWorld()) || !IsValid(HostHandle->GetGameInstance()) || ClientHandles.ContainsByPredicate([](const TWeakObjectPtr<AGameplayPlayerController>& Client) { return !Client.IsValid() || !IsValid(Client->GetWorld()) || !IsValid(Client->GetGameInstance()); }))
+        {
+            Test->AddError(FString::Printf(TEXT("Run PIE count=%d stage=%d encounter=%d lost a participant controller or its PIE world."), Count, Stage, EncounterIndex + 1));
+            return End();
+        }
+        URunStateSubsystem* Run = HostHandle->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+        if (!Check(IsValid(Run), TEXT("The active PIE host retains its Run subsystem."))) return End();
+        if (Run->GetPhase() == ERunPhase::Defeat)
+        {
+            const int32 Living = Run->GetPartyMembers().FilterByPredicate([](const FRunPartyMember& Member) { return Member.bCreated && Member.CurrentHP > 0.0f; }).Num();
+            Test->AddError(FString::Printf(TEXT("Run PIE count=%d stage=%d encounter=%d node=%s ended in defeat with %d living party members instead of the fixture victory."), Count, Stage, EncounterIndex + 1, *Run->GetCurrentNodeId().ToString(), Living));
+            return End();
+        }
         if (Stage == 2)
         {
             URunMapWidget* Map = Screen<URunMapWidget>(Host);
@@ -121,7 +133,7 @@ public:
                 bSawRemoteWalking = false;
                 bSawMoveCommitted = false;
                 bSawMontage = false;
-                bPreparedEnemyHP = false;
+                bPreparedCombatHP = false;
                 RemoteCosts.Reset();
                 RemoteMontages.Reset();
                 RewardPartyBefore.Reset();
@@ -139,16 +151,23 @@ public:
             if (!Round || Round->GetView().Phase != ECombatRoundPhase::Planning || !Synchronized()) return false;
             const auto& Units = Round->GetView().Units;
             if (!Check(Units.FilterByPredicate([](const auto& Unit) { return !Unit.bEnemy; }).Num() == Count, TEXT("Authored combat spawns exactly one character per participant."))) return End();
-            if (!bPreparedEnemyHP)
+            if (!Check(Units.FilterByPredicate([](const auto& Unit) { return Unit.bEnemy; }).Num() == 4, TEXT("The authored encounter retains all four enemies in every fixture combat."))) return End();
+            if (!bPreparedCombatHP)
             {
-                // Keep this network flow fixture independent of damage balance while exercising the real sword collision.
-                // 실제 검 충돌을 검사하면서 네트워크 흐름 픽스처가 피해 밸런스에 의존하지 않도록 합니다.
+                // Isolate survival and one-hit enemy health through live GAS attributes without modifying authored balance.
+                // 작성된 밸런스를 바꾸지 않고 실제 GAS 속성으로 생존과 적 1회 타격 체력을 고정합니다.
                 for (const auto& Unit : Units)
                 {
-                    if (!Unit.bEnemy || !IsValid(Unit.Unit) || Unit.HP <= 0.0f) continue;
-                    Unit.Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), FMath::Min(Unit.HP, SwordPower));
+                    if (!IsValid(Unit.Unit) || Unit.HP <= 0.0f) continue;
+                    UAbilitySystemComponent* AbilitySystem = Unit.Unit->GetAbilitySystemComponent();
+                    if (!Check(IsValid(AbilitySystem), TEXT("Every living fixture unit retains its GAS attributes."))) return End();
+                    if (!Unit.bEnemy) AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetMaxHPAttribute(), FixtureMaxHP);
+                    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), Unit.bEnemy ? FMath::Min(Unit.HP, SwordPower) : FixtureMaxHP);
                 }
-                bPreparedEnemyHP = true;
+                FCombatCheckpointData FixtureCheckpoint;
+                FText Error;
+                if (!Check(Round->CapturePlanningCheckpoint(FixtureCheckpoint, Error), *FString::Printf(TEXT("The survival fixture satisfies the authored checkpoint validation: %s"), *Error.ToString()))) return End();
+                bPreparedCombatHP = true;
                 return false;
             }
             if (!bMoveReserved)
@@ -208,6 +227,7 @@ public:
             if (!Round || !Synchronized()) return false;
             if (Active >= Count)
             {
+                PlannedRoundNumber = Round->GetView().RoundNumber;
                 Advance(5);
                 return false;
             }
@@ -250,6 +270,15 @@ public:
                         }
                     }
                 }
+            }
+            if (Run->GetPhase() == ERunPhase::Combat && Round && Round->GetView().Phase == ECombatRoundPhase::Planning && Round->GetView().RoundNumber > PlannedRoundNumber)
+            {
+                // Submit another real sword round when fewer participants than enemies cannot finish in one round.
+                // 참가자가 적보다 적어 한 라운드에 끝나지 않으면 실제 검 공격 라운드를 다시 제출합니다.
+                if (!Check(Round->GetView().RoundNumber <= 16, TEXT("The real sword collision defeats four enemies within the bounded fixture rounds."))) return End();
+                Active = 0;
+                Advance(3);
+                return false;
             }
             if (Run->GetPhase() != ERunPhase::Result || !ClientsAt(ERunPhase::Result)) return false;
             if (!Check(Run->GetLastResult() == ECombatResult::Victory, TEXT("The actual authored attack completes the encounter with victory."))) return End();
@@ -323,7 +352,7 @@ public:
             for (const FRunPartyMember& Member : Restored->GetPartyMembers())
             {
                 const FRunPartyMember* Live = Run->GetPartyMembers().FindByPredicate([&Member](const FRunPartyMember& Candidate) { return Candidate.CharacterId == Member.CharacterId; });
-                if (!Check(Live && Live->Gold == Member.Gold, TEXT("The selected personal gold balance survives result reload."))) return End();
+                if (!Check(Live && Live->Gold == Member.Gold && Live->CurrentHP == Member.CurrentHP && FMath::IsFinite(Member.CurrentHP) && Member.CurrentHP > 0.0f && Member.CurrentHP <= FixtureMaxHP, TEXT("Personal gold and the surviving combat HP persist exactly through result reload."))) return End();
             }
             Continue->OnClicked.Broadcast();
             Advance(6);
@@ -408,7 +437,11 @@ private:
         }
         if (!Host || Clients.Num() != Count - 1 || ServerControllers.Num() != Count - 1) return false;
         AGameplayGameModeBase* Mode = Host->GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
-        return Mode && Mode->PartyDefinition && Mode->GetEncounterManager() && Mode->GetEncounterManager()->GetCombatManager();
+        if (!Mode || !Mode->PartyDefinition || !Mode->GetEncounterManager() || !Mode->GetEncounterManager()->GetCombatManager()) return false;
+        HostHandle = Host;
+        ClientHandles.Reset();
+        for (AGameplayPlayerController* Client : Clients) ClientHandles.Add(Client);
+        return true;
     }
 
     bool Initialize()
@@ -436,8 +469,11 @@ private:
             Member.bPlayerControlled = Index == 0;
             Member.ClassId = Classes[Index];
             Member.CharacterName = FText::FromString(Participant.AccountId.Subject);
-            Member.CharacterId = FGuid::NewGuid();
-            Member.OwnerAccountId = Participant.AccountId;
+            if (Count > 1)
+            {
+                Member.CharacterId = FGuid::NewGuid();
+                Member.OwnerAccountId = Participant.AccountId;
+            }
         }
         Identity.HostAccountId = Identity.OriginalParticipants[0].AccountId;
         FText Error;
@@ -459,7 +495,18 @@ private:
             Member.Gold = 9;
         }
         if (!Check(UGameplayStatics::SaveGameToSlot(Saved.Get(), Slot, 0) && Run->LoadCheckpoint(Error), *FString::Printf(TEXT("Reload explicitly saved sword attacks for the network combat fixture: %s"), *Error.ToString()))) return false;
-        if (Count > 1)
+        if (Count == 1)
+        {
+            FRunAccountId AccountId;
+            if (!Check(Run->GetRunIdentity().Origin == ERunIdentityOrigin::LocalDevelopment && Run->GetRunIdentity().OriginalParticipants.Num() == 1 && Mode->ResolveRunParticipant(Host, AccountId) && AccountId == Run->GetRunIdentity().HostAccountId, TEXT("The standalone fixture resolves the normalized local Run account."))) return false;
+            // Real menu travel creates Gameplay after the Run; this in-place fixture must refresh that same account context.
+            // 실제 메뉴 이동은 Run 생성 뒤 Gameplay를 만들므로 현재 레벨 픽스처에서도 같은 계정 문맥을 갱신합니다.
+            Host->RefreshRunFlowPermissions();
+            AGameplayGameState* State = Host->GetWorld()->GetGameState<AGameplayGameState>();
+            const FGuid CharacterId = State ? Host->GetInventoryCharacterId(State->GetViewState()) : FGuid();
+            if (!Check(CharacterId.IsValid() && Run->GetPartyMembers().ContainsByPredicate([AccountId, CharacterId](const FRunPartyMember& Member) { return Member.bCreated && Member.bPlayerControlled && Member.OwnerAccountId == AccountId && Member.CharacterId == CharacterId; }), TEXT("The standalone controller resolves its original character before combat, shops and rewards."))) return false;
+        }
+        else
         {
             if (!Check(Mode->AssignRunParticipant(Host, Identity.HostAccountId), TEXT("Explicitly bind the original host."))) return false;
             for (int32 Index = 0; Index < ServerControllers.Num(); ++Index)
@@ -509,10 +556,12 @@ private:
     int32 Stage = 0;
     int32 Active = 0;
     int32 EncounterIndex = 0;
+    int32 PlannedRoundNumber = 0;
     int32 RewardParticipant = 0;
     double Started = 0;
     bool bSawMontage = false;
-    bool bPreparedEnemyHP = false;
+    bool bPreparedCombatHP = false;
+    static constexpr float FixtureMaxHP = 10000.0f;
     float SwordPower = 0.0f;
     bool bMoveReserved = false;
     bool bSawServerWalking = false;
@@ -522,6 +571,8 @@ private:
     int32 MoveUnitId = INDEX_NONE;
     FIntPoint MoveDestination;
     AGameplayPlayerController* Host = nullptr;
+    TWeakObjectPtr<AGameplayPlayerController> HostHandle;
+    TArray<TWeakObjectPtr<AGameplayPlayerController>> ClientHandles;
     TArray<AGameplayPlayerController*> Clients;
     TArray<AGameplayPlayerController*> ServerControllers;
     TStrongObjectPtr<ULevelEditorPlaySettings> Settings;

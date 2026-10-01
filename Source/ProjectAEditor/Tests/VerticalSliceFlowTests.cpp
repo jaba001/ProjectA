@@ -32,6 +32,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Paths.h"
+#include "Misc/Parse.h"
 #include "Misc/ScopeExit.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "PlayInEditorDataTypes.h"
@@ -68,13 +69,39 @@ T* FindActiveWidget(UWorld* World)
     return nullptr;
 }
 
+// Commit the new-character editor through its real Save button before testing controls behind the modal.
+// 새 캐릭터 편집창의 실제 저장 버튼으로 확정한 뒤 모달 뒤의 조작 버튼을 검사합니다.
+bool SaveCreatedSlot(FAutomationTestBase* Test, UCharacterCreationWidget* Creation, int32 SlotIndex)
+{
+    UWidget* Panel = Creation ? Creation->GetWidgetFromName(TEXT("ProfessionDetailPanel")) : nullptr;
+    if (!Test->TestTrue(TEXT("Creating a character opens its detail editor before direct-control selection."), Panel && Panel->GetVisibility() == ESlateVisibility::Visible)) return false;
+    if (!Test->TestFalse(TEXT("The new-character modal prevents direct-control selection before Save."), Creation->SelectPlayerControlledSlot(SlotIndex))) return false;
+    TArray<UWidget*> Widgets;
+    Creation->WidgetTree->GetAllWidgets(Widgets);
+    TArray<UButton*> SaveButtons;
+    for (UWidget* Widget : Widgets)
+    {
+        UButton* Button = Cast<UButton>(Widget);
+        UTextBlock* Label = Button ? Cast<UTextBlock>(Button->GetChildAt(0)) : nullptr;
+        if (!Label || Label->GetText().ToString() != TEXT("저장") || !Button->GetIsEnabled() || !Button->OnClicked.Contains(Creation, GET_FUNCTION_NAME_CHECKED(UCharacterCreationWidget, SaveSlotDetails))) continue;
+        UWidget* Ancestor = Button;
+        while (Ancestor && Ancestor != Panel) Ancestor = Ancestor->GetParent();
+        if (Ancestor == Panel) SaveButtons.Add(Button);
+    }
+    if (!Test->TestTrue(TEXT("The active character editor exposes one bound Save button."), SaveButtons.Num() == 1)) return false;
+    SaveButtons[0]->OnClicked.Broadcast();
+    const TArray<FRunPartyMember> Members = Creation->GetPartyMembers();
+    return Test->TestTrue(TEXT("Saving commits the created slot and closes its editor without selecting direct control."), Panel->GetVisibility() == ESlateVisibility::Collapsed && Members.IsValidIndex(SlotIndex) && Members[SlotIndex].bCreated && !Members[SlotIndex].bPlayerControlled);
+}
+
 // Preserve saved-menu, preview cleanup and character draft coverage independently of combat execution.
 // 전투 실행과 독립적으로 저장된 메뉴, 미리보기 정리 및 캐릭터 초안 검증을 유지합니다.
 class FPlayMenuLifecycle : public IAutomationLatentCommand
 {
 public:
-    explicit FPlayMenuLifecycle(FAutomationTestBase* InTest) : Test(InTest), StageStarted(FPlatformTime::Seconds())
+    explicit FPlayMenuLifecycle(FAutomationTestBase* InTest) : Test(InTest), StageStarted(FPlatformTime::Seconds()), bFlowOnly(FParse::Param(FCommandLine::Get(), TEXT("ProjectAFlowOnly")))
     {
+        if (bFlowOnly) Test->AddInfo(TEXT("-ProjectAFlowOnly skips preview animation playback, looping/loop-boundary checks and asset screenshots; character creation/Save, ClassInfo layout, selection/edit/cancel buttons and preview actor cleanup remain covered."));
     }
 
     virtual bool Update() override
@@ -145,6 +172,7 @@ public:
                         for (int32 Index = 0; Index < 4; ++Index)
                         {
                             Cast<UButton>(Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_Create"), Index))))->OnClicked.Broadcast();
+                            if (!SaveCreatedSlot(Test, Creation, Index)) return true;
                         }
                         PreviewCaptureStage = 1;
                         ProfessionPanelTime = FPlatformTime::Seconds();
@@ -162,6 +190,7 @@ public:
                             UWidget* Info = Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_ClassInfo"), Index)));
                             const FGeometry& Geometry = Info->GetCachedGeometry();
                             Test->TestTrue(TEXT("Every ClassInfo button fits inside the creation screen."), Geometry.LocalToAbsolute(Geometry.GetLocalSize()).Y <= ScreenBottom + 1.0f);
+                            if (bFlowOnly) continue;
                             AActor* Actor = Menu->GetPreviewStage()->GetPreviewActorForSlot(Index);
                             USkeletalMeshComponent* Mesh = Actor ? Actor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
                             UAnimSingleNodeInstance* Animation = Mesh ? Mesh->GetSingleNodeInstance() : nullptr;
@@ -169,23 +198,31 @@ public:
                             Animation->SetPosition(Animation->GetLength() - 0.1f, false);
                             PreviewAnimationLengths[Index] = Animation->GetLength();
                         }
-                        Capture(TEXT("00-FourPreviews.png"));
+                        if (!bFlowOnly)
+                        {
+                            Capture(TEXT("00-FourPreviews.png"));
+                            PreviewCaptureStage = 2;
+                            ProfessionPanelTime = FPlatformTime::Seconds();
+                            return false;
+                        }
                         PreviewCaptureStage = 2;
-                        ProfessionPanelTime = FPlatformTime::Seconds();
-                        return false;
                     }
                     for (int32 Index = 0; Index < 4; ++Index)
                     {
-                        AActor* Actor = Menu->GetPreviewStage()->GetPreviewActorForSlot(Index);
-                        USkeletalMeshComponent* Mesh = Actor ? Actor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
-                        UAnimSingleNodeInstance* Animation = Mesh ? Mesh->GetSingleNodeInstance() : nullptr;
-                        Test->TestTrue(TEXT("Idle animation advances through its loop boundary in the real preview world."), Animation && Animation->IsPlaying() && Animation->GetCurrentTime() < PreviewAnimationLengths[Index] - 0.1f);
+                        if (!bFlowOnly)
+                        {
+                            AActor* Actor = Menu->GetPreviewStage()->GetPreviewActorForSlot(Index);
+                            USkeletalMeshComponent* Mesh = Actor ? Actor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+                            UAnimSingleNodeInstance* Animation = Mesh ? Mesh->GetSingleNodeInstance() : nullptr;
+                            Test->TestTrue(TEXT("Idle animation advances through its loop boundary in the real preview world."), Animation && Animation->IsPlaying() && Animation->GetCurrentTime() < PreviewAnimationLengths[Index] - 0.1f);
+                        }
                         Cast<UButton>(Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_Delete"), Index))))->OnClicked.Broadcast();
                         Test->TestNull(TEXT("Deleting the slot removes its animated preview actor."), Menu->GetPreviewStage()->GetPreviewActorForSlot(Index));
                     }
                     PreviewCaptureStage = 3;
                 }
                 CreateButton->OnClicked.Broadcast();
+                if (!SaveCreatedSlot(Test, Creation, 0)) return true;
                 UButton* Edit = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_Edit")));
                 UButton* Info = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_ClassInfo")));
                 UEditableTextBox* NameInput = Cast<UEditableTextBox>(Creation->GetWidgetFromName(TEXT("ProfessionNameInput")));
@@ -220,7 +257,7 @@ public:
             {
                 return false;
             }
-            if (!bProfessionCaptured)
+            if (!bProfessionCaptured && !bFlowOnly)
             {
                 Capture(TEXT("00-ProfessionDetails.png"));
                 bProfessionCaptured = true;
@@ -317,6 +354,7 @@ private:
                         return false;
                     }
                     Create->OnClicked.Broadcast();
+                    if (!SaveCreatedSlot(Test, Draft, Index)) return false;
                     AActor* Actor = Preview->GetPreviewActorForSlot(Index);
                     Test->TestNotNull(TEXT("Each profession has a visible preview class."), Actor);
                     Test->TestNull(TEXT("Preview cannot execute pawn AI or combat."), Cast<APawn>(Actor));
@@ -474,6 +512,7 @@ private:
     FAutomationTestBase* Test;
     int32 Stage = 0;
     double StageStarted;
+    bool bFlowOnly = false;
     bool bProfessionPanelTested = false;
     int32 PreviewCaptureStage = 0;
     bool bProfessionCaptured = false;
@@ -551,12 +590,14 @@ public:
             UButton* Create = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_Create")));
             if (!Require(Create && Create->GetIsEnabled(), TEXT("The actual creation screen can create slot zero."))) return true;
             Create->OnClicked.Broadcast();
+            if (!SaveCreatedSlot(Test, Creation, 0)) return true;
             UButton* Control = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_PlayerControl")));
             UButton* Start = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_StartGame")));
             if (!Require(Control && Control->GetIsEnabled() && Start, TEXT("The created card exposes direct control and Start."))) return true;
             Control->OnClicked.Broadcast();
             const int32 CreatedCount = Creation->GetPartyMembers().FilterByPredicate([](const FRunPartyMember& Member) { return Member.bCreated; }).Num();
-            if (!Require(CreatedCount == 1 && Start->GetIsEnabled(), TEXT("Exactly one controlled character starts without AI companions."))) return true;
+            const int32 ControlledCount = Creation->GetPartyMembers().FilterByPredicate([](const FRunPartyMember& Member) { return Member.bCreated && Member.bPlayerControlled; }).Num();
+            if (!Require(CreatedCount == 1 && ControlledCount == 1 && Start->GetIsEnabled(), TEXT("Exactly one controlled character starts without AI companions."))) return true;
             Start->OnClicked.Broadcast();
             Advance();
             return false;

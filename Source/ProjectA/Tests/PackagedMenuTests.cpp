@@ -6,10 +6,16 @@
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "UI/MainMenu/MainMenuScreenWidget.h"
 #include "Components/Button.h"
+#include "Components/TextBlock.h"
 #include "TimerManager.h"
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/Run/RunSaveGame.h"
+#include "Game/Run/RunItemShopCatalog.h"
+#include "Controller/GameplayPlayerController.h"
+#include "Game/GameState/GameplayGameState.h"
 #include "UI/Gameplay/EncounterResultWidget.h"
+#include "UI/Gameplay/GameplayActionButton.h"
 #include "UI/Gameplay/RunEncounterWidget.h"
 #include "UI/MainMenu/RunSurrenderWidget.h"
 #include "Components/VerticalBox.h"
@@ -261,7 +267,7 @@ public:
     {
         if (FPlatformTime::Seconds() - Started > 30.0)
         {
-            Test->AddError(TEXT("Packaged Continue timed out."));
+            Test->AddError(FString::Printf(TEXT("Menu Continue timed out: menuClicked=%d rewardClicked=%d resultContinued=%d. %s"), bClicked, bRewardClicked, bContinued, *LastState));
             return true;
         }
         for (const FWorldContext& Context : GEngine->GetWorldContexts())
@@ -271,9 +277,11 @@ public:
             {
                 continue;
             }
+            URunStateSubsystem* Run = World->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+            CaptureState(bContinued ? TEXT("WaitingForShop") : bClicked ? TEXT("WaitingForResult") : TEXT("WaitingForMenu"), World, Run);
+            if (!Run) continue;
             if (bContinued)
             {
-                URunStateSubsystem* Run = World->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
                 TArray<UUserWidget*> Screens;
                 UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Screens, URunEncounterWidget::StaticClass(), false);
                 for (UUserWidget* Screen : Screens)
@@ -282,6 +290,7 @@ public:
                     if (!Encounter->IsActivated()) continue;
                     UVerticalBox* Actions = Cast<UVerticalBox>(Screen->GetWidgetFromName(TEXT("EncounterActions")));
                     UButton* Action = Run->GetPhase() == ERunPhase::EncounterChoice ? (Actions ? Cast<UButton>(Actions->GetChildAt(1)) : nullptr) : Cast<UButton>(Screen->GetWidgetFromName(TEXT("Button_LeaveShop")));
+                    CaptureState(TEXT("WaitingForShopAction"), World, Run, Screen, Action);
                     if (Action && Action->GetIsEnabled()) Action->OnClicked.Broadcast();
                     break;
                 }
@@ -295,17 +304,33 @@ public:
             for (UUserWidget* Widget : Widgets)
             {
                 UButton* Continue = Cast<UButton>(Widget->GetWidgetFromName(TEXT("Button_Continue")));
-                if (!Continue || !Continue->GetIsEnabled())
-                {
-                    continue;
-                }
                 if (!bClicked)
                 {
+                    UMainMenuScreenWidget* Menu = Cast<UMainMenuScreenWidget>(Widget);
+                    CaptureState(TEXT("WaitingForMenuContinue"), World, Run, Widget, Continue);
+                    if (!Menu || !Menu->IsActivated()) continue;
+                    if (!VerifySavedItemDefinitions()) return true;
+                    FText EligibilityError;
+                    const bool bEligible = Run->CanContinueStandaloneSavedRun(EligibilityError);
+                    LastState += FString::Printf(TEXT(" eligible=%d explicitSlot=%s fixtureExists=%d eligibilityError=%s"), bEligible, *URunStateSubsystem::ResolveCheckpointSlot(FCommandLine::Get()), UGameplayStatics::DoesSaveGameExist(URunStateSubsystem::ResolveCheckpointSlot(FCommandLine::Get()), 0), *EligibilityError.ToString());
+                    Test->AddInfo(LastState);
+                    // Verify the writer fixture and the actual menu before invoking its delegate; do not repair eligibility in the test.
+                    // delegate 호출 전에 writer 저장과 실제 메뉴를 검증하며 테스트에서 이어하기 적격성을 보정하지 않습니다.
+                    if (!Test->TestTrue(TEXT("The independent writer fixture is eligible for Standalone menu Continue."), bEligible) || !Test->TestNotNull(TEXT("The active main menu exposes its authored Continue button."), Continue) || !Test->TestTrue(TEXT("The eligible active menu enables Continue."), Continue->GetIsEnabled()))
+                    {
+                        Test->AddError(LastState);
+                        return true;
+                    }
                     bClicked = true;
                     Continue->OnClicked.Broadcast();
+                    CaptureState(TEXT("WaitingForGameplayTravel"), World, Run, Widget, Continue);
+                    Test->AddInfo(LastState);
                     return false;
                 }
-                URunStateSubsystem* Run = World->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
+                if (!Continue) continue;
+                UEncounterResultWidget* Result = Cast<UEncounterResultWidget>(Widget);
+                CaptureState(TEXT("WaitingForActiveResult"), World, Run, Widget, Continue);
+                if (!Result || !Result->IsActivated()) continue;
                 Test->TestTrue(TEXT("Menu Continue opens saved result"), Run->GetPhase() == ERunPhase::Result);
                 if (!Test->TestEqual(TEXT("Restored party count"), Run->GetPartyMembers().Num(), 1))
                 {
@@ -313,6 +338,41 @@ public:
                 }
                 Test->TestEqual(TEXT("Menu restores name"), Run->GetPartyMembers()[0].CharacterName.ToString(), FString(TEXT("Restart Mage")));
                 Test->TestEqual(TEXT("Menu restores HP"), Run->GetPartyMembers()[0].CurrentHP, 61.0f);
+                if (!Test->TestTrue(TEXT("Menu restores the first completed victory without starting the next battle."), Run->GetCompletedNodes() == TArray<FName>{TEXT("Combat_01")} && Run->GetCurrentNodeId() == TEXT("Combat_01") && Run->GetLastResult() == ECombatResult::Victory)) return true;
+                AGameplayPlayerController* Controller = Result->GetOwningPlayer<AGameplayPlayerController>();
+                AGameplayGameState* State = World->GetGameState<AGameplayGameState>();
+                CaptureState(TEXT("WaitingForRewardView"), World, Run, Widget, Continue);
+                if (!Controller || !State || State->GetViewState().GoldRewardState.NodeId != Run->GetCurrentNodeId()) return false;
+                const FGameplayViewState& View = State->GetViewState();
+                UGameplayActionButton* Card = Cast<UGameplayActionButton>(Result->GetWidgetFromName(TEXT("GoldReward1")));
+                CaptureState(bRewardClicked ? TEXT("WaitingForRewardClaim") : TEXT("WaitingForRewardCard"), World, Run, Widget, Continue);
+                if (!bRewardClicked)
+                {
+                    if (!Card || !Card->GetIsEnabled() || Controller->IsRewardSelectionPending()) return false;
+                    const FRunPartyMember& Member = Run->GetPartyMembers()[0];
+                    RewardCharacterId = Controller->GetRewardCharacterId(View);
+                    if (!Test->TestTrue(TEXT("The result restores three unclaimed choices for the original personal reward owner."), Run->GetGoldRewardState().SchemaVersion == 1 && Run->GetGoldRewardState().GoldChoices.Num() == 3 && Run->GetGoldRewardState().Claims.IsEmpty() && Run->GetGoldRewardRecipientIds() == TArray<FGuid>{RewardCharacterId} && RewardCharacterId == Member.CharacterId && Member.bPlayerControlled && !Member.OwnerAccountId.IsEmpty())) return true;
+                    if (!Test->TestTrue(TEXT("Result Continue remains disabled until the personal reward is collected."), !Continue->GetIsEnabled() && !Run->CanContinueAfterRewards())) return true;
+                    RewardChoices = Run->GetGoldRewardState().GoldChoices;
+                    for (int32 Amount : RewardChoices)
+                    {
+                        if (!Test->TestTrue(TEXT("The restored reward choices stay within five to fifteen gold."), Amount >= 5 && Amount <= 15)) return true;
+                    }
+                    GoldBeforeReward = Member.Gold;
+                    RewardOwner = Member.OwnerAccountId;
+                    // Invoke the authored reward-card delegate and wait for its request to update both Run and visible state.
+                    // 제작된 보상 카드 delegate를 호출하고 요청이 Run과 화면 상태에 모두 반영될 때까지 기다립니다.
+                    Card->OnClicked.Broadcast();
+                    bRewardClicked = true;
+                    return false;
+                }
+                const FRunGoldRewardClaim* Claim = Run->GetGoldRewardState().Claims.FindByPredicate([this](const FRunGoldRewardClaim& Candidate) { return Candidate.CharacterId == RewardCharacterId; });
+                const FRunGoldRewardClaim* VisibleClaim = View.GoldRewardState.Claims.FindByPredicate([this](const FRunGoldRewardClaim& Candidate) { return Candidate.CharacterId == RewardCharacterId; });
+                if (!Claim || !VisibleClaim || Controller->IsRewardSelectionPending() || !Continue->GetIsEnabled()) return false;
+                const FRunPartyMember& Member = Run->GetPartyMembers()[0];
+                const FRunPartyMember* VisibleMember = View.PartyMembers.FindByPredicate([this](const FRunPartyMember& Candidate) { return Candidate.CharacterId == RewardCharacterId; });
+                if (!Test->TestTrue(TEXT("The clicked card pays exactly its amount to the original owner and restores Continue."), Claim->ChoiceIndex == 0 && VisibleClaim->ChoiceIndex == 0 && Run->GetGoldRewardState().Claims.Num() == 1 && Member.CharacterId == RewardCharacterId && Member.OwnerAccountId == RewardOwner && Member.Gold == GoldBeforeReward + RewardChoices[0] && VisibleMember && VisibleMember->Gold == Member.Gold && Run->CanContinueAfterRewards() && View.bCanContinueAfterRewards)) return true;
+                if (!Test->TestTrue(TEXT("Reward collection preserves all restored amounts and disables its claimed card."), Card && !Card->GetIsEnabled() && Run->GetGoldRewardState().GoldChoices == RewardChoices && View.GoldRewardState.GoldChoices == RewardChoices)) return true;
                 Continue->OnClicked.Broadcast();
                 Test->TestTrue(TEXT("Result Continue opens the required encounter choice."), Run->GetPhase() == ERunPhase::EncounterChoice);
                 bContinued = true;
@@ -323,10 +383,65 @@ public:
     }
 
 private:
+    // Diagnose the actual writer save and verify that value comparison still rejects changed definition fields.
+    // 실제 writer 저장을 진단하고 값 비교가 변경된 정의 필드를 계속 거절하는지 검증합니다.
+    bool VerifySavedItemDefinitions()
+    {
+        FText Error;
+        TStrongObjectPtr<URunSaveGame> Save(Cast<URunSaveGame>(FRunCheckpointStorage::Load(URunStateSubsystem::ResolveCheckpointSlot(FCommandLine::Get()), Error)));
+        if (!Test->TestNotNull(TEXT("The real menu reads the isolated writer's Run SaveGame."), Save.Get()))
+        {
+            Test->AddError(Error.ToString());
+            return false;
+        }
+        for (const FRunPartyMember& Member : Save->Party)
+        {
+            for (const FRunItemDefinition& Item : Member.Items)
+            {
+                const FRunItemDefinition* CatalogItem = Save->ItemShopState.Catalog.FindByPredicate([&Item](const FRunItemDefinition& Candidate) { return Candidate.Asset == Item.Asset; });
+                if (!Test->TestNotNull(TEXT("Every preserved starting item has its frozen catalog definition."), CatalogItem)) return false;
+                Test->AddInfo(FString::Printf(TEXT("Saved item definition: asset=%s catalogName=%s ownedName=%s catalogTextKey=%s ownedTextKey=%s strictEqual=%d valueEqual=%d GIsEditor=%d"), *Item.Asset.ToString(), *CatalogItem->DisplayName.ToString(), *Item.DisplayName.ToString(), *FTextInspector::GetKey(CatalogItem->DisplayName).Get(FString()), *FTextInspector::GetKey(Item.DisplayName).Get(FString()), FRunItemDefinition::StaticStruct()->CompareScriptStruct(CatalogItem, &Item, 0), RunItemShopCatalog::IsSameDefinition(*CatalogItem, Item), GIsEditor));
+                if (!Test->TestTrue(TEXT("Menu save validation preserves identical item values across Editor and game text identities."), RunItemShopCatalog::IsSameDefinition(*CatalogItem, Item))) return false;
+                FRunItemDefinition Changed = Item;
+                Changed.Price = Item.Price == 1 ? 2 : 1;
+                if (!Test->TestFalse(TEXT("Saved item comparison rejects a changed price."), RunItemShopCatalog::IsSameDefinition(*CatalogItem, Changed))) return false;
+                Changed = Item;
+                Changed.Asset.Reset();
+                if (!Test->TestFalse(TEXT("Saved item comparison rejects a changed asset."), RunItemShopCatalog::IsSameDefinition(*CatalogItem, Changed))) return false;
+                Changed = Item;
+                Changed.Tags.RemoveTag(RunItemShopCatalog::GetWeaponTag());
+                if (!Test->TestFalse(TEXT("Saved item comparison rejects changed content tags."), RunItemShopCatalog::IsSameDefinition(*CatalogItem, Changed))) return false;
+                Changed = Item;
+                Changed.DisplayName = FText::FromString(Item.DisplayName.ToString() + TEXT(" changed"));
+                if (!Test->TestFalse(TEXT("Saved item comparison rejects a changed frozen display name."), RunItemShopCatalog::IsSameDefinition(*CatalogItem, Changed))) return false;
+            }
+        }
+        return true;
+    }
+
+    // Retain the latest menu, Run and reward diagnostics so every wait has a useful timeout reason.
+    // 모든 대기의 시간 초과 원인을 확인하도록 최신 메뉴·Run·보상 진단을 보존합니다.
+    void CaptureState(const TCHAR* Stage, UWorld* World, const URunStateSubsystem* Run, UUserWidget* Widget = nullptr, const UButton* Continue = nullptr)
+    {
+        const UCommonActivatableWidget* Active = Cast<UCommonActivatableWidget>(Widget);
+        const UTextBlock* SaveStatus = Widget ? Cast<UTextBlock>(Widget->GetWidgetFromName(TEXT("SaveStatus"))) : nullptr;
+        AGameplayPlayerController* Controller = Widget ? Widget->GetOwningPlayer<AGameplayPlayerController>() : nullptr;
+        const AGameplayGameState* State = World->GetGameState<AGameplayGameState>();
+        const UButton* Card = Widget ? Cast<UButton>(Widget->GetWidgetFromName(TEXT("GoldReward1"))) : nullptr;
+        LastState = FString::Printf(TEXT("stage=%s world=%s phase=%d node=%s encounter=%s party=%d completed=%d widget=%s active=%d continueFound=%d continueEnabled=%d saveError=%s saveStatus=%s"), Stage, *World->GetName(), Run ? static_cast<int32>(Run->GetPhase()) : INDEX_NONE, Run ? *Run->GetCurrentNodeId().ToString() : TEXT("None"), Run ? *Run->GetCurrentEncounterId().ToString() : TEXT("None"), Run ? Run->GetPartyMembers().Num() : INDEX_NONE, Run ? Run->GetCompletedNodes().Num() : INDEX_NONE, *GetNameSafe(Widget), Active && Active->IsActivated(), Continue != nullptr, Continue && Continue->GetIsEnabled(), Run ? *Run->GetSaveError().ToString() : TEXT("NoRun"), SaveStatus ? *SaveStatus->GetText().ToString() : TEXT("NoSaveStatus"));
+        LastState += FString::Printf(TEXT(" controller=%s gameState=%s rewardNode=%s choices=%d claims=%d recipients=%d viewRewardNode=%s viewClaims=%d cardFound=%d cardEnabled=%d rewardPending=%d rewardMessage=%s"), *GetNameSafe(Widget ? Widget->GetOwningPlayer() : nullptr), *GetNameSafe(State), Run ? *Run->GetGoldRewardState().NodeId.ToString() : TEXT("None"), Run ? Run->GetGoldRewardState().GoldChoices.Num() : INDEX_NONE, Run ? Run->GetGoldRewardState().Claims.Num() : INDEX_NONE, Run ? Run->GetGoldRewardRecipientIds().Num() : INDEX_NONE, State ? *State->GetViewState().GoldRewardState.NodeId.ToString() : TEXT("None"), State ? State->GetViewState().GoldRewardState.Claims.Num() : INDEX_NONE, Card != nullptr, Card && Card->GetIsEnabled(), Controller && Controller->IsRewardSelectionPending(), Controller ? *Controller->GetRewardSelectionMessage().ToString() : TEXT("NoGameplayController"));
+    }
+
     FAutomationTestBase* Test;
     double Started;
     bool bClicked = false;
+    bool bRewardClicked = false;
     bool bContinued = false;
+    FGuid RewardCharacterId;
+    FRunAccountId RewardOwner;
+    TArray<int32> RewardChoices;
+    int32 GoldBeforeReward = 0;
+    FString LastState = TEXT("No game world with a GameInstance was found.");
 };
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPackagedContinueTest, "ProjectA.Menu.PackagedContinue", EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)

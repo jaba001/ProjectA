@@ -1810,7 +1810,14 @@ bool FCombatRoundMeleeAreaCollisionTest::RunTest(const FString& Parameters)
         OtherCombat->UnitIndex = Fixture.Enemies[0]->UnitIndex;
         if (Case == 4 && !Fixture.AddObstacle(Position(100, 50), FVector(2, 25, 100))) return false;
         if (Case == 5) Fixture.Enemies[1]->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        if (Case == 6) Fixture.Enemies[1]->Die();
+        if (Case == 6)
+        {
+            // Death handling consumes the zero-HP state established by damage rather than replacing it.
+            // 사망 처리는 피해로 확정된 HP 0 상태를 사용하며 체력 값을 대신 설정하지 않습니다.
+            Fixture.Enemies[1]->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), 0.f);
+            Fixture.Enemies[1]->Die();
+            if (!TestTrue(TEXT("The area fixture marks the enemy dead with zero GAS HP before release"), !Fixture.Enemies[1]->IsUnitAlive() && Fixture.Enemies[1]->GetAttributeSet()->GetHP() == 0.f)) return false;
+        }
         Fixture.AddPawnSensor(Fixture.Enemies[0], FVector::ZeroVector, FVector(150));
         if (Case == 8) Fixture.AddPawnSensor(Fixture.Enemies[3], FVector(-200, 0, 0), FVector(150));
         if (!Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Fixture.Enemies[0])) || !Fixture.Submit(1, Fixture.Command(Friend, TEXT("Wait"))) || !Fixture.Ready(0) || !Fixture.Ready(1)) return false;

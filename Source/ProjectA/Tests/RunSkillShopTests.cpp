@@ -301,7 +301,7 @@ bool FRunSkillShopRerollPersistenceTest::RunTest(const FString& Parameters)
     const FRunSkillShopState Initial = Fixture.Run->GetSkillShopState();
     const TArray<FRunPartyMember> BeforeParty = Fixture.Run->GetPartyMembers();
     const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
-    TestEqual(TEXT("New skill shops freeze four existing and 176 catalog skills"), Initial.Catalog.Num(), 180);
+    TestEqual(TEXT("New skill shops freeze the existing sword and 176 catalog skills"), Initial.Catalog.Num(), 177);
     TestEqual(TEXT("Entering a skill shop resets the first reroll to 1G"), Initial.RerollPrice, 1);
     TestTrue(TEXT("New skill-shop stock carries a positive revision"), Initial.Revision > 0);
     const auto CheckOffers = [this, &Fixture](const FRunSkillShopState& State)

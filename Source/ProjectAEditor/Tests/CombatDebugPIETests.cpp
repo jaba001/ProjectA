@@ -11,13 +11,16 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Editor.h"
 #include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
 #include "Game/Development/CombatDebugLoadout.h"
 #include "Game/GameModes/CombatDebugGameMode.h"
 #include "GAS/Attribute/AS_Unit.h"
 #include "HAL/FileManager.h"
+#include "ImageUtils.h"
 #include "Misc/App.h"
 #include "Misc/CommandLine.h"
+#include "Misc/FileHelper.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "NiagaraComponent.h"
@@ -46,6 +49,12 @@ public:
     {
         OutputDirectory = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation/CombatDebugPIE") / FGuid::NewGuid().ToString(EGuidFormats::Digits));
         IFileManager::Get().MakeDirectory(*OutputDirectory, true);
+        ViewportRenderedHandle = UGameViewportClient::OnViewportRendered().AddRaw(this, &FAuthoredToolsAndVfx::CaptureRenderedViewport);
+    }
+
+    virtual ~FAuthoredToolsAndVfx() override
+    {
+        UGameViewportClient::OnViewportRendered().Remove(ViewportRenderedHandle);
     }
 
     virtual bool Update() override
@@ -126,8 +135,10 @@ public:
         if (Stage == 5)
         {
             ObserveVfx();
+            if (bCaptureFailed) return End();
             if (Round->GetView().Phase == ECombatRoundPhase::Resolving) return false;
             if (Round->GetView().RoundNumber == SampleRound && Round->GetView().Phase != ECombatRoundPhase::Finished) return false;
+            if (!PendingScreenshot.IsEmpty()) return false;
             Test->AddInfo(FString::Printf(TEXT("%s: active=%d, ready=%d, max particles=%d, max age=%.3f; GPU particle counts use the engine's delayed count/estimate."), *Samples[SampleIndex], bSawActive, bSawReady, MaxParticles, MaxAge));
             if (!Check(bSawActive && bSawReady && MaxParticles > 0 && MaxAge > 0.f, TEXT("The real authored skill produces active, ready, advancing particle simulation."))) return End();
             if (!Check(bFirstScreenshot && bMiddleScreenshot, TEXT("Viewport captures were requested on two frames with active particle simulation."))) return End();
@@ -136,11 +147,15 @@ public:
         }
         if (Stage == 6)
         {
-            if (FScreenshotRequest::IsScreenshotRequested()) return false;
-            if (!Check(IFileManager::Get().FileSize(*FirstScreenshot) > 0 && IFileManager::Get().FileSize(*MiddleScreenshot) > 0, TEXT("Both real viewport screenshots were written."))) return End();
-            Test->AddInfo(TEXT("VFX screenshots: ") + FirstScreenshot + TEXT(" ; ") + MiddleScreenshot);
+            if (!PendingScreenshot.IsEmpty() || FScreenshotRequest::IsScreenshotRequested()) return false;
+            if (!Check(!bCaptureFailed && bFirstCaptureCompleted && bMiddleCaptureCompleted && IFileManager::Get().FileSize(*FirstScreenshot) > 0 && IFileManager::Get().FileSize(*MiddleScreenshot) > 0, TEXT("Both captures completed on rendered PIE viewport frames and were written before restart or teardown."))) return End();
+            Test->AddInfo(TEXT("VFX screenshots: ") + FirstScreenshot + TEXT(" ; ") + MiddleScreenshot + TEXT(". The _middle file is the second particle observation at least 0.1 seconds after the first; it does not identify the effect lifetime midpoint."));
             ++SampleIndex;
-            if (SampleIndex == Samples.Num()) return End();
+            if (SampleIndex == Samples.Num())
+            {
+                Check(CompletedCaptures == Samples.Num() * 2, TEXT("Every authored sample has two completed captures from its real PIE viewport."));
+                return End();
+            }
             if (!Check(Mode->RestartCombat(), TEXT("Restart the disposable combat for the next authored effect."))) return End();
             Advance(4);
         }
@@ -211,6 +226,7 @@ private:
         SampleRound = View.RoundNumber;
         if (!Check(Round->SubmitPlan(Controller, View.CombatId, View.RoundNumber, View.PlanRevision, Command, Error) && Round->SetParticipantReady(Controller, View.CombatId, View.RoundNumber, View.PlanRevision, true, Error), FString::Printf(TEXT("Execute the authored command: %s"), *Error.ToString()))) return false;
         bSawActive = bSawReady = bFirstScreenshot = bMiddleScreenshot = false;
+        bFirstCaptureCompleted = bMiddleCaptureCompleted = bCaptureFailed = false;
         MaxParticles = 0;
         MaxAge = FirstParticleAge = 0.f;
         FirstScreenshot = OutputDirectory / (Samples[SampleIndex] + TEXT("_first.png"));
@@ -246,18 +262,64 @@ private:
         }
         MaxParticles = FMath::Max(MaxParticles, Particles);
         MaxAge = FMath::Max(MaxAge, Age);
-        if (Particles <= 0 || FScreenshotRequest::IsScreenshotRequested()) return;
+        if (Particles <= 0 || !PendingScreenshot.IsEmpty() || FScreenshotRequest::IsScreenshotRequested()) return;
         if (!bFirstScreenshot)
         {
             FirstParticleAge = Age;
-            FScreenshotRequest::RequestScreenshot(FirstScreenshot, true, false);
-            bFirstScreenshot = true;
+            // Capture the rendered battlefield so the tool overlay cannot hide the effect under inspection.
+            // 검사할 이펙트가 도구 패널에 가려지지 않도록 렌더링된 전장을 캡처합니다.
+            bFirstScreenshot = QueueViewportCapture(FirstScreenshot, Age);
         }
         else if (!bMiddleScreenshot && Age - FirstParticleAge >= 0.1f)
         {
-            FScreenshotRequest::RequestScreenshot(MiddleScreenshot, true, false);
-            bMiddleScreenshot = true;
+            bMiddleScreenshot = QueueViewportCapture(MiddleScreenshot, Age);
         }
+    }
+
+    bool QueueViewportCapture(const FString& Filename, float ParticleAge)
+    {
+        UWorld* World = IsValid(Controller) ? Controller->GetWorld() : nullptr;
+        UGameViewportClient* ViewportClient = World ? World->GetGameViewport() : nullptr;
+        if (!Check(World && World->WorldType == EWorldType::PIE && IsValid(ViewportClient) && ViewportClient->GetWorld() == World && ViewportClient->Viewport, TEXT("Each capture request targets the live PIE game viewport.")))
+        {
+            bCaptureFailed = true;
+            return false;
+        }
+        CaptureViewportClient = ViewportClient;
+        ExpectedScreenshotSize = ViewportClient->Viewport->GetRenderTargetTextureSizeXY();
+        PendingScreenshot = Filename;
+        PendingParticleAge = ParticleAge;
+        return true;
+    }
+
+    void CaptureRenderedViewport(FViewport* RenderedViewport)
+    {
+        if (PendingScreenshot.IsEmpty()) return;
+        UGameViewportClient* ViewportClient = CaptureViewportClient.Get();
+        if (!IsValid(ViewportClient) || RenderedViewport != ViewportClient->Viewport) return;
+        UWorld* World = IsValid(Controller) ? Controller->GetWorld() : nullptr;
+        const FIntPoint Size = RenderedViewport->GetRenderTargetTextureSizeXY();
+        TArray<FColor> Pixels;
+        // Read only the matching PIE render target after its draw event, excluding Slate UI and editor viewports.
+        // Slate UI와 에디터 뷰포트를 제외하고 그리기 이벤트가 끝난 해당 PIE 렌더 타깃만 읽습니다.
+        const bool bPixelsValid = World && World->WorldType == EWorldType::PIE && ViewportClient->GetWorld() == World && Size == ExpectedScreenshotSize && Size.X > 0 && Size.Y > 0 && GetViewportScreenShot(RenderedViewport, Pixels) && Pixels.Num() == int64(Size.X) * Size.Y;
+        if (Check(bPixelsValid, TEXT("The capture event supplied the expected live PIE viewport and complete pixels at its requested resolution.")))
+        {
+            for (FColor& Pixel : Pixels) Pixel.A = 255;
+            TArray64<uint8> Png;
+            FImageUtils::PNGCompressImageArray(Size.X, Size.Y, TArrayView64<const FColor>(Pixels.GetData(), Pixels.Num()), Png);
+            if (Check(!Png.IsEmpty() && FFileHelper::SaveArrayToFile(Png, *PendingScreenshot) && IFileManager::Get().FileSize(*PendingScreenshot) == Png.Num(), TEXT("The rendered PIE capture was fully saved before completion was published.")))
+            {
+                bFirstCaptureCompleted |= PendingScreenshot == FirstScreenshot;
+                bMiddleCaptureCompleted |= PendingScreenshot == MiddleScreenshot;
+                ++CompletedCaptures;
+                Test->AddInfo(FString::Printf(TEXT("Rendered PIE capture: %s; viewport=%dx%d; particle observation age=%.3f; world=%s."), *PendingScreenshot, Size.X, Size.Y, PendingParticleAge, *World->GetName()));
+            }
+            else bCaptureFailed = true;
+        }
+        else bCaptureFailed = true;
+        PendingScreenshot.Reset();
+        CaptureViewportClient.Reset();
     }
 
     bool Check(bool bValue, const FString& Message) { return Test->TestTrue(Message, bValue); }
@@ -277,17 +339,26 @@ private:
     FString OutputDirectory;
     FString FirstScreenshot;
     FString MiddleScreenshot;
+    FString PendingScreenshot;
+    TWeakObjectPtr<UGameViewportClient> CaptureViewportClient;
+    FDelegateHandle ViewportRenderedHandle;
+    FIntPoint ExpectedScreenshotSize = FIntPoint::ZeroValue;
     int32 Stage = 0;
     int32 SampleIndex = 0;
     int32 SampleRound = 0;
     int32 MaxParticles = 0;
+    int32 CompletedCaptures = 0;
     double Started = 0.0;
     float MaxAge = 0.f;
     float FirstParticleAge = 0.f;
+    float PendingParticleAge = 0.f;
     bool bSawActive = false;
     bool bSawReady = false;
     bool bFirstScreenshot = false;
     bool bMiddleScreenshot = false;
+    bool bFirstCaptureCompleted = false;
+    bool bMiddleCaptureCompleted = false;
+    bool bCaptureFailed = false;
 };
 }
 

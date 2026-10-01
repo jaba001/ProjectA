@@ -11,4 +11,5 @@ namespace RunItemShopCatalog
     PROJECTA_API bool Roll(FRunItemShopState& State, bool bAllowDuplicates, const FGameplayTagQuery& Query, FText& OutError);
     PROJECTA_API bool Validate(const FRunItemShopState& State, FText& OutError);
     PROJECTA_API bool ValidateItem(const FRunItemDefinition& Item);
+    PROJECTA_API bool IsSameDefinition(const FRunItemDefinition& Left, const FRunItemDefinition& Right);
 }

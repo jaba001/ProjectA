@@ -289,6 +289,9 @@ bool FRunStandaloneControlPersistenceTest::RunTest(const FString& Parameters)
     // 명시 플래그가 없는 기존 싱글 저장은 소유권을 다시 쓰지 않고 고정 슬롯을 복원합니다.
     TStrongObjectPtr<URunSaveGame> OlderSave(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Slot.Name, Error)));
     if (!TestNotNull(TEXT("The pre-combat map checkpoint remains readable"), OlderSave.Get())) return false;
+    // Historical flag-free saves predate personal reward claims for the explicitly selected character.
+    // 조작 플래그가 없는 과거 저장은 명시적으로 선택한 캐릭터의 개인 보상 수령 기록이 도입되기 전 형식입니다.
+    OlderSave->GoldRewardState = FRunGoldRewardState();
     for (FRunPartyMember& Member : OlderSave->Party)
     {
         Member.bPlayerControlled = false;

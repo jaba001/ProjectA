@@ -19,6 +19,7 @@
 #include "Engine/StaticMeshSocket.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
 #include "Misc/MemStack.h"
 #include "Unit/UnitBase.h"
 #include "UObject/UnrealType.h"
@@ -52,14 +53,16 @@ namespace
 bool CombatWeaponTrace::SampleBoneTransform(const USkeletalMesh* Mesh, const UAnimMontage* Montage, FName Slot, FName BoneOrSocket, double MontageSeconds, FTransform& OutComponentTransform)
 {
     OutComponentTransform = FTransform::Identity;
-    if (!IsValid(Mesh) || !IsValid(Mesh->GetSkeleton()) || !IsValid(Montage) || Montage->GetSkeleton() != Mesh->GetSkeleton() || !FMath::IsFinite(MontageSeconds) || !FMath::IsFinite(Montage->GetPlayLength()) || MontageSeconds < 0.0 || MontageSeconds > Montage->GetPlayLength() || Montage->SlotAnimTracks.Num() != 1 || Slot.IsNone() || BoneOrSocket.IsNone()) return false;
+    // Validate animation hierarchies with Unreal's runtime mesh compatibility check, including registered body variants.
+    // 등록된 몸체 변형을 포함하여 Unreal의 런타임 메시 호환 검사로 애니메이션 본 계층을 검증합니다.
+    if (!IsValid(Mesh) || !IsValid(Mesh->GetSkeleton()) || !IsValid(Montage) || !IsValid(Montage->GetSkeleton()) || !Montage->GetSkeleton()->IsCompatibleMesh(Mesh) || !FMath::IsFinite(MontageSeconds) || !FMath::IsFinite(Montage->GetPlayLength()) || MontageSeconds < 0.0 || MontageSeconds > Montage->GetPlayLength() || Montage->SlotAnimTracks.Num() != 1 || Slot.IsNone() || BoneOrSocket.IsNone()) return false;
     const FSlotAnimationTrack& Track = Montage->SlotAnimTracks[0];
     if (Track.SlotName != Slot) return false;
     const FAnimSegment* Segment = Track.AnimTrack.GetSegmentAtTime(static_cast<float>(MontageSeconds));
     if (!Segment || !FMath::IsFinite(Segment->GetValidPlayRate()) || FMath::IsNearlyZero(Segment->AnimPlayRate) || Segment->LoopingCount != 1) return false;
     float SequenceSeconds = 0.f;
     const UAnimSequence* Sequence = Cast<UAnimSequence>(Segment->GetAnimationData(static_cast<float>(MontageSeconds), SequenceSeconds));
-    if (!IsValid(Sequence) || Sequence->GetSkeleton() != Mesh->GetSkeleton() || Sequence->AdditiveAnimType != AAT_None || !FMath::IsFinite(Sequence->GetPlayLength()) || Sequence->GetPlayLength() <= 0.f || !FMath::IsFinite(Sequence->RateScale) || FMath::IsNearlyZero(Sequence->RateScale) || !FMath::IsFinite(SequenceSeconds) || SequenceSeconds < 0.f || SequenceSeconds > Sequence->GetPlayLength()) return false;
+    if (!IsValid(Sequence) || !IsValid(Sequence->GetSkeleton()) || !Sequence->GetSkeleton()->IsCompatibleMesh(Mesh) || Sequence->AdditiveAnimType != AAT_None || !FMath::IsFinite(Sequence->GetPlayLength()) || Sequence->GetPlayLength() <= 0.f || !FMath::IsFinite(Sequence->RateScale) || FMath::IsNearlyZero(Sequence->RateScale) || !FMath::IsFinite(SequenceSeconds) || SequenceSeconds < 0.f || SequenceSeconds > Sequence->GetPlayLength()) return false;
 
     FTransform AttachmentOffset = FTransform::Identity;
     if (const USkeletalMeshSocket* Socket = Mesh->FindSocket(BoneOrSocket))
@@ -69,7 +72,7 @@ bool CombatWeaponTrace::SampleBoneTransform(const USkeletalMesh* Mesh, const UAn
     }
     const FReferenceSkeleton& ReferenceSkeleton = Mesh->GetRefSkeleton();
     const int32 AttachmentIndex = ReferenceSkeleton.FindBoneIndex(BoneOrSocket);
-    if (AttachmentIndex == INDEX_NONE || ReferenceSkeleton.GetNum() > MAX_uint16) return false;
+    if (AttachmentIndex == INDEX_NONE || Sequence->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(BoneOrSocket) == INDEX_NONE || ReferenceSkeleton.GetNum() > MAX_uint16) return false;
 
     // Engine pose extraction preserves mesh retargeting and root-lock behavior on servers without a rendered AnimInstance.
     // 엔진 포즈 추출로 화면 AnimInstance가 없는 서버에서도 메시 리타깃과 루트 잠금 동작을 유지합니다.
@@ -86,7 +89,18 @@ bool CombatWeaponTrace::SampleBoneTransform(const USkeletalMesh* Mesh, const UAn
     Curve.InitFrom(RequiredBones);
     UE::Anim::FStackAttributeContainer Attributes;
     FAnimationPoseData PoseData(Pose, Curve, Attributes);
-    const FAnimExtractContext ExtractContext(static_cast<double>(SequenceSeconds), Montage->HasRootMotion());
+    FAnimExtractContext ExtractContext(static_cast<double>(SequenceSeconds), Montage->HasRootMotion());
+    // Cross-skeleton extraction requires Unreal's compressed bone remapping instead of editor raw source indices.
+    // 서로 다른 스켈레톤의 추출은 에디터 원본 본 인덱스 대신 Unreal의 압축 포즈 본 매핑을 사용해야 합니다.
+    if (Sequence->GetSkeleton() != Mesh->GetSkeleton())
+    {
+        if (!Sequence->IsCompressedDataValid() || Sequence->GetSkeletonVirtualBoneGuid() != Sequence->GetSkeleton()->GetVirtualBoneGuid()) return false;
+#if WITH_EDITOR
+        const IConsoleVariable* ForceRawData = IConsoleManager::Get().FindConsoleVariable(TEXT("a.ForceEvalRawData"));
+        if (ForceRawData && ForceRawData->GetInt() == 1) return false;
+        ExtractContext.bEnforceCompressedDataSampling = true;
+#endif
+    }
     Sequence->GetAnimationPose(PoseData, ExtractContext);
     FTransform BoneTransform = FTransform::Identity;
     for (int32 Index = AttachmentIndex; Index != INDEX_NONE; Index = ReferenceSkeleton.GetParentIndex(Index))

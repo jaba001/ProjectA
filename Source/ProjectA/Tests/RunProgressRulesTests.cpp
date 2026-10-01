@@ -10,7 +10,10 @@
 #include "Game/Run/RunStateSubsystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/ScopeExit.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "UObject/StrongObjectPtr.h"
+#include "UObject/UnrealType.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunRouteRulesTest, "ProjectA.Run.Progress.RouteDefinitionBoundaries", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -143,7 +146,12 @@ bool FRunCandidatePublicationTest::RunTest(const FString& Parameters)
     {
         TStrongObjectPtr<URunSaveGame> Save(Run->CreateSaveData());
         TArray<uint8> Bytes;
-        UGameplayStatics::SaveGameToMemory(Save.Get(), Bytes);
+        // Persistent editor archives mint unstored localization keys for unkeyed text; compare all runtime properties without that side effect.
+        // 에디터 영속 아카이브는 키 없는 텍스트에 미반영 키를 생성하므로 그 부작용 없이 모든 런타임 속성을 비교합니다.
+        FMemoryWriter Writer(Bytes, false);
+        FObjectAndNameAsStringProxyArchive Archive(Writer, false);
+        Archive.ArNoDelta = true;
+        Save->Serialize(Archive);
         return Bytes;
     };
     const auto ReadDisk = [&Slot]()
@@ -154,13 +162,29 @@ bool FRunCandidatePublicationTest::RunTest(const FString& Parameters)
     };
     int32 Events = 0;
     bool bObservedDurableState = false;
+    bool bVerifyDurablePublication = false;
     Run->OnRunStateChanged.AddLambda([&]()
     {
         ++Events;
-        bObservedDurableState = CaptureRuntime() == ReadDisk();
+        if (!bVerifyDurablePublication) return;
+        TStrongObjectPtr<URunSaveGame> Durable(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromMemory(ReadDisk())));
+        TStrongObjectPtr<URunSaveGame> Published(Run->CreateSaveData());
+        bObservedDurableState = TestNotNull(TEXT("Published state already has a readable durable record"), Durable.Get());
+        if (!bObservedDurableState) return;
+        // Engine property equality compares editor text values while retaining string-table and invariant distinctions.
+        // 엔진 속성 비교는 문자열 테이블과 불변 텍스트 구분을 유지하며 에디터 텍스트 값을 비교합니다.
+        for (TFieldIterator<FProperty> Property(URunSaveGame::StaticClass()); Property; ++Property)
+        {
+            bObservedDurableState &= TestTrue(FString::Printf(TEXT("Published %s agrees with the durable record before notification"), *Property->GetName()), Property->Identical_InContainer(Published.Get(), Durable.Get()));
+        }
     });
     const auto VerifyTransaction = [&](const TCHAR* Label, TFunctionRef<bool()> Action)
     {
+        // Preparation and combat-start notifications are transient; require durable publication only for persistence transactions.
+        // 준비와 전투 시작 알림은 임시 상태이므로 저장 트랜잭션에서만 영속 기록 발행을 요구합니다.
+        bVerifyDurablePublication = true;
+        bObservedDurableState = false;
+        ON_SCOPE_EXIT { bVerifyDurablePublication = false; };
         const TArray<uint8> BeforeRuntime = CaptureRuntime();
         const TArray<uint8> BeforeDisk = ReadDisk();
         const int32 BeforeEvents = Events;

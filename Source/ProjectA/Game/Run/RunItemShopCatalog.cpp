@@ -5,6 +5,7 @@
 #include "NativeGameplayTags.h"
 #include "Serialization/Csv/CsvParser.h"
 #include "Types/GameplayTagCandidateSelection.h"
+#include "UObject/TextProperty.h"
 
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ItemWeapon, "Item.Weapon");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ItemWeaponSword, "Item.Weapon.Sword");
@@ -120,6 +121,16 @@ bool RunItemShopCatalog::ValidateItem(const FRunItemDefinition& Item)
     return Item.Asset.IsValid() && Item.Asset.GetSubPathUtf8String().IsEmpty() && AssetPath.StartsWith(TEXT("/Game/")) && FPackageName::IsValidObjectPath(AssetPath) && IsValidDisplayName(Item.DisplayName.ToString()) && Item.Tags.HasTag(TAG_ItemWeapon) && Item.Price > 0;
 }
 
+bool RunItemShopCatalog::IsSameDefinition(const FRunItemDefinition& Left, const FRunItemDefinition& Right)
+{
+    // Editor SaveGame serialization assigns different keys to copied CSV text; compare its value and retain every other reflected field.
+    // 에디터 SaveGame 직렬화는 복사한 CSV 문구에 서로 다른 키를 부여하므로 문구 값과 나머지 모든 리플렉션 필드를 비교합니다.
+    if (!FTextProperty::Identical_Implementation(Left.DisplayName, Right.DisplayName, 0, FTextProperty::EIdenticalLexicalCompareMethod::DisplayString)) return false;
+    FRunItemDefinition Comparable = Right;
+    Comparable.DisplayName = Left.DisplayName;
+    return FRunItemDefinition::StaticStruct()->CompareScriptStruct(&Left, &Comparable, 0);
+}
+
 bool RunItemShopCatalog::Load(TArray<FRunItemDefinition>& OutCatalog, FText& OutError)
 {
     OutError = FText::GetEmpty();
@@ -195,7 +206,7 @@ bool RunItemShopCatalog::Validate(const FRunItemShopState& State, FText& OutErro
     {
         if (Offer.OfferId.IsNone() || Offer.OfferId == FRunItemShopState::GetRerollOfferId() || OfferIds.Contains(Offer.OfferId) || !ValidateItem(Offer.Item)) return Fail();
         const FRunItemDefinition* CatalogItem = State.Catalog.FindByPredicate([&Offer](const FRunItemDefinition& Item) { return Item.Asset == Offer.Item.Asset; });
-        if (!CatalogItem || CatalogItem->Price != Offer.Item.Price || CatalogItem->DisplayName.ToString() != Offer.Item.DisplayName.ToString() || CatalogItem->Tags != Offer.Item.Tags) return Fail();
+        if (!CatalogItem || !IsSameDefinition(*CatalogItem, Offer.Item)) return Fail();
         OfferIds.Add(Offer.OfferId);
     }
     return true;
