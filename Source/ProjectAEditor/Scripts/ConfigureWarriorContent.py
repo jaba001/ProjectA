@@ -24,7 +24,10 @@ SWORD_WARRIOR_GRIP = (-11.095651, 5.605028, -10.0)
 SWORD_ENEMY_GRIP = (-8.5, 5.0, -10.0)
 SWORD_RECOVERY_START_SECONDS = 0.2
 SWORD_MONTAGE_SECONDS = 1.933333
-REMOVED_SKILL_PATHS = {SKILLS + "/BPDA_SweepingStrike", SKILLS + "/DA_SweepingStrike", ROOT + "/Blueprint/DataAsset/DA_SweepingStrike"}
+REMOVED_SKILL_IDS = {"SweepingStrike", "AOE", "RangedAttack"}
+REMOVED_SKILL_PATHS = {SKILLS + "/" + name for name in ["BPDA_SweepingStrike", "DA_SweepingStrike", "BPDA_AreaAttack", "BPDA_RangedAttack"]}
+REMOVED_SKILL_PATHS.update({ROOT + "/Blueprint/DataAsset/" + name for name in ["DA_SweepingStrike", "BPDA_AreaAttack", "BPDA_RangedAttack"]})
+REMOVED_ABILITY_PATHS = {ROOT + "/Blueprint/GAS/Ability/" + name for name in ["BPGA_AreaAttack", "BPGA_RangedAttack"]}
 
 
 def require(value, message):
@@ -54,7 +57,11 @@ def project_mesh(source_path):
 
 
 def is_removed_skill(skill):
-    return bool(skill and (str(skill.get_editor_property("skill_id")) == "SweepingStrike" or skill.get_path_name().split(".")[0] in REMOVED_SKILL_PATHS))
+    return bool(skill and (str(skill.get_editor_property("skill_id")) in REMOVED_SKILL_IDS or skill.get_path_name().split(".")[0] in REMOVED_SKILL_PATHS))
+
+
+def is_removed_ability(ability):
+    return bool(ability and ability.get_path_name().split(".")[0] in REMOVED_ABILITY_PATHS)
 
 
 def remove_deleted_loadout_skill(party):
@@ -68,8 +75,14 @@ def remove_deleted_loadout_skill(party):
         defaults = unreal.get_default_object(blueprint.generated_class())
         skills = list(defaults.get_editor_property("equipped_skill_data_assets"))
         retained = [skill for skill in skills if not is_removed_skill(skill)]
-        if len(retained) != len(skills):
+        abilities = list(defaults.get_editor_property("equipped_skill_ability_classes"))
+        retained_abilities = [ability for ability in abilities if not is_removed_ability(ability)]
+        remove_default = is_removed_ability(defaults.get_editor_property("default_attack_ability_class"))
+        if len(retained) != len(skills) or len(retained_abilities) != len(abilities) or remove_default:
             defaults.set_editor_property("equipped_skill_data_assets", retained)
+            defaults.set_editor_property("equipped_skill_ability_classes", retained_abilities)
+            if remove_default:
+                defaults.set_editor_property("default_attack_ability_class", None)
             unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
             save(blueprint)
     professions = dict(party.get_editor_property("professions"))
@@ -151,7 +164,7 @@ def configure():
     basic = load(SKILLS + "/BPDA_DefaulatAttack")
     basic.set_editor_property("skill_name", "비무장 공격")
     save(basic)
-    previous = [basic, load(SKILLS + "/BPDA_RangedAttack"), load(SKILLS + "/BPDA_AreaAttack")]
+    previous = [basic]
     montages = []
     for skill in previous:
         montage = skill.get_editor_property("round_definition").get_editor_property("cast_montage") if skill.get_editor_property("use_round_definition") else None
@@ -240,7 +253,7 @@ def configure():
     save(party)
     catalog = load(ROOT + "/Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog")
     catalog_skills = dict(catalog.get_editor_property("skills"))
-    catalog_skills = {key: skill for key, skill in catalog_skills.items() if str(key) != "SweepingStrike" and not is_removed_skill(skill)}
+    catalog_skills = {key: skill for key, skill in catalog_skills.items() if str(key) not in REMOVED_SKILL_IDS and not is_removed_skill(skill)}
     catalog_skills[unreal.Name("SwordAttack")] = sword
     catalog.set_editor_property("skills", catalog_skills)
     save(catalog)
@@ -274,7 +287,7 @@ def verify():
         require(math.dist((location.x, location.y, location.z), expected_location) < 0.001, "Blade socket does not match sword geometry")
     require(abs(montage.get_editor_property("sequence_length") - SWORD_MONTAGE_SECONDS) < 0.001, "Kwang attack and recovery length changed")
     require(profile.get_editor_property("action_point_cost") == basic.get_editor_property("action_point_cost"), "Sword AP was not preserved")
-    expected = [basic, load(SKILLS + "/BPDA_RangedAttack"), load(SKILLS + "/BPDA_AreaAttack"), sword]
+    expected = [basic, sword]
     require(montage == load(WARRIOR_MONTAGE), "Sword montage path does not preserve the Kwang folder")
     require(list(HELPER.get_montage_animations(montage)) == [load(mirrored_path(source, SWORD_SUFFIX)) for source in [SWORD_SOURCE, SWORD_RECOVERY_SOURCE]], "Warrior sword montage is not the Kwang attack and recovery")
     require(HELPER.validate_sword_montage(montage, load(mirrored_path(SWORD_SOURCE, SWORD_SUFFIX)), load(mirrored_path(SWORD_RECOVERY_SOURCE, SWORD_SUFFIX)), SWORD_RECOVERY_START_SECONDS), "Saved warrior Kwang segment timing or blending mismatch")
@@ -340,7 +353,12 @@ def verify():
     for profession, blueprint_name in [("Mage", "BP_MageUnit"), ("Archer", "BP_PlayerUnit"), ("Rogue", "BP_RogueUnit")]:
         require(classes[unreal.Name(profession)] == load(ROOT + "/Blueprint/Unit/" + blueprint_name).generated_class(), "Another profession class changed: " + profession)
     shared_skills = list(unreal.get_default_object(player_class).get_editor_property("equipped_skill_data_assets"))
-    require(all(skill in shared_skills for skill in expected[:-1]) and not any(is_removed_skill(skill) for skill in shared_skills), "Shared player loadout must retain its other skills without Sweeping Strike")
+    require(all(skill in shared_skills for skill in expected[:-1]) and not any(is_removed_skill(skill) for skill in shared_skills), "Shared player loadout must retain its other skills without deleted prototype attacks")
+    for name in ["BP_PlayerUnit", "BP_WarriorUnit", "BP_MageUnit", "BP_ArcherUnit", "BP_RogueUnit"]:
+        path = ROOT + "/Blueprint/Unit/" + name
+        if ASSETS.does_asset_exist(path):
+            defaults = unreal.get_default_object(load(path).generated_class())
+            require(not any(is_removed_ability(ability) for ability in defaults.get_editor_property("equipped_skill_ability_classes")) and not is_removed_ability(defaults.get_editor_property("default_attack_ability_class")), "Deleted prototype ability remains equipped: " + name)
     REPORT["sword_profile"] = profile.export_text()
     REPORT["folder_moves"] = legacy_moves()
     for old, new in REPORT["folder_moves"].items():

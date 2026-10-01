@@ -30,7 +30,7 @@ bool UOpponentSnapshotCatalogDataAsset::ResolveSkills(const FPartySnapshotMember
     {
         if (RunContentMigration::IsRemovedSkillId(SkillId))
         {
-            OutError = NSLOCTEXT("Snapshot", "RemovedSkill", "삭제된 휩쓸기 스킬은 상대 파티에 장착할 수 없습니다.");
+            OutError = NSLOCTEXT("Snapshot", "RemovedSkill", "삭제된 스킬은 상대 파티에 장착할 수 없습니다.");
             return false;
         }
         USkillDefinitionDataAsset* Skill = Skills.FindRef(SkillId);

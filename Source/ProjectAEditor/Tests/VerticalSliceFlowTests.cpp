@@ -900,7 +900,7 @@ bool FVerticalSliceSavedSkillLoadoutTest::RunTest(const FString& Parameters)
         AddError(TEXT("The requested skill-loadout test slot already exists; choose a fresh suffix. No PIE game was started."));
         return false;
     }
-    const TArray<FString> AssetNames = { TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_RangedAttack"), TEXT("BPDA_AreaAttack"), TEXT("BPDA_swoard_attack") };
+    const TArray<FString> AssetNames = {TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_swoard_attack")};
     TArray<FCombatRoundSkill> Skills;
     for (const FString& Name : AssetNames)
     {
@@ -915,7 +915,7 @@ bool FVerticalSliceSavedSkillLoadoutTest::RunTest(const FString& Parameters)
         }
         Skills.Add(Skill);
     }
-    AddInfo(TEXT("Runs four saved-menu/encounter PIE sessions; enemy selection uses one Slate mouse press/release through the viewport and controller, skill/menu buttons use their delegates."));
+    AddInfo(TEXT("Runs two saved-menu/encounter PIE sessions; enemy selection uses one Slate mouse press/release through the viewport and controller, skill/menu buttons use their delegates."));
     for (int32 Index = 0; Index < Skills.Num(); ++Index)
     {
         ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/MainMenu")));

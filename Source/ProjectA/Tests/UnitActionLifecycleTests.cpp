@@ -195,7 +195,7 @@ bool FCombatRoundSkillMigrationTest::RunTest(const FString& Parameters)
 
     // Inspect saved ability defaults while changing only transient skill definitions.
     // 저장된 어빌리티 기본값을 읽으며 임시 스킬 정의만 변경합니다.
-    const TPair<const TCHAR*, const TCHAR*> AuthoredMontages[] = {{TEXT("BPDA_DefaulatAttack"), TEXT("MM_Attack_01_Montage")}, {TEXT("BPDA_AreaAttack"), TEXT("MM_Attack_03_Montage")}};
+    const TPair<const TCHAR*, const TCHAR*> AuthoredMontages[] = {{TEXT("BPDA_DefaulatAttack"), TEXT("MM_Attack_01_Montage")}, {TEXT("BPDA_swoard_attack"), TEXT("MM_Attack_01_Montage")}};
     for (const TPair<const TCHAR*, const TCHAR*>& Authored : AuthoredMontages)
     {
         const FString AssetPath = FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/%s.%s"), Authored.Key, Authored.Key);
@@ -209,16 +209,6 @@ bool FCombatRoundSkillMigrationTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Saved attack defaults reference the expected montage"), AuthoredAttack->GetAuthoredAttackMontage(), AuthoredMontage);
         if (!TestTrue(TEXT("The authored skill resolves without activating its ability"), AuthoredSkill->ResolveRoundSkill(Resolved, Error))) return false;
         TestEqual(TEXT("Migration retains the authored attack montage"), Resolved.CastMontage.Get(), AuthoredSkill->bUseRoundDefinition && AuthoredSkill->RoundDefinition.CastMontage ? AuthoredSkill->RoundDefinition.CastMontage.Get() : AuthoredMontage);
-        if (FString(Authored.Key) == TEXT("BPDA_AreaAttack"))
-        {
-            TestTrue(TEXT("The saved area attack retains its legacy enemy tile area definition"), !AuthoredSkill->bUseRoundDefinition && AuthoredSkill->TargetRule == ESkillTargetRule::EnemyTile && AuthoredSkill->AreaType == ESkillAreaType::AroundTarget);
-            TestEqual(TEXT("The saved area attack uses its authored damage of 200"), Resolved.Power, 200.f);
-            TestEqual(TEXT("The saved area attack resolves as a ground attack"), Resolved.Kind, ECombatRoundSkillKind::GroundAttack);
-            TestEqual(TEXT("The saved area attack casts without approaching"), Resolved.Approach, ECombatRoundApproach::None);
-            TestEqual(TEXT("The saved area attack retains its selected point"), Resolved.TargetLoss, ECombatRoundTargetLoss::KeepLocation);
-            TestEqual(TEXT("The saved area attack converts its one-tile radius to 200 cm"), Resolved.HitRange, 200.f);
-        }
-
         USkillDefinitionDataAsset* PresentationSkill = MakeSkill(GetTransientPackage(), AuthoredSkill->AbilityClass);
         PresentationSkill->bUseRoundDefinition = true;
         TestTrue(TEXT("An explicit profile can reuse the legacy montage"), PresentationSkill->ResolveRoundSkill(Resolved, Error));
@@ -328,23 +318,15 @@ bool FCombatRoundRetargetPolicyTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("An invalid serialized target-loss enum is rejected before normalization"), Skill->ResolveRoundSkill(Resolved, Error));
     TestFalse(TEXT("Invalid target-loss data reports the asset error"), Error.IsEmpty());
 
-    for (const TCHAR* AssetName : {TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_RangedAttack"), TEXT("BPDA_swoard_attack"), TEXT("BPDA_AreaAttack")})
+    for (const TCHAR* AssetName : {TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_swoard_attack")})
     {
         const FString AssetPath = FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/%s.%s"), AssetName, AssetName);
         const USkillDefinitionDataAsset* Authored = LoadObject<USkillDefinitionDataAsset>(nullptr, *AssetPath);
         if (!TestNotNull(AssetPath + TEXT(" exists"), Authored)) return false;
         const ECombatRoundTargetLoss SavedPolicy = Authored->RoundDefinition.TargetLoss;
         if (!TestTrue(AssetPath + TEXT(" resolves"), Authored->ResolveRoundSkill(Resolved, Error))) return false;
-        if (FString(AssetName) == TEXT("BPDA_AreaAttack"))
-        {
-            TestEqual(TEXT("The authored area attack remains a fixed ground attack"), Resolved.Kind, ECombatRoundSkillKind::GroundAttack);
-            TestEqual(TEXT("The authored area attack preserves its selected location"), Resolved.TargetLoss, ECombatRoundTargetLoss::KeepLocation);
-        }
-        else
-        {
-            TestTrue(AssetPath + TEXT(" remains a unit-targeted attack"), Resolved.Kind == ECombatRoundSkillKind::Melee || Resolved.Kind == ECombatRoundSkillKind::Projectile);
-            TestEqual(AssetPath + TEXT(" adopts the common retarget policy"), Resolved.TargetLoss, ECombatRoundTargetLoss::NearestEnemy);
-        }
+        TestEqual(AssetPath + TEXT(" remains a unit-targeted melee attack"), Resolved.Kind, ECombatRoundSkillKind::Melee);
+        TestEqual(AssetPath + TEXT(" adopts the common retarget policy"), Resolved.TargetLoss, ECombatRoundTargetLoss::NearestEnemy);
         TestEqual(AssetPath + TEXT(" keeps its authored profile unchanged"), Authored->RoundDefinition.TargetLoss, SavedPolicy);
     }
     return true;
@@ -456,14 +438,14 @@ bool FRunStartingSkillLoadoutTest::RunTest(const FString& Parameters)
 {
     UPartyDefinitionDataAsset* Catalog = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
     USkillDefinitionDataAsset* Unarmed = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_DefaulatAttack.BPDA_DefaulatAttack"));
-    USkillDefinitionDataAsset* Purchased = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_RangedAttack.BPDA_RangedAttack"));
+    USkillDefinitionDataAsset* Purchased = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"));
     if (!TestTrue(TEXT("Authored catalog, unarmed skill and purchasable skill exist"), Catalog && Unarmed && Purchased)) return false;
     FText Error;
     for (FName ClassId : UProfessionBase::GetPlayableIds())
     {
         TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
         if (!TestTrue(TEXT("Every new profession resolves the same unarmed-only loadout"), Catalog->ResolveStartingSkills(ClassId, Skills, Error) && Skills == TArray<TObjectPtr<USkillDefinitionDataAsset>>{Unarmed})) return false;
-        TestFalse(TEXT("New-character preview excludes the purchasable ranged skill"), Catalog->GetProfessionDetails(ClassId).ToString().Contains(Purchased->SkillName.ToString()));
+        TestFalse(TEXT("New-character preview excludes the purchasable sword skill"), Catalog->GetProfessionDetails(ClassId).ToString().Contains(Purchased->SkillName.ToString()));
         FRunPartyMember Member;
         Member.ClassId = ClassId;
         FProfessionDefinition Legacy;

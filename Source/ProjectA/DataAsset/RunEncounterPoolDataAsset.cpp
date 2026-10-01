@@ -39,7 +39,7 @@ URunEncounterPoolDataAsset::URunEncounterPoolDataAsset()
         Offer.EncounterTag = Index == 2 ? FRunEncounterOffer::GetItemShopTag() : FRunEncounterOffer::GetSkillShopTag();
         Offer.DisplayName = Offer.GetDisplayName();
     }
-    for (const TCHAR* AssetName : {TEXT("BPDA_swoard_attack"), TEXT("BPDA_RangedAttack"), TEXT("BPDA_AreaAttack")})
+    for (const TCHAR* AssetName : {TEXT("BPDA_swoard_attack")})
     {
         FRunSkillShopOffer& Offer = FixedSkillOffers.AddDefaulted_GetRef();
         Offer.OfferId = FName(AssetName);
@@ -170,7 +170,7 @@ bool URunEncounterPoolDataAsset::BuildSkillShop(FRunSkillShopState& OutState, FT
     {
         if (RunContentMigration::IsRemovedSkill(Offer.Skill))
         {
-            OutError = NSLOCTEXT("RunSkillShop", "RemovedSkill", "삭제된 휩쓸기 스킬은 상점 후보에 포함할 수 없습니다.");
+            OutError = NSLOCTEXT("RunSkillShop", "RemovedSkill", "삭제된 스킬은 상점 후보에 포함할 수 없습니다.");
             return false;
         }
         const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());

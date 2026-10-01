@@ -118,7 +118,7 @@ bool UPartySnapshotLibrary::ValidateSnapshot(const FPartySnapshot& Snapshot, FTe
         }
         if (Member.SkillIds.ContainsByPredicate([](FName SkillId) { return RunContentMigration::IsRemovedSkillId(SkillId); }))
         {
-            OutError = NSLOCTEXT("PartySnapshot", "RemovedSkill", "삭제된 휩쓸기 스킬을 새 Snapshot에 포함할 수 없습니다.");
+            OutError = NSLOCTEXT("PartySnapshot", "RemovedSkill", "삭제된 스킬을 새 Snapshot에 포함할 수 없습니다.");
             return false;
         }
         if (Member.EquipmentIds.Num() > 16 || !HasUniqueIdentifiers(Member.EquipmentIds) || (!Member.TacticsId.IsNone() && !IsStableIdentifier(Member.TacticsId)))
@@ -216,7 +216,7 @@ bool UPartySnapshotLibrary::LoadSnapshot(FName SlotId, FPartySnapshot& OutSnapsh
         const int32 RemovedCount = Member.SkillIds.RemoveAll([](FName SkillId) { return RunContentMigration::IsRemovedSkillId(SkillId); });
         if (RemovedCount > 0 && Member.SkillIds.IsEmpty())
         {
-            OutError = NSLOCTEXT("PartySnapshot", "RemovedOnlySkill", "삭제된 휩쓸기를 제거한 뒤 남은 스킬이 없어 상대 Snapshot을 불러올 수 없습니다.");
+            OutError = NSLOCTEXT("PartySnapshot", "RemovedOnlySkill", "삭제된 스킬을 제거한 뒤 남은 스킬이 없어 상대 Snapshot을 불러올 수 없습니다.");
             return false;
         }
     }

@@ -50,7 +50,7 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 
 검증 범위:
 
-- 실제 메뉴·전사 생성·전투 노드에서 시작하며 휩쓸기를 제외하고 검 공격을 포함한 저장된 DA 4개의 목록·계획·피해 적용을 확인한다.
+- 실제 메뉴·전사 생성·전투 노드에서 시작하며 저장된 검·비무장 DA 2개의 목록·계획·피해 적용을 확인한다. 삭제 대상인 휩쓸기·테스트 원거리·AOE 3종은 제외한다.
 - 화면 전환 후 Slate 마우스 누름/해제 한 번을 뷰포트 hit-test·컨트롤러 입력에 전달한다. 메뉴·스킬 버튼은 delegate를 사용하며 물리 마우스 하드웨어 검사는 아니다.
 - 전용 시험 저장만 생성·정리하며 기존 저장과 디스크 에셋·밸런스는 변경하지 않는다.
 
@@ -60,16 +60,11 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 
 실제 창 설정은 `-game /Game/User_JeHoon/LEVEL/MainMenu`와 `Automation RunTests ProjectA.Menu.GameWindowOptions`로 검사한다. 항복 UI는 같은 맵에서 새 `-ProjectASaveSlot=ProjectA_Automation_Surrender_<고유값>`과 `ProjectA.Menu.GameMenuSurrender`를 사용한다. 별도 프로세스 이어하기는 새 `-T11CheckpointSlot=ProjectA_Automation_Restart_<고유값> -T11WriteCheckpoint`로 `ProjectA.Persistence.ProcessRestart`를 먼저 실행한 뒤, 해당 슬롯을 `-ProjectASaveSlot`으로 지정한 `-game` 프로세스에서 `ProjectA.Menu.PackagedContinue`를 실행한다. 시험 이름과 달리 `UnrealEditor-Cmd -game` 실행은 패키징 검증이 아니다.
 
-7. `CreateRangedAttack.py`: 기본 공격 DA·GA를 `BPDA_RangedAttack`·`BPGA_RangedAttack`으로 복제하고 기존 단일 대상 투사체 변환을 연결한다. 캐릭터 장착과 기존 에셋은 유지하며 대상이 이미 있으면 덮어쓰지 않는다. `-RangedAttackVerifyOnly`는 제작 직후 저장된 연결·복제 수치만 다시 읽는다. 두 명령 모두 게임을 실행하지 않는다.
+7. `CreateRangedAttack.py`는 폐기 안내 도구로 유지한다. 테스트 원거리 `BPDA_RangedAttack` 제거에 따라 에셋을 작성하거나 재생성하지 않으며 실행 시 폐기 안내만 반환한다. 이전 작성·검증 결과는 당시 이력이다.
 
-```powershell
-& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateRangedAttack.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
-& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateRangedAttack.py") -RangedAttackVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
-```
+8. `ConfigureSweepingStrike.py`는 폐기 안내 도구로 유지한다. 휩쓸기 제거에 따라 에셋을 작성하거나 재생성하지 않으며 실행 시 폐기 안내만 반환한다. `ConfigureCombatContent.py`의 현재 생성 대상에서도 휩쓸기·테스트 원거리·AOE 3종을 제외한다. 신규 후보·기존 저장 보유 제거의 확인은 [TODO 2-12절](../../../Docs/TODO.md#2-12-휩쓸기-근접-범위-충돌)을 따른다.
 
-8. `ConfigureSweepingStrike.py`는 폐기 안내 도구로 유지한다. 휩쓸기 제거에 따라 에셋을 작성하거나 재생성하지 않으며 실행 시 폐기 안내만 반환한다. `ConfigureCombatContent.py`의 현재 생성 대상에서도 휩쓸기를 제외한다. 신규 후보·기존 저장 보유 제거의 확인은 [TODO 2-12절](../../../Docs/TODO.md#2-12-휩쓸기-근접-범위-충돌)을 따른다.
-
-`ProjectA.Combat.Round.MeleeAreaPhysicalContacts`와 `MeleeTargetAndSides`는 휩쓸기 콘텐츠와 독립적인 근접 범위·타일형 공통 기능 회귀로 보존한다. 기존 작성·검증 결과는 [당시 이력](../../../Docs/HISTORY.md#최근-변경)으로 구분한다.
+`ProjectA.Combat.Round.MeleeAreaPhysicalContacts`와 `MeleeTargetAndSides`는 삭제 대상 3종과 독립적인 근접 범위·타일형 공통 기능 회귀로 보존한다. 생성 스킬 176종과 범위·투사체 공통 C++·GAS·FX도 유지한다. 기존 작성·검증 결과는 [당시 이력](../../../Docs/HISTORY.md#최근-변경)으로 구분한다.
 
 9. `ConfigureTestEnemies.py`: 기본 PvE 인카운터를 기존 적 클래스 4개로 구성하고 Gameplay Arena를 앞열 `(1,2)`, `(2,2)`·뒷열 `(0,3)`, `(3,3)`으로 배치한다. 유닛 능력치·스킬·Snapshot 정의는 변경하지 않는다. 열린 에디터가 패키지를 잠글 수 있으므로 저장 후 종료하고 실행한다. `-TestEnemiesVerifyOnly`는 저장된 클래스 수·배치만 읽는다.
 
@@ -91,7 +86,7 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 재실행은 작성 구성을 다시 적용하므로 수동 장착·부착·전사 직업 연결을 재설정한다. 부분 누락 시 고유 임시 폴더에서 리타깃하고 엔진의 에셋 통합으로 기존 의존 참조를 보존한다. `RoundMontageOverrides`와 기존 보행·DefaultSlot을 유지하고 맞지 않는 Manny Foot IK만 제거한다. Retargeter의 기본 연산을 중복 추가하지 않으며 Rig 지정 후 유효한 6개 연산을 한 번 구성한다. 설정 버전 변경이나 `-WarriorRebuildRetargets`는 관련 시퀀스 48개를 기존 경로에 다시 작성하고 원본 Root Motion 설정·참조를 보존한다.
 
-`-WarriorVerifyOnly`는 연산 구성·48개 시퀀스의 길이/포즈/유한 좌표/골반 이동 범위, 원본 폴더 구조·이전 참조 73개, 전사/적 몽타주의 실제 Kwang 공격·복귀 세그먼트를 검사한다. 공격 1.2초에 복귀 0.933333초의 첫 중복 포즈 0.2초를 제외해 총 1.933333초로 연결하며 블렌드 인 0.08초/아웃 0.12초를 사용한다. 검은 축 순서 혼동을 방지하는 `unreal.Rotator(pitch=0, yaw=0, roll=180)`과 손잡이 부착 위치·`BladeBase`/`BladeTip` 소켓·검 전용 `bUseWeaponTrace`로 작성한다. 활성 0.23~0.43초·반경 4cm와 서버 에셋 포즈 기반 칼날 표본 123개를 검사하며 실제 접촉·피해 실행은 [TODO](../../../Docs/TODO.md#2-15-전사와-검-공격-콘텐츠)에 남긴다.
+`-WarriorVerifyOnly`는 연산 구성·48개 시퀀스의 길이/포즈/유한 좌표/골반 이동 범위, 원본 폴더 구조·이전 참조 73개, 전사/적 몽타주의 실제 Kwang 공격·복귀 세그먼트와 전사의 검·비무장 DA 2개 장착 저장본을 검사한다. 공격 1.2초에 복귀 0.933333초의 첫 중복 포즈 0.2초를 제외해 총 1.933333초로 연결하며 블렌드 인 0.08초/아웃 0.12초를 사용한다. 검은 축 순서 혼동을 방지하는 `unreal.Rotator(pitch=0, yaw=0, roll=180)`과 손잡이 부착 위치·`BladeBase`/`BladeTip` 소켓·검 전용 `bUseWeaponTrace`로 작성한다. 활성 0.23~0.43초·반경 4cm와 서버 에셋 포즈 기반 칼날 표본 123개를 검사하며 실제 접촉·피해 실행은 [TODO](../../../Docs/TODO.md#2-15-전사와-검-공격-콘텐츠)에 남긴다.
 
 11. `ImportParagonAnimations.py`: `Content/ParagonAnimationsRetargetedToManny`의 FBX를 `/Game/User_JeHoon/ParagonAnimationsRetargetedToManny`에 원본 하위 폴더대로 가져온다. Manny 뼈대·프리뷰 메시는 `/Game/Characters/Mannequins/Meshes`의 원본을 직접 참조하며 복제하거나 저장하지 않는다. 이 스크립트는 AnimSequence만 가져오며 게임 스킬 연결은 변경하지 않는다. FBX만 압축 해제한 상태와 Content Browser에서 열 수 있는 저장 에셋을 구분한다.
 

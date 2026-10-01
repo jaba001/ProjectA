@@ -11,12 +11,7 @@ UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_RunMigrationExcluded, "ProjectA.Test.RunMigrat
 
 namespace
 {
-    const FSoftObjectPath RemovedPaths[] =
-    {
-        FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_SweepingStrike.BPDA_SweepingStrike")),
-        FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DA_SweepingStrike.DA_SweepingStrike")),
-        FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_SweepingStrike.DA_SweepingStrike"))
-    };
+    const FSoftObjectPath RemovedPaths[] = {FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_SweepingStrike.BPDA_SweepingStrike")), FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DA_SweepingStrike.DA_SweepingStrike")), FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_SweepingStrike.DA_SweepingStrike")), FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_AreaAttack.BPDA_AreaAttack")), FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/BPDA_AreaAttack.BPDA_AreaAttack")), FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_RangedAttack.BPDA_RangedAttack"))};
 
     FRunSkillShopOffer MakeOffer(int32 Index, FGameplayTag Tag = TAG_RunMigrationEligible, float Weight = 1.0f)
     {
@@ -49,7 +44,7 @@ namespace
             Member.OwnerAccountId = Save->Identity.HostAccountId;
             Member.Gold = 127;
             Member.CurrentHP = 73.0f;
-            Member.Skills = {MakeOffer(0).Skill, RemovedPaths[0], RemovedPaths[1], RemovedPaths[2]};
+            Member.Skills = {MakeOffer(0).Skill, RemovedPaths[0], RemovedPaths[3], RemovedPaths[5]};
             Member.Items.AddDefaulted();
             FRunNodeDefinition& Node = Save->Nodes.AddDefaulted_GetRef();
             Node.NodeId = TEXT("Combat_03");
@@ -84,8 +79,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunRemovedSkillIdentityTest, "ProjectA.Run.Con
 bool FRunRemovedSkillIdentityTest::RunTest(const FString& Parameters)
 {
     for (const FSoftObjectPath& Path : RemovedPaths) TestTrue(TEXT("Each exact historical or current skill path is removed"), RunContentMigration::IsRemovedSkill(Path));
-    for (FName Id : {FName(TEXT("SweepingStrike")), FName(TEXT("SkillDefinitionDataAsset:DA_SweepingStrike")), FName(TEXT("SkillDefinitionDataAsset:BPDA_SweepingStrike"))}) TestTrue(TEXT("Each supported historical skill identifier is removed"), RunContentMigration::IsRemovedSkillId(Id));
-    for (FName Id : {FName(TEXT("Whirlwind")), FName(TEXT("Sweep")), FName(TEXT("AnotherType:DA_SweepingStrike")), FName(TEXT("SweepingStrike_Copy"))}) TestFalse(TEXT("Other named skills and similar identifiers remain available"), RunContentMigration::IsRemovedSkillId(Id));
+    for (FName Id : {FName(TEXT("SweepingStrike")), FName(TEXT("SkillDefinitionDataAsset:DA_SweepingStrike")), FName(TEXT("SkillDefinitionDataAsset:BPDA_SweepingStrike")), FName(TEXT("AOE")), FName(TEXT("SkillDefinitionDataAsset:BPDA_AreaAttack")), FName(TEXT("RangedAttack")), FName(TEXT("SkillDefinitionDataAsset:BPDA_RangedAttack"))}) TestTrue(TEXT("Each supported historical skill identifier is removed"), RunContentMigration::IsRemovedSkillId(Id));
+    for (FName Id : {FName(TEXT("Whirlwind")), FName(TEXT("Sweep")), FName(TEXT("AreaAttack")), FName(TEXT("AnotherType:DA_SweepingStrike")), FName(TEXT("SweepingStrike_Copy")), FName(TEXT("RangedAttack_Copy"))}) TestFalse(TEXT("Other named skills and similar identifiers remain available"), RunContentMigration::IsRemovedSkillId(Id));
     for (const TCHAR* Path : {TEXT("/Game/AnotherPack/DA_SweepingStrike.DA_SweepingStrike"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_SweepingStrike_Copy.BPDA_SweepingStrike_Copy"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_Whirlwind.BPDA_NS_Mage_Whirlwind"), TEXT("/Game/RPGEffects/ParticlesNiagara/Mage/Whirlwind/NS_Mage_Whirlwind.NS_Mage_Whirlwind")}) TestFalse(TEXT("Other packages derived names and original whirlwind effects are preserved"), RunContentMigration::IsRemovedSkill(FSoftObjectPath(Path)));
     TestFalse(TEXT("An empty path cannot be treated as deleted content"), RunContentMigration::IsRemovedSkill(FSoftObjectPath()));
     return true;
@@ -122,6 +117,46 @@ bool FRunRemovedSkillShopRepairTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("The same original save gives the same full shop state and replacement identifier"), SameShop(Shop, Repeated->SkillShopState));
     const FRunSkillShopState Once = Shop;
     TestTrue(TEXT("Repeated migration is successful and changes no shop or party value"), RunContentMigration::RemoveDeletedSkills(*Fixture.Save, Error) && SameShop(Once, Fixture.Save->SkillShopState) && FRunPartyMember::StaticStruct()->CompareScriptStruct(&ExpectedMember, &Fixture.Save->Party[0], 0));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunTwoRemovedSkillShopRepairTest, "ProjectA.Run.ContentMigration.TwoDeletedOffersAndStableProgress", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunTwoRemovedSkillShopRepairTest::RunTest(const FString& Parameters)
+{
+    FRunMigrationFixture Fixture;
+    FRunSkillShopState& OriginalShop = Fixture.Save->SkillShopState;
+    OriginalShop.Catalog[4].Skill = RemovedPaths[4];
+    OriginalShop.Catalog[5].Skill = RemovedPaths[5];
+    const TArray<FRunSkillShopOffer> Retained = {OriginalShop.Catalog[0], OriginalShop.Catalog[1], OriginalShop.Catalog[2]};
+    OriginalShop.Offers = {Retained[0], OriginalShop.Catalog[4], Retained[1], OriginalShop.Catalog[5], Retained[2]};
+    TStrongObjectPtr<URunSaveGame> Repeated(DuplicateObject<URunSaveGame>(Fixture.Save.Get(), GetTransientPackage()));
+    FRunPartyMember ExpectedMember = Fixture.Save->Party[0];
+    ExpectedMember.Skills.SetNum(1);
+    const FRunIdentityData Identity = Fixture.Save->Identity;
+    FText Error;
+    if (!TestTrue(TEXT("Two deleted AOE and ranged offers are replaced together"), RunContentMigration::RemoveDeletedSkills(*Fixture.Save, Error))) return false;
+    const FRunSkillShopState& Shop = Fixture.Save->SkillShopState;
+    if (!TestEqual(TEXT("Two replacements restore exactly five displayed offers"), Shop.Offers.Num(), 5)) return false;
+    TestEqual(TEXT("Only the two deleted frozen candidates are removed"), Shop.Catalog.Num(), 7);
+    for (int32 Index = 0; Index < Retained.Num(); ++Index) TestTrue(TEXT("Both holes leave retained offer identity order price text tags and weight untouched"), FRunSkillShopOffer::StaticStruct()->CompareScriptStruct(&Retained[Index], &Shop.Offers[Index], 0));
+    TSet<FSoftObjectPath> Paths;
+    for (const FRunSkillShopOffer& Offer : Shop.Offers) Paths.Add(Offer.Skill);
+    TestEqual(TEXT("Two replacements never repeat one another or retained stock"), Paths.Num(), 5);
+    for (int32 Index = Retained.Num(); Index < Shop.Offers.Num(); ++Index)
+    {
+        const FRunSkillShopOffer& Replacement = Shop.Offers[Index];
+        const FRunSkillShopOffer* Candidate = Shop.Catalog.FindByPredicate([&Replacement](const FRunSkillShopOffer& Offer) { return Offer.Skill == Replacement.Skill; });
+        TestTrue(TEXT("Each replacement respects the saved query positive weight and retained-stock exclusion"), Candidate && Shop.Query.Matches(Replacement.Tags) && Replacement.BaseWeight > 0.0f && (Replacement.Skill == MakeOffer(3).Skill || Replacement.Skill == MakeOffer(6).Skill));
+        TestTrue(TEXT("Each replacement preserves its frozen price text tags and weight"), Candidate && Replacement.Price == Candidate->Price && Replacement.DisplayName.ToString() == Candidate->DisplayName.ToString() && Replacement.Description.ToString() == Candidate->Description.ToString() && Replacement.Tags == Candidate->Tags && Replacement.BaseWeight == Candidate->BaseWeight);
+    }
+    TestTrue(TEXT("Removing all three owned prototypes preserves gold HP ownership equipment and other party fields"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&ExpectedMember, &Fixture.Save->Party[0], 0));
+    TestTrue(TEXT("Simultaneous deletion preserves Run identity and current progress"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Fixture.Save->Identity, 0) && Fixture.Save->CurrentNode == Repeated->CurrentNode && Fixture.Save->CompletedNodes == Repeated->CompletedNodes && Fixture.Save->Phase == Repeated->Phase && Fixture.Save->Result == Repeated->Result);
+    TestTrue(TEXT("Two holes advance one revision and do not charge either reroll or recovery"), Shop.Revision == 12 && Shop.RerollPrice == 7 && Shop.Recovery.Price == 9);
+    if (!TestTrue(TEXT("The same two-hole original candidate migrates independently"), RunContentMigration::RemoveDeletedSkills(*Repeated, Error))) return false;
+    TestTrue(TEXT("Both replacements and their identifiers are deterministic"), SameShop(Shop, Repeated->SkillShopState));
+    const FRunSkillShopState Once = Shop;
+    TestTrue(TEXT("A second pass is idempotent after removing all three prototypes"), RunContentMigration::RemoveDeletedSkills(*Fixture.Save, Error) && SameShop(Once, Fixture.Save->SkillShopState));
     return true;
 }
 

@@ -4,6 +4,7 @@
 
 #include "RunEncounterPIEHelpers.h"
 #include "Animation/AnimMontage.h"
+#include "AbilitySystemComponent.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
@@ -18,6 +19,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Game/GameModes/GameplayGameModeBase.h"
 #include "Game/Run/RunSaveGame.h"
+#include "GAS/Attribute/AS_Unit.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "PlayInEditorDataTypes.h"
@@ -119,6 +121,7 @@ public:
                 bSawRemoteWalking = false;
                 bSawMoveCommitted = false;
                 bSawMontage = false;
+                bPreparedEnemyHP = false;
                 RemoteCosts.Reset();
                 RemoteMontages.Reset();
                 RewardPartyBefore.Reset();
@@ -136,6 +139,18 @@ public:
             if (!Round || Round->GetView().Phase != ECombatRoundPhase::Planning || !Synchronized()) return false;
             const auto& Units = Round->GetView().Units;
             if (!Check(Units.FilterByPredicate([](const auto& Unit) { return !Unit.bEnemy; }).Num() == Count, TEXT("Authored combat spawns exactly one character per participant."))) return End();
+            if (!bPreparedEnemyHP)
+            {
+                // Keep this network flow fixture independent of damage balance while exercising the real sword collision.
+                // 실제 검 충돌을 검사하면서 네트워크 흐름 픽스처가 피해 밸런스에 의존하지 않도록 합니다.
+                for (const auto& Unit : Units)
+                {
+                    if (!Unit.bEnemy || !IsValid(Unit.Unit) || Unit.HP <= 0.0f) continue;
+                    Unit.Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), FMath::Min(Unit.HP, SwordPower));
+                }
+                bPreparedEnemyHP = true;
+                return false;
+            }
             if (!bMoveReserved)
             {
                 AGameplayPlayerController* Mover = Clients.IsEmpty() ? Host : Clients.Last();
@@ -183,7 +198,7 @@ public:
             Command.TargetUnitId = Enemy->UnitId;
             Command.TargetCoord = Enemy->HomeCoord;
             Command.DestinationCoord = Unit->HomeCoord;
-            Command.SkillId = FName(TEXT("SkillDefinitionDataAsset:BPDA_AreaAttack"));
+            Command.SkillId = FName(TEXT("SkillDefinitionDataAsset:BPDA_swoard_attack"));
             Controller->SubmitRoundPlan(Command);
             ++Active;
             return false;
@@ -199,7 +214,7 @@ public:
             AGameplayPlayerController* Controller = Active == 0 ? Host : Clients[Active - 1];
             if (Controller->IsRoundRequestPending()) return false;
             const auto* Unit = Round->GetView().Units.FindByPredicate([Controller](const auto& Candidate) { return !Candidate.bEnemy && Candidate.OwnerSlot == Controller->GetRoundParticipantSlot(); });
-            if (!Check(Unit && Unit->Command.SkillId == FName(TEXT("SkillDefinitionDataAsset:BPDA_AreaAttack")), TEXT("Each local or remote planning request reaches the authoritative round."))) return End();
+            if (!Check(Unit && Unit->Command.SkillId == FName(TEXT("SkillDefinitionDataAsset:BPDA_swoard_attack")), TEXT("Each local or remote planning request reaches the authoritative round."))) return End();
             Controller->SetRoundReady(true);
             ++Active;
             return false;
@@ -433,13 +448,17 @@ private:
         // 이 네트워크 전투 픽스처는 명시적으로 저장한 구매부터 시작하며 상점 거래는 별도로 검사합니다.
         TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));
         if (!Check(Saved.IsValid(), TEXT("New Run has a durable save for the acquired-skill fixture."))) return false;
+        USkillDefinitionDataAsset* Sword = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"));
+        FCombatRoundSkill SwordDefinition;
+        if (!Check(Sword && Sword->ResolveRoundSkill(SwordDefinition, Error) && SwordDefinition.Power > 0.0f, TEXT("The retained sword skill has a valid damage profile."))) return false;
+        SwordPower = SwordDefinition.Power;
         for (FRunPartyMember& Member : Saved->Party)
         {
             if (!Check(Member.bHasSkillLoadout && Member.Skills.Num() == 1 && Member.Gold == 10, TEXT("Every newly initialized character starts unarmed with ten gold."))) return false;
-            Member.Skills.Add(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_AreaAttack.BPDA_AreaAttack")));
+            Member.Skills.Add(FSoftObjectPath(Sword));
             Member.Gold = 9;
         }
-        if (!Check(UGameplayStatics::SaveGameToSlot(Saved.Get(), Slot, 0) && Run->LoadCheckpoint(Error), *FString::Printf(TEXT("Reload explicitly saved area attacks for the network combat fixture: %s"), *Error.ToString()))) return false;
+        if (!Check(UGameplayStatics::SaveGameToSlot(Saved.Get(), Slot, 0) && Run->LoadCheckpoint(Error), *FString::Printf(TEXT("Reload explicitly saved sword attacks for the network combat fixture: %s"), *Error.ToString()))) return false;
         if (Count > 1)
         {
             if (!Check(Mode->AssignRunParticipant(Host, Identity.HostAccountId), TEXT("Explicitly bind the original host."))) return false;
@@ -493,6 +512,8 @@ private:
     int32 RewardParticipant = 0;
     double Started = 0;
     bool bSawMontage = false;
+    bool bPreparedEnemyHP = false;
+    float SwordPower = 0.0f;
     bool bMoveReserved = false;
     bool bSawServerWalking = false;
     bool bSawRemoteWalking = false;

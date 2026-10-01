@@ -3,14 +3,22 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Types/GameplayTagCandidateSelection.h"
 
+namespace
+{
+    // Match only retired prototype asset identities; generated area and projectile skills remain available.
+    // 폐기된 시험용 에셋 식별자만 대조하며 생성형 범위·투사체 스킬은 유지합니다.
+    const TCHAR* const RemovedSkillPaths[] = {TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_SweepingStrike.BPDA_SweepingStrike"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DA_SweepingStrike.DA_SweepingStrike"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_SweepingStrike.DA_SweepingStrike"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_AreaAttack.BPDA_AreaAttack"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/BPDA_AreaAttack.BPDA_AreaAttack"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_RangedAttack.BPDA_RangedAttack")};
+}
+
 bool RunContentMigration::IsRemovedSkill(const FSoftObjectPath& Path)
 {
-    return Path == FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_SweepingStrike.BPDA_SweepingStrike")) || Path == FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DA_SweepingStrike.DA_SweepingStrike")) || Path == FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_SweepingStrike.DA_SweepingStrike"));
+    for (const TCHAR* RemovedPath : RemovedSkillPaths) if (Path == FSoftObjectPath(RemovedPath)) return true;
+    return false;
 }
 
 bool RunContentMigration::IsRemovedSkillId(FName SkillId)
 {
-    return SkillId == TEXT("SweepingStrike") || SkillId == TEXT("SkillDefinitionDataAsset:DA_SweepingStrike") || SkillId == TEXT("SkillDefinitionDataAsset:BPDA_SweepingStrike");
+    return SkillId == TEXT("SweepingStrike") || SkillId == TEXT("SkillDefinitionDataAsset:DA_SweepingStrike") || SkillId == TEXT("SkillDefinitionDataAsset:BPDA_SweepingStrike") || SkillId == TEXT("AOE") || SkillId == TEXT("SkillDefinitionDataAsset:BPDA_AreaAttack") || SkillId == TEXT("RangedAttack") || SkillId == TEXT("SkillDefinitionDataAsset:BPDA_RangedAttack");
 }
 
 bool RunContentMigration::RemoveDeletedSkills(URunSaveGame& Save, FText& OutError)
@@ -20,7 +28,7 @@ bool RunContentMigration::RemoveDeletedSkills(URunSaveGame& Save, FText& OutErro
         const int32 Removed = Member.Skills.RemoveAll([](const FSoftObjectPath& Path) { return IsRemovedSkill(Path); });
         if (Removed > 0 && Member.bHasSkillLoadout && Member.Skills.IsEmpty())
         {
-            OutError = NSLOCTEXT("RunContentMigration", "EmptyLoadout", "휩쓸기 제거 후 보유 스킬이 없는 캐릭터는 현재 저장 규칙으로 재개할 수 없습니다. 원본 저장을 유지합니다.");
+            OutError = NSLOCTEXT("RunContentMigration", "EmptyLoadout", "삭제된 스킬 제거 후 보유 스킬이 없는 캐릭터는 현재 저장 규칙으로 재개할 수 없습니다. 원본 저장을 유지합니다.");
             return false;
         }
     }
@@ -49,7 +57,7 @@ bool RunContentMigration::RemoveDeletedSkills(URunSaveGame& Save, FText& OutErro
     }
     if (bCheckpointChanged && Checkpoint.SchemaVersion == 3)
     {
-        OutError = NSLOCTEXT("RunContentMigration", "PlanRevision", "휩쓸기 제거 후 저장된 준비 계획을 갱신할 수 없습니다. 원본 저장을 유지합니다.");
+        OutError = NSLOCTEXT("RunContentMigration", "PlanRevision", "삭제된 스킬 제거 후 저장된 준비 계획을 갱신할 수 없습니다. 원본 저장을 유지합니다.");
         if (Checkpoint.PlanRevision < 1 || Checkpoint.PlanRevision >= MAX_int32 - 1) return false;
         ++Checkpoint.PlanRevision;
     }
@@ -59,7 +67,7 @@ bool RunContentMigration::RemoveDeletedSkills(URunSaveGame& Save, FText& OutErro
     const int32 RemovedCandidates = Shop.Catalog.RemoveAll([](const FRunSkillShopOffer& Offer) { return IsRemovedSkill(Offer.Skill); });
     if (RemovedOffers > 0 || RemovedCandidates > 0)
     {
-        OutError = NSLOCTEXT("RunContentMigration", "ShopRepair", "삭제된 휩쓸기 상품을 현재 상점 후보로 교체할 수 없습니다. 원본 저장을 유지합니다.");
+        OutError = NSLOCTEXT("RunContentMigration", "ShopRepair", "삭제된 스킬 상품을 현재 상점 후보로 교체할 수 없습니다. 원본 저장을 유지합니다.");
         if (Shop.SchemaVersion != 1) return false;
     }
     if (bHadCatalog && (RemovedOffers > 0 || RemovedCandidates > 0))
