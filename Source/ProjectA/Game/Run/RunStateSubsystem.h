@@ -97,6 +97,9 @@ public:
     bool BeginEncounter(FName NodeId);
     bool MarkCombatStarted();
     bool CompleteEncounter(ECombatResult Result);
+    // Publish final party HP in the same durable transaction as the encounter result.
+    // 전투 결과와 같은 저장 트랜잭션에서 파티의 최종 HP를 공개합니다.
+    bool CompleteEncounter(ECombatResult Result, const TMap<int32, float>& FinalPartyHP);
     bool AbortEncounter();
     bool ContinueRun();
     bool CanContinueAfterRewards() const;

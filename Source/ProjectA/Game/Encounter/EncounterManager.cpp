@@ -566,6 +566,7 @@ void AEncounterManager::FinishEncounter()
         OnFlowChanged.Broadcast();
         return;
     }
+    TMap<int32, float> FinalPartyHP;
     for (const TPair<int32, TObjectPtr<AUnitBase>>& Entry : PartyActors)
     {
         if (IsValid(Entry.Value) && Entry.Value->GetAttributeSet())
@@ -575,13 +576,13 @@ void AEncounterManager::FinishEncounter()
             {
                 HP = 0.f;
             }
-            RunState->UpdatePartyMemberHP(Entry.Key, HP);
+            FinalPartyHP.Add(Entry.Key, HP);
         }
     }
     // Publish the result only after its durable record succeeds; retry keeps the same pending result.
     // 결과 기록이 저장된 뒤 결과를 표시하며 재시도 동안 같은 대기 결과를 유지합니다.
     const ECombatResult Result = PendingResult;
-    if (!RunState->CompleteEncounter(Result))
+    if (!RunState->CompleteEncounter(Result, FinalPartyHP))
     {
         FlowMessage = RunState->GetSaveError();
         OnFlowChanged.Broadcast();

@@ -9,6 +9,7 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/World.h"
 #include "Game/GameModes/CombatDebugGameMode.h"
+#include "Game/Run/RunContentMigration.h"
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunItemShopCatalog.h"
@@ -60,7 +61,13 @@ void UCombatDebugLoadout::Initialize(ACombatManager* InManager)
         Filter.bRecursiveClasses = true;
         TArray<FAssetData> Assets;
         Registry.GetAssets(Filter, Assets);
-        for (const FAssetData& Asset : Assets) SkillAssets.AddUnique(Asset.GetSoftObjectPath());
+        // Exclude retired skills before building labels, filter counts and acquisition buttons.
+        // 표시명·필터 개수·획득 버튼을 만들기 전에 삭제된 스킬을 제외합니다.
+        for (const FAssetData& Asset : Assets)
+        {
+            const FSoftObjectPath Path = Asset.GetSoftObjectPath();
+            if (!RunContentMigration::IsRemovedSkill(Path)) SkillAssets.AddUnique(Path);
+        }
         SkillAssets.Sort([](const FSoftObjectPath& Left, const FSoftObjectPath& Right) { return Left.ToString() < Right.ToString(); });
         // Match the runtime SkillName first and cache labels once instead of loading assets during UI searches.
         // 실행 시 사용하는 SkillName을 우선하고 UI 검색 중 에셋을 로드하지 않도록 표시명을 한 번 캐시합니다.

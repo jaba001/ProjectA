@@ -175,8 +175,19 @@ bool FRunCandidatePublicationTest::RunTest(const FString& Parameters)
     if (!Run->BeginEncounter(TEXT("Combat_01"))) return false;
     if (!VerifyTransaction(TEXT("Preparation cancellation"), [&]() { return Run->AbortEncounter(); })) return false;
     if (!Run->BeginEncounter(TEXT("Combat_01")) || !Run->MarkCombatStarted()) return false;
-    Run->UpdatePartyMemberHP(0, 1.0f);
-    if (!VerifyTransaction(TEXT("Victory publication"), [&]() { return Run->CompleteEncounter(ECombatResult::Victory); })) return false;
+    const TArray<uint8> BeforeVictoryRuntime = CaptureRuntime();
+    const TArray<uint8> BeforeVictoryDisk = ReadDisk();
+    const int32 BeforeVictoryEvents = Events;
+    TestFalse(TEXT("Final HP cannot target an unknown party slot"), Run->CompleteEncounter(ECombatResult::Victory, {{4, 1.0f}}));
+    TestFalse(TEXT("Negative final HP is rejected without changing the party"), Run->CompleteEncounter(ECombatResult::Victory, {{0, -1.0f}}));
+    TestTrue(TEXT("Invalid final HP preserves every runtime value disk byte and publication count"), CaptureRuntime() == BeforeVictoryRuntime && ReadDisk() == BeforeVictoryDisk && Events == BeforeVictoryEvents);
+    if (!VerifyTransaction(TEXT("Victory and final HP publication"), [&]() { return Run->CompleteEncounter(ECombatResult::Victory, {{0, 1.0f}}); })) return false;
+    TestTrue(TEXT("A durable victory commits HP and progress without prematurely awarding gold"), Run->GetPartyMembers()[0].CurrentHP == 1.0f && Run->GetPartyMembers()[0].Gold == 10 && Run->GetCompletedNodes() == TArray<FName>{TEXT("Combat_01")} && Run->GetLastResult() == ECombatResult::Victory && Run->GetGoldRewardState().Claims.IsEmpty());
+    const TArray<uint8> VictoryRuntime = CaptureRuntime();
+    const TArray<uint8> VictoryDisk = ReadDisk();
+    const int32 VictoryEvents = Events;
+    TestFalse(TEXT("A duplicate result cannot replace committed HP or reroll rewards"), Run->CompleteEncounter(ECombatResult::Victory, {{0, 99.0f}}));
+    TestTrue(TEXT("Duplicate victory preserves HP rewards progress and durable bytes"), CaptureRuntime() == VictoryRuntime && ReadDisk() == VictoryDisk && Events == VictoryEvents);
     const FRunAccountId Account = Run->GetPartyMembers()[0].OwnerAccountId;
     const FGuid CharacterId = Run->GetPartyMembers()[0].CharacterId;
     if (!VerifyTransaction(TEXT("Reward claim"), [&]() { return Run->SelectGoldReward(Account, CharacterId, TEXT("Combat_01"), 0, Error); })) return false;
@@ -187,8 +198,9 @@ bool FRunCandidatePublicationTest::RunTest(const FString& Parameters)
     if (!VerifyTransaction(TEXT("Recovery purchase"), [&]() { return Run->PurchaseShopOffer(Account, CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Error, Run->GetSkillShopState().Revision); })) return false;
     if (!VerifyTransaction(TEXT("Shop departure"), [&]() { return Run->LeaveRunEncounter(); })) return false;
     if (!Run->BeginEncounter(TEXT("Combat_02")) || !Run->MarkCombatStarted()) return false;
-    Run->UpdatePartyMemberHP(0, 0.0f);
-    if (!VerifyTransaction(TEXT("Defeat publication"), [&]() { return Run->CompleteEncounter(ECombatResult::Defeat); })) return false;
+    const int32 GoldBeforeDefeat = Run->GetPartyMembers()[0].Gold;
+    if (!VerifyTransaction(TEXT("Defeat and final HP publication"), [&]() { return Run->CompleteEncounter(ECombatResult::Defeat, {{0, 0.0f}}); })) return false;
+    TestTrue(TEXT("A durable defeat commits death without gold rewards or additional completed nodes"), Run->GetPartyMembers()[0].CurrentHP == 0.0f && Run->GetPartyMembers()[0].Gold == GoldBeforeDefeat && Run->GetCompletedNodes() == TArray<FName>{TEXT("Combat_01")} && Run->GetLastResult() == ECombatResult::Defeat && Run->GetGoldRewardState().GoldChoices.IsEmpty() && Run->GetGoldRewardState().Claims.IsEmpty());
     return true;
 }
 

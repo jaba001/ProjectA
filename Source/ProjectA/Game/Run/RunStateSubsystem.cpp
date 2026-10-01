@@ -1054,12 +1054,27 @@ bool URunStateSubsystem::MarkCombatStarted()
 
 bool URunStateSubsystem::CompleteEncounter(ECombatResult Result)
 {
+    return CompleteEncounter(Result, {});
+}
+
+bool URunStateSubsystem::CompleteEncounter(ECombatResult Result, const TMap<int32, float>& FinalPartyHP)
+{
     if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || Phase != ERunPhase::Combat || (Result != ECombatResult::Victory && Result != ECombatResult::Defeat))
     {
         return false;
     }
 
     TStrongObjectPtr<URunSaveGame> Save(CreateSaveData());
+    for (const TPair<int32, float>& Entry : FinalPartyHP)
+    {
+        FRunPartyMember* Member = Save->Party.FindByPredicate([&Entry](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.SlotIndex == Entry.Key; });
+        if (!Member || !FMath::IsFinite(Entry.Value) || Entry.Value < 0.0f)
+        {
+            SaveError = NSLOCTEXT("RunCheckpoint", "FinalPartyHP", "전투 결과의 캐릭터 슬롯 또는 최종 체력이 유효하지 않습니다. 기존 파티와 저장을 유지합니다.");
+            return false;
+        }
+        Member->CurrentHP = Entry.Value;
+    }
     if (Result == ECombatResult::Victory && (GoldRewardState.SchemaVersion == 1 || SkillShopState.SchemaVersion == 1))
     {
         if (PendingGoldRewardState.NodeId != CurrentNodeId)
