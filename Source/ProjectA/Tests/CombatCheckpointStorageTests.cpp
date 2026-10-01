@@ -7,6 +7,7 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunContentMigration.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Tests/RunRewardTestHelpers.h"
@@ -691,33 +692,62 @@ bool FCombatRoundCheckpointValidationTest::RunTest(const FString& Parameters)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundCheckpointSkillRenameTest, "ProjectA.Checkpoint.RoundSkillRenameCompatibility", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundCheckpointRemovedSkillTest, "ProjectA.Checkpoint.RemovedSkillMigration", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 
-bool FCombatRoundCheckpointSkillRenameTest::RunTest(const FString& Parameters)
+bool FCombatRoundCheckpointRemovedSkillTest::RunTest(const FString& Parameters)
 {
     const FName PreviousId(TEXT("SkillDefinitionDataAsset:DA_SweepingStrike"));
     const FName CurrentId(TEXT("SkillDefinitionDataAsset:BPDA_SweepingStrike"));
-    TestEqual(TEXT("Saved commands use the configured primary asset redirect"), UCombatCheckpointLibrary::ResolveSavedSkillId(PreviousId), CurrentId);
-    TestEqual(TEXT("The current command identifier remains unchanged"), UCombatCheckpointLibrary::ResolveSavedSkillId(CurrentId), CurrentId);
-    TestEqual(TEXT("Internal wait and human skip remain empty"), UCombatCheckpointLibrary::ResolveSavedSkillId(NAME_None), NAME_None);
+    TestTrue(TEXT("Both saved command identities identify the deleted skill"), RunContentMigration::IsRemovedSkillId(PreviousId) && RunContentMigration::IsRemovedSkillId(CurrentId));
+    TestFalse(TEXT("Internal wait and human skip are not removed content"), RunContentMigration::IsRemovedSkillId(NAME_None));
     const FName UnrelatedId(TEXT("SkillDefinitionDataAsset:BPDA_DefaulatAttack"));
     TestEqual(TEXT("Other existing skill identifiers are preserved"), UCombatCheckpointLibrary::ResolveSavedSkillId(UnrelatedId), UnrelatedId);
     const FSoftObjectPath CurrentPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_SweepingStrike.BPDA_SweepingStrike"));
-    USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(CurrentPath.TryLoad());
-    if (!TestNotNull(TEXT("The renamed skill asset exists"), Skill)) return false;
     const FSoftObjectPath PreviousPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DA_SweepingStrike.DA_SweepingStrike"));
     const FSoftObjectPath OriginalPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/DA_SweepingStrike.DA_SweepingStrike"));
-    TestTrue(TEXT("Both historical soft references load the renamed asset"), PreviousPath.TryLoad() == Skill && OriginalPath.TryLoad() == Skill);
+    TestTrue(TEXT("Current and historical paths identify deleted content without loading it"), RunContentMigration::IsRemovedSkill(CurrentPath) && RunContentMigration::IsRemovedSkill(PreviousPath) && RunContentMigration::IsRemovedSkill(OriginalPath));
     FCheckpointStorageFixture Fixture;
     FText Error;
     if (!TestTrue(TEXT("A real-content checkpoint fixture initializes"), Fixture.Initialize(Error))) return false;
     FCombatCheckpointData Checkpoint = Fixture.MakeRoundCheckpoint();
-    Checkpoint.Units[0].Skills = {PreviousPath};
+    const TArray<FSoftObjectPath> RemainingSkills = Checkpoint.Units[0].Skills;
+    Checkpoint.Units[0].Skills.Add(PreviousPath);
     Checkpoint.RoundPlans[0].Command.SkillId = PreviousId;
     Checkpoint.RoundPlans[0].Command.TargetUnitId = Checkpoint.Units[1].RoundUnitId;
     Checkpoint.RoundPlans[0].Command.TargetCoord = Checkpoint.Units[1].GridCoord;
     Checkpoint.RoundPlans[0].bReady = true;
-    TestTrue(TEXT("An existing ready save validates with its old path and command identifier"), UCombatCheckpointLibrary::Validate(Checkpoint, Fixture.Run->GetPartyMembers(), Error));
+    Checkpoint.RoundPlans[0].bHasMovePlan = true;
+    Checkpoint.RoundPlans[0].MoveDestinationCoord = FIntPoint(2, 0);
+    TStrongObjectPtr<URunSaveGame> Original(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
+    if (!TestNotNull(TEXT("The fixture has a stored Run"), Original.Get())) return false;
+    Original->Version = 5;
+    Original->Phase = ERunPhase::Combat;
+    Original->Identity = Checkpoint.Identity;
+    Original->CurrentNode = Checkpoint.NodeId;
+    Original->CurrentEncounter = Checkpoint.EncounterId;
+    Original->Party[0].CurrentHP = Checkpoint.Units[0].HP;
+    Original->Party[0].Skills.Add(CurrentPath);
+    Original->CombatCheckpoint = Checkpoint;
+    if (!TestTrue(TEXT("Install a historical payload without validating removed assets"), FRunCheckpointStorage::Save(Original.Get(), Fixture.Slot, Error))) return false;
+    const TArray<uint8> Bytes = Fixture.ReadBytes();
+    FString Token;
+    TStrongObjectPtr<URunSaveGame> Loaded(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Error, &Token)));
+    if (!TestNotNull(TEXT("Storage normalizes the loaded candidate"), Loaded.Get())) return false;
+    TestEqual(TEXT("Removing owned content preserves other skills"), Loaded->Party[0].Skills.Num(), Original->Party[0].Skills.Num() - 1);
+    TestEqual(TEXT("Gold is never charged during migration"), Loaded->Party[0].Gold, Original->Party[0].Gold);
+    TestEqual(TEXT("The current route position is preserved"), Loaded->CurrentNode, Original->CurrentNode);
+    TestTrue(TEXT("Ownership and Run identity are preserved"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Loaded->Identity, &Original->Identity, 0));
+    TestTrue(TEXT("The checkpoint retains its other equipped skills"), Loaded->CombatCheckpoint.Units[0].Skills == RemainingSkills);
+    TestTrue(TEXT("The removed command is cleared and its human readiness is released"), Loaded->CombatCheckpoint.RoundPlans[0].Command.SkillId.IsNone() && Loaded->CombatCheckpoint.RoundPlans[0].Command.UnitId == Checkpoint.RoundPlans[0].UnitId && !Loaded->CombatCheckpoint.RoundPlans[0].bReady);
+    TestTrue(TEXT("Independent movement remains reserved"), Loaded->CombatCheckpoint.RoundPlans[0].bHasMovePlan && Loaded->CombatCheckpoint.RoundPlans[0].MoveDestinationCoord == Checkpoint.RoundPlans[0].MoveDestinationCoord);
+    TestEqual(TEXT("The planning revision changes once"), Loaded->CombatCheckpoint.PlanRevision, Checkpoint.PlanRevision + 1);
+    TestTrue(TEXT("Normalized round state validates before publication"), UCombatCheckpointLibrary::Validate(Loaded->CombatCheckpoint, Fixture.Run->GetPartyMembers(), Error));
+    TestTrue(TEXT("Migration is idempotent"), RunContentMigration::RemoveDeletedSkills(*Loaded, Error) && Loaded->CombatCheckpoint.PlanRevision == Checkpoint.PlanRevision + 1);
+    TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
+    Restored->EnableCheckpointSaving(Fixture.Slot);
+    TestTrue(TEXT("Standalone Continue accepts the migrated full Run"), Restored->CanContinueStandaloneSavedRun(Error));
+    TestTrue(TEXT("Standalone loading publishes the normalized party and planning state"), Restored->LoadStandaloneCheckpoint(Error) && SameCheckpoint(Restored->GetCombatCheckpoint(), Loaded->CombatCheckpoint) && Restored->GetPartyMembers()[0].Skills == Loaded->CombatCheckpoint.Units[0].Skills && Restored->GetPartyMembers()[0].CurrentHP == Loaded->CombatCheckpoint.Units[0].HP);
+    TestTrue(TEXT("Loading never rewrites the original save bytes"), Fixture.ReadBytes() == Bytes && !Token.IsEmpty());
     return true;
 }
 

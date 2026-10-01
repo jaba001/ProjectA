@@ -1,11 +1,12 @@
 # ProjectA 완료 작업과 검증 기록
 
-갱신일: 2026-09-30. 완료 범위·기준 커밋·실행 근거를 기록한다. 현재 상태와 간단 확인은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
+갱신일: 2026-10-01. 완료 범위·기준 커밋·실행 근거를 기록한다. 현재 상태와 간단 확인은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
 
 ## 최근 변경
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-10-01 휩쓸기 콘텐츠·기존 저장 제거 | 스킬 에셋 1개 삭제·참조 7개 정리, 상점 179종/디버그 180종과 작성 도구의 재생성 방지 반영. 로컬·관리 Run 및 Snapshot 읽기 후보의 보유·진열·예약을 제거하고 인간 준비 해제·계획 Revision 갱신, 저장된 태그/가중치의 결정적 상점 빈칸 보충·다른 상태 보존 구현. Development Editor / Win64 22.62초·최종 회귀 증분 5.10초 성공, 독립 코드 리뷰·Python 25개 구문·문서 링크 473개·diff 검사 통과. 최초 저작은 저장 전 레지스트리 의존성으로 삭제를 보류했으며 패키지 정보 갱신 후 엔진 삭제 성공·잔여 참조 0. 기존 저장 26개 원본 및 다른 추적 콘텐츠 유지 확인. 회귀 소스는 컴파일만 수행하고 게임·PIE·자동화 테스트 미실행. 근거: `Saved/Automation/RemoveSweepingStrikeBuild.txt`, `RemoveSweepingStrikeFinalBuild.txt`, `RemoveSweepingStrike.json`, `RemoveSweepingStrikeStatic.json`; [사용자 확인](TODO.md#2-12-휩쓸기-근접-범위-충돌) |
 | 2026-10-01 기본 Run 10전투·반복 상점 | 새 Run을 기존 DefaultEncounter의 전투 10회로 확장하고 1~9번째 승리 보상 뒤 상점 선택·퇴장, 마지막 보상 뒤 완료에 연결. 방문 회차·선택 초기화를 Continue와 함께 원자 저장하고 기존 두 전투 저장을 보존하며 지도 목록에 높이 300 상한 스크롤 적용. UHT 포함 Development Editor / Win64 23.78초·최종 회귀 증분 7.63초 성공, 독립 코드 리뷰·문서 링크·diff 정적 검사 통과. 전체 진행·중간 저장 실패/재개·반복 상점·레거시 회귀 소스는 컴파일만 수행했으며 게임·PIE·자동화 테스트 미실행. 근거: `Saved/Automation/TenBattleBuild.txt`, `TenBattleFinalBuild.txt`; [사용자 확인](TODO.md#2-19-비무장-시작과-스킬-상점) |
 | 2026-10-01 스킬상점 5개 진열·전체 리롤 | 기존 4종과 생성 풀 176종을 직접 참조해 5개를 중복 없이 추첨하며 리롤 비용은 입장 1G·성공마다 +1G로 증가. 카탈로그·태그 조건·가중치·진열·비용 저장, 소유자·생존 Human·Revision 검증과 원자 차감·저장 후 공개, 기존 고정 상품 저장 보존. 화면은 진열만 복제하고 기존 풀의 cook 참조 연결. UHT 포함 Development Editor / Win64 29.44초·회귀 포함 15.23초·최종 UI 증분 5.13초 성공, 후보 180개·직렬화 풀 참조·CSV SHA·원본 콘텐츠 보존·문서 링크 464개·독립 코드 리뷰·diff 정적 검사 통과. 리롤/실패저장/재개/레거시 회귀 소스는 컴파일만 수행했으며 게임·PIE·자동화 테스트 미실행. 근거: `Saved/Automation/SkillShopStatic.py`, `SkillShopBuild.txt`; [사용자 확인](TODO.md#2-19-비무장-시작과-스킬-상점) |
 | 2026-09-30 화살·도끼·베기 방향 보정 | Niagara 후보 26개 중 기존 로컬 본체 19개는 원본 유지, 월드 공간 7개만 원본 팩/하위 구조의 TargetDirection 필수 파생과 BPDA VFX 참조·direction_source에 연결. 베기 4개 속도/회전 보존, 투사체 3개 메시 본체 로컬·독립 전진 속도 제거·비메시 잔상 월드 공간 유지. 도끼·불꽃 화살의 활성 위치 이벤트 5개는 공식 GenerateLocationEvent/ReceiveLocationEvent 1.1로 갱신하고 저장본 확인. Cascade 로컬 PSA_Velocity에 0.01cm/s 방향값 전달. 실제 추가 7개·5,750,319바이트(5.48MiB)로 사전 최대 81MiB 안내와 구분. 원본 26개 SHA·577개 명세의 식별/설정/태그 보존, BPDA 7개 직렬화 데이터의 VFX 이름 참조 외 동일 확인. 외부 메시/재질 직접 참조와 베기 23개/이미터 162개·Swipe +X 경계 정적 조사. UHT 포함 Development Editor / Win64 최종 컴파일·링크 18.86초 성공. 독립 검토·저장본/명세 정적 검사와 Python 프로필 176개·정상 입력 2개·잘못된 입력 12개 거절·CSV 577행 식별 보존 검사 통과. 게임·PIE·자동화 테스트 미실행. 근거: Saved/Automation/CombatVfxDirection/Authoring.json; [사용자 확인](TODO.md#2-37-전투-디버그-레벨) |

@@ -7,7 +7,6 @@ import unreal
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ConfigureSweepingStrike import configure_sweeping_strike
 from RetargetContentLibrary import retarget, verify_retarget_motion
 from WarriorContentPaths import ENEMY_RIGS, ENEMY_SOURCE, ROOT, SWORD_FOLDER, SWORD_RECOVERY_SOURCE, SWORD_SOURCE, SWORD_SOURCE_MESH, SWORD_SUFFIX, UNARMED_SOURCE, WARRIOR_MONTAGE, WARRIOR_RIGS, WARRIOR_SOURCE, WEAPON_SOURCE, animation_sources, legacy_moves, migrate_legacy_assets, mirrored_path, retarget_output_path
 
@@ -25,6 +24,7 @@ SWORD_WARRIOR_GRIP = (-11.095651, 5.605028, -10.0)
 SWORD_ENEMY_GRIP = (-8.5, 5.0, -10.0)
 SWORD_RECOVERY_START_SECONDS = 0.2
 SWORD_MONTAGE_SECONDS = 1.933333
+REMOVED_SKILL_PATHS = {SKILLS + "/BPDA_SweepingStrike", SKILLS + "/DA_SweepingStrike", ROOT + "/Blueprint/DataAsset/DA_SweepingStrike"}
 
 
 def require(value, message):
@@ -51,6 +51,39 @@ def project_mesh(source_path):
     mesh = load(source_path)
     skeleton = require(mesh.get_editor_property("skeleton"), "Source mesh has no skeleton: " + source_path)
     return mesh, skeleton
+
+
+def is_removed_skill(skill):
+    return bool(skill and (str(skill.get_editor_property("skill_id")) == "SweepingStrike" or skill.get_path_name().split(".")[0] in REMOVED_SKILL_PATHS))
+
+
+def remove_deleted_loadout_skill(party):
+    # Filter existing loadouts without replacing other user-authored skills or profession settings.
+    # 기존 장착을 필터링하며 다른 사용자 스킬과 직업 설정은 교체하지 않습니다.
+    for name in ["BP_PlayerUnit", "BP_WarriorUnit", "BP_MageUnit", "BP_ArcherUnit", "BP_RogueUnit", "BP_EnemyUnit", "BP_SnapshotOpponent"]:
+        path = ROOT + "/Blueprint/Unit/" + name
+        if not ASSETS.does_asset_exist(path):
+            continue
+        blueprint = load(path)
+        defaults = unreal.get_default_object(blueprint.generated_class())
+        skills = list(defaults.get_editor_property("equipped_skill_data_assets"))
+        retained = [skill for skill in skills if not is_removed_skill(skill)]
+        if len(retained) != len(skills):
+            defaults.set_editor_property("equipped_skill_data_assets", retained)
+            unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
+            save(blueprint)
+    professions = dict(party.get_editor_property("professions"))
+    changed = False
+    for key, definition in professions.items():
+        skills = list(definition.get_editor_property("starting_skills"))
+        retained = [skill for skill in skills if not is_removed_skill(skill)]
+        if len(retained) != len(skills):
+            definition.set_editor_property("starting_skills", retained)
+            professions[key] = definition
+            changed = True
+    if changed:
+        party.set_editor_property("professions", professions)
+        save(party)
 
 
 def configure_weapon(blueprint, weapon, grip):
@@ -113,18 +146,12 @@ def configure_unit(blueprint, mesh, animation, skills, overrides, weapon):
 def configure():
     require(not ASSETS.does_asset_exist(ROOT + "/ROG_Modular_Armor/DA_MannyAppearance"), "The common appearance catalogue is active; use ConfigureRogAppearance.py instead of rebuilding the historical GKnight setup")
     REPORT["folder_moves"] = migrate_legacy_assets()
-    old_path = SKILLS + "/DA_SweepingStrike"
-    new_path = SKILLS + "/BPDA_SweepingStrike"
-    if not ASSETS.does_asset_exist(new_path):
-        sweep = load(old_path)
-        require(TOOLS.rename_assets([unreal.AssetRenameData(sweep, SKILLS, "BPDA_SweepingStrike")]), "Sweeping Strike rename failed")
-    sweep = load(new_path)
-    configure_sweeping_strike(sweep)
-    save(sweep)
+    party = load(ROOT + "/Blueprint/DataAsset/Parties/DA_VerticalSliceParty")
+    remove_deleted_loadout_skill(party)
     basic = load(SKILLS + "/BPDA_DefaulatAttack")
     basic.set_editor_property("skill_name", "비무장 공격")
     save(basic)
-    previous = [basic, load(SKILLS + "/BPDA_RangedAttack"), load(SKILLS + "/BPDA_AreaAttack"), sweep]
+    previous = [basic, load(SKILLS + "/BPDA_RangedAttack"), load(SKILLS + "/BPDA_AreaAttack")]
     montages = []
     for skill in previous:
         montage = skill.get_editor_property("round_definition").get_editor_property("cast_montage") if skill.get_editor_property("use_round_definition") else None
@@ -200,7 +227,6 @@ def configure():
     # Snapshot commands continue to use their saved loadout; only the visual/default unit setup changes.
     # Snapshot 명령은 저장된 장착을 유지하며 유닛의 표현과 기본 구성만 변경합니다.
     configure_unit(load(ROOT + "/Blueprint/Unit/BP_SnapshotOpponent"), enemy_mesh, enemy_retargets[source_abp], [sword], enemy_overrides, weapon)
-    party = load(ROOT + "/Blueprint/DataAsset/Parties/DA_VerticalSliceParty")
     professions = dict(party.get_editor_property("professions"))
     warrior_definition = professions[unreal.Name("Warrior")]
     warrior_definition.set_editor_property("combat_class", warrior.generated_class())
@@ -214,6 +240,7 @@ def configure():
     save(party)
     catalog = load(ROOT + "/Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog")
     catalog_skills = dict(catalog.get_editor_property("skills"))
+    catalog_skills = {key: skill for key, skill in catalog_skills.items() if str(key) != "SweepingStrike" and not is_removed_skill(skill)}
     catalog_skills[unreal.Name("SwordAttack")] = sword
     catalog.set_editor_property("skills", catalog_skills)
     save(catalog)
@@ -230,11 +257,8 @@ def configure():
 def verify():
     sword = load(SKILLS + "/BPDA_swoard_attack")
     basic = load(SKILLS + "/BPDA_DefaulatAttack")
-    sweep = load(SKILLS + "/BPDA_SweepingStrike")
     require(str(basic.get_editor_property("skill_name")) == "비무장 공격", "Unarmed display name mismatch")
     require(str(basic.get_editor_property("skill_id")) == "DeafaultAttack", "Existing basic attack identity changed")
-    require(str(sweep.get_editor_property("skill_name")) == "휩쓸기", "Sweeping Strike display changed")
-    require(sweep.get_editor_property("round_definition").get_editor_property("use_melee_area_collision"), "Sweeping Strike collision is not enabled")
     profile = sword.get_editor_property("round_definition")
     montage = profile.get_editor_property("cast_montage")
     require(sword.get_editor_property("use_round_definition") and profile.get_editor_property("kind") == unreal.CombatRoundSkillKind.MELEE, "Sword attack must use a melee profile")
@@ -250,7 +274,7 @@ def verify():
         require(math.dist((location.x, location.y, location.z), expected_location) < 0.001, "Blade socket does not match sword geometry")
     require(abs(montage.get_editor_property("sequence_length") - SWORD_MONTAGE_SECONDS) < 0.001, "Kwang attack and recovery length changed")
     require(profile.get_editor_property("action_point_cost") == basic.get_editor_property("action_point_cost"), "Sword AP was not preserved")
-    expected = [basic, load(SKILLS + "/BPDA_RangedAttack"), load(SKILLS + "/BPDA_AreaAttack"), sweep, sword]
+    expected = [basic, load(SKILLS + "/BPDA_RangedAttack"), load(SKILLS + "/BPDA_AreaAttack"), sword]
     require(montage == load(WARRIOR_MONTAGE), "Sword montage path does not preserve the Kwang folder")
     require(list(HELPER.get_montage_animations(montage)) == [load(mirrored_path(source, SWORD_SUFFIX)) for source in [SWORD_SOURCE, SWORD_RECOVERY_SOURCE]], "Warrior sword montage is not the Kwang attack and recovery")
     require(HELPER.validate_sword_montage(montage, load(mirrored_path(SWORD_SOURCE, SWORD_SUFFIX)), load(mirrored_path(SWORD_RECOVERY_SOURCE, SWORD_SUFFIX)), SWORD_RECOVERY_START_SECONDS), "Saved warrior Kwang segment timing or blending mismatch")
@@ -315,10 +339,8 @@ def verify():
     player_class = load(ROOT + "/Blueprint/Unit/BP_PlayerUnit").generated_class()
     for profession, blueprint_name in [("Mage", "BP_MageUnit"), ("Archer", "BP_PlayerUnit"), ("Rogue", "BP_RogueUnit")]:
         require(classes[unreal.Name(profession)] == load(ROOT + "/Blueprint/Unit/" + blueprint_name).generated_class(), "Another profession class changed: " + profession)
-    require(len(unreal.get_default_object(player_class).get_editor_property("equipped_skill_data_assets")) == 4, "Shared player loadout changed")
-    for path in [SKILLS + "/DA_SweepingStrike", ROOT + "/Blueprint/DataAsset/DA_SweepingStrike"]:
-        old_reference = unreal.SoftObjectPath(path + ".DA_SweepingStrike")
-        require(HELPER.load_saved_asset_reference(old_reference) == sweep, "Historical Sweeping Strike reference does not redirect")
+    shared_skills = list(unreal.get_default_object(player_class).get_editor_property("equipped_skill_data_assets"))
+    require(all(skill in shared_skills for skill in expected[:-1]) and not any(is_removed_skill(skill) for skill in shared_skills), "Shared player loadout must retain its other skills without Sweeping Strike")
     REPORT["sword_profile"] = profile.export_text()
     REPORT["folder_moves"] = legacy_moves()
     for old, new in REPORT["folder_moves"].items():

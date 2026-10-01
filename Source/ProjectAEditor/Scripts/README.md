@@ -50,7 +50,7 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 
 검증 범위:
 
-- 실제 메뉴·전사 생성·전투 노드에서 시작하며 검 공격을 포함한 저장된 DA 5개의 목록·계획·피해 적용을 확인한다.
+- 실제 메뉴·전사 생성·전투 노드에서 시작하며 휩쓸기를 제외하고 검 공격을 포함한 저장된 DA 4개의 목록·계획·피해 적용을 확인한다.
 - 화면 전환 후 Slate 마우스 누름/해제 한 번을 뷰포트 hit-test·컨트롤러 입력에 전달한다. 메뉴·스킬 버튼은 delegate를 사용하며 물리 마우스 하드웨어 검사는 아니다.
 - 전용 시험 저장만 생성·정리하며 기존 저장과 디스크 에셋·밸런스는 변경하지 않는다.
 
@@ -67,14 +67,9 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateRangedAttack.py") -RangedAttackVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-8. `ConfigureSweepingStrike.py`: 기존 휩쓸기만 근접 전방 박스 충돌로 갱신한다. 타일 범위 분기는 끄고 `bUseMeleeAreaCollision=true`·`MeleeAreaHalfExtent=(75,250,100)`을 사용한다. 위력·AP·기존 몽타주는 보존하며 빈 몽타주는 기본공격에서 재사용한다. `-SweepingStrikeVerifyOnly`는 저장 결과만 읽는다. `ConfigureCombatContent.py`의 생성 경로도 같은 설정 함수를 사용한다.
+8. `ConfigureSweepingStrike.py`는 폐기 안내 도구로 유지한다. 휩쓸기 제거에 따라 에셋을 작성하거나 재생성하지 않으며 실행 시 폐기 안내만 반환한다. `ConfigureCombatContent.py`의 현재 생성 대상에서도 휩쓸기를 제외한다. 신규 후보·기존 저장 보유 제거의 확인은 [TODO 2-12절](../../../Docs/TODO.md#2-12-휩쓸기-근접-범위-충돌)을 따른다.
 
-```powershell
-& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureSweepingStrike.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
-& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureSweepingStrike.py") -SweepingStrikeVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
-```
-
-`ProjectA.Combat.Round.MeleeAreaPhysicalContacts`는 타일과 다른 월드 위치·회전·범위 크기·차폐·복수 피격·근접 왕복을 검사한다. 기존 `MeleeTargetAndSides`는 타일형 경로 회귀로 보존한다. 작동 실행 상태는 [TODO](../../../Docs/TODO.md#2-12-휩쓸기-근접-범위-충돌)에 남긴다.
+`ProjectA.Combat.Round.MeleeAreaPhysicalContacts`와 `MeleeTargetAndSides`는 휩쓸기 콘텐츠와 독립적인 근접 범위·타일형 공통 기능 회귀로 보존한다. 기존 작성·검증 결과는 [당시 이력](../../../Docs/HISTORY.md#최근-변경)으로 구분한다.
 
 9. `ConfigureTestEnemies.py`: 기본 PvE 인카운터를 기존 적 클래스 4개로 구성하고 Gameplay Arena를 앞열 `(1,2)`, `(2,2)`·뒷열 `(0,3)`, `(3,3)`으로 배치한다. 유닛 능력치·스킬·Snapshot 정의는 변경하지 않는다. 열린 에디터가 패키지를 잠글 수 있으므로 저장 후 종료하고 실행한다. `-TestEnemiesVerifyOnly`는 저장된 클래스 수·배치만 읽는다.
 

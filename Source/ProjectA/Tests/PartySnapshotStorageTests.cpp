@@ -5,6 +5,8 @@
 #include "Game/Snapshot/PartySnapshotSaveGame.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include <limits>
 
 namespace
@@ -154,6 +156,8 @@ bool FPartySnapshotValidationTest::RunTest(const FString& Parameters)
     Reject(TEXT("Duplicate skills are rejected"));
     Invalid.Members[0].SkillIds[0] = NAME_None;
     Reject(TEXT("Empty skill identifier is rejected"));
+    Invalid.Members[0].SkillIds[0] = TEXT("SweepingStrike");
+    Reject(TEXT("Removed SweepingStrike cannot be authored into a new snapshot"));
     Invalid.Members[0].EquipmentIds.SetNum(17);
     Reject(TEXT("Oversized equipment list is rejected"));
     const FName DuplicateEquipmentId = Invalid.Members[0].EquipmentIds[0];
@@ -265,6 +269,46 @@ bool FPartySnapshotStorageTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Wrong SaveGame class preserves every output field"), AreSnapshotsEqual(Restored, Original));
     TestTrue(TEXT("Isolated test save is removed"), UGameplayStatics::DeleteGameInSlot(SlotName, 0));
     TestFalse(TEXT("Test save no longer exists"), UGameplayStatics::DoesSaveGameExist(SlotName, 0));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPartySnapshotRemovedSkillMigrationTest, "ProjectA.Snapshot.RemovedSkillMigration", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FPartySnapshotRemovedSkillMigrationTest::RunTest(const FString& Parameters)
+{
+    const FScopedSnapshotTestSlot Slot;
+    const FString SlotName = UPartySnapshotLibrary::GetSaveSlotName(Slot.Id);
+    const FString Path = FPaths::ProjectSavedDir() / TEXT("SaveGames") / (SlotName + TEXT(".sav"));
+    FPartySnapshot Original = MakeStorageTestSnapshot();
+    Original.Members[0].SkillIds = {TEXT("DefaultAttack"), TEXT("SweepingStrike"), TEXT("Whirlwind"), TEXT("Sweep")};
+    Original.Members[0].Appearance.BodyId = TEXT("Body_01");
+    Original.Members[0].Appearance.ItemIds = {TEXT("Armor_01")};
+    UPartySnapshotSaveGame* Save = Cast<UPartySnapshotSaveGame>(UGameplayStatics::CreateSaveGameObject(UPartySnapshotSaveGame::StaticClass()));
+    if (!TestNotNull(TEXT("Legacy snapshot fixture is created"), Save)) return false;
+    Save->Snapshot = Original;
+    if (!TestTrue(TEXT("Legacy snapshot writes before migration through the raw SaveGame API"), UGameplayStatics::SaveGameToSlot(Save, SlotName, 0))) return false;
+    TArray<uint8> OriginalBytes;
+    if (!TestTrue(TEXT("Legacy snapshot bytes are captured"), FFileHelper::LoadFileToArray(OriginalBytes, *Path))) return false;
+    FPartySnapshot Expected = Original;
+    Expected.Members[0].SkillIds.Remove(TEXT("SweepingStrike"));
+    FPartySnapshot Restored;
+    FText Error;
+    if (!TestTrue(TEXT("Loading removes only the deleted skill from the candidate"), UPartySnapshotLibrary::LoadSnapshot(Slot.Id, Restored, Error))) return false;
+    TestTrue(TEXT("Stats, names, versions, formation, appearance, equipment, tactics and remaining skill order are preserved"), AreSnapshotsEqual(Restored, Expected));
+    TArray<uint8> CurrentBytes;
+    TestTrue(TEXT("Snapshot bytes remain readable after migration"), FFileHelper::LoadFileToArray(CurrentBytes, *Path));
+    TestTrue(TEXT("Loading never rewrites the original legacy snapshot file"), CurrentBytes == OriginalBytes);
+    TestFalse(TEXT("Saving a new snapshot cannot reintroduce the deleted skill"), UPartySnapshotLibrary::SaveSnapshot(Slot.Id, Original, Error));
+    TestFalse(TEXT("A rejected deleted-skill write explains the failure"), Error.IsEmpty());
+    CurrentBytes.Reset();
+    TestTrue(TEXT("Snapshot bytes remain readable after a rejected write"), FFileHelper::LoadFileToArray(CurrentBytes, *Path));
+    TestTrue(TEXT("A rejected write leaves the legacy snapshot file unchanged"), CurrentBytes == OriginalBytes);
+    Save->Snapshot = Original;
+    Save->Snapshot.Members[0].SkillIds = {TEXT("SweepingStrike")};
+    if (!TestTrue(TEXT("A deleted-only legacy fixture writes directly"), UGameplayStatics::SaveGameToSlot(Save, SlotName, 0))) return false;
+    TestFalse(TEXT("Removing the only skill rejects the snapshot instead of granting a replacement"), UPartySnapshotLibrary::LoadSnapshot(Slot.Id, Restored, Error));
+    TestTrue(TEXT("A rejected deleted-only snapshot preserves the previous output"), AreSnapshotsEqual(Restored, Expected));
+    TestTrue(TEXT("An empty migrated loadout explains why it cannot be restored"), Error.ToString().Contains(TEXT("남은 스킬")));
     return true;
 }
 

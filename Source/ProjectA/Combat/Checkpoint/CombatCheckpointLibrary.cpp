@@ -3,6 +3,7 @@
 #include "Unit/UnitDataRules.h"
 #include "Combat/Library/CombatTargetingLibrary.h"
 #include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
+#include "Game/Run/RunContentMigration.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/AssetManager.h"
 #include "Game/Run/RunIdentityLibrary.h"
@@ -152,7 +153,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
         TSet<UClass*> AbilityClasses;
         for (const FSoftObjectPath& Path : Unit.Skills)
         {
-            if (!IsAssetPath(Path) || SkillPaths.Contains(Path))
+            if (!IsAssetPath(Path) || RunContentMigration::IsRemovedSkill(Path) || SkillPaths.Contains(Path))
             {
                 return false;
             }

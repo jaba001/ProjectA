@@ -2,6 +2,7 @@
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunIdentityLibrary.h"
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunContentMigration.h"
 #include "Game/Run/RunParticipationLibrary.h"
 #include "Game/Run/RunProgressRules.h"
 #include "Game/Run/RunSaveFormat.h"
@@ -728,6 +729,7 @@ bool URunStateSubsystem::ReadManagedSave(FGuid RunId, FRunAuthorityRecordData& O
     FRunAuthorityRecordData Record;
     if (FLocalRunAuthorityStore(LocalCallerContext.StoreNamespace).Read(RunId, Record, OutError) != ERunAuthorityResult::Success) return false;
     TStrongObjectPtr<URunSaveGame> Save(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromMemory(Record.Payload)));
+    if (Save && !RunContentMigration::RemoveDeletedSkills(*Save, OutError)) return false;
     if (!Save || Save->GetClass() != URunSaveGame::StaticClass() || !FRunSaveFormat::IsManaged(Save->Version) || !ValidateSave(Save.Get(), OutError))
     {
         OutError = NSLOCTEXT("ManagedRun", "InvalidPayload", "기준 저장소 본문이 유효한 개발용 v4 관리 Run이 아닙니다.");

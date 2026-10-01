@@ -27,12 +27,19 @@ if not catalog:
     factory.set_editor_property("data_asset_class", unreal.OpponentSnapshotCatalogDataAsset)
     catalog = tools.create_asset("DA_OpponentSnapshotCatalog", root + "/DataAsset/Snapshots", unreal.OpponentSnapshotCatalogDataAsset, factory)
     catalog.set_editor_property("enemy_classes", {unreal.Name(name): enemy.generated_class() for name in ["Warrior", "Mage", "Archer", "Rogue"]})
-    catalog.set_editor_property("skills", {
-        unreal.Name("DefaultAttack"): unreal.load_asset(root + "/DataAsset/Skills/BPDA_DefaulatAttack"),
-        unreal.Name("SweepingStrike"): unreal.load_asset(root + "/DataAsset/Skills/BPDA_SweepingStrike"),
-    })
+    catalog.set_editor_property("skills", {unreal.Name("DefaultAttack"): unreal.load_asset(root + "/DataAsset/Skills/BPDA_DefaulatAttack")})
     if not assets.save_loaded_asset(catalog):
         raise RuntimeError("Could not save Snapshot catalog")
+
+# Remove deleted aliases while preserving all other user-authored catalog entries.
+# 삭제된 별칭만 제거하고 사용자가 작성한 다른 카탈로그 항목은 모두 보존합니다.
+removed_paths = {root + "/DataAsset/Skills/BPDA_SweepingStrike", root + "/DataAsset/Skills/DA_SweepingStrike", root + "/DataAsset/DA_SweepingStrike"}
+catalog_skills = dict(catalog.get_editor_property("skills"))
+retained_skills = {key: skill for key, skill in catalog_skills.items() if str(key) != "SweepingStrike" and not (skill and (str(skill.get_editor_property("skill_id")) == "SweepingStrike" or skill.get_path_name().split(".")[0] in removed_paths))}
+if len(retained_skills) != len(catalog_skills):
+    catalog.set_editor_property("skills", retained_skills)
+    if not assets.save_loaded_asset(catalog):
+        raise RuntimeError("Could not save Snapshot catalog cleanup")
 
 mode = unreal.load_asset(root + "/Game/BP_GameplayGameMode")
 defaults = unreal.get_default_object(mode.generated_class())
@@ -48,7 +55,7 @@ slot_id = "SampleOpponent"
 slot_name = unreal.PartySnapshotLibrary.get_save_slot_name(slot_id)
 if not unreal.GameplayStatics.does_save_game_exist(slot_name, 0):
     stats = unreal.PartySnapshotStats(max_hp=100.0, current_hp=100.0, max_action_points=2, max_sub_action_points=1, move_range=1)
-    member = unreal.PartySnapshotMember(member_id="SampleArcher", class_id="Archer", character_name="Snapshot Archer", stats=stats, skill_ids=["DefaultAttack", "SweepingStrike"], formation_slot=0)
+    member = unreal.PartySnapshotMember(member_id="SampleArcher", class_id="Archer", character_name="Snapshot Archer", stats=stats, skill_ids=["DefaultAttack"], formation_slot=0)
     snapshot = unreal.PartySnapshot(schema_version=1, content_version=1, snapshot_id="SampleOpponentV1", members=[member])
     result = unreal.PartySnapshotLibrary.save_snapshot(slot_id, snapshot)
     unreal.log("Snapshot sample save: " + str(result))

@@ -128,6 +128,11 @@ bool FOpponentSnapshotSkillResolutionTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The second identifier retains its slot position"), Resolved[1].Get(), Fixture.BasicAttack);
 
     const TArray<TObjectPtr<USkillDefinitionDataAsset>> Previous = Resolved;
+    Fixture.Catalog->Skills.Add(TEXT("SweepingStrike"), Fixture.BasicAttack);
+    Member.SkillIds = {Fixture.BasicAttack->SkillId, TEXT("SweepingStrike")};
+    TestFalse(TEXT("A deleted identifier cannot resolve even when a catalog still maps it to a valid skill"), Fixture.Catalog->ResolveSkills(Member, Resolved, Error));
+    TestTrue(TEXT("A deleted identifier preserves the caller's previous loadout"), Resolved == Previous);
+    TestFalse(TEXT("A deleted identifier explains rejection"), Error.IsEmpty());
     Member.SkillIds = { Fixture.BasicAttack->SkillId, TEXT("MissingAfterValidSkill") };
     TestFalse(TEXT("A later unresolved identifier rejects the whole skill list"), Fixture.Catalog->ResolveSkills(Member, Resolved, Error));
     TestTrue(TEXT("Partial resolution preserves the caller's previous loadout"), Resolved == Previous);

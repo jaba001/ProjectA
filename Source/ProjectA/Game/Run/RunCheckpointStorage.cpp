@@ -1,4 +1,6 @@
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunContentMigration.h"
+#include "Game/Run/RunSaveGame.h"
 #include "GameFramework/SaveGame.h"
 #include "HAL/PlatformFileManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -130,6 +132,10 @@ USaveGame* FRunCheckpointStorage::Load(const FString& Slot, FText& OutError, FSt
         return nullptr;
     }
     USaveGame* Save = UGameplayStatics::LoadGameFromMemory(Bytes);
+    if (URunSaveGame* RunSave = Cast<URunSaveGame>(Save))
+    {
+        if (!RunContentMigration::RemoveDeletedSkills(*RunSave, OutError)) return nullptr;
+    }
     if (Save)
     {
         if (OutToken) *OutToken = MakeConfirmationToken(Slot, Bytes);

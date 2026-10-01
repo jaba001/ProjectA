@@ -225,7 +225,7 @@ $project = "$PWD/ProjectA.uproject"
 & $editor $project -ProjectAOpponentSnapshot=SampleOpponent
 ```
 
-샘플은 Hunter 1명·최대 HP 140/현재 HP 120·AP 2/SubAP 1·이동 1·배치 0·DefaultAttack/SweepingStrike다. 기존 샘플 슬롯은 덮어쓰지 않는다.
+샘플은 Hunter 1명·최대 HP 140/현재 HP 120·AP 2/SubAP 1·이동 1·배치 0·DefaultAttack을 사용한다. 2026-10-01 확정한 휩쓸기 제거는 기존 Snapshot 입력·샘플에도 적용하며 다른 스킬·소유권은 유지한다. 기존 샘플 슬롯을 일괄 덮어쓰지 않으며 로드 후보 검증 후 정상 저장에 반영한다. [제거·저장 적용 범위](PROJECT_PLAN.md#상점-인카운터)
 SlotId는 영문·숫자·밑줄 1~64자이며 `ProjectA_Opponent_<SlotId>`로 저장한다. 샘플 `.sav`는 Git·패키지에 포함하지 않는다.
 Snapshot Run은 `ProjectA_SnapshotRun_<SlotId>`, PvE는 `ProjectA_Run`이다. `-ProjectASaveSlot=...`이 우선하며 이어하기는 같은 상대 인자를 사용한다.
 패키지에서 샘플을 쓰려면 그 실행 환경의 저장 API로 먼저 생성해야 한다. 실행 인자를 제거하면 기본 PvE다.

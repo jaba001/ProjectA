@@ -2,6 +2,7 @@
 
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
+#include "Game/Run/RunContentMigration.h"
 #include "Unit/EnemyUnit.h"
 #include "Unit/CharacterAppearanceComponent.h"
 #include "DataAsset/CharacterAppearanceCatalog.h"
@@ -27,6 +28,11 @@ bool UOpponentSnapshotCatalogDataAsset::ResolveSkills(const FPartySnapshotMember
     }
     for (FName SkillId : Member.SkillIds)
     {
+        if (RunContentMigration::IsRemovedSkillId(SkillId))
+        {
+            OutError = NSLOCTEXT("Snapshot", "RemovedSkill", "삭제된 휩쓸기 스킬은 상대 파티에 장착할 수 없습니다.");
+            return false;
+        }
         USkillDefinitionDataAsset* Skill = Skills.FindRef(SkillId);
         if (!IsValid(Skill))
         {

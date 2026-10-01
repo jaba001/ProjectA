@@ -1,5 +1,6 @@
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "Game/Snapshot/PartySnapshotSaveGame.h"
+#include "Game/Run/RunContentMigration.h"
 #include "Kismet/GameplayStatics.h"
 #include "Unit/UnitDataRules.h"
 
@@ -115,6 +116,11 @@ bool UPartySnapshotLibrary::ValidateSnapshot(const FPartySnapshot& Snapshot, FTe
             OutError = NSLOCTEXT("PartySnapshot", "Skills", "파티원은 중복 없는 스킬 식별자를 1~5개 가져야 합니다.");
             return false;
         }
+        if (Member.SkillIds.ContainsByPredicate([](FName SkillId) { return RunContentMigration::IsRemovedSkillId(SkillId); }))
+        {
+            OutError = NSLOCTEXT("PartySnapshot", "RemovedSkill", "삭제된 휩쓸기 스킬을 새 Snapshot에 포함할 수 없습니다.");
+            return false;
+        }
         if (Member.EquipmentIds.Num() > 16 || !HasUniqueIdentifiers(Member.EquipmentIds) || (!Member.TacticsId.IsNone() && !IsStableIdentifier(Member.TacticsId)))
         {
             OutError = NSLOCTEXT("PartySnapshot", "EquipmentTactics", "파티원의 장비 또는 전술 식별자가 올바르지 않습니다.");
@@ -202,13 +208,25 @@ bool UPartySnapshotLibrary::LoadSnapshot(FName SlotId, FPartySnapshot& OutSnapsh
         OutError = NSLOCTEXT("PartySnapshot", "Read", "상대 파티 Snapshot을 불러오지 못했거나 저장 형식이 올바르지 않습니다.");
         return false;
     }
-    if (!ValidateSnapshot(Save->Snapshot, OutError))
+    // Remove retired identifiers from a candidate without rewriting the original opponent save.
+    // 원본 상대 저장을 다시 쓰지 않고 후보 데이터에서 삭제된 식별자를 제거합니다.
+    FPartySnapshot Candidate = Save->Snapshot;
+    for (FPartySnapshotMember& Member : Candidate.Members)
+    {
+        const int32 RemovedCount = Member.SkillIds.RemoveAll([](FName SkillId) { return RunContentMigration::IsRemovedSkillId(SkillId); });
+        if (RemovedCount > 0 && Member.SkillIds.IsEmpty())
+        {
+            OutError = NSLOCTEXT("PartySnapshot", "RemovedOnlySkill", "삭제된 휩쓸기를 제거한 뒤 남은 스킬이 없어 상대 Snapshot을 불러올 수 없습니다.");
+            return false;
+        }
+    }
+    if (!ValidateSnapshot(Candidate, OutError))
     {
         return false;
     }
 
     // Rejected data must not partially replace the currently selected opponent.
     // 거절된 데이터가 현재 선택한 상대 정보를 부분적으로 덮어쓰지 않도록 합니다.
-    OutSnapshot = Save->Snapshot;
+    OutSnapshot = MoveTemp(Candidate);
     return true;
 }

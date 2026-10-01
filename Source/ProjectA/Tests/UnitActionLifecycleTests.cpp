@@ -328,7 +328,7 @@ bool FCombatRoundRetargetPolicyTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("An invalid serialized target-loss enum is rejected before normalization"), Skill->ResolveRoundSkill(Resolved, Error));
     TestFalse(TEXT("Invalid target-loss data reports the asset error"), Error.IsEmpty());
 
-    for (const TCHAR* AssetName : {TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_RangedAttack"), TEXT("BPDA_SweepingStrike"), TEXT("BPDA_swoard_attack"), TEXT("BPDA_AreaAttack")})
+    for (const TCHAR* AssetName : {TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_RangedAttack"), TEXT("BPDA_swoard_attack"), TEXT("BPDA_AreaAttack")})
     {
         const FString AssetPath = FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/%s.%s"), AssetName, AssetName);
         const USkillDefinitionDataAsset* Authored = LoadObject<USkillDefinitionDataAsset>(nullptr, *AssetPath);

@@ -1,5 +1,6 @@
 #include "Unit/UnitDataRules.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Game/Run/RunContentMigration.h"
 
 bool UnitDataRules::IsValidMaxHP(float MaxHP)
 {
@@ -48,7 +49,7 @@ bool UnitDataRules::ValidateSkills(const TArray<TObjectPtr<USkillDefinitionDataA
     for (int32 Index = 0; Index < Skills.Num(); ++Index)
     {
         USkillDefinitionDataAsset* Skill = Skills[Index];
-        if (!IsValid(Skill))
+        if (!IsValid(Skill) || RunContentMigration::IsRemovedSkill(FSoftObjectPath(Skill)) || RunContentMigration::IsRemovedSkillId(FName(*Skill->GetPrimaryAssetId().ToString())))
         {
             OutError = FText::Format(NSLOCTEXT("UnitDataRules", "MissingSkill", "StartingSkills[{0}] is missing or invalid. / StartingSkills[{0}] 참조가 없거나 유효하지 않습니다."), FText::AsNumber(Index));
             return false;
