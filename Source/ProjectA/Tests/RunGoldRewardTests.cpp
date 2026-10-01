@@ -5,6 +5,7 @@
 #include "DataAsset/RunEncounterPoolDataAsset.h"
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunProgressRules.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Kismet/GameplayStatics.h"
@@ -50,11 +51,19 @@ namespace
 
         bool FinishBattle(ECombatResult Result = ECombatResult::Victory, bool bPlayerDead = false)
         {
-            const FName Node = Run->GetCompletedNodes().IsEmpty() ? TEXT("Combat_01") : TEXT("Combat_02");
+            if (!Run->GetNodes().IsValidIndex(Run->GetCompletedNodes().Num())) return false;
+            const FName Node = Run->GetNodes()[Run->GetCompletedNodes().Num()].NodeId;
             if (!Run->BeginEncounter(Node) || !Run->MarkCombatStarted()) return false;
             Run->UpdatePartyMemberHP(0, Result == ECombatResult::Defeat ? 0.0f : 70.0f);
             Run->UpdatePartyMemberHP(1, Result == ECombatResult::Defeat || bPlayerDead ? 0.0f : 70.0f);
             return Run->CompleteEncounter(Result);
+        }
+
+        bool ContinueToNextBattle()
+        {
+            if (!Run->ContinueRun()) return false;
+            if (Run->GetPhase() == ERunPhase::EncounterChoice && (!Run->SelectRunEncounter(TEXT("Shop_01")) || !Run->LeaveRunEncounter())) return false;
+            return Run->GetPhase() == ERunPhase::Map;
         }
 
         bool Select(int32 ChoiceIndex, FName Node = TEXT("Combat_01"))
@@ -164,18 +173,34 @@ bool FRunGoldRewardLifecycleTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Defeat cannot grant gold"), Defeat.Select(0));
     TestEqual(TEXT("Defeat preserves the previous gold balance"), Defeat.Run->GetPartyMembers()[1].Gold, 10);
     FGoldRewardFixture Victory;
-    if (!Victory.Initialize() || !Victory.FinishBattle(ECombatResult::Victory, true)) return false;
-    TestTrue(TEXT("A dead selected owner can collect the victory won by a companion"), Victory.Select(0));
-    TestEqual(TEXT("Gold collection does not revive a dead character"), Victory.Run->GetPartyMembers()[1].CurrentHP, 0.0f);
-    const int32 FirstGold = Victory.Run->GetPartyMembers()[1].Gold;
-    if (!Victory.Run->ContinueRun() || !Victory.Run->SelectRunEncounter(TEXT("Shop_01")) || !Victory.Run->LeaveRunEncounter() || !Victory.FinishBattle(ECombatResult::Victory, true)) return false;
-    TestTrue(TEXT("The final battle replaces the prior node and clears its claims"), Victory.Run->GetGoldRewardState().NodeId == TEXT("Combat_02") && Victory.Run->GetGoldRewardState().GoldChoices.Num() == 3 && Victory.Run->GetGoldRewardState().Claims.IsEmpty());
-    TestFalse(TEXT("The previous node's delayed claim cannot spend the final reward"), Victory.Select(0));
-    TestFalse(TEXT("The final victory waits on its own reward"), Victory.Run->ContinueRun());
-    const int32 FinalReward = Victory.Run->GetGoldRewardState().GoldChoices[2];
-    TestTrue(TEXT("The final reward can be selected before Run completion"), Victory.Select(2, TEXT("Combat_02")));
-    TestEqual(TEXT("Both independent victories contribute exactly their chosen amounts"), Victory.Run->GetPartyMembers()[1].Gold, FirstGold + FinalReward);
+    if (!Victory.Initialize() || !TestEqual(TEXT("Reward progression covers ten victories"), Victory.Run->GetNodes().Num(), 10)) return false;
+    int32 ExpectedGold = Victory.Run->GetPartyMembers()[1].Gold;
+    FName PreviousNode;
+    for (int32 Index = 0; Index < Victory.Run->GetNodes().Num(); ++Index)
+    {
+        if (!Victory.FinishBattle(ECombatResult::Victory, true)) return false;
+        const FName Node = Victory.Run->GetNodes()[Index].NodeId;
+        const FRunGoldRewardState Offered = Victory.Run->GetGoldRewardState();
+        if (!TestTrue(TEXT("Each new victory replaces the prior reward and clears its claims"), Offered.NodeId == Node && Offered.GoldChoices.Num() == 3 && Offered.Claims.IsEmpty())) return false;
+        if (!PreviousNode.IsNone()) TestFalse(TEXT("The previous node's delayed claim cannot collect the next reward"), Victory.Select(0, PreviousNode));
+        TestFalse(TEXT("Each victory waits on its own reward"), Victory.Run->ContinueRun());
+        const int32 Choice = Index % 3;
+        ExpectedGold += Offered.GoldChoices[Choice];
+        if (!TestTrue(TEXT("A dead selected owner can collect victory rewards won by a companion"), Victory.Select(Choice, Node))) return false;
+        TestEqual(TEXT("Every chosen reward adds gold exactly once"), Victory.Run->GetPartyMembers()[1].Gold, ExpectedGold);
+        TestEqual(TEXT("Gold collection does not revive a dead character"), Victory.Run->GetPartyMembers()[1].CurrentHP, 0.0f);
+        TestFalse(TEXT("A repeated request cannot collect a reward twice"), Victory.Select(Choice, Node));
+        if (Index + 1 < Victory.Run->GetNodes().Num())
+        {
+            if (!TestTrue(TEXT("Nonfinal collected rewards unlock the next battle"), Victory.ContinueToNextBattle())) return false;
+            if (!TestTrue(TEXT("Each nonfinal victory reloads its durable progress"), Victory.Run->LoadStandaloneCheckpoint(Victory.Error))) return false;
+            TestTrue(TEXT("Reload preserves the current boundary gold and dead selected owner"), Victory.Run->GetPhase() == ERunPhase::Map && Victory.Run->GetCompletedNodes().Num() == Index + 1 && Victory.Run->GetEncounterProgress().AfterCompletedNodeCount == Index + 1 && Victory.Run->GetPartyMembers()[1].Gold == ExpectedGold && Victory.Run->GetPartyMembers()[1].CurrentHP == 0.0f);
+        }
+        PreviousNode = Node;
+    }
     TestTrue(TEXT("Collecting the last reward unlocks Complete without an extra shop"), Victory.Run->ContinueRun() && Victory.Run->GetPhase() == ERunPhase::Complete);
+    TStrongObjectPtr<URunSaveGame> Completed(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Victory.Slot, Victory.Error)));
+    TestTrue(TEXT("The final durable checkpoint records all ten victories and the chosen reward"), Completed && Completed->Nodes.Num() == 10 && Completed->CompletedNodes.Num() == 10 && Completed->Phase == ERunPhase::Complete && Completed->Party[1].Gold == ExpectedGold && Completed->GoldRewardState.Claims.Num() == 1);
     return true;
 }
 
@@ -189,6 +214,7 @@ bool FRunGoldRewardLegacyTest::RunTest(const FString& Parameters)
         if (!Fixture.Initialize() || !Fixture.FinishBattle()) return false;
         TStrongObjectPtr<URunSaveGame> Legacy(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
         if (!Legacy) return false;
+        Legacy->Nodes = RunProgressRules::GetLegacyPrototypeRoute().Nodes;
         Legacy->GoldRewardState = FRunGoldRewardState();
         Legacy->ItemShopState = FRunItemShopState();
         for (FRunPartyMember& Member : Legacy->Party)
@@ -209,6 +235,7 @@ bool FRunGoldRewardLegacyTest::RunTest(const FString& Parameters)
         if (!FRunCheckpointStorage::Save(Legacy.Get(), Fixture.Slot, Fixture.Error)) return false;
         const TArray<uint8> LegacyBytes = Fixture.ReadBytes();
         if (!TestTrue(TEXT("A result saved before rewards existed remains loadable"), Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error))) return false;
+        TestEqual(TEXT("A historical Run retains its saved two-combat route"), Fixture.Run->GetNodes().Num(), 2);
         TestTrue(TEXT("Loading never rerolls rewards for a historical result or rewrites it"), Fixture.Run->GetGoldRewardState().SchemaVersion == 0 && Fixture.Run->GetGoldRewardState().GoldChoices.IsEmpty() && LegacyBytes == Fixture.ReadBytes());
         TestFalse(TEXT("A historical result cannot claim retroactive gold"), Fixture.Select(0));
         if (!TestTrue(TEXT("Historical results can Continue without a reward"), Fixture.Run->CanContinueAfterRewards() && Fixture.Run->ContinueRun())) return false;
@@ -222,6 +249,10 @@ bool FRunGoldRewardLegacyTest::RunTest(const FString& Parameters)
         {
             TestTrue(TEXT("Pre-shop legacy Runs preserve their original zero-gold progression"), Fixture.Run->GetGoldRewardState().SchemaVersion == 0 && Fixture.Run->GetGoldRewardState().GoldChoices.IsEmpty() && Fixture.Run->GetPartyMembers()[1].Gold == 0 && Fixture.Run->CanContinueAfterRewards());
         }
+        TestTrue(TEXT("A historical second victory still completes its original Run"), Fixture.Run->ContinueRun() && Fixture.Run->GetPhase() == ERunPhase::Complete);
+        const TArray<uint8> CompletedBytes = Fixture.ReadBytes();
+        TestFalse(TEXT("A completed historical Run cannot resume as a longer new Run"), Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error));
+        TestTrue(TEXT("Rejected historical completion preserves its route and durable file"), Fixture.Run->GetNodes().Num() == 2 && Fixture.Run->GetPhase() == ERunPhase::Complete && CompletedBytes == Fixture.ReadBytes());
     }
     return true;
 }

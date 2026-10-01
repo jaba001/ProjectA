@@ -17,9 +17,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunRouteRulesTest, "ProjectA.Run.Progress.Rout
 bool FRunRouteRulesTest::RunTest(const FString& Parameters)
 {
     const FRunRouteDefinition& Prototype = RunProgressRules::GetPrototypeRoute();
-    if (!TestEqual(TEXT("The production prototype retains its two combat nodes"), Prototype.Nodes.Num(), 2)) return false;
+    const FRunRouteDefinition& Legacy = RunProgressRules::GetLegacyPrototypeRoute();
+    if (!TestEqual(TEXT("The production prototype contains ten combat nodes"), Prototype.Nodes.Num(), 10)) return false;
+    TestEqual(TEXT("Historical saves retain the original two-node definition"), Legacy.Nodes.Num(), 2);
+    TestTrue(TEXT("New and historical saved routes resolve by their preserved lengths"), RunProgressRules::GetRouteForNodes(Prototype.Nodes) == &Prototype && RunProgressRules::GetRouteForNodes(Legacy.Nodes) == &Legacy);
+    TestTrue(TEXT("Only the new route repeats shops between victories"), Prototype.bRepeatEncounters && !Legacy.bRepeatEncounters);
     TestTrue(TEXT("The prototype keeps the existing node and encounter identifiers"), Prototype.Nodes[0].NodeId == TEXT("Combat_01") && Prototype.Nodes[1].NodeId == TEXT("Combat_02") && Prototype.Nodes[0].EncounterId == TEXT("DefaultEncounter") && Prototype.Nodes[1].EncounterId == TEXT("DefaultEncounter"));
-    FRunRouteDefinition Alternate = Prototype;
+    FRunRouteDefinition Alternate = Legacy;
     FRunNodeDefinition Extra;
     Extra.NodeId = TEXT("Fixture_Final");
     Extra.EncounterId = TEXT("Fixture_FinalEncounter");
@@ -31,6 +35,7 @@ bool FRunRouteRulesTest::RunTest(const FString& Parameters)
     FRunProgressView Progress{Nodes, Completed, NAME_None, NAME_None, ERunPhase::Map, ECombatResult::None};
     TestTrue(TEXT("A different definition controls node count and encounter identity without changing production content"), RunProgressRules::ValidateNodes(Alternate, Progress));
     TestFalse(TEXT("Existing prototype saves cannot silently acquire the alternate route"), RunProgressRules::ValidateNodes(Prototype, Progress));
+    TestNull(TEXT("An unsupported saved route length cannot acquire a known route"), RunProgressRules::GetRouteForNodes(Nodes));
     TestTrue(TEXT("The alternate route starts from its empty map boundary"), RunProgressRules::ValidatePhase(Progress, true, true));
     FRunEncounterProgress Encounter;
     Encounter.SchemaVersion = 1;
@@ -64,7 +69,55 @@ bool FRunRouteRulesTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Completion follows the supplied route length"), Progress.Phase == ERunPhase::Complete && RunProgressRules::ValidatePhase(Progress, true, true));
     Completed[1] = TEXT("SkippedNode");
     TestFalse(TEXT("Progress must still be the exact prefix of the supplied route"), RunProgressRules::ValidateNodes(Alternate, Progress));
-    TestEqual(TEXT("The alternate fixture never changes production route content"), RunProgressRules::GetPrototypeRoute().Nodes.Num(), 2);
+    TestEqual(TEXT("The alternate fixture never changes production route content"), RunProgressRules::GetPrototypeRoute().Nodes.Num(), 10);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunRepeatedEncounterBoundaryTest, "ProjectA.Run.Progress.RepeatedEncounterBoundaries", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunRepeatedEncounterBoundaryTest::RunTest(const FString& Parameters)
+{
+    const FRunRouteDefinition& Route = RunProgressRules::GetPrototypeRoute();
+    TArray<FRunNodeDefinition> Nodes = Route.Nodes;
+    TArray<FName> Completed;
+    FRunProgressView Progress{Nodes, Completed, NAME_None, NAME_None, ERunPhase::Map, ECombatResult::None};
+    FRunEncounterProgress Encounter;
+    Encounter.SchemaVersion = 1;
+    FText Error;
+    if (!GetDefault<URunEncounterPoolDataAsset>()->BuildFixedOffers(Encounter.Offers, Error)) return false;
+    for (int32 Index = 0; Index < Nodes.Num(); ++Index)
+    {
+        Completed.Add(Nodes[Index].NodeId);
+        Progress.CurrentNode = Nodes[Index].NodeId;
+        Progress.CurrentEncounter = Nodes[Index].EncounterId;
+        Progress.Phase = ERunPhase::Result;
+        Progress.Result = ECombatResult::Victory;
+        TestTrue(TEXT("Each result retains the completed previous shop boundary"), RunProgressRules::ValidatePhase(Progress, true, true) && RunProgressRules::ValidateEncounterProgress(Route, Progress, Encounter));
+        if (Index + 1 == Nodes.Num())
+        {
+            Progress.CurrentEncounter = NAME_None;
+            Progress.Phase = RunProgressRules::GetContinuationPhase(Route, Completed.Num(), Encounter);
+            TestTrue(TEXT("The tenth result ends with the ninth shop completed"), Progress.Phase == ERunPhase::Complete && Encounter.AfterCompletedNodeCount == 9 && RunProgressRules::ValidatePhase(Progress, true, true) && RunProgressRules::ValidateEncounterProgress(Route, Progress, Encounter));
+            continue;
+        }
+        Encounter.AfterCompletedNodeCount = Completed.Num();
+        Encounter.SelectedEncounterId = NAME_None;
+        Encounter.bCompleted = false;
+        Progress.CurrentEncounter = NAME_None;
+        Progress.Phase = RunProgressRules::GetContinuationPhase(Route, Completed.Num(), Encounter);
+        TestTrue(TEXT("Each of the first nine results opens its own fresh choices"), Progress.Phase == ERunPhase::EncounterChoice && RunProgressRules::ValidateEncounterProgress(Route, Progress, Encounter));
+        --Encounter.AfterCompletedNodeCount;
+        TestFalse(TEXT("A stale shop boundary cannot validate the next choice screen"), RunProgressRules::ValidateEncounterProgress(Route, Progress, Encounter));
+        ++Encounter.AfterCompletedNodeCount;
+        Encounter.SelectedEncounterId = Encounter.Offers[Index % Encounter.Offers.Num()].EncounterId;
+        TestFalse(TEXT("A choice screen cannot contain a previously selected shop"), RunProgressRules::ValidateEncounterProgress(Route, Progress, Encounter));
+        Progress.Phase = ERunPhase::Shop;
+        TestTrue(TEXT("A selection belongs to the current victory boundary"), RunProgressRules::ValidateEncounterProgress(Route, Progress, Encounter));
+        Progress.Phase = ERunPhase::Map;
+        TestFalse(TEXT("The map cannot bypass leaving the selected shop"), RunProgressRules::ValidateEncounterProgress(Route, Progress, Encounter));
+        Encounter.bCompleted = true;
+        TestTrue(TEXT("Leaving each shop unlocks the following map boundary"), RunProgressRules::ValidatePhase(Progress, true, true) && RunProgressRules::ValidateEncounterProgress(Route, Progress, Encounter));
+    }
     return true;
 }
 

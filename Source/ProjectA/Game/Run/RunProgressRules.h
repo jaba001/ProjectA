@@ -12,6 +12,7 @@ struct PROJECTA_API FRunRouteDefinition
     TArray<FRunNodeDefinition> Nodes;
     int32 EncounterAfterCompletedNodes = INDEX_NONE;
     int32 EncounterOfferCount = 0;
+    bool bRepeatEncounters = false;
 };
 
 // Borrow runtime values without owning actors, loading assets or interpreting a save format.
@@ -29,6 +30,8 @@ struct PROJECTA_API FRunProgressView
 namespace RunProgressRules
 {
     PROJECTA_API const FRunRouteDefinition& GetPrototypeRoute();
+    PROJECTA_API const FRunRouteDefinition& GetLegacyPrototypeRoute();
+    PROJECTA_API const FRunRouteDefinition* GetRouteForNodes(TConstArrayView<FRunNodeDefinition> Nodes);
     PROJECTA_API bool ValidateNodes(const FRunRouteDefinition& Route, const FRunProgressView& Progress);
     PROJECTA_API bool ValidateEncounterProgress(const FRunRouteDefinition& Route, const FRunProgressView& Progress, const FRunEncounterProgress& Encounter);
     PROJECTA_API bool ValidatePhase(const FRunProgressView& Progress, bool bHasCreatedMember, bool bHasLivingMember);

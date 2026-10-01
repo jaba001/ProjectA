@@ -2,7 +2,7 @@
 
 기준일: 2026-10-01. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
 
-기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 위임 실행에서 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀를 통과했다. 실제 서비스·다중 PC·지연/손실 확인은 별도다.
+기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 위임 실행은 당시 두 전투 경로의 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀 결과다. 새 10전투 경로·실제 서비스·다중 PC·지연/손실은 사용자 확인 대기다.
 
 T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 새 라운드는 저장된 준비 완료 경계에서 복구하며 이전 순차 Combat 저장은 계속 거절한다. 진행 중 시전·투사체의 임의 시점 복원은 지원하지 않는다. Steam/PlayFab·MMR은 미구현이며 [최신 확인](TODO.md#2-14-확정-전투-규칙과-준비-완료-복구)을 따른다.
 
@@ -23,12 +23,12 @@ T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 새 라�
 3. Start Game → `/Game/User_JeHoon/LEVEL/Gameplay` → Run Map에서 첫 Combat 노드를 선택한다.
 4. 전장에서 적 또는 스킬이 요구하는 타일을 클릭하고 하단의 실제 장착 스킬 버튼으로 계획을 적용한 뒤 준비 완료한다. 스킬 미선택 준비 완료는 행동 비용 없이 턴을 넘기며 선택한 스킬은 취소할 수 있다. 위치 이동은 이동 예약 → 아군 빈칸 한 번 클릭으로 예약하며 스킬 없이 이동만 예약하면 SAP 1만 소모한다. 전원 준비 후 SAP 이동을 먼저 끝내고 선택한 AP 행동을 실행한다. 나머지 생성 동료는 서버 AI가 계획·실행한다.
 5. 속도차 대기·이동·시전·피격·복귀를 관찰한다. 남은 유효 투사체까지 정리되면 다음 라운드 계획으로 돌아간다. 해결 중 새 행동을 입력할 수 없다.
-6. 첫 Victory → 5~15G 보상 3개 중 1개 수령 → Continue → 스킬상점·아이템상점·상점3 중 하나 선택 → 나가기 → 두 번째 Combat 노드를 진행한다. 두 번째 Victory도 보상을 수령한 뒤 Continue로 완료된 Run Map을 표시한다.
+6. 새 Run은 1~9번째 Victory마다 5~15G 보상 3개 중 1개 수령 → Continue → 스킬상점·아이템상점·상점3 중 하나 선택 → 나가기 → 다음 Combat 노드를 진행한다. 10번째 Victory도 보상을 수령한 뒤 Continue로 완료된 Run Map을 표시한다.
 7. 잔여 공격까지 정리한 뒤 양 팀 전멸을 포함한 패배는 Defeat 화면을 표시하고 Run을 종료한다. 승리 보상은 지급하지 않는다.
 
 빌드 후 UE를 재시작하여 C++·리플렉션 변경을 반영한다. 이번 전환에는 새 맵·WBP 생성이나 Config 변경이 필요하지 않다.
 
-2026-09-16 사용자는 지금까지 플레이한 범위에서 이상이 없다고 보고했다. 추가 확인은 [TODO](TODO.md#1-사용자-작동-확인)에 짧게 기록하며 협동은 2인 → 4인 순서로 진행한다.
+2026-09-16 일반 플레이 보고는 당시 두 전투 경로의 관찰 범위에 한정한다. 추가 확인은 [TODO](TODO.md#1-사용자-작동-확인)에 짧게 기록하며 협동은 2인 → 4인 순서로 진행한다.
 
 ```mermaid
 flowchart LR
@@ -42,14 +42,14 @@ flowchart LR
     D --> E[Encounter 준비]
     E --> F[Grid Combat]
     F -->|Victory| G[Result]
-    G -->|첫 승리 Continue| I[인카운터 3개 중 선택]
+    G -->|1~9번째 승리 Continue| I[인카운터 3개 중 선택]
     I --> J[선택한 인카운터]
     J -->|나가기| D
     G -->|마지막 승리 Continue| K[Run 완료]
     F -->|Defeat| H[패배 화면]
 ```
 
-Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `DefaultEncounter`를 재사용한다. 월드 진행은 CommonUI 노드 화면으로 표현한다. 물리적인 WorldMap 탐험과 전투별 CombatMap 전환은 현재 흐름에 없다.
+Gameplay는 계속 유지하는 단일 레벨이며 새 Run의 `Combat_01`~`Combat_10`은 모두 `DefaultEncounter`를 재사용한다. 기존 적 4마리·능력치·난이도를 유지한다. CommonUI 지도는 완료 수/전체 노드 수를 표시하고 알려진 `ContentBox` 직계 `NodeList`를 최대 높이 300의 스크롤 목록으로 감싼다. 기존 바인딩·슬롯 배치·완료/잠금 표시와 별도 사용자 계층은 보존한다. 물리적인 WorldMap 탐험과 전투별 CombatMap 전환은 현재 흐름에 없다.
 
 ## 모듈과 책임
 
@@ -62,7 +62,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 | `AGameplayGameState` | 단계·파티·노드·결과와 전투/아레나 참조를 읽기 전용 뷰로 복제. Client RunState는 서버 권위의 대체물이 아님 |
 | `AGameplayPlayerController` | `APartyPlayerController` 상속. 로컬 Root UI, 소유 연결의 전투 RPC, 현재 Host의 노드 선택·Continue 요청 |
 | `UGameplayRootWidget` | 해당 플레이어 화면의 CommonUI Run/Combat/Modal 스택과 저장 실패·재시도 안내 |
-| `URunMapWidget` | 노드와 진행 상태 표시, 선택 요청. 직접 Spawn하지 않음 |
+| `URunMapWidget` | 전체 노드·진행 분모·완료/잠금 상태와 높이 300 상한 스크롤 목록 표시, 선택 요청. 직접 Spawn하지 않음 |
 | `URunEncounterWidget` | 인카운터 3개 선택·본인 골드·스킬상점/상점3 상품 5개·증가형 리롤 비용·회복 및 아이템상점 상품 5개·판매 완료·리롤·구매·나가기 표시. 기존 RunLayer의 native CommonUI 화면 |
 | `AEncounterManager` | Encounter 준비·스폰·라운드 전투 연결·종료 HP 추출·정리와 Run 전이. 순차 턴 저장/복원 훅 제거 |
 | `ACombatArena` | 배치된 Grid, 슬롯별 좌표, 카메라, 타일 활성화 관리 |
@@ -85,7 +85,9 @@ Gameplay는 계속 유지하는 단일 레벨이며 두 Combat 노드는 `Defaul
 
 ### 상점 인카운터
 
-새 Run은 첫 승리 보상 수령 후 Continue에서 `EncounterChoice`, 선택 시 `Shop`, 나가기 시 `Map`으로 전환한다. 전투 노드 수는 2개를 유지하며 상점 방문을 전투 완료 수에 더하지 않는다. 선택하지 않은 상점은 방문할 수 없다. 레벨 이동·별도 Arena 스폰 없이 UI로 처리한다.
+새 Run은 전투 10회 중 1~9번째 승리 보상 수령 후 Continue에서 `EncounterChoice`, 선택 시 `Shop`, 나가기 시 `Map`으로 전환한다. 총 9회 방문하며 상점을 전투 완료 수에 더하지 않는다. 10번째 승리는 보상 후 `Complete`로 전환하고 패배는 기존 종료 규칙을 유지한다. 선택하지 않은 상점은 방문할 수 없으며 레벨 이동·별도 Arena 스폰 없이 UI로 처리한다.
+
+반복 방문의 `FRunEncounterProgress.AfterCompletedNodeCount`에 해당 방문 직전의 완료 전투 수를 저장한다. 다음 Continue의 저장 후보에서 회차·선택 ID·퇴장 상태를 함께 초기화하며 실패 시 이전 결과·보상·상점 상태를 유지한다. 상점 선택 시 해당 상점의 저장된 카탈로그·조건으로 새 진열을 확정하고 스킬 리롤 비용은 1G로 초기화한다. 골드·보유 스킬/아이템·장비·소유권과 다른 상점의 저장 상태는 유지하며 이어하기는 현재 선택·진열·비용을 그대로 복구한다.
 
 기존 상점1은 **스킬상점**, 상점2는 **아이템상점** 인카운터로 관리한다. `FRunEncounterOffer.EncounterTag`의 `Encounter.Shop.Skill`·`Encounter.Shop.Item` 분류로 UI·구매·리롤 실행을 판정하며 표시 이름과 저장 ID를 분리한다. 저장 호환을 위해 `Shop_01/02/03` ID를 유지하고 상점3은 스킬상점과 같은 구매·리롤 규칙을 사용한다. 분류 태그가 없는 이전 정의·저장은 공통 해석에서 기존 Shop ID를 분류하며, 기본 이전 이름만 새 이름으로 표시하고 사용자 지정 이름과 저장 원본은 보존한다.
 
@@ -110,7 +112,7 @@ CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한�
 | `URunEncounterPoolDataAsset` | `FixedOffers`에 인카운터 3개, `FixedSkillOffers/SkillShopPool/SkillShopQuery`에 스킬 후보·태그 조건, `Recovery`에 전체 회복 가격, `StartingGold`에 개인 시작 골드 정의. 인카운터 후보 3개는 고정 제시 |
 | `FRunSkillShopState` | schema 1의 `Catalog/Offers/Query/Revision/RerollPrice`에 스킬 후보·진열 5개·태그 조건·변경 버전·현재 리롤 비용 저장. 이전 카탈로그 없는 고정 상품 저장 보존 |
 | `FRunEncounterOffer` | `EncounterId`·`DisplayName`·`Type`·`EncounterTag`의 USTRUCT 값 데이터. `GetResolvedTag/IsSupportedShop/IsItemShop/GetDisplayName`으로 분류·표시 이름 해석 |
-| `FRunEncounterProgress` | schema·제시 목록·선택 ID·퇴장 완료 여부. Run 저장과 GameState 표시 뷰에 포함 |
+| `FRunEncounterProgress` | schema·제시 목록·선택 ID·퇴장 완료 여부·`AfterCompletedNodeCount` 방문 회차. Run 저장과 GameState 표시 뷰에 포함 |
 | `UPartyDefinitionDataAsset::RunEncounterPool` | 새 Run에서 사용할 풀. 미지정 시 native 기본값 스킬상점·아이템상점·상점3 사용 |
 
 풀을 직접 편집하려면 `Content/User_JeHoon/Blueprint/DataAsset` 아래에 `RunEncounterPoolDataAsset` 유형의 DataAsset을 만들고 `DA_VerticalSliceParty.RunEncounterPool`에 연결한다. 서로 다른 ID와 이름을 가진 Shop 인카운터 3개에 `Encounter.Shop.Skill` 또는 `Encounter.Shop.Item` 태그를 지정한다. 기본 동작에는 에셋 생성·WBP 재생성이 필요 없다. 정의는 새 Run 초기화 시 분류 태그·표시 이름을 포함한 값으로 복사하며 진행 중 풀 수정으로 저장된 선택지가 바뀌지 않는다.
@@ -311,6 +313,8 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 
 기본 슬롯은 `ProjectA_Run`, 상대 Snapshot 슬롯은 `ProjectA_Opponent_` 접두사다. 새 게임·승패·Continue·상점 전이와 전투의 준비 완료 경계를 저장한다. 준비 완료·전투 시작은 저장 성공 뒤 확정하며 실패 시 이전 상태를 보존한다. 강제 종료 뒤 일반 Continue 또는 관리 명시적 재개로 마지막 저장 계획·Ready·유닛·자원·배치를 복구한다. 진행 중 시전·투사체의 시각을 복원하지 않고 저장된 경계에서 다시 실행한다. 테스트 슬롯은 `-ProjectASaveSlot=...`로 분리한다.
 
+저장된 노드가 `Combat_01`~`Combat_02`인 기존 저장은 원래 두 전투·중간 상점 경로로 검증·재개하며 10회로 소급 연장하지 않는다. 기존 상품·잔액·보유품·보상·소유권을 유지하고 새 Run에만 10전투·반복 상점 경로를 적용한다. 저장 버전과 구직업·순차 Combat 거절 규약은 유지한다.
+
 | 저장 종류 | 현재 처리 |
 |---|---|
 | 일반 v1 | Identity 없는 LegacyOffline 비전투 호환. 소유자/Host 추정 이관 금지 |
@@ -417,7 +421,7 @@ Paragon의 FBX 원본은 `Content/ParagonAnimationsRetargetedToManny`에 보존�
 | 화면 | 이름과 형식 |
 |---|---|
 | GameplayRoot | `RootOverlay`, `RunLayer`, `CombatLayer`, `ModalLayer`; 세 레이어는 `CommonActivatableWidgetStack` |
-| RunMap | `Text_Progress`, `Text_Party`, `Text_FlowMessage`, `NodeList`(`VerticalBox`); 노드 버튼은 런타임 생성 |
+| RunMap | `Text_Progress`, `Text_Party`, `Text_FlowMessage`, `NodeList`(`VerticalBox`); 노드 버튼은 런타임 생성, 알려진 계층의 목록은 높이 300 상한 스크롤 적용 |
 | RoundPlanning | Native CommonUI 상단 요약·우측 대상·좌하단 파티·하단 중앙 스킬·우하단 행동. 전장 대상 선택·장착 스킬 버튼 적용·SAP 이동 예약/취소·준비/취소. 필수 WBP 바인딩 없음 |
 | Result | `Text_Result`, `Button_Continue` |
 
@@ -435,7 +439,7 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 
 ## 현재 한계와 보존 대상
 
-- 기본 콘텐츠는 두 전투 시험 Run과 네 직업을 사용한다. 공통 초기값·개인 인벤토리·9칸 장비 UI·49종 장착·상점 HP 회복·임시 승리 골드 보상은 구현했다. 직업별 고유 스킬·최종 밸런스·회복/부활 인카운터·추가 보상·나머지 246종 장비 분류·비무기 콘텐츠·장비 능력치/부여 스킬·Snapshot 장비 연결과 목표 Run 구성은 미구현이다.
+- 기본 콘텐츠는 전투 10회·상점 9회의 새 시험 Run과 네 직업을 사용하며 기존 두 전투 저장은 보존한다. 공통 초기값·개인 인벤토리·9칸 장비 UI·49종 장착·상점 HP 회복·임시 승리 골드 보상은 구현했다. 직업별 고유 스킬·최종 밸런스·회복/부활 인카운터·추가 보상·나머지 246종 장비 분류·비무기 콘텐츠·장비 능력치/부여 스킬·Snapshot 장비 연결과 목표 PvE/PvP 20전투·60인카운터 구성은 미구현이다.
 - 4×4 Grid·ASC HP/AP·기존 외형/사망 표현과 시전 몽타주를 연결한다. 순차 턴·AI·기존 GAS/몽타주 알림의 효과 실행은 기본 전투에서 제외하며 장착 스킬은 초기 라운드 변환을 사용한다. 미지원 이전 대상/범위/커스텀 능력은 명시 프로필을 요구하며 자동으로 다른 효과로 바꾸지 않는다. Streaming/Level Instance는 현재 흐름에 없다.
 - 2026-09-11부터 작업 폴더에서 삭제된 TestMap·BP_PartyPlayerController·TestGameModebase의 삭제 이력을 2026-09-16 Git에 반영한다. 자동 복원하지 않으며 기존 최초 생성·Audit 도구의 TestMap 입력은 별도 원본 확보가 필요하다. WorldMap 레벨/native class는 deprecated 상태이며 실행 흐름에서 제외한다.
 - WorldMap의 WorldSettings가 참조하는 WorldMapGameModeBase는 호환을 위해 보존한다.
@@ -451,7 +455,7 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 | `CombatPlanValidator` | 액터 없는 값 입력으로 런타임과 체크포인트의 계획 규칙 공유. 소유권·월드 충돌·실시간 GAS 조건은 호출 경계에서 검사 |
 | `CombatAIPlanning` / `CombatSkillExecutor` | 기존 AI 선택 정책과 서버 스킬 충돌·검 궤적·GAS 효과 실행. Coordinator는 순서·시간·행동 상태 전이·결과 조율 |
 | `CombatCollisionPolicy` / `CombatEffectLibrary` | 대상 자격·벽 차폐·접촉 우선순위와 효과 Spec 생성/적용 공통화. 즉시 효과 성공은 `WasSuccessfullyApplied()` 사용 |
-| `RunProgressRules` / `RunSaveFormat` | 시험 경로/진행 규칙과 저장 v1~v6 해석 분리. 현재 두 전투와 중간 상점 유지; 목표 10회 PvP 콘텐츠는 구현 대기 |
+| `RunProgressRules` / `RunSaveFormat` | 새 10전투·반복 상점 경로와 기존 두 전투 경로를 분리 검증, 저장 v1~v6 해석 유지. 목표 PvE/PvP 20전투·60인카운터 구성은 구현 대기 |
 | `CommitSaveCandidate` | 준비 완료·결과·취소·Continue·상점·보상을 후보 계산 후 저장하고 성공한 상태만 공개. 실패 시 기존 상태와 재시도 보상 추첨 유지 |
 | `Combat/Legacy` | Unit·Controller·Manager의 비활성 순차 전투 구현 격리. 리플렉션 이름·Blueprint·저장 참조 보존 |
 

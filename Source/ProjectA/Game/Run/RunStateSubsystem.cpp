@@ -168,7 +168,9 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
     {
         return false;
     }
-    const FRunRouteDefinition& Route = RunProgressRules::GetPrototypeRoute();
+    const FRunRouteDefinition* SavedRoute = RunProgressRules::GetRouteForNodes(Save->Nodes);
+    if (!SavedRoute) return false;
+    const FRunRouteDefinition& Route = *SavedRoute;
     const FRunProgressView Progress{Save->Nodes, Save->CompletedNodes, Save->CurrentNode, Save->CurrentEncounter, Save->Phase, Save->Result};
     if (!RunProgressRules::ValidateNodes(Route, Progress) || !RunProgressRules::ValidateEncounterProgress(Route, Progress, Save->EncounterProgress)) return false;
     if (Save->EncounterProgress.SchemaVersion != 0 && Save->Identity.Origin == ERunIdentityOrigin::LegacyOffline) return false;
@@ -185,7 +187,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
         return false;
     }
     const bool bItemShopSelected = Save->EncounterProgress.IsItemShop();
-    if (Save->ItemShopState.SchemaVersion == 1 && (Save->SkillShopState.SchemaVersion != 1 || Save->EncounterProgress.SchemaVersion != 1 || (Save->ItemShopState.Revision > 0) != bItemShopSelected)) return false;
+    if (Save->ItemShopState.SchemaVersion == 1 && (Save->SkillShopState.SchemaVersion != 1 || Save->EncounterProgress.SchemaVersion != 1 || (bItemShopSelected && Save->ItemShopState.Revision <= 0) || (!Route.bRepeatEncounters && (Save->ItemShopState.Revision > 0) != bItemShopSelected))) return false;
     TSet<FSoftObjectPath> DisplayedItemAssets;
     for (const FRunItemShopOffer& Offer : Save->ItemShopState.Offers)
     {
@@ -1146,7 +1148,17 @@ bool URunStateSubsystem::ContinueRun()
 
     TStrongObjectPtr<URunSaveGame> Save(CreateSaveData());
     Save->CurrentEncounter = NAME_None;
-    Save->Phase = RunProgressRules::GetContinuationPhase(RunProgressRules::GetPrototypeRoute(), Save->CompletedNodes.Num(), Save->EncounterProgress);
+    const FRunRouteDefinition* Route = RunProgressRules::GetRouteForNodes(Save->Nodes);
+    if (!Route) return false;
+    if (Route->bRepeatEncounters && Save->EncounterProgress.SchemaVersion == 1 && Save->CompletedNodes.Num() >= Route->EncounterAfterCompletedNodes && Save->CompletedNodes.Num() < Route->Nodes.Num())
+    {
+        // Reset the next visit in the same durable transaction as Continue while retaining purchased content.
+        // 구매한 콘텐츠는 유지하며 Continue와 같은 저장 트랜잭션에서 다음 방문을 초기화합니다.
+        Save->EncounterProgress.SelectedEncounterId = NAME_None;
+        Save->EncounterProgress.bCompleted = false;
+        Save->EncounterProgress.AfterCompletedNodeCount = Save->CompletedNodes.Num();
+    }
+    Save->Phase = RunProgressRules::GetContinuationPhase(*Route, Save->CompletedNodes.Num(), Save->EncounterProgress);
     return CommitSaveCandidate(Save.Get(), SaveError);
 }
 

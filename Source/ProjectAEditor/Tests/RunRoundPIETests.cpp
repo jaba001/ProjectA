@@ -316,7 +316,8 @@ public:
         }
         if (Stage == 6)
         {
-            if (EncounterIndex == 0)
+            if (!Check(Run->GetCompletedNodes().Num() == EncounterIndex + 1, TEXT("Each authored victory completes exactly the next Run node."))) return End();
+            if (EncounterIndex + 1 < Run->GetNodes().Num())
             {
                 bool bFailed = false;
                 if (!RunEncounterPIE::TickToMap(Test, Host, Clients, bFailed)) return bFailed ? End() : false;
@@ -325,8 +326,8 @@ public:
                 return false;
             }
             if (Run->GetPhase() != ERunPhase::Complete || !ClientsAt(ERunPhase::Complete)) return false;
-            Check(Run->GetCompletedNodes().Num() == 2, TEXT("Both authored encounters and the intermediate shop complete one Run."));
-            Test->AddInfo(FString::Printf(TEXT("%d-player PIE completed two real combats, personal reward-card selection, shop selection/exit, durable result reload and replicated host-only progression."), Count));
+            if (!Check(Run->GetCompletedNodes().Num() == Run->GetNodes().Num(), TEXT("All ten authored encounters and the nine intermediate shops complete one Run."))) return End();
+            Test->AddInfo(FString::Printf(TEXT("%d-player PIE completed %d real combats and %d intermediate shops, personal reward-card selection, durable result reload and replicated host-only progression."), Count, Run->GetNodes().Num(), Run->GetNodes().Num() - 1));
             if (Count == 1)
             {
                 UClass* UnitClass = LoadClass<AUnitBase>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/Unit/BP_PlayerUnit.BP_PlayerUnit_C"));
@@ -427,6 +428,7 @@ private:
         FText Error;
         const bool bInitialized = Count == 1 ? Run->InitializeRun(Party, Error) : Run->InitializeRunWithIdentity(Party, Identity, Error);
         if (!Check(bInitialized, *FString::Printf(TEXT("Initialize authored Run: %s"), *Error.ToString()))) return false;
+        if (!Check(Run->GetNodes().Num() == 10, TEXT("The newly initialized Run exposes ten sequential combat nodes."))) return false;
         // This network combat fixture starts from an explicitly saved purchase; shop transactions have separate coverage.
         // 이 네트워크 전투 픽스처는 명시적으로 저장한 구매부터 시작하며 상점 거래는 별도로 검사합니다.
         TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));

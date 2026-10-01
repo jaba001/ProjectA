@@ -6,12 +6,14 @@
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Run/RunParticipationLibrary.h"
+#include "Game/Run/RunProgressRules.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Tests/RunRewardTestHelpers.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Misc/ScopeExit.h"
 #include "UObject/StrongObjectPtr.h"
 
 namespace
@@ -65,8 +67,23 @@ bool FRunEncounterFlowTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("Unselected shops cannot be visited afterward"), Run->SelectRunEncounter(TEXT("Shop_03")));
         TestEqual(TEXT("An empty shop preserves HP"), Run->GetPartyMembers()[0].CurrentHP, 73.f);
         TestTrue(TEXT("An empty shop preserves every identity field"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Run->GetRunIdentity(), 0));
-        TestTrue(TEXT("The next battle starts"), Run->BeginEncounter(TEXT("Combat_02")) && Run->MarkCombatStarted());
-        TestTrue(TEXT("The final victory finishes without another shop"), Run->CompleteEncounter(ECombatResult::Victory) && RunRewardTests::CollectPendingGoldRewards(Run.Get()) && Run->ContinueRun() && Run->GetPhase() == ERunPhase::Complete);
+        for (int32 NodeIndex = 1; NodeIndex < Run->GetNodes().Num(); ++NodeIndex)
+        {
+            const FName Node = Run->GetNodes()[NodeIndex].NodeId;
+            if (!TestTrue(TEXT("Each following battle starts in order"), Run->BeginEncounter(Node) && Run->MarkCombatStarted())) return false;
+            if (!TestTrue(TEXT("Each following victory reaches Continue after its reward"), Run->CompleteEncounter(ECombatResult::Victory) && RunRewardTests::CollectPendingGoldRewards(Run.Get()) && Run->ContinueRun())) return false;
+            if (NodeIndex + 1 == Run->GetNodes().Num())
+            {
+                TestTrue(TEXT("The tenth victory finishes without another shop"), Run->GetPhase() == ERunPhase::Complete);
+                continue;
+            }
+            TestTrue(TEXT("A new victory resets the encounter selection and completion"), Run->GetPhase() == ERunPhase::EncounterChoice && Run->GetEncounterProgress().SelectedEncounterId.IsNone() && !Run->GetEncounterProgress().bCompleted && Run->GetEncounterProgress().AfterCompletedNodeCount == NodeIndex + 1);
+            const FName NextChoice(*FString::Printf(TEXT("Shop_%02d"), (Index + NodeIndex - 1) % 3 + 1));
+            TestFalse(TEXT("A repeated encounter still requires entry before exit"), Run->LeaveRunEncounter());
+            if (!TestTrue(TEXT("Item skill and third shops remain selectable on later victories"), Run->SelectRunEncounter(NextChoice) && Run->LeaveRunEncounter())) return false;
+            TestTrue(TEXT("Each selected shop permits the immediately following combat"), Run->CanStartNode(Run->GetNodes()[NodeIndex + 1].NodeId));
+        }
+        TestEqual(TEXT("Every shop choice permits all ten combat nodes to complete"), Run->GetCompletedNodes().Num(), 10);
     }
     TStrongObjectPtr<URunEncounterPoolDataAsset> Pool(NewObject<URunEncounterPoolDataAsset>());
     TArray<FRunEncounterOffer> Offers;
@@ -133,6 +150,7 @@ bool FRunEncounterPersistenceTest::RunTest(const FString& Parameters)
     FRunCheckpointStorage::Save(Invalid.Get(), Slot.Name, Error);
     TestFalse(TEXT("A map save cannot bypass an unfinished shop"), Run->LoadCheckpoint(Error));
     Legacy->EncounterProgress = FRunEncounterProgress();
+    Legacy->Nodes = RunProgressRules::GetLegacyPrototypeRoute().Nodes;
     Legacy->ItemShopState = FRunItemShopState();
     for (FRunPartyMember& Member : Legacy->Party)
     {
@@ -141,7 +159,65 @@ bool FRunEncounterPersistenceTest::RunTest(const FString& Parameters)
     }
     Legacy->GoldRewardState = FRunGoldRewardState();
     if (!TestTrue(TEXT("Pre-feature defaults remain loadable"), FRunCheckpointStorage::Save(Legacy.Get(), Slot.Name, Error) && Run->LoadStandaloneCheckpoint(Error))) return false;
+    TestEqual(TEXT("The historical checkpoint keeps its original two combat nodes"), Run->GetNodes().Num(), 2);
     TestTrue(TEXT("An old Run preserves its original route without new encounters"), WinFirstBattle(Run.Get()) && Run->ContinueRun() && Run->CanStartNode(TEXT("Combat_02")));
+    TestTrue(TEXT("An old Run completes after its saved second combat"), Run->BeginEncounter(TEXT("Combat_02")) && Run->MarkCombatStarted() && Run->CompleteEncounter(ECombatResult::Victory) && RunRewardTests::CollectPendingGoldRewards(Run.Get()) && Run->ContinueRun() && Run->GetPhase() == ERunPhase::Complete);
+    TestFalse(TEXT("A completed historical Run cannot silently gain a third combat"), Run->BeginEncounter(TEXT("Combat_03")));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunRepeatedEncounterPersistenceTest, "ProjectA.Run.Encounter.RepeatedChoicesPersistAndReset", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunRepeatedEncounterPersistenceTest::RunTest(const FString& Parameters)
+{
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<URunStateSubsystem> Run(NewObject<URunStateSubsystem>(Instance.Get()));
+    TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Instance.Get()));
+    const FString Slot = TEXT("RepeatedShop_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    ON_SCOPE_EXIT { Run->OnRunStateChanged.Clear(); UGameplayStatics::DeleteGameInSlot(Slot, 0); };
+    Run->PartyDefinition = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
+    Run->EnableCheckpointSaving(Slot);
+    Restored->EnableCheckpointSaving(Slot);
+    FText Error;
+    if (!Run->PartyDefinition || !Run->InitializeRun({MakeShopMember()}, Error) || !Run->GetSaveError().IsEmpty()) return false;
+    const FRunIdentityData Identity = Run->GetRunIdentity();
+    if (!WinFirstBattle(Run.Get()) || !Run->ContinueRun() || !Run->SelectRunEncounter(TEXT("Shop_02")) || !Run->LeaveRunEncounter()) return false;
+    const FRunItemShopState PreviousItemStock = Run->GetItemShopState();
+    if (!Run->BeginEncounter(TEXT("Combat_02")) || !Run->MarkCombatStarted() || !Run->CompleteEncounter(ECombatResult::Victory) || !RunRewardTests::CollectPendingGoldRewards(Run.Get())) return false;
+    if (!TestTrue(TEXT("The second result reloads with its previous completed shop"), Run->LoadStandaloneCheckpoint(Error) && Run->GetPhase() == ERunPhase::Result && Run->GetEncounterProgress().AfterCompletedNodeCount == 1 && Run->GetEncounterProgress().SelectedEncounterId == TEXT("Shop_02") && Run->GetEncounterProgress().bCompleted)) return false;
+    const auto ReadBytes = [&Slot]()
+    {
+        TArray<uint8> Bytes;
+        UGameplayStatics::LoadDataFromSlot(Bytes, Slot, 0);
+        return Bytes;
+    };
+    const TArray<uint8> BeforeBytes = ReadBytes();
+    int32 Events = 0;
+    const FDelegateHandle Handle = Run->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("A failed later Continue cannot expose a reset shop visit"), Run->ContinueRun());
+    TestTrue(TEXT("Failed later Continue preserves boundary selection completion result and disk together"), Run->GetPhase() == ERunPhase::Result && Run->GetEncounterProgress().AfterCompletedNodeCount == 1 && Run->GetEncounterProgress().SelectedEncounterId == TEXT("Shop_02") && Run->GetEncounterProgress().bCompleted && Events == 0 && ReadBytes() == BeforeBytes);
+    if (!TestTrue(TEXT("The later Continue retries with one atomic reset"), Run->ContinueRun() && Events == 1)) return false;
+    Run->OnRunStateChanged.Remove(Handle);
+    if (!TestTrue(TEXT("The second choice screen restores as a fresh visit"), Restored->LoadStandaloneCheckpoint(Error) && Restored->GetPhase() == ERunPhase::EncounterChoice && Restored->GetEncounterProgress().AfterCompletedNodeCount == 2 && Restored->GetEncounterProgress().SelectedEncounterId.IsNone() && !Restored->GetEncounterProgress().bCompleted)) return false;
+    TestTrue(TEXT("Inactive item stock survives loading the next choice screen"), FRunItemShopState::StaticStruct()->CompareScriptStruct(&PreviousItemStock, &Restored->GetItemShopState(), 0));
+    if (!TestTrue(TEXT("A skill shop can follow the saved item shop"), Restored->SelectRunEncounter(TEXT("Shop_01")))) return false;
+    const FRunPartyMember Player = Restored->GetPartyMembers()[0];
+    if (!TestTrue(TEXT("The second shop's reroll can be purchased"), Restored->PurchaseShopOffer(Player.OwnerAccountId, Player.CharacterId, FRunSkillShopState::GetRerollOfferId(), Error, Restored->GetSkillShopState().Revision))) return false;
+    const FRunSkillShopState PaidStock = Restored->GetSkillShopState();
+    const int32 PaidGold = Restored->GetPartyMembers()[0].Gold;
+    TestEqual(TEXT("A paid reroll raises this visit's next price"), PaidStock.RerollPrice, 2);
+    if (!TestTrue(TEXT("The entered second shop resumes with its current visit"), Run->LoadStandaloneCheckpoint(Error) && Run->GetPhase() == ERunPhase::Shop && Run->GetEncounterProgress().AfterCompletedNodeCount == 2 && Run->GetEncounterProgress().SelectedEncounterId == TEXT("Shop_01"))) return false;
+    TestTrue(TEXT("Shop resume preserves offers revision reroll price and paid gold"), FRunSkillShopState::StaticStruct()->CompareScriptStruct(&PaidStock, &Run->GetSkillShopState(), 0) && Run->GetPartyMembers()[0].Gold == PaidGold);
+    if (!Run->LeaveRunEncounter() || !Restored->LoadStandaloneCheckpoint(Error) || !Restored->BeginEncounter(TEXT("Combat_03")) || !Restored->MarkCombatStarted() || !Restored->CompleteEncounter(ECombatResult::Victory) || !RunRewardTests::CollectPendingGoldRewards(Restored.Get()) || !Restored->ContinueRun() || !Restored->SelectRunEncounter(TEXT("Shop_01"))) return false;
+    TestTrue(TEXT("A later skill-shop entry resets its price and starts a new stock revision"), Restored->GetSkillShopState().RerollPrice == 1 && Restored->GetSkillShopState().Revision > PaidStock.Revision && Restored->GetSkillShopState().Offers.Num() == 5);
+    TestTrue(TEXT("Repeated encounters preserve every Run identity field"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Restored->GetRunIdentity(), 0));
+    TStrongObjectPtr<URunSaveGame> Invalid(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Slot, Error)));
+    if (!Invalid) return false;
+    Invalid->EncounterProgress.AfterCompletedNodeCount = 2;
+    if (!FRunCheckpointStorage::Save(Invalid.Get(), Slot, Error)) return false;
+    TestFalse(TEXT("A stale saved shop boundary cannot resume a later visit"), Restored->LoadStandaloneCheckpoint(Error));
+    TestTrue(TEXT("Rejected stale loading preserves the current entered shop"), Restored->GetPhase() == ERunPhase::Shop && Restored->GetEncounterProgress().AfterCompletedNodeCount == 3);
     return true;
 }
 

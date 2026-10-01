@@ -5,6 +5,7 @@
 #include "Components/Border.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/ScrollBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -46,6 +47,23 @@ void URunMapWidget::NativeOnInitialized()
         Content->AddChildToVerticalBox(Text_Party)->SetPadding(FMargin(0.0f, 8.0f));
         Content->AddChildToVerticalBox(NodeList);
         Content->AddChildToVerticalBox(Text_FlowMessage)->SetPadding(FMargin(0.0f, 16.0f, 0.0f, 0.0f));
+    }
+
+    // Keep every node reachable while retaining the known scaffold's list binding and slot layout.
+    // 알려진 생성 구조의 목록 바인딩과 슬롯 배치를 유지하면서 모든 노드를 스크롤로 확인할 수 있게 합니다.
+    if (Root && Content && Content->GetParent() == Root && NodeList->GetParent() == Content)
+    {
+        const int32 NodeIndex = Content->GetChildIndex(NodeList);
+        UVerticalBoxSlot* NodeSlot = CastChecked<UVerticalBoxSlot>(NodeList->Slot);
+        USizeBox* NodeListSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("RunMapNodeListSize"));
+        NodeListSize->SetMaxDesiredHeight(300.0f);
+        UScrollBox* NodeScroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("RunMapNodeScroll"));
+        NodeScroll->SetAllowOverscroll(false);
+        NodeScroll->SetScrollWhenFocusChanges(EScrollWhenFocusChanges::InstantScroll);
+        NodeList->RemoveFromParent();
+        Content->InsertChildAt(NodeIndex, NodeListSize, NodeSlot);
+        NodeListSize->SetContent(NodeScroll);
+        NodeScroll->AddChild(NodeList);
     }
 
     if (Root && Background && Background->GetParent() == Root)

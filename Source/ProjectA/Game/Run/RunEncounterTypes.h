@@ -56,6 +56,11 @@ struct PROJECTA_API FRunEncounterProgress
     UPROPERTY(BlueprintReadOnly, Category = "Encounter")
     bool bCompleted = false;
 
+    // Bind the current shop visit to its completed combat boundary without changing older saves.
+    // 이전 저장을 변경하지 않고 현재 상점 방문을 완료 전투 경계에 연결합니다.
+    UPROPERTY(BlueprintReadOnly, Category = "Encounter")
+    int32 AfterCompletedNodeCount = 1;
+
     const FRunEncounterOffer* FindSelectedOffer() const;
     bool IsItemShop() const;
 };

@@ -48,7 +48,7 @@ namespace RunEncounterPIE
             URunEncounterWidget* Screen = FindScreen(Client);
             if (!State || !Screen || State->GetViewState().Phase != Phase) return false;
             const FRunEncounterProgress& Received = State->GetViewState().EncounterProgress;
-            if (Received.Offers.Num() != 3 || Received.SelectedEncounterId != Progress.SelectedEncounterId || Received.bCompleted != Progress.bCompleted) return false;
+            if (Received.Offers.Num() != 3 || Received.SelectedEncounterId != Progress.SelectedEncounterId || Received.bCompleted != Progress.bCompleted || Received.AfterCompletedNodeCount != Progress.AfterCompletedNodeCount) return false;
             for (int32 Index = 0; Index < 3; ++Index)
             {
                 if (Received.Offers[Index].EncounterId != Progress.Offers[Index].EncounterId || Received.Offers[Index].DisplayName.ToString() != Progress.Offers[Index].DisplayName.ToString()) return false;
