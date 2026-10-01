@@ -41,28 +41,28 @@ $scriptDirectory = Join-Path $projectDirectory 'Source/ProjectAEditor/Scripts'
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ValidateGameplayAssets.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-6. 저장된 메뉴 맵에서 시작하는 스킬 목록 PIE 통합 테스트를 실행한다. 이 환경의 UE 5.7에서는 `-NullRHI` 상태의 PIE travel이 `GenericWindow::GetRestoredDimensions` fatal을 일으켜, 실제 렌더러의 `-RenderOffscreen`을 사용한다. 실행마다 비어 있는 전용 저장 슬롯을 지정한다.
+6. 저장된 메뉴 맵에서 시작하는 스킬 목록 PIE 통합 테스트의 실행 명령이다. 사용자 요청에 따라 에셋 교체 전 추가 스킬 실행은 보류한다. 이 환경의 UE 5.7에서는 `-NullRHI` 상태의 PIE travel이 `GenericWindow::GetRestoredDimensions` fatal을 일으켜, 실제 렌더러의 `-RenderOffscreen`을 사용한다. 실행마다 비어 있는 전용 저장 슬롯을 지정한다.
 
 ```powershell
 $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToString('N')
 & $editorExecutable $projectFile -unattended -nop4 -RenderOffscreen -nosound -Windowed -ResX=1280 -ResY=720 -WinX=0 -WinY=0 ("-ProjectASaveSlot=$skillTestSlot") '-ExecCmds=Automation RunTests ProjectA.VerticalSlice.SavedSkillLoadout' '-TestExit=Automation Test Queue Empty' ("-ReportExportPath=$projectDirectory/Saved/Automation/SkillLoadoutPIE")
 ```
 
-검증 범위:
+시험 성공 시 확인할 범위(최신 `SavedSkillLoadout` 수정본은 컴파일만 확인하고 재실행하지 않음):
 
 - 실제 메뉴·전사 생성·전투 노드에서 시작하며 저장된 검·비무장 DA 2개의 목록·계획·피해 적용을 확인한다. 삭제 대상인 휩쓸기·테스트 원거리·AOE 3종은 제외한다.
 - 화면 전환 후 Slate 마우스 누름/해제 한 번을 뷰포트 hit-test·컨트롤러 입력에 전달한다. 메뉴·스킬 버튼은 delegate를 사용하며 물리 마우스 하드웨어 검사는 아니다.
 - 전용 시험 저장만 생성·정리하며 기존 저장과 디스크 에셋·밸런스는 변경하지 않는다.
 
-종료 코드와 함께 JSON의 테스트 상태·오류 및 `Test Completed. Result={Success}`를 확인한다. 화면 캡처 경로는 `Saved/Automation/SkillLoadoutScreenshots`다. 메뉴·설정 검사는 별도 `ProjectA.VerticalSlice.SavedMenuLifecycle`을 사용한다. 작동 테스트는 [작업 규칙](../../../AGENTS.md#작동-테스트와-보고서)을 따르며 남은 확인은 [TODO](../../../Docs/TODO.md), 완료 결과는 [HISTORY](../../../Docs/HISTORY.md)에 짧게 기록한다.
+종료 코드와 함께 JSON의 테스트 상태·오류 및 `Test Completed. Result={Success}`를 확인한다. 화면 캡처 경로는 `Saved/Automation/SkillLoadoutScreenshots`다. 메뉴·설정 검사는 별도 `ProjectA.VerticalSlice.SavedMenuLifecycle`을 사용한다. 작동 테스트는 [작업 규칙](../../../AGENTS.md#작동-테스트와-보고서)을 따르며 현행 시험 구현의 실행 결과와 제외 범위는 [재검증 이력](../../../Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관), 향후 목표 Run·온라인·새 에셋 도입은 [TODO](../../../Docs/TODO.md)를 따른다.
 
-추가 위임 실행 명령은 같은 엔진 인자로 `Automation RunTests ProjectA.RunRoundPIE.1Players+ProjectA.RunRoundPIE.2Players+ProjectA.RunRoundPIE.4Players`를 사용한다. 각 시험이 새 전용 저장을 만들고 정리한다. 실제 두 전투·상점·결과 저장 복원·원격 AP/몽타주/SAP를 검사하며 서비스 인증은 시험 계정으로 대체한다.
+추가 위임 실행 명령은 같은 엔진 인자로 `Automation RunTests ProjectA.RunRoundPIE.1Players+ProjectA.RunRoundPIE.2Players+ProjectA.RunRoundPIE.4Players`를 사용한다. 각 시험이 새 전용 저장을 만들고 정리한다. 현행 fixture는 각 10전투·9상점 진행, 결과·HP/골드 저장 재로드와 원격 AP/몽타주/SAP를 검사한다. 전투 진행을 위해 인간 HP를 높인 fixture여서 정상 난이도 검증은 아니며 서비스 인증은 검사하지 않고 개발용 로컬 계정 문맥을 사용한다.
 
 실제 창 설정은 `-game /Game/User_JeHoon/LEVEL/MainMenu`와 `Automation RunTests ProjectA.Menu.GameWindowOptions`로 검사한다. 항복 UI는 같은 맵에서 새 `-ProjectASaveSlot=ProjectA_Automation_Surrender_<고유값>`과 `ProjectA.Menu.GameMenuSurrender`를 사용한다. 별도 프로세스 이어하기는 새 `-T11CheckpointSlot=ProjectA_Automation_Restart_<고유값> -T11WriteCheckpoint`로 `ProjectA.Persistence.ProcessRestart`를 먼저 실행한 뒤, 해당 슬롯을 `-ProjectASaveSlot`으로 지정한 `-game` 프로세스에서 `ProjectA.Menu.PackagedContinue`를 실행한다. 시험 이름과 달리 `UnrealEditor-Cmd -game` 실행은 패키징 검증이 아니다.
 
 7. `CreateRangedAttack.py`는 폐기 안내 도구로 유지한다. 테스트 원거리 `BPDA_RangedAttack` 제거에 따라 에셋을 작성하거나 재생성하지 않으며 실행 시 폐기 안내만 반환한다. 이전 작성·검증 결과는 당시 이력이다.
 
-8. `ConfigureSweepingStrike.py`는 폐기 안내 도구로 유지한다. 휩쓸기 제거에 따라 에셋을 작성하거나 재생성하지 않으며 실행 시 폐기 안내만 반환한다. `ConfigureCombatContent.py`의 현재 생성 대상에서도 휩쓸기·테스트 원거리·AOE 3종을 제외한다. 신규 후보·기존 저장 보유 제거의 확인은 [TODO 2-12절](../../../Docs/TODO.md#2-12-삭제-스킬과-기존-저장-호환)을 따른다.
+8. `ConfigureSweepingStrike.py`는 폐기 안내 도구로 유지한다. 휩쓸기 제거에 따라 에셋을 작성하거나 재생성하지 않으며 실행 시 폐기 안내만 반환한다. `ConfigureCombatContent.py`의 현재 생성 대상에서도 휩쓸기·테스트 원거리·AOE 3종을 제외한다. 신규 후보·기존 저장 보유 제거의 확인은 [구현·검증 이력](../../../Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
 `ProjectA.Combat.Round.MeleeAreaPhysicalContacts`와 `MeleeTargetAndSides`는 삭제 대상 3종과 독립적인 근접 범위·타일형 공통 기능 회귀로 보존한다. 생성 스킬 176종과 범위·투사체 공통 C++·GAS·FX도 유지한다. 기존 작성·검증 결과는 [당시 이력](../../../Docs/HISTORY.md#최근-변경)으로 구분한다.
 
@@ -86,7 +86,7 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 재실행은 작성 구성을 다시 적용하므로 수동 장착·부착·전사 직업 연결을 재설정한다. 부분 누락 시 고유 임시 폴더에서 리타깃하고 엔진의 에셋 통합으로 기존 의존 참조를 보존한다. `RoundMontageOverrides`와 기존 보행·DefaultSlot을 유지하고 맞지 않는 Manny Foot IK만 제거한다. Retargeter의 기본 연산을 중복 추가하지 않으며 Rig 지정 후 유효한 6개 연산을 한 번 구성한다. 설정 버전 변경이나 `-WarriorRebuildRetargets`는 관련 시퀀스 48개를 기존 경로에 다시 작성하고 원본 Root Motion 설정·참조를 보존한다.
 
-`-WarriorVerifyOnly`는 연산 구성·48개 시퀀스의 길이/포즈/유한 좌표/골반 이동 범위, 원본 폴더 구조·이전 참조 73개, 전사/적 몽타주의 실제 Kwang 공격·복귀 세그먼트와 전사의 검·비무장 DA 2개 장착 저장본을 검사한다. 공격 1.2초에 복귀 0.933333초의 첫 중복 포즈 0.2초를 제외해 총 1.933333초로 연결하며 블렌드 인 0.08초/아웃 0.12초를 사용한다. 검은 축 순서 혼동을 방지하는 `unreal.Rotator(pitch=0, yaw=0, roll=180)`과 손잡이 부착 위치·`BladeBase`/`BladeTip` 소켓·검 전용 `bUseWeaponTrace`로 작성한다. 활성 0.23~0.43초·반경 4cm와 서버 에셋 포즈 기반 칼날 표본 123개를 검사하며 실제 접촉·피해 실행은 [TODO](../../../Docs/TODO.md#2-15-근접-무기와-공격-표현-연결)에 남긴다.
+`-WarriorVerifyOnly`는 연산 구성·48개 시퀀스의 길이/포즈/유한 좌표/골반 이동 범위, 원본 폴더 구조·이전 참조 73개, 전사/적 몽타주의 실제 Kwang 공격·복귀 세그먼트와 전사의 검·비무장 DA 2개 장착 저장본을 검사한다. 공격 1.2초에 복귀 0.933333초의 첫 중복 포즈 0.2초를 제외해 총 1.933333초로 연결하며 블렌드 인 0.08초/아웃 0.12초를 사용한다. 검은 축 순서 혼동을 방지하는 `unreal.Rotator(pitch=0, yaw=0, roll=180)`과 손잡이 부착 위치·`BladeBase`/`BladeTip` 소켓·검 전용 `bUseWeaponTrace`로 작성한다. 활성 0.23~0.43초·반경 4cm와 서버 에셋 포즈 기반 칼날 표본 123개를 검사하며 이 도구의 정적 검사는 실제 접촉 화면을 포함하지 않는다. 서버 칼날 추적의 회귀 범위는 [재검증 이력](../../../Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
 11. `ImportParagonAnimations.py`: `Content/ParagonAnimationsRetargetedToManny`의 FBX를 `/Game/User_JeHoon/ParagonAnimationsRetargetedToManny`에 원본 하위 폴더대로 가져온다. Manny 뼈대·프리뷰 메시는 `/Game/Characters/Mannequins/Meshes`의 원본을 직접 참조하며 복제하거나 저장하지 않는다. 이 스크립트는 AnimSequence만 가져오며 게임 스킬 연결은 변경하지 않는다. FBX만 압축 해제한 상태와 Content Browser에서 열 수 있는 저장 에셋을 구분한다.
 
@@ -95,9 +95,9 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ImportParagonAnimations.py") -ParagonVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-`-ParagonImportLimit=<개수>`로 처리 범위를 제한할 수 있다. 기존 목적지 에셋은 검증 후 재사용하고 누락된 에셋을 가져온다. 원본 샘플링률을 자동 판정하고 종료 시간을 프레임 경계에 맞춘다. 신규 애니메이션의 개별 프리뷰에는 원본 Manny 메시를 지정한다. 검사는 원본 Manny 메시·뼈대 연결, AnimSequence 형식·길이·본 트랙·원본 FBX 참조를 대상으로 하며 결과는 `Saved/Automation/ParagonAnimationsImport.json`·`ParagonAnimationsReload.json`에 기록한다. 2026-09-21 전체 5,385개 저장·별도 재로드 검사를 통과했다. 파일명의 Additive/MSA만으로 Unreal 전용 가산 설정을 지정하지 않으며 PIE·게임 플레이를 실행하지 않는다. Animation Editor의 실제 재생 확인은 [TODO](../../../Docs/TODO.md#2-16-애니메이션-팩-도입과-리타깃)를 따른다.
+`-ParagonImportLimit=<개수>`로 처리 범위를 제한할 수 있다. 기존 목적지 에셋은 검증 후 재사용하고 누락된 에셋을 가져온다. 원본 샘플링률을 자동 판정하고 종료 시간을 프레임 경계에 맞춘다. 신규 애니메이션의 개별 프리뷰에는 원본 Manny 메시를 지정한다. 검사는 원본 Manny 메시·뼈대 연결, AnimSequence 형식·길이·본 트랙·원본 FBX 참조를 대상으로 하며 결과는 `Saved/Automation/ParagonAnimationsImport.json`·`ParagonAnimationsReload.json`에 기록한다. 2026-09-21 전체 5,385개 저장·별도 재로드 검사를 통과했다. 파일명의 Additive/MSA만으로 Unreal 전용 가산 설정을 지정하지 않으며 PIE·게임 플레이를 실행하지 않는다. Animation Editor 재생은 위 정적 재로드 검사에 포함되지 않았다. 새 애니메이션을 채택할 때의 확인은 [에셋 도입 계획](../../../Docs/TODO.md#6-신규-에셋-선정과-도입)을 따른다.
 
-12. `ConfigureShopSkillPresentation.py`: 공용 `BP_PlayerUnit`에 원본 Manny 메시·검 부착·`AM_SwordAttack_Manny` 대체 몽타주를 연결한다. 현재 Blueprint의 기본 장착 목록은 보존하고 새 Run의 비무장 시작·구매 장착은 C++ Run 데이터에서 적용한다. 원본 뼈대 참조 이전이 완료되어 있어야 하며 호환 뼈대 추가나 원본 저장은 하지 않는다. 제작 결과는 `Saved/Automation/ShopSkillPresentationConfigure.json`에 기록한다. 실제 구매·공격 확인은 [TODO](../../../Docs/TODO.md#2-19-비무장-시작과-스킬-상점)를 따른다.
+12. `ConfigureShopSkillPresentation.py`: 공용 `BP_PlayerUnit`에 원본 Manny 메시·검 부착·`AM_SwordAttack_Manny` 대체 몽타주를 연결한다. 현재 Blueprint의 기본 장착 목록은 보존하고 새 Run의 비무장 시작·구매 장착은 C++ Run 데이터에서 적용한다. 원본 뼈대 참조 이전이 완료되어 있어야 하며 호환 뼈대 추가나 원본 저장은 하지 않는다. 제작 결과는 `Saved/Automation/ShopSkillPresentationConfigure.json`에 기록한다. 2026-10-01 스킬별 구매·표현 실행은 사용자 지시로 제외했다. 진행·저장 회귀 범위는 [재검증 이력](../../../Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureShopSkillPresentation.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
@@ -138,7 +138,7 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 `-RogAppearanceMaterialsOnly`는 이전 Manny 의상 구성에서 기존 직업 매핑·Blueprint·스태프 설정을 유지하고 카탈로그와 신체 파츠 재질 영역만 갱신한다. 현행 몸체 선택이 활성화된 경우 이 작성기는 재실행을 차단한다. `VerifyRogAppearance.py`는 현재 몸체 구성 검사로 연결한다. 미사용 `MI_MannyNeutral`은 이전 작업에서 참조 확인 후 엔진 기능으로 제거했다.
 
-이전 Manny 구성의 재로드 검사는 네 직업의 기본·개별·전체 부위 선택과 잘못된 ID/중복 거부, 원본 참조·Manny 재질 영역·텍스처·본 자세·공통 애니메이션·검 표본·스태프 부착·물리 연결을 확인한다. 결과는 `Saved/Automation/RogAppearanceConfigure.json`, `RogAppearanceReload.json`에 저장한다. 현행 몸체 선택에서 호출하면 17번 Primitive 검사를 수행하고 `PrimitiveAppearanceReload.json`에 저장한다. 화면/플레이 실행은 하지 않으며 [검증 상태와 사용자 확인](../../../Docs/TODO.md#2-30-캐릭터-외형과-프리뷰)을 따른다. 카탈로그 활성 시 이전 GKnight·마녀·Assassin 구성의 재작성을 차단하고 `-WarriorVerifyOnly`는 현재 공통 외형과 기존 적/이전 참조 검사를 함께 수행한다.
+이전 Manny 구성의 재로드 검사는 네 직업의 기본·개별·전체 부위 선택과 잘못된 ID/중복 거부, 원본 참조·Manny 재질 영역·텍스처·본 자세·공통 애니메이션·검 표본·스태프 부착·물리 연결을 확인한다. 결과는 `Saved/Automation/RogAppearanceConfigure.json`, `RogAppearanceReload.json`에 저장한다. 현행 몸체 선택에서 호출하면 17번 Primitive 검사를 수행하고 `PrimitiveAppearanceReload.json`에 저장한다. 화면/플레이 실행은 하지 않으며 [구현·검증 이력](../../../Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다. 카탈로그 활성 시 이전 GKnight·마녀·Assassin 구성의 재작성을 차단하고 `-WarriorVerifyOnly`는 현재 공통 외형과 기존 적/이전 참조 검사를 함께 수행한다.
 
 17. `ConfigurePrimitiveAppearance.py`: 기존 `DA_MannyAppearance`의 `BodyVariants`에 남자 `Male`·여자 `Female`을 등록한다. 남자는 원본 `SKM_Primitive_Charater_01_Body`, 여자는 실제 에셋 이름인 `SKM_Primitive_02_Body`를 직접 참조한다. 원본 공통 뼈대의 Compatible Skeleton·본별 이동 리타기팅·DefaultSlot 설정으로 Manny 애니메이션을 공유하며 메시·텍스처·애니메이션을 복제하지 않는다. 네 직업의 전투·Snapshot·프리뷰 기본 메시를 남자로 연결하고 의상 표시를 비활성화한다. 마법사 기본 `Staff` 메시를 비우고 표시·충돌을 끈다. 103개 의상 항목·스태프 원본·기존 저장 ID는 향후 아이템 작업을 위해 보존한다.
 
@@ -153,7 +153,7 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 `-PrimitivePreviewFacingOnly`는 네 직업 메뉴 프리뷰 Blueprint와 현재 Male/Female의 `PreviewMeshTransform` 회전을 `0°`, 저장된 MainMenu 카메라 X를 `-500`, 네 슬롯 앵커 Yaw를 `90°`로 맞춘다. 나머지 몸체 설정·슬롯 위치·상세 거리 배율은 보존한다. 같은 옵션의 읽기 전용 검사는 Blueprint 4개·몸체 변환 2개·앵커 4개·카메라를 재로드하여 `Saved/Automation/PreviewFacingReload.json`에 기록한다. 화면·드래그 실행 검증은 포함하지 않는다.
 
-전체 검사는 네 직업의 기본 메시·몸체 ID와 이전 의상 선택 검증·원본 애니메이션 포즈·마법사 기본 스태프 제거·래그돌 구조를 읽기 전용으로 확인한다. 결과는 `Saved/Automation/PrimitiveAppearanceConfigure.json`, `PrimitiveAppearanceReload.json`에 기록한다. 실제 화면·게임 검증은 [TODO 2-30](../../../Docs/TODO.md#2-30-캐릭터-외형과-프리뷰)의 사용자 확인으로 남긴다.
+전체 검사는 네 직업의 기본 메시·몸체 ID와 이전 의상 선택 검증·원본 애니메이션 포즈·마법사 기본 스태프 제거·래그돌 구조를 읽기 전용으로 확인한다. 결과는 `Saved/Automation/PrimitiveAppearanceConfigure.json`, `PrimitiveAppearanceReload.json`에 기록한다. 실제 메뉴 저장·선택·수정·삭제는 확인했으나 프리뷰 idle 루프 경계 4건은 통과하지 못했고 애니메이션 캡처는 제외했다. [재검증 이력](../../../Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
 18. `ConfigureSkillVfxDirection.py`: `CombatVfxAssetLibrary`로 카탈로그의 Niagara 베기 23개·지정 투사체 3개를 조사한다. 본체가 이미 로컬이면 원본을 유지하며 월드 공간 대상 7개만 `/Game/User_JeHoon/{원본 팩/하위 폴더}/{이름}_TargetDirection`으로 파생한다. 원본 메시·재질을 직접 참조하고 기존 BPDA의 VFX와 `CatalogSkillSpecs.json`의 `direction_source`를 연결한다. 도끼·불꽃 화살의 위치 이벤트는 공식 NiagaraEditor 갱신 API로 `GenerateLocationEvent`·`ReceiveLocationEvent` 1.1을 적용해 로컬 본체와 월드 잔상의 좌표를 변환한다. `CreateCatalogSkills.py`도 이 선택적 방향 참조를 사용한다. 대상과 보정 계약은 [PROJECT_PLAN 4-1](../../../Docs/PROJECT_PLAN.md#4-1-스킬-이펙트-에셋-목록)을 따른다.
 
@@ -161,4 +161,4 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureSkillVfxDirection.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-작성 명령은 파생 에셋·대상 BPDA·명세를 저장한다. 기존 파생의 `CombatDirectionSource`가 원본 경로와 정확히 일치해야 하며, 출처 정보가 없거나 다르면 사용자 수정본을 보호하기 위해 중단한다. 대상 스킬에 다른 사용자 지정 VFX가 있으면 보존하고 중단한다. 결과는 `Saved/Automation/CombatVfxDirection/Authoring.json`에 원본 SHA·변경 대상·이미터 공간·파생 용량으로 기록한다. 2026-09-30 결과는 26개 중 7개·약 5.48MiB이며 사전 최대 81MiB 추정과 구분한다. 메타데이터·Niagara 컴파일 확인은 게임 재생·대상 방향 일치 검증을 포함하지 않으며 [사용자 확인](../../../Docs/TODO.md#2-37-전투-디버그-레벨)을 별도로 수행한다.
+작성 명령은 파생 에셋·대상 BPDA·명세를 저장한다. 기존 파생의 `CombatDirectionSource`가 원본 경로와 정확히 일치해야 하며, 출처 정보가 없거나 다르면 사용자 수정본을 보호하기 위해 중단한다. 대상 스킬에 다른 사용자 지정 VFX가 있으면 보존하고 중단한다. 결과는 `Saved/Automation/CombatVfxDirection/Authoring.json`에 원본 SHA·변경 대상·이미터 공간·파생 용량으로 기록한다. 2026-09-30 결과는 26개 중 7개·약 5.48MiB이며 사전 최대 81MiB 추정과 구분한다. 메타데이터·Niagara 컴파일 확인은 게임 재생·대상 방향 일치 검증을 포함하지 않는다. 채택할 신규 에셋의 재생 방향은 [도입 계획](../../../Docs/TODO.md#6-신규-에셋-선정과-도입)에 따라 확인한다.
