@@ -162,3 +162,14 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 ```
 
 작성 명령은 파생 에셋·대상 BPDA·명세를 저장한다. 기존 파생의 `CombatDirectionSource`가 원본 경로와 정확히 일치해야 하며, 출처 정보가 없거나 다르면 사용자 수정본을 보호하기 위해 중단한다. 대상 스킬에 다른 사용자 지정 VFX가 있으면 보존하고 중단한다. 결과는 `Saved/Automation/CombatVfxDirection/Authoring.json`에 원본 SHA·변경 대상·이미터 공간·파생 용량으로 기록한다. 2026-09-30 결과는 26개 중 7개·약 5.48MiB이며 사전 최대 81MiB 추정과 구분한다. 메타데이터·Niagara 컴파일 확인은 게임 재생·대상 방향 일치 검증을 포함하지 않는다. 채택할 신규 에셋의 재생 방향은 [도입 계획](../../../Docs/TODO.md#6-신규-에셋-선정과-도입)에 따라 확인한다.
+
+19. `ConfigureDungeonLevels.py`: `DungeonFantasySpec.json`·`DungeonStoneSpec.json`에 따라 Gameplay를 Unreal 기능으로 복제하여 `/Game/User_JeHoon/LEVEL/DungeonFantasy`·`DungeonStone`을 작성한다. FANTASTIC의 `/Game/Fantastic_Dungeon_Pack`·Modular Dungeon Collection의 `/Game/Dungeon_Modular_V1`을 직접 참조하고 전장·Grid·GameplayCamera를 보존한다. 두 맵만 기존 `BP_CombatDebugGameMode`를 지정하며 원본 Blueprint·Gameplay·DebugCombat과 기본 Run 전환은 유지한다. 생성·navigation 저장·최종 독립 재로드 정적 검사를 통과했다. [구성 기준](../../../Docs/PROJECT_PLAN.md#4-3-지하-던전-비교-레벨)
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureDungeonLevels.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=ResavePackages '-Package=/Game/User_JeHoon/LEVEL/DungeonFantasy' -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=ResavePackages '-Package=/Game/User_JeHoon/LEVEL/DungeonStone' -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureDungeonLevels.py") -DungeonVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+```
+
+기본 실행은 신규 맵만 생성·저장한다. `-DungeonVerifyOnly`는 저장본의 원본 에셋 참조·전장 연결을 읽기 전용으로 검사하고 `Saved/Automation/Dungeons/Reload.json`에 기록한다. 제작 결과는 같은 폴더의 `Configuration.json`에 기록한다. `-DungeonRebuild`는 기존 두 비교 맵의 장식을 재구성하여 수동 장식 수정을 덮어쓰는 명시적 옵션이다. navigation 명령의 `-ini`는 자동 빌드의 비동기 로딩 대기를 해당 프로세스에서만 해제하며 프로젝트 설정을 저장하지 않는다. 정적 검사는 실제 화면·클릭·이동을 포함하지 않으며 [TODO 10절](../../../Docs/TODO.md#10-지하-던전-비교-레벨-확인)에서 사용자가 확인한다.

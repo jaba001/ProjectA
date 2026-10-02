@@ -58,3 +58,10 @@ P2P 연결과 중앙 저장·계정 인증·MMR 검증은 각각 필요하다. �
 `O`를 기존 설정 CommonUI 경로에 추가하고 UE 5.8.3 Development Editor / Win64 컴파일·링크와 정적 검사를 통과했다. 실제 입력 확인은 미실행이며 [단축키 계약](UI_README.md#8-2-gameplay-인벤토리와-설정-단축키)을 따른다.
 
 - [ ] Gameplay와 열린 인벤토리에서 `O`로 설정을 열고 `O` 또는 `Esc`로 닫는다. 화면 변경 확인 중에는 먼저 이전 설정이 복구되고 배경 전장 입력이 차단되어야 한다.
+
+## 10 지하 던전 비교 레벨 확인
+
+상태: 두 비교 맵 생성·navigation 저장·독립 재로드의 원본 참조·배치·충돌·카메라 여백·GameMode 정적 검사 통과. 실제 화면·입력·이동 확인은 미실행이다. 기존 Gameplay·DebugCombat과 기본 Run 진입은 유지한다. [구성 기준](PROJECT_PLAN.md#4-3-지하-던전-비교-레벨)
+
+- [ ] `/Game/User_JeHoon/LEVEL/DungeonFantasy`를 직접 열어 GameplayCamera 뷰를 확인하고, 관리 Run이 없는 로컬 1인 Standalone·Non-Shipping Play에서 전사 1명·적 4명 생성과 전장·타일 가시성·타일 클릭·이동 예약·실제 이동을 확인한다.
+- [ ] `/Game/User_JeHoon/LEVEL/DungeonStone`에서 같은 조건과 절차를 반복한다. 장식이 전장 가시성·클릭·이동을 방해하지 않아야 하며 두 팩의 분위기를 비교한다.
