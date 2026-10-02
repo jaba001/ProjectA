@@ -6,6 +6,7 @@
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-10-02 설정 O 단축키 | `O`를 기존 `Esc`와 같은 CommonUI 설정 열기·닫기·확인 복원 경로에 연결하고 인벤토리 안내와 사용 문서를 갱신했다. UE 5.8.3 Development Editor / Win64 컴파일·링크 16.74초, 코드 검토·문서 링크·diff 정적 검사 통과. 게임·PIE·자동화 실행은 미수행이며 [TODO 9절](TODO.md#9-설정-o-단축키-확인)에 사용자 입력 확인을 남겼다. 근거: `Saved/Automation/SettingsOShortcutBuild.log`. |
 | 2026-10-02 포더킹 참고 목록형 인벤토리 | 상점과 `I` 창의 가방 격자를 24px 아이콘·이름·사본 수량의 세로 목록으로 교체하고 GameplayTagQuery 분류 탭·개수·선택 강조·클릭 상세와 별도 스킬 탭을 추가했다. 원본 ItemIndex·장비 Revision·권위 스킬 fallback·빈 가방 Drop·서버 장착 조건을 유지하며 원본 에셋·저장 형식은 변경하지 않았다. UE 5.8.3 Development Editor / Win64 최종 컴파일·링크 8.32초, 독립 코드 검토·문서 링크·diff 정적 검사 통과. 에디터·게임·PIE·자동화 실행은 미수행이며 [TODO 8절](TODO.md#8-목록형-인벤토리-확인)에 화면·입력 확인을 남겼다. 근거: `Saved/Automation/InventoryListFinalBuild.log`. |
 | 2026-10-02 UE 5.8.3 마이그레이션 | 엔진 연결·게임/Editor 타깃을 5.8·V7·Unreal5_8로 전환하고 Notify·Niagara·IKRetargeter·ControlRig API 호환을 수정했다. 번들 .NET 10으로 프로젝트 파일 재생성 12.47초, 최종 Development Editor / Win64 컴파일·링크 12.30초 성공. 독립 코드 리뷰·문서 링크·솔루션·diff 정적 검사 통과. 에셋 변환·로드·게임·PIE·자동화 실행은 미수행이며 [TODO 7절](TODO.md#7-ue-58-전환-확인)에 사용자 확인을 남겼다. 근거: `Saved/Automation/UE58ProjectFiles.log`, `UE58MigrationVerifiedBuild.log`. 로컬 설치 목록에 누락된 엔진은 HKCU `Unreal Engine/Builds`의 `5.8` 경로로 등록했으며 Launcher 설치 목록은 변경하지 않았다. |
 | 2026-10-01 TODO 재검증과 완료 구현 이관 | TODO의 완료 구현·컴파일 설명을 남은 확인과 분리하여 [9-15절](#9-15-2026-10-01-todo-재검증과-구현-이관)에 통합했다. 사용자 실행 요청으로 자동화 166개·1/2/4인 진행·메뉴 버튼·실제 Quit를 확인하고 저장 거절 사유·호환 Skeleton 검 추적·게임 문맥의 표시명 비교를 보완했다. 최종 컴파일 13.34초와 대상 저장 검사 에디터 7개·게임 6개·실제 메뉴 Continue가 통과했다. 전체 메뉴의 idle 루프 실패와 제외한 표현 검사는 해당 절을 따른다. |

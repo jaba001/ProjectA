@@ -48,6 +48,7 @@ void UGameplayRootWidget::RegisterGameplayShortcuts()
     ShortcutActions->RowStruct = FCommonInputActionDataBase::StaticStruct();
     ShortcutActions->AddRow(TEXT("Inventory"), FGameplayShortcutAction(NSLOCTEXT("GameplayShortcuts", "Inventory", "인벤토리"), EKeys::I));
     ShortcutActions->AddRow(TEXT("Settings"), FGameplayShortcutAction(NSLOCTEXT("GameplayShortcuts", "Settings", "설정"), EKeys::Escape));
+    ShortcutActions->AddRow(TEXT("SettingsAlternate"), FGameplayShortcutAction(NSLOCTEXT("GameplayShortcuts", "Settings", "설정"), EKeys::O));
     const auto BindShortcut = [this](FName RowName, const FSimpleDelegate& Callback)
     {
         FDataTableRowHandle Action;
@@ -60,6 +61,7 @@ void UGameplayRootWidget::RegisterGameplayShortcuts()
     };
     BindShortcut(TEXT("Inventory"), FSimpleDelegate::CreateUObject(this, &UGameplayRootWidget::ToggleInventory));
     BindShortcut(TEXT("Settings"), FSimpleDelegate::CreateUObject(this, &UGameplayRootWidget::ToggleSettings));
+    BindShortcut(TEXT("SettingsAlternate"), FSimpleDelegate::CreateUObject(this, &UGameplayRootWidget::ToggleSettings));
 }
 
 bool UGameplayRootWidget::IsUtilityMenuOpen() const

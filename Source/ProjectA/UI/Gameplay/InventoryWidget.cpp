@@ -82,7 +82,7 @@ void UInventoryWidget::NativeOnInitialized()
     UHorizontalBox* FooterContent = WidgetTree->ConstructWidget<UHorizontalBox>();
     Footer->SetContent(FooterContent);
     UTextBlock* Shortcuts = WidgetTree->ConstructWidget<UTextBlock>();
-    Shortcuts->SetText(NSLOCTEXT("Inventory", "Shortcuts", "I · 인벤토리 닫기    Esc · 설정 열기"));
+    Shortcuts->SetText(NSLOCTEXT("Inventory", "Shortcuts", "I · 인벤토리 닫기    Esc / O · 설정 열기"));
     Shortcuts->SetAutoWrapText(true);
     Theme.StyleText(Shortcuts, false, 15);
     UHorizontalBoxSlot* ShortcutsSlot = FooterContent->AddChildToHorizontalBox(Shortcuts);
