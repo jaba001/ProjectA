@@ -12,6 +12,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Combat/Library/CombatWeaponTraceLibrary.h"
+#include "ControlRigAssetReference.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphPin.h"
@@ -38,6 +39,7 @@
 #include "Modules/ModuleManager.h"
 #include "ObjectTools.h"
 #include "RetargetEditor/IKRetargetBatchOperation.h"
+#include "Retargeter/IKRetargeter.h"
 #include "UObject/CoreRedirects.h"
 #include "UObject/ObjectRedirector.h"
 #include "UObject/Package.h"
@@ -654,7 +656,7 @@ bool UWarriorAssetLibrary::RemoveLegacyFootIK(UAnimBlueprint* Blueprint)
         for (UEdGraphNode* Node : Graph->Nodes)
         {
             UAnimGraphNode_ControlRig* RigNode = Cast<UAnimGraphNode_ControlRig>(Node);
-            const UClass* RigClass = RigNode ? RigNode->Node.GetControlRigClass().Get() : nullptr;
+            const UClass* RigClass = RigNode ? RigNode->Node.GetControlRigAssetReference().GetBlueprintClass().Get() : nullptr;
             if (!RigClass || RigClass->GetPathName() != LegacyRigPath) continue;
             UEdGraphPin* Input = FindPosePin(RigNode, EGPD_Input);
             UEdGraphPin* Output = FindPosePin(RigNode, EGPD_Output);

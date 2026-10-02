@@ -1,6 +1,6 @@
 # UI 구조·생성 도구
 
-기준일: 2026-10-01. 화면 구성과 JSON 기반 Widget Blueprint 생성 규칙을 정의한다. 게임 흐름·에셋 연결은 [PROJECT_PLAN](PROJECT_PLAN.md), 현재 구현의 실행 결과와 제외 범위는 [HISTORY](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관), 향후 목표 Run·온라인·신규 에셋 도입은 [TODO](TODO.md)를 따른다.
+기준일: 2026-10-02. UE 5.8의 화면 구성과 JSON 기반 Widget Blueprint 생성 규칙을 정의한다. 게임 흐름·에셋 연결은 [PROJECT_PLAN](PROJECT_PLAN.md), UE 5.7의 실행 기록과 제외 범위는 [HISTORY](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관), UE 5.8 사용자 작동 확인·향후 목표 Run·온라인·신규 에셋 도입은 [TODO](TODO.md)를 따른다.
 
 ## 구성과 편집 원칙
 
@@ -34,7 +34,7 @@
 Development Editor / Win64 빌드 후 프로젝트 루트 PowerShell에서 실행한다. 빌드·프로젝트 파일 재생성 명령은 [README](../README.md#개발-환경)를 따른다.
 
 ```powershell
-$editor = 'C:/Program Files/Epic Games/UE_5.7/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'
+$editor = 'C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'
 $project = Join-Path (Get-Location) 'ProjectA.uproject'
 $spec = 'Source/ProjectAEditor/UiScaffoldSpecs/MainMenuScreenWidget.json'
 & $editor $project -run=GenerateUiScaffold -nop4 -unattended -NullRHI -DryRun "-Spec=$spec"

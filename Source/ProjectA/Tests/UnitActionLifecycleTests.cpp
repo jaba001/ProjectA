@@ -132,8 +132,8 @@ bool FUnitRetiredActionTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The fixture observes a directly delivered release event"), ReleaseEvents, 1);
     ReleaseEvents = 0;
     UAN_SkillRelease* ReleaseNotify = NewObject<UAN_SkillRelease>(Unit);
-    ReleaseNotify->Notify(Unit->GetMesh(), nullptr);
-    ReleaseNotify->Notify(Unit->GetMesh(), nullptr);
+    ReleaseNotify->Notify(Unit->GetMesh(), nullptr, FAnimNotifyEventReference());
+    ReleaseNotify->Notify(Unit->GetMesh(), nullptr, FAnimNotifyEventReference());
     TestEqual(TEXT("Repeated legacy montage notifies emit no release events for round units"), ReleaseEvents, 0);
     TestEqual(TEXT("Legacy montage notifies preserve source HP"), Unit->GetAttributeSet()->GetHP(), 100.0f);
     TestEqual(TEXT("Legacy montage notifies preserve target HP"), Target->GetAttributeSet()->GetHP(), 100.0f);

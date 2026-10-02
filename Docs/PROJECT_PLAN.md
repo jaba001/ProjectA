@@ -1,8 +1,8 @@
 # ProjectA 구현 구조와 설정
 
-기준일: 2026-10-01. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
+기준일: 2026-10-02. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다. 엔진 기준은 UE 5.8.3이며 기존 실행 결과는 UE 5.7 당시 이력이다. UE 5.8 작동 확인은 [TODO 7절](TODO.md#7-ue-58-전환-확인)을 따른다.
 
-기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 위임 실행은 당시 두 전투 경로의 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀 결과다. 2026-10-01 현행 1인·같은 PC 2/4인 PIE에서 각 10전투·9상점 선택/퇴장·개인 보상과 저장 재로드를 확인했다. 진행용 HP fixture이며 정상 난이도·실제 서비스·다중 PC·지연/손실 검증은 별도다. [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
+기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 UE 5.7 위임 실행은 당시 두 전투 경로의 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀 결과다. 2026-10-01 UE 5.7의 당시 코드로 1인·같은 PC 2/4인 PIE에서 각 10전투·9상점 선택/퇴장·개인 보상과 저장 재로드를 확인했다. 진행용 HP fixture이며 UE 5.8·정상 난이도·실제 서비스·다중 PC·지연/손실 검증은 별도다. [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
 T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 새 라운드는 저장된 준비 완료 경계에서 복구하며 이전 순차 Combat 저장은 계속 거절한다. 진행 중 시전·투사체의 임의 시점 복원은 지원하지 않는다. Steam/PlayFab·MMR은 미구현이며 [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
@@ -16,7 +16,7 @@ T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 새 라�
 
 ## 기본 실행 흐름
 
-실행 환경은 UE 5.7의 `ProjectA.uproject`다.
+실행 환경은 UE 5.8의 `ProjectA.uproject`다. 게임·Editor 타깃은 `BuildSettingsVersion.V7`·`EngineIncludeOrderVersion.Unreal5_8`을 사용한다.
 
 1. 기본 시작 맵인 `/Game/User_JeHoon/LEVEL/MainMenu`를 연다.
 2. 게임 시작 → 싱글플레이 → CharacterCreation에서 1~4명의 캐릭터를 생성하고 직접 조작할 한 명을 선택한다. 직업 화살표와 Edit로 직업·이름을 바꾼다. 멀티플레이는 기존 같은 PC·LAN 개발용 방으로 연결한다.
@@ -26,7 +26,7 @@ T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 새 라�
 6. 새 Run은 1~9번째 Victory마다 5~15G 보상 3개 중 1개 수령 → Continue → 스킬상점·아이템상점·상점3 중 하나 선택 → 나가기 → 다음 Combat 노드를 진행한다. 10번째 Victory도 보상을 수령한 뒤 Continue로 완료된 Run Map을 표시한다.
 7. 잔여 공격까지 정리한 뒤 양 팀 전멸을 포함한 패배는 Defeat 화면을 표시하고 Run을 종료한다. 승리 보상은 지급하지 않는다.
 
-빌드 후 UE를 재시작하여 C++·리플렉션 변경을 반영한다. 이번 전환에는 새 맵·WBP 생성이나 Config 변경이 필요하지 않다.
+빌드 후 UE를 재시작하여 C++·리플렉션 변경을 반영한다. 라운드 계획 전환에는 새 맵·WBP 생성이나 Config 변경이 필요하지 않다.
 
 2026-09-16 일반 플레이 보고는 당시 두 전투 경로의 관찰 범위에 한정한다. 현행 1/2/4인 시험 Run 진행과 검증 제한은 [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
@@ -185,7 +185,7 @@ Standalone은 결과 저장 성공 후 유닛·전투 상태를 정리한다. �
 
 MainMenu·Gameplay GameMode는 `InitializeHUDForPlayer`에서 HUDClass가 있을 때만 엔진 기본 AHUD 초기화를 호출한다. HUDClass=None인 CommonUI 화면은 빈 클래스 생성 요청을 생략한다.
 
-GameplayCue 검색은 `DefaultGame.ini`의 `GameplayAbilitiesDeveloperSettings`와 `AbilitySystemGlobals`에 `GameplayCueNotifyPaths=/Game/User_JeHoon`을 지정한다. UE 5.7은 두 배열을 중복 없이 합친다. DeveloperSettings 배열이 비었던 이전 실행에 대비한 공식 호환 설정 보완이며 최초 빈값 원인은 미확정이다. 2026-09-18 실제 Game 설정·설정 객체·Globals 경로 일치와 전체 `/Game` fallback 경고 소멸을 확인했다. 작성된 GameplayCueNotify 에셋이 없어 실제 Cue 발동은 미검증이며 외부 Cue 도입 시 의존 경로도 등록한다. [완료 이력](HISTORY.md#9-2-gameplaycue-설정과-경고). 새 GameplayCue 에셋을 채택하면 [도입 계획](TODO.md#6-신규-에셋-선정과-도입)에 따라 검색 경로와 표현을 확인한다.
+GameplayCue 검색은 `DefaultGame.ini`의 `GameplayAbilitiesDeveloperSettings`와 `AbilitySystemGlobals`에 `GameplayCueNotifyPaths=/Game/User_JeHoon`을 지정한다. 설치된 UE 5.8.3의 `AbilitySystemGlobals.cpp`에서 두 배열을 `TSet`으로 중복 없이 합치는 동작을 정적 확인했으며 설정은 유지한다. DeveloperSettings 배열이 비었던 이전 실행에 대비한 공식 호환 설정 보완이며 최초 빈값 원인은 미확정이다. 2026-09-18 UE 5.7에서 실제 Game 설정·설정 객체·Globals 경로 일치와 전체 `/Game` fallback 경고 소멸을 확인했다. UE 5.8 경고 소멸과 실제 Cue 발동은 미검증이며 GameplayCueNotify 에셋도 아직 작성하지 않았다. 외부 Cue 도입 시 의존 경로도 등록한다. [완료 이력](HISTORY.md#9-2-gameplaycue-설정과-경고). 새 GameplayCue 에셋을 채택하면 [도입 계획](TODO.md#6-신규-에셋-선정과-도입)에 따라 검색 경로와 표현을 확인한다.
 
 GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMenu의 UIOnly 상태에서 travel한 뒤 남는 viewport `IgnoreInput`과 로컬 포커스는 native 진입 코드가 복구한다. 이 입력 수정에는 WBP 재생성이 필요 없다.
 

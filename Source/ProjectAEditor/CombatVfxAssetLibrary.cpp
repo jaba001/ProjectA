@@ -213,8 +213,10 @@ FString UCombatVfxAssetLibrary::ConfigureEmitterSpace(UNiagaraSystem* System, co
         // Preserve authored angular motion and renderer bindings while recompiling the changed simulation space.
         // 시뮬레이션 공간을 다시 컴파일하며 작성된 회전 운동과 렌더러 바인딩은 보존합니다.
         Data->GraphSource->MarkNotSynchronized(TEXT("Project combat VFX simulation space changed."));
-        System->RefreshSystemParametersFromEmitter(*Handle);
     }
+    // Prepare dependent script parameters through the system-wide Unreal 5.8 authoring API.
+    // Unreal 5.8의 시스템 단위 작성 API로 종속 스크립트 파라미터를 준비합니다.
+    System->PrepareRapidIterationParametersForCompilation();
     System->MarkPackageDirty();
     System->RequestCompile(true);
     System->WaitForCompilationComplete(true, false);
@@ -281,10 +283,9 @@ FString UCombatVfxAssetLibrary::UpgradeLocationEventToWorldVersion(UNiagaraSyste
         if (Upgrade.Node->SelectedScriptVersion != Upgrade.TargetVersion) return FString::Printf(TEXT("Location event version change failed: %s; do not save. / 위치 이벤트 버전 변경에 실패했으므로 저장하지 마세요."), *Upgrade.Node->GetPathName());
         Upgrade.Emitter.GetEmitterData()->GraphSource->MarkNotSynchronized(TEXT("Project location events upgraded to world-space version 1.1."));
     }
-    for (const FNiagaraEmitterHandle& Handle : System->GetEmitterHandles())
-    {
-        if (Handle.GetInstance().GetEmitterData()) System->RefreshSystemParametersFromEmitter(Handle);
-    }
+    // Refresh all dependent rapid iteration stores after changing the module versions.
+    // 모듈 버전을 변경한 뒤 모든 종속 신속 반복 파라미터 저장소를 갱신합니다.
+    System->PrepareRapidIterationParametersForCompilation();
     System->MarkPackageDirty();
     System->RequestCompile(true);
     System->WaitForCompilationComplete(true, false);

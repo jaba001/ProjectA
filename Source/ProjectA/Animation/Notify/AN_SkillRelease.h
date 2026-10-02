@@ -19,7 +19,7 @@ public:
 
     // Sends the skill release event when the notify is reached.
     // 노티파이 시점에 스킬 발동 이벤트를 전송합니다.
-    virtual void Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation) override;
+    virtual void Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) override;
 
 protected:
     // Event tag to trigger skill release timing in GAS abilities.

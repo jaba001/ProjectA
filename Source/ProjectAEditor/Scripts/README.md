@@ -2,10 +2,10 @@
 
 UI 구조·생성 옵션·JSON 필드는 [UI_README](../../../Docs/UI_README.md)를 따른다.
 
-Development Editor / Win64 빌드를 사용한다. Python은 `-EnablePlugins=PythonScriptPlugin`으로 해당 프로세스에서만 활성화한다. 제작 경로는 `/Game/User_JeHoon`이며 사용자 요청에 따른 지팡이 직접 임포트는 `/Game/MageStaff_FreeWeapons`를 사용한다. 최초 생성·Audit는 기존 TestMap을 요구하므로 현재 사용자 삭제 상태에서 실행 전 원본 가용성을 확인한다.
+UE 5.8 Development Editor / Win64 빌드를 사용한다. 아래 기존 실행·재로드 결과는 UE 5.7 이력이며 UE 5.8 작동 확인은 [TODO 7절](../../../Docs/TODO.md#7-ue-58-전환-확인)을 따른다. Python은 `-EnablePlugins=PythonScriptPlugin`으로 해당 프로세스에서만 활성화한다. 제작 경로는 `/Game/User_JeHoon`이며 사용자 요청에 따른 지팡이 직접 임포트는 `/Game/MageStaff_FreeWeapons`를 사용한다. 최초 생성·Audit는 기존 TestMap을 요구하므로 현재 사용자 삭제 상태에서 실행 전 원본 가용성을 확인한다.
 
 ```powershell
-$editorExecutable = 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
+$editorExecutable = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $projectFile = 'C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject'
 $projectDirectory = Split-Path $projectFile -Parent
 $scriptDirectory = Join-Path $projectDirectory 'Source/ProjectAEditor/Scripts'
@@ -41,14 +41,14 @@ $scriptDirectory = Join-Path $projectDirectory 'Source/ProjectAEditor/Scripts'
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ValidateGameplayAssets.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-6. 저장된 메뉴 맵에서 시작하는 스킬 목록 PIE 통합 테스트의 실행 명령이다. 사용자 요청에 따라 에셋 교체 전 추가 스킬 실행은 보류한다. 이 환경의 UE 5.7에서는 `-NullRHI` 상태의 PIE travel이 `GenericWindow::GetRestoredDimensions` fatal을 일으켜, 실제 렌더러의 `-RenderOffscreen`을 사용한다. 실행마다 비어 있는 전용 저장 슬롯을 지정한다.
+6. 저장된 메뉴 맵에서 시작하는 스킬 목록 PIE 통합 테스트의 실행 명령이다. 사용자 요청에 따라 에셋 교체 전 추가 스킬 실행은 보류한다. 이 환경의 UE 5.7 실행에서 `-NullRHI` 상태의 PIE travel이 `GenericWindow::GetRestoredDimensions` fatal을 일으킨 이력에 따라 실제 렌더러의 `-RenderOffscreen`을 유지한다. UE 5.8에서 해당 오류의 재현 여부는 확인하지 않았다. 실행마다 비어 있는 전용 저장 슬롯을 지정한다.
 
 ```powershell
 $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToString('N')
 & $editorExecutable $projectFile -unattended -nop4 -RenderOffscreen -nosound -Windowed -ResX=1280 -ResY=720 -WinX=0 -WinY=0 ("-ProjectASaveSlot=$skillTestSlot") '-ExecCmds=Automation RunTests ProjectA.VerticalSlice.SavedSkillLoadout' '-TestExit=Automation Test Queue Empty' ("-ReportExportPath=$projectDirectory/Saved/Automation/SkillLoadoutPIE")
 ```
 
-시험 성공 시 확인할 범위(최신 `SavedSkillLoadout` 수정본은 컴파일만 확인하고 재실행하지 않음):
+시험 성공 시 확인할 범위(UE 5.7 당시 `SavedSkillLoadout` 수정본은 컴파일만 확인하고 재실행하지 않음):
 
 - 실제 메뉴·전사 생성·전투 노드에서 시작하며 저장된 검·비무장 DA 2개의 목록·계획·피해 적용을 확인한다. 삭제 대상인 휩쓸기·테스트 원거리·AOE 3종은 제외한다.
 - 화면 전환 후 Slate 마우스 누름/해제 한 번을 뷰포트 hit-test·컨트롤러 입력에 전달한다. 메뉴·스킬 버튼은 delegate를 사용하며 물리 마우스 하드웨어 검사는 아니다.

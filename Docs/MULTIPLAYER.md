@@ -4,7 +4,9 @@
 
 ## 현재 상태
 
-기본 Combat는 라운드 계획·시간차 실행으로 교체했다. `ACombatRoundCoordinator`가 서버 계획·시각·위치·충돌·피해를 소유하며 기존 Listen Server·원래 캐릭터 소유권·관리 lease를 연결한다. 순차 턴·연속 AI 실행과 턴 저장 복원은 폐기했다. 2026-10-01 현행 코드에서 1인·동일 PC 2/4인 각각 10전투·9상점의 자동 진행을 확인했다. 진행용 HP 조건의 검증이며 실제 난이도·Ready 강제 종료 후 Actor 재구성·다중 PC 동작의 확인으로 확대하지 않는다. [검증 범위](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
+엔진 기준은 UE 5.8.3이다. 기존 실행 결과는 UE 5.7 이력이며 UE 5.8 협동 작동 확인은 [TODO 7절](TODO.md#7-ue-58-전환-확인)에 남긴다.
+
+기본 Combat는 라운드 계획·시간차 실행으로 교체했다. `ACombatRoundCoordinator`가 서버 계획·시각·위치·충돌·피해를 소유하며 기존 Listen Server·원래 캐릭터 소유권·관리 lease를 연결한다. 순차 턴·연속 AI 실행과 턴 저장 복원은 폐기했다. 2026-10-01 UE 5.7의 당시 코드로 1인·동일 PC 2/4인 각각 10전투·9상점의 자동 진행을 확인했다. 진행용 HP 조건의 검증이며 UE 5.8·실제 난이도·Ready 강제 종료 후 Actor 재구성·다중 PC 동작의 확인으로 확대하지 않는다. [검증 범위](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
 이전 ff22940의 승계 PIE·관리 계약 성공은 순차 전투 이력이다. 비전투 관리 재개와 새 schema 3의 Ready 경계 복구를 지원하며 이전 순차 Combat 저장은 본문·Host·참가자·lease 변경 전에 거절한다. 강제 종료 후 마지막으로 저장한 준비 완료 상태를 복구하며 진행 중 시전·투사체의 임의 시점 복원은 지원하지 않는다. [상세 경계](#12-시간차-자동-전투의-확장-경계)
 
@@ -174,7 +176,7 @@ Steam Leaderboards는 전투 정당성을 검증하지 않는다. Trusted 점수
 공식 참고: [Steam 인증](https://partner.steamgames.com/doc/features/auth?l=english), [Steam Cloud](https://partner.steamgames.com/doc/features/cloud?l=english), [PlayFab 개발 모드](https://learn.microsoft.com/en-us/gaming/playfab/pricing/development-mode).
 
 준비물은 Steamworks AppID·테스트 계정/권한·PlayFab Title·승인된 개발 환경이다. 공급자는 기존 결정을 유지한다.
-Unreal Online Subsystem·공식 SDK·엔진 비동기 delegate를 우선하며 선택한 UE 5.7 플러그인/NetDriver 코드를 확인해 설정한다.
+Unreal Online Subsystem·공식 SDK·엔진 비동기 delegate를 우선하며 선택한 UE 5.8 플러그인/NetDriver 코드를 확인해 설정한다.
 로그인 성공·표시명·PIE ID·Client Verified 플래그를 서버 인증 증거로 쓰지 않는다. 서버가 검증한 티켓 계정을 실제 연결에 대응한다.
 온라인 실패를 Development 계정이나 로컬 저장 성공으로 대체하지 않으며 이전 연결의 늦은 인증 완료도 현재 Run을 바꾸지 못하게 해야 한다.
 
@@ -196,7 +198,7 @@ MMR은 Run 종료 시 반영한다. 반영 대상 확정 기준·시점, 계산�
 4. 자체 ID를 만들 시점에는 [Steamworks 온보딩](https://partner.steamgames.com/doc/gettingstarted/onboarding)의 계약·신원·은행/세금 절차와 앱 등록을 사용자가 진행한다. [Steam Direct 수수료](https://partner.steamgames.com/doc/gettingstarted/appfee)는 앱당 USD 100 상당이며 지역 세금이 적용될 수 있다. 이는 전투 서버의 월 운영비와 별도다. 현재 결제를 요청하거나 대신 실행하는 단계는 아니다.
 5. 자체 App ID·Title이 준비되면 PlayFab의 Steam 연동 설정에서 해당 앱 ID와 권한이 있는 Web API Key를 연결한다. 키는 공급자 관리 화면에서만 취급하고 게임/Listen Host/Git/채팅에 넣지 않는다. Steam 티켓으로 로그인하는 계약과 필요한 설정은 [공식 Steam 인증 API](https://learn.microsoft.com/en-us/xbox/playfab/api-references/c/pfauthentication/functions/pfauthenticationloginwithsteamasync)를 따른다. 단순 CustomID 로그인이나 로그인 성공 자체를 전투 결과 검증으로 대신하지 않는다.
 
-위 Epic 웹 예제의 기존 SteamNetDriver 설정은 프로젝트에 그대로 복사하지 않는다. 설치된 UE 5.7 소스와 플러그인 구성을 아래처럼 대조했다.
+위 Epic 웹 예제의 기존 SteamNetDriver 설정은 프로젝트에 그대로 복사하지 않는다. 2026-10-02 설치된 UE 5.8.3 소스와 플러그인 구성을 아래처럼 정적 대조했다.
 
 ### 로컬 엔진 점검과 다음 구현
 
@@ -205,8 +207,8 @@ MMR은 Run 종료 시 반영한다. 반영 대상 확정 기준·시점, 계산�
 | 프로젝트 | `ProjectA.uproject`에 Steam/PlayFab 활성화 없음. Build.cs의 OnlineSubsystem은 주석뿐이며 Config에 Steam 서비스/NetDriver 설정 없음 |
 | Steam API | 엔진 `Plugins/Online/OnlineSubsystemSteam/OnlineSubsystemSteam.uplugin` 존재, 기본 비활성 |
 | P2P transport | 엔진 `Plugins/Runtime/Steam/SteamSockets/SteamSockets.uplugin`과 `USteamSocketsNetDriver` 존재. `/Script/SteamSockets.SteamSocketsNetDriver`를 사용할 경로 |
-| IP 전용 경로 | `SocketSubsystemSteamIP.uplugin`은 NAT punchthrough를 제공하지 않으며 P2P에 SteamSockets를 쓰도록 명시. 두 플러그인을 같은 transport로 취급하지 않음 |
-| PlayFab | 프로젝트와 설치된 엔진에서 `.uplugin`을 찾지 못함. SDK 도입 시 UE 5.7 지원 버전·인증 API를 먼저 고정 |
+| IP 전용 경로 | 엔진 `Plugins/Online/SocketSubsystemSteamIP/SocketSubsystemSteamIP.uplugin`은 NAT punchthrough를 제공하지 않으며 P2P에 SteamSockets를 쓰도록 명시. 두 플러그인을 같은 transport로 취급하지 않음 |
+| PlayFab | 엔진 `Plugins/Online/Microsoft/PlayFabParty/PlayFabParty.uplugin` 존재, 기본 비활성. Win64용 PlayFab Party Socket Subsystem이며 프로젝트 인증·Title 연동·중앙 저장·MMR 구현을 뜻하지 않음. 실제 SDK 도입 시 UE 5.8 지원 버전·인증 API를 먼저 고정 |
 | 관리 저장 | 현재 `FLocalRunAuthorityStore`는 같은 PC 동기 파일/OS lease, 개발 호출자만 지원. Steam 계정 ID만 주입해 온라인 관리 Run으로 승격하지 않음 |
 
 연결 구현 순서는 **명시적인 개발 온라인 설정 → 엔진 OnlineSubsystem 세션·SteamSockets 연결 → 검증된 원래 계정 배정 → 별도 PC의 사용자 접속 확인 → 공유 저장/승계 원자 처리 → 확정된 MMR 정책**으로 둔다. 온라인 초기화 실패를 개발 계정 성공으로 대체하지 않는다. 기본 싱글플레이 진입과 기존 로컬 저장은 계속 지원한다.
@@ -215,11 +217,11 @@ MMR은 Run 종료 시 반영한다. 반영 대상 확정 기준·시점, 계산�
 
 ## 개발 실행 참조
 
-프로젝트 루트 PowerShell·UE 5.7 기준 명령이다. 실행 대상은 [TODO](TODO.md), 완료 결과는 [HISTORY](HISTORY.md)를 따른다. 샘플 생성은 로컬 에셋/저장을 작성하므로 최초 준비 시에만 실행한다.
+프로젝트 루트 PowerShell·UE 5.8 기준 명령이다. UE 5.8 작동 확인은 미실행이며 실행 대상은 [TODO](TODO.md), UE 5.7 완료 결과는 [HISTORY](HISTORY.md)를 따른다. 샘플 생성은 로컬 에셋/저장을 작성하므로 최초 준비 시에만 실행한다.
 
 ```powershell
-$editor = 'C:/Program Files/Epic Games/UE_5.7/Engine/Binaries/Win64/UnrealEditor.exe'
-$editorCmd = 'C:/Program Files/Epic Games/UE_5.7/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'
+$editor = 'C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe'
+$editorCmd = 'C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'
 $project = "$PWD/ProjectA.uproject"
 & $editorCmd $project -run=pythonscript -EnablePlugins=PythonScriptPlugin "-script=$PWD/Source/ProjectAEditor/Scripts/ConfigureSnapshotContent.py" -unattended -nullrhi -nop4
 & $editor $project -ProjectAOpponentSnapshot=SampleOpponent

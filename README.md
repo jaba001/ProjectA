@@ -1,6 +1,6 @@
 # ProjectA
 
-Unreal Engine 5.7 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심의 Run 진행, 파티 빌드 성장, 상대 Snapshot을 활용한 Async PvP와 최대 4인 Co-op을 목표로 한다.
+Unreal Engine 5.8 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심의 Run 진행, 파티 빌드 성장, 상대 Snapshot을 활용한 Async PvP와 최대 4인 Co-op을 목표로 한다.
 
 새 에셋을 구입할 예정이며 팩·적용 범위·기존 에셋 매핑은 미정이다. 도입 계획은 [TODO 6절](Docs/TODO.md#6-신규-에셋-선정과-도입)을 따른다. 현재 콘텐츠의 실제 교체는 수행하지 않았다.
 
@@ -14,10 +14,12 @@ Unreal Engine 5.7 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 
 ## 구현 상태
 
+현재 엔진 기준은 설치된 UE 5.8.3이다. 아래 실행·자동화 결과는 UE 5.7 당시 이력이며 UE 5.8 작동 확인은 [TODO 7절](Docs/TODO.md#7-ue-58-전환-확인)에 남긴다.
+
 | 구분 | 상태 |
 |---|---|
-| 기본 Run | 새 게임 전투 10회·상점 9회. 싱글은 직접 조작 1명·나머지 동료 AI. 시작 장비·비무장 공격·개인 10G·구매/장비 저장 유지. 현행 1/2/4인 PIE 10전투·9상점 진행 확인, 스킬/장비 추가 검사는 에셋 교체 후 진행 |
-| 승리 보상 | 5~15G 선택지 3개 중 하나를 개인 골드로 수령. 선택지·수령 저장과 중복 방지, 전원 수령 후 Host Continue. 현행 2/4인 PIE 카드 delegate·개인 금액·저장·진행 확인, 실제 입력 범위/인벤토리 표시 대기 |
+| 기본 Run | 새 게임 전투 10회·상점 9회. 싱글은 직접 조작 1명·나머지 동료 AI. 시작 장비·비무장 공격·개인 10G·구매/장비 저장 유지. UE 5.7의 1/2/4인 PIE 10전투·9상점 진행 확인 이력, 스킬/장비 추가 검사는 에셋 교체 후 진행 |
+| 승리 보상 | 5~15G 선택지 3개 중 하나를 개인 골드로 수령. 선택지·수령 저장과 중복 방지, 전원 수령 후 Host Continue. UE 5.7의 2/4인 PIE 카드 delegate·개인 금액·저장·진행 확인 이력, 실제 입력 범위/인벤토리 표시 대기 |
 | 시작 메뉴 | 게임 시작에서 싱글/멀티 선택. 메뉴 생성·저장·선택·수정·취소·삭제, 실제 Quit와 Continue의 저장 결과 복원·보상·다음 노드 개방 확인. 이어하기 옆 항복은 확인 후 현재 일반 싱글 저장 포기 |
 | 전투 | 대상 클릭 → 습득 스킬 적용 → 준비 완료. 스킬 미선택 준비 완료는 턴 넘기기. 새 Run의 네 직업은 비무장 공격만 시작하고 구매한 스킬을 다음 전투에서 사용. 시험 적 4마리는 검 공격 유지. SAP 이동 후 AP 시간차 공격·서버 충돌·시전 종료 후 복귀 |
 | 저장 | 비전투 v1/v2·관리 v4 유지. Ready 경계는 일반 v5·LegacyOffline v6·관리 v4에 저장 후 확정. 실패 시 준비·전투 시작 차단, 강제 종료 후 저장 상태 복구. 이전 순차 Combat 저장 거절 |
@@ -28,8 +30,8 @@ Unreal Engine 5.7 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 | 공통 UI 외형 | 기존 DemonicUI의 청동 장식·붉은 버튼·성 배경 적용. `WB_Equipment`·`WB_Bag`를 참고한 장비·인벤토리를 상점과 `I` 창에서 공유 |
 | 공통 UI 배율 | 1920×1080 기준 공통 DPI. 전투는 상단 라운드·우측 대상·좌하단 파티·하단 중앙 스킬·우하단 행동 패널, 카메라는 고정 화면 비율 제한 해제 |
 | 개발용 유닛 HP | `Source/ProjectA/UI/Debug/`에서 관리. Debug/Development 전투에서 머리 위 현재/최대 HP와 체력바 표시. 콘솔 `projecta.Debug.UnitHP 0`으로 끄고 `1`로 켜기. Shipping/Test 제외. [구현 기준](Docs/UI_README.md#7-1-개발용-유닛-hp-표시) |
-| 멀티플레이 | 현행 동일 PC Listen Server PIE 2/4인에서 각 10전투·9상점 선택/퇴장·개인 보상·Host Continue 확인. 진행 fixture이며 정상 난이도·Steam·다중 PC·지연/손실 검증은 별도 |
-| T14 잔여 | Steam/PlayFab 인증·P2P·공유 저장·MMR. Cue 검색 설정과 fallback 경고 소멸 확인, 실제 Cue 에셋은 미작성 |
+| 멀티플레이 | UE 5.7의 동일 PC Listen Server PIE 2/4인에서 각 10전투·9상점 선택/퇴장·개인 보상·Host Continue 확인 이력. 진행 fixture이며 UE 5.8·정상 난이도·Steam·다중 PC·지연/손실 검증은 별도 |
+| T14 잔여 | Steam/PlayFab 인증·P2P·공유 저장·MMR. Cue 검색 경로의 UE 5.8 병합 동작은 정적 확인, fallback 경고 소멸은 UE 5.7 실행 이력이며 실제 Cue 에셋은 미작성 |
 
 메인메뉴의 **게임 시작 → 싱글플레이**는 기존 캐릭터 생성으로, **게임 시작 → 멀티플레이**는 같은 PC·LAN의 2~4인 개발용 방으로 연결한다. 기존 첫 화면의 별도 개발용 협동 버튼은 제거했다. 멀티는 IPv4 주소 참가·준비·Host 시작과 참가자마다 궁수 한 명 배정을 유지하며 Unreal Listen Server를 사용한다. Shipping에서는 비활성이고 Steam 초대·로그인·관리 Run 재개 UI는 별도다.
 
@@ -41,13 +43,13 @@ Unreal Engine 5.7 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 
 캐릭터 생성 화면의 기본 카메라 X는 `-500`, 네 슬롯 앵커 Yaw는 `90°`다. 직업·몸체 선택과 상세 편집 종료 후에도 같은 정면 방향을 사용한다. 엔진 Details에서 거리·방향을 조절하는 위치는 [프리뷰 설정](Docs/UI_README.md#화면프리뷰)을 따른다.
 
-앞선 자동화 166개·1/2/4인 10전투·9상점과 메뉴 버튼·실제 Quit·Continue 검증은 [재검증 이력](Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다. 최종 저장 값 비교 보완 후 컴파일과 대상 저장 검사 에디터 7개·게임 6개·실제 Continue가 통과했으며 전체 166개는 다시 실행하지 않았다. 메뉴 버튼 검증은 `-ProjectAFlowOnly`로 프리뷰 애니메이션·캡처를 제외했다. 전체 메뉴의 idle 루프 경계 4건 실패와 미검증 화면은 [당시 실행 기록](Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)에 남겼다. 새 에셋·온라인 서비스는 [후속 기획](Docs/TODO.md)에 둔다. 사용자 지시로 스킬·VFX·아이템 장비의 추가 실행은 제외했고 최신 `SavedSkillLoadout` fixture는 컴파일만 확인했다.
+앞선 UE 5.7 자동화 166개·1/2/4인 10전투·9상점과 메뉴 버튼·실제 Quit·Continue 검증은 [재검증 이력](Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다. 당시 최종 저장 값 비교 보완 후 컴파일과 대상 저장 검사 에디터 7개·게임 6개·실제 Continue가 통과했으며 전체 166개는 다시 실행하지 않았다. 메뉴 버튼 검증은 `-ProjectAFlowOnly`로 프리뷰 애니메이션·캡처를 제외했다. 전체 메뉴의 idle 루프 경계 4건 실패와 미검증 화면은 [당시 실행 기록](Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)에 남겼다. 새 에셋·온라인 서비스는 [후속 기획](Docs/TODO.md)에 둔다. 사용자 지시로 스킬·VFX·아이템 장비의 추가 실행은 제외했고 당시 `SavedSkillLoadout` fixture는 컴파일만 확인했다.
 
 ## 실행
 
 일반 싱글 새 게임은 생성한 카드의 **직접 조작** 버튼으로 한 명을 선택해야 시작한다. 나머지 생성 동료는 서버 AI가 계획·실행하며 원래 소유자는 바뀌지 않는다. 선택은 저장·이어하기·다음 전투에서 유지하고, 선택한 캐릭터가 사망하면 생존 AI가 자동으로 전투를 계속한다. 선택한 카드를 삭제하면 다시 선택해야 한다. 기존 저장의 호환 범위는 [저장과 멀티플레이 연결 경계](Docs/PROJECT_PLAN.md#저장과-멀티플레이-연결-경계)를 따른다.
 
-1. UE 5.7에서 `ProjectA.uproject`와 `/Game/User_JeHoon/LEVEL/MainMenu`를 연다.
+1. UE 5.8에서 `ProjectA.uproject`와 `/Game/User_JeHoon/LEVEL/MainMenu`를 연다.
 2. 게임 시작 → 싱글플레이 → 캐릭터 1~4명 생성 → 직접 조작할 1명 선택 → Start Game → 첫 Combat 노드를 선택한다.
 3. 전장에서 **적 한 번 클릭 → 하단의 장착 스킬 버튼 클릭 → 준비 완료** 순서로 행동한다. 스킬 버튼을 누르면 해당 계획이 적용된다. **스킬을 선택하지 않고 준비 완료하면 행동 비용 없이 턴을 넘긴다.** 선택한 스킬은 **스킬 선택 취소**로 해제할 수 있다. 위치를 바꾸려면 **이동 예약 · SAP 1 → 강조된 아군 빈칸 한 번 클릭**으로 예약한다. 스킬 없이 이동만 예약할 수 있으며 이때 SAP 1만 소모한다. 준비 전까지 이동·자원 소모는 없다. 모두 준비하면 SAP 이동을 먼저 끝내고 선택한 AP 행동을 실행한다. AI 동료의 계획은 서버가 결정하며 직접 조작 캐릭터가 사망하면 생존 AI만으로 자동 진행한다.
 4. 1~9번째 Victory마다 5~15G 골드 보상 3개 중 1개 선택 → Continue → 스킬상점·아이템상점·상점3 중 하나 선택 → 나가기 → 다음 전투로 진행한다. 10번째 Victory는 보상 선택 뒤 Continue로 Run을 완료하며 패배에는 보상을 지급하지 않는다. 지도는 완료 수/10과 스크롤 가능한 노드 목록을 표시한다.
@@ -132,7 +134,7 @@ UI는 1920×1080을 기준으로 뷰포트에 맞춰 같은 비율로 확대·�
 
 ## 개발 환경
 
-- 엔진: Unreal Engine 5.7, C++, GAS, CommonUI, UMG.
+- 엔진: Unreal Engine 5.8 (설치 확인: 5.8.3), C++, GAS, CommonUI, UMG. 게임·Editor 타깃은 `BuildSettingsVersion.V7`·`EngineIncludeOrderVersion.Unreal5_8`을 사용한다.
 - 모듈: `Source/ProjectA`는 런타임, `Source/ProjectAEditor`는 에셋 도구·에디터 테스트. Editor 의존성은 런타임 모듈에 추가하지 않는다.
 - 제작 에셋: `Content/User_JeHoon` (`/Game/User_JeHoon`). 외부 리소스·템플릿은 원본을 직접 참조한다. 새 프로젝트 에셋과 필수 파생 결과만 제작 경로에 두며 편의를 위한 복제는 하지 않는다.
 - UI: [에셋 도구](Source/ProjectAEditor/Scripts/README.md), [위젯·JSON 명세](Docs/UI_README.md).
@@ -140,20 +142,24 @@ UI는 1920×1080을 기준으로 뷰포트에 맞춰 같은 비율로 확대·�
 Development Editor / Win64 빌드:
 
 ```powershell
-& "C:\Program Files\Epic Games\UE_5.7\Engine\Build\BatchFiles\Build.bat" ProjectAEditor Win64 Development -Project="C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -WaitMutex -FromMsBuild -architecture=x64
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" ProjectAEditor Win64 Development -Project="C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -WaitMutex -FromMsBuild -architecture=x64
 ```
 
 C++ 파일 추가·삭제·이름 변경 후 프로젝트 파일 재생성:
 
 ```powershell
-& "C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe" -ProjectFiles -Project="C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -Game -Engine
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" -ProjectFiles -Project="C:\Users\jaba0\Desktop\MyProjects\ProjectA\ProjectA.uproject" -Game -Engine
 ```
+
+`Build.bat`가 UE 5.8의 번들 .NET을 선택하므로 UnrealBuildTool 실행 파일을 직접 호출하지 않는다. VS2022용 C++ 솔루션과 .NET 10 엔진 C# 도구용 `Automation_ProjectA` 솔루션은 분리되며, 후자의 편집이 필요한 경우에만 VS2026을 검토한다.
 
 ## 검증 현황
 
-2026-09-16 사용자 확인: 지금까지 직접 플레이한 범위에서 이상 없음. 협동·예외 경로·자동화 전체의 통과 여부는 별도 확인 대상이다.
+2026-10-02 UE 5.8.3 프로젝트 파일 재생성과 Development Editor / Win64 컴파일·링크, 코드·문서·솔루션 정적 검사를 통과했다. 에셋 로드·플레이는 [TODO 7절](Docs/TODO.md#7-ue-58-전환-확인)의 사용자 확인 대상으로 남긴다.
 
-현재 [TODO](Docs/TODO.md)는 목표 Run의 추가 규칙·후속 구현, 온라인 서비스 준비·연동, 신규 에셋 선정·도입을 기록한다. 현행 시험 Run의 자동화 결과와 검증 범위는 [HISTORY 9절](Docs/HISTORY.md#9-todo-완료-항목-이관)에 보존하며 사용자 직접 플레이·정상 난이도 검증으로 확대하지 않는다.
+2026-09-16 UE 5.7 사용자 확인: 당시 직접 플레이한 범위에서 이상 없음. UE 5.8·협동·예외 경로·자동화 전체의 통과 여부는 별도 확인 대상이다.
+
+현재 [TODO](Docs/TODO.md)는 목표 Run의 추가 규칙·후속 구현, 온라인 서비스 준비·연동, 신규 에셋 선정·도입과 UE 5.8 사용자 작동 확인을 기록한다. UE 5.7 시험 Run의 자동화 결과와 검증 범위는 [HISTORY 9절](Docs/HISTORY.md#9-todo-완료-항목-이관)에 보존하며 사용자 직접 플레이·정상 난이도 검증으로 확대하지 않는다.
 
 ## 작업 규칙
 

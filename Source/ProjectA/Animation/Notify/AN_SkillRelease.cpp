@@ -10,9 +10,10 @@ UAN_SkillRelease::UAN_SkillRelease()
     SkillReleaseEventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Release"));
 }
 
-void UAN_SkillRelease::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation)
+void UAN_SkillRelease::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)
 {
     (void)Animation;
+    (void)EventReference;
 
     if (!MeshComp)
     {
