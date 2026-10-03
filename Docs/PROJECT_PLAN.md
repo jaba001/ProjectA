@@ -317,6 +317,16 @@ Gameplay의 전장·Grid·GameplayCamera·물리 바닥·NavBounds를 복제하�
 
 신규 uasset 62개는 Blueprint 12·AnimBlueprint/BlendSpace/몽타주 각 10·스킬 12·IK Rig 4·Retargeter 2·리타깃 시퀀스 2개이며 합계 1,673,195바이트(약 1.6MiB)다. 약 661MiB의 설치된 생물 원본 팩과 구분한다. 원본 5개 루트의 1,574파일 SHA가 유지됐고 기존 추적 에셋 5,973개 중 의도한 `DA_DefaultEncounter`만 변경했다. Gameplay 읽기 전용 로드에서 혼합 편성 4개·앞열 2/뒷열 2 배치를 확인했으며 읽기 전용 재로드 전후 신규 62개와 변경 인카운터의 63개 SHA도 동일하다. 근거는 같은 보고서 폴더의 `FinalFileAudit.json`이다.
 
+### 4-6 미사용 프로젝트 에셋 정리
+
+미사용 여부는 Asset Registry의 하드·소프트·관리·검색 참조, Source/Config의 경로와 동적 콘텐츠 선택, 생성 명세·제작용 자료, 기존 SaveGame 호환을 함께 검토한다. 원본 Fab 팩·FBX·사용자 수정본은 보존하며 검토한 `/Game/User_JeHoon/`의 애니메이션 결과만 Unreal 기능으로 삭제한다. 폴더 이름이나 직접 참조 수만으로 삭제하지 않는다.
+
+AnimSequence 5,528·몽타주 19·AnimBlueprint 6·BlendSpace 6의 5,559개, 4,592,948,479바이트(약 4.28GiB)를 삭제해 프로젝트 에셋 461개를 남겼다. 원본 Paragon FBX 5,385개, IK Rig·Retargeter 27개, Kwang 검 공격 9개, 몬스터 Blueprint 12개·환경 맵 12개와 기존 Runtime/FX/UI, 구형 Snapshot의 실제 클래스·저장 경로 별칭, T12 위젯을 보존했다.
+
+삭제 후 빈 Registry 조회 처리 오류를 수정하고 독립 재로드에서 생존 패키지 23,729개의 삭제 대상 참조 없음과 몬스터 12개·디버그 카탈로그 13개·네 직업·자세 138표본을 확인했다. 기본 Paragon 2개도 별도 명령에서 검사했으며 두 프로세스 모두 종료 0이다. 삭제 파일 집합은 계획과 일치하고 남은 Content 20,655파일은 SHA256이 동일하다. 근거는 `Saved/Automation/AssetCleanup/Apply.json`·`Verify.json`·`FileVerification.json`이다. 게임 동작은 사용자 확인 대기다.
+
+`CleanupUnusedProjectAssets.py`는 검토한 `Saved/Automation/AssetCleanup/DeletionPlan.json`을 검사하며 기본 실행은 감사만 수행한다. 적용은 계획의 HEAD·파일 SHA·크기·클래스·참조가 일치해야 하며 커밋 전에 별도 프로세스로 삭제 결과를 검사한다. 계획을 자동 생성하거나 이전 커밋의 계획을 재사용하지 않는다. Paragon 임포트 기본 범위는 현재 Kwang 공격·복귀 2개이며 전체·개별 임포트는 명시적 옵션으로 선택한다. [실행 명령](../Source/ProjectAEditor/Scripts/README.md)·[사용자 확인](TODO.md#13-에셋-정리-후-확인)
+
 ### 개발용 협동 진입
 
 Non-Shipping MainMenu의 **게임 시작 → 멀티플레이**는 같은 PC·LAN의 새 2~4인 개발용 방으로 연결한다. 첫 화면의 별도 개발용 협동 버튼은 제거했다. `UGameModeSelectionWidget`은 싱글플레이 선택 시 기존 CharacterCreation, 멀티플레이 선택 시 `UDevelopmentCoopWidget`을 연다. Host는 `OpenLevel(..., listen?ProjectADevCoop=2~4)`, Client는 정규화한 IPv4:포트로 `ClientTravel`을 사용한다. 기본 포트는 7777이며 별도 세션 검색·온라인 인증은 없다.
@@ -416,7 +426,7 @@ Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구
 
 ROG 8부위·103개 항목과 원본 신체/의상 자료는 향후 아이템용으로 보존하며 현재 생성 UI와 착용 적용에서는 제외한다. 이전 Manny 텍스처 수정의 세 파츠 재질 영역·카탈로그 연결과 검증 결과는 보존 이력이며 Primitive 몸체의 현재 표시 경로와 구분한다. 제작·검사 명령은 [에셋 스크립트](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
 
-GKnight·Assassin·Stylized Dark Witch와 해당 리타깃 자료는 이전 구성 이력으로 보존한다. 마녀 임포트의 본 배율 1·높이 약 1.87m·물리 재생성과 원본 FBX 보존은 당시 수정 결과이며 현재 직업 외형에 사용하지 않는다. `/Game/MageStaff_FreeWeapons` 원본과 필요한 임포트 결과 5개는 향후 아이템용으로 보존한다. 현행 외형 카탈로그가 연결된 마법사·도적에 이전 외형 작성 스크립트를 다시 적용하지 못하도록 보호한다.
+GKnight·Assassin·Stylized Dark Witch의 원본·임포트 자료와 제작용 Rig는 보존한다. 이전 외형 6종의 미사용 애니메이션·몽타주·AnimBlueprint·BlendSpace는 [정리 기준](#4-6-미사용-프로젝트-에셋-정리)에 따라 삭제했다. 마녀 임포트의 본 배율 1·높이 약 1.87m·물리 재생성은 당시 수정 결과이며 현재 직업 외형에 사용하지 않는다. `/Game/MageStaff_FreeWeapons` 원본과 필요한 임포트 결과 5개는 향후 아이템용으로 보존한다. 현행 외형 카탈로그가 연결된 마법사·도적에 이전 외형 작성 스크립트를 다시 적용하지 못하도록 보호한다.
 
 별도 `Sword` 표시는 `AUnitBase::RefreshSkillPresentation`에서 저장된 장착에 맞춰 갱신하며 아군과 Snapshot 상대가 공유한다. 마법사는 기본 스태프를 들지 않는다. 전투·Snapshot의 `Staff` 메시·표시·충돌은 비활성화하며 메뉴 프리뷰에서 사용자가 제거한 `Staff` 컴포넌트는 복원하지 않는다. 스태프 원본은 변경하지 않는다. 궁수의 실제 Unit·MenuPreview는 기존 `BP_PlayerUnit`·`BP_PartyMenuPreview`를 유지한다. 궁수 Snapshot은 `BP_ArcherSnapshotOpponent`를 사용하며 이전 공통 Snapshot 클래스는 호환 맵에 보존한다. 기존 직업별 저장 경로·스킬 장착·전체 래그돌 실행 경로를 유지한다.
 
@@ -435,14 +445,14 @@ GKnight·Assassin·Stylized Dark Witch와 해당 리타깃 자료는 이전 구�
 | `ROG_Modular_Armor/DA_MannyAppearance` | 기존 카탈로그 경로 유지. `BodyVariants`에 Primitive 몸체 원본 참조. ROG 8부위·103개 항목과 Manny 신체 파츠의 원본 재질 연결은 보존하되 의상 UI·착용은 중지 |
 | `GKnight/Meshes/SK_GothicKnight_VA`, `GKnight/Meshes/SK_GothicKnight_Skeleton` | 원본 `/Game/GKnight`로 연결하는 작은 Redirector. 메시·뼈대 페이로드 중복 제거 |
 | `Skeleton_Guard/Mesh_UE4/Full/SKM_Skeleton_Guard_Body`, `Skeleton_Guard/Demoscene_UE4/Mesh/UE4_Mannequin_Skeleton` | 원본 `/Game/Skeleton_Guard`로 연결하는 작은 Redirector |
-| `Characters/Mannequins/Anims/Unarmed` | 기존 ABP·BS·Walk/Jog/Jump/Attack 하위 구조를 유지한 리타깃 사본. 유닛별 접미사로 구분 |
-| `Blueprint/Unit/Animation/Montage` | 기존 프로젝트 공격 몽타주와 유닛별 리타깃 사본 |
+| `Characters/Mannequins/Anims/Unarmed` | 현행·저장 호환과 기존 전사·적 검증에 필요한 ABP·BS·Walk/Jog/Jump/Attack 리타깃 결과. 폐기 외형 6종의 미사용 체인은 삭제 |
+| `Blueprint/Unit/Animation/Montage` | 현재 공격·검증·저장 호환에 필요한 프로젝트 몽타주. 미사용 외형별 결과와 공격 02 몽타주는 삭제 |
 | `BossyEnemy/Animations/InPlace/Attacks` | 이전 `Boss_Attack_Swing_InP` 리타깃 시퀀스와 검 몽타주 보존 |
-| `ParagonAnimationsRetargetedToManny/KwangManny/Attack` | 적용 이전부터 사용하던 GKnight·Manny·적의 검 공격·복귀 유지. 파라곤 모델용 추가 리타깃은 미사용 보존 |
+| `ParagonAnimationsRetargetedToManny/KwangManny/Attack` | 원본 임포트 공격·복귀 2개와 GKnight·Manny·기본 적에 필요한 파생 결과 7개의 검 공격 9개 보존 |
 | `GKnight/Rigs`, `Skeleton_Guard/Rigs` | 기존 전사·적 IK Rig·Retargeter 유지. 사용자가 삭제한 `Paragon*/Characters/Heroes/*/Rigs`의 미사용 IK Rig·Retargeter 12개는 참조 없음 확인 후 삭제 상태 보존 |
 | `Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Sword` | 원본 구조를 유지한 검 사본. 전사·기본 적의 `hand_r` 부착 |
 | `Characters/Mannequins/Meshes/SK_Mannequin`, `Characters/Mannequins/Meshes/SKM_Manny_Simple` | 원본 `/Game/Characters/Mannequins/Meshes`로 연결하는 작은 Redirector. AnimSequence는 원본 뼈대·프리뷰 직접 참조 |
-| `ParagonAnimationsRetargetedToManny` | 원본 32개 캐릭터/하위 폴더를 유지한 AnimSequence 5,385개. 전체 저장·별도 재로드 확인, Kwang 검 공격용 리타깃은 별도 연결 |
+| `ParagonAnimationsRetargetedToManny` | 전체 AnimSequence 5,385개 임포트는 당시 이력. 현재 Kwang 공격 9개 이외 미사용 결과 5,401개는 삭제했으며 FBX 원본은 보존 |
 | `Blueprint/DataAsset/SkillPools/DA_EncounterSkillPool` | `USkillPoolDataAsset`, 기존 추가 스킬 후보·가중치 유지 |
 | `Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog` | `UOpponentSnapshotCatalogDataAsset`, 네 직업 모두 기존 `BP_SnapshotOpponent` 연결. 기존 스킬 별칭·`SwordAttack`·콘텐츠 버전 보존 |
 | `UI/Gameplay/WBP_GameplayRootWidget` | `UGameplayRootWidget`, 기존 RunMap/Result와 native RoundPlanning 화면 연결 |
@@ -452,7 +462,7 @@ GKnight·Assassin·Stylized Dark Witch와 해당 리타깃 자료는 이전 구�
 
 클래스는 런타임 Blueprint 문자열 경로 Load 대신 DataAsset과 Blueprint 기본값 참조로 연결한다.
 
-Paragon의 FBX 원본은 `Content/ParagonAnimationsRetargetedToManny`에 보존하며 32개 캐릭터 폴더·5,385개 파일이다. `ImportParagonAnimations.py`로 AnimSequence 5,385개를 생성·저장하고 최신 저장본의 별도 재로드에서 전체 뼈대·Manny 프리뷰·양수 길이·유효한 본 트랙·원본 FBX 참조를 확인했다. 샘플링률은 자동 판정하고 종료 시간을 프레임 경계에 맞춘다. `Additive`·`MSA` 등 파일명만으로 FBX에 없는 Unreal 전용 설정을 추정 적용하지 않는다. Animation Editor 재생은 위 정적 재로드 검사에 포함되지 않았다. 새 애니메이션의 채택과 확인은 [에셋 도입 계획](TODO.md#6-신규-에셋-선정과-도입)을 따른다.
+Paragon의 FBX 원본은 `Content/ParagonAnimationsRetargetedToManny`에 보존하며 32개 캐릭터 폴더·5,385개 파일이다. 2026-09-21 전체 AnimSequence 5,385개 생성·저장과 별도 재로드 검사는 당시 이력이다. 현재 `ImportParagonAnimations.py`의 기본 작성·검사는 Kwang 공격·복귀 2개만 선택하고 `-ParagonImportAll` 또는 `-ParagonAnimationPaths`로 추가 범위를 명시한다. 샘플링률 자동 판정·프레임 경계 보정과 Manny 뼈대·프리뷰·길이·본 트랙·원본 FBX 검사는 유지한다. `Additive`·`MSA` 파일명만으로 가산 설정을 추정하지 않으며 Animation Editor 재생은 정적 검사에 포함하지 않는다. 새 애니메이션의 채택과 확인은 [에셋 도입 계획](TODO.md#6-신규-에셋-선정과-도입)을 따른다.
 
 2026-09-16 DA 7개의 폴더 변경은 Unreal AssetTools로 수행하고 구경로 해석·기존 저장 해시 보존을 확인했다. 2026-09-21 휩쓸기의 이름 변경과 구경로·PrimaryAssetId 리디렉션 확인은 당시 이력이다. 2026-10-01 확정한 휩쓸기·테스트 원거리·AOE 3종의 제거는 [상점·저장 적용 범위](#상점-인카운터)와 [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)를 따른다. 다른 에셋·저장 참조는 보존한다.
 

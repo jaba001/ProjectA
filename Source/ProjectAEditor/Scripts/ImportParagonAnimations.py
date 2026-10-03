@@ -1,24 +1,76 @@
 import json
 import re
+import sys
 import time
 from pathlib import Path
 
 import unreal
 
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from WarriorContentPaths import SWORD_RECOVERY_SOURCE, SWORD_SOURCE
+
 
 PROJECT = Path(unreal.Paths.project_dir()).resolve()
-SOURCE = PROJECT / "Content/ParagonAnimationsRetargetedToManny"
+SOURCE = (PROJECT / "Content/ParagonAnimationsRetargetedToManny").resolve()
 DESTINATION = "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny"
 MESH_SOURCE = "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"
 MESH_PATH = MESH_SOURCE
 SKELETON_PATH = "/Game/Characters/Mannequins/Meshes/SK_Mannequin"
 LIBRARY = unreal.EditorAssetLibrary
+DEFAULT_ANIMATION_PATHS = [path.removeprefix(DESTINATION + "/") for path in [SWORD_SOURCE, SWORD_RECOVERY_SOURCE]]
 
 
 def require(value, message):
     if not value:
         raise RuntimeError(message)
     return value
+
+
+def option_value(command_line, name):
+    matches = list(re.finditer(r"(?:^|\s)-" + re.escape(name) + r"(?==|\s|$)", command_line))
+    require(len(matches) <= 1, "Duplicate option: -" + name)
+    if not matches:
+        return None
+    value = re.match(r'=(?:"([^"]*)"|([^\s"]*))(?=\s|$)', command_line[matches[0].end():])
+    require(value, "Expected -" + name + "=<value>")
+    return value.group(1) if value.group(1) is not None else value.group(2)
+
+
+def option_flag(command_line, name):
+    matches = list(re.finditer(r"(?:^|\s)-" + re.escape(name) + r"(?==|\s|$)", command_line))
+    require(len(matches) <= 1, "Duplicate option: -" + name)
+    require(not matches or matches[0].end() == len(command_line) or command_line[matches[0].end()].isspace(), "The -" + name + " flag does not take a value")
+    return bool(matches)
+
+
+def select_sources(command_line, source_root, default_paths):
+    import_all = option_flag(command_line, "ParagonImportAll")
+    requested = option_value(command_line, "ParagonAnimationPaths")
+    limit_value = option_value(command_line, "ParagonImportLimit")
+    require(not import_all or requested is None, "Use either -ParagonImportAll or -ParagonAnimationPaths")
+    source_root = source_root.resolve()
+    if import_all:
+        sources = sorted(source_root.rglob("*.FBX"))
+    else:
+        # Import only active sword sources unless an explicit selection is supplied.
+        # 명시적 선택이 없으면 현행 검 공격 소스만 임포트합니다.
+        names = requested.split(",") if requested is not None else list(default_paths)
+        require(names and len(names) == len(set(names)), "Animation selection must contain unique relative paths")
+        sources = []
+        for name in names:
+            require(name and name == name.strip() and "\\" not in name and ":" not in name, "Expected a relative animation path without an extension: " + name)
+            require(all(part not in ["", ".", ".."] for part in name.split("/")) and not Path(name).suffix, "Invalid animation selection path: " + name)
+            source = (source_root / (name + ".FBX")).resolve()
+            require(source.is_relative_to(source_root) and source.is_file(), "Missing selected source or path outside the Paragon folder: " + name)
+            require(source not in sources, "Duplicate selected source: " + name)
+            sources.append(source)
+    require(sources, "Extract the selected Paragon FBX sources under Content first")
+    if limit_value is not None:
+        require(re.fullmatch(r"[0-9]+", limit_value) and int(limit_value) > 0, "ParagonImportLimit must be a positive integer")
+        sources = sources[:int(limit_value)]
+    return sources
 
 
 def save(asset):
@@ -98,12 +150,9 @@ def verify_animation(asset, source, skeleton, preview_mesh):
 
 def main():
     command_line = unreal.SystemLibrary.get_command_line()
-    verify_only = "-ParagonVerifyOnly" in command_line
-    limit_match = re.search(r"-ParagonImportLimit=(\d+)", command_line)
-    sources = sorted(SOURCE.rglob("*.FBX"))
-    require(sources, "Extract the Paragon archive under Content first")
-    if limit_match:
-        sources = sources[:int(limit_match.group(1))]
+    verify_only = option_flag(command_line, "ParagonVerifyOnly")
+    sources = select_sources(command_line, SOURCE, DEFAULT_ANIMATION_PATHS)
+    selected_paths = [source.relative_to(SOURCE).with_suffix("").as_posix() for source in sources]
     skeleton = load_manny()
     preview_mesh = require(unreal.load_asset(MESH_PATH), "Missing Manny preview mesh")
     require(preview_mesh.get_editor_property("skeleton") == skeleton, "Invalid Manny preview mesh")
@@ -128,7 +177,7 @@ def main():
             failures.append({"source": str(source), "error": str(error)})
             unreal.log_error("PARAGON_IMPORT_FAILURE " + str(source) + " " + str(error))
         if index % 50 == 0 or index == len(sources) or failures:
-            report = {"sources": len(sources), "processed": index, "imported": imported, "verified": len(results), "failures": failures, "verify_only": verify_only, "elapsed_seconds": round(time.time() - started, 2), "assets": results}
+            report = {"sources": len(sources), "selected_paths": selected_paths, "processed": index, "imported": imported, "verified": len(results), "failures": failures, "verify_only": verify_only, "elapsed_seconds": round(time.time() - started, 2), "assets": results}
             report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
             unreal.log("PARAGON_IMPORT_PROGRESS " + str(index) + "/" + str(len(sources)) + " failures=" + str(len(failures)))
             unreal.SystemLibrary.collect_garbage()

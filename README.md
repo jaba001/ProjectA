@@ -33,6 +33,7 @@ Unreal Engine 5.8 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 | 지하 던전 비교 레벨 | `DungeonFantasy`·`DungeonStone` 생성·navigation 저장·독립 재로드 검사 통과. FANTASTIC·Modular Dungeon Collection 원본 직접 참조, 기존 기본 Run 진입 유지. 실제 화면·플레이는 [TODO 10절](Docs/TODO.md#10-지하-던전-비교-레벨-확인)에서 사용자 확인 |
 | 환경 비교 레벨 | 초원·숲·사막·얼음·여름 계열 12맵 생성·navigation 저장·독립 재로드 정적 검사 통과. 배치 메시 3,240개를 맵별 ISM 9~17개 그룹으로 구성. 사용자 화면·입력·성능 확인은 [TODO 11절](Docs/TODO.md#11-환경-비교-레벨-확인) |
 | 몬스터 콘텐츠 | 오크·트롤·늑대인간·골렘·늑대·곰·멧돼지·거미·악어·두꺼비와 설원 늑대/곰 재질 변형의 12개 Blueprint 작성·저장·독립 재로드 정적 검사 통과. 기본 편성은 오크·트롤·늑대·골렘, 기존 검 적은 디버그 13번째 항목으로 보존. 실제 플레이는 [TODO 12절](Docs/TODO.md#12-몬스터-콘텐츠-확인)에서 사용자 확인. [구성 기준](Docs/PROJECT_PLAN.md#4-5-몬스터-콘텐츠) |
+| 미사용 에셋 정리 | 프로젝트 애니메이션 결과 5,559개·약 4.28GiB 삭제, 독립 재로드 정적 검사 통과. 남은 Content 20,655파일의 SHA256 동일. 원본 Fab 팩·FBX와 현행 콘텐츠·제작용 Rig·저장 호환·T12를 보존했다. [정리 기준](Docs/PROJECT_PLAN.md#4-6-미사용-프로젝트-에셋-정리)·[사용자 확인](Docs/TODO.md#13-에셋-정리-후-확인) |
 | 멀티플레이 | UE 5.7의 동일 PC Listen Server PIE 2/4인에서 각 10전투·9상점 선택/퇴장·개인 보상·Host Continue 확인 이력. 진행 fixture이며 UE 5.8·정상 난이도·Steam·다중 PC·지연/손실 검증은 별도 |
 | T14 잔여 | Steam/PlayFab 인증·P2P·공유 저장·MMR. Cue 검색 경로의 UE 5.8 병합 동작은 정적 확인, fallback 경고 소멸은 UE 5.7 실행 이력이며 실제 Cue 에셋은 미작성 |
 
@@ -97,7 +98,7 @@ C++·리플렉션·프로젝트 설정 변경 반영을 위해 빌드 후 UE를 
 
 외부 에셋은 원본을 직접 참조하며 `User_JeHoon`에 편의상 복제하지 않는다. 새 프로젝트 에셋·필수 파생 결과만 해당 폴더에 작성한다. 중복 정리는 원본에서 `User_JeHoon`으로 복사한 사본에 한정하며 외부 팩끼리는 비교하지 않는다. [에셋 구성](Docs/PROJECT_PLAN.md#gameplay-에셋과-배치)
 
-Paragon AnimSequence 5,385개를 원본의 32개 캐릭터 폴더 구조대로 `/Game/User_JeHoon/ParagonAnimationsRetargetedToManny`에 저장했다. 이는 원본 FBX를 엔진용으로 임포트한 결과이며 단순 복사본이 아니다. 기존 애니메이션과 신규 임포트 모두 원본 Manny 뼈대·프리뷰 메시를 직접 참조한다. 메시·뼈대 복사본 6개를 통합해 Content 용량을 34.01MiB 줄였다. Animation Editor의 실제 재생은 앞선 검증에 포함되지 않았으며 Kwang 검 공격 연결은 별도로 관리한다. [원본 참조와 보존 상태](Docs/PROJECT_PLAN.md#gameplay-에셋과-배치)
+2026-09-21 Paragon AnimSequence 5,385개 임포트·정적 재로드 성공은 당시 이력이다. 미사용 결과 정리 후 원본 FBX 5,385개와 Kwang 공격·복귀 소스 2개·필수 파생 결과 7개의 에셋 9개를 보존한다. `ImportParagonAnimations.py`의 기본 범위는 소스 2개이며 전체·개별 선택은 명시적 옵션을 사용한다. [정리 기준](Docs/PROJECT_PLAN.md#4-6-미사용-프로젝트-에셋-정리)·[작성 명령](Source/ProjectAEditor/Scripts/README.md)
 
 SAP 이동은 캐릭터마다 목적지 하나를 예약하며 민첩·`MaxWalkSpeed`와 무관하게 **350cm/s의 고정 속도**로 실행한다. 준비 전에는 변경·취소할 수 있고 실제 위치·자원은 바뀌지 않는다. Ready Phase 종료 시 이동 SAP 1과 공격 비용을 합산하여 AP/SAP를 즉시 한 번 차감하며 불발에도 환불하지 않는다. 모든 예약 이동 완료 후 기존 속도차에 따라 AP 행동을 시작하며 도착 위치가 새 복귀 칸이 된다. 다른 유닛의 복귀·예약 칸 이동과 자리 교환을 막고 이동 실패 시 출발점으로 복원한다.
 

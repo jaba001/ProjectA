@@ -88,14 +88,18 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 `-WarriorVerifyOnly`는 연산 구성·48개 시퀀스의 길이/포즈/유한 좌표/골반 이동 범위, 원본 폴더 구조·이전 참조 73개, 전사/적 몽타주의 실제 Kwang 공격·복귀 세그먼트와 전사의 검·비무장 DA 2개 장착 저장본을 검사한다. 공격 1.2초에 복귀 0.933333초의 첫 중복 포즈 0.2초를 제외해 총 1.933333초로 연결하며 블렌드 인 0.08초/아웃 0.12초를 사용한다. 검은 축 순서 혼동을 방지하는 `unreal.Rotator(pitch=0, yaw=0, roll=180)`과 손잡이 부착 위치·`BladeBase`/`BladeTip` 소켓·검 전용 `bUseWeaponTrace`로 작성한다. 활성 0.23~0.43초·반경 4cm와 서버 에셋 포즈 기반 칼날 표본 123개를 검사하며 이 도구의 정적 검사는 실제 접촉 화면을 포함하지 않는다. 서버 칼날 추적의 회귀 범위는 [재검증 이력](../../../Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
-11. `ImportParagonAnimations.py`: `Content/ParagonAnimationsRetargetedToManny`의 FBX를 `/Game/User_JeHoon/ParagonAnimationsRetargetedToManny`에 원본 하위 폴더대로 가져온다. Manny 뼈대·프리뷰 메시는 `/Game/Characters/Mannequins/Meshes`의 원본을 직접 참조하며 복제하거나 저장하지 않는다. 이 스크립트는 AnimSequence만 가져오며 게임 스킬 연결은 변경하지 않는다. FBX만 압축 해제한 상태와 Content Browser에서 열 수 있는 저장 에셋을 구분한다.
+11. `ImportParagonAnimations.py`: 기본 작성·검사는 `Content/ParagonAnimationsRetargetedToManny/KwangManny/Attack`의 `PrimaryAttack_A_Slow`·`PrimaryAttack_A_Slow_Recovery` FBX 2개만 선택한다. 결과는 `/Game/User_JeHoon/ParagonAnimationsRetargetedToManny` 아래 원본 하위 구조를 유지한다. Manny 뼈대·프리뷰 원본을 직접 참조하며 게임 스킬 연결은 변경하지 않는다. 미사용 결과를 자동 재생성하지 않고 원본 FBX 5,385개는 보존한다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ImportParagonAnimations.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ImportParagonAnimations.py") -ParagonVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ImportParagonAnimations.py") -ParagonImportAll -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ImportParagonAnimations.py") '-ParagonAnimationPaths=KwangManny/Attack/PrimaryAttack_A_Slow,KwangManny/Attack/PrimaryAttack_A_Slow_Recovery' -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-`-ParagonImportLimit=<개수>`로 처리 범위를 제한할 수 있다. 기존 목적지 에셋은 검증 후 재사용하고 누락된 에셋을 가져온다. 원본 샘플링률을 자동 판정하고 종료 시간을 프레임 경계에 맞춘다. 신규 애니메이션의 개별 프리뷰에는 원본 Manny 메시를 지정한다. 검사는 원본 Manny 메시·뼈대 연결, AnimSequence 형식·길이·본 트랙·원본 FBX 참조를 대상으로 하며 결과는 `Saved/Automation/ParagonAnimationsImport.json`·`ParagonAnimationsReload.json`에 기록한다. 2026-09-21 전체 5,385개 저장·별도 재로드 검사를 통과했다. 파일명의 Additive/MSA만으로 Unreal 전용 가산 설정을 지정하지 않으며 PIE·게임 플레이를 실행하지 않는다. Animation Editor 재생은 위 정적 재로드 검사에 포함되지 않았다. 새 애니메이션을 채택할 때의 확인은 [에셋 도입 계획](../../../Docs/TODO.md#6-신규-에셋-선정과-도입)을 따른다.
+`-ParagonImportAll`은 전체 FBX를 선택하고 `-ParagonAnimationPaths=<상대경로,...>`는 확장자 없는 경로를 명시한다. 두 옵션은 함께 사용할 수 없으며 경로 이탈·누락 파일·중복 선택을 거절한다. `-ParagonImportLimit=<양수>`는 선택 후 처리 수를 제한한다. `-ParagonVerifyOnly`도 같은 선택 기준을 사용하며 기존 결과만 읽는다.
+
+기존 목적지 에셋은 검증 후 재사용하고 누락된 에셋만 가져온다. 원본 샘플링률·프레임 경계와 Manny 뼈대·프리뷰·AnimSequence 길이·본 트랙·원본 FBX를 검사하며 선택 경로와 결과는 `Saved/Automation/ParagonAnimationsImport.json`·`ParagonAnimationsReload.json`에 기록한다. 2026-09-21 전체 5,385개 저장·별도 재로드 성공은 당시 이력이다. Additive/MSA 파일명만으로 가산 설정을 추정하지 않으며 에디터 재생·PIE·게임은 실행하지 않는다. 새 채택 범위는 [에셋 도입 계획](../../../Docs/TODO.md#6-신규-에셋-선정과-도입)을 따른다.
 
 12. `ConfigureShopSkillPresentation.py`: 공용 `BP_PlayerUnit`에 원본 Manny 메시·검 부착·`AM_SwordAttack_Manny` 대체 몽타주를 연결한다. 현재 Blueprint의 기본 장착 목록은 보존하고 새 Run의 비무장 시작·구매 장착은 C++ Run 데이터에서 적용한다. 원본 뼈대 참조 이전이 완료되어 있어야 하며 호환 뼈대 추가나 원본 저장은 하지 않는다. 제작 결과는 `Saved/Automation/ShopSkillPresentationConfigure.json`에 기록한다. 2026-10-01 스킬별 구매·표현 실행은 사용자 지시로 제외했다. 진행·저장 회귀 범위는 [재검증 이력](../../../Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
@@ -103,11 +107,11 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureShopSkillPresentation.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-13. 파라곤 캐릭터 외형과 사망 애니메이션 작성 도구는 롤백에 따라 제거했다. 당시 GKnight 전사와 이후 마녀·Assassin 구성은 이전 이력이며 현재 네 직업은 16번 공통 의상 구성을 사용한다. 기본 적 Skeleton_Guard·기존 Blueprint 경로·미사용 파라곤 결과는 보존한다. `ImportMageStaff.py`는 원본 FBX가 있을 때만 사용하는 수동 임포트 도구다.
+13. 파라곤 캐릭터 외형과 사망 애니메이션 작성 도구는 롤백에 따라 제거했다. 당시 GKnight 전사와 이후 마녀·Assassin 구성은 이전 이력이며 현재 네 직업은 17번 공통 몸체 구성을 사용한다. 기본 적 Skeleton_Guard·기존 Blueprint 경로·활성 검 공격은 보존하며 미사용 외형 결과는 22번 도구로 정리했다. `ImportMageStaff.py`는 원본 FBX가 있을 때만 사용하는 수동 임포트 도구다.
 
 `RetargetContentLibrary.py`는 Rig·리타깃·골반 이동 검증을 공통 제공한다. 호출 도구가 보고서·재작성 여부·출력 경로 함수를 전달하여 다른 도구의 전역 설정을 참조하지 않는다. 기존 전사 콘텐츠의 강제 재작성은 `-WarriorRebuildRetargets`를 사용한다.
 
-14. `ConsolidateCopiedAssets.py`: `User_JeHoon`에 복사한 Manny·GKnight·Skeleton_Guard 메시·뼈대 6개만 원본으로 통합한다. 외부 팩끼리는 비교하지 않는다. 원본 형상·기준 포즈·애니메이션 데이터를 검사하고 GKnight·Skeleton_Guard의 필요한 몽타주 슬롯만 원본에 보존한다. 애니메이션·AnimBP·메시 참조를 갱신하고 옛 경로에는 작은 Redirector를 남긴다. 검 소켓 수정본과 임포트·리타깃 결과는 유지한다.
+14. `ConsolidateCopiedAssets.py`: `User_JeHoon`에 복사한 Manny·GKnight·Skeleton_Guard 메시·뼈대 6개만 원본으로 통합한다. 외부 팩끼리는 비교하지 않는다. 원본 형상·기준 포즈·애니메이션 데이터를 검사하고 GKnight·Skeleton_Guard의 필요한 몽타주 슬롯만 원본에 보존한다. 애니메이션·AnimBP·메시 참조를 갱신하고 옛 경로에는 작은 Redirector를 남긴다. 검 소켓 수정본과 필수 임포트·리타깃 결과는 유지한다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConsolidateCopiedAssets.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
@@ -117,7 +121,7 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 기본 실행은 읽기 전용 사전검사다. 적용 결과는 `Saved/Automation/CopiedAssetsMigration.json`, 별도 프로세스 재로드는 `CopiedAssetsReload.json`에 기록한다. VerifyOnly는 적용 기록이 필요하다. 기존 원본 팩의 설치 상태를 유지하며 두 원본 뼈대의 슬롯 설정만 예외적으로 Git에서 추적한다. PIE·게임 플레이를 실행하지 않는다.
 
-15. `ConfigureWitchAssassin.py`: 이전 마법사 Stylized Dark Witch·도적 Assassin Skin1 구성 도구. 현행 의상 카탈로그가 연결된 직업의 재작성을 차단한다. 이전 구성에서는 원본 모델을 직접 참조하고 마녀 임포트의 본 배율 100·분리된 변형 계층을 같은 경로에서 정리해 PhysicsAsset을 재생성했다. 원본 FBX와 `_DarkWitch`·`_Assassin` 리타깃, 뼈대의 `DefaultSlot`·마녀 임포트 3개·스태프 5개를 기존 경로에 보존한다.
+15. `ConfigureWitchAssassin.py`: 이전 마법사 Stylized Dark Witch·도적 Assassin Skin1 구성 도구. 현행 의상 카탈로그가 연결된 직업의 재작성을 차단한다. 당시 마녀 임포트의 본 배율·계층을 정리하고 PhysicsAsset을 재생성했다. 원본 FBX·뼈대 설정·마녀 임포트 3개·스태프 5개와 제작용 Rig는 보존하며 미사용 `_DarkWitch`·`_Assassin` 애니메이션 체인은 22번 도구로 정리했다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureWitchAssassin.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
@@ -198,3 +202,13 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 ```
 
 기본 명령은 명세의 프로젝트 전용 에셋과 `DA_DefaultEncounter`를 작성·저장하며 소유 정보가 없는 기존 생성 대상은 변경하지 않고 중단한다. `-MonsterVerifyOnly`는 저장하지 않고 원본 참조·Skeleton/PhysicsAsset·애니메이션 그래프·몽타주·GAS 계약·저장된 CDO와 편성을 검사한다. 기존 기본 비무장 공격의 피해·AP·태그/Query·GAS 효과와 전체 래그돌을 유지하고 원본 패키지를 저장하지 않는다. Development Editor / Win64 컴파일·62개 신규 에셋 작성·독립 재로드 정적 검사 통과, 원본 1,574파일과 재로드 전후 신규/변경 63개 SHA 보존을 확인했다. 결과는 `Saved/Automation/Monsters/Configuration.json`·`Reload.json`·`FinalFileAudit.json`에 기록한다. 게임·PIE·자동화 테스트는 실행하지 않으며 실제 크기·움직임·공격·사망·디버그 추가는 [TODO 12절](../../../Docs/TODO.md#12-몬스터-콘텐츠-확인)에서 사용자가 확인한다.
+
+22. `CleanupUnusedProjectAssets.py`: 참조 그래프·Source/Config·생성 명세·저장 호환을 검토한 `Saved/Automation/AssetCleanup/DeletionPlan.json`만 처리한다. 계획은 `schema_version=1`, 현재 전체 `base_commit`, `retained_roots`와 삭제 대상의 `package`·`asset_class`·`file`·`bytes`·`sha256`을 기록한다. 자동 미사용 탐색·계획 생성 도구가 아니며 `/Game/User_JeHoon/`의 AnimSequence·몽타주·AnimBlueprint·BlendSpace만 허용한다. [정리 기준](../../../Docs/PROJECT_PLAN.md#4-6-미사용-프로젝트-에셋-정리)
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CleanupUnusedProjectAssets.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CleanupUnusedProjectAssets.py") -CleanupUnusedApply -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CleanupUnusedProjectAssets.py") -CleanupUnusedVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+```
+
+기본 명령은 계획·파일 SHA·크기·클래스·모든 참조 분류를 감사한다. `-CleanupUnusedApply`는 참조하는 에셋부터 50개씩 엔진 기능으로 삭제하고 결과를 검사하며 `-CleanupUnusedVerifyOnly`는 삭제 후 읽기 전용으로 검사한다. 적용·검증 옵션은 함께 사용할 수 없다. 모든 모드에서 계획과 HEAD가 일치해야 하므로 별도 프로세스 검증은 커밋 전에 실행한다. 커밋 이후에는 현재 HEAD의 새 계획을 검토하며 계획의 기준만 임의 변경하지 않는다. 경로 이탈·파일 변경·외부 참조·후보 간 순환 참조를 거절하고 잔존 파일/Registry·생존 패키지 의존·보호 루트 폐쇄를 검사한다. 결과는 같은 폴더의 `Audit.json`·`Apply.json`·`Verify.json`에 기록하며 실제 새 Run·Continue·디버그 확인은 [TODO 13절](../../../Docs/TODO.md#13-에셋-정리-후-확인)을 따른다.
