@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AssetRegistry/AssetData.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "AssetDeduplicationLibrary.generated.h"
 
@@ -15,6 +16,26 @@ class PROJECTAEDITOR_API UAssetDeduplicationLibrary : public UBlueprintFunctionL
     GENERATED_BODY()
 
 public:
+    // Load a level with its external objects through the same engine flag used by asset deletion.
+    // 에셋 삭제에서 사용하는 엔진 플래그로 레벨과 External Object를 함께 불러옵니다.
+    UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
+    static UObject* LoadAssetWithExternalObjects(const FAssetData& AssetData);
+
+    // Remove reviewed orphan packages through engine cleanup after their retired demo world is deleted.
+    // 폐기된 데모 월드를 삭제한 뒤 검토된 고아 패키지를 엔진 정리 기능으로 제거합니다.
+    UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
+    static bool DeleteRetiredDemoExternalPackages(const TArray<FName>& PackageNames);
+
+    // Finish package cleanup only after reviewed combat assets have disappeared from the registry.
+    // 검토된 전투 에셋이 Registry에서 제거된 뒤에만 남은 패키지 정리를 마칩니다.
+    UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
+    static bool CleanupDeletedCombatAssetPackages(const TArray<FName>& PackageNames);
+
+    // Delete an audited closed combat asset group without retaining Python object wrappers.
+    // Python 객체 래퍼를 유지하지 않고 감사한 닫힌 전투 에셋 묶음을 삭제합니다.
+    UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
+    static bool DeleteReviewedCombatAssets(const TArray<FAssetData>& AssetData);
+
     // Compare source geometry, generated LOD settings and reference bones; other mesh settings require separate checks.
     // 원본 형상, 자동 LOD 설정, 기준 뼈를 비교하며 기타 메시 설정은 별도 검사가 필요합니다.
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")

@@ -319,9 +319,11 @@ bool FPartySnapshotRemovedSkillMigrationTest::RunTest(const FString& Parameters)
         if (!TestTrue(TEXT("Each deleted-only legacy fixture writes directly"), UGameplayStatics::SaveGameToSlot(Save, SlotName, 0))) return false;
         TArray<uint8> RejectedBytes;
         if (!TestTrue(TEXT("The deleted-only original bytes are captured"), FFileHelper::LoadFileToArray(RejectedBytes, *Path))) return false;
-        TestFalse(TEXT("Removing the only skill rejects the snapshot instead of granting a replacement"), UPartySnapshotLibrary::LoadSnapshot(Slot.Id, Restored, Error));
-        TestTrue(TEXT("Each rejected deleted-only snapshot preserves the previous output"), AreSnapshotsEqual(Restored, Expected));
-        TestTrue(TEXT("Each empty migrated loadout explains why it cannot be restored"), Error.ToString().Contains(TEXT("남은 스킬")));
+        FPartySnapshot FallbackExpected = Original;
+        FallbackExpected.Members[0].SkillIds = {TEXT("DefaultAttack")};
+        TestTrue(TEXT("Removing the only retired skill restores the existing unarmed alias"), UPartySnapshotLibrary::LoadSnapshot(Slot.Id, Restored, Error));
+        TestTrue(TEXT("The unarmed fallback preserves every other snapshot field"), AreSnapshotsEqual(Restored, FallbackExpected));
+        TestTrue(TEXT("A valid fallback clears the load explanation"), Error.IsEmpty());
         CurrentBytes.Reset();
         TestTrue(TEXT("Rejected migration leaves the original file readable"), FFileHelper::LoadFileToArray(CurrentBytes, *Path));
         TestTrue(TEXT("Rejected migration never rewrites deleted-only original bytes"), CurrentBytes == RejectedBytes);

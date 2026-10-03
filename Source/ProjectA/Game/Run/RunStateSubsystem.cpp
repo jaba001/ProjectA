@@ -1203,7 +1203,7 @@ bool URunStateSubsystem::SelectRunEncounter(FName EncounterId)
     Save->EncounterProgress.SelectedEncounterId = EncounterId;
     Save->Phase = ERunPhase::Shop;
     if (Offer->IsItemShop() && Save->ItemShopState.SchemaVersion == 1 && !RunItemShopCatalog::Roll(Save->ItemShopState, false, FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag()), SaveError)) return false;
-    if (!Offer->IsItemShop() && !Save->SkillShopState.Catalog.IsEmpty() && !URunEncounterPoolDataAsset::RollSkillShop(Save->SkillShopState, true, SaveError)) return false;
+    if (!Offer->IsItemShop() && URunEncounterPoolDataAsset::GetSkillShopOfferCount(Save->SkillShopState) > 0 && !URunEncounterPoolDataAsset::RollSkillShop(Save->SkillShopState, true, SaveError)) return false;
     return CommitSaveCandidate(Save.Get(), SaveError);
 }
 
@@ -1225,7 +1225,7 @@ bool URunStateSubsystem::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, 
         OutError = NSLOCTEXT("RunSkillShop", "ChangedStock", "스킬 상점이 변경되었습니다. 최신 목록에서 다시 선택하세요.");
         if (SkillShopState.Revision == MAX_int32 || ExpectedShopRevision != SkillShopState.Revision) return false;
     }
-    if (bSkillReroll && (SkillShopState.Catalog.IsEmpty() || SkillShopState.Revision <= 0 || SkillShopState.RerollPrice == MAX_int32)) return false;
+    if (bSkillReroll && (URunEncounterPoolDataAsset::GetSkillShopOfferCount(SkillShopState) <= 0 || SkillShopState.Revision <= 0 || SkillShopState.RerollPrice == MAX_int32)) return false;
     const bool bRecovery = !bItemShop && OfferId == FRunSkillShopState::GetRecoveryOfferId();
     const FRunSkillShopOffer* Offer = SkillShopState.Offers.FindByPredicate([OfferId](const FRunSkillShopOffer& Candidate) { return Candidate.OfferId == OfferId; });
     if (!bItemShop && !bRecovery && !bSkillReroll && !Offer) return false;

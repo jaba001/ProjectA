@@ -7,16 +7,97 @@
 #include "Animation/AnimationAsset.h"
 #include "Animation/IAnimationSequenceCompiler.h"
 #include "Animation/Skeleton.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/Level.h"
 #include "Engine/SkinnedAssetCommon.h"
 #include "MeshDescription.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Serialization/MemoryWriter.h"
+#include "Misc/PackageName.h"
+#include "ObjectTools.h"
 #include "UObject/Package.h"
 #include "UObject/Class.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAssetDeduplication, Log, All);
+
+UObject* UAssetDeduplicationLibrary::LoadAssetWithExternalObjects(const FAssetData& AssetData)
+{
+    return IsInGameThread() && AssetData.IsValid() ? AssetData.GetAsset({ULevel::LoadAllExternalObjectsTag}) : nullptr;
+}
+
+bool UAssetDeduplicationLibrary::DeleteRetiredDemoExternalPackages(const TArray<FName>& PackageNames)
+{
+    if (!IsInGameThread() || FPackageName::DoesPackageExist(TEXT("/Game/Free_Magic/Maps/Free_Magic_Map"))) return false;
+    TArray<UPackage*> Packages;
+    for (FName PackageName : PackageNames)
+    {
+        const FString Name = PackageName.ToString();
+        if (!Name.StartsWith(TEXT("/Game/__ExternalActors__/Free_Magic/Maps/Free_Magic_Map/")) && !Name.StartsWith(TEXT("/Game/__ExternalObjects__/Free_Magic/Maps/Free_Magic_Map/"))) return false;
+        if (!FPackageName::DoesPackageExist(Name)) continue;
+        UPackage* Package = FindPackage(nullptr, *Name);
+        Packages.Add(Package ? Package : CreatePackage(*Name));
+    }
+    // The authoring script checks the complete graph and hashes before the world and its orphans are deleted.
+    // 작성 스크립트가 월드와 고아 패키지 삭제 전에 전체 참조 그래프와 해시를 검사합니다.
+    ObjectTools::CleanupAfterSuccessfulDelete(Packages, false);
+    for (FName PackageName : PackageNames) if (FPackageName::DoesPackageExist(PackageName.ToString())) return false;
+    return true;
+}
+
+bool UAssetDeduplicationLibrary::CleanupDeletedCombatAssetPackages(const TArray<FName>& PackageNames)
+{
+    if (!IsInGameThread()) return false;
+    const TSet<FString> CombatRoots = {TEXT("ArrowTrail"), TEXT("FXVarietyPack"), TEXT("Free_Magic"), TEXT("Hack_And_Slash_FX"), TEXT("Knife_light"), TEXT("Luos8Elements"), TEXT("MegaMagicVFXBundle"), TEXT("Mixed_Magic_VFX_Pack"), TEXT("RPGEffects"), TEXT("SlashTrail_SoftTofu"), TEXT("SwordTrailVFX"), TEXT("TrailPack"), TEXT("Vefects")};
+    IAssetRegistry& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
+    TArray<UPackage*> Packages;
+    for (FName PackageName : PackageNames)
+    {
+        const FString Name = PackageName.ToString();
+        FString Root;
+        FString Relative;
+        if (!Name.StartsWith(TEXT("/Game/")) || !Name.Mid(6).Split(TEXT("/"), &Root, &Relative)) return false;
+        const bool bProjectCombatAsset = Name.StartsWith(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/")) || Name.StartsWith(TEXT("/Game/User_JeHoon/RPGEffects/")) || Name.StartsWith(TEXT("/Game/User_JeHoon/Free_Magic/")) || Name == TEXT("/Game/User_JeHoon/Blueprint/DataAsset/SkillPools/DA_SkillPool_Catalog") || Name == TEXT("/Game/User_JeHoon/Blueprint/TESTPROJECTILE");
+        TArray<FAssetData> Assets;
+        Registry.GetAssetsByPackageName(PackageName, Assets);
+        if ((!CombatRoots.Contains(Root) && !bProjectCombatAsset) || !Assets.IsEmpty()) return false;
+        if (!FPackageName::DoesPackageExist(Name)) continue;
+        UPackage* Package = FindPackage(nullptr, *Name);
+        Packages.Add(Package ? Package : CreatePackage(*Name));
+    }
+    // Force deletion can remove an asset while transient script references keep its package alive.
+    // 강제 삭제가 에셋을 제거해도 스크립트의 임시 참조가 패키지를 유지할 수 있습니다.
+    ObjectTools::CleanupAfterSuccessfulDelete(Packages, false);
+    for (FName PackageName : PackageNames) if (FPackageName::DoesPackageExist(PackageName.ToString())) return false;
+    return true;
+}
+
+bool UAssetDeduplicationLibrary::DeleteReviewedCombatAssets(const TArray<FAssetData>& AssetData)
+{
+    if (!IsInGameThread() || AssetData.IsEmpty()) return false;
+    const TSet<FString> CombatRoots = {TEXT("ArrowTrail"), TEXT("FXVarietyPack"), TEXT("Free_Magic"), TEXT("Hack_And_Slash_FX"), TEXT("Knife_light"), TEXT("Luos8Elements"), TEXT("MegaMagicVFXBundle"), TEXT("Mixed_Magic_VFX_Pack"), TEXT("RPGEffects"), TEXT("SlashTrail_SoftTofu"), TEXT("SwordTrailVFX"), TEXT("TrailPack"), TEXT("Vefects")};
+    for (const FAssetData& Data : AssetData)
+    {
+        const FString Name = Data.PackageName.ToString();
+        FString Root;
+        FString Relative;
+        if (!Data.IsValid() || !Name.StartsWith(TEXT("/Game/")) || !Name.Mid(6).Split(TEXT("/"), &Root, &Relative)) return false;
+        const bool bProjectCombatAsset = (Name.StartsWith(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/")) && !Name.StartsWith(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Monsters/")) && Name != TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_DefaulatAttack") && Name != TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack")) || Name.StartsWith(TEXT("/Game/User_JeHoon/RPGEffects/")) || Name.StartsWith(TEXT("/Game/User_JeHoon/Free_Magic/")) || Name == TEXT("/Game/User_JeHoon/Blueprint/DataAsset/SkillPools/DA_SkillPool_Catalog") || Name == TEXT("/Game/User_JeHoon/Blueprint/TESTPROJECTILE");
+        if (!CombatRoots.Contains(Root) && !bProjectCombatAsset) return false;
+    }
+    TArray<UObject*> Objects;
+    for (const FAssetData& Data : AssetData)
+    {
+        UObject* Object = Data.GetAsset({ULevel::LoadAllExternalObjectsTag});
+        if (!IsValid(Object) || Object->GetPackage()->GetFName() != Data.PackageName || Object->GetPathName() != Data.GetSoftObjectPath().ToString()) return false;
+        Objects.AddUnique(Object);
+    }
+    const int32 ObjectCount = Objects.Num();
+    // The caller verifies hashes and persisted references; remaining references belong to the reviewed group or transient engine objects.
+    // 호출부가 해시와 저장된 참조를 검증하며 남은 참조는 검토된 묶음 내부 또는 엔진 임시 객체에 속합니다.
+    return ObjectTools::DeleteObjectsUnchecked(Objects) >= ObjectCount;
+}
 
 bool UAssetDeduplicationLibrary::SetAnimationBlueprintPreviewMesh(UAnimBlueprint* Blueprint, USkeletalMesh* Mesh)
 {

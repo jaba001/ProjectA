@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "NativeGameplayTags.h"
+#include "DataAsset/RunEncounterPoolDataAsset.h"
 #include "Game/Run/RunContentMigration.h"
 #include "Game/Run/RunSaveGame.h"
 #include "UObject/StrongObjectPtr.h"
@@ -81,7 +82,9 @@ bool FRunRemovedSkillIdentityTest::RunTest(const FString& Parameters)
     for (const FSoftObjectPath& Path : RemovedPaths) TestTrue(TEXT("Each exact historical or current skill path is removed"), RunContentMigration::IsRemovedSkill(Path));
     for (FName Id : {FName(TEXT("SweepingStrike")), FName(TEXT("SkillDefinitionDataAsset:DA_SweepingStrike")), FName(TEXT("SkillDefinitionDataAsset:BPDA_SweepingStrike")), FName(TEXT("AOE")), FName(TEXT("SkillDefinitionDataAsset:BPDA_AreaAttack")), FName(TEXT("RangedAttack")), FName(TEXT("SkillDefinitionDataAsset:BPDA_RangedAttack"))}) TestTrue(TEXT("Each supported historical skill identifier is removed"), RunContentMigration::IsRemovedSkillId(Id));
     for (FName Id : {FName(TEXT("Whirlwind")), FName(TEXT("Sweep")), FName(TEXT("AreaAttack")), FName(TEXT("AnotherType:DA_SweepingStrike")), FName(TEXT("SweepingStrike_Copy")), FName(TEXT("RangedAttack_Copy"))}) TestFalse(TEXT("Other named skills and similar identifiers remain available"), RunContentMigration::IsRemovedSkillId(Id));
-    for (const TCHAR* Path : {TEXT("/Game/AnotherPack/DA_SweepingStrike.DA_SweepingStrike"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_SweepingStrike_Copy.BPDA_SweepingStrike_Copy"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_Whirlwind.BPDA_NS_Mage_Whirlwind"), TEXT("/Game/RPGEffects/ParticlesNiagara/Mage/Whirlwind/NS_Mage_Whirlwind.NS_Mage_Whirlwind")}) TestFalse(TEXT("Other packages derived names and original whirlwind effects are preserved"), RunContentMigration::IsRemovedSkill(FSoftObjectPath(Path)));
+    for (const TCHAR* Path : {TEXT("/Game/AnotherPack/DA_SweepingStrike.DA_SweepingStrike"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_SweepingStrike_Copy.BPDA_SweepingStrike_Copy"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_DefaulatAttack.BPDA_DefaulatAttack"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Monsters/DA_Monster_Bear.DA_Monster_Bear"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_FutureVfxSkill.BPDA_FutureVfxSkill")}) TestFalse(TEXT("Retained monster attacks base skills similar names and future content stay available"), RunContentMigration::IsRemovedSkill(FSoftObjectPath(Path)));
+    for (const TCHAR* Path : {TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_Whirlwind.BPDA_NS_Mage_Whirlwind"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_NS_Mage_Whirlwind_d5d622a9.BPDA_NS_Mage_Whirlwind_d5d622a9"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Catalog/RPGEffects/ParticlesNiagara/Mage/Whirlwind/BPDA_NS_Mage_Whirlwind_d5d622a9.BPDA_NS_Mage_Whirlwind_d5d622a9")}) TestTrue(TEXT("Current and both exact historical catalog paths retire together"), RunContentMigration::IsRemovedSkill(FSoftObjectPath(Path)));
+    for (FName Id : {FName(TEXT("Catalog_438db4e2237d4037")), FName(TEXT("SkillDefinitionDataAsset:BPDA_NS_Mage_Whirlwind")), FName(TEXT("SkillDefinitionDataAsset:BPDA_NS_Mage_Whirlwind_d5d622a9"))}) TestTrue(TEXT("Authored catalog and current or renamed primary identities retire together"), RunContentMigration::IsRemovedSkillId(Id));
     TestFalse(TEXT("An empty path cannot be treated as deleted content"), RunContentMigration::IsRemovedSkill(FSoftObjectPath()));
     return true;
 }
@@ -184,29 +187,53 @@ bool FRunRemovedSkillCatalogAndLegacyTest::RunTest(const FString& Parameters)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunRemovedSkillFailureTest, "ProjectA.Run.ContentMigration.UnrepairableCandidatesAndEmptyLoadout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunRemovedSkillFailureTest, "ProjectA.Run.ContentMigration.InvalidRevisionOrSchema", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FRunRemovedSkillFailureTest::RunTest(const FString& Parameters)
 {
-    for (int32 Case = 0; Case < 4; ++Case)
+    for (int32 Case = 0; Case < 2; ++Case)
     {
         FRunMigrationFixture Original;
-        if (Case == 0) Original.Save->SkillShopState.Catalog.SetNum(5);
-        if (Case == 1)
-        {
-            Original.Save->SkillShopState.Catalog[5].BaseWeight = 0.0f;
-            Original.Save->SkillShopState.Catalog[6].Tags = FGameplayTagContainer(TAG_RunMigrationExcluded);
-        }
-        if (Case == 2) Original.Save->SkillShopState.Revision = MAX_int32;
-        if (Case == 3) Original.Save->Party[0].Skills = {RemovedPaths[0]};
+        if (Case == 0) Original.Save->SkillShopState.Revision = MAX_int32;
+        if (Case == 1) Original.Save->SkillShopState.SchemaVersion = 2;
         const FRunSkillShopState OriginalShop = Original.Save->SkillShopState;
         const FRunPartyMember OriginalMember = Original.Save->Party[0];
         TStrongObjectPtr<URunSaveGame> Candidate(DuplicateObject<URunSaveGame>(Original.Save.Get(), GetTransientPackage()));
         FText Error;
-        TestFalse(TEXT("An insufficient catalog filtered replacements exhausted revision or deleted-only loadout rejects the candidate"), RunContentMigration::RemoveDeletedSkills(*Candidate, Error));
+        TestFalse(TEXT("An exhausted revision or unsupported schema rejects the migration candidate"), RunContentMigration::RemoveDeletedSkills(*Candidate, Error));
         TestFalse(TEXT("Every rejected candidate provides a visible explanation"), Error.IsEmpty());
         TestTrue(TEXT("Migrating an isolated candidate leaves every original shop and party value unchanged"), SameShop(OriginalShop, Original.Save->SkillShopState) && FRunPartyMember::StaticStruct()->CompareScriptStruct(&OriginalMember, &Original.Save->Party[0], 0));
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunRemovedSkillReducedCatalogTest, "ProjectA.Run.ContentMigration.ReducedCatalogAndRetiredOnlyFallback", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunRemovedSkillReducedCatalogTest::RunTest(const FString& Parameters)
+{
+    FRunMigrationFixture Fixture;
+    FRunSkillShopState& Shop = Fixture.Save->SkillShopState;
+    Shop.Catalog = {Shop.Catalog[0], Shop.Catalog[4]};
+    Shop.Offers = Shop.Catalog;
+    Fixture.Save->Party[0].Skills = {RemovedPaths[0]};
+    FRunPartyMember ExpectedMember = Fixture.Save->Party[0];
+    const FSoftObjectPath Unarmed(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_DefaulatAttack.BPDA_DefaulatAttack"));
+    ExpectedMember.Skills = {Unarmed};
+    const FRunSkillShopOffer Retained = Shop.Catalog[0];
+    FText Error;
+    if (!TestTrue(TEXT("A one-candidate catalog and retired-only party migrate successfully"), RunContentMigration::RemoveDeletedSkills(*Fixture.Save, Error))) return false;
+    TestTrue(TEXT("Reduced stock keeps the existing candidate and every frozen offer field"), Shop.Catalog.Num() == 1 && Shop.Offers.Num() == 1 && FRunSkillShopOffer::StaticStruct()->CompareScriptStruct(&Retained, &Shop.Offers[0], 0));
+    TestTrue(TEXT("Fallback replaces only the retired loadout without changing gold ownership HP or progress"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&ExpectedMember, &Fixture.Save->Party[0], 0));
+    TestTrue(TEXT("Reducing stock advances only the revision and never charges a reroll"), Shop.Revision == 12 && Shop.RerollPrice == 7 && Shop.Recovery.Price == 9);
+    const FRunSkillShopState Once = Shop;
+    TestTrue(TEXT("The reduced catalog and unarmed fallback are idempotent"), RunContentMigration::RemoveDeletedSkills(*Fixture.Save, Error) && SameShop(Once, Shop));
+
+    FRunMigrationFixture Empty;
+    Empty.Save->SkillShopState.Catalog = {Empty.Save->SkillShopState.Catalog[4]};
+    Empty.Save->SkillShopState.Offers = Empty.Save->SkillShopState.Catalog;
+    if (!TestTrue(TEXT("A retired-only modern catalog retains its recovery service"), RunContentMigration::RemoveDeletedSkills(*Empty.Save, Error))) return false;
+    TestTrue(TEXT("Empty modern stock preserves recovery and reroll prices without adding products"), Empty.Save->SkillShopState.Offers.IsEmpty() && Empty.Save->SkillShopState.Catalog.IsEmpty() && Empty.Save->SkillShopState.Revision == 12 && Empty.Save->SkillShopState.RerollPrice == 7 && Empty.Save->SkillShopState.Recovery.Price == 9);
+    TestTrue(TEXT("Recovery-only modern state validates and cannot charge a reroll"), URunEncounterPoolDataAsset::ValidateSkillShop(Empty.Save->SkillShopState, Error) && !URunEncounterPoolDataAsset::RollSkillShop(Empty.Save->SkillShopState, false, Error));
     return true;
 }
 

@@ -8,6 +8,7 @@ import unreal
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from RetargetContentLibrary import retarget, verify_retarget_motion
+from RetiredSkillContent import REMOVED_SKILL_IDS, REMOVED_SKILL_PATHS
 from WarriorContentPaths import ENEMY_RIGS, ENEMY_SOURCE, ROOT, SWORD_FOLDER, SWORD_RECOVERY_SOURCE, SWORD_SOURCE, SWORD_SOURCE_MESH, SWORD_SUFFIX, UNARMED_SOURCE, WARRIOR_MONTAGE, WARRIOR_RIGS, WARRIOR_SOURCE, WEAPON_SOURCE, animation_sources, legacy_moves, migrate_legacy_assets, mirrored_path, retarget_output_path
 
 SKILLS = ROOT + "/Blueprint/DataAsset/Skills"
@@ -24,9 +25,6 @@ SWORD_WARRIOR_GRIP = (-11.095651, 5.605028, -10.0)
 SWORD_ENEMY_GRIP = (-8.5, 5.0, -10.0)
 SWORD_RECOVERY_START_SECONDS = 0.2
 SWORD_MONTAGE_SECONDS = 1.933333
-REMOVED_SKILL_IDS = {"SweepingStrike", "AOE", "RangedAttack"}
-REMOVED_SKILL_PATHS = {SKILLS + "/" + name for name in ["BPDA_SweepingStrike", "DA_SweepingStrike", "BPDA_AreaAttack", "BPDA_RangedAttack"]}
-REMOVED_SKILL_PATHS.update({ROOT + "/Blueprint/DataAsset/" + name for name in ["DA_SweepingStrike", "BPDA_AreaAttack", "BPDA_RangedAttack"]})
 REMOVED_ABILITY_PATHS = {ROOT + "/Blueprint/GAS/Ability/" + name for name in ["BPGA_AreaAttack", "BPGA_RangedAttack"]}
 
 

@@ -213,12 +213,7 @@ bool UPartySnapshotLibrary::LoadSnapshot(FName SlotId, FPartySnapshot& OutSnapsh
     FPartySnapshot Candidate = Save->Snapshot;
     for (FPartySnapshotMember& Member : Candidate.Members)
     {
-        const int32 RemovedCount = Member.SkillIds.RemoveAll([](FName SkillId) { return RunContentMigration::IsRemovedSkillId(SkillId); });
-        if (RemovedCount > 0 && Member.SkillIds.IsEmpty())
-        {
-            OutError = NSLOCTEXT("PartySnapshot", "RemovedOnlySkill", "삭제된 스킬을 제거한 뒤 남은 스킬이 없어 상대 Snapshot을 불러올 수 없습니다.");
-            return false;
-        }
+        RunContentMigration::RemoveDeletedSkillIds(Member.SkillIds);
     }
     if (!ValidateSnapshot(Candidate, OutError))
     {

@@ -45,6 +45,7 @@ public:
 
     bool BuildFixedOffers(TArray<FRunEncounterOffer>& OutOffers, FText& OutError) const;
     bool BuildSkillShop(FRunSkillShopState& OutState, FText& OutError) const;
+    static int32 GetSkillShopOfferCount(const FRunSkillShopState& State);
     static bool ValidateSkillShop(const FRunSkillShopState& State, FText& OutError);
     static bool RollSkillShop(FRunSkillShopState& State, bool bResetRerollPrice, FText& OutError);
     bool ValidateGoldRewardRange(FText& OutError) const;

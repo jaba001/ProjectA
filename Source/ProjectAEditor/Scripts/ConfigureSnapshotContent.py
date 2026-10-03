@@ -1,4 +1,10 @@
+import sys
+from pathlib import Path
+
 import unreal
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from RetiredSkillContent import REMOVED_SKILL_IDS, is_removed_skill
 
 # Create trusted content for the opt-in local Snapshot exercise.
 # 선택적으로 실행하는 로컬 Snapshot 검증용 신뢰 콘텐츠를 생성합니다.
@@ -33,11 +39,8 @@ if not catalog:
 
 # Remove deleted aliases while preserving all other user-authored catalog entries.
 # 삭제된 별칭만 제거하고 사용자가 작성한 다른 카탈로그 항목은 모두 보존합니다.
-removed_ids = {"SweepingStrike", "AOE", "RangedAttack"}
-removed_paths = {root + "/DataAsset/Skills/" + name for name in ["BPDA_SweepingStrike", "DA_SweepingStrike", "BPDA_AreaAttack", "BPDA_RangedAttack"]}
-removed_paths.update({root + "/DataAsset/" + name for name in ["DA_SweepingStrike", "BPDA_AreaAttack", "BPDA_RangedAttack"]})
 catalog_skills = dict(catalog.get_editor_property("skills"))
-retained_skills = {key: skill for key, skill in catalog_skills.items() if str(key) not in removed_ids and not (skill and (str(skill.get_editor_property("skill_id")) in removed_ids or skill.get_path_name().split(".")[0] in removed_paths))}
+retained_skills = {key: skill for key, skill in catalog_skills.items() if str(key) not in REMOVED_SKILL_IDS and not is_removed_skill(skill)}
 if len(retained_skills) != len(catalog_skills):
     catalog.set_editor_property("skills", retained_skills)
     if not assets.save_loaded_asset(catalog):

@@ -1,15 +1,14 @@
+import sys
+from pathlib import Path
+
 import unreal
 
-# Remove only deleted prototype skills from the existing encounter pool; preserve other authored entries and bindings.
-# 기존 인카운터 풀에서 삭제된 시험 스킬만 제거하고 다른 작성 항목과 연결은 보존합니다.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from RetiredSkillContent import is_removed_skill
+
+# Remove reviewed retired skills while preserving future authored entries and bindings.
+# 검토된 폐기 스킬을 제거하고 향후 작성할 항목과 연결은 보존합니다.
 root = "/Game/User_JeHoon/Blueprint/DataAsset"
-removed_ids = {"SweepingStrike", "AOE", "RangedAttack"}
-removed_paths = {root + "/Skills/" + name for name in ["BPDA_SweepingStrike", "DA_SweepingStrike", "BPDA_AreaAttack", "BPDA_RangedAttack"]}
-removed_paths.update({root + "/" + name for name in ["DA_SweepingStrike", "BPDA_AreaAttack", "BPDA_RangedAttack"]})
-
-
-def is_removed_skill(skill):
-    return bool(skill and (str(skill.get_editor_property("skill_id")) in removed_ids or skill.get_path_name().split(".")[0] in removed_paths))
 
 
 pool_path = root + "/SkillPools/DA_EncounterSkillPool"

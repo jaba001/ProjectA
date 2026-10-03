@@ -30,7 +30,6 @@ bool URunEncounterPoolDataAsset::BuildGoldRewards(FName NodeId, FRunGoldRewardSt
 
 URunEncounterPoolDataAsset::URunEncounterPoolDataAsset()
 {
-    SkillShopPool = TSoftObjectPtr<USkillPoolDataAsset>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/SkillPools/DA_SkillPool_Catalog.DA_SkillPool_Catalog")));
     for (int32 Index = 1; Index <= 3; ++Index)
     {
         FRunEncounterOffer& Offer = FixedOffers.AddDefaulted_GetRef();
@@ -67,6 +66,13 @@ bool URunEncounterPoolDataAsset::BuildFixedOffers(TArray<FRunEncounterOffer>& Ou
     return true;
 }
 
+int32 URunEncounterPoolDataAsset::GetSkillShopOfferCount(const FRunSkillShopState& State)
+{
+    int32 EligibleCount = 0;
+    for (const FRunSkillShopOffer& Offer : State.Catalog) if (FMath::IsFinite(Offer.BaseWeight) && Offer.BaseWeight > 0.0f && (State.Query.IsEmpty() || State.Query.Matches(Offer.Tags))) ++EligibleCount;
+    return FMath::Min(FRunSkillShopState::OfferCount, EligibleCount);
+}
+
 bool URunEncounterPoolDataAsset::ValidateSkillShop(const FRunSkillShopState& State, FText& OutError)
 {
     OutError = NSLOCTEXT("RunSkillShop", "InvalidCatalog", "스킬 상점의 상품·가격·스킬 데이터가 유효하지 않습니다.");
@@ -77,9 +83,9 @@ bool URunEncounterPoolDataAsset::ValidateSkillShop(const FRunSkillShopState& Sta
         return true;
     }
     if (State.SchemaVersion != 1 || State.Recovery.Price <= 0 || State.Revision < 0 || State.RerollPrice <= 0) return false;
-    const bool bLegacy = State.Catalog.IsEmpty();
-    if (bLegacy && (State.Revision != 0 || State.RerollPrice != 1 || !State.Query.IsEmpty() || State.Offers.IsEmpty() || State.Offers.Num() > 32)) return false;
-    if (!bLegacy && (State.Catalog.Num() < FRunSkillShopState::OfferCount || State.Catalog.Num() > 512 || State.Revision <= 0 || State.RerollPrice > State.Revision || State.Offers.Num() != FRunSkillShopState::OfferCount)) return false;
+    const bool bLegacy = State.Catalog.IsEmpty() && State.Revision == 0;
+    if (bLegacy && (State.RerollPrice != 1 || !State.Query.IsEmpty() || State.Offers.Num() > 32)) return false;
+    if (!bLegacy && (State.Catalog.Num() > 512 || State.Revision <= 0 || State.RerollPrice > State.Revision || State.Offers.Num() != GetSkillShopOfferCount(State))) return false;
     const auto ValidateProducts = [bLegacy](const TArray<FRunSkillShopOffer>& Products)
     {
         TSet<FName> OfferIds{FRunSkillShopState::GetRecoveryOfferId(), FRunSkillShopState::GetRerollOfferId()};
@@ -123,9 +129,10 @@ bool URunEncounterPoolDataAsset::RollSkillShop(FRunSkillShopState& State, bool b
     }
     FRandomStream Random(FMath::Rand());
     TArray<int32> SelectedIndices;
-    if (!GameplayTagCandidateSelection::Select(Candidates, State.Query, FRunSkillShopState::OfferCount, false, Random, SelectedIndices))
+    const int32 OfferCount = GetSkillShopOfferCount(State);
+    if (OfferCount <= 0 || !GameplayTagCandidateSelection::Select(Candidates, State.Query, OfferCount, false, Random, SelectedIndices))
     {
-        OutError = NSLOCTEXT("RunSkillShop", "InsufficientCandidates", "태그 조건을 만족하는 스킬 상점 후보가 5개 이상 필요합니다.");
+        OutError = NSLOCTEXT("RunSkillShop", "InsufficientCandidates", "태그 조건을 만족하는 양수 가중치 스킬 상점 후보가 필요합니다.");
         return false;
     }
     FRunSkillShopState Updated = State;

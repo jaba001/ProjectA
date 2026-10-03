@@ -64,7 +64,7 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 
 8. `ConfigureSweepingStrike.py`는 폐기 안내 도구로 유지한다. 휩쓸기 제거에 따라 에셋을 작성하거나 재생성하지 않으며 실행 시 폐기 안내만 반환한다. `ConfigureCombatContent.py`의 현재 생성 대상에서도 휩쓸기·테스트 원거리·AOE 3종을 제외한다. 신규 후보·기존 저장 보유 제거의 확인은 [구현·검증 이력](../../../Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
-`ProjectA.Combat.Round.MeleeAreaPhysicalContacts`와 `MeleeTargetAndSides`는 삭제 대상 3종과 독립적인 근접 범위·타일형 공통 기능 회귀로 보존한다. 생성 스킬 176종과 범위·투사체 공통 C++·GAS·FX도 유지한다. 기존 작성·검증 결과는 [당시 이력](../../../Docs/HISTORY.md#최근-변경)으로 구분한다.
+`ProjectA.Combat.Round.MeleeAreaPhysicalContacts`와 `MeleeTargetAndSides`는 콘텐츠 삭제와 독립적인 근접 범위·타일형 공통 기능 회귀로 보존한다. 사용자 스킬은 비무장·근접 공격 2종이며 몬스터 전용 공격 12종을 보존하고 범위·투사체 공통 C++·GAS·FX는 신규 콘텐츠 연결을 위해 유지한다. 기존 작성·검증 결과는 [당시 이력](../../../Docs/HISTORY.md#최근-변경)으로 구분한다.
 
 9. `ConfigureTestEnemies.py`: 기본 PvE 인카운터의 유효한 적 클래스 4개와 순서를 보존하고 Gameplay Arena만 앞열 `(1,2)`, `(2,2)`·뒷열 `(0,3)`, `(3,3)`으로 배치한다. 혼합 편성을 같은 클래스로 덮어쓰지 않으며 유닛 능력치·스킬·Snapshot 정의는 변경하지 않는다. 열린 에디터가 패키지를 잠글 수 있으므로 저장 후 종료하고 실행한다. `-TestEnemiesVerifyOnly`는 저장된 클래스 수·순서·배치만 읽는다.
 
@@ -159,13 +159,7 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 전체 검사는 네 직업의 기본 메시·몸체 ID와 이전 의상 선택 검증·원본 애니메이션 포즈·마법사 기본 스태프 제거·래그돌 구조를 읽기 전용으로 확인한다. 결과는 `Saved/Automation/PrimitiveAppearanceConfigure.json`, `PrimitiveAppearanceReload.json`에 기록한다. 실제 메뉴 저장·선택·수정·삭제는 확인했으나 프리뷰 idle 루프 경계 4건은 통과하지 못했고 애니메이션 캡처는 제외했다. [재검증 이력](../../../Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
-18. `ConfigureSkillVfxDirection.py`: `CombatVfxAssetLibrary`로 카탈로그의 Niagara 베기 23개·지정 투사체 3개를 조사한다. 본체가 이미 로컬이면 원본을 유지하며 월드 공간 대상 7개만 `/Game/User_JeHoon/{원본 팩/하위 폴더}/{이름}_TargetDirection`으로 파생한다. 원본 메시·재질을 직접 참조하고 기존 BPDA의 VFX와 `CatalogSkillSpecs.json`의 `direction_source`를 연결한다. 도끼·불꽃 화살의 위치 이벤트는 공식 NiagaraEditor 갱신 API로 `GenerateLocationEvent`·`ReceiveLocationEvent` 1.1을 적용해 로컬 본체와 월드 잔상의 좌표를 변환한다. `CreateCatalogSkills.py`도 이 선택적 방향 참조를 사용한다. 대상과 보정 계약은 [PROJECT_PLAN 4-1](../../../Docs/PROJECT_PLAN.md#4-1-스킬-이펙트-에셋-목록)을 따른다.
-
-```powershell
-& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureSkillVfxDirection.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
-```
-
-작성 명령은 파생 에셋·대상 BPDA·명세를 저장한다. 기존 파생의 `CombatDirectionSource`가 원본 경로와 정확히 일치해야 하며, 출처 정보가 없거나 다르면 사용자 수정본을 보호하기 위해 중단한다. 대상 스킬에 다른 사용자 지정 VFX가 있으면 보존하고 중단한다. 결과는 `Saved/Automation/CombatVfxDirection/Authoring.json`에 원본 SHA·변경 대상·이미터 공간·파생 용량으로 기록한다. 2026-09-30 결과는 26개 중 7개·약 5.48MiB이며 사전 최대 81MiB 추정과 구분한다. 메타데이터·Niagara 컴파일 확인은 게임 재생·대상 방향 일치 검증을 포함하지 않는다. 채택할 신규 에셋의 재생 방향은 [도입 계획](../../../Docs/TODO.md#6-신규-에셋-선정과-도입)에 따라 확인한다.
+18. `ConfigureSkillVfxDirection.py`와 `CreateCatalogSkills.py`: 2026-10-03 폐기된 VFX 스킬 생성의 이전 진입점이다. 실행 시 폐기 안내만 표시하고 에셋·명세를 작성하지 않는다. `CatalogSkillSpecs.json`은 폐기 상태와 [RetiredSkillContent.json](RetiredSkillContent.json)의 삭제 경로 이력만 연결한다. 신규 VFX는 [도입 기준](../../../Docs/TODO.md#6-신규-에셋-선정과-도입)에 따라 별도 명세를 작성한다. [현재 정리 범위](../../../Docs/PROJECT_PLAN.md#4-8-기본-공격-외-스킬-정리)
 
 19. `ConfigureDungeonLevels.py`: `DungeonFantasySpec.json`·`DungeonStoneSpec.json`에 따라 Gameplay를 Unreal 기능으로 복제하여 `/Game/User_JeHoon/LEVEL/Environment/DungeonFantasy`·`DungeonStone`을 작성한다. FANTASTIC의 `/Game/Fantastic_Dungeon_Pack`·Modular Dungeon Collection의 `/Game/Dungeon_Modular_V1`을 직접 참조하고 전장·Grid·GameplayCamera를 보존한다. 두 맵만 기존 `BP_CombatDebugGameMode`를 지정하며 원본 Blueprint·Gameplay·DebugCombat과 기본 Run 전환은 유지한다. 최초 생성·navigation 저장·독립 재로드 정적 검사를 통과했다. 현행 밝기는 23번 도구와 같은 명세를 사용한다. [구성 기준](../../../Docs/PROJECT_PLAN.md#4-3-지하-던전-비교-레벨)
 
@@ -223,3 +217,13 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 ```
 
 `-LightingCaptureBaseline`은 원본 검토 후 작업 시작 시 1회 기준 해시만 `Saved/Automation/Lighting/`에 기록하고 종료하는 독립 모드다. 보호 검사 실패를 회피하기 위해 기준을 덮어쓰지 않는다. 조명 저장 후 navigation 캐시 재생성이 필요하므로 폴더에 대상 비교 맵 14개만 있는지 확인하고 navigation 빌드·저장 후 별도 프로세스의 `-LightingVerifyOnly`로 재검사한다. 검사는 완료된 작성 보고서와 저장본의 조명·노출·렌더링 CVar·원본 파일 해시·비조명 설정 보존을 읽기 전용으로 확인하며 결과는 같은 폴더의 `Configuration.json`·`Reload.json`에 기록한다. 14맵 조명·navigation 저장·최종 독립 재로드와 실제 CVar 7개 검사는 통과했으며 보호 대상 20,643파일·재로드 전후 전체 Content 20,657파일 SHA를 보존했다. 설정 반영에는 에디터 재시작·셰이더 재컴파일이 필요하고 화면·게임·PIE·FPS 확인은 [TODO 14절](../../../Docs/TODO.md#14-렌더링과-밝기-확인)을 따른다.
+
+24. `ResetSkillContent.py`: [RetiredSkillContent.json](RetiredSkillContent.json)의 검토된 VFX 스킬·풀·VFX 에셋만 처리한다. 몬스터 전용 공격·원본 공격 애니메이션은 보존하며 UI·환경·무기 공유 리소스는 참조 감사로 보호한다. 기본 감사와 `-SkillResetApply` 적용·`-SkillResetVerifyOnly` 독립 읽기 전용 재로드를 구분한다. 패키지는 엔진 기능으로 삭제하고 대상 17루트의 잔존 파일이 없음을 확인한 뒤 빈 하위 폴더만 제거한다. MoviePipelinePrimaryConfig 로드를 위해 MovieRenderPipeline을 해당 명령에만 활성화한다. 로그·기준·결과는 `Saved/Automation/SkillReset/`에 보관하며 게임·PIE를 시작하지 않는다. [정리 기준](../../../Docs/PROJECT_PLAN.md#4-8-기본-공격-외-스킬-정리)
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ResetSkillContent.py") '-EnablePlugins=PythonScriptPlugin,MovieRenderPipeline' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ResetSkillContent.py") -SkillResetApply '-EnablePlugins=PythonScriptPlugin,MovieRenderPipeline' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ResetSkillContent.py") -SkillResetVerifyOnly '-EnablePlugins=PythonScriptPlugin,MovieRenderPipeline' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+```
+
+적용·검증은 커밋 전 명세의 기준 HEAD에서 수행한다. 중단된 적용을 재개할 때만 같은 명세·기준 해시와 기존 Apply 보고서를 사용하여 적용 명령에 `-SkillResetResume`를 추가한다. 기준 해시를 바꾸거나 보고서 없이 부분 삭제를 성공으로 처리하지 않는다. 커밋 후 삭제 명세를 다시 적용하지 않는다. 실제 새 Run·Continue·디버그와 몬스터 공격 확인은 [TODO 18절](../../../Docs/TODO.md#18-기본-공격-외-스킬-정리-확인)을 따른다.
