@@ -64,7 +64,7 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 
 8. `ConfigureSweepingStrike.py`는 폐기 안내 도구로 유지한다. 휩쓸기 제거에 따라 에셋을 작성하거나 재생성하지 않으며 실행 시 폐기 안내만 반환한다. `ConfigureCombatContent.py`의 현재 생성 대상에서도 휩쓸기·테스트 원거리·AOE 3종을 제외한다. 신규 후보·기존 저장 보유 제거의 확인은 [구현·검증 이력](../../../Docs/HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
-`ProjectA.Combat.Round.MeleeAreaPhysicalContacts`와 `MeleeTargetAndSides`는 콘텐츠 삭제와 독립적인 근접 범위·타일형 공통 기능 회귀로 보존한다. 사용자 스킬은 비무장·근접 공격 2종이며 몬스터 전용 공격 12종을 보존하고 범위·투사체 공통 C++·GAS·FX는 신규 콘텐츠 연결을 위해 유지한다. 기존 작성·검증 결과는 [당시 이력](../../../Docs/HISTORY.md#최근-변경)으로 구분한다.
+`ProjectA.Combat.Round.MeleeAreaPhysicalContacts`와 `MeleeTargetAndSides`는 콘텐츠 삭제와 독립적인 근접 범위·타일형 공통 기능 회귀로 보존한다. 두 기본 공격·몬스터 전용 공격 12종을 보존하고 새 DrGame 스킬 60종을 별도 명세로 작성하며 범위·투사체 공통 C++·GAS·FX는 신규 콘텐츠 연결을 위해 유지한다. 기존 작성·검증 결과는 [당시 이력](../../../Docs/HISTORY.md#최근-변경)으로 구분한다.
 
 9. `ConfigureTestEnemies.py`: 기본 PvE 인카운터의 유효한 적 클래스 4개와 순서를 보존하고 Gameplay Arena만 앞열 `(1,2)`, `(2,2)`·뒷열 `(0,3)`, `(3,3)`으로 배치한다. 혼합 편성을 같은 클래스로 덮어쓰지 않으며 유닛 능력치·스킬·Snapshot 정의는 변경하지 않는다. 열린 에디터가 패키지를 잠글 수 있으므로 저장 후 종료하고 실행한다. `-TestEnemiesVerifyOnly`는 저장된 클래스 수·순서·배치만 읽는다.
 
@@ -227,3 +227,18 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 ```
 
 적용·검증은 커밋 전 명세의 기준 HEAD에서 수행한다. 중단된 적용을 재개할 때만 같은 명세·기준 해시와 기존 Apply 보고서를 사용하여 적용 명령에 `-SkillResetResume`를 추가한다. 기준 해시를 바꾸거나 보고서 없이 부분 삭제를 성공으로 처리하지 않는다. 커밋 후 삭제 명세를 다시 적용하지 않는다. 실제 새 Run·Continue·디버그와 몬스터 공격 확인은 [TODO 18절](../../../Docs/TODO.md#18-기본-공격-외-스킬-정리-확인)을 따른다.
+
+25. `AuditDrGameVfx.py`: 구입 VFX/SFX 6팩의 원본 Niagara·오디오 클래스·패키지 의존·사용자 파라미터·AudioPlayer 바인딩/플래그를 읽고 `Saved/Automation/DrGameSkills/Inventory.json`에 기록한다. 원본을 저장하지 않으며 NullRHI의 IsReadyToRun 값을 실제 재생 확인으로 해석하지 않는다. 원본 데모의 InputAction 경고는 별도 기록한다. [필수 원본 팩·루트](../../../Docs/PROJECT_PLAN.md#4-9-구입-vfx와-sfx-도입)
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/AuditDrGameVfx.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+```
+
+26. `CreateDrGameSkills.py`: [DrGameSkillSpecs.json](DrGameSkillSpecs.json)의 주효과 60개·상점 풀·Run 풀을 `/Game/User_JeHoon/`에 작성하고 기본 파티의 Run 풀을 연결한다. 독립 스킬 미생성 보조 63개·구입 원본·두 기본 공격·몬스터 전용 공격 12개·닫힌 퇴역 명세는 보존한다. 목적지 소유 정보·저장 설정 불일치를 거절하며 재실행으로 수동 수정을 덮어쓰지 않는다. 시험 위력25/AP1/가중치1과 판정 시점·범위는 명세를 따른다. NiagaraFluids·ChaosNiagara는 프로젝트 설정에서 활성화한다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDrGameSkills.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDrGameSkills.py") -DrGameSkillsVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+```
+
+기본 명령은 신규 소유 에셋을 작성·저장하고 기존 기본 파티의 Run 풀 참조 변경도 저장한다. `-DrGameSkillsVerifyOnly`는 별도 프로세스에서 저장본·태그·GAS 효과·Niagara 사용자 파라미터·상점 후보·파티 연결과 보호 해시를 읽기 전용으로 검사한다. 작성·재로드 결과는 `Author.json`·`Reload.json`에 기록하고 CSV는 이 결과와 원본 참조를 목록으로 정리한다. 원본 Niagara 내부 SFX를 사용하여 별도 외부 Sound 중복 재생을 추가하지 않는다. 실제 화면·전투·청취는 [TODO 19절](../../../Docs/TODO.md#19-구입-vfxsfx-스킬-확인)에서 사용자가 확인한다.

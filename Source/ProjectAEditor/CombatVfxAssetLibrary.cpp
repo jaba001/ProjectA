@@ -4,6 +4,7 @@
 #include "Misc/App.h"
 #include "NiagaraEmitter.h"
 #include "NiagaraEmitterHandle.h"
+#include "NiagaraDataInterfaceAudioPlayer.h"
 #include "NiagaraGraph.h"
 #include "NiagaraMeshRendererProperties.h"
 #include "NiagaraNodeFunctionCall.h"
@@ -13,6 +14,8 @@
 #include "NiagaraSystem.h"
 #include "Serialization/JsonSerializer.h"
 #include "UObject/Package.h"
+#include "UObject/UObjectHash.h"
+#include "Sound/SoundBase.h"
 #include "UpgradeNiagaraScriptResults.h"
 #include "ViewModels/Stack/NiagaraStackGraphUtilities.h"
 
@@ -48,6 +51,13 @@ namespace
             Row->SetArrayField(TEXT("value"), {MakeShared<FJsonValueNumber>(Value.X), MakeShared<FJsonValueNumber>(Value.Y), MakeShared<FJsonValueNumber>(Value.Z), MakeShared<FJsonValueNumber>(Value.W)});
         }
         else if (Variable.GetType() == FNiagaraTypeDefinition::GetFloatDef()) Row->SetNumberField(TEXT("value"), Store.GetParameterValue<float>(Variable));
+        else if (Variable.GetType() == FNiagaraTypeDefinition::GetIntDef()) Row->SetNumberField(TEXT("value"), Store.GetParameterValue<int32>(Variable));
+        else if (Variable.GetType() == FNiagaraTypeDefinition::GetBoolDef()) Row->SetBoolField(TEXT("value"), Store.GetParameterValue<FNiagaraBool>(Variable).GetValue());
+        else if (Variable.GetType() == FNiagaraTypeDefinition::GetPositionDef())
+        {
+            const FNiagaraPosition Value = Store.GetParameterValue<FNiagaraPosition>(Variable);
+            Row->SetArrayField(TEXT("value"), {MakeShared<FJsonValueNumber>(Value.X), MakeShared<FJsonValueNumber>(Value.Y), MakeShared<FJsonValueNumber>(Value.Z)});
+        }
         return Row;
     }
 }
@@ -58,7 +68,27 @@ FString UCombatVfxAssetLibrary::InspectNiagaraSpace(UNiagaraSystem* System)
     Root->SetBoolField(TEXT("valid"), IsValid(System));
     if (IsValid(System))
     {
+        System->WaitForCompilationComplete(true, false);
+        Root->SetBoolField(TEXT("ready"), System->IsReadyToRun());
+        Root->SetBoolField(TEXT("systemValid"), System->IsValid());
         Root->SetStringField(TEXT("asset"), System->GetPathName());
+        // Inspect embedded audio interfaces so catalogs distinguish built-in SFX from optional external playback.
+        // 카탈로그에서 내장 SFX와 선택적 외부 재생을 구분하도록 포함된 오디오 인터페이스를 검사합니다.
+        TArray<TSharedPtr<FJsonValue>> AudioInterfaces;
+        ForEachObjectWithOuter(System, [&AudioInterfaces](UObject* Object)
+        {
+            const UNiagaraDataInterfaceAudioPlayer* Audio = Cast<UNiagaraDataInterfaceAudioPlayer>(Object);
+            if (!Audio) return;
+            TSharedRef<FJsonObject> Row = MakeShared<FJsonObject>();
+            Row->SetStringField(TEXT("object"), Audio->GetPathName());
+            Row->SetStringField(TEXT("sound"), GetPathNameSafe(Audio->SoundToPlay));
+            Row->SetBoolField(TEXT("stopOnDestroy"), Audio->bStopWhenComponentIsDestroyed);
+            Row->SetBoolField(TEXT("allowLoopingOneShot"), Audio->bAllowLoopingOneShotSounds);
+            Row->SetBoolField(TEXT("limitPlaysPerTick"), Audio->bLimitPlaysPerTick);
+            Row->SetNumberField(TEXT("maxPlaysPerTick"), Audio->MaxPlaysPerTick);
+            AudioInterfaces.Add(MakeShared<FJsonValueObject>(Row));
+        }, EGetObjectsFlags::IncludeNestedObjects);
+        Root->SetArrayField(TEXT("audioInterfaces"), AudioInterfaces);
         TArray<TSharedPtr<FJsonValue>> UserParameters;
         for (const FNiagaraVariableWithOffset& Variable : System->GetExposedParameters().ReadParameterVariables()) UserParameters.Add(MakeShared<FJsonValueObject>(DescribeParameter(System->GetExposedParameters(), Variable)));
         Root->SetArrayField(TEXT("userParameters"), UserParameters);

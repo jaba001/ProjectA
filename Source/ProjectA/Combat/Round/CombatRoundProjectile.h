@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "GameplayTagContainer.h"
 #include "Combat/Round/CombatRoundTypes.h"
+#include "Combat/Round/CombatSkillPresentation.h"
 #include "CombatRoundProjectile.generated.h"
 
 class AUnitBase;
@@ -67,11 +68,22 @@ private:
     UPROPERTY(Replicated)
     float VisualLifetime = 0.f;
 
+    UPROPERTY(Replicated)
+    FVector VisualSourcePosition = FVector::ZeroVector;
+
+    UPROPERTY(Replicated)
+    FVector VisualTargetPosition = FVector::ZeroVector;
+
+    UPROPERTY(ReplicatedUsing = OnRep_Visual)
+    bool bPresentationReady = false;
+
     UPROPERTY(Transient)
     FCombatSkillVfx ImpactVisual;
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UFXSystemComponent>> VisualComponents;
+
+    CombatSkillPresentation::FAudioState VisualAudio;
 
     UPROPERTY(VisibleAnywhere, Category = "Round Combat")
     TObjectPtr<UStaticMeshComponent> ProjectileMesh = nullptr;
@@ -98,4 +110,5 @@ private:
     bool bRestrictTargets = false;
     bool bInitialized = false;
     bool bResolved = false;
+    bool bPresentationAttached = false;
 };

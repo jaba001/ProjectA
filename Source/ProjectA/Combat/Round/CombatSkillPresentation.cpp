@@ -1,5 +1,6 @@
 #include "Combat/Round/CombatSkillPresentation.h"
 #include "Combat/Round/CombatRoundTypes.h"
+#include "Components/AudioComponent.h"
 #include "Distributions/DistributionFloatParticleParameter.h"
 #include "Distributions/DistributionVectorParticleParameter.h"
 #include "Engine/World.h"
@@ -9,6 +10,7 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+#include "NiagaraTypes.h"
 #include "Particles/ParticleSystem.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Particles/ParticleEmitter.h"
@@ -16,12 +18,80 @@
 #include "Particles/ParticleModuleRequired.h"
 #include "Particles/Lifetime/ParticleModuleLifetime.h"
 #include "Particles/Velocity/ParticleModuleVelocity.h"
+#include "Sound/SoundBase.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogCombatSkillPresentation, Log, All);
 
 namespace
 {
+    bool HasNiagaraParameter(const UNiagaraSystem* System, FName Name, const FNiagaraTypeDefinition& Type)
+    {
+        return IsValid(System) && !Name.IsNone() && System->GetExposedParameters().FindParameterOffset(FNiagaraVariable(Type, Name));
+    }
+
+    bool HasNiagaraOverrides(const FCombatSkillVfx& Visual)
+    {
+        return !Visual.StartPositionParameter.IsNone() || !Visual.EndPositionParameter.IsNone() || !Visual.BoolParameters.IsEmpty() || !Visual.FloatParameters.IsEmpty();
+    }
+
+    bool ValidateNiagaraOverrides(const UNiagaraSystem* System, const FCombatSkillVfx& Visual, FName& InvalidParameter)
+    {
+        for (FName Name : {Visual.StartPositionParameter, Visual.EndPositionParameter})
+        {
+            if (Name.IsNone()) continue;
+            if (!HasNiagaraParameter(System, Name, FNiagaraTypeDefinition::GetVec3Def()) && !HasNiagaraParameter(System, Name, FNiagaraTypeDefinition::GetPositionDef()))
+            {
+                InvalidParameter = Name;
+                return false;
+            }
+        }
+        for (const TPair<FName, bool>& Parameter : Visual.BoolParameters)
+        {
+            if (!HasNiagaraParameter(System, Parameter.Key, FNiagaraTypeDefinition::GetBoolDef()))
+            {
+                InvalidParameter = Parameter.Key;
+                return false;
+            }
+        }
+        for (const TPair<FName, float>& Parameter : Visual.FloatParameters)
+        {
+            if (!HasNiagaraParameter(System, Parameter.Key, FNiagaraTypeDefinition::GetFloatDef()))
+            {
+                InvalidParameter = Parameter.Key;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void BindNiagaraOverrides(UNiagaraComponent* Component, UNiagaraSystem* System, const FCombatSkillVfx& Visual, const CombatSkillPresentation::FEndpointParameters& Endpoints)
+    {
+        if (!IsValid(Component) || !IsValid(System)) return;
+        // Vector endpoints live in the actual component space, including authored relative translation and scale.
+        // Vector 끝점은 작성된 상대 위치와 크기를 반영한 실제 컴포넌트 공간에 놓입니다.
+        if (HasNiagaraParameter(System, Visual.StartPositionParameter, FNiagaraTypeDefinition::GetVec3Def())) Component->SetVariableVec3(Visual.StartPositionParameter, Component->GetComponentTransform().InverseTransformPosition(Endpoints.SourceWorldPosition) + Visual.StartPositionOffset);
+        else if (HasNiagaraParameter(System, Visual.StartPositionParameter, FNiagaraTypeDefinition::GetPositionDef())) Component->SetVariablePosition(Visual.StartPositionParameter, Endpoints.SourceWorldPosition + Visual.StartPositionOffset);
+        if (HasNiagaraParameter(System, Visual.EndPositionParameter, FNiagaraTypeDefinition::GetVec3Def())) Component->SetVariableVec3(Visual.EndPositionParameter, Component->GetComponentTransform().InverseTransformPosition(Endpoints.TargetWorldPosition));
+        else if (HasNiagaraParameter(System, Visual.EndPositionParameter, FNiagaraTypeDefinition::GetPositionDef())) Component->SetVariablePosition(Visual.EndPositionParameter, Endpoints.TargetWorldPosition);
+        for (const TPair<FName, bool>& Parameter : Visual.BoolParameters) Component->SetVariableBool(Parameter.Key, Parameter.Value);
+        for (const TPair<FName, float>& Parameter : Visual.FloatParameters) Component->SetVariableFloat(Parameter.Key, Parameter.Value);
+    }
+
+    void LimitAudioLifetime(UWorld* World, UAudioComponent* Component, float Duration)
+    {
+        if (!IsValid(World) || !IsValid(Component)) return;
+        // Both one-shots and imported loops have bounded cosmetic lifetimes independent of combat locks.
+        // 단발과 임포트한 반복 사운드 모두 전투 잠금과 별개로 표현 수명이 제한됩니다.
+        const float SafeDuration = FMath::IsFinite(Duration) ? FMath::Clamp(Duration, 0.01f, 60.f) : 5.f;
+        FTimerHandle Handle;
+        World->GetTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(Component, [Component]()
+        {
+            Component->Stop();
+            if (IsValid(Component)) Component->DestroyComponent();
+        }), SafeDuration, false);
+    }
+
     bool FindParameterInput(double Output, double MinInput, double MaxInput, double MinOutput, double MaxOutput, DistributionParamMode Mode, double& Input)
     {
         if (!FMath::IsFinite(Output) || !FMath::IsFinite(MinInput) || !FMath::IsFinite(MaxInput) || !FMath::IsFinite(MinOutput) || !FMath::IsFinite(MaxOutput)) return false;
@@ -146,6 +216,8 @@ bool CombatSkillPresentation::Prepare(UWorld* World, const TArray<FCombatRoundSk
             {
                 UNiagaraSystem* System = Visual->Niagara.LoadSynchronous();
                 if (!IsValid(System)) return Fail(Skill, Visual->Niagara.ToString(), TEXT("Niagara 이펙트 에셋을 불러오지 못했습니다."));
+                FName InvalidParameter;
+                if (!ValidateNiagaraOverrides(System, *Visual, InvalidParameter)) return Fail(Skill, FString::Printf(TEXT("%s : %s"), *System->GetPathName(), *InvalidParameter.ToString()), TEXT("원본 Niagara의 공개 파라미터 이름 또는 타입이 작성된 설정과 다릅니다."));
                 if (!Assets.Contains(System))
                 {
 #if WITH_EDITORONLY_DATA
@@ -164,6 +236,12 @@ bool CombatSkillPresentation::Prepare(UWorld* World, const TArray<FCombatRoundSk
                 if (!IsValid(System)) return Fail(Skill, Visual->Cascade.ToString(), TEXT("Cascade 이펙트 에셋을 불러오지 못했습니다."));
                 Assets.AddUnique(System);
             }
+            if (!Visual->Sound.IsNull())
+            {
+                USoundBase* Sound = Visual->Sound.LoadSynchronous();
+                if (!IsValid(Sound)) return Fail(Skill, Visual->Sound.ToString(), TEXT("스킬 사운드 에셋을 불러오지 못했습니다."));
+                Assets.AddUnique(Sound);
+            }
         }
     }
     for (UObject* Asset : Assets)
@@ -174,7 +252,7 @@ bool CombatSkillPresentation::Prepare(UWorld* World, const TArray<FCombatRoundSk
     return true;
 }
 
-void CombatSkillPresentation::Attach(AActor* Owner, const FCombatSkillVfx& Visual, TArray<TObjectPtr<UFXSystemComponent>>& Components, bool bAutoDestroy, const FProjectileParameters* Projectile)
+void CombatSkillPresentation::Attach(AActor* Owner, const FCombatSkillVfx& Visual, TArray<TObjectPtr<UFXSystemComponent>>& Components, FAudioState& Audio, const FEndpointParameters& Endpoints, bool bAutoDestroy, const FProjectileParameters* Projectile)
 {
     Destroy(Components);
     if (!IsValid(Owner) || !Owner->GetRootComponent() || Owner->GetNetMode() == NM_DedicatedServer || Visual.RelativeTransform.ContainsNaN()) return;
@@ -183,8 +261,17 @@ void CombatSkillPresentation::Attach(AActor* Owner, const FCombatSkillVfx& Visua
     const FVector Scale = Visual.RelativeTransform.GetScale3D();
     if (UNiagaraSystem* System = Visual.Niagara.LoadSynchronous())
     {
-        UNiagaraComponent* Component = UNiagaraFunctionLibrary::SpawnSystemAttached(System, Owner->GetRootComponent(), NAME_None, Location, Rotation, Scale, EAttachLocation::KeepRelativeOffset, bAutoDestroy, ENCPoolMethod::None, true, false);
-        if (IsValid(Component)) Components.Add(Component);
+        const bool bBindParameters = HasNiagaraOverrides(Visual);
+        UNiagaraComponent* Component = UNiagaraFunctionLibrary::SpawnSystemAttached(System, Owner->GetRootComponent(), NAME_None, Location, Rotation, Scale, EAttachLocation::KeepRelativeOffset, bAutoDestroy, ENCPoolMethod::None, !bBindParameters, false);
+        if (IsValid(Component))
+        {
+            if (bBindParameters)
+            {
+                BindNiagaraOverrides(Component, System, Visual, Endpoints);
+                Component->Activate(true);
+            }
+            if (IsValid(Component)) Components.Add(Component);
+        }
     }
     if (UParticleSystem* System = Visual.Cascade.LoadSynchronous())
     {
@@ -203,6 +290,18 @@ void CombatSkillPresentation::Attach(AActor* Owner, const FCombatSkillVfx& Visua
         Component->SetGenerateOverlapEvents(false);
         Component->SetCanEverAffectNavigation(false);
     }
+    // Replication may rebuild visual components; an optional release sound starts only once per actor.
+    // 복제가 시각 컴포넌트를 재생성하더라도 선택적 발동 사운드는 액터마다 한 번만 시작합니다.
+    if (!Audio.bStarted && !Visual.Sound.IsNull())
+    {
+        if (USoundBase* Sound = Visual.Sound.LoadSynchronous())
+        {
+            Audio.bStarted = true;
+            UAudioComponent* Component = UGameplayStatics::SpawnSoundAttached(Sound, Owner->GetRootComponent(), NAME_None, Location, Rotation, EAttachLocation::KeepRelativeOffset, true, Visual.SoundVolume, Visual.SoundPitch, 0.f, nullptr, nullptr, true);
+            Audio.Component = Component;
+            LimitAudioLifetime(Owner->GetWorld(), Component, Visual.SoundMaxDuration);
+        }
+    }
 }
 
 void CombatSkillPresentation::Destroy(TArray<TObjectPtr<UFXSystemComponent>>& Components)
@@ -214,16 +313,45 @@ void CombatSkillPresentation::Destroy(TArray<TObjectPtr<UFXSystemComponent>>& Co
     Components.Reset();
 }
 
+void CombatSkillPresentation::StopAudio(FAudioState& Audio)
+{
+    if (UAudioComponent* Component = Audio.Component.Get())
+    {
+        Component->Stop();
+        if (IsValid(Component)) Component->DestroyComponent();
+    }
+    Audio.Component.Reset();
+    Audio.bStarted = false;
+}
+
+bool CombatSkillPresentation::HasActiveAudio(const FAudioState& Audio)
+{
+    const UAudioComponent* Component = Audio.Component.Get();
+    return IsValid(Component) && Component->IsPlaying();
+}
+
 void CombatSkillPresentation::Impact(UWorld* World, const FCombatSkillVfx& Visual, const FTransform& Transform)
 {
     if (!World || World->GetNetMode() == NM_DedicatedServer || Visual.RelativeTransform.ContainsNaN() || Transform.ContainsNaN()) return;
     const FTransform WorldTransform = Visual.RelativeTransform * Transform;
     if (UNiagaraSystem* System = Visual.Niagara.LoadSynchronous())
     {
-        LimitImpactLifetime(World, UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, System, WorldTransform.GetLocation(), WorldTransform.Rotator(), WorldTransform.GetScale3D(), true, true, ENCPoolMethod::None, false));
+        const bool bBindParameters = HasNiagaraOverrides(Visual);
+        UNiagaraComponent* Component = UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, System, WorldTransform.GetLocation(), WorldTransform.Rotator(), WorldTransform.GetScale3D(), true, !bBindParameters, ENCPoolMethod::None, false);
+        if (IsValid(Component) && bBindParameters)
+        {
+            const FEndpointParameters Endpoints{Transform.GetLocation(), Transform.GetLocation()};
+            BindNiagaraOverrides(Component, System, Visual, Endpoints);
+            Component->Activate(true);
+        }
+        LimitImpactLifetime(World, Component);
     }
     if (UParticleSystem* System = Visual.Cascade.LoadSynchronous())
     {
         LimitImpactLifetime(World, UGameplayStatics::SpawnEmitterAtLocation(World, System, WorldTransform, true, EPSCPoolMethod::None, true));
+    }
+    if (USoundBase* Sound = Visual.Sound.LoadSynchronous())
+    {
+        LimitAudioLifetime(World, UGameplayStatics::SpawnSoundAtLocation(World, Sound, WorldTransform.GetLocation(), WorldTransform.Rotator(), Visual.SoundVolume, Visual.SoundPitch, 0.f, nullptr, nullptr, true), Visual.SoundMaxDuration);
     }
 }

@@ -37,13 +37,16 @@ void ACombatSkillEffectActor::Tick(float DeltaSeconds)
     if (!HasAuthority() || !bResolved) return;
     // Auto-destroyed components signal actual completion, including deferred Niagara activation.
     // 자동 삭제된 컴포넌트로 지연된 Niagara 활성화를 포함한 실제 재생 완료를 확인합니다.
-    if (GetNetMode() == NM_Standalone && !VisualComponents.ContainsByPredicate([](const UFXSystemComponent* Component) { return IsValid(Component); })) Destroy();
+    if (GetNetMode() == NM_Standalone && !CombatSkillPresentation::HasActiveAudio(VisualAudio) && !VisualComponents.ContainsByPredicate([](const UFXSystemComponent* Component) { return IsValid(Component); })) Destroy();
 }
 
 void ACombatSkillEffectActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ACombatSkillEffectActor, Visual);
+    DOREPLIFETIME(ACombatSkillEffectActor, VisualSourcePosition);
+    DOREPLIFETIME(ACombatSkillEffectActor, VisualTargetPosition);
+    DOREPLIFETIME(ACombatSkillEffectActor, bPresentationReady);
 }
 
 void ACombatSkillEffectActor::InitializeEffect(AUnitBase* Source, AUnitBase* Target, FVector AimLocation, const FCombatRoundSkill& Skill, const TArray<FCombatRoundUnitView>& Units, double PresentationTime)
@@ -89,6 +92,9 @@ void ACombatSkillEffectActor::InitializeEffect(AUnitBase* Source, AUnitBase* Tar
         if (IsValid(Entry.Unit) && Entry.Unit->GetWorld() == GetWorld()) AllowedTargets.AddUnique(Entry.Unit);
     }
     Visual = Skill.Vfx;
+    VisualSourcePosition = SourceLocation;
+    VisualTargetPosition = AimPoint;
+    bPresentationReady = true;
     OnRep_Visual();
     if (IsValid(GetOwner())) GetOwner()->OnDestroyed.AddUniqueDynamic(this, &ACombatSkillEffectActor::HandleOwnerDestroyed);
     ForceNetUpdate();
@@ -181,7 +187,7 @@ void ACombatSkillEffectActor::AdvanceEffect(float DeltaSeconds, double Presentat
         // Record the unit before callbacks because effect application may reenter combat cleanup.
         // 효과 적용이 전투 정리에 재진입할 수 있으므로 콜백 전에 피격 유닛을 기록합니다.
         HitOnceUnits.Add(Contact.Unit);
-        if (!Definition.ImpactVfx.Niagara.IsNull() || !Definition.ImpactVfx.Cascade.IsNull()) MulticastImpact(Definition.ImpactVfx, FTransform(Rotation, Contact.Point));
+        if (!Definition.ImpactVfx.Niagara.IsNull() || !Definition.ImpactVfx.Cascade.IsNull() || !Definition.ImpactVfx.Sound.IsNull()) MulticastImpact(Definition.ImpactVfx, FTransform(Rotation, Contact.Point));
         OnImpact.Broadcast(SourceUnit.Get(), Target, Definition.Power);
     }
     if (bHitWall || ElapsedSeconds >= TotalDuration) ResolveEffect();
@@ -198,12 +204,12 @@ void ACombatSkillEffectActor::ResolveEffect(bool bDestroyActor)
     {
         // Collision completion must not cut off the authored effect before its first rendered frame.
         // 충돌 판정 완료가 작성된 효과의 첫 렌더링 프레임 이전에 표현을 끊지 않도록 합니다.
-        if (Visual.Niagara.IsNull() && Visual.Cascade.IsNull()) Destroy();
+        if (Visual.Niagara.IsNull() && Visual.Cascade.IsNull() && Visual.Sound.IsNull()) Destroy();
         else
         {
             // Natural completion releases one-shot systems; cap imported loops without extending damage or round locks.
             // 단발 시스템은 자연 완료로 해제하며 피해나 라운드 잠금을 연장하지 않고 임포트한 반복 효과를 제한합니다.
-            SetLifeSpan(5.f);
+            SetLifeSpan(Visual.Sound.IsNull() ? 5.f : FMath::Max(5.f, FMath::Clamp(Visual.SoundMaxDuration, 0.01f, 60.f)));
             SetActorTickEnabled(GetNetMode() == NM_Standalone);
         }
     }
@@ -211,7 +217,12 @@ void ACombatSkillEffectActor::ResolveEffect(bool bDestroyActor)
 
 void ACombatSkillEffectActor::OnRep_Visual()
 {
-    if (!IsActorBeingDestroyed()) CombatSkillPresentation::Attach(this, Visual, VisualComponents, true);
+    // Activate once after all launch data exists, even when replicated configuration arrived in an earlier frame.
+    // 복제된 설정이 앞선 프레임에 도착했더라도 모든 발동 데이터가 준비된 뒤 한 번만 활성화합니다.
+    if (IsActorBeingDestroyed() || !bPresentationReady || bPresentationAttached) return;
+    bPresentationAttached = true;
+    const CombatSkillPresentation::FEndpointParameters Endpoints{VisualSourcePosition, VisualTargetPosition};
+    CombatSkillPresentation::Attach(this, Visual, VisualComponents, VisualAudio, Endpoints, true);
 }
 
 void ACombatSkillEffectActor::HandleOwnerDestroyed(AActor* DestroyedActor)
@@ -231,5 +242,6 @@ void ACombatSkillEffectActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
     ResolveEffect(false);
     if (IsValid(GetOwner())) GetOwner()->OnDestroyed.RemoveDynamic(this, &ACombatSkillEffectActor::HandleOwnerDestroyed);
     CombatSkillPresentation::Destroy(VisualComponents);
+    CombatSkillPresentation::StopAudio(VisualAudio);
     Super::EndPlay(EndPlayReason);
 }

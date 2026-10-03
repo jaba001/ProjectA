@@ -10,6 +10,7 @@ class UAnimMontage;
 class UGameplayEffect;
 class UNiagaraSystem;
 class UParticleSystem;
+class USoundBase;
 
 // Reference source effects without duplicating their packages or running third-party Blueprint logic.
 // 원본 패키지를 복제하거나 외부 Blueprint 로직을 실행하지 않고 효과를 참조합니다.
@@ -26,6 +27,52 @@ struct PROJECTA_API FCombatSkillVfx
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FTransform RelativeTransform = FTransform::Identity;
+
+    // Optional original audio is separate from sounds already authored inside a Niagara system.
+    // 선택적 원본 오디오는 Niagara 시스템 내부에 이미 작성된 사운드와 별개입니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sound")
+    TSoftObjectPtr<USoundBase> Sound;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sound", meta = (ClampMin = "0.0", ClampMax = "10.0"))
+    float SoundVolume = 1.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sound", meta = (ClampMin = "0.125", ClampMax = "4.0"))
+    float SoundPitch = 1.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sound", meta = (ClampMin = "0.01", ClampMax = "60.0"))
+    float SoundMaxDuration = 5.f;
+
+    // Bind typed endpoints before activation; empty names retain the original Niagara values.
+    // 활성화 전에 타입에 맞는 끝점을 연결하며 빈 이름은 원본 Niagara 값을 유지합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Niagara Parameters")
+    FName StartPositionParameter;
+
+    // Vector parameters use local offsets; Position parameters use the captured caster world position.
+    // Vector 파라미터는 로컬 오프셋을 사용하고 Position 파라미터는 저장한 시전자 월드 위치를 사용합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Niagara Parameters")
+    FVector StartPositionOffset = FVector::ZeroVector;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Niagara Parameters")
+    FName EndPositionParameter;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, NotReplicated, Category = "Niagara Parameters")
+    TMap<FName, bool> BoolParameters;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, NotReplicated, Category = "Niagara Parameters")
+    TMap<FName, float> FloatParameters;
+
+    // Native map replication is unsupported; serialize bounded cosmetic overrides explicitly.
+    // 기본 Map 복제는 지원되지 않으므로 수량이 제한된 표현용 재정의를 명시적으로 직렬화합니다.
+    bool NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess);
+};
+
+template<>
+struct TStructOpsTypeTraits<FCombatSkillVfx> : public TStructOpsTypeTraitsBase2<FCombatSkillVfx>
+{
+    enum
+    {
+        WithNetSerializer = true
+    };
 };
 
 UENUM(BlueprintType)

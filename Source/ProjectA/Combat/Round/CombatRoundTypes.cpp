@@ -1,5 +1,62 @@
 #include "Combat/Round/CombatRoundTypes.h"
 #include "GameplayEffect.h"
+#include "NiagaraSystem.h"
+#include "Particles/ParticleSystem.h"
+#include "Sound/SoundBase.h"
+
+namespace
+{
+    template<typename TValue>
+    void SerializeVisualParameters(FArchive& Ar, TMap<FName, TValue>& Parameters)
+    {
+        if (Ar.IsSaving() && Parameters.Num() > 64)
+        {
+            Ar.SetError();
+            return;
+        }
+        uint8 Count = static_cast<uint8>(Parameters.Num());
+        Ar << Count;
+        if (Count > 64)
+        {
+            Ar.SetError();
+            return;
+        }
+        TArray<FName> Names;
+        if (Ar.IsSaving())
+        {
+            Parameters.GetKeys(Names);
+            Names.Sort(FNameLexicalLess());
+        }
+        else Parameters.Reset();
+        for (uint8 Index = 0; Index < Count && !Ar.IsError(); ++Index)
+        {
+            FName Name = Ar.IsSaving() ? Names[Index] : NAME_None;
+            TValue Value = Ar.IsSaving() ? Parameters.FindChecked(Name) : TValue{};
+            Ar << Name;
+            Ar << Value;
+            if (Name.IsNone() || (Ar.IsLoading() && Parameters.Contains(Name))) Ar.SetError();
+            else if (Ar.IsLoading()) Parameters.Add(Name, Value);
+        }
+    }
+}
+
+bool FCombatSkillVfx::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
+{
+    Ar << Niagara;
+    Ar << Cascade;
+    Ar << RelativeTransform;
+    Ar << Sound;
+    Ar << SoundVolume;
+    Ar << SoundPitch;
+    Ar << SoundMaxDuration;
+    Ar << StartPositionParameter;
+    Ar << StartPositionOffset;
+    Ar << EndPositionParameter;
+    SerializeVisualParameters(Ar, BoolParameters);
+    SerializeVisualParameters(Ar, FloatParameters);
+    bOutSuccess = !Ar.IsError();
+    return true;
+}
 
 float CombatRoundRules::StartDelay(float HighestSpeed, float UnitSpeed)
 {
@@ -58,7 +115,20 @@ bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
     if (Skill.TargetRule > ESkillTargetRule::AnyTile) return false;
     const auto IsValidVfx = [](const FCombatSkillVfx& Vfx)
     {
-        return (Vfx.Niagara.IsNull() || Vfx.Cascade.IsNull()) && !Vfx.RelativeTransform.ContainsNaN() && Vfx.RelativeTransform.GetRotation().IsNormalized() && Vfx.RelativeTransform.GetScale3D().GetMin() > 0.0;
+        if ((!Vfx.Niagara.IsNull() && !Vfx.Cascade.IsNull()) || Vfx.RelativeTransform.ContainsNaN() || !Vfx.RelativeTransform.GetRotation().IsNormalized() || Vfx.RelativeTransform.GetScale3D().GetMin() <= 0.0) return false;
+        if (!FMath::IsFinite(Vfx.SoundVolume) || Vfx.SoundVolume < 0.f || Vfx.SoundVolume > 10.f || !FMath::IsFinite(Vfx.SoundPitch) || Vfx.SoundPitch < 0.125f || Vfx.SoundPitch > 4.f || !FMath::IsFinite(Vfx.SoundMaxDuration) || Vfx.SoundMaxDuration < 0.01f || Vfx.SoundMaxDuration > 60.f) return false;
+        if (Vfx.StartPositionOffset.ContainsNaN() || Vfx.StartPositionOffset.GetAbsMax() > 100000.f || Vfx.BoolParameters.Num() > 64 || Vfx.FloatParameters.Num() > 64) return false;
+        if (Vfx.Niagara.IsNull() && (!Vfx.StartPositionParameter.IsNone() || !Vfx.EndPositionParameter.IsNone() || !Vfx.BoolParameters.IsEmpty() || !Vfx.FloatParameters.IsEmpty())) return false;
+        if (!Vfx.StartPositionParameter.IsNone() && Vfx.StartPositionParameter == Vfx.EndPositionParameter) return false;
+        for (const TPair<FName, bool>& Parameter : Vfx.BoolParameters)
+        {
+            if (Parameter.Key.IsNone() || Vfx.FloatParameters.Contains(Parameter.Key) || Parameter.Key == Vfx.StartPositionParameter || Parameter.Key == Vfx.EndPositionParameter) return false;
+        }
+        for (const TPair<FName, float>& Parameter : Vfx.FloatParameters)
+        {
+            if (Parameter.Key.IsNone() || !FMath::IsFinite(Parameter.Value) || Parameter.Key == Vfx.StartPositionParameter || Parameter.Key == Vfx.EndPositionParameter) return false;
+        }
+        return true;
     };
     if (!IsValidVfx(Skill.Vfx) || !IsValidVfx(Skill.ImpactVfx)) return false;
     if (!FMath::IsFinite(Skill.EffectHitDelaySeconds) || Skill.EffectHitDelaySeconds < 0.f || Skill.EffectHitDelaySeconds > 10.f) return false;

@@ -61,6 +61,9 @@ void ACombatRoundProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
     DOREPLIFETIME(ACombatRoundProjectile, Visual);
     DOREPLIFETIME(ACombatRoundProjectile, VisualVelocity);
     DOREPLIFETIME(ACombatRoundProjectile, VisualLifetime);
+    DOREPLIFETIME(ACombatRoundProjectile, VisualSourcePosition);
+    DOREPLIFETIME(ACombatRoundProjectile, VisualTargetPosition);
+    DOREPLIFETIME(ACombatRoundProjectile, bPresentationReady);
 }
 
 void ACombatRoundProjectile::ConfigurePresentation(const FCombatRoundSkill& Skill)
@@ -113,10 +116,13 @@ void ACombatRoundProjectile::InitializeProjectile(AUnitBase* Source, AUnitBase* 
     RemainingLifetime = Lifetime;
     bTrackTarget = bHoming;
     VisualVelocity = Direction.GetSafeNormal() * FlightSpeed;
+    VisualSourcePosition = Source->GetCapsuleComponent()->GetComponentLocation();
+    VisualTargetPosition = AimPoint;
     // Straight-flight parameters describe actual travel; homing systems retain their authored behavior.
     // 직선 비행 파라미터는 실제 이동을 나타내며 유도 시스템은 원본 동작을 유지합니다.
     VisualLifetime = bHoming ? 0.f : FMath::Min(Lifetime, static_cast<float>(Direction.Size() / FlightSpeed));
     PresentationStartedAt = FMath::IsFinite(PresentationTime) && PresentationTime >= 0.0 ? PresentationTime : -1.0;
+    bPresentationReady = true;
     // Activate particles only after the launch direction is final, including world-space burst emitters.
     // 월드 공간 Burst 이미터도 올바른 발사 방향으로 생성되도록 방향 확정 후 파티클을 활성화합니다.
     OnRep_Visual();
@@ -206,7 +212,7 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds, double Presen
     // 월드 지형은 WorldDynamic을 Block해야 하며 Visibility 전용 그리드 박스와 Overlap 센서는 벽이 아닙니다.
     if (GetWorld()->OverlapBlockingTestByChannel(Start, FQuat::Identity, ECC_WorldDynamic, Shape, WorldQueryParams, WorldResponses))
     {
-        if (!ImpactVisual.Niagara.IsNull() || !ImpactVisual.Cascade.IsNull()) MulticastImpact(ImpactVisual, FTransform(GetActorQuat(), Start));
+        if (!ImpactVisual.Niagara.IsNull() || !ImpactVisual.Cascade.IsNull() || !ImpactVisual.Sound.IsNull()) MulticastImpact(ImpactVisual, FTransform(GetActorQuat(), Start));
         ResolveProjectile();
         return;
     }
@@ -268,7 +274,7 @@ void ACombatRoundProjectile::AdvanceProjectile(float DeltaSeconds, double Presen
     if (bHitWorld && (Candidates.IsEmpty() || CombatCollisionPolicy::IsBlockedByWorld(bHitWorld, WorldHitTime, Candidates[0].Time)))
     {
         SetActorLocation(WorldHit.bStartPenetrating ? Start : FVector(WorldHit.Location), false, nullptr, ETeleportType::TeleportPhysics);
-        if (!ImpactVisual.Niagara.IsNull() || !ImpactVisual.Cascade.IsNull()) MulticastImpact(ImpactVisual, FTransform(GetActorQuat(), GetActorLocation()));
+        if (!ImpactVisual.Niagara.IsNull() || !ImpactVisual.Cascade.IsNull() || !ImpactVisual.Sound.IsNull()) MulticastImpact(ImpactVisual, FTransform(GetActorQuat(), GetActorLocation()));
         ResolveProjectile();
         return;
     }
@@ -300,7 +306,7 @@ void ACombatRoundProjectile::ResolveProjectile(AUnitBase* HitUnit, bool bDestroy
     bResolved = true;
     if (SourceUnit.IsValid() && IsEligibleTarget(HitUnit))
     {
-        if (!ImpactVisual.Niagara.IsNull() || !ImpactVisual.Cascade.IsNull()) MulticastImpact(ImpactVisual, FTransform(GetActorQuat(), GetActorLocation()));
+        if (!ImpactVisual.Niagara.IsNull() || !ImpactVisual.Cascade.IsNull() || !ImpactVisual.Sound.IsNull()) MulticastImpact(ImpactVisual, FTransform(GetActorQuat(), GetActorLocation()));
         OnImpact.Broadcast(SourceUnit.Get(), HitUnit, DamageAmount);
     }
     OnImpact.Clear();
@@ -324,14 +330,19 @@ void ACombatRoundProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     ResolveProjectile(nullptr, false);
     CombatSkillPresentation::Destroy(VisualComponents);
+    CombatSkillPresentation::StopAudio(VisualAudio);
     Super::EndPlay(EndPlayReason);
 }
 
 void ACombatRoundProjectile::OnRep_Visual()
 {
-    if (IsActorBeingDestroyed()) return;
+    // Wait for initialization and suppress duplicate notifies so embedded Niagara audio cannot replay at release.
+    // 초기화를 기다리고 중복 Notify를 차단하여 Niagara 내부 오디오가 발동 때 다시 재생되지 않도록 합니다.
+    if (IsActorBeingDestroyed() || !bPresentationReady || bPresentationAttached) return;
+    bPresentationAttached = true;
     const CombatSkillPresentation::FProjectileParameters Parameters{VisualVelocity, VisualLifetime};
-    CombatSkillPresentation::Attach(this, Visual, VisualComponents, false, &Parameters);
+    const CombatSkillPresentation::FEndpointParameters Endpoints{VisualSourcePosition, VisualTargetPosition};
+    CombatSkillPresentation::Attach(this, Visual, VisualComponents, VisualAudio, Endpoints, false, &Parameters);
     if (ProjectileMesh) ProjectileMesh->SetVisibility(VisualComponents.IsEmpty());
 }
 

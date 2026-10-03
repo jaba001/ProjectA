@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Combat/Round/CombatRoundTypes.h"
+#include "Combat/Round/CombatSkillPresentation.h"
 #include "GameFramework/Actor.h"
 #include "CombatSkillEffectActor.generated.h"
 
@@ -48,11 +49,22 @@ private:
     UPROPERTY(ReplicatedUsing = OnRep_Visual)
     FCombatSkillVfx Visual;
 
+    UPROPERTY(Replicated)
+    FVector VisualSourcePosition = FVector::ZeroVector;
+
+    UPROPERTY(Replicated)
+    FVector VisualTargetPosition = FVector::ZeroVector;
+
+    UPROPERTY(ReplicatedUsing = OnRep_Visual)
+    bool bPresentationReady = false;
+
     UPROPERTY(Transient)
     TArray<TObjectPtr<UFXSystemComponent>> VisualComponents;
 
     UPROPERTY(Transient)
     FCombatRoundSkill Definition;
+
+    CombatSkillPresentation::FAudioState VisualAudio;
 
     TWeakObjectPtr<AUnitBase> SourceUnit;
     TWeakObjectPtr<AUnitBase> TargetUnit;
@@ -68,4 +80,5 @@ private:
     bool bResolved = false;
     bool bOnlyTarget = false;
     bool bHitWindowStarted = false;
+    bool bPresentationAttached = false;
 };
