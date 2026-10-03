@@ -69,29 +69,17 @@ T* FindActiveWidget(UWorld* World)
     return nullptr;
 }
 
-// Commit the new-character editor through its real Save button before testing controls behind the modal.
-// 새 캐릭터 편집창의 실제 저장 버튼으로 확정한 뒤 모달 뒤의 조작 버튼을 검사합니다.
-bool SaveCreatedSlot(FAutomationTestBase* Test, UCharacterCreationWidget* Creation, int32 SlotIndex)
+// Verify that creation commits the default character without opening its optional editor.
+// 생성 즉시 기본 캐릭터가 확정되고 선택적인 편집창은 열리지 않는지 검사합니다.
+bool VerifyCreatedSlot(FAutomationTestBase* Test, UCharacterCreationWidget* Creation, int32 SlotIndex)
 {
     UWidget* Panel = Creation ? Creation->GetWidgetFromName(TEXT("ProfessionDetailPanel")) : nullptr;
-    if (!Test->TestTrue(TEXT("Creating a character opens its detail editor before direct-control selection."), Panel && Panel->GetVisibility() == ESlateVisibility::Visible)) return false;
-    if (!Test->TestFalse(TEXT("The new-character modal prevents direct-control selection before Save."), Creation->SelectPlayerControlledSlot(SlotIndex))) return false;
-    TArray<UWidget*> Widgets;
-    Creation->WidgetTree->GetAllWidgets(Widgets);
-    TArray<UButton*> SaveButtons;
-    for (UWidget* Widget : Widgets)
-    {
-        UButton* Button = Cast<UButton>(Widget);
-        UTextBlock* Label = Button ? Cast<UTextBlock>(Button->GetChildAt(0)) : nullptr;
-        if (!Label || Label->GetText().ToString() != TEXT("저장") || !Button->GetIsEnabled() || !Button->OnClicked.Contains(Creation, GET_FUNCTION_NAME_CHECKED(UCharacterCreationWidget, SaveSlotDetails))) continue;
-        UWidget* Ancestor = Button;
-        while (Ancestor && Ancestor != Panel) Ancestor = Ancestor->GetParent();
-        if (Ancestor == Panel) SaveButtons.Add(Button);
-    }
-    if (!Test->TestTrue(TEXT("The active character editor exposes one bound Save button."), SaveButtons.Num() == 1)) return false;
-    SaveButtons[0]->OnClicked.Broadcast();
+    if (!Test->TestTrue(TEXT("Creating a character keeps the detail editor closed."), Panel && Panel->GetVisibility() == ESlateVisibility::Collapsed)) return false;
     const TArray<FRunPartyMember> Members = Creation->GetPartyMembers();
-    return Test->TestTrue(TEXT("Saving commits the created slot and closes its editor without selecting direct control."), Panel->GetVisibility() == ESlateVisibility::Collapsed && Members.IsValidIndex(SlotIndex) && Members[SlotIndex].bCreated && !Members[SlotIndex].bPlayerControlled);
+    if (!Test->TestTrue(TEXT("Creation immediately commits a named default character without selecting direct control."), Members.IsValidIndex(SlotIndex) && Members[SlotIndex].bCreated && !Members[SlotIndex].CharacterName.ToString().TrimStartAndEnd().IsEmpty() && !Members[SlotIndex].bPlayerControlled)) return false;
+    UButton* Edit = Cast<UButton>(Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_Edit"), SlotIndex))));
+    UButton* Control = Cast<UButton>(Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_PlayerControl"), SlotIndex))));
+    return Test->TestTrue(TEXT("The created card immediately offers editing and direct-control selection."), Edit && Edit->IsVisible() && Edit->GetIsEnabled() && Control && Control->IsVisible() && Control->GetIsEnabled());
 }
 
 // Preserve saved-menu, preview cleanup and character draft coverage independently of combat execution.
@@ -101,7 +89,7 @@ class FPlayMenuLifecycle : public IAutomationLatentCommand
 public:
     explicit FPlayMenuLifecycle(FAutomationTestBase* InTest) : Test(InTest), StageStarted(FPlatformTime::Seconds()), bFlowOnly(FParse::Param(FCommandLine::Get(), TEXT("ProjectAFlowOnly")))
     {
-        if (bFlowOnly) Test->AddInfo(TEXT("-ProjectAFlowOnly skips preview animation playback, looping/loop-boundary checks and asset screenshots; character creation/Save, ClassInfo layout, selection/edit/cancel buttons and preview actor cleanup remain covered."));
+        if (bFlowOnly) Test->AddInfo(TEXT("-ProjectAFlowOnly skips preview animation playback, looping/loop-boundary checks and asset screenshots; immediate character creation, ClassInfo layout, selection/edit/save/cancel buttons and preview actor cleanup remain covered."));
     }
 
     virtual bool Update() override
@@ -172,7 +160,7 @@ public:
                         for (int32 Index = 0; Index < 4; ++Index)
                         {
                             Cast<UButton>(Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_Create"), Index))))->OnClicked.Broadcast();
-                            if (!SaveCreatedSlot(Test, Creation, Index)) return true;
+                            if (!VerifyCreatedSlot(Test, Creation, Index)) return true;
                         }
                         PreviewCaptureStage = 1;
                         ProfessionPanelTime = FPlatformTime::Seconds();
@@ -222,7 +210,7 @@ public:
                     PreviewCaptureStage = 3;
                 }
                 CreateButton->OnClicked.Broadcast();
-                if (!SaveCreatedSlot(Test, Creation, 0)) return true;
+                if (!VerifyCreatedSlot(Test, Creation, 0)) return true;
                 UButton* Edit = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_Edit")));
                 UButton* Info = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_ClassInfo")));
                 UEditableTextBox* NameInput = Cast<UEditableTextBox>(Creation->GetWidgetFromName(TEXT("ProfessionNameInput")));
@@ -354,7 +342,7 @@ private:
                         return false;
                     }
                     Create->OnClicked.Broadcast();
-                    if (!SaveCreatedSlot(Test, Draft, Index)) return false;
+                    if (!VerifyCreatedSlot(Test, Draft, Index)) return false;
                     AActor* Actor = Preview->GetPreviewActorForSlot(Index);
                     Test->TestNotNull(TEXT("Each profession has a visible preview class."), Actor);
                     Test->TestNull(TEXT("Preview cannot execute pawn AI or combat."), Cast<APawn>(Actor));
@@ -590,7 +578,7 @@ public:
             UButton* Create = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_Create")));
             if (!Require(Create && Create->GetIsEnabled(), TEXT("The actual creation screen can create slot zero."))) return true;
             Create->OnClicked.Broadcast();
-            if (!SaveCreatedSlot(Test, Creation, 0)) return true;
+            if (!VerifyCreatedSlot(Test, Creation, 0)) return true;
             UButton* Control = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_PlayerControl")));
             UButton* Start = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_StartGame")));
             if (!Require(Control && Control->GetIsEnabled() && Start, TEXT("The created card exposes direct control and Start."))) return true;

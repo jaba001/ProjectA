@@ -1,6 +1,6 @@
 # UI 구조·생성 도구
 
-기준일: 2026-10-02. UE 5.8의 화면 구성과 JSON 기반 Widget Blueprint 생성 규칙을 정의한다. 게임 흐름·에셋 연결은 [PROJECT_PLAN](PROJECT_PLAN.md), UE 5.7의 실행 기록과 제외 범위는 [HISTORY](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관), UE 5.8 사용자 작동 확인·향후 목표 Run·온라인·신규 에셋 도입은 [TODO](TODO.md)를 따른다.
+기준일: 2026-10-03. UE 5.8의 화면 구성과 JSON 기반 Widget Blueprint 생성 규칙을 정의한다. 게임 흐름·에셋 연결은 [PROJECT_PLAN](PROJECT_PLAN.md), UE 5.7의 실행 기록과 제외 범위는 [HISTORY](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관), UE 5.8 사용자 작동 확인·향후 목표 Run·온라인·신규 에셋 도입은 [TODO](TODO.md)를 따른다.
 
 ## 구성과 편집 원칙
 
@@ -114,7 +114,7 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 |---|---|
 | MainMenuRoot | MainStack·MenuStack·ModalStack. MenuStack 활성 시 MainStack을 Hidden 처리하고 Back/X 또는 Clear 시 복원 |
 | GameModeSelection | 게임 시작에서 MenuStack에 표시. 싱글은 CharacterCreation, 멀티는 기존 개발용 방. 캐릭터 생성·접속 전 멀티 화면 뒤로가기는 모드 선택, 모드 선택 뒤로가기는 첫 화면 복원 |
-| CharacterCreation | 슬롯 생성 시 편집 패널·프리뷰 표시. 슬롯 X는 해당 캐릭터 제거. 화면 Back/X는 초안·프리뷰 정리 |
+| CharacterCreation | 생성 버튼으로 슬롯 기본 직업·남자 몸체·자동 이름의 캐릭터와 프리뷰를 즉시 생성하고 파티 화면 유지. Edit로 편집 패널 표시. 슬롯 X는 해당 캐릭터 제거. 화면 Back/X는 초안·프리뷰 정리 |
 | PreviewStage | MainMenu의 월드 Actor·카메라 사용. SceneCapture2D·RenderTarget 미사용 |
 | GameplayRoot | CommonUserWidget. RunLayer·CombatLayer·ModalLayer는 CommonActivatableWidgetStack |
 | Gameplay 화면 | RunMap·RoundPlanning·Result는 CommonActivatableWidget. 스폰은 EncounterManager가 담당. 이전 CombatHUD WBP는 참조만 보존 |
@@ -122,20 +122,20 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 
 프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 Warrior/Mage/Archer/Rogue 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
-거리·방향·간격은 `/Game/User_JeHoon/LEVEL/MainMenu`의 Outliner에서 `MainMenuPreviewStage`를 선택하여 Details에서 수정하고 레벨을 저장한다. 생성·수정 중 상세 카메라는 자동 계산하므로 별도 거리 배율을 사용한다.
+거리·방향·간격은 `/Game/User_JeHoon/LEVEL/MainMenu`의 Outliner에서 `MainMenuPreviewStage`를 선택하여 Details에서 수정하고 레벨을 저장한다. Edit 편집 중 상세 카메라는 자동 계산하므로 별도 거리 배율을 사용한다.
 
 | 조절 대상 | Details 위치 | 현재값·조절 방향 |
 |---|---|---|
 | 전체 캐릭터 크기 | `PreviewCamera` 컴포넌트 → Transform → Location X | `-500`. `-450`은 더 가깝게, `-550`은 더 멀게 표시 |
 | 캐릭터 기본 방향 | `Slot0Anchor`~`Slot3Anchor` → Transform → Rotation Z(Yaw) | 모두 `90°`. 각 슬롯의 기본 정면 방향 |
 | 캐릭터 사이 간격 | `Slot0Anchor`~`Slot3Anchor` → Transform → Location Y | `-450 / -150 / 150 / 450`. 절댓값을 줄이면 가운데로 모임 |
-| 생성·수정 확대 크기 | Actor의 MainMenu → Preview → Camera → `Focused Camera Distance Scale` | `1.15`. `1.05`는 더 가깝게, `1.3`은 더 멀게 표시. `1.0` 미만은 전신이 잘릴 수 있음 |
+| Edit 편집 확대 크기 | Actor의 MainMenu → Preview → Camera → `Focused Camera Distance Scale` | `1.15`. `1.05`는 더 가깝게, `1.3`은 더 멀게 표시. `1.0` 미만은 전신이 잘릴 수 있음 |
 
 카메라 X와 앵커 Yaw는 C++ 생성 기본값·작성 스크립트·저장된 MainMenu에 동일하게 적용한다. 네 직업 프리뷰 Blueprint와 현재 남녀 몸체의 `PreviewMeshTransform` 회전은 `0°`로 맞추고 앵커가 정면 방향을 결정한다. Stage는 몸체의 원래 회전에 임시 드래그 회전을 더하며, 편집 종료 시 원래 방향을 복원한다. 몸체 선택을 반복해도 회전 보정이 누적되지 않는다.
 
 전사 `BP_WarriorMenuPreview`·마법사 `BP_MageMenuPreview`·도적 `BP_RogueMenuPreview`·궁수 `BP_PartyMenuPreview`는 선택한 Primitive 몸체와 원본 재질·공통 Idle을 사용한다. 남자는 `SKM_Primitive_Charater_01_Body`, 여자는 실제 원본 이름 `SKM_Primitive_02_Body`다. 마법사의 기본 스태프는 표시하지 않는다. ROG 의상 UI·착용은 중지하고 기존 103개 항목·스태프 원본 에셋은 향후 아이템용으로 보존한다.
 
-캐릭터 **생성/수정**의 오른쪽 편집창에서 ◀·▶ 버튼으로 남자·여자 몸체를 순환 선택한다. 순서는 카탈로그 `BodyVariants` 배열을 따르며 기본값은 남자다. 선택 즉시 같은 월드 프리뷰에 반영한다. 회전 버튼은 제거하고 미리보기 영역을 **우클릭한 채 좌우로 드래그**하여 캐릭터를 돌린다. 우클릭 해제·화면 닫기·마우스 캡처 상실 시 회전을 중지하며 편집 패널에서는 회전을 시작하지 않는다. **저장**은 초안에 반영하고 **취소**는 이전 선택을 복원한다. 새 캐릭터 생성을 취소하면 빈 슬롯으로 복원한다. 기존 Designer WBP에도 C++ 공통 편집창을 적용한다. `BodyId`가 없는 이전 저장은 기본 남자로 해석한다. 메뉴의 실제 저장·선택·수정·취소·삭제는 확인했으나 프리뷰 idle 루프 경계 4건은 통과하지 못했고 애니메이션 캡처는 제외했다. [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
+생성된 캐릭터의 **Edit**로 연 오른쪽 편집창에서 ◀·▶ 버튼으로 남자·여자 몸체를 순환 선택한다. 순서는 카탈로그 `BodyVariants` 배열을 따르며 기본값은 남자다. 선택 즉시 같은 월드 프리뷰에 반영한다. 회전 버튼은 제거하고 미리보기 영역을 **우클릭한 채 좌우로 드래그**하여 캐릭터를 돌린다. 우클릭 해제·화면 닫기·마우스 캡처 상실 시 회전을 중지하며 편집 패널에서는 회전을 시작하지 않는다. **저장**은 초안에 반영하고 **취소**는 이전 선택을 복원한다. 편집 취소는 생성된 캐릭터를 유지하며 편집 전 이름·직업·몸체를 복원한다. 기존 Designer WBP에도 C++ 공통 편집창을 적용한다. `BodyId`가 없는 이전 저장은 기본 남자로 해석한다. 이전 메뉴 구현의 실제 저장·선택·수정·취소·삭제는 확인했으나 프리뷰 idle 루프 경계 4건은 통과하지 못했고 애니메이션 캡처는 제외했다. 즉시 생성 변경의 화면·입력 확인은 [TODO 15절](TODO.md#15-캐릭터-즉시-생성-확인)에서 별도로 진행한다. [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
 GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메뉴 travel의 잔여 IgnoreInput·초기 포커스만 복구한다. CharacterCreation의 Text_StartGameStatus는 선택 바인딩이며 누락 시 Native 표시 영역을 추가한다. 상세 배치·바인딩은 [PROJECT_PLAN](PROJECT_PLAN.md#gameplay-에셋과-배치)을 따른다.
 

@@ -915,9 +915,7 @@ void UCharacterCreationWidget::CreateCharacterInSlot(int32 SlotIndex)
     if (!PartyDraft.Create(SlotIndex)) return;
     SyncDraftProperties();
     SetSlotClass(SlotIndex, SlotClassIds[SlotIndex]);
-    ShowSlotDetails(SlotIndex, true);
-    bDetailNewCharacter = DetailSlot == SlotIndex;
-    UE_LOG(LogTemp, Log, TEXT("[CharacterCreationWidget] Character creation panel opened. SlotIndex: %d, ClassId: %s"), SlotIndex, *SlotClassIds[SlotIndex].ToString());
+    UE_LOG(LogTemp, Log, TEXT("[CharacterCreationWidget] Character created. SlotIndex: %d, ClassId: %s"), SlotIndex, *SlotClassIds[SlotIndex].ToString());
 }
 
 void UCharacterCreationWidget::ClearCharacterSlot(int32 SlotIndex)
@@ -1501,7 +1499,6 @@ void UCharacterCreationWidget::ShowSlotDetails(int32 SlotIndex, bool bEditable)
     if (!Member || !Member->bCreated) return;
     DetailSlot = SlotIndex;
     bDetailEditable = bEditable;
-    bDetailNewCharacter = false;
     PendingClassId = Member->ClassId;
     PendingAppearance = Member->Appearance;
     DetailError->SetText(FText::GetEmpty());
@@ -1719,7 +1716,6 @@ void UCharacterCreationWidget::SaveSlotDetails()
     SetSlotCharacterName(DetailSlot, FText::FromString(Name));
     SetSlotClass(DetailSlot, GetAvailablePartyClassIds()[Index]);
     PartyDraft.SetAppearance(DetailSlot, PendingAppearance);
-    bDetailNewCharacter = false;
     CloseSlotDetails();
 }
 
@@ -1727,10 +1723,8 @@ void UCharacterCreationWidget::CloseSlotDetails()
 {
     StopPreviewRotation();
     const int32 PreviousSlot = DetailSlot;
-    const bool bDiscardNewCharacter = bDetailNewCharacter;
     DetailSlot = INDEX_NONE;
     bDetailEditable = false;
-    bDetailNewCharacter = false;
     PendingAppearance = FCharacterAppearanceSelection();
     PendingClassId = NAME_None;
     if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
@@ -1743,8 +1737,7 @@ void UCharacterCreationWidget::CloseSlotDetails()
         DetailBackdrop->SetVisibility(ESlateVisibility::Collapsed);
         if (PreviousSlot != INDEX_NONE) DetailUnderlyingRoot->SetVisibility(DetailUnderlyingVisibility);
     }
-    if (bDiscardNewCharacter) ClearCharacterSlot(PreviousSlot);
-    else if (IsSlotCreated(PreviousSlot)) UpdatePreviewStageSlot(PreviousSlot, PartyDraft.GetSlot(PreviousSlot)->ClassId);
+    if (IsSlotCreated(PreviousSlot)) UpdatePreviewStageSlot(PreviousSlot, PartyDraft.GetSlot(PreviousSlot)->ClassId);
 }
 
 void UCharacterCreationWidget::NativeOnDeactivated()

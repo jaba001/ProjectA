@@ -627,6 +627,5 @@ private:
     int32 PreviewDragUserIndex = INDEX_NONE;
     bool bDetailEditable = false;
     bool bUpdatingDetail = false;
-    bool bDetailNewCharacter = false;
     ESlateVisibility DetailUnderlyingVisibility = ESlateVisibility::Visible;
 };
