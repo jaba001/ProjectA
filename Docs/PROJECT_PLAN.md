@@ -263,9 +263,9 @@ Niagara 방향 후보 26개 중 본체가 이미 로컬 공간인 19개는 원�
 
 ### 4-3 지하 던전 비교 레벨
 
-`/Game/User_JeHoon/LEVEL/DungeonFantasy`와 `/Game/User_JeHoon/LEVEL/DungeonStone` 두 비교 맵을 작성했다. 각각 FANTASTIC의 `/Game/Fantastic_Dungeon_Pack`과 Modular Dungeon Collection의 `/Game/Dungeon_Modular_V1`을 직접 참조한다. 두 원본 팩은 기존 원본 경로에 임포트했으며 합계 약 4.03GiB다. Git에서 무시되는 원본을 강제로 추가하지 않으므로 다른 환경에서도 해당 팩 설치가 필요하다.
+`/Game/User_JeHoon/LEVEL/Environment/DungeonFantasy`와 `/Game/User_JeHoon/LEVEL/Environment/DungeonStone` 두 비교 맵을 사용한다. 기존 `LEVEL/` 경로는 사용자 이동으로 작성된 ObjectRedirector이며 현재 경로 연결을 확인하고 보존했다. 각각 FANTASTIC의 `/Game/Fantastic_Dungeon_Pack`과 Modular Dungeon Collection의 `/Game/Dungeon_Modular_V1`을 직접 참조한다. 두 원본 팩은 기존 원본 경로에 임포트했으며 합계 약 4.03GiB다. Git에서 무시되는 원본을 강제로 추가하지 않으므로 다른 환경에서도 해당 팩 설치가 필요하다.
 
-| 비교 맵 | 장식 메시·조명·불꽃 FX |
+| 비교 맵 | 장식 메시·조명·불꽃 FX (최초 생성) |
 |---|---|
 | `DungeonFantasy` | 108·9·6 |
 | `DungeonStone` | 101·8·6 |
@@ -326,6 +326,14 @@ AnimSequence 5,528·몽타주 19·AnimBlueprint 6·BlendSpace 6의 5,559개, 4,5
 삭제 후 빈 Registry 조회 처리 오류를 수정하고 독립 재로드에서 생존 패키지 23,729개의 삭제 대상 참조 없음과 몬스터 12개·디버그 카탈로그 13개·네 직업·자세 138표본을 확인했다. 기본 Paragon 2개도 별도 명령에서 검사했으며 두 프로세스 모두 종료 0이다. 삭제 파일 집합은 계획과 일치하고 남은 Content 20,655파일은 SHA256이 동일하다. 근거는 `Saved/Automation/AssetCleanup/Apply.json`·`Verify.json`·`FileVerification.json`이다. 게임 동작은 사용자 확인 대기다.
 
 `CleanupUnusedProjectAssets.py`는 검토한 `Saved/Automation/AssetCleanup/DeletionPlan.json`을 검사하며 기본 실행은 감사만 수행한다. 적용은 계획의 HEAD·파일 SHA·크기·클래스·참조가 일치해야 하며 커밋 전에 별도 프로세스로 삭제 결과를 검사한다. 계획을 자동 생성하거나 이전 커밋의 계획을 재사용하지 않는다. Paragon 임포트 기본 범위는 현재 Kwang 공격·복귀 2개이며 전체·개별 임포트는 명시적 옵션으로 선택한다. [실행 명령](../Source/ProjectAEditor/Scripts/README.md)·[사용자 확인](TODO.md#13-에셋-정리-후-확인)
+
+### 4-7 렌더링 설정과 비교 레벨 밝기
+
+`DefaultEngine.ini`에서 GI를 None(0), 반사를 SSR(2)로 지정하고 `r.Lumen.Supported=0`으로 프로젝트 지원을 차단한다. Nanite는 `r.Nanite.ProjectEnabled=False`·`r.Nanite=0`으로 끄고 `r.Nanite.ProxyRenderMode=0`으로 기존 일반 메시 대체 LOD를 사용한다. UE 5.8.3의 VSM은 Nanite 지원에 의존하므로 `r.Shadow.Virtual.Enable=0`으로 일반 그림자를 사용한다. 원본 메시의 Nanite 설정·페이로드는 변경하지 않는다. 지원 설정 변경에는 에디터 재시작·셰이더 재컴파일이 필요하다. 기존 거리장과 독립 RayTracing·PathTracing 설정은 유지하며 SSR는 화면 정보에 제한되고 낮은 반사 품질에서는 비활성화된다.
+
+환경 12맵은 수동 노출 보정 +1EV(2배)·SkyLight 강도 +35%를 적용하며 Sun 강도는 유지한다. 두 던전은 노출 보정 +1EV·vignette 0.12·중성색 보조광 강도 Fantasy 5,200/Stone 10,500과 그림자 없는 SkyLight 각 1개·강도 0.35를 사용한다. 생성 명세·작성기에 같은 값을 반영했다. [ConfigureLevelLighting.py](../Source/ProjectAEditor/Scripts/ConfigureLevelLighting.py)는 기존 14맵의 조명·노출만 수정하고 전장·장식·navigation을 보존한다.
+
+UE 5.8.3에서 실제 렌더링 CVar 7개와 던전 Redirector를 확인했으며 MainMenu·Gameplay·DebugCombat·WorldMap에는 PostProcessVolume 재정의가 없다. 14맵의 조명·navigation 저장·최종 읽기 전용 재로드 모두 종료 0이며 오류 0·기존 commandlet CrowdManager와 navigation 변환 경고가 있다. 작성 시 보호 대상 20,643파일의 SHA와 비조명 설정을 보존했고 재로드 전후 Content 전체 20,657파일의 SHA도 동일하다. 근거는 `Saved/Automation/Lighting/{Inspection,Configuration,Reload}.json`이다. C++ 변경은 없으며 렌더링·게임·PIE·실제 FPS는 미확인이다. [작성·검사 명령](../Source/ProjectAEditor/Scripts/README.md)·[사용자 확인](TODO.md#14-렌더링과-밝기-확인)
 
 ### 개발용 협동 진입
 

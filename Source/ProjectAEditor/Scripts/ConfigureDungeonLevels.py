@@ -17,6 +17,8 @@ from ConfigureCombatDebugLevel import inspect_level, require
 ROOT = Path(unreal.Paths.project_dir()).resolve()
 SOURCE_MAP = "/Game/User_JeHoon/LEVEL/Gameplay"
 DUNGEON_MODE = "/Game/User_JeHoon/Blueprint/Game/BP_CombatDebugGameMode"
+OUTPUT_ROOT = "/Game/User_JeHoon/LEVEL/Environment/"
+SKY_CUBEMAP = "/Engine/MapTemplates/Sky/DaylightAmbientCubemap"
 LEVELS = ["DungeonFantasy", "DungeonStone"]
 DECORATION_TAG = unreal.Name("ProjectADungeonDecoration")
 ACTORS = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
@@ -164,6 +166,37 @@ def configure_atmosphere(spec):
     mark(actor, "IndoorPostProcess", "lighting")
 
 
+def apply_lighting(spec):
+    actors = {actor.get_actor_label(): actor for actor in ACTORS.get_all_level_actors()}
+    for item in spec["lights"]:
+        actor = require(actors.get("Dungeon_" + item["label"]), "Existing dungeon light is missing: " + item["label"])
+        component = require(actor.get_component_by_class(unreal.PointLightComponent), "Expected an existing point light")
+        component.set_intensity(item["intensity"])
+        component.set_light_color(color(item["color"]), True)
+    palette = spec["palette"]
+    post = require(actors.get("Dungeon_IndoorPostProcess"), "Existing dungeon exposure is missing")
+    settings = post.get_editor_property("settings")
+    for name, value in {"override_auto_exposure_bias": True, "auto_exposure_bias": palette["exposure_bias"], "override_vignette_intensity": True, "vignette_intensity": palette["vignette"], "override_dynamic_global_illumination_method": True, "dynamic_global_illumination_method": unreal.DynamicGlobalIlluminationMethod.NONE, "override_reflection_method": True, "reflection_method": unreal.ReflectionMethod.SCREEN_SPACE}.items():
+        settings.set_editor_property(name, value)
+    post.set_editor_property("settings", settings)
+    # A small unshadowed ambient light fills surfaces previously lit by Lumen bounce lighting.
+    # 작은 무그림자 환경광으로 기존 Lumen 간접광이 비추던 면을 보완합니다.
+    sky = actors.get("Dungeon_AmbientSky")
+    if sky is None:
+        sky = require(ACTORS.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(-300.0, 400.0, 1000.0)), "Could not create indoor ambient lighting")
+        mark(sky, "AmbientSky", "lighting")
+    require(DECORATION_TAG in sky.get_editor_property("tags"), "Refusing to replace an unowned ambient light")
+    component = require(sky.get_component_by_class(unreal.SkyLightComponent), "Expected an indoor SkyLight")
+    component.set_mobility(unreal.ComponentMobility.MOVABLE)
+    component.set_editor_property("source_type", unreal.SkyLightSourceType.SLS_SPECIFIED_CUBEMAP)
+    component.set_editor_property("real_time_capture", False)
+    component.set_cubemap(require(unreal.load_asset(SKY_CUBEMAP), "Engine ambient cubemap is missing"))
+    component.set_intensity(palette["ambient_intensity"])
+    component.set_light_color(color(palette["ambient_color"]))
+    component.set_cast_shadows(False)
+    component.set_editor_property("can_ever_affect_navigation", False)
+
+
 def segment_intersects_box(start, end, minimum, maximum):
     lower, upper = 0.0, 0.999
     for axis in range(3):
@@ -191,7 +224,7 @@ def verify_decoration(spec, source_layout):
     require(layout == source_layout, "Dungeon changed the source combat or physical floor layout")
     actors = ACTORS.get_all_level_actors()
     decoration = [actor for actor in actors if DECORATION_TAG in actor.get_editor_property("tags")]
-    expected = {"Dungeon_" + item["label"] for item in spec["meshes"] + spec["lights"] + spec.get("effects", [])} | {"Dungeon_IndoorPostProcess"}
+    expected = {"Dungeon_" + item["label"] for item in spec["meshes"] + spec["lights"] + spec.get("effects", [])} | {"Dungeon_IndoorPostProcess", "Dungeon_AmbientSky"}
     require({actor.get_actor_label() for actor in decoration} == expected and len(decoration) == len(expected), "Missing or duplicate authored decoration")
     meshes = []
     camera = next(actor for actor in actors if isinstance(actor, unreal.CameraActor))
@@ -208,6 +241,7 @@ def verify_decoration(spec, source_layout):
         component = actor.get_component_by_class(unreal.StaticMeshComponent)
         mesh = component.get_editor_property("static_mesh")
         require(mesh.get_path_name().split(".")[0] == item["asset"] and item["asset"].startswith(spec["pack_root"] + "/"), "Decoration no longer references its source pack")
+        require(mesh.get_num_lods() > 0 and mesh.get_num_vertices(0) > 0 and mesh.get_num_triangles(0) > 0, "Dungeon mesh has no ordinary render LOD: " + item["asset"])
         location, scale = mesh_placement(mesh, item)
         verify_transform(actor, vector(location), scale, item.get("yaw", 0.0))
         require(component.get_editor_property("mobility") == unreal.ComponentMobility.STATIC, "Decoration lost static mobility")
@@ -247,16 +281,25 @@ def verify_decoration(spec, source_layout):
     post = by_label["Dungeon_IndoorPostProcess"]
     settings = post.get_editor_property("settings")
     require(post.get_editor_property("unbound") and settings.get_editor_property("auto_exposure_method") == unreal.AutoExposureMethod.AEM_MANUAL and not settings.get_editor_property("auto_exposure_apply_physical_camera_exposure"), "Indoor exposure differs")
+    for name, value in {"auto_exposure_bias": spec["palette"]["exposure_bias"], "vignette_intensity": spec["palette"]["vignette"]}.items():
+        require(settings.get_editor_property("override_" + name) and abs(settings.get_editor_property(name) - value) < 0.0001, "Saved indoor post process differs: " + name)
+    require(settings.get_editor_property("override_dynamic_global_illumination_method") and settings.get_editor_property("dynamic_global_illumination_method") == unreal.DynamicGlobalIlluminationMethod.NONE, "Dungeon enables dynamic global illumination")
+    require(settings.get_editor_property("override_reflection_method") and settings.get_editor_property("reflection_method") == unreal.ReflectionMethod.SCREEN_SPACE, "Dungeon reflection method differs")
+    sky = by_label["Dungeon_AmbientSky"].get_component_by_class(unreal.SkyLightComponent)
+    require(sky and sky.get_editor_property("mobility") == unreal.ComponentMobility.MOVABLE and not sky.get_editor_property("cast_shadows"), "Indoor ambient light must be movable and unshadowed")
+    require(sky.get_editor_property("source_type") == unreal.SkyLightSourceType.SLS_SPECIFIED_CUBEMAP and sky.get_editor_property("cubemap").get_path_name().split(".")[0] == SKY_CUBEMAP and not sky.get_editor_property("real_time_capture"), "Indoor ambient cubemap differs")
+    require(abs(sky.get_editor_property("intensity") - spec["palette"]["ambient_intensity"]) < 0.0001 and sum(isinstance(actor, unreal.SkyLight) for actor in actors) == 1, "Indoor ambient intensity or light count differs")
+    require(all(abs(getattr(sky.get_light_color(), channel) - getattr(color(spec["palette"]["ambient_color"]), channel)) < 0.01 for channel in ["r", "g", "b"]), "Indoor ambient color differs")
     fog = require(next((actor for actor in actors if isinstance(actor, unreal.ExponentialHeightFog)), None), "Indoor fog is missing")
     require(abs(fog.get_component_by_class(unreal.ExponentialHeightFogComponent).get_editor_property("fog_density") - spec["palette"]["fog_density"]) < 0.0001, "Saved indoor fog differs")
-    return {"level": spec["level"], "pack_root": spec["pack_root"], "layout": layout, "decoration_count": len(decoration), "mesh_count": len(meshes), "light_count": len(lights), "effect_count": len(effects), "meshes": meshes, "lights": lights, "effects": effects, "camera_samples": len(samples), "gameplay_test": "not run"}
+    return {"level": spec["level"], "pack_root": spec["pack_root"], "layout": layout, "decoration_count": len(decoration), "mesh_count": len(meshes), "light_count": len(lights) + 1, "effect_count": len(effects), "meshes": meshes, "lights": lights, "ambient_intensity": sky.get_editor_property("intensity"), "exposure_bias": settings.get_editor_property("auto_exposure_bias"), "effects": effects, "camera_samples": len(samples), "gameplay_test": "not run"}
 
 
 def main():
     require(not (VERIFY_ONLY and REBUILD), "Verify and rebuild are mutually exclusive")
     specs = [json.loads((SCRIPT_DIRECTORY / (name + "Spec.json")).read_text(encoding="utf-8")) for name in LEVELS]
     for name, spec in zip(LEVELS, specs):
-        require(spec["level"] == "/Game/User_JeHoon/LEVEL/" + name, "Unexpected output level")
+        require(spec["level"] == OUTPUT_ROOT + name, "Unexpected output level")
         require((ROOT / "Content" / spec["pack_root"].removeprefix("/Game/")).is_dir(), "Download the owned source pack before authoring")
         if not VERIFY_ONLY:
             require(REBUILD or not ASSETS.does_asset_exist(spec["level"]), "Level already exists; inspect or explicitly use -DungeonRebuild")
@@ -294,6 +337,7 @@ def main():
                 place_light(item)
             for item in spec.get("effects", []):
                 place_effect(item)
+            apply_lighting(spec)
             require(unreal.EditorLoadingAndSavingUtils.save_map(world, spec["level"]), "Could not save authored dungeon")
         reports.append(verify_decoration(spec, dungeon_layout))
     require(protected_hashes(specs) == before, "Original project or source pack assets changed during dungeon authoring")

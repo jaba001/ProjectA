@@ -307,6 +307,22 @@ def configure_atmosphere(spec):
         settings.set_editor_property(name, value)
     post.set_editor_property("settings", settings)
     mark(post, "Environment_PostProcess", "lighting")
+    apply_lighting(spec)
+
+
+def apply_lighting(spec):
+    lighting = spec["lighting"]
+    actors = {actor.get_actor_label(): actor for actor in ACTORS.get_all_level_actors()}
+    require(LIGHT_LABELS.issubset(actors), "Existing environment lighting is incomplete")
+    actors["Environment_Sun"].get_component_by_class(unreal.DirectionalLightComponent).set_intensity(lighting["sun_lux"])
+    actors["Environment_Sky"].get_component_by_class(unreal.SkyLightComponent).set_intensity(lighting["sky_intensity"])
+    post = actors["Environment_PostProcess"]
+    settings = post.get_editor_property("settings")
+    # Keep a fixed exposure and explicit raster lighting when global Lumen support is disabled.
+    # 전역 Lumen을 끈 상태에서 고정 노출과 일반 렌더링 조명 방식을 명시합니다.
+    for name, value in {"override_auto_exposure_bias": True, "auto_exposure_bias": lighting["exposure_bias"], "override_dynamic_global_illumination_method": True, "dynamic_global_illumination_method": unreal.DynamicGlobalIlluminationMethod.NONE, "override_reflection_method": True, "reflection_method": unreal.ReflectionMethod.SCREEN_SPACE}.items():
+        settings.set_editor_property(name, value)
+    post.set_editor_property("settings", settings)
 
 
 def world_bounds(mesh, transform):
@@ -407,6 +423,8 @@ def verify_lighting(spec, by_label):
     for name, value in {"auto_exposure_bias": lighting["exposure_bias"], "camera_iso": 100.0, "camera_shutter_speed": 125.0, "depth_of_field_fstop": aperture(lighting), "depth_of_field_focal_distance": 0.0}.items():
         require(settings.get_editor_property("override_" + name) and abs(settings.get_editor_property(name) - value) < 0.0001, "Saved exposure parameter differs: " + name)
     require(settings.get_editor_property("override_auto_exposure_method") and settings.get_editor_property("override_auto_exposure_apply_physical_camera_exposure"), "Saved exposure override is disabled")
+    require(settings.get_editor_property("override_dynamic_global_illumination_method") and settings.get_editor_property("dynamic_global_illumination_method") == unreal.DynamicGlobalIlluminationMethod.NONE, "Environment enables dynamic global illumination")
+    require(settings.get_editor_property("override_reflection_method") and settings.get_editor_property("reflection_method") == unreal.ReflectionMethod.SCREEN_SPACE, "Environment reflection method differs")
     actual_ev100 = math.log2(settings.get_editor_property("depth_of_field_fstop") ** 2 * settings.get_editor_property("camera_shutter_speed") * 100.0 / settings.get_editor_property("camera_iso"))
     require(abs(actual_ev100 - lighting.get("exposure_ev100", 14.0)) < 0.0001, "Saved physical camera EV100 differs")
 

@@ -63,8 +63,8 @@ P2P 연결과 중앙 저장·계정 인증·MMR 검증은 각각 필요하다. �
 
 상태: 두 비교 맵 생성·navigation 저장·독립 재로드의 원본 참조·배치·충돌·카메라 여백·GameMode 정적 검사 통과. 실제 화면·입력·이동 확인은 미실행이다. 기존 Gameplay·DebugCombat과 기본 Run 진입은 유지한다. [구성 기준](PROJECT_PLAN.md#4-3-지하-던전-비교-레벨)
 
-- [ ] `/Game/User_JeHoon/LEVEL/DungeonFantasy`를 직접 열어 GameplayCamera 뷰를 확인하고, 관리 Run이 없는 로컬 1인 Standalone·Non-Shipping Play에서 전사 1명·적 4명 생성과 전장·타일 가시성·타일 클릭·이동 예약·실제 이동을 확인한다.
-- [ ] `/Game/User_JeHoon/LEVEL/DungeonStone`에서 같은 조건과 절차를 반복한다. 장식이 전장 가시성·클릭·이동을 방해하지 않아야 하며 두 팩의 분위기를 비교한다.
+- [ ] `/Game/User_JeHoon/LEVEL/Environment/DungeonFantasy`를 직접 열어 GameplayCamera 뷰를 확인하고, 관리 Run이 없는 로컬 1인 Standalone·Non-Shipping Play에서 전사 1명·적 4명 생성과 전장·타일 가시성·타일 클릭·이동 예약·실제 이동을 확인한다.
+- [ ] `/Game/User_JeHoon/LEVEL/Environment/DungeonStone`에서 같은 조건과 절차를 반복한다. 장식이 전장 가시성·클릭·이동을 방해하지 않아야 하며 두 팩의 분위기를 비교한다.
 
 ## 11 환경 비교 레벨 확인
 
@@ -87,3 +87,11 @@ P2P 연결과 중앙 저장·계정 인증·MMR 검증은 각각 필요하다. �
 상태: 미사용 프로젝트 애니메이션 결과 5,559개 삭제·독립 재로드 정적 검사 통과. 남은 Content 20,655파일의 SHA256 동일. 원본 Fab 팩·FBX, 현재 콘텐츠·제작용 Rig·저장 호환·T12를 보존했다. 게임·PIE·자동화 테스트는 미실행이다. [정리 기준](PROJECT_PLAN.md#4-6-미사용-프로젝트-에셋-정리)
 
 - [ ] 새 Run의 전투·상점, 기존 저장의 Continue와 `DebugCombat`을 확인한다. 에셋 누락·클래스 로드 오류 없이 현재 몸체·기본 적 편성·검 공격·스킬과 저장된 진행이 유지되어야 한다.
+
+## 14 렌더링과 밝기 확인
+
+상태: 실제 렌더링 CVar 7개와 14개 비교 맵의 밝기 저장·독립 재로드 정적 검사 통과. 원본 파일·비조명 설정과 읽기 전용 재로드 전후 Content 전체 SHA를 보존했다. 렌더링·게임·PIE와 실제 FPS는 미확인이다. [구성 기준](PROJECT_PLAN.md#4-7-렌더링-설정과-비교-레벨-밝기)
+
+- [ ] 에디터를 재시작하고 셰이더 컴파일 완료 후 `Environment/`의 14맵에서 일반 메시 누락·그림자 오류와 지나치게 밝은 지면이 없는지 확인한다.
+- [ ] 관리 Run이 없는 로컬 1인 Standalone·Non-Shipping Play에서 두 던전의 전장·유닛·타일이 보이고 기존 클릭·이동이 유지되는지 확인한다.
+- [ ] 같은 해상도·그래픽 품질에서 변경 전후 FPS·끊김을 비교하고 이상이 있으면 맵 이름·조건을 기록한다.

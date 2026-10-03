@@ -68,11 +68,13 @@ Unreal Engine 5.8 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 
 디버그의 **스킬 타이밍** 탭에서 보유 스킬을 선택하면 별도 스크롤 영역에서 시전 대기·효과 피격 대기·효과 판정 기간·투사체 속도·검 타격 기간을 조절하고 **임시 적용 / 원본 복원 / 설정값 복사**를 사용할 수 있다. 같은 스킬을 사용하는 아군·적군에 함께 적용하며 원본 에셋·Run 저장은 바꾸지 않고 전투 초기화 시 복원한다. 효과 피격 대기는 VFX가 보인 뒤 판정이 시작될 때까지의 시간이며 기본 0초다. 실제 효과의 접촉 프레임을 자동 추정하지 않으므로 화면과 피해 시점을 직접 맞춘다. [필드와 적용 범위](Docs/UI_README.md#7-2-전투-디버그-도구)
 
-**지하 던전 비교 레벨**은 `/Game/User_JeHoon/LEVEL/DungeonFantasy`와 `/Game/User_JeHoon/LEVEL/DungeonStone`을 각각 직접 열어 비교한다. Gameplay를 Unreal 기능으로 복제하고 `/Game/Fantastic_Dungeon_Pack`·`/Game/Dungeon_Modular_V1` 원본으로 장식했다. 두 맵만 기존 `BP_CombatDebugGameMode`를 지정하여 관리 Run이 없는 로컬 1인 개발 Play에서 전사 1명·적 4명으로 확인한다. 실제 화면·입력·이동은 사용자 확인 대상이다. [구성 기준](Docs/PROJECT_PLAN.md#4-3-지하-던전-비교-레벨)
+**지하 던전 비교 레벨**은 `/Game/User_JeHoon/LEVEL/Environment/DungeonFantasy`와 `/Game/User_JeHoon/LEVEL/Environment/DungeonStone`을 각각 직접 열어 비교한다. Gameplay를 Unreal 기능으로 복제하고 `/Game/Fantastic_Dungeon_Pack`·`/Game/Dungeon_Modular_V1` 원본으로 장식했다. 두 맵만 기존 `BP_CombatDebugGameMode`를 지정하여 관리 Run이 없는 로컬 1인 개발 Play에서 전사 1명·적 4명으로 확인한다. 실제 화면·입력·이동은 사용자 확인 대상이다. [구성 기준](Docs/PROJECT_PLAN.md#4-3-지하-던전-비교-레벨)
 
 전투 디버그의 **캐릭터·체력 → 적군 추가**에서 신규 12개와 기존 `BP_EnemyUnit`을 선택한다. `Fantasy_Pack`·`StylizedCreaturesBundle`의 원본 메시·재질·애니메이션을 직접 참조하고 늑대인간·골렘의 Manny 공격 2개만 리타깃한다. 기존 기본 비무장 공격의 피해·AP·GAS 조건과 전체 래그돌을 유지한다. 일반 Run은 기본 편성 4개만 로드하며 13개 카탈로그는 디버그 목록 조회 시 로드한다. [작성 명령](Source/ProjectAEditor/Scripts/README.md)·[구성 명세](Source/ProjectAEditor/Scripts/MonsterContentSpecs.json)
 
 **환경 비교 레벨**은 `/Game/User_JeHoon/LEVEL/Environment/`의 12맵이다. 초원·숲·대나무·사막·습지·얼음·해변을 원본 메시와 ISM으로 구성하고 표면 Material 9개·자식 MI 44개를 작성했다. 맵 생성·navigation 저장·맵과 재질의 독립 재로드 정적 검사를 통과했다. 원본 팩은 Git에 포함하지 않으므로 다른 PC에서도 설치가 필요하다. 화면·조작·FPS는 사용자 확인 대상이다. [맵 목록·구성 기준](Docs/PROJECT_PLAN.md#4-4-환경-비교-레벨)
+
+프로젝트 전체의 Lumen·Nanite 지원과 런타임 사용을 끄고 SSR·일반 메시·일반 그림자로 전환했다. 원본 메시 설정을 보존하며 에디터 재시작·셰이더 재컴파일이 필요하다. 두 던전과 환경 12맵에 노출 +1EV(2배)·환경광 개선을 적용하고 저장·독립 재로드 정적 검사를 통과했다. 실제 화면·FPS는 사용자 확인 대상이다. [렌더링 기준](Docs/PROJECT_PLAN.md#4-7-렌더링-설정과-비교-레벨-밝기)·[사용자 확인](Docs/TODO.md#14-렌더링과-밝기-확인)
 
 화살·도끼·베기의 방향 보정은 Niagara 후보 26개 중 원본 월드 좌표가 발사 방향을 따르지 않는 7개에 필수 파생 효과를 연결한다. 원본 26개와 메시·재질 참조를 보존하며 추가 용량은 약 5.48MiB다. 방향·잔상과 피격의 실제 일치는 앞선 검증에 포함되지 않았으며 새 에셋 채택 시 다시 확인한다. [보정 범위](Docs/PROJECT_PLAN.md#4-1-스킬-이펙트-에셋-목록)
 

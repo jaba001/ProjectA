@@ -1,7 +1,7 @@
 {
-  "level": "/Game/User_JeHoon/LEVEL/DungeonFantasy",
+  "level": "/Game/User_JeHoon/LEVEL/Environment/DungeonFantasy",
   "pack_root": "/Game/Fantastic_Dungeon_Pack",
-  "palette": {"fill_color": [98, 144, 214], "torch_color": [255, 153, 76], "fog_density": 0.006, "saturation": 0.95},
+  "palette": {"fill_color": [98, 144, 214], "torch_color": [255, 153, 76], "fog_density": 0.006, "saturation": 0.95, "exposure_bias": 1.0, "ambient_intensity": 0.35, "ambient_color": [190, 210, 235], "vignette": 0.12},
   "meshes": [
     {"label": "Floor_A1", "asset": "/Game/Fantastic_Dungeon_Pack/meshes/modular/floor/pivotEdge/MOD_Floor_01_E_straight_med", "position": [-1300, -400, 1], "size": [400, 400, 50], "yaw": 0, "align": "top", "category": "floor"},
     {"label": "Floor_A2", "asset": "/Game/Fantastic_Dungeon_Pack/meshes/modular/floor/pivotEdge/MOD_Floor_01_E_straight_med", "position": [-900, -400, 1], "size": [400, 400, 50], "yaw": 90, "align": "top", "category": "floor"},
@@ -113,7 +113,7 @@
     {"label": "Brazier_GateEast", "asset": "/Game/Fantastic_Dungeon_Pack/meshes/props/light/SM_PROP_brazier_dungeon_02", "position": [70, 1260, 1], "size": [140, 140, 95], "yaw": 0, "category": "prop"}
   ],
   "lights": [
-    {"label": "MoonlitBattlefield", "position": [-300, 480, 1000], "color": [126, 177, 255], "intensity": 3200, "radius": 1850, "shadows": false},
+    {"label": "MoonlitBattlefield", "position": [-300, 480, 1000], "color": [174, 196, 230], "intensity": 5200, "radius": 1850, "shadows": false},
     {"label": "ArcaneGate", "position": [-300, 1450, 475], "color": [157, 115, 255], "intensity": 2100, "radius": 760, "shadows": true},
     {"label": "BrazierLight_WestFront", "position": [-1010, -260, 165], "color": [255, 151, 74], "intensity": 1750, "radius": 760, "shadows": true},
     {"label": "BrazierLight_EastFront", "position": [410, -260, 165], "color": [255, 151, 74], "intensity": 1750, "radius": 760, "shadows": true},

@@ -167,12 +167,12 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 작성 명령은 파생 에셋·대상 BPDA·명세를 저장한다. 기존 파생의 `CombatDirectionSource`가 원본 경로와 정확히 일치해야 하며, 출처 정보가 없거나 다르면 사용자 수정본을 보호하기 위해 중단한다. 대상 스킬에 다른 사용자 지정 VFX가 있으면 보존하고 중단한다. 결과는 `Saved/Automation/CombatVfxDirection/Authoring.json`에 원본 SHA·변경 대상·이미터 공간·파생 용량으로 기록한다. 2026-09-30 결과는 26개 중 7개·약 5.48MiB이며 사전 최대 81MiB 추정과 구분한다. 메타데이터·Niagara 컴파일 확인은 게임 재생·대상 방향 일치 검증을 포함하지 않는다. 채택할 신규 에셋의 재생 방향은 [도입 계획](../../../Docs/TODO.md#6-신규-에셋-선정과-도입)에 따라 확인한다.
 
-19. `ConfigureDungeonLevels.py`: `DungeonFantasySpec.json`·`DungeonStoneSpec.json`에 따라 Gameplay를 Unreal 기능으로 복제하여 `/Game/User_JeHoon/LEVEL/DungeonFantasy`·`DungeonStone`을 작성한다. FANTASTIC의 `/Game/Fantastic_Dungeon_Pack`·Modular Dungeon Collection의 `/Game/Dungeon_Modular_V1`을 직접 참조하고 전장·Grid·GameplayCamera를 보존한다. 두 맵만 기존 `BP_CombatDebugGameMode`를 지정하며 원본 Blueprint·Gameplay·DebugCombat과 기본 Run 전환은 유지한다. 생성·navigation 저장·최종 독립 재로드 정적 검사를 통과했다. [구성 기준](../../../Docs/PROJECT_PLAN.md#4-3-지하-던전-비교-레벨)
+19. `ConfigureDungeonLevels.py`: `DungeonFantasySpec.json`·`DungeonStoneSpec.json`에 따라 Gameplay를 Unreal 기능으로 복제하여 `/Game/User_JeHoon/LEVEL/Environment/DungeonFantasy`·`DungeonStone`을 작성한다. FANTASTIC의 `/Game/Fantastic_Dungeon_Pack`·Modular Dungeon Collection의 `/Game/Dungeon_Modular_V1`을 직접 참조하고 전장·Grid·GameplayCamera를 보존한다. 두 맵만 기존 `BP_CombatDebugGameMode`를 지정하며 원본 Blueprint·Gameplay·DebugCombat과 기본 Run 전환은 유지한다. 최초 생성·navigation 저장·독립 재로드 정적 검사를 통과했다. 현행 밝기는 23번 도구와 같은 명세를 사용한다. [구성 기준](../../../Docs/PROJECT_PLAN.md#4-3-지하-던전-비교-레벨)
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureDungeonLevels.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
-& $editorExecutable $projectFile -run=ResavePackages '-Package=/Game/User_JeHoon/LEVEL/DungeonFantasy' -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
-& $editorExecutable $projectFile -run=ResavePackages '-Package=/Game/User_JeHoon/LEVEL/DungeonStone' -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=ResavePackages '-Package=/Game/User_JeHoon/LEVEL/Environment/DungeonFantasy' -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=ResavePackages '-Package=/Game/User_JeHoon/LEVEL/Environment/DungeonStone' -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureDungeonLevels.py") -DungeonVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
 ```
 
@@ -212,3 +212,14 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 ```
 
 기본 명령은 계획·파일 SHA·크기·클래스·모든 참조 분류를 감사한다. `-CleanupUnusedApply`는 참조하는 에셋부터 50개씩 엔진 기능으로 삭제하고 결과를 검사하며 `-CleanupUnusedVerifyOnly`는 삭제 후 읽기 전용으로 검사한다. 적용·검증 옵션은 함께 사용할 수 없다. 모든 모드에서 계획과 HEAD가 일치해야 하므로 별도 프로세스 검증은 커밋 전에 실행한다. 커밋 이후에는 현재 HEAD의 새 계획을 검토하며 계획의 기준만 임의 변경하지 않는다. 경로 이탈·파일 변경·외부 참조·후보 간 순환 참조를 거절하고 잔존 파일/Registry·생존 패키지 의존·보호 루트 폐쇄를 검사한다. 결과는 같은 폴더의 `Audit.json`·`Apply.json`·`Verify.json`에 기록하며 실제 새 Run·Continue·디버그 확인은 [TODO 13절](../../../Docs/TODO.md#13-에셋-정리-후-확인)을 따른다.
+
+23. `ConfigureLevelLighting.py`: `EnvironmentLevelSpecs.json`과 두 던전 명세의 현행 조명·노출을 기존 `/Game/User_JeHoon/LEVEL/Environment/` 14맵에 적용한다. 기본 명령은 조명만 부분 수정하며 전장·장식·재질·navigation 설정과 기존 던전 이동 Redirector를 보존한다. 전체 맵의 장식을 재작성하는 `-EnvironmentRebuild`·`-DungeonRebuild` 없이 밝기를 갱신한다. [렌더링·밝기 기준](../../../Docs/PROJECT_PLAN.md#4-7-렌더링-설정과-비교-레벨-밝기)
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureLevelLighting.py") -LightingCaptureBaseline -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureLevelLighting.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=ResavePackages ("-PackageFolder=" + (Join-Path (Split-Path $projectFile) 'Content/User_JeHoon/LEVEL/Environment')) -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureLevelLighting.py") -LightingVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+```
+
+`-LightingCaptureBaseline`은 원본 검토 후 작업 시작 시 1회 기준 해시만 `Saved/Automation/Lighting/`에 기록하고 종료하는 독립 모드다. 보호 검사 실패를 회피하기 위해 기준을 덮어쓰지 않는다. 조명 저장 후 navigation 캐시 재생성이 필요하므로 폴더에 대상 비교 맵 14개만 있는지 확인하고 navigation 빌드·저장 후 별도 프로세스의 `-LightingVerifyOnly`로 재검사한다. 검사는 완료된 작성 보고서와 저장본의 조명·노출·렌더링 CVar·원본 파일 해시·비조명 설정 보존을 읽기 전용으로 확인하며 결과는 같은 폴더의 `Configuration.json`·`Reload.json`에 기록한다. 14맵 조명·navigation 저장·최종 독립 재로드와 실제 CVar 7개 검사는 통과했으며 보호 대상 20,643파일·재로드 전후 전체 Content 20,657파일 SHA를 보존했다. 설정 반영에는 에디터 재시작·셰이더 재컴파일이 필요하고 화면·게임·PIE·FPS 확인은 [TODO 14절](../../../Docs/TODO.md#14-렌더링과-밝기-확인)을 따른다.

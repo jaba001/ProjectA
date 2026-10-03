@@ -1,7 +1,7 @@
 {
-  "level": "/Game/User_JeHoon/LEVEL/DungeonStone",
+  "level": "/Game/User_JeHoon/LEVEL/Environment/DungeonStone",
   "pack_root": "/Game/Dungeon_Modular_V1",
-  "palette": {"fill_color": [130, 157, 181], "torch_color": [255, 146, 65], "fog_density": 0.005, "saturation": 0.8},
+  "palette": {"fill_color": [130, 157, 181], "torch_color": [255, 146, 65], "fog_density": 0.005, "saturation": 0.8, "exposure_bias": 1.0, "ambient_intensity": 0.35, "ambient_color": [190, 210, 235], "vignette": 0.12},
   "meshes": [
     {"label": "Floor_0_0", "asset": "/Game/Dungeon_Modular_V1/Meshes/SM_Floor_Flagstone_01", "position": [-1300, -400, 1], "category": "floor", "size": [400, 400, 18.6], "align": "top", "yaw": 0},
     {"label": "Floor_0_1", "asset": "/Game/Dungeon_Modular_V1/Meshes/SM_Floor_Flagstone_01", "position": [-1300, 0, 1], "category": "floor", "size": [400, 400, 18.6], "align": "top", "yaw": 180},
@@ -112,7 +112,7 @@
     {"label": "LeftSconce_1Light", "position": [-1310, 780, 325], "color": [255, 146, 65], "intensity": 1800, "radius": 950, "shadows": true},
     {"label": "RightSconce_0Light", "position": [710, 80, 325], "color": [255, 146, 65], "intensity": 1800, "radius": 950, "shadows": true},
     {"label": "RightSconce_1Light", "position": [710, 780, 325], "color": [255, 146, 65], "intensity": 1800, "radius": 950, "shadows": true},
-    {"label": "ArenaFill", "position": [-300, 400, 820], "color": [130, 157, 181], "intensity": 7000, "radius": 2300, "shadows": false, "source_radius": 300},
+    {"label": "ArenaFill", "position": [-300, 400, 820], "color": [174, 193, 214], "intensity": 10500, "radius": 2300, "shadows": false, "source_radius": 300},
     {"label": "GateColdRim", "position": [-300, 1460, 380], "color": [105, 142, 173], "intensity": 1800, "radius": 750, "shadows": false}
   ],
   "effects": [
