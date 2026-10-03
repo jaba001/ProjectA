@@ -1,0 +1,265 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "title": "Fantasy Characters (Pack)",
+      "url": "https://www.fab.com/listings/f5816915-86d9-4bef-b8f3-921408ae240b",
+      "root": "/Game/Fantasy_Pack"
+    },
+    {
+      "title": "Stylized Fantasy Creatures Bundle",
+      "url": "https://www.fab.com/listings/8e208ab4-667d-4a86-870a-f0c3e9b0e080",
+      "root": "/Game/StylizedCreaturesBundle"
+    }
+  ],
+  "default_formation": [
+    "Orc",
+    "Troll",
+    "Wolf",
+    "Golem"
+  ],
+  "units": [
+    {
+      "id": "Orc",
+      "name": "오크 망치병",
+      "source_pack": "Fantasy Characters (Pack)",
+      "mesh": "/Game/Fantasy_Pack/Characters/Orc_Hummer/Mesh/SK_Orc_Hummer",
+      "output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Orc_Hummer/Blueprints",
+      "locomotion": [
+        "/Game/Fantasy_Pack/Characters/Orc_Hummer/Animations/Anim_Orc_Hummer_Idle",
+        "/Game/Fantasy_Pack/Characters/Orc_Hummer/Animations/Anim_Orc_Hummer_Walk",
+        "/Game/Fantasy_Pack/Characters/Orc_Hummer/Animations/Anim_Orc_Hummer_Run"
+      ],
+      "attack": "/Game/Fantasy_Pack/Characters/Orc_Hummer/Animations/Anim_Orc_Hummer_Attack_3",
+      "retarget": false,
+      "height_cm": 190,
+      "capsule_radius": 42,
+      "capsule_half_height": 96,
+      "windup": 0.5,
+      "material": null,
+      "animation_output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Orc_Hummer/Animations"
+    },
+    {
+      "id": "Troll",
+      "name": "동굴 트롤",
+      "source_pack": "Fantasy Characters (Pack)",
+      "mesh": "/Game/Fantasy_Pack/Characters/Troll/Mesh/SK_Troll",
+      "output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Troll/Blueprints",
+      "locomotion": [
+        "/Game/Fantasy_Pack/Characters/Troll/Animations/Anim_Troll_Idle",
+        "/Game/Fantasy_Pack/Characters/Troll/Animations/Anim_Troll_Walk",
+        "/Game/Fantasy_Pack/Characters/Troll/Animations/Anim_Troll_Run"
+      ],
+      "attack": "/Game/Fantasy_Pack/Characters/Troll/Animations/Anim_Troll_Attack_3",
+      "retarget": false,
+      "height_cm": 220,
+      "capsule_radius": 42,
+      "capsule_half_height": 96,
+      "windup": 0.9,
+      "material": null,
+      "animation_output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Troll/Animations"
+    },
+    {
+      "id": "Werewolf",
+      "name": "늑대인간",
+      "source_pack": "Fantasy Characters (Pack)",
+      "mesh": "/Game/Fantasy_Pack/Characters/Werewolf/Mesh/SK_Werewolf_Full_02",
+      "output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Werewolf/Blueprints",
+      "locomotion": [
+        "/Game/Fantasy_Pack/Animations/2Without_Weapon/Anim_Idle_Without_Weapon",
+        "/Game/Fantasy_Pack/Animations/2Without_Weapon/Anim_Walk_Without_Weapon",
+        "/Game/Fantasy_Pack/Animations/2Without_Weapon/Anim_Run_Without_Weapon"
+      ],
+      "attack": "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01",
+      "retarget": true,
+      "height_cm": 185,
+      "capsule_radius": 42,
+      "capsule_half_height": 96,
+      "windup": 0.3,
+      "material": null,
+      "animation_output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Werewolf/Animations"
+    },
+    {
+      "id": "Golem",
+      "name": "바위 골렘",
+      "source_pack": "Fantasy Characters (Pack)",
+      "mesh": "/Game/Fantasy_Pack/Characters/Golem/Mesh/SK_Golem",
+      "output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Golem/Blueprints",
+      "locomotion": [
+        "/Game/Fantasy_Pack/Animations/2Without_Weapon/Anim_Idle_Without_Weapon",
+        "/Game/Fantasy_Pack/Animations/2Without_Weapon/Anim_Walk_Without_Weapon",
+        "/Game/Fantasy_Pack/Animations/2Without_Weapon/Anim_Run_Without_Weapon"
+      ],
+      "attack": "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01",
+      "retarget": true,
+      "height_cm": 210,
+      "capsule_radius": 42,
+      "capsule_half_height": 96,
+      "windup": 0.3,
+      "material": null,
+      "animation_output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Golem/Animations"
+    },
+    {
+      "id": "Wolf",
+      "name": "숲 늑대",
+      "source_pack": "Stylized Fantasy Creatures Bundle",
+      "mesh": "/Game/StylizedCreaturesBundle/Meshes/Wolf/SK_Wolf",
+      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Wolf",
+      "locomotion": [
+        "/Game/StylizedCreaturesBundle/Animations/Wolf/A_Wolf_idle",
+        "/Game/StylizedCreaturesBundle/Animations/Wolf/A_Wolf_Walk_Forward",
+        "/Game/StylizedCreaturesBundle/Animations/Wolf/A_Wolf_Run_Forward"
+      ],
+      "attack": "/Game/StylizedCreaturesBundle/Animations/Wolf/A_Wolf_Combat_Unarmed_Attack",
+      "retarget": false,
+      "scale": 0.72,
+      "capsule_radius": 42,
+      "capsule_half_height": 70,
+      "windup": 0.4,
+      "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Wolf/MI_Wolf_Gr",
+      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Wolf"
+    },
+    {
+      "id": "Bear",
+      "name": "숲 곰",
+      "source_pack": "Stylized Fantasy Creatures Bundle",
+      "mesh": "/Game/StylizedCreaturesBundle/Meshes/Bear/SK_Bear",
+      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Bear",
+      "locomotion": [
+        "/Game/StylizedCreaturesBundle/Animations/Bear/A_Bear_idle",
+        "/Game/StylizedCreaturesBundle/Animations/Bear/A_Bear_Walk_Forward",
+        "/Game/StylizedCreaturesBundle/Animations/Bear/A_Bear_Run_Forward"
+      ],
+      "attack": "/Game/StylizedCreaturesBundle/Animations/Bear/A_Bear_Combat_Unarmed_Attack",
+      "retarget": false,
+      "scale": 0.8,
+      "capsule_radius": 42,
+      "capsule_half_height": 70,
+      "windup": 0.47,
+      "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Bear/MI_Bear_Br",
+      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Bear"
+    },
+    {
+      "id": "Boar",
+      "name": "멧돼지",
+      "source_pack": "Stylized Fantasy Creatures Bundle",
+      "mesh": "/Game/StylizedCreaturesBundle/Meshes/Boar/SK_Boar",
+      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Boar",
+      "locomotion": [
+        "/Game/StylizedCreaturesBundle/Animations/Boar/A_Boar_idle",
+        "/Game/StylizedCreaturesBundle/Animations/Boar/A_Boar_Walk_Forward",
+        "/Game/StylizedCreaturesBundle/Animations/Boar/A_Boar_Run_Forward"
+      ],
+      "attack": "/Game/StylizedCreaturesBundle/Animations/Boar/A_Boar_Combat_Unarmed_Attack",
+      "retarget": false,
+      "scale": 0.68,
+      "capsule_radius": 42,
+      "capsule_half_height": 70,
+      "windup": 0.53,
+      "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Boar/MI_Boar_Br",
+      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Boar"
+    },
+    {
+      "id": "Spider",
+      "name": "동굴 거미",
+      "source_pack": "Stylized Fantasy Creatures Bundle",
+      "mesh": "/Game/StylizedCreaturesBundle/Meshes/Spider/SK_Spider",
+      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Spider",
+      "locomotion": [
+        "/Game/StylizedCreaturesBundle/Animations/Spider/A_Spider_idle",
+        "/Game/StylizedCreaturesBundle/Animations/Spider/A_Spider_Walk_Forward",
+        "/Game/StylizedCreaturesBundle/Animations/Spider/A_Spider_Run_Forward"
+      ],
+      "attack": "/Game/StylizedCreaturesBundle/Animations/Spider/A_Spider_Combat_Unarmed_Attack",
+      "retarget": false,
+      "scale": 0.72,
+      "capsule_radius": 42,
+      "capsule_half_height": 70,
+      "windup": 0.33,
+      "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Spider/MI_Spider_Br",
+      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Spider"
+    },
+    {
+      "id": "Crocodile",
+      "name": "늪 악어",
+      "source_pack": "Stylized Fantasy Creatures Bundle",
+      "mesh": "/Game/StylizedCreaturesBundle/Meshes/Crocodile/SK_Crocodile",
+      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Crocodile",
+      "locomotion": [
+        "/Game/StylizedCreaturesBundle/Animations/Crocodile/A_Crocodile_idle",
+        "/Game/StylizedCreaturesBundle/Animations/Crocodile/A_Crocodile_Walk_Forward",
+        "/Game/StylizedCreaturesBundle/Animations/Crocodile/A_Crocodile_Run_Forward"
+      ],
+      "attack": "/Game/StylizedCreaturesBundle/Animations/Crocodile/A_Crocodile_Combat_Unarmed_Attack",
+      "retarget": false,
+      "scale": 0.53,
+      "capsule_radius": 42,
+      "capsule_half_height": 70,
+      "windup": 0.43,
+      "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Crocodile/MI_Crocodile_Gn",
+      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Crocodile"
+    },
+    {
+      "id": "Toad",
+      "name": "늪 두꺼비",
+      "source_pack": "Stylized Fantasy Creatures Bundle",
+      "mesh": "/Game/StylizedCreaturesBundle/Meshes/Toad/SK_Toad",
+      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Toad",
+      "locomotion": [
+        "/Game/StylizedCreaturesBundle/Animations/Toad/A_Toad_idle",
+        "/Game/StylizedCreaturesBundle/Animations/Toad/A_Toad_Walk_Forward",
+        "/Game/StylizedCreaturesBundle/Animations/Toad/A_Toad_Run_Forward"
+      ],
+      "attack": "/Game/StylizedCreaturesBundle/Animations/Toad/A_Toad_Combat_Unarmed_Attack",
+      "retarget": false,
+      "scale": 0.72,
+      "capsule_radius": 42,
+      "capsule_half_height": 70,
+      "windup": 0.4,
+      "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Toad/MI_Toad_Gn",
+      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Toad"
+    },
+    {
+      "id": "SnowWolf",
+      "name": "설원 늑대",
+      "source_pack": "Stylized Fantasy Creatures Bundle",
+      "mesh": "/Game/StylizedCreaturesBundle/Meshes/Wolf/SK_Wolf",
+      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Wolf",
+      "locomotion": [
+        "/Game/StylizedCreaturesBundle/Animations/Wolf/A_Wolf_idle",
+        "/Game/StylizedCreaturesBundle/Animations/Wolf/A_Wolf_Walk_Forward",
+        "/Game/StylizedCreaturesBundle/Animations/Wolf/A_Wolf_Run_Forward"
+      ],
+      "attack": "/Game/StylizedCreaturesBundle/Animations/Wolf/A_Wolf_Combat_Unarmed_Attack",
+      "retarget": false,
+      "scale": 0.72,
+      "capsule_radius": 42,
+      "capsule_half_height": 70,
+      "windup": 0.4,
+      "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Wolf/MI_Wolf_Wh",
+      "share_animation": "Wolf",
+      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Wolf"
+    },
+    {
+      "id": "SnowBear",
+      "name": "설원 곰",
+      "source_pack": "Stylized Fantasy Creatures Bundle",
+      "mesh": "/Game/StylizedCreaturesBundle/Meshes/Bear/SK_Bear",
+      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Bear",
+      "locomotion": [
+        "/Game/StylizedCreaturesBundle/Animations/Bear/A_Bear_idle",
+        "/Game/StylizedCreaturesBundle/Animations/Bear/A_Bear_Walk_Forward",
+        "/Game/StylizedCreaturesBundle/Animations/Bear/A_Bear_Run_Forward"
+      ],
+      "attack": "/Game/StylizedCreaturesBundle/Animations/Bear/A_Bear_Combat_Unarmed_Attack",
+      "retarget": false,
+      "scale": 0.8,
+      "capsule_radius": 42,
+      "capsule_half_height": 70,
+      "windup": 0.47,
+      "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Bear/MI_Bear_Wh",
+      "share_animation": "Bear",
+      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Bear"
+    }
+  ]
+}

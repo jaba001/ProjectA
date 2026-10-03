@@ -1,11 +1,12 @@
 # ProjectA 완료 작업과 검증 기록
 
-갱신일: 2026-10-02. 완료 범위·기준 커밋·실행 근거를 기록한다. 현행 구현은 [PROJECT_PLAN](PROJECT_PLAN.md), 확정 기획은 [GAME_DESIGN](GAME_DESIGN.md), 다음 콘텐츠·온라인 서비스·에셋 도입은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
+갱신일: 2026-10-03. 완료 범위·기준 커밋·실행 근거를 기록한다. 현행 구현은 [PROJECT_PLAN](PROJECT_PLAN.md), 확정 기획은 [GAME_DESIGN](GAME_DESIGN.md), 다음 콘텐츠·온라인 서비스·에셋 도입은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
 
 ## 최근 변경
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-10-03 몬스터 콘텐츠 구현 | Fantasy_Pack·StylizedCreaturesBundle 원본 직접 참조로 10종·설원 재질 변형 2개와 native GroundSpeed·DefaultSlot·기존 GAS 기본 공격 연결을 작성했다. 기본 편성 오크·트롤·늑대·골렘 4개, 기존 검 적 포함 소프트 디버그 카탈로그 13개와 캡슐 생성 높이 보정을 적용했다. Development Editor / Win64 컴파일 및 에셋 작성·독립 재로드 종료 0. 신규 62개·1,673,195바이트(약 1.6MiB), 원본 5루트·1,574파일 SHA 보존, 기존 추적 5,973개 중 DA_DefaultEncounter만 변경, 재로드 전후 신규/변경 63개 SHA 동일. Gameplay 혼합 편성·앞열 2/뒷열 2 정적 검사 통과. 게임·PIE·자동화 테스트 미실행. 근거: `Saved/Automation/Monsters/Configuration.json`, `Reload.json`, `FinalFileAudit.json`; [구성 기준](PROJECT_PLAN.md#4-5-몬스터-콘텐츠)·[사용자 확인](TODO.md#12-몬스터-콘텐츠-확인) |
 | 2026-10-02 지하 던전 비교 레벨 | 보유 FANTASTIC·Modular Dungeon Collection을 원본 경로에서 직접 참조하여 `DungeonFantasy`·`DungeonStone`을 작성했다. 메시·조명·불꽃은 각각 108·9·6개와 101·8·6개이며 기존 독립 전투 모드만 신규 맵에 지정했다. Gameplay·DebugCombat·기본 Run 연결을 보존하고 UE 5.8의 폐기된 `r.Mobile.VirtualTextures` 설정을 제거했다. 제작·두 맵 navigation 저장·별도 재로드 종료 0, 카메라 48표본·전장 여백·충돌/navigation 제외·원본 참조·저장 설정·보호 파일 7,732개 SHA 검사 통과. 재로드 오류 0·기존 Gameplay nav 변환 및 commandlet CrowdManager 경고 3건. Python 구문·문서 링크·diff 검사 통과, 렌더링·게임·PIE·자동화 테스트 미실행. 근거: `Saved/Automation/Dungeons/Configuration.json`, `Reload.json`, `NavigationFantasy.log`, `NavigationStone.log`, `Static.json`; [사용자 확인](TODO.md#10-지하-던전-비교-레벨-확인). |
 | 2026-10-02 설정 O 단축키 | `O`를 기존 `Esc`와 같은 CommonUI 설정 열기·닫기·확인 복원 경로에 연결하고 인벤토리 안내와 사용 문서를 갱신했다. UE 5.8.3 Development Editor / Win64 컴파일·링크 16.74초, 코드 검토·문서 링크·diff 정적 검사 통과. 게임·PIE·자동화 실행은 미수행이며 [TODO 9절](TODO.md#9-설정-o-단축키-확인)에 사용자 입력 확인을 남겼다. 근거: `Saved/Automation/SettingsOShortcutBuild.log`. |
 | 2026-10-02 포더킹 참고 목록형 인벤토리 | 상점과 `I` 창의 가방 격자를 24px 아이콘·이름·사본 수량의 세로 목록으로 교체하고 GameplayTagQuery 분류 탭·개수·선택 강조·클릭 상세와 별도 스킬 탭을 추가했다. 원본 ItemIndex·장비 Revision·권위 스킬 fallback·빈 가방 Drop·서버 장착 조건을 유지하며 원본 에셋·저장 형식은 변경하지 않았다. UE 5.8.3 Development Editor / Win64 최종 컴파일·링크 8.32초, 독립 코드 검토·문서 링크·diff 정적 검사 통과. 에디터·게임·PIE·자동화 실행은 미수행이며 [TODO 8절](TODO.md#8-목록형-인벤토리-확인)에 화면·입력 확인을 남겼다. 근거: `Saved/Automation/InventoryListFinalBuild.log`. |

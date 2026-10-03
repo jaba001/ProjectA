@@ -5,6 +5,7 @@
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Combat/SkillActor/SkillActorBase.h"
+#include "Components/CapsuleComponent.h"
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/EncounterDefinitionDataAsset.h"
 #include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
@@ -539,6 +540,9 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
             Unit->HealingItemCount = 0;
             Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), Member->Stats.CurrentHP);
         }
+        // Match each enemy body's capsule to the tile so shorter monsters do not float at the fixed spawn height.
+        // 작은 몬스터가 고정 생성 높이에서 뜨지 않도록 각 적 몸체의 캡슐 높이를 타일에 맞춥니다.
+        Unit->SetActorLocation(Tile->GetActorLocation() + FVector(0.f, 0.f, Unit->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), false, nullptr, ETeleportType::TeleportPhysics);
         Unit->SetTeam(ETeam::Enemy);
         Unit->SetCurrentTile(Tile);
     }

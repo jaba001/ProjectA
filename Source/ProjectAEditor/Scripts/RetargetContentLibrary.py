@@ -10,6 +10,9 @@ TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
 HELPER = unreal.WarriorAssetLibrary
 RETARGET_SETUP_VERSION = "2"
 RETARGET_OP_CLASSES = ["IKRetargetPelvisMotionController", "IKRetargetFKChainsController", "IKRetargetIKChainsController", "IKRetargetRunIKRigController", "IKRetargetRootMotionController", "IKRetargetCurveRemapController"]
+# UE 5.8 merges default IK chain work into RunIKRig; retain the exact legacy stack for UE 5.7 assets.
+# UE 5.8은 기본 IK 체인 처리를 RunIKRig에 통합하며 UE 5.7 에셋의 정확한 기존 스택도 허용합니다.
+RETARGET_OP_STACKS = [RETARGET_OP_CLASSES, [name for name in RETARGET_OP_CLASSES if name != "IKRetargetIKChainsController"]]
 
 
 def require(value, message):
@@ -36,11 +39,20 @@ def rig(mesh, directory, name, *, save_asset):
 
 
 def valid_retarget_ops(controller, target_root="root", target_pelvis="pelvis"):
-    if controller.get_num_retarget_ops() != len(RETARGET_OP_CLASSES):
+    ops = [controller.get_op_controller(index) for index in range(controller.get_num_retarget_ops())]
+    classes = [op.get_class().get_name() if op else None for op in ops]
+    if classes not in RETARGET_OP_STACKS:
         return False
-    for index, expected in enumerate(RETARGET_OP_CLASSES):
-        op = controller.get_op_controller(index)
-        if not op or op.get_class().get_name() != expected or not controller.get_retarget_op_enabled(index):
+    names = [controller.get_op_name(index) for index in range(len(ops))]
+    if any(str(name) == "None" for name in names) or len({str(name) for name in names}) != len(names):
+        return False
+    for index, op in enumerate(ops):
+        if not controller.get_retarget_op_enabled(index):
+            return False
+        # Legacy IKChains executes as a RunIKRig child; the five-op UE 5.8 default has no child ops.
+        # 기존 IKChains는 RunIKRig의 자식으로 실행하며 UE 5.8 기본 5개 연산에는 자식 연산이 없습니다.
+        expected_parent = names[classes.index("IKRetargetRunIKRigController")] if classes[index] == "IKRetargetIKChainsController" else unreal.Name("None")
+        if controller.get_parent_op_by_name(names[index]) != expected_parent:
             return False
         if isinstance(op, unreal.IKRetargetRootMotionController):
             if str(op.get_source_root_bone()) != "root" or str(op.get_target_root_bone()) != target_root or str(op.get_target_pelvis_bone()) != target_pelvis:

@@ -19,6 +19,14 @@
 #include "Unit/EnemyUnit.h"
 #include "Unit/PlayerUnit.h"
 
+namespace
+{
+    bool IsUsableEnemyClass(const UClass* Class)
+    {
+        return IsValid(Class) && Class->IsChildOf(AEnemyUnit::StaticClass()) && !Class->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists);
+    }
+}
+
 ACombatDebugGameMode::ACombatDebugGameMode()
 {
     DefaultPawnClass = nullptr;
@@ -142,18 +150,34 @@ bool ACombatDebugGameMode::SpawnDebugUnits()
     return true;
 }
 
+TArray<TSubclassOf<AEnemyUnit>> ACombatDebugGameMode::GetAvailableEnemyClasses() const
+{
+    TArray<TSubclassOf<AEnemyUnit>> Classes;
+    if (!IsValid(EnemyDefinition) || !EnemyDefinition->OpponentSnapshotSlot.IsNone()) return Classes;
+    // Load soft catalog entries only for debug selection and retain valid initial classes in the union.
+    // 디버그 선택에만 소프트 카탈로그를 로드하고 유효한 초기 편성 클래스도 합집합에 보존합니다.
+    for (const TSoftClassPtr<AEnemyUnit>& Candidate : EnemyDefinition->EnemyCatalogClasses)
+    {
+        if (Candidate.IsNull()) continue;
+        UClass* Resolved = Candidate.LoadSynchronous();
+        if (IsUsableEnemyClass(Resolved)) Classes.AddUnique(Resolved);
+    }
+    for (TSubclassOf<AEnemyUnit> Candidate : EnemyDefinition->EnemyUnitClasses)
+    {
+        if (IsUsableEnemyClass(Candidate.Get())) Classes.AddUnique(Candidate);
+    }
+    return Classes;
+}
+
 void ACombatDebugGameMode::GetDebugSpawnOptions(bool bEnemy, TArray<FName>& OutIds, TArray<FText>& OutNames) const
 {
     OutIds.Reset();
     OutNames.Reset();
     if (bEnemy)
     {
-        if (!IsValid(EnemyDefinition) || !EnemyDefinition->OpponentSnapshotSlot.IsNone()) return;
-        for (TSubclassOf<AEnemyUnit> EnemyClass : EnemyDefinition->EnemyUnitClasses)
+        for (TSubclassOf<AEnemyUnit> EnemyClass : GetAvailableEnemyClasses())
         {
-            if (!EnemyClass || EnemyClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated)) continue;
             const FName Id(*EnemyClass->GetPathName());
-            if (OutIds.Contains(Id)) continue;
             const AEnemyUnit* Defaults = EnemyClass->GetDefaultObject<AEnemyUnit>();
             FString Name = EnemyClass->GetName();
             Name.RemoveFromEnd(TEXT("_C"));
@@ -205,11 +229,28 @@ AUnitBase* ACombatDebugGameMode::SpawnConfiguredDebugUnit(bool bEnemy, FName Opt
     TArray<TObjectPtr<USkillDefinitionDataAsset>> StartingSkills;
     if (bEnemy)
     {
+        // Initial debug spawning reuses hard references without loading unselected catalog monsters.
+        // 초기 디버그 생성은 선택되지 않은 카탈로그 몬스터를 로드하지 않고 기존 직접 참조를 사용합니다.
         if (IsValid(EnemyDefinition) && EnemyDefinition->OpponentSnapshotSlot.IsNone())
         {
             for (TSubclassOf<AEnemyUnit> Candidate : EnemyDefinition->EnemyUnitClasses)
             {
-                if (Candidate && FName(*Candidate->GetPathName()) == OptionId) UnitClass = Candidate;
+                if (IsUsableEnemyClass(Candidate.Get()) && FName(*Candidate->GetPathName()) == OptionId)
+                {
+                    UnitClass = Candidate;
+                    break;
+                }
+            }
+        }
+        if (!UnitClass)
+        {
+            for (TSubclassOf<AEnemyUnit> Candidate : GetAvailableEnemyClasses())
+            {
+                if (FName(*Candidate->GetPathName()) == OptionId)
+                {
+                    UnitClass = Candidate;
+                    break;
+                }
             }
         }
     }

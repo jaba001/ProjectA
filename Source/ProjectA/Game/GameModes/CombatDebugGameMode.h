@@ -7,6 +7,7 @@
 class ACombatArena;
 class ACombatGridTile;
 class ACombatManager;
+class AEnemyUnit;
 class AUnitBase;
 class UEncounterDefinitionDataAsset;
 class UPartyDefinitionDataAsset;
@@ -42,6 +43,7 @@ protected:
 private:
     void InitializeDebugCombat();
     bool SpawnDebugUnits();
+    TArray<TSubclassOf<AEnemyUnit>> GetAvailableEnemyClasses() const;
     AUnitBase* SpawnConfiguredDebugUnit(bool bEnemy, FName OptionId, ACombatGridTile* Tile, FText& OutError);
     void CleanupDebugCombat();
 

@@ -66,14 +66,14 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 
 `ProjectA.Combat.Round.MeleeAreaPhysicalContacts`와 `MeleeTargetAndSides`는 삭제 대상 3종과 독립적인 근접 범위·타일형 공통 기능 회귀로 보존한다. 생성 스킬 176종과 범위·투사체 공통 C++·GAS·FX도 유지한다. 기존 작성·검증 결과는 [당시 이력](../../../Docs/HISTORY.md#최근-변경)으로 구분한다.
 
-9. `ConfigureTestEnemies.py`: 기본 PvE 인카운터를 기존 적 클래스 4개로 구성하고 Gameplay Arena를 앞열 `(1,2)`, `(2,2)`·뒷열 `(0,3)`, `(3,3)`으로 배치한다. 유닛 능력치·스킬·Snapshot 정의는 변경하지 않는다. 열린 에디터가 패키지를 잠글 수 있으므로 저장 후 종료하고 실행한다. `-TestEnemiesVerifyOnly`는 저장된 클래스 수·배치만 읽는다.
+9. `ConfigureTestEnemies.py`: 기본 PvE 인카운터의 유효한 적 클래스 4개와 순서를 보존하고 Gameplay Arena만 앞열 `(1,2)`, `(2,2)`·뒷열 `(0,3)`, `(3,3)`으로 배치한다. 혼합 편성을 같은 클래스로 덮어쓰지 않으며 유닛 능력치·스킬·Snapshot 정의는 변경하지 않는다. 열린 에디터가 패키지를 잠글 수 있으므로 저장 후 종료하고 실행한다. `-TestEnemiesVerifyOnly`는 저장된 클래스 수·순서·배치만 읽는다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureTestEnemies.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureTestEnemies.py") -TestEnemiesVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
 
-10. `ConfigureWarriorContent.py`: 이전 GKnight 전사와 현재 Skeleton_Guard 적의 콘텐츠 작성·검사 도구. 현행 네 직업 의상 구성은 16번 도구를 사용한다. 공통 리타깃은 `RetargetContentLibrary.py`에서 제공한다. 메시·뼈대는 원본을 직접 참조하며, 검은 타격 소켓을 추가한 Weapon_Pack 수정본을 유지한다.
+10. `ConfigureWarriorContent.py`: 이전 GKnight 전사와 기존 Skeleton_Guard 적의 콘텐츠 작성·검사 도구. 현행 네 직업 의상 구성은 16번 도구를 사용한다. 공통 리타깃은 `RetargetContentLibrary.py`에서 제공한다. 메시·뼈대는 원본을 직접 참조하며, 검은 타격 소켓을 추가한 Weapon_Pack 수정본을 유지한다.
 
 IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandlet에서도 지원한다. 아래 기존 전사 제작 명령은 의상 카탈로그가 활성화되어 있으면 재작성을 차단한다. `-WarriorVerifyOnly`는 공통 외형 검사와 기존 적·직업 매핑을 확인한다. 현행 네 직업의 상세 검사는 `VerifyRogAppearance.py`를 사용한다. 두 도구 모두 PIE·게임 플레이를 시작하지 않는다.
 
@@ -189,3 +189,12 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 ```
 
 기본 실행은 새 에셋만 작성한다. `-EnvironmentNames=MeadowBloom,PineRidge`로 맵 작성·검사만 선택할 수 있으며 재질 도구는 명세의 재질 전체를 처리한다. 기존 결과를 재작성하려면 각각 `-EnvironmentSurfacesRebuild`·`-EnvironmentRebuild`를 명시하며 작성된 재질 설정·수동 장식 수정을 덮어쓴다. ISM 배치 전 `has_material_usage` 사전검사를 통과해야 하며 원본 기본 재질의 자동 수정에 의존하지 않는다. 원본 팩과 기존 프로젝트 에셋의 해시를 보호하고, 검사는 저장된 재질 그래프·RVT switch·MI usage override·부모/텍스처 참조와 ISM 변환·예산·지면 빈틈·카메라 여백을 확인한다. 보고서는 `Saved/Automation/Environments/{SurfacesConfiguration,SurfacesReload,Configuration,Reload}.json`이며 화면·이동·실제 FPS 확인은 [TODO 11절](../../../Docs/TODO.md#11-환경-비교-레벨-확인)에서 사용자가 수행한다.
+
+21. `ConfigureMonsterContent.py`: [MonsterContentSpecs.json](MonsterContentSpecs.json)의 10종·설원 재질 변형 2개에 프로젝트 전용 Enemy Blueprint·BlendSpace·native GroundSpeed AnimBlueprint·단일 DefaultSlot 공격 몽타주와 Skill DataAsset을 작성한다. `Fantasy_Pack`·`StylizedCreaturesBundle` 원본을 직접 참조하며 늑대인간·골렘의 Manny 공격 2개만 원본 하위 경로를 유지하여 리타깃한다. 설원 늑대/곰은 기존 종의 애니메이션과 원본 재질을 공유한다. 기본 편성을 오크·트롤·늑대·골렘 4개로 구성하고 기존 `BP_EnemyUnit`을 포함한 소프트 디버그 카탈로그 13개를 연결한다. [구성 기준](../../../Docs/PROJECT_PLAN.md#4-5-몬스터-콘텐츠)
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureMonsterContent.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureMonsterContent.py") -MonsterVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+```
+
+기본 명령은 명세의 프로젝트 전용 에셋과 `DA_DefaultEncounter`를 작성·저장하며 소유 정보가 없는 기존 생성 대상은 변경하지 않고 중단한다. `-MonsterVerifyOnly`는 저장하지 않고 원본 참조·Skeleton/PhysicsAsset·애니메이션 그래프·몽타주·GAS 계약·저장된 CDO와 편성을 검사한다. 기존 기본 비무장 공격의 피해·AP·태그/Query·GAS 효과와 전체 래그돌을 유지하고 원본 패키지를 저장하지 않는다. Development Editor / Win64 컴파일·62개 신규 에셋 작성·독립 재로드 정적 검사 통과, 원본 1,574파일과 재로드 전후 신규/변경 63개 SHA 보존을 확인했다. 결과는 `Saved/Automation/Monsters/Configuration.json`·`Reload.json`·`FinalFileAudit.json`에 기록한다. 게임·PIE·자동화 테스트는 실행하지 않으며 실제 크기·움직임·공격·사망·디버그 추가는 [TODO 12절](../../../Docs/TODO.md#12-몬스터-콘텐츠-확인)에서 사용자가 확인한다.
