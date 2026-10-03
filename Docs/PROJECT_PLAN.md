@@ -1,6 +1,6 @@
 # ProjectA 구현 구조와 설정
 
-기준일: 2026-10-02. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다. 엔진 기준은 UE 5.8.3이며 기존 실행 결과는 UE 5.7 당시 이력이다. UE 5.8 작동 확인은 [TODO 7절](TODO.md#7-ue-58-전환-확인)을 따른다.
+기준일: 2026-10-03. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다. 엔진 기준은 UE 5.8.3이며 기본 Run·협동의 기존 실행 결과는 UE 5.7 당시 이력이다. 비교 맵 에셋 작성·검사는 UE 5.8 기준이며 작동 확인은 [TODO 7절](TODO.md#7-ue-58-전환-확인)을 따른다.
 
 기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 UE 5.7 위임 실행은 당시 두 전투 경로의 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀 결과다. 2026-10-01 UE 5.7의 당시 코드로 1인·같은 PC 2/4인 PIE에서 각 10전투·9상점 선택/퇴장·개인 보상과 저장 재로드를 확인했다. 진행용 HP fixture이며 UE 5.8·정상 난이도·실제 서비스·다중 PC·지연/손실 검증은 별도다. [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
@@ -277,6 +277,33 @@ Niagara 방향 후보 26개 중 본체가 이미 로컬 공간인 19개는 원�
 생성·navigation 저장·독립 재로드 검사는 카메라 시선 48표본·전장 여백·장식 충돌 비활성·navigation 영향 제외·원본 참조·저장된 변환과 설정·독립 전투 모드를 통과했다. 보호 대상 7,732개 파일의 SHA 불변과 읽기 전용 재로드 전후 새 맵 해시 보존도 확인했다. 렌더링·UI·PIE·실제 작동 테스트는 수행하지 않았다. 화면·클릭·이동은 [TODO 10절](TODO.md#10-지하-던전-비교-레벨-확인)에서 사용자가 확인한다.
 
 UE 5.8에서 폐기된 `DefaultEngine.ini`의 `r.Mobile.VirtualTextures`를 제거하여 엔진 ensure를 해소했으며 기존 `r.VirtualTextures=True`는 유지한다.
+
+### 4-4 환경 비교 레벨
+
+UE 5.8에서 `/Game/User_JeHoon/LEVEL/Environment/` 아래 초원·숲·사막·얼음·여름 계열 12개 맵을 생성·저장했다. 원본 경로는 `/Game/Orasot_Bundle`·`/Game/InfinityBladeIceLands`·`/Game/Kobo_Nature`이며 Git에 포함하지 않으므로 다른 PC에서도 해당 팩 설치가 필요하다. 배치 메시 합계는 3,240개이며 각 맵은 ISM 9~17개 그룹으로 구성한다.
+
+| 테마 | 맵 이름 | 원본 팩 | 배치 메시 | ISM 그룹 |
+|---|---|---|---:|---:|
+| 꽃 초원 | `MeadowBloom` | Orasot | 333 | 10 |
+| 소나무 능선 | `PineRidge` | Orasot | 287 | 15 |
+| 대나무 정원 | `BambooGarden` | Orasot | 300 | 11 |
+| 붉은 숲 | `CrimsonForest` | Orasot | 341 | 12 |
+| 사막 협곡 | `DesertCanyon` | Orasot | 216 | 12 |
+| 여름 오아시스 | `DesertOasis` | Orasot | 263 | 9 |
+| 어두운 습지 | `DarkMarsh` | Orasot | 312 | 9 |
+| 사바나 숲 | `SavannahGrove` | Orasot | 329 | 9 |
+| 얼어붙은 고개 | `FrozenPass` | Infinity Blade Ice Lands | 216 | 17 |
+| 눈 덮인 요새 | `IceCitadel` | Infinity Blade Ice Lands | 206 | 16 |
+| 한낮의 야자 해안 | `PalmCoast` | Kobo Nature·Orasot | 214 | 12 |
+| 노을빛 수정 석호 | `SunsetLagoon` | Kobo Nature·Orasot | 223 | 12 |
+
+Gameplay의 전장·Grid·GameplayCamera·물리 바닥·NavBounds를 복제하여 보존하고 새 맵만 기존 `BP_CombatDebugGameMode`로 구성한다. 반복 메시를 원본 메시·재질·그림자·거리 설정별 ISM으로 묶으며 모든 장식의 충돌과 navigation 영향을 끈다. 기존 Gameplay·DebugCombat·던전 맵과 기본 Run 전환은 유지한다.
+
+원본 메시·텍스처·재질 부모는 직접 참조한다. Orasot의 RVT 의존성과 Landscape 전용 지면은 평면에 그대로 적용할 수 없어 원본 텍스처의 월드 XY UV 표면 Material과 RVT 사용을 해제한 자식 MI를 `/Game/User_JeHoon/Materials/Environment/` 아래 원본 팩·하위 구조대로 새로 작성했다. 얼음 팩은 원본 Material의 usage flag를 보존하고 새 자식 MI의 UE 5.8 Material usage override로 ISM을 지원한다. ISM 배치 전에 `has_material_usage`로 실제 지원을 검사하며 원본 기본 재질의 자동 수정에 의존하지 않는다. 새 표면 Material 9개·자식 MI 44개는 모두 비교 맵에서 사용한다. 원본 메시·텍스처·Material을 복제하거나 변경하지 않는다. 지면은 `/Engine/BasicShapes/Plane`의 10000×9000 평면, 중심 `(-300,400)`, Z=1로 구성한다.
+
+`EnvironmentLevelSpecs.json`의 `levels`·`surfaces`·`instances`를 `ConfigureEnvironmentSurfaces.py`와 `ConfigureEnvironmentLevels.py`가 사용한다. 재질을 먼저 작성한 뒤 맵을 생성하며, 별도 읽기 전용 재로드에서 원본 참조·SHA·저장된 ISM 변환·지면 빈틈·전장 시선 48표본과 XY60/Z20 여백을 검사한다. 기본 예산은 맵별 LOD0 삼각형 500만·그림자 삼각형 200만·그림자 메시 256개·LOD0 section 배치 256개·메시별 재질 슬롯 8개이며 초과 시 작성을 중단한다. 생성 결과의 맵별 LOD0 삼각형은 43,081~241,358개다. Sun 1개·고정 cubemap SkyLight·단순 안개와 EV100 13.3~14.2의 물리 수동 노출을 사용한다. 이 정적 예산은 실제 FPS 검증을 대체하지 않는다.
+
+12개 맵의 생성·navigation 저장·최종 독립 재로드와 재질의 독립 재로드 정적 검사를 통과했다. 작성·navigation 저장·재로드 전후 보호 대상 8,176개 파일의 SHA 불변과 읽기 전용 재로드 전후 새 맵 해시 보존을 확인했다. 재질 최초 작성의 보호 대상은 8,123개 파일이다. 실제 화면·입력·이동·성능은 미확인이다. 명령은 [에셋 도구 20번](../Source/ProjectAEditor/Scripts/README.md)을 따르고 결과는 `Saved/Automation/Environments/`에 기록한다. 사용자 확인은 [TODO 11절](TODO.md#11-환경-비교-레벨-확인)에서 관리한다.
 
 ### 개발용 협동 진입
 

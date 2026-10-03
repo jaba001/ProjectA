@@ -2,7 +2,7 @@
 
 UI 구조·생성 옵션·JSON 필드는 [UI_README](../../../Docs/UI_README.md)를 따른다.
 
-UE 5.8 Development Editor / Win64 빌드를 사용한다. 아래 기존 실행·재로드 결과는 UE 5.7 이력이며 UE 5.8 작동 확인은 [TODO 7절](../../../Docs/TODO.md#7-ue-58-전환-확인)을 따른다. Python은 `-EnablePlugins=PythonScriptPlugin`으로 해당 프로세스에서만 활성화한다. 제작 경로는 `/Game/User_JeHoon`이며 사용자 요청에 따른 지팡이 직접 임포트는 `/Game/MageStaff_FreeWeapons`를 사용한다. 최초 생성·Audit는 기존 TestMap을 요구하므로 현재 사용자 삭제 상태에서 실행 전 원본 가용성을 확인한다.
+UE 5.8 Development Editor / Win64 빌드를 사용한다. 기존 Gameplay·Run 도구의 실행·재로드 결과는 UE 5.7 이력이며 19~20번 비교 레벨 도구의 작성·검사 결과는 UE 5.8 기준이다. UE 5.8 작동 확인은 [TODO 7절](../../../Docs/TODO.md#7-ue-58-전환-확인)을 따른다. Python은 `-EnablePlugins=PythonScriptPlugin`으로 해당 프로세스에서만 활성화한다. 제작 경로는 `/Game/User_JeHoon`이며 사용자 요청에 따른 지팡이 직접 임포트는 `/Game/MageStaff_FreeWeapons`를 사용한다. 최초 생성·Audit는 기존 TestMap을 요구하므로 현재 사용자 삭제 상태에서 실행 전 원본 가용성을 확인한다.
 
 ```powershell
 $editorExecutable = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
@@ -173,3 +173,19 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 ```
 
 기본 실행은 신규 맵만 생성·저장한다. `-DungeonVerifyOnly`는 저장본의 원본 에셋 참조·전장 연결을 읽기 전용으로 검사하고 `Saved/Automation/Dungeons/Reload.json`에 기록한다. 제작 결과는 같은 폴더의 `Configuration.json`에 기록한다. `-DungeonRebuild`는 기존 두 비교 맵의 장식을 재구성하여 수동 장식 수정을 덮어쓰는 명시적 옵션이다. navigation 명령의 `-ini`는 자동 빌드의 비동기 로딩 대기를 해당 프로세스에서만 해제하며 프로젝트 설정을 저장하지 않는다. 정적 검사는 실제 화면·클릭·이동을 포함하지 않으며 [TODO 10절](../../../Docs/TODO.md#10-지하-던전-비교-레벨-확인)에서 사용자가 확인한다.
+
+20. `ConfigureEnvironmentSurfaces.py`·`ConfigureEnvironmentLevels.py`: `EnvironmentLevelSpecs.json`의 `surfaces`·`instances`를 먼저 작성하고 `levels`의 비교 맵을 `/Game/User_JeHoon/LEVEL/Environment/`에 생성한다. Orasot·Infinity Blade Ice Lands·Kobo Nature의 원본을 직접 참조하며, 평면 지면·RVT 해제·얼음 팩의 ISM 지원에 필요한 새 Material·자식 MI만 `/Game/User_JeHoon/Materials/Environment/`에 작성한다. 얼음 자식 MI는 UE 5.8 Material usage override를 사용하여 원본 Material의 flag를 보존한다. 기존 전장·물리 바닥·카메라와 독립 전투 모드를 보존하고 반복 장식을 ISM으로 묶는다. UE 5.8에서 12개 맵·표면 Material 9개·자식 MI 44개를 생성·저장하고 navigation 저장·맵과 재질의 최종 독립 재로드 정적 검사를 통과했다. 원본 팩은 Git에 포함하지 않으므로 다른 PC에서도 해당 팩 설치가 필요하다. [맵 목록·구성 기준](../../../Docs/PROJECT_PLAN.md#4-4-환경-비교-레벨)
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureEnvironmentSurfaces.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureEnvironmentLevels.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+$environmentSpecs = Get-Content (Join-Path $scriptDirectory 'EnvironmentLevelSpecs.json') -Raw | ConvertFrom-Json
+foreach ($environmentSpec in $environmentSpecs.levels)
+{
+    & $editorExecutable $projectFile -run=ResavePackages ("-Package=/Game/User_JeHoon/LEVEL/Environment/" + $environmentSpec.name) -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+}
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureEnvironmentSurfaces.py") -EnvironmentSurfacesVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureEnvironmentLevels.py") -EnvironmentVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+```
+
+기본 실행은 새 에셋만 작성한다. `-EnvironmentNames=MeadowBloom,PineRidge`로 맵 작성·검사만 선택할 수 있으며 재질 도구는 명세의 재질 전체를 처리한다. 기존 결과를 재작성하려면 각각 `-EnvironmentSurfacesRebuild`·`-EnvironmentRebuild`를 명시하며 작성된 재질 설정·수동 장식 수정을 덮어쓴다. ISM 배치 전 `has_material_usage` 사전검사를 통과해야 하며 원본 기본 재질의 자동 수정에 의존하지 않는다. 원본 팩과 기존 프로젝트 에셋의 해시를 보호하고, 검사는 저장된 재질 그래프·RVT switch·MI usage override·부모/텍스처 참조와 ISM 변환·예산·지면 빈틈·카메라 여백을 확인한다. 보고서는 `Saved/Automation/Environments/{SurfacesConfiguration,SurfacesReload,Configuration,Reload}.json`이며 화면·이동·실제 FPS 확인은 [TODO 11절](../../../Docs/TODO.md#11-환경-비교-레벨-확인)에서 사용자가 수행한다.
