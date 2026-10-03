@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source_csv": "Docs/SKILL_EFFECT_ASSETS.csv",
+  "source_csv": "DataCatalogs/SKILL_EFFECT_ASSETS.csv",
   "source_csv_sha256": "eb3b8e9b7eb1b17f09d3fbd26284502087df9b88cabf67f99b4f5e483ed048fd",
   "source_count": 577,
   "notes": [

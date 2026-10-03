@@ -105,7 +105,9 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 Run의 `Combat_01`~`Comb
 
 카탈로그가 없는 기존 schema 1은 고정 상품에서 삭제 대상 3종만 제외하고 다른 상품·골드를 유지하며 새 진열·리롤을 소급 적용하지 않는다. 회복 필드 누락은 기본값 1G로 읽는다. schema 0에는 상품·골드를 소급 지급하지 않으며 명시 장착이 없는 기존 파티의 직업 기본값에서도 삭제 대상 3종을 제외한다. RunSaveGame에는 전체 상태를 저장하고 GameState 표시 뷰에는 현재 진열·비용·Revision 등 표시 상태를 전달하여 후보 `Catalog/Query`를 복제하지 않는다. 같은 PC 2/4인 진행·보상은 확인했으나 상점 구매·리롤 조작은 이번 실행 범위에 포함되지 않았다. [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
-2026-09-25 아이템상점 시험: [WEAPON_ASSETS.csv](WEAPON_ASSETS.csv)의 방패·탄환·화살·기타를 포함한 전체 295개를 사용하고 `가격(G)`은 모두 1이다. 새 Run은 마지막 열 `게임 내 이름`을 표시하며 첫 입장과 1G 리롤마다 중복 없는 5개를 추첨한다. 같은 이름을 시작 장비·인벤토리·장비창에서도 사용하며 기존 저장의 고정 카탈로그·상품·보유 사본은 저장 당시 이름을 유지한다. 이전 4열 CSV는 원본 이름을 사용하고, 새 5열 CSV의 빈 이름은 오류로 처리한다. 표시명은 식별자가 아니며 경로 기반 ID·GameplayTag 분류·장착 프로필은 유지한다. 이전 진열·구매 상품은 다음 리롤에서 다시 등장할 수 있다. 구매한 슬롯은 판매 완료로 바뀌고 `FRunPartyMember.Items`의 개인 보유 사본으로 추가한다. 구매와 장착은 별도 명령이다.
+2026-09-25 아이템상점 시험: [WEAPON_ASSETS.csv](../DataCatalogs/WEAPON_ASSETS.csv)의 방패·탄환·화살·기타를 포함한 전체 295개를 사용하고 `가격(G)`은 모두 1이다. 새 Run은 마지막 열 `게임 내 이름`을 표시하며 첫 입장과 1G 리롤마다 중복 없는 5개를 추첨한다. 같은 이름을 시작 장비·인벤토리·장비창에서도 사용하며 기존 저장의 고정 카탈로그·상품·보유 사본은 저장 당시 이름을 유지한다. 이전 4열 CSV는 원본 이름을 사용하고, 새 5열 CSV의 빈 이름은 오류로 처리한다. 표시명은 식별자가 아니며 경로 기반 ID·GameplayTag 분류·장착 프로필은 유지한다. 이전 진열·구매 상품은 다음 리롤에서 다시 등장할 수 있다. 구매한 슬롯은 판매 완료로 바뀌고 `FRunPartyMember.Items`의 개인 보유 사본으로 추가한다. 구매와 장착은 별도 명령이다.
+
+프로젝트 루트 `DataCatalogs/`에 무기·스킬 이펙트·스킬 생성 현황·인카운터 풀·몬스터 CSV를 함께 보관한다. 런타임 아이템 카탈로그는 `DataCatalogs/WEAPON_ASSETS.csv`를 읽고 빌드의 UFS RuntimeDependency에도 같은 경로를 지정한다. 스킬 생성 명세의 원본 CSV는 `DataCatalogs/SKILL_EFFECT_ASSETS.csv`다.
 
 CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한다. 앞뒤 공백·선행 `+`·선행 0은 허용하며 소수·접미 문자·쉼표·지수 표기·범위 초과는 카탈로그 전체를 거절하고 기존 출력을 보존한다. 기존 4/5열 CSV와 저장된 카탈로그는 유지한다.
 
@@ -121,7 +123,7 @@ CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한�
 
 풀을 직접 편집하려면 `Content/User_JeHoon/Blueprint/DataAsset` 아래에 `RunEncounterPoolDataAsset` 유형의 DataAsset을 만들고 `DA_VerticalSliceParty.RunEncounterPool`에 연결한다. 서로 다른 ID와 이름을 가진 Shop 인카운터 3개에 `Encounter.Shop.Skill` 또는 `Encounter.Shop.Item` 태그를 지정한다. 기본 동작에는 에셋 생성·WBP 재생성이 필요 없다. 정의는 새 Run 초기화 시 분류 태그·표시 이름을 포함한 값으로 복사하며 진행 중 풀 수정으로 저장된 선택지가 바뀌지 않는다.
 
-[ENCOUNTER_POOL.csv](ENCOUNTER_POOL.csv)는 기존 기본 상점 3개와 속성별 무기·스킬 상점 10개를 모은 기획 목록이다. ID·이름·상점 종류·속성·분류 태그·판매 대상·등장 가중치·구현 상태·확인 사항을 기록한다. 신규 ID는 기획 식별자이며 CSV 런타임 로더·상품 필터·후보 추첨은 연결하지 않았다. 기존 `Shop_01/02/03`과 분류 태그를 보존하고 미정 가중치는 공란으로 둔다. [확정 범위와 미정 항목](GAME_DESIGN.md#2-3-속성별-상점-인카운터)
+[ENCOUNTER_POOL.csv](../DataCatalogs/ENCOUNTER_POOL.csv)는 기존 기본 상점 3개와 속성별 무기·스킬 상점 10개를 모은 기획 목록이다. ID·이름·상점 종류·속성·분류 태그·판매 대상·등장 가중치·구현 상태·확인 사항을 기록한다. 신규 ID는 기획 식별자이며 CSV 런타임 로더·상품 필터·후보 추첨은 연결하지 않았다. 기존 `Shop_01/02/03`과 분류 태그를 보존하고 미정 가중치는 공란으로 둔다. [확정 범위와 미정 항목](GAME_DESIGN.md#2-3-속성별-상점-인카운터)
 
 향후 인카운터 후보의 확률 제시는 정의와 별도의 `FRunEncounterPoolEntry` USTRUCT에 정의 ID/참조·상대 가중치·출현 구간·조건을 두는 구성을 권장한다. 에디터 중심 편집은 DataAsset의 배열, 대량 수치·CSV 편집이 필요하면 `FTableRowBase` 기반 DataTable을 사용한다. 추첨은 Host에서 확정하고 제시 결과를 Run에 저장한다. 인카운터 후보의 가중치·추첨은 미구현이며 스킬·아이템상점 상품의 시험 추첨·리롤과 구분한다.
 
@@ -193,7 +195,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 ### 4-1 스킬 이펙트 에셋 목록
 
-[SKILL_EFFECT_ASSETS.csv](SKILL_EFFECT_ASSETS.csv)는 로컬 Content의 17개 최상위 폴더에서 효과 시스템 489개(NiagaraSystem 343·ParticleSystem 146)와 스킬 구성 Blueprint 88개를 정리한다. `계열, 세부 분류, 속성·테마, 에셋 형식, 원본 팩, 위치, 에셋 이름, 분류 근거, 확인 사항, 게임 내 이름, 스킬 방식, 방식 분류 기준`의 12개 열을 기록하며 UTF-8 BOM CSV로 저장한다. 원본 팩은 최상위 폴더명이다. Blueprint에는 효과 Actor·생성 래퍼·Trail 애니메이션 알림을 포함하고 기반 BP를 구분한다. 재질·텍스처·메시·하위 NiagaraEmitter·모듈·데모 재생 도구는 제외한다.
+[SKILL_EFFECT_ASSETS.csv](../DataCatalogs/SKILL_EFFECT_ASSETS.csv)는 로컬 Content의 17개 최상위 폴더에서 효과 시스템 489개(NiagaraSystem 343·ParticleSystem 146)와 스킬 구성 Blueprint 88개를 정리한다. `계열, 세부 분류, 속성·테마, 에셋 형식, 원본 팩, 위치, 에셋 이름, 분류 근거, 확인 사항, 게임 내 이름, 스킬 방식, 방식 분류 기준`의 12개 열을 기록하며 UTF-8 BOM CSV로 저장한다. 원본 팩은 최상위 폴더명이다. Blueprint에는 효과 Actor·생성 래퍼·Trail 애니메이션 알림을 포함하고 기반 BP를 구분한다. 재질·텍스처·메시·하위 NiagaraEmitter·모듈·데모 재생 도구는 제외한다.
 
 `스킬 방식`은 투사체 95·범위형 91·근접공격 28·지원형 68·이동형 5·보조 효과 257·보류 33개로 분류한다. 생성된 176개는 [생성 명세](../Source/ProjectAEditor/Scripts/CatalogSkillSpecs.json)의 프로필을 우선하여 `slash/spin`은 근접공격, `projectile`은 투사체, `area/beam`은 범위형, `heal/shield`는 지원형으로 기록한다. 근접공격도 여러 적을 타격할 수 있으며 범위형에는 전방 직선 빔이 포함된다. 미생성 항목은 기존 에셋 분류에 따른 활용안으로 `실행 보류`를 명시한다. 범위형 장판·안개·상태이상과 지원형 지속 치유 등의 구체 효과·지속시간은 확정하지 않는다. Trail·피격·부착·시전·공용 표시·환경 연출은 보조 효과이며 일반 오라·마법진·복합/선형 공격 등 방식이 불분명한 항목은 보류한다. 이 열은 기획용 분류이며 게임의 GameplayTag·충돌 판정·BPDA를 변경하지 않는다.
 
@@ -216,7 +218,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 클래스·객체명은 엔진을 실행하지 않고 uasset의 AssetRegistry 및 최상위 Export 메타데이터로 확인했다. 시각 형태는 이름·폴더 기반 분류이며 실제 재생·지속 피해·유도 이동·능력치 연결을 의미하지 않는다. 마법진과 장판, 투사체 본체와 Trail, 시스템과 Blueprint 및 Niagara/Cascade 변형은 별도 항목이다. 동명 에셋은 전체 경로로 구분하고 원본 오타·Old/Charged 변형을 보존한다. `P_Warrior_Swipe`의 패키지 파일명 `P_Warrior_sWIPE` 차이는 확인 사항에 남겼다. [기존 검증 이력](HISTORY.md#9-14-csv-분류와-표시명-정적-검증)
 
-[CatalogSkillSpecs.json](../Source/ProjectAEditor/Scripts/CatalogSkillSpecs.json)은 577개 원본 중 176개를 새 스킬로 구성하고 401개를 보류한다. 생성 대상은 베기·소환 무기 26개, 회전 2개, 단일 투사체 32개, 지점 범위 64개, 빔 5개, 즉시 치유 3개, 보호막 44개다. 외부 Blueprint 88개, Ribbon/AnimTrail 33개, 자체 이동 파라미터 연동이 필요한 6개와 지속 효과·부착·피격·조준 표현 등은 보류하며 [SKILL_CREATION_STATUS.csv](SKILL_CREATION_STATUS.csv)에 각 사유를 기록한다.
+[CatalogSkillSpecs.json](../Source/ProjectAEditor/Scripts/CatalogSkillSpecs.json)은 577개 원본 중 176개를 새 스킬로 구성하고 401개를 보류한다. 생성 대상은 베기·소환 무기 26개, 회전 2개, 단일 투사체 32개, 지점 범위 64개, 빔 5개, 즉시 치유 3개, 보호막 44개다. 외부 Blueprint 88개, Ribbon/AnimTrail 33개, 자체 이동 파라미터 연동이 필요한 6개와 지속 효과·부착·피격·조준 표현 등은 보류하며 [SKILL_CREATION_STATUS.csv](../DataCatalogs/SKILL_CREATION_STATUS.csv)에 각 사유를 기록한다.
 
 [CreateCatalogSkills.py](../Source/ProjectAEditor/Scripts/CreateCatalogSkills.py)는 기본적으로 원본 시스템을 참조하고 아래 방향 보정 7개에는 `direction_source` 파생을 사용하는 명시 RoundDefinition BPDA를 `/Game/User_JeHoon/Blueprint/DataAsset/Skills/` 바로 아래에 작성한다. 사용자 요청에 따라 파일명 해시를 제거하고 `BPDA_{원본 에셋 이름}`을 사용하며, 대소문자를 구분하지 않는 중복 이름에만 CSV 순서대로 `_1`, `_2`를 붙인다. 중복 대상은 `N_EnergyShield`·`N_Tsunami` 각 2개이며 기존 5개 스킬 이름과 충돌하지 않는다. 내부 `Catalog_<hash>` SkillId·CSV 표시명·스킬 설정은 유지한다. 176개를 Unreal AssetTools로 이동하고 풀 참조를 갱신했으며 Redirector 176개를 정리했다. 이전 Package/Object 경로와 PrimaryAssetId의 리디렉션 설정을 추가했다. 별도 `SkillPools/DA_SkillPool_Catalog`를 유지하며 새 Run 스킬상점은 해당 풀을 기존 에셋 참조로 연결한다. 기존 저장의 상품·장착 목록은 보존한다. 같은 목적지가 있으면 속성을 비교하고 불일치 시 덮어쓰지 않고 중단한다. 원본 CSV·원본 에셋·기존 스킬 패키지 해시와 데이터 검증을 확인하며 `-CatalogSkillsVerifyOnly`는 저장 없이 다시 읽는다. 구경로 로드와 PrimaryAssetId 설정 검사의 범위는 [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
@@ -307,7 +309,7 @@ Gameplay의 전장·Grid·GameplayCamera·물리 바닥·NavBounds를 복제하�
 
 ### 4-5 몬스터 콘텐츠
 
-[MONSTER_ASSETS.csv](MONSTER_ASSETS.csv)는 현재 카탈로그 13개의 이름·구분·기본 편성 순서·원본 팩·Blueprint·메시·교체 재질 경로를 정리한 UTF-8 BOM 목록이다. 명세와 저장 재로드 기록을 대조하고 에셋 파일 존재를 확인했다. 기본 편성 순서의 빈칸은 미포함, 교체 재질 경로의 빈칸은 별도 지정 없음이다. 기존 `BP_EnemyUnit`의 ‘스켈레톤 검병’은 목록용 설명명이며 원본 메시 기준은 [WarriorContentPaths.py](../Source/ProjectAEditor/Scripts/WarriorContentPaths.py)의 `ENEMY_SOURCE`다. CSV 편집은 게임 설정에 자동 반영되지 않는다.
+[MONSTER_ASSETS.csv](../DataCatalogs/MONSTER_ASSETS.csv)는 현재 카탈로그 13개의 이름·구분·기본 편성 순서·원본 팩·Blueprint·메시·교체 재질 경로를 정리한 UTF-8 BOM 목록이다. 명세와 저장 재로드 기록을 대조하고 에셋 파일 존재를 확인했다. 기본 편성 순서의 빈칸은 미포함, 교체 재질 경로의 빈칸은 별도 지정 없음이다. 기존 `BP_EnemyUnit`의 ‘스켈레톤 검병’은 목록용 설명명이며 원본 메시 기준은 [WarriorContentPaths.py](../Source/ProjectAEditor/Scripts/WarriorContentPaths.py)의 `ENEMY_SOURCE`다. CSV 편집은 게임 설정에 자동 반영되지 않는다.
 
 [MonsterContentSpecs.json](../Source/ProjectAEditor/Scripts/MonsterContentSpecs.json)은 오크 망치병·동굴 트롤·늑대인간·바위 골렘과 늑대·곰·멧돼지·거미·악어·두꺼비 10종, 설원 늑대·설원 곰 재질 변형 2개의 프로젝트 전용 Blueprint를 정의한다. `DA_DefaultEncounter`의 신규 기본 편성은 `Orc`·`Troll`·`Wolf`·`Golem` 4개다. 기존 `BP_EnemyUnit`과 검 공격은 보존하고 디버그 적군 목록의 13번째 항목으로 제공한다. 별도 확률 추첨·종별 밸런스 정책은 추가하지 않는다.
 

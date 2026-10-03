@@ -135,7 +135,7 @@ bool RunItemShopCatalog::Load(TArray<FRunItemDefinition>& OutCatalog, FText& Out
 {
     OutError = FText::GetEmpty();
     FString CsvText;
-    if (!FFileHelper::LoadFileToString(CsvText, *FPaths::Combine(FPaths::ProjectDir(), TEXT("Docs/WEAPON_ASSETS.csv"))))
+    if (!FFileHelper::LoadFileToString(CsvText, *FPaths::Combine(FPaths::ProjectDir(), TEXT("DataCatalogs/WEAPON_ASSETS.csv"))))
     {
         OutError = NSLOCTEXT("RunItemShop", "MissingCatalog", "무기 에셋 CSV를 읽을 수 없습니다.");
         return false;
