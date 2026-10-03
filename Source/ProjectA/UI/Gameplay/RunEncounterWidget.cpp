@@ -231,9 +231,11 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             const bool bAffordable = Buyer && Offer.Price > 0 && Buyer->Gold >= Offer.Price;
             const FText Status = bOwned ? NSLOCTEXT("RunSkillShop", "Owned", "보유 중") : bLoadoutFull ? NSLOCTEXT("RunSkillShop", "FullLoadout", "스킬 5개 보유") : bAffordable ? NSLOCTEXT("RunSkillShop", "Buy", "구매") : NSLOCTEXT("RunSkillShop", "CannotBuy", "구매 불가");
             Button->Configure(Offer.OfferId, Status);
-            ShopNames[Index]->SetText(Offer.DisplayName);
-            ShopPrices[Index]->SetText(FText::Format(NSLOCTEXT("RunSkillShop", "Price", "{0}G"), FText::AsNumber(Offer.Price)));
             const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());
+            // Refresh renamed skill labels without changing the saved shop offer.
+            // 저장된 상점 상품을 변경하지 않고 이름이 바뀐 스킬의 표시를 갱신합니다.
+            ShopNames[Index]->SetText(Skill && !Skill->SkillName.IsEmpty() ? Skill->SkillName : Offer.DisplayName);
+            ShopPrices[Index]->SetText(FText::Format(NSLOCTEXT("RunSkillShop", "Price", "{0}G"), FText::AsNumber(Offer.Price)));
             ShopIcons[Index]->SetVisibility(Skill && Skill->SkillIcon ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
             if (Skill && Skill->SkillIcon) ShopIcons[Index]->SetBrushFromTexture(Skill->SkillIcon);
             ShopCards[Index]->SetRenderOpacity(bOwned ? 0.55f : 1.0f);

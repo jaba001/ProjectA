@@ -289,7 +289,7 @@ CombatSkillExecution::ETraceResult CombatSkillExecution::AdvanceWeaponTrace(AUni
     UAnimMontage* Montage = Source->ResolveRoundCastMontage(Skill.CastMontage);
     if (!IsValid(Montage) || !FMath::IsFinite(Montage->RateScale) || Montage->RateScale <= 0.f)
     {
-        OutStatus = FText::FromString(TEXT("검 공격 애니메이션 설정 누락"));
+        OutStatus = FText::FromString(TEXT("근접 공격 애니메이션 설정 누락"));
         return ETraceResult::Invalid;
     }
     const double WindowEnd = Skill.WindupSeconds + Skill.WeaponTraceDuration;
