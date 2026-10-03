@@ -72,6 +72,8 @@ Unreal Engine 5.8 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 
 전투 디버그의 **캐릭터·체력 → 적군 추가**에서 신규 12개와 기존 `BP_EnemyUnit`을 선택한다. `Fantasy_Pack`·`StylizedCreaturesBundle`의 원본 메시·재질·애니메이션을 직접 참조하고 늑대인간·골렘의 Manny 공격 2개만 리타깃한다. 기존 기본 비무장 공격의 피해·AP·GAS 조건과 전체 래그돌을 유지한다. 일반 Run은 기본 편성 4개만 로드하며 13개 카탈로그는 디버그 목록 조회 시 로드한다. [작성 명령](Source/ProjectAEditor/Scripts/README.md)·[구성 명세](Source/ProjectAEditor/Scripts/MonsterContentSpecs.json)
 
+전체 13개 몬스터의 이름·기본 편성·원본 팩·에셋 경로는 [몬스터 목록 CSV](Docs/MONSTER_ASSETS.csv)에서 확인한다. 한글 호환용 UTF-8 BOM이며 목록 편집은 게임 설정에 자동 반영되지 않는다.
+
 **환경 비교 레벨**은 `/Game/User_JeHoon/LEVEL/Environment/`의 12맵이다. 초원·숲·대나무·사막·습지·얼음·해변을 원본 메시와 ISM으로 구성하고 표면 Material 9개·자식 MI 44개를 작성했다. 맵 생성·navigation 저장·맵과 재질의 독립 재로드 정적 검사를 통과했다. 원본 팩은 Git에 포함하지 않으므로 다른 PC에서도 설치가 필요하다. 화면·조작·FPS는 사용자 확인 대상이다. [맵 목록·구성 기준](Docs/PROJECT_PLAN.md#4-4-환경-비교-레벨)
 
 프로젝트 전체의 Lumen·Nanite 지원과 런타임 사용을 끄고 SSR·일반 메시·일반 그림자로 전환했다. 원본 메시 설정을 보존하며 에디터 재시작·셰이더 재컴파일이 필요하다. 두 던전과 환경 12맵에 노출 +1EV(2배)·환경광 개선을 적용하고 저장·독립 재로드 정적 검사를 통과했다. 실제 화면·FPS는 사용자 확인 대상이다. [렌더링 기준](Docs/PROJECT_PLAN.md#4-7-렌더링-설정과-비교-레벨-밝기)·[사용자 확인](Docs/TODO.md#14-렌더링과-밝기-확인)

@@ -307,6 +307,8 @@ Gameplay의 전장·Grid·GameplayCamera·물리 바닥·NavBounds를 복제하�
 
 ### 4-5 몬스터 콘텐츠
 
+[MONSTER_ASSETS.csv](MONSTER_ASSETS.csv)는 현재 카탈로그 13개의 이름·구분·기본 편성 순서·원본 팩·Blueprint·메시·교체 재질 경로를 정리한 UTF-8 BOM 목록이다. 명세와 저장 재로드 기록을 대조하고 에셋 파일 존재를 확인했다. 기본 편성 순서의 빈칸은 미포함, 교체 재질 경로의 빈칸은 별도 지정 없음이다. 기존 `BP_EnemyUnit`의 ‘스켈레톤 검병’은 목록용 설명명이며 원본 메시 기준은 [WarriorContentPaths.py](../Source/ProjectAEditor/Scripts/WarriorContentPaths.py)의 `ENEMY_SOURCE`다. CSV 편집은 게임 설정에 자동 반영되지 않는다.
+
 [MonsterContentSpecs.json](../Source/ProjectAEditor/Scripts/MonsterContentSpecs.json)은 오크 망치병·동굴 트롤·늑대인간·바위 골렘과 늑대·곰·멧돼지·거미·악어·두꺼비 10종, 설원 늑대·설원 곰 재질 변형 2개의 프로젝트 전용 Blueprint를 정의한다. `DA_DefaultEncounter`의 신규 기본 편성은 `Orc`·`Troll`·`Wolf`·`Golem` 4개다. 기존 `BP_EnemyUnit`과 검 공격은 보존하고 디버그 적군 목록의 13번째 항목으로 제공한다. 별도 확률 추첨·종별 밸런스 정책은 추가하지 않는다.
 
 원본 `/Game/Fantasy_Pack`·`/Game/StylizedCreaturesBundle`의 메시·Skeleton·PhysicsAsset·재질·시퀀스를 직접 참조한다. 새 생물 팩은 약 661MiB이며 Git에서 무시되는 원본은 다른 PC에서도 설치가 필요하다. 새 Blueprint·BlendSpace·AnimBlueprint·몽타주는 `/Game/User_JeHoon/` 아래 원본 팩·하위 구조를 유지하고, 공격 Skill DataAsset은 `Blueprint/DataAsset/Skills/Monsters/`에 작성한다. 늑대인간·골렘의 Manny 비무장 공격 2개만 필수 리타깃 결과로 작성하며 원본 메시·재질·애니메이션을 복제하지 않는다. 설원 변형은 해당 늑대/곰의 애니메이션을 공유한다.
