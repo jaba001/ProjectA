@@ -69,6 +69,9 @@ void URunEncounterWidget::NativeOnInitialized()
     Content->AddChildToVerticalBox(TitleBar);
     Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_EncounterTitle"));
     Title->SetJustification(ETextJustify::Center);
+    Title->SetAutoWrapText(true);
+    Title->SetWrapTextAt(532.0f);
+    Title->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
     TitleBar->SetContent(Title);
     Theme.AddDivider(WidgetTree, Content);
     UScrollBox* MerchantScroll = WidgetTree->ConstructWidget<UScrollBox>();
@@ -311,7 +314,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
         const FRunEncounterOffer* Selected = View.EncounterProgress.FindSelectedOffer();
         Title->SetText(Selected ? Selected->GetDisplayName() : NSLOCTEXT("RunEncounter", "Shop", "상점"));
     }
-    if (View.bTargetRun) Title->SetText(FText::Format(FText::FromString(TEXT("{0} · {1}/80 완료 · 로컬 Snapshot 교대")), Title->GetText(), FText::AsNumber(View.TargetCompletedSteps)));
+    if (View.bTargetRun && (View.Phase == ERunPhase::EncounterChoice || bInShop)) Title->SetText(FText::Format(NSLOCTEXT("RunEncounter", "TargetProgressTitle", "{0} · {1}/80 완료"), Title->GetText(), FText::AsNumber(View.TargetCompletedSteps)));
 }
 
 void URunEncounterWidget::HandleSelection(FName EncounterId)

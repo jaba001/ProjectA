@@ -30,6 +30,24 @@ namespace
     {
         return Slot + TEXT(":") + FSHA1::HashBuffer(Bytes.GetData(), Bytes.Num()).ToString();
     }
+
+#if PLATFORM_WINDOWS
+    // Match Unreal's Windows platform-file normalization before bypassing it for atomic Win32 operations.
+    // 원자적 Win32 호출에서 플랫폼 파일 계층을 우회하기 전에 Unreal의 Windows 경로 정규화를 적용합니다.
+    FString GetWindowsApiPath(const FString& Path)
+    {
+        FString Normalized = FPaths::ConvertRelativePathToFull(Path);
+        const bool bUNC = Normalized.StartsWith(TEXT("//"));
+        FPaths::RemoveDuplicateSlashes(Normalized);
+        if (bUNC) Normalized.InsertAt(0, TEXT('/'));
+        Normalized.ReplaceInline(TEXT("/"), TEXT("\\"));
+        if (Normalized.Len() >= MAX_PATH)
+        {
+            Normalized = bUNC ? TEXT("\\\\?\\UNC\\") + Normalized.Mid(2) : TEXT("\\\\?\\") + Normalized;
+        }
+        return Normalized;
+    }
+#endif
 }
 
 bool FRunCheckpointStorage::IsSafeSlotName(const FString& Slot)
@@ -101,7 +119,7 @@ bool FRunCheckpointStorage::Save(USaveGame* SaveGame, const FString& Slot, FText
 #endif
     // Both paths share a directory; never delete the destination before replacement.
     // 두 경로는 같은 디렉터리이며 교체 전에 목적지 파일을 삭제하지 않습니다.
-    const bool bReplaced = ::MoveFileExW(*Temporary, *Destination, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+    const bool bReplaced = ::MoveFileExW(*GetWindowsApiPath(Temporary), *GetWindowsApiPath(Destination), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
     if (!bReplaced)
     {
         PlatformFile.DeleteFile(*Temporary);
@@ -155,7 +173,7 @@ bool FRunCheckpointStorage::DeleteIfUnchanged(const FString& Slot, const FString
     const FString Path = GetSlotPath(Slot);
     // Use exclusive access so closing this handle completes deletion before the next save.
     // 이 핸들을 닫으면 다음 저장 전에 삭제가 완료되도록 독점 접근을 사용합니다.
-    HANDLE Handle = ::CreateFileW(*Path, GENERIC_READ | DELETE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    HANDLE Handle = ::CreateFileW(*GetWindowsApiPath(Path), GENERIC_READ | DELETE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
     if (Handle == INVALID_HANDLE_VALUE) return false;
     bool bDeleted = false;
     LARGE_INTEGER Size;

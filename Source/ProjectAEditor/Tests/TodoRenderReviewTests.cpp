@@ -36,6 +36,7 @@
 #include "HAL/IConsoleManager.h"
 #include "ImageUtils.h"
 #include "InputCoreTypes.h"
+#include "InputKeyEventArgs.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/App.h"
 #include "Misc/CommandLine.h"
@@ -387,6 +388,8 @@ public:
                 return false;
             }
             if (!Check(FVector::Dist2D(Ally->GetActorLocation(), InitialLocation) > 2.f && Ally->GetCurrentSubActionPoint() == InitialSAP - 1, TEXT("Real world frames move the owned character to the reserved tile and pay SAP once."))) return End();
+            bSAPMovementVerified = true;
+            RecordPointerObservation(TEXT("destination_arrived"));
             Test->AddInfo(TEXT("The public controller reservation and actual Slate LMB tile click both reach the authoritative SAP plan; actual world frames verify movement, one SAP charge and destination occupancy. Hardware mouse input and network replication are separate."));
             return End();
         }
@@ -422,18 +425,28 @@ public:
             const TSharedPtr<SViewport> Widget = Controller->GetWorld()->GetGameViewport()->GetGameViewportWidget();
             const TSharedPtr<SWindow> Window = Slate.FindWidgetWindow(Widget.ToSharedRef());
             if (!Check(Window.IsValid() && Window->GetNativeWindow().IsValid() && !Slate.GetPressedMouseButtons().Contains(EKeys::LeftMouseButton), TEXT("The real destination click has a native window and begins with LMB released."))) return End();
-            TileClickObserver = Controller->OnRoundWorldTileClicked.AddLambda([this](FIntPoint Coord) { ObservedClickCoord = Coord; ++ObservedTileClicks; });
+            TileClickObserver = Controller->OnRoundWorldTileClicked.AddLambda([this](FIntPoint Coord) { ObservedClickCoord = Coord; ++ObservedTileClicks; RecordPointerObservation(TEXT("world_tile_clicked")); });
+            UnitClickObserver = Controller->OnRoundWorldUnitClicked.AddLambda([this](int32 UnitId) { ObservedClickedUnitId = UnitId; ++ObservedUnitClicks; RecordPointerObservation(TEXT("world_unit_clicked")); });
+            PointerViewport = Controller->GetWorld()->GetGameViewport();
+            ViewportInputObserver = PointerViewport->OnInputKey().AddLambda([this](const FInputKeyEventArgs& Event)
+            {
+                if (Event.Key != EKeys::LeftMouseButton) return;
+                if (Event.Event == IE_Pressed) ++ObservedViewportPresses;
+                if (Event.Event == IE_Released) ++ObservedViewportReleases;
+                RecordPointerObservation(Event.Event == IE_Pressed ? TEXT("viewport_pressed") : Event.Event == IE_Released ? TEXT("viewport_released") : TEXT("viewport_other_lmb"));
+            });
             ClickCursor = Cursor;
             Test->AddInfo(FString::Printf(TEXT("Actual environment tile click: map=%s coord=%s projectedPixel=%s SlateCursor=%s tracedActor=%s."), *Name, *Destination->GridCoord.ToString(), *Pixel.ToString(), *Cursor.ToString(), *Destination->GetName()));
-            bPointerPressed = true;
-            Slate.ProcessMouseButtonDownEvent(Window->GetNativeWindow(), FPointerEvent(FSlateApplication::CursorPointerIndex, Cursor, Cursor, TSet<FKey>{EKeys::LeftMouseButton}, EKeys::LeftMouseButton, 0, FModifierKeysState()));
+            RecordPointerObservation(TEXT("click_prepared"));
+            PointerWorldTickObserver = FWorldDelegates::OnWorldPreActorTick.AddLambda([this](UWorld* World, ELevelTick, float) { DispatchPointerOnWorldTick(World); });
             Advance(13);
             return false;
         }
         if (Stage == 13)
         {
-            FSlateApplication::Get().ProcessMouseButtonUpEvent(FPointerEvent(FSlateApplication::CursorPointerIndex, ClickCursor, ClickCursor, TSet<FKey>(), EKeys::LeftMouseButton, 0, FModifierKeysState()));
-            bPointerPressed = false;
+            if (bPointerDispatchFailed) return End();
+            if (PointerDispatchPhase < 2 && FPlatformTime::Seconds() - Started < 2.0) return false;
+            if (!Check(PointerDispatchPhase == 2 && PointerReleaseFrame > PointerPressFrame, TEXT("Exactly one Slate down/up pair is dispatched before two distinct natural PIE actor ticks."))) return End();
             Advance(14);
             return false;
         }
@@ -441,7 +454,10 @@ public:
         {
             if (!Warm(3, 0.05) || Controller->IsRoundRequestPending()) return false;
             const FCombatRoundUnitView* Entry = FindAllyView();
-            if (!Check(ObservedTileClicks == 1 && ObservedClickCoord == Destination->GridCoord && Entry && Entry->bHasMovePlan && Entry->MoveDestinationCoord == Destination->GridCoord && Ally->GetActorLocation().Equals(InitialLocation, 0.01f) && Ally->GetCurrentSubActionPoint() == InitialSAP, TEXT("Actual Slate LMB down/up dispatches the original destination once and the normal controller/server path reserves it without moving or charging SAP."))) return End();
+            RecordPointerObservation(TEXT("reservation_observed"));
+            const FString ClickDetails = FString::Printf(TEXT("map=%s viewportPressed=%d viewportReleased=%d tileClicks=%d expectedTile=%s observedTile=%s unitClicks=%d clickedUnit=%d entry=%d movePlan=%d plannedTile=%s distanceFromStart=%.6f SAP=%d initialSAP=%d pressFrame=%llu releaseFrame=%llu request=%s"), *Name, ObservedViewportPresses, ObservedViewportReleases, ObservedTileClicks, *Destination->GridCoord.ToString(), *ObservedClickCoord.ToString(), ObservedUnitClicks, ObservedClickedUnitId, Entry != nullptr, Entry && Entry->bHasMovePlan, Entry ? *Entry->MoveDestinationCoord.ToString() : TEXT("none"), FVector::Distance(Ally->GetActorLocation(), InitialLocation), Ally->GetCurrentSubActionPoint(), InitialSAP, PointerPressFrame, PointerReleaseFrame, *Controller->GetRoundRequestStatus().ToString());
+            if (!Check(ObservedViewportPresses == 1 && ObservedViewportReleases == 1 && ObservedUnitClicks == 0 && ObservedTileClicks == 1 && ObservedClickCoord == Destination->GridCoord && Entry && Entry->bHasMovePlan && Entry->MoveDestinationCoord == Destination->GridCoord && Ally->GetActorLocation().Equals(InitialLocation, 0.01f) && Ally->GetCurrentSubActionPoint() == InitialSAP, TEXT("Actual Slate LMB down/up dispatches the original destination once and the normal controller/server path reserves it without moving or charging SAP. ") + ClickDetails)) return End();
+            bSAPPointerReservationVerified = true;
             RestorePointer();
             Controller->SetRoundReady(true);
             if (!Check(Round->IsSAPMovementInProgress(), TEXT("The normal Ready request starts the server's SAP movement after the actual mouse reservation."))) return End();
@@ -734,7 +750,7 @@ private:
 
     // Use the actual platform cursor and viewport trace, then require the genuine world hit to be the intended tile.
     // 실제 플랫폼 커서와 뷰포트 추적을 사용하고 실제 월드 충돌 대상이 의도한 타일인지 확인합니다.
-    bool PositionPointer(ACombatGridTile* Tile, const FVector& Point, FVector2D& OutPixel, FVector2D& OutCursor)
+    bool PositionPointer(ACombatGridTile* Tile, const FVector& Point, FVector2D& OutPixel, FVector2D& OutCursor, bool bFocusViewport = true)
     {
         UGameViewportClient* Viewport = Controller->GetWorld()->GetGameViewport();
         const TSharedPtr<SViewport> Widget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
@@ -753,10 +769,10 @@ private:
         const FGeometry& Geometry = Widget->GetCachedGeometry();
         OutCursor = Geometry.LocalToAbsolute(OutPixel * Geometry.GetLocalSize() / FVector2D(Size));
         const FVector2D Before = Slate.GetCursorPos();
-        Slate.SetAllUserFocusToGameViewport(EFocusCause::SetDirectly);
+        if (bFocusViewport) Slate.SetAllUserFocusToGameViewport(EFocusCause::SetDirectly);
         Slate.SetCursorPos(OutCursor);
         Viewport->Viewport->SetMouse(FMath::RoundToInt(OutPixel.X), FMath::RoundToInt(OutPixel.Y));
-        Slate.ProcessMouseMoveEvent(FPointerEvent(FSlateApplication::CursorPointerIndex, OutCursor, Before, TSet<FKey>(), EKeys::Invalid, 0, FModifierKeysState()));
+        Slate.ProcessMouseMoveEvent(FPointerEvent(FSlateApplication::CursorPointerIndex, OutCursor, Before, Slate.GetPressedMouseButtons(), EKeys::Invalid, 0, FModifierKeysState()));
         const FWidgetPath Path = Slate.LocateWindowUnderMouse(OutCursor, Slate.GetInteractiveTopLevelWindows());
         if (!Path.IsValid() || Path.GetLastWidget() != Widget.ToSharedRef()) return false;
         FHitResult Hit;
@@ -776,10 +792,135 @@ private:
         return true;
     }
 
+    // Deliver one real Slate click immediately before two separate natural PIE actor ticks, where PlayerInput consumes the live cursor.
+    // PlayerInput이 현재 커서를 읽는 서로 다른 두 실제 PIE 액터 Tick 직전에 실제 Slate 클릭 한 쌍을 전달합니다.
+    void DispatchPointerOnWorldTick(UWorld* World)
+    {
+        if (Stage != 13 || bPointerDispatchFailed || PointerDispatchPhase >= 2 || !Controller.IsValid() || World != Controller->GetWorld() || GFrameCounter == PointerLastTickFrame) return;
+        PointerLastTickFrame = GFrameCounter;
+        FVector2D Pixel;
+        FVector2D Cursor;
+        const bool bPositioned = PositionPointer(Destination.Get(), ClickWorldPosition, Pixel, Cursor, false);
+        if (bPositioned) ClickCursor = Cursor;
+        RecordPointerObservation(bPositioned ? TEXT("pre_actor_pointer_positioned") : TEXT("pre_actor_pointer_invalid"));
+        if (!Check(bPositioned, TEXT("The actual platform cursor, viewport coordinates, Slate hit path and unobstructed tile trace agree immediately before the natural PIE input tick.")))
+        {
+            bPointerDispatchFailed = true;
+            return;
+        }
+        FSlateApplication& Slate = FSlateApplication::Get();
+        if (PointerDispatchPhase == 0)
+        {
+            const TSharedPtr<SViewport> Widget = PointerViewport.IsValid() ? PointerViewport->GetGameViewportWidget() : nullptr;
+            const TSharedPtr<SWindow> Window = Widget.IsValid() ? Slate.FindWidgetWindow(Widget.ToSharedRef()) : nullptr;
+            if (!Check(Window.IsValid() && Window->GetNativeWindow().IsValid() && !Slate.GetPressedMouseButtons().Contains(EKeys::LeftMouseButton), TEXT("The single Slate press begins with LMB released on the live gameplay native window.")))
+            {
+                bPointerDispatchFailed = true;
+                return;
+            }
+            PointerPressFrame = GFrameCounter;
+            bPointerPressed = true;
+            TSet<FKey> Pressed = Slate.GetPressedMouseButtons();
+            Pressed.Add(EKeys::LeftMouseButton);
+            Slate.ProcessMouseButtonDownEvent(Window->GetNativeWindow(), FPointerEvent(FSlateApplication::CursorPointerIndex, Cursor, Cursor, Pressed, EKeys::LeftMouseButton, 0, FModifierKeysState()));
+            PointerDispatchPhase = 1;
+            RecordPointerObservation(TEXT("slate_press_dispatched"));
+            return;
+        }
+        PointerReleaseFrame = GFrameCounter;
+        TSet<FKey> Pressed = Slate.GetPressedMouseButtons();
+        Pressed.Remove(EKeys::LeftMouseButton);
+        Slate.ProcessMouseButtonUpEvent(FPointerEvent(FSlateApplication::CursorPointerIndex, Cursor, Cursor, Pressed, EKeys::LeftMouseButton, 0, FModifierKeysState()));
+        bPointerPressed = false;
+        PointerDispatchPhase = 2;
+        RecordPointerObservation(TEXT("slate_release_dispatched"));
+    }
+
+    // Preserve each input boundary separately so a failed assertion distinguishes delivery, world picking and authoritative planning.
+    // 실패한 검증이 전달·월드 선택·권위 예약 중 어느 단계인지 구분하도록 입력 경계별 상태를 보존합니다.
+    void RecordPointerObservation(const FString& Phase)
+    {
+        TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        Record->SetStringField(TEXT("phase"), Phase);
+        Record->SetNumberField(TEXT("engine_frame"), static_cast<double>(GFrameCounter));
+        Record->SetNumberField(TEXT("viewport_pressed"), ObservedViewportPresses);
+        Record->SetNumberField(TEXT("viewport_released"), ObservedViewportReleases);
+        Record->SetNumberField(TEXT("tile_clicks"), ObservedTileClicks);
+        Record->SetStringField(TEXT("clicked_tile"), ObservedClickCoord.ToString());
+        Record->SetNumberField(TEXT("unit_clicks"), ObservedUnitClicks);
+        Record->SetNumberField(TEXT("clicked_unit"), ObservedClickedUnitId);
+        Record->SetStringField(TEXT("expected_tile"), Destination.IsValid() ? Destination->GridCoord.ToString() : TEXT("missing"));
+        if (Controller.IsValid() && Controller->GetWorld())
+        {
+            Record->SetNumberField(TEXT("world_seconds"), Controller->GetWorld()->GetTimeSeconds());
+            Record->SetBoolField(TEXT("input_enabled"), Controller->IsRoundInputEnabled());
+            Record->SetBoolField(TEXT("request_pending"), Controller->IsRoundRequestPending());
+            Record->SetStringField(TEXT("request_status"), Controller->GetRoundRequestStatus().ToString());
+            Record->SetBoolField(TEXT("controller_lmb_down"), Controller->IsInputKeyDown(EKeys::LeftMouseButton));
+            float MouseX = 0.f;
+            float MouseY = 0.f;
+            Record->SetBoolField(TEXT("viewport_mouse_available"), Controller->GetMousePosition(MouseX, MouseY));
+            Record->SetStringField(TEXT("viewport_mouse"), FVector2D(MouseX, MouseY).ToString());
+            FHitResult Hit;
+            const bool bHit = Controller->GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_Visibility), false, Hit);
+            Record->SetStringField(TEXT("cursor_trace_actor"), bHit ? GetNameSafe(Hit.GetActor()) : TEXT("none"));
+            Record->SetBoolField(TEXT("cursor_trace_expected_tile"), bHit && Hit.GetActor() == Destination.Get());
+            const FCombatRoundUnitView* Entry = Round.IsValid() ? FindAllyView() : nullptr;
+            Record->SetBoolField(TEXT("unit_view_exists"), Entry != nullptr);
+            Record->SetBoolField(TEXT("has_move_plan"), Entry && Entry->bHasMovePlan);
+            Record->SetStringField(TEXT("planned_tile"), Entry ? Entry->MoveDestinationCoord.ToString() : TEXT("missing"));
+            if (Ally.IsValid())
+            {
+                Record->SetNumberField(TEXT("distance_from_start_cm"), FVector::Distance(Ally->GetActorLocation(), InitialLocation));
+                Record->SetNumberField(TEXT("sap"), Ally->GetCurrentSubActionPoint());
+                Record->SetNumberField(TEXT("initial_sap"), InitialSAP);
+            }
+        }
+        if (FSlateApplication::IsInitialized())
+        {
+            FSlateApplication& Slate = FSlateApplication::Get();
+            const FVector2D Cursor = Slate.GetCursorPos();
+            const FWidgetPath Path = Slate.LocateWindowUnderMouse(Cursor, Slate.GetInteractiveTopLevelWindows());
+            UGameViewportClient* Viewport = Controller.IsValid() && Controller->GetWorld() ? Controller->GetWorld()->GetGameViewport() : nullptr;
+            const TSharedPtr<SViewport> Widget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
+            Record->SetStringField(TEXT("platform_cursor"), Cursor.ToString());
+            Record->SetStringField(TEXT("expected_cursor"), ClickCursor.ToString());
+            Record->SetBoolField(TEXT("slate_path_is_viewport"), Widget.IsValid() && Path.IsValid() && Path.GetLastWidget() == Widget.ToSharedRef());
+            Record->SetBoolField(TEXT("slate_lmb_down"), Slate.GetPressedMouseButtons().Contains(EKeys::LeftMouseButton));
+            Record->SetBoolField(TEXT("viewport_has_focus"), Viewport && Viewport->Viewport && Viewport->Viewport->HasFocus());
+        }
+        PointerObservations.Add(MakeShared<FJsonValueObject>(Record));
+    }
+
+    void WritePointerEvidence()
+    {
+        if (PointerObservations.IsEmpty() || bPointerEvidenceSaved) return;
+        bPointerEvidenceSaved = true;
+        TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        Record->SetStringField(TEXT("map"), MapPath);
+        Record->SetBoolField(TEXT("slate_reservation_verified"), bSAPPointerReservationVerified);
+        Record->SetBoolField(TEXT("natural_frame_movement_and_sap_verified"), bSAPMovementVerified);
+        Record->SetNumberField(TEXT("press_engine_frame"), static_cast<double>(PointerPressFrame));
+        Record->SetNumberField(TEXT("release_engine_frame"), static_cast<double>(PointerReleaseFrame));
+        Record->SetArrayField(TEXT("observations"), PointerObservations);
+        Record->SetStringField(TEXT("scope"), TEXT("One Slate down/up pair before distinct natural PIE actor ticks. Viewport key receipt, world tile/unit delegates and server plan are observed without direct-click controller calls, retries, manual world ticks or live attribute changes. Physical hardware input and network replication are separate."));
+        FString Json;
+        FJsonSerializer::Serialize(Record, TJsonWriterFactory<>::Create(&Json));
+        const FString Path = OutputDirectory / (Name + TEXT("_sap_input.json"));
+        if (Check(FFileHelper::SaveStringToFile(Json, *Path), TEXT("Actual Slate input boundary observations are saved on both success and failure before PIE teardown."))) Test->AddInfo(TEXT("TODO SAP input evidence: ") + Path);
+    }
+
     void RestorePointer()
     {
+        if (PointerWorldTickObserver.IsValid()) FWorldDelegates::OnWorldPreActorTick.Remove(PointerWorldTickObserver);
+        PointerWorldTickObserver.Reset();
+        if (PointerViewport.IsValid() && ViewportInputObserver.IsValid()) PointerViewport->OnInputKey().Remove(ViewportInputObserver);
+        ViewportInputObserver.Reset();
+        PointerViewport.Reset();
         if (Controller.IsValid() && TileClickObserver.IsValid()) Controller->OnRoundWorldTileClicked.Remove(TileClickObserver);
         TileClickObserver.Reset();
+        if (Controller.IsValid() && UnitClickObserver.IsValid()) Controller->OnRoundWorldUnitClicked.Remove(UnitClickObserver);
+        UnitClickObserver.Reset();
         if (!FSlateApplication::IsInitialized()) return;
         FSlateApplication& Slate = FSlateApplication::Get();
         if (bPointerPressed)
@@ -904,6 +1045,8 @@ private:
     bool End()
     {
         RetainViewport();
+        if (!PointerObservations.IsEmpty()) RecordPointerObservation(TEXT("review_end"));
+        WritePointerEvidence();
         RestorePointer();
         RestoreReviewWindow();
         RestorePerformanceCamera();
@@ -964,9 +1107,26 @@ private:
     FVector2D PreviousCursor = FVector2D::ZeroVector;
     bool bCursorMoved = false;
     bool bPointerPressed = false;
+    bool bPointerDispatchFailed = false;
+    bool bSAPPointerReservationVerified = false;
+    bool bSAPMovementVerified = false;
+    bool bPointerEvidenceSaved = false;
+    TWeakObjectPtr<UGameViewportClient> PointerViewport;
     FDelegateHandle TileClickObserver;
+    FDelegateHandle UnitClickObserver;
+    FDelegateHandle ViewportInputObserver;
+    FDelegateHandle PointerWorldTickObserver;
     FIntPoint ObservedClickCoord = FIntPoint::ZeroValue;
     int32 ObservedTileClicks = 0;
+    int32 ObservedUnitClicks = 0;
+    int32 ObservedClickedUnitId = INDEX_NONE;
+    int32 ObservedViewportPresses = 0;
+    int32 ObservedViewportReleases = 0;
+    int32 PointerDispatchPhase = 0;
+    uint64 PointerLastTickFrame = MAX_uint64;
+    uint64 PointerPressFrame = 0;
+    uint64 PointerReleaseFrame = 0;
+    TArray<TSharedPtr<FJsonValue>> PointerObservations;
     TArray<double> WallIntervals;
     TArray<double> WorldDeltas;
     TArray<double> AppDeltas;

@@ -2,10 +2,14 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "AbilitySystemComponent.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Blueprint/WidgetTree.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "Components/Button.h"
+#include "Components/PanelWidget.h"
+#include "Components/TextBlock.h"
 #include "Controller/GameplayPlayerController.h"
 #include "Controller/MainMenuPlayerController.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
@@ -15,10 +19,12 @@
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Game/Encounter/CombatArena.h"
+#include "Game/GameState/GameplayGameState.h"
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "GameplayEffect.h"
+#include "GameplayEffectExtension.h"
 #include "GAS/Attribute/AS_Unit.h"
 #include "GAS/CombatGameplayTags.h"
 #include "GAS/Effect/GE_Damage.h"
@@ -37,6 +43,9 @@
 #include "Tests/AutomationEditorCommon.h"
 #include "TodoReviewWindowPlacement.h"
 #include "TodoReviewGameplayPresentation.h"
+#include "UI/Combat/CombatRoundPlanningWidget.h"
+#include "UI/Gameplay/GameplayActionButton.h"
+#include "UI/Gameplay/RunEncounterWidget.h"
 #include "UI/MainMenu/CharacterCreationWidget.h"
 #include "UI/MainMenu/GameModeSelectionWidget.h"
 #include "UI/MainMenu/MainMenuScreenWidget.h"
@@ -64,6 +73,7 @@ namespace NormalTargetRunReview
 
         virtual ~FReview() override
         {
+            UnbindConsumable();
             ReleaseViewport();
         }
 
@@ -186,6 +196,7 @@ namespace NormalTargetRunReview
             }
             const bool bStable = Run->GetPhase() != ERunPhase::Preparing && (Run->GetPhase() != ERunPhase::Combat || (Round && Round->GetView().Phase == ECombatRoundPhase::Planning && !Controller->IsRoundRequestPending()));
             if (bStable && !VerifySavedBoundary(Run, Signature)) return End();
+            if (bObserveConsumableResolving && !ObserveConsumableBoundary(Run, Round)) return bPassed ? false : End();
             if (Run->GetPhase() == ERunPhase::Defeat || Run->GetPhase() == ERunPhase::Complete)
             {
                 if (TerminalStarted == 0.0)
@@ -317,9 +328,67 @@ namespace NormalTargetRunReview
             return false;
         }
 
+        static bool Visible(UWidget* Widget)
+        {
+            for (UWidget* Current = Widget; Current; Current = Current->GetParent()) if (!Current->IsVisible()) return false;
+            return Widget != nullptr;
+        }
+
+        bool RequestServiceUI(URunStateSubsystem* Run, const FRunPartyMember& Member, FName OfferId, FGameplayTag Tag, int32 Price, float ExpectedHP, bool bConsumable, bool bFullRecovery)
+        {
+            URunEncounterWidget* Shop = Screen<URunEncounterWidget>(Controller->GetWorld());
+            UGameplayActionButton* Button = Shop ? Cast<UGameplayActionButton>(Shop->GetWidgetFromName(TEXT("Button_ShopRecovery"))) : nullptr;
+            const bool bButtonReady = Button && Visible(Button) && Button->GetIsEnabled();
+            // Observe the actual CommonUI transition instead of failing before its newly selected screen activates.
+            // 새로 선택한 화면이 활성화되기 전에 실패하지 않고 실제 CommonUI 전환을 관측합니다.
+            if (!bButtonReady && FPlatformTime::Seconds() - ServiceUIReadyAt < 5.0) return false;
+            const AGameplayGameState* GameState = Controller->GetWorld()->GetGameState<AGameplayGameState>();
+            const FGameplayViewState* View = GameState ? &GameState->GetViewState() : nullptr;
+            const FGuid BuyerId = View ? Controller->GetShopBuyerCharacterId(*View) : FGuid();
+            const FRunShopBuyerView* BuyerView = View ? View->ShopBuyerViews.FindByPredicate([BuyerId](const FRunShopBuyerView& Entry) { return Entry.CharacterId == BuyerId; }) : nullptr;
+            Event(Run, TEXT("service_ui_readiness"), FString::Printf(TEXT("shop=%s button=%s visible=%d enabled=%d wait_seconds=%.3f pending=%d buyer_matches=%d hp=%.3f displayed_max_hp=%.3f gold=%d price=%d"), *GetNameSafe(Shop), *GetNameSafe(Button), Button && Visible(Button), Button && Button->GetIsEnabled(), FPlatformTime::Seconds() - ServiceUIReadyAt, Controller->IsShopPurchasePending(), BuyerId == Member.CharacterId, Member.CurrentHP, BuyerView ? BuyerView->MaxHP : -1.f, Member.Gold, Price));
+            if (!Check(bButtonReady, TEXT("The eligible authored recovery service exposes its enabled original UI button within five natural seconds."))) return false;
+            if (!Check(BuyerId == Member.CharacterId && BuyerView && View->Phase == ERunPhase::Shop && View->EncounterProgress.SelectedEncounterId == Run->GetEncounterProgress().SelectedEncounterId, TEXT("The actual shop presentation identifies the original eligible buyer and current encounter."))) return false;
+            ExpectedServiceParty = Run->GetPartyMembers();
+            FRunPartyMember* Expected = ExpectedServiceParty.FindByPredicate([&Member](const FRunPartyMember& Entry) { return Entry.CharacterId == Member.CharacterId; });
+            if (!Check(Expected != nullptr, TEXT("The service observes only the original direct-control buyer."))) return false;
+            Expected->Gold -= Price;
+            Expected->CurrentHP = ExpectedHP;
+            if (bConsumable) ++Expected->Consumables[0].Quantity;
+            ExpectedServiceRevision = (bFullRecovery ? Run->GetSkillShopState().Revision : Run->GetRecoveryState().Revision) + 1;
+            PendingServiceTag = Tag;
+            bPendingFullRecovery = bFullRecovery;
+            ServiceObservedAt = 0.0;
+            int32 Dispatches = 0;
+            FName Dispatched;
+            const FDelegateHandle Handle = Button->OnActionRequested.AddLambda([&](FName Id) { ++Dispatches; Dispatched = Id; });
+            Event(Run, bFullRecovery ? TEXT("request_skill_shop_recovery") : TEXT("request_service_purchase"), Tag.ToString());
+            Button->OnClicked.Broadcast();
+            Button->OnActionRequested.Remove(Handle);
+            return Check(Dispatches == 1 && Dispatched == OfferId, TEXT("The original service UI delegate dispatches its actual tagged offer exactly once."));
+        }
+
+        bool ObserveServiceUI(URunStateSubsystem* Run)
+        {
+            const int32 Revision = bPendingFullRecovery ? Run->GetSkillShopState().Revision : Run->GetRecoveryState().Revision;
+            if (!Check(Revision == ExpectedServiceRevision && ExpectedServiceParty.Num() == Run->GetPartyMembers().Num(), TEXT("The actual UI service commits exactly one expected revision."))) return false;
+            for (int32 Index = 0; Index < ExpectedServiceParty.Num(); ++Index) if (!Check(FRunPartyMember::StaticStruct()->CompareScriptStruct(&ExpectedServiceParty[Index], &Run->GetPartyMembers()[Index], 0), TEXT("The UI service changes exactly the buyer's authored HP/stock and price; companions remain unchanged."))) return false;
+            if (ServiceObservedAt == 0.0) ServiceObservedAt = FPlatformTime::Seconds();
+            if (FPlatformTime::Seconds() - ServiceObservedAt < 0.25) return false;
+            if (!VerifySavedBoundary(Run, LastSignature) || !Capture(Controller->GetWorld(), FString::Printf(TEXT("ServiceUI_%02d"), ServiceUIPurchases + 1))) return false;
+            ++ServiceUIPurchases;
+            if (PendingServiceTag.MatchesTag(FRunEncounterOffer::GetRevivalTag())) ++RevivalUIPurchases;
+            else if (PendingServiceTag.MatchesTag(FRunEncounterOffer::GetConsumableShopTag())) ++ConsumableUIPurchases;
+            else ++RecoveryUIPurchases;
+            Event(Run, TEXT("actual_service_ui_purchase_verified"), PendingServiceTag.ToString());
+            ExpectedServiceParty.Reset();
+            return true;
+        }
+
         bool VisitShop(URunStateSubsystem* Run)
         {
             if (Controller->IsShopPurchasePending()) return false;
+            if (!ExpectedServiceParty.IsEmpty() && !ObserveServiceUI(Run)) return bPassed ? false : End();
             const FRunPartyMember* Member = DirectMember(Run);
             const FRunEncounterOffer* Encounter = Run->GetEncounterProgress().FindSelectedOffer();
             if (!Check(Member && Encounter, TEXT("The selected normal encounter retains its original direct character and offer."))) return End();
@@ -327,6 +396,13 @@ namespace NormalTargetRunReview
             FText Error;
             if (!Check(Run->ResolveMemberProfession(*Member, Profession, Error), Error.ToString())) return End();
             const FString VisitKey = FString::Printf(TEXT("%d:%s"), Run->GetTargetRunState().CompletedEncounterChoices.Num(), *Encounter->EncounterId.ToString());
+            if (ServiceUIVisit != VisitKey)
+            {
+                ServiceUIVisit = VisitKey;
+                ServiceUIReadyAt = FPlatformTime::Seconds();
+                return false;
+            }
+            if (FPlatformTime::Seconds() - ServiceUIReadyAt < 0.25) return false;
             const FGameplayTag Tag = Encounter->GetResolvedTag();
             const bool bRecovery = Tag.MatchesTag(FRunEncounterOffer::GetRecoveryTag());
             const bool bRevival = Tag.MatchesTag(FRunEncounterOffer::GetRevivalTag());
@@ -335,9 +411,9 @@ namespace NormalTargetRunReview
             const int32 ServicePrice = bRecovery ? Rules.RecoveryPrice : bRevival ? Rules.RevivalPrice : Rules.ConsumablePrice;
             if ((bRecovery || bRevival || bConsumable) && !AttemptedServices.Contains(VisitKey) && Member->Gold >= ServicePrice && (bRecovery ? Member->CurrentHP > 0.f && Member->CurrentHP < Profession.MaxHP : bRevival ? Member->CurrentHP == 0.f : Member->CurrentHP > 0.f))
             {
+                const float ExpectedHP = bConsumable ? Member->CurrentHP : bRevival ? Profession.MaxHP * Rules.RevivalFraction : FMath::Min(Profession.MaxHP, Member->CurrentHP + Rules.RecoveryHP);
+                if (!RequestServiceUI(Run, *Member, Tag.GetTagName(), Tag, ServicePrice, ExpectedHP, bConsumable, false)) return bPassed ? false : End();
                 AttemptedServices.Add(VisitKey);
-                Event(Run, TEXT("request_service_purchase"), Tag.ToString());
-                Controller->RequestPurchaseShopOffer(Member->CharacterId, Tag.GetTagName(), Run->GetRecoveryState().Revision);
                 LastProgress = FPlatformTime::Seconds();
                 return false;
             }
@@ -346,9 +422,8 @@ namespace NormalTargetRunReview
                 const FRunSkillShopState& Shop = Run->GetSkillShopState();
                 if (Member->CurrentHP < Profession.MaxHP && Member->Gold >= Shop.Recovery.Price && !AttemptedServices.Contains(VisitKey + TEXT(":full_recovery")))
                 {
+                    if (!RequestServiceUI(Run, *Member, FRunSkillShopState::GetRecoveryOfferId(), FRunEncounterOffer::GetRecoveryTag(), Shop.Recovery.Price, Profession.MaxHP, false, true)) return bPassed ? false : End();
                     AttemptedServices.Add(VisitKey + TEXT(":full_recovery"));
-                    Event(Run, TEXT("request_skill_shop_recovery"));
-                    Controller->RequestPurchaseShopOffer(Member->CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Shop.Revision);
                     LastProgress = FPlatformTime::Seconds();
                     return false;
                 }
@@ -434,6 +509,158 @@ namespace NormalTargetRunReview
             return Tags;
         }
 
+        void UnbindConsumable()
+        {
+            if (ConsumableSource.IsValid() && ConsumableSource->GetAbilitySystemComponent())
+            {
+                UAbilitySystemComponent* ASC = ConsumableSource->GetAbilitySystemComponent();
+                ASC->OnGameplayEffectAppliedDelegateToTarget.Remove(ConsumableGasHandle);
+                ASC->GetGameplayAttributeValueChangeDelegate(UAS_Unit::GetHPAttribute()).Remove(ConsumableHealthHandle);
+            }
+            ConsumableGasHandle.Reset();
+            ConsumableHealthHandle.Reset();
+        }
+
+        bool AwaitConsumablePlanningUI(URunStateSubsystem* Run, ACombatRoundCoordinator* Round, const FCombatRoundSkill& Skill)
+        {
+            const FCombatRoundView& View = Round->GetView();
+            const FString Key = View.CombatId.ToString() + TEXT(":") + FString::FromInt(View.RoundNumber);
+            const FString ExpectedHeader = FString::Printf(TEXT("라운드 %d · 행동 선택"), View.RoundNumber);
+            UCombatRoundPlanningWidget* Planning = Screen<UCombatRoundPlanningWidget>(Controller->GetWorld());
+            FString DisplayedHeader;
+            bool bButtonExists = false;
+            if (Planning && Planning->WidgetTree) Planning->WidgetTree->ForEachWidget([&](UWidget* Widget)
+            {
+                const UTextBlock* Label = Cast<UTextBlock>(Widget);
+                if (Label && Label->GetText().ToString().StartsWith(TEXT("라운드 "))) DisplayedHeader = Label->GetText().ToString();
+                const UCombatRoundSkillButton* Button = Cast<UCombatRoundSkillButton>(Widget);
+                if (Button && Button->GetSkillId() == Skill.SkillId) bButtonExists = true;
+            });
+            if (ConsumablePlanningWaitKey != Key)
+            {
+                ConsumablePlanningWaitKey = Key;
+                ConsumablePlanningFirstHeader = DisplayedHeader;
+                ConsumablePlanningWaitAt = FPlatformTime::Seconds();
+            }
+            // Let the displayed round refresh before the single target click; a stale round refresh clears that selection.
+            // 이전 라운드 갱신이 선택을 지우지 않도록 화면의 현재 라운드 갱신 후 대상을 한 번 클릭합니다.
+            const bool bReady = Planning && DisplayedHeader == ExpectedHeader && bButtonExists;
+            if (!bReady && FPlatformTime::Seconds() - ConsumablePlanningWaitAt < 5.0) return false;
+            Event(Run, TEXT("consumable_ui_planning_readiness"), FString::Printf(TEXT("screen=%s first_header=%s displayed_header=%s expected_header=%s button_exists=%d wait_seconds=%.3f"), *GetNameSafe(Planning), *ConsumablePlanningFirstHeader, *DisplayedHeader, *ExpectedHeader, bButtonExists, FPlatformTime::Seconds() - ConsumablePlanningWaitAt));
+            if (!bReady) Capture(Controller->GetWorld(), TEXT("ConsumablePlanningNotReady"));
+            return Check(bReady, TEXT("The actual planning screen displays the current action-selection round and original consumable button before one target selection."));
+        }
+
+        bool RequestConsumableUI(URunStateSubsystem* Run, ACombatRoundCoordinator* Round, const FCombatRoundUnitView& Direct, const FCombatRoundSkill& Skill)
+        {
+            UCombatRoundPlanningWidget* Planning = Screen<UCombatRoundPlanningWidget>(Controller->GetWorld());
+            if (!Check(Planning && Planning->WidgetTree && Direct.Unit && Direct.Unit->GetAbilitySystemComponent(), TEXT("A legal consumable is displayed by the actual active planning screen."))) return false;
+            // Exercise the existing world-selection and button delegates; no private widget state or command is injected.
+            // 위젯 내부 상태나 명령을 주입하지 않고 기존 전장 선택·버튼 delegate를 실행합니다.
+            Controller->OnRoundWorldUnitClicked.Broadcast(Direct.UnitId);
+            UCombatRoundSkillButton* Button = nullptr;
+            Planning->WidgetTree->ForEachWidget([&](UWidget* Widget)
+            {
+                UCombatRoundSkillButton* Candidate = Cast<UCombatRoundSkillButton>(Widget);
+                if (Candidate && Candidate->GetSkillId() == Skill.SkillId) Button = Candidate;
+            });
+            Event(Run, TEXT("consumable_ui_button_selected"), FString::Printf(TEXT("skill=%s button=%s visible=%d enabled=%d tooltip=%s"), *Skill.SkillId.ToString(), *GetNameSafe(Button), Button && Visible(Button), Button && Button->GetIsEnabled(), Button ? *Button->GetToolTipText().ToString() : TEXT("missing")));
+            if (!Check(Button && Visible(Button) && Button->GetIsEnabled(), TEXT("The actual tagged consumable button is visible and enabled after selecting the owned unit."))) return false;
+            const FRunConsumableStack* Stack = Direct.Unit->Consumables.FindByPredicate([&Skill](const FRunConsumableStack& Entry) { return Skill.EffectTags.HasTagExact(Entry.ItemTag); });
+            const FRunPartyMember* Member = DirectMember(Run);
+            if (!Check(Stack && Stack->Quantity > 0 && Member, TEXT("The UI request uses available authored stock without a quantity override."))) return false;
+            UnbindConsumable();
+            ConsumableSource = Direct.Unit;
+            ConsumableCharacterId = Member->CharacterId;
+            ObservedConsumableSkill = Skill;
+            ConsumableCombatId = Round->GetView().CombatId;
+            ConsumableRound = Round->GetView().RoundNumber;
+            ConsumableQuantityBefore = Stack->Quantity;
+            ConsumableAPBefore = Direct.Unit->GetCurrentActionPoint();
+            ConsumableGasCount = 0;
+            ConsumableHealthChangeCount = 0;
+            ConsumableEffectContext = FGameplayEffectContextHandle();
+            ConsumableHPBefore = ConsumableHPAfter = 0.f;
+            bConsumableContext = true;
+            ConsumableBoundaryAt = 0.0;
+            UAbilitySystemComponent* ASC = Direct.Unit->GetAbilitySystemComponent();
+            ConsumableHealthHandle = ASC->GetGameplayAttributeValueChangeDelegate(UAS_Unit::GetHPAttribute()).AddLambda([this](const FOnAttributeChangeData& Change)
+            {
+                if (Change.NewValue <= Change.OldValue || !Change.GEModData || !ConsumableSource.IsValid()) return;
+                const FGameplayEffectModCallbackData& Mod = *Change.GEModData;
+                FGameplayTagContainer Tags;
+                Mod.EffectSpec.GetAllAssetTags(Tags);
+                if (!Tags.HasAll(ObservedConsumableSkill.EffectTags) || &Mod.Target != ConsumableSource->GetAbilitySystemComponent() || Mod.EffectSpec.GetContext().GetOriginalInstigator() != ConsumableSource.Get()) return;
+                // Freeze the first matching HP change and correlate it with the same applied effect context.
+                // 첫 일치 HP 변화만 고정하고 동일한 적용 효과 context와 대조합니다.
+                if (++ConsumableHealthChangeCount != 1) return;
+                ConsumableEffectContext = Mod.EffectSpec.GetContext();
+                ConsumableHPBefore = Change.OldValue;
+                ConsumableHPAfter = Change.NewValue;
+            });
+            ConsumableGasHandle = ASC->OnGameplayEffectAppliedDelegateToTarget.AddLambda([this](UAbilitySystemComponent* Recipient, const FGameplayEffectSpec& Spec, FActiveGameplayEffectHandle)
+            {
+                FGameplayTagContainer Tags;
+                Spec.GetAllAssetTags(Tags);
+                if (!Tags.HasAll(ObservedConsumableSkill.EffectTags)) return;
+                ++ConsumableGasCount;
+                bConsumableContext &= ConsumableSource.IsValid() && Recipient == ConsumableSource->GetAbilitySystemComponent() && Spec.GetContext().GetOriginalInstigator() == ConsumableSource.Get() && ConsumableHealthChangeCount == 1 && ConsumableEffectContext.IsValid() && Spec.GetContext() == ConsumableEffectContext;
+            });
+            ++ConsumableUIRequests;
+            Button->OnClicked.Broadcast();
+            return true;
+        }
+
+        bool ReadyConsumableUI()
+        {
+            UCombatRoundPlanningWidget* Planning = Screen<UCombatRoundPlanningWidget>(Controller->GetWorld());
+            UButton* Ready = nullptr;
+            if (Planning && Planning->WidgetTree) Planning->WidgetTree->ForEachWidget([&](UWidget* Widget)
+            {
+                UButton* Button = Cast<UButton>(Widget);
+                UTextBlock* Label = Button ? Cast<UTextBlock>(Button->GetContent()) : nullptr;
+                if (Label && Label->GetText().ToString() == TEXT("준비 완료")) Ready = Button;
+            });
+            if (!Check(Ready && Visible(Ready) && Ready->GetIsEnabled() && ConsumableSource.IsValid(), TEXT("The accepted consumable plan enables the actual Ready button."))) return false;
+            if (!Capture(Controller->GetWorld(), FString::Printf(TEXT("ConsumableUI_%02d_Planned"), ConsumableUIRequests))) return false;
+            Ready->OnClicked.Broadcast();
+            bObserveConsumableResolving = true;
+            return Check(ConsumableSource->GetCurrentActionPoint() == ConsumableAPBefore - ObservedConsumableSkill.ActionPointCost && ConsumableSource->Consumables[0].Quantity == ConsumableQuantityBefore, TEXT("The original Ready button spends authored AP once and retains stock until actual release."));
+        }
+
+        bool ObserveConsumableBoundary(URunStateSubsystem* Run, ACombatRoundCoordinator* Round)
+        {
+            const bool bBoundary = Run->GetPhase() == ERunPhase::Result || Run->GetPhase() == ERunPhase::Defeat || Run->GetPhase() == ERunPhase::Complete || (Run->GetPhase() == ERunPhase::Combat && Round && Round->GetView().CombatId == ConsumableCombatId && Round->GetView().RoundNumber > ConsumableRound && Round->GetView().Phase == ECombatRoundPhase::Planning);
+            if (!bBoundary) return false;
+            if (ConsumableBoundaryAt == 0.0) ConsumableBoundaryAt = FPlatformTime::Seconds();
+            if (FPlatformTime::Seconds() - ConsumableBoundaryAt < 0.25) return false;
+            const FRunPartyMember* Member = DirectMember(Run);
+            const FRunConsumableStack* Stack = Member ? Member->Consumables.FindByPredicate([this](const FRunConsumableStack& Entry) { return ObservedConsumableSkill.EffectTags.HasTagExact(Entry.ItemTag); }) : nullptr;
+            const bool bApplied = ConsumableGasCount == 1;
+            if (!Check(Member && Member->CharacterId == ConsumableCharacterId && Stack && ConsumableGasCount <= 1 && ConsumableHealthChangeCount == ConsumableGasCount && bConsumableContext && Stack->Quantity == ConsumableQuantityBefore - (bApplied ? 1 : 0), TEXT("The next published boundary retains one correlated GAS release, HP change, and stock decrement, or preserves stock after interruption."))) return false;
+            if (bApplied && !Check(ConsumableHPAfter > ConsumableHPBefore && ConsumableHPAfter - ConsumableHPBefore <= ObservedConsumableSkill.Power + KINDA_SMALL_NUMBER, TEXT("The actual self-targeted GAS callback observes positive authored healing without a health override."))) return false;
+            if (!VerifySavedBoundary(Run, LastSignature) || !Capture(Controller->GetWorld(), FString::Printf(TEXT("ConsumableUI_%02d_Boundary"), ConsumableUIRequests))) return false;
+            TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+            Record->SetStringField(TEXT("skill"), ObservedConsumableSkill.SkillId.ToString());
+            Record->SetStringField(TEXT("combat_id"), ConsumableCombatId.ToString());
+            Record->SetNumberField(TEXT("round"), ConsumableRound);
+            Record->SetNumberField(TEXT("hp_before_gas"), ConsumableHPBefore);
+            Record->SetNumberField(TEXT("hp_after_gas"), ConsumableHPAfter);
+            Record->SetNumberField(TEXT("ap_paid_at_ready"), ObservedConsumableSkill.ActionPointCost);
+            Record->SetNumberField(TEXT("gas_applications"), ConsumableGasCount);
+            Record->SetNumberField(TEXT("correlated_hp_changes"), ConsumableHealthChangeCount);
+            Record->SetBoolField(TEXT("same_effect_context_verified"), bApplied && bConsumableContext);
+            Record->SetNumberField(TEXT("quantity_before"), ConsumableQuantityBefore);
+            Record->SetNumberField(TEXT("quantity_at_saved_boundary"), Stack->Quantity);
+            Record->SetBoolField(TEXT("applied"), bApplied);
+            ConsumableObservations.Add(MakeShared<FJsonValueObject>(Record));
+            if (bApplied) ++ConsumableUIUses;
+            Event(Run, bApplied ? TEXT("actual_consumable_ui_release_verified") : TEXT("actual_consumable_ui_interrupted_stock_preserved"));
+            UnbindConsumable();
+            bObserveConsumableResolving = false;
+            return true;
+        }
+
         bool PlanRound(URunStateSubsystem* Run, ACombatRoundCoordinator* Round)
         {
             if (Controller->IsRoundRequestPending() || !Controller->IsRoundInputEnabled()) return false;
@@ -475,7 +702,13 @@ namespace NormalTargetRunReview
             {
                 if (!Check(FCombatRoundCommand::StaticStruct()->CompareScriptStruct(&Direct->Command, &PendingCommand, 0), TEXT("The normal player's public plan is accepted without changing any companion AI plan: ") + Controller->GetRoundRequestStatus().ToString())) return End();
                 bAwaitingPlan = false;
-                Controller->SetRoundReady(true);
+                const FCombatRoundSkill* AcceptedSkill = Round->FindSkill(PendingCommand.SkillId);
+                if (!Check(AcceptedSkill != nullptr, TEXT("The accepted normal plan retains its actual skill profile."))) return End();
+                if (RunRecoveryRules::IsConsumable(*AcceptedSkill))
+                {
+                    if (!ReadyConsumableUI()) return End();
+                }
+                else Controller->SetRoundReady(true);
                 return false;
             }
             const FString RoundKey = View.CombatId.ToString() + TEXT(":") + FString::FromInt(View.RoundNumber);
@@ -488,6 +721,13 @@ namespace NormalTargetRunReview
             {
                 if (Entry.bEnemy || !Entry.Unit || !Entry.Unit->IsUnitAlive() || Entry.UnitId == Direct->UnitId) continue;
                 if (!Check(Entry.OwnerSlot == 0 && Entry.bReady, TEXT("Living companions retain their production AI control and fixed ready plans."))) return End();
+            }
+            float IncomingPlannedPower = 0.f;
+            for (const FCombatRoundUnitView& Enemy : View.Units)
+            {
+                if (!Enemy.bEnemy || !Enemy.Unit || !Enemy.Unit->IsUnitAlive() || Enemy.Command.TargetUnitId != Direct->UnitId) continue;
+                const FCombatRoundSkill* Attack = Round->FindSkill(Enemy.Command.SkillId);
+                if (Attack && EffectiveTags(*Attack).HasTag(ProjectACombatTags::Skill_Effect_Damage)) IncomingPlannedPower += Attack->Power;
             }
             FCombatRoundCommand Best;
             int32 BestPriority = MIN_int32;
@@ -509,7 +749,10 @@ namespace NormalTargetRunReview
                     const float MaxHP = Target.Unit->GetAttributeSet()->GetMaxHP();
                     const double Utility = bHeal ? FMath::Min(Skill->Power, MaxHP - HP) : bShield ? FMath::Max(0.f, Skill->Power - Target.Unit->GetAttributeSet()->GetShield()) : FMath::Min(Skill->Power, HP);
                     if (Utility <= 0.0) continue;
-                    const int32 Priority = bHeal && HP < MaxHP * 0.25f ? 3 : bDamage && HP <= Skill->Power ? 2 : bDamage ? 1 : 0;
+                    // Heal before a visible queued attack crosses the lethal boundary, instead of waiting below 25% HP.
+                    // HP 25% 미만까지 기다리지 않고 표시된 예약 공격이 치명 구간에 도달하기 전에 회복합니다.
+                    const bool bDangerousSelfHeal = bHeal && Target.UnitId == Direct->UnitId && IncomingPlannedPower > 0.f && MaxHP - HP >= Skill->Power && HP <= IncomingPlannedPower + Skill->Power;
+                    const int32 Priority = bHeal && (HP < MaxHP * 0.25f || bDangerousSelfHeal) ? 3 : bDamage && HP <= Skill->Power ? 2 : bDamage ? 1 : 0;
                     double EffectiveUtility = Utility;
                     if (bDamage && CombatRoundRules::UsesChain(*Skill)) for (int32 Jump = 1; Jump < Skill->Chain.MaxTargets; ++Jump) EffectiveUtility += Skill->Power * FMath::Pow(Skill->Chain.DamageMultiplierPerJump, static_cast<float>(Jump));
                     const double Distance = FVector::DistSquared2D(Direct->Unit->GetActorLocation(), Target.Unit->GetActorLocation());
@@ -530,7 +773,11 @@ namespace NormalTargetRunReview
                         Candidate.DestinationCoord = Destination;
                         FText Error;
                         if (!Round->CanPlanCommand(Candidate, Error)) continue;
-                        if (Priority > BestPriority || (Priority == BestPriority && (EffectiveUtility > BestUtility || (FMath::IsNearlyEqual(EffectiveUtility, BestUtility) && Distance < BestDistance))))
+                        const FCombatRoundSkill* Previous = Round->FindSkill(Best.SkillId);
+                        // For equally useful legal healing, observe an owned consumable once through its actual UI.
+                        // 합법 회복의 효용이 같을 때 보유 소모품을 한 번 실제 UI로 관측합니다.
+                        const bool bObserveEquivalentConsumable = ConsumableUIUses == 0 && bHeal && RunRecoveryRules::IsConsumable(*Skill) && Previous && !RunRecoveryRules::IsConsumable(*Previous) && FMath::IsNearlyEqual(EffectiveUtility, BestUtility) && FMath::IsNearlyEqual(Distance, BestDistance);
+                        if (Priority > BestPriority || (Priority == BestPriority && (EffectiveUtility > BestUtility || (FMath::IsNearlyEqual(EffectiveUtility, BestUtility) && (Distance < BestDistance || bObserveEquivalentConsumable)))))
                         {
                             Best = Candidate;
                             BestPriority = Priority;
@@ -540,6 +787,8 @@ namespace NormalTargetRunReview
                     }
                 }
             }
+            const FCombatRoundSkill* SelectedSkill = Round->FindSkill(Best.SkillId);
+            if (SelectedSkill && RunRecoveryRules::IsConsumable(*SelectedSkill) && !AwaitConsumablePlanningUI(Run, Round, *SelectedSkill)) return bPassed ? false : End();
             PlannedRounds.Add(RoundKey);
             ++RoundsSubmitted;
             if (BestPriority == MIN_int32)
@@ -551,7 +800,11 @@ namespace NormalTargetRunReview
             PendingCommand = Best;
             bAwaitingPlan = true;
             Event(Run, TEXT("request_normal_plan"), FString::Printf(TEXT("skill=%s target=%d destination=%s"), *Best.SkillId.ToString(), Best.TargetUnitId, *Best.DestinationCoord.ToString()));
-            Controller->SubmitRoundPlan(Best);
+            if (SelectedSkill && RunRecoveryRules::IsConsumable(*SelectedSkill))
+            {
+                if (!RequestConsumableUI(Run, Round, *Direct, *SelectedSkill)) return End();
+            }
+            else Controller->SubmitRoundPlan(Best);
             LastProgress = FPlatformTime::Seconds();
             return false;
         }
@@ -602,6 +855,9 @@ namespace NormalTargetRunReview
                     Entry->SetNumberField(TEXT("max_ap"), Unit.Unit ? Unit.Unit->GetMaxActionPoint() : 0);
                     Entry->SetNumberField(TEXT("sap"), Unit.Unit ? Unit.Unit->GetCurrentSubActionPoint() : 0);
                     Entry->SetNumberField(TEXT("max_sap"), Unit.Unit ? Unit.Unit->GetMaxSubActionPoint() : 0);
+                    int32 Quantity = 0;
+                    if (Unit.Unit) for (const FRunConsumableStack& Stack : Unit.Unit->Consumables) Quantity += Stack.Quantity;
+                    Entry->SetNumberField(TEXT("consumable_quantity"), Quantity);
                     Entry->SetStringField(TEXT("status"), Unit.Status.ToString());
                     Entry->SetStringField(TEXT("skill"), Unit.Command.SkillId.ToString());
                     Entry->SetNumberField(TEXT("target"), Unit.Command.TargetUnitId);
@@ -651,6 +907,7 @@ namespace NormalTargetRunReview
 
         bool End()
         {
+            UnbindConsumable();
             if (Outcome.IsEmpty()) Outcome = TEXT("ValidationFailure");
             if (GEditor && GEditor->PlayWorld) RetainViewport(GEditor->PlayWorld);
             GEditor->RequestEndPlayMap();
@@ -670,7 +927,15 @@ namespace NormalTargetRunReview
             Report->SetNumberField(TEXT("completed_encounter_choices"), CompletedChoices);
             Report->SetNumberField(TEXT("normal_rounds_submitted"), RoundsSubmitted);
             Report->SetNumberField(TEXT("saved_boundary_deserializations"), SavedBoundaryReads);
-            Report->SetStringField(TEXT("scope"), TEXT("Actual normal single-player menu creates four default characters with one direct and three production companions. Public encounter/shop/reward/node/plan/Ready requests only. No HP, damage, AP, skill catalog, stock, gold, enemy roster, timing, physics or result overrides. Test-only strategy prioritizes legal critical healing, finishing a visible enemy, damage, then support; takes offered recovery and skills and maximum offered gold. Actual first-victory menu restart when reached, plus checkpoint deserialization at stable boundaries. A natural defeat ends observation honestly; one run does not establish overall balance, all strategies, online PvP or manual play quality."));
+            Report->SetNumberField(TEXT("consumable_ui_requests"), ConsumableUIRequests);
+            Report->SetNumberField(TEXT("consumable_ui_uses_observed"), ConsumableUIUses);
+            Report->SetArrayField(TEXT("consumable_ui_observations"), ConsumableObservations);
+            Report->SetNumberField(TEXT("recovery_ui_purchases"), RecoveryUIPurchases);
+            Report->SetNumberField(TEXT("consumable_shop_ui_purchases"), ConsumableUIPurchases);
+            Report->SetNumberField(TEXT("revival_ui_purchases"), RevivalUIPurchases);
+            Report->SetStringField(TEXT("revival_ui_status"), RevivalUIPurchases > 0 ? TEXT("Observed through the offered original UI after natural death.") : TEXT("Unobserved: no eligible natural-death revival UI purchase was reached; no death or result was forced."));
+            Report->SetStringField(TEXT("consumable_ui_status"), ConsumableUIUses > 0 ? TEXT("Actual UI plan/Ready, GAS healing, AP cost, quantity and saved boundary observed.") : TEXT("Unobserved: no successful natural consumable UI release was reached; no health or stock override was applied."));
+            Report->SetStringField(TEXT("scope"), TEXT("Actual normal single-player menu creates four default characters with one direct and three production companions. Public encounter/shop/reward/node/plan/Ready requests only. No HP, damage, AP, skill catalog, stock, gold, enemy roster, timing, physics or result overrides. Test-only strategy prioritizes legal critical healing or full-value self-healing before visible queued attack power crosses the danger boundary, then finishing a visible enemy, damage and support. Consumable plans use original world-selection/skill/Ready delegates and services use the actual recovery button; these are UI delegates, not physical mouse clicks. For equal legal healing utility, observe an owned consumable once. Observe actual self-heal GAS HP/AP/quantity and durable boundaries; natural death/revival may remain unobserved. Takes offered recovery and skills and maximum offered gold. Actual first-victory menu restart when reached, plus checkpoint deserialization at stable boundaries. A natural defeat ends observation honestly; one run does not establish overall balance, all strategies, online PvP or manual play quality."));
             Report->SetArrayField(TEXT("events"), Events);
             Report->SetObjectField(TEXT("first_planning_presentation"), PresentationReport);
             FString JSON;
@@ -695,6 +960,40 @@ namespace NormalTargetRunReview
         TSet<FString> PlannedRounds;
         TSet<FGuid> VerifiedCombatStats;
         FCombatRoundCommand PendingCommand;
+        FString ServiceUIVisit;
+        FString ConsumablePlanningWaitKey;
+        FString ConsumablePlanningFirstHeader;
+        TArray<FRunPartyMember> ExpectedServiceParty;
+        FGameplayTag PendingServiceTag;
+        TArray<TSharedPtr<FJsonValue>> ConsumableObservations;
+        TWeakObjectPtr<AUnitBase> ConsumableSource;
+        FCombatRoundSkill ObservedConsumableSkill;
+        FGameplayEffectContextHandle ConsumableEffectContext;
+        FGuid ConsumableCombatId;
+        FGuid ConsumableCharacterId;
+        FDelegateHandle ConsumableGasHandle;
+        FDelegateHandle ConsumableHealthHandle;
+        int32 ExpectedServiceRevision = 0;
+        int32 ServiceUIPurchases = 0;
+        int32 RecoveryUIPurchases = 0;
+        int32 RevivalUIPurchases = 0;
+        int32 ConsumableUIPurchases = 0;
+        int32 ConsumableUIRequests = 0;
+        int32 ConsumableUIUses = 0;
+        int32 ConsumableRound = 0;
+        int32 ConsumableQuantityBefore = 0;
+        int32 ConsumableAPBefore = 0;
+        int32 ConsumableGasCount = 0;
+        int32 ConsumableHealthChangeCount = 0;
+        float ConsumableHPBefore = 0.f;
+        float ConsumableHPAfter = 0.f;
+        double ServiceUIReadyAt = 0.0;
+        double ServiceObservedAt = 0.0;
+        double ConsumableBoundaryAt = 0.0;
+        double ConsumablePlanningWaitAt = 0.0;
+        bool bPendingFullRecovery = false;
+        bool bObserveConsumableResolving = false;
+        bool bConsumableContext = true;
         TodoReviewGameplayPresentation::FReadiness FirstPlanningPresentation;
         TSharedRef<FJsonObject> PresentationReport = MakeShared<FJsonObject>();
         int32 Stage = 0;
