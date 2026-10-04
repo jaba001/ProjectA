@@ -16,7 +16,7 @@ def check(value, message):
     return value
 
 
-world = check(unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/Gameplay"), "Gameplay map loads")
+world = check(unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/Core/Gameplay"), "Gameplay map loads")
 mode_class = check(world.get_world_settings().get_editor_property("default_game_mode"), "Gameplay has a GameMode override")
 mode = unreal.get_default_object(mode_class)
 check(isinstance(mode, unreal.GameplayGameModeBase), "Gameplay GameMode derives from GameplayGameModeBase")
@@ -56,7 +56,7 @@ check(not any(isinstance(actor, unreal.UnitBase) or isinstance(actor, unreal.Com
 
 menu_class = unreal.load_class(None, ROOT + "/Blueprint/Controller/BP_MainMenuPlayerController.BP_MainMenuPlayerController_C")
 menu_defaults = unreal.get_default_object(check(menu_class, "Existing MainMenu controller Blueprint loads"))
-check(str(menu_defaults.get_editor_property("gameplay_level_name")) == ROOT + "/LEVEL/Gameplay", "Existing MainMenu controller resolves GameplayLevelName to Gameplay")
+check(str(menu_defaults.get_editor_property("gameplay_level_name")) == ROOT + "/LEVEL/Core/Gameplay", "Existing MainMenu controller resolves GameplayLevelName to Gameplay")
 report = {"passed": len(checks), "checks": checks, "gameplay_world": world.get_path_name(), "game_mode": mode_class.get_path_name(), "root_widget": root_class.get_path_name(), "scope": "Loaded asset/class references and configured level actors; this is not a PIE gameplay test."}
 output = os.path.join(unreal.Paths.project_saved_dir(), "Automation", "GameplayAssetValidation.json")
 os.makedirs(os.path.dirname(output), exist_ok=True)

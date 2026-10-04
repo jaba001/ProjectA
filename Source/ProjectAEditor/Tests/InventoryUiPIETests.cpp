@@ -181,7 +181,7 @@ public:
             Params.SessionDestination = EPlaySessionDestinationType::InProcess;
             Params.WorldType = EPlaySessionWorldType::PlayInEditor;
             Params.bAllowOnlineSubsystem = false;
-            Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/MainMenu");
+            Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu");
             GEditor->RequestPlaySession(Params);
             Advance(1);
             return false;
@@ -1383,7 +1383,7 @@ bool FInventoryUiReviewTest::RunTest(const FString& Parameters)
         AddError(TEXT("Use -ProjectASaveSlot=ProjectA_Automation_InventoryUI_<fresh alphanumeric suffix>; user saves are never loaded or changed."));
         return false;
     }
-    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/MainMenu")));
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<InventoryUiPIE::FInventoryReview>(this, Slot, Size));
     return true;
 }

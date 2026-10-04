@@ -6,7 +6,7 @@ import unreal
 
 # Edit only the existing PvE encounter and its placed formation, preserving unit definitions.
 # 유닛 정의를 보존하고 기존 PvE 인카운터와 배치된 진형만 수정합니다.
-map_path = "/Game/User_JeHoon/LEVEL/Gameplay"
+map_path = "/Game/User_JeHoon/LEVEL/Core/Gameplay"
 encounter_path = "/Game/User_JeHoon/Blueprint/DataAsset/Encounters/DA_DefaultEncounter"
 formation = [(1, 2), (2, 2), (0, 3), (3, 3)]
 verify_only = "-TestEnemiesVerifyOnly" in unreal.SystemLibrary.get_command_line()

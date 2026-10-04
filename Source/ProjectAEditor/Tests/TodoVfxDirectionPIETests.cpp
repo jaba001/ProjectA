@@ -362,7 +362,7 @@ public:
             Params.SessionDestination = EPlaySessionDestinationType::InProcess;
             Params.WorldType = EPlaySessionWorldType::PlayInEditor;
             Params.bAllowOnlineSubsystem = false;
-            Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/DebugCombat");
+            Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/Development/DebugCombat");
             GEditor->RequestPlaySession(Params);
             Advance(1);
             return false;
@@ -2229,7 +2229,7 @@ bool FTodoVfxDirectionsPIETest::RunTest(const FString& Parameters)
         return false;
     }
     TestEqual(TEXT("The approved render scope contains exactly 39 casts."), TodoVfxDirections::MakeCases().Num(), 39);
-    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/DebugCombat")));
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Development/DebugCombat")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<TodoVfxDirections::FDirectionReview>(this, Slot));
     return true;
 }
@@ -2263,7 +2263,7 @@ bool FTodoMonsterAttacksPIETest::RunTest(const FString& Parameters)
         AddError(TEXT("Supply a fresh -ProjectASaveSlot=ProjectA_Automation_TodoReview_<suffix>; existing user saves are preserved."));
         return false;
     }
-    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/DebugCombat")));
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Development/DebugCombat")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<TodoVfxDirections::FDirectionReview>(this, Slot, true));
     return true;
 }

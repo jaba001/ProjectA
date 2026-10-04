@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "maps": [
+    {"name": "MainMenu", "old_path": "/Game/User_JeHoon/LEVEL/MainMenu", "path": "/Game/User_JeHoon/LEVEL/Core/MainMenu"},
+    {"name": "Gameplay", "old_path": "/Game/User_JeHoon/LEVEL/Gameplay", "path": "/Game/User_JeHoon/LEVEL/Core/Gameplay"},
+    {"name": "DebugCombat", "old_path": "/Game/User_JeHoon/LEVEL/DebugCombat", "path": "/Game/User_JeHoon/LEVEL/Development/DebugCombat"},
+    {"name": "WorldMap", "old_path": "/Game/User_JeHoon/LEVEL/WorldMap", "path": "/Game/User_JeHoon/LEVEL/Legacy/WorldMap"},
+    {"name": "DungeonFantasy", "old_path": "/Game/User_JeHoon/LEVEL/Environment/DungeonFantasy", "path": "/Game/User_JeHoon/LEVEL/Environment/Dungeon/DungeonFantasy"},
+    {"name": "DungeonStone", "old_path": "/Game/User_JeHoon/LEVEL/Environment/DungeonStone", "path": "/Game/User_JeHoon/LEVEL/Environment/Dungeon/DungeonStone"},
+    {"name": "MeadowBloom", "old_path": "/Game/User_JeHoon/LEVEL/Environment/MeadowBloom", "path": "/Game/User_JeHoon/LEVEL/Environment/Grassland/MeadowBloom"},
+    {"name": "SavannahGrove", "old_path": "/Game/User_JeHoon/LEVEL/Environment/SavannahGrove", "path": "/Game/User_JeHoon/LEVEL/Environment/Grassland/SavannahGrove"},
+    {"name": "PineRidge", "old_path": "/Game/User_JeHoon/LEVEL/Environment/PineRidge", "path": "/Game/User_JeHoon/LEVEL/Environment/Forest/PineRidge"},
+    {"name": "CrimsonForest", "old_path": "/Game/User_JeHoon/LEVEL/Environment/CrimsonForest", "path": "/Game/User_JeHoon/LEVEL/Environment/Forest/CrimsonForest"},
+    {"name": "BambooGarden", "old_path": "/Game/User_JeHoon/LEVEL/Environment/BambooGarden", "path": "/Game/User_JeHoon/LEVEL/Environment/Forest/BambooGarden"},
+    {"name": "DarkMarsh", "old_path": "/Game/User_JeHoon/LEVEL/Environment/DarkMarsh", "path": "/Game/User_JeHoon/LEVEL/Environment/Forest/DarkMarsh"},
+    {"name": "DesertCanyon", "old_path": "/Game/User_JeHoon/LEVEL/Environment/DesertCanyon", "path": "/Game/User_JeHoon/LEVEL/Environment/Desert/DesertCanyon"},
+    {"name": "DesertOasis", "old_path": "/Game/User_JeHoon/LEVEL/Environment/DesertOasis", "path": "/Game/User_JeHoon/LEVEL/Environment/Desert/DesertOasis"},
+    {"name": "FrozenPass", "old_path": "/Game/User_JeHoon/LEVEL/Environment/FrozenPass", "path": "/Game/User_JeHoon/LEVEL/Environment/Ice/FrozenPass"},
+    {"name": "IceCitadel", "old_path": "/Game/User_JeHoon/LEVEL/Environment/IceCitadel", "path": "/Game/User_JeHoon/LEVEL/Environment/Ice/IceCitadel"},
+    {"name": "PalmCoast", "old_path": "/Game/User_JeHoon/LEVEL/Environment/PalmCoast", "path": "/Game/User_JeHoon/LEVEL/Environment/Summer/PalmCoast"},
+    {"name": "SunsetLagoon", "old_path": "/Game/User_JeHoon/LEVEL/Environment/SunsetLagoon", "path": "/Game/User_JeHoon/LEVEL/Environment/Summer/SunsetLagoon"}
+  ],
+  "legacy_redirectors": [
+    {"old_path": "/Game/User_JeHoon/LEVEL/DungeonFantasy", "path": "/Game/User_JeHoon/LEVEL/Environment/Dungeon/DungeonFantasy"},
+    {"old_path": "/Game/User_JeHoon/LEVEL/DungeonStone", "path": "/Game/User_JeHoon/LEVEL/Environment/Dungeon/DungeonStone"}
+  ]
+}

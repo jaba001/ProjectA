@@ -94,7 +94,7 @@ public:
             Params.SessionDestination = EPlaySessionDestinationType::InProcess;
             Params.WorldType = EPlaySessionWorldType::PlayInEditor;
             Params.bAllowOnlineSubsystem = false;
-            Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/Gameplay");
+            Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/Core/Gameplay");
             Params.StartLocation = FVector(0, 0, 300);
             GEditor->RequestPlaySession(Params);
             Advance(1);
@@ -799,7 +799,7 @@ void FRunRoundPIETest::GetTests(TArray<FString>& Names, TArray<FString>& Command
 
 bool FRunRoundPIETest::RunTest(const FString& Parameters)
 {
-    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Core/Gameplay")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectARunRoundTests::FRunRoundPIE>(this, FCString::Atoi(*Parameters)));
     return true;
 }
@@ -808,7 +808,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunRoundSwordGeometryTest, "ProjectA.RunRoundS
 
 bool FRunRoundSwordGeometryTest::RunTest(const FString& Parameters)
 {
-    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Core/Gameplay")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectARunRoundTests::FRunRoundPIE>(this, 1, true));
     return true;
 }

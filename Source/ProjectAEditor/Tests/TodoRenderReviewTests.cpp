@@ -59,7 +59,23 @@
 
 namespace TodoRenderReview
 {
-const TArray<FString> EnvironmentMaps = {TEXT("DungeonFantasy"), TEXT("DungeonStone"), TEXT("MeadowBloom"), TEXT("PineRidge"), TEXT("BambooGarden"), TEXT("CrimsonForest"), TEXT("DesertCanyon"), TEXT("DesertOasis"), TEXT("DarkMarsh"), TEXT("SavannahGrove"), TEXT("FrozenPass"), TEXT("IceCitadel"), TEXT("PalmCoast"), TEXT("SunsetLagoon")};
+const TMap<FString, FString> EnvironmentMaps =
+{
+    {TEXT("DungeonFantasy"), TEXT("Dungeon/DungeonFantasy")},
+    {TEXT("DungeonStone"), TEXT("Dungeon/DungeonStone")},
+    {TEXT("MeadowBloom"), TEXT("Grassland/MeadowBloom")},
+    {TEXT("PineRidge"), TEXT("Forest/PineRidge")},
+    {TEXT("BambooGarden"), TEXT("Forest/BambooGarden")},
+    {TEXT("CrimsonForest"), TEXT("Forest/CrimsonForest")},
+    {TEXT("DesertCanyon"), TEXT("Desert/DesertCanyon")},
+    {TEXT("DesertOasis"), TEXT("Desert/DesertOasis")},
+    {TEXT("DarkMarsh"), TEXT("Forest/DarkMarsh")},
+    {TEXT("SavannahGrove"), TEXT("Grassland/SavannahGrove")},
+    {TEXT("FrozenPass"), TEXT("Ice/FrozenPass")},
+    {TEXT("IceCitadel"), TEXT("Ice/IceCitadel")},
+    {TEXT("PalmCoast"), TEXT("Summer/PalmCoast")},
+    {TEXT("SunsetLagoon"), TEXT("Summer/SunsetLagoon")}
+};
 
 bool Prepare(FAutomationTestBase* Test, const FString& MapPath, FString& OutSlot)
 {
@@ -849,17 +865,18 @@ IMPLEMENT_COMPLEX_AUTOMATION_TEST(FTodoEnvironmentRenderReview, "ProjectA.TodoRe
 
 void FTodoEnvironmentRenderReview::GetTests(TArray<FString>& OutBeautifiedNames, TArray<FString>& OutTestCommands) const
 {
-    for (const FString& Map : TodoRenderReview::EnvironmentMaps)
+    for (const TPair<FString, FString>& Map : TodoRenderReview::EnvironmentMaps)
     {
-        OutBeautifiedNames.Add(Map);
-        OutTestCommands.Add(Map);
+        OutBeautifiedNames.Add(Map.Key);
+        OutTestCommands.Add(Map.Key);
     }
 }
 
 bool FTodoEnvironmentRenderReview::RunTest(const FString& Parameters)
 {
-    if (!TodoRenderReview::EnvironmentMaps.Contains(Parameters)) return false;
-    const FString MapPath = TEXT("/Game/User_JeHoon/LEVEL/Environment/") + Parameters;
+    const FString* RelativePath = TodoRenderReview::EnvironmentMaps.Find(Parameters);
+    if (!RelativePath) return false;
+    const FString MapPath = TEXT("/Game/User_JeHoon/LEVEL/Environment/") + *RelativePath;
     FString Slot;
     if (!TodoRenderReview::Prepare(this, MapPath, Slot)) return false;
     ADD_LATENT_AUTOMATION_COMMAND(TodoRenderReview::FReview(this, MapPath, Parameters, Slot, false));
@@ -875,7 +892,7 @@ bool FTodoDeathHealthPaintReview::RunTest(const FString& Parameters)
         AddError(TEXT("DeathHealthPaint includes two actual native Windows positions; omit -RenderOffscreen to run this regression. No editor preferences are changed."));
         return false;
     }
-    const FString MapPath = TEXT("/Game/User_JeHoon/LEVEL/Environment/MeadowBloom");
+    const FString MapPath = TEXT("/Game/User_JeHoon/LEVEL/Environment/Grassland/MeadowBloom");
     FString Slot;
     if (!TodoRenderReview::Prepare(this, MapPath, Slot)) return false;
     ADD_LATENT_AUTOMATION_COMMAND(TodoRenderReview::FReview(this, MapPath, TEXT("DeathHealthPaint"), Slot, true));

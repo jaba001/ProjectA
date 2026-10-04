@@ -196,7 +196,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSnapshotEncounterFailureTest, "ProjectA.Snapsh
 bool FSnapshotEncounterFailureTest::RunTest(const FString& Parameters)
 {
     AddExpectedErrorPlain(TEXT("[Encounter]"), EAutomationExpectedErrorFlags::Contains, 3);
-    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Core/Gameplay")));
     ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectASnapshotEncounterTests::FCheckPreparationFailures>(this));
     ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());

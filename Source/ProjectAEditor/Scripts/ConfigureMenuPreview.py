@@ -3,7 +3,7 @@ import unreal
 # Preserve Designer widgets; configure only the missing menu stage and a visual-only preview.
 # Designer 위젯은 보존하고 누락된 메뉴 스테이지와 표시 전용 프리뷰만 설정합니다.
 root = "/Game/User_JeHoon"
-world = unreal.EditorLoadingAndSavingUtils.load_map(root + "/LEVEL/MainMenu")
+world = unreal.EditorLoadingAndSavingUtils.load_map(root + "/LEVEL/Core/MainMenu")
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 stages = [actor for actor in actors.get_all_level_actors() if isinstance(actor, unreal.MainMenuPreviewStage)]
 if len(stages) > 1:
@@ -55,6 +55,6 @@ mesh_component.set_editor_property("relative_rotation", unreal.Rotator())
 unreal.BlueprintEditorLibrary.compile_blueprint(preview)
 if not unreal.EditorAssetLibrary.save_loaded_asset(preview):
     raise RuntimeError("Could not save menu preview Idle and orientation.")
-if not unreal.EditorLoadingAndSavingUtils.save_map(world, root + "/LEVEL/MainMenu"):
+if not unreal.EditorLoadingAndSavingUtils.save_map(world, root + "/LEVEL/Core/MainMenu"):
     raise RuntimeError("Could not save MainMenu stage placement.")
 unreal.log("T12: MainMenu stage and four visual-only profession previews configured.")

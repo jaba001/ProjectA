@@ -60,7 +60,7 @@ def configure_preview_facing():
         mesh.set_editor_property("relative_rotation", unreal.Rotator())
         unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
         save(blueprint)
-    world = require(unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/MainMenu"), "Missing MainMenu map")
+    world = require(unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/Core/MainMenu"), "Missing MainMenu map")
     stages = [actor for actor in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors() if isinstance(actor, unreal.MainMenuPreviewStage)]
     require(len(stages) == 1, "MainMenu requires one preview stage")
     stage = stages[0]
@@ -70,7 +70,7 @@ def configure_preview_facing():
     camera.set_editor_property("relative_location", location)
     for index in range(4):
         stage.get_editor_property("slot%d_anchor" % index).set_editor_property("relative_rotation", unreal.Rotator(pitch=0.0, yaw=90.0, roll=0.0))
-    require(unreal.EditorLoadingAndSavingUtils.save_map(world, ROOT + "/LEVEL/MainMenu"), "Could not save preview facing")
+    require(unreal.EditorLoadingAndSavingUtils.save_map(world, ROOT + "/LEVEL/Core/MainMenu"), "Could not save preview facing")
     unreal.log("PRIMITIVE_PREVIEW_FACING_CONFIGURED")
 
 

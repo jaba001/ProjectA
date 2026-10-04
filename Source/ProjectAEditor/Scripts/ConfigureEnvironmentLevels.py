@@ -15,10 +15,11 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
 
 from ConfigureDungeonLevels import color, core_layout, mesh_placement, segment_intersects_box, vector
 from ConfigureCombatDebugLevel import require
+from ProjectLevelPaths import project_level_path
 
 
 ROOT = Path(unreal.Paths.project_dir()).resolve()
-SOURCE_MAP = "/Game/User_JeHoon/LEVEL/Gameplay"
+SOURCE_MAP = "/Game/User_JeHoon/LEVEL/Core/Gameplay"
 MODE = "/Game/User_JeHoon/Blueprint/Game/BP_CombatDebugGameMode"
 OUTPUT_ROOT = "/Game/User_JeHoon/LEVEL/Environment/"
 SKY_CUBEMAP = "/Engine/MapTemplates/Sky/DaylightAmbientCubemap"
@@ -37,7 +38,8 @@ LIGHT_LABELS = {"Environment_Sun", "Environment_Sky", "Environment_Fog", "Enviro
 
 
 def level_path(spec):
-    return OUTPUT_ROOT + spec["name"]
+    require(spec.get("level") == project_level_path(spec["name"]) and spec["level"].startswith(OUTPUT_ROOT), "Environment output differs from the project level layout")
+    return spec["level"]
 
 
 def original_path(path, spec):
@@ -74,6 +76,7 @@ def read_specs():
     specs = document["levels"]
     require(specs and len({spec["name"] for spec in specs}) == len(specs), "Environment names must be unique")
     for spec in specs:
+        level_path(spec)
         require(re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", spec["name"]) and spec.get("title"), "Invalid environment identity")
         require(spec.get("source_roots") and all(root.startswith(("/Game/", "/Engine/")) and ".." not in root and not root.startswith("/Game/User_JeHoon") for root in spec["source_roots"]), "Invalid original asset roots")
         require(spec.get("meshes") and len({item["label"] for item in spec["meshes"]}) == len(spec["meshes"]), "Mesh labels must be unique")

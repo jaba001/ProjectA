@@ -12,12 +12,13 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 from ConfigureCombatDebugLevel import inspect_level, require
+from ProjectLevelPaths import project_level_path
 
 
 ROOT = Path(unreal.Paths.project_dir()).resolve()
-SOURCE_MAP = "/Game/User_JeHoon/LEVEL/Gameplay"
+SOURCE_MAP = "/Game/User_JeHoon/LEVEL/Core/Gameplay"
 DUNGEON_MODE = "/Game/User_JeHoon/Blueprint/Game/BP_CombatDebugGameMode"
-OUTPUT_ROOT = "/Game/User_JeHoon/LEVEL/Environment/"
+OUTPUT_ROOT = "/Game/User_JeHoon/LEVEL/Environment/Dungeon/"
 SKY_CUBEMAP = "/Engine/MapTemplates/Sky/DaylightAmbientCubemap"
 LEVELS = ["DungeonFantasy", "DungeonStone"]
 DECORATION_TAG = unreal.Name("ProjectADungeonDecoration")
@@ -299,7 +300,7 @@ def main():
     require(not (VERIFY_ONLY and REBUILD), "Verify and rebuild are mutually exclusive")
     specs = [json.loads((SCRIPT_DIRECTORY / (name + "Spec.json")).read_text(encoding="utf-8")) for name in LEVELS]
     for name, spec in zip(LEVELS, specs):
-        require(spec["level"] == OUTPUT_ROOT + name, "Unexpected output level")
+        require(spec["level"] == project_level_path(name) and spec["level"].startswith(OUTPUT_ROOT), "Unexpected output level")
         require((ROOT / "Content" / spec["pack_root"].removeprefix("/Game/")).is_dir(), "Download the owned source pack before authoring")
         if not VERIFY_ONLY:
             require(REBUILD or not ASSETS.does_asset_exist(spec["level"]), "Level already exists; inspect or explicitly use -DungeonRebuild")

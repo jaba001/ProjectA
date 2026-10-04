@@ -18,9 +18,9 @@ T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 새 라�
 
 실행 환경은 UE 5.8의 `ProjectA.uproject`다. 게임·Editor 타깃은 `BuildSettingsVersion.V7`·`EngineIncludeOrderVersion.Unreal5_8`을 사용한다.
 
-1. 기본 시작 맵인 `/Game/User_JeHoon/LEVEL/MainMenu`를 연다.
+1. 기본 시작 맵인 `/Game/User_JeHoon/LEVEL/Core/MainMenu`를 연다.
 2. 게임 시작 → 싱글플레이 → CharacterCreation에서 1~4명의 캐릭터를 생성하고 직접 조작할 한 명을 선택한다. 생성 버튼은 기본값으로 즉시 생성하며 직업 화살표와 Edit로 직업·이름·몸체를 바꾼다. 멀티플레이는 기존 같은 PC·LAN 개발용 방으로 연결한다.
-3. Start Game → `/Game/User_JeHoon/LEVEL/Gameplay` → Run Map에서 첫 Combat 노드를 선택한다.
+3. Start Game → `/Game/User_JeHoon/LEVEL/Core/Gameplay` → Run Map에서 첫 Combat 노드를 선택한다.
 4. 전장에서 적 또는 스킬이 요구하는 타일을 클릭하고 하단의 실제 장착 스킬 버튼으로 계획을 적용한 뒤 준비 완료한다. 스킬 미선택 준비 완료는 행동 비용 없이 턴을 넘기며 선택한 스킬은 취소할 수 있다. 위치 이동은 이동 예약 → 아군 빈칸 한 번 클릭으로 예약하며 스킬 없이 이동만 예약하면 SAP 1만 소모한다. 전원 준비 후 SAP 이동을 먼저 끝내고 선택한 AP 행동을 실행한다. 나머지 생성 동료는 서버 AI가 계획·실행한다.
 5. 속도차 대기·이동·시전·피격·복귀를 관찰한다. 남은 유효 투사체까지 정리되면 다음 라운드 계획으로 돌아간다. 해결 중 새 행동을 입력할 수 없다.
 6. 새 Run은 1~9번째 Victory마다 5~15G 보상 3개 중 1개 수령 → Continue → 스킬상점·아이템상점·상점3 중 하나 선택 → 나가기 → 다음 Combat 노드를 진행한다. 10번째 Victory도 보상을 수령한 뒤 Continue로 완료된 Run Map을 표시한다.
@@ -224,7 +224,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 ### 4-2 전투 디버그 레벨
 
-`/Game/User_JeHoon/LEVEL/DebugCombat`은 프로젝트 소유 Gameplay 맵의 배치·카메라·Grid를 Unreal API로 복제한 독립 개발 레벨이다. `BP_CombatDebugGameMode`는 기존 Party·Enemy 정의를 참조하고 전사 1명·적 4명을 생성한다. `ACombatDebugPlayerController`와 기존 라운드 계획 UI를 사용하며 일반 인카운터 진행·결과·저장 경로에는 연결하지 않는다. 로컬 Standalone·비 Shipping에서만 동작하고 활성 관리 Run이 있으면 시작을 거절한다.
+`/Game/User_JeHoon/LEVEL/Development/DebugCombat`은 프로젝트 소유 Gameplay 맵의 배치·카메라·Grid를 Unreal API로 복제한 독립 개발 레벨이다. `BP_CombatDebugGameMode`는 기존 Party·Enemy 정의를 참조하고 전사 1명·적 4명을 생성한다. `ACombatDebugPlayerController`와 기존 라운드 계획 UI를 사용하며 일반 인카운터 진행·결과·저장 경로에는 연결하지 않는다. 로컬 Standalone·비 Shipping에서만 동작하고 활성 관리 Run이 있으면 시작을 거절한다.
 
 `UCombatDebugLoadout`은 Skills 하위의 유효 DataAsset 74종(기본 2·몬스터 전용 12·신규 60)과 태그 장착 프로필이 있는 장비 49종을 제공한다. 몬스터 공격도 개발용 일반 카탈로그에 포함되며 새 Run의 상점 후보 61종과 구분한다. 장비 후보는 기존 `RunEquipmentRules`로 검증하고 임시 보유 상태에만 기록한다. 획득은 지정 슬롯에 즉시 장착하며 밀려난 장비는 임시 보유 목록에 남는다. 제거는 장착 해제·보유 삭제·참조 인덱스 보정을 함께 수행한다. 장비는 현재 외형만 바꾸며 능력치·스킬은 부여하지 않는다.
 
@@ -244,7 +244,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 ### 4-3 지하 던전 비교 레벨
 
-`/Game/User_JeHoon/LEVEL/Environment/DungeonFantasy`와 `/Game/User_JeHoon/LEVEL/Environment/DungeonStone` 두 비교 맵을 사용한다. 기존 `LEVEL/` 경로는 사용자 이동으로 작성된 ObjectRedirector이며 현재 경로 연결을 확인하고 보존했다. 각각 FANTASTIC의 `/Game/Fantastic_Dungeon_Pack`과 Modular Dungeon Collection의 `/Game/Dungeon_Modular_V1`을 직접 참조한다. 두 원본 팩은 기존 원본 경로에 임포트했으며 합계 약 4.03GiB다. Git에서 무시되는 원본을 강제로 추가하지 않으므로 다른 환경에서도 해당 팩 설치가 필요하다.
+`/Game/User_JeHoon/LEVEL/Environment/Dungeon/DungeonFantasy`와 `/Game/User_JeHoon/LEVEL/Environment/Dungeon/DungeonStone` 두 비교 맵을 사용한다. 기존 `LEVEL/` 직속 던전 2개는 실제 중복 맵이 아닌 호환용 ObjectRedirector였으며 이번 경로 정리에서 제거했다. 폴더 정리와 이전 경로 호환은 [4-10절](#4-10-레벨-폴더와-이전-경로-호환)을 따른다. 각각 FANTASTIC의 `/Game/Fantastic_Dungeon_Pack`과 Modular Dungeon Collection의 `/Game/Dungeon_Modular_V1`을 직접 참조한다. 두 원본 팩은 기존 원본 경로에 임포트했으며 합계 약 4.03GiB다. Git에서 무시되는 원본을 강제로 추가하지 않으므로 다른 환경에서도 해당 팩 설치가 필요하다.
 
 | 비교 맵 | 장식 메시·조명·불꽃 FX (최초 생성) |
 |---|---|
@@ -263,20 +263,20 @@ UE 5.8에서 폐기된 `DefaultEngine.ini`의 `r.Mobile.VirtualTextures`를 제�
 
 UE 5.8에서 `/Game/User_JeHoon/LEVEL/Environment/` 아래 초원·숲·사막·얼음·여름 계열 12개 맵을 생성·저장했다. 원본 경로는 `/Game/Orasot_Bundle`·`/Game/InfinityBladeIceLands`·`/Game/Kobo_Nature`이며 Git에 포함하지 않으므로 다른 PC에서도 해당 팩 설치가 필요하다. 배치 메시 합계는 3,240개이며 각 맵은 ISM 9~17개 그룹으로 구성한다.
 
-| 테마 | 맵 이름 | 원본 팩 | 배치 메시 | ISM 그룹 |
+| 테마 | `Environment/` 기준 경로 | 원본 팩 | 배치 메시 | ISM 그룹 |
 |---|---|---|---:|---:|
-| 꽃 초원 | `MeadowBloom` | Orasot | 333 | 10 |
-| 소나무 능선 | `PineRidge` | Orasot | 287 | 15 |
-| 대나무 정원 | `BambooGarden` | Orasot | 300 | 11 |
-| 붉은 숲 | `CrimsonForest` | Orasot | 341 | 12 |
-| 사막 협곡 | `DesertCanyon` | Orasot | 216 | 12 |
-| 여름 오아시스 | `DesertOasis` | Orasot | 263 | 9 |
-| 어두운 습지 | `DarkMarsh` | Orasot | 312 | 9 |
-| 사바나 숲 | `SavannahGrove` | Orasot | 329 | 9 |
-| 얼어붙은 고개 | `FrozenPass` | Infinity Blade Ice Lands | 216 | 17 |
-| 눈 덮인 요새 | `IceCitadel` | Infinity Blade Ice Lands | 206 | 16 |
-| 한낮의 야자 해안 | `PalmCoast` | Kobo Nature·Orasot | 214 | 12 |
-| 노을빛 수정 석호 | `SunsetLagoon` | Kobo Nature·Orasot | 223 | 12 |
+| 꽃 초원 | `Grassland/MeadowBloom` | Orasot | 333 | 10 |
+| 소나무 능선 | `Forest/PineRidge` | Orasot | 287 | 15 |
+| 대나무 정원 | `Forest/BambooGarden` | Orasot | 300 | 11 |
+| 붉은 숲 | `Forest/CrimsonForest` | Orasot | 341 | 12 |
+| 사막 협곡 | `Desert/DesertCanyon` | Orasot | 216 | 12 |
+| 여름 오아시스 | `Desert/DesertOasis` | Orasot | 263 | 9 |
+| 어두운 습지 | `Forest/DarkMarsh` | Orasot | 312 | 9 |
+| 사바나 숲 | `Grassland/SavannahGrove` | Orasot | 329 | 9 |
+| 얼어붙은 고개 | `Ice/FrozenPass` | Infinity Blade Ice Lands | 216 | 17 |
+| 눈 덮인 요새 | `Ice/IceCitadel` | Infinity Blade Ice Lands | 206 | 16 |
+| 한낮의 야자 해안 | `Summer/PalmCoast` | Kobo Nature·Orasot | 214 | 12 |
+| 노을빛 수정 석호 | `Summer/SunsetLagoon` | Kobo Nature·Orasot | 223 | 12 |
 
 Gameplay의 전장·Grid·GameplayCamera·물리 바닥·NavBounds를 복제하여 보존하고 새 맵만 기존 `BP_CombatDebugGameMode`로 구성한다. 반복 메시를 원본 메시·재질·그림자·거리 설정별 ISM으로 묶으며 모든 장식의 충돌과 navigation 영향을 끈다. 기존 Gameplay·DebugCombat·던전 맵과 기본 Run 전환은 유지한다.
 
@@ -366,6 +366,26 @@ Spawn_Ninja_Root의 원본과 두 높이 대안은 3조건·15장으로 비교�
 신규 60종과 비무장·근접·몬스터 공격 14종의 전체 74스킬을 읽기 전용으로 검수했다. 시전·투사체·효과 충돌·피격 방향, 원본 Niagara 79종의 그래프·주효과/피격 83슬롯과 저장된 끝점 공간을 대조했다. 기본·몬스터 공격 14종에는 직접 VFX·ImpactVFX가 없으며 기존 대상 방향의 애니메이션 경로를 유지한다. UE 5.8.3 Development Editor / Win64 컴파일, 기존 DA 8개(끝점 7개·가시엄니 VFX 참조 1개)와 필수 Niagara 파생본 1개 작성·독립 재로드·DataValidation·전체 에셋 감사를 오류·경고 없이 통과했다. 파생본의 다른 좌표 입력·시각 설정·원본 모듈 참조와 작성/재로드 해시가 일치했다. 나머지 신규 52개·기본/몬스터 14개·원본 1,900파일과 읽기 전용 검사 전후 스킬 74파일 해시를 보존했다. 근거는 `Saved/Automation/SkillVfxDirection/`의 작성·재로드·원본 그래프·최종 보존 보고서다. 작성 당시 화면·게임·PIE·자동화 테스트는 미실행이었다. 후속 위임 검수의 범위는 [TODO 22절](TODO.md#22-스킬-vfx-방향-확인)과 최신 실행 이력을 따른다.
 
 2026-10-04 사용자 위임으로 실제 PIE·게임·화면 검수를 진행했다. 몬스터·외형 에디터 도구의 동일한 내부 함수명을 구분해 동작 변경 없이 Unity 컴파일 충돌을 해소했다. 후속 인벤토리 검수 fixture의 뷰포트 종료 수명 보완을 포함한 Editor 컴파일·링크 8.90초를 통과했으며 별도 native 회귀 175개를 12.445초에 통과했다. 이전 cooked 패키지 저장/이어하기/종료는 해당 코드의 이력이다. HP의 창·NativePaint 크기/위치 결함을 보완하고 실제 Windows 창 검수 15개를 통과했다. 14맵·42장의 세 화면 비율에서 유닛 5개의 HP 위치 오차는 최대 0.585px였으며 사망/부활 5→4→5개 표시와 창 X/Y 37/29px 이동 시 Paint 위치 유지도 확인했다. 최신 Development 패키지의 BuildCookRun 80.10초와 cooked CSV 289개·스킬 61후보/세 보완 DA 읽기 검사를 통과했다. 동일 실행 파일·빌드·컨테이너 5개의 격리 writer 저장을 별도 프로세스에서 Continue → 보상 → Shop_02 → Combat_02로 복원했고 실제 Quit 버튼의 자연 종료도 확인했다. Editor 작성 저장의 cooked 재개는 FText 직렬화 크기 차이로 실패한 이력을 유지하며 동일 패키지 writer 결과와 구분한다. 모든 검수 종료 후 Content 19,804파일의 SHA/크기 동일과 승인한 프로젝트 DA 3개의 정확한 변경을 확인했다. 원본 저장 49개·GameUserSettings·외부 EditorKeyBindings의 SHA를 보존했고 검수 소유 임시 파일을 정리했으며 예상 밖 Content·저장 추가는 없었다. 몬스터·메뉴·환경·스킬·인벤토리의 결과와 제한은 [최신 실행 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)을 따른다. 체인 초기 수치·미선택 온라인 정책은 계속 대기한다.
+
+### 4-10 레벨 폴더와 이전 경로 호환
+
+[LevelFolderLayout.json](../Source/ProjectAEditor/Scripts/LevelFolderLayout.json)을 18개 고유 맵의 경로 기준으로 사용한다. `name`은 기존 맵 이름, `old_path`는 이동 전 경로, `path`는 현재 경로이며 `legacy_redirectors`는 먼저 존재하던 별칭이다. 원본 Fab 팩·맵 배치·게임 모드·navigation·필수 파생 재질은 보존하고 폴더만 용도와 테마로 나눈다.
+
+| `LEVEL/` 기준 폴더 | 맵 |
+|---|---|
+| `Core` | `MainMenu`, `Gameplay` |
+| `Development` | `DebugCombat` |
+| `Legacy` | `WorldMap` — 현재 Run 흐름에서 제외된 보존 맵 |
+| `Environment/Dungeon` | `DungeonFantasy`, `DungeonStone` |
+| `Environment/Grassland` | `MeadowBloom`, `SavannahGrove` |
+| `Environment/Forest` | `PineRidge`, `CrimsonForest`, `BambooGarden`, `DarkMarsh` |
+| `Environment/Desert` | `DesertCanyon`, `DesertOasis` |
+| `Environment/Ice` | `FrozenPass`, `IceCitadel` |
+| `Environment/Summer` | `PalmCoast`, `SunsetLagoon` |
+
+이동 전 프로젝트 341파일·43,833,372바이트를 SHA-256으로 비교했으며 완전 동일한 파일은 없었다. 외부 원본 중 같은 크기인 29파일과의 비교에서도 동일 사본은 없었다. 실제 맵 18개를 Unreal AssetTools로 이동하고 맵 상태 스냅샷 동일성을 확인했다. 기존 `LEVEL/DungeonFantasy`·`LEVEL/DungeonStone`의 Redirector 2개를 Unreal 기능으로 삭제했으며 이번 맵 18개는 이동 과정에서 Redirector 없이 옛 경로가 정리됐다. 옛 물리 경로·Registry 항목 20개의 부재와 디스크 패키지 13,963개의 전방 의존 참조에 옛 경로가 없음을 확인했다. 메뉴 Blueprint의 Gameplay 이름 참조를 갱신·컴파일·저장하고 기본 시작·쿠킹 경로 및 이전 경로 CoreRedirect를 반영했다. 검 소켓 수정본·가시엄니 방향 수정본·리타깃 제작 자료·환경 재질 53개는 삭제 대상이 아니다.
+
+[OrganizeLevelFolders.py](../Source/ProjectAEditor/Scripts/OrganizeLevelFolders.py)의 기본 실행은 사전 감사, `-LevelFoldersApply`는 이동·참조 갱신·Redirector 정리, `-LevelFoldersVerifyOnly`는 독립 읽기 전용 검사다. 적용 전에 기본 시작·쿠킹 경로와 로컬 에디터의 최근 맵/맵별 뷰 키를 갱신하고 로컬 설정의 원본 바이트·카메라 좌표를 보존한다. CoreRedirect는 이동·Redirector 정리 후 추가한다. 이후 환경 14맵의 navigation을 공식 `ResavePackages -BuildNavigationData`로 재빌드·저장하고 독립 검증을 실행한다. 삭제 개수와 무관하게 새 World 18개·옛 물리 경로 20개 부재·이전 Package/Object 해석을 검사한다. UE 5.8.3 Development Editor / Win64 컴파일은 38.89초·오류/경고 0으로 완료했다. 적용과 새 프로세스의 읽기 전용 검증은 모두 종료 0이며 18맵의 상태 스냅샷·옛 SoftObjectPath 20개의 정확한 새 World 해석·옛 경로 부재·13,963패키지의 전방 의존 참조를 확인했다. 보호 Content 19,786파일과 원본 저장 49개·GameUserSettings·외부 EditorKeyBindings의 크기/SHA를 보존했다. 최종 Content 19,805파일에 예상 밖 추가는 없으며 로컬 에디터 설정은 검토된 맵 경로와 컴파일 모듈 시각 2개 외에 동일하고 카메라 좌표를 유지했다. Navigation 재빌드 후 환경 14맵의 각 64타일과 native Recast payload SHA가 원본과 정확히 일치했으며 모든 18맵에서 삭제된 export는 없었다. Gameplay·DebugCombat은 기존 0타일을 유지하며 저장 버전이 27→28로 정규화됐고, Legacy WorldMap에는 원본 로드 때 엔진이 생성하던 빈 Recast·SceneComponent 2개가 저장됐다. 이후 독립 재로드와 보호 파일 전체 SHA를 다시 확인했다. 근거는 `Saved/Automation/LevelFolders/{Audit,Apply,Verify,ProtectedFinal,EditorMapPaths.Final,Payloads.AfterNavigationRepair}.json`, `InspectMapPayloads.py`, `Build.Editor.log`·`Navigation.Build.log`다. 이번 이동 후 PIE·게임·자동화 테스트는 실행하지 않았으며 [TODO 24절](TODO.md#24-레벨-폴더-정리-후-확인)의 사용자 새 게임·이어하기 확인을 남긴다. 기존 생성·화면 검수의 성공은 당시 경로와 코드 기준의 이력이다.
 
 ### 개발용 협동 진입
 
@@ -476,8 +496,8 @@ GKnight·Assassin·Stylized Dark Witch의 원본·임포트 자료와 제작용 
 
 | 에셋 경로 | 클래스 / 저장된 연결 |
 |---|---|
-| `LEVEL/MainMenu` | 기본 시작 맵 |
-| `LEVEL/Gameplay` | TestMap geometry·NavMesh·Grid를 복제한 기준 레벨, `BP_GameplayGameMode` Override |
+| `LEVEL/Core/MainMenu` | 기본 시작 맵 |
+| `LEVEL/Core/Gameplay` | TestMap geometry·NavMesh·Grid를 복제한 기준 레벨, `BP_GameplayGameMode` Override |
 | `Blueprint/Game/BP_GameplayGameMode` | `AGameplayGameModeBase`, PartyDefinition과 `EncounterDefinitions[DefaultEncounter]` 설정 |
 | `Blueprint/Controller/BP_GameplayPlayerController` | `AGameplayPlayerController`, GameplayRootWidgetClass 설정 |
 | `Blueprint/DataAsset/Parties/DA_VerticalSliceParty` | `UPartyDefinitionDataAsset`, 전사는 `BP_WarriorUnit`, 나머지 직업과 fallback은 `BP_PlayerUnit` |
@@ -528,7 +548,7 @@ Paragon의 FBX 원본은 `Content/ParagonAnimationsRetargetedToManny`에 보존�
 5. `BP_GameplayPlayerController`의 GameplayRootWidgetClass와 Root WBP의 RunMapWidgetClass/ResultWidgetClass를 위 표대로 연결한다. 새 계획 화면은 native 기본값을 사용하며 기존 CombatHUDWidgetClass를 다시 연결할 필요가 없다.
 6. Gameplay의 World Settings에서 GameMode Override를 지정하고 Arena의 Grid/CameraAnchor/좌표를 위 표와 맞춘다.
 7. Grid의 TileClass·크기·Z를 확인한다. P 키로 NavMesh가 바닥/스폰 위치를 덮는지 보고 필요할 때 Build → Build Paths 후 Save All한다.
-8. `BP_MainMenuPlayerController`의 GameplayLevelName을 `/Game/User_JeHoon/LEVEL/Gameplay`로 지정한다. 제거된 옛 `StartGameLevelName=WorldMap` 필드는 실행에 사용하지 않는다.
+8. `BP_MainMenuPlayerController`의 GameplayLevelName을 `/Game/User_JeHoon/LEVEL/Core/Gameplay`로 지정한다. 제거된 옛 `StartGameLevelName=WorldMap` 필드는 실행에 사용하지 않는다.
 
 ### Designer 바인딩
 
@@ -555,7 +575,7 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 
 - 기본 콘텐츠는 전투 10회·상점 9회의 새 시험 Run과 네 직업을 사용하며 기존 두 전투 저장은 보존한다. 공통 초기값·개인 인벤토리·9칸 장비 UI·49종 장착·상점 HP 회복·임시 승리 골드 보상은 구현했다. 직업별 고유 스킬·최종 밸런스·회복/부활 인카운터·추가 보상·나머지 240종 장비 분류·비무기 콘텐츠·장비 능력치/부여 스킬·Snapshot 장비 연결과 목표 PvE/PvP 20전투·60인카운터 구성은 미구현이다.
 - 4×4 Grid·ASC HP/AP·기존 외형/사망 표현과 시전 몽타주를 연결한다. 순차 턴·AI·기존 GAS/몽타주 알림의 효과 실행은 기본 전투에서 제외하며 장착 스킬은 초기 라운드 변환을 사용한다. 미지원 이전 대상/범위/커스텀 능력은 명시 프로필을 요구하며 자동으로 다른 효과로 바꾸지 않는다. Streaming/Level Instance는 현재 흐름에 없다.
-- 2026-09-11부터 작업 폴더에서 삭제된 TestMap·BP_PartyPlayerController·TestGameModebase의 삭제 이력을 2026-09-16 Git에 반영한다. 자동 복원하지 않으며 기존 최초 생성·Audit 도구의 TestMap 입력은 별도 원본 확보가 필요하다. WorldMap 레벨/native class는 deprecated 상태이며 실행 흐름에서 제외한다.
+- 2026-09-11부터 작업 폴더에서 삭제된 TestMap·BP_PartyPlayerController·TestGameModebase의 삭제 이력을 2026-09-16 Git에 반영한다. 자동 복원하지 않으며 최초 생성 도구의 TestMap 입력은 별도 원본 확보가 필요하다. 현재 Audit 도구는 실제 역할 4맵을 새 경로로 검사한다. WorldMap 레벨/native class는 deprecated 상태이며 실행 흐름에서 제외한다.
 - WorldMap의 WorldSettings가 참조하는 WorldMapGameModeBase는 호환을 위해 보존한다.
 - 로컬 Snapshot·Listen Server·개발용 관리 저장의 구현을 실제 계정 인증, Steam 연결, PlayFab 운영, 경쟁 결과 검증이나 MMR 완료로 기록하지 않는다.
 - 빌드·자동화 결과와 사용자의 실제 조작 검증을 구분한다. 향후 Run·온라인·에셋 도입 조건은 [TODO](TODO.md), 현재 시험 구현의 실행 결과와 제한은 [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.

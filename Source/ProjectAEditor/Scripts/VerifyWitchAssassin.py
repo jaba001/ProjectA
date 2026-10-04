@@ -25,7 +25,7 @@ def verify():
         unreal.log("WITCH_ASSASSIN_LEGACY_CHECK_DELEGATED_TO_CURRENT_APPEARANCE")
         return
     catalog = load(ROOT + "/Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog")
-    world = unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/MainMenu")
+    world = unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/Core/MainMenu")
     actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors()
     stage = next(actor for actor in actors if isinstance(actor, unreal.MainMenuPreviewStage))
     for actor in actors:

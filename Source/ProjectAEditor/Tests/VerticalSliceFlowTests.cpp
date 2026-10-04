@@ -198,7 +198,7 @@ public:
             Params.SessionDestination = EPlaySessionDestinationType::InProcess;
             Params.WorldType = EPlaySessionWorldType::PlayInEditor;
             Params.bAllowOnlineSubsystem = false;
-            Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/MainMenu");
+            Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu");
             GEditor->RequestPlaySession(Params);
             bRequestedPIE = true;
             StageStarted = FPlatformTime::Seconds();
@@ -1066,7 +1066,7 @@ public:
             Params.SessionDestination = EPlaySessionDestinationType::InProcess;
             Params.WorldType = EPlaySessionWorldType::PlayInEditor;
             Params.bAllowOnlineSubsystem = false;
-            Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/MainMenu");
+            Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu");
             GEditor->RequestPlaySession(Params);
             bRequestedPIE = true;
             return false;
@@ -1485,7 +1485,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVerticalSliceMenuLifecycleTest, "ProjectA.Vert
 
 bool FVerticalSliceMenuLifecycleTest::RunTest(const FString& Parameters)
 {
-    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/MainMenu")));
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectAVerticalSliceTests::FPlayMenuLifecycle>(this));
     ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
     return true;
@@ -1530,7 +1530,7 @@ bool FVerticalSliceSavedSkillLoadoutTest::RunTest(const FString& Parameters)
     AddInfo(TEXT("Runs two saved-menu/encounter PIE sessions; enemy selection uses one Slate mouse press/release through the viewport and controller, skill/menu buttons use their delegates."));
     for (int32 Index = 0; Index < Skills.Num(); ++Index)
     {
-        ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/MainMenu")));
+        ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu")));
         FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectAVerticalSliceTests::FPlaySavedSkillLoadout>(this, Skills, Index));
         ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
     }

@@ -3,6 +3,7 @@
   "levels": [
     {
       "name": "MeadowBloom",
+      "level": "/Game/User_JeHoon/LEVEL/Environment/Grassland/MeadowBloom",
       "title": "꽃 초원",
       "source_roots": ["/Game/Orasot_Bundle", "/Engine/BasicShapes"],
       "lighting": {"sun_color": [255, 240, 212], "sky_color": [210, 232, 255], "fog_color": [196, 220, 199], "sun_rotation": [-48, -35, 0], "sun_lux": 55000, "sky_intensity": 3375, "fog_density": 0.002, "exposure_bias": 1.0, "exposure_ev100": 14.0},
@@ -345,6 +346,7 @@
     },
     {
       "name": "PineRidge",
+      "level": "/Game/User_JeHoon/LEVEL/Environment/Forest/PineRidge",
       "title": "소나무 능선",
       "source_roots": ["/Game/Orasot_Bundle", "/Engine/BasicShapes"],
       "lighting": {"sun_color": [238, 245, 255], "sky_color": [190, 215, 245], "fog_color": [150, 181, 190], "sun_rotation": [-42, -28, 0], "sun_lux": 45000, "sky_intensity": 2430, "fog_density": 0.004, "exposure_bias": 1.0, "exposure_ev100": 13.3},
@@ -641,6 +643,7 @@
     },
     {
       "name": "BambooGarden",
+      "level": "/Game/User_JeHoon/LEVEL/Environment/Forest/BambooGarden",
       "title": "대나무 정원",
       "source_roots": ["/Game/Orasot_Bundle", "/Engine/BasicShapes"],
       "lighting": {"sun_color": [244, 250, 215], "sky_color": [194, 226, 219], "fog_color": [167, 205, 188], "sun_rotation": [-48, -30, 0], "sun_lux": 48000, "sky_intensity": 3375, "fog_density": 0.005, "exposure_bias": 1.0, "exposure_ev100": 13.8},
@@ -950,6 +953,7 @@
     },
     {
       "name": "CrimsonForest",
+      "level": "/Game/User_JeHoon/LEVEL/Environment/Forest/CrimsonForest",
       "title": "붉은 숲",
       "source_roots": ["/Game/Orasot_Bundle", "/Engine/BasicShapes"],
       "lighting": {"sun_color": [255, 220, 190], "sky_color": [214, 220, 239], "fog_color": [206, 160, 162], "sun_rotation": [-40, -45, 0], "sun_lux": 50000, "sky_intensity": 3510, "fog_density": 0.004, "exposure_bias": 1.0, "exposure_ev100": 13.8},
@@ -1300,6 +1304,7 @@
     },
     {
       "name": "DesertCanyon",
+      "level": "/Game/User_JeHoon/LEVEL/Environment/Desert/DesertCanyon",
       "title": "사막 협곡",
       "source_roots": ["/Game/Orasot_Bundle", "/Engine/BasicShapes"],
       "lighting": {"sun_color": [255, 231, 191], "sky_color": [202, 225, 255], "fog_color": [219, 188, 151], "sun_rotation": [-46, -30, 0], "sun_lux": 65000, "sky_intensity": 4050, "fog_density": 0.002, "exposure_bias": 1.0, "exposure_ev100": 14.2},
@@ -1525,6 +1530,7 @@
     },
     {
       "name": "DesertOasis",
+      "level": "/Game/User_JeHoon/LEVEL/Environment/Desert/DesertOasis",
       "title": "여름 오아시스",
       "source_roots": ["/Game/Orasot_Bundle", "/Engine/BasicShapes"],
       "lighting": {"sun_color": [255, 246, 215], "sky_color": [193, 224, 255], "fog_color": [181, 218, 225], "sun_rotation": [-54, -25, 0], "sun_lux": 65000, "sky_intensity": 4320, "fog_density": 0.0015, "exposure_bias": 1.0, "exposure_ev100": 14.1},
@@ -1797,6 +1803,7 @@
     },
     {
       "name": "DarkMarsh",
+      "level": "/Game/User_JeHoon/LEVEL/Environment/Forest/DarkMarsh",
       "title": "어두운 습지",
       "source_roots": ["/Game/Orasot_Bundle", "/Engine/BasicShapes"],
       "lighting": {"sun_color": [203, 221, 249], "sky_color": [180, 199, 222], "fog_color": [119, 150, 162], "sun_rotation": [-42, -35, 0], "sun_lux": 40000, "sky_intensity": 3780, "fog_density": 0.008, "exposure_bias": 1.0, "exposure_ev100": 13.5},
@@ -2118,6 +2125,7 @@
     },
     {
       "name": "SavannahGrove",
+      "level": "/Game/User_JeHoon/LEVEL/Environment/Grassland/SavannahGrove",
       "title": "사바나 숲",
       "source_roots": ["/Game/Orasot_Bundle", "/Engine/BasicShapes"],
       "lighting": {"sun_color": [255, 226, 175], "sky_color": [208, 224, 248], "fog_color": [213, 193, 151], "sun_rotation": [-38, -40, 0], "sun_lux": 58000, "sky_intensity": 3510, "fog_density": 0.003, "exposure_bias": 1.0, "exposure_ev100": 14.0},
@@ -2456,6 +2464,7 @@
     },
     {
       "name": "FrozenPass",
+      "level": "/Game/User_JeHoon/LEVEL/Environment/Ice/FrozenPass",
       "title": "얼어붙은 고개",
       "source_roots": ["/Game/InfinityBladeIceLands", "/Engine/BasicShapes"],
       "lighting": {"sun_color": [229, 241, 255], "sky_color": [202, 224, 255], "fog_color": [187, 214, 236], "sun_rotation": [-48, -35, 0], "sun_lux": 52000, "sky_intensity": 3510, "exposure_ev100": 14.0, "exposure_bias": 1.0, "fog_density": 0.003},
@@ -2681,6 +2690,7 @@
     },
     {
       "name": "IceCitadel",
+      "level": "/Game/User_JeHoon/LEVEL/Environment/Ice/IceCitadel",
       "title": "눈 덮인 요새",
       "source_roots": ["/Game/InfinityBladeIceLands", "/Engine/BasicShapes"],
       "lighting": {"sun_color": [240, 245, 255], "sky_color": [214, 231, 255], "fog_color": [191, 218, 236], "sun_rotation": [-44, -30, 0], "sun_lux": 55000, "sky_intensity": 3780, "exposure_ev100": 14.1, "exposure_bias": 1.0, "fog_density": 0.0025},
@@ -2896,6 +2906,7 @@
     },
     {
       "name": "PalmCoast",
+      "level": "/Game/User_JeHoon/LEVEL/Environment/Summer/PalmCoast",
       "title": "한낮의 야자 해안",
       "source_roots": ["/Game/Kobo_Nature", "/Game/Orasot_Bundle", "/Engine/BasicShapes"],
       "lighting": {"sun_color": [255, 243, 219], "sky_color": [186, 227, 255], "fog_color": [180, 219, 231], "sun_rotation": [-51, -42, 0], "sun_lux": 65000, "sky_intensity": 3915, "fog_density": 0.002, "exposure_bias": 1.0, "exposure_ev100": 14.2},
@@ -3119,6 +3130,7 @@
     },
     {
       "name": "SunsetLagoon",
+      "level": "/Game/User_JeHoon/LEVEL/Environment/Summer/SunsetLagoon",
       "title": "노을빛 수정 석호",
       "source_roots": ["/Game/Kobo_Nature", "/Game/Orasot_Bundle", "/Engine/BasicShapes"],
       "lighting": {"sun_color": [255, 201, 158], "sky_color": [182, 206, 248], "fog_color": [216, 172, 155], "sun_rotation": [-28, -70, 0], "sun_lux": 32000, "sky_intensity": 2970, "fog_density": 0.003, "exposure_bias": 1.0, "exposure_ev100": 13.3},

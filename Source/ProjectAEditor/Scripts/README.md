@@ -4,7 +4,7 @@ UI 구조·생성 옵션·JSON 필드는 [UI_README](../../../Docs/UI_README.md)
 
 2026-10-04 사용자가 위임한 UE 5.8.3 엔진 자동화·실제 렌더링·입력 검수의 최신 범위는 [검증 이력](../../../Docs/HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)에 기록한다. 아래 도구별 작성·재로드 이력과 최신 작동 검수는 구분하며 남은 확인은 [TODO](../../../Docs/TODO.md)를 따른다.
 
-UE 5.8 Development Editor / Win64 빌드를 사용한다. 기존 Gameplay·Run 도구의 실행·재로드 결과는 UE 5.7 이력이며 19~20번 비교 레벨 도구의 작성·검사 결과는 UE 5.8 기준이다. UE 5.8 작동 확인은 [TODO 7절](../../../Docs/TODO.md#7-ue-58-전환-확인)을 따른다. Python은 `-EnablePlugins=PythonScriptPlugin`으로 해당 프로세스에서만 활성화한다. 제작 경로는 `/Game/User_JeHoon`이며 사용자 요청에 따른 지팡이 직접 임포트는 `/Game/MageStaff_FreeWeapons`를 사용한다. 최초 생성·Audit는 기존 TestMap을 요구하므로 현재 사용자 삭제 상태에서 실행 전 원본 가용성을 확인한다.
+UE 5.8 Development Editor / Win64 빌드를 사용한다. 기존 Gameplay·Run 도구의 실행·재로드 결과는 UE 5.7 이력이며 19~20번 비교 레벨 도구의 작성·검사 결과는 UE 5.8 기준이다. UE 5.8 작동 확인은 [TODO 7절](../../../Docs/TODO.md#7-ue-58-전환-확인)을 따른다. Python은 `-EnablePlugins=PythonScriptPlugin`으로 해당 프로세스에서만 활성화한다. 제작 경로는 `/Game/User_JeHoon`이며 사용자 요청에 따른 지팡이 직접 임포트는 `/Game/MageStaff_FreeWeapons`를 사용한다. 최초 생성 도구 `ConfigureGameplayAssets.py`만 기존 TestMap을 요구하며 입력이 없으면 작성 전에 중단한다. `AuditGameplayAssets.py`는 현재 역할 4맵의 새 경로를 검사하므로 TestMap을 요구하지 않는다.
 
 ```powershell
 $editorExecutable = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
@@ -34,7 +34,7 @@ $scriptDirectory = Join-Path $projectDirectory 'Source/ProjectAEditor/Scripts'
 4. 복제 맵에 내비게이션 데이터를 빌드하여 저장한다. Bounds/Recast Actor가 존재해도 저장된 경로 데이터가 없으면 이동 요청이 실패한다. `-Package`는 신규 Gameplay 한 개로 제한한다.
 
 ```powershell
-& $editorExecutable $projectFile -run=ResavePackages '-Package=/Game/User_JeHoon/LEVEL/Gameplay' -BuildNavigationData -ProjectOnly -unattended -nop4 -NullRHI
+& $editorExecutable $projectFile -run=ResavePackages '-Package=/Game/User_JeHoon/LEVEL/Core/Gameplay' -BuildNavigationData -ProjectOnly -unattended -nop4 -NullRHI
 ```
 
 5. 별도 프로세스에서 저장된 연결과 navigation data Actor를 검사한다. 결과는 `Saved/Automation/GameplayAssetValidation.json`이며 실제 경로와 이동은 아래 PIE 테스트에서 검사한다. 에디터 맵 로드 직후의 비동기 navigation 초기화는 tick 없는 Python commandlet의 경로 검사와 구분한다.
@@ -60,7 +60,7 @@ $skillTestSlot = 'ProjectA_Automation_SkillLoadout_' + [Guid]::NewGuid().ToStrin
 
 추가 위임 실행 명령은 같은 엔진 인자로 `Automation RunTests ProjectA.RunRoundPIE.1Players+ProjectA.RunRoundPIE.2Players+ProjectA.RunRoundPIE.4Players`를 사용한다. 각 시험이 새 전용 저장을 만들고 정리한다. 현행 fixture는 각 10전투·9상점 진행, 결과·HP/골드 저장 재로드와 원격 AP/몽타주/SAP를 검사한다. 전투 진행을 위해 인간 HP를 높인 fixture여서 정상 난이도 검증은 아니며 서비스 인증은 검사하지 않고 개발용 로컬 계정 문맥을 사용한다.
 
-실제 창 설정은 `-game /Game/User_JeHoon/LEVEL/MainMenu`와 `Automation RunTests ProjectA.Menu.GameWindowOptions`로 검사한다. 항복 UI는 같은 맵에서 새 `-ProjectASaveSlot=ProjectA_Automation_Surrender_<고유값>`과 `ProjectA.Menu.GameMenuSurrender`를 사용한다. 별도 프로세스 이어하기는 새 `-T11CheckpointSlot=ProjectA_Automation_Restart_<고유값> -T11WriteCheckpoint`로 `ProjectA.Persistence.ProcessRestart`를 먼저 실행한 뒤, 해당 슬롯을 `-ProjectASaveSlot`으로 지정한 `-game` 프로세스에서 `ProjectA.Menu.PackagedContinue`를 실행한다. 시험 이름과 달리 `UnrealEditor-Cmd -game` 실행은 패키징 검증이 아니다.
+실제 창 설정은 `-game /Game/User_JeHoon/LEVEL/Core/MainMenu`와 `Automation RunTests ProjectA.Menu.GameWindowOptions`로 검사한다. 항복 UI는 같은 맵에서 새 `-ProjectASaveSlot=ProjectA_Automation_Surrender_<고유값>`과 `ProjectA.Menu.GameMenuSurrender`를 사용한다. 별도 프로세스 이어하기는 새 `-T11CheckpointSlot=ProjectA_Automation_Restart_<고유값> -T11WriteCheckpoint`로 `ProjectA.Persistence.ProcessRestart`를 먼저 실행한 뒤, 해당 슬롯을 `-ProjectASaveSlot`으로 지정한 `-game` 프로세스에서 `ProjectA.Menu.PackagedContinue`를 실행한다. 시험 이름과 달리 `UnrealEditor-Cmd -game` 실행은 패키징 검증이 아니다.
 
 7. `CreateRangedAttack.py`는 폐기 안내 도구로 유지한다. 테스트 원거리 `BPDA_RangedAttack` 제거에 따라 에셋을 작성하거나 재생성하지 않으며 실행 시 폐기 안내만 반환한다. 이전 작성·검증 결과는 당시 이력이다.
 
@@ -163,18 +163,18 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 18. `ConfigureSkillVfxDirection.py`와 `CreateCatalogSkills.py`: 2026-10-03 폐기된 VFX 스킬 생성의 이전 진입점이다. 실행 시 폐기 안내만 표시하고 에셋·명세를 작성하지 않는다. `CatalogSkillSpecs.json`은 폐기 상태와 [RetiredSkillContent.json](RetiredSkillContent.json)의 삭제 경로 이력만 연결한다. 신규 VFX는 [도입 기준](../../../Docs/TODO.md#6-신규-에셋-선정과-도입)에 따라 별도 명세를 작성한다. [현재 정리 범위](../../../Docs/PROJECT_PLAN.md#4-8-기본-공격-외-스킬-정리)
 
-19. `ConfigureDungeonLevels.py`: `DungeonFantasySpec.json`·`DungeonStoneSpec.json`에 따라 Gameplay를 Unreal 기능으로 복제하여 `/Game/User_JeHoon/LEVEL/Environment/DungeonFantasy`·`DungeonStone`을 작성한다. FANTASTIC의 `/Game/Fantastic_Dungeon_Pack`·Modular Dungeon Collection의 `/Game/Dungeon_Modular_V1`을 직접 참조하고 전장·Grid·GameplayCamera를 보존한다. 두 맵만 기존 `BP_CombatDebugGameMode`를 지정하며 원본 Blueprint·Gameplay·DebugCombat과 기본 Run 전환은 유지한다. 최초 생성·navigation 저장·독립 재로드 정적 검사를 통과했다. 현행 밝기는 23번 도구와 같은 명세를 사용한다. [구성 기준](../../../Docs/PROJECT_PLAN.md#4-3-지하-던전-비교-레벨)
+19. `ConfigureDungeonLevels.py`: `DungeonFantasySpec.json`·`DungeonStoneSpec.json`에 따라 Gameplay를 Unreal 기능으로 복제하여 `/Game/User_JeHoon/LEVEL/Environment/Dungeon/DungeonFantasy`·`DungeonStone`을 작성한다. FANTASTIC의 `/Game/Fantastic_Dungeon_Pack`·Modular Dungeon Collection의 `/Game/Dungeon_Modular_V1`을 직접 참조하고 전장·Grid·GameplayCamera를 보존한다. 두 맵만 기존 `BP_CombatDebugGameMode`를 지정하며 원본 Blueprint·Gameplay·DebugCombat과 기본 Run 전환은 유지한다. 최초 생성·navigation 저장·독립 재로드 정적 검사 결과는 폴더 이동 전 이력이다. 현행 밝기는 23번 도구와 같은 명세를 사용한다. [구성 기준](../../../Docs/PROJECT_PLAN.md#4-3-지하-던전-비교-레벨)
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureDungeonLevels.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
-& $editorExecutable $projectFile -run=ResavePackages '-Package=/Game/User_JeHoon/LEVEL/Environment/DungeonFantasy' -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
-& $editorExecutable $projectFile -run=ResavePackages '-Package=/Game/User_JeHoon/LEVEL/Environment/DungeonStone' -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=ResavePackages '-Package=/Game/User_JeHoon/LEVEL/Environment/Dungeon/DungeonFantasy' -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=ResavePackages '-Package=/Game/User_JeHoon/LEVEL/Environment/Dungeon/DungeonStone' -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureDungeonLevels.py") -DungeonVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
 ```
 
-기본 실행은 신규 맵만 생성·저장한다. `-DungeonVerifyOnly`는 저장본의 원본 에셋 참조·전장 연결을 읽기 전용으로 검사하고 `Saved/Automation/Dungeons/Reload.json`에 기록한다. 제작 결과는 같은 폴더의 `Configuration.json`에 기록한다. `-DungeonRebuild`는 기존 두 비교 맵의 장식을 재구성하여 수동 장식 수정을 덮어쓰는 명시적 옵션이다. navigation 명령의 `-ini`는 자동 빌드의 비동기 로딩 대기를 해당 프로세스에서만 해제하며 프로젝트 설정을 저장하지 않는다. 정적 검사는 실제 화면·클릭·이동을 포함하지 않으며 [TODO 10절](../../../Docs/TODO.md#10-지하-던전-비교-레벨-확인)에서 사용자가 확인한다.
+기본 실행은 신규 맵만 생성·저장한다. `-DungeonVerifyOnly`는 저장본의 원본 에셋 참조·전장 연결을 읽기 전용으로 검사하고 `Saved/Automation/Dungeons/Reload.json`에 기록한다. 제작 결과는 같은 폴더의 `Configuration.json`에 기록한다. `-DungeonRebuild`는 기존 두 비교 맵의 장식을 재구성하여 수동 장식 수정을 덮어쓰는 명시적 옵션이다. navigation 명령의 `-ini`는 자동 빌드의 비동기 로딩 대기를 해당 프로세스에서만 해제하며 프로젝트 설정을 저장하지 않는다. 정적 검사는 실제 화면·클릭·이동을 포함하지 않는다. 별도 실행 검수 이력은 [TODO 10절](../../../Docs/TODO.md#10-지하-던전-비교-레벨-확인), 폴더 이동 후 확인은 [TODO 24절](../../../Docs/TODO.md#24-레벨-폴더-정리-후-확인)을 따른다.
 
-20. `ConfigureEnvironmentSurfaces.py`·`ConfigureEnvironmentLevels.py`: `EnvironmentLevelSpecs.json`의 `surfaces`·`instances`를 먼저 작성하고 `levels`의 비교 맵을 `/Game/User_JeHoon/LEVEL/Environment/`에 생성한다. Orasot·Infinity Blade Ice Lands·Kobo Nature의 원본을 직접 참조하며, 평면 지면·RVT 해제·얼음 팩의 ISM 지원에 필요한 새 Material·자식 MI만 `/Game/User_JeHoon/Materials/Environment/`에 작성한다. 얼음 자식 MI는 UE 5.8 Material usage override를 사용하여 원본 Material의 flag를 보존한다. 기존 전장·물리 바닥·카메라와 독립 전투 모드를 보존하고 반복 장식을 ISM으로 묶는다. UE 5.8에서 12개 맵·표면 Material 9개·자식 MI 44개를 생성·저장하고 navigation 저장·맵과 재질의 최종 독립 재로드 정적 검사를 통과했다. 원본 팩은 Git에 포함하지 않으므로 다른 PC에서도 해당 팩 설치가 필요하다. [맵 목록·구성 기준](../../../Docs/PROJECT_PLAN.md#4-4-환경-비교-레벨)
+20. `ConfigureEnvironmentSurfaces.py`·`ConfigureEnvironmentLevels.py`: `EnvironmentLevelSpecs.json`의 `surfaces`·`instances`를 먼저 작성하고 `levels`의 `level` 경로에 따라 비교 맵을 `/Game/User_JeHoon/LEVEL/Environment/<테마>/`에 생성한다. Orasot·Infinity Blade Ice Lands·Kobo Nature의 원본을 직접 참조하며, 평면 지면·RVT 해제·얼음 팩의 ISM 지원에 필요한 새 Material·자식 MI만 `/Game/User_JeHoon/Materials/Environment/`에 작성한다. 얼음 자식 MI는 UE 5.8 Material usage override를 사용하여 원본 Material의 flag를 보존한다. 기존 전장·물리 바닥·카메라와 독립 전투 모드를 보존하고 반복 장식을 ISM으로 묶는다. UE 5.8에서 12개 맵·표면 Material 9개·자식 MI 44개를 생성·저장하고 navigation 저장·맵과 재질의 최종 독립 재로드 정적 검사를 통과했다. 원본 팩은 Git에 포함하지 않으므로 다른 PC에서도 해당 팩 설치가 필요하다. [맵 목록·구성 기준](../../../Docs/PROJECT_PLAN.md#4-4-환경-비교-레벨)
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureEnvironmentSurfaces.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
@@ -182,13 +182,13 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 $environmentSpecs = Get-Content (Join-Path $scriptDirectory 'EnvironmentLevelSpecs.json') -Raw | ConvertFrom-Json
 foreach ($environmentSpec in $environmentSpecs.levels)
 {
-    & $editorExecutable $projectFile -run=ResavePackages ("-Package=/Game/User_JeHoon/LEVEL/Environment/" + $environmentSpec.name) -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+    & $editorExecutable $projectFile -run=ResavePackages ("-Package=" + $environmentSpec.level) -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
 }
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureEnvironmentSurfaces.py") -EnvironmentSurfacesVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureEnvironmentLevels.py") -EnvironmentVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
 ```
 
-기본 실행은 새 에셋만 작성한다. `-EnvironmentNames=MeadowBloom,PineRidge`로 맵 작성·검사만 선택할 수 있으며 재질 도구는 명세의 재질 전체를 처리한다. 기존 결과를 재작성하려면 각각 `-EnvironmentSurfacesRebuild`·`-EnvironmentRebuild`를 명시하며 작성된 재질 설정·수동 장식 수정을 덮어쓴다. ISM 배치 전 `has_material_usage` 사전검사를 통과해야 하며 원본 기본 재질의 자동 수정에 의존하지 않는다. 원본 팩과 기존 프로젝트 에셋의 해시를 보호하고, 검사는 저장된 재질 그래프·RVT switch·MI usage override·부모/텍스처 참조와 ISM 변환·예산·지면 빈틈·카메라 여백을 확인한다. 보고서는 `Saved/Automation/Environments/{SurfacesConfiguration,SurfacesReload,Configuration,Reload}.json`이며 화면·이동·실제 FPS 확인은 [TODO 11절](../../../Docs/TODO.md#11-환경-비교-레벨-확인)에서 사용자가 수행한다.
+기본 실행은 새 에셋만 작성한다. `-EnvironmentNames=MeadowBloom,PineRidge`로 맵 작성·검사만 선택할 수 있으며 재질 도구는 명세의 재질 전체를 처리한다. 기존 결과를 재작성하려면 각각 `-EnvironmentSurfacesRebuild`·`-EnvironmentRebuild`를 명시하며 작성된 재질 설정·수동 장식 수정을 덮어쓴다. ISM 배치 전 `has_material_usage` 사전검사를 통과해야 하며 원본 기본 재질의 자동 수정에 의존하지 않는다. 원본 팩과 기존 프로젝트 에셋의 해시를 보호하고, 검사는 저장된 재질 그래프·RVT switch·MI usage override·부모/텍스처 참조와 ISM 변환·예산·지면 빈틈·카메라 여백을 확인한다. 보고서는 `Saved/Automation/Environments/{SurfacesConfiguration,SurfacesReload,Configuration,Reload}.json`이며 별도 화면·이동·실제 FPS 검수 범위는 [TODO 11절](../../../Docs/TODO.md#11-환경-비교-레벨-확인), 폴더 이동 후 확인은 [TODO 24절](../../../Docs/TODO.md#24-레벨-폴더-정리-후-확인)을 따른다.
 
 21. `ConfigureMonsterContent.py`: [MonsterContentSpecs.json](MonsterContentSpecs.json)의 10종·설원 재질 변형 2개에 프로젝트 전용 Enemy Blueprint·BlendSpace·native GroundSpeed AnimBlueprint·단일 DefaultSlot 공격 몽타주와 Skill DataAsset을 작성한다. `Fantasy_Pack`·`StylizedCreaturesBundle` 원본을 직접 참조하며 늑대인간·골렘의 Manny 공격 2개만 원본 하위 경로를 유지하여 리타깃한다. 설원 늑대/곰은 기존 종의 애니메이션과 원본 재질을 공유한다. 기본 편성을 오크·트롤·늑대·골렘 4개로 구성하고 기존 `BP_EnemyUnit`을 포함한 소프트 디버그 카탈로그 13개를 연결한다. [구성 기준](../../../Docs/PROJECT_PLAN.md#4-5-몬스터-콘텐츠)
 
@@ -209,7 +209,7 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 
 기본 명령은 계획·파일 SHA·크기·클래스·모든 참조 분류를 감사한다. `-CleanupUnusedApply`는 참조하는 에셋부터 50개씩 엔진 기능으로 삭제하고 결과를 검사하며 `-CleanupUnusedVerifyOnly`는 삭제 후 읽기 전용으로 검사한다. 적용·검증 옵션은 함께 사용할 수 없다. 모든 모드에서 계획과 HEAD가 일치해야 하므로 별도 프로세스 검증은 커밋 전에 실행한다. 커밋 이후에는 현재 HEAD의 새 계획을 검토하며 계획의 기준만 임의 변경하지 않는다. 경로 이탈·파일 변경·외부 참조·후보 간 순환 참조를 거절하고 잔존 파일/Registry·생존 패키지 의존·보호 루트 폐쇄를 검사한다. 결과는 같은 폴더의 `Audit.json`·`Apply.json`·`Verify.json`에 기록하며 실제 새 Run·Continue·디버그 확인은 [TODO 13절](../../../Docs/TODO.md#13-에셋-정리-후-확인)을 따른다.
 
-23. `ConfigureLevelLighting.py`: `EnvironmentLevelSpecs.json`과 두 던전 명세의 현행 조명·노출을 기존 `/Game/User_JeHoon/LEVEL/Environment/` 14맵에 적용한다. 기본 명령은 조명만 부분 수정하며 전장·장식·재질·navigation 설정과 기존 던전 이동 Redirector를 보존한다. 전체 맵의 장식을 재작성하는 `-EnvironmentRebuild`·`-DungeonRebuild` 없이 밝기를 갱신한다. [렌더링·밝기 기준](../../../Docs/PROJECT_PLAN.md#4-7-렌더링-설정과-비교-레벨-밝기)
+23. `ConfigureLevelLighting.py`: `EnvironmentLevelSpecs.json`과 두 던전 명세의 현행 조명·노출을 기존 `/Game/User_JeHoon/LEVEL/Environment/<테마>/` 14맵에 적용한다. 기본 명령은 조명만 부분 수정하며 전장·장식·재질·navigation 설정을 보존한다. 이전 맵 경로 호환은 공통 폴더 명세와 엔진 리디렉션 설정으로 관리한다. 전체 맵의 장식을 재작성하는 `-EnvironmentRebuild`·`-DungeonRebuild` 없이 밝기를 갱신한다. [렌더링·밝기 기준](../../../Docs/PROJECT_PLAN.md#4-7-렌더링-설정과-비교-레벨-밝기)
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureLevelLighting.py") -LightingCaptureBaseline -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
@@ -271,3 +271,16 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 ```
 
 기본 모드는 기존 파생본의 독립 읽기 전용 검사다. 신규 작성은 명시적 `-SkillVfxDirectionAuthor`만 허용하며 소유 정보가 없는 기존 결과를 덮어쓰지 않는다. 28번 작성 → 26번 방향 참조 갱신 → 별도 프로세스의 28번 기본 검사·26번 방향 VerifyOnly·27번 전체 감사 순서로 확인한다. 결과는 `Saved/Automation/SkillVfxDirection/DerivativeAuthor.json`·`DerivativeReload.json`에 기록하며 화면·게임·PIE·자동화 테스트를 시작하지 않는다.
+
+29. `OrganizeLevelFolders.py`: `LevelFolderLayout.json`을 기준으로 18개 맵을 Unreal 기능으로 이동한다. 기본 실행은 변경 없는 사전 감사, `-LevelFoldersApply`는 이동·참조 갱신·Redirector 정리, `-LevelFoldersVerifyOnly`는 독립 프로세스의 읽기 전용 검증이다. `ProjectLevelPaths.py`는 작성 도구의 기존 맵 이름과 새 용도·테마 경로를 공통으로 관리한다. `EnvironmentLevelSpecs.json` 각 항목의 `level`과 두 던전 명세의 `level`은 이 기준과 일치해야 한다. 기존 맵 이동·Redirector 정리는 Unreal 기능으로 수행하며 탐색기에서 `.umap`만 이동하지 않는다. 원본 팩·고유 맵 18개·필수 파생 자료를 유지하고 이전 Package/Object 경로를 새 맵으로 연결한다. [폴더 기준](../../../Docs/PROJECT_PLAN.md#4-10-레벨-폴더와-이전-경로-호환)·[이동 후 검증](../../../Docs/TODO.md#24-레벨-폴더-정리-후-확인)
+
+이 도구는 이번 18맵 이동만을 위한 제한된 유지보수 명령이며 `Saved/Automation/LevelFolders`의 사전 SHA·바이트 백업(`ProtectedBefore.json`·`Before/`)과 감사 기준(`Baseline.json`)을 사용한다. 완료된 작업에 Audit/Apply를 다시 실행하거나 현재 상태로 옛 Baseline을 재생성하지 않는다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/OrganizeLevelFolders.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/OrganizeLevelFolders.py") -LevelFoldersApply -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=ResavePackages ("-PackageFolder=" + (Join-Path (Split-Path $projectFile) 'Content/User_JeHoon/LEVEL/Environment')) -BuildNavigationData -ProjectOnly '-ini:Engine:[/Script/NavigationSystem.NavigationSystemV1]:bWaitForAsyncLoadingBeforeBuildingNavigationAutomatically=False' -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/OrganizeLevelFolders.py") -LevelFoldersVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+```
+
+적용 전 기본 시작·쿠킹 맵과 로컬 에디터의 최근 맵/맵별 뷰 키를 새 경로로 갱신한다. 로컬 설정은 원본 바이트를 백업하고 카메라 좌표·뷰 설정을 보존한다. CoreRedirect는 맵 이동과 Redirector 정리를 마친 뒤 추가한다. 이동 후 환경 14맵의 navigation을 공식 `ResavePackages -BuildNavigationData`로 재빌드·저장하고 새 프로세스의 `-LevelFoldersVerifyOnly`를 실행한다. 기존 던전 별칭 2개와 이동하는 맵의 옛 경로 18개를 구분한다. 엔진이 이동 중 Redirector를 생성하지 않을 수도 있으므로 삭제 개수를 고정하지 않는다. 최종 검증은 새 World 18개와 옛 물리 경로 20개의 부재, 옛 SoftObjectPath의 정확한 새 맵 해석을 확인한다. 2026-10-04 적용·navigation 재빌드·최종 독립 검증 종료 0과 Development Editor / Win64 38.89초 컴파일을 통과했다. 환경 14맵은 각 64타일과 native Recast payload SHA가 원본과 같고 모든 18맵에서 삭제된 export는 없다. 근거는 `Saved/Automation/LevelFolders/{Audit,Apply,Verify,ProtectedFinal,EditorMapPaths.Final,Payloads.AfterNavigationRepair}.json`과 `Build.Editor.log`·`Navigation.Build.log`이며 이번 작업에서 PIE·게임·자동화 테스트는 실행하지 않았다. 현재 확인 범위는 [TODO 24절](../../../Docs/TODO.md#24-레벨-폴더-정리-후-확인)을 따른다.

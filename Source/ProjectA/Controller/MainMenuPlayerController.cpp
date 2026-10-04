@@ -15,7 +15,7 @@ AMainMenuPlayerController::AMainMenuPlayerController()
 {
     bShowMouseCursor = true;
     bAutoManageActiveCameraTarget = false;
-    GameplayLevelName = TEXT("/Game/User_JeHoon/LEVEL/Gameplay");
+    GameplayLevelName = TEXT("/Game/User_JeHoon/LEVEL/Core/Gameplay");
 }
 
 void AMainMenuPlayerController::BeginPlay()

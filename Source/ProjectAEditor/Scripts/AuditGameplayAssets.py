@@ -1,6 +1,16 @@
 import json
 import os
+import sys
+from pathlib import Path
+
 import unreal
+
+SCRIPT_DIRECTORY = Path(__file__).resolve().parent
+sys.dont_write_bytecode = True
+if str(SCRIPT_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIRECTORY))
+
+from ProjectLevelPaths import project_level_path
 
 # Load assets without saving them; write evidence only under Saved.
 # 에셋은 저장하지 않고 읽으며 확인 결과만 Saved 아래에 기록합니다.
@@ -8,7 +18,7 @@ report = {"assets": [], "maps": [], "world_map_references": []}
 registry = unreal.AssetRegistryHelpers.get_asset_registry()
 registry.search_all_assets(True)
 options = unreal.AssetRegistryDependencyOptions(include_soft_package_references=True, include_hard_package_references=True, include_searchable_names=True, include_soft_management_references=True, include_hard_management_references=True)
-report["world_map_references"] = [str(value) for value in registry.get_referencers("/Game/User_JeHoon/LEVEL/WorldMap", options)]
+report["world_map_references"] = [str(value) for value in registry.get_referencers(project_level_path("WorldMap"), options)]
 
 properties = ["default_game_mode", "player_controller_class", "default_pawn_class", "spectator_class", "hud_class", "combat_manager_class", "player_unit_classes", "enemy_unit_classes", "player_coords", "enemy_coords", "tile_class", "row_count", "col_count", "spacing", "gap_spacing", "gap_start_index", "hud_widget_class", "main_menu_root_widget_class", "main_menu_screen_widget_class", "character_creation_widget_class", "world_map_level_name", "equipped_skill_data_assets", "equipped_skill_ability_classes", "default_attack_ability_class", "ability_class", "attack_montage", "move_to_target", "damage", "base_damage", "skill_actor_class", "camera_actor", "auto_activate_for_player", "auto_possess_ai", "ai_controller_class", "main_menu_widget_class", "gameplay_level_name", "party_definition", "encounter_definitions", "fallback_player_unit_class", "gameplay_root_widget_class", "run_map_widget_class", "result_widget_class", "combat_hud_widget_class", "grid", "camera_anchor"]
 properties.extend(["start_game_level_name", "damage_amount", "spawned_attack_actor_class", "empty_sprite", "player_sprite", "enemy_sprite", "movable_sprite", "active_sprite"])
@@ -43,11 +53,9 @@ for data in registry.get_assets_by_path("/Game/User_JeHoon", recursive=True):
             entry["error"] = str(error)
     report["assets"].append(entry)
 
-map_names = ["TestMap", "MainMenu", "WorldMap"]
-if unreal.EditorAssetLibrary.does_asset_exist("/Game/User_JeHoon/LEVEL/Gameplay"):
-    map_names.append("Gameplay")
+map_names = ["MainMenu", "Gameplay", "DebugCombat", "WorldMap"]
 for map_name in map_names:
-    world = unreal.EditorLoadingAndSavingUtils.load_map("/Game/User_JeHoon/LEVEL/" + map_name)
+    world = unreal.EditorLoadingAndSavingUtils.load_map(project_level_path(map_name))
     entry = {"name": map_name, "loaded": bool(world), "actors": []}
     if world:
         entry["world_settings"] = inspect_object(world.get_world_settings())

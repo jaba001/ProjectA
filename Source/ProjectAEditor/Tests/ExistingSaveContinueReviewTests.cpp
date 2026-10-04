@@ -127,7 +127,7 @@ namespace ExistingSaveContinueReview
                 Params.SessionDestination = EPlaySessionDestinationType::InProcess;
                 Params.WorldType = EPlaySessionWorldType::PlayInEditor;
                 Params.bAllowOnlineSubsystem = false;
-                Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/MainMenu");
+                Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu");
                 GEditor->RequestPlaySession(Params);
                 Stage = 1;
                 return false;
@@ -329,7 +329,7 @@ bool FExistingSaveContinueReviewTest::RunTest(const FString& Parameters)
     Observation->Report->SetBoolField(TEXT("settings_or_managed_authority_mutated_by_fixture"), false);
     Observation->Report->SetBoolField(TEXT("actual_continue_delegate_invoked"), false);
     Observation->Report->SetBoolField(TEXT("public_restore_compared"), false);
-    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/MainMenu")));
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FReview>(this, Observation));
     ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
     return true;

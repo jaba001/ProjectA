@@ -6,12 +6,15 @@ import unreal
 # Run through the PythonScript commandlet with PythonScriptPlugin temporarily enabled.
 # PythonScriptPlugin을 명령줄에서 일시 활성화한 PythonScript commandlet으로 실행합니다.
 ROOT = "/Game/User_JeHoon"
+# This historical first-generation source was removed; never substitute or recreate it automatically.
+# 이 최초 생성용 원본은 삭제되었으므로 자동 대체하거나 복원하지 않습니다.
+SOURCE_MAP = ROOT + "/LEVEL/TestMap"
 OUTPUTS = {
     "party": ROOT + "/Blueprint/DataAsset/Parties/DA_VerticalSliceParty",
     "encounter": ROOT + "/Blueprint/DataAsset/Encounters/DA_DefaultEncounter",
     "controller": ROOT + "/Blueprint/Controller/BP_GameplayPlayerController",
     "game_mode": ROOT + "/Blueprint/Game/BP_GameplayGameMode",
-    "map": ROOT + "/LEVEL/Gameplay",
+    "map": ROOT + "/LEVEL/Core/Gameplay",
 }
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 assets_to_save = []
@@ -54,6 +57,7 @@ def widget_class(name, native_name):
 # 이전 생성본이나 사용자가 편집한 Gameplay 콘텐츠를 덮어쓰지 않습니다.
 existing = [path for path in OUTPUTS.values() if unreal.EditorAssetLibrary.does_asset_exist(path)]
 require(not existing, "Gameplay assets already exist; inspect and edit them in the editor instead of overwriting: " + ", ".join(existing))
+require(unreal.EditorAssetLibrary.does_asset_exist(SOURCE_MAP), "The historical TestMap source is absent; first-time generation requires an explicitly restored original source map.")
 player_class = load_class(ROOT + "/Blueprint/Unit/BP_PlayerUnit.BP_PlayerUnit_C")
 enemy_class = load_class(ROOT + "/Blueprint/Unit/BP_EnemyUnit.BP_EnemyUnit_C")
 party_class = load_class("/Script/ProjectA.PartyDefinitionDataAsset")
@@ -61,7 +65,7 @@ encounter_class = load_class("/Script/ProjectA.EncounterDefinitionDataAsset")
 mode_class = load_class("/Script/ProjectA.GameplayGameModeBase")
 controller_class = load_class("/Script/ProjectA.GameplayPlayerController")
 arena_class = load_class("/Script/ProjectA.CombatArena")
-source_world = require(unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/TestMap"), "TestMap could not be loaded.")
+source_world = require(unreal.EditorLoadingAndSavingUtils.load_map(SOURCE_MAP), "TestMap could not be loaded.")
 actor_subsystem = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 source_actors = actor_subsystem.get_all_level_actors()
 source_grids = [actor for actor in source_actors if isinstance(actor, unreal.CombatGridManager)]
@@ -100,7 +104,7 @@ unreal.BlueprintEditorLibrary.compile_blueprint(mode)
 
 # Duplicate through Unreal asset APIs so TestMap and its serialized references remain untouched.
 # TestMap과 직렬화된 참조를 보존하도록 Unreal 에셋 API로 복제합니다.
-gameplay_asset = require(unreal.EditorAssetLibrary.duplicate_asset(ROOT + "/LEVEL/TestMap", OUTPUTS["map"]), "Gameplay map duplication failed.")
+gameplay_asset = require(unreal.EditorAssetLibrary.duplicate_asset(SOURCE_MAP, OUTPUTS["map"]), "Gameplay map duplication failed.")
 world = require(unreal.EditorLoadingAndSavingUtils.load_map(OUTPUTS["map"]), "Gameplay could not be loaded after duplication.")
 require(world.get_path_name() == OUTPUTS["map"] + ".Gameplay", "Refusing to save an unexpected world: " + world.get_path_name())
 world.get_world_settings().set_editor_property("default_game_mode", mode.generated_class())
@@ -129,10 +133,10 @@ arena.set_editor_property("enemy_coords", [unreal.IntPoint(1, 2), unreal.IntPoin
 for asset in assets_to_save:
     require(unreal.EditorAssetLibrary.save_loaded_asset(asset, only_if_is_dirty=False), "Asset save failed: " + asset.get_path_name())
 require(unreal.EditorLoadingAndSavingUtils.save_map(world, OUTPUTS["map"]), "Gameplay map save failed.")
-report = {"created": OUTPUTS, "source_map": ROOT + "/LEVEL/TestMap", "game_mode": mode.generated_class().get_path_name(), "controller": controller.generated_class().get_path_name(), "root_widget": root_widget_class.get_path_name(), "grid": grid.get_path_name(), "arena": arena.get_path_name(), "camera": camera.get_path_name(), "camera_location": str(camera.get_actor_location()), "camera_rotation": str(camera.get_actor_rotation()), "party_fallback": player_class.get_path_name(), "enemy": enemy_class.get_path_name(), "validation": "Asset configuration and package save only; PIE gameplay is verified separately."}
+report = {"created": OUTPUTS, "source_map": SOURCE_MAP, "game_mode": mode.generated_class().get_path_name(), "controller": controller.generated_class().get_path_name(), "root_widget": root_widget_class.get_path_name(), "grid": grid.get_path_name(), "arena": arena.get_path_name(), "camera": camera.get_path_name(), "camera_location": str(camera.get_actor_location()), "camera_rotation": str(camera.get_actor_rotation()), "party_fallback": player_class.get_path_name(), "enemy": enemy_class.get_path_name(), "validation": "Asset configuration and package save only; PIE gameplay is verified separately."}
 output = os.path.join(unreal.Paths.project_saved_dir(), "Automation", "GameplayProvisioning.json")
 os.makedirs(os.path.dirname(output), exist_ok=True)
 with open(output, "w", encoding="utf-8") as handle:
     json.dump(report, handle, ensure_ascii=False, indent=2)
 unreal.log("GAMEPLAY_PROVISIONING_COMPLETE: " + output)
-unreal.log("Run ResavePackages -Package=/Game/User_JeHoon/LEVEL/Gameplay -BuildNavigationData before ValidateGameplayAssets.py or PIE.")
+unreal.log("Run ResavePackages -Package=/Game/User_JeHoon/LEVEL/Core/Gameplay -BuildNavigationData before ValidateGameplayAssets.py or PIE.")

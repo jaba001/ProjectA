@@ -7,8 +7,8 @@ import unreal
 
 
 ROOT = Path(unreal.Paths.project_dir()).resolve()
-SOURCE_MAP = "/Game/User_JeHoon/LEVEL/Gameplay"
-DEBUG_MAP = "/Game/User_JeHoon/LEVEL/DebugCombat"
+SOURCE_MAP = "/Game/User_JeHoon/LEVEL/Core/Gameplay"
+DEBUG_MAP = "/Game/User_JeHoon/LEVEL/Development/DebugCombat"
 MODE_PATH = "/Game/User_JeHoon/Blueprint/Game/BP_CombatDebugGameMode"
 PARTY_PATH = "/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty"
 ENEMY_PATH = "/Game/User_JeHoon/Blueprint/DataAsset/Encounters/DA_DefaultEncounter"

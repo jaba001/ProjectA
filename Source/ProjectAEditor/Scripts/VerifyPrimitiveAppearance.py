@@ -59,7 +59,7 @@ def verify_preview_facing():
         if profession == "Mage":
             verify_default_staff(blueprint)
         report["preview_blueprints"].append(blueprint.get_path_name())
-    require(unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/MainMenu"), "Missing MainMenu map")
+    require(unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/Core/MainMenu"), "Missing MainMenu map")
     stages = [actor for actor in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors() if isinstance(actor, unreal.MainMenuPreviewStage)]
     require(len(stages) == 1, "MainMenu requires one preview stage")
     stage = stages[0]
@@ -123,7 +123,7 @@ def verify():
     male = load(BODIES[0][2])
     party = load(ROOT + "/Blueprint/DataAsset/Parties/DA_VerticalSliceParty")
     snapshots = load(ROOT + "/Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog")
-    unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/MainMenu")
+    unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/Core/MainMenu")
     stage = next(actor for actor in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors() if isinstance(actor, unreal.MainMenuPreviewStage))
     source_defaults = unreal.get_default_object(load(ROOT + "/Blueprint/Unit/BP_PlayerUnit").generated_class())
     for profession, unit_name, preview_name in PROFESSIONS:

@@ -32,7 +32,7 @@ def digest(path):
 
 
 def map_file(package):
-    require(package.startswith(environment.OUTPUT_ROOT) and "/" not in package.removeprefix(environment.OUTPUT_ROOT), "Lighting target must be an Environment world")
+    require(package.startswith(environment.OUTPUT_ROOT) and package == environment.project_level_path(package.rsplit("/", 1)[-1]), "Lighting target must match an organized Environment world")
     return "Content/" + package.removeprefix("/Game/") + ".umap"
 
 
@@ -121,7 +121,7 @@ def read_targets():
     require(len(indoor) == 2, "Lighting authoring requires both dungeon specifications")
     targets = [("environment", environment.level_path(spec), spec) for spec in outdoor]
     for name, spec in zip(dungeon.LEVELS, indoor):
-        require(spec["level"] == environment.OUTPUT_ROOT + name, "Dungeon world must use its moved Environment path")
+        require(spec["level"] == dungeon.project_level_path(name) and spec["level"].startswith(dungeon.OUTPUT_ROOT), "Dungeon world must use its organized Environment path")
         targets.append(("dungeon", spec["level"], spec))
     require(len({package for _, package, _ in targets}) == 14, "Lighting worlds must be unique")
     for _, package, _ in targets:

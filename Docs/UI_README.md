@@ -124,7 +124,7 @@ C++ 타입은 각 이름에 U 접두사를 붙인다. 부모 누락·순환 참�
 
 프리뷰 설정은 MainMenu에 PreviewStage 1개 배치 → PreviewActorClasses의 Warrior/Mage/Archer/Rogue 연결 → PreviewCamera·Slot0~3Anchor 조정 순서다. 메뉴 전용 Actor를 사용하며 전투 입력·AI·충돌 로직은 제외한다. Stage·클래스 누락 시 경고를 기록하고 카드 UI는 유지한다.
 
-기준 거리·방향·간격은 `/Game/User_JeHoon/LEVEL/MainMenu`의 Outliner에서 `MainMenuPreviewStage`를 선택하여 Details에서 수정하고 레벨을 저장한다. 전체 보기의 최종 거리는 실제 뷰포트와 몸체 경계에 맞춰 자동 보정하며 Edit 상세 카메라는 별도 거리 배율을 사용한다.
+기준 거리·방향·간격은 `/Game/User_JeHoon/LEVEL/Core/MainMenu`의 Outliner에서 `MainMenuPreviewStage`를 선택하여 Details에서 수정하고 레벨을 저장한다. 전체 보기의 최종 거리는 실제 뷰포트와 몸체 경계에 맞춰 자동 보정하며 Edit 상세 카메라는 별도 거리 배율을 사용한다.
 
 | 조절 대상 | Details 위치 | 현재값·조절 방향 |
 |---|---|---|

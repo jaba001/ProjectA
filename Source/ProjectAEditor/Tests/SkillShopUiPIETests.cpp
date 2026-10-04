@@ -161,7 +161,7 @@ namespace SkillShopUiReview
                 Params.SessionDestination = EPlaySessionDestinationType::InProcess;
                 Params.WorldType = EPlaySessionWorldType::PlayInEditor;
                 Params.bAllowOnlineSubsystem = false;
-                Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/MainMenu");
+                Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu");
                 GEditor->RequestPlaySession(Params);
                 Advance(bPurchased ? 20 : 1);
                 return false;
@@ -726,7 +726,7 @@ bool FSkillShopUiReviewTest::RunTest(const FString& Parameters)
         AddError(TEXT("The review output directory cannot be created under Saved."));
         return false;
     }
-    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/MainMenu")));
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<SkillShopUiReview::FReview>(this, Slot));
     return true;
 }

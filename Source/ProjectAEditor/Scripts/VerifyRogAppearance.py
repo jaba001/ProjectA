@@ -67,7 +67,7 @@ def verify():
     sword = load(ROOT + "/Blueprint/DataAsset/Skills/BPDA_swoard_attack")
     party = load(ROOT + "/Blueprint/DataAsset/Parties/DA_VerticalSliceParty")
     snapshots = load(ROOT + "/Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog")
-    unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/MainMenu")
+    unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/Core/MainMenu")
     actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors()
     stage = next(actor for actor in actors if isinstance(actor, unreal.MainMenuPreviewStage))
     for actor in actors:

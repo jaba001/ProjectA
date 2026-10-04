@@ -84,7 +84,7 @@ bool UDevelopmentCoopSubsystem::Host(APlayerController* Controller, int32 Capaci
     GetGameInstance()->GetSubsystem<URunStateSubsystem>()->ResetDevelopmentRun();
     bPending = bActive = bResetAtMenu = true;
     Status = FText::FromString(TEXT("개발용 방을 여는 중입니다."));
-    UGameplayStatics::OpenLevel(Controller, TEXT("/Game/User_JeHoon/LEVEL/Gameplay"), true, FString::Printf(TEXT("listen?ProjectADevCoop=%d"), Capacity));
+    UGameplayStatics::OpenLevel(Controller, TEXT("/Game/User_JeHoon/LEVEL/Core/Gameplay"), true, FString::Printf(TEXT("listen?ProjectADevCoop=%d"), Capacity));
     Error = FText::GetEmpty();
     return true;
 }
@@ -110,7 +110,7 @@ void UDevelopmentCoopSubsystem::Leave(APlayerController* Controller)
     if (!IsAvailable() || !Controller || !Controller->IsLocalController() || Controller->GetGameInstance() != GetGameInstance()) return;
     bPending = bActive = false;
     Status = FText::FromString(TEXT("개발용 협동에서 나왔습니다. 새 방으로 다시 시작할 수 있습니다."));
-    UGameplayStatics::OpenLevel(Controller, TEXT("/Game/User_JeHoon/LEVEL/MainMenu"), true);
+    UGameplayStatics::OpenLevel(Controller, TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu"), true);
 }
 
 void UDevelopmentCoopSubsystem::ArriveAtMenu()
