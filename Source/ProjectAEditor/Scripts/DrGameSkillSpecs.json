@@ -102,6 +102,7 @@
       "target_rule": "ENEMY_UNIT",
       "effect": "Damage",
       "shape": "Beam",
+      "classification_tags": ["Skill.Shape.Chain"],
       "offset": [
         600,
         0,

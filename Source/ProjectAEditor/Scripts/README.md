@@ -239,6 +239,10 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDrGameSkills.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDrGameSkills.py") -DrGameSkillsVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDrGameSkills.py") -DrGameSkillsAddClassificationTags -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDrGameSkills.py") -DrGameSkillsAddClassificationTags -DrGameSkillsVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
 ```
 
 기본 명령은 신규 소유 에셋을 작성·저장하고 기존 기본 파티의 Run 풀 참조 변경도 저장한다. `-DrGameSkillsVerifyOnly`는 별도 프로세스에서 저장본·태그·GAS 효과·Niagara 사용자 파라미터·상점 후보·파티 연결과 보호 해시를 읽기 전용으로 검사한다. 작성·재로드 결과는 `Author.json`·`Reload.json`에 기록하고 CSV는 이 결과와 원본 참조를 목록으로 정리한다. 원본 Niagara 내부 SFX를 사용하여 별도 외부 Sound 중복 재생을 추가하지 않는다. 실제 화면·전투·청취는 [TODO 19절](../../../Docs/TODO.md#19-구입-vfxsfx-스킬-확인)에서 사용자가 확인한다.
+
+`-DrGameSkillsAddClassificationTags`는 기존 소유 DA의 다른 저장 필드가 명세와 모두 일치할 때 선언된 분류 태그만 추가한다. 현재 `link` 5종에 기존 `Skill.Shape.Beam`을 유지하여 `Skill.Shape.Chain`을 추가하며 피해·대상·VFX·SFX·타이밍·풀·파티는 변경하지 않는다. `-DrGameSkillsVerifyOnly`를 함께 지정하면 읽기 전용이며, 이 두 명령의 결과는 기존 도입 이력을 덮어쓰지 않고 `Saved/Automation/ChainSkillFilter/Author.json`·`Reload.json`에 기록한다. 다중 대상 연쇄는 추가하지 않는다. [체인 분류 사용자 확인](../../../Docs/TODO.md#21-체인-스킬-방식-필터-확인)

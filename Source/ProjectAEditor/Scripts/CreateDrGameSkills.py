@@ -15,11 +15,12 @@ from RetiredSkillContent import REMOVED_SKILL_IDS, REMOVED_SKILL_PATHS
 ROOT = Path(unreal.Paths.project_dir()).resolve()
 SPEC = json.loads(Path(__file__).with_name("DrGameSkillSpecs.json").read_text(encoding="utf-8"))
 VERIFY = "-DrGameSkillsVerifyOnly" in unreal.SystemLibrary.get_command_line()
+ADD_CLASSIFICATION_TAGS = "-DrGameSkillsAddClassificationTags" in unreal.SystemLibrary.get_command_line()
 ASSETS = unreal.EditorAssetLibrary
 TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
 OWNER_KEY = "ProjectA.DrGameSkills"
 OWNER = "DrGameSkills.v1"
-REPORT_DIR = ROOT / "Saved/Automation/DrGameSkills"
+REPORT_DIR = ROOT / "Saved/Automation" / ("ChainSkillFilter" if ADD_CLASSIFICATION_TAGS else "DrGameSkills")
 
 
 def require(value, reason):
@@ -85,16 +86,40 @@ def save(asset):
     require(ASSETS.save_loaded_asset(asset, only_if_is_dirty=False), "Save failed: " + asset.get_path_name())
 
 
+def add_classification_tags(asset, actual, expected):
+    declared = {tag for settings in SPEC["profiles"].values() for tag in settings.get("classification_tags", [])}
+    actual_names = re.findall(r'TagName="?([A-Za-z0-9_.]+)"?', actual.get_editor_property("effect_tags").export_text())
+    expected_names = re.findall(r'TagName="?([A-Za-z0-9_.]+)"?', expected.get_editor_property("effect_tags").export_text())
+    missing = set(expected_names) - set(actual_names)
+    if not missing or not missing.issubset(declared) or set(actual_names) - set(expected_names):
+        return False
+    # Only append declared classification tags when every other stored round field still matches the specification.
+    # 저장된 나머지 라운드 필드가 모두 명세와 일치할 때만 선언된 분류 태그를 추가합니다.
+    expected.set_editor_property("effect_tags", make_tags(actual_names))
+    unchanged = normalized(actual) == normalized(expected)
+    expected.set_editor_property("effect_tags", make_tags(expected_names))
+    if not unchanged:
+        return False
+    actual.set_editor_property("effect_tags", make_tags(expected_names))
+    asset.set_editor_property("round_definition", actual)
+    return True
+
+
 def set_or_check(asset, properties, created):
+    modified = False
     for name, expected in properties.items():
         if created:
             asset.set_editor_property(name, expected)
         else:
             actual = asset.get_editor_property(name)
             if normalized(actual) != normalized(expected):
+                if ADD_CLASSIFICATION_TAGS and not VERIFY and name == "round_definition" and add_classification_tags(asset, actual, expected):
+                    modified = True
+                    continue
                 REPORT_DIR.mkdir(parents=True, exist_ok=True)
                 (REPORT_DIR / "PropertyDifference.json").write_text(json.dumps({"asset": asset.get_path_name(), "property": name, "actual": normalized(actual), "expected": normalized(expected)}, ensure_ascii=False, indent=2), encoding="utf-8")
                 raise RuntimeError("Existing authored value changed; review without overwriting: " + asset.get_path_name() + " / " + name)
+    return modified
 
 
 def make_vfx(entry, inspections):
@@ -145,7 +170,7 @@ def make_profile(entry, inspections):
     profile.set_editor_property("effect_sphere", settings["sphere"])
     profile.set_editor_property("effect_hit_delay_seconds", settings["delay"])
     profile.set_editor_property("effect_duration", settings["duration"])
-    tags = entry["element_tags"] + ["Skill.Effect." + settings["effect"], "Skill.Shape." + settings["shape"]]
+    tags = entry["element_tags"] + ["Skill.Effect." + settings["effect"], "Skill.Shape." + settings["shape"]] + settings.get("classification_tags", [])
     if settings["effect"] == "Damage":
         tags.append("Attack.Close" if settings["shape"] == "Slash" else "Attack.Ranged")
     profile.set_editor_property("effect_tags", make_tags(tags))
@@ -172,20 +197,23 @@ def main():
     original_map = ROOT / "Content/Untitled.umap"
     if original_map.is_file():
         source_hashes[str(original_map.relative_to(ROOT))] = file_hash(original_map)
-    installed_baseline = REPORT_DIR / "OriginalHashes.json"
+    installed_baseline = ROOT / "Saved/Automation/DrGameSkills/OriginalHashes.json"
     if installed_baseline.is_file():
         installed_hashes = json.loads(installed_baseline.read_text(encoding="utf-8"))
         require(all(file_hash(ROOT / filename) == expected for filename, expected in installed_hashes.items()), "Installed source baseline changed before authoring")
     new_files = {package_file(entry["destination"]) for entry in selected}
+    authored_hashes = {str(path.relative_to(ROOT)): file_hash(path) for path in new_files if path.is_file()}
     retained_hashes = {str(path.relative_to(ROOT)): file_hash(path) for path in (ROOT / "Content/User_JeHoon/Blueprint/DataAsset/Skills").rglob("*.uasset") if path not in new_files}
     validator = require(unreal.get_editor_subsystem(unreal.EditorValidatorSubsystem), "Validator subsystem is missing")
-    inspections, skills, created, warnings = {}, [], [], []
+    inspections, skills, created, updated, warnings = {}, [], [], [], []
     for entry in selected:
         profile = make_profile(entry, inspections)
         settings = SPEC["profiles"][entry["profile"]]
         properties = {"skill_id": entry["skill_id"], "skill_name": entry["name"], "skill_description": description(entry), "use_round_definition": True, "round_definition": profile, "ability_class": None, "action_point_cost": SPEC["defaults"]["action_point_cost"], "target_rule": getattr(unreal.SkillTargetRule, settings["target_rule"]), "area_type": unreal.SkillAreaType.SINGLE, "area_radius": 0, "move_to_target": settings["approach"] == "UNIT"}
         skill, is_new = obtain(entry["destination"], unreal.SkillDefinitionDataAsset)
-        set_or_check(skill, properties, is_new)
+        modified = set_or_check(skill, properties, is_new)
+        if modified:
+            updated.append(skill)
         if is_new:
             ASSETS.set_metadata_tag(skill, "DrGameSource", entry["source"])
             created.append(skill)
@@ -228,13 +256,16 @@ def main():
         party.set_editor_property("run_encounter_pool", run_pool)
     require({name: normalized(party.get_editor_property(name)) for name in before} == before and {str(name): normalized(value) for name, value in party.get_editor_property("professions").items()} == profession_values, "Party starting content changed")
     if not VERIFY:
-        for asset in created:
+        for asset in created + updated:
             save(asset)
         if party_changed:
             save(party)
-    for filename, expected in {**source_hashes, **retained_hashes}.items():
+    updated_files = {str(package_file(asset.get_path_name().split(".")[0]).relative_to(ROOT)) for asset in updated}
+    protected_authored = {filename: expected for filename, expected in authored_hashes.items() if filename not in updated_files}
+    for filename, expected in {**source_hashes, **retained_hashes, **protected_authored}.items():
         require(file_hash(ROOT / filename) == expected, "Protected package changed: " + filename)
     report = {"mode": "reload" if VERIFY else "author", "specification_sha256": file_hash(Path(__file__).with_name("DrGameSkillSpecs.json")), "skills": len(skills), "profiles": dict(Counter(entry["profile"] for entry in selected)), "source_effects": len(SPEC["entries"]), "auxiliary_effects": len(SPEC["entries"]) - len(skills), "created_packages": len(created), "shop_candidates": len(entries), "pool": SPEC["pool"], "run_pool": SPEC["run_pool"], "party": SPEC["party"], "party_reference_changed": party_changed, "retained_skill_count": len(retained_hashes), "source_files_unchanged": len(source_hashes), "data_validation": "passed", "warnings": warnings, "assets": [skill.get_path_name() for skill in skills], "niagara": inspections, "gameplay_test": "not run", "visual_alignment": "user verification pending", "sfx_playback": "user verification pending"}
+    report.update({"updated_packages": len(updated), "updated_assets": [asset.get_path_name() for asset in updated], "untouched_authored_skills_unchanged": len(protected_authored)})
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     output = REPORT_DIR / ("Reload.json" if VERIFY else "Author.json")
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")

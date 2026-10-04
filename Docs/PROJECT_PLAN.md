@@ -1,6 +1,6 @@
 # ProjectA 구현 구조와 설정
 
-기준일: 2026-10-03. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다. 엔진 기준은 UE 5.8.3이며 기본 Run·협동의 기존 실행 결과는 UE 5.7 당시 이력이다. 비교 맵 에셋 작성·검사는 UE 5.8 기준이며 작동 확인은 [TODO 7절](TODO.md#7-ue-58-전환-확인)을 따른다.
+기준일: 2026-10-04. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다. 엔진 기준은 UE 5.8.3이며 기본 Run·협동의 기존 실행 결과는 UE 5.7 당시 이력이다. 비교 맵 에셋 작성·검사는 UE 5.8 기준이며 작동 확인은 [TODO 7절](TODO.md#7-ue-58-전환-확인)을 따른다.
 
 기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 UE 5.7 위임 실행은 당시 두 전투 경로의 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀 결과다. 2026-10-01 UE 5.7의 당시 코드로 1인·같은 PC 2/4인 PIE에서 각 10전투·9상점 선택/퇴장·개인 보상과 저장 재로드를 확인했다. 진행용 HP fixture이며 UE 5.8·정상 난이도·실제 서비스·다중 PC·지연/손실 검증은 별도다. [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
@@ -197,7 +197,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 [SKILL_EFFECT_ASSETS.csv](../DataCatalogs/SKILL_EFFECT_ASSETS.csv)는 퇴역·공유 원본 이력 577행과 새 구입 Niagara 123행을 합친 700행 목록이다. 기존 577행의 모든 셀·바이트를 보존하여 삭제 전 원본 VFX·17개 최상위 폴더 이력을 유지한다. 당시 효과 시스템 489개(NiagaraSystem 343·ParticleSystem 146)와 스킬 구성 Blueprint 88개를 조사했다. 현재 삭제 대상 572행은 `확인 사항`에 삭제 상태·이력 경로를 표시하고 공유 원본 5행은 유지한다. `계열, 세부 분류, 속성·테마, 에셋 형식, 원본 팩, 위치, 에셋 이름, 분류 근거, 확인 사항, 게임 내 이름, 스킬 방식, 방식 분류 기준`의 12개 열·UTF-8 BOM을 보존하며 삭제된 경로를 설치 상태로 해석하지 않는다. 재질·텍스처·메시·하위 NiagaraEmitter·모듈·데모 재생 도구는 이 CSV에 포함하지 않는다.
 
-기존 577행의 `스킬 방식`은 투사체 95·범위형 91·근접공격 28·지원형 68·이동형 5·보조 효과 257·보류 33개였다. 신규 123행은 생성 명세의 범위형 29·투사체 14·근접공격 4·지원형 13과 미생성 보조 63개다. 과거 생성 프로필의 `slash/spin`은 근접공격, `projectile`은 투사체, `area/beam`은 범위형, `heal/shield`는 지원형으로 기록한다. 현재 원본 VFX 목록과 분류를 보존하며 이 목록의 항목을 게임 스킬에 자동 편입하지 않는다. Trail·피격·부착·시전·공용 표시·환경 연출은 보조 효과이며 방식이 불분명한 항목은 보류한다. 이 열은 기획용 분류이며 GameplayTag·충돌 판정·BPDA를 변경하지 않는다.
+기존 577행의 `스킬 방식`은 투사체 95·범위형 91·근접공격 28·지원형 68·이동형 5·보조 효과 257·보류 33개였다. 신규 123행은 생성 명세의 범위형 24·체인 5·투사체 14·근접공격 4·지원형 13과 미생성 보조 63개다. 과거 생성 프로필의 `slash/spin`은 근접공격, `projectile`은 투사체, `area/beam`은 범위형, `heal/shield`는 지원형으로 기록한다. 현재 원본 VFX 목록과 분류를 보존하며 이 목록의 항목을 게임 스킬에 자동 편입하지 않는다. Trail·피격·부착·시전·공용 표시·환경 연출은 보조 효과이며 방식이 불분명한 항목은 보류한다. CSV는 목록이며 태그·에셋을 변경하지 않는다. 신규 `link` 5종의 체인 분류는 [4-9절](#4-9-구입-vfx와-sfx-도입)의 실제 태그와 대응한다.
 
 [5속성·복합 허용 정책](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)에 따라 `속성·테마` 열에 기획 배정안을 기록한다. 복합 표기는 `물리 + 불 + 냉기 + 번개 + 카오스` 순서에서 배정한 속성만 연결한다. 커서·조준·레벨업 등 공용 표시·지원 표현과 공통 기반 BP의 공란은 속성 미배정이며 별도 속성이 아니다.
 
@@ -228,7 +228,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 `UCombatDebugLoadout`은 Skills 하위의 유효 DataAsset 74종(기본 2·몬스터 전용 12·신규 60)과 태그 장착 프로필이 있는 장비 49종을 제공한다. 몬스터 공격도 개발용 일반 카탈로그에 포함되며 새 Run의 상점 후보 61종과 구분한다. 장비 후보는 기존 `RunEquipmentRules`로 검증하고 임시 보유 상태에만 기록한다. 획득은 지정 슬롯에 즉시 장착하며 밀려난 장비는 임시 보유 목록에 남는다. 제거는 장착 해제·보유 삭제·참조 인덱스 보정을 함께 수행한다. 장비는 현재 외형만 바꾸며 능력치·스킬은 부여하지 않는다.
 
-스킬 목록은 기존 `ResolveRoundSkill` 결과의 `EffectTags`를 카탈로그 캐시에 보관하여 속성 8탭과 방식 6탭을 이름/에셋명 검색과 교차 적용한다. 속성은 전체·물리·화염·냉기·번개·카오스·복합·미분류이며 방식은 전체·투사체·범위형·근접공격·지원형·미분류다. `FGameplayTagQuery` 분류를 유지하고 비무장·근접 공격 2종은 태그가 없어 미분류로 제공하고 신규 60종은 저장된 속성·효과·형태 태그로 분류한다. 몬스터 전용 공격 12개는 원래 몬스터 장착을 유지한다. 삭제한 생성 스킬과 CSV의 미생성 보류 항목은 구입 목록에 추가하지 않는다. 분류를 위해 원본 태그·에셋·스킬 실행 규칙을 변경하지 않는다. [UI 기준](UI_README.md#7-2-전투-디버그-도구)
+스킬 목록은 기존 `ResolveRoundSkill` 결과의 `EffectTags`를 카탈로그 캐시에 보관하여 속성 8탭과 방식 7탭을 이름/에셋명 검색과 교차 적용한다. 속성은 전체·물리·화염·냉기·번개·카오스·복합·미분류이며 방식은 전체·투사체·범위형·체인·근접공격·지원형·미분류다. `FGameplayTagQuery`로 지원 효과를 우선 분류하고 `Skill.Shape.Chain`이 있는 공격은 기존 Beam 태그를 유지해도 체인으로 분류하여 범위형에서 제외한다. 비무장·근접 공격 2종은 태그가 없어 미분류로 제공하고 신규 60종은 저장된 속성·효과·형태 태그로 분류한다. 몬스터 전용 공격 12개는 원래 몬스터 장착을 유지한다. 삭제한 생성 스킬과 CSV의 미생성 보류 항목은 구입 목록에 추가하지 않는다. 체인 5종은 대상 하나와 연결하는 기존 판정을 유지하며 다중 대상 연쇄 기능은 추가하지 않는다. [UI 기준](UI_README.md#7-2-전투-디버그-도구)
 
 스킬 0~5개 변경은 `ACombatRoundCoordinator`에서 소유·생존·Planning·정지 상태를 확인하고 실제 Unit·실행 스킬 캐시를 함께 갱신한다. 해당 유닛의 계획·이동 예약 및 자신의 준비를 해제하며 HP/AP/보호막은 초기화하지 않는다. 전투 초기화는 유닛·투사체·효과를 정리하고 처음 장착으로 다시 생성한다. 일반 Run 메모리·체크포인트는 디버그 변경에 사용하지 않는다.
 
@@ -341,13 +341,15 @@ UE 5.8.3 Development Editor / Win64 최종 컴파일·링크 4.74초, 엔진 삭
 | [ProjectileVFX with Hit and Launch VFX ( with SFX )](https://www.fab.com/listings/4f4de421-d1dc-49c3-b66d-fb22fa8d015e) | `/Game/ProjectileHitVFX` |
 | [Slash and Hit VFX (with SFX)](https://www.fab.com/listings/f6bf529f-6db4-43a5-a5f1-2ff5b8d9a0f4) | `/Game/SlashHitVFX` |
 
-[DrGameSkillSpecs.json](../Source/ProjectAEditor/Scripts/DrGameSkillSpecs.json)의 NiagaraSystem 123개 중 주효과 60개를 새 `DrGame_` ID·프로젝트 전용 DA로 작성하고 피격·Trail·Decal·버전/Fluid 대안 63개는 독립 스킬 미생성으로 보존한다. 프로필은 area 15·line 9·link 5·projectile 14·slash 4·heal 6·shield 7개다. Level Up/Spawn 표현은 회복·보호막에 연결하며 경험치 증가·소환 기능을 추가하지 않는다. 투사체 14개는 기존 서버 최초 차단 충돌의 직선 비행을 사용하고 링크 5개는 선택한 대상 하나와 연결한다. 피해·치유·흡수량 25·AP 1·후보 가중치 1과 선딜·판정 기간·범위는 시험 설정이며 최종 밸런스·확률 정책이 아니다.
+[DrGameSkillSpecs.json](../Source/ProjectAEditor/Scripts/DrGameSkillSpecs.json)의 NiagaraSystem 123개 중 주효과 60개를 새 `DrGame_` ID·프로젝트 전용 DA로 작성하고 피격·Trail·Decal·버전/Fluid 대안 63개는 독립 스킬 미생성으로 보존한다. 프로필은 area 15·line 9·link 5·projectile 14·slash 4·heal 6·shield 7개다. Level Up/Spawn 표현은 회복·보호막에 연결하며 경험치 증가·소환 기능을 추가하지 않는다. 투사체 14개는 기존 서버 최초 차단 충돌의 직선 비행을 사용한다. `link` 5종에는 기존 `Skill.Shape.Beam`을 보존하여 `Skill.Shape.Chain` 분류 태그를 추가하고 선택한 대상 하나와 연결하는 판정·표현을 유지한다. 다중 대상 연쇄는 미구현이며 태그·UI 분류와 구분한다. 피해·치유·흡수량 25·AP 1·후보 가중치 1과 선딜·판정 기간·범위는 시험 설정이며 최종 밸런스·확률 정책이 아니다.
 
 새 `DA_DrGameSkillShopPool`은 근접 공격 1종·신규 60종의 61후보를 제공하고 `DA_DrGameRunEncounterPool`을 기본 파티의 `RunEncounterPool`에 연결했다. 신규 패키지는 스킬 60개·풀 2개이며 기존 변경은 파티의 Run 풀 참조다. 시작 비무장 공격·몬스터 전용 공격 12개·기존 공격 애니메이션과 [퇴역 명세](#4-8-기본-공격-외-스킬-정리)를 보존한다. 기존 저장에 확정한 카탈로그·진열·가격은 유지하므로 신규 후보는 새 Run에서 확인한다.
 
 [이펙트 목록](../DataCatalogs/SKILL_EFFECT_ASSETS.csv)·[생성 현황](../DataCatalogs/SKILL_CREATION_STATUS.csv)은 각각 기존 577행의 셀·바이트를 보존하고 신규 123행을 추가한 700행이다. 별도 [SFX 목록](../DataCatalogs/SKILL_SOUND_ASSETS.csv)은 SoundCue 120개·SoundWave 114개의 팩·원본 objectpath·VFX/스킬 단계·전이 참조·길이/looping을 기록한다. 원본 AudioPlayer SoundToPlay와 파괴/looping/재생 제한 플래그·Audio 사용자 파라미터를 확인하고 빈 바인딩을 별도로 표시한다. 신규 스킬은 원본 Niagara 내부 SFX를 사용하며 외부 Sound 중복 재생을 추가하지 않는다. 지원되는 파라미터에 AudioOn·최적화 모드를 적용하고 부가 잔류·동적 조명·LevelUp 텍스트 표현을 끈다. 목록의 참조·바인딩 확인은 실제 재생·청취 결과가 아니다.
 
 프로젝트에서 NiagaraFluids·ChaosNiagara를 활성화하며 원본 Niagara를 수정하지 않는다. Development Editor / Win64 컴파일, 에셋 작성·독립 읽기 전용 재로드·DataValidation, 원본 1,900파일·보존 스킬 14개 해시와 CSV·문서 정적 검사를 통과했다. 원본 설치 감사에는 사용하지 않는 데모 Blueprint의 InputAction 경고 20개가 있으며 작성·재로드는 오류·경고 0이다. NullRHI의 IsReadyToRun 값은 렌더 실행 검증으로 사용하지 않는다. 게임·PIE·자동화 테스트·실제 VFX/SFX 재생은 미실행이며 [TODO 19절](TODO.md#19-구입-vfxsfx-스킬-확인)에서 사용자가 확인한다. 근거: `Saved/Automation/DrGameSkills/Inventory.json`·`Author.json`·`Reload.json`·`FinalPreservation.json`·`CsvValidation.json`.
+
+2026-10-04 체인 분류 추가는 별도 `Saved/Automation/ChainSkillFilter/Author.json`·`Reload.json`으로 저장·읽기 전용 재로드·DataValidation을 통과했다. 기존 링크 DA 5개에 분류 태그만 추가하고 나머지 신규 55개·보존 공격 14개·원본 1,900파일 해시를 보존했다. CSV 2개는 해당 5행만 갱신했으며 실제 UI·전투 확인은 [TODO 21절](TODO.md#21-체인-스킬-방식-필터-확인)에서 대기한다.
 
 ### 개발용 협동 진입
 

@@ -98,21 +98,24 @@ namespace
         return FGameplayTagQuery::BuildQuery(Root);
     }
 
-    // Support effects take precedence over their area shape; beam attacks remain area skills.
-    // 지원 효과는 범위 형태보다 우선하며 빔 공격은 범위형 스킬로 분류합니다.
+    // Support effects take precedence over chain classification, which takes precedence over other attack shapes.
+    // 지원 효과를 체인 분류보다 우선하고 체인은 다른 공격 형태보다 우선합니다.
     const TArray<FDebugSkillMethod>& GetDebugSkillMethods()
     {
         static const TArray<FDebugSkillMethod> Methods = []
         {
             const TArray<FGameplayTag> Support = { ProjectACombatTags::Skill_Effect_Heal, ProjectACombatTags::Skill_Effect_Shield };
+            TArray<FGameplayTag> AttackExcluded = Support;
+            AttackExcluded.Add(ProjectACombatTags::Skill_Shape_Chain);
             TArray<FGameplayTag> Classified = Support;
-            Classified.Append({ ProjectACombatTags::Skill_Shape_Projectile, ProjectACombatTags::Skill_Shape_Area, ProjectACombatTags::Skill_Shape_Beam, ProjectACombatTags::Skill_Shape_Slash });
+            Classified.Append({ ProjectACombatTags::Skill_Shape_Projectile, ProjectACombatTags::Skill_Shape_Area, ProjectACombatTags::Skill_Shape_Beam, ProjectACombatTags::Skill_Shape_Chain, ProjectACombatTags::Skill_Shape_Slash });
             return TArray<FDebugSkillMethod>
             {
                 { TEXT("전체"), TEXT("모든 방식의 스킬 · 선택한 속성과 검색 조건 적용"), FGameplayTagQuery() },
-                { TEXT("투사체"), TEXT("투사체 형태의 공격 스킬"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Projectile }, Support) },
-                { TEXT("범위형"), TEXT("범위·직선 빔 공격 스킬 · 치유·보호막 제외"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Area, ProjectACombatTags::Skill_Shape_Beam }, Support) },
-                { TEXT("근접공격"), TEXT("베기·회전 공격 스킬 · 여러 적을 공격할 수 있음"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Slash }, Support) },
+                { TEXT("투사체"), TEXT("투사체 형태의 공격 스킬 · 체인·지원 효과 제외"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Projectile }, AttackExcluded) },
+                { TEXT("범위형"), TEXT("범위·직선 빔 공격 스킬 · 체인·지원 효과 제외"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Area, ProjectACombatTags::Skill_Shape_Beam }, AttackExcluded) },
+                { TEXT("체인"), TEXT("대상 연결 형태 스킬 · 현재 링크 5종은 단일 대상 공격"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Chain }, Support) },
+                { TEXT("근접공격"), TEXT("베기·회전 공격 스킬 · 체인·지원 효과 제외"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Slash }, AttackExcluded) },
                 { TEXT("지원형"), TEXT("치유·보호막 스킬"), MakeDebugSkillMethodQuery(Support, {}) },
                 { TEXT("미분류"), TEXT("방식·지원 효과 분류 태그가 없는 스킬 · CSV의 보류 에셋과 별개"), MakeDebugSkillMethodQuery({}, Classified) }
             };

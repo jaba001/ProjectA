@@ -16,4 +16,5 @@ namespace ProjectACombatTags
     UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Projectile, "Skill.Shape.Projectile");
     UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Area, "Skill.Shape.Area");
     UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Beam, "Skill.Shape.Beam");
+    UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Chain, "Skill.Shape.Chain");
 }
