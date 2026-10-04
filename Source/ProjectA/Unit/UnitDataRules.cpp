@@ -1,6 +1,7 @@
 #include "Unit/UnitDataRules.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Run/RunContentMigration.h"
+#include "Game/Run/RunRecoveryTypes.h"
 
 bool UnitDataRules::IsValidMaxHP(float MaxHP)
 {
@@ -56,6 +57,11 @@ bool UnitDataRules::ValidateSkills(const TArray<TObjectPtr<USkillDefinitionDataA
         }
         FCombatRoundSkill Definition;
         if (!Skill->ResolveRoundSkill(Definition, OutError)) return false;
+        if (RunRecoveryRules::IsConsumable(Definition))
+        {
+            OutError = NSLOCTEXT("UnitDataRules", "ConsumableStockRequired", "Consumables require tagged Run stock instead of an acquired skill slot. / 소모품은 습득 스킬 슬롯 대신 태그가 지정된 Run 재고가 필요합니다.");
+            return false;
+        }
         if (SkillIds.Contains(Definition.SkillId))
         {
             OutError = FText::Format(NSLOCTEXT("UnitDataRules", "DuplicateSkill", "Skill asset ID is duplicated: {0}. / 스킬 에셋 ID가 중복됩니다: {0}."), FText::FromName(Definition.SkillId));

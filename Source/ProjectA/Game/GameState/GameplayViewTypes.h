@@ -63,6 +63,15 @@ struct PROJECTA_API FGameplayViewState
     FRunItemShopState ItemShopState;
 
     UPROPERTY()
+    FRunRecoveryState RecoveryState;
+
+    UPROPERTY()
+    int32 TargetCompletedSteps = 0;
+
+    UPROPERTY()
+    bool bTargetRun = false;
+
+    UPROPERTY()
     FRunGoldRewardState GoldRewardState;
 
     UPROPERTY()

@@ -421,7 +421,7 @@ namespace SkillShopUiReview
             // 기존 근접 공격은 어빌리티 분류를 유지하며 작성된 GameplayEffect가 피해 태그를 제공합니다.
             const UGameplayEffect* MeleeEffect = Profiles[0].EffectClass ? Profiles[0].EffectClass.GetDefaultObject() : nullptr;
             if (!Check(Profiles[0].Kind == ECombatRoundSkillKind::Melee && Profiles[0].TargetRule == ESkillTargetRule::EnemyUnit && MeleeEffect && MeleeEffect->GetAssetTags().HasTag(ProjectACombatTags::Skill_Effect_Damage), TEXT("The original legacy melee resolves its real attack kind and authored damage-effect tag without modifying ability tags."))) return false;
-            if (!Check(CombatRoundRules::UsesChain(Profiles[1]) && Profiles[1].Chain.MaxTargets == 1 && Profiles[2].EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Heal) && Profiles[3].EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Shield), TEXT("The three original DrGame offers retain unchanged single-target Chain, healing and shield tags."))) return false;
+            if (!Check(CombatRoundRules::UsesChain(Profiles[1]) && Profiles[1].Chain.MaxTargets == 4 && FMath::IsNearlyEqual(Profiles[1].Chain.JumpDistance, 600.f) && FMath::IsNearlyEqual(Profiles[1].Chain.JumpIntervalSeconds, 0.15f) && FMath::IsNearlyEqual(Profiles[1].Chain.DamageMultiplierPerJump, 0.8f) && Profiles[2].EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Heal) && Profiles[3].EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Shield), TEXT("The authored DrGame offers retain the selected four-target Chain settings, healing and shield tags."))) return false;
             for (int32 Index = 1; Index < Profiles.Num(); ++Index) if (!Check(FMath::IsNearlyEqual(Profiles[Index].Power, 25.f), TEXT("Purchased DrGame profiles retain their authored test power of 25 without fixture overrides."))) return false;
             for (const FRunSkillShopOffer& Offer : Catalog)
             {
@@ -554,7 +554,15 @@ namespace SkillShopUiReview
             Command.DestinationCoord = Caster->HomeCoord;
             const FCombatRoundView View = Round->GetView();
             FText Error;
-            if (!Check(!CombatRoundRules::UsesChain(Definition) || Definition.Chain.MaxTargets == 1, TEXT("The purchased authored chain retains its pending single-target default."))) return false;
+            bool bEquippedProfileMatches = false;
+            for (const USkillDefinitionDataAsset* Equipped : Source->GetEquippedSkillDataAssets())
+            {
+                FCombatRoundSkill LiveProfile;
+                if (!IsValid(Equipped) || !Equipped->ResolveRoundSkill(LiveProfile, Error) || LiveProfile.SkillId != Definition.SkillId) continue;
+                bEquippedProfileMatches = FCombatRoundSkill::StaticStruct()->CompareScriptStruct(&LiveProfile, &Profiles[CastIndex], 0);
+                break;
+            }
+            if (!Check(bEquippedProfileMatches, TEXT("The actual spawned unit's purchased DataAsset resolves every original field, including its chain settings."))) return false;
             const bool bSubmitted = Round->SubmitPlan(Controller.Get(), View.CombatId, View.RoundNumber, View.PlanRevision, Command, Error);
             if (!Check(bSubmitted, TEXT("The public owned request submits the actually purchased profile: ") + Error.ToString())) return false;
             const FCombatRoundView PlannedView = Round->GetView();

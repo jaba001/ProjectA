@@ -24,6 +24,18 @@
 	],
 	"Plugins": [
 		{
+			"Name": "OnlineSubsystemSteam",
+			"Enabled": true,
+			"PlatformAllowList": ["Win64"],
+			"TargetConfigurationDenyList": ["Shipping", "Test"]
+		},
+		{
+			"Name": "SteamSockets",
+			"Enabled": true,
+			"PlatformAllowList": ["Win64"],
+			"TargetConfigurationDenyList": ["Shipping", "Test"]
+		},
+		{
 			"Name": "ModelingToolsEditorMode",
 			"Enabled": true,
 			"TargetAllowList": [

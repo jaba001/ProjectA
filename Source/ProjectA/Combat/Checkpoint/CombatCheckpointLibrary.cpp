@@ -151,6 +151,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
         TSet<FSoftObjectPath> SkillPaths;
         TSet<FPrimaryAssetId> SkillIds;
         TSet<UClass*> AbilityClasses;
+        if (!RunRecoveryRules::ValidateStacks(Unit.Consumables, OutError) || ((!bRound || Unit.Team == ETeam::Enemy) && !Unit.Consumables.IsEmpty())) return false;
         for (const FSoftObjectPath& Path : Unit.Skills)
         {
             if (!IsAssetPath(Path) || RunContentMigration::IsRemovedSkill(Path) || SkillPaths.Contains(Path))
@@ -163,6 +164,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
                 FCombatRoundSkill RoundSkill;
                 FText SkillError;
                 if (!Skill || !Skill->ResolveRoundSkill(RoundSkill, SkillError) || SkillIds.Contains(Skill->GetPrimaryAssetId())) return false;
+                if (RunRecoveryRules::IsConsumable(RoundSkill)) return false;
                 SkillPaths.Add(Path);
                 SkillIds.Add(Skill->GetPrimaryAssetId());
                 continue;
@@ -180,6 +182,11 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
             SkillPaths.Add(Path);
             SkillIds.Add(Skill->GetPrimaryAssetId());
             AbilityClasses.Add(Skill->AbilityClass);
+        }
+        for (const FRunConsumableStack& Stack : Unit.Consumables)
+        {
+            const USkillDefinitionDataAsset* Definition = Cast<USkillDefinitionDataAsset>(Stack.Skill.TryLoad());
+            if (!Definition || SkillIds.Contains(Definition->GetPrimaryAssetId())) return false;
         }
         if (!bRound && (!DefaultAbility || !DefaultAbility->IsChildOf(UGameplayAbility::StaticClass()) || !AbilityClasses.Contains(DefaultAbility)))
         {

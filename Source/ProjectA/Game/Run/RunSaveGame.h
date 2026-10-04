@@ -7,6 +7,7 @@
 #include "Game/Run/RunSkillShopTypes.h"
 #include "Game/Run/RunGoldRewardTypes.h"
 #include "Game/Run/RunParticipationTypes.h"
+#include "Game/Run/TargetRunTypes.h"
 #include "Combat/Checkpoint/CombatCheckpointTypes.h"
 #include "Types/CombatResult.h"
 #include "RunSaveGame.generated.h"
@@ -49,4 +50,6 @@ public:
     FRunItemShopState ItemShopState;
     UPROPERTY()
     FRunGoldRewardState GoldRewardState;
+    UPROPERTY()
+    FRunTargetState TargetRun;
 };

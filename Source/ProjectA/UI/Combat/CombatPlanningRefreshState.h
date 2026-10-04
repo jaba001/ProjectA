@@ -20,6 +20,7 @@ struct FCombatPlanningUnitObservation
     int32 AP = 0;
     int32 SAP = 0;
     int32 MoveRange = 0;
+    TArray<int32> ConsumableQuantities;
     bool bAlive = false;
 
     bool operator==(const FCombatPlanningUnitObservation& Other) const;

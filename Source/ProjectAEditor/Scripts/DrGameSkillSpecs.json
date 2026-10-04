@@ -113,6 +113,12 @@
       "effect": "Damage",
       "shape": "Beam",
       "classification_tags": ["Skill.Shape.Chain"],
+      "chain": {
+        "max_targets": 4,
+        "jump_distance": 600.0,
+        "jump_interval_seconds": 0.15,
+        "damage_multiplier_per_jump": 0.8
+      },
       "offset": [
         600,
         0,

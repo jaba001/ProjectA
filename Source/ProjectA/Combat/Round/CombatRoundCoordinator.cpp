@@ -4,6 +4,7 @@
 #include "Combat/Library/CombatEffectLibrary.h"
 #include "Combat/Round/CombatPlanValidator.h"
 #include "Combat/Round/CombatAIPlanning.h"
+#include "Combat/Round/CombatConsumableRules.h"
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimMontage.h"
 #include "Combat/CombatManager.h"
@@ -209,6 +210,14 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
         {
             OutError = RoundText(TEXT("인간 캐릭터의 원래 소유 연결을 확인하지 못했습니다."));
             return false;
+        }
+        if (!RunRecoveryRules::ValidateStacks(Unit->Consumables, OutError) || (Entry.bEnemy && !Unit->Consumables.IsEmpty())) return false;
+        for (const FRunConsumableStack& Stack : Unit->Consumables)
+        {
+            FCombatRoundSkill Skill;
+            if (!RunRecoveryRules::ResolveStack(Stack, Skill, OutError) || Entry.SkillIds.Contains(Skill.SkillId)) return false;
+            if (!FindSkill(Skill.SkillId)) Skills.Add(Skill);
+            Entry.SkillIds.AddUnique(Skill.SkillId);
         }
         View.Units.Add(Entry);
     }
@@ -745,6 +754,7 @@ bool ACombatRoundCoordinator::IsValidUnitTarget(int32 SourceUnitId, FName SkillI
     const FCombatRoundUnitView& Target = View.Units[TargetIndex];
     if (!IsValid(Source.Unit) || !IsValid(Target.Unit) || !Source.Unit->IsUnitAlive() || !Target.Unit->IsUnitAlive()) return false;
     if (!(Source.HP > 0.f) || !(Target.HP > 0.f) || !Source.SkillIds.Contains(SkillId)) return false;
+    if (RunRecoveryRules::IsConsumable(*Skill)) return CombatConsumableRules::CanUse(Source.Unit, Target.Unit, *Skill, Source.OwnerSlot > 0 && !Source.bEnemy);
     return CombatSkillExecution::IsValidEffectTarget(Source.Unit, Target.Unit, *Skill);
 }
 
@@ -1185,7 +1195,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
             if (!Facing.IsNearlyZero()) Entry.Unit->SetActorRotation(Facing.Rotation());
             if (!Action.bMontageStarted)
             {
-                UAnimMontage* Montage = Entry.Unit->ResolveRoundCastMontage(Skill->CastMontage);
+                UAnimMontage* Montage = RunRecoveryRules::IsConsumable(*Skill) ? Skill->CastMontage.Get() : Entry.Unit->ResolveRoundCastMontage(Skill->CastMontage);
                 Action.bMontageStarted = true;
                 Action.MontageStartedAt = MontageClock;
                 Action.MontageRecoverySeconds = MontageRecoveryBudget(Montage);
@@ -1328,6 +1338,14 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
     if (Action.bReleased || !HasExecutionAuthority() || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) return;
     Action.bReleased = true;
     const int32 TargetIndex = FindUnitIndex(Action.EffectiveTargetUnitId);
+    if (RunRecoveryRules::IsConsumable(Skill))
+    {
+        AUnitBase* Target = View.Units.IsValidIndex(TargetIndex) ? View.Units[TargetIndex].Unit.Get() : nullptr;
+        const bool bSucceeded = CombatConsumableRules::Release(Entry.Unit, Target, Skill, Entry.OwnerSlot > 0 && !Entry.bEnemy && !CombatManager->IsPartyAIControlled(Entry.Unit));
+        if (bSucceeded) Entry.HP = Entry.Unit->GetAttributeSet()->GetHP();
+        StartRecovery(Index, !bSucceeded, RoundText(bSucceeded ? TEXT("회복 소모품 사용") : TEXT("회복 조건 변경으로 소모품 보존")));
+        return;
+    }
     CombatSkillExecution::FReleaseContext Context;
     Context.Owner = this;
     Context.Source = Entry.Unit;

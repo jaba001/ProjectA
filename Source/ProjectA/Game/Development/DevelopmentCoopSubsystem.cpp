@@ -7,6 +7,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Controller/MainMenuPlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/ConfigCacheIni.h"
 
 bool UDevelopmentCoopSubsystem::IsAvailable()
 {
@@ -70,7 +71,7 @@ bool UDevelopmentCoopSubsystem::CanTravel(APlayerController* Controller, FText& 
 {
     Error = FText::FromString(TEXT("독립 실행된 메인메뉴에서 접속을 시작해 주세요."));
     const URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
-    return IsAvailable() && Cast<AMainMenuPlayerController>(Controller) && Controller->GetGameInstance() == GetGameInstance() && Controller->IsLocalController() && Controller->GetNetMode() == NM_Standalone && !bPending && !bActive && Run && !Run->IsManagedRun() && !Run->HasManagedLease();
+    return IsAvailable() && FConfigCacheIni::GetCustomConfigString() != TEXT("SteamDev") && Cast<AMainMenuPlayerController>(Controller) && Controller->GetGameInstance() == GetGameInstance() && Controller->IsLocalController() && Controller->GetNetMode() == NM_Standalone && !bPending && !bActive && Run && !Run->IsManagedRun() && !Run->HasManagedLease();
 }
 
 bool UDevelopmentCoopSubsystem::Host(APlayerController* Controller, int32 Capacity, FText& Error)

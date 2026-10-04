@@ -32,6 +32,7 @@
 #include "Unit/PlayerUnit.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Tests/CombatChainTestHelpers.h"
+#include "Combat/Round/CombatConsumableRules.h"
 #include <limits>
 
 namespace CombatRoundTests
@@ -198,7 +199,7 @@ namespace CombatRoundTests
             return Unit->ConfigureProfession(100.0f, 2, 2, Skills);
         }
 
-        bool Initialize(int32 HumanCount = 1, float EnemySpeed = 10.0f, const FCombatRoundSkill* EnemySkill = nullptr, FIntPoint EnemyCoord = FIntPoint(0, 3), int32 EnemyCount = 1, const FCombatRoundSkill* FirstHumanSkill = nullptr, float FirstHumanSpeed = 20.0f, bool bUseFixtureSkills = true, bool bEnemyWithoutSkills = false, int32 FirstHumanMoveRange = 1)
+        bool Initialize(int32 HumanCount = 1, float EnemySpeed = 10.0f, const FCombatRoundSkill* EnemySkill = nullptr, FIntPoint EnemyCoord = FIntPoint(0, 3), int32 EnemyCount = 1, const FCombatRoundSkill* FirstHumanSkill = nullptr, float FirstHumanSpeed = 20.0f, bool bUseFixtureSkills = true, bool bEnemyWithoutSkills = false, int32 FirstHumanMoveRange = 1, const TArray<FRunConsumableStack>* FirstConsumables = nullptr)
         {
             if (!World.IsValid() || !Combat || !Arena || !Grid || Grid->TileMap.Num() != 16 || EnemyCount < 1 || EnemyCount > 4) return false;
             FRunIdentityData Identity;
@@ -213,6 +214,7 @@ namespace CombatRoundTests
                 AUnitBase* Unit = AddUnit(FIntPoint(Index * 2, 0), ETeam::Player);
                 APartyPlayerController* Controller = World->SpawnActor<APartyPlayerController>();
                 if (!Unit || !Controller) return false;
+                if (Index == 0 && FirstConsumables) Unit->Consumables = *FirstConsumables;
                 if (Index == 0 && !Unit->ConfigureMoveRange(FirstHumanMoveRange)) return false;
                 if (Index == 0 && FirstHumanSkill)
                 {
@@ -2829,6 +2831,60 @@ bool FCombatRoundChainLifecycleTest::RunTest(const FString& Parameters)
         }
         TestTrue(TEXT("Coordinator execution retains the original caster in every GAS context"), bOriginalGasContext);
         Source->GetAbilitySystemComponent()->OnGameplayEffectAppliedDelegateToTarget.Remove(Applied);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundConsumableLifecycleTest, "ProjectA.Combat.Consumable.AuthoredHealOwnershipCostsAndInterruptedRelease", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundConsumableLifecycleTest::RunTest(const FString& Parameters)
+{
+    for (bool bInterrupted : {false, true})
+    {
+        FRunConsumableStack Stack;
+        Stack.ItemTag = RunRecoveryRules::GetHealingItemTag();
+        Stack.Skill = RunRecoveryRules::GetHealingSkillPath();
+        Stack.Quantity = 1;
+        FCombatRoundSkill Skill;
+        FText Error;
+        if (!TestTrue(TEXT("The real saved healing DA resolves through registered item and GAS effect tags"), RunRecoveryRules::ResolveStack(Stack, Skill, Error))) return false;
+        TestEqual(TEXT("Authored trial healing is25HP"), Skill.Power, 25.f);
+        TestEqual(TEXT("Authored trial action cost is1AP"), Skill.ActionPointCost, 1);
+        const TArray<FRunConsumableStack> Stacks{Stack};
+        CombatRoundTests::FFixture Fixture;
+        if (!TestTrue(TEXT("Consumable stock adds a skill without consuming an acquired slot"), Fixture.Initialize(1, 10.f, nullptr, FIntPoint(0, 3), 1, nullptr, 20.f, true, false, 1, &Stacks))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        ACombatRoundCoordinator* Round = Fixture.Round;
+        const FCombatRoundCommand Command = Fixture.Command(Source, Skill.SkillId, Source);
+        TestFalse(TEXT("Full HP cannot reserve an item or AP"), Round->CanPlanCommand(Command, Error));
+        Source->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), 40.f);
+        TestFalse(TEXT("AI cannot use the human consumable action"), CombatConsumableRules::CanUse(Source, Source, Skill, false));
+        TestFalse(TEXT("The owner cannot spend this consumable on another actor"), CombatConsumableRules::CanUse(Source, Fixture.Enemies[0], Skill, true));
+        Source->GetAbilitySystemComponent()->BlockAbilitiesWithTags(Skill.EffectTags);
+        TestFalse(TEXT("GAS blocking tags reject the normal planning command"), Round->CanPlanCommand(Command, Error));
+        Source->GetAbilitySystemComponent()->UnBlockAbilitiesWithTags(Skill.EffectTags);
+        Source->Consumables[0].Quantity = 0;
+        TestFalse(TEXT("Zero stock rejects the normal planning command"), Round->CanPlanCommand(Command, Error));
+        Source->Consumables[0].Quantity = 1;
+        int32 Applied = 0;
+        bool bContextAndTags = true;
+        const FDelegateHandle Handle = Source->GetAbilitySystemComponent()->OnGameplayEffectAppliedDelegateToTarget.AddLambda([&](UAbilitySystemComponent* TargetASC, const FGameplayEffectSpec& Spec, FActiveGameplayEffectHandle)
+        {
+            FGameplayTagContainer Tags;
+            Spec.GetAllAssetTags(Tags);
+            ++Applied;
+            bContextAndTags &= TargetASC == Source->GetAbilitySystemComponent() && Spec.GetContext().GetOriginalInstigator() == Source && Tags.HasTagExact(Stack.ItemTag);
+        });
+        if (!TestTrue(TEXT("A valid own-human plan uses the existing submit and Ready APIs"), Fixture.Submit(0, Command) && Fixture.Ready(0))) return false;
+        TestEqual(TEXT("Locking spends the normal AP cost once"), Source->GetCurrentActionPoint(), 1);
+        TestEqual(TEXT("Ready has not consumed the item before release"), Source->Consumables[0].Quantity, 1);
+        if (bInterrupted) Round->StopRound();
+        for (int32 Step = 0; Step < 250 && Round->GetView().Phase == ECombatRoundPhase::Resolving; ++Step) Round->Tick(.01f);
+        TestEqual(TEXT("Only actual successful release consumes one item"), Source->Consumables[0].Quantity, bInterrupted ? 1 : 0);
+        TestEqual(TEXT("Only actual release applies native Instant GAS healing"), Source->GetAttributeSet()->GetHP(), bInterrupted ? 40.f : 65.f);
+        TestEqual(TEXT("Repeated ticks never repeat the GAS application"), Applied, bInterrupted ? 0 : 1);
+        TestTrue(TEXT("The original caster self-target and item tag reach the GAS spec"), bContextAndTags);
+        Source->GetAbilitySystemComponent()->OnGameplayEffectAppliedDelegateToTarget.Remove(Handle);
     }
     return true;
 }

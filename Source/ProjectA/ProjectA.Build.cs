@@ -35,6 +35,13 @@ public class ProjectA : ModuleRules
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "AssetRegistry", "ApplicationCore" });
+        PublicDependencyModuleNames.Add("OnlineSubsystem");
+        bool bSteamDevelopment = Target.Platform == UnrealTargetPlatform.Win64 && Target.Configuration != UnrealTargetConfiguration.Shipping && Target.Configuration != UnrealTargetConfiguration.Test;
+        PublicDefinitions.Add("PROJECTA_WITH_STEAM_DEV=" + (bSteamDevelopment ? "1" : "0"));
+        if (bSteamDevelopment)
+        {
+            PrivateDependencyModuleNames.AddRange(new string[] { "OnlineSubsystemSteam", "SteamSockets" });
+        }
 
 		PublicIncludePaths.AddRange(new string[] {
 			"ProjectA",
@@ -44,9 +51,5 @@ public class ProjectA : ModuleRules
         // Uncomment if you are using Slate UI
         // PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 
-        // Uncomment if you are using online features
-        // PrivateDependencyModuleNames.Add("OnlineSubsystem");
-
-        // To include OnlineSubsystemSteam, add it to the plugins section in your uproject file with the Enabled attribute set to true
     }
 }

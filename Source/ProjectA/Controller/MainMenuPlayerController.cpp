@@ -5,6 +5,8 @@
 #include "Game/Run/RunStateSubsystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "UI/MainMenu/CharacterCreationWidget.h"
 #include "UI/MainMenu/MainMenuPreviewStage.h"
 #include "UI/MainMenu/MainMenuRootWidget.h"
@@ -137,7 +139,11 @@ bool AMainMenuPlayerController::StartNewGameFromParty(const TArray<FRunPartyMemb
         return false;
     }
 
-    if (!RunState->InitializeRun(PartyMembers, OutError))
+    bool bPrototype = false;
+#if !UE_BUILD_SHIPPING && !UE_BUILD_TEST
+    bPrototype = FParse::Param(FCommandLine::Get(), TEXT("ProjectAPrototypeRun"));
+#endif
+    if (!(bPrototype ? RunState->InitializeRun(PartyMembers, OutError) : RunState->InitializeTargetRun(PartyMembers, OutError)))
     {
         UE_LOG(LogTemp, Warning, TEXT("[MainMenuPlayerController] Party validation failed: %s"), *OutError.ToString());
         return false;

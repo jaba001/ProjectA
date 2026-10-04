@@ -84,6 +84,9 @@ struct PROJECTA_API FCombatCheckpointUnit
     float HealingItemAmount = 40.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    TArray<FRunConsumableStack> Consumables;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     bool bDead = false;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")

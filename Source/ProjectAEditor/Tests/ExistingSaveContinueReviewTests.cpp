@@ -37,6 +37,8 @@
 #include "Serialization/JsonSerializer.h"
 #include "Settings/LevelEditorPlaySettings.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "TodoReviewWindowPlacement.h"
+#include "TodoReviewGameplayPresentation.h"
 #include "UI/MainMenu/MainMenuScreenWidget.h"
 #include "Unit/UnitBase.h"
 #include "UnrealClient.h"
@@ -50,6 +52,7 @@ namespace ExistingSaveContinueReview
     {
         FString Result = FPaths::ConvertRelativePathToFull(Path);
         FPaths::NormalizeDirectoryName(Result);
+        FPaths::CollapseRelativeDirectories(Result);
         return Result;
     }
 
@@ -65,6 +68,8 @@ namespace ExistingSaveContinueReview
         FString Root;
         FString Slot;
         FString SourcePath;
+        FString BaselinePath;
+        FString OutputDirectory;
         TArray<uint8> OriginalBytes;
         TStrongObjectPtr<URunSaveGame> Raw;
         TStrongObjectPtr<URunSaveGame> Expected;
@@ -103,7 +108,7 @@ namespace ExistingSaveContinueReview
                 Observation->Report->SetBoolField(TEXT("passed"), bChecksPassed && bGameplayRestored);
                 Observation->Report->SetBoolField(TEXT("observation_completed"), bObservationCompleted);
                 FString Json;
-                Check(FJsonSerializer::Serialize(Observation->Report, TJsonWriterFactory<>::Create(&Json)) && FFileHelper::SaveStringToFile(Json, *(Observation->Root / TEXT("Saved/Automation/TodoReview/SavedOriginalContinueReview.json")), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM), TEXT("The isolated Continue result is written to Saved only."));
+                Check(FJsonSerializer::Serialize(Observation->Report, TJsonWriterFactory<>::Create(&Json)) && FFileHelper::SaveStringToFile(Json, *(Observation->OutputDirectory / (Observation->Slot + TEXT(".json"))), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM), TEXT("The isolated Continue result is written to the explicit current review directory in Saved only."));
                 return true;
             }
             if (FPlatformTime::Seconds() - Started > 60.0)
@@ -122,6 +127,7 @@ namespace ExistingSaveContinueReview
                 Settings->NewWindowWidth = 1280;
                 Settings->NewWindowHeight = 720;
                 Settings->SetClientWindowSize(FIntPoint(1280, 720));
+                if (!TodoReviewWindowPlacement::Configure(Test, Settings.Get())) return End();
                 FRequestPlaySessionParams Params;
                 Params.EditorPlaySettings = Settings.Get();
                 Params.SessionDestination = EPlaySessionDestinationType::InProcess;
@@ -139,6 +145,7 @@ namespace ExistingSaveContinueReview
             {
                 AMainMenuPlayerController* MenuController = Cast<AMainMenuPlayerController>(World->GetFirstPlayerController());
                 if (!MenuController) return false;
+                if (!Check(UWorld::RemovePIEPrefix(World->GetOutermost()->GetName()) == TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu"), TEXT("The actual Continue button belongs to the relocated Core/MainMenu World."))) return End();
                 TArray<UUserWidget*> Widgets;
                 UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Widgets, UMainMenuScreenWidget::StaticClass(), false);
                 for (UUserWidget* Widget : Widgets)
@@ -183,7 +190,17 @@ namespace ExistingSaveContinueReview
             ACombatRoundCoordinator* Round = Combat ? Combat->GetRoundCoordinator() : nullptr;
             if (!Round || Round->GetView().Phase != ECombatRoundPhase::Planning) return false;
             if (!VerifyRestored(Run, Combat, Round)) return End();
-            if (++WarmFrames < 12) return false;
+            if (PresentationStarted == 0.0) PresentationStarted = FPlatformTime::Seconds();
+            Observation->Report->SetObjectField(TEXT("presentation_readiness"), PresentationReport);
+            if (!Presentation.Poll(World, Round, PresentationReport))
+            {
+                if (FPlatformTime::Seconds() - PresentationStarted < 30.0) return false;
+                Check(false, TEXT("Natural Continue frames did not produce the authored camera POV, visible unit meshes and rendered grid within thirty seconds; see presentation_readiness."));
+                Capture(World, true);
+                Observation->Report->SetStringField(TEXT("outcome"), TEXT("GameplayDataRestoredPresentationNotReady"));
+                bObservationCompleted = true;
+                return End();
+            }
             if (!Capture(World)) return End();
             bGameplayRestored = bObservationCompleted = true;
             Observation->Report->SetStringField(TEXT("outcome"), TEXT("GameplayRestored"));
@@ -199,6 +216,7 @@ namespace ExistingSaveContinueReview
 
         bool VerifyRestored(URunStateSubsystem* Run, ACombatManager* Combat, ACombatRoundCoordinator* Round)
         {
+            if (!Check(UWorld::RemovePIEPrefix(Combat->GetWorld()->GetOutermost()->GetName()) == TEXT("/Game/User_JeHoon/LEVEL/Core/Gameplay"), TEXT("The authored Continue arrives in the relocated Core/Gameplay World."))) return false;
             const URunSaveGame& Expected = *Observation->Expected.Get();
             const FCombatCheckpointData& Checkpoint = Expected.CombatCheckpoint;
             if (!Check(!Run->IsManagedRun() && Run->GetPhase() == Expected.Phase && Run->GetLastResult() == Expected.Result && Run->GetCurrentNodeId() == Expected.CurrentNode && Run->GetCurrentEncounterId() == Expected.CurrentEncounter && Run->GetCompletedNodes() == Expected.CompletedNodes, TEXT("The actual Continue restores the original phase, result and route without starting a new Run."))) return false;
@@ -237,8 +255,9 @@ namespace ExistingSaveContinueReview
             return true;
         }
 
-        bool Capture(UWorld* World)
+        bool Capture(UWorld* World, bool bDiagnostic = false)
         {
+            if (!TodoReviewWindowPlacement::Ensure(Test, World)) return false;
             UGameViewportClient* Viewport = World->GetGameViewport();
             const TSharedPtr<SViewport> Widget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
             const FIntPoint Size = Viewport && Viewport->Viewport ? Viewport->Viewport->GetSizeXY() : FIntPoint::ZeroValue;
@@ -248,9 +267,9 @@ namespace ExistingSaveContinueReview
             for (FColor& Pixel : Pixels) Pixel.A = 255;
             TArray64<uint8> PNG;
             FImageUtils::PNGCompressImageArray(Size.X, Size.Y, Pixels, PNG);
-            const FString Path = Observation->Root / TEXT("Saved/Automation/TodoReview") / (Observation->Slot + TEXT(".png"));
+            const FString Path = Observation->OutputDirectory / (Observation->Slot + (bDiagnostic ? TEXT("_PresentationNotReady.png") : TEXT(".png")));
             if (!Check(!PNG.IsEmpty() && FFileHelper::SaveArrayToFile(PNG, *Path), TEXT("The restored gameplay screenshot is written to Saved only."))) return false;
-            Observation->Report->SetStringField(TEXT("gameplay_png"), Path);
+            Observation->Report->SetStringField(bDiagnostic ? TEXT("diagnostic_png") : TEXT("gameplay_png"), Path);
             Observation->Report->SetStringField(TEXT("actual_capture_size"), Size.ToString());
             return true;
         }
@@ -280,9 +299,11 @@ namespace ExistingSaveContinueReview
         TSharedRef<FObservation> Observation;
         TStrongObjectPtr<ULevelEditorPlaySettings> Settings;
         TSharedPtr<ISlateViewport> RetainedViewport;
+        TodoReviewGameplayPresentation::FReadiness Presentation;
+        TSharedRef<FJsonObject> PresentationReport = MakeShared<FJsonObject>();
         double Started = 0.0;
+        double PresentationStarted = 0.0;
         int32 Stage = 0;
-        int32 WarmFrames = 0;
         bool bChecksPassed = true;
         bool bObservationCompleted = false;
         bool bGameplayRestored = false;
@@ -301,19 +322,26 @@ bool FExistingSaveContinueReviewTest::RunTest(const FString& Parameters)
     int32 ExpectedBytes = 0;
     FString ExpectedSHA256;
     if (!TestTrue(TEXT("Only the ProjectA Editor's own project-local Saved directory may be used."), GIsEditor && GEditor && !GEditor->PlayWorld && FPaths::GetCleanFilename(FPaths::GetProjectFilePath()) == TEXT("ProjectA.uproject") && AbsolutePath(FPaths::ProjectSavedDir()).Equals(Observation->Root / TEXT("Saved"), ESearchCase::IgnoreCase))) return false;
+    if (!TestTrue(TEXT("An explicit current user-state baseline is required; historical baselines are not assumed."), FParse::Value(FCommandLine::Get(), TEXT("ProjectAExistingSaveContinueBaseline="), Observation->BaselinePath))) return false;
+    Observation->BaselinePath = AbsolutePath(Observation->BaselinePath);
+    if (!TodoReviewWindowPlacement::OutputRoot(this, Observation->OutputDirectory)) return false;
+    if (!TestTrue(TEXT("The current review output directory can be created inside Saved."), IFileManager::Get().MakeDirectory(*Observation->OutputDirectory, true))) return false;
+    if (!TestTrue(TEXT("The baseline must be an existing JSON inside this project's Saved/Automation directory."), Observation->BaselinePath.StartsWith(AbsolutePath(Observation->Root / TEXT("Saved/Automation")) + TEXT("/"), ESearchCase::IgnoreCase) && FPaths::GetExtension(Observation->BaselinePath).Equals(TEXT("json"), ESearchCase::IgnoreCase) && FPaths::FileExists(Observation->BaselinePath))) return false;
     if (!TestTrue(TEXT("An explicit fresh UUID Continue clone, positive source size and SHA256 are required."), FParse::Value(FCommandLine::Get(), TEXT("ProjectAExistingSaveContinueSlot="), Observation->Slot) && Observation->Slot.StartsWith(Prefix) && Observation->Slot.Len() == Prefix.Len() + 32 && FGuid::ParseExact(Observation->Slot.Right(32), EGuidFormats::Digits, Guid) && Guid.IsValid() && Observation->Slot == Prefix + Guid.ToString(EGuidFormats::Digits).ToLower() && URunStateSubsystem::ResolveCheckpointSlot(FCommandLine::Get()) == Observation->Slot && FParse::Value(FCommandLine::Get(), TEXT("ProjectAExistingSaveContinueBytes="), ExpectedBytes) && ExpectedBytes > 0 && FParse::Value(FCommandLine::Get(), TEXT("ProjectAExistingSaveContinueSHA256="), ExpectedSHA256) && IsSHA256Literal(ExpectedSHA256))) return false;
     Observation->SourcePath = Observation->Root / TEXT("Saved/SaveGames/ProjectA_Run.sav");
     TArray<uint8> Clone;
     FString BaselineText;
     FString BaselineSHA256;
     TSharedPtr<FJsonObject> Baseline;
-    if (!TestTrue(TEXT("The original and disposable UUID clone exactly match the externally authorized original baseline."), FFileHelper::LoadFileToArray(Observation->OriginalBytes, *Observation->SourcePath) && Observation->OriginalBytes.Num() == ExpectedBytes && FFileHelper::LoadFileToArray(Clone, *(Observation->Root / TEXT("Saved/SaveGames") / (Observation->Slot + TEXT(".sav")))) && Clone == Observation->OriginalBytes && FFileHelper::LoadFileToString(BaselineText, *(Observation->Root / TEXT("Saved/Automation/TodoReview/BeforeUserState.json"))) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(BaselineText), Baseline) && Baseline.IsValid() && Baseline->TryGetStringField(TEXT("Saved/SaveGames/ProjectA_Run.sav"), BaselineSHA256) && IsSHA256Literal(BaselineSHA256) && BaselineSHA256.Equals(ExpectedSHA256, ESearchCase::IgnoreCase))) return false;
+    if (!TestTrue(TEXT("The original and disposable UUID clone exactly match the externally authorized original baseline."), FFileHelper::LoadFileToArray(Observation->OriginalBytes, *Observation->SourcePath) && Observation->OriginalBytes.Num() == ExpectedBytes && FFileHelper::LoadFileToArray(Clone, *(Observation->Root / TEXT("Saved/SaveGames") / (Observation->Slot + TEXT(".sav")))) && Clone == Observation->OriginalBytes && FFileHelper::LoadFileToString(BaselineText, *Observation->BaselinePath) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(BaselineText), Baseline) && Baseline.IsValid() && Baseline->TryGetStringField(TEXT("Saved/SaveGames/ProjectA_Run.sav"), BaselineSHA256) && IsSHA256Literal(BaselineSHA256) && BaselineSHA256.Equals(ExpectedSHA256, ESearchCase::IgnoreCase))) return false;
+    if (!TestTrue(TEXT("The fresh clone observation never replaces an earlier report or screenshot."), !FPaths::FileExists(Observation->OutputDirectory / (Observation->Slot + TEXT(".json"))) && !FPaths::FileExists(Observation->OutputDirectory / (Observation->Slot + TEXT(".png"))))) return false;
     Observation->Raw.Reset(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Observation->Slot, 0)));
     FText Error;
     Observation->Expected.Reset(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Observation->Slot, Error)));
     if (!TestTrue(TEXT("The isolated clone raw load is an ordinary saved Combat Run, without acquiring any managed authority."), Observation->Raw.IsValid() && !FRunSaveFormat::IsManaged(Observation->Raw->Version) && Observation->Raw->Phase == ERunPhase::Combat)) return false;
     Observation->Report->SetStringField(TEXT("scope"), TEXT("Original-byte UUID clone only: actual main-menu Continue delegate, production in-memory migration and public Combat restoration. Original-slot Unreal load/save, managed authority mutation, normal gameplay actions and cooked compatibility are excluded. External driver checks all original files with SHA256; C++ checks source bytes/SHA1."));
     Observation->Report->SetStringField(TEXT("clone_slot"), Observation->Slot);
+    Observation->Report->SetStringField(TEXT("current_baseline_path"), Observation->BaselinePath);
     Observation->Report->SetStringField(TEXT("external_baseline_sha256"), BaselineSHA256);
     Observation->Report->SetStringField(TEXT("cpp_original_sha1_before"), FSHA1::HashBuffer(Observation->OriginalBytes.GetData(), Observation->OriginalBytes.Num()).ToString());
     Observation->Report->SetNumberField(TEXT("raw_version"), Observation->Raw->Version);

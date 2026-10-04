@@ -18,6 +18,7 @@ VERIFY = "-DrGameSkillsVerifyOnly" in unreal.SystemLibrary.get_command_line()
 ADD_CLASSIFICATION_TAGS = "-DrGameSkillsAddClassificationTags" in unreal.SystemLibrary.get_command_line()
 UPDATE_VFX_DIRECTIONS = "-DrGameSkillsUpdateVfxDirections" in unreal.SystemLibrary.get_command_line()
 ENABLE_CHAIN = "-DrGameSkillsEnableChain" in unreal.SystemLibrary.get_command_line()
+REPAIR_CHAIN_WRITE = "-DrGameSkillsRepairChainWrite" in unreal.SystemLibrary.get_command_line()
 ASSETS = unreal.EditorAssetLibrary
 TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
 OWNER_KEY = "ProjectA.DrGameSkills"
@@ -153,11 +154,14 @@ def enable_chain(asset, properties, entry):
     actual = asset.get_editor_property("round_definition")
     expected = properties["round_definition"]
     actual_chain = actual.get_editor_property("chain")
-    expected_chain = expected.get_editor_property("chain")
+    # Nested struct getters are live views; preserve the desired values outside the parent before comparison edits.
+    # 중첩 구조체 getter는 부모를 가리키는 뷰이므로 비교용 부모 변경 전에 목표 값을 독립 구조체에 보존합니다.
+    expected_chain = make_chain(SPEC["profiles"][entry["profile"]]["chain"])
     actual_description = normalized(asset.get_editor_property("skill_description"))
     if normalized(actual_chain) == normalized(expected_chain) and actual_description == properties["skill_description"]:
         return False
-    if normalized(actual_chain) != normalized(unreal.CombatChainSettings()) or expected_chain.get_editor_property("max_targets") <= 1 or actual_description != legacy_link_description(entry):
+    permitted_description = properties["skill_description"] if REPAIR_CHAIN_WRITE else legacy_link_description(entry)
+    if normalized(actual_chain) != normalized(unreal.CombatChainSettings()) or expected_chain.get_editor_property("max_targets") <= 1 or actual_description != permitted_description:
         return False
     # Preserve every other authored field before replacing both the legacy chain settings and its description.
     # 기존 체인 설정과 설명을 함께 교체하기 전에 작성된 다른 모든 필드를 보존합니다.
@@ -294,10 +298,23 @@ def description(entry):
 
 def main():
     require(sum((ADD_CLASSIFICATION_TAGS, UPDATE_VFX_DIRECTIONS, ENABLE_CHAIN)) <= 1, "Run classification, endpoint and chain migrations separately")
+    require(not REPAIR_CHAIN_WRITE or (ENABLE_CHAIN and not VERIFY), "Partial chain repair requires the author-only chain migration")
     selected = [entry for entry in SPEC["entries"] if entry["profile"]]
     if ENABLE_CHAIN:
         require(SPEC["profiles"]["link"].get("chain") and len([entry for entry in selected if entry["profile"] == "link"]) == 5, "Chain migration requires the five declared link skills")
         require(all(not settings.get("chain") or name == "link" for name, settings in SPEC["profiles"].items()), "Chain migration only supports the declared link profile")
+    if REPAIR_CHAIN_WRITE:
+        # Repair only the hash-bound five-package partial write documented by the failed independent reload.
+        # 독립 재로드 실패로 기록된 해시 고정 5개 패키지의 부분 작성 상태만 복구합니다.
+        baseline_path = REPORT_DIR / "ProxyRepairBaseline.json"
+        require(baseline_path.is_file(), "Partial chain repair requires its inspected baseline")
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        permitted = {entry["destination"] for entry in selected if entry["profile"] == "link"}
+        require(baseline.get("version") == 1 and set(baseline.get("asset_hashes", {})) == permitted and baseline.get("specification_sha256") == file_hash(Path(__file__).with_name("DrGameSkillSpecs.json")), "Partial chain repair scope or specification changed")
+        require(file_hash(REPORT_DIR / "ProxyRepairAuthorBefore.json") == baseline["author_report_sha256"] and file_hash(REPORT_DIR / "PartialStateInspection.json") == baseline["inspection_sha256"], "Partial chain repair evidence changed")
+        author = json.loads((REPORT_DIR / "ProxyRepairAuthorBefore.json").read_text(encoding="utf-8"))
+        require(author.get("mode") == "author" and author.get("updated_packages") == 5 and author.get("created_packages") == 0 and author.get("party_reference_changed") is False and {value.split(".")[0] for value in author.get("updated_assets", [])} == permitted, "Partial chain repair requires the exact prior five-package write")
+        require(all(file_hash(package_file(package)) == expected_hash for package, expected_hash in baseline["asset_hashes"].items()), "Partial chain repair packages changed after inspection")
     require(len(selected) == 60 and len({entry["skill_id"] for entry in selected}) == 60 and len({entry["destination"] for entry in selected}) == 60, "Specification identities must be unique")
     require(all(entry["skill_id"].startswith("DrGame_") for entry in selected), "New skill IDs must be distinct from the retired catalog")
     require(all(entry["skill_id"] not in REMOVED_SKILL_IDS for entry in selected), "Retired skill ID reuse is forbidden")
@@ -367,6 +384,9 @@ def main():
     if party_changed:
         party.set_editor_property("run_encounter_pool", run_pool)
     require({name: normalized(party.get_editor_property(name)) for name in before} == before and {str(name): normalized(value) for name, value in party.get_editor_property("professions").items()} == profession_values, "Party starting content changed")
+    if ENABLE_CHAIN:
+        permitted = {entry["destination"] for entry in selected if entry["profile"] == "link"}
+        require(not created and not party_changed and all(asset.get_path_name().split(".")[0] in permitted for asset in updated), "Chain migration may only save the five existing link DataAssets")
     if not VERIFY:
         for asset in created + updated:
             save(asset)
@@ -378,6 +398,10 @@ def main():
         require(file_hash(ROOT / filename) == expected, "Protected package changed: " + filename)
     report = {"mode": "reload" if VERIFY else "author", "specification_sha256": file_hash(Path(__file__).with_name("DrGameSkillSpecs.json")), "skills": len(skills), "profiles": dict(Counter(entry["profile"] for entry in selected)), "source_effects": len(SPEC["entries"]), "auxiliary_effects": len(SPEC["entries"]) - len(skills), "created_packages": len(created), "shop_candidates": len(entries), "pool": SPEC["pool"], "run_pool": SPEC["run_pool"], "party": SPEC["party"], "party_reference_changed": party_changed, "retained_skill_count": len(retained_hashes), "source_files_unchanged": len(source_hashes), "data_validation": "passed", "warnings": warnings, "assets": [skill.get_path_name() for skill in skills], "niagara": inspections, "gameplay_test": "not run", "visual_alignment": "user verification pending", "sfx_playback": "user verification pending"}
     report.update({"updated_packages": len(updated), "updated_assets": [asset.get_path_name() for asset in updated], "untouched_authored_skills_unchanged": len(protected_authored)})
+    if ENABLE_CHAIN:
+        report["chain_settings"] = SPEC["profiles"]["link"]["chain"]
+        report["chain_assets"] = [entry["destination"] for entry in selected if entry["profile"] == "link"]
+        report["partial_chain_write_repaired"] = REPAIR_CHAIN_WRITE
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     output = REPORT_DIR / ("Reload.json" if VERIFY else "Author.json")
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")

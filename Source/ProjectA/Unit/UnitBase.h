@@ -6,6 +6,7 @@
 #include "AbilitySystemComponent.h"
 #include "GAS/Attribute/AS_Unit.h"
 #include "Types/UnitActionTypes.h"
+#include "Game/Run/RunRecoveryTypes.h"
 #include "UnitBase.generated.h"
 
 class ACombatGridTile;
@@ -385,6 +386,11 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "UnitBase|Item")
     int32 HealingItemCount = 1;
+
+    // Authoritative consumable stock is captured at the existing Ready boundary.
+    // 권위 소모품 재고는 기존 준비 완료 경계에서 저장합니다.
+    UPROPERTY(BlueprintReadOnly, Replicated, Category = "UnitBase|Consumables")
+    TArray<FRunConsumableStack> Consumables;
 
     UFUNCTION(BlueprintPure, Category = "UnitBase|Item", meta = (DeprecatedFunction, DeprecationMessage = "Use round planning; this entry point only preserves legacy asset compatibility."))
     bool CanUseHealingItem(AUnitBase* TargetUnit) const;

@@ -38,6 +38,14 @@ bool CombatPlanValidation::ValidateCheckpointPlans(const FCombatCheckpointData& 
             Unit.SkillIds.Add(Skill.SkillId);
             if (!FindSkill(State, Skill.SkillId)) State.Skills.Add(MoveTemp(Skill));
         }
+        for (const FRunConsumableStack& Stack : Saved->Consumables)
+        {
+            FCombatRoundSkill Skill;
+            if (!RunRecoveryRules::ResolveStack(Stack, Skill, OutError) || Unit.SkillIds.Contains(Skill.SkillId)) return false;
+            if (Unit.Command.SkillId == Skill.SkillId && (Saved->PartyControlMode != EPartyControlMode::Human || Saved->Team != ETeam::Player || Unit.Command.TargetUnitId != Unit.UnitId || Saved->HP <= 0.f || Saved->HP >= Saved->MaxHP || Stack.Quantity <= 0)) return false;
+            Unit.SkillIds.Add(Skill.SkillId);
+            if (!FindSkill(State, Skill.SkillId)) State.Skills.Add(MoveTemp(Skill));
+        }
     }
     if (PlannedUnits.Num() != Checkpoint.Units.Num()) return false;
     // Checkpoint structure is validated without inventing saved GAS state; live tag conditions are checked on restore and release.

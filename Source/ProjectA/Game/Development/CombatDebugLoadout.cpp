@@ -13,6 +13,7 @@
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunItemShopCatalog.h"
+#include "Game/Run/RunRecoveryTypes.h"
 #include "GameFramework/PlayerController.h"
 #include "Modules/ModuleManager.h"
 #include "Unit/CharacterEquipmentComponent.h"
@@ -66,7 +67,14 @@ void UCombatDebugLoadout::Initialize(ACombatManager* InManager)
         for (const FAssetData& Asset : Assets)
         {
             const FSoftObjectPath Path = Asset.GetSoftObjectPath();
-            if (!RunContentMigration::IsRemovedSkill(Path)) SkillAssets.AddUnique(Path);
+            if (RunContentMigration::IsRemovedSkill(Path)) continue;
+            const USkillDefinitionDataAsset* Definition = Cast<USkillDefinitionDataAsset>(Asset.GetAsset());
+            FCombatRoundSkill Profile;
+            FText SkillError;
+            // Consumables require Run-owned stock and never occupy a general debug skill slot.
+            // 소모품은 Run 소유 재고가 필요하므로 일반 디버그 스킬 슬롯에 포함하지 않습니다.
+            if (Definition && Definition->ResolveRoundSkill(Profile, SkillError) && RunRecoveryRules::IsConsumable(Profile)) continue;
+            SkillAssets.AddUnique(Path);
         }
         SkillAssets.Sort([](const FSoftObjectPath& Left, const FSoftObjectPath& Right) { return Left.ToString() < Right.ToString(); });
         // Match the runtime SkillName first and cache labels once instead of loading assets during UI searches.

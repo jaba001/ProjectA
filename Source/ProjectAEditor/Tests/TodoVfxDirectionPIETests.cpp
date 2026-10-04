@@ -73,6 +73,7 @@
 #include "Settings/LevelEditorPlaySettings.h"
 #include "Sound/SoundBase.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "TodoReviewWindowPlacement.h"
 #include "Unit/UnitBase.h"
 #include "UnrealClient.h"
 #include "UObject/StrongObjectPtr.h"
@@ -201,6 +202,7 @@ struct FObservedSegment
     float LastAge = 0.f;
     bool bMovedTarget = false;
     bool bCaptured = false;
+    bool bLateCaptured = false;
     bool bFollowingVerified = false;
 };
 
@@ -291,10 +293,19 @@ public:
     {
         bNinjaVisibilityReview = !bMonsterReview && FParse::Param(FCommandLine::Get(), TEXT("ProjectANinjaVisibilityReview"));
         bFocusedReview = !bMonsterReview && (bNinjaVisibilityReview || FParse::Param(FCommandLine::Get(), TEXT("ProjectAVfxFocusedReview")));
-        bSettlingReview = bMonsterReview && FParse::Param(FCommandLine::Get(), TEXT("ProjectARagdollSettlingReview"));
+        bAuthoredChainReview = !bMonsterReview && !bFocusedReview && FParse::Param(FCommandLine::Get(), TEXT("ProjectAAuthoredChainReview"));
+        bFinalSettlingReview = bMonsterReview && FParse::Param(FCommandLine::Get(), TEXT("ProjectARagdollFinalSettlingReview"));
+        bSettlingReview = bMonsterReview && (bFinalSettlingReview || FParse::Param(FCommandLine::Get(), TEXT("ProjectARagdollSettlingReview")));
         if (bFocusedReview) Cases = bNinjaVisibilityReview ? MakeNinjaVisibilityCases() : MakeFocusedCases();
-        const FString ReviewFolder = bNinjaVisibilityReview ? TEXT("VfxNinjaVisibility") : bFocusedReview ? TEXT("VfxFocused") : bSettlingReview ? TEXT("MonsterSettling") : bMonsterReview ? TEXT("MonsterAttacks") : TEXT("VfxDirections");
-        OutputDirectory = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation/TodoReview") / ReviewFolder / FGuid::NewGuid().ToString(EGuidFormats::Digits));
+        if (bAuthoredChainReview) Cases.RemoveAll([](const FCase& Case) { return !Case.bChain; });
+        const FString ReviewFolder = bAuthoredChainReview ? TEXT("AuthoredChain") : bNinjaVisibilityReview ? TEXT("VfxNinjaVisibility") : bFocusedReview ? TEXT("VfxFocused") : bSettlingReview ? TEXT("MonsterSettling") : bMonsterReview ? TEXT("MonsterAttacks") : TEXT("VfxDirections");
+        FString ReviewRoot;
+        if (!TodoReviewWindowPlacement::OutputRoot(Test, ReviewRoot))
+        {
+            bInitializationFailed = true;
+            return;
+        }
+        OutputDirectory = ReviewRoot / ReviewFolder / FGuid::NewGuid().ToString(EGuidFormats::Digits);
         IFileManager::Get().MakeDirectory(*OutputDirectory, true);
         CaptureHandle = UGameViewportClient::OnViewportRendered().AddRaw(this, &FDirectionReview::CaptureRenderedViewport);
         bRecordRequested = FParse::Param(FCommandLine::Get(), TEXT("ProjectARecordReviewAudio"));
@@ -314,6 +325,7 @@ public:
 
     virtual bool Update() override
     {
+        if (bInitializationFailed) return true;
         DrainAudioDiagnostics();
         if (StageStarted == 0.0) StageStarted = FPlatformTime::Seconds();
         if (Stage == 9)
@@ -348,6 +360,7 @@ public:
             Settings->NewWindowWidth = 1280;
             Settings->NewWindowHeight = 720;
             Settings->SetClientWindowSize(FIntPoint(1280, 720));
+            if (!TodoReviewWindowPlacement::Configure(Test, Settings.Get())) return End();
             if (bRecordRequested && !bMonsterReview)
             {
                 // Enable sound only on the duplicated review settings; saved editor audio preferences remain unchanged.
@@ -418,6 +431,7 @@ public:
                 return false;
             }
             if (bFocusedReview && !InspectFocusedView()) return End();
+            if (!TodoReviewWindowPlacement::Ensure(Test, Controller->GetWorld())) return End();
             if (ShouldRecordCase())
             {
                 if (!StartAudioReviewRecording()) return End();
@@ -437,7 +451,7 @@ public:
             if (!PendingScreenshot.IsEmpty()) return false;
             const int32 ExpectedCaptures = AttackCaptureCount(Cases[CaseIndex]);
             if (CapturedThisCase < ExpectedCaptures && FPlatformTime::Seconds() - StageStarted < 15.0) return false;
-            const int32 ExpectedImpacts = Cases[CaseIndex].bChain ? 3 : 1;
+            const int32 ExpectedImpacts = Cases[CaseIndex].bChain ? Definition.Chain.MaxTargets : 1;
             if (!Definition.ImpactVfx.Niagara.IsNull() && (ImpactInstances.Num() < ExpectedImpacts || MaxImpactParticles <= 0) && FPlatformTime::Seconds() - StageStarted < 15.0) return false;
             if (bRecordingAudio)
             {
@@ -480,6 +494,10 @@ public:
                 bDeathCaptureQueued = false;
                 bLateDeathCaptureQueued = false;
                 bSettlingDeathCaptureQueued = false;
+                bFinalSettlingCaptureQueued = false;
+                FinalSleepStartedAt = -1.0;
+                FinalSleepObservedSeconds = 0.0;
+                bFinalSettled = false;
                 SettlingFrameSamples.Reset();
                 LastSettlingObservedWorldTime = -1.0;
                 DeathStartedWorldTime = Controller->GetWorld()->GetTimeSeconds();
@@ -506,7 +524,7 @@ public:
 
 private:
     bool NeedsLateCaptures(const FCase& Current, const FCombatRoundSkill& Skill) const { return !Current.bChain && !Current.bBasicAttack && (Current.bFocusedExtraPhases || Current.bFalling || Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Shape_Area) || Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Heal) || Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Shield)); }
-    int32 CapturePlanCount(const FCase& Current, const FCombatRoundSkill& Skill) const { return Current.bChain || Current.bMonster ? 3 : 2 + (NeedsLateCaptures(Current, Skill) ? 2 : 0) + (Current.bNinjaShortPhases ? 2 : 0) + (Current.bFocusedFinalBurstPhase ? 1 : 0) + (!Current.bBasicAttack && !Skill.ImpactVfx.Niagara.IsNull() ? 1 : 0); }
+    int32 CapturePlanCount(const FCase& Current, const FCombatRoundSkill& Skill) const { return Current.bChain ? (bAuthoredChainReview ? Skill.Chain.MaxTargets * 2 : 3) : Current.bMonster ? 3 : 2 + (NeedsLateCaptures(Current, Skill) ? 2 : 0) + (Current.bNinjaShortPhases ? 2 : 0) + (Current.bFocusedFinalBurstPhase ? 1 : 0) + (!Current.bBasicAttack && !Skill.ImpactVfx.Niagara.IsNull() ? 1 : 0); }
     int32 AttackCaptureCount(const FCase& Current) const { return CapturePlanCount(Current, Definition); }
 
     bool PrepareFocusedView(AActor* Camera, const FVector& Focus)
@@ -785,7 +803,7 @@ private:
         if (!Check(!Source->IsUnitAlive() && Source->GetAttributeSet()->GetHP() <= 0.f && Source->GetMesh()->IsSimulatingPhysics() && Source->GetCapsuleComponent()->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Source->GetCurrentTile() && DeathHomeTile.IsValid() && !DeathHomeTile->GetOccupyingUnit(), TEXT("Lethal GAS damage applies actual monster ragdoll, disables capsule collision and releases its reserved tile."))) return End();
         if (bCaptureFailed) return End();
         const double DeathWorldSeconds = Controller->GetWorld()->GetTimeSeconds() - DeathStartedWorldTime;
-        if (bSettlingReview && bLateDeathCaptureQueued && !bSettlingDeathCaptureQueued && !ObserveSettlingRagdollFrame(DeathWorldSeconds)) return End();
+        if (bSettlingReview && bLateDeathCaptureQueued && (!bSettlingDeathCaptureQueued || (bFinalSettlingReview && !bFinalSettlingCaptureQueued)) && !ObserveSettlingRagdollFrame(DeathWorldSeconds)) return End();
         if (!bDeathCaptureQueued)
         {
             bDeathCaptureQueued = QueueCapture(TEXT("death_ragdoll"), static_cast<float>(FPlatformTime::Seconds() - StageStarted));
@@ -841,7 +859,21 @@ private:
             bSettlingDeathCaptureQueued = QueueCapture(TEXT("death_ragdoll_world800"), static_cast<float>(DeathWorldSeconds));
             return false;
         }
-        if (!Check(CapturedThisCase == (bSettlingReview ? 6 : 5), bSettlingReview ? TEXT("The original monster supplies both its preserved 2.5-second frame and optional actual eight-second frame before Restart.") : TEXT("The original monster also supplies its actual late ragdoll frame before Restart."))) return End();
+        if (bFinalSettlingReview && !bFinalSettlingCaptureQueued)
+        {
+            if (!bFinalSettled && DeathWorldSeconds < 60.0) return false;
+            TSharedPtr<FJsonObject> Record = Records.Last()->AsObject();
+            Record->SetBoolField(TEXT("final_ragdoll_continuous_sleep_passed"), bFinalSettled);
+            Record->SetNumberField(TEXT("final_ragdoll_world_seconds"), DeathWorldSeconds);
+            Record->SetNumberField(TEXT("final_ragdoll_continuous_sleep_seconds"), FinalSleepObservedSeconds);
+            Record->SetStringField(TEXT("final_ragdoll_status"), bFinalSettled ? TEXT("All original bodies remained naturally asleep for at least three advancing world seconds; final pose and floor contact require PNG inspection.") : TEXT("FAILED: no three-second continuous natural sleep before the sixty-world-second deadline; final settling is unconfirmed."));
+            // Record failure and still review every original monster; never manufacture rest by editing velocity or physics.
+            // 속도·물리를 바꿔 정지를 만들지 않고 실패를 기록한 뒤 모든 원본 몬스터 검수를 계속합니다.
+            Check(bFinalSettled, TEXT("The original ragdoll reaches three consecutive world seconds of natural engine sleep within sixty seconds: ") + Cases[CaseIndex].Label);
+            bFinalSettlingCaptureQueued = QueueCapture(bFinalSettled ? TEXT("death_ragdoll_final_asleep") : TEXT("death_ragdoll_final_timeout"), static_cast<float>(DeathWorldSeconds));
+            return false;
+        }
+        if (!Check(CapturedThisCase == (bFinalSettlingReview ? 7 : bSettlingReview ? 6 : 5), TEXT("The original monster provides its attack/death frames and every explicitly requested natural ragdoll observation before Restart."))) return End();
         RestoreMovedActors();
         FixtureMonster->Destroy();
         FixtureMonster.Reset();
@@ -873,7 +905,7 @@ private:
         ++CaseIndex;
         if (CaseIndex == Cases.Num())
         {
-            Check(CompletedCaptures == (bSettlingReview ? 78 : 65), bSettlingReview ? TEXT("All thirteen originals preserve their five frames and add an actual eight-second ragdoll frame without modifying physics.") : TEXT("All thirteen original monsters retain four initial attack/return/death captures and add one actual late ragdoll capture."));
+            Check(CompletedCaptures == (bFinalSettlingReview ? 91 : bSettlingReview ? 78 : 65), TEXT("All thirteen originals retain their existing frames and every explicitly requested natural ragdoll observation without changing physics."));
             return End();
         }
         Advance(1);
@@ -902,9 +934,17 @@ private:
                 ++ObservedBodies;
             }
         }
-        if (!Check(bFiniteBodies && ObservedBodies > 0 && FMath::IsFinite(MaxLinearSpeed) && FMath::IsFinite(MaxAngularSpeed), TEXT("Every observed original ragdoll frame from 2.5 to eight world seconds keeps finite bounds and physical velocities."))) return false;
+        if (!Check(bFiniteBodies && ObservedBodies > 0 && FMath::IsFinite(MaxLinearSpeed) && FMath::IsFinite(MaxAngularSpeed), TEXT("Every observed original ragdoll frame keeps finite bounds and physical velocities throughout the requested natural observation window."))) return false;
+        const double PreviousObservedWorldTime = LastSettlingObservedWorldTime;
         LastSettlingObservedWorldTime = ElapsedWorldSeconds;
         const bool bAnyBodyAwake = Mesh->IsAnyRigidBodyAwake();
+        if (bFinalSettlingReview)
+        {
+            if (bAnyBodyAwake) FinalSleepStartedAt = -1.0;
+            else if (FinalSleepStartedAt < 0.0) FinalSleepStartedAt = ElapsedWorldSeconds;
+            FinalSleepObservedSeconds = FinalSleepStartedAt < 0.0 ? 0.0 : ElapsedWorldSeconds - FinalSleepStartedAt;
+            bFinalSettled = FinalSleepObservedSeconds >= 3.0 && ElapsedWorldSeconds <= 60.0;
+        }
         const double BoundsMinZMinusFloor = Mesh->Bounds.Origin.Z - Mesh->Bounds.BoxExtent.Z - FloorZ;
         TSharedRef<FJsonObject> Sample = MakeShared<FJsonObject>();
         Sample->SetNumberField(TEXT("world_seconds_since_death"), ElapsedWorldSeconds);
@@ -914,9 +954,10 @@ private:
         Sample->SetNumberField(TEXT("max_linear_speed_cm_per_second"), MaxLinearSpeed);
         Sample->SetNumberField(TEXT("max_angular_speed_radians_per_second"), MaxAngularSpeed);
         Sample->SetNumberField(TEXT("mesh_bounds_min_z_minus_tile_floor_z"), BoundsMinZMinusFloor);
+        if (bFinalSettlingReview) Sample->SetNumberField(TEXT("continuous_sleep_seconds"), FinalSleepObservedSeconds);
         SettlingFrameSamples.Add(MakeShared<FJsonValueObject>(Sample));
         Records.Last()->AsObject()->SetArrayField(TEXT("settling_ragdoll_frame_samples"), SettlingFrameSamples);
-        if (ElapsedWorldSeconds >= 8.0)
+        if (ElapsedWorldSeconds >= 8.0 && PreviousObservedWorldTime < 8.0)
         {
             TSharedPtr<FJsonObject> Record = Records.Last()->AsObject();
             Record->SetNumberField(TEXT("settling_ragdoll_observed_world_seconds"), ElapsedWorldSeconds);
@@ -973,7 +1014,7 @@ private:
                 if (!Package.StartsWith(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/"))) continue;
                 if (!Check(!UniqueDrGame.Contains(Asset), TEXT("Official DrGame skill IDs are unique."))) return false;
                 UniqueDrGame.Add(Asset);
-                if (Included.Contains(Package) || bFocusedReview) continue;
+                if (Included.Contains(Package) || bFocusedReview || bAuthoredChainReview) continue;
                 const USkillDefinitionDataAsset* Data = Cast<USkillDefinitionDataAsset>(Asset.TryLoad());
                 FCombatRoundSkill Profile;
                 FText Error;
@@ -993,9 +1034,13 @@ private:
                     if (!Check(UniqueDrGame.Contains(FSoftObjectPath(Current.Asset + TEXT(".") + FPaths::GetCleanFilename(Current.Asset))), TEXT("The focused fixture references the unchanged official authored asset: ") + Current.Asset)) return false;
                 }
             }
+            else if (bAuthoredChainReview)
+            {
+                if (!Check(AddedCount == 0 && Cases.Num() == 25 && Included.Num() == 5, TEXT("The explicit authored-chain review selects all five original links in four directions and large coordinates."))) return false;
+            }
             else if (!Check(AddedCount == 48 && Cases.Num() == 87, TEXT("Preserve the approved 39 casts and add exactly the 48 uncovered official DrGame assets."))) return false;
         }
-        PlannedCaptures = bMonsterReview ? (bSettlingReview ? 78 : 65) : 0;
+        PlannedCaptures = bMonsterReview ? (bFinalSettlingReview ? 91 : bSettlingReview ? 78 : 65) : 0;
         if (!bMonsterReview)
         {
             for (const FCase& Current : Cases)
@@ -1154,13 +1199,13 @@ private:
             if (Current.NinjaVisibilityCondition == ENinjaVisibilityCondition::VisualHeight30) Definition.Vfx.RelativeTransform.AddToTranslation(FVector(0, 0, 30));
             else if (Current.NinjaVisibilityCondition == ENinjaVisibilityCondition::SourceHeight20) Definition.Vfx.FloatParameters.Add(TEXT("User.HeightOffset"), 20.f);
         }
-        if (Current.bChain || (bNinjaVisibilityReview && Current.NinjaVisibilityCondition != ENinjaVisibilityCondition::Baseline))
+        if (Current.bChain && !Check(CombatRoundRules::UsesChain(Definition) && Definition.Chain.MaxTargets == 4 && FMath::IsNearlyEqual(Definition.Chain.JumpDistance, 600.f) && FMath::IsNearlyEqual(Definition.Chain.JumpIntervalSeconds, 0.15f) && FMath::IsNearlyEqual(Definition.Chain.DamageMultiplierPerJump, 0.8f), TEXT("The saved chain resolves the selected four-target, 600cm, 0.15-second and 0.8-per-jump settings."))) return false;
+        if ((Current.bChain && !bAuthoredChainReview) || (bNinjaVisibilityReview && Current.NinjaVisibilityCondition != ENinjaVisibilityCondition::Baseline))
         {
             if (Current.bChain)
             {
-                if (!Check(CombatRoundRules::UsesChain(Definition) && Definition.Chain.MaxTargets == 1, TEXT("Authored chain data retains the pending single-target default."))) return false;
-                // Prototype values are scoped to an unsaved object in this disposable PIE; no content balance choice is applied.
-                // 임시 수치는 저장하지 않는 일회성 PIE 객체에만 적용하며 콘텐츠 밸런스 선택으로 반영하지 않습니다.
+                // Preserve the historical three-target direction fixture independently of the saved four-target content.
+                // 저장된 4대상 콘텐츠와 독립적으로 기존 3대상 방향 검수 fixture를 보존합니다.
                 Definition.Chain.MaxTargets = 3;
                 Definition.Chain.JumpDistance = 400.f;
                 Definition.Chain.JumpIntervalSeconds = 0.4f;
@@ -1220,7 +1265,7 @@ private:
             Source->SetActorLocation(FVector(Center.X, Center.Y, FloorZ + Source->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), false, nullptr, ETeleportType::TeleportPhysics);
             for (int32 Index = 0; Index < Enemies.Num(); ++Index)
             {
-                const FVector Offset = Index == 0 ? Current.Direction * 230.0 : Index == 1 ? Current.Direction * 430.0 + Side * 100.0 : Index == 2 ? Current.Direction * 630.0 - Side * 80.0 : -Current.Direction * 900.0;
+                const FVector Offset = Index == 0 ? Current.Direction * 230.0 : Index == 1 ? Current.Direction * 430.0 + Side * 100.0 : Index == 2 ? Current.Direction * 630.0 - Side * 80.0 : bAuthoredChainReview ? Current.Direction * 830.0 + Side * 100.0 : -Current.Direction * 900.0;
                 Enemies[Index]->SetActorLocation(Center + Offset + FVector(0, 0, Enemies[Index]->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), false, nullptr, ETeleportType::TeleportPhysics);
             }
         }
@@ -1255,7 +1300,7 @@ private:
         }
         AActor* Camera = Controller->GetViewTarget();
         if (!Check(IsValid(Camera), TEXT("The actual gameplay camera remains the rendering view target."))) return false;
-        const FVector Focus = Current.bCardinal ? (Source->GetActorLocation() + Enemies[2]->GetActorLocation()) * 0.5 : (Source->GetActorLocation() + Enemies[Current.TargetIndex]->GetActorLocation()) * 0.5;
+        const FVector Focus = Current.bCardinal ? (Source->GetActorLocation() + Enemies[bAuthoredChainReview ? 3 : 2]->GetActorLocation()) * 0.5 : (Source->GetActorLocation() + Enemies[Current.TargetIndex]->GetActorLocation()) * 0.5;
         const FVector CameraPosition = Focus + FVector(-1000, -1200, 1200);
         MoveFixtureActor(Camera, FTransform((Focus - CameraPosition).Rotation(), CameraPosition, Camera->GetActorScale3D()));
         UGameViewportClient* Viewport = Controller->GetWorld()->GetGameViewport();
@@ -1279,7 +1324,7 @@ private:
         if (!PrepareFocusedView(Camera, Focus)) return false;
         if (!Definition.Vfx.Niagara.IsNull()) Definition.Vfx.Niagara.LoadSynchronous();
         if (!Definition.ImpactVfx.Niagara.IsNull()) Definition.ImpactVfx.Niagara.LoadSynchronous();
-        Test->AddInfo(FString::Printf(TEXT("VFX case %d/%d: %s; asset=%s; transient chain=%d/400cm/0.4s/1; source=%d; target=%d; target capsule=%s; floorZ=%.2f."), CaseIndex + 1, Cases.Num(), *Current.Label, *AssetPath, Current.bChain ? 3 : 1, Source->UnitIndex, Target->UnitIndex, *Target->GetCapsuleComponent()->GetComponentLocation().ToString(), FloorZ));
+        Test->AddInfo(FString::Printf(TEXT("VFX case %d/%d: %s; asset=%s; authoredChain=%d chain=%d/%.2fcm/%.2fs/%.2f; source=%d; target=%d; target capsule=%s; floorZ=%.2f."), CaseIndex + 1, Cases.Num(), *Current.Label, *AssetPath, bAuthoredChainReview, Definition.Chain.MaxTargets, Definition.Chain.JumpDistance, Definition.Chain.JumpIntervalSeconds, Definition.Chain.DamageMultiplierPerJump, Source->UnitIndex, Target->UnitIndex, *Target->GetCapsuleComponent()->GetComponentLocation().ToString(), FloorZ));
         return true;
     }
 
@@ -1392,7 +1437,7 @@ private:
         {
             int32 Sequence = INDEX_NONE;
             double NearestAnchor = TNumericLimits<double>::Max();
-            for (int32 Index = 0; Index < 3; ++Index)
+            for (int32 Index = 0; Index < Definition.Chain.MaxTargets; ++Index)
             {
                 const FVector Anchor = Index == 0 ? Source->GetCapsuleComponent()->GetComponentLocation() : Enemies[Index - 1]->GetCapsuleComponent()->GetComponentLocation();
                 double Distance = FVector::DistSquared(Component->GetComponentLocation(), Anchor);
@@ -1404,7 +1449,7 @@ private:
                     Sequence = Index;
                 }
             }
-            if (!Check(Sequence >= 0 && Sequence < 3 && !Segments.ContainsByPredicate([Sequence](const FObservedSegment& Existing) { return Existing.Sequence == Sequence; }), TEXT("Each launched chain has a unique bounded presentation sequence."))) return false;
+            if (!Check(Sequence >= 0 && Sequence < Definition.Chain.MaxTargets && Enemies.IsValidIndex(Sequence) && !Segments.ContainsByPredicate([Sequence](const FObservedSegment& Existing) { return Existing.Sequence == Sequence; }), TEXT("Each launched chain has a unique bounded presentation sequence."))) return false;
             FObservedSegment& Added = Segments.AddDefaulted_GetRef();
             Added.Component = Component;
             Added.Target = Enemies[Sequence];
@@ -1470,6 +1515,12 @@ private:
         {
             Test->AddInfo(FString::Printf(TEXT("%s segment%d: source=%s; decoded endpoint=%s; expected capsule=%s; LWCtile=%s; particleAge=%.3f; particles=%d."), *Cases[CaseIndex].Label, Segment->Sequence, *Segment->FixedSource.ToString(), *Endpoint.ToString(), *Expected.ToString(), *FVector(Instance->GetSystemInstance_Unsafe()->GetLWCTile()).ToString(), Age, Particles));
             Segment->bCaptured = QueueCapture(FString::Printf(TEXT("segment%d"), Segment->Sequence), Age);
+        }
+        if (bAuthoredChainReview && Segment->bCaptured && !Segment->bLateCaptured && Age >= 0.6f && Particles > 0 && PendingScreenshot.IsEmpty())
+        {
+            // Observe the original beam after natural playback has reached its main visible phase.
+            // 자연 재생이 주 표현 단계에 도달한 뒤 원본 빔을 관측합니다.
+            Segment->bLateCaptured = QueueCapture(FString::Printf(TEXT("segment%d_main"), Segment->Sequence), Age);
         }
         return true;
     }
@@ -1792,7 +1843,7 @@ private:
         }
         if (!Current.bBasicAttack && !Current.bChain && IsDirectional() && !ExpectedAimDirection.IsNearlyZero()) bValid &= Check(bOrientationVerified, TEXT("The directional main Niagara orientation was inspected in its actual targeting direction."));
         if (!Current.bChain && Definition.EffectTags.HasTag(ProjectACombatTags::Skill_Shape_Area)) bValid &= Check(bCenterVerified, TEXT("Nondirectional target-centered effects use their selected target center."));
-        if (!Definition.ImpactVfx.Niagara.IsNull()) bValid &= Check(ImpactInstances.Num() >= (Current.bChain ? 3 : 1) && MaxImpactParticles > 0, TEXT("The original impact VFX is observed in actual active particle instances after the real GAS hit."));
+        if (!Definition.ImpactVfx.Niagara.IsNull()) bValid &= Check(ImpactInstances.Num() >= (Current.bChain ? Definition.Chain.MaxTargets : 1) && MaxImpactParticles > 0, TEXT("The original impact VFX is observed in actual active particle instances after the real GAS hit."));
         if (Current.bMonster)
         {
             bValid &= Check(bApproached && bReturned && AppliedEffects == 1 && FMath::IsNearlyEqual(Target->GetAttributeSet()->GetHP(), InitialHP.FindChecked(Target) - Definition.Power), TEXT("The original monster approaches, applies one unchanged GAS hit and returns without duplicate damage."));
@@ -1800,12 +1851,14 @@ private:
         }
         if (Current.bChain)
         {
-            const TArray<int32> Expected{Enemies[0]->UnitIndex, Enemies[1]->UnitIndex, Enemies[2]->UnitIndex};
-            bValid &= Check(AppliedEffects == 3 && ChainHitIds == Expected && Segments.Num() == 3, TEXT("The real coordinator chains to the nearest three distinct enemies in order and honors its total limit."));
-            for (int32 Index = 0; Index < 3; ++Index) bValid &= Check(FMath::IsNearlyEqual(Enemies[Index]->GetAttributeSet()->GetHP(), InitialHP.FindChecked(Enemies[Index]) - Definition.Power), TEXT("Every actual chained GAS hit applies the unchanged original power once."));
-            bValid &= Check(Enemies[3]->GetAttributeSet()->GetHP() == InitialHP.FindChecked(Enemies[3]), TEXT("The fourth enemy remains untouched."));
-            for (const FObservedSegment& Segment : Segments) bValid &= Check(Segment.bFollowingVerified && Segment.bCaptured, TEXT("Every chain segment follows the moving target, retains height and supplies its own rendered PNG."));
-            bValid &= Check(OriginalChainSettings.MaxTargets == 1 && AuthoredSkill->RoundDefinition.Chain.MaxTargets == 1, TEXT("Prototype values never replace the pending production balance default."));
+            TArray<int32> Expected;
+            for (int32 Index = 0; Index < Definition.Chain.MaxTargets; ++Index) Expected.Add(Enemies[Index]->UnitIndex);
+            bValid &= Check(AppliedEffects == Definition.Chain.MaxTargets && ChainHitIds == Expected && Segments.Num() == Definition.Chain.MaxTargets, TEXT("The real coordinator follows nearest distinct enemies and honors the active profile's total limit."));
+            for (int32 Index = 0; Index < Definition.Chain.MaxTargets; ++Index) bValid &= Check(FMath::IsNearlyEqual(Enemies[Index]->GetAttributeSet()->GetHP(), InitialHP.FindChecked(Enemies[Index]) - Definition.Power * FMath::Pow(Definition.Chain.DamageMultiplierPerJump, static_cast<float>(Index)), 0.001f), TEXT("Every actual chained GAS hit uses the active profile's cumulative power exactly once."));
+            if (!bAuthoredChainReview) bValid &= Check(Enemies[3]->GetAttributeSet()->GetHP() == InitialHP.FindChecked(Enemies[3]), TEXT("The three-target fixture leaves the fourth enemy untouched."));
+            for (const FObservedSegment& Segment : Segments) bValid &= Check(Segment.bFollowingVerified && Segment.bCaptured && (!bAuthoredChainReview || Segment.bLateCaptured), TEXT("Every chain segment follows the moving target, retains height and supplies its requested early and natural main-phase PNGs."));
+            bValid &= Check(FCombatChainSettings::StaticStruct()->CompareScriptStruct(&OriginalChainSettings, &AuthoredSkill->RoundDefinition.Chain, 0), TEXT("The original saved chain settings remain unchanged after review."));
+            if (bAuthoredChainReview) bValid &= Check(!Prototype.IsValid() && FCombatChainSettings::StaticStruct()->CompareScriptStruct(&Definition.Chain, &OriginalChainSettings, 0), TEXT("The actual four-target review executes the original DataAsset without a chain override."));
         }
         else if (Definition.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Heal)) bValid &= Check(Target->GetAttributeSet()->GetHP() > InitialHP.FindChecked(Target), TEXT("The representative healing effect changes actual authoritative HP."));
         else if (Definition.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Shield)) bValid &= Check(bAppliedShield, TEXT("The representative shield is observed in GAS before the next round expires it."));
@@ -1824,7 +1877,14 @@ private:
             Record->SetStringField(TEXT("resolved_attack_montage"), ExpectedMonsterMontage.IsValid() ? ExpectedMonsterMontage->GetPathName() : TEXT("none"));
             Record->SetBoolField(TEXT("approach_and_return_observed"), bApproached && bReturned);
         }
-        Record->SetBoolField(TEXT("transient_multi_target_prototype"), Current.bChain);
+        Record->SetBoolField(TEXT("transient_multi_target_prototype"), Current.bChain && !bAuthoredChainReview);
+        Record->SetBoolField(TEXT("authored_multi_target_chain"), Current.bChain && bAuthoredChainReview);
+        Record->SetNumberField(TEXT("chain_max_targets"), Definition.Chain.MaxTargets);
+        Record->SetNumberField(TEXT("chain_jump_distance_cm"), Definition.Chain.JumpDistance);
+        Record->SetNumberField(TEXT("chain_jump_interval_seconds"), Definition.Chain.JumpIntervalSeconds);
+        Record->SetNumberField(TEXT("chain_damage_multiplier_per_jump"), Definition.Chain.DamageMultiplierPerJump);
+        Record->SetBoolField(TEXT("chain_main_phases_required"), Current.bChain && bAuthoredChainReview);
+        Record->SetBoolField(TEXT("chain_main_phases_captured"), Current.bChain && bAuthoredChainReview && Segments.Num() == Definition.Chain.MaxTargets && !Segments.ContainsByPredicate([](const FObservedSegment& Segment) { return !Segment.bLateCaptured; }));
         Record->SetBoolField(TEXT("large_world"), Current.bLargeWorld);
         Record->SetBoolField(TEXT("passed_runtime_contract"), bValid);
         Record->SetNumberField(TEXT("captures"), CapturedThisCase);
@@ -1995,10 +2055,16 @@ private:
         Summary->SetStringField(TEXT("optional_audio_environment"), TEXT("Recording only: temporarily set official au.DisableAppVolume and au.NeverDisableSubmixes with console value/priority restoration; wait for the audio-thread start fence, actual master-submix sample callbacks and one real second before casting. Source audio, saved editor settings and FApp unfocused-volume configuration remain unchanged. Live device/listener/sound diagnostics and PCM signal analysis are separate from listening quality."));
         Summary->SetStringField(TEXT("scope"), bMonsterReview ? TEXT("Original 12 monster classes plus the retained skeleton; real enemy AI, authored montage, approach, recovery, GAS and AP; subsequent lethal GAS ragdoll, tile release and Restart restores original four-enemy roster. Preserve four early PNG and add a fifth at 2.5 actual world seconds with finite physical body velocities and awake state. A late sample does not establish final settling or floor penetration. Transient actors and human observation HP only; original physics, assets and saves stay unchanged. PNG review remains required for body pose and floor contact; audio listening, FPS and multiplayer are not measured.") : TEXT("Rendered local standalone PIE; preserve the 39 casts and append 48 distinct official DrGame assets. All 60 DrGame plus two retained human attacks. Original early observations plus required active main ages 0.3/0.6 for falling/area/healing/shield and actual impact PNG where authored; per-case phase ages are recorded. Chain capture starts at live age 0.15. Transient chain prototype=3/400cm/0.4s/1. PNG review remains required for visible direction and floor height; audio listening, FPS baseline and multiplayer are not measured."));
         if (bFocusedReview) Summary->SetStringField(TEXT("scope"), Summary->GetStringField(TEXT("focused_scope")));
+        if (bAuthoredChainReview) Summary->SetStringField(TEXT("scope"), TEXT("All five authored chain DataAssets, four directions and LWC, four real targets each: 25 casts and 200 rendered early/main-phase segment captures. Original saved 4/600cm/0.15s/0.8 settings execute without a profile override; nearest unhit order, original-caster GAS attenuation, one AP payment, endpoint tracking and main audio first-segment-only flags are checked. Optional actual submix recording is separate from individual listening quality. Original assets and saves remain unchanged."));
         if (bSettlingReview)
         {
             Summary->SetBoolField(TEXT("ragdoll_settling_review"), true);
             Summary->SetStringField(TEXT("scope"), TEXT("Thirteen original monster attack/GAS/death/restart contracts and all 65 existing frames remain required. Add thirteen naturally simulated eight-world-second ragdoll PNGs and finite-bounds/velocity plus engine-awake observations on each available advancing world frame from 2.5 to eight seconds. Engine sleep and visible pose/floor contact are separate from combat contract success. Awake originals stay awake in the report; no force sleep, physics settings, manual tick, original asset or user-save changes. Final settlement is unconfirmed without engine sleep and actual screenshot review."));
+        }
+        if (bFinalSettlingReview)
+        {
+            Summary->SetBoolField(TEXT("ragdoll_final_settling_review"), true);
+            Summary->SetStringField(TEXT("scope"), TEXT("Thirteen original monsters retain all 78 prior attack/death/2.5s/8s frames and add thirteen final PNGs. Observe natural engine awake states and finite velocities on advancing world frames until three continuous seconds of all-body sleep or a sixty-world-second deadline. Timeout is an automation failure with explicit unconfirmed settling status while remaining monsters continue. No forced sleep, velocity reset, manual tick or physics changes. Actual pose/floor contact still requires final PNG inspection."));
         }
         Summary->SetArrayField(TEXT("cases"), Records);
         Summary->SetNumberField(TEXT("shutdown_stage"), Stage);
@@ -2166,7 +2232,10 @@ private:
     double NaturalCueLastActiveClock = -1.0;
     double NaturalCueFirstAbsentClock = -1.0;
     double LastSettlingObservedWorldTime = -1.0;
+    double FinalSleepStartedAt = -1.0;
+    double FinalSleepObservedSeconds = 0.0;
     bool bOriginalGasContext = true;
+    bool bInitializationFailed = false;
     bool bCaptureFailed = false;
     bool bSawMontage = false;
     bool bSawActive = false;
@@ -2179,11 +2248,15 @@ private:
     bool bDeathCaptureQueued = false;
     bool bLateDeathCaptureQueued = false;
     bool bSettlingDeathCaptureQueued = false;
+    bool bFinalSettlingCaptureQueued = false;
+    bool bFinalSettled = false;
     bool bCatalogExpanded = false;
     bool bMonsterReview = false;
     bool bFocusedReview = false;
+    bool bAuthoredChainReview = false;
     bool bNinjaVisibilityReview = false;
     bool bSettlingReview = false;
+    bool bFinalSettlingReview = false;
     bool bFocusedViewObserved = false;
     bool bFocusedLODDistanceObserved = false;
     bool bFocusedListenerChanged = false;

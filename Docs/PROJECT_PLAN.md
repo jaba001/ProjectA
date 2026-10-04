@@ -1,10 +1,10 @@
 # ProjectA 구현 구조와 설정
 
-기준일: 2026-10-04. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다. 엔진 기준은 UE 5.8.3이며 현재 검수와 제한은 [최신 실행 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)을 따른다. UE 5.7 결과는 당시 코드의 이력으로 보존한다. HP 화면 보완과 현행 데이터 읽기 검사를 포함한 native 회귀 175개와 최신 Development 패키지의 CSV/스킬 데이터·격리 저장 작성/Continue·Quit를 통과했다.
+기준일: 2026-10-04. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다. 엔진 기준은 UE 5.8.3이며 현재 검수와 제한은 [최신 실행 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)을 따른다. UE 5.7 결과와 아래의 기존 실행 결과는 당시 코드의 이력으로 보존한다. HP 화면 보완과 데이터 읽기 검사를 포함한 native 회귀 175개·Development 패키지 검수는 목표 Run·회복 소모품 도입 전 결과이며 이번 변경의 검증을 대신하지 않는다.
 
 기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 UE 5.7 위임 실행은 당시 두 전투 경로의 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀 결과다. 2026-10-01 UE 5.7의 당시 코드로 1인·같은 PC 2/4인 PIE에서 각 10전투·9상점 선택/퇴장·개인 보상과 저장 재로드를 확인했다. 진행용 HP fixture이며 정상 난이도·실제 서비스·다중 PC·지연/손실 검증은 별도다. 2026-10-04 UE 5.8.3에서도 1/2/4인 PIE의 10전투·9상점·개인 보상·Host Continue를 확인했다. [과거 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)·[현재 검수](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)
 
-T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 새 라운드는 저장된 준비 완료 경계에서 복구하며 이전 순차 Combat 저장은 계속 거절한다. 진행 중 시전·투사체의 임의 시점 복원은 지원하지 않는다. Steam/PlayFab·MMR은 미구현이며 [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
+T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 새 라운드는 저장된 준비 완료 경계에서 복구하며 이전 순차 Combat 저장은 계속 거절한다. 진행 중 시전·투사체의 임의 시점 복원은 지원하지 않는다. Steam 480 연결 시제품은 별도 개발 설정으로 구현했으며 실제 다중 PC 접속·인증은 미확인이다. PlayFab·온라인 Run·MMR의 미구현 범위는 [멀티플레이 계약](MULTIPLAYER.md#9-steamplayfab와-남은-서비스-정책)을 따른다.
 
 | 영역 | 기준 문서 |
 |---|---|
@@ -14,16 +14,16 @@ T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 새 라�
 | 완료 구현과 검증 범위 | [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관) |
 | 변경 과정과 과거 판단 | [HISTORY](HISTORY.md) |
 
-## 기본 실행 흐름
+## 1 기본 실행 흐름
 
 실행 환경은 UE 5.8의 `ProjectA.uproject`다. 게임·Editor 타깃은 `BuildSettingsVersion.V7`·`EngineIncludeOrderVersion.Unreal5_8`을 사용한다.
 
 1. 기본 시작 맵인 `/Game/User_JeHoon/LEVEL/Core/MainMenu`를 연다.
 2. 게임 시작 → 싱글플레이 → CharacterCreation에서 1~4명의 캐릭터를 생성하고 직접 조작할 한 명을 선택한다. 생성 버튼은 기본값으로 즉시 생성하며 직업 화살표와 Edit로 직업·이름·몸체를 바꾼다. 멀티플레이는 기존 같은 PC·LAN 개발용 방으로 연결한다.
-3. Start Game → `/Game/User_JeHoon/LEVEL/Core/Gameplay` → Run Map에서 첫 Combat 노드를 선택한다.
+3. Start Game → `/Game/User_JeHoon/LEVEL/Core/Gameplay` → 후보 3개 중 하나를 고르는 인카운터를 세 번 방문한 뒤 Run Map의 첫 Combat 노드를 선택한다.
 4. 전장에서 적 또는 스킬이 요구하는 타일을 클릭하고 하단의 실제 장착 스킬 버튼으로 계획을 적용한 뒤 준비 완료한다. 스킬 미선택 준비 완료는 행동 비용 없이 턴을 넘기며 선택한 스킬은 취소할 수 있다. 위치 이동은 이동 예약 → 아군 빈칸 한 번 클릭으로 예약하며 스킬 없이 이동만 예약하면 SAP 1만 소모한다. 전원 준비 후 SAP 이동을 먼저 끝내고 선택한 AP 행동을 실행한다. 나머지 생성 동료는 서버 AI가 계획·실행한다.
 5. 속도차 대기·이동·시전·피격·복귀를 관찰한다. 남은 유효 투사체까지 정리되면 다음 라운드 계획으로 돌아간다. 해결 중 새 행동을 입력할 수 없다.
-6. 새 Run은 1~9번째 Victory마다 5~15G 보상 3개 중 1개 수령 → Continue → 스킬상점·아이템상점·상점3 중 하나 선택 → 나가기 → 다음 Combat 노드를 진행한다. 10번째 Victory도 보상을 수령한 뒤 Continue로 완료된 Run Map을 표시한다.
+6. 새 싱글 Run은 PvE와 로컬 Snapshot을 번갈아 20전투 진행한다. PvE 승리에서는 저장된 골드 후보 3개 중 하나를 수령하고 Snapshot 승리에는 골드·성장을 지급하지 않는다. Continue 뒤 다음 전투 전 인카운터를 세 번 방문하며 20번째 승리 뒤 완료된다. 화면 진행 수는 60선택과 20전투를 합한 80단계다. 시험 편성·성장·회복 규칙은 [5-1절](#5-1-목표-run과-회복-시험-데이터)을 따른다.
 7. 잔여 공격까지 정리한 뒤 양 팀 전멸을 포함한 패배는 Defeat 화면을 표시하고 Run을 종료한다. 승리 보상은 지급하지 않는다.
 
 빌드 후 UE를 재시작하여 C++·리플렉션 변경을 반영한다. 라운드 계획 전환에는 새 맵·WBP 생성이나 Config 변경이 필요하지 않다.
@@ -37,21 +37,21 @@ flowchart LR
     M -->|멀티플레이| L[LAN 방 생성/참가]
     B -->|OpenLevel 1회| C[Gameplay]
     L --> R[Gameplay 대기실]
-    R -->|전원 준비 후 Host 시작| D[Run Map UI]
-    C --> D[Run Map UI]
-    D --> E[Encounter 준비]
+    R -->|전원 준비 후 Host 시작| P[기존 개발용 10전투 경로]
+    C --> I[인카운터 3회 선택]
+    D[Run Map UI] --> E[Encounter 준비]
     E --> F[Grid Combat]
     F -->|Victory| G[Result]
-    G -->|1~9번째 승리 Continue| I[인카운터 3개 중 선택]
-    I --> J[선택한 인카운터]
-    J -->|나가기| D
-    G -->|마지막 승리 Continue| K[Run 완료]
+    G -->|1~19번째 승리 Continue| I
+    I --> J[각 방문 후보 3개 중 선택·퇴장]
+    J -->|3회 방문 완료| D
+    G -->|20번째 승리 Continue| K[Run 완료]
     F -->|Defeat| H[패배 화면]
 ```
 
-Gameplay는 계속 유지하는 단일 레벨이며 새 Run의 `Combat_01`~`Combat_10`은 모두 `DefaultEncounter`를 재사용한다. 적 4마리와 기존 능력치·공격값을 유지하며 신규 편성은 [몬스터 콘텐츠](#4-5-몬스터-콘텐츠)를 따른다. CommonUI 지도는 완료 수/전체 노드 수를 표시하고 알려진 `ContentBox` 직계 `NodeList`를 최대 높이 300의 스크롤 목록으로 감싼다. 기존 바인딩·슬롯 배치·완료/잠금 표시와 별도 사용자 계층은 보존한다. 물리적인 WorldMap 탐험과 전투별 CombatMap 전환은 현재 흐름에 없다.
+Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_01`~`TargetCombat_20`은 저장된 목표 정의의 PvE 편성과 로컬 Snapshot을 번갈아 사용한다. 기존 `Combat_01`~`Combat_02/10` 저장과 개발 협동·명시적 `-ProjectAPrototypeRun`의 10전투 경로는 보존한다. 원본 몬스터 구성은 [4-5절](#4-5-몬스터-콘텐츠), 목표 편성은 [5-1절](#5-1-목표-run과-회복-시험-데이터)을 따른다. CommonUI 지도는 완료 수/전체 노드 수를 표시하고 알려진 `ContentBox` 직계 `NodeList`를 최대 높이 300의 스크롤 목록으로 감싼다. 기존 바인딩·슬롯 배치·완료/잠금 표시와 별도 사용자 계층은 보존한다. 물리적인 WorldMap 탐험과 전투별 CombatMap 전환은 현재 흐름에 없다.
 
-## 모듈과 책임
+## 2 모듈과 책임
 
 런타임은 `Source/ProjectA`, 에셋 생성·에디터 도구·PIE 테스트는 `Source/ProjectAEditor`에 둔다. Editor 의존성을 런타임 모듈로 옮기지 않는다.
 
@@ -63,37 +63,47 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 Run의 `Combat_01`~`Comb
 | `AGameplayPlayerController` | `APartyPlayerController` 상속. 로컬 Root UI, 소유 연결의 전투 RPC, 현재 Host의 노드 선택·Continue 요청 |
 | `UGameplayRootWidget` | 해당 플레이어 화면의 CommonUI Run/Combat/Modal 스택과 저장 실패·재시도 안내 |
 | `URunMapWidget` | 전체 노드·진행 분모·완료/잠금 상태와 높이 300 상한 스크롤 목록 표시, 선택 요청. 직접 Spawn하지 않음 |
-| `URunEncounterWidget` | 인카운터 3개 선택·본인 골드·스킬상점/상점3의 61후보 중 최대 5개 진열·증가형 리롤 비용·회복 및 아이템상점 상품 5개·판매 완료·리롤·구매·나가기 표시. 기존 RunLayer의 native CommonUI 화면 |
-| `AEncounterManager` | Encounter 준비·스폰·라운드 전투 연결·종료 HP 추출·정리와 Run 전이. 순차 턴 저장/복원 훅 제거 |
+| `URunEncounterWidget` | 태그로 분류한 후보 3개 선택·진행 수·본인 골드와 상품 표시. 스킬 61후보/아이템 진열·리롤·구매 및 목표 Run의 회복·소모품·부활 서비스 제공. 기존 RunLayer의 native CommonUI 화면 |
+| `AEncounterManager` | Encounter 준비·스폰·라운드 전투 연결·종료 HP/소모품 재고 추출·정리와 Run 전이. 순차 턴 저장/복원 훅 제거 |
 | `ACombatArena` | 배치된 Grid, 슬롯별 좌표, 카메라, 타일 활성화 관리 |
 | `ACombatManager` / `ACombatRoundCoordinator` | Run 전투 연결, 라운드 계획·시간표·실행·잔여 공격 정리·결과 확정. `UTurnManager`는 참조 호환용 외형만 유지 |
 | `UCombatActionAuthority` | 기존 Run 식별·원래 소유권·서버 연결·관리 lease·Human/AI 검증 유지. 이전 즉시 순차 행동 실행은 제거 |
 | `AUnitBase` / GAS / Grid | 서버 HP/AP·사망·실제 위치/복귀 칸·복제 표현. 라운드가 이동/피격을 소유하며 기존 ASC 데이터와 사망 표현 연결 |
 | 적·아군 AI | `CombatAIPlanning`이 장착 순서와 태그 조건으로 후보를 선택하고 Coordinator가 인간 초안 전에 한 명령씩 고정. 이전 AI 컴포넌트는 참조 호환 유지 |
 | `ACombatRoundPlayerController` / `UCombatRoundPlanningWidget` | 소유 연결의 계획·준비 RPC와 CommonUI 계획 화면. `UCombatHUDWidget`은 이전 WBP 참조용 외형 |
-| `UEncounterResultWidget` | 승리 골드 3택1·개인 잔액·수령 상태·Continue, 패배 Run 종료 안내 |
+| `UEncounterResultWidget` | 보상 대상 승리의 골드 3택1·개인 잔액·수령 상태·Continue, 목표 Snapshot의 무보상 결과 및 패배 Run 종료 안내 |
 
 실행 중 복제 뷰와 Actor 조회는 허용하되 Run/Party/Encounter/Command는 직렬화 가능한 값 데이터가 기준이다. GameInstance에 전투 Actor나 UI 동작을 집중시키지 않는다.
 
-## 파티와 전투 규약
+## 3 파티와 전투 규약
+
+### 3-1 시작 장비와 장착
+
+`UProfessionBase.StartingEquipment`가 전사 한손검+방패·궁수 활·마법사 양손 스태프·도적 단검의 원본 경로와 기준 슬롯을 정의한다. 새 Run에서 `Items`에 지급하고 `FRunEquipmentState`의 기준 슬롯·개별 아이템 인덱스·Revision으로 장착한다. `Items`는 추가 전용 배열이며 같은 에셋 여러 개도 서로 다른 사본이다. 원본이 없으면 지급·장착을 생략하고 슬롯을 비운다. 현재 5개 시작 원본은 CSV와 콘텐츠에 모두 존재하며 복제하지 않는다.
+
+`URunEquipmentCatalog`는 `GameplayTagQuery`·에셋별 선택 설정·허용/점유 슬롯·소켓/상대 변환을 작성 가능한 native CDO 데이터로 관리한다. 특정 에셋 프로필이 일반 태그 프로필을 우선하며 이름·직업 분기로 장착 종류를 판정하지 않는다. 단검 20·방패 15·활 11·명시 한손/양손검 2·시작 스태프 1개를 지원한다. `RunEquipmentRules`가 중복 점유·사본·호환 교체를 공통 검증한다. 활은 왼손, 시작 스태프와 양손검은 오른손을 기준으로 두 손을 점유한다.
+
+`ChangeEquipment`는 상점 단계·신뢰 소유자·생존 Human·아이템 인덱스·Revision과 원본 메시를 검증하고 저장 후보를 원자 반영한다. 실패하면 파티·Revision·원본 파일·상태 알림을 유지한다. `CharacterEquipmentComponent`는 선택 몸체의 소켓에 원본 Static/Skeletal Mesh를 붙이며 명시 장비 상태의 기존 스킬 검 표시는 숨긴다. 검 스킬의 기존 판정 컴포넌트·GAS·스킬·능력치는 유지한다. 손잡이 위치·회전·배율은 프로필의 에셋별 `Attachments.RelativeTransform`으로 조정한다.
+
+이전 저장의 누락된 장비 상태는 과거 스킬 외형을 유지하며 첫 명시 장착부터 새 상태를 적용한다. 시작 아이템을 재지급하거나 저장 카탈로그를 바꾸지 않는다. 비무기 슬롯 콘텐츠·나머지 240개 분류·능력치/부여 스킬·Snapshot `EquipmentIds` 연결은 후속 기획 대상이다. 아이템·장비 조작과 새 에셋 부착 재생은 사용자 지시로 이번 실행에서 제외했다. [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
+
+### 3-2 상점 인카운터
 
 **전투 승리 보상**
 
-`FRunGoldRewardState`의 노드·골드 선택지 3개·캐릭터별 수령 기록을 저장하고 복제 뷰로 표시한다. `RunEncounterPoolDataAsset.GoldRewardMin/GoldRewardMax`의 기본값은 5/15이며 각 선택지를 독립 추첨한다. 서버가 연결 소유자·현재 Human·노드·선택 인덱스·미수령·잔액 범위를 검증하고 골드와 수령을 함께 저장한다. 파티 승리 시 사망한 직접 조작 캐릭터도 수령할 수 있으며 AI는 제외한다. 현재 인간 참가자가 모두 선택해야 Host가 Continue한다. 마지막 전투도 보상 수령 후 종료하며 패배 보상은 없다.
+`FRunGoldRewardState`의 노드·골드 선택지 3개·캐릭터별 수령 기록을 저장하고 복제 뷰로 표시한다. 기존 10전투 경로는 `RunEncounterPoolDataAsset.GoldRewardMin/GoldRewardMax` 기본값 5/15 사이에서 각 선택지를 독립 추첨한다. 새 목표 Run은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 PvE 골드 후보와 성장 규칙을 저장한다. 서버가 연결 소유자·현재 Human·노드·선택 인덱스·미수령·잔액 범위를 검증하고 골드와 수령을 함께 저장한다. 파티 승리 시 사망한 직접 조작 캐릭터도 수령할 수 있으며 AI는 제외한다. 현재 인간 참가자가 모두 선택해야 Host가 Continue한다. 보상 대상 전투는 수령 후 Continue를 허용하며 목표 Run의 Snapshot과 패배에는 보상을 지급하지 않는다.
 
 선택지와 수령은 재개 시 복원한다. 기존 보상 필드가 없는 Result는 그대로 Continue하고 스킬 상점 schema 1 저장의 다음 승리부터 보상을 적용한다. 상점 도입 전 저장은 기존 골드·장착 규약을 유지한다. [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
-### 상점 인카운터
+새 목표 Run은 첫 전투를 포함해 각 전투 전에 `EncounterChoice`에서 후보 하나를 선택해 `Shop`으로 방문한다. 나가기 두 번은 다음 선택으로, 세 번째는 `Map`으로 전환한다. 기존 10전투 경로는 1~9번째 승리 후 한 번씩 방문하고 10번째 승리 뒤 완료하는 규칙을 보존한다. 전투 완료 수와 선택 완료 수를 분리 저장하며 선택하지 않은 인카운터는 방문할 수 없다. 레벨 이동·별도 Arena 스폰 없이 UI로 처리한다.
 
-새 Run은 전투 10회 중 1~9번째 승리 보상 수령 후 Continue에서 `EncounterChoice`, 선택 시 `Shop`, 나가기 시 `Map`으로 전환한다. 총 9회 방문하며 상점을 전투 완료 수에 더하지 않는다. 10번째 승리는 보상 후 `Complete`로 전환하고 패배는 기존 종료 규칙을 유지한다. 선택하지 않은 상점은 방문할 수 없으며 레벨 이동·별도 Arena 스폰 없이 UI로 처리한다.
-
-반복 방문의 `FRunEncounterProgress.AfterCompletedNodeCount`에 해당 방문 직전의 완료 전투 수를 저장한다. 다음 Continue의 저장 후보에서 회차·선택 ID·퇴장 상태를 함께 초기화하며 실패 시 이전 결과·보상·상점 상태를 유지한다. 상점 선택 시 해당 상점의 저장된 카탈로그·조건으로 새 진열을 확정하고 스킬 리롤 비용은 1G로 초기화한다. 골드·보유 스킬/아이템·장비·소유권과 다른 상점의 저장 상태는 유지하며 이어하기는 현재 선택·진열·비용을 그대로 복구한다.
+반복 방문의 `FRunEncounterProgress.AfterCompletedNodeCount`에 해당 방문 직전의 완료 전투 수를 저장하며 목표 schema 2는 `VisitIndex`와 완료 선택 수를 함께 검증한다. 다음 Continue의 저장 후보에서 회차·선택 ID·퇴장 상태를 함께 초기화하며 실패 시 이전 결과·보상·상점 상태를 유지한다. 상점 선택 시 해당 상점의 저장된 카탈로그·조건으로 새 진열을 확정하고 스킬 리롤 비용은 1G로 초기화한다. 골드·보유 스킬/아이템·장비·소유권과 다른 상점의 저장 상태는 유지하며 이어하기는 현재 선택·진열·비용을 그대로 복구한다.
 
 기존 상점1은 **스킬상점**, 상점2는 **아이템상점** 인카운터로 관리한다. `FRunEncounterOffer.EncounterTag`의 `Encounter.Shop.Skill`·`Encounter.Shop.Item` 분류로 UI·구매·리롤 실행을 판정하며 표시 이름과 저장 ID를 분리한다. 저장 호환을 위해 `Shop_01/02/03` ID를 유지하고 상점3은 스킬상점과 같은 구매·리롤 규칙을 사용한다. 분류 태그가 없는 이전 정의·저장은 공통 해석에서 기존 Shop ID를 분류하며, 기본 이전 이름만 새 이름으로 표시하고 사용자 지정 이름과 저장 원본은 보존한다.
 
 아군 네 직업은 비무장 공격 하나로 시작하고 직접 조작 캐릭터별 개인 10G, AI 동료 0G를 사용한다. 새 Run의 스킬상점·상점3은 근접 공격 1종·신규 VFX 스킬 60종의 61후보에서 최대 5개를 1G에 판매한다. 신규 후보 확인은 새 Run을 기준으로 하며 기존 저장의 확정 카탈로그·진열·가격은 보존한다. 상품 수는 가용 후보 수와 최대 5개 중 작은 값이며 같은 진열 안에서 중복하지 않는다. 리롤은 전체 진열을 다시 추첨하고 이전 상품의 재등장을 허용한다. 비용은 입장 때 1G로 초기화한 뒤 성공할 때마다 1G씩 증가하며 이어하기에서는 현재 비용을 복원한다.
 
-본인 생존 인간 캐릭터만 구매·리롤하고 같은 스킬의 재구매와 비무장 공격을 포함한 총 스킬 5개 초과 구매를 거절한다. 습득 즉시 Run 장착 목록에 추가하며 다음 전투부터 사용한다. HP 전체 회복은 1G로 유지하고 직업 설정의 최대 HP까지 즉시 적용하며 만피 구매를 거절한다. 시작 골드·상품 가격·리롤 증가량은 시험값이며 최종 밸런스·확률 가중치는 미확정이다.
+본인 생존 인간 캐릭터만 구매·리롤하고 같은 스킬의 재구매와 비무장 공격을 포함한 총 일반 스킬 5개 초과 구매를 거절한다. 회복 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 별도 태그·재고 경로를 사용한다. 습득 즉시 Run 장착 목록에 추가하며 다음 전투부터 사용한다. HP 전체 회복은 1G로 유지하고 직업 설정의 최대 HP까지 즉시 적용하며 만피 구매를 거절한다. 시작 골드·상품 가격·리롤 증가량은 시험값이며 최종 밸런스·확률 가중치는 미확정이다.
 
 `RunEncounterPoolDataAsset.StartingGold/FixedSkillOffers/Recovery/SkillShopPool/SkillShopQuery`에서 시작 골드·기본 상품·회복·추가 풀·태그 조건을 관리한다. 현재 기본 파티는 `DA_DrGameRunEncounterPool`의 `DA_DrGameSkillShopPool`을 사용한다. 기존 고정 스킬 진열은 새 풀에서 비우고 근접 공격 1종·신규 60종을 가중치 1의 시험 후보로 제공한다. 새 Run의 schema 1 `FRunSkillShopState.Catalog/Offers/Query/Revision/RerollPrice`에 값을 고정하며 `OfferCount`는 가용 후보 수와 최대 5개 중 작은 값이다. 공통 후보 추첨은 저장된 태그 조건·기본 가중치를 사용하되 최종 수치와 태그별 가중치 보정 정책은 미확정이다. 신규 도입·원본 설치 전제는 [4-9절](#4-9-구입-vfx와-sfx-도입)을 따른다.
 
@@ -115,31 +125,21 @@ CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한�
 
 | 데이터 | 역할 |
 |---|---|
-| `URunEncounterPoolDataAsset` | `FixedOffers`에 인카운터 3개, `FixedSkillOffers/SkillShopPool/SkillShopQuery`에 스킬 후보·태그 조건, `Recovery`에 전체 회복 가격, `StartingGold`에 개인 시작 골드 정의. 인카운터 후보 3개는 고정 제시 |
+| `URunEncounterPoolDataAsset` | 기존 경로의 `FixedOffers`에 인카운터 3개, `FixedSkillOffers/SkillShopPool/SkillShopQuery`에 스킬 후보·태그 조건, `Recovery`에 전체 회복 가격, `StartingGold`에 개인 시작 골드 정의. 인카운터 후보 3개는 고정 제시 |
 | `FRunSkillShopState` | schema 1의 `Catalog/Offers/Query/Revision/RerollPrice`에 스킬 후보·가용 후보 최대 5개 진열·태그 조건·변경 버전·현재 리롤 비용 저장. 새 Run은 근접 공격 1종·신규 60종의 61후보. 이전 고정 상품·확정 카탈로그 저장 보존 |
-| `FRunEncounterOffer` | `EncounterId`·`DisplayName`·`Type`·`EncounterTag`의 USTRUCT 값 데이터. `GetResolvedTag/IsSupportedShop/IsItemShop/GetDisplayName`으로 분류·표시 이름 해석 |
+| `FRunEncounterOffer` | `EncounterId`·`DisplayName`·`Type`·`EncounterTag`의 USTRUCT 값 데이터. `GetResolvedTag/IsSupportedEncounter/IsService/IsItemShop/GetDisplayName`으로 태그 분류·표시 이름 해석 |
 | `FRunEncounterProgress` | schema·제시 목록·선택 ID·퇴장 완료 여부·`AfterCompletedNodeCount` 방문 회차. Run 저장과 GameState 표시 뷰에 포함 |
-| `UPartyDefinitionDataAsset::RunEncounterPool` | 새 Run에서 사용할 풀. 미지정 시 native 기본값 스킬상점·아이템상점·상점3 사용 |
+| `UPartyDefinitionDataAsset::RunEncounterPool` | 일반 상점 상품·태그 조건·시작 골드 정의. 기존 경로의 인카운터 기본값은 스킬상점·아이템상점·상점3이며 목표 Run 후보는 `TargetRunDefinition`에서 별도로 고정 |
 
-풀을 직접 편집하려면 `Content/User_JeHoon/Blueprint/DataAsset` 아래에 `RunEncounterPoolDataAsset` 유형의 DataAsset을 만들고 `DA_VerticalSliceParty.RunEncounterPool`에 연결한다. 서로 다른 ID와 이름을 가진 Shop 인카운터 3개에 `Encounter.Shop.Skill` 또는 `Encounter.Shop.Item` 태그를 지정한다. 기본 동작에는 에셋 생성·WBP 재생성이 필요 없다. 정의는 새 Run 초기화 시 분류 태그·표시 이름을 포함한 값으로 복사하며 진행 중 풀 수정으로 저장된 선택지가 바뀌지 않는다.
+기존 경로의 상점 풀을 직접 편집하려면 `Content/User_JeHoon/Blueprint/DataAsset` 아래에 `RunEncounterPoolDataAsset` 유형의 DataAsset을 만들고 `DA_VerticalSliceParty.RunEncounterPool`에 연결한다. 서로 다른 ID와 이름을 가진 Shop 인카운터 3개에 `Encounter.Shop.Skill` 또는 `Encounter.Shop.Item` 태그를 지정한다. 기본 동작에는 에셋 생성·WBP 재생성이 필요 없다. 정의는 새 Run 초기화 시 분류 태그·표시 이름을 포함한 값으로 복사하며 진행 중 풀 수정으로 저장된 선택지가 바뀌지 않는다.
 
-[ENCOUNTER_POOL.csv](../DataCatalogs/ENCOUNTER_POOL.csv)는 기존 기본 상점 3개와 속성별 무기·스킬 상점 10개를 모은 기획 목록이다. ID·이름·상점 종류·속성·분류 태그·판매 대상·등장 가중치·구현 상태·확인 사항을 기록한다. 신규 ID는 기획 식별자이며 CSV 런타임 로더·상품 필터·후보 추첨은 연결하지 않았다. 기존 `Shop_01/02/03`과 분류 태그를 보존하고 미정 가중치는 공란으로 둔다. [확정 범위와 미정 항목](GAME_DESIGN.md#2-3-속성별-상점-인카운터)
+[ENCOUNTER_POOL.csv](../DataCatalogs/ENCOUNTER_POOL.csv)는 기존 상점 3개·미연동 속성별 상점 10개와 목표 Run의 실제 `TargetOffer_01`~`TargetOffer_05`를 기록한 18행 목록이다. 기존 13행과 미정 속성·빈 가중치를 보존하며 추가 5행은 native 정의의 ID·분류 태그·시험 가격·서비스 규칙과 대응한다. 목표 후보는 저장된 정의와 태그 조건에 따라 고정 순환으로 제시하며 CSV 자체를 런타임에 읽지 않는다. 속성별 상품 필터·확률 가중치 제시는 미구현이다. [확정 범위와 미정 항목](GAME_DESIGN.md#2-3-속성별-상점-인카운터)
 
 향후 인카운터 후보의 확률 제시는 정의와 별도의 `FRunEncounterPoolEntry` USTRUCT에 정의 ID/참조·상대 가중치·출현 구간·조건을 두는 구성을 권장한다. 에디터 중심 편집은 DataAsset의 배열, 대량 수치·CSV 편집이 필요하면 `FTableRowBase` 기반 DataTable을 사용한다. 추첨은 Host에서 확정하고 제시 결과를 Run에 저장한다. 인카운터 후보의 가중치·추첨은 미구현이며 스킬·아이템상점 상품의 시험 추첨·리롤과 구분한다.
 
-전이는 후보 저장 객체에 계산하고 저장 성공 후 선택·퇴장 상태를 반영한다. 실패하면 기존 상태를 유지하며 같은 버튼으로 재시도한다. 기존 저장의 schema 0은 상점 없는 경로를 유지하며 새 Run의 schema 1과 구분한다. 상점 내부 재개·관리 lease·Host 진행 권한은 [MULTIPLAYER](MULTIPLAYER.md), 진행·저장 검증 범위는 [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
+전이는 후보 저장 객체에 계산하고 저장 성공 후 선택·퇴장 상태를 반영한다. 실패하면 기존 상태를 유지하며 같은 버튼으로 재시도한다. 기존 schema 0의 상점 없는 경로와 schema 1의 10전투 상점 흐름을 유지하며 새 목표 Run의 인카운터 schema 2와 구분한다. 상점 내부 재개·관리 lease·Host 진행 권한은 [MULTIPLAYER](MULTIPLAYER.md), 진행·저장 검증 범위는 [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
-### 3-1 시작 장비와 장착
-
-`UProfessionBase.StartingEquipment`가 전사 한손검+방패·궁수 활·마법사 양손 스태프·도적 단검의 원본 경로와 기준 슬롯을 정의한다. 새 Run에서 `Items`에 지급하고 `FRunEquipmentState`의 기준 슬롯·개별 아이템 인덱스·Revision으로 장착한다. `Items`는 추가 전용 배열이며 같은 에셋 여러 개도 서로 다른 사본이다. 원본이 없으면 지급·장착을 생략하고 슬롯을 비운다. 현재 5개 시작 원본은 CSV와 콘텐츠에 모두 존재하며 복제하지 않는다.
-
-`URunEquipmentCatalog`는 `GameplayTagQuery`·에셋별 선택 설정·허용/점유 슬롯·소켓/상대 변환을 작성 가능한 native CDO 데이터로 관리한다. 특정 에셋 프로필이 일반 태그 프로필을 우선하며 이름·직업 분기로 장착 종류를 판정하지 않는다. 단검 20·방패 15·활 11·명시 한손/양손검 2·시작 스태프 1개를 지원한다. `RunEquipmentRules`가 중복 점유·사본·호환 교체를 공통 검증한다. 활은 왼손, 시작 스태프와 양손검은 오른손을 기준으로 두 손을 점유한다.
-
-`ChangeEquipment`는 상점 단계·신뢰 소유자·생존 Human·아이템 인덱스·Revision과 원본 메시를 검증하고 저장 후보를 원자 반영한다. 실패하면 파티·Revision·원본 파일·상태 알림을 유지한다. `CharacterEquipmentComponent`는 선택 몸체의 소켓에 원본 Static/Skeletal Mesh를 붙이며 명시 장비 상태의 기존 스킬 검 표시는 숨긴다. 검 스킬의 기존 판정 컴포넌트·GAS·스킬·능력치는 유지한다. 손잡이 위치·회전·배율은 프로필의 에셋별 `Attachments.RelativeTransform`으로 조정한다.
-
-이전 저장의 누락된 장비 상태는 과거 스킬 외형을 유지하며 첫 명시 장착부터 새 상태를 적용한다. 시작 아이템을 재지급하거나 저장 카탈로그를 바꾸지 않는다. 비무기 슬롯 콘텐츠·나머지 240개 분류·능력치/부여 스킬·Snapshot `EquipmentIds` 연결은 후속 기획 대상이다. 아이템·장비 조작과 새 에셋 부착 재생은 사용자 지시로 이번 실행에서 제외했다. [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
-
-### 파티
+### 3-3 파티
 
 - CharacterCreation은 생성 버튼에서 슬롯 기본 직업·기본 몸체·자동 이름으로 즉시 생성하고 Edit에서만 상세 편집을 연다. 네 슬롯 중 하나 이상 생성하고 직접 조작할 한 명을 선택해야 시작한다. 각 생성 카드의 `직접 조작` 버튼으로 선택하며 선택한 카드를 삭제하면 다시 선택해야 한다. 직업·이름 편집은 선택을 유지하고 화면 재진입은 초안과 선택을 초기화한다.
 - 빈 슬롯은 스폰하지 않으며 원래 `SlotIndex`를 Arena의 PlayerCoords에 대응한다. 슬롯은 이름·`ClassId`·생성 여부·현재 HP와 `bPlayerControlled` 선택을 전달한다. 식별된 Run은 `CharacterId`와 원래 `OwnerAccountId`도 보존한다.
@@ -148,12 +148,12 @@ CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한�
 - `CombatClass`가 없으면 기존 `PlayerUnitClasses`와 명시적인 `FallbackPlayerUnitClass`를 사용한다. 전사 `BP_WarriorUnit`·마법사 `BP_MageUnit`·도적 `BP_RogueUnit`·궁수 `BP_PlayerUnit`은 공통 외형 카탈로그의 Primitive 남자·여자 몸체를 사용한다. Blueprint의 이전 기본 스킬과 별개로 새 Run은 비무장 스킬만 시작한다.
 - 외형은 `FCharacterAppearanceSelection.BodyId`로 선택하고 기존 appearance 구조를 통해 Run·Snapshot·체크포인트·복제에 전달한다. `UCharacterAppearanceCatalog.BodyVariants` 배열의 원본 메시를 공통 `UCharacterAppearanceComponent`가 적용하며 기존 저장에 `BodyId`가 없으면 남자 기본값을 사용한다. ROG 의상 UI·착용은 중지하고 `ItemIds`·103개 항목·원본 에셋은 향후 아이템용으로 보존한다. 마법사 Blueprint의 고정 스태프 표시는 제거하고 실제 시작 장비로 표시한다. 기존 `LegacyEnemyClasses` 체크포인트 호환·래그돌을 유지하며 장비 능력치 연결과 개발용 협동 로비의 캐릭터 생성 UI는 이번 범위에 포함하지 않는다.
 - 수정하지 않은 이름은 직업 표시명과 슬롯 번호를 사용한다. 개별 이름 변경은 `SetSlotCharacterName`으로 반영한다.
-- 네 직업의 현재 시작값은 HP 100·힘/민첩/지능 각 10이다. 첫 스폰은 직업 정의의 HP와 능력치를 사용하고 이후 전투는 저장한 결과 HP를 유지한다. HP 0인 멤버는 다음 전투에 스폰하지 않는다. 최종 밸런스·성장률·능력치의 피해 보정 공식은 별도다.
+- 네 직업의 현재 시작값은 HP 100·힘/민첩/지능 각 10이다. 첫 스폰은 직업 정의의 HP와 능력치를 사용하고 이후 전투는 저장한 결과 HP를 유지한다. HP 0인 멤버는 다음 전투에 스폰하지 않는다. 목표 Run은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 시험 성장을 공통 직업 해석에 적용하며 최종 밸런스·피해 보정 공식은 별도다.
 - 전투 속도는 현재 GAS 민첩과 1:1이다. 기본 아군 속도는 10이며 일반 `AEnemyUnit`의 시작 힘/민첩/지능은 각각 5·속도 5다. 일반 적 HP 150·AP 2는 유지하고 Snapshot 적은 스폰 후 저장된 세 능력치로 설정한다.
 
 `UPartyDefinitionDataAsset::IsDataValid`는 Unreal Data Validation에서 동일한 `ResolveProfession` 검사를 사용한다. 에셋 경로·직업 ID와 함께 누락 또는 Abstract/Deprecated 클래스, 유효하지 않은 HP/AP와 힘·민첩·지능, 빈·누락·중복 시작 스킬과 잘못된 라운드 프로필을 보고한다. 전투 Actor의 `CombatClass` → `PlayerUnitClasses` → 명시 fallback 순서를 유지한다. 직업 정의용 `ProfessionClass`는 별도로 필수이며 목록의 ClassId와 일치해야 한다. 실제 선택된 전투 클래스만 검사하며 잘못된 명시 클래스를 fallback으로 대체하지 않는다. 제작 파티 에셋을 Content Browser에서 선택해 **Validate Assets**로 사전 확인할 수 있으며, 전투 실행 검증과 구분한다.
 
-### 행동과 결과
+### 3-4 행동과 결과
 
 `CanStartNode → BeginEncounter → PrepareArena → SpawnParty/Enemies → ConfigureCombatParticipants → MarkCombatStarted → StartCombat`으로 시작한다. 누락 클래스·잘못된 초기 배치·등록 실패는 부분 스폰을 정리하고 오류를 표시한다.
 
@@ -177,9 +177,9 @@ SAP 이동은 Coordinator의 `SAPMoveSpeed=350cm/s`를 사용하며 민첩·`Rou
 
 기존 GA/SkillActor의 즉시 실행과 순차 `StartSkill`·TurnManager·AI 연속 판단·End Turn은 실행하지 않는다. 모든 예약 행동과 복귀·잔여 투사체가 종료된 뒤에만 결과를 Encounter로 전달한다. 양 팀 전멸은 패배·Run 종료이며 승리 보상을 지급하지 않는다. 엄호의 계획·실행·피해 흡수는 제거하고 상태이상은 후순위로 둔다. 확정 규칙은 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)을 기준으로 한다.
 
-Standalone은 결과 저장 성공 후 유닛·전투 상태를 정리한다. 네트워크는 Result 표시 동안 최종 상태를 유지하고 Continue/월드 종료 시 정리한다. EncounterManager는 최종 파티 HP를 슬롯별 값으로 수집하여 결과·보상·단계와 같은 저장 후보에 전달하며 저장 성공 후 Run 파티에 공개한다. 결과/Continue 저장 실패는 기존 Run 파티·단계·파일을 보존하며 재시도할 수 있다. Continue 재시도 성공 시 이전 오류를 동기 상태 전이 통지 전에 제거하여 상점 선택 화면에 남기지 않는다.
+Standalone은 결과 저장 성공 후 유닛·전투 상태를 정리한다. 네트워크는 Result 표시 동안 최종 상태를 유지하고 Continue/월드 종료 시 정리한다. EncounterManager는 최종 파티 HP와 소모품 재고를 슬롯별 값으로 수집하여 결과·보상·단계와 같은 저장 후보에 전달하며 저장 성공 후 Run 파티에 공개한다. 결과/Continue 저장 실패는 기존 Run 파티·단계·파일을 보존하며 재시도할 수 있다. Continue 재시도 성공 시 이전 오류를 동기 상태 전이 통지 전에 제거하여 상점 선택 화면에 남기지 않는다.
 
-### 입력
+### 3-5 입력
 
 활성 CommonUI 화면이 입력 모드를 소유한다. Combat 계획은 `All / CaptureDuringMouseDown`으로 최초 한 번 클릭부터 전장 유닛·타일을 선택하고 RunMap/Result는 `Menu / NoCapture`를 유지한다. Controller는 실제 게임 뷰포트에 닿은 로컬 클릭만 전달하며 UI 패널 뒤 월드 선택·실행 중 입력·타인 조작을 막는다. 이전 타일 즉시 행동/End Turn HUD는 사용하지 않는다.
 
@@ -191,7 +191,7 @@ GameplayCue 검색은 `DefaultGame.ini`의 `GameplayAbilitiesDeveloperSettings`�
 
 GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMenu의 UIOnly 상태에서 travel한 뒤 남는 viewport `IgnoreInput`과 로컬 포커스는 native 진입 코드가 복구한다. 이 입력 수정에는 WBP 재생성이 필요 없다.
 
-## 콘텐츠·UI 설정
+## 4 콘텐츠·UI 설정
 
 ### 4-1 스킬 이펙트 에셋 목록
 
@@ -226,7 +226,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 `/Game/User_JeHoon/LEVEL/Development/DebugCombat`은 프로젝트 소유 Gameplay 맵의 배치·카메라·Grid를 Unreal API로 복제한 독립 개발 레벨이다. `BP_CombatDebugGameMode`는 기존 Party·Enemy 정의를 참조하고 전사 1명·적 4명을 생성한다. `ACombatDebugPlayerController`와 기존 라운드 계획 UI를 사용하며 일반 인카운터 진행·결과·저장 경로에는 연결하지 않는다. 로컬 Standalone·비 Shipping에서만 동작하고 활성 관리 Run이 있으면 시작을 거절한다.
 
-`UCombatDebugLoadout`은 Skills 하위의 유효 DataAsset 74종(기본 2·몬스터 전용 12·신규 60)과 태그 장착 프로필이 있는 장비 49종을 제공한다. 몬스터 공격도 개발용 일반 카탈로그에 포함되며 새 Run의 상점 후보 61종과 구분한다. 장비 후보는 기존 `RunEquipmentRules`로 검증하고 임시 보유 상태에만 기록한다. 획득은 지정 슬롯에 즉시 장착하며 밀려난 장비는 임시 보유 목록에 남는다. 제거는 장착 해제·보유 삭제·참조 인덱스 보정을 함께 수행한다. 장비는 현재 외형만 바꾸며 능력치·스킬은 부여하지 않는다.
+`UCombatDebugLoadout`은 Skills 하위의 유효 DataAsset 74종(기본 2·몬스터 전용 12·신규 60)과 태그 장착 프로필이 있는 장비 49종을 제공한다. 몬스터 공격도 개발용 일반 카탈로그에 포함되며 새 Run의 상점 후보 61종과 구분한다. `Item.Consumable` 태그의 회복약은 일반 카탈로그·스킬 5칸·상점 스킬 풀에서 제외하고 목표 Run의 별도 재고에서만 사용한다. 장비 후보는 기존 `RunEquipmentRules`로 검증하고 임시 보유 상태에만 기록한다. 획득은 지정 슬롯에 즉시 장착하며 밀려난 장비는 임시 보유 목록에 남는다. 제거는 장착 해제·보유 삭제·참조 인덱스 보정을 함께 수행한다. 장비는 현재 외형만 바꾸며 능력치·스킬은 부여하지 않는다.
 
 스킬 목록은 기존 `ResolveRoundSkill` 결과의 `EffectTags`를 카탈로그 캐시에 보관하여 속성 8탭과 방식 7탭을 이름/에셋명 검색과 교차 적용한다. 속성은 전체·물리·화염·냉기·번개·카오스·복합·미분류이며 방식은 전체·투사체·범위형·체인·근접공격·지원형·미분류다. `FGameplayTagQuery`로 지원 효과를 우선 분류하고 `Skill.Shape.Chain`이 있는 공격은 기존 Beam 태그를 유지해도 체인으로 분류하여 범위형에서 제외한다. 비무장·근접 공격 2종은 태그가 없어 미분류로 제공하고 신규 60종은 저장된 속성·효과·형태 태그로 분류한다. 몬스터 전용 공격 12개는 원래 몬스터 장착을 유지한다. 삭제한 생성 스킬과 CSV의 미생성 보류 항목은 구입 목록에 추가하지 않는다. 체인 5종은 최근접 생존 미타격 적을 연결하는 다중 연쇄 실행을 지원하며 수치·진행·보존 계약은 [4-9절](#4-9-구입-vfx와-sfx-도입)을 따른다. [UI 기준](UI_README.md#7-2-전투-디버그-도구)
 
@@ -296,7 +296,7 @@ Gameplay의 전장·Grid·GameplayCamera·물리 바닥·NavBounds를 복제하�
 
 `UMonsterAnimInstance.GroundSpeed`는 라운드가 제공하는 실제 수평 속도로 Idle/Walk/Run을 선택하고 `DefaultSlot`으로 공격을 표시한다. 미등록 슬롯은 UE 기본 `DefaultGroup` 해석을 사용하며 원본 Skeleton 패키지를 저장하지 않는다. `ResolveRoundSkill`의 기존 기본 비무장 공격 피해 50·AP 1·GAS 효과와 태그/Query 조건을 유지하고 몬스터별 몽타주·발동 시간만 연결한다. 적 HP 150·AP 2·능력치 각 5, 서버 이동·발동·피격과 기존 래그돌을 유지한다. 생성 위치는 각 캡슐 반높이에 맞춰 타일에 배치한다.
 
-`EnemyCatalogClasses`는 소프트 클래스 13개를 보관하며 일반 Run은 `EnemyUnitClasses`의 기본 편성 4개만 로드한다. 디버그 목록 조회 시 유효한 소프트 카탈로그와 기본 편성을 중복 없이 해석한다. `ConfigureMonsterContent.py`가 명세를 적용하고 `-MonsterVerifyOnly`는 저장본을 읽기 전용으로 검사한다. Development Editor / Win64 컴파일과 작성·저장·독립 재로드 정적 검사를 통과했다. 작성 근거는 `Saved/Automation/Monsters/Configuration.json`·`Reload.json`이다. 2026-10-04 UE 5.8.3 실제 PIE에서 13종의 접근·몽타주·대상 방향·복귀·원래 GAS 피해/AP와 사망/래그돌/타일 해제·기본 편성 초기화를 통과했다. 초기 52장·사망 2.5초 후 13장의 총 65장에서 크기·재질·지면 접촉·공격 방향을 직접 확인했다. 2.5초의 엔진 수면 표본은 깨어 있는 몸체 12종·수면 1종이며 최종 안착 판정은 아니다. 원본 물리를 유지한 8초 추가 13장의 총 78장 검수를 통과했다. 8초에는 수면 9종·깨어 있는 몸체 4종이었으며 전체 최종 안착은 미확인이다. [최신 검수 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)·[추가 확인](TODO.md#12-몬스터-콘텐츠-확인)
+`EnemyCatalogClasses`는 소프트 클래스 13개를 보관하며 기존 2/10전투 경로는 `EnemyUnitClasses`의 기본 편성 4개를 로드하고 새 목표 Run은 저장한 묶음별 편성을 사용한다. 디버그 목록 조회 시 유효한 소프트 카탈로그와 기본 편성을 중복 없이 해석한다. `ConfigureMonsterContent.py`가 명세를 적용하고 `-MonsterVerifyOnly`는 저장본을 읽기 전용으로 검사한다. Development Editor / Win64 컴파일과 작성·저장·독립 재로드 정적 검사를 통과했다. 작성 근거는 `Saved/Automation/Monsters/Configuration.json`·`Reload.json`이다. 2026-10-04 UE 5.8.3 실제 PIE에서 13종의 접근·몽타주·대상 방향·복귀·원래 GAS 피해/AP와 사망/래그돌/타일 해제·기본 편성 초기화를 통과했다. 초기 52장·사망 2.5초 후 13장의 총 65장에서 크기·재질·지면 접촉·공격 방향을 직접 확인했다. 2.5초의 엔진 수면 표본은 깨어 있는 몸체 12종·수면 1종이며 최종 안착 판정은 아니다. 원본 물리를 유지한 8초 추가 13장의 총 78장 검수를 통과했다. 8초에는 수면 9종·깨어 있는 몸체 4종이었으며 전체 최종 안착은 미확인이다. [최신 검수 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)·[추가 확인](TODO.md#12-몬스터-콘텐츠-확인)
 
 신규 uasset 62개는 Blueprint 12·AnimBlueprint/BlendSpace/몽타주 각 10·스킬 12·IK Rig 4·Retargeter 2·리타깃 시퀀스 2개이며 합계 1,673,195바이트(약 1.6MiB)다. 약 661MiB의 설치된 생물 원본 팩과 구분한다. 원본 5개 루트의 1,574파일 SHA가 유지됐고 기존 추적 에셋 5,973개 중 의도한 `DA_DefaultEncounter`만 변경했다. Gameplay 읽기 전용 로드에서 혼합 편성 4개·앞열 2/뒷열 2 배치를 확인했으며 읽기 전용 재로드 전후 신규 62개와 변경 인카운터의 63개 SHA도 동일하다. 근거는 같은 보고서 폴더의 `FinalFileAudit.json`이다.
 
@@ -353,11 +353,11 @@ Spawn_Ninja_Root의 원본과 두 높이 대안은 3조건·15장으로 비교�
 
 프로젝트에서 NiagaraFluids·ChaosNiagara를 활성화하며 원본 Niagara를 수정하지 않는다. Development Editor / Win64 컴파일, 에셋 작성·독립 읽기 전용 재로드·DataValidation, 원본 1,900파일·보존 스킬 14개 해시와 CSV·문서 정적 검사를 통과했다. 원본 설치 감사에는 사용하지 않는 데모 Blueprint의 InputAction 경고 20개가 있으며 작성·재로드는 오류·경고 0이다. NullRHI의 IsReadyToRun 값은 렌더 실행 검증으로 사용하지 않는다. 설치·작성 당시 게임·PIE·자동화 테스트·VFX/SFX 재생은 미실행이었다. 후속 위임 검수의 범위는 [TODO 19절](TODO.md#19-구입-vfxsfx-스킬-확인)과 최신 실행 이력을 따른다. 근거: `Saved/Automation/DrGameSkills/Inventory.json`·`Author.json`·`Reload.json`·`FinalPreservation.json`·`CsvValidation.json`.
 
-2026-10-04 체인 분류 추가는 별도 `Saved/Automation/ChainSkillFilter/Author.json`·`Reload.json`으로 저장·읽기 전용 재로드·DataValidation을 통과했다. 기존 링크 DA 5개에 분류 태그만 추가하고 나머지 신규 55개·보존 공격 14개·원본 1,900파일 해시를 보존했다. CSV 2개는 해당 5행만 갱신했다. 실제 체인 탭의 전체 5종과 미보유 항목 필터를 확인했으며 다중 수치·에셋 적용의 대기는 [TODO 23절](TODO.md#23-다중-체인-공격-확인)을 따른다.
+2026-10-04 체인 분류 추가는 별도 `Saved/Automation/ChainSkillFilter/Author.json`·`Reload.json`으로 저장·읽기 전용 재로드·DataValidation을 통과했다. 기존 링크 DA 5개에 분류 태그만 추가하고 나머지 신규 55개·보존 공격 14개·원본 1,900파일 해시를 보존했다. CSV 2개는 해당 5행만 갱신했다. 당시 실제 체인 탭의 전체 5종과 미보유 항목 필터를 확인했다. 후속 다중 설정과 검수 범위는 아래 구현 및 [TODO 23절](TODO.md#23-다중-체인-공격-확인)을 따른다.
 
 2026-10-04 다중 체인 실행은 `CombatRoundRules::UsesChain`의 `FGameplayTagQuery`와 `Chain.MaxTargets > 1`로 전용 `ACombatChainEffectActor`를 선택한다. 현재 지원 조합은 Chain·Damage 태그, Heal/Shield 제외, EnemyUnit·단일 대상 효과 충돌이며 기존 고정 Melee 실행 종류는 지원 지오메트리를 제한한다. 최초 피격은 기존 범위·피격 대기·태그 조건·벽 차단을 유지한다. 이후에는 직전 피격 위치에서 점프 거리 안의 최근접 생존 미타격 적을 선택하고 동거리에서는 작은 UnitId를 우선한다. 각 점프의 실제 피격 시점에도 생존·태그·거리·시야 차단을 다시 검사하며 같은 적은 한 번만 타격한다. 시전자 또는 대기 중 대상의 사망·후보 소진·최대 수 도달 시 종료하고, 이미 피격된 적의 사망은 저장된 피격 위치에서 다음 연결을 계속한다.
 
-`FCombatChainSettings`는 첫 대상을 포함한 `MaxTargets`·cm 단위 `JumpDistance`·`JumpIntervalSeconds`·점프별 누적 `DamageMultiplierPerJump`를 관리한다. 기본값 1·0·0·1은 기존 단일 연결을 유지한다. 원래 시전자의 GAS·효과/조건 태그를 그대로 사용하고 기존 행동 비용은 한 번만 차감한다. 원본 연결 Niagara 5종을 구간마다 직접 참조하며 연결 구간 SFX는 최초 구간에서 한 번, 피격 VFX/SFX는 대상마다 재생한다. 구간별 연출을 정리하고 판정 종료 시 기존 라운드 잠금을 해제한다. `FCombatChainRuntimeData`는 진행을 UnitId·시간·좌표로 보관하며 구간 표현을 복제한다. 기존 확정 Ready 경계 저장 범위는 유지하고 진행 중 연쇄의 별도 복구는 추가하지 않는다. UE 5.8.3 Development Editor / Win64 컴파일을 통과했다. 기존 74스킬의 읽기 전용 해석·VFX 참조와 원본 1,900파일 보존 검사를 통과했다. 초기 수치는 선택 대기이며 DA 설정·작성 후 독립 재로드 검증은 보류했다. HP 보완 후 native 재검수에서 실제 Actor·Coordinator·GAS 회귀 6개를 통과했다. 원본 5종의 임시 3대상·4방향/LWC 화면을 확인했으며 다중 PC 협동 동기화는 별도다. [TODO 23절](TODO.md#23-다중-체인-공격-확인)
+`FCombatChainSettings`는 첫 대상을 포함한 `MaxTargets`·cm 단위 `JumpDistance`·`JumpIntervalSeconds`·점프별 누적 `DamageMultiplierPerJump`를 관리한다. 구조체 기본값 1·0·0·1은 기존 단일 연결을 유지한다. 현재 링크 5종에는 사용자가 채택한 시험값 `MaxTargets=4`, `JumpDistance=600cm`, `JumpIntervalSeconds=0.15`, `DamageMultiplierPerJump=0.8`을 적용한다. 원래 시전자의 GAS·효과/조건 태그를 그대로 사용하고 기존 행동 비용은 한 번만 차감한다. 원본 연결 Niagara 5종을 구간마다 직접 참조하며 연결 구간 SFX는 최초 구간에서 한 번, 피격 VFX/SFX는 대상마다 재생한다. 구간별 연출을 정리하고 판정 종료 시 기존 라운드 잠금을 해제한다. `FCombatChainRuntimeData`는 진행을 UnitId·시간·좌표로 보관하며 구간 표현을 복제한다. 기존 확정 Ready 경계 저장 범위는 유지하고 진행 중 연쇄의 별도 복구는 추가하지 않는다. 초기 구현 당시 UE 5.8.3 Development Editor / Win64 컴파일과 74스킬 읽기 전용 해석·원본 보존 검사, Actor·Coordinator·GAS 회귀 6개 및 임시 3대상·4방향/LWC 화면을 확인했다. 이 결과는 현재 4대상 설정 검수와 구분하며 새 작성·독립 재로드·실행 결과는 TODO에 기록한다. 다중 PC 협동 동기화는 별도다. [TODO 23절](TODO.md#23-다중-체인-공격-확인)
 
 2026-10-04 VFX 방향 보정은 Niagara 파라미터의 자료형과 그래프에서 소비하는 좌표 공간을 분리한다. `FCombatSkillVfx.StartPositionSpace`·`EndPositionSpace`의 기본 `ParameterType`은 기존 Vec3 로컬·Position 월드 해석을 보존한다. 체인 5종의 `User.EndPos_V`는 월드 공간 이미터의 원점과 직접 연결하므로 `World`, 화염 화살비·우박 폭격의 `User.Launch_Position`은 Position 자료형이지만 로컬 이미터의 위치·속도 오프셋이므로 `ComponentLocal`로 지정한다. 활성화 전에 상대 위치·회전·크기와 Niagara LWC 타일 변환을 반영하고 원본 Niagara·피해·대상·태그·GAS·판정·SFX·시점·풀·파티는 보존한다.
 
@@ -365,7 +365,7 @@ Spawn_Ninja_Root의 원본과 두 높이 대안은 3조건·15장으로 비교�
 
 신규 60종과 비무장·근접·몬스터 공격 14종의 전체 74스킬을 읽기 전용으로 검수했다. 시전·투사체·효과 충돌·피격 방향, 원본 Niagara 79종의 그래프·주효과/피격 83슬롯과 저장된 끝점 공간을 대조했다. 기본·몬스터 공격 14종에는 직접 VFX·ImpactVFX가 없으며 기존 대상 방향의 애니메이션 경로를 유지한다. UE 5.8.3 Development Editor / Win64 컴파일, 기존 DA 8개(끝점 7개·가시엄니 VFX 참조 1개)와 필수 Niagara 파생본 1개 작성·독립 재로드·DataValidation·전체 에셋 감사를 오류·경고 없이 통과했다. 파생본의 다른 좌표 입력·시각 설정·원본 모듈 참조와 작성/재로드 해시가 일치했다. 나머지 신규 52개·기본/몬스터 14개·원본 1,900파일과 읽기 전용 검사 전후 스킬 74파일 해시를 보존했다. 근거는 `Saved/Automation/SkillVfxDirection/`의 작성·재로드·원본 그래프·최종 보존 보고서다. 작성 당시 화면·게임·PIE·자동화 테스트는 미실행이었다. 후속 위임 검수의 범위는 [TODO 22절](TODO.md#22-스킬-vfx-방향-확인)과 최신 실행 이력을 따른다.
 
-2026-10-04 사용자 위임으로 실제 PIE·게임·화면 검수를 진행했다. 몬스터·외형 에디터 도구의 동일한 내부 함수명을 구분해 동작 변경 없이 Unity 컴파일 충돌을 해소했다. 후속 인벤토리 검수 fixture의 뷰포트 종료 수명 보완을 포함한 Editor 컴파일·링크 8.90초를 통과했으며 별도 native 회귀 175개를 12.445초에 통과했다. 이전 cooked 패키지 저장/이어하기/종료는 해당 코드의 이력이다. HP의 창·NativePaint 크기/위치 결함을 보완하고 실제 Windows 창 검수 15개를 통과했다. 14맵·42장의 세 화면 비율에서 유닛 5개의 HP 위치 오차는 최대 0.585px였으며 사망/부활 5→4→5개 표시와 창 X/Y 37/29px 이동 시 Paint 위치 유지도 확인했다. 최신 Development 패키지의 BuildCookRun 80.10초와 cooked CSV 289개·스킬 61후보/세 보완 DA 읽기 검사를 통과했다. 동일 실행 파일·빌드·컨테이너 5개의 격리 writer 저장을 별도 프로세스에서 Continue → 보상 → Shop_02 → Combat_02로 복원했고 실제 Quit 버튼의 자연 종료도 확인했다. Editor 작성 저장의 cooked 재개는 FText 직렬화 크기 차이로 실패한 이력을 유지하며 동일 패키지 writer 결과와 구분한다. 모든 검수 종료 후 Content 19,804파일의 SHA/크기 동일과 승인한 프로젝트 DA 3개의 정확한 변경을 확인했다. 원본 저장 49개·GameUserSettings·외부 EditorKeyBindings의 SHA를 보존했고 검수 소유 임시 파일을 정리했으며 예상 밖 Content·저장 추가는 없었다. 몬스터·메뉴·환경·스킬·인벤토리의 결과와 제한은 [최신 실행 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)을 따른다. 체인 초기 수치·미선택 온라인 정책은 계속 대기한다.
+2026-10-04 사용자 위임으로 실제 PIE·게임·화면 검수를 진행했다. 몬스터·외형 에디터 도구의 동일한 내부 함수명을 구분해 동작 변경 없이 Unity 컴파일 충돌을 해소했다. 후속 인벤토리 검수 fixture의 뷰포트 종료 수명 보완을 포함한 Editor 컴파일·링크 8.90초를 통과했으며 별도 native 회귀 175개를 12.445초에 통과했다. 이전 cooked 패키지 저장/이어하기/종료는 해당 코드의 이력이다. HP의 창·NativePaint 크기/위치 결함을 보완하고 실제 Windows 창 검수 15개를 통과했다. 14맵·42장의 세 화면 비율에서 유닛 5개의 HP 위치 오차는 최대 0.585px였으며 사망/부활 5→4→5개 표시와 창 X/Y 37/29px 이동 시 Paint 위치 유지도 확인했다. 최신 Development 패키지의 BuildCookRun 80.10초와 cooked CSV 289개·스킬 61후보/세 보완 DA 읽기 검사를 통과했다. 동일 실행 파일·빌드·컨테이너 5개의 격리 writer 저장을 별도 프로세스에서 Continue → 보상 → Shop_02 → Combat_02로 복원했고 실제 Quit 버튼의 자연 종료도 확인했다. Editor 작성 저장의 cooked 재개는 FText 직렬화 크기 차이로 실패한 이력을 유지하며 동일 패키지 writer 결과와 구분한다. 모든 검수 종료 후 Content 19,804파일의 SHA/크기 동일과 승인한 프로젝트 DA 3개의 정확한 변경을 확인했다. 원본 저장 49개·GameUserSettings·외부 EditorKeyBindings의 SHA를 보존했고 검수 소유 임시 파일을 정리했으며 예상 밖 Content·저장 추가는 없었다. 몬스터·메뉴·환경·스킬·인벤토리의 결과와 제한은 [최신 실행 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)을 따른다. 이 결과는 후속 체인 4대상 설정·목표 Run·회복 소모품·Steam 연결 시제품 도입 전 이력이며 현재 검수와 서비스 준비 조건은 TODO를 따른다.
 
 ### 4-10 레벨 폴더와 이전 경로 호환
 
@@ -387,9 +387,9 @@ Spawn_Ninja_Root의 원본과 두 높이 대안은 3조건·15장으로 비교�
 
 [OrganizeLevelFolders.py](../Source/ProjectAEditor/Scripts/OrganizeLevelFolders.py)의 기본 실행은 사전 감사, `-LevelFoldersApply`는 이동·참조 갱신·Redirector 정리, `-LevelFoldersVerifyOnly`는 독립 읽기 전용 검사다. 적용 전에 기본 시작·쿠킹 경로와 로컬 에디터의 최근 맵/맵별 뷰 키를 갱신하고 로컬 설정의 원본 바이트·카메라 좌표를 보존한다. CoreRedirect는 이동·Redirector 정리 후 추가한다. 이후 환경 14맵의 navigation을 공식 `ResavePackages -BuildNavigationData`로 재빌드·저장하고 독립 검증을 실행한다. 삭제 개수와 무관하게 새 World 18개·옛 물리 경로 20개 부재·이전 Package/Object 해석을 검사한다. UE 5.8.3 Development Editor / Win64 컴파일은 38.89초·오류/경고 0으로 완료했다. 적용과 새 프로세스의 읽기 전용 검증은 모두 종료 0이며 18맵의 상태 스냅샷·옛 SoftObjectPath 20개의 정확한 새 World 해석·옛 경로 부재·13,963패키지의 전방 의존 참조를 확인했다. 보호 Content 19,786파일과 원본 저장 49개·GameUserSettings·외부 EditorKeyBindings의 크기/SHA를 보존했다. 최종 Content 19,805파일에 예상 밖 추가는 없으며 로컬 에디터 설정은 검토된 맵 경로와 컴파일 모듈 시각 2개 외에 동일하고 카메라 좌표를 유지했다. Navigation 재빌드 후 환경 14맵의 각 64타일과 native Recast payload SHA가 원본과 정확히 일치했으며 모든 18맵에서 삭제된 export는 없었다. Gameplay·DebugCombat은 기존 0타일을 유지하며 저장 버전이 27→28로 정규화됐고, Legacy WorldMap에는 원본 로드 때 엔진이 생성하던 빈 Recast·SceneComponent 2개가 저장됐다. 이후 독립 재로드와 보호 파일 전체 SHA를 다시 확인했다. 근거는 `Saved/Automation/LevelFolders/{Audit,Apply,Verify,ProtectedFinal,EditorMapPaths.Final,Payloads.AfterNavigationRepair}.json`, `InspectMapPayloads.py`, `Build.Editor.log`·`Navigation.Build.log`다. 이번 이동 후 PIE·게임·자동화 테스트는 실행하지 않았으며 [TODO 24절](TODO.md#24-레벨-폴더-정리-후-확인)의 사용자 새 게임·이어하기 확인을 남긴다. 기존 생성·화면 검수의 성공은 당시 경로와 코드 기준의 이력이다.
 
-### 개발용 협동 진입
+### 4-11 개발용 협동 진입
 
-Non-Shipping MainMenu의 **게임 시작 → 멀티플레이**는 같은 PC·LAN의 새 2~4인 개발용 방으로 연결한다. 첫 화면의 별도 개발용 협동 버튼은 제거했다. `UGameModeSelectionWidget`은 싱글플레이 선택 시 기존 CharacterCreation, 멀티플레이 선택 시 `UDevelopmentCoopWidget`을 연다. Host는 `OpenLevel(..., listen?ProjectADevCoop=2~4)`, Client는 정규화한 IPv4:포트로 `ClientTravel`을 사용한다. 기본 포트는 7777이며 별도 세션 검색·온라인 인증은 없다.
+Non-Shipping MainMenu의 **게임 시작 → 멀티플레이**는 같은 PC·LAN의 새 2~4인 개발용 방으로 연결한다. 첫 화면의 별도 개발용 협동 버튼은 제거했다. `UGameModeSelectionWidget`은 싱글플레이 선택 시 기존 CharacterCreation, 멀티플레이 선택 시 `UDevelopmentCoopWidget`을 연다. Host는 `OpenLevel(..., listen?ProjectADevCoop=2~4)`, Client는 정규화한 IPv4:포트로 `ClientTravel`을 사용한다. 기본 포트는 7777이며 이 LAN 경로에는 별도 세션 검색·온라인 인증이 없다. `-CustomConfig=SteamDev -ProjectASteamDev`를 명시하면 같은 메뉴에 Steam 480 친구 연결·공식 인증 관측용 시제품 UI를 표시한다. Run·관리 저장은 연결하지 않으며 실제 접속·인증 검수는 [온라인 계약](MULTIPLAYER.md#9-steamplayfab와-남은-서비스-정책)을 따른다.
 
 `UDevelopmentCoopSubsystem`은 GameInstance 단위 연결 대기·실패 메시지를 관리한다. `ADevelopmentCoopLobby`가 참가 번호·연결·준비 상태를 복제하고, GameMode의 PreLogin/PostLogin에서 정원·시작 여부와 서버 배정을 확인한다. 준비 RPC는 요청한 연결에만 적용하며 시작·노드·Continue는 Host만 허용한다.
 
@@ -401,12 +401,12 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 |---|---|
 | 직업 편집 | Edit에서 이름 1~32자·직업 편집. 저장 시 적용, 취소 시 기존 값 유지. ClassInfo는 HP·힘/민첩/지능·민첩에서 구한 전투 속도·AP/SubAP·시작 스킬 표시 |
 | 직업 데이터 | `bUseUnitClassDefaults`의 능력치/AP 해석과 CombatClass fallback 유지. 새 Run은 `UnarmedStartingSkill`을 사용하고 다음 전투는 파티에 저장된 습득 목록을 사용. 명시 스킬 목록이 없는 기존 저장만 과거 직업 기본값 해석 유지. 미지원 직업·잘못된 수치·중복 스킬 ID 거절 |
-| 회복약 | 기존 데이터 프로퍼티만 보존. 즉시 회복 실행과 이전 HUD 버튼은 제거했으며 새 라운드 소비 행동은 미구현 |
+| 회복약 | 기존 즉시 회복 프로퍼티는 호환용이며 이전 HUD 실행은 제거 상태 유지. 새 목표 Run만 태그 기반 GAS 소모 행동·별도 재고를 사용하며 수치·저장 경계는 [5-1절](#5-1-목표-run과-회복-시험-데이터) 적용 |
 | 추가 스킬 | 전투 진입 시 EncounterSkillPool 자동 추첨·장착 제거. 실제 시작/명시 장착 DA만 사용하며 장착 최대 5개·계획/해결 중 변경 거절 유지. 기존 풀 에셋과 명시 획득 API는 보존 |
-| 전투 간 이관 | HP 유지. 새 전투의 추가 스킬 자동 추첨 없음. 전투 복구는 저장된 Ready 경계 사용. Snapshot 적은 저장된 스킬 구성 사용 |
+| 전투 간 이관 | HP·소모품 재고 유지. 새 전투의 추가 스킬 자동 추첨 없음. 전투 복구는 저장된 Ready 경계 사용. Snapshot 적은 저장된 스킬 구성 사용 |
 | 적·아군 AI | 실제 장착 스킬 순서·가까운 적 기준으로 인간 초안 전에 단일 명령 고정. 장착된 복귀형 Tile 공격은 적 HomeCoord를 공격/접근 좌표로 선택 가능. 합법 공격이 없으면 목록에 노출되지 않는 내부 대기 처리 |
 | 사망 표현 | 아군·적·Snapshot 모두 기존 Ragdoll 충돌 프로필·본 물리·서버 생성 사망 충격량 사용. 캡슐 충돌 해제·타일 해제·행동 취소 유지. 단발 사망 애니메이션 분기와 설정 제거. [에셋 도입 계획](TODO.md#6-신규-에셋-선정과-도입) |
-| 메뉴 프리뷰 | 초기 카메라 X `-500`·4개 앵커 Yaw `90°`를 기준으로 실제 몸체 투영과 가로 여백에 맞춰 파티 구도를 조정한다. 화면 크기·파티·외형 변경은 초기 기준에서 다시 계산하고 상세 편집 종료 시 파티 구도를 복원한다. 네 직업은 Primitive 몸체·공통 Idle을 표시하며 마법사 기본 스태프와 전투 Pawn 생성은 없다. [수치 조절](UI_README.md#화면프리뷰)·[최신 검수 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수) |
+| 메뉴 프리뷰 | 초기 카메라 X `-500`·4개 앵커 Yaw `90°`를 기준으로 실제 몸체 투영과 가로 여백에 맞춰 파티 구도를 조정한다. 화면 크기·파티·외형 변경은 초기 기준에서 다시 계산하고 상세 편집 종료 시 파티 구도를 복원한다. 네 직업은 Primitive 몸체·공통 Idle을 표시하며 마법사 기본 스태프와 전투 Pawn 생성은 없다. [수치 조절](UI_README.md#4-화면프리뷰)·[최신 검수 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수) |
 | 생성 화면 종료 | Back/X는 초안·프리뷰 정리. 재진입 시 빈 4슬롯. 상세 패널이 열려 있으면 먼저 패널만 닫음. 최소 슬롯 높이로 ClassInfo 표시 유지 |
 | 모드 선택 | 게임 시작 → 싱글플레이/멀티플레이. 캐릭터 생성·접속 시작 전 멀티 화면에서 돌아오면 모드 선택 복원, 모드 선택의 뒤로가기는 첫 화면 복원. 연결 이후 나가기는 기존 세션 정리/메뉴 복귀 |
 | 싱글 여정 항복 | 이어하기 옆 104×40 버튼·`URunSurrenderWidget` 확인창. 돌아가기 기본 포커스, 확인된 현재 일반 싱글 저장만 삭제. 취소·실패·저장 변경은 원본/현재 Run 보존 |
@@ -428,15 +428,15 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 
 `UCharacterInventoryPanel`은 포더킹 참고 이미지의 가방 목록을 상점과 `I` 창에 공통 적용한다. 전체·무기·방패·탄약·기타·스킬 탭의 아이콘/개수, 미장착 사본의 분류 아이콘·저장된 이름·`(1)`, 선택 상세를 native 위젯으로 구성한다. 분류는 기존 GameplayTag 조건을 사용하고 같은 에셋의 개별 `ItemIndex`와 현재 장비 `Revision`, 빈 가방 Drop·서버 권한 검사를 유지한다. 상세는 저장 카탈로그 참고 가격·장착 지원·허용 슬롯을 표시하며 능력치·희귀도·효과를 생성하지 않는다. 스킬 탭은 실제 장착 목록과 권위 Run의 이전 저장 해석을 유지한다. 기존 장비 슬롯·원본 에셋·저장 형식·네트워크 권위는 유지하며 WBP 재생성은 필요 없다. 2026-10-04 검수 4개·27장에서 세 화면 비율의 실제 Slate 구매/장착·저장·권한 거절과 O/Esc 설정 복귀를 확인했다. 해제·권한 거절 Drop은 합성 `NativeOnDrop`이며 실제 드래그 시작·다중 PC 검수는 별도다. [검수 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)·[추가 확인](TODO.md#8-목록형-인벤토리-확인)을 따른다.
 
-### 타겟·행동 세부 규칙
+### 4-12 타겟·행동 세부 규칙
 
 - `GetCombatSpeed()`는 현재 GAS 민첩을 그대로 사용하며 독립 `CombatSpeed=20` 값은 제거했다. 시작 지연은 `(최고 속도 − 해당 속도) × 0.1초`이고 기본 아군 10·일반 적 5에서는 적이 0.5초 늦게 시작한다. Planning에서 고정한 속도는 근접 접근·복귀에도 적용한다. [이전 검증](HISTORY.md#9-9-민첩-기반-전투-속도)
 - 현재 검·비무장은 `Approach=Unit`으로 대상 Actor의 현재 월드 위치를 추적하며 타일은 배치·복귀 기준이다. 접근 범위에 들어오면 즉시 `Casting`으로 전환하고 검의 접근 거리 105cm보다 가까워도 간격을 맞추려고 후퇴하지 않는다. 상호 접근·시전 전환의 화면 품질은 2026-10-01 자동화 범위에 포함되지 않았다. [검증 범위](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
-- 현재 사용자 스킬은 두 기본 공격·신규 VFX 60종이며 몬스터 전용 공격 12개도 유지한다. 새 Run의 상점은 근접 공격·신규 60종의 61후보이고 개발용 일반 카탈로그는 유효 DA 74종이다. 범위·투사체 공통 C++·GAS·FX와 `RoundDefinition.bUseMeleeAreaCollision`·`MeleeAreaHalfExtent`, 타일 기반 `TargetAndSides` 계산·타일 범위 라이브러리는 신규 스킬 도입을 위한 기능으로 보존한다.
+- 현재 사용자 스킬은 두 기본 공격·신규 VFX 60종이며 몬스터 전용 공격 12개도 유지한다. 새 Run의 상점은 근접 공격·신규 60종의 61후보이고 개발용 일반 카탈로그는 유효 DA 74종이다. 새 목표 Run의 회복 DA 1개는 `Item.Consumable` 태그로 이 일반 목록과 분리한다. 범위·투사체 공통 C++·GAS·FX와 `RoundDefinition.bUseMeleeAreaCollision`·`MeleeAreaHalfExtent`, 타일 기반 `TargetAndSides` 계산·타일 범위 라이브러리는 신규 스킬 도입을 위한 기능으로 보존한다.
 - `SkillDefinitionDataAsset.bUseRoundDefinition`과 `RoundDefinition`으로 스킬별 실제 시간·범위·접근·복귀·투사체 정책을 편집한다. 근접·투사체의 발동 전 대상 사망은 가장 가까운 유효 생존 적 재선택으로 공통 해석한다. 공격자의 현재 위치로 거리를 계산하고 `IsValidUnitTarget` 조건을 재사용하며, 유닛 접근형은 접근·미발동 시전·칼날 궤적을 다시 시작한다. 후보가 없으면 불발 후 복귀하고 추가 비용은 차감하지 않는다. 지점 공격·발사 후 투사체·기존 저장 프로필 값은 유지한다. 미지정 장착 스킬은 [GAME_DESIGN 8-7](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)의 초기 변환을 사용한다.
-- 시전 표현은 명시 프로필의 `RoundDefinition.CastMontage`를 우선하며 비어 있으면 `AbilityClass`의 기존 `AttackMontage`를 사용한다. 서버가 시전 진입 시 한 번 재생을 전달한다. 몽타주 재생 인스턴스의 루트 모션과 유닛의 기존 `AN_SkillRelease` 효과 발동은 차단하며, `WindupSeconds`·충돌·AP 계산과 발동 1회는 유지한다. 발동 후 `Recovery`에서 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝날 때까지 기다린 뒤 복귀한다. 서버의 재생 인스턴스를 사용할 수 없으면 에셋 길이/RateScale·블렌드 아웃·여유 시간 0.25초를 사용하며 시전 시작 기준 최대 60초로 제한한다. 반복·자동 종료 누락·잘못된 길이/속도로 무한 대기하지 않으며 시간 초과 시 남은 표현을 즉시 정리한다. 사망·중단·발동 전 취소·다음 행동 시작도 해당 인스턴스를 정리한다. [이전 검증](HISTORY.md#9-5-da-시전-몽타주-연결)
+- 시전 표현은 명시 프로필의 `RoundDefinition.CastMontage`를 우선하며 비어 있으면 `AbilityClass`의 기존 `AttackMontage`를 사용한다. 소모품은 명시 몽타주만 사용해 공격 몽타주 fallback을 적용하지 않는다. 서버가 시전 진입 시 한 번 재생을 전달한다. 몽타주 재생 인스턴스의 루트 모션과 유닛의 기존 `AN_SkillRelease` 효과 발동은 차단하며, `WindupSeconds`·충돌·AP 계산과 발동 1회는 유지한다. 발동 후 `Recovery`에서 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝날 때까지 기다린 뒤 복귀한다. 서버의 재생 인스턴스를 사용할 수 없으면 에셋 길이/RateScale·블렌드 아웃·여유 시간 0.25초를 사용하며 시전 시작 기준 최대 60초로 제한한다. 반복·자동 종료 누락·잘못된 길이/속도로 무한 대기하지 않으며 시간 초과 시 남은 표현을 즉시 정리한다. 사망·중단·발동 전 취소·다음 행동 시작도 해당 인스턴스를 정리한다. [이전 검증](HISTORY.md#9-5-da-시전-몽타주-연결)
 - 몽타주 대기 시간은 서버가 받은 `DeltaSeconds`를 프레임당 한 번 누적하며 고정 간격 시뮬레이션의 미처리 시간과 분리한다. 프레임 지연 뒤 누적 시뮬레이션을 처리할 때 시전 대기까지 중복 차감하여 조기에 복귀하지 않도록 한다.
-- 기존 GAS 효과·모든 타일 범위·상태효과·회복약이 새 행동으로 완전 변환된 것은 아니다. 새 Run의 아군은 비무장 공격 1개로 시작하고 상점에서 근접 공격·신규 VFX 60종을 습득할 수 있다. 기존 Blueprint·Snapshot·저장에서는 삭제 VFX 스킬만 제외하고 두 기본 공격·몬스터 전용 공격을 유지한다. 기존 `BP_EnemyUnit`의 근접 공격과 신규 몬스터의 기존 전용 공격을 유지한다. [몬스터 구성](#4-5-몬스터-콘텐츠) · [지원 변환](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)
+- 이전 GAS 효과·모든 타일 범위·상태효과를 새 행동으로 완전 변환한 것은 아니다. 회복 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 명시 프로필과 재고만 지원한다. 새 Run의 아군은 비무장 공격 1개로 시작하고 상점에서 근접 공격·신규 VFX 60종을 습득할 수 있다. 기존 Blueprint·Snapshot·저장에서는 삭제 VFX 스킬만 제외하고 두 기본 공격·몬스터 전용 공격을 유지한다. 기존 `BP_EnemyUnit`의 근접 공격과 신규 몬스터의 기존 전용 공격을 유지한다. [몬스터 구성](#4-5-몬스터-콘텐츠) · [지원 변환](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)
 - `RoundMontageOverrides`는 공통 DA를 변경하지 않고 유닛의 Skeleton에 맞는 몽타주로 바꾼다. 전사의 검·비무장과 적의 검 표현에 적용하며 Root Motion·서버 발동 권위·몽타주 종료 후 복귀 규칙을 유지한다. 검은 `hand_r`에 하나만 부착한다.
 - 검만 `bUseWeaponTrace=true`를 사용한다. 서버가 최종 몽타주의 에셋 포즈·메시·무기 부착·소켓을 `GetAnimationPose`로 계산하고 0.23~0.43초를 0.005초 간격·반경 4cm로 검사한다. 렌더 메시 갱신·인스턴스 종료와 독립적으로 누적 구간을 처리하며 행동 취소·사망·대상 상실은 서버 단계에서 처리한다. 최초 적 한 명에게 기존 GAS `Data.Damage`로 1회 피해를 적용한다. `SM_Sword`의 `BladeBase=(0,0,-22)`·`BladeTip=(0,0.191992,-118.28656)`, Pitch/Yaw 0도·Roll 180도, 전사 부착 `(-11.095651,5.605028,-10)`·적 `(-8.5,5,-10)`을 사용한다. 단위는 cm이며 손잡이 위치와 궤적을 함께 관리한다.
 - 리타깃 도구 4개의 중복 연산을 각 6개로 정리하고 보행·공격 시퀀스 48개를 기존 경로에 다시 작성했다. 원본 Root Motion 설정·참조를 보존하며 별도 재로드에서 길이·유효한 포즈·유한 좌표·골반 이동 범위를 검사한다. 전사 전방 보행의 골반 이동은 약 454cm에서 8cm로 줄었으며 정적 재로드 결과만으로 실제 보행 품질을 판단하지 않는다.
@@ -444,13 +444,25 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 - 복귀형 행동은 계획 잠금 시 시작 방향을 저장하고 원위치 도착·복귀 시간 초과 복원·제자리 완료 시 해당 방향과 정지 속도를 복원한다. 성공한 잔류 이동은 조준 방향을 유지한다. 서버의 최종 회전은 기존 Actor 이동 복제로 전달한다.
 - 다른 유닛의 복귀·예약 칸으로 이동하거나 자리를 교환할 수 없으며 실패한 이동은 출발점으로 복원한다. 같은 시각에도 서버 순서대로 피해·사망을 즉시 반영하고 미발동 공격을 취소한다. 계획 수정은 해당 소유자의 준비만 해제한다.
 
-## 저장과 멀티플레이 연결 경계
+## 5 저장과 멀티플레이 연결 경계
 
 기존 사용자 v5 저장은 UUID 복사본에서 읽기 전용으로 확인했다. Combat_01·파티 4명·각 HP 100과 저장 당시 아이템 295개·스킬 177개 카탈로그를 보존했고, 원본·복사본 바이트와 외부 원본 SHA가 관찰 전후 동일했다. 근접 공격의 원본 round 이름은 비어 있었으나 현재 표시명과 공식 ResolveRoundSkill 결과는 모두 근접 공격이었다. 이후 별도 UUID 사본에서 실제 메뉴 Continue delegate와 공개 전투 복원을 통과했다. 공식 메모리 마이그레이션으로 기존 스킬 카탈로그는 퇴역 스킬을 제외해 177→1개가 됐고 아이템 295개는 유지했다. 파티 4명·유닛 8개·Round/Revision 1과 HP/AP/SAP·원래 소유권·명령·타일 점유를 비교했으며 882×462 화면의 8개 HP와 UI를 직접 확인했다. 원본 저장 49개·설정 1개의 SHA와 사본 바이트는 전후 동일했고 사본을 정리했다. 현재 프로젝트에서의 Continue 복원 검증이며 원본 저장을 Unreal로 변경하거나 cooked 호환을 확인한 결과는 아니다.
 
 기본 슬롯은 `ProjectA_Run`, 상대 Snapshot 슬롯은 `ProjectA_Opponent_` 접두사다. 새 게임·승패·Continue·상점 전이와 전투의 준비 완료 경계를 저장한다. 준비 완료·전투 시작은 저장 성공 뒤 확정하며 실패 시 이전 상태를 보존한다. 강제 종료 뒤 일반 Continue 또는 관리 명시적 재개로 마지막 저장 계획·Ready·유닛·자원·배치를 복구한다. 진행 중 시전·투사체의 시각을 복원하지 않고 저장된 경계에서 다시 실행한다. 테스트 슬롯은 `-ProjectASaveSlot=...`로 분리한다.
 
-저장된 노드가 `Combat_01`~`Combat_02`인 기존 저장은 원래 두 전투·중간 상점 경로로 검증·재개하며 10회로 소급 연장하지 않는다. 기존 상품·잔액·보유품·보상·소유권을 유지하고 새 Run에만 10전투·반복 상점 경로를 적용한다. 저장 버전과 구직업·순차 Combat 거절 규약은 유지한다.
+저장된 노드가 `Combat_01`~`Combat_02` 또는 `Combat_01`~`Combat_10`인 기존 저장은 원래 경로·상품·잔액·보유품·보상·소유권을 유지한다. 새 싱글 Run만 목표 20전투·60선택 경로를 사용하며 기존 저장을 소급 연장하거나 회복약을 추가 지급하지 않는다. 개발 협동과 `-ProjectAPrototypeRun`을 명시한 개발 회귀는 기존 10전투 경로를 유지한다. 저장 버전과 구직업·순차 Combat 거절 규약은 유지한다.
+
+### 5-1 목표 Run과 회복 시험 데이터
+
+`UTargetRunDefinitionDataAsset`의 기본 정의 또는 PartyDefinition의 선택적 정의를 새 싱글 Run 생성 때 값으로 고정한다. `FRunTargetState` schema 1은 10묶음의 적 편성·로컬 Snapshot·성장·골드 후보·인카운터 선택과 회복 규칙을 보존한다. 각 전투 전에 후보 3개 중 하나를 고르는 인카운터를 세 번 방문한다. 지원 태그와 `GameplayTagQuery`로 적격 후보를 정하고 개발 시험은 고정 순환으로 제시한다.
+
+기본 후보는 스킬상점·아이템상점·회복소·소모품상점·부활소다. PvE 적은 기존 10종에서 묶음별 1~4마리로 지정하며, 최대 HP +5와 힘·민첩·지능 각각 +1은 PvE 승리마다 적용한다. 현재 HP를 자동 회복하지 않으며 Snapshot은 성장·골드를 지급하지 않는다. 묶음 i(0~9)의 PvE 골드 후보는 5+i·7+i·10+i다. 최종 난이도와 구분한 사용자 위임 시험값이다.
+
+회복 소모품은 정식 `DA_HealthPotion`의 GAS Instant Heal과 `Item.Consumable.Healing` 태그를 사용한다. HP 25/AP 1, 시작 1개·추가 구입 1G이며 습득 스킬 5칸과 별도로 보관한다. 일반 스킬 카탈로그·장착·Snapshot 스킬 필드는 `Item.Consumable` 태그를 거절하고 소모품 재고만 정식 DA 경로를 보존한다. 본인 생존 Human의 부상 상태에서만 사용할 수 있고 실제 회복 발동 성공 후 수량 1개를 차감한다. 발동 전 사망·중단은 수량을 소모하지 않는다. 비용 차감 전 Ready 경계에 HP/AP·재고·정식 DA·명령을 함께 저장하며 복구 시 해당 경계부터 다시 실행한다. HP·재고는 다음 준비 완료 또는 결과 경계에서 함께 저장하고 진행 중 임의 시점 저장은 추가하지 않는다.
+
+회복소는 HP 25/1G, 부활소는 최대 HP 25%/1G다. 서버가 원래 소유자·Human·생존/사망 조건·가격·revision을 검사하고 후보 저장 성공 후 HP·골드·재고를 반영한다. 중복 revision과 실패한 저장은 재적용하지 않는다. AI 동료 구매·소모품 자동 사용·온라인 서비스 권위는 현재 범위에 포함하지 않는다.
+
+### 5-2 저장 버전과 호환
 
 | 저장 종류 | 현재 처리 |
 |---|---|
@@ -476,7 +488,7 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 
 Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구 경로에 별도 속도 필드를 만들지 않으며 소수 민첩을 일반 적 기본값 5나 이전 독립 속도 20으로 대체하지 않는다.
 
-## Gameplay 에셋과 배치
+## 6 Gameplay 에셋과 배치
 
 외부 에셋은 원본 경로에서 직접 참조하고 작업 편의를 위한 `User_JeHoon` 복제를 하지 않는다. 새 프로젝트 에셋과 필수 파생 결과는 `Content/User_JeHoon/`에 작성하며 외부 팩 기반 파생 결과의 하위 구조·대소문자를 유지한다. 중복 정리는 원본에서 `User_JeHoon`으로 복사한 사본에 한정하며 외부 팩끼리는 비교·통합하지 않는다. 기존 사본은 수정 차이·참조·이전 경로 호환을 확인하고 Unreal 기능으로 통합한다. C++·설정·생성 명세는 기존 Source·Config 위치를 유지한다.
 
@@ -528,7 +540,7 @@ GKnight·Assassin·Stylized Dark Witch의 원본·임포트 자료와 제작용 
 
 Paragon의 FBX 원본은 `Content/ParagonAnimationsRetargetedToManny`에 보존하며 32개 캐릭터 폴더·5,385개 파일이다. 2026-09-21 전체 AnimSequence 5,385개 생성·저장과 별도 재로드 검사는 당시 이력이다. 현재 `ImportParagonAnimations.py`의 기본 작성·검사는 Kwang 공격·복귀 2개만 선택하고 `-ParagonImportAll` 또는 `-ParagonAnimationPaths`로 추가 범위를 명시한다. 샘플링률 자동 판정·프레임 경계 보정과 Manny 뼈대·프리뷰·길이·본 트랙·원본 FBX 검사는 유지한다. `Additive`·`MSA` 파일명만으로 가산 설정을 추정하지 않으며 Animation Editor 재생은 정적 검사에 포함하지 않는다. 새 애니메이션의 채택과 확인은 [에셋 도입 계획](TODO.md#6-신규-에셋-선정과-도입)을 따른다.
 
-2026-09-16 DA 7개의 폴더 변경은 Unreal AssetTools로 수행하고 구경로 해석·기존 저장 해시 보존을 확인했다. 2026-09-21 휩쓸기의 이름 변경과 구경로·PrimaryAssetId 리디렉션 확인은 당시 이력이다. 2026-10-01 확정한 휩쓸기·테스트 원거리·AOE 3종의 제거는 [상점·저장 적용 범위](#상점-인카운터)와 [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)를 따른다. 다른 에셋·저장 참조는 보존한다.
+2026-09-16 DA 7개의 폴더 변경은 Unreal AssetTools로 수행하고 구경로 해석·기존 저장 해시 보존을 확인했다. 2026-09-21 휩쓸기의 이름 변경과 구경로·PrimaryAssetId 리디렉션 확인은 당시 이력이다. 2026-10-01 확정한 휩쓸기·테스트 원거리·AOE 3종의 제거는 [상점·저장 적용 범위](#3-2-상점-인카운터)와 [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)를 따른다. 다른 에셋·저장 참조는 보존한다.
 
 | Gameplay 배치 대상 | 값 |
 |---|---|
@@ -539,7 +551,7 @@ Paragon의 FBX 원본은 `Content/ParagonAnimationsRetargetedToManny`에 보존�
 | `GameplayCamera` | `ACameraActor`, 위치 `(-300,-1000,1500)`, Pitch `-46.97`, Yaw `90`, FOV `55` |
 | 여러 Arena 배치 시 | 사용할 Arena의 Actor Tags에 `GameplayArena` 지정 |
 
-### 설정 변경 또는 연결 복구 순서
+### 6-1 설정 변경 또는 연결 복구 순서
 
 1. `DA_VerticalSliceParty`의 Professions에서 직업별 CombatClass를 설정한다. 기존 PlayerUnitClasses 매핑과 FallbackPlayerUnitClass도 확인하고 Save한다.
 2. `DA_DefaultEncounter`의 EnemyUnitClasses에 `AEnemyUnit` 자식 클래스를 지정한다.
@@ -550,7 +562,7 @@ Paragon의 FBX 원본은 `Content/ParagonAnimationsRetargetedToManny`에 보존�
 7. Grid의 TileClass·크기·Z를 확인한다. P 키로 NavMesh가 바닥/스폰 위치를 덮는지 보고 필요할 때 Build → Build Paths 후 Save All한다.
 8. `BP_MainMenuPlayerController`의 GameplayLevelName을 `/Game/User_JeHoon/LEVEL/Core/Gameplay`로 지정한다. 제거된 옛 `StartGameLevelName=WorldMap` 필드는 실행에 사용하지 않는다.
 
-### Designer 바인딩
+### 6-2 Designer 바인딩
 
 | 화면 | 이름과 형식 |
 |---|---|
@@ -559,11 +571,11 @@ Paragon의 FBX 원본은 `Content/ParagonAnimationsRetargetedToManny`에 보존�
 | RoundPlanning | Native CommonUI 상단 요약·우측 대상·좌하단 파티·하단 중앙 스킬·우하단 행동. 전장 대상 선택·장착 스킬 버튼 적용·SAP 이동 예약/취소·준비/취소. 필수 WBP 바인딩 없음 |
 | Result | `Text_Result`, `Button_Continue` |
 
-새 계획 화면의 스킬 목록은 실제 장착 DA에서 해석한 서버 라운드 프로필로 구성한다. 적을 클릭하면 스킬 버튼이 나타나며 버튼 클릭이 계획 적용 요청이다. 시험 스킬·자동 추첨 스킬을 더하지 않는다. 파티·선택 캐릭터·행동 패널을 하단에 분리하고 각 내용을 독립 스크롤한다. 배치·크기는 [UI 기준](UI_README.md#10-2-전투-배치와-카메라), 현행 화면·입력 자동화의 범위는 [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
+새 계획 화면의 스킬 목록은 실제 장착 DA와 별도 소모품 재고의 정식 DA에서 해석한 서버 라운드 프로필로 구성한다. 소모품은 수량을 표시하고 본인 대상 명령을 만든다. 적을 클릭하면 스킬 버튼이 나타나며 버튼 클릭이 계획 적용 요청이다. 시험 스킬·자동 추첨 스킬을 더하지 않는다. 파티·선택 캐릭터·행동 패널을 하단에 분리하고 각 내용을 독립 스크롤한다. 배치·크기는 [UI 기준](UI_README.md#10-2-전투-배치와-카메라), 현행 화면·입력 자동화의 범위는 [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
 이전 HUD의 선택적 바인딩은 참조 호환용이다. Designer를 수정한 WBP를 덮어쓰기 전에 변경 내용을 확인한다. JSON spec 변경은 실제 생성·Compile·Save를 거쳐 반영하며 DryRun만으로 완료를 기록하지 않는다.
 
-## 에셋 도구와 CLI
+## 7 에셋 도구와 CLI
 
 Development Editor / Win64 빌드를 사용한다. 초기 순서는 UI 생성 → Gameplay 생성 → Navigation Build → 저장 연결 검사다. 최초 생성 도구는 대상이 없는 환경에서만 실행하며 현재 TestMap 삭제 상태를 사전에 확인한다.
 
@@ -571,9 +583,9 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 
 메뉴 WBP 3종은 `UI/MainMenu`, 검증 사본은 `Validation/T12`에 둔다. `ProjectA.Menu.AssetContracts -T12GeneratedAssets`로 생성본을 검사한다. 지원 위젯·명세·옵션은 [UI 명세](UI_README.md), 실행 명령·제약은 [에셋 도구](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
 
-## 현재 한계와 보존 대상
+## 8 현재 한계와 보존 대상
 
-- 기본 콘텐츠는 전투 10회·상점 9회의 새 시험 Run과 네 직업을 사용하며 기존 두 전투 저장은 보존한다. 공통 초기값·개인 인벤토리·9칸 장비 UI·49종 장착·상점 HP 회복·임시 승리 골드 보상은 구현했다. 직업별 고유 스킬·최종 밸런스·회복/부활 인카운터·추가 보상·나머지 240종 장비 분류·비무기 콘텐츠·장비 능력치/부여 스킬·Snapshot 장비 연결과 목표 PvE/PvP 20전투·60인카운터 구성은 미구현이다.
+- 새 싱글의 PvE/로컬 Snapshot 20전투·60선택과 시험 편성·성장·보상·회복/부활·전투 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 구현 범위다. 기존 2/10전투 저장과 개발 협동 10전투 경로는 보존한다. 직업별 고유 스킬·최종 밸런스·나머지 240종 장비 분류·추가 비무기 콘텐츠·장비 능력치/부여 스킬·Snapshot 장비 연결은 미구현이며 실행 검수 결과는 [TODO](TODO.md)를 따른다.
 - 4×4 Grid·ASC HP/AP·기존 외형/사망 표현과 시전 몽타주를 연결한다. 순차 턴·AI·기존 GAS/몽타주 알림의 효과 실행은 기본 전투에서 제외하며 장착 스킬은 초기 라운드 변환을 사용한다. 미지원 이전 대상/범위/커스텀 능력은 명시 프로필을 요구하며 자동으로 다른 효과로 바꾸지 않는다. Streaming/Level Instance는 현재 흐름에 없다.
 - 2026-09-11부터 작업 폴더에서 삭제된 TestMap·BP_PartyPlayerController·TestGameModebase의 삭제 이력을 2026-09-16 Git에 반영한다. 자동 복원하지 않으며 최초 생성 도구의 TestMap 입력은 별도 원본 확보가 필요하다. 현재 Audit 도구는 실제 역할 4맵을 새 경로로 검사한다. WorldMap 레벨/native class는 deprecated 상태이며 실행 흐름에서 제외한다.
 - WorldMap의 WorldSettings가 참조하는 WorldMapGameModeBase는 호환을 위해 보존한다.
@@ -589,7 +601,8 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 | `CombatPlanValidator` | 액터 없는 값 입력으로 런타임과 체크포인트의 계획 규칙 공유. 소유권·월드 충돌·실시간 GAS 조건은 호출 경계에서 검사 |
 | `CombatAIPlanning` / `CombatSkillExecutor` | 기존 AI 선택 정책과 서버 스킬 충돌·검 궤적·GAS 효과 실행. Coordinator는 순서·시간·행동 상태 전이·결과 조율 |
 | `CombatCollisionPolicy` / `CombatEffectLibrary` | 대상 자격·벽 차폐·접촉 우선순위와 효과 Spec 생성/적용 공통화. 즉시 효과 성공은 `WasSuccessfullyApplied()` 사용 |
-| `RunProgressRules` / `RunSaveFormat` | 새 10전투·반복 상점 경로와 기존 두 전투 경로를 분리 검증, 저장 v1~v6 해석 유지. 목표 PvE/PvP 20전투·60인카운터 구성은 구현 대기 |
+| `RunProgressRules` / `RunSaveFormat` | 새 싱글 20전투·60선택과 기존 2/10전투 경로를 분리 검증. 저장 v1~v6 해석을 유지하며 TargetRun schema 1에 고정 편성·성장·선택·회복 규칙을 보존 |
+| `RunRecoveryRules` / `CombatConsumableRules` | 정식 DA·소모품 태그·재고 검증과 본인 생존 Human의 GAS 회복/실제 발동 후 수량 차감. 서비스와 경계 저장은 기존 Run 후보 저장 경로 사용 |
 | `CommitSaveCandidate` | 준비 완료·결과·취소·Continue·상점·보상을 후보 계산 후 저장하고 성공한 상태만 공개. 실패 시 기존 상태와 재시도 보상 추첨 유지 |
 | `Combat/Legacy` | Unit·Controller·Manager의 비활성 순차 전투 구현 격리. 리플렉션 이름·Blueprint·저장 참조 보존 |
 

@@ -8,6 +8,7 @@
 #include "Tests/CombatChainTestHelpers.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameplayEffect.h"
@@ -548,6 +549,83 @@ bool FCombatChainSelectionGasTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Owned tags team roster and maximum-target filtering preserve excluded HP"), Untagged->GetAttributeSet()->GetHP() == 100.f && Blocked->GetAttributeSet()->GetHP() == 100.f && Ally->GetAttributeSet()->GetHP() == 100.f && Outsider->GetAttributeSet()->GetHP() == 100.f && Fourth->GetAttributeSet()->GetHP() == 100.f);
     TestEqual(TEXT("Effect-managed release does not invoke the immediate hit path"), ImmediateHits, 0);
     Source->GetAbilitySystemComponent()->OnGameplayEffectAppliedDelegateToTarget.Remove(Applied);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatChainAuthoredSkillsTest, "ProjectA.Combat.Chain.AuthoredFiveSkillsFourTargetsAndAttenuation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatChainAuthoredSkillsTest::RunTest(const FString& Parameters)
+{
+    for (const FString& Theme : {FString(TEXT("Bramble")), FString(TEXT("Electric")), FString(TEXT("Energy")), FString(TEXT("Fire")), FString(TEXT("Magic"))})
+    {
+        const FString Name = TEXT("DA_DrGame_LinkChainVFX_Link_") + Theme;
+        const FString Path = TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/___LinkChainVFX/") + Name + TEXT(".") + Name;
+        TStrongObjectPtr<USkillDefinitionDataAsset> Asset(LoadObject<USkillDefinitionDataAsset>(nullptr, *Path));
+        FCombatRoundSkill Skill;
+        FText Error;
+        if (!TestTrue(TEXT("The actual saved chain DataAsset resolves: ") + Theme, Asset.IsValid() && Asset->ResolveRoundSkill(Skill, Error))) return false;
+        const FCombatRoundSkill Before = Asset->RoundDefinition;
+        if (!TestTrue(TEXT("The selected authored values reach runtime without a fixture override"), CombatRoundRules::UsesChain(Skill) && Skill.Chain.MaxTargets == 4 && FMath::IsNearlyEqual(Skill.Chain.JumpDistance, 600.f) && FMath::IsNearlyEqual(Skill.Chain.JumpIntervalSeconds, 0.15f) && FMath::IsNearlyEqual(Skill.Chain.DamageMultiplierPerJump, 0.8f))) return false;
+        CombatSkillEffectTests::FFixture Fixture;
+        AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
+        TArray<AUnitBase*> Enemies;
+        for (float Distance : {300.f, 900.f, 1200.f, 1500.f, 1800.f}) Enemies.Add(Fixture.AddUnit(FVector(Distance, 0.f, 100.f), ETeam::Enemy));
+        if (!Source || Enemies.Contains(nullptr)) return false;
+        TArray<int32> Hits;
+        int32 Resolutions = 0;
+        int32 AppliedEffects = 0;
+        bool bOriginalGasContext = true;
+        bool bApplied = true;
+        const FDelegateHandle Applied = Source->GetAbilitySystemComponent()->OnGameplayEffectAppliedDelegateToTarget.AddLambda([&](UAbilitySystemComponent*, const FGameplayEffectSpec& Spec, FActiveGameplayEffectHandle)
+        {
+            FGameplayTagContainer Tags;
+            Spec.GetAllAssetTags(Tags);
+            bOriginalGasContext &= Spec.GetContext().GetOriginalInstigator() == Source && Spec.GetContext().GetSourceObject() == Source && Tags.HasAll(Skill.EffectTags);
+            ++AppliedEffects;
+        });
+        CombatSkillExecution::FReleaseContext Context;
+        Context.Owner = Source;
+        Context.Source = Source;
+        Context.Target = Enemies[0];
+        Context.AimLocation = Enemies[0]->GetActorLocation();
+        Context.PresentationTime = 0.0;
+        ACombatChainEffectActor* Chain = nullptr;
+        const CombatSkillExecution::FReleaseResult Released = CombatSkillExecution::Release(Context, Fixture.Roster, Skill, [](AUnitBase*) {}, [](ACombatRoundProjectile*) {}, [&](ACombatSkillEffectActor* Effect)
+        {
+            Chain = Cast<ACombatChainEffectActor>(Effect);
+            Effect->OnResolved.AddLambda([&](ACombatSkillEffectActor*) { ++Resolutions; });
+            Effect->OnImpact.AddLambda([&](AUnitBase* OriginalSource, AUnitBase* Target, float Power)
+            {
+                bOriginalGasContext &= OriginalSource == Source;
+                Hits.Add(Target->UnitIndex);
+                FCombatRoundSkill Impact = Skill;
+                Impact.Power = Power;
+                bApplied &= CombatSkillExecution::ApplyEffect(OriginalSource, Target, Impact);
+            });
+        });
+        if (!TestTrue(TEXT("The authored tagged skill selects the real chain executor"), Released.bSucceeded && Chain)) return false;
+        double Time = Skill.EffectHitDelaySeconds - 0.01;
+        Chain->AdvanceEffect(static_cast<float>(Time), Time);
+        TestTrue(TEXT("The original first-impact delay remains in force"), Hits.IsEmpty());
+        Time += 0.02;
+        Chain->AdvanceEffect(0.02f, Time);
+        TestEqual(TEXT("The first original target is hit once after its authored delay"), Hits.Num(), 1);
+        for (int32 Index = 1; Index < 4; ++Index)
+        {
+            Time += 0.14;
+            Chain->AdvanceEffect(0.14f, Time);
+            TestEqual(TEXT("A subsequent hit cannot precede the selected 0.15-second interval"), Hits.Num(), Index);
+            Time += 0.02;
+            Chain->AdvanceEffect(0.02f, Time);
+            TestEqual(TEXT("The next nearest unhit enemy receives exactly one delayed hit"), Hits.Num(), Index + 1);
+        }
+        Chain->AdvanceEffect(10.f, Time + 10.0);
+        TestTrue(TEXT("The first target counts toward four and the fifth reachable enemy remains untouched"), Hits == TArray<int32>({Enemies[0]->UnitIndex, Enemies[1]->UnitIndex, Enemies[2]->UnitIndex, Enemies[3]->UnitIndex}) && Enemies[4]->GetAttributeSet()->GetHP() == 100.f);
+        for (int32 Index = 0; Index < 4; ++Index) TestTrue(TEXT("The actual GAS HP uses cumulative authored attenuation"), FMath::IsNearlyEqual(Enemies[Index]->GetAttributeSet()->GetHP(), 100.f - Skill.Power * FMath::Pow(0.8f, static_cast<float>(Index)), 0.001f));
+        TestTrue(TEXT("The exact 600cm jump boundary, original GAS context and single completion survive actual authored content"), bApplied && bOriginalGasContext && AppliedEffects == 4 && Resolutions == 1 && Chain->HasResolved());
+        TestTrue(TEXT("Loading and exercising the profile never mutates its authored DataAsset"), FCombatRoundSkill::StaticStruct()->CompareScriptStruct(&Before, &Asset->RoundDefinition, 0));
+        Source->GetAbilitySystemComponent()->OnGameplayEffectAppliedDelegateToTarget.Remove(Applied);
+    }
     return true;
 }
 

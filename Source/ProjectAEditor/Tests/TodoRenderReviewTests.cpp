@@ -15,6 +15,7 @@
 #include "Controller/CombatDebugPlayerController.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Dom/JsonObject.h"
+#include "DynamicRHI.h"
 #include "Editor.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
@@ -43,11 +44,13 @@
 #include "Misc/Paths.h"
 #include "PlayInEditorDataTypes.h"
 #include "RenderingThread.h"
+#include "RenderTimer.h"
 #include "Scalability.h"
 #include "Serialization/JsonSerializer.h"
 #include "Settings/LevelEditorPlaySettings.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "TodoRenderReviewTestTypes.h"
+#include "TodoReviewWindowPlacement.h"
 #include "UI/Combat/CombatRoundPlanningWidget.h"
 #include "UI/Debug/CombatDebugWidget.h"
 #include "Unit/UnitBase.h"
@@ -129,20 +132,28 @@ public:
     FReview(FAutomationTestBase* InTest, FString InMapPath, FString InName, FString InSlot, bool bInHealth) : Test(InTest), MapPath(MoveTemp(InMapPath)), Name(MoveTemp(InName)), Slot(MoveTemp(InSlot)), bHealth(bInHealth)
     {
         bRenderOffscreen = FParse::Param(FCommandLine::Get(), TEXT("RenderOffscreen"));
+        bPerformanceRoute = !bHealth && FParse::Param(FCommandLine::Get(), TEXT("ProjectAEnvironmentPerformanceRoute"));
         Test->AddInfo(FString::Printf(TEXT("Render review mode: render_offscreen=%d; native_window_position_regression=%d."), bRenderOffscreen, bHealth));
-        OutputDirectory = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation/TodoReview/Render") / FGuid::NewGuid().ToString(EGuidFormats::Digits));
-        IFileManager::Get().MakeDirectory(*OutputDirectory, true);
+        FString OutputRoot;
+        bValidOutput = TodoReviewWindowPlacement::OutputRoot(Test, OutputRoot);
+        if (bValidOutput)
+        {
+            OutputDirectory = OutputRoot / TEXT("Render") / FGuid::NewGuid().ToString(EGuidFormats::Digits);
+            bValidOutput = IFileManager::Get().MakeDirectory(*OutputDirectory, true);
+        }
     }
 
     virtual ~FReview() override
     {
         RestorePointer();
         RestoreReviewWindow();
+        RestorePerformanceCamera();
         ReleaseRetainedViewport();
     }
 
     virtual bool Update() override
     {
+        if (!bValidOutput) return true;
         if (Started == 0.0) Started = FPlatformTime::Seconds();
         if (Stage == 99)
         {
@@ -170,6 +181,7 @@ public:
             Settings->NewWindowWidth = 1280;
             Settings->NewWindowHeight = 720;
             Settings->SetClientWindowSize(FIntPoint(1280, 720));
+            if (!TodoReviewWindowPlacement::Configure(Test, Settings.Get())) return End();
             FRequestPlaySessionParams Params;
             Params.EditorPlaySettings = Settings.Get();
             Params.SessionDestination = EPlaySessionDestinationType::InProcess;
@@ -209,6 +221,7 @@ public:
             const TSharedPtr<SViewport> Widget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
             const TSharedPtr<SWindow> Window = Widget.IsValid() ? FSlateApplication::Get().FindWidgetWindow(Widget.ToSharedRef()) : nullptr;
             if (!Check(Window.IsValid(), TEXT("The disposable PIE viewport owns a real Slate window."))) return End();
+            if (!TodoReviewWindowPlacement::Ensure(Test, Controller->GetWorld())) return End();
             Test->AddInfo(FString::Printf(TEXT("Review viewport before resize: %s; window client: %s; Slate: %s."), *Viewport->Viewport->GetSizeXY().ToString(), *Window->GetClientSizeInScreen().ToString(), *Widget->GetCachedGeometry().GetLocalSize().ToString()));
             // Restore the requested client size after Slate's initial work-area fitting, without changing user display settings.
             // 사용자 화면 설정을 바꾸지 않고 Slate의 초기 작업 영역 맞춤 이후 요청한 클라이언트 크기를 복원합니다.
@@ -236,6 +249,7 @@ public:
                 Advance(Stage);
                 return false;
             }
+            if (!TodoReviewWindowPlacement::Ensure(Test, Controller->GetWorld())) return End();
             if (Stage == 21)
             {
                 SampleQuality = Scalability::GetQualityLevels();
@@ -245,6 +259,13 @@ public:
                 SampleLastPlatform = FPlatformTime::Seconds();
                 SampleLastEngineFrame = GFrameCounter;
                 SampleLastWorldTime = Controller->GetWorld()->GetTimeSeconds();
+                if (bPerformanceRoute)
+                {
+                    PerformanceCamera = Controller->GetViewTarget();
+                    if (!Check(PerformanceCamera.IsValid() && PerformanceCamera->GetWorld()->WorldType == EWorldType::PIE, TEXT("Performance camera movement is restricted to the current disposable PIE camera."))) return End();
+                    OriginalPerformanceCamera = PerformanceCamera->GetActorTransform();
+                    bPerformanceCameraCaptured = true;
+                }
                 Advance(22);
                 return false;
             }
@@ -320,9 +341,27 @@ public:
             OriginalNativePosition = FIntPoint(NativeX, NativeY);
             OriginalNativeWindowSize = FIntPoint(NativeWidth, NativeHeight);
             MovedReviewWindow = Window;
+            FVector2D RequestedPosition = OriginalReviewWindowPosition + FVector2D(37.0, 29.0);
+            if (FParse::Param(FCommandLine::Get(), TEXT("ProjectAReviewLeftMonitor")))
+            {
+                FPlatformRect WorkArea;
+                if (!TodoReviewWindowPlacement::LeftWorkArea(Test, WorkArea)) return End();
+                const FVector2D Size = Window->GetSizeInScreen();
+                const FVector2D Minimum(WorkArea.Left, WorkArea.Top);
+                const FVector2D Maximum(WorkArea.Right - Size.X, WorkArea.Bottom - Size.Y);
+                if (!Check(Maximum.X >= Minimum.X && Maximum.Y >= Minimum.Y, TEXT("The moved HP review window fits the actual left monitor's work area."))) return End();
+                RequestedPosition = FVector2D(FMath::Clamp(RequestedPosition.X, Minimum.X, Maximum.X), FMath::Clamp(RequestedPosition.Y, Minimum.Y, Maximum.Y));
+                if ((RequestedPosition - OriginalReviewWindowPosition).Size() <= 16.0)
+                {
+                    const TArray<FVector2D> Candidates{Minimum, Maximum, FVector2D(Minimum.X, Maximum.Y), FVector2D(Maximum.X, Minimum.Y)};
+                    for (const FVector2D& Candidate : Candidates) if ((Candidate - OriginalReviewWindowPosition).SizeSquared() > (RequestedPosition - OriginalReviewWindowPosition).SizeSquared()) RequestedPosition = Candidate;
+                }
+                if (!Check((RequestedPosition - OriginalReviewWindowPosition).Size() > 16.0, TEXT("The actual left monitor has room for a second distinct HP-review window position without entering another monitor."))) return End();
+            }
             // Change only the disposable PIE window position, then observe naturally repainted labels without modifying display preferences.
             // 화면 설정을 변경하지 않고 폐기 가능한 PIE 창 위치만 바꾼 뒤 자연스럽게 다시 그려진 표시를 관찰합니다.
-            Window->MoveWindowTo(OriginalReviewWindowPosition + FVector2D(37.0, 29.0));
+            Window->MoveWindowTo(RequestedPosition);
+            Test->AddInfo(FString::Printf(TEXT("HP window offset request: original=%s requested=%s nativeOriginal=%s nativeSize=%s."), *OriginalReviewWindowPosition.ToString(), *RequestedPosition.ToString(), *OriginalNativePosition.ToString(), *OriginalNativeWindowSize.ToString()));
             Advance(23);
             return false;
         }
@@ -334,7 +373,7 @@ public:
             int32 NativeY = 0;
             int32 NativeWidth = 0;
             int32 NativeHeight = 0;
-            if (!Check(Window.IsValid() && Window->GetNativeWindow().IsValid() && Window->GetNativeWindow()->GetRestoredDimensions(NativeX, NativeY, NativeWidth, NativeHeight) && (FVector2D(NativeX, NativeY) - FVector2D(OriginalNativePosition)).Size() > 16.0 && FIntPoint(NativeWidth, NativeHeight) == OriginalNativeWindowSize, TEXT("A second actual native window position changes the desktop offset while retaining the original window size."))) return End();
+            if (!Check(Window.IsValid() && Window->GetNativeWindow().IsValid() && Window->GetNativeWindow()->GetRestoredDimensions(NativeX, NativeY, NativeWidth, NativeHeight) && (FVector2D(NativeX, NativeY) - FVector2D(OriginalNativePosition)).Size() > 16.0 && FIntPoint(NativeWidth, NativeHeight) == OriginalNativeWindowSize, TEXT("A second actual native window position changes the desktop offset while retaining the original window size.")) || !TodoReviewWindowPlacement::Ensure(Test, Controller->GetWorld())) return End();
             const FTodoHealthPaintObservation Moved = Observe();
             if (!Check(Moved.Labels.Num() == 5 && Moved.BoxCount == 15, TEXT("The moved review window retains five real live HP labels and their original draw counts.")) || !VerifyHealthPlacement(Moved) || !Capture(TEXT("revived_ui"))) return End();
             return End();
@@ -420,8 +459,13 @@ public:
                 WallIntervals.Reset();
                 WorldDeltas.Reset();
                 AppDeltas.Reset();
+                GameThreadTimes.Reset();
+                RenderThreadTimes.Reset();
+                RHIThreadTimes.Reset();
+                GPUTimes.Reset();
                 SampleRows.Reset();
-                if (!Check(++SampleRestarts <= 5, TEXT("A bounded environment sample obtains 180 consecutive actual engine frames."))) return End();
+                SampleElapsed = 0.0;
+                if (!Check(++SampleRestarts <= 5, TEXT("A bounded environment sample obtains consecutive actual engine frames."))) return End();
             }
             else
             {
@@ -432,14 +476,70 @@ public:
                 WallIntervals.Add(Wall);
                 WorldDeltas.Add(WorldDelta);
                 AppDeltas.Add(AppDelta);
-                SampleRows.Add(FString::Printf(TEXT("%llu,%.6f,%.6f,%.6f,%.6f"), Frame, static_cast<double>(World->GetTimeSeconds()), Wall, WorldDelta, AppDelta));
+                const double GameMS = FPlatformTime::ToMilliseconds(GGameThreadTime);
+                const double RenderMS = FPlatformTime::ToMilliseconds(GRenderThreadTime);
+                const double RHIMS = FPlatformTime::ToMilliseconds(GRHIThreadTime);
+                const double GPUMS = FPlatformTime::ToMilliseconds(RHIGetGPUFrameCycles());
+                if (!Check(FMath::IsFinite(GameMS) && GameMS >= 0.0 && FMath::IsFinite(RenderMS) && RenderMS >= 0.0 && FMath::IsFinite(RHIMS) && RHIMS >= 0.0 && FMath::IsFinite(GPUMS) && GPUMS >= 0.0, TEXT("Engine thread and GPU cycle observations are finite and retain unavailable zero values explicitly."))) return End();
+                GameThreadTimes.Add(GameMS);
+                RenderThreadTimes.Add(RenderMS);
+                RHIThreadTimes.Add(RHIMS);
+                GPUTimes.Add(GPUMS);
+                SampleElapsed += Wall / 1000.0;
+                const FVector CameraLocation = Controller->GetViewTarget()->GetActorLocation();
+                SampleRows.Add(FString::Printf(TEXT("%llu,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f"), Frame, static_cast<double>(World->GetTimeSeconds()), Wall, WorldDelta, AppDelta, GameMS, RenderMS, RHIMS, GPUMS, CameraLocation.X, CameraLocation.Y, CameraLocation.Z));
             }
             SampleLastPlatform = Now;
             SampleLastEngineFrame = Frame;
             SampleLastWorldTime = World->GetTimeSeconds();
-            if (WallIntervals.Num() < 180) return false;
-            if (!WriteFrameTiming() || !ReserveMovement()) return End();
+            if (bPerformanceRoute)
+            {
+                const double Phase = FMath::Fmod(SampleElapsed, 10.0) * 2.0 * PI / 10.0;
+                const FVector Offset(200.0 * FMath::Sin(Phase), 150.0 * FMath::Sin(Phase * 2.0), 0.0);
+                if (!Check(PerformanceCamera.IsValid() && PerformanceCamera->SetActorLocation(OriginalPerformanceCamera.GetLocation() + Offset, false, nullptr, ETeleportType::TeleportPhysics), TEXT("The disposable authored camera follows the documented horizontal review route without changing saved map data."))) return End();
+            }
+            if (WallIntervals.Num() < (bPerformanceRoute ? 600 : 180) || (bPerformanceRoute && SampleElapsed < 10.0)) return false;
+            if (!WriteFrameTiming()) return End();
+            if (bPerformanceRoute)
+            {
+                RestorePerformanceCamera();
+                Advance(24);
+                return false;
+            }
+            if (!ReserveMovement()) return End();
             Advance(11);
+            return false;
+        }
+        if (Stage == 25)
+        {
+            if (!Warm(30, 0.5)) return false;
+            if (!Check(PerformanceCamera.IsValid() && PerformanceCamera->GetActorTransform().Equals(OriginalPerformanceCamera), TEXT("The camera exactly returns to its authored transform before normal tile interaction.")) || !ReserveMovement()) return End();
+            Advance(11);
+            return false;
+        }
+        if (Stage == 24)
+        {
+            if (!bRouteCapturePositioned)
+            {
+                const double Phase = (RouteCaptureIndex * 2.0 + 1.0) * PI / 4.0;
+                const FVector Offset(200.0 * FMath::Sin(Phase), 150.0 * FMath::Sin(Phase * 2.0), 0.0);
+                bPerformanceCameraCaptured = true;
+                if (!Check(PerformanceCamera.IsValid() && PerformanceCamera->SetActorLocation(OriginalPerformanceCamera.GetLocation() + Offset, false, nullptr, ETeleportType::TeleportPhysics), TEXT("Post-sample screenshots revisit actual route positions without contaminating timing samples."))) return End();
+                bRouteCapturePositioned = true;
+                Advance(24);
+                return false;
+            }
+            if (!Warm(30, 0.5)) return false;
+            if (!Capture(FString::Printf(TEXT("route_%d_after_timing"), RouteCaptureIndex + 1))) return End();
+            ++RouteCaptureIndex;
+            bRouteCapturePositioned = false;
+            if (RouteCaptureIndex < 4)
+            {
+                Advance(24);
+                return false;
+            }
+            RestorePerformanceCamera();
+            Advance(25);
             return false;
         }
         return false;
@@ -702,31 +802,48 @@ private:
         Result->SetNumberField(TEXT("mean_ms"), Total / Values.Num());
         Result->SetNumberField(TEXT("median_ms"), (Sorted[(Sorted.Num() - 1) / 2] + Sorted[Sorted.Num() / 2]) * 0.5);
         Result->SetNumberField(TEXT("p95_ms"), Sorted[FMath::CeilToInt(Sorted.Num() * 0.95) - 1]);
+        Result->SetNumberField(TEXT("p99_ms"), Sorted[FMath::CeilToInt(Sorted.Num() * 0.99) - 1]);
         Result->SetNumberField(TEXT("min_ms"), Sorted[0]);
         Result->SetNumberField(TEXT("max_ms"), Sorted.Last());
         return Result;
     }
 
-    // Observe current idle frame intervals without screenshots, readbacks, manual world ticks or quality changes.
-    // 캡처·이미지 읽기·수동 월드 Tick·품질 변경 없이 현재 유휴 프레임 간격을 관찰합니다.
+    // Observe live engine timings without screenshots, readbacks, manual world ticks or quality changes during sampling.
+    // 표본 중 캡처·이미지 읽기·수동 월드 Tick·품질 변경 없이 실제 엔진 시간을 관찰합니다.
     bool WriteFrameTiming()
     {
-        if (!Check(WallIntervals.Num() == 180 && SampleQuality == Scalability::GetQualityLevels() && Controller->GetWorld()->GetGameViewport()->Viewport->GetSizeXY() == FIntPoint(1280, 720), TEXT("The full current frame sample retains 180 real frames, 1280x720 and its unchanged actual quality values."))) return false;
+        if (!Check((bPerformanceRoute ? WallIntervals.Num() >= 600 && SampleElapsed >= 10.0 : WallIntervals.Num() == 180) && SampleQuality == Scalability::GetQualityLevels() && Controller->GetWorld()->GetGameViewport()->Viewport->GetSizeXY() == FIntPoint(1280, 720), TEXT("The complete consecutive sample retains its requested frame/time budget, 1280x720 and unchanged actual quality values."))) return false;
         TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
         Record->SetStringField(TEXT("map"), MapPath);
-        Record->SetStringField(TEXT("run_type"), TEXT("Editor standalone PIE current idle planning scene"));
+        Record->SetStringField(TEXT("run_type"), bPerformanceRoute ? TEXT("Editor standalone PIE authored camera horizontal route") : TEXT("Editor standalone PIE current idle planning scene"));
         Record->SetNumberField(TEXT("sample_frames"), WallIntervals.Num());
+        Record->SetNumberField(TEXT("sample_elapsed_seconds"), SampleElapsed);
+        Record->SetNumberField(TEXT("observed_engine_loop_fps"), 1000.0 / SummarizeIntervals(WallIntervals)->GetNumberField(TEXT("mean_ms")));
+        Record->SetNumberField(TEXT("platform_intervals_above_16_667_ms"), WallIntervals.FilterByPredicate([](double Value) { return Value > 16.667; }).Num());
+        Record->SetNumberField(TEXT("platform_intervals_above_33_333_ms"), WallIntervals.FilterByPredicate([](double Value) { return Value > 33.333; }).Num());
+        Record->SetNumberField(TEXT("platform_intervals_above_50_ms"), WallIntervals.FilterByPredicate([](double Value) { return Value > 50.0; }).Num());
         Record->SetNumberField(TEXT("discarded_nonconsecutive_windows"), SampleRestarts);
         Record->SetNumberField(TEXT("viewport_width"), 1280);
         Record->SetNumberField(TEXT("viewport_height"), 720);
         Record->SetBoolField(TEXT("render_offscreen"), bRenderOffscreen);
         Record->SetBoolField(TEXT("capture_readback_during_samples"), false);
         Record->SetBoolField(TEXT("cpu_or_gpu_present_time_measured"), false);
+        Record->SetBoolField(TEXT("engine_thread_cycle_times_recorded"), true);
+        Record->SetNumberField(TEXT("positive_gpu_time_samples"), GPUTimes.FilterByPredicate([](double Value) { return Value > 0.0; }).Num());
+        Record->SetNumberField(TEXT("positive_game_thread_time_samples"), GameThreadTimes.FilterByPredicate([](double Value) { return Value > 0.0; }).Num());
+        Record->SetNumberField(TEXT("positive_render_thread_time_samples"), RenderThreadTimes.FilterByPredicate([](double Value) { return Value > 0.0; }).Num());
+        Record->SetNumberField(TEXT("positive_rhi_thread_time_samples"), RHIThreadTimes.FilterByPredicate([](double Value) { return Value > 0.0; }).Num());
         Record->SetBoolField(TEXT("previous_version_fps_improvement_proven"), false);
-        Record->SetStringField(TEXT("limits"), TEXT("Platform intervals and engine deltas include editor scheduling; CPU, GPU and physical display present times are not measured separately. The render_offscreen field records the actual execution mode. No previous-version baseline is measured."));
+        Record->SetStringField(TEXT("limits"), TEXT("Platform intervals include editor scheduling. Game/render/RHI counters are engine process thread cycles excluding idle, and GPU is the latest RHI GPU-frame cycle result; asynchronous counters can describe different frames and include editor rendering. Zero GPU/RHI counters mean unavailable, not free work. Physical display present and previous-version baseline are not measured. No quality, frame cap, physics, live combat attributes or saved map are changed."));
+        Record->SetStringField(TEXT("camera_route"), bPerformanceRoute ? TEXT("Original actor position + (200*sin(2*pi*t/10),150*sin(4*pi*t/10),0) cm; original rotation/FOV; minimum 600 consecutive frames and 10 platform seconds; exact original transform restored before ordinary SAP input.") : TEXT("Unchanged authored gameplay camera"));
         Record->SetObjectField(TEXT("wall_frame_interval"), SummarizeIntervals(WallIntervals));
         Record->SetObjectField(TEXT("world_delta"), SummarizeIntervals(WorldDeltas));
         Record->SetObjectField(TEXT("app_delta"), SummarizeIntervals(AppDeltas));
+        Record->SetObjectField(TEXT("game_thread_ms"), SummarizeIntervals(GameThreadTimes));
+        Record->SetObjectField(TEXT("render_thread_ms"), SummarizeIntervals(RenderThreadTimes));
+        Record->SetObjectField(TEXT("rhi_thread_ms"), SummarizeIntervals(RHIThreadTimes));
+        Record->SetObjectField(TEXT("gpu_frame_ms"), SummarizeIntervals(GPUTimes));
+        if (!GPUTimes.ContainsByPredicate([](double Value) { return Value > 0.0; })) Test->AddWarning(TEXT("RHI GPU-frame timing was unavailable for every sample; no GPU-performance conclusion is supported."));
         TSharedRef<FJsonObject> Quality = MakeShared<FJsonObject>();
         Quality->SetNumberField(TEXT("resolution"), SampleQuality.ResolutionQuality);
         Quality->SetNumberField(TEXT("view_distance"), SampleQuality.ViewDistanceQuality);
@@ -752,10 +869,18 @@ private:
         FJsonSerializer::Serialize(Record, TJsonWriterFactory<>::Create(&Json));
         const FString JsonPath = OutputDirectory / (Name + TEXT("_current_frame_timing.json"));
         const FString CsvPath = OutputDirectory / (Name + TEXT("_current_frame_timing.csv"));
-        const FString Csv = TEXT("engine_frame,world_time_s,wall_interval_ms,world_delta_ms,app_delta_ms\n") + FString::Join(SampleRows, TEXT("\n")) + TEXT("\n");
+        const FString Csv = TEXT("engine_frame,world_time_s,wall_interval_ms,world_delta_ms,app_delta_ms,game_thread_ms,render_thread_ms,rhi_thread_ms,gpu_frame_ms,camera_x,camera_y,camera_z\n") + FString::Join(SampleRows, TEXT("\n")) + TEXT("\n");
         if (!Check(FFileHelper::SaveStringToFile(Json, *JsonPath) && FFileHelper::SaveStringToFile(Csv, *CsvPath), TEXT("Current raw frame intervals and their explicit limitations are saved only after sampling completes."))) return false;
-        Test->AddInfo(FString::Printf(TEXT("Current environment sample: %s; frames=180; 1280x720; wall mean=%.3fms median=%.3fms p95=%.3fms; JSON=%s; CSV=%s. These are current PIE intervals, not CPU/GPU present timing or before/after FPS improvement."), *Name, SummarizeIntervals(WallIntervals)->GetNumberField(TEXT("mean_ms")), SummarizeIntervals(WallIntervals)->GetNumberField(TEXT("median_ms")), SummarizeIntervals(WallIntervals)->GetNumberField(TEXT("p95_ms")), *JsonPath, *CsvPath));
+        Test->AddInfo(FString::Printf(TEXT("Current environment sample: %s; frames=%d; seconds=%.3f; route=%d; 1280x720; wall mean=%.3fms median=%.3fms p95=%.3fms; GPU positive samples=%d; JSON=%s; CSV=%s. Engine-thread/RHI GPU observations are separate from physical present and before/after FPS improvement."), *Name, WallIntervals.Num(), SampleElapsed, bPerformanceRoute, SummarizeIntervals(WallIntervals)->GetNumberField(TEXT("mean_ms")), SummarizeIntervals(WallIntervals)->GetNumberField(TEXT("median_ms")), SummarizeIntervals(WallIntervals)->GetNumberField(TEXT("p95_ms")), GPUTimes.FilterByPredicate([](double Value) { return Value > 0.0; }).Num(), *JsonPath, *CsvPath));
         return true;
+    }
+
+    // Restore only the transient PIE camera, including failed or interrupted observations.
+    // 실패하거나 중단된 관측에서도 일시적인 PIE 카메라만 복원합니다.
+    void RestorePerformanceCamera()
+    {
+        if (bPerformanceCameraCaptured && PerformanceCamera.IsValid()) PerformanceCamera->SetActorTransform(OriginalPerformanceCamera, false, nullptr, ETeleportType::TeleportPhysics);
+        bPerformanceCameraCaptured = false;
     }
 
     bool Check(bool bCondition, const FString& Message)
@@ -781,6 +906,7 @@ private:
         RetainViewport();
         RestorePointer();
         RestoreReviewWindow();
+        RestorePerformanceCamera();
         Probe.Reset();
         GEditor->RequestEndPlayMap();
         Test->AddInfo(TEXT("Render review checks authored camera/grid/roster, real HP draw output and actual Slate tile input. Current capture-free frame intervals are recorded for environment comparison; physical display present, before/after FPS baselines, sound and network support are separate."));
@@ -844,9 +970,21 @@ private:
     TArray<double> WallIntervals;
     TArray<double> WorldDeltas;
     TArray<double> AppDeltas;
+    TArray<double> GameThreadTimes;
+    TArray<double> RenderThreadTimes;
+    TArray<double> RHIThreadTimes;
+    TArray<double> GPUTimes;
     TArray<FString> SampleRows;
     Scalability::FQualityLevels SampleQuality;
     double SampleLastPlatform = 0.0;
+    double SampleElapsed = 0.0;
+    TWeakObjectPtr<AActor> PerformanceCamera;
+    FTransform OriginalPerformanceCamera;
+    bool bPerformanceCameraCaptured = false;
+    bool bPerformanceRoute = false;
+    bool bValidOutput = false;
+    bool bRouteCapturePositioned = false;
+    int32 RouteCaptureIndex = 0;
     uint64 SampleLastEngineFrame = 0;
     float SampleLastWorldTime = 0.f;
     int32 SampleRestarts = 0;

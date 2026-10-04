@@ -12,3 +12,8 @@
 "Shop_Skill_Cold","냉기 스킬 상점","스킬","냉기","Encounter.Shop.Skill","냉기 속성 스킬","","기획·미연동","복합 속성·속성 공란 스킬의 판매 기준·상품 수·가격 미정"
 "Shop_Skill_Lightning","번개 스킬 상점","스킬","번개","Encounter.Shop.Skill","번개 속성 스킬","","기획·미연동","복합 속성·속성 공란 스킬의 판매 기준·상품 수·가격 미정"
 "Shop_Skill_Chaos","카오스 스킬 상점","스킬","카오스","Encounter.Shop.Skill","카오스 속성 스킬","","기획·미연동","복합 속성·속성 공란 스킬의 판매 기준·상품 수·가격 미정"
+"TargetOffer_01","스킬상점","스킬","","Encounter.Shop.Skill","기존 61후보·최대 5개 진열·HP 전체 회복","","목표 Run 구현·검수 중","신규 목표 Run 전용. 태그 조건 후보를 고정 순환하여 3개 제시. 확률 가중치는 미적용. 검증 결과는 Docs/TODO.md 참조"
+"TargetOffer_02","아이템상점","아이템","","Encounter.Shop.Item","기존 무기·방패·탄환·화살·기타","","목표 Run 구현·검수 중","신규 목표 Run 전용. 태그 조건 후보를 고정 순환하여 3개 제시. 확률 가중치는 미적용. 검증 결과는 Docs/TODO.md 참조"
+"TargetOffer_03","회복소","회복","","Encounter.Service.Recovery","본인 생존 Human HP 25 회복·1G·만피 거절","","목표 Run 구현·검수 중","신규 목표 Run 전용. 태그 조건 후보를 고정 순환하여 3개 제시. 확률 가중치는 미적용. 검증 결과는 Docs/TODO.md 참조. 개발 시험값"
+"TargetOffer_04","소모품상점","소모품","","Encounter.Shop.Consumable","회복 소모품 1개·1G. 전투에서 본인 HP 25 회복·AP 1·실제 발동 시 1개 소모","","목표 Run 구현·검수 중","신규 목표 Run 전용. 태그 조건 후보를 고정 순환하여 3개 제시. 확률 가중치는 미적용. 검증 결과는 Docs/TODO.md 참조. 시작 1개는 새 Run에서만 지급. 개발 시험값"
+"TargetOffer_05","부활소","부활","","Encounter.Service.Revival","본인 사망 Human 최대 HP 25% 부활·1G","","목표 Run 구현·검수 중","신규 목표 Run 전용. 태그 조건 후보를 고정 순환하여 3개 제시. 확률 가중치는 미적용. 검증 결과는 Docs/TODO.md 참조. 개발 시험값"

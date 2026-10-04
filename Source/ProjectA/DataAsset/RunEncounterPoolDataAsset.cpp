@@ -1,5 +1,6 @@
 #include "DataAsset/RunEncounterPoolDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Game/Run/RunRecoveryTypes.h"
 #include "DataAsset/SkillPoolDataAsset.h"
 #include "Game/Run/RunContentMigration.h"
 #include "Types/GameplayTagCandidateSelection.h"
@@ -98,6 +99,7 @@ bool URunEncounterPoolDataAsset::ValidateSkillShop(const FRunSkillShopState& Sta
             FText SkillError;
             if (Offer.OfferId.IsNone() || OfferIds.Contains(Offer.OfferId) || Offer.Price <= 0 || Offer.DisplayName.IsEmpty() || !IsValid(Skill) || !Skill->ResolveRoundSkill(Definition, SkillError) || SkillIds.Contains(Definition.SkillId)) return false;
             if (!bLegacy && (!FMath::IsFinite(Offer.BaseWeight) || Offer.BaseWeight < 0.0f || Offer.Tags != Definition.EffectTags)) return false;
+            if (RunRecoveryRules::IsConsumable(Definition)) return false;
             OfferIds.Add(Offer.OfferId);
             SkillIds.Add(Definition.SkillId);
         }

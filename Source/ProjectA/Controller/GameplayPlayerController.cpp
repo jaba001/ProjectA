@@ -265,6 +265,8 @@ void AGameplayPlayerController::RequestPurchaseShopOffer(FGuid CharacterId, FNam
     ShopPurchaseMessage = FText::GetEmpty();
     bShopPurchasePending = true;
     bPendingItemShop = HasAuthority() && RunState ? RunState->GetEncounterProgress().IsItemShop() : GameplayState && GameplayState->GetViewState().EncounterProgress.IsItemShop();
+    const FRunEncounterOffer* Selected = HasAuthority() && RunState ? RunState->GetEncounterProgress().FindSelectedOffer() : GameplayState ? GameplayState->GetViewState().EncounterProgress.FindSelectedOffer() : nullptr;
+    bPendingService = Selected && Selected->IsService();
     PendingShopRevision = INDEX_NONE;
     RefreshGameplayFlow();
     if (HasAuthority()) ExecuteShopPurchase(CharacterId, OfferId, ExpectedShopRevision);
@@ -290,6 +292,8 @@ void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName Off
     const AGameplayGameModeBase* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGameplayGameModeBase>() : nullptr;
     const URunStateSubsystem* CurrentRun = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     const bool bItemShop = CurrentRun && CurrentRun->GetEncounterProgress().IsItemShop();
+    const FRunEncounterOffer* Selected = CurrentRun ? CurrentRun->GetEncounterProgress().FindSelectedOffer() : nullptr;
+    const bool bService = Selected && Selected->IsService();
     FRunAccountId BuyerAccountId;
     bool bSucceeded = false;
     if (Mode && Mode->ResolveRunParticipant(this, BuyerAccountId))
@@ -299,11 +303,12 @@ void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName Off
     }
     if (bSucceeded)
     {
-        if (bItemShop) Error = OfferId == FRunItemShopState::GetRerollOfferId() ? NSLOCTEXT("RunItemShop", "Rerolled", "아이템 상점의 상품을 다시 추첨했습니다.") : NSLOCTEXT("RunItemShop", "PurchasedEquipment", "아이템을 구매했습니다. 장착 가능한 아이템은 장비 슬롯으로 드래그하세요.");
+        if (bService) Error = NSLOCTEXT("RunRecovery", "Purchased", "회복 서비스를 구매하고 진행을 저장했습니다.");
+        else if (bItemShop) Error = OfferId == FRunItemShopState::GetRerollOfferId() ? NSLOCTEXT("RunItemShop", "Rerolled", "아이템 상점의 상품을 다시 추첨했습니다.") : NSLOCTEXT("RunItemShop", "PurchasedEquipment", "아이템을 구매했습니다. 장착 가능한 아이템은 장비 슬롯으로 드래그하세요.");
         else if (OfferId == FRunSkillShopState::GetRerollOfferId()) Error = NSLOCTEXT("RunSkillShop", "Rerolled", "스킬 상점의 5개 상품을 다시 추첨했습니다. 다음 리롤 비용이 1G 증가했습니다.");
         else Error = OfferId == FRunSkillShopState::GetRecoveryOfferId() ? NSLOCTEXT("RunSkillShop", "Recovered", "HP를 회복했습니다.") : NSLOCTEXT("RunSkillShop", "Purchased", "스킬을 구매했습니다. 다음 전투부터 사용할 수 있습니다.");
     }
-    const int32 ConfirmedShopRevision = bSucceeded && CurrentRun ? (bItemShop ? CurrentRun->GetItemShopState().Revision : CurrentRun->GetSkillShopState().Revision) : INDEX_NONE;
+    const int32 ConfirmedShopRevision = bSucceeded && CurrentRun ? (bService ? CurrentRun->GetRecoveryState().Revision : bItemShop ? CurrentRun->GetItemShopState().Revision : CurrentRun->GetSkillShopState().Revision) : INDEX_NONE;
     ClientReceiveShopPurchaseResult(bSucceeded, Error, ConfirmedShopRevision);
 }
 
@@ -472,6 +477,7 @@ void AGameplayPlayerController::RefreshGameplayFlow()
         ShopPurchaseMessage = FText::GetEmpty();
         bShopPurchasePending = false;
         bPendingItemShop = false;
+        bPendingService = false;
         PendingShopRevision = INDEX_NONE;
     }
     else if (PendingShopRevision != INDEX_NONE)
@@ -479,8 +485,13 @@ void AGameplayPlayerController::RefreshGameplayFlow()
         // Wait for the saved stock and buyer values of the requested shop before allowing another action.
         // 요청한 상점의 저장된 재고와 구매자 정보가 표시 뷰에 도착한 뒤 다음 행동을 허용합니다.
         int32 DisplayedShopRevision = INDEX_NONE;
-        if (HasAuthority() && RunState && RunState->GetEncounterProgress().IsItemShop() == bPendingItemShop) DisplayedShopRevision = bPendingItemShop ? RunState->GetItemShopState().Revision : RunState->GetSkillShopState().Revision;
-        else if (GameplayState && GameplayState->GetViewState().EncounterProgress.IsItemShop() == bPendingItemShop) DisplayedShopRevision = bPendingItemShop ? GameplayState->GetViewState().ItemShopState.Revision : GameplayState->GetViewState().SkillShopState.Revision;
+        const FRunEncounterProgress* Progress = HasAuthority() && RunState ? &RunState->GetEncounterProgress() : GameplayState ? &GameplayState->GetViewState().EncounterProgress : nullptr;
+        const FRunEncounterOffer* Selected = Progress ? Progress->FindSelectedOffer() : nullptr;
+        if (Progress && Progress->IsItemShop() == bPendingItemShop && (Selected && Selected->IsService()) == bPendingService)
+        {
+            if (HasAuthority() && RunState) DisplayedShopRevision = bPendingService ? RunState->GetRecoveryState().Revision : bPendingItemShop ? RunState->GetItemShopState().Revision : RunState->GetSkillShopState().Revision;
+            else if (GameplayState) DisplayedShopRevision = bPendingService ? GameplayState->GetViewState().RecoveryState.Revision : bPendingItemShop ? GameplayState->GetViewState().ItemShopState.Revision : GameplayState->GetViewState().SkillShopState.Revision;
+        }
         if (DisplayedShopRevision >= PendingShopRevision)
         {
             bShopPurchasePending = false;

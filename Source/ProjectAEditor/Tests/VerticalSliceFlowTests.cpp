@@ -43,6 +43,7 @@
 #include "Misc/Parse.h"
 #include "Misc/ScopeExit.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "TodoReviewWindowPlacement.h"
 #include "PlayInEditorDataTypes.h"
 #include "Settings/LevelEditorPlaySettings.h"
 #include "UObject/StrongObjectPtr.h"
@@ -80,6 +81,11 @@ public:
         const TSharedPtr<SViewport> Widget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
         const TSharedPtr<SWindow> Window = Widget.IsValid() ? FSlateApplication::Get().FindWidgetWindow(Widget.ToSharedRef()) : nullptr;
         if (!Window.IsValid() || !Viewport || !Viewport->Viewport) return false;
+        if (!TodoReviewWindowPlacement::Ensure(Test, World))
+        {
+            bFailed = true;
+            return false;
+        }
         if (!bResizeRequested)
         {
             const FIntPoint Before = Viewport->Viewport->GetSizeXY();
@@ -121,6 +127,14 @@ private:
 // 주변 에디터 창 대신 실제 게임플레이 Slate 위젯을 캡처합니다.
 bool CaptureGameplayUI(FAutomationTestBase* Test, UWorld* World, const FString& Filename, FIntPoint ExpectedSize)
 {
+    if (!TodoReviewWindowPlacement::Ensure(Test, World)) return false;
+    FString OutputPath = Filename;
+    FString ExplicitOutputRoot;
+    if (FParse::Value(FCommandLine::Get(), TEXT("ProjectAReviewOutputRoot="), ExplicitOutputRoot))
+    {
+        if (!TodoReviewWindowPlacement::OutputRoot(Test, ExplicitOutputRoot)) return false;
+        OutputPath = ExplicitOutputRoot / TEXT("Screenshots") / FPaths::GetCleanFilename(Filename);
+    }
     UGameViewportClient* Viewport = World ? World->GetGameViewport() : nullptr;
     const TSharedPtr<SViewport> Widget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
     const FIntPoint ViewportSize = Viewport && Viewport->Viewport ? Viewport->Viewport->GetSizeXY() : FIntPoint::ZeroValue;
@@ -131,9 +145,9 @@ bool CaptureGameplayUI(FAutomationTestBase* Test, UWorld* World, const FString& 
     for (FColor& Pixel : Pixels) Pixel.A = 255;
     TArray64<uint8> Png;
     FImageUtils::PNGCompressImageArray(Dimensions.X, Dimensions.Y, Pixels, Png);
-    IFileManager::Get().MakeDirectory(*FPaths::GetPath(Filename), true);
-    if (!Test->TestTrue(TEXT("The complete gameplay UI capture is saved before travel or PIE teardown."), !Png.IsEmpty() && FFileHelper::SaveArrayToFile(Png, *Filename) && IFileManager::Get().FileSize(*Filename) == Png.Num())) return false;
-    Test->AddInfo(FString::Printf(TEXT("Gameplay Slate screenshot: %s (%dx%d)."), *Filename, Dimensions.X, Dimensions.Y));
+    IFileManager::Get().MakeDirectory(*FPaths::GetPath(OutputPath), true);
+    if (!Test->TestTrue(TEXT("The complete gameplay UI capture is saved before travel or PIE teardown."), !Png.IsEmpty() && FFileHelper::SaveArrayToFile(Png, *OutputPath) && IFileManager::Get().FileSize(*OutputPath) == Png.Num())) return false;
+    Test->AddInfo(FString::Printf(TEXT("Gameplay Slate screenshot: %s (%dx%d)."), *OutputPath, Dimensions.X, Dimensions.Y));
     return true;
 }
 
@@ -193,6 +207,7 @@ public:
             PlaySettings->NewWindowWidth = 1280;
             PlaySettings->NewWindowHeight = 720;
             PlaySettings->SetClientWindowSize(FIntPoint(1280, 720));
+            if (!TodoReviewWindowPlacement::Configure(Test, PlaySettings.Get())) return true;
             FRequestPlaySessionParams Params;
             Params.EditorPlaySettings = PlaySettings.Get();
             Params.SessionDestination = EPlaySessionDestinationType::InProcess;
@@ -1038,6 +1053,7 @@ class FPlaySavedSkillLoadout : public IAutomationLatentCommand
 public:
     FPlaySavedSkillLoadout(FAutomationTestBase* InTest, const TArray<FCombatRoundSkill>& InSkills, int32 InSkillIndex) : Test(InTest), Skills(InSkills), SkillIndex(InSkillIndex)
     {
+        bNewGameEntryOnly = FParse::Param(FCommandLine::Get(), TEXT("ProjectANewGameEntryOnly"));
     }
 
     virtual ~FPlaySavedSkillLoadout() override
@@ -1061,6 +1077,7 @@ public:
             PlaySettings->NewWindowWidth = ViewportSize.X;
             PlaySettings->NewWindowHeight = ViewportSize.Y;
             PlaySettings->SetClientWindowSize(ViewportSize);
+            if (!TodoReviewWindowPlacement::Configure(Test, PlaySettings.Get())) return true;
             FRequestPlaySessionParams Params;
             Params.EditorPlaySettings = PlaySettings.Get();
             Params.SessionDestination = EPlaySessionDestinationType::InProcess;
@@ -1131,9 +1148,21 @@ public:
             URunMapWidget* Map = FindActiveWidget<URunMapWidget>(World);
             if (!Map || !Run || Run->GetPhase() != ERunPhase::Map) return false;
             if (!ViewportPreparation.Update(Test, World, ExpectedViewportSize)) return ViewportPreparation.HasFailed();
+            if (!Require(UWorld::RemovePIEPrefix(World->GetOutermost()->GetName()) == TEXT("/Game/User_JeHoon/LEVEL/Core/Gameplay"), TEXT("The authored New Game route arrives in relocated Core/Gameplay."))) return true;
+            if (bNewGameEntryOnly && !bRecordedNewParty)
+            {
+                const FRunPartyMember* Member = Run->GetPartyMembers().FindByPredicate([](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.bPlayerControlled; });
+                FProfessionDefinition Profession;
+                if (!Require(Member && Member->bHasSkillLoadout && Member->Skills.Num() == 1 && Member->Gold == 10 && Run->PartyDefinition && Run->PartyDefinition->ResolveProfession(Member->ClassId, Profession), TEXT("The unmodified new Run retains its starting unarmed skill, ten gold and resolved authored profession."))) return true;
+                EntryMember = *Member;
+                EntryMaxHP = Profession.MaxHP;
+                EntryAP = Profession.ActionPoints;
+                EntrySAP = Profession.SubActionPoints;
+                bRecordedNewParty = true;
+            }
             // Preserve full saved-loadout execution coverage without giving new characters free shop skills.
             // 새 캐릭터에게 상점 스킬을 무료로 주지 않고 저장된 전체 장착의 실행 범위를 검사합니다.
-            if (!bInstalledSavedLoadout)
+            if (!bNewGameEntryOnly && !bInstalledSavedLoadout)
             {
                 const FString Slot = URunStateSubsystem::ResolveCheckpointSlot(FCommandLine::Get());
                 TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));
@@ -1191,6 +1220,20 @@ public:
             if (!Controlled || !IsValid(Controlled->Unit)) return false;
             Source = Controlled->Unit;
             SourceId = Controlled->UnitId;
+            if (bNewGameEntryOnly)
+            {
+                if (!Require(bRecordedNewParty && Source->GetAttributeSet() && Run && Run->GetPhase() == ERunPhase::Combat && Round->GetView().RoundNumber == 1 && Controlled->SkillIds.Num() == 1 && !bInstalledSavedLoadout && !bPreparedSurvival, TEXT("The fresh first encounter starts at its real first planning round without acquired-loadout or survival overrides."))) return true;
+                const FRunPartyMember* Member = Run->GetPartyMembers().FindByPredicate([this](const FRunPartyMember& Candidate) { return Candidate.CharacterId == EntryMember.CharacterId; });
+                if (!Require(Member && Member->OwnerAccountId == EntryMember.OwnerAccountId && Member->ClassId == EntryMember.ClassId && Member->CharacterName.EqualTo(EntryMember.CharacterName) && Member->Skills == EntryMember.Skills && Member->Gold == EntryMember.Gold && FMath::IsNearlyEqual(Source->GetAttributeSet()->GetHP(), EntryMaxHP) && FMath::IsNearlyEqual(Source->GetAttributeSet()->GetMaxHP(), EntryMaxHP) && Source->GetCurrentActionPoint() == EntryAP && Source->GetCurrentSubActionPoint() == EntrySAP, TEXT("New-game travel preserves character ownership, identity, starting content and the unmodified profession HP/AP/SAP."))) return true;
+                if (++EntryWarmFrames < 12) return false;
+                const FString Slot = URunStateSubsystem::ResolveCheckpointSlot(FCommandLine::Get());
+                FString EntryOutputRoot;
+                if (!TodoReviewWindowPlacement::OutputRoot(Test, EntryOutputRoot)) return true;
+                const FString CapturePath = EntryOutputRoot / TEXT("Screenshots") / (Slot + TEXT("_NewGame.png"));
+                if (!CaptureGameplayUI(Test, World, CapturePath, ExpectedViewportSize)) return true;
+                Test->AddInfo(FString::Printf(TEXT("NewGameEntry passed: actual New Game/Single/Create/Control/Start/node delegates; Core/Gameplay; HP %.3f/%.3f AP %d SAP %d; no save-content, skill, enemy or survival overrides; screenshot=%s. This entry-only observation does not assert normal-difficulty victory or subjective play quality."), Source->GetAttributeSet()->GetHP(), Source->GetAttributeSet()->GetMaxHP(), Source->GetCurrentActionPoint(), Source->GetCurrentSubActionPoint(), *CapturePath));
+                return true;
+            }
             if (!bPreparedSurvival)
             {
                 // Isolate only fixture survival through live GAS; preserve target HP, skill power and action costs.
@@ -1421,6 +1464,13 @@ private:
     int32 SkillIndex;
     bool bInstalledSavedLoadout = false;
     bool bPreparedSurvival = false;
+    bool bNewGameEntryOnly = false;
+    bool bRecordedNewParty = false;
+    FRunPartyMember EntryMember;
+    float EntryMaxHP = 0.f;
+    int32 EntryAP = 0;
+    int32 EntrySAP = 0;
+    int32 EntryWarmFrames = 0;
     bool bProjectionObserved = false;
     int32 ProjectionStableFrames = 0;
     float ProjectionStableWorldTime = 0.f;
@@ -1527,8 +1577,9 @@ bool FVerticalSliceSavedSkillLoadoutTest::RunTest(const FString& Parameters)
         }
         Skills.Add(Skill);
     }
-    AddInfo(TEXT("Runs two saved-menu/encounter PIE sessions; enemy selection uses one Slate mouse press/release through the viewport and controller, skill/menu buttons use their delegates."));
-    for (int32 Index = 0; Index < Skills.Num(); ++Index)
+    const bool bNewGameEntryOnly = FParse::Param(FCommandLine::Get(), TEXT("ProjectANewGameEntryOnly"));
+    AddInfo(bNewGameEntryOnly ? TEXT("Runs one actual new-game entry with the original starting skill, gold and HP/AP/SAP. Combat actions, acquired-loadout fixture and survival overrides are excluded.") : TEXT("Runs two saved-menu/encounter PIE sessions; enemy selection uses one Slate mouse press/release through the viewport and controller, skill/menu buttons use their delegates."));
+    for (int32 Index = 0; Index < (bNewGameEntryOnly ? 1 : Skills.Num()); ++Index)
     {
         ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu")));
         FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectAVerticalSliceTests::FPlaySavedSkillLoadout>(this, Skills, Index));

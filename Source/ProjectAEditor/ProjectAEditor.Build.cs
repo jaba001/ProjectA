@@ -16,6 +16,7 @@ public class ProjectAEditor : ModuleRules
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
+			"ApplicationCore",
 			"AnimGraph",
 			"AnimGraphRuntime",
 			"AssetRegistry",
@@ -43,6 +44,7 @@ public class ProjectAEditor : ModuleRules
 			"StaticMeshDescription",
 			"PhysicsUtilities",
 			"RenderCore",
+			"RHI",
 			"SlateNullRenderer",
 			"Slate",
 			"SlateCore",

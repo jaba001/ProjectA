@@ -284,3 +284,13 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 ```
 
 적용 전 기본 시작·쿠킹 맵과 로컬 에디터의 최근 맵/맵별 뷰 키를 새 경로로 갱신한다. 로컬 설정은 원본 바이트를 백업하고 카메라 좌표·뷰 설정을 보존한다. CoreRedirect는 맵 이동과 Redirector 정리를 마친 뒤 추가한다. 이동 후 환경 14맵의 navigation을 공식 `ResavePackages -BuildNavigationData`로 재빌드·저장하고 새 프로세스의 `-LevelFoldersVerifyOnly`를 실행한다. 기존 던전 별칭 2개와 이동하는 맵의 옛 경로 18개를 구분한다. 엔진이 이동 중 Redirector를 생성하지 않을 수도 있으므로 삭제 개수를 고정하지 않는다. 최종 검증은 새 World 18개와 옛 물리 경로 20개의 부재, 옛 SoftObjectPath의 정확한 새 맵 해석을 확인한다. 2026-10-04 적용·navigation 재빌드·최종 독립 검증 종료 0과 Development Editor / Win64 38.89초 컴파일을 통과했다. 환경 14맵은 각 64타일과 native Recast payload SHA가 원본과 같고 모든 18맵에서 삭제된 export는 없다. 근거는 `Saved/Automation/LevelFolders/{Audit,Apply,Verify,ProtectedFinal,EditorMapPaths.Final,Payloads.AfterNavigationRepair}.json`과 `Build.Editor.log`·`Navigation.Build.log`이며 이번 작업에서 PIE·게임·자동화 테스트는 실행하지 않았다. 현재 확인 범위는 [TODO 24절](../../../Docs/TODO.md#24-레벨-폴더-정리-후-확인)을 따른다.
+
+
+30. `CreateRecoverySkill.py`: 목표 Run 전용 `DA_HealthPotion` 한 개를 Unreal AssetTools로 작성한다. `Item.Consumable.Healing`·GAS Instant Heal·HP 25·AP 1을 사용하며 원본 VFX/몬스터 에셋을 수정하지 않는다. 기존 목적지는 소유 메타데이터와 전체 작성 프로필이 일치해야 한다. 다른 제작자 에셋이나 다른 값은 덮어쓰지 않는다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateRecoverySkill.py") -unattended -nop4 -NullRHI -nosound -NoTraceServer
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateRecoverySkill.py") -RecoverySkillVerifyOnly -unattended -nop4 -NullRHI -nosound -NoTraceServer
+```
+
+작성 후 별도 프로세스에서 `-RecoverySkillVerifyOnly`를 실행한다. 결과는 `Saved/Automation/RecoverySkill/Author.json`·`Verify.json`에 기록한다. 회복량·AP 변경은 기존 결과를 자동 덮어쓰는 용도로 지원하지 않으며 정식 데이터 변경과 저장 호환 검토가 필요하다. 이 스크립트는 PIE나 게임을 실행하지 않는다.

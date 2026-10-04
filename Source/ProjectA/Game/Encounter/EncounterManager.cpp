@@ -105,8 +105,17 @@ bool AEncounterManager::RequestStartNode(FName NodeId)
     {
         return FailPreparation(ArenaError);
     }
-    const TObjectPtr<UEncounterDefinitionDataAsset>* Definition = Definitions.Find(RunState->GetCurrentEncounterId());
-    if (!Definition || !IsValid(*Definition) || !SpawnEncounter(*Definition))
+    UEncounterDefinitionDataAsset* Definition = Definitions.FindRef(RunState->GetCurrentEncounterId());
+    if (RunState->IsTargetRun())
+    {
+        const FRunTargetState& Target = RunState->GetTargetRunState();
+        const int32 CombatIndex = RunState->GetCompletedNodes().Num();
+        if (!Target.Groups.IsValidIndex(CombatIndex / 2)) return FailPreparation(NSLOCTEXT("TargetRun", "MissingGroup", "목표 Run의 전투 묶음이 없습니다."));
+        Definition = NewObject<UEncounterDefinitionDataAsset>(this);
+        if (CombatIndex % 2 != 0) Definition->SnapshotCatalog = Cast<UOpponentSnapshotCatalogDataAsset>(Target.OpponentCatalog.TryLoad());
+        else for (const FSoftClassPath& Path : Target.Groups[CombatIndex / 2].EnemyClasses) Definition->EnemyUnitClasses.Add(Path.TryLoadClass<AEnemyUnit>());
+    }
+    if (!IsValid(Definition) || !SpawnEncounter(Definition))
     {
         return FailPreparation(FlowMessage.IsEmpty() ? FText::FromString(TEXT("Encounter spawn failed. Check unit classes and spawn coordinates. / 유닛 클래스와 스폰 좌표를 확인하세요.")) : FlowMessage);
     }
@@ -287,6 +296,7 @@ bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FTe
         TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
         for (const FSoftObjectPath& Path : Saved.Skills) Skills.Add(Cast<USkillDefinitionDataAsset>(Path.TryLoad()));
         if (!Unit->ConfigureProfession(Saved.MaxHP, Saved.MaxAP, Saved.MaxSubAP, Skills, Saved.Strength, Saved.Dexterity, Saved.Intelligence) || !Unit->ConfigureMoveRange(Saved.MoveRange)) return FailRestore();
+        Unit->Consumables = Saved.Consumables;
         Unit->UnitIndex = Saved.RoundUnitId;
         Unit->RuntimeCharacterName = Saved.CharacterName;
         if (!Unit->CharacterAppearance || !Unit->CharacterAppearance->SetAppearance(Unit->CharacterAppearance->AppearanceCatalog, Saved.Appearance)) return FailRestore();
@@ -398,7 +408,8 @@ void AEncounterManager::SuspendForDisconnectedParticipant()
 
 bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition)
 {
-    const bool bUseSnapshot = !Definition->OpponentSnapshotSlot.IsNone();
+    const bool bTargetSnapshot = RunState->IsTargetRun() && RunState->GetCompletedNodes().Num() % 2 != 0;
+    const bool bUseSnapshot = bTargetSnapshot || !Definition->OpponentSnapshotSlot.IsNone();
     FPartySnapshot Snapshot;
     TArray<TArray<TObjectPtr<USkillDefinitionDataAsset>>> SnapshotSkills;
     if (bUseSnapshot)
@@ -410,7 +421,9 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
             FlowMessage = FText::FromString(TEXT("Opponent Snapshot catalog is missing. / 상대 스냅샷 카탈로그가 없습니다."));
             return false;
         }
-        if (!UPartySnapshotLibrary::LoadSnapshot(Definition->OpponentSnapshotSlot, Snapshot, FlowMessage) || !Definition->SnapshotCatalog->ValidateForEncounter(Snapshot, Arena->EnemyCoords.Num(), FlowMessage))
+        if (bTargetSnapshot) Snapshot = RunState->GetTargetRunState().Groups[RunState->GetCompletedNodes().Num() / 2].Opponent;
+        else if (!UPartySnapshotLibrary::LoadSnapshot(Definition->OpponentSnapshotSlot, Snapshot, FlowMessage)) return false;
+        if (!Definition->SnapshotCatalog->ValidateForEncounter(Snapshot, Arena->EnemyCoords.Num(), FlowMessage))
         {
             return false;
         }
@@ -456,7 +469,7 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Arena->PlayerCoords[Member.SlotIndex]);
         FProfessionDefinition Profession;
         TArray<TObjectPtr<USkillDefinitionDataAsset>> MemberSkills;
-        if (!PartyDefinition->ResolveProfession(Member.ClassId, Profession, FlowMessage) || !PartyDefinition->ResolveMemberSkills(Member, MemberSkills, FlowMessage) || !PartyDefinition->ValidateMemberAppearance(Member, FlowMessage))
+        if (!RunState->ResolveMemberProfession(Member, Profession, FlowMessage) || !PartyDefinition->ResolveMemberSkills(Member, MemberSkills, FlowMessage) || !PartyDefinition->ValidateMemberAppearance(Member, FlowMessage))
         {
             return false;
         }
@@ -490,6 +503,7 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
             return false;
         }
         Unit->RuntimeCharacterName = Member.CharacterName;
+        Unit->Consumables = Member.Consumables;
         Unit->SetTeam(ETeam::Player);
         Unit->SetCurrentTile(Tile);
         if (Member.CurrentHP >= 0.f && Unit->GetAttributeSet())
@@ -571,6 +585,7 @@ void AEncounterManager::FinishEncounter()
         return;
     }
     TMap<int32, float> FinalPartyHP;
+    TMap<int32, TArray<FRunConsumableStack>> FinalConsumables;
     for (const TPair<int32, TObjectPtr<AUnitBase>>& Entry : PartyActors)
     {
         if (IsValid(Entry.Value) && Entry.Value->GetAttributeSet())
@@ -581,12 +596,13 @@ void AEncounterManager::FinishEncounter()
                 HP = 0.f;
             }
             FinalPartyHP.Add(Entry.Key, HP);
+            FinalConsumables.Add(Entry.Key, Entry.Value->Consumables);
         }
     }
     // Publish the result only after its durable record succeeds; retry keeps the same pending result.
     // 결과 기록이 저장된 뒤 결과를 표시하며 재시도 동안 같은 대기 결과를 유지합니다.
     const ECombatResult Result = PendingResult;
-    if (!RunState->CompleteEncounter(Result, FinalPartyHP))
+    if (!RunState->CompleteEncounter(Result, FinalPartyHP, FinalConsumables))
     {
         FlowMessage = RunState->GetSaveError();
         OnFlowChanged.Broadcast();

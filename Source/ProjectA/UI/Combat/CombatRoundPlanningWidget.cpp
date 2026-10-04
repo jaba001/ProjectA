@@ -356,6 +356,12 @@ FCombatRoundCommand UCombatRoundPlanningWidget::BuildCommand(FName SkillId) cons
     const ACombatRoundPlayerController* Controller = Cast<ACombatRoundPlayerController>(GetOwningPlayer());
     const ACombatRoundCoordinator* Coordinator = Controller ? Controller->GetRoundCoordinator() : nullptr;
     const FCombatRoundSkill* Skill = Coordinator ? Coordinator->FindSkill(SkillId) : nullptr;
+    if (Coordinator && Skill && RunRecoveryRules::IsConsumable(*Skill))
+    {
+        const FCombatRoundUnitView* Unit = Coordinator->GetView().Units.FindByPredicate([Command](const FCombatRoundUnitView& Entry) { return Entry.UnitId == Command.UnitId; });
+        Command.TargetUnitId = Command.UnitId;
+        if (Unit) Command.TargetCoord = Command.DestinationCoord = Unit->HomeCoord;
+    }
     if (Coordinator && Skill && Skill->bRemainAtDestination)
     {
         const FCombatRoundUnitView* Unit = Coordinator->GetView().Units.FindByPredicate([Command](const FCombatRoundUnitView& Entry) { return Entry.UnitId == Command.UnitId; });
@@ -645,6 +651,7 @@ FCombatPlanningRefreshState UCombatRoundPlanningWidget::CaptureRefreshState() co
         Observation.AP = Unit.Unit->GetCurrentActionPoint();
         Observation.SAP = Unit.Unit->GetCurrentSubActionPoint();
         Observation.MoveRange = Unit.Unit->GetMoveRange();
+        for (const FRunConsumableStack& Stack : Unit.Unit->Consumables) Observation.ConsumableQuantities.Add(Stack.Quantity);
         Observation.CurrentTile = Unit.Unit->GetCurrentTile();
         if (UAbilitySystemComponent* ASC = Unit.Unit->GetAbilitySystemComponent())
         {
@@ -740,6 +747,12 @@ void UCombatRoundPlanningWidget::RefreshView(bool bForce)
         if (SelectedUnit && IsValid(SelectedUnit->Unit))
         {
             UnitDetails->SetText(FText::FromString(FString::Printf(TEXT("%s\nHP %.0f · AP %d · SAP %d · 속도 %s"), *UnitLabel(*SelectedUnit), SelectedUnit->HP, SelectedUnit->Unit->GetCurrentActionPoint(), SelectedUnit->Unit->GetCurrentSubActionPoint(), *FText::AsNumber(SelectedUnit->Speed).ToString())));
+            if (!SelectedUnit->Unit->Consumables.IsEmpty())
+            {
+                int32 Quantity = 0;
+                for (const FRunConsumableStack& Stack : SelectedUnit->Unit->Consumables) Quantity += Stack.Quantity;
+                UnitDetails->SetText(FText::Format(FText::FromString(TEXT("{0} · 소모품 {1}개")), UnitDetails->GetText(), FText::AsNumber(Quantity)));
+            }
             bHasMovePlan = SelectedUnit->bHasMovePlan;
             MovePlanDetails->SetText(FText::FromString(bHasMovePlan ? FString::Printf(TEXT("SAP 이동: (%d,%d) · 비용 1"), SelectedUnit->MoveDestinationCoord.X, SelectedUnit->MoveDestinationCoord.Y) : TEXT("SAP 이동: 예약 없음")));
             const ACombatArena* Arena = Coordinator->GetArena();

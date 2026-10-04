@@ -114,7 +114,7 @@ namespace
                 { TEXT("전체"), TEXT("모든 방식의 스킬 · 선택한 속성과 검색 조건 적용"), FGameplayTagQuery() },
                 { TEXT("투사체"), TEXT("투사체 형태의 공격 스킬 · 체인·지원 효과 제외"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Projectile }, AttackExcluded) },
                 { TEXT("범위형"), TEXT("범위·직선 빔 공격 스킬 · 체인·지원 효과 제외"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Area, ProjectACombatTags::Skill_Shape_Beam }, AttackExcluded) },
-                { TEXT("체인"), TEXT("대상 연결 형태 스킬 · 현재 링크 5종은 단일 대상 공격"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Chain }, Support) },
+                { TEXT("체인"), TEXT("최근접 미타격 적에게 이어지는 연결 공격"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Chain }, Support) },
                 { TEXT("근접공격"), TEXT("베기·회전 공격 스킬 · 체인·지원 효과 제외"), MakeDebugSkillMethodQuery({ ProjectACombatTags::Skill_Shape_Slash }, AttackExcluded) },
                 { TEXT("지원형"), TEXT("치유·보호막 스킬"), MakeDebugSkillMethodQuery(Support, {}) },
                 { TEXT("미분류"), TEXT("방식·지원 효과 분류 태그가 없는 스킬 · CSV의 보류 에셋과 별개"), MakeDebugSkillMethodQuery({}, Classified) }

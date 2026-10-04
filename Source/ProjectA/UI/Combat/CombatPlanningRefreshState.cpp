@@ -2,7 +2,7 @@
 
 bool FCombatPlanningUnitObservation::operator==(const FCombatPlanningUnitObservation& Other) const
 {
-    return Unit == Other.Unit && AbilitySystem == Other.AbilitySystem && CurrentTile == Other.CurrentTile && Tags == Other.Tags && BlockedAbilityTags == Other.BlockedAbilityTags && Name == Other.Name && AP == Other.AP && SAP == Other.SAP && MoveRange == Other.MoveRange && bAlive == Other.bAlive;
+    return Unit == Other.Unit && AbilitySystem == Other.AbilitySystem && CurrentTile == Other.CurrentTile && Tags == Other.Tags && BlockedAbilityTags == Other.BlockedAbilityTags && Name == Other.Name && AP == Other.AP && SAP == Other.SAP && MoveRange == Other.MoveRange && ConsumableQuantities == Other.ConsumableQuantities && bAlive == Other.bAlive;
 }
 
 bool FCombatPlanningTileObservation::operator==(const FCombatPlanningTileObservation& Other) const

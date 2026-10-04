@@ -37,12 +37,34 @@ const FRunRouteDefinition& RunProgressRules::GetPrototypeRoute()
     return Route;
 }
 
+const FRunRouteDefinition& RunProgressRules::GetTargetRoute()
+{
+    static const FRunRouteDefinition Route = []()
+    {
+        FRunRouteDefinition Definition;
+        Definition.bTargetRun = true;
+        Definition.bRepeatEncounters = true;
+        Definition.EncounterAfterCompletedNodes = 0;
+        Definition.EncounterOfferCount = 3;
+        for (int32 Index = 0; Index < 20; ++Index)
+        {
+            FRunNodeDefinition& Node = Definition.Nodes.AddDefaulted_GetRef();
+            Node.NodeId = FName(*FString::Printf(TEXT("TargetCombat_%02d"), Index + 1));
+            Node.EncounterId = Index % 2 == 0 ? TEXT("TargetPvE") : TEXT("TargetSnapshot");
+            Node.DisplayName = FText::FromString(FString::Printf(TEXT("%d / 10 · %s"), Index / 2 + 1, Index % 2 == 0 ? TEXT("PvE") : TEXT("로컬 Snapshot")));
+        }
+        return Definition;
+    }();
+    return Route;
+}
+
 const FRunRouteDefinition* RunProgressRules::GetRouteForNodes(TConstArrayView<FRunNodeDefinition> Nodes)
 {
     // Preserve saved route lengths; node identity and ordering are validated separately.
     // 저장된 경로 길이를 보존하며 노드 식별자와 순서는 별도로 검증합니다.
     if (Nodes.Num() == GetPrototypeRoute().Nodes.Num()) return &GetPrototypeRoute();
     if (Nodes.Num() == GetLegacyPrototypeRoute().Nodes.Num()) return &GetLegacyPrototypeRoute();
+    if (Nodes.Num() == GetTargetRoute().Nodes.Num()) return &GetTargetRoute();
     return nullptr;
 }
 
@@ -62,6 +84,29 @@ bool RunProgressRules::ValidateEncounterProgress(const FRunRouteDefinition& Rout
 {
     const bool bChoice = Progress.Phase == ERunPhase::EncounterChoice;
     const bool bShop = Progress.Phase == ERunPhase::Shop;
+    if (Route.bTargetRun)
+    {
+        const int32 Completed = Progress.CompletedNodes.Num();
+        const bool bAfterBattle = Progress.Phase == ERunPhase::Result || Progress.Phase == ERunPhase::Complete;
+        const int32 Boundary = Completed - (bAfterBattle ? 1 : 0);
+        if (Encounter.SchemaVersion != 2 || Boundary < 0 || Boundary >= 20 || Encounter.AfterCompletedNodeCount != Boundary || Encounter.VisitIndex < 0 || Encounter.VisitIndex >= 3 || Encounter.Offers.Num() != 3) return false;
+        TSet<FName> Ids;
+        for (const FRunEncounterOffer& Offer : Encounter.Offers)
+        {
+            if (Offer.EncounterId.IsNone() || Ids.Contains(Offer.EncounterId) || Offer.DisplayName.IsEmpty() || !Offer.IsSupportedEncounter()) return false;
+            Ids.Add(Offer.EncounterId);
+        }
+        const bool bSelected = !Encounter.SelectedEncounterId.IsNone();
+        if (bSelected && !Ids.Contains(Encounter.SelectedEncounterId)) return false;
+        if (bChoice || bShop)
+        {
+            const bool bInitial = Completed == 0 && Progress.CurrentNode.IsNone() && Progress.Result == ECombatResult::None;
+            const bool bLater = Completed > 0 && Progress.CurrentNode == Progress.Nodes[Completed - 1].NodeId && Progress.Result == ECombatResult::Victory;
+            return !Encounter.bCompleted && bSelected == bShop && Progress.CurrentEncounter.IsNone() && (bInitial || bLater);
+        }
+        return Encounter.VisitIndex == 2 && Encounter.bCompleted && bSelected;
+    }
+    if (Encounter.VisitIndex != 0) return false;
     if (Encounter.SchemaVersion == 0) return !bChoice && !bShop && Encounter.Offers.IsEmpty() && Encounter.SelectedEncounterId.IsNone() && !Encounter.bCompleted;
     const int32 Boundary = Route.bRepeatEncounters ? Encounter.AfterCompletedNodeCount : Route.EncounterAfterCompletedNodes;
     if (Encounter.SchemaVersion != 1 || Boundary < 1 || !Progress.Nodes.IsValidIndex(Boundary) || Encounter.Offers.Num() != Route.EncounterOfferCount) return false;
@@ -107,6 +152,7 @@ bool RunProgressRules::ValidatePhase(const FRunProgressView& Progress, bool bHas
 ERunPhase RunProgressRules::GetContinuationPhase(const FRunRouteDefinition& Route, int32 CompletedNodeCount, const FRunEncounterProgress& Encounter)
 {
     if (CompletedNodeCount >= Route.Nodes.Num()) return ERunPhase::Complete;
+    if (Route.bTargetRun) return Encounter.bCompleted ? ERunPhase::Map : ERunPhase::EncounterChoice;
     const int32 Boundary = Route.bRepeatEncounters ? Encounter.AfterCompletedNodeCount : Route.EncounterAfterCompletedNodes;
     if (Encounter.SchemaVersion == 1 && !Encounter.bCompleted && CompletedNodeCount == Boundary) return ERunPhase::EncounterChoice;
     return ERunPhase::Map;

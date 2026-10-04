@@ -128,6 +128,7 @@ void AUnitBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
     DOREPLIFETIME(AUnitBase, MoveRange);
     DOREPLIFETIME(AUnitBase, HealingItemAmount);
     DOREPLIFETIME(AUnitBase, HealingItemCount);
+    DOREPLIFETIME(AUnitBase, Consumables);
     DOREPLIFETIME(AUnitBase, DefaultAttackAbilityClass);
     DOREPLIFETIME(AUnitBase, EquippedSkillAbilityClasses);
     DOREPLIFETIME(AUnitBase, EquippedSkillDataAssets);

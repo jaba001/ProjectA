@@ -6,6 +6,7 @@
 #include "Game/Run/RunEncounterTypes.h"
 #include "Game/Run/RunSkillShopTypes.h"
 #include "Game/Run/RunGoldRewardTypes.h"
+#include "Game/Run/TargetRunTypes.h"
 #include "Game/Run/ManagedRunTypes.h"
 #include "Game/Run/Authority/LocalRunAuthorityStore.h"
 #include "Combat/Checkpoint/CombatCheckpointTypes.h"
@@ -17,6 +18,7 @@
 class UPartyDefinitionDataAsset;
 class URunSaveGame;
 class UEngine;
+struct FProfessionDefinition;
 
 DECLARE_MULTICAST_DELEGATE(FOnRunStateChanged);
 
@@ -40,6 +42,12 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Run")
     bool InitializeRun(const TArray<FRunPartyMember>& Members, FText& OutError);
+    bool InitializeTargetRun(const TArray<FRunPartyMember>& Members, FText& OutError);
+    bool IsTargetRun() const { return TargetRun.SchemaVersion == 1; }
+    const FRunTargetState& GetTargetRunState() const { return TargetRun; }
+    bool ResolveMemberProfession(const FRunPartyMember& Member, FProfessionDefinition& OutProfession, FText& OutError) const;
+    const FRunRecoveryState& GetRecoveryState() const { return TargetRun.Recovery; }
+    bool PurchaseRecoveryOffer(const FRunAccountId& AccountId, FGuid CharacterId, FName OfferId, FText& OutError, int32 ExpectedRevision);
 
     // Accept validated data from a future authority layer; this API does not authenticate accounts.
     // 향후 권위 계층의 데이터를 검증해 받으며 이 API 자체는 계정을 인증하지 않습니다.
@@ -100,6 +108,7 @@ public:
     // Publish final party HP in the same durable transaction as the encounter result.
     // 전투 결과와 같은 저장 트랜잭션에서 파티의 최종 HP를 공개합니다.
     bool CompleteEncounter(ECombatResult Result, const TMap<int32, float>& FinalPartyHP);
+    bool CompleteEncounter(ECombatResult Result, const TMap<int32, float>& FinalPartyHP, const TMap<int32, TArray<FRunConsumableStack>>& FinalConsumables);
     bool AbortEncounter();
     bool ContinueRun();
     bool CanContinueAfterRewards() const;
@@ -160,6 +169,11 @@ private:
     void ClearManagedMenuTravel();
     void HandleManagedTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString);
     void AutoSaveCheckpoint();
+    bool InitializeStandaloneRun(const TArray<FRunPartyMember>& Members, bool bTarget, FText& OutError);
+    bool InitializeIdentifiedRun(const TArray<FRunPartyMember>& Members, const FRunIdentityData& Identity, bool bTarget, FText& OutError);
+    bool ConfigureTargetRun(URunSaveGame* Save, FText& OutError) const;
+    bool ConfigureRecoveryRun(URunSaveGame* Save, FText& OutError) const;
+    bool ValidateRecoverySave(const URunSaveGame* Save, FText& OutError) const;
     FString SaveSlot = TEXT("ProjectA_Run");
     bool bCheckpointSaving = false;
     FText SaveError;
@@ -180,6 +194,9 @@ private:
 
     UPROPERTY(Transient)
     FRunEncounterProgress EncounterProgress;
+
+    UPROPERTY(Transient)
+    FRunTargetState TargetRun;
 
     UPROPERTY(Transient)
     FRunSkillShopState SkillShopState;

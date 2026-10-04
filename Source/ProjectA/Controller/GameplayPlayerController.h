@@ -99,6 +99,7 @@ private:
     FText ShopPurchaseMessage;
     bool bShopPurchasePending = false;
     bool bPendingItemShop = false;
+    bool bPendingService = false;
     int32 PendingShopRevision = INDEX_NONE;
     FText EquipmentMessage;
     bool bEquipmentChangePending = false;

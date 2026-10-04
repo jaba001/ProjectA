@@ -31,10 +31,15 @@ struct PROJECTA_API FRunEncounterOffer
 
     static FGameplayTag GetSkillShopTag();
     static FGameplayTag GetItemShopTag();
+    static FGameplayTag GetRecoveryTag();
+    static FGameplayTag GetRevivalTag();
+    static FGameplayTag GetConsumableShopTag();
     FGameplayTag GetResolvedTag() const;
     FText GetDisplayName() const;
     bool IsItemShop() const;
     bool IsSupportedShop() const;
+    bool IsService() const;
+    bool IsSupportedEncounter() const;
 };
 
 USTRUCT(BlueprintType)
@@ -60,6 +65,9 @@ struct PROJECTA_API FRunEncounterProgress
     // 이전 저장을 변경하지 않고 현재 상점 방문을 완료 전투 경계에 연결합니다.
     UPROPERTY(BlueprintReadOnly, Category = "Encounter")
     int32 AfterCompletedNodeCount = 1;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Encounter")
+    int32 VisitIndex = 0;
 
     const FRunEncounterOffer* FindSelectedOffer() const;
     bool IsItemShop() const;

@@ -29,6 +29,16 @@ protected:
 
 private:
     UButton* AddButton(UVerticalBox* Box, const FName Name, const FText& Text);
+    void BuildSteamControls(UVerticalBox* Box);
+    void RefreshSteam();
+    UFUNCTION()
+    void HandleSteamHost();
+    UFUNCTION()
+    void HandleSteamFind();
+    UFUNCTION()
+    void HandleSteamJoin();
+    UFUNCTION()
+    void HandleSteamInvite();
     UFUNCTION()
     void HandleHost();
     UFUNCTION()
@@ -55,6 +65,13 @@ private:
     TObjectPtr<UButton> ReadyButton;
     UPROPERTY(Transient)
     TObjectPtr<UButton> StartButton;
+    UPROPERTY(Transient)
+    TObjectPtr<UComboBoxString> SteamResults;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> SteamFindButton;
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> SteamInviteButton;
+    TArray<FString> SteamResultLabels;
     bool bLocalReady = false;
     bool bShowLocalError = false;
 };

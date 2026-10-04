@@ -4,6 +4,7 @@
 #include "Game/Run/RunIdentityTypes.h"
 #include "Game/Run/RunItemShopTypes.h"
 #include "Game/Run/RunEquipmentTypes.h"
+#include "Game/Run/RunRecoveryTypes.h"
 #include "Unit/CharacterAppearanceTypes.h"
 #include "RunTypes.generated.h"
 
@@ -89,6 +90,9 @@ struct PROJECTA_API FRunPartyMember
 
     UPROPERTY(BlueprintReadOnly, Category = "Run|Skills")
     TArray<FSoftObjectPath> Skills;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Run|Consumables")
+    TArray<FRunConsumableStack> Consumables;
 };
 
 USTRUCT(BlueprintType)

@@ -35,23 +35,28 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
         View.SkillShopState.Catalog.Reset();
         View.SkillShopState.Query = FGameplayTagQuery();
         View.ItemShopState = Run->GetItemShopState();
+        View.RecoveryState = Run->GetRecoveryState();
+        View.bTargetRun = Run->IsTargetRun();
+        View.TargetCompletedSteps = Run->GetCompletedNodes().Num() + Run->GetTargetRunState().CompletedEncounterChoices.Num();
         // Replicate only the visible stock; the frozen candidate catalog remains on the server.
         // 표시 중인 재고만 복제하고 고정된 후보 카탈로그는 서버에 보관합니다.
         View.ItemShopState.Catalog.Reset();
         View.GoldRewardState = Run->GetGoldRewardState();
         View.GoldRewardRecipientIds = Run->GetGoldRewardRecipientIds();
         View.bCanContinueAfterRewards = Run->CanContinueAfterRewards();
-        const UPartyDefinitionDataAsset* Catalog = Run->PartyDefinition ? Run->PartyDefinition.Get() : GetDefault<UPartyDefinitionDataAsset>();
         const bool bOrdinarySinglePlayer = !Run->IsManagedRun() && Run->GetRunIdentity().Origin == ERunIdentityOrigin::LocalDevelopment && Run->GetRunIdentity().OriginalParticipants.Num() == 1;
+        const FRunEncounterOffer* Selected = View.EncounterProgress.FindSelectedOffer();
+        const bool bRevival = View.bTargetRun && Selected && Selected->GetResolvedTag().MatchesTag(FRunEncounterOffer::GetRevivalTag());
         for (const FRunPartyMember& Member : View.PartyMembers)
         {
             FText EquipmentError;
             if (Run->CanChangeEquipment(Member.OwnerAccountId, Member.CharacterId, EquipmentError)) View.EquipmentEditableCharacterIds.Add(Member.CharacterId);
-            if (!Member.bCreated || Member.CurrentHP <= 0.f || !Member.CharacterId.IsValid() || Member.OwnerAccountId.IsEmpty()) continue;
+            if (!Member.bCreated || (bRevival ? Member.CurrentHP != 0.f : Member.CurrentHP <= 0.f) || !Member.CharacterId.IsValid() || Member.OwnerAccountId.IsEmpty()) continue;
             if (!(bOrdinarySinglePlayer ? Member.bPlayerControlled : !Run->IsManagedRun() || Run->GetParticipation().HumanParticipants.Contains(Member.OwnerAccountId))) continue;
             View.ShopBuyerCharacterIds.Add(Member.CharacterId);
             FProfessionDefinition Profession;
-            if (Catalog->ResolveProfession(Member.ClassId, Profession) && FMath::IsFinite(Profession.MaxHP) && Profession.MaxHP > 0.f)
+            FText ProfessionError;
+            if (Run->ResolveMemberProfession(Member, Profession, ProfessionError) && FMath::IsFinite(Profession.MaxHP) && Profession.MaxHP > 0.f)
             {
                 FRunShopBuyerView& BuyerView = View.ShopBuyerViews.AddDefaulted_GetRef();
                 BuyerView.CharacterId = Member.CharacterId;

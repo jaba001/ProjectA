@@ -2,6 +2,7 @@
 
 #if WITH_EDITOR
 #include "Game/Run/RunItemShopCatalog.h"
+#include "Game/Run/RunRecoveryTypes.h"
 #include "Misc/PackageName.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogProjectAAssetManager, Log, All);
@@ -9,6 +10,15 @@ DEFINE_LOG_CATEGORY_STATIC(LogProjectAAssetManager, Log, All);
 void UProjectAAssetManager::ModifyCook(TConstArrayView<const ITargetPlatform*> TargetPlatforms, TArray<FName>& PackagesToCook, TArray<FName>& PackagesToNeverCook)
 {
     Super::ModifyCook(TargetPlatforms, PackagesToCook, PackagesToNeverCook);
+    // The consumable uses a runtime path; cook only its authored package and normal dependencies.
+    // 소모품은 런타임 경로를 사용하므로 작성된 패키지 하나와 일반 의존성만 쿠킹에 포함합니다.
+    const FName RecoveryPackage = RunRecoveryRules::GetHealingSkillPath().GetLongPackageFName();
+    if (PackagesToNeverCook.Contains(RecoveryPackage) || !FPackageName::DoesPackageExist(RecoveryPackage.ToString()))
+    {
+        UE_LOG(LogProjectAAssetManager, Error, TEXT("Recovery skill package is missing or excluded from cooking: %s"), *RecoveryPackage.ToString());
+        return;
+    }
+    PackagesToCook.AddUnique(RecoveryPackage);
     TArray<FRunItemDefinition> Catalog;
     FText Error;
     if (!RunItemShopCatalog::Load(Catalog, Error))

@@ -68,6 +68,7 @@ bool ACombatRoundCoordinator::CapturePlanningCheckpoint(FCombatCheckpointData& O
         Saved.MoveRange = Unit->GetMoveRange();
         Saved.HealingItemCount = Unit->HealingItemCount;
         Saved.HealingItemAmount = Unit->HealingItemAmount;
+        Saved.Consumables = Unit->Consumables;
         Saved.bHasTile = Unit->GetCurrentTile() != nullptr;
         Saved.GridCoord = Entry.HomeCoord;
         Saved.Transform = Unit->GetActorTransform();
@@ -132,6 +133,11 @@ bool ACombatRoundCoordinator::RestorePlanningCheckpoint(const FCombatCheckpointD
         if (!IsValid(Unit) || !Unit->GetAttributeSet() || !Plan || FSoftObjectPath(Unit->GetClass()) != Saved.UnitClass || Unit->GetTeam() != Saved.Team || Unit->IsUnitAlive() == Saved.bDead || !FMath::IsNearlyEqual(Unit->GetAttributeSet()->GetHP(), Saved.HP) || Unit->GetCurrentActionPoint() != Saved.AP || Unit->GetCurrentSubActionPoint() != Saved.SubAP) return false;
         if (Saved.Team == ETeam::Player && (Authority->GetPartySlot(Unit) != Saved.PartySlot || Authority->GetCharacterId(Unit) != Saved.CharacterId || Authority->GetOwnerAccountId(Unit) != Saved.OwnerAccountId)) return false;
         if (!Unit->CharacterAppearance || !FCharacterAppearanceSelection::StaticStruct()->CompareScriptStruct(&Unit->CharacterAppearance->Selection, &Saved.Appearance, 0)) return false;
+        if (Unit->Consumables.Num() != Saved.Consumables.Num()) return false;
+        for (int32 StackIndex = 0; StackIndex < Saved.Consumables.Num(); ++StackIndex)
+        {
+            if (!FRunConsumableStack::StaticStruct()->CompareScriptStruct(&Unit->Consumables[StackIndex], &Saved.Consumables[StackIndex], 0)) return false;
+        }
         if (Saved.bHasTile && (Unit->GetCurrentTile() != Arena->Grid->GetTileAtCoord(Saved.GridCoord) || !Unit->GetCurrentTile() || Unit->GetCurrentTile()->GetOccupyingUnit() != Unit)) return false;
         if (!Saved.bHasTile && Unit->GetCurrentTile()) return false;
         Entry.UnitId = Saved.RoundUnitId;
@@ -140,6 +146,13 @@ bool ACombatRoundCoordinator::RestorePlanningCheckpoint(const FCombatCheckpointD
         Entry.Speed = Unit->GetCombatSpeed();
         Entry.Command = Plan->Command;
         Entry.Command.SkillId = UCombatCheckpointLibrary::ResolveSavedSkillId(Entry.Command.SkillId);
+        // An explicit conversion to AI cancels the owner's saved consumable request without consuming stock.
+        // 명시적인 AI 전환은 재고를 소모하지 않고 소유자의 저장된 소모품 요청을 취소합니다.
+        if (const FCombatRoundSkill* SavedSkill = FindCommandSkill(Entry.Command); SavedSkill && Entry.OwnerSlot == 0 && RunRecoveryRules::IsConsumable(*SavedSkill))
+        {
+            Entry.Command = FCombatRoundCommand();
+            Entry.Command.UnitId = Entry.UnitId;
+        }
         Entry.bHasMovePlan = Plan->bHasMovePlan;
         Entry.MoveDestinationCoord = Plan->MoveDestinationCoord;
         // Explicit resume control changes retain saved commands and allow current AI owners to execute them.
