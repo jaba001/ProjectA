@@ -5,11 +5,12 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Unit/CharacterAppearanceComponent.h"
 
 AMainMenuPreviewStage::AMainMenuPreviewStage()
 {
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
     SpawnedPreviewActors.SetNum(4);
     PreviewBaseRotations.Init(FQuat::Identity, 4);
 
@@ -40,6 +41,74 @@ AMainMenuPreviewStage::AMainMenuPreviewStage()
     Slot3Anchor->SetupAttachment(SceneRoot);
     Slot3Anchor->SetRelativeLocation(FVector(0.0f, 450.0f, 0.0f));
     Slot3Anchor->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));
+}
+
+void AMainMenuPreviewStage::BeginPlay()
+{
+    Super::BeginPlay();
+    OverviewCameraTransform = PreviewCamera->GetComponentTransform();
+    OverviewFieldOfView = PreviewCamera->FieldOfView;
+    UnfocusedCameraTransform = OverviewCameraTransform;
+    UnfocusedFieldOfView = OverviewFieldOfView;
+    InvalidateOverviewCameraFit();
+}
+
+void AMainMenuPreviewStage::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    APlayerController* Controller = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+    if (!Controller || Controller->GetViewTarget() != this || !Controller->PlayerCameraManager) return;
+    int32 Width = 0;
+    int32 Height = 0;
+    Controller->GetViewportSize(Width, Height);
+    if (Width <= 0 || Height <= 0) return;
+    const FIntPoint ViewportSize(Width, Height);
+    const bool bViewportChanged = PreviewViewportSize != ViewportSize;
+    if (bViewportChanged)
+    {
+        PreviewViewportSize = ViewportSize;
+        InvalidateOverviewCameraFit();
+    }
+    if (FocusedSlot != INDEX_NONE)
+    {
+        if (bViewportChanged) RefreshPreviewFocus();
+        return;
+    }
+    if (bOverviewCameraFitInvalidated)
+    {
+        // Start a refit from the authored camera and wait for its actual cached view before projecting bounds.
+        // 작성된 카메라에서 재조정을 시작하고 실제 캐시 시점이 반영된 뒤 몸체 경계를 투영합니다.
+        PreviewCamera->SetWorldTransform(OverviewCameraTransform);
+        PreviewCamera->SetFieldOfView(OverviewFieldOfView);
+        OverviewCameraDistanceScale = 1.0;
+        bOverviewCameraFitInvalidated = false;
+        return;
+    }
+    if (!Controller->PlayerCameraManager->GetCameraLocation().Equals(PreviewCamera->GetComponentLocation(), 0.1f) || !Controller->PlayerCameraManager->GetCameraRotation().Equals(PreviewCamera->GetComponentRotation(), 0.1f) || !FMath::IsNearlyEqual(Controller->PlayerCameraManager->GetFOVAngle(), PreviewCamera->FieldOfView, 0.1f)) return;
+    double RequiredScale = 1.0;
+    for (AActor* Actor : SpawnedPreviewActors)
+    {
+        const USkeletalMeshComponent* Mesh = IsValid(Actor) ? Actor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+        if (!Mesh || Mesh->Bounds.BoxExtent.IsNearlyZero()) continue;
+        for (int32 Corner = 0; Corner < 8; ++Corner)
+        {
+            const FVector Point = Mesh->Bounds.Origin + Mesh->Bounds.BoxExtent * FVector((Corner & 1) ? 1.0 : -1.0, (Corner & 2) ? 1.0 : -1.0, (Corner & 4) ? 1.0 : -1.0);
+            FVector2D Screen;
+            if (!Controller->ProjectWorldLocationToScreen(Point, Screen, true)) continue;
+            RequiredScale = FMath::Max(RequiredScale, FMath::Abs(Screen.X - Width * 0.5) / (Width * 0.4));
+        }
+    }
+    if (RequiredScale <= 1.005) return;
+    // Fit all four bodies inside the party cards' horizontal margins using the actual viewport projection.
+    // 실제 뷰포트 투영을 사용하여 네 몸체가 파티 카드의 수평 여백 안에 들어오도록 맞춥니다.
+    const FVector Center = (Slot0Anchor->GetComponentLocation() + Slot3Anchor->GetComponentLocation()) * 0.5 + GetActorUpVector() * 90.0;
+    OverviewCameraDistanceScale *= RequiredScale;
+    PreviewCamera->SetWorldLocation(Center + (OverviewCameraTransform.GetLocation() - Center) * OverviewCameraDistanceScale);
+}
+
+void AMainMenuPreviewStage::InvalidateOverviewCameraFit()
+{
+    bOverviewCameraFitInvalidated = true;
 }
 
 void AMainMenuPreviewStage::SetPreviewActorForSlot(int32 SlotIndex, FName ClassId)
@@ -81,6 +150,7 @@ void AMainMenuPreviewStage::SetPreviewActorForSlot(int32 SlotIndex, FName ClassI
     PreviewActor->AttachToComponent(SlotAnchor, FAttachmentTransformRules::KeepWorldTransform);
     SpawnedPreviewActors[SlotIndex] = PreviewActor;
     if (const USceneComponent* PreviewRoot = PreviewActor->GetRootComponent()) PreviewBaseRotations[SlotIndex] = PreviewRoot->GetRelativeTransform().GetRotation();
+    InvalidateOverviewCameraFit();
     RefreshPreviewFocus();
     UE_LOG(LogTemp, Log, TEXT("[MainMenuPreviewStage] Preview actor updated. SlotIndex: %d, ClassId: %s"), SlotIndex, *ClassId.ToString());
 }
@@ -99,6 +169,7 @@ void AMainMenuPreviewStage::ClearPreviewActorForSlot(int32 SlotIndex)
     }
     SpawnedPreviewActors[SlotIndex] = nullptr;
     PreviewBaseRotations[SlotIndex] = FQuat::Identity;
+    InvalidateOverviewCameraFit();
 }
 
 void AMainMenuPreviewStage::ClearAllPreviewActors()
@@ -126,6 +197,7 @@ bool AMainMenuPreviewStage::SetPreviewAppearance(int32 SlotIndex, UCharacterAppe
     }
     const bool bApplied = Appearance ? Appearance->SetAppearance(Catalog, Selection) : !Catalog && Selection.IsEmpty();
     if (bApplied && PreviewActor->GetRootComponent()) PreviewBaseRotations[SlotIndex] = PreviewActor->GetRootComponent()->GetRelativeTransform().GetRotation();
+    if (bApplied) InvalidateOverviewCameraFit();
     if (FocusedSlot == SlotIndex) RefreshPreviewFocus();
     return bApplied;
 }

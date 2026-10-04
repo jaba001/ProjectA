@@ -3,10 +3,13 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Blueprint/WidgetTree.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/ComboBoxString.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/TextBlock.h"
 #include "Controller/CombatDebugPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Editor.h"
@@ -16,6 +19,7 @@
 #include "Game/Development/CombatDebugLoadout.h"
 #include "Game/GameModes/CombatDebugGameMode.h"
 #include "GAS/Attribute/AS_Unit.h"
+#include "GAS/CombatGameplayTags.h"
 #include "HAL/FileManager.h"
 #include "ImageUtils.h"
 #include "Misc/App.h"
@@ -23,6 +27,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "Misc/ScopeExit.h"
 #include "NiagaraComponent.h"
 #include "NiagaraEmitterInstance.h"
 #include "NiagaraSystem.h"
@@ -33,6 +38,7 @@
 #include "Settings/LevelEditorPlaySettings.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "UI/Combat/CombatRoundPlanningWidget.h"
+#include "UI/Debug/CombatDebugWidget.h"
 #include "Unit/UnitBase.h"
 #include "UnrealClient.h"
 #include "UObject/StrongObjectPtr.h"
@@ -100,7 +106,8 @@ public:
             TArray<UUserWidget*> Screens;
             UWidgetBlueprintLibrary::GetAllWidgetsOfClass(Controller, Screens, UCombatRoundPlanningWidget::StaticClass(), false);
             if (!Screens.ContainsByPredicate([this](UUserWidget* Screen) { return Screen->GetOwningPlayer() == Controller && Cast<UCombatRoundPlanningWidget>(Screen)->IsActivated(); })) return false;
-            if (!PrepareRoster()) return End();
+            if (!SelectReadyDebugAlly()) return false;
+            if (!VerifySkillMethodFilters() || !PrepareRoster()) return End();
             RevivedUnit->Die();
             Advance(2);
             return false;
@@ -206,16 +213,170 @@ private:
         return Check(Round->GetView().Units.Num() == OriginalCount + 2 && Round->GetView().CombatId == CombatId && Mode->GetCombatManager()->GetRuntimeUnitId(RevivedUnit) == UnitId && RevivedUnit->GetEquippedSkillDataAssets() == OriginalSkills, TEXT("Authored spawning preserves the current combat, original character and loadout."));
     }
 
+    UCombatDebugWidget* FindDebugTools() const
+    {
+        TArray<UUserWidget*> Screens;
+        UWidgetBlueprintLibrary::GetAllWidgetsOfClass(Controller, Screens, UCombatDebugWidget::StaticClass(), false);
+        for (UUserWidget* Screen : Screens)
+        {
+            if (Screen->GetOwningPlayer() == Controller) return Cast<UCombatDebugWidget>(Screen);
+        }
+        return nullptr;
+    }
+
+    bool SelectReadyDebugAlly()
+    {
+        UCombatDebugWidget* Tools = FindDebugTools();
+        ACombatRoundCoordinator* Round = Controller->GetRoundCoordinator();
+        const FCombatRoundUnitView* Ally = Round->GetView().Units.FindByPredicate([this](const FCombatRoundUnitView& Unit) { return !Unit.bEnemy && Unit.OwnerSlot == Controller->GetRoundParticipantSlot() && IsValid(Unit.Unit); });
+        if (!Tools || !Tools->WidgetTree || !Ally) return false;
+        TArray<UWidget*> Widgets;
+        Tools->WidgetTree->GetAllWidgets(Widgets);
+        const FString Prefix = FString::Printf(TEXT("[아군] %d · "), Ally->UnitId);
+        for (UWidget* Widget : Widgets)
+        {
+            UComboBoxString* Choice = Cast<UComboBoxString>(Widget);
+            if (!Choice) continue;
+            for (int32 Index = 0; Index < Choice->GetOptionCount(); ++Index)
+            {
+                const FString Option = Choice->GetOptionAtIndex(Index);
+                if (!Option.StartsWith(Prefix)) continue;
+                // Wait for the widget's normal roster refresh, then use its real selection delegate.
+                // 위젯의 정상 명단 갱신을 기다린 뒤 실제 선택 델리게이트를 사용합니다.
+                Choice->SetSelectedOption(Option);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool VerifySkillMethodFilters()
+    {
+        UCombatDebugWidget* Tools = FindDebugTools();
+        if (!Check(Tools && Tools->WidgetTree, TEXT("The live combat exposes its authored debug tool widget."))) return false;
+        TArray<UWidget*> Widgets;
+        Tools->WidgetTree->GetAllWidgets(Widgets);
+        TMap<int32, UCombatDebugActionButton*> Methods;
+        TMap<int32, UCombatDebugActionButton*> Categories;
+        for (UWidget* Widget : Widgets)
+        {
+            UCombatDebugActionButton* Button = Cast<UCombatDebugActionButton>(Widget);
+            if (!Button) continue;
+            if (Button->Action == ECombatDebugAction::SelectSkillMethod) Methods.Add(Button->Index, Button);
+            if (Button->Action == ECombatDebugAction::SelectSkillCategory) Categories.Add(Button->Index, Button);
+        }
+        if (!Check(Methods.Num() == 7 && Categories.Num() == 8, TEXT("The live catalog exposes seven method tabs and eight element tabs."))) return false;
+        const TArray<FString> Labels{TEXT("전체"), TEXT("투사체"), TEXT("범위형"), TEXT("체인"), TEXT("근접공격"), TEXT("지원형"), TEXT("미분류")};
+        for (int32 Index = 0; Index < Labels.Num(); ++Index)
+        {
+            UCombatDebugActionButton* const* Button = Methods.Find(Index);
+            const UTextBlock* Label = Button ? Cast<UTextBlock>((*Button)->GetContent()) : nullptr;
+            if (!Check(Label && Label->GetText().ToString().Contains(Labels[Index]), TEXT("Every live method tab has its declared order and Korean label."))) return false;
+        }
+        if (!Check(Categories.Contains(0), TEXT("The element catalog provides an all-elements tab."))) return false;
+        Categories.FindChecked(0)->OnClicked.Broadcast();
+        Methods.FindChecked(3)->OnClicked.Broadcast();
+        Widgets.Reset();
+        Tools->WidgetTree->GetAllWidgets(Widgets);
+        TSet<FSoftObjectPath> ChainAssets;
+        UCombatDebugLoadout* Loadout = Controller->GetDebugLoadout();
+        if (!Check(IsValid(Loadout), TEXT("Live method filtering uses the shared resolved skill catalog."))) return false;
+        ACombatRoundCoordinator* Round = Controller->GetRoundCoordinator();
+        const FCombatRoundUnitView* Ally = Round->GetView().Units.FindByPredicate([this](const FCombatRoundUnitView& Unit) { return !Unit.bEnemy && Unit.OwnerSlot == Controller->GetRoundParticipantSlot() && IsValid(Unit.Unit); });
+        if (!Check(Ally != nullptr, TEXT("The method-filter fixture selects an actual owned ally."))) return false;
+        const int32 AllyId = Ally->UnitId;
+        AUnitBase* Source = Ally->Unit;
+        const TArray<TObjectPtr<USkillDefinitionDataAsset>> SavedSkills = Source->GetEquippedSkillDataAssets();
+        TSet<FSoftObjectPath> CatalogChains;
+        TSet<FSoftObjectPath> ExpectedUnownedChains;
+        FSoftObjectPath OwnershipProbe;
+        for (const FSoftObjectPath& Asset : Loadout->GetSkillAssets())
+        {
+            const FGameplayTagContainer& Tags = Loadout->GetSkillTags(Asset);
+            if (!Tags.HasTag(ProjectACombatTags::Skill_Shape_Chain)) continue;
+            if (!Check(!Tags.HasTag(ProjectACombatTags::Skill_Effect_Heal) && !Tags.HasTag(ProjectACombatTags::Skill_Effect_Shield), TEXT("Every current catalog chain is an attack profile."))) return false;
+            CatalogChains.Add(Asset);
+            if (SavedSkills.ContainsByPredicate([&Asset](const USkillDefinitionDataAsset* Skill) { return Skill && FSoftObjectPath(Skill) == Asset; })) continue;
+            ExpectedUnownedChains.Add(Asset);
+            if (OwnershipProbe.IsNull()) OwnershipProbe = Asset;
+        }
+        if (!Check(CatalogChains.Num() == 5, TEXT("The resolved complete catalog contains all five authored chain skills."))) return false;
+        for (UWidget* Widget : Widgets)
+        {
+            const UCombatDebugActionButton* Button = Cast<UCombatDebugActionButton>(Widget);
+            if (!Button || Button->Action != ECombatDebugAction::AddSkill) continue;
+            const FGameplayTagContainer& Tags = Loadout->GetSkillTags(Button->Asset);
+            if (!Check(Tags.HasTag(ProjectACombatTags::Skill_Shape_Chain) && !Tags.HasTag(ProjectACombatTags::Skill_Effect_Heal) && !Tags.HasTag(ProjectACombatTags::Skill_Effect_Shield), TEXT("The clicked chain tab displays chain attacks and excludes support effects."))) return false;
+            ChainAssets.Add(Button->Asset);
+        }
+        if (!Check(ChainAssets.Num() == ExpectedUnownedChains.Num() && ChainAssets.Includes(ExpectedUnownedChains), TEXT("The clicked chain tab exactly matches all five catalog chains after excluding the selected ally's owned skills."))) return false;
+        Test->AddInfo(FString::Printf(TEXT("Chain filter: complete catalog=%d, already owned=%d, displayed unowned=%d."), CatalogChains.Num(), CatalogChains.Num() - ExpectedUnownedChains.Num(), ChainAssets.Num()));
+        USkillDefinitionDataAsset* ProbeSkill = Cast<USkillDefinitionDataAsset>(OwnershipProbe.TryLoad());
+        if (!Check(ProbeSkill && SavedSkills.Num() < 5, TEXT("A current unowned chain is available for an isolated ownership filter probe."))) return false;
+        TArray<TObjectPtr<USkillDefinitionDataAsset>> ProbeSkills = SavedSkills;
+        ProbeSkills.Add(ProbeSkill);
+        FText Error;
+        if (!Check(Round->SetDebugUnitSkills(Controller, AllyId, ProbeSkills, Error), TEXT("The public debug API temporarily equips the original chain asset: ") + Error.ToString())) return false;
+        bool bRestored = false;
+        ON_SCOPE_EXIT
+        {
+            if (!bRestored)
+            {
+                Round->SetDebugUnitSkills(Controller, AllyId, SavedSkills, Error);
+                Methods.FindChecked(3)->OnClicked.Broadcast();
+            }
+        };
+        Methods.FindChecked(3)->OnClicked.Broadcast();
+        Widgets.Reset();
+        Tools->WidgetTree->GetAllWidgets(Widgets);
+        TSet<FSoftObjectPath> ProbeUnowned;
+        bool bProbeOwnedVisible = false;
+        for (UWidget* Widget : Widgets)
+        {
+            const UCombatDebugActionButton* Button = Cast<UCombatDebugActionButton>(Widget);
+            if (!Button) continue;
+            if (Button->Action == ECombatDebugAction::AddSkill) ProbeUnowned.Add(Button->Asset);
+            if (Button->Action == ECombatDebugAction::RemoveSkill && Button->Asset == OwnershipProbe) bProbeOwnedVisible = true;
+        }
+        TSet<FSoftObjectPath> ExpectedProbe = ExpectedUnownedChains;
+        ExpectedProbe.Remove(OwnershipProbe);
+        if (!Check(bProbeOwnedVisible && ProbeUnowned.Num() == ExpectedProbe.Num() && ProbeUnowned.Includes(ExpectedProbe) && !ProbeUnowned.Contains(OwnershipProbe), TEXT("Equipping a real chain moves it to the owned list and excludes only that asset from the chain acquisition list."))) return false;
+        bRestored = Round->SetDebugUnitSkills(Controller, AllyId, SavedSkills, Error);
+        if (!Check(bRestored && Source->GetEquippedSkillDataAssets() == SavedSkills, TEXT("The disposable ownership probe restores the exact original loadout: ") + Error.ToString())) return false;
+        Methods.FindChecked(3)->OnClicked.Broadcast();
+        Methods.FindChecked(2)->OnClicked.Broadcast();
+        Widgets.Reset();
+        Tools->WidgetTree->GetAllWidgets(Widgets);
+        int32 AreaAssets = 0;
+        for (UWidget* Widget : Widgets)
+        {
+            const UCombatDebugActionButton* Button = Cast<UCombatDebugActionButton>(Widget);
+            if (!Button || Button->Action != ECombatDebugAction::AddSkill) continue;
+            if (!Check(!CatalogChains.Contains(Button->Asset) && !Loadout->GetSkillTags(Button->Asset).HasTag(ProjectACombatTags::Skill_Shape_Chain), TEXT("The clicked area tab excludes all chain-classified link attacks."))) return false;
+            ++AreaAssets;
+        }
+        if (!Check(AreaAssets > 0, TEXT("Area filtering retains ordinary area and beam attacks."))) return false;
+        Methods.FindChecked(0)->OnClicked.Broadcast();
+        Test->AddInfo(TEXT("Verified live method-tab delegates, the complete five-chain catalog, exact unowned filtering and owned-list transfer/restoration; the transient probe neither changes authored assets nor saves a loadout."));
+        return true;
+    }
+
     bool PrepareSkill()
     {
-        const FString Path = TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/") + Samples[SampleIndex] + TEXT(".") + Samples[SampleIndex];
+        const FString Name = FPaths::GetCleanFilename(Samples[SampleIndex]);
+        const FString Path = TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/") + Samples[SampleIndex] + TEXT(".") + Name;
         Skill.Reset(LoadObject<USkillDefinitionDataAsset>(nullptr, *Path));
         ACombatRoundCoordinator* Round = Controller->GetRoundCoordinator();
         const FCombatRoundUnitView* Ally = Round->GetView().Units.FindByPredicate([](const FCombatRoundUnitView& Unit) { return !Unit.bEnemy && IsValid(Unit.Unit) && Unit.Unit->IsUnitAlive(); });
         const FCombatRoundUnitView* Enemy = Round->GetView().Units.FindByPredicate([](const FCombatRoundUnitView& Unit) { return Unit.bEnemy && IsValid(Unit.Unit) && Unit.Unit->IsUnitAlive(); });
         if (!Check(Skill.IsValid() && Ally && Enemy, TEXT("The representative authored skill and both teams are available."))) return false;
         FText Error;
+        // Stabilize real-frame observation in this disposable combat without changing content or normal difficulty.
+        // 콘텐츠나 정상 난이도를 변경하지 않고 폐기할 전투에서 실제 프레임 관찰을 안정화합니다.
+        if (!Check(Round->SetDebugUnitHealth(Controller, Ally->UnitId, 10000.f, 10000.f, Error), FString::Printf(TEXT("Apply transient observation HP fixture: %s"), *Error.ToString()))) return false;
+        Test->AddInfo(TEXT("The observation fixture sets only the disposable debug ally to 10,000 HP; this is not a normal-difficulty or persistent Run test."));
         if (!Check(Skill->ResolveRoundSkill(Definition, Error) && Round->SetDebugUnitSkills(Controller, Ally->UnitId, {Skill.Get()}, Error), FString::Printf(TEXT("Equip authored skill %s: %s"), *Samples[SampleIndex], *Error.ToString()))) return false;
+        if (!Check(CombatRoundRules::IsValidSkill(Definition) && Definition.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Damage) && !Definition.Vfx.Niagara.IsNull(), TEXT("Each current representative uses its resolved authored target, collision, tags and Niagara profile."))) return false;
         FCombatRoundCommand Command;
         Command.UnitId = Ally->UnitId;
         Command.SkillId = Definition.SkillId;
@@ -229,8 +390,8 @@ private:
         bFirstCaptureCompleted = bMiddleCaptureCompleted = bCaptureFailed = false;
         MaxParticles = 0;
         MaxAge = FirstParticleAge = 0.f;
-        FirstScreenshot = OutputDirectory / (Samples[SampleIndex] + TEXT("_first.png"));
-        MiddleScreenshot = OutputDirectory / (Samples[SampleIndex] + TEXT("_middle.png"));
+        FirstScreenshot = OutputDirectory / (Name + TEXT("_first.png"));
+        MiddleScreenshot = OutputDirectory / (Name + TEXT("_middle.png"));
         return true;
     }
 
@@ -335,7 +496,7 @@ private:
     FRunPartyMember OriginalEquipment;
     FTransform AliveMeshTransform;
     FCombatRoundSkill Definition;
-    TArray<FString> Samples{TEXT("BPDA_N_BlackholeExplosion"), TEXT("BPDA_NS_Dark_Solo_Projectile"), TEXT("BPDA_NS_Fire_Slash"), TEXT("BPDA_P_Warrior_Swipe")};
+    TArray<FString> Samples{TEXT("__AoeVFX/DA_DrGame_AoeVFX_AOE_BlazeBlast"), TEXT("ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_Arrow"), TEXT("SlashHitVFX/DA_DrGame_SlashHitVFX_Slash_Katana"), TEXT("___LinkChainVFX/DA_DrGame_LinkChainVFX_Link_Electric")};
     FString OutputDirectory;
     FString FirstScreenshot;
     FString MiddleScreenshot;

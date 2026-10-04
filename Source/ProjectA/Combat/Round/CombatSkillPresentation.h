@@ -35,6 +35,9 @@ namespace CombatSkillPresentation
     // 행동 시간이 시작되기 전에 원본 효과 에셋을 준비하고 소유 전투 세션에서 참조를 유지합니다.
     bool Prepare(UWorld* World, const TArray<FCombatRoundSkill>& Skills, TArray<TObjectPtr<UObject>>& PreparedAssets, FText& OutError);
     void Attach(AActor* Owner, const FCombatSkillVfx& Visual, TArray<TObjectPtr<UFXSystemComponent>>& Components, FAudioState& Audio, const FEndpointParameters& Endpoints, bool bAutoDestroy = false, const FProjectileParameters* Projectile = nullptr);
+    // Update moving endpoints without restarting the effect or overwriting per-segment audio overrides.
+    // 이펙트를 재시작하거나 구간별 사운드 설정을 덮어쓰지 않고 이동하는 끝점을 갱신합니다.
+    void UpdateEndpoints(const TArray<TObjectPtr<UFXSystemComponent>>& Components, const FCombatSkillVfx& Visual, const FEndpointParameters& Endpoints);
     void Destroy(TArray<TObjectPtr<UFXSystemComponent>>& Components);
     void StopAudio(FAudioState& Audio);
     bool HasActiveAudio(const FAudioState& Audio);

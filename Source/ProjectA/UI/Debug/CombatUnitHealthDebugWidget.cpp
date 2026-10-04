@@ -1,16 +1,18 @@
 #include "UI/Debug/CombatUnitHealthDebugWidget.h"
 
 #if !UE_BUILD_SHIPPING && !UE_BUILD_TEST
-#include "Blueprint/SlateBlueprintLibrary.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "Components/CapsuleComponent.h"
 #include "Controller/CombatRoundPlayerController.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/World.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
 #include "HAL/IConsoleManager.h"
 #include "Rendering/DrawElementTypes.h"
 #include "Rendering/SlateRenderer.h"
+#include "Slate/SGameLayerManager.h"
 #include "Styling/CoreStyle.h"
 #include "Unit/UnitBase.h"
 
@@ -36,6 +38,13 @@ int32 UCombatUnitHealthDebugWidget::NativePaint(const FPaintArgs& Args, const FG
     const ACombatRoundPlayerController* Controller = Cast<ACombatRoundPlayerController>(GetOwningPlayer());
     const ACombatRoundCoordinator* Coordinator = Controller ? Controller->GetRoundCoordinator() : nullptr;
     if (!IsValid(Coordinator) || !Controller->IsLocalController()) return BaseLayer;
+    const UGameViewportClient* Viewport = Controller->GetWorld()->GetGameViewport();
+    const TSharedPtr<IGameLayerManager> LayerManager = Viewport ? Viewport->GetGameLayerManager() : nullptr;
+    if (!LayerManager.IsValid()) return BaseLayer;
+    FVector2D ViewportSize;
+    Viewport->GetViewportSize(ViewportSize);
+    const FGeometry ViewportPaintGeometry = LayerManager->GetViewportWidgetHostPaintGeometry();
+    if (ViewportSize.X <= 0.0 || ViewportSize.Y <= 0.0 || ViewportPaintGeometry.GetLocalSize().X <= 0.0 || ViewportPaintGeometry.GetLocalSize().Y <= 0.0) return BaseLayer;
     const FVector2D Bounds = AllottedGeometry.GetLocalSize();
     if (Bounds.X <= 0.0 || Bounds.Y <= 0.0) return BaseLayer;
     const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 13);
@@ -56,10 +65,10 @@ int32 UCombatUnitHealthDebugWidget::NativePaint(const FPaintArgs& Args, const FG
         const FVector Anchor = Capsule->GetComponentLocation() + FVector(0.f, 0.f, Capsule->GetScaledCapsuleHalfHeight() + 24.f);
         FVector2D ScreenPosition;
         if (Anchor.ContainsNaN() || !Controller->ProjectWorldLocationToScreen(Anchor, ScreenPosition, false)) continue;
-        FVector2D Position;
-        // Convert viewport pixels through Slate geometry once, including DPI and window offsets.
-        // DPI와 창 위치를 포함해 뷰포트 픽셀을 Slate 지오메트리로 한 번만 변환합니다.
-        USlateBlueprintLibrary::ScreenToWidgetLocal(this, AllottedGeometry, ScreenPosition, Position);
+        // Keep both geometries in paint space so desktop window offsets are not added to the draw position.
+        // 두 지오메트리를 그리기 좌표 공간으로 유지하여 데스크톱 창 위치가 그리기 위치에 더해지지 않게 합니다.
+        const FVector2D ViewportPosition = ViewportPaintGeometry.GetLocalSize() * (ScreenPosition / ViewportSize);
+        const FVector2D Position = AllottedGeometry.AbsoluteToLocal(ViewportPaintGeometry.LocalToAbsolute(ViewportPosition));
         if (Position.ContainsNaN() || Position.X < 0.0 || Position.Y < 0.0 || Position.X > Bounds.X || Position.Y > Bounds.Y) continue;
         FString Label = FString::Printf(TEXT("HP %s / %s"), *FText::AsNumber(HP, &Numbers).ToString(), *FText::AsNumber(MaxHP, &Numbers).ToString());
         if (Attributes->GetShield() > 0.f) Label += FString::Printf(TEXT("  보호막 %s"), *FText::AsNumber(Attributes->GetShield(), &Numbers).ToString());

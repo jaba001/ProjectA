@@ -13,6 +13,8 @@ Binaries/
 DerivedDataCache/
 Intermediate/
 Saved/
+# Unreal cook-generated asset open order / 언리얼 쿠킹으로 생성한 에셋 로드 순서
+Build/Windows/FileOpenOrder/
 
 # Unreal plugin generated folders / 언리얼 플러그인 자동 생성 폴더
 Plugins/**/Binaries/

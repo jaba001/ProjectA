@@ -1,4 +1,5 @@
 #include "Combat/Round/CombatRoundTypes.h"
+#include "GAS/CombatGameplayTags.h"
 #include "GameplayEffect.h"
 #include "NiagaraSystem.h"
 #include "Particles/ParticleSystem.h"
@@ -6,6 +7,14 @@
 
 namespace
 {
+    bool IsValidChainSettings(const FCombatChainSettings& Chain)
+    {
+        if (Chain.MaxTargets < 1 || Chain.MaxTargets > 32) return false;
+        if (!FMath::IsFinite(Chain.JumpDistance) || Chain.JumpDistance < 0.f || Chain.JumpDistance > 100000.f || (Chain.MaxTargets > 1 && Chain.JumpDistance <= 0.f)) return false;
+        if (!FMath::IsFinite(Chain.JumpIntervalSeconds) || Chain.JumpIntervalSeconds < 0.f || Chain.JumpIntervalSeconds > 10.f) return false;
+        return FMath::IsFinite(Chain.DamageMultiplierPerJump) && Chain.DamageMultiplierPerJump >= 0.f && Chain.DamageMultiplierPerJump <= 1.f;
+    }
+
     template<typename TValue>
     void SerializeVisualParameters(FArchive& Ar, TMap<FName, TValue>& Parameters)
     {
@@ -61,6 +70,17 @@ bool FCombatSkillVfx::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuc
     return true;
 }
 
+bool FCombatChainSettings::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
+{
+    Ar << MaxTargets;
+    Ar << JumpDistance;
+    Ar << JumpIntervalSeconds;
+    Ar << DamageMultiplierPerJump;
+    if (!IsValidChainSettings(*this)) Ar.SetError();
+    bOutSuccess = !Ar.IsError();
+    return true;
+}
+
 float CombatRoundRules::StartDelay(float HighestSpeed, float UnitSpeed)
 {
     if (!FMath::IsFinite(HighestSpeed) || !FMath::IsFinite(UnitSpeed)) return 0.0f;
@@ -109,6 +129,12 @@ bool CombatRoundRules::MatchesTargetTeam(const FCombatRoundSkill& Skill, bool bS
     return bSourceEnemy != bTargetEnemy;
 }
 
+bool CombatRoundRules::UsesChain(const FCombatRoundSkill& Skill)
+{
+    static const FGameplayTagQuery Query = FGameplayTagQuery::MakeQuery_MatchTag(ProjectACombatTags::Skill_Shape_Chain);
+    return Query.Matches(Skill.EffectTags);
+}
+
 bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
 {
     if (Skill.EffectClass && Skill.EffectClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists)) return false;
@@ -116,6 +142,15 @@ bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
     if (Skill.SkillId.IsNone() || Skill.Kind > ECombatRoundSkillKind::Wait || Skill.Approach > ECombatRoundApproach::Tile || Skill.TargetLoss > ECombatRoundTargetLoss::NearestEnemy) return false;
     if (static_cast<uint8>(Skill.Kind) == 3) return false;
     if (Skill.TargetRule > ESkillTargetRule::AnyTile) return false;
+    if (!IsValidChainSettings(Skill.Chain)) return false;
+    if (Skill.Chain.MaxTargets > 1)
+    {
+        // Tags select chain execution; the fixed kind only restricts supported collision geometry.
+        // 태그가 체인 실행을 선택하며 고정 종류는 지원하는 충돌 지오메트리만 제한합니다.
+        if (!UsesChain(Skill) || !Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Damage) || Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Heal) || Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Shield)) return false;
+        if (Skill.TargetRule != ESkillTargetRule::EnemyUnit || Skill.Kind != ECombatRoundSkillKind::Melee || !Skill.bUseEffectCollision || !Skill.bTargetOnly || !Skill.EffectTravel.IsZero()) return false;
+        if (Skill.bUseWeaponTrace || Skill.bUseMeleeAreaCollision || Skill.MeleeArea != ESkillAreaType::Single) return false;
+    }
     const auto IsValidVfx = [](const FCombatSkillVfx& Vfx)
     {
         if ((!Vfx.Niagara.IsNull() && !Vfx.Cascade.IsNull()) || Vfx.RelativeTransform.ContainsNaN() || !Vfx.RelativeTransform.GetRotation().IsNormalized() || Vfx.RelativeTransform.GetScale3D().GetMin() <= 0.0) return false;

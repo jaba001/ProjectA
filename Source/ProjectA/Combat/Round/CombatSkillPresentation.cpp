@@ -319,6 +319,22 @@ void CombatSkillPresentation::Attach(AActor* Owner, const FCombatSkillVfx& Visua
     }
 }
 
+void CombatSkillPresentation::UpdateEndpoints(const TArray<TObjectPtr<UFXSystemComponent>>& Components, const FCombatSkillVfx& Visual, const FEndpointParameters& Endpoints)
+{
+    if (Endpoints.SourceWorldPosition.ContainsNaN() || Endpoints.TargetWorldPosition.ContainsNaN()) return;
+    for (UFXSystemComponent* Component : Components)
+    {
+        UNiagaraComponent* Niagara = Cast<UNiagaraComponent>(Component);
+        if (!IsValid(Niagara) || !Niagara->IsActive() || Niagara->GetComponentTransform().ContainsNaN()) continue;
+        UNiagaraSystem* System = Niagara->GetAsset();
+        if (!IsValid(System)) continue;
+        // Reuse the authored endpoint spaces with the live component transform; activation and sound stay unchanged.
+        // 실제 컴포넌트 변환으로 작성된 끝점 공간을 재사용하며 활성화와 사운드는 유지합니다.
+        BindNiagaraEndpoint(Niagara, System, Visual.StartPositionParameter, Visual.StartPositionSpace, Endpoints.SourceWorldPosition, Visual.StartPositionOffset);
+        BindNiagaraEndpoint(Niagara, System, Visual.EndPositionParameter, Visual.EndPositionSpace, Endpoints.TargetWorldPosition, FVector::ZeroVector);
+    }
+}
+
 void CombatSkillPresentation::Destroy(TArray<TObjectPtr<UFXSystemComponent>>& Components)
 {
     for (UFXSystemComponent* Component : Components)

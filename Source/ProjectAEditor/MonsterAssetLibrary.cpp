@@ -47,7 +47,7 @@ namespace
         return IsProjectAsset(Asset) && Asset->GetOutermost()->GetMetaData().GetValue(Asset, AuthorKey) == Owner;
     }
 
-    bool Fail(const TCHAR* Reason)
+    bool ReportMonsterAssetFailure(const TCHAR* Reason)
     {
         UE_LOG(LogMonsterAssetLibrary, Error, TEXT("%s"), Reason);
         return false;
@@ -133,7 +133,7 @@ namespace
             if (SlotName != FAnimSlotGroup::DefaultSlotName) Reason = TEXT("Custom monster slots must already exist on the original skeleton / 사용자 정의 몬스터 슬롯은 원본 스켈레톤에 이미 있어야 합니다");
             else if (Blueprint->TargetSkeleton->GetSlotGroupName(SlotName) != FAnimSlotGroup::DefaultGroupName) Reason = TEXT("Missing DefaultSlot must resolve to the engine DefaultGroup / 미등록 DefaultSlot은 엔진 DefaultGroup으로 해석되어야 합니다");
         }
-        return !Reason || (bReportErrors && Fail(Reason));
+        return !Reason || (bReportErrors && ReportMonsterAssetFailure(Reason));
     }
 
     bool CheckBlueprint(UAnimBlueprint* Blueprint, UBlendSpace* BlendSpace, FName SlotName)
@@ -177,11 +177,11 @@ bool UMonsterAssetLibrary::ValidateMonsterSkill(USkillDefinitionDataAsset* Skill
 
 bool UMonsterAssetLibrary::ConfigureMonsterBlendSpace(UBlendSpace1D* BlendSpace, UAnimSequence* Idle, UAnimSequence* Walk, UAnimSequence* Run, float WalkSpeed, float RunSpeed)
 {
-    if (!ValidBlendSpaceInputs(BlendSpace, Idle, Walk, Run, WalkSpeed, RunSpeed)) return Fail(TEXT("Monster BlendSpace requires a project destination, matching skeletons, nonadditive sequences and increasing finite speeds / 몬스터 BlendSpace에는 프로젝트 대상과 일치하는 스켈레톤, 일반 시퀀스, 증가하는 유한 속도가 필요합니다"));
-    if (HasOwner(BlendSpace, BlendSpaceOwner)) return CheckBlendSpace(BlendSpace, Idle, Walk, Run, WalkSpeed, RunSpeed) || Fail(TEXT("The saved monster BlendSpace differs; preserve it for explicit repair / 저장된 몬스터 BlendSpace가 달라 명시적 수정을 위해 보존합니다"));
-    if (BlendSpace->GetOutermost()->GetMetaData().HasValue(BlendSpace, AuthorKey) || !BlendSpace->GetBlendSamples().IsEmpty()) return Fail(TEXT("Only a new empty monster BlendSpace may be configured / 새로운 빈 몬스터 BlendSpace만 구성할 수 있습니다"));
+    if (!ValidBlendSpaceInputs(BlendSpace, Idle, Walk, Run, WalkSpeed, RunSpeed)) return ReportMonsterAssetFailure(TEXT("Monster BlendSpace requires a project destination, matching skeletons, nonadditive sequences and increasing finite speeds / 몬스터 BlendSpace에는 프로젝트 대상과 일치하는 스켈레톤, 일반 시퀀스, 증가하는 유한 속도가 필요합니다"));
+    if (HasOwner(BlendSpace, BlendSpaceOwner)) return CheckBlendSpace(BlendSpace, Idle, Walk, Run, WalkSpeed, RunSpeed) || ReportMonsterAssetFailure(TEXT("The saved monster BlendSpace differs; preserve it for explicit repair / 저장된 몬스터 BlendSpace가 달라 명시적 수정을 위해 보존합니다"));
+    if (BlendSpace->GetOutermost()->GetMetaData().HasValue(BlendSpace, AuthorKey) || !BlendSpace->GetBlendSamples().IsEmpty()) return ReportMonsterAssetFailure(TEXT("Only a new empty monster BlendSpace may be configured / 새로운 빈 몬스터 BlendSpace만 구성할 수 있습니다"));
     FStructProperty* ParameterProperty = FindFProperty<FStructProperty>(UBlendSpace::StaticClass(), TEXT("BlendParameters"));
-    if (!ParameterProperty || ParameterProperty->Struct != FBlendParameter::StaticStruct() || ParameterProperty->ArrayDim != 3) return Fail(TEXT("The engine BlendSpace axis property is unavailable / 엔진 BlendSpace 축 프로퍼티를 확인할 수 없습니다"));
+    if (!ParameterProperty || ParameterProperty->Struct != FBlendParameter::StaticStruct() || ParameterProperty->ArrayDim != 3) return ReportMonsterAssetFailure(TEXT("The engine BlendSpace axis property is unavailable / 엔진 BlendSpace 축 프로퍼티를 확인할 수 없습니다"));
     FBlendParameter* Axis = ParameterProperty->ContainerPtrToValuePtr<FBlendParameter>(BlendSpace, 0);
     const FBlendParameter PreviousAxis = *Axis;
     USkeleton* PreviousSkeleton = BlendSpace->GetSkeleton();
@@ -206,7 +206,7 @@ bool UMonsterAssetLibrary::ConfigureMonsterBlendSpace(UBlendSpace1D* BlendSpace,
     if (BlendSpace->AddSample(Idle, FVector::ZeroVector) == INDEX_NONE || BlendSpace->AddSample(Walk, FVector(WalkSpeed, 0.f, 0.f)) == INDEX_NONE || BlendSpace->AddSample(Run, FVector(RunSpeed, 0.f, 0.f)) == INDEX_NONE)
     {
         RestoreEmptyAsset();
-        return Fail(TEXT("Could not add the monster locomotion samples; restored the empty asset / 몬스터 이동 표본 추가에 실패하여 빈 에셋을 복구했습니다"));
+        return ReportMonsterAssetFailure(TEXT("Could not add the monster locomotion samples; restored the empty asset / 몬스터 이동 표본 추가에 실패하여 빈 에셋을 복구했습니다"));
     }
     BlendSpace->ValidateSampleData();
     BlendSpace->PostEditChange();
@@ -214,7 +214,7 @@ bool UMonsterAssetLibrary::ConfigureMonsterBlendSpace(UBlendSpace1D* BlendSpace,
     if (!CheckBlendSpace(BlendSpace, Idle, Walk, Run, WalkSpeed, RunSpeed))
     {
         RestoreEmptyAsset();
-        return Fail(TEXT("Authored monster BlendSpace validation failed; restored the empty asset / 작성된 몬스터 BlendSpace 검증에 실패하여 빈 에셋을 복구했습니다"));
+        return ReportMonsterAssetFailure(TEXT("Authored monster BlendSpace validation failed; restored the empty asset / 작성된 몬스터 BlendSpace 검증에 실패하여 빈 에셋을 복구했습니다"));
     }
     BlendSpace->GetOutermost()->GetMetaData().SetValue(BlendSpace, AuthorKey, BlendSpaceOwner);
     BlendSpace->MarkPackageDirty();
@@ -229,10 +229,10 @@ bool UMonsterAssetLibrary::ValidateMonsterBlendSpace(UBlendSpace1D* BlendSpace, 
 bool UMonsterAssetLibrary::ConfigureLocomotionAnimBlueprint(UAnimBlueprint* Blueprint, UBlendSpace* BlendSpace, FName SlotName)
 {
     if (!ValidBlueprintInputs(Blueprint, BlendSpace, SlotName, true)) return false;
-    if (HasOwner(Blueprint, BlueprintOwner)) return CheckBlueprint(Blueprint, BlendSpace, SlotName) || Fail(TEXT("The saved monster graph differs; preserve it for explicit repair / 저장된 몬스터 그래프가 달라 명시적 수정을 위해 보존합니다"));
+    if (HasOwner(Blueprint, BlueprintOwner)) return CheckBlueprint(Blueprint, BlendSpace, SlotName) || ReportMonsterAssetFailure(TEXT("The saved monster graph differs; preserve it for explicit repair / 저장된 몬스터 그래프가 달라 명시적 수정을 위해 보존합니다"));
     UAnimGraphNode_Root* Root = FindRoot(Blueprint);
     UEdGraphPin* ResultPin = PosePin(Root, EGPD_Input);
-    if (Blueprint->GetOutermost()->GetMetaData().HasValue(Blueprint, AuthorKey) || !Root || Root->GetGraph()->Nodes.Num() != 1 || !ResultPin || !ResultPin->LinkedTo.IsEmpty()) return Fail(TEXT("Only a new empty project AnimGraph may be configured / 새로운 빈 프로젝트 AnimGraph만 구성할 수 있습니다"));
+    if (Blueprint->GetOutermost()->GetMetaData().HasValue(Blueprint, AuthorKey) || !Root || Root->GetGraph()->Nodes.Num() != 1 || !ResultPin || !ResultPin->LinkedTo.IsEmpty()) return ReportMonsterAssetFailure(TEXT("Only a new empty project AnimGraph may be configured / 새로운 빈 프로젝트 AnimGraph만 구성할 수 있습니다"));
     UEdGraph* Graph = Root->GetGraph();
     const UEdGraphSchema* Schema = Graph->GetSchema();
     Blueprint->Modify();
@@ -267,7 +267,7 @@ bool UMonsterAssetLibrary::ConfigureLocomotionAnimBlueprint(UAnimBlueprint* Blue
         Player->DestroyNode();
         Slot->DestroyNode();
         Speed->DestroyNode();
-        return Fail(TEXT("Could not connect the monster graph; restored its empty root / 몬스터 그래프 연결에 실패하여 빈 최종 포즈를 복구했습니다"));
+        return ReportMonsterAssetFailure(TEXT("Could not connect the monster graph; restored its empty root / 몬스터 그래프 연결에 실패하여 빈 최종 포즈를 복구했습니다"));
     }
     // UE may register DefaultSlot in memory during compilation; original skeleton packages are never saved here.
     // UE는 컴파일 중 DefaultSlot을 메모리에 등록할 수 있으며 여기서는 원본 스켈레톤 패키지를 저장하지 않습니다.
@@ -280,7 +280,7 @@ bool UMonsterAssetLibrary::ConfigureLocomotionAnimBlueprint(UAnimBlueprint* Blue
         Speed->DestroyNode();
         FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
         FKismetEditorUtilities::CompileBlueprint(Blueprint);
-        return Fail(TEXT("Authored monster graph validation failed; restored its empty root / 작성된 몬스터 그래프 검증에 실패하여 빈 최종 포즈를 복구했습니다"));
+        return ReportMonsterAssetFailure(TEXT("Authored monster graph validation failed; restored its empty root / 작성된 몬스터 그래프 검증에 실패하여 빈 최종 포즈를 복구했습니다"));
     }
     Blueprint->GetOutermost()->GetMetaData().SetValue(Blueprint, AuthorKey, BlueprintOwner);
     Blueprint->MarkPackageDirty();

@@ -17,11 +17,12 @@ SPEC = json.loads(Path(__file__).with_name("DrGameSkillSpecs.json").read_text(en
 VERIFY = "-DrGameSkillsVerifyOnly" in unreal.SystemLibrary.get_command_line()
 ADD_CLASSIFICATION_TAGS = "-DrGameSkillsAddClassificationTags" in unreal.SystemLibrary.get_command_line()
 UPDATE_VFX_DIRECTIONS = "-DrGameSkillsUpdateVfxDirections" in unreal.SystemLibrary.get_command_line()
+ENABLE_CHAIN = "-DrGameSkillsEnableChain" in unreal.SystemLibrary.get_command_line()
 ASSETS = unreal.EditorAssetLibrary
 TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
 OWNER_KEY = "ProjectA.DrGameSkills"
 OWNER = "DrGameSkills.v1"
-REPORT_DIR = ROOT / "Saved/Automation" / ("SkillVfxDirection" if UPDATE_VFX_DIRECTIONS else "ChainSkillFilter" if ADD_CLASSIFICATION_TAGS else "DrGameSkills")
+REPORT_DIR = ROOT / "Saved/Automation" / ("ChainSkills" if ENABLE_CHAIN else "SkillVfxDirection" if UPDATE_VFX_DIRECTIONS else "ChainSkillFilter" if ADD_CLASSIFICATION_TAGS else "DrGameSkills")
 
 
 def require(value, reason):
@@ -75,6 +76,7 @@ def obtain(path, asset_class):
         return asset, False
     require(not VERIFY, "Missing authored package: " + path)
     require(not UPDATE_VFX_DIRECTIONS, "Endpoint migration cannot create packages: " + path)
+    require(not ENABLE_CHAIN, "Chain migration cannot create packages: " + path)
     folder, name = path.rsplit("/", 1)
     factory = unreal.DataAssetFactory()
     factory.set_editor_property("data_asset_class", asset_class)
@@ -145,8 +147,33 @@ def update_vfx_directions(asset, actual, expected):
     return True
 
 
-def set_or_check(asset, properties, created):
-    modified = False
+def enable_chain(asset, properties, entry):
+    if entry is None or entry["profile"] != "link" or not SPEC["profiles"][entry["profile"]].get("chain"):
+        return False
+    actual = asset.get_editor_property("round_definition")
+    expected = properties["round_definition"]
+    actual_chain = actual.get_editor_property("chain")
+    expected_chain = expected.get_editor_property("chain")
+    actual_description = normalized(asset.get_editor_property("skill_description"))
+    if normalized(actual_chain) == normalized(expected_chain) and actual_description == properties["skill_description"]:
+        return False
+    if normalized(actual_chain) != normalized(unreal.CombatChainSettings()) or expected_chain.get_editor_property("max_targets") <= 1 or actual_description != legacy_link_description(entry):
+        return False
+    # Preserve every other authored field before replacing both the legacy chain settings and its description.
+    # 기존 체인 설정과 설명을 함께 교체하기 전에 작성된 다른 모든 필드를 보존합니다.
+    expected.set_editor_property("chain", actual_chain)
+    unchanged = normalized(actual) == normalized(expected)
+    expected.set_editor_property("chain", expected_chain)
+    if not unchanged or any(normalized(asset.get_editor_property(name)) != normalized(value) for name, value in properties.items() if name not in ("round_definition", "skill_description")):
+        return False
+    actual.set_editor_property("chain", expected_chain)
+    asset.set_editor_property("round_definition", actual)
+    asset.set_editor_property("skill_description", properties["skill_description"])
+    return True
+
+
+def set_or_check(asset, properties, created, entry=None):
+    modified = ENABLE_CHAIN and not VERIFY and not created and enable_chain(asset, properties, entry)
     for name, expected in properties.items():
         if created:
             asset.set_editor_property(name, expected)
@@ -181,12 +208,23 @@ def make_vfx(entry, inspections):
         require(parameter_types.get(name) == "NiagaraFloat", "Niagara float mismatch: " + name)
     for name in [entry.get("start_position_parameter"), entry.get("end_position_parameter")]:
         require(not name or parameter_types.get(name) in ("Vector3f", "NiagaraPosition"), "Niagara endpoint mismatch: " + str(name))
-    require(not entry.get("sound"), "Embedded Niagara SFX must not have duplicate external playback")
+    sound = None
+    if entry.get("sound"):
+        # Permit direct original audio only when embedded playback is explicitly disabled and its live dependency is verified.
+        # 내부 재생을 명시적으로 끄고 실제 의존성을 검증한 경우에만 원본 오디오 직접 참조를 허용합니다.
+        require(entry.get("embedded_audio") is False and entry.get("bool_parameters", {}).get("User.AudioOn") is False and parameter_types.get("User.AudioOn") == "NiagaraBool", "External sound requires explicitly disabled embedded audio")
+        original_audio = {row["sound"].split(".", 1)[0] for row in inspected["audioInterfaces"] if row.get("sound")}
+        source_pack = "/".join(entry["source"].split("/")[:3]) + "/"
+        require(entry["sound"].startswith(source_pack) and entry["sound"] in entry.get("sound_dependencies", []) and entry["sound"] in original_audio, "External sound must be a verified original source-pack dependency")
+        sound = load(entry["sound"])
+        require(isinstance(sound, unreal.SoundBase), "External original audio must be SoundBase")
     vfx = unreal.CombatSkillVfx()
     vfx.set_editor_property("niagara", source)
     vfx.set_editor_property("relative_transform", unreal.Transform(location=unreal.Vector(*entry["translation"])))
     vfx.set_editor_property("bool_parameters", entry.get("bool_parameters", {}))
     vfx.set_editor_property("float_parameters", entry.get("float_parameters", {}))
+    if sound is not None:
+        vfx.set_editor_property("sound", sound)
     if entry.get("start_position_parameter"):
         vfx.set_editor_property("start_position_parameter", entry["start_position_parameter"])
         require(entry.get("start_position_space") in ("ComponentLocal", "World"), "Start endpoint space must be explicit")
@@ -222,20 +260,44 @@ def make_profile(entry, inspections):
         tags.append("Attack.Close" if settings["shape"] == "Slash" else "Attack.Ranged")
     profile.set_editor_property("effect_tags", make_tags(tags))
     profile.set_editor_property("effect_class", require(unreal.load_class(None, "/Script/ProjectA.GE_" + settings["effect"]), "Native GameplayEffect is missing"))
+    if settings.get("chain") is not None:
+        profile.set_editor_property("chain", make_chain(settings["chain"]))
     profile.set_editor_property("vfx", make_vfx(entry["vfx"], inspections))
     if entry.get("impact"):
         profile.set_editor_property("impact_vfx", make_vfx(entry["impact"], inspections))
     return profile
 
 
+def make_chain(settings):
+    names = {"max_targets", "jump_distance", "jump_interval_seconds", "damage_multiplier_per_jump"}
+    require(isinstance(settings, dict) and set(settings) == names, "Chain settings must declare exactly four fields")
+    require(isinstance(settings["max_targets"], int) and not isinstance(settings["max_targets"], bool) and settings["max_targets"] > 1, "Enabled chains must declare multiple targets")
+    chain = unreal.CombatChainSettings()
+    for name, value in settings.items():
+        chain.set_editor_property(name, value)
+    return chain
+
+
+def legacy_link_description(entry):
+    return f"선택한 적 하나를 연결해 {SPEC['defaults']['power']:g} 피해를 줍니다."
+
+
 def description(entry):
     power = SPEC["defaults"]["power"]
-    return {"area": f"선택한 지점의 범위 안 적들에게 각각 {power:g} 피해를 줍니다.", "line": f"전방 직선 범위 안 적들에게 각각 {power:g} 피해를 줍니다.", "link": f"선택한 적 하나를 연결해 {power:g} 피해를 줍니다.", "slash": f"접근한 뒤 전방 범위 안 적들에게 각각 {power:g} 피해를 줍니다.", "projectile": f"직선 투사체로 처음 부딪힌 적에게 {power:g} 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.", "heal": f"대상 아군의 HP를 {power:g} 회복합니다.", "shield": f"대상 아군에게 피해 {power:g}을 흡수하는 보호막을 부여합니다. 남은 보호막은 라운드 종료 시 사라집니다."}[entry["profile"]]
+    chain = SPEC["profiles"][entry["profile"]].get("chain")
+    if entry["profile"] == "link" and chain and chain["max_targets"] > 1:
+        decrease = (1.0 - chain["damage_multiplier_per_jump"]) * 100.0
+        damage = f"첫 피해 {power:g}, 점프마다 피해 {decrease:g}% 감소." if decrease > 0.0 else f"대상마다 {power:g} 피해를 줍니다."
+        return f"선택한 적부터 최근접 미타격 적 순서로 첫 대상을 포함해 최대 {chain['max_targets']}명에게 연쇄합니다. 점프 거리 {chain['jump_distance']:g}cm, 간격 {chain['jump_interval_seconds']:g}초. {damage}"
+    return {"area": f"선택한 지점의 범위 안 적들에게 각각 {power:g} 피해를 줍니다.", "line": f"전방 직선 범위 안 적들에게 각각 {power:g} 피해를 줍니다.", "link": legacy_link_description(entry), "slash": f"접근한 뒤 전방 범위 안 적들에게 각각 {power:g} 피해를 줍니다.", "projectile": f"직선 투사체로 처음 부딪힌 적에게 {power:g} 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.", "heal": f"대상 아군의 HP를 {power:g} 회복합니다.", "shield": f"대상 아군에게 피해 {power:g}을 흡수하는 보호막을 부여합니다. 남은 보호막은 라운드 종료 시 사라집니다."}[entry["profile"]]
 
 
 def main():
-    require(not (ADD_CLASSIFICATION_TAGS and UPDATE_VFX_DIRECTIONS), "Run classification and endpoint migrations separately")
+    require(sum((ADD_CLASSIFICATION_TAGS, UPDATE_VFX_DIRECTIONS, ENABLE_CHAIN)) <= 1, "Run classification, endpoint and chain migrations separately")
     selected = [entry for entry in SPEC["entries"] if entry["profile"]]
+    if ENABLE_CHAIN:
+        require(SPEC["profiles"]["link"].get("chain") and len([entry for entry in selected if entry["profile"] == "link"]) == 5, "Chain migration requires the five declared link skills")
+        require(all(not settings.get("chain") or name == "link" for name, settings in SPEC["profiles"].items()), "Chain migration only supports the declared link profile")
     require(len(selected) == 60 and len({entry["skill_id"] for entry in selected}) == 60 and len({entry["destination"] for entry in selected}) == 60, "Specification identities must be unique")
     require(all(entry["skill_id"].startswith("DrGame_") for entry in selected), "New skill IDs must be distinct from the retired catalog")
     require(all(entry["skill_id"] not in REMOVED_SKILL_IDS for entry in selected), "Retired skill ID reuse is forbidden")
@@ -259,7 +321,7 @@ def main():
         settings = SPEC["profiles"][entry["profile"]]
         properties = {"skill_id": entry["skill_id"], "skill_name": entry["name"], "skill_description": description(entry), "use_round_definition": True, "round_definition": profile, "ability_class": None, "action_point_cost": SPEC["defaults"]["action_point_cost"], "target_rule": getattr(unreal.SkillTargetRule, settings["target_rule"]), "area_type": unreal.SkillAreaType.SINGLE, "area_radius": 0, "move_to_target": settings["approach"] == "UNIT"}
         skill, is_new = obtain(entry["destination"], unreal.SkillDefinitionDataAsset)
-        modified = set_or_check(skill, properties, is_new)
+        modified = set_or_check(skill, properties, is_new, entry)
         if modified:
             updated.append(skill)
         if is_new:
@@ -298,6 +360,7 @@ def main():
     party_changed = previous_pool != run_pool
     require(not VERIFY or not party_changed, "Saved party is not connected to the new Run shop pool")
     require(not UPDATE_VFX_DIRECTIONS or not party_changed, "Endpoint migration cannot change the party Run pool")
+    require(not ENABLE_CHAIN or not party_changed, "Chain migration cannot change the party Run pool")
     before = {name: normalized(party.get_editor_property(name)) for name in ["unarmed_starting_skill", "encounter_skill_pool", "fallback_player_unit_class"]}
     professions = party.get_editor_property("professions")
     profession_values = {str(name): normalized(value) for name, value in professions.items()}

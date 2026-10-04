@@ -2,12 +2,16 @@
 
 #include "Misc/AutomationTest.h"
 #include "AbilitySystemComponent.h"
+#include "Combat/Round/CombatChainEffectActor.h"
 #include "Combat/Round/CombatSkillEffectActor.h"
 #include "Combat/Round/CombatSkillExecutor.h"
+#include "Tests/CombatChainTestHelpers.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameplayEffect.h"
+#include "Sound/SoundWave.h"
 #include "Unit/UnitBase.h"
 #include "UObject/StrongObjectPtr.h"
 #include <limits>
@@ -62,7 +66,7 @@ namespace CombatSkillEffectTests
             return Unit;
         }
 
-        bool AddWall(FVector Location)
+        bool AddWall(FVector Location, UBoxComponent** OutWall = nullptr)
         {
             AActor* Wall = World.IsValid() ? World->SpawnActor<AActor>(Location, FRotator::ZeroRotator) : nullptr;
             if (!Wall) return false;
@@ -74,6 +78,7 @@ namespace CombatSkillEffectTests
             Box->SetCollisionResponseToAllChannels(ECR_Block);
             Box->RegisterComponent();
             Wall->SetActorLocation(Location);
+            if (OutWall) *OutWall = Box;
             return true;
         }
 
@@ -462,6 +467,237 @@ bool FCombatSkillEffectInvalidTimingTest::RunTest(const FString& Parameters)
             Effect->AdvanceEffect(20.f);
             TestTrue(TEXT("Direct initialization rejects invalid timing without hits or unresolved actors"), Effect->HasResolved() && Resolutions == 1 && Hits == 0);
         }
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatChainSelectionGasTest, "ProjectA.Combat.Chain.NearestUnhitTagsOriginalCasterAndLimit", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatChainSelectionGasTest::RunTest(const FString& Parameters)
+{
+    CombatSkillEffectTests::FFixture Fixture;
+    AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
+    AUnitBase* First = Fixture.AddUnit(FVector(200.f, 0.f, 100.f), ETeam::Enemy);
+    AUnitBase* HigherId = Fixture.AddUnit(FVector(350.f, 50.f, 100.f), ETeam::Enemy);
+    AUnitBase* LowerId = Fixture.AddUnit(FVector(350.f, -50.f, 100.f), ETeam::Enemy);
+    AUnitBase* Untagged = Fixture.AddUnit(FVector(205.f, 0.f, 100.f), ETeam::Enemy);
+    AUnitBase* Blocked = Fixture.AddUnit(FVector(210.f, 0.f, 100.f), ETeam::Enemy);
+    AUnitBase* Ally = Fixture.AddUnit(FVector(215.f, 0.f, 100.f), ETeam::Player);
+    AUnitBase* Fourth = Fixture.AddUnit(FVector(450.f, 0.f, 100.f), ETeam::Enemy);
+    AUnitBase* Outsider = Fixture.AddUnit(FVector(201.f, 0.f, 100.f), ETeam::Enemy, false);
+    if (!Source || !First || !HigherId || !LowerId || !Untagged || !Blocked || !Ally || !Fourth || !Outsider) return false;
+    HigherId->UnitIndex = Fixture.Roster[2].UnitId = 9;
+    LowerId->UnitIndex = Fixture.Roster[3].UnitId = 2;
+    FCombatRoundSkill Skill = CombatChainTests::Skill();
+    const FGameplayTag Required = FGameplayTag::RequestGameplayTag(TEXT("Data.Damage"));
+    const FGameplayTag QueryTag = ProjectACombatTags::Data_Heal;
+    const FGameplayTag Excluded = ProjectACombatTags::Data_Shield;
+    Skill.SourceRequiredTags.AddTag(QueryTag);
+    Skill.TargetRequiredTags.AddTag(Required);
+    Skill.TargetBlockedTags.AddTag(Excluded);
+    Skill.TargetTagQuery = FGameplayTagQuery::MakeQuery_MatchTag(QueryTag);
+    Source->GetAbilitySystemComponent()->AddLooseGameplayTag(QueryTag);
+    for (AUnitBase* Unit : {First, HigherId, LowerId, Untagged, Blocked, Ally, Fourth, Outsider}) Unit->GetAbilitySystemComponent()->AddLooseGameplayTag(Required);
+    for (AUnitBase* Unit : {First, HigherId, LowerId, Blocked, Ally, Fourth, Outsider}) Unit->GetAbilitySystemComponent()->AddLooseGameplayTag(QueryTag);
+    Blocked->GetAbilitySystemComponent()->AddLooseGameplayTag(Excluded);
+    TArray<int32> HitIds;
+    bool bOriginalCaster = true;
+    bool bAppliedThroughGas = true;
+    bool bOriginalGasContext = true;
+    int32 AppliedEffects = 0;
+    const FDelegateHandle Applied = Source->GetAbilitySystemComponent()->OnGameplayEffectAppliedDelegateToTarget.AddLambda([&](UAbilitySystemComponent*, const FGameplayEffectSpec& Spec, FActiveGameplayEffectHandle)
+    {
+        bOriginalGasContext &= Spec.GetContext().GetOriginalInstigator() == Source && Spec.GetContext().GetSourceObject() == Source;
+        FGameplayTagContainer Tags;
+        Spec.GetAllAssetTags(Tags);
+        bOriginalGasContext &= Tags.HasTag(ProjectACombatTags::Skill_Shape_Chain) && Tags.HasTag(ProjectACombatTags::Skill_Effect_Damage);
+        ++AppliedEffects;
+    });
+    CombatSkillExecution::FReleaseContext Context;
+    Context.Owner = Source;
+    Context.Source = Source;
+    Context.Target = First;
+    Context.AimLocation = First->GetActorLocation();
+    Context.PresentationTime = 0.0;
+    ACombatChainEffectActor* Chain = nullptr;
+    int32 ImmediateHits = 0;
+    const CombatSkillExecution::FReleaseResult Released = CombatSkillExecution::Release(Context, Fixture.Roster, Skill, [&ImmediateHits](AUnitBase*) { ++ImmediateHits; }, [](ACombatRoundProjectile*) {}, [&](ACombatSkillEffectActor* Effect)
+    {
+        Chain = Cast<ACombatChainEffectActor>(Effect);
+        Effect->OnImpact.AddLambda([&](AUnitBase* OriginalSource, AUnitBase* Target, float Power)
+        {
+            bOriginalCaster &= OriginalSource == Source;
+            HitIds.Add(Target->UnitIndex);
+            FCombatRoundSkill HitSkill = Skill;
+            HitSkill.Power = Power;
+            bAppliedThroughGas &= CombatSkillExecution::ApplyEffect(OriginalSource, Target, HitSkill);
+        });
+    });
+    if (!TestTrue(TEXT("The tagged executor creates a managed chain actor"), Released.bSucceeded && Chain)) return false;
+    Chain->AdvanceEffect(0.125f, 0.125);
+    TestTrue(TEXT("The first impact chooses the lower-ID nearest unhit enemy before the next delay"), Chain->GetChainRuntimeData().TargetUnitId == LowerId->UnitIndex && HitIds.Num() == 1);
+    Chain->AdvanceEffect(0.125f, 0.25);
+    Chain->AdvanceEffect(0.125f, 0.375);
+    Chain->AdvanceEffect(1.f, 1.375);
+    TestTrue(TEXT("Equal-distance ordering is independent of roster insertion and targets are never repeated"), HitIds == TArray<int32>({First->UnitIndex, LowerId->UnitIndex, HigherId->UnitIndex}));
+    TestTrue(TEXT("The total target limit includes the first enemy and resolves the chain"), Chain->HasResolved() && Chain->GetChainRuntimeData().HitUnitIds.Num() == 3);
+    TestTrue(TEXT("All jumps retain the original source actor and actual GAS context and tags"), bOriginalCaster && bAppliedThroughGas && bOriginalGasContext && AppliedEffects == 3);
+    TestEqual(TEXT("The first enemy receives the authored power"), First->GetAttributeSet()->GetHP(), 80.f);
+    TestEqual(TEXT("The second enemy receives one cumulative multiplier"), LowerId->GetAttributeSet()->GetHP(), 90.f);
+    TestEqual(TEXT("The third enemy receives two cumulative multipliers"), HigherId->GetAttributeSet()->GetHP(), 95.f);
+    TestTrue(TEXT("Owned tags team roster and maximum-target filtering preserve excluded HP"), Untagged->GetAttributeSet()->GetHP() == 100.f && Blocked->GetAttributeSet()->GetHP() == 100.f && Ally->GetAttributeSet()->GetHP() == 100.f && Outsider->GetAttributeSet()->GetHP() == 100.f && Fourth->GetAttributeSet()->GetHP() == 100.f);
+    TestEqual(TEXT("Effect-managed release does not invoke the immediate hit path"), ImmediateHits, 0);
+    Source->GetAbilitySystemComponent()->OnGameplayEffectAppliedDelegateToTarget.Remove(Applied);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatChainFirstWindowClockTest, "ProjectA.Combat.Chain.FirstVolumeOcclusionWindowAndPresentationClock", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatChainFirstWindowClockTest::RunTest(const FString& Parameters)
+{
+    for (int32 Case = 0; Case < 2; ++Case)
+    {
+        CombatSkillEffectTests::FFixture Fixture;
+        AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
+        AUnitBase* Target = Fixture.AddUnit(FVector(Case == 0 ? 900.f : 200.f, 0.f, 100.f), ETeam::Enemy);
+        ACombatChainEffectActor* Chain = Fixture.World->SpawnActor<ACombatChainEffectActor>();
+        if (!Source || !Target || !Chain) return false;
+        UBoxComponent* Wall = nullptr;
+        if (Case == 1 && !Fixture.AddWall(FVector(100.f, 0.f, 100.f), &Wall)) return false;
+        int32 Hits = 0;
+        Chain->OnImpact.AddLambda([&Hits](AUnitBase*, AUnitBase*, float) { ++Hits; });
+        Chain->InitializeEffect(Source, Target, Target->GetActorLocation(), CombatChainTests::Skill(), Fixture.Roster, 0.0);
+        Chain->AdvanceEffect(0.125f, 0.125);
+        TestTrue(TEXT("A target outside the first volume or behind cover remains pending within its active window"), Hits == 0 && !Chain->HasResolved());
+        if (Case == 0) Target->SetActorLocation(FVector(200.f, 0.f, 100.f));
+        else Wall->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Chain->AdvanceEffect(0.125f, 0.25);
+        TestTrue(TEXT("The original first capsule query can hit a target that enters or emerges later"), Hits == 1 && Chain->HasResolved());
+    }
+    CombatSkillEffectTests::FFixture Fixture;
+    AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
+    AUnitBase* First = Fixture.AddUnit(FVector(200.f, 0.f, 100.f), ETeam::Enemy);
+    AUnitBase* Second = Fixture.AddUnit(FVector(350.f, 0.f, 100.f), ETeam::Enemy);
+    ACombatChainEffectActor* Chain = Fixture.World->SpawnActor<ACombatChainEffectActor>();
+    if (!Source || !First || !Second || !Chain) return false;
+    int32 Hits = 0;
+    Chain->OnImpact.AddLambda([&Hits](AUnitBase*, AUnitBase*, float) { ++Hits; });
+    Chain->InitializeEffect(Source, First, First->GetActorLocation(), CombatChainTests::Skill(), Fixture.Roster, 10.0);
+    for (int32 Step = 0; Step < 50; ++Step) Chain->AdvanceEffect(0.01f, 10.0);
+    TestEqual(TEXT("Creation-frame simulation debt cannot consume the initial lead-in"), Hits, 0);
+    Chain->AdvanceEffect(5.f, 10.125);
+    TestEqual(TEXT("The first presentation boundary resolves only the first target"), Hits, 1);
+    for (int32 Step = 0; Step < 50; ++Step) Chain->AdvanceEffect(0.01f, 10.125);
+    TestTrue(TEXT("A new segment cannot spend old simulation debt in the same presentation frame"), Hits == 1 && !Chain->HasResolved());
+    Chain->AdvanceEffect(5.f, 10.25);
+    TestTrue(TEXT("The next target waits for its own presentation interval and then resolves"), Hits == 2 && Chain->HasResolved());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatChainDelayedGuardsTest, "ProjectA.Combat.Chain.PendingTargetDeathRangeWallTagsAndCasterDeath", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatChainDelayedGuardsTest::RunTest(const FString& Parameters)
+{
+    for (int32 Case = 0; Case < 5; ++Case)
+    {
+        CombatSkillEffectTests::FFixture Fixture;
+        AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
+        AUnitBase* First = Fixture.AddUnit(FVector(200.f, 0.f, 100.f), ETeam::Enemy);
+        AUnitBase* Pending = Fixture.AddUnit(FVector(400.f, 0.f, 100.f), ETeam::Enemy);
+        ACombatChainEffectActor* Chain = Fixture.World->SpawnActor<ACombatChainEffectActor>();
+        if (!Source || !First || !Pending || !Chain) return false;
+        FCombatRoundSkill Skill = CombatChainTests::Skill();
+        const FGameplayTag Required = FGameplayTag::RequestGameplayTag(TEXT("Data.Damage"));
+        Skill.TargetRequiredTags.AddTag(Required);
+        First->GetAbilitySystemComponent()->AddLooseGameplayTag(Required);
+        Pending->GetAbilitySystemComponent()->AddLooseGameplayTag(Required);
+        int32 Hits = 0;
+        int32 Resolutions = 0;
+        Chain->OnImpact.AddLambda([&Hits](AUnitBase*, AUnitBase*, float) { ++Hits; });
+        Chain->OnResolved.AddLambda([&Resolutions](ACombatSkillEffectActor*) { ++Resolutions; });
+        Chain->InitializeEffect(Source, First, First->GetActorLocation(), Skill, Fixture.Roster, 0.0);
+        Chain->AdvanceEffect(0.125f, 0.125);
+        if (!TestTrue(TEXT("The eligible second enemy is captured as a pending segment"), Hits == 1 && Chain->GetChainRuntimeData().TargetUnitId == Pending->UnitIndex)) return false;
+        if (Case == 0) Pending->Die();
+        else if (Case == 1) Pending->SetActorLocation(FVector(2000.f, 0.f, 100.f));
+        else if (Case == 2 && !Fixture.AddWall(FVector(300.f, 0.f, 100.f))) return false;
+        else if (Case == 3) Pending->GetAbilitySystemComponent()->RemoveLooseGameplayTag(Required);
+        else if (Case == 4) Source->Die();
+        Chain->AdvanceEffect(0.125f, 0.25);
+        Chain->AdvanceEffect(5.f, 5.25);
+        TestTrue(TEXT("Changed pending eligibility cancels subsequent hits without rerouting or duplicate completion"), Chain->HasResolved() && Hits == 1 && Resolutions == 1);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatChainDeadPreviousPositionTest, "ProjectA.Combat.Chain.DeadOrDestroyedPreviousTargetRetainsContactPosition", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatChainDeadPreviousPositionTest::RunTest(const FString& Parameters)
+{
+    for (bool bDestroyPrevious : {false, true})
+    {
+        CombatSkillEffectTests::FFixture Fixture;
+        AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
+        AUnitBase* First = Fixture.AddUnit(FVector(200.f, 0.f, 100.f), ETeam::Enemy);
+        AUnitBase* Second = Fixture.AddUnit(FVector(400.f, 0.f, 100.f), ETeam::Enemy);
+        ACombatChainEffectActor* Chain = Fixture.World->SpawnActor<ACombatChainEffectActor>();
+        if (!Source || !First || !Second || !Chain) return false;
+        FCombatRoundSkill Skill = CombatChainTests::Skill();
+        Skill.Power = 120.f;
+        Skill.Chain.MaxTargets = 2;
+        Skill.Chain.JumpDistance = 250.f;
+        Skill.Chain.DamageMultiplierPerJump = 1.f;
+        int32 Hits = 0;
+        bool bOriginalCaster = true;
+        bool bApplied = true;
+        Chain->OnImpact.AddLambda([&](AUnitBase* OriginalSource, AUnitBase* Target, float Power)
+        {
+            bOriginalCaster &= OriginalSource == Source;
+            FCombatRoundSkill HitSkill = Skill;
+            HitSkill.Power = Power;
+            bApplied &= CombatSkillExecution::ApplyEffect(OriginalSource, Target, HitSkill);
+            ++Hits;
+            if (Target == First)
+            {
+                if (bDestroyPrevious) First->Destroy();
+                else First->SetActorLocation(FVector(10000.f, 0.f, 100.f));
+            }
+        });
+        Chain->InitializeEffect(Source, First, First->GetActorLocation(), Skill, Fixture.Roster, 0.0);
+        Chain->AdvanceEffect(0.125f, 0.125);
+        TestTrue(TEXT("A lethal or destroyed previous enemy retains its pre-damage origin rather than corpse movement"), Hits == 1 && Chain->GetChainRuntimeData().SegmentSourcePosition.Equals(FVector(200.f, 0.f, 100.f)) && Chain->GetChainRuntimeData().TargetUnitId == Second->UnitIndex);
+        Chain->AdvanceEffect(0.125f, 0.25);
+        TestTrue(TEXT("The next enemy is reached from the saved position with the original caster's GAS damage"), Hits == 2 && bOriginalCaster && bApplied && !Second->IsUnitAlive() && Chain->HasResolved());
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatChainAuthoredSoundBudgetTest, "ProjectA.Combat.Chain.AuthoredSoundCleanupBudgetDoesNotExtendHits", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatChainAuthoredSoundBudgetTest::RunTest(const FString& Parameters)
+{
+    for (float SoundLimit : {3.f, 10.f, 60.f})
+    {
+        CombatSkillEffectTests::FFixture Fixture;
+        AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
+        AUnitBase* Target = Fixture.AddUnit(FVector(200.f, 0.f, 100.f), ETeam::Enemy);
+        ACombatChainEffectActor* Chain = Fixture.World->SpawnActor<ACombatChainEffectActor>();
+        TStrongObjectPtr<USoundWave> Sound(NewObject<USoundWave>(GetTransientPackage(), NAME_None, RF_Transient));
+        if (!Source || !Target || !Chain || !Sound.IsValid()) return false;
+        FCombatRoundSkill Skill = CombatChainTests::Skill();
+        Skill.Vfx.Sound = Sound.Get();
+        Skill.Vfx.SoundMaxDuration = SoundLimit;
+        int32 Hits = 0;
+        int32 Resolutions = 0;
+        Chain->OnImpact.AddLambda([&Hits](AUnitBase*, AUnitBase*, float) { ++Hits; });
+        Chain->OnResolved.AddLambda([&Resolutions](ACombatSkillEffectActor*) { ++Resolutions; });
+        Chain->InitializeEffect(Source, Target, Target->GetActorLocation(), Skill, Fixture.Roster, 0.0);
+        Chain->AdvanceEffect(0.125f, 0.125);
+        // The audio-disabled native fixture checks the real actor cleanup deadline, without claiming waveform playback or listening.
+        // 사운드 비활성 네이티브 fixture로 실제 액터 정리 시한을 확인하며 파형 재생·청취 결과로 기록하지 않습니다.
+        TestTrue(TEXT("Authored audio cleanup keeps the base five-second floor and longer finite sound limits after collision resolution"), Chain->HasResolved() && FMath::IsNearlyEqual(Chain->GetLifeSpan(), FMath::Max(5.f, SoundLimit)));
+        Chain->AdvanceEffect(60.f, 60.125);
+        TestTrue(TEXT("A longer cosmetic sound budget never extends authoritative hits or completion callbacks"), Hits == 1 && Resolutions == 1 && Chain->GetChainRuntimeData().HitUnitIds.Num() == 1);
     }
     return true;
 }

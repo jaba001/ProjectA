@@ -18,6 +18,7 @@ class PROJECTA_API AMainMenuPreviewStage : public AActor
 
 public:
     AMainMenuPreviewStage();
+    virtual void Tick(float DeltaSeconds) override;
 
     // Replaces the preview actor assigned to one slot using the configured class map.
     // 설정된 클래스 맵을 사용해 한 슬롯의 프리뷰 액터를 교체합니다.
@@ -41,6 +42,7 @@ public:
     void ClearPreviewFocus();
 
 protected:
+    virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     // Root component used to move the entire preview stage in L_MainMenu.
     // L_MainMenu에서 전체 프리뷰 스테이지를 이동하기 위한 루트 컴포넌트입니다.
@@ -78,7 +80,16 @@ protected:
 
 private:
     USceneComponent* GetSlotAnchor(int32 SlotIndex) const;
+    void InvalidateOverviewCameraFit();
     void RefreshPreviewFocus();
+
+    // Retain the authored level camera as the basis for each overview refit.
+    // 전체 보기 재조정의 기준으로 레벨에서 작성한 원래 카메라를 유지합니다.
+    FTransform OverviewCameraTransform;
+    float OverviewFieldOfView = 90.0f;
+    double OverviewCameraDistanceScale = 1.0;
+    FIntPoint PreviewViewportSize = FIntPoint::ZeroValue;
+    bool bOverviewCameraFitInvalidated = true;
 
     int32 FocusedSlot = INDEX_NONE;
     FTransform UnfocusedCameraTransform;

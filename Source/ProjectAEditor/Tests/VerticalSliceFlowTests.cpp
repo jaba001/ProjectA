@@ -5,6 +5,12 @@
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Animation/AnimSingleNodeInstance.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Camera/PlayerCameraManager.h"
+#include "Camera/CameraComponent.h"
+#include "Game/Encounter/CombatArena.h"
+#include "HAL/FileManager.h"
+#include "ImageUtils.h"
+#include "Misc/FileHelper.h"
 #include "Blueprint/WidgetTree.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "Components/Button.h"
@@ -16,10 +22,12 @@
 #include "Controller/GameplayPlayerController.h"
 #include "Controller/MainMenuPlayerController.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
+#include "DataAsset/CharacterAppearanceCatalog.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Editor.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
+#include "Engine/SkeletalMesh.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Widgets/SViewport.h"
 #include "Widgets/SWindow.h"
@@ -49,10 +57,86 @@
 #include "UI/MainMenu/OptionsWidget.h"
 #include "UnrealClient.h"
 #include "Unit/UnitBase.h"
+#include "Unit/CharacterAppearanceComponent.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
 
 namespace ProjectAVerticalSliceTests
 {
+// Prepare the real PIE window without changing production display settings or accepting a smaller capture.
+// 제품 화면 설정을 변경하거나 작은 캡처를 허용하지 않고 실제 PIE 창을 준비합니다.
+class FPIEViewportPreparation
+{
+public:
+    bool Update(FAutomationTestBase* Test, UWorld* World, FIntPoint ExpectedSize)
+    {
+        if (RequestedSize != ExpectedSize)
+        {
+            RequestedSize = ExpectedSize;
+            bResizeRequested = bReady = bFailed = false;
+            WarmFrames = ResizeRetries = 0;
+        }
+        if (bReady) return true;
+        UGameViewportClient* Viewport = World ? World->GetGameViewport() : nullptr;
+        const TSharedPtr<SViewport> Widget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
+        const TSharedPtr<SWindow> Window = Widget.IsValid() ? FSlateApplication::Get().FindWidgetWindow(Widget.ToSharedRef()) : nullptr;
+        if (!Window.IsValid() || !Viewport || !Viewport->Viewport) return false;
+        if (!bResizeRequested)
+        {
+            const FIntPoint Before = Viewport->Viewport->GetSizeXY();
+            Test->AddInfo(FString::Printf(TEXT("Saved UI viewport before resize: requested=%dx%d physical=%dx%d window=%s localGeometry=%s DPI=%.3f."), ExpectedSize.X, ExpectedSize.Y, Before.X, Before.Y, *FVector2D(Window->GetSizeInScreen()).ToString(), *Widget->GetCachedGeometry().GetLocalSize().ToString(), Window->GetDPIScaleFactor()));
+            Window->Resize(FVector2D(ExpectedSize.X, ExpectedSize.Y));
+            bResizeRequested = true;
+            return false;
+        }
+        if (++WarmFrames < 2) return false;
+        const FIntPoint After = Viewport->Viewport->GetSizeXY();
+        if (After != ExpectedSize && ResizeRetries < 3)
+        {
+            const FVector2D ClientSize = Window->GetClientSizeInScreen();
+            const FVector2D Correction(ExpectedSize.X - After.X, ExpectedSize.Y - After.Y);
+            Test->AddInfo(FString::Printf(TEXT("Saved UI viewport resize retry=%d requested=%dx%d physical=%dx%d client=%s correction=%s."), ResizeRetries + 1, ExpectedSize.X, ExpectedSize.Y, After.X, After.Y, *ClientSize.ToString(), *Correction.ToString()));
+            Window->Resize(ClientSize + Correction);
+            ++ResizeRetries;
+            WarmFrames = 0;
+            return false;
+        }
+        Test->AddInfo(FString::Printf(TEXT("Saved UI viewport after resize: requested=%dx%d physical=%dx%d window=%s localGeometry=%s DPI=%.3f warmFrames=%d."), ExpectedSize.X, ExpectedSize.Y, After.X, After.Y, *FVector2D(Window->GetSizeInScreen()).ToString(), *Widget->GetCachedGeometry().GetLocalSize().ToString(), Window->GetDPIScaleFactor(), WarmFrames));
+        bReady = Test->TestTrue(TEXT("The actual PIE viewport has the exact requested physical review dimensions within three border-feedback retries."), After == ExpectedSize);
+        bFailed = !bReady;
+        return bReady;
+    }
+
+    bool HasFailed() const { return bFailed; }
+
+private:
+    bool bResizeRequested = false;
+    bool bReady = false;
+    bool bFailed = false;
+    int32 WarmFrames = 0;
+    int32 ResizeRetries = 0;
+    FIntPoint RequestedSize = FIntPoint::ZeroValue;
+};
+
+// Capture the actual gameplay Slate widget rather than the surrounding editor window.
+// 주변 에디터 창 대신 실제 게임플레이 Slate 위젯을 캡처합니다.
+bool CaptureGameplayUI(FAutomationTestBase* Test, UWorld* World, const FString& Filename, FIntPoint ExpectedSize)
+{
+    UGameViewportClient* Viewport = World ? World->GetGameViewport() : nullptr;
+    const TSharedPtr<SViewport> Widget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
+    const FIntPoint ViewportSize = Viewport && Viewport->Viewport ? Viewport->Viewport->GetSizeXY() : FIntPoint::ZeroValue;
+    if (!Test->TestTrue(TEXT("The actual gameplay viewport retains the exact requested physical Slate UI capture dimensions."), Widget.IsValid() && ViewportSize == ExpectedSize)) return false;
+    TArray<FColor> Pixels;
+    FIntVector Dimensions;
+    if (!Test->TestTrue(TEXT("The actual gameplay Slate capture has the complete viewport dimensions."), FSlateApplication::Get().TakeScreenshot(Widget.ToSharedRef(), Pixels, Dimensions) && Dimensions.X == ViewportSize.X && Dimensions.Y == ViewportSize.Y && Pixels.Num() == ViewportSize.X * ViewportSize.Y)) return false;
+    for (FColor& Pixel : Pixels) Pixel.A = 255;
+    TArray64<uint8> Png;
+    FImageUtils::PNGCompressImageArray(Dimensions.X, Dimensions.Y, Pixels, Png);
+    IFileManager::Get().MakeDirectory(*FPaths::GetPath(Filename), true);
+    if (!Test->TestTrue(TEXT("The complete gameplay UI capture is saved before travel or PIE teardown."), !Png.IsEmpty() && FFileHelper::SaveArrayToFile(Png, *Filename) && IFileManager::Get().FileSize(*Filename) == Png.Num())) return false;
+    Test->AddInfo(FString::Printf(TEXT("Gameplay Slate screenshot: %s (%dx%d)."), *Filename, Dimensions.X, Dimensions.Y));
+    return true;
+}
+
 template <typename T>
 T* FindActiveWidget(UWorld* World)
 {
@@ -92,10 +176,38 @@ public:
         if (bFlowOnly) Test->AddInfo(TEXT("-ProjectAFlowOnly skips preview animation playback, looping/loop-boundary checks and asset screenshots; immediate character creation, ClassInfo layout, selection/edit/save/cancel buttons and preview actor cleanup remain covered."));
     }
 
+    virtual ~FPlayMenuLifecycle() override
+    {
+        RestorePreviewPointer();
+    }
+
     virtual bool Update() override
     {
-        if (FPlatformTime::Seconds() - StageStarted > 60.0)
+        if (!bRequestedPIE)
         {
+            PlaySettings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
+            PlaySettings->SetPlayNetMode(PIE_Standalone);
+            PlaySettings->SetPlayNumberOfClients(1);
+            PlaySettings->SetRunUnderOneProcess(true);
+            PlaySettings->bLaunchSeparateServer = false;
+            PlaySettings->NewWindowWidth = 1280;
+            PlaySettings->NewWindowHeight = 720;
+            PlaySettings->SetClientWindowSize(FIntPoint(1280, 720));
+            FRequestPlaySessionParams Params;
+            Params.EditorPlaySettings = PlaySettings.Get();
+            Params.SessionDestination = EPlaySessionDestinationType::InProcess;
+            Params.WorldType = EPlaySessionWorldType::PlayInEditor;
+            Params.bAllowOnlineSubsystem = false;
+            Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/MainMenu");
+            GEditor->RequestPlaySession(Params);
+            bRequestedPIE = true;
+            StageStarted = FPlatformTime::Seconds();
+            return false;
+        }
+        if (FPlatformTime::Seconds() - StageStarted > (Stage == 2 ? 120.0 : 60.0))
+        {
+            AMainMenuPlayerController* Menu = GEditor->PlayWorld ? Cast<AMainMenuPlayerController>(GEditor->PlayWorld->GetFirstPlayerController()) : nullptr;
+            if (Menu) for (int32 Index = 0; Index < 4; ++Index) LogPreview(Menu, Index, TEXT("timeout"));
             Test->AddError(FString::Printf(TEXT("Saved menu PIE timed out at stage %d."), Stage));
             return true;
         }
@@ -146,6 +258,7 @@ public:
             {
                 return false;
             }
+            if (PreviewRatioIndex == 0 && !ViewportPreparation.Update(Test, World, FIntPoint(1280, 720))) return ViewportPreparation.HasFailed();
             UButton* CreateButton = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_Create")));
             if (!Require(CreateButton != nullptr, TEXT("CharacterCreation contains the slot zero create button.")))
             {
@@ -172,6 +285,8 @@ public:
                     }
                     if (PreviewCaptureStage == 1)
                     {
+                        if (!bFlowOnly && !ReviewPreviewRatios(Menu, World)) return bPreviewGeometryFailed || ViewportPreparation.HasFailed();
+                        PreviewWorldStart = World->GetTimeSeconds();
                         const float ScreenBottom = Creation->GetCachedGeometry().LocalToAbsolute(Creation->GetCachedGeometry().GetLocalSize()).Y;
                         for (int32 Index = 0; Index < 4; ++Index)
                         {
@@ -183,34 +298,61 @@ public:
                             USkeletalMeshComponent* Mesh = Actor ? Actor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
                             UAnimSingleNodeInstance* Animation = Mesh ? Mesh->GetSingleNodeInstance() : nullptr;
                             if (!Require(Animation && Animation->IsPlaying() && Animation->IsLooping(), TEXT("Every preview runs its looping idle animation."))) return true;
-                            Animation->SetPosition(Animation->GetLength() - 0.1f, false);
                             PreviewAnimationLengths[Index] = Animation->GetLength();
+                            PreviewAnimationRates[Index] = Animation->GetPlayRate();
+                            PreviewAnimationStartTimes[Index] = PreviewAnimationLastTimes[Index] = Animation->GetCurrentTime();
+                            if (!Require(PreviewAnimationLengths[Index] > 0.f && PreviewAnimationRates[Index] > 0.f, TEXT("Every preview has a positive authored loop length and play rate."))) return true;
+                            LogPreview(Menu, Index, TEXT("start"));
                         }
                         if (!bFlowOnly)
                         {
-                            Capture(TEXT("00-FourPreviews.png"));
                             PreviewCaptureStage = 2;
                             ProfessionPanelTime = FPlatformTime::Seconds();
                             return false;
                         }
                         PreviewCaptureStage = 2;
                     }
-                    for (int32 Index = 0; Index < 4; ++Index)
+                    if (!bFlowOnly)
                     {
-                        if (!bFlowOnly)
+                        bool bWholeCycles = true;
+                        for (int32 Index = 0; Index < 4; ++Index)
                         {
                             AActor* Actor = Menu->GetPreviewStage()->GetPreviewActorForSlot(Index);
                             USkeletalMeshComponent* Mesh = Actor ? Actor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
                             UAnimSingleNodeInstance* Animation = Mesh ? Mesh->GetSingleNodeInstance() : nullptr;
-                            Test->TestTrue(TEXT("Idle animation advances through its loop boundary in the real preview world."), Animation && Animation->IsPlaying() && Animation->GetCurrentTime() < PreviewAnimationLengths[Index] - 0.1f);
+                            if (!Require(Animation && Animation->IsPlaying() && Animation->IsLooping() && FMath::IsNearlyEqual(Animation->GetPlayRate(), PreviewAnimationRates[Index]), TEXT("The authored preview retains its playing looping state and original play rate while observed."))) return true;
+                            const float Current = Animation->GetCurrentTime();
+                            const float Previous = PreviewAnimationLastTimes[Index];
+                            if (Current + KINDA_SMALL_NUMBER < Previous)
+                            {
+                                ++PreviewAnimationWraps[Index];
+                                PreviewAnimationAdvance[Index] += PreviewAnimationLengths[Index] - Previous + Current;
+                            }
+                            else PreviewAnimationAdvance[Index] += FMath::Max(0.f, Current - Previous);
+                            PreviewAnimationLastTimes[Index] = Current;
+                            bWholeCycles &= PreviewAnimationWraps[Index] > 0 && PreviewAnimationAdvance[Index] + KINDA_SMALL_NUMBER >= PreviewAnimationLengths[Index] && World->GetTimeSeconds() - PreviewWorldStart + KINDA_SMALL_NUMBER >= PreviewAnimationLengths[Index] / PreviewAnimationRates[Index];
                         }
+                        if (!bWholeCycles) return false;
+                        for (int32 Index = 0; Index < 4; ++Index)
+                        {
+                            LogPreview(Menu, Index, TEXT("end"));
+                            if (!Require(PreviewAnimationWraps[Index] > 0 && PreviewAnimationAdvance[Index] + KINDA_SMALL_NUMBER >= PreviewAnimationLengths[Index], TEXT("Idle animation advances through at least one whole cycle and its loop boundary in the actual preview world."))) return true;
+                        }
+                    }
+                    for (int32 Index = 0; Index < 4; ++Index)
+                    {
                         Cast<UButton>(Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_Delete"), Index))))->OnClicked.Broadcast();
                         Test->TestNull(TEXT("Deleting the slot removes its animated preview actor."), Menu->GetPreviewStage()->GetPreviewActorForSlot(Index));
                     }
                     PreviewCaptureStage = 3;
                 }
-                CreateButton->OnClicked.Broadcast();
-                if (!VerifyCreatedSlot(Test, Creation, 0)) return true;
+                if (!bBodyDraftPrepared)
+                {
+                    CreateButton->OnClicked.Broadcast();
+                    if (!VerifyCreatedSlot(Test, Creation, 0)) return true;
+                    bBodyDraftPrepared = true;
+                }
+                if (!ReviewBodyControls(Creation, Menu, World)) return bBodyReviewFailed;
                 UButton* Edit = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_Edit")));
                 UButton* Info = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_ClassInfo")));
                 UEditableTextBox* NameInput = Cast<UEditableTextBox>(Creation->GetWidgetFromName(TEXT("ProfessionNameInput")));
@@ -218,6 +360,13 @@ public:
                 if (!Require(Edit && Info && NameInput && ClassSelect, TEXT("Slot detail controls exist.")))
                 {
                     return true;
+                }
+                if (!bFlowOnly)
+                {
+                    UCameraComponent* Camera = Menu->GetPreviewStage()->FindComponentByClass<UCameraComponent>();
+                    if (!Require(Camera != nullptr, TEXT("The actual preview stage has its party camera before editing."))) return true;
+                    PartyCameraBeforeDetails = Camera->GetComponentTransform();
+                    PartyFOVBeforeDetails = Camera->FieldOfView;
                 }
                 Edit->OnClicked.Broadcast();
                 NameInput->SetText(FText::FromString(TEXT("   ")));
@@ -247,12 +396,36 @@ public:
             }
             if (!bProfessionCaptured && !bFlowOnly)
             {
-                Capture(TEXT("00-ProfessionDetails.png"));
+                if (!Capture(TEXT("00-ProfessionDetails.png"))) return true;
                 bProfessionCaptured = true;
                 ProfessionPanelTime = FPlatformTime::Seconds();
                 return false;
             }
-            Creation->CloseSlotDetails();
+            if (!bProfessionDetailsClosed)
+            {
+                Creation->CloseSlotDetails();
+                bProfessionDetailsClosed = true;
+                if (!bFlowOnly)
+                {
+                    UCameraComponent* Camera = Menu->GetPreviewStage()->FindComponentByClass<UCameraComponent>();
+                    if (!Require(Camera && Camera->GetComponentTransform().Equals(PartyCameraBeforeDetails, 0.1f) && FMath::IsNearlyEqual(Camera->FieldOfView, PartyFOVBeforeDetails, 0.01f), TEXT("Closing the actual detail screen restores the saved party camera transform and field of view."))) return true;
+                    ResetPreviewCameraObservation();
+                    return false;
+                }
+            }
+            if (!bFlowOnly && !WaitForPreviewCamera(Menu, World)) return false;
+            if (!bFlowOnly)
+            {
+                UCameraComponent* Camera = Menu->GetPreviewStage()->FindComponentByClass<UCameraComponent>();
+                if (!Require(Camera && Menu->PlayerCameraManager->GetCameraLocation().Equals(Camera->GetComponentLocation(), 0.1f) && Menu->PlayerCameraManager->GetCameraRotation().Equals(Camera->GetComponentRotation(), 0.05f) && FMath::IsNearlyEqual(Menu->PlayerCameraManager->GetFOVAngle(), Camera->FieldOfView, 0.01f) && FMath::IsNearlyEqual(Camera->FieldOfView, PartyFOVBeforeDetails, 0.01f) && FMath::IsNearlyEqual(Camera->FieldOfView, 90.f, 0.01f), TEXT("The actual player camera cache converges to the current native overview camera and its original 90-degree overview field of view after detail closure and bounds refitting."))) return true;
+                Test->AddInfo(FString::Printf(TEXT("Detail close camera convergence: original=%s current=%s actual=%s originalFOV=%.3f currentFOV=%.3f actualFOV=%.3f stableFrames=%d stableWorldSeconds=%.3f."), *PartyCameraBeforeDetails.GetLocation().ToString(), *Camera->GetComponentLocation().ToString(), *Menu->PlayerCameraManager->GetCameraLocation().ToString(), PartyFOVBeforeDetails, Camera->FieldOfView, Menu->PlayerCameraManager->GetFOVAngle(), PreviewCameraStableFrames, World->GetTimeSeconds() - PreviewCameraStableWorldStart));
+                if (!ReviewPartyBounds(Menu, World, FIntPoint(1280, 720), TEXT("details-closed")) || !Capture(TEXT("00-PartyAfterDetails.png"))) return true;
+            }
+            for (int32 Index = 1; Index < 4; ++Index)
+            {
+                Cast<UButton>(Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_Delete"), Index))))->OnClicked.Broadcast();
+                if (!Require(Menu->GetPreviewStage()->GetPreviewActorForSlot(Index) == nullptr, TEXT("The restored overview fixture removes its extra created slots through actual delete buttons."))) return true;
+            }
             const TArray<FRunPartyMember> Members = Creation->GetPartyMembers();
             if (!Require(Members.Num() == 4 && Members[0].bCreated && !Members[1].bCreated && !Members[2].bCreated && !Members[3].bCreated, TEXT("Character creation exports one created member and three empty slots.")))
             {
@@ -492,9 +665,326 @@ private:
         return true;
     }
 
-    void Capture(const TCHAR* FileName)
+    // Find the real detail actions by their visible labels inside the actual editor panel.
+    // 실제 편집 패널 안의 표시된 라벨로 상세 행동 버튼을 찾습니다.
+    UButton* FindDetailButton(UCharacterCreationWidget* Creation, const FString& Label)
     {
-        FScreenshotRequest::RequestScreenshot(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/VerticalSliceScreenshots"), FileName), true, false);
+        UWidget* Panel = Creation->GetWidgetFromName(TEXT("ProfessionDetailPanel"));
+        UButton* Result = nullptr;
+        Creation->WidgetTree->ForEachWidget([&](UWidget* Widget)
+        {
+            UButton* Button = Cast<UButton>(Widget);
+            UTextBlock* Text = Button ? Cast<UTextBlock>(Button->GetContent()) : nullptr;
+            if (!Text || Text->GetText().ToString() != Label) return;
+            for (UWidget* Parent = Button->GetParent(); Parent; Parent = Parent->GetParent()) if (Parent == Panel) Result = Button;
+        });
+        return Result;
+    }
+
+    bool CheckStoredBody(UCharacterCreationWidget* Creation, FName ExpectedBodyId)
+    {
+        const FRunPartyMember Actual = Creation->GetPartyMembers()[0];
+        FRunPartyMember Expected = BodyOriginalMember;
+        Expected.Appearance.BodyId = ExpectedBodyId;
+        Expected.CharacterName = Actual.CharacterName;
+        const bool bStored = Actual.CharacterName.ToString() == BodyOriginalMember.CharacterName.ToString() && FRunPartyMember::StaticStruct()->CompareScriptStruct(&Expected, &Actual, 0);
+        if (!Require(bStored, TEXT("A body edit changes only its saved body identifier and preserves the original name, class, outfit identifiers, control and complete remaining draft data."))) bBodyReviewFailed = true;
+        return bStored;
+    }
+
+    bool CheckPreviewBody(UCharacterCreationWidget* Creation, AMainMenuPlayerController* Menu, FName BodyId, bool bDetailOpen)
+    {
+        FProfessionDefinition Profession;
+        const bool bResolved = Creation->PartyDefinition && Creation->PartyDefinition->ResolveProfession(BodyOriginalMember.ClassId, Profession);
+        const FCharacterAppearanceBodyVariant* Body = bResolved && Profession.AppearanceCatalog ? Profession.AppearanceCatalog->FindBodyVariant(BodyId) : nullptr;
+        AActor* Actor = Menu->GetPreviewStage()->GetPreviewActorForSlot(0);
+        USkeletalMeshComponent* Mesh = Actor ? Actor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+        UCharacterAppearanceComponent* Appearance = Actor ? Actor->FindComponentByClass<UCharacterAppearanceComponent>() : nullptr;
+        UWidget* Panel = Creation->GetWidgetFromName(TEXT("ProfessionDetailPanel"));
+        UTextBlock* Name = Cast<UTextBlock>(Creation->GetWidgetFromName(TEXT("AppearanceBodyName")));
+        const bool bMesh = Body && Mesh && Mesh->IsVisible() && !Actor->IsHidden() && Mesh->GetSkeletalMeshAsset() && Mesh->GetSkeletalMeshAsset()->GetPathName() == Body->Mesh.ToSoftObjectPath().ToString() && Appearance && Profession.AppearanceCatalog->FindBodyVariant(Appearance->Selection.BodyId) == Body;
+        const bool bUI = Panel && (bDetailOpen ? Panel->IsVisible() && Name && Name->GetText().ToString() == Body->DisplayName.ToString() : Panel->GetVisibility() == ESlateVisibility::Collapsed);
+        if (!Require(bMesh && bUI, TEXT("The actual preview uses the catalog's original selected body mesh and the actual detail label or closed panel agrees with that body.")))
+        {
+            bBodyReviewFailed = true;
+            return false;
+        }
+        Test->AddInfo(FString::Printf(TEXT("Body UI stage=%d selected=%s originalMesh=%s savedBody=%s detailOpen=%d."), BodyReviewStage, *BodyId.ToString(), *Mesh->GetSkeletalMeshAsset()->GetPathName(), *Creation->GetPartyMembers()[0].Appearance.BodyId.ToString(), bDetailOpen));
+        return true;
+    }
+
+    // Release the routed review gesture and restore the cursor even when a later assertion fails.
+    // 이후 검사가 실패해도 라우팅한 검수 제스처를 해제하고 커서를 복원합니다.
+    void RestorePreviewPointer()
+    {
+        if (!FSlateApplication::IsInitialized()) return;
+        FSlateApplication& Slate = FSlateApplication::Get();
+        if (bPreviewPointerPressed)
+        {
+            const FVector2D Cursor = Slate.GetCursorPos();
+            Slate.ProcessMouseButtonUpEvent(FPointerEvent(FSlateApplication::CursorPointerIndex, Cursor, Cursor, TSet<FKey>(), EKeys::RightMouseButton, 0, FModifierKeysState()));
+            bPreviewPointerPressed = false;
+        }
+        if (bPreviewCursorMoved) Slate.SetCursorPos(PreviousPreviewCursor);
+        bPreviewCursorMoved = false;
+    }
+
+    // Route physical-style Slate pointer events through the actual preview backdrop; never call the rotation implementation directly.
+    // 회전 구현을 직접 호출하지 않고 실제 프리뷰 배경으로 Slate 포인터 이벤트를 라우팅합니다.
+    bool ReviewPreviewDrag(UCharacterCreationWidget* Creation, AMainMenuPlayerController* Menu)
+    {
+        if (PreviewDragStage >= 4) return true;
+        FSlateApplication& Slate = FSlateApplication::Get();
+        const TSharedPtr<SWindow> Window = Slate.FindWidgetWindow(Creation->TakeWidget());
+        UWidget* Panel = Creation->GetWidgetFromName(TEXT("ProfessionDetailPanel"));
+        AActor* Actor = Menu->GetPreviewStage()->GetPreviewActorForSlot(0);
+        const FGeometry& Geometry = Creation->GetCachedGeometry();
+        const auto Fail = [this]() { bBodyReviewFailed = true; return false; };
+        if (!Require(Window.IsValid() && Window->GetNativeWindow().IsValid() && Panel && Actor && !Geometry.GetLocalSize().IsNearlyZero(), TEXT("The actual body editor supplies a native Slate window, preview actor and hit-test geometry for RMB dragging."))) return Fail();
+        const TSet<FKey> Pressed{EKeys::RightMouseButton};
+        const TSet<FKey> Released;
+        if (PreviewDragStage == 0)
+        {
+            if (!Require(!Slate.GetPressedMouseButtons().Contains(EKeys::RightMouseButton) && !Creation->HasMouseCaptureByUser(0), TEXT("The isolated preview drag starts with its RMB and widget capture released."))) return Fail();
+            PreviousPreviewCursor = Slate.GetCursorPos();
+            bPreviewCursorMoved = true;
+            PreviewRotationBeforeDrag = Actor->GetActorQuat();
+            const FVector2D LocalSize = Geometry.GetLocalSize();
+            PreviewDragStart = Geometry.LocalToAbsolute(FVector2D(LocalSize.X * 0.25, LocalSize.Y * 0.5));
+            PreviewDragEnd = Geometry.LocalToAbsolute(FVector2D(LocalSize.X * 0.25 + 80.0, LocalSize.Y * 0.5));
+            if (!Require(Geometry.IsUnderLocation(PreviewDragStart) && Geometry.IsUnderLocation(PreviewDragEnd) && !Panel->GetCachedGeometry().IsUnderLocation(PreviewDragStart) && !Panel->GetCachedGeometry().IsUnderLocation(PreviewDragEnd), TEXT("The complete real RMB drag lies on the visible preview backdrop outside every detail form control."))) return Fail();
+            Slate.SetCursorPos(PreviewDragStart);
+            Slate.ProcessMouseMoveEvent(FPointerEvent(FSlateApplication::CursorPointerIndex, PreviewDragStart, PreviousPreviewCursor, Released, EKeys::Invalid, 0, FModifierKeysState()));
+            const FWidgetPath Path = Slate.LocateWindowUnderMouse(PreviewDragStart, Slate.GetInteractiveTopLevelWindows());
+            if (!Require(Path.IsValid() && Path.ContainsWidget(&Creation->TakeWidget().Get()), TEXT("The physical-style pointer hit path routes through the actual character creation widget."))) return Fail();
+            bPreviewPointerPressed = true;
+            Slate.ProcessMouseButtonDownEvent(Window->GetNativeWindow(), FPointerEvent(FSlateApplication::CursorPointerIndex, PreviewDragStart, PreviewDragStart, Pressed, EKeys::RightMouseButton, 0, FModifierKeysState()));
+            if (!Require(Creation->HasMouseCaptureByUser(0), TEXT("Actual Slate RMB down reaches NativeOnMouseButtonDown and captures the creation widget."))) return Fail();
+        }
+        else if (PreviewDragStage == 1)
+        {
+            if (!Require(Creation->HasMouseCaptureByUser(0), TEXT("The real RMB gesture retains capture before moving."))) return Fail();
+            Slate.SetCursorPos(PreviewDragEnd);
+            Slate.ProcessMouseMoveEvent(FPointerEvent(FSlateApplication::CursorPointerIndex, PreviewDragEnd, PreviewDragStart, Pressed, EKeys::Invalid, 0, FModifierKeysState()));
+            PreviewRotationAfterDrag = Actor->GetActorQuat();
+            const double Delta = FMath::Abs(FRotator::NormalizeAxis(PreviewRotationAfterDrag.Rotator().Yaw - PreviewRotationBeforeDrag.Rotator().Yaw));
+            if (!Require(Delta > 10.0 && Delta < 80.0 && Creation->HasMouseCaptureByUser(0) && CheckStoredBody(Creation, TEXT("Female")), TEXT("Actual captured Slate move rotates the pending body while leaving the saved female party draft unchanged."))) return Fail();
+            Test->AddInfo(FString::Printf(TEXT("Actual Slate RMB preview drag: start=%s end=%s yawBefore=%.3f yawAfter=%.3f delta=%.3f capture=%d."), *PreviewDragStart.ToString(), *PreviewDragEnd.ToString(), PreviewRotationBeforeDrag.Rotator().Yaw, PreviewRotationAfterDrag.Rotator().Yaw, Delta, Creation->HasMouseCaptureByUser(0)));
+        }
+        else if (PreviewDragStage == 2)
+        {
+            Slate.ProcessMouseButtonUpEvent(FPointerEvent(FSlateApplication::CursorPointerIndex, PreviewDragEnd, PreviewDragEnd, Released, EKeys::RightMouseButton, 0, FModifierKeysState()));
+            bPreviewPointerPressed = false;
+            if (!Require(!Creation->HasMouseCaptureByUser(0) && !Slate.GetPressedMouseButtons().Contains(EKeys::RightMouseButton), TEXT("Actual Slate RMB up reaches NativeOnMouseButtonUp and releases both widget capture and pressed-button state."))) return Fail();
+            Slate.SetCursorPos(PreviewDragStart);
+            Slate.ProcessMouseMoveEvent(FPointerEvent(FSlateApplication::CursorPointerIndex, PreviewDragStart, PreviewDragEnd, Released, EKeys::Invalid, 0, FModifierKeysState()));
+            if (!Require(Actor->GetActorQuat().Equals(PreviewRotationAfterDrag, 0.001), TEXT("A real pointer move after RMB release cannot continue rotating the preview."))) return Fail();
+        }
+        else if (PreviewDragStage == 3)
+        {
+            bPreviewPointerPressed = true;
+            Slate.ProcessMouseButtonDownEvent(Window->GetNativeWindow(), FPointerEvent(FSlateApplication::CursorPointerIndex, PreviewDragStart, PreviewDragStart, Pressed, EKeys::RightMouseButton, 0, FModifierKeysState()));
+            if (!Require(Creation->HasMouseCaptureByUser(0), TEXT("A second actual RMB down captures the editor so cancel must release an active gesture."))) return Fail();
+        }
+        ++PreviewDragStage;
+        return PreviewDragStage >= 4;
+    }
+
+    // Drive real body selector, save and cancel delegates while observing pending previews and the stored party draft separately.
+    // 실제 몸체 선택·저장·취소 델리게이트를 사용하고 대기 중 프리뷰와 저장된 파티 초안을 각각 관찰합니다.
+    bool ReviewBodyControls(UCharacterCreationWidget* Creation, AMainMenuPlayerController* Menu, UWorld* World)
+    {
+        if (BodyReviewStage >= 7) return true;
+        UButton* Edit = Cast<UButton>(Creation->GetWidgetFromName(TEXT("Button_Slot0_Edit")));
+        UButton* Next = Cast<UButton>(Creation->GetWidgetFromName(TEXT("AppearanceBodyNext")));
+        UButton* Previous = Cast<UButton>(Creation->GetWidgetFromName(TEXT("AppearanceBodyPrevious")));
+        UButton* Save = FindDetailButton(Creation, TEXT("저장"));
+        UButton* Cancel = FindDetailButton(Creation, TEXT("닫기 / 취소"));
+        const auto Fail = [this]() { bBodyReviewFailed = true; return false; };
+        if (!Require(Edit && Next && Previous && Save && Cancel, TEXT("The real body selector and detail save/cancel actions are present in the saved character creation UI."))) return Fail();
+        if (BodyReviewStage == 0)
+        {
+            BodyOriginalMember = Creation->GetPartyMembers()[0];
+            FProfessionDefinition Profession;
+            if (!Require(Creation->PartyDefinition && Creation->PartyDefinition->ResolveProfession(BodyOriginalMember.ClassId, Profession) && Profession.AppearanceCatalog && Profession.AppearanceCatalog->DefaultBodyId == FName(TEXT("Male")) && Profession.AppearanceCatalog->FindBodyVariant(TEXT("Female")), TEXT("The current profession resolves its actual default male and selectable female catalog entries."))) return Fail();
+            Edit->OnClicked.Broadcast();
+            if (!Require(Next->GetIsEnabled() && Previous->GetIsEnabled(), TEXT("Both actual body selector arrows are enabled while editing."))) return Fail();
+            Next->OnClicked.Broadcast();
+            if (!CheckStoredBody(Creation, BodyOriginalMember.Appearance.BodyId) || !CheckPreviewBody(Creation, Menu, TEXT("Female"), true)) return Fail();
+        }
+        else
+        {
+            if (!bFlowOnly && !WaitForPreviewCamera(Menu, World)) return false;
+            if (BodyReviewStage == 1)
+            {
+                if (!CheckPreviewBody(Creation, Menu, TEXT("Female"), true) || (!bFlowOnly && !Capture(TEXT("00-BodyFemaleDraft.png")))) return Fail();
+                Save->OnClicked.Broadcast();
+                if (!CheckStoredBody(Creation, TEXT("Female")) || !CheckPreviewBody(Creation, Menu, TEXT("Female"), false)) return Fail();
+                SavedFemalePreviewRotation = Menu->GetPreviewStage()->GetPreviewActorForSlot(0)->GetActorQuat();
+                Test->AddInfo(FString::Printf(TEXT("Saved female preview original facing: %s."), *SavedFemalePreviewRotation.Rotator().ToString()));
+            }
+            else if (BodyReviewStage == 2)
+            {
+                Edit->OnClicked.Broadcast();
+                if (!CheckPreviewBody(Creation, Menu, TEXT("Female"), true)) return Fail();
+                if (!Require(Menu->GetPreviewStage()->GetPreviewActorForSlot(0)->GetActorQuat().Equals(SavedFemalePreviewRotation, 0.001), TEXT("Opening the saved female editor retains that body's original facing before switching to a pending male body."))) return Fail();
+                Previous->OnClicked.Broadcast();
+                if (!CheckStoredBody(Creation, TEXT("Female")) || !CheckPreviewBody(Creation, Menu, TEXT("Male"), true)) return Fail();
+            }
+            else if (BodyReviewStage == 3)
+            {
+                if (!bFlowOnly && !ReviewPreviewDrag(Creation, Menu)) return false;
+                if (!CheckPreviewBody(Creation, Menu, TEXT("Male"), true) || (!bFlowOnly && !Capture(TEXT("00-BodyMaleCancelledDraft.png")))) return Fail();
+                Cancel->OnClicked.Broadcast();
+                if (!CheckStoredBody(Creation, TEXT("Female")) || !CheckPreviewBody(Creation, Menu, TEXT("Female"), false)) return Fail();
+                if (!bFlowOnly)
+                {
+                    AActor* Actor = Menu->GetPreviewStage()->GetPreviewActorForSlot(0);
+                    Test->AddInfo(FString::Printf(TEXT("Actual Cancel after captured RMB: capture=%d RMBPressed=%d actor=%s actualFacing=%s savedFemaleFacing=%s pendingMaleFacing=%s femaleErrorDegrees=%.3f."), Creation->HasMouseCaptureByUser(0), FSlateApplication::Get().GetPressedMouseButtons().Contains(EKeys::RightMouseButton), *GetNameSafe(Actor), Actor ? *Actor->GetActorRotation().ToString() : TEXT("missing"), *SavedFemalePreviewRotation.Rotator().ToString(), *PreviewRotationBeforeDrag.Rotator().ToString(), Actor ? FMath::RadiansToDegrees(Actor->GetActorQuat().AngularDistance(SavedFemalePreviewRotation)) : -1.0));
+                    if (!Require(!Creation->HasMouseCaptureByUser(0), TEXT("The actual Cancel button releases the active character editor RMB capture."))) return Fail();
+                    if (!Require(Actor && Actor->GetActorQuat().Equals(SavedFemalePreviewRotation, 0.001), TEXT("The actual Cancel button restores the saved female body's own original facing after a pending male drag."))) return Fail();
+                    RestorePreviewPointer();
+                }
+            }
+            else if (BodyReviewStage == 4)
+            {
+                if (!CheckPreviewBody(Creation, Menu, TEXT("Female"), false) || (!bFlowOnly && !Capture(TEXT("00-BodyFemaleAfterCancel.png")))) return Fail();
+                Edit->OnClicked.Broadcast();
+                if (!CheckPreviewBody(Creation, Menu, TEXT("Female"), true)) return Fail();
+                Previous->OnClicked.Broadcast();
+                if (!CheckPreviewBody(Creation, Menu, TEXT("Male"), true)) return Fail();
+                Save->OnClicked.Broadcast();
+                if (!CheckStoredBody(Creation, TEXT("Male")) || !CheckPreviewBody(Creation, Menu, TEXT("Male"), false)) return Fail();
+            }
+            else if (BodyReviewStage == 5)
+            {
+                for (int32 Index = 1; Index < 4; ++Index)
+                {
+                    UButton* Create = Cast<UButton>(Creation->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_Slot%d_Create"), Index))));
+                    if (!Require(Create && Create->GetIsEnabled(), TEXT("Actual create buttons prepare the other three default party slots for detail-close camera review."))) return Fail();
+                    Create->OnClicked.Broadcast();
+                    if (!VerifyCreatedSlot(Test, Creation, Index)) return Fail();
+                }
+            }
+            else if (BodyReviewStage == 6)
+            {
+                if (!CheckStoredBody(Creation, TEXT("Male")) || !CheckPreviewBody(Creation, Menu, TEXT("Male"), false) || (!bFlowOnly && (!ReviewPartyBounds(Menu, World, FIntPoint(1280, 720), TEXT("body-default-restored")) || !Capture(TEXT("00-BodyMaleRestored.png"))))) return Fail();
+                Test->AddInfo(bFlowOnly ? TEXT("Actual body arrows, original Female/Male mesh application, save, cancel and complete draft preservation are verified; FlowOnly skips rendered preview RMB input.") : TEXT("Actual body arrows, original Female/Male mesh application, save, cancel, complete draft preservation and routed Slate RMB down/move/up, capture release and cancel-facing restoration are verified."));
+            }
+        }
+        ++BodyReviewStage;
+        ResetPreviewCameraObservation();
+        return false;
+    }
+
+    void ResetPreviewCameraObservation()
+    {
+        bPreviewCameraObserved = false;
+        PreviewCameraStableFrames = 0;
+        PreviewCameraStableWorldStart = 0.f;
+    }
+
+    // Observe the actual player camera after native window resizing instead of forcing preview state or manually ticking it.
+    // 네이티브 창 크기 변경 후 프리뷰 상태나 Tick을 강제하지 않고 실제 플레이어 카메라를 관찰합니다.
+    bool WaitForPreviewCamera(AMainMenuPlayerController* Menu, UWorld* World)
+    {
+        AMainMenuPreviewStage* Preview = Menu ? Menu->GetPreviewStage() : nullptr;
+        UCameraComponent* Camera = Preview ? Preview->FindComponentByClass<UCameraComponent>() : nullptr;
+        APlayerCameraManager* Manager = Menu ? Menu->PlayerCameraManager : nullptr;
+        if (!Camera || !Manager || Menu->GetViewTarget() != Preview) return false;
+        const FVector Location = Manager->GetCameraLocation();
+        const FRotator Rotation = Manager->GetCameraRotation();
+        const float FOV = Manager->GetFOVAngle();
+        const bool bMatchesComponent = Location.Equals(Camera->GetComponentLocation(), 0.1f) && Rotation.Equals(Camera->GetComponentRotation(), 0.05f) && FMath::IsNearlyEqual(FOV, Camera->FieldOfView, 0.01f);
+        const bool bUnchanged = bPreviewCameraObserved && Location.Equals(PreviousPreviewCameraLocation, 0.1f) && Rotation.Equals(PreviousPreviewCameraRotation, 0.05f) && FMath::IsNearlyEqual(FOV, PreviousPreviewCameraFOV, 0.01f);
+        if (!bMatchesComponent || !bUnchanged)
+        {
+            PreviewCameraStableFrames = 0;
+            PreviewCameraStableWorldStart = World->GetTimeSeconds();
+        }
+        else ++PreviewCameraStableFrames;
+        bPreviewCameraObserved = true;
+        PreviousPreviewCameraLocation = Location;
+        PreviousPreviewCameraRotation = Rotation;
+        PreviousPreviewCameraFOV = FOV;
+        return bMatchesComponent && PreviewCameraStableFrames >= 5 && World->GetTimeSeconds() - PreviewCameraStableWorldStart >= 0.15f;
+    }
+
+    bool ReviewPreviewRatios(AMainMenuPlayerController* Menu, UWorld* World)
+    {
+        const FIntPoint Sizes[] = {FIntPoint(1280, 720), FIntPoint(1680, 720), FIntPoint(1024, 768), FIntPoint(1280, 720)};
+        const TCHAR* Filenames[] = {TEXT("00-FourPreviews.png"), TEXT("00-FourPreviews-21x9.png"), TEXT("00-FourPreviews-4x3.png"), TEXT("00-FourPreviews-Restored16x9.png")};
+        if (PreviewRatioIndex >= UE_ARRAY_COUNT(Sizes)) return true;
+        const FIntPoint Size = Sizes[PreviewRatioIndex];
+        if (!ViewportPreparation.Update(Test, World, Size) || !WaitForPreviewCamera(Menu, World)) return false;
+        if (!ReviewPartyBounds(Menu, World, Size, TEXT("ratio")))
+        {
+            bPreviewGeometryFailed = true;
+            return false;
+        }
+        const FString Filename = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/VerticalSliceScreenshots"), Filenames[PreviewRatioIndex]));
+        if (!CaptureGameplayUI(Test, World, Filename, Size))
+        {
+            bPreviewGeometryFailed = true;
+            return false;
+        }
+        ++PreviewRatioIndex;
+        ResetPreviewCameraObservation();
+        return false;
+    }
+
+    bool ReviewPartyBounds(AMainMenuPlayerController* Menu, UWorld* World, FIntPoint Size, const TCHAR* Phase)
+    {
+        for (int32 Index = 0; Index < 4; ++Index)
+        {
+            AActor* Actor = Menu->GetPreviewStage()->GetPreviewActorForSlot(Index);
+            USkeletalMeshComponent* Mesh = Actor ? Actor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+            if (!Require(Mesh && Mesh->IsVisible() && !Actor->IsHidden() && !Mesh->Bounds.BoxExtent.IsNearlyZero(), TEXT("Every original party preview has actual visible skeletal mesh bounds during ratio review.")))
+            {
+                bPreviewGeometryFailed = true;
+                return false;
+            }
+            double MinX = TNumericLimits<double>::Max();
+            double MaxX = -TNumericLimits<double>::Max();
+            double MinY = TNumericLimits<double>::Max();
+            double MaxY = -TNumericLimits<double>::Max();
+            bool bAllInside = true;
+            for (int32 Corner = 0; Corner < 8; ++Corner)
+            {
+                const FVector Point = Mesh->Bounds.Origin + Mesh->Bounds.BoxExtent * FVector((Corner & 1) ? 1.0 : -1.0, (Corner & 2) ? 1.0 : -1.0, (Corner & 4) ? 1.0 : -1.0);
+                FVector2D Pixel;
+                const bool bProjected = Menu->ProjectWorldLocationToScreen(Point, Pixel, true);
+                bAllInside &= bProjected && Pixel.X >= 0.0 && Pixel.X <= Size.X;
+                if (bProjected)
+                {
+                    MinX = FMath::Min(MinX, Pixel.X);
+                    MaxX = FMath::Max(MaxX, Pixel.X);
+                    MinY = FMath::Min(MinY, Pixel.Y);
+                    MaxY = FMath::Max(MaxY, Pixel.Y);
+                }
+            }
+            Test->AddInfo(FString::Printf(TEXT("Party preview phase=%s ratio=%dx%d slot=%d mesh=%s projectedX=%.2f..%.2f projectedY=%.2f..%.2f camera=%s stableFrames=%d stableWorldSeconds=%.3f."), Phase, Size.X, Size.Y, Index, *Mesh->GetName(), MinX, MaxX, MinY, MaxY, *Menu->PlayerCameraManager->GetCameraLocation().ToString(), PreviewCameraStableFrames, World->GetTimeSeconds() - PreviewCameraStableWorldStart));
+            if (!Require(bAllInside, TEXT("All eight corners of each actual party mesh remain horizontally inside the requested physical viewport after camera convergence.")))
+            {
+                bPreviewGeometryFailed = true;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool Capture(const TCHAR* FileName)
+    {
+        return CaptureGameplayUI(Test, GEditor->PlayWorld, FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/VerticalSliceScreenshots"), FileName)), FIntPoint(1280, 720));
+    }
+
+    void LogPreview(AMainMenuPlayerController* Menu, int32 Index, const TCHAR* Phase)
+    {
+        AActor* Actor = Menu && Menu->GetPreviewStage() ? Menu->GetPreviewStage()->GetPreviewActorForSlot(Index) : nullptr;
+        USkeletalMeshComponent* Mesh = Actor ? Actor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+        UAnimSingleNodeInstance* Animation = Mesh ? Mesh->GetSingleNodeInstance() : nullptr;
+        UWorld* World = Menu ? Menu->GetWorld() : nullptr;
+        Test->AddInfo(FString::Printf(TEXT("Preview %s slot=%d world=%.3f elapsed=%.3f start=%.3f time=%.3f length=%.3f rate=%.3f observedAdvance=%.3f wraps=%d playing=%d looping=%d meshTick=%d registeredTick=%d visible=%d actorHidden=%d pauseAnims=%d visibilityTick=%d animScale=%.3f worldPaused=%d."), Phase, Index, World ? World->GetTimeSeconds() : -1.f, World ? World->GetTimeSeconds() - PreviewWorldStart : -1.f, PreviewAnimationStartTimes[Index], Animation ? Animation->GetCurrentTime() : -1.f, Animation ? Animation->GetLength() : -1.f, Animation ? Animation->GetPlayRate() : -1.f, PreviewAnimationAdvance[Index], PreviewAnimationWraps[Index], Animation && Animation->IsPlaying(), Animation && Animation->IsLooping(), Mesh && Mesh->IsComponentTickEnabled(), Mesh && Mesh->PrimaryComponentTick.IsTickFunctionRegistered(), Mesh && Mesh->IsVisible(), Actor && Actor->IsHidden(), Mesh && Mesh->bPauseAnims, Mesh ? static_cast<int32>(Mesh->VisibilityBasedAnimTickOption) : -1, Mesh ? Mesh->GlobalAnimRateScale : -1.f, World && World->IsPaused()));
     }
 
     FAutomationTestBase* Test;
@@ -504,8 +994,41 @@ private:
     bool bProfessionPanelTested = false;
     int32 PreviewCaptureStage = 0;
     bool bProfessionCaptured = false;
+    bool bProfessionDetailsClosed = false;
+    bool bBodyDraftPrepared = false;
+    bool bBodyReviewFailed = false;
+    int32 BodyReviewStage = 0;
+    FRunPartyMember BodyOriginalMember;
+    int32 PreviewDragStage = 0;
+    bool bPreviewPointerPressed = false;
+    bool bPreviewCursorMoved = false;
+    FVector2D PreviousPreviewCursor = FVector2D::ZeroVector;
+    FVector2D PreviewDragStart = FVector2D::ZeroVector;
+    FVector2D PreviewDragEnd = FVector2D::ZeroVector;
+    FQuat PreviewRotationBeforeDrag = FQuat::Identity;
+    FQuat PreviewRotationAfterDrag = FQuat::Identity;
+    FQuat SavedFemalePreviewRotation = FQuat::Identity;
     double ProfessionPanelTime = 0.0;
     float PreviewAnimationLengths[4] = {};
+    float PreviewAnimationRates[4] = {};
+    float PreviewAnimationStartTimes[4] = {};
+    float PreviewAnimationLastTimes[4] = {};
+    float PreviewAnimationAdvance[4] = {};
+    int32 PreviewAnimationWraps[4] = {};
+    float PreviewWorldStart = 0.f;
+    int32 PreviewRatioIndex = 0;
+    bool bPreviewGeometryFailed = false;
+    bool bPreviewCameraObserved = false;
+    int32 PreviewCameraStableFrames = 0;
+    float PreviewCameraStableWorldStart = 0.f;
+    FVector PreviousPreviewCameraLocation = FVector::ZeroVector;
+    FRotator PreviousPreviewCameraRotation = FRotator::ZeroRotator;
+    float PreviousPreviewCameraFOV = 0.f;
+    FTransform PartyCameraBeforeDetails;
+    float PartyFOVBeforeDetails = 0.f;
+    bool bRequestedPIE = false;
+    FPIEViewportPreparation ViewportPreparation;
+    TStrongObjectPtr<ULevelEditorPlaySettings> PlaySettings;
 };
 
 // Drive saved-menu buttons and send one Slate click through viewport hit testing and controller input.
@@ -520,6 +1043,7 @@ public:
     virtual ~FPlaySavedSkillLoadout() override
     {
         if (ObservedTargetASC.IsValid()) ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UAS_Unit::GetHPAttribute()).Remove(HPChangedHandle);
+        if (bReviewPointerPressed && FSlateApplication::IsInitialized()) FSlateApplication::Get().ProcessMouseButtonUpEvent(FPointerEvent(FSlateApplication::CursorPointerIndex, ClickPosition, ClickPosition, TSet<FKey>(), EKeys::LeftMouseButton, 0, FModifierKeysState()));
         if (bMovedCursor && FSlateApplication::IsInitialized()) FSlateApplication::Get().SetCursorPos(PreviousCursor);
     }
 
@@ -533,10 +1057,14 @@ public:
             PlaySettings->SetPlayNumberOfClients(1);
             const FIntPoint Sizes[] = { FIntPoint(1280, 720), FIntPoint(1024, 768), FIntPoint(1600, 720), FIntPoint(1280, 800) };
             const FIntPoint ViewportSize = Sizes[SkillIndex % UE_ARRAY_COUNT(Sizes)];
+            ExpectedViewportSize = ViewportSize;
             PlaySettings->NewWindowWidth = ViewportSize.X;
             PlaySettings->NewWindowHeight = ViewportSize.Y;
+            PlaySettings->SetClientWindowSize(ViewportSize);
             FRequestPlaySessionParams Params;
             Params.EditorPlaySettings = PlaySettings.Get();
+            Params.SessionDestination = EPlaySessionDestinationType::InProcess;
+            Params.WorldType = EPlaySessionWorldType::PlayInEditor;
             Params.bAllowOnlineSubsystem = false;
             Params.GlobalMapOverride = TEXT("/Game/User_JeHoon/LEVEL/MainMenu");
             GEditor->RequestPlaySession(Params);
@@ -545,6 +1073,11 @@ public:
         }
         if (FPlatformTime::Seconds() - StageStarted > 60.0)
         {
+            UWorld* DiagnosticWorld = GEditor->PlayWorld;
+            AGameplayPlayerController* DiagnosticController = DiagnosticWorld ? Cast<AGameplayPlayerController>(DiagnosticWorld->GetFirstPlayerController()) : nullptr;
+            URunStateSubsystem* DiagnosticRun = DiagnosticController && DiagnosticController->GetGameInstance() ? DiagnosticController->GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+            ACombatRoundCoordinator* DiagnosticRound = DiagnosticController ? DiagnosticController->GetRoundCoordinator() : nullptr;
+            Test->AddInfo(FString::Printf(TEXT("Saved skill timeout world=%.3f runPhase=%d roundPhase=%d sourceAlive=%d sourceHP=%.1f damageChanges=%d targetHP=%.1f->%.1f."), DiagnosticWorld ? DiagnosticWorld->GetTimeSeconds() : -1.f, DiagnosticRun ? static_cast<int32>(DiagnosticRun->GetPhase()) : -1, DiagnosticRound ? static_cast<int32>(DiagnosticRound->GetView().Phase) : -1, Source.IsValid() && Source->IsUnitAlive(), Source.IsValid() && Source->GetAttributeSet() ? Source->GetAttributeSet()->GetHP() : -1.f, HPChangeCount, InitialTargetHP, LowestTargetHP));
             Test->AddError(FString::Printf(TEXT("Saved skill PIE timed out at stage %d for %s. %s"), Stage, *Skills[SkillIndex].SkillId.ToString(), *UIReadiness));
             return true;
         }
@@ -597,6 +1130,7 @@ public:
         {
             URunMapWidget* Map = FindActiveWidget<URunMapWidget>(World);
             if (!Map || !Run || Run->GetPhase() != ERunPhase::Map) return false;
+            if (!ViewportPreparation.Update(Test, World, ExpectedViewportSize)) return ViewportPreparation.HasFailed();
             // Preserve full saved-loadout execution coverage without giving new characters free shop skills.
             // 새 캐릭터에게 상점 스킬을 무료로 주지 않고 저장된 전체 장착의 실행 범위를 검사합니다.
             if (!bInstalledSavedLoadout)
@@ -634,6 +1168,7 @@ public:
         if (Stage == 7)
         {
             if (!Run) return false;
+            if (!Require(Run->GetPhase() != ERunPhase::Defeat, TEXT("The disposable survival fixture preserves the player while its single authored attack resolves."))) return true;
             if (Round && Round->GetView().PendingProjectiles > 0) bSawProjectile = true;
             if (Source.IsValid() && Source->GetCurrentActionPoint() == InitialAP - Skills[SkillIndex].ActionPointCost) bSawAPCost = true;
             if (Source.IsValid() && Skills[SkillIndex].Kind == ECombatRoundSkillKind::Projectile && !Source->GetActorLocation().Equals(ActionOrigin, 0.1f)) bRangedStayedAtOrigin = false;
@@ -656,6 +1191,20 @@ public:
             if (!Controlled || !IsValid(Controlled->Unit)) return false;
             Source = Controlled->Unit;
             SourceId = Controlled->UnitId;
+            if (!bPreparedSurvival)
+            {
+                // Isolate only fixture survival through live GAS; preserve target HP, skill power and action costs.
+                // 실제 GAS로 테스트 생존만 격리하며 대상 HP, 스킬 위력과 행동 비용은 유지합니다.
+                UAbilitySystemComponent* AbilitySystem = Source->GetAbilitySystemComponent();
+                if (!Require(AbilitySystem != nullptr, TEXT("The actual controlled unit provides GAS attributes for a disposable survival fixture."))) return true;
+                AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetMaxHPAttribute(), 10000.f);
+                AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), 10000.f);
+                FCombatCheckpointData Checkpoint;
+                FText Error;
+                if (!Require(Round->CapturePlanningCheckpoint(Checkpoint, Error), *FString::Printf(TEXT("The live survival fixture satisfies actual checkpoint validation: %s"), *Error.ToString()))) return true;
+                bPreparedSurvival = true;
+                return false;
+            }
             const int32 AllyCount = Round->GetView().Units.FilterByPredicate([](const FCombatRoundUnitView& Unit) { return !Unit.bEnemy; }).Num();
             if (!Require(AllyCount == 1 && Controlled->SkillIds.Num() == Skills.Num(), TEXT("The real encounter restores one warrior with the explicitly saved skills."))) return true;
             for (const FCombatRoundSkill& Skill : Skills)
@@ -686,8 +1235,30 @@ public:
             InitialTargetHP = LowestTargetHP = Target->Unit->GetAttributeSet()->GetHP();
             UGameViewportClient* Viewport = World->GetGameViewport();
             const TSharedPtr<SViewport> ViewportWidget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
-            FVector2D Pixel;
-            if (!Require(ViewportWidget.IsValid() && Viewport->Viewport && Controller->ProjectWorldLocationToScreen(Target->Unit->GetActorLocation(), Pixel), TEXT("The actual enemy projects into the game viewport."))) return true;
+            FVector2D Pixel = FVector2D::ZeroVector;
+            const FIntPoint ViewportSize = Viewport && Viewport->Viewport ? Viewport->Viewport->GetSizeXY() : FIntPoint::ZeroValue;
+            const APlayerCameraManager* Camera = Controller->PlayerCameraManager;
+            const bool bProjected = ViewportWidget.IsValid() && ViewportSize.X > 0 && ViewportSize.Y > 0 && Controller->ProjectWorldLocationToScreen(Target->Unit->GetActorLocation(), Pixel) && Pixel.X >= 4.f && Pixel.Y >= 4.f && Pixel.X < ViewportSize.X - 4.f && Pixel.Y < ViewportSize.Y - 4.f;
+            const FVector CameraLocation = Camera ? Camera->GetCameraLocation() : FVector::ZeroVector;
+            const FRotator CameraRotation = Camera ? Camera->GetCameraRotation() : FRotator::ZeroRotator;
+            const float CameraFOV = Camera ? Camera->GetFOVAngle() : 0.f;
+            const ACombatArena* Arena = Round->GetArena();
+            AActor* ViewTarget = Controller->GetViewTarget();
+            const bool bArenaCamera = Camera && Arena && ViewTarget && ViewTarget->FindComponentByClass<UCameraComponent>() && (!IsValid(Arena->CameraAnchor) || ViewTarget == Arena->CameraAnchor);
+            const bool bCameraStable = bArenaCamera && bProjected && bProjectionObserved && CameraLocation.Equals(PreviousCameraLocation, 0.25f) && CameraRotation.Equals(PreviousCameraRotation, 0.05f) && FMath::IsNearlyEqual(CameraFOV, PreviousCameraFOV, 0.01f) && Pixel.Equals(PreviousTargetPixel, 1.f);
+            if (!bCameraStable)
+            {
+                ProjectionStableWorldTime = World->GetTimeSeconds();
+                ProjectionStableFrames = 0;
+            }
+            else ++ProjectionStableFrames;
+            bProjectionObserved = bProjected;
+            PreviousCameraLocation = CameraLocation;
+            PreviousCameraRotation = CameraRotation;
+            PreviousCameraFOV = CameraFOV;
+            PreviousTargetPixel = Pixel;
+            UIReadiness += FString::Printf(TEXT("; projection=%d pixel=%s viewport=%dx%d camera=%s rotation=%s FOV=%.2f stableFrames=%d stableWorldSeconds=%.3f viewTarget=%s"), bProjected, *Pixel.ToString(), ViewportSize.X, ViewportSize.Y, *CameraLocation.ToString(), *CameraRotation.ToString(), CameraFOV, ProjectionStableFrames, World->GetTimeSeconds() - ProjectionStableWorldTime, *GetNameSafe(Controller->GetViewTarget()));
+            if (!bCameraStable || ProjectionStableFrames < 3 || World->GetTimeSeconds() - ProjectionStableWorldTime < 0.15f) return false;
             FSlateApplication& Slate = FSlateApplication::Get();
             const FGeometry& Geometry = ViewportWidget->GetCachedGeometry();
             const FIntPoint Size = Viewport->Viewport->GetSizeXY();
@@ -701,7 +1272,7 @@ public:
             if (!Require(Window.IsValid(), TEXT("The game viewport has a Slate window for one real input click."))) return true;
             const TSet<FKey> Pressed = { EKeys::LeftMouseButton };
             const TSet<FKey> Released;
-            Slate.ProcessMouseMoveEvent(FPointerEvent(0, Cursor, PreviousCursor, Released, EKeys::Invalid, 0, FModifierKeysState()));
+            Slate.ProcessMouseMoveEvent(FPointerEvent(FSlateApplication::CursorPointerIndex, Cursor, PreviousCursor, Released, EKeys::Invalid, 0, FModifierKeysState()));
             const FWidgetPath CursorPath = Slate.LocateWindowUnderMouse(Cursor, Slate.GetInteractiveTopLevelWindows());
             // CommonUI blocks input during screen transitions; wait for the viewport before the single press.
             // CommonUI 화면 전환 중에는 입력이 차단되므로 클릭 한 번 전에 뷰포트 입력 준비를 기다립니다.
@@ -716,7 +1287,8 @@ public:
                 }
             });
             Test->AddInfo(FString::Printf(TEXT("Single click pixel=%s cursor=%s viewport=%s hit=%s"), *Pixel.ToString(), *Cursor.ToString(), *Geometry.GetLocalSize().ToString(), CursorPath.IsValid() ? *CursorPath.GetLastWidget()->GetTypeAsString() : TEXT("none")));
-            Slate.ProcessMouseButtonDownEvent(Window->GetNativeWindow(), FPointerEvent(0, Cursor, Cursor, Pressed, EKeys::LeftMouseButton, 0, FModifierKeysState()));
+            bReviewPointerPressed = true;
+            Slate.ProcessMouseButtonDownEvent(Window->GetNativeWindow(), FPointerEvent(FSlateApplication::CursorPointerIndex, Cursor, Cursor, Pressed, EKeys::LeftMouseButton, 0, FModifierKeysState()));
             ClickPosition = Cursor;
             bMousePressed = true;
             Advance();
@@ -727,7 +1299,8 @@ public:
             if (bMousePressed)
             {
                 const TSet<FKey> Released;
-                FSlateApplication::Get().ProcessMouseButtonUpEvent(FPointerEvent(0, ClickPosition, ClickPosition, Released, EKeys::LeftMouseButton, 0, FModifierKeysState()));
+                FSlateApplication::Get().ProcessMouseButtonUpEvent(FPointerEvent(FSlateApplication::CursorPointerIndex, ClickPosition, ClickPosition, Released, EKeys::LeftMouseButton, 0, FModifierKeysState()));
+                bReviewPointerPressed = false;
                 bMousePressed = false;
                 return false;
             }
@@ -748,7 +1321,7 @@ public:
                 const UTextBlock* Label = Cast<UTextBlock>((*Match)->GetContent());
                 if (!Require(Label && Label->GetText().ToString().Contains(Skill.Name.ToString()), TEXT("The skill button displays the saved skill name."))) return true;
             }
-            FScreenshotRequest::RequestScreenshot(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/SkillLoadoutScreenshots"), FString::Printf(TEXT("%d-FourSkills.png"), SkillIndex + 1)), true, false);
+            if (!CaptureGameplayUI(Test, World, FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/SkillLoadoutScreenshots"), FString::Printf(TEXT("%d-SavedSkills.png"), SkillIndex + 1))), ExpectedViewportSize)) return true;
             Advance();
             return false;
         }
@@ -847,6 +1420,14 @@ private:
     TArray<FCombatRoundSkill> Skills;
     int32 SkillIndex;
     bool bInstalledSavedLoadout = false;
+    bool bPreparedSurvival = false;
+    bool bProjectionObserved = false;
+    int32 ProjectionStableFrames = 0;
+    float ProjectionStableWorldTime = 0.f;
+    FVector PreviousCameraLocation = FVector::ZeroVector;
+    FRotator PreviousCameraRotation = FRotator::ZeroRotator;
+    float PreviousCameraFOV = 0.f;
+    FVector2D PreviousTargetPixel = FVector2D::ZeroVector;
     int32 Stage = 0;
     double StageStarted = 0.0;
     FString UIReadiness;
@@ -855,6 +1436,7 @@ private:
     FIntPoint TargetCoord = FIntPoint::ZeroValue;
     int32 PlanIndex = 0;
     bool bAwaitingPlan = false;
+    bool bReviewPointerPressed = false;
     TWeakObjectPtr<AUnitBase> Source;
     TWeakObjectPtr<UAbilitySystemComponent> ObservedTargetASC;
     FDelegateHandle HPChangedHandle;
@@ -872,6 +1454,8 @@ private:
     FVector2D ClickPosition;
     bool bMousePressed = false;
     bool bRequestedPIE = false;
+    FPIEViewportPreparation ViewportPreparation;
+    FIntPoint ExpectedViewportSize = FIntPoint::ZeroValue;
     TStrongObjectPtr<ULevelEditorPlaySettings> PlaySettings;
 };
 
@@ -902,7 +1486,6 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVerticalSliceMenuLifecycleTest, "ProjectA.Vert
 bool FVerticalSliceMenuLifecycleTest::RunTest(const FString& Parameters)
 {
     ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/MainMenu")));
-    ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectAVerticalSliceTests::FPlayMenuLifecycle>(this));
     ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
     return true;

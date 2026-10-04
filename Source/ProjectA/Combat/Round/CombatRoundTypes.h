@@ -141,6 +141,41 @@ enum class ECombatRoundTargetLoss : uint8
     NearestEnemy
 };
 
+// A single target preserves existing content; limits bound server work rather than choose balance values.
+// 단일 대상은 기존 콘텐츠를 보존하며 상한은 밸런스 수치가 아니라 서버 작업량을 제한합니다.
+USTRUCT(BlueprintType)
+struct PROJECTA_API FCombatChainSettings
+{
+    GENERATED_BODY()
+
+    // Include the first struck enemy in the total target count.
+    // 총 대상 수에 최초 피격 적을 포함합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Chain", meta = (ClampMin = "1", ClampMax = "32"))
+    int32 MaxTargets = 1;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Chain", meta = (ClampMin = "0.0", ClampMax = "100000.0", EditCondition = "MaxTargets > 1"))
+    float JumpDistance = 0.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Chain", meta = (ClampMin = "0.0", ClampMax = "10.0", EditCondition = "MaxTargets > 1"))
+    float JumpIntervalSeconds = 0.f;
+
+    // Apply this factor cumulatively after each jump; one preserves the authored damage.
+    // 점프마다 배율을 누적 적용하며 1은 작성된 피해량을 유지합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Chain", meta = (ClampMin = "0.0", ClampMax = "1.0", EditCondition = "MaxTargets > 1"))
+    float DamageMultiplierPerJump = 1.f;
+
+    bool NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess);
+};
+
+template<>
+struct TStructOpsTypeTraits<FCombatChainSettings> : public TStructOpsTypeTraitsBase2<FCombatChainSettings>
+{
+    enum
+    {
+        WithNetSerializer = true
+    };
+};
+
 // Round execution values and optional presentation are resolved without activating legacy abilities.
 // 기존 어빌리티를 활성화하지 않고 라운드 실행 수치와 선택적 표현을 해석합니다.
 USTRUCT(BlueprintType)
@@ -194,6 +229,9 @@ struct PROJECTA_API FCombatRoundSkill
     // 빈 태그 조건은 기존 콘텐츠를 유지하며 효과는 GAS Spec을 통해 이 태그를 받습니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect")
     FGameplayTagContainer EffectTags;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Chain")
+    FCombatChainSettings Chain;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect")
     FGameplayTagQuery SourceTagQuery;
@@ -439,6 +477,7 @@ namespace CombatRoundRules
     PROJECTA_API bool IsOwnTerritory(bool bEnemy, FIntPoint Coord);
     PROJECTA_API bool UsesUnitTarget(const FCombatRoundSkill& Skill);
     PROJECTA_API bool MatchesTargetTeam(const FCombatRoundSkill& Skill, bool bSourceEnemy, bool bTargetEnemy);
+    PROJECTA_API bool UsesChain(const FCombatRoundSkill& Skill);
     PROJECTA_API bool IsSupportedEffectDuration(const FCombatRoundSkill& Skill);
     PROJECTA_API bool IsValidSkill(const FCombatRoundSkill& Skill);
 }

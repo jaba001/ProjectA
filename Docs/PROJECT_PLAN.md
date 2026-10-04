@@ -1,8 +1,8 @@
 # ProjectA 구현 구조와 설정
 
-기준일: 2026-10-04. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다. 엔진 기준은 UE 5.8.3이며 기본 Run·협동의 기존 실행 결과는 UE 5.7 당시 이력이다. 비교 맵 에셋 작성·검사는 UE 5.8 기준이며 작동 확인은 [TODO 7절](TODO.md#7-ue-58-전환-확인)을 따른다.
+기준일: 2026-10-04. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다. 엔진 기준은 UE 5.8.3이며 현재 검수와 제한은 [최신 실행 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)을 따른다. UE 5.7 결과는 당시 코드의 이력으로 보존한다. HP 화면 보완과 현행 데이터 읽기 검사를 포함한 native 회귀 175개와 최신 Development 패키지의 CSV/스킬 데이터·격리 저장 작성/Continue·Quit를 통과했다.
 
-기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 UE 5.7 위임 실행은 당시 두 전투 경로의 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀 결과다. 2026-10-01 UE 5.7의 당시 코드로 1인·같은 PC 2/4인 PIE에서 각 10전투·9상점 선택/퇴장·개인 보상과 저장 재로드를 확인했다. 진행용 HP fixture이며 UE 5.8·정상 난이도·실제 서비스·다중 PC·지연/손실 검증은 별도다. [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
+기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 UE 5.7 위임 실행은 당시 두 전투 경로의 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀 결과다. 2026-10-01 UE 5.7의 당시 코드로 1인·같은 PC 2/4인 PIE에서 각 10전투·9상점 선택/퇴장·개인 보상과 저장 재로드를 확인했다. 진행용 HP fixture이며 정상 난이도·실제 서비스·다중 PC·지연/손실 검증은 별도다. 2026-10-04 UE 5.8.3에서도 1/2/4인 PIE의 10전투·9상점·개인 보상·Host Continue를 확인했다. [과거 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)·[현재 검수](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)
 
 T14의 이전 턴 복구·승계 성공은 과거 코드 이력이다. 새 라운드는 저장된 준비 완료 경계에서 복구하며 이전 순차 Combat 저장은 계속 거절한다. 진행 중 시전·투사체의 임의 시점 복원은 지원하지 않는다. Steam/PlayFab·MMR은 미구현이며 [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
@@ -63,7 +63,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 Run의 `Combat_01`~`Comb
 | `AGameplayPlayerController` | `APartyPlayerController` 상속. 로컬 Root UI, 소유 연결의 전투 RPC, 현재 Host의 노드 선택·Continue 요청 |
 | `UGameplayRootWidget` | 해당 플레이어 화면의 CommonUI Run/Combat/Modal 스택과 저장 실패·재시도 안내 |
 | `URunMapWidget` | 전체 노드·진행 분모·완료/잠금 상태와 높이 300 상한 스크롤 목록 표시, 선택 요청. 직접 Spawn하지 않음 |
-| `URunEncounterWidget` | 인카운터 3개 선택·본인 골드·스킬상점/상점3 가용 후보 최대 5개(현재 근접 공격 1개)·증가형 리롤 비용·회복 및 아이템상점 상품 5개·판매 완료·리롤·구매·나가기 표시. 기존 RunLayer의 native CommonUI 화면 |
+| `URunEncounterWidget` | 인카운터 3개 선택·본인 골드·스킬상점/상점3의 61후보 중 최대 5개 진열·증가형 리롤 비용·회복 및 아이템상점 상품 5개·판매 완료·리롤·구매·나가기 표시. 기존 RunLayer의 native CommonUI 화면 |
 | `AEncounterManager` | Encounter 준비·스폰·라운드 전투 연결·종료 HP 추출·정리와 Run 전이. 순차 턴 저장/복원 훅 제거 |
 | `ACombatArena` | 배치된 Grid, 슬롯별 좌표, 카메라, 타일 활성화 관리 |
 | `ACombatManager` / `ACombatRoundCoordinator` | Run 전투 연결, 라운드 계획·시간표·실행·잔여 공격 정리·결과 확정. `UTurnManager`는 참조 호환용 외형만 유지 |
@@ -97,15 +97,15 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 Run의 `Combat_01`~`Comb
 
 `RunEncounterPoolDataAsset.StartingGold/FixedSkillOffers/Recovery/SkillShopPool/SkillShopQuery`에서 시작 골드·기본 상품·회복·추가 풀·태그 조건을 관리한다. 현재 기본 파티는 `DA_DrGameRunEncounterPool`의 `DA_DrGameSkillShopPool`을 사용한다. 기존 고정 스킬 진열은 새 풀에서 비우고 근접 공격 1종·신규 60종을 가중치 1의 시험 후보로 제공한다. 새 Run의 schema 1 `FRunSkillShopState.Catalog/Offers/Query/Revision/RerollPrice`에 값을 고정하며 `OfferCount`는 가용 후보 수와 최대 5개 중 작은 값이다. 공통 후보 추첨은 저장된 태그 조건·기본 가중치를 사용하되 최종 수치와 태그별 가중치 보정 정책은 미확정이다. 신규 도입·원본 설치 전제는 [4-9절](#4-9-구입-vfx와-sfx-도입)을 따른다.
 
+2026-10-04 `SkillShopUI`는 기존 61후보를 보존한 격리 진열 5개에서 근접·번개 Chain·치유·보호막 4종의 원래 카드 delegate 구매를 통과했다. 비무장 포함 5개 스킬 탭·저장과 네 번의 실제 메뉴 Continue → 상점 나가기 → Combat_02 지도 카드 요청 → 공개 전투 실행을 확인했다. 각 스킬의 원래 시전자·GAS 1회·AP 1과 능력치 변화, 근접의 실제 몽타주·나머지 Niagara 및 화면 10장을 확인했다. 최초 승리는 공개 상태 fixture로 구성하고 치유의 현재 HP만 일시 조정했으며 원본 DA·위력·태그·Chain 대상 1명은 유지했다. 원본 저장/설정 50파일의 SHA와 소유 검수 슬롯 정리를 통과했다. 물리적 카드 클릭·첫 전투 난이도·다중 PC 검수는 별도다. [검수 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)
+
 `FRunPartyMember.Gold/Skills/bHasSkillLoadout/CurrentHP`를 저장 기준으로 사용한다. 서버가 신뢰 연결의 소유자·상점 단계·생존 Human·잔액·스킬 중복·보유 한도·부족 HP와 모든 구매·회복·리롤 요청의 Revision을 검사한다. 골드·습득 스킬·HP·진열·현재 리롤 비용·Revision을 하나의 저장 후보에 반영하고 성공한 변경만 공개한다. 실패하면 메모리와 기존 파일을 보존하며 재개 시 저장된 카탈로그·진열·비용을 복원한다.
 
 2026-10-03 사용자 요청으로 몬스터 전용 공격을 보존하고 비무장·근접 공격 외 기존 VFX 스킬을 제거한다. 기존 Run·Snapshot·전투 체크포인트는 로드 후보의 보유 스킬·상점 후보/진열과 해당 예약에서 삭제된 VFX 스킬을 제거하고 해당 인간의 준비 완료를 해제한다. 두 기본 공격·골드·보유품·진행·소유권과 독립 이동 예약은 보존한다. 삭제 후 명시 스킬 목록이 비는 기존 Run·체크포인트는 기존 비무장 공격을 복구하며 Snapshot의 빈 스킬 목록은 기존 DefaultAttack 별칭을 사용한다. 남은 상품의 가격·가중치·태그·리롤비는 유지하며 후보가 모두 삭제된 사용자 지정 스킬상점은 회복만 제공하고 리롤을 비활성화한다. 원본 저장을 일괄 덮어쓰지 않고 후보 검증 후 반영하며 이후 정상 저장에 남긴다. [에셋 정리 범위](#4-8-기본-공격-외-스킬-정리) · [사용자 확인](TODO.md#18-기본-공격-외-스킬-정리-확인)
 
-제거 후 보유 스킬이 없는 캐릭터 또는 Snapshot은 오류로 재개를 거절하고 원본 저장을 보존한다.
-
 카탈로그가 없는 기존 schema 1은 고정 상품에서 삭제 스킬을 제외하고 두 기본 공격·골드를 유지하며 새 리롤 규칙을 소급 적용하지 않는다. 회복 필드 누락은 기본값 1G로 읽는다. schema 0에는 상품·골드를 소급 지급하지 않으며 명시 장착이 없는 기존 파티의 직업 기본값도 남은 두 기본 공격으로 제한한다. RunSaveGame에는 전체 상태를 저장하고 GameState 표시 뷰에는 현재 진열·비용·Revision 등 표시 상태를 전달하여 후보 `Catalog/Query`를 복제하지 않는다. 이전 상점 실행 결과는 [과거 검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
-2026-09-25 아이템상점 시험: [WEAPON_ASSETS.csv](../DataCatalogs/WEAPON_ASSETS.csv)의 방패·탄환·화살·기타를 포함한 전체 295개를 사용하고 `가격(G)`은 모두 1이다. 새 Run은 마지막 열 `게임 내 이름`을 표시하며 첫 입장과 1G 리롤마다 중복 없는 5개를 추첨한다. 같은 이름을 시작 장비·인벤토리·장비창에서도 사용하며 기존 저장의 고정 카탈로그·상품·보유 사본은 저장 당시 이름을 유지한다. 이전 4열 CSV는 원본 이름을 사용하고, 새 5열 CSV의 빈 이름은 오류로 처리한다. 표시명은 식별자가 아니며 경로 기반 ID·GameplayTag 분류·장착 프로필은 유지한다. 이전 진열·구매 상품은 다음 리롤에서 다시 등장할 수 있다. 구매한 슬롯은 판매 완료로 바뀌고 `FRunPartyMember.Items`의 개인 보유 사본으로 추가한다. 구매와 장착은 별도 명령이다.
+2026-09-25 아이템상점 시험: [WEAPON_ASSETS.csv](../DataCatalogs/WEAPON_ASSETS.csv)의 방패·탄환·화살·기타를 포함한 현재 289개를 사용하고 `가격(G)`은 모두 1이다. 새 Run은 마지막 열 `게임 내 이름`을 표시하며 첫 입장과 1G 리롤마다 중복 없는 5개를 추첨한다. 같은 이름을 시작 장비·인벤토리·장비창에서도 사용하며 기존 저장의 고정 카탈로그·상품·보유 사본은 저장 당시 이름을 유지한다. 이전 4열 CSV는 원본 이름을 사용하고, 새 5열 CSV의 빈 이름은 오류로 처리한다. 표시명은 식별자가 아니며 경로 기반 ID·GameplayTag 분류·장착 프로필은 유지한다. 이전 진열·구매 상품은 다음 리롤에서 다시 등장할 수 있다. 구매한 슬롯은 판매 완료로 바뀌고 `FRunPartyMember.Items`의 개인 보유 사본으로 추가한다. 구매와 장착은 별도 명령이다.
 
 프로젝트 루트 `DataCatalogs/`에 무기·스킬 이펙트·스킬 생성 현황·SFX·인카운터 풀·몬스터 CSV를 함께 보관한다. 런타임 아이템 카탈로그는 `DataCatalogs/WEAPON_ASSETS.csv`를 읽고 빌드의 UFS RuntimeDependency에도 같은 경로를 지정한다. VFX·SFX CSV는 원본 설치·퇴역 이력과 새 생성 상태를 기록하는 목록이다. 기존 카탈로그 생성 도구는 폐기 상태를 유지하고 새 생성 입력은 `DrGameSkillSpecs.json`을 사용한다.
 
@@ -137,7 +137,7 @@ CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한�
 
 `ChangeEquipment`는 상점 단계·신뢰 소유자·생존 Human·아이템 인덱스·Revision과 원본 메시를 검증하고 저장 후보를 원자 반영한다. 실패하면 파티·Revision·원본 파일·상태 알림을 유지한다. `CharacterEquipmentComponent`는 선택 몸체의 소켓에 원본 Static/Skeletal Mesh를 붙이며 명시 장비 상태의 기존 스킬 검 표시는 숨긴다. 검 스킬의 기존 판정 컴포넌트·GAS·스킬·능력치는 유지한다. 손잡이 위치·회전·배율은 프로필의 에셋별 `Attachments.RelativeTransform`으로 조정한다.
 
-이전 저장의 누락된 장비 상태는 과거 스킬 외형을 유지하며 첫 명시 장착부터 새 상태를 적용한다. 시작 아이템을 재지급하거나 저장 카탈로그를 바꾸지 않는다. 비무기 슬롯 콘텐츠·나머지 246개 분류·능력치/부여 스킬·Snapshot `EquipmentIds` 연결은 후속 기획 대상이다. 아이템·장비 조작과 새 에셋 부착 재생은 사용자 지시로 이번 실행에서 제외했다. [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
+이전 저장의 누락된 장비 상태는 과거 스킬 외형을 유지하며 첫 명시 장착부터 새 상태를 적용한다. 시작 아이템을 재지급하거나 저장 카탈로그를 바꾸지 않는다. 비무기 슬롯 콘텐츠·나머지 240개 분류·능력치/부여 스킬·Snapshot `EquipmentIds` 연결은 후속 기획 대상이다. 아이템·장비 조작과 새 에셋 부착 재생은 사용자 지시로 이번 실행에서 제외했다. [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
 ### 파티
 
@@ -228,7 +228,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 `UCombatDebugLoadout`은 Skills 하위의 유효 DataAsset 74종(기본 2·몬스터 전용 12·신규 60)과 태그 장착 프로필이 있는 장비 49종을 제공한다. 몬스터 공격도 개발용 일반 카탈로그에 포함되며 새 Run의 상점 후보 61종과 구분한다. 장비 후보는 기존 `RunEquipmentRules`로 검증하고 임시 보유 상태에만 기록한다. 획득은 지정 슬롯에 즉시 장착하며 밀려난 장비는 임시 보유 목록에 남는다. 제거는 장착 해제·보유 삭제·참조 인덱스 보정을 함께 수행한다. 장비는 현재 외형만 바꾸며 능력치·스킬은 부여하지 않는다.
 
-스킬 목록은 기존 `ResolveRoundSkill` 결과의 `EffectTags`를 카탈로그 캐시에 보관하여 속성 8탭과 방식 7탭을 이름/에셋명 검색과 교차 적용한다. 속성은 전체·물리·화염·냉기·번개·카오스·복합·미분류이며 방식은 전체·투사체·범위형·체인·근접공격·지원형·미분류다. `FGameplayTagQuery`로 지원 효과를 우선 분류하고 `Skill.Shape.Chain`이 있는 공격은 기존 Beam 태그를 유지해도 체인으로 분류하여 범위형에서 제외한다. 비무장·근접 공격 2종은 태그가 없어 미분류로 제공하고 신규 60종은 저장된 속성·효과·형태 태그로 분류한다. 몬스터 전용 공격 12개는 원래 몬스터 장착을 유지한다. 삭제한 생성 스킬과 CSV의 미생성 보류 항목은 구입 목록에 추가하지 않는다. 체인 5종은 대상 하나와 연결하는 기존 판정을 유지하며 다중 대상 연쇄 기능은 추가하지 않는다. [UI 기준](UI_README.md#7-2-전투-디버그-도구)
+스킬 목록은 기존 `ResolveRoundSkill` 결과의 `EffectTags`를 카탈로그 캐시에 보관하여 속성 8탭과 방식 7탭을 이름/에셋명 검색과 교차 적용한다. 속성은 전체·물리·화염·냉기·번개·카오스·복합·미분류이며 방식은 전체·투사체·범위형·체인·근접공격·지원형·미분류다. `FGameplayTagQuery`로 지원 효과를 우선 분류하고 `Skill.Shape.Chain`이 있는 공격은 기존 Beam 태그를 유지해도 체인으로 분류하여 범위형에서 제외한다. 비무장·근접 공격 2종은 태그가 없어 미분류로 제공하고 신규 60종은 저장된 속성·효과·형태 태그로 분류한다. 몬스터 전용 공격 12개는 원래 몬스터 장착을 유지한다. 삭제한 생성 스킬과 CSV의 미생성 보류 항목은 구입 목록에 추가하지 않는다. 체인 5종은 최근접 생존 미타격 적을 연결하는 다중 연쇄 실행을 지원하며 수치·진행·보존 계약은 [4-9절](#4-9-구입-vfx와-sfx-도입)을 따른다. [UI 기준](UI_README.md#7-2-전투-디버그-도구)
 
 스킬 0~5개 변경은 `ACombatRoundCoordinator`에서 소유·생존·Planning·정지 상태를 확인하고 실제 Unit·실행 스킬 캐시를 함께 갱신한다. 해당 유닛의 계획·이동 예약 및 자신의 준비를 해제하며 HP/AP/보호막은 초기화하지 않는다. 전투 초기화는 유닛·투사체·효과를 정리하고 처음 장착으로 다시 생성한다. 일반 Run 메모리·체크포인트는 디버그 변경에 사용하지 않는다.
 
@@ -240,7 +240,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 `SetDebugUnitHealth`는 등록된 생존 아군·적군의 최대/현재 HP를 GAS 기본 속성으로 변경한다. 로컬 개발 전투의 Planning·정지·소유/적 등록 상태와 `1 ≤ 현재 HP ≤ 최대 HP ≤ 1,000,000`을 검증한다. 장착·AP/SAP·행동 계획·고정 AI 명령은 보존하고 인간 참가자의 준비를 해제하며 Revision과 뷰를 갱신한다. 사망·전투 종료 상태의 HP 편집은 거절하고 아군 부활은 기존 별도 경로를 사용한다. 확대 패널과 생성·체력 조작은 [UI 7-2절](UI_README.md#7-2-전투-디버그-도구)을 따른다.
 
-[ConfigureCombatDebugLevel.py](../Source/ProjectAEditor/Scripts/ConfigureCombatDebugLevel.py)는 위 맵·모드 생성, Party의 테스트 풀 참조 해제, 참조가 없는 테스트 풀 에셋 제거를 Unreal API로 수행한다. `-CombatDebugVerifyOnly`는 저장하지 않고 연결·배치·원본 보존을 재검사한다. `DA_VerticalSliceParty.RunEncounterPool`은 미지정이며 일반 3상점을 사용한다. 이전 저장의 `Encounter.Shop.Skill.Test`는 호환 태그로만 남겨 일반 스킬상점·1G 상품으로 해석하고 무료 목록은 더 이상 사용하지 않는다. [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
+[ConfigureCombatDebugLevel.py](../Source/ProjectAEditor/Scripts/ConfigureCombatDebugLevel.py)는 위 맵·모드 생성, Party의 테스트 풀 참조 해제, 참조가 없는 테스트 풀 에셋 제거를 Unreal API로 수행한다. `-CombatDebugVerifyOnly`는 저장하지 않고 연결·배치·원본 보존을 재검사한다. 당시 `DA_VerticalSliceParty.RunEncounterPool`은 미지정이었으며 현재는 [4-9절](#4-9-구입-vfx와-sfx-도입)의 DrGame 풀·61후보를 사용한다. 이전 저장의 `Encounter.Shop.Skill.Test`는 호환 태그로만 남겨 일반 스킬상점·1G 상품으로 해석하고 무료 목록은 더 이상 사용하지 않는다. [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
 ### 4-3 지하 던전 비교 레벨
 
@@ -255,7 +255,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 기본 명령은 신규 맵을 작성하고, `-DungeonVerifyOnly`는 저장본을 읽기 전용으로 검사한다. `-DungeonRebuild`는 기존 비교 맵의 장식을 다시 구성하는 명시적 재작성 옵션으로 수동 장식 수정을 덮어쓴다. `DungeonFantasySpec.json`·`DungeonStoneSpec.json`이 원본 에셋·배치 명세를 관리하며 결과는 `Saved/Automation/Dungeons/Configuration.json`·`Reload.json`에 기록한다.
 
-생성·navigation 저장·독립 재로드 검사는 카메라 시선 48표본·전장 여백·장식 충돌 비활성·navigation 영향 제외·원본 참조·저장된 변환과 설정·독립 전투 모드를 통과했다. 보호 대상 7,732개 파일의 SHA 불변과 읽기 전용 재로드 전후 새 맵 해시 보존도 확인했다. 렌더링·UI·PIE·실제 작동 테스트는 수행하지 않았다. 화면·클릭·이동은 [TODO 10절](TODO.md#10-지하-던전-비교-레벨-확인)에서 사용자가 확인한다.
+생성·navigation 저장·독립 재로드 검사는 카메라 시선 48표본·전장 여백·장식 충돌 비활성·navigation 영향 제외·원본 참조·저장된 변환과 설정·독립 전투 모드를 통과했다. 보호 대상 7,732개 파일의 SHA 불변과 읽기 전용 재로드 전후 새 맵 해시 보존도 확인했다. 2026-10-04 UE 5.8.3 Standalone PIE에서 두 던전의 실제 Windows 창 4:3·16:9·21:9 화면과 Slate 좌표 클릭→delegate 1회→공개 SAP 예약·이동 요청·자원·점유 갱신을 확인했다. 두 던전과 환경 12맵의 실제 Windows 창에서 동일 품질·1280×720·맵별 연속 180프레임을 표본으로 기록했다. wall 간격의 맵별 평균은 8.374~11.688ms·p95는 10.153~18.312ms이며 CPU/GPU·화면 제시 시각·변경 전후 FPS 비교를 측정하지 않는다. [검수 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)·[추가 확인](TODO.md#10-지하-던전-비교-레벨-확인)
 
 UE 5.8에서 폐기된 `DefaultEngine.ini`의 `r.Mobile.VirtualTextures`를 제거하여 엔진 ensure를 해소했으며 기존 `r.VirtualTextures=True`는 유지한다.
 
@@ -284,7 +284,7 @@ Gameplay의 전장·Grid·GameplayCamera·물리 바닥·NavBounds를 복제하�
 
 `EnvironmentLevelSpecs.json`의 `levels`·`surfaces`·`instances`를 `ConfigureEnvironmentSurfaces.py`와 `ConfigureEnvironmentLevels.py`가 사용한다. 재질을 먼저 작성한 뒤 맵을 생성하며, 별도 읽기 전용 재로드에서 원본 참조·SHA·저장된 ISM 변환·지면 빈틈·전장 시선 48표본과 XY60/Z20 여백을 검사한다. 기본 예산은 맵별 LOD0 삼각형 500만·그림자 삼각형 200만·그림자 메시 256개·LOD0 section 배치 256개·메시별 재질 슬롯 8개이며 초과 시 작성을 중단한다. 생성 결과의 맵별 LOD0 삼각형은 43,081~241,358개다. Sun 1개·고정 cubemap SkyLight·단순 안개와 EV100 13.3~14.2의 물리 수동 노출을 사용한다. 이 정적 예산은 실제 FPS 검증을 대체하지 않는다.
 
-12개 맵의 생성·navigation 저장·최종 독립 재로드와 재질의 독립 재로드 정적 검사를 통과했다. 작성·navigation 저장·재로드 전후 보호 대상 8,176개 파일의 SHA 불변과 읽기 전용 재로드 전후 새 맵 해시 보존을 확인했다. 재질 최초 작성의 보호 대상은 8,123개 파일이다. 실제 화면·입력·이동·성능은 미확인이다. 명령은 [에셋 도구 20번](../Source/ProjectAEditor/Scripts/README.md)을 따르고 결과는 `Saved/Automation/Environments/`에 기록한다. 사용자 확인은 [TODO 11절](TODO.md#11-환경-비교-레벨-확인)에서 관리한다.
+12개 맵의 생성·navigation 저장·최종 독립 재로드와 재질의 독립 재로드 정적 검사를 통과했다. 작성·navigation 저장·재로드 전후 보호 대상 8,176개 파일의 SHA 불변과 읽기 전용 재로드 전후 새 맵 해시 보존을 확인했다. 재질 최초 작성의 보호 대상은 8,123개 파일이다. 2026-10-04 UE 5.8.3 Standalone PIE에서 12맵의 실제 Windows 창 4:3·16:9·21:9 화면과 Slate 좌표 클릭→delegate 1회→공개 SAP 예약·이동 요청·자원·점유 갱신을 확인했다. 프레임 표본의 범위는 [4-3절](#4-3-지하-던전-비교-레벨)을 따르며 변경 전후 FPS 비교는 미검증이다. 명령은 [에셋 도구 20번](../Source/ProjectAEditor/Scripts/README.md)을 따른다. [검수 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)·[추가 확인](TODO.md#11-환경-비교-레벨-확인)
 
 ### 4-5 몬스터 콘텐츠
 
@@ -296,7 +296,7 @@ Gameplay의 전장·Grid·GameplayCamera·물리 바닥·NavBounds를 복제하�
 
 `UMonsterAnimInstance.GroundSpeed`는 라운드가 제공하는 실제 수평 속도로 Idle/Walk/Run을 선택하고 `DefaultSlot`으로 공격을 표시한다. 미등록 슬롯은 UE 기본 `DefaultGroup` 해석을 사용하며 원본 Skeleton 패키지를 저장하지 않는다. `ResolveRoundSkill`의 기존 기본 비무장 공격 피해 50·AP 1·GAS 효과와 태그/Query 조건을 유지하고 몬스터별 몽타주·발동 시간만 연결한다. 적 HP 150·AP 2·능력치 각 5, 서버 이동·발동·피격과 기존 래그돌을 유지한다. 생성 위치는 각 캡슐 반높이에 맞춰 타일에 배치한다.
 
-`EnemyCatalogClasses`는 소프트 클래스 13개를 보관하며 일반 Run은 `EnemyUnitClasses`의 기본 편성 4개만 로드한다. 디버그 목록 조회 시 유효한 소프트 카탈로그와 기본 편성을 중복 없이 해석한다. `ConfigureMonsterContent.py`가 명세를 적용하고 `-MonsterVerifyOnly`는 저장본을 읽기 전용으로 검사한다. Development Editor / Win64 컴파일과 작성·저장·독립 재로드 정적 검사를 통과했다. 결과는 `Saved/Automation/Monsters/Configuration.json`·`Reload.json`에 기록한다. 작동 테스트는 미실행이며 [TODO 12절](TODO.md#12-몬스터-콘텐츠-확인)을 따른다.
+`EnemyCatalogClasses`는 소프트 클래스 13개를 보관하며 일반 Run은 `EnemyUnitClasses`의 기본 편성 4개만 로드한다. 디버그 목록 조회 시 유효한 소프트 카탈로그와 기본 편성을 중복 없이 해석한다. `ConfigureMonsterContent.py`가 명세를 적용하고 `-MonsterVerifyOnly`는 저장본을 읽기 전용으로 검사한다. Development Editor / Win64 컴파일과 작성·저장·독립 재로드 정적 검사를 통과했다. 작성 근거는 `Saved/Automation/Monsters/Configuration.json`·`Reload.json`이다. 2026-10-04 UE 5.8.3 실제 PIE에서 13종의 접근·몽타주·대상 방향·복귀·원래 GAS 피해/AP와 사망/래그돌/타일 해제·기본 편성 초기화를 통과했다. 초기 52장·사망 2.5초 후 13장의 총 65장에서 크기·재질·지면 접촉·공격 방향을 직접 확인했다. 2.5초의 엔진 수면 표본은 깨어 있는 몸체 12종·수면 1종이며 최종 안착 판정은 아니다. 원본 물리를 유지한 8초 추가 13장의 총 78장 검수를 통과했다. 8초에는 수면 9종·깨어 있는 몸체 4종이었으며 전체 최종 안착은 미확인이다. [최신 검수 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)·[추가 확인](TODO.md#12-몬스터-콘텐츠-확인)
 
 신규 uasset 62개는 Blueprint 12·AnimBlueprint/BlendSpace/몽타주 각 10·스킬 12·IK Rig 4·Retargeter 2·리타깃 시퀀스 2개이며 합계 1,673,195바이트(약 1.6MiB)다. 약 661MiB의 설치된 생물 원본 팩과 구분한다. 원본 5개 루트의 1,574파일 SHA가 유지됐고 기존 추적 에셋 5,973개 중 의도한 `DA_DefaultEncounter`만 변경했다. Gameplay 읽기 전용 로드에서 혼합 편성 4개·앞열 2/뒷열 2 배치를 확인했으며 읽기 전용 재로드 전후 신규 62개와 변경 인카운터의 63개 SHA도 동일하다. 근거는 같은 보고서 폴더의 `FinalFileAudit.json`이다.
 
@@ -316,7 +316,7 @@ Gameplay의 전장·Grid·GameplayCamera·물리 바닥·NavBounds를 복제하�
 
 환경 12맵은 수동 노출 보정 +1EV(2배)·SkyLight 강도 +35%를 적용하며 Sun 강도는 유지한다. 두 던전은 노출 보정 +1EV·vignette 0.12·중성색 보조광 강도 Fantasy 5,200/Stone 10,500과 그림자 없는 SkyLight 각 1개·강도 0.35를 사용한다. 생성 명세·작성기에 같은 값을 반영했다. [ConfigureLevelLighting.py](../Source/ProjectAEditor/Scripts/ConfigureLevelLighting.py)는 기존 14맵의 조명·노출만 수정하고 전장·장식·navigation을 보존한다.
 
-UE 5.8.3에서 실제 렌더링 CVar 7개와 던전 Redirector를 확인했으며 MainMenu·Gameplay·DebugCombat·WorldMap에는 PostProcessVolume 재정의가 없다. 14맵의 조명·navigation 저장·최종 읽기 전용 재로드 모두 종료 0이며 오류 0·기존 commandlet CrowdManager와 navigation 변환 경고가 있다. 작성 시 보호 대상 20,643파일의 SHA와 비조명 설정을 보존했고 재로드 전후 Content 전체 20,657파일의 SHA도 동일하다. 근거는 `Saved/Automation/Lighting/{Inspection,Configuration,Reload}.json`이다. C++ 변경은 없으며 렌더링·게임·PIE·실제 FPS는 미확인이다. [작성·검사 명령](../Source/ProjectAEditor/Scripts/README.md)·[사용자 확인](TODO.md#14-렌더링과-밝기-확인)
+UE 5.8.3에서 실제 렌더링 CVar 7개와 던전 Redirector를 확인했으며 MainMenu·Gameplay·DebugCombat·WorldMap에는 PostProcessVolume 재정의가 없다. 14맵의 조명·navigation 저장·최종 읽기 전용 재로드 모두 종료 0이며 오류 0·기존 commandlet CrowdManager와 navigation 변환 경고가 있다. 작성 시 보호 대상 20,643파일의 SHA와 비조명 설정을 보존했고 재로드 전후 Content 전체 20,657파일의 SHA도 동일하다. 근거는 `Saved/Automation/Lighting/{Inspection,Configuration,Reload}.json`이다. 2026-10-04 실제 PIE 렌더링과 세 화면 비율의 42장 검수에서 전장·유닛 가시성을 확인했다. 변경 전후 FPS 비교는 미확인이다. [작성·검사 명령](../Source/ProjectAEditor/Scripts/README.md)·[추가 확인](TODO.md#14-렌더링과-밝기-확인)
 
 ### 4-8 기본 공격 외 스킬 정리
 
@@ -341,21 +341,31 @@ UE 5.8.3 Development Editor / Win64 최종 컴파일·링크 4.74초, 엔진 삭
 | [ProjectileVFX with Hit and Launch VFX ( with SFX )](https://www.fab.com/listings/4f4de421-d1dc-49c3-b66d-fb22fa8d015e) | `/Game/ProjectileHitVFX` |
 | [Slash and Hit VFX (with SFX)](https://www.fab.com/listings/f6bf529f-6db4-43a5-a5f1-2ff5b8d9a0f4) | `/Game/SlashHitVFX` |
 
-[DrGameSkillSpecs.json](../Source/ProjectAEditor/Scripts/DrGameSkillSpecs.json)의 NiagaraSystem 123개 중 주효과 60개를 새 `DrGame_` ID·프로젝트 전용 DA로 작성하고 피격·Trail·Decal·버전/Fluid 대안 63개는 독립 스킬 미생성으로 보존한다. 프로필은 area 15·line 9·link 5·projectile 14·slash 4·heal 6·shield 7개다. Level Up/Spawn 표현은 회복·보호막에 연결하며 경험치 증가·소환 기능을 추가하지 않는다. 투사체 14개는 기존 서버 최초 차단 충돌의 직선 비행을 사용한다. `link` 5종에는 기존 `Skill.Shape.Beam`을 보존하여 `Skill.Shape.Chain` 분류 태그를 추가하고 선택한 대상 하나와 연결하는 판정·표현을 유지한다. 다중 대상 연쇄는 미구현이며 태그·UI 분류와 구분한다. 피해·치유·흡수량 25·AP 1·후보 가중치 1과 선딜·판정 기간·범위는 시험 설정이며 최종 밸런스·확률 정책이 아니다.
+[DrGameSkillSpecs.json](../Source/ProjectAEditor/Scripts/DrGameSkillSpecs.json)의 NiagaraSystem 123개 중 주효과 60개를 새 `DrGame_` ID·프로젝트 전용 DA로 작성하고 피격·Trail·Decal·버전/Fluid 대안 63개는 독립 스킬 미생성으로 보존한다. 프로필은 area 15·line 9·link 5·projectile 14·slash 4·heal 6·shield 7개다. Level Up/Spawn 표현은 회복·보호막에 연결하며 경험치 증가·소환 기능을 추가하지 않는다. 투사체 14개는 기존 서버 최초 차단 충돌의 직선 비행을 사용한다. `link` 5종은 기존 `Skill.Shape.Beam`과 `Skill.Shape.Chain`을 유지하며, Chain 태그 쿼리와 다중 대상 설정으로 전용 연쇄 실행기에 연결한다. 구입 원본 연결 VFX를 각 구간에서 직접 참조하고 신규 복제 에셋을 만들지 않는다. 피해·치유·흡수량 25·AP 1·후보 가중치 1과 선딜·판정 기간·범위는 시험 설정이며 최종 밸런스·확률 정책이 아니다.
 
 새 `DA_DrGameSkillShopPool`은 근접 공격 1종·신규 60종의 61후보를 제공하고 `DA_DrGameRunEncounterPool`을 기본 파티의 `RunEncounterPool`에 연결했다. 신규 패키지는 스킬 60개·풀 2개이며 기존 변경은 파티의 Run 풀 참조다. 시작 비무장 공격·몬스터 전용 공격 12개·기존 공격 애니메이션과 [퇴역 명세](#4-8-기본-공격-외-스킬-정리)를 보존한다. 기존 저장에 확정한 카탈로그·진열·가격은 유지하므로 신규 후보는 새 Run에서 확인한다.
 
-[이펙트 목록](../DataCatalogs/SKILL_EFFECT_ASSETS.csv)·[생성 현황](../DataCatalogs/SKILL_CREATION_STATUS.csv)은 각각 기존 577행의 셀·바이트를 보존하고 신규 123행을 추가한 700행이다. 별도 [SFX 목록](../DataCatalogs/SKILL_SOUND_ASSETS.csv)은 SoundCue 120개·SoundWave 114개의 팩·원본 objectpath·VFX/스킬 단계·전이 참조·길이/looping을 기록한다. 원본 AudioPlayer SoundToPlay와 파괴/looping/재생 제한 플래그·Audio 사용자 파라미터를 확인하고 빈 바인딩을 별도로 표시한다. 신규 스킬은 원본 Niagara 내부 SFX를 사용하며 외부 Sound 중복 재생을 추가하지 않는다. 지원되는 파라미터에 AudioOn·최적화 모드를 적용하고 부가 잔류·동적 조명·LevelUp 텍스트 표현을 끈다. 목록의 참조·바인딩 확인은 실제 재생·청취 결과가 아니다.
+[이펙트 목록](../DataCatalogs/SKILL_EFFECT_ASSETS.csv)·[생성 현황](../DataCatalogs/SKILL_CREATION_STATUS.csv)은 각각 기존 577행의 셀·바이트를 보존하고 신규 123행을 추가한 700행이다. 별도 [SFX 목록](../DataCatalogs/SKILL_SOUND_ASSETS.csv)은 SoundCue 120개·SoundWave 114개의 팩·원본 objectpath·VFX/스킬 단계·전이 참조·길이/looping을 기록한다. 원본 AudioPlayer SoundToPlay와 파괴/looping/재생 제한 플래그·Audio 사용자 파라미터를 확인하고 빈 바인딩을 별도로 표시한다. 신규 스킬의 원본 Niagara 내부 SFX를 유지한다. PoisonCarousel은 원본 카메라 거리 2,000cm 오디오 컬링을 피하도록 프로젝트의 User.AudioOn을 끄고 동일한 원본 SoundCue를 외부 Sound로 직접 참조한다. Volume/Pitch 1·시작 0초·상한 5초로 원본 큐 볼륨 0.75와 2.143초의 반복 없는 Wave를 유지하며 중복 재생을 차단한다. 기존 DA의 두 필드 작성·독립 재로드와 공식 생성기 검증 전용 실행을 통과했다. 스킬 60개·상점 후보 61개를 확인했고 추가 생성·수정·저장 없이 Content 19,807파일의 상태와 대상 SHA를 보존했다. 수정 후 네 카메라/리스너 조건에서 WAV 신호·최대 동시 오디오 1개와 원본 큐의 자연 종료를 확인했다. 원본 큐 Pitch 1.2를 반영한 재생 길이는 약 1.786초이며 WAV 마지막 0.2초는 무음이었다. 청취 품질과 다른 효과의 전체 오디오 수명은 별도 검수다. 지원되는 파라미터에 AudioOn·최적화 모드를 적용하고 부가 잔류·동적 조명·LevelUp 텍스트 표현을 끈다. 목록의 참조·바인딩 확인은 실제 재생·청취 결과가 아니다.
 
-프로젝트에서 NiagaraFluids·ChaosNiagara를 활성화하며 원본 Niagara를 수정하지 않는다. Development Editor / Win64 컴파일, 에셋 작성·독립 읽기 전용 재로드·DataValidation, 원본 1,900파일·보존 스킬 14개 해시와 CSV·문서 정적 검사를 통과했다. 원본 설치 감사에는 사용하지 않는 데모 Blueprint의 InputAction 경고 20개가 있으며 작성·재로드는 오류·경고 0이다. NullRHI의 IsReadyToRun 값은 렌더 실행 검증으로 사용하지 않는다. 게임·PIE·자동화 테스트·실제 VFX/SFX 재생은 미실행이며 [TODO 19절](TODO.md#19-구입-vfxsfx-스킬-확인)에서 사용자가 확인한다. 근거: `Saved/Automation/DrGameSkills/Inventory.json`·`Author.json`·`Reload.json`·`FinalPreservation.json`·`CsvValidation.json`.
+Line_Lava의 프로젝트 StepDistance 250 재정의를 제거하여 원본 1,400을 사용한다. 원본 Count 5·GapTime 0.3초와 피해·AP·판정 범위·시점은 유지했고 정확한 기존 DA만 저장·독립 재로드하여 다른 전체 필드와 원본 해시 보존을 확인했다. 수정 후 0.6초의 분리된 기둥과 실제 1.256초의 다섯 번째 연출이 시전자에서 적 방향으로 진행하는 화면을 확인했다.
 
-2026-10-04 체인 분류 추가는 별도 `Saved/Automation/ChainSkillFilter/Author.json`·`Reload.json`으로 저장·읽기 전용 재로드·DataValidation을 통과했다. 기존 링크 DA 5개에 분류 태그만 추가하고 나머지 신규 55개·보존 공격 14개·원본 1,900파일 해시를 보존했다. CSV 2개는 해당 5행만 갱신했으며 실제 UI·전투 확인은 [TODO 21절](TODO.md#21-체인-스킬-방식-필터-확인)에서 대기한다.
+Spawn_Ninja_Root의 원본과 두 높이 대안은 3조건·15장으로 비교했다. 기본 0.610초에는 연막이 없고 프로젝트 상대 높이 +30cm·User.HeightOffset 20 대안의 0.607/0.609초에는 시전자 발 주변 연막을 확인했다. 같은 렌더러·MID·Emitter 소스 모드·품질을 유지한 근거로 기존 프로젝트 DA의 Vfx.RelativeTransform.Z만 -90→-60으로 변경했다. 기존 DA 한 개의 저장·독립 재로드·전체 round 역재구성과 공식 생성기의 60스킬/61후보 검사를 통과했다. 원본 Niagara와 User.HeightOffset -20·피해/AP/태그/시점·다른 Content 파일은 유지했다. 적용 후 집중 검수 7시전·30장의 실제 화면에서 약 0.606초의 시전자 발 주변 회색 연기를 확인했다. 초기/0.12초 표본은 희미하고 별도 0.08초 표본은 관측 보류했으며 최종 표현 선호는 대기한다. 최신 패키지의 실제 로드에서 저장된 Z=-60과 원본 참조를 확인했다.
+
+프로젝트에서 NiagaraFluids·ChaosNiagara를 활성화하며 원본 Niagara를 수정하지 않는다. Development Editor / Win64 컴파일, 에셋 작성·독립 읽기 전용 재로드·DataValidation, 원본 1,900파일·보존 스킬 14개 해시와 CSV·문서 정적 검사를 통과했다. 원본 설치 감사에는 사용하지 않는 데모 Blueprint의 InputAction 경고 20개가 있으며 작성·재로드는 오류·경고 0이다. NullRHI의 IsReadyToRun 값은 렌더 실행 검증으로 사용하지 않는다. 설치·작성 당시 게임·PIE·자동화 테스트·VFX/SFX 재생은 미실행이었다. 후속 위임 검수의 범위는 [TODO 19절](TODO.md#19-구입-vfxsfx-스킬-확인)과 최신 실행 이력을 따른다. 근거: `Saved/Automation/DrGameSkills/Inventory.json`·`Author.json`·`Reload.json`·`FinalPreservation.json`·`CsvValidation.json`.
+
+2026-10-04 체인 분류 추가는 별도 `Saved/Automation/ChainSkillFilter/Author.json`·`Reload.json`으로 저장·읽기 전용 재로드·DataValidation을 통과했다. 기존 링크 DA 5개에 분류 태그만 추가하고 나머지 신규 55개·보존 공격 14개·원본 1,900파일 해시를 보존했다. CSV 2개는 해당 5행만 갱신했다. 실제 체인 탭의 전체 5종과 미보유 항목 필터를 확인했으며 다중 수치·에셋 적용의 대기는 [TODO 23절](TODO.md#23-다중-체인-공격-확인)을 따른다.
+
+2026-10-04 다중 체인 실행은 `CombatRoundRules::UsesChain`의 `FGameplayTagQuery`와 `Chain.MaxTargets > 1`로 전용 `ACombatChainEffectActor`를 선택한다. 현재 지원 조합은 Chain·Damage 태그, Heal/Shield 제외, EnemyUnit·단일 대상 효과 충돌이며 기존 고정 Melee 실행 종류는 지원 지오메트리를 제한한다. 최초 피격은 기존 범위·피격 대기·태그 조건·벽 차단을 유지한다. 이후에는 직전 피격 위치에서 점프 거리 안의 최근접 생존 미타격 적을 선택하고 동거리에서는 작은 UnitId를 우선한다. 각 점프의 실제 피격 시점에도 생존·태그·거리·시야 차단을 다시 검사하며 같은 적은 한 번만 타격한다. 시전자 또는 대기 중 대상의 사망·후보 소진·최대 수 도달 시 종료하고, 이미 피격된 적의 사망은 저장된 피격 위치에서 다음 연결을 계속한다.
+
+`FCombatChainSettings`는 첫 대상을 포함한 `MaxTargets`·cm 단위 `JumpDistance`·`JumpIntervalSeconds`·점프별 누적 `DamageMultiplierPerJump`를 관리한다. 기본값 1·0·0·1은 기존 단일 연결을 유지한다. 원래 시전자의 GAS·효과/조건 태그를 그대로 사용하고 기존 행동 비용은 한 번만 차감한다. 원본 연결 Niagara 5종을 구간마다 직접 참조하며 연결 구간 SFX는 최초 구간에서 한 번, 피격 VFX/SFX는 대상마다 재생한다. 구간별 연출을 정리하고 판정 종료 시 기존 라운드 잠금을 해제한다. `FCombatChainRuntimeData`는 진행을 UnitId·시간·좌표로 보관하며 구간 표현을 복제한다. 기존 확정 Ready 경계 저장 범위는 유지하고 진행 중 연쇄의 별도 복구는 추가하지 않는다. UE 5.8.3 Development Editor / Win64 컴파일을 통과했다. 기존 74스킬의 읽기 전용 해석·VFX 참조와 원본 1,900파일 보존 검사를 통과했다. 초기 수치는 선택 대기이며 DA 설정·작성 후 독립 재로드 검증은 보류했다. HP 보완 후 native 재검수에서 실제 Actor·Coordinator·GAS 회귀 6개를 통과했다. 원본 5종의 임시 3대상·4방향/LWC 화면을 확인했으며 다중 PC 협동 동기화는 별도다. [TODO 23절](TODO.md#23-다중-체인-공격-확인)
 
 2026-10-04 VFX 방향 보정은 Niagara 파라미터의 자료형과 그래프에서 소비하는 좌표 공간을 분리한다. `FCombatSkillVfx.StartPositionSpace`·`EndPositionSpace`의 기본 `ParameterType`은 기존 Vec3 로컬·Position 월드 해석을 보존한다. 체인 5종의 `User.EndPos_V`는 월드 공간 이미터의 원점과 직접 연결하므로 `World`, 화염 화살비·우박 폭격의 `User.Launch_Position`은 Position 자료형이지만 로컬 이미터의 위치·속도 오프셋이므로 `ComponentLocal`로 지정한다. 활성화 전에 상대 위치·회전·크기와 Niagara LWC 타일 변환을 반영하고 원본 Niagara·피해·대상·태그·GAS·판정·SFX·시점·풀·파티는 보존한다.
 
 가시엄니 원본 `NS_BrambleTusk`의 `GPU_Fang`은 월드 공간 이미터의 `AddVelocity` 좌표 공간이 Simulation(0)이어서 속도 +X가 시전자 회전에 따라 돌지 않았다. 해당 모듈 입력은 외부 User 파라미터로 공개되지 않아 단순 참조·자식 Blueprint·컴포넌트 회전으로 보정할 수 없다. 원본 팩과 하위 구조를 유지한 `/Game/User_JeHoon/__GroundAttackVFX/NS/NS_BrambleTusk`의 필수 Niagara 파생본 1개(12,648,343바이트·약 12.1MiB)에서 검증된 좌표 공간 입력 하나만 Local(2)로 변경했다. 월드 이미터·속도 수치·렌더러·회전·SFX·원본 모듈 참조는 보존한다. 작업 편의를 위한 원본 복제는 계속 금지하며 이 파생본은 대상 방향으로 표시하기 위한 필수 결과다.
 
-신규 60종과 비무장·근접·몬스터 공격 14종의 전체 74스킬을 읽기 전용으로 검수했다. 시전·투사체·효과 충돌·피격 방향, 원본 Niagara 79종의 그래프·주효과/피격 83슬롯과 저장된 끝점 공간을 대조했다. 기본·몬스터 공격 14종에는 직접 VFX·ImpactVFX가 없으며 기존 대상 방향의 애니메이션 경로를 유지한다. UE 5.8.3 Development Editor / Win64 컴파일, 기존 DA 8개(끝점 7개·가시엄니 VFX 참조 1개)와 필수 Niagara 파생본 1개 작성·독립 재로드·DataValidation·전체 에셋 감사를 오류·경고 없이 통과했다. 파생본의 다른 좌표 입력·시각 설정·원본 모듈 참조와 작성/재로드 해시가 일치했다. 나머지 신규 52개·기본/몬스터 14개·원본 1,900파일과 읽기 전용 검사 전후 스킬 74파일 해시를 보존했다. 근거는 `Saved/Automation/SkillVfxDirection/`의 작성·재로드·원본 그래프·최종 보존 보고서다. 화면·게임·PIE·자동화 테스트는 미실행, [TODO 22절](TODO.md#22-스킬-vfx-방향-확인)의 사용자 확인 대기다.
+신규 60종과 비무장·근접·몬스터 공격 14종의 전체 74스킬을 읽기 전용으로 검수했다. 시전·투사체·효과 충돌·피격 방향, 원본 Niagara 79종의 그래프·주효과/피격 83슬롯과 저장된 끝점 공간을 대조했다. 기본·몬스터 공격 14종에는 직접 VFX·ImpactVFX가 없으며 기존 대상 방향의 애니메이션 경로를 유지한다. UE 5.8.3 Development Editor / Win64 컴파일, 기존 DA 8개(끝점 7개·가시엄니 VFX 참조 1개)와 필수 Niagara 파생본 1개 작성·독립 재로드·DataValidation·전체 에셋 감사를 오류·경고 없이 통과했다. 파생본의 다른 좌표 입력·시각 설정·원본 모듈 참조와 작성/재로드 해시가 일치했다. 나머지 신규 52개·기본/몬스터 14개·원본 1,900파일과 읽기 전용 검사 전후 스킬 74파일 해시를 보존했다. 근거는 `Saved/Automation/SkillVfxDirection/`의 작성·재로드·원본 그래프·최종 보존 보고서다. 작성 당시 화면·게임·PIE·자동화 테스트는 미실행이었다. 후속 위임 검수의 범위는 [TODO 22절](TODO.md#22-스킬-vfx-방향-확인)과 최신 실행 이력을 따른다.
+
+2026-10-04 사용자 위임으로 실제 PIE·게임·화면 검수를 진행했다. 몬스터·외형 에디터 도구의 동일한 내부 함수명을 구분해 동작 변경 없이 Unity 컴파일 충돌을 해소했다. 후속 인벤토리 검수 fixture의 뷰포트 종료 수명 보완을 포함한 Editor 컴파일·링크 8.90초를 통과했으며 별도 native 회귀 175개를 12.445초에 통과했다. 이전 cooked 패키지 저장/이어하기/종료는 해당 코드의 이력이다. HP의 창·NativePaint 크기/위치 결함을 보완하고 실제 Windows 창 검수 15개를 통과했다. 14맵·42장의 세 화면 비율에서 유닛 5개의 HP 위치 오차는 최대 0.585px였으며 사망/부활 5→4→5개 표시와 창 X/Y 37/29px 이동 시 Paint 위치 유지도 확인했다. 최신 Development 패키지의 BuildCookRun 80.10초와 cooked CSV 289개·스킬 61후보/세 보완 DA 읽기 검사를 통과했다. 동일 실행 파일·빌드·컨테이너 5개의 격리 writer 저장을 별도 프로세스에서 Continue → 보상 → Shop_02 → Combat_02로 복원했고 실제 Quit 버튼의 자연 종료도 확인했다. Editor 작성 저장의 cooked 재개는 FText 직렬화 크기 차이로 실패한 이력을 유지하며 동일 패키지 writer 결과와 구분한다. 모든 검수 종료 후 Content 19,804파일의 SHA/크기 동일과 승인한 프로젝트 DA 3개의 정확한 변경을 확인했다. 원본 저장 49개·GameUserSettings·외부 EditorKeyBindings의 SHA를 보존했고 검수 소유 임시 파일을 정리했으며 예상 밖 Content·저장 추가는 없었다. 몬스터·메뉴·환경·스킬·인벤토리의 결과와 제한은 [최신 실행 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)을 따른다. 체인 초기 수치·미선택 온라인 정책은 계속 대기한다.
 
 ### 개발용 협동 진입
 
@@ -376,7 +386,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 전투 간 이관 | HP 유지. 새 전투의 추가 스킬 자동 추첨 없음. 전투 복구는 저장된 Ready 경계 사용. Snapshot 적은 저장된 스킬 구성 사용 |
 | 적·아군 AI | 실제 장착 스킬 순서·가까운 적 기준으로 인간 초안 전에 단일 명령 고정. 장착된 복귀형 Tile 공격은 적 HomeCoord를 공격/접근 좌표로 선택 가능. 합법 공격이 없으면 목록에 노출되지 않는 내부 대기 처리 |
 | 사망 표현 | 아군·적·Snapshot 모두 기존 Ragdoll 충돌 프로필·본 물리·서버 생성 사망 충격량 사용. 캡슐 충돌 해제·타일 해제·행동 취소 유지. 단발 사망 애니메이션 분기와 설정 제거. [에셋 도입 계획](TODO.md#6-신규-에셋-선정과-도입) |
-| 메뉴 프리뷰 | MainMenuPreviewStage의 카메라 X `-500`·4개 앵커 Yaw `90°` 사용. 네 직업은 선택한 Primitive 몸체와 공통 Idle을 표시한다. 프리뷰 Blueprint·몸체 회전을 정규화하고 상세 편집 종료 시 슬롯의 기본 방향을 복원한다. 마법사 기본 스태프 없음. 전투 Pawn 생성 없음. [수치 조절](UI_README.md#화면프리뷰)·[구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관) |
+| 메뉴 프리뷰 | 초기 카메라 X `-500`·4개 앵커 Yaw `90°`를 기준으로 실제 몸체 투영과 가로 여백에 맞춰 파티 구도를 조정한다. 화면 크기·파티·외형 변경은 초기 기준에서 다시 계산하고 상세 편집 종료 시 파티 구도를 복원한다. 네 직업은 Primitive 몸체·공통 Idle을 표시하며 마법사 기본 스태프와 전투 Pawn 생성은 없다. [수치 조절](UI_README.md#화면프리뷰)·[최신 검수 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수) |
 | 생성 화면 종료 | Back/X는 초안·프리뷰 정리. 재진입 시 빈 4슬롯. 상세 패널이 열려 있으면 먼저 패널만 닫음. 최소 슬롯 높이로 ClassInfo 표시 유지 |
 | 모드 선택 | 게임 시작 → 싱글플레이/멀티플레이. 캐릭터 생성·접속 시작 전 멀티 화면에서 돌아오면 모드 선택 복원, 모드 선택의 뒤로가기는 첫 화면 복원. 연결 이후 나가기는 기존 세션 정리/메뉴 복귀 |
 | 싱글 여정 항복 | 이어하기 옆 104×40 버튼·`URunSurrenderWidget` 확인창. 돌아가기 기본 포커스, 확인된 현재 일반 싱글 저장만 삭제. 취소·실패·저장 변경은 원본/현재 Run 보존 |
@@ -384,7 +394,9 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 공통 UI 외형 | `UDemonicUITheme`이 기존 DemonicUI 텍스처를 참조하여 메뉴·설정·캐릭터 생성·협동·Run·상점·결과·라운드 계획과 저장/협동 안내를 꾸민다. 기존 입력·바인딩·권한 조건 유지 |
 | 공통 UI 배율 | `UserInterfaceSettings`의 1920×1080 기준 `ScaleToFit`·`ApplicationScale=1` 사용. 화면별 추가 축소 제거, 전투는 화면 가장자리의 정보·조작 패널과 중앙 전장으로 구성 |
 
-2026-10-01 `SavedMenuLifecycle -ProjectAFlowOnly`에서 4슬롯 생성·실제 저장 버튼·선택/교체·수정/취소·삭제와 프리뷰 정리를 확인했다. 프리뷰 재생·루프와 에셋 캡처는 제외했으며 전체 메뉴의 idle 루프 경계 4건 실패는 실제 Tick·재생 시각 확인까지 보류한다. 독립 게임 창의 실제 Quit·자연 종료와 Continue의 저장 결과·보상·다음 노드 개방을 확인했다. 저장 표시명은 `FText` key 동일성 대신 공통 값 비교를 사용하고 표시명·Asset·Tags·Price의 무결성 검사를 유지한다. 최종 보완 후 에디터 7개·게임 6개의 대상 저장 검사가 통과했으며 앞선 자동화 166개는 전체 재실행하지 않았다. [실행 근거](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
+2026-10-01 `SavedMenuLifecycle -ProjectAFlowOnly`에서 4슬롯 생성·실제 저장 버튼·선택/교체·수정/취소·삭제와 프리뷰 정리를 확인했다. 프리뷰 재생·루프와 에셋 캡처는 제외했으며 전체 메뉴의 idle 루프 경계 4건 실패는 당시 실제 Tick·재생 시각 확인까지 보류했다. 독립 게임 창의 실제 Quit·자연 종료와 Continue의 저장 결과·보상·다음 노드 개방을 확인했다. 저장 표시명은 `FText` key 동일성 대신 공통 값 비교를 사용하고 표시명·Asset·Tags·Price의 무결성 검사를 유지한다. 최종 보완 후 에디터 7개·게임 6개의 대상 저장 검사가 통과했으며 앞선 자동화 166개는 전체 재실행하지 않았다. [실행 근거](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
+
+2026-10-04 전체 메뉴 검수는 네 직업 몸체·4:3/16:9/21:9의 생성·Edit 저장/취소·우클릭 드래그 입력과 원본 카메라 복원·실제 프리뷰 루프를 통과했다. 당시 제외했던 프리뷰/화면 검수와 구분하며 [최신 실행 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)을 따른다.
 
 설정은 Unreal `UGameUserSettings`의 화면·Scalability API를 사용한다. 테두리 없는 전체 화면은 게임 창 기준 모니터의 바탕 화면 해상도로 고정하고 기존 혼합 품질은 프리셋을 선택하기 전까지 보존한다. 미확인 화면의 전체 화면 단축키 전환을 차단하고 정상 창 종료 전 복원한다. 새 제작 에셋·Config 변경은 필요하지 않다. 상세 계약은 [UI_README 8절](UI_README.md#8-시작-메뉴-설정)을 따른다. 독립 게임 창의 옵션 저장·복원 자동화 범위는 [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)에 기록했다.
 
@@ -394,7 +406,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 
 Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이어에서 표시한다. `I`는 개인 골드·스킬·아이템과 실제 장착 상태를 조회하며 상점에서도 동일한 장비·인벤토리 패널을 상품 양쪽에 표시한다. 상점 페이즈의 본인 생존 Human은 지원 프로필 49종을 드래그 장착·교체·해제한다. `Esc`와 `O`는 기존 Options 화면의 같은 열기·닫기·확인 복원 경로로 연결하며 별도 창이 열린 동안 로컬 전장 입력을 차단한다. 키·복구 계약은 [UI 단축키](UI_README.md#8-2-gameplay-인벤토리와-설정-단축키), 장착 지원·후속 범위는 [3-1절](#3-1-시작-장비와-장착)을 따른다.
 
-`UCharacterInventoryPanel`은 포더킹 참고 이미지의 가방 목록을 상점과 `I` 창에 공통 적용한다. 전체·무기·방패·탄약·기타·스킬 탭의 아이콘/개수, 미장착 사본의 분류 아이콘·저장된 이름·`(1)`, 선택 상세를 native 위젯으로 구성한다. 분류는 기존 GameplayTag 조건을 사용하고 같은 에셋의 개별 `ItemIndex`와 현재 장비 `Revision`, 빈 가방 Drop·서버 권한 검사를 유지한다. 상세는 저장 카탈로그 참고 가격·장착 지원·허용 슬롯을 표시하며 능력치·희귀도·효과를 생성하지 않는다. 스킬 탭은 실제 장착 목록과 권위 Run의 이전 저장 해석을 유지한다. 기존 장비 슬롯·원본 에셋·저장 형식·네트워크 권위는 유지하며 WBP 재생성은 필요 없다. 작동 확인은 [TODO 8절](TODO.md#8-목록형-인벤토리-확인)을 따른다.
+`UCharacterInventoryPanel`은 포더킹 참고 이미지의 가방 목록을 상점과 `I` 창에 공통 적용한다. 전체·무기·방패·탄약·기타·스킬 탭의 아이콘/개수, 미장착 사본의 분류 아이콘·저장된 이름·`(1)`, 선택 상세를 native 위젯으로 구성한다. 분류는 기존 GameplayTag 조건을 사용하고 같은 에셋의 개별 `ItemIndex`와 현재 장비 `Revision`, 빈 가방 Drop·서버 권한 검사를 유지한다. 상세는 저장 카탈로그 참고 가격·장착 지원·허용 슬롯을 표시하며 능력치·희귀도·효과를 생성하지 않는다. 스킬 탭은 실제 장착 목록과 권위 Run의 이전 저장 해석을 유지한다. 기존 장비 슬롯·원본 에셋·저장 형식·네트워크 권위는 유지하며 WBP 재생성은 필요 없다. 2026-10-04 검수 4개·27장에서 세 화면 비율의 실제 Slate 구매/장착·저장·권한 거절과 O/Esc 설정 복귀를 확인했다. 해제·권한 거절 Drop은 합성 `NativeOnDrop`이며 실제 드래그 시작·다중 PC 검수는 별도다. [검수 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)·[추가 확인](TODO.md#8-목록형-인벤토리-확인)을 따른다.
 
 ### 타겟·행동 세부 규칙
 
@@ -413,6 +425,8 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 - 다른 유닛의 복귀·예약 칸으로 이동하거나 자리를 교환할 수 없으며 실패한 이동은 출발점으로 복원한다. 같은 시각에도 서버 순서대로 피해·사망을 즉시 반영하고 미발동 공격을 취소한다. 계획 수정은 해당 소유자의 준비만 해제한다.
 
 ## 저장과 멀티플레이 연결 경계
+
+기존 사용자 v5 저장은 UUID 복사본에서 읽기 전용으로 확인했다. Combat_01·파티 4명·각 HP 100과 저장 당시 아이템 295개·스킬 177개 카탈로그를 보존했고, 원본·복사본 바이트와 외부 원본 SHA가 관찰 전후 동일했다. 근접 공격의 원본 round 이름은 비어 있었으나 현재 표시명과 공식 ResolveRoundSkill 결과는 모두 근접 공격이었다. 이후 별도 UUID 사본에서 실제 메뉴 Continue delegate와 공개 전투 복원을 통과했다. 공식 메모리 마이그레이션으로 기존 스킬 카탈로그는 퇴역 스킬을 제외해 177→1개가 됐고 아이템 295개는 유지했다. 파티 4명·유닛 8개·Round/Revision 1과 HP/AP/SAP·원래 소유권·명령·타일 점유를 비교했으며 882×462 화면의 8개 HP와 UI를 직접 확인했다. 원본 저장 49개·설정 1개의 SHA와 사본 바이트는 전후 동일했고 사본을 정리했다. 현재 프로젝트에서의 Continue 복원 검증이며 원본 저장을 Unreal로 변경하거나 cooked 호환을 확인한 결과는 아니다.
 
 기본 슬롯은 `ProjectA_Run`, 상대 Snapshot 슬롯은 `ProjectA_Opponent_` 접두사다. 새 게임·승패·Continue·상점 전이와 전투의 준비 완료 경계를 저장한다. 준비 완료·전투 시작은 저장 성공 뒤 확정하며 실패 시 이전 상태를 보존한다. 강제 종료 뒤 일반 Continue 또는 관리 명시적 재개로 마지막 저장 계획·Ready·유닛·자원·배치를 복구한다. 진행 중 시전·투사체의 시각을 복원하지 않고 저장된 경계에서 다시 실행한다. 테스트 슬롯은 `-ProjectASaveSlot=...`로 분리한다.
 
@@ -539,7 +553,7 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 
 ## 현재 한계와 보존 대상
 
-- 기본 콘텐츠는 전투 10회·상점 9회의 새 시험 Run과 네 직업을 사용하며 기존 두 전투 저장은 보존한다. 공통 초기값·개인 인벤토리·9칸 장비 UI·49종 장착·상점 HP 회복·임시 승리 골드 보상은 구현했다. 직업별 고유 스킬·최종 밸런스·회복/부활 인카운터·추가 보상·나머지 246종 장비 분류·비무기 콘텐츠·장비 능력치/부여 스킬·Snapshot 장비 연결과 목표 PvE/PvP 20전투·60인카운터 구성은 미구현이다.
+- 기본 콘텐츠는 전투 10회·상점 9회의 새 시험 Run과 네 직업을 사용하며 기존 두 전투 저장은 보존한다. 공통 초기값·개인 인벤토리·9칸 장비 UI·49종 장착·상점 HP 회복·임시 승리 골드 보상은 구현했다. 직업별 고유 스킬·최종 밸런스·회복/부활 인카운터·추가 보상·나머지 240종 장비 분류·비무기 콘텐츠·장비 능력치/부여 스킬·Snapshot 장비 연결과 목표 PvE/PvP 20전투·60인카운터 구성은 미구현이다.
 - 4×4 Grid·ASC HP/AP·기존 외형/사망 표현과 시전 몽타주를 연결한다. 순차 턴·AI·기존 GAS/몽타주 알림의 효과 실행은 기본 전투에서 제외하며 장착 스킬은 초기 라운드 변환을 사용한다. 미지원 이전 대상/범위/커스텀 능력은 명시 프로필을 요구하며 자동으로 다른 효과로 바꾸지 않는다. Streaming/Level Instance는 현재 흐름에 없다.
 - 2026-09-11부터 작업 폴더에서 삭제된 TestMap·BP_PartyPlayerController·TestGameModebase의 삭제 이력을 2026-09-16 Git에 반영한다. 자동 복원하지 않으며 기존 최초 생성·Audit 도구의 TestMap 입력은 별도 원본 확보가 필요하다. WorldMap 레벨/native class는 deprecated 상태이며 실행 흐름에서 제외한다.
 - WorldMap의 WorldSettings가 참조하는 WorldMapGameModeBase는 호환을 위해 보존한다.

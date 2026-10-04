@@ -9,7 +9,7 @@ import unreal
 
 ROOT = Path(unreal.Paths.project_dir()).resolve()
 SKILL_ROOT = "/Game/User_JeHoon/Blueprint/DataAsset/Skills"
-REPORT_DIR = ROOT / "Saved/Automation/SkillVfxDirection"
+REPORT_DIR = ROOT / "Saved/Automation" / ("ChainSkills" if "-ChainSkillsAudit" in unreal.SystemLibrary.get_command_line() else "SkillVfxDirection")
 ORIGINAL_HASHES = ROOT / "Saved/Automation/DrGameSkills/OriginalHashes.json"
 DIRECTION_WORDS = ("velocity", "rotation", "orientation", "direction", "facing", "axis", "position", "location", "beam", "start", "end", "target", "source", "space", "transform")
 CASCADE_FIELDS = ("enabled", "use_local_space", "screen_alignment", "emitter_origin", "emitter_rotation", "orbit_module_affects_velocity_alignment", "start_velocity", "start_velocity_radial", "in_world_space", "apply_owner_scale", "acceleration", "velocity", "velocity_scale", "scale", "start_rotation", "start_rotation_rate", "rotation_rate", "rotation", "inherit_parent", "axis_lock", "axis_lock_option", "lock_axis_flags", "mesh_alignment", "mesh", "camera_facing", "camera_facing_option", "roll_pitch_yaw_range", "start_location", "location", "end_point", "source", "source_method", "source_name", "source_absolute", "source_tangent", "source_tangent_method", "target", "target_method", "target_name", "target_absolute", "target_tangent", "target_tangent_method")
@@ -210,6 +210,8 @@ def main():
             errors.append("Runtime skill validation failed: " + path)
         profile = unreal.MonsterAssetLibrary.get_resolved_monster_skill(skill)
         row = {"asset": path, "valid": bool(valid), "use_round_definition": bool(skill.get_editor_property("use_round_definition")), "resolved": {name: serialize(profile.get_editor_property(name)) for name in ["skill_id", "name", "kind", "target_rule", "approach", "effect_tags", "target_only", "homing", "effect_offset", "effect_travel", "use_effect_collision", "effect_half_extent", "effect_sphere", "projectile_speed", "projectile_radius"]}}
+        chain = profile.get_editor_property("chain")
+        row["resolved"]["chain"] = {name: chain.get_editor_property(name) for name in ["max_targets", "jump_distance", "jump_interval_seconds", "damage_multiplier_per_jump"]}
         row["resolved"]["vfx"] = inspect_visual(profile.get_editor_property("vfx"), niagara, cascade, errors, path, "vfx")
         row["resolved"]["impact_vfx"] = inspect_visual(profile.get_editor_property("impact_vfx"), niagara, cascade, errors, path, "impact_vfx")
         skills.append(row)

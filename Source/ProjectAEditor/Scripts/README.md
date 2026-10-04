@@ -2,6 +2,8 @@
 
 UI 구조·생성 옵션·JSON 필드는 [UI_README](../../../Docs/UI_README.md)를 따른다.
 
+2026-10-04 사용자가 위임한 UE 5.8.3 엔진 자동화·실제 렌더링·입력 검수의 최신 범위는 [검증 이력](../../../Docs/HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)에 기록한다. 아래 도구별 작성·재로드 이력과 최신 작동 검수는 구분하며 남은 확인은 [TODO](../../../Docs/TODO.md)를 따른다.
+
 UE 5.8 Development Editor / Win64 빌드를 사용한다. 기존 Gameplay·Run 도구의 실행·재로드 결과는 UE 5.7 이력이며 19~20번 비교 레벨 도구의 작성·검사 결과는 UE 5.8 기준이다. UE 5.8 작동 확인은 [TODO 7절](../../../Docs/TODO.md#7-ue-58-전환-확인)을 따른다. Python은 `-EnablePlugins=PythonScriptPlugin`으로 해당 프로세스에서만 활성화한다. 제작 경로는 `/Game/User_JeHoon`이며 사용자 요청에 따른 지팡이 직접 임포트는 `/Game/MageStaff_FreeWeapons`를 사용한다. 최초 생성·Audit는 기존 TestMap을 요구하므로 현재 사용자 삭제 상태에서 실행 전 원본 가용성을 확인한다.
 
 ```powershell
@@ -243,15 +245,19 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDrGameSkills.py") -DrGameSkillsAddClassificationTags -DrGameSkillsVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDrGameSkills.py") -DrGameSkillsUpdateVfxDirections -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDrGameSkills.py") -DrGameSkillsUpdateVfxDirections -DrGameSkillsVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDrGameSkills.py") -DrGameSkillsEnableChain -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDrGameSkills.py") -DrGameSkillsEnableChain -DrGameSkillsVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
 ```
 
-기본 명령은 신규 소유 에셋을 작성·저장하고 기존 기본 파티의 Run 풀 참조 변경도 저장한다. `-DrGameSkillsVerifyOnly`는 별도 프로세스에서 저장본·태그·GAS 효과·Niagara 사용자 파라미터·상점 후보·파티 연결과 보호 해시를 읽기 전용으로 검사한다. 작성·재로드 결과는 `Author.json`·`Reload.json`에 기록하고 CSV는 이 결과와 원본 참조를 목록으로 정리한다. 원본 Niagara 내부 SFX를 사용하여 별도 외부 Sound 중복 재생을 추가하지 않는다. 실제 화면·전투·청취는 [TODO 19절](../../../Docs/TODO.md#19-구입-vfxsfx-스킬-확인)에서 사용자가 확인한다.
+기본 명령은 신규 소유 에셋을 작성·저장하고 기존 기본 파티의 Run 풀 참조 변경도 저장한다. `-DrGameSkillsVerifyOnly`는 별도 프로세스에서 저장본·태그·GAS 효과·Niagara 사용자 파라미터·상점 후보·파티 연결과 보호 해시를 읽기 전용으로 검사한다. 작성·재로드 결과는 `Author.json`·`Reload.json`에 기록하고 CSV는 이 결과와 원본 참조를 목록으로 정리한다. 일반 VFX는 원본 Niagara 내부 SFX를 사용한다. PoisonCarousel은 내부 `User.AudioOn=false`와 검증된 동일 원본 Cue의 외부 단일 발동을 사용하며 중복 재생을 추가하지 않는다. 실제 화면·전투·신호의 검수 결과는 [최신 실행 이력](../../../Docs/HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)을 따르고 개별 청감은 [TODO 19절](../../../Docs/TODO.md#19-구입-vfxsfx-스킬-확인)에 남긴다.
 
-`-DrGameSkillsAddClassificationTags`는 기존 소유 DA의 다른 저장 필드가 명세와 모두 일치할 때 선언된 분류 태그만 추가한다. 현재 `link` 5종에 기존 `Skill.Shape.Beam`을 유지하여 `Skill.Shape.Chain`을 추가하며 피해·대상·VFX·SFX·타이밍·풀·파티는 변경하지 않는다. `-DrGameSkillsVerifyOnly`를 함께 지정하면 읽기 전용이며, 이 두 명령의 결과는 기존 도입 이력을 덮어쓰지 않고 `Saved/Automation/ChainSkillFilter/Author.json`·`Reload.json`에 기록한다. 다중 대상 연쇄는 추가하지 않는다. [체인 분류 사용자 확인](../../../Docs/TODO.md#21-체인-스킬-방식-필터-확인)
+`-DrGameSkillsAddClassificationTags`는 기존 소유 DA의 다른 저장 필드가 명세와 모두 일치할 때 선언된 분류 태그만 추가한다. `link` 5종에 기존 `Skill.Shape.Beam`을 유지하여 `Skill.Shape.Chain`을 추가하며 피해·대상·VFX·SFX·타이밍·풀·파티는 변경하지 않는다. `-DrGameSkillsVerifyOnly`를 함께 지정하면 읽기 전용이며, 이 두 명령의 결과는 기존 도입 이력을 덮어쓰지 않고 `Saved/Automation/ChainSkillFilter/Author.json`·`Reload.json`에 기록한다. 이 옵션의 분류 추가는 다중 연쇄 설정을 변경하지 않는다. [체인 분류 사용자 확인](../../../Docs/TODO.md#21-체인-스킬-방식-필터-확인)
 
-`-DrGameSkillsUpdateVfxDirections`는 다른 저장 필드가 명세와 모두 일치할 때 기존 `ParameterType` 끝점 공간과 명세에 선언된 원본/필수 파생본 Niagara 참조 쌍만 전환한다. 체인 5종의 끝점은 `World`, 화염 화살비·우박 폭격 2종의 시작점은 `ComponentLocal`이며 가시엄니 1종은 28번 도구로 작성한 방향 파생본을 참조한다. 원본 Niagara 자료형·에셋·상대 변환·오프셋·기존 판정·태그·GAS·SFX·시점·풀·파티는 보존한다. 분류 태그 전환 옵션과 동시에 사용할 수 없다. `-DrGameSkillsVerifyOnly`를 함께 지정하면 저장하지 않고 독립 재로드하며 결과는 `Saved/Automation/SkillVfxDirection/Author.json`·`Reload.json`에 기록한다. [방향 사용자 확인](../../../Docs/TODO.md#22-스킬-vfx-방향-확인)
+`-DrGameSkillsUpdateVfxDirections`는 다른 저장 필드가 명세와 모두 일치할 때 기존 `ParameterType` 끝점 공간과 명세에 선언된 원본/필수 파생본 Niagara 참조 쌍만 전환한다. 체인 5종의 끝점은 `World`, 화염 화살비·우박 폭격 2종의 시작점은 `ComponentLocal`이며 가시엄니 1종은 28번 도구로 작성한 방향 파생본을 참조한다. 원본 Niagara 자료형·에셋·상대 변환·오프셋·기존 판정·태그·GAS·SFX·시점·풀·파티는 보존한다. 다른 마이그레이션 옵션과 동시에 사용할 수 없다. `-DrGameSkillsVerifyOnly`를 함께 지정하면 저장하지 않고 독립 재로드하며 결과는 `Saved/Automation/SkillVfxDirection/Author.json`·`Reload.json`에 기록한다. [방향 사용자 확인](../../../Docs/TODO.md#22-스킬-vfx-방향-확인)
 
-27. `AuditSkillVfxDirections.py`: 전체 스킬 DA 74개를 기존 해석기로 읽고 Niagara 사용자 파라미터·이미터 공간·방향 관련 스크립트 값과 Cascade 방향 모듈·분포를 감사한다. 원본 1,900파일과 스킬 74파일의 전후 해시를 비교하며 저장·효과 활성화·게임 실행을 하지 않는다. 결과는 `Saved/Automation/SkillVfxDirection/AssetAudit.json`에 기록한다. 원본 HLSL·런타임 좌표 변환 정적 검토와 실제 화면 확인은 구분한다.
+`-DrGameSkillsEnableChain`은 소유 정보가 확인된 `link` 5종에서 기본 `Chain` 값(대상 1·거리 0·간격 0·배율 1)과 기존 단일 연결 설명이 일치할 때 명세의 체인 설정과 생성 설명만 함께 변경한다. 다른 전체 라운드 필드·DA 속성이 일치해야 하며 누락 패키지 생성·파티 연결 변경·다른 마이그레이션 옵션 병행은 거절한다. `profiles.link.chain`의 필수 키는 `max_targets`·`jump_distance`·`jump_interval_seconds`·`damage_multiplier_per_jump`다. 최대 수는 첫 대상을 포함하고 점프 거리 단위는 cm이며 배율은 점프마다 누적 적용한다. 비체인 기본 대상 1은 기존 동작을 유지한다. VerifyOnly는 에셋 수정·저장 없이 비교하며 결과는 `Saved/Automation/ChainSkills/Author.json`·`Reload.json`에 기록한다. UE 5.8.3 Development Editor / Win64 컴파일을 통과했다. 기존 74스킬의 읽기 전용 해석·VFX 참조와 원본 1,900파일 보존 검사를 통과했다. 초기 수치는 선택 대기이며 체인 설정 작성·독립 재로드 검증은 보류했다. [사용자 확인](../../../Docs/TODO.md#23-다중-체인-공격-확인)은 별도로 수행한다.
+
+27. `AuditSkillVfxDirections.py`: 전체 스킬 DA 74개를 기존 해석기로 읽고 해석된 `Chain` 4필드·Niagara 사용자 파라미터·이미터 공간·방향 관련 스크립트 값과 Cascade 방향 모듈·분포를 감사한다. 원본 1,900파일과 스킬 74파일의 전후 해시를 비교하며 저장·효과 활성화·게임 실행을 하지 않는다. 결과는 `Saved/Automation/SkillVfxDirection/AssetAudit.json`에 기록하며 `-ChainSkillsAudit` 지정 시 `Saved/Automation/ChainSkills/AssetAudit.json`을 사용한다. 원본 HLSL·런타임 좌표 변환 정적 검토와 실제 화면 확인은 구분한다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/AuditSkillVfxDirections.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false

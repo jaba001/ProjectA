@@ -21,6 +21,10 @@
 #include "Components/VerticalBox.h"
 #include "Game/Run/RunCheckpointStorage.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
+#include "DataAsset/RunEncounterPoolDataAsset.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
+#include "NiagaraSystem.h"
+#include "Sound/SoundBase.h"
 #include "Misc/CommandLine.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/ComboBoxString.h"
@@ -29,6 +33,95 @@
 #include "UI/MainMenu/OptionsWidget.h"
 #include "UnrealClient.h"
 #include "UObject/StrongObjectPtr.h"
+#include "HAL/FileManager.h"
+#include "Misc/PackageName.h"
+#include "Misc/Paths.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTodoPackagedCatalogTest, "ProjectA.TodoReview.PackagedCsv", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FTodoPackagedCatalogTest::RunTest(const FString& Parameters)
+{
+    // Read the production path through Unreal's platform file so the same check exercises the staged UFS catalog in a cooked game.
+    // Unreal 플랫폼 파일로 실제 경로를 읽어 같은 검사에서 쿠킹된 게임의 UFS 카탈로그도 확인합니다.
+    const FString CatalogPath = FPaths::Combine(FPaths::ProjectDir(), TEXT("DataCatalogs/WEAPON_ASSETS.csv"));
+    TArray<FRunItemDefinition> Catalog;
+    FText Error;
+    if (!TestTrue(TEXT("The runtime platform file exposes the authored catalog at its project-relative path."), IFileManager::Get().FileExists(*CatalogPath))) return false;
+    if (!TestTrue(TEXT("The production catalog loader reads the staged CSV without a source-tree fallback."), RunItemShopCatalog::Load(Catalog, Error)))
+    {
+        AddError(Error.ToString());
+        return false;
+    }
+    if (!TestEqual(TEXT("The staged authored catalog retains all 289 available item definitions."), Catalog.Num(), 289)) return false;
+    TSet<FSoftObjectPath> Assets;
+    for (const FRunItemDefinition& Item : Catalog)
+    {
+        if (!TestTrue(TEXT("Every catalog item retains its unique original asset path, display name, whole price and gameplay tags."), !Item.Asset.IsNull() && !Assets.Contains(Item.Asset) && !Item.DisplayName.IsEmpty() && Item.Price == 1 && Item.Tags.HasTag(RunItemShopCatalog::GetWeaponTag()))) return false;
+        if (!TestTrue(FString::Printf(TEXT("The original item package exists in the runtime filesystem: %s"), *Item.Asset.GetLongPackageName()), FPackageName::DoesPackageExist(Item.Asset.GetLongPackageName()))) return false;
+        Assets.Add(Item.Asset);
+    }
+    AddInfo(FString::Printf(TEXT("Production CSV path=%s; items=%d; cooked=%d."), *CatalogPath, Catalog.Num(), FPlatformProperties::RequiresCookedData()));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTodoPackagedSkillProfilesTest, "ProjectA.TodoReview.PackagedSkillProfiles", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FTodoPackagedSkillProfilesTest::RunTest(const FString& Parameters)
+{
+    // Load the production party and construct only an in-memory shop; no checkpoint, authored asset or source default is modified.
+    // 실제 파티를 불러와 메모리 상점만 구성하며 체크포인트·작성 에셋·원본 기본값을 변경하지 않습니다.
+    TStrongObjectPtr<UPartyDefinitionDataAsset> Party(LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty")));
+    URunEncounterPoolDataAsset* Pool = Party.IsValid() ? Party->RunEncounterPool.Get() : nullptr;
+    if (!TestTrue(TEXT("The actual party retains its authored DrGame encounter and skill-pool references."), Pool && FSoftObjectPath(Pool) == FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Encounters/DA_DrGameRunEncounterPool.DA_DrGameRunEncounterPool")) && Pool->SkillShopPool.ToSoftObjectPath() == FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/SkillPools/DA_DrGameSkillShopPool.DA_DrGameSkillShopPool")))) return false;
+    FRunSkillShopState Shop;
+    FText Error;
+    if (!TestTrue(TEXT("The official runtime builder resolves the authored catalog entirely in memory."), Pool->BuildSkillShop(Shop, Error)))
+    {
+        AddError(Error.ToString());
+        return false;
+    }
+    if (!TestEqual(TEXT("The runtime skill catalog retains all 61 authored candidates."), Shop.Catalog.Num(), 61) || !TestTrue(TEXT("The official tag, weight, profile and offer validation accepts the memory-only shop."), URunEncounterPoolDataAsset::ValidateSkillShop(Shop, Error))) return false;
+    TSet<FSoftObjectPath> Paths;
+    TSet<FName> SkillIds;
+    for (const FRunSkillShopOffer& Offer : Shop.Catalog)
+    {
+        if (!TestTrue(TEXT("Every runtime skill candidate retains one unique package, positive original price and weight."), !Offer.Skill.IsNull() && !Paths.Contains(Offer.Skill) && Offer.Price == 1 && Offer.BaseWeight > 0.f && FPackageName::DoesPackageExist(Offer.Skill.GetLongPackageName()))) return false;
+        TStrongObjectPtr<USkillDefinitionDataAsset> Asset(Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad()));
+        FCombatRoundSkill Skill;
+        if (!TestTrue(FString::Printf(TEXT("The runtime filesystem resolves the original authored skill: %s"), *Offer.Skill.ToString()), Asset.IsValid() && Asset->ResolveRoundSkill(Skill, Error) && !SkillIds.Contains(Skill.SkillId) && Offer.Tags == Skill.EffectTags)) return false;
+        Paths.Add(Offer.Skill);
+        SkillIds.Add(Skill.SkillId);
+    }
+    struct FExpectedProfile
+    {
+        const TCHAR* Asset;
+        const TCHAR* Niagara;
+    };
+    const FExpectedProfile Expected[] =
+    {
+        {TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_Line_Lava.DA_DrGame_GroundAttackVFX_Line_Lava"), TEXT("/Game/__GroundAttackVFX/NS/NS_Line_Lava.NS_Line_Lava")},
+        {TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_PoisonCarousel.DA_DrGame_AoeVFX_AOE_PoisonCarousel"), TEXT("/Game/__AoeVFX/NS/NS_AOE_PoisonCarousel.NS_AOE_PoisonCarousel")},
+        {TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_Spawn_Ninja_Root.DA_DrGame_LevelUpSpawn_Spawn_Ninja_Root"), TEXT("/Game/_LevelUpSpawn/NS/NS_Spawn_Ninja_Root.NS_Spawn_Ninja_Root")}
+    };
+    TArray<FCombatRoundSkill> Profiles;
+    for (const FExpectedProfile& Entry : Expected)
+    {
+        const FSoftObjectPath Path(Entry.Asset);
+        TStrongObjectPtr<USkillDefinitionDataAsset> Asset(Cast<USkillDefinitionDataAsset>(Path.TryLoad()));
+        FCombatRoundSkill Skill;
+        if (!TestTrue(TEXT("Each repaired project DataAsset is an authored candidate with an unchanged resolved visual profile."), Paths.Contains(Path) && Asset.IsValid() && Asset->bUseRoundDefinition && Asset->ResolveRoundSkill(Skill, Error) && FCombatSkillVfx::StaticStruct()->CompareScriptStruct(&Asset->RoundDefinition.Vfx, &Skill.Vfx, 0))) return false;
+        if (!TestTrue(TEXT("The loaded repaired profile retains its exact available original Niagara reference."), Skill.Vfx.Niagara.ToSoftObjectPath() == FSoftObjectPath(Entry.Niagara) && Skill.Vfx.Niagara.LoadSynchronous() != nullptr)) return false;
+        Profiles.Add(MoveTemp(Skill));
+    }
+    if (!TestFalse(TEXT("The cooked Lava project profile has no StepDistance override."), Profiles[0].Vfx.FloatParameters.Contains(TEXT("User.StepDistance")))) return false;
+    const FCombatSkillVfx& Poison = Profiles[1].Vfx;
+    const bool* AudioOn = Poison.BoolParameters.Find(TEXT("User.AudioOn"));
+    if (!TestTrue(TEXT("The cooked Poison project profile disables embedded audio and directly loads its identical original cue."), AudioOn && !*AudioOn && Poison.Sound.ToSoftObjectPath() == FSoftObjectPath(TEXT("/Game/__AoeVFX/_GenericSource/SFX/Sfx_Hit_Poison_Cue.Sfx_Hit_Poison_Cue")) && Poison.Sound.LoadSynchronous() != nullptr && Poison.SoundVolume == 1.f && Poison.SoundPitch == 1.f && Poison.SoundMaxDuration == 5.f)) return false;
+    const FCombatSkillVfx& Ninja = Profiles[2].Vfx;
+    if (!TestTrue(TEXT("The cooked Ninja project profile retains its repaired visual height without overriding original HeightOffset."), Ninja.RelativeTransform.GetTranslation().Z == -60.0 && !Ninja.FloatParameters.Contains(TEXT("User.HeightOffset")))) return false;
+    AddInfo(FString::Printf(TEXT("Runtime skill catalog=%d; repaired project profiles=%d; cooked=%d; checkpoint writes=0; source Niagara defaults were not inspected."), Shop.Catalog.Num(), Profiles.Num(), FPlatformProperties::RequiresCookedData()));
+    return true;
+}
 
 // Exercise real game-window resolution confirmation and timeout while restoring the user's settings.
 // 사용자 설정을 복원하면서 실제 게임 창 해상도 확인과 시간 초과 복구를 실행합니다.

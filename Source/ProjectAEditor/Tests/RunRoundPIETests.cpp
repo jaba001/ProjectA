@@ -4,8 +4,10 @@
 
 #include "RunEncounterPIEHelpers.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/AnimSequenceBase.h"
 #include "AbilitySystemComponent.h"
 #include "Combat/CombatManager.h"
+#include "Combat/Library/CombatWeaponTraceLibrary.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
@@ -13,10 +15,12 @@
 #include "Engine/Engine.h"
 #include "Engine/NetConnection.h"
 #include "Engine/NetDriver.h"
+#include "Engine/SkeletalMesh.h"
 #include "Game/Encounter/EncounterManager.h"
 #include "Game/Encounter/CombatArena.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Game/GameModes/GameplayGameModeBase.h"
 #include "Game/Run/RunSaveGame.h"
 #include "GAS/Attribute/AS_Unit.h"
@@ -51,7 +55,7 @@ T* Screen(AGameplayPlayerController* Controller)
 class FRunRoundPIE : public IAutomationLatentCommand
 {
 public:
-    FRunRoundPIE(FAutomationTestBase* InTest, int32 InCount) : Test(InTest), Count(InCount), Slot(TEXT("ProjectA_Automation_RunRound_") + FGuid::NewGuid().ToString(EGuidFormats::Digits)) {}
+    FRunRoundPIE(FAutomationTestBase* InTest, int32 InCount, bool bInGeometryOnly = false) : Test(InTest), Count(InCount), Slot(TEXT("ProjectA_Automation_RunRound_") + FGuid::NewGuid().ToString(EGuidFormats::Digits)), bGeometryOnly(bInGeometryOnly) {}
 
     virtual bool Update() override
     {
@@ -118,6 +122,17 @@ public:
         }
         if (Stage == 2)
         {
+            if (bGeometryOnly)
+            {
+                // Use the same authoritative request as the map button without requiring a rendered widget for geometry inspection.
+                // 형태 검사에는 렌더링된 위젯을 요구하지 않고 지도 버튼과 같은 권한 요청을 사용합니다.
+                if (Run->GetPhase() != ERunPhase::Map) return false;
+                const FRunNodeDefinition* Node = Run->GetNodes().FindByPredicate([Run](const FRunNodeDefinition& Candidate) { return Run->CanStartNode(Candidate.NodeId); });
+                if (!Check(Node != nullptr, TEXT("The geometry-only fixture has an eligible authored Run node."))) return End();
+                Host->RequestStartNode(Node->NodeId);
+                Advance(3);
+                return false;
+            }
             URunMapWidget* Map = Screen<URunMapWidget>(Host);
             if (!Map || Run->GetPhase() != ERunPhase::Map || !ClientsAt(ERunPhase::Map)) return false;
             UVerticalBox* Nodes = Cast<UVerticalBox>(Map->GetWidgetFromName(TEXT("NodeList")));
@@ -133,7 +148,10 @@ public:
                 bSawRemoteWalking = false;
                 bSawMoveCommitted = false;
                 bSawMontage = false;
+                bSawBladeCast = false;
+                bSawUnarmedCast = false;
                 bPreparedCombatHP = false;
+                ExpectedSubmittedSkills.Reset();
                 RemoteCosts.Reset();
                 RemoteMontages.Reset();
                 RewardPartyBefore.Reset();
@@ -162,7 +180,7 @@ public:
                     UAbilitySystemComponent* AbilitySystem = Unit.Unit->GetAbilitySystemComponent();
                     if (!Check(IsValid(AbilitySystem), TEXT("Every living fixture unit retains its GAS attributes."))) return End();
                     if (!Unit.bEnemy) AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetMaxHPAttribute(), FixtureMaxHP);
-                    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), Unit.bEnemy ? FMath::Min(Unit.HP, SwordPower) : FixtureMaxHP);
+                    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), Unit.bEnemy ? FMath::Min(Unit.HP, FixtureEnemyHP) : FixtureMaxHP);
                 }
                 FCombatCheckpointData FixtureCheckpoint;
                 FText Error;
@@ -196,7 +214,12 @@ public:
             }
             AGameplayPlayerController* Controller = Active == 0 ? Host : Clients[Active - 1];
             const FCombatRoundUnitView* Unit = Units.FindByPredicate([Controller](const auto& Candidate) { return !Candidate.bEnemy && Candidate.OwnerSlot == Controller->GetRoundParticipantSlot(); });
-            const FCombatRoundUnitView* Enemy = Units.FindByPredicate([](const auto& Candidate) { return Candidate.bEnemy && Candidate.HP > 0; });
+            TArray<const FCombatRoundUnitView*> LivingEnemies;
+            for (const auto& Candidate : Units)
+            {
+                if (Candidate.bEnemy && Candidate.HP > 0 && IsValid(Candidate.Unit)) LivingEnemies.Add(&Candidate);
+            }
+            const FCombatRoundUnitView* Enemy = LivingEnemies.IsEmpty() ? nullptr : LivingEnemies[bGeometryOnly ? 0 : Active % LivingEnemies.Num()];
             if (!Unit || !Enemy || !IsValid(Unit->Unit) || Controller->IsRoundRequestPending()) return false;
             AGameplayGameModeBase* Mode = Host->GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
             const FGuid CharacterId = Mode->GetEncounterManager()->GetCombatManager()->GetCharacterId(Unit->Unit);
@@ -211,13 +234,19 @@ public:
                 if (!Check(Skill && Skill->ResolveRoundSkill(Definition, Error), *FString::Printf(TEXT("An authored profession skill resolves for the expected loadout: %s"), *Error.ToString()))) return End();
                 ExpectedSkillIds.Add(Definition.SkillId);
             }
-            if (!Check(Unit->SkillIds == ExpectedSkillIds && Unit->HP > 0, TEXT("Each original owner retains its ordered profession skills and living character."))) return End();
+            if (!Check(Unit->SkillIds == ExpectedSkillIds && ExpectedSkillIds.Contains(SwordSkillId) && ExpectedSkillIds.Contains(UnarmedSkillId) && Unit->HP > 0, TEXT("Each original owner retains both saved original attacks, their order, and a living character."))) return End();
             FCombatRoundCommand Command;
             Command.UnitId = Unit->UnitId;
             Command.TargetUnitId = Enemy->UnitId;
             Command.TargetCoord = Enemy->HomeCoord;
             Command.DestinationCoord = Unit->HomeCoord;
-            Command.SkillId = FName(TEXT("SkillDefinitionDataAsset:BPDA_swoard_attack"));
+            // Keep the original blade profile for upright bodies; the preserved unarmed profile covers the shorter fixture body.
+            // 직립 몸체에는 원래 칼날 프로필을 유지하고 작은 픽스처 몸체에는 보존된 비무장 프로필을 사용합니다.
+            const bool bUseBlade = bGeometryOnly || Enemy->Unit->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() >= Unit->Unit->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+            Command.SkillId = bUseBlade ? SwordSkillId : UnarmedSkillId;
+            const FCombatRoundSkill* SelectedSkill = Round->FindSkill(Command.SkillId);
+            if (!Check(SelectedSkill && SelectedSkill->bUseWeaponTrace == bUseBlade, TEXT("The fixture selects the real authored blade or unarmed collision profile without changing it."))) return End();
+            ExpectedSubmittedSkills.Add(Unit->UnitId, Command.SkillId);
             Controller->SubmitRoundPlan(Command);
             ++Active;
             return false;
@@ -234,7 +263,8 @@ public:
             AGameplayPlayerController* Controller = Active == 0 ? Host : Clients[Active - 1];
             if (Controller->IsRoundRequestPending()) return false;
             const auto* Unit = Round->GetView().Units.FindByPredicate([Controller](const auto& Candidate) { return !Candidate.bEnemy && Candidate.OwnerSlot == Controller->GetRoundParticipantSlot(); });
-            if (!Check(Unit && Unit->Command.SkillId == FName(TEXT("SkillDefinitionDataAsset:BPDA_swoard_attack")), TEXT("Each local or remote planning request reaches the authoritative round."))) return End();
+            const FName* ExpectedSkill = Unit ? ExpectedSubmittedSkills.Find(Unit->UnitId) : nullptr;
+            if (!Check(Unit && ExpectedSkill && Unit->Command.SkillId == *ExpectedSkill, TEXT("Each local or remote original-attack request reaches the authoritative round."))) return End();
             Controller->SetRoundReady(true);
             ++Active;
             return false;
@@ -245,6 +275,13 @@ public:
             {
                 for (const auto& Unit : Round->GetView().Units)
                 {
+                    LogSwordContactDiagnostics(Round, Unit);
+                    if (IsValid(Unit.Unit) && !Unit.bEnemy && Unit.ActionPhase == ECombatRoundActionPhase::Casting)
+                    {
+                        const FCombatRoundSkill* Skill = Round->FindSkill(Unit.Command.SkillId);
+                        if (Skill && Skill->SkillId == SwordSkillId && Skill->bUseWeaponTrace) bSawBladeCast = true;
+                        if (Skill && Skill->SkillId == UnarmedSkillId && !Skill->bUseWeaponTrace) bSawUnarmedCast = true;
+                    }
                     if (Unit.Unit && !Unit.bEnemy && Unit.Unit->HasRoundCastMontageInstance()) bSawMontage = true;
                     if (Unit.Unit && Unit.UnitId == MoveUnitId)
                     {
@@ -270,13 +307,19 @@ public:
                         }
                     }
                 }
+                if (bGeometryOnly && bFullSwordGeometryRecorded)
+                {
+                    Test->AddInfo(TEXT("Geometry-only diagnostic ended after the complete authored swing scan; encounter victory and multiplayer behavior were not validated."));
+                    return End();
+                }
             }
             if (Run->GetPhase() == ERunPhase::Combat && Round && Round->GetView().Phase == ECombatRoundPhase::Planning && Round->GetView().RoundNumber > PlannedRoundNumber)
             {
-                // Submit another real sword round when fewer participants than enemies cannot finish in one round.
-                // 참가자가 적보다 적어 한 라운드에 끝나지 않으면 실제 검 공격 라운드를 다시 제출합니다.
-                if (!Check(Round->GetView().RoundNumber <= 16, TEXT("The real sword collision defeats four enemies within the bounded fixture rounds."))) return End();
+                // Submit another real attack round when fewer participants than enemies cannot finish in one round.
+                // 참가자가 적보다 적어 한 라운드에 끝나지 않으면 실제 공격 라운드를 다시 제출합니다.
+                if (!Check(Round->GetView().RoundNumber <= 16, TEXT("The original blade and unarmed collisions defeat all four authored enemies within the bounded fixture rounds."))) return End();
                 Active = 0;
+                ExpectedSubmittedSkills.Reset();
                 Advance(3);
                 return false;
             }
@@ -340,6 +383,7 @@ public:
                 if (!Check(!RemoteContinue->GetIsEnabled() && !Client->CanIssueRunCommands(), TEXT("Only the original host can continue the replicated result."))) return End();
             }
             if (!Check(bSawMontage, TEXT("The authored montage has an active animation instance during real PIE combat."))) return End();
+            if (!Check(bSawBladeCast && bSawUnarmedCast, TEXT("Every fixture encounter actually casts both retained attacks before its real victory."))) return End();
             if (!Check(bSawServerWalking && bSawMoveCommitted, TEXT("SAP moves at 350 cm/s with animation input and commits its new home before AP attacks."))) return End();
             if (Count > 1 && !Check(bSawRemoteWalking, TEXT("A real remote NetDriver delivers SAP walking velocity to an animated mesh."))) return End();
             if (!Check(RemoteCosts.Num() == Clients.Num() && RemoteMontages.Num() == Clients.Num(), TEXT("Every remote client receives AP consumption and actual casting montage playback."))) return End();
@@ -410,6 +454,142 @@ public:
     }
 
 private:
+    // Observe original collision geometry without moving bodies or changing the authored trace or victory requirements.
+    // 몸체를 이동하거나 작성된 궤적·승리 조건을 바꾸지 않고 원래 충돌 형태를 관찰합니다.
+    void LogSwordContactDiagnostics(ACombatRoundCoordinator* Round, const FCombatRoundUnitView& Source)
+    {
+        if (Source.bEnemy || !IsValid(Source.Unit) || !Source.Unit->IsUnitAlive()) return;
+        const FString Key = FString::Printf(TEXT("%d/%d/%d"), EncounterIndex, Round->GetView().RoundNumber, Source.UnitId);
+        if ((Source.ActionPhase == ECombatRoundActionPhase::Recovery || Source.ActionPhase == ECombatRoundActionPhase::Returning || CombatRoundRules::IsTerminal(Source.ActionPhase)) && !SwordOutcomeDiagnostics.Contains(Key))
+        {
+            SwordOutcomeDiagnostics.Add(Key);
+            Test->AddInfo(FString::Printf(TEXT("Original attack fixture outcome %s skill=%s phase=%d status=%s"), *Key, *Source.Command.SkillId.ToString(), static_cast<int32>(Source.ActionPhase), *Source.Status.ToString()));
+        }
+        if (Source.ActionPhase != ECombatRoundActionPhase::Casting || SwordPoseDiagnostics.Contains(Key)) return;
+        SwordPoseDiagnostics.Add(Key);
+        const FCombatRoundSkill* Skill = Round->FindSkill(Source.Command.SkillId);
+        UAnimMontage* Montage = Skill ? Source.Unit->ResolveRoundCastMontage(Skill->CastMontage) : nullptr;
+        if (!Skill || !Skill->bUseWeaponTrace || !IsValid(Montage)) return;
+        LogFullSwordGeometry(Round, Source, *Skill, Montage);
+        TArray<CombatWeaponTrace::FBladePose> Poses;
+        TSet<int32> FrozenHits;
+        double MinZ = TNumericLimits<double>::Max();
+        double MaxZ = TNumericLimits<double>::Lowest();
+        const double EndTime = Skill->WindupSeconds + Skill->WeaponTraceDuration;
+        for (double Time = Skill->WindupSeconds; Time <= EndTime + UE_DOUBLE_SMALL_NUMBER; Time = FMath::Min(Time + 0.005, EndTime))
+        {
+            CombatWeaponTrace::FBladePose Pose;
+            if (!CombatWeaponTrace::SampleBlade(Source.Unit, *Skill, Montage, Time * Montage->RateScale, Pose)) break;
+            const CombatWeaponTrace::FBladePose Previous = Poses.IsEmpty() ? Pose : Poses.Last();
+            if (const AUnitBase* Hit = CombatWeaponTrace::FindFirstHit(Source.Unit->GetWorld(), Source.Unit, Round->GetView().Units, Previous, Pose, Skill->WeaponTraceRadius))
+            {
+                const auto* HitView = Round->GetView().Units.FindByPredicate([Hit](const auto& Candidate) { return Candidate.Unit == Hit; });
+                if (HitView) FrozenHits.Add(HitView->UnitId);
+            }
+            Poses.Add(Pose);
+            MinZ = FMath::Min(MinZ, FMath::Min(Pose.Base.Z, Pose.Tip.Z));
+            MaxZ = FMath::Max(MaxZ, FMath::Max(Pose.Base.Z, Pose.Tip.Z));
+            if (Time + UE_DOUBLE_SMALL_NUMBER >= EndTime) break;
+        }
+        FString Targets;
+        for (const auto& Target : Round->GetView().Units)
+        {
+            if (!Target.bEnemy || Target.HP <= 0.f || !IsValid(Target.Unit)) continue;
+            const UCapsuleComponent* Capsule = Target.Unit->GetCapsuleComponent();
+            double MinGap = TNumericLimits<double>::Max();
+            for (const auto& Pose : Poses)
+            {
+                const int32 Intervals = FMath::Max(1, FMath::CeilToInt(FVector::Dist(Pose.Base, Pose.Tip) / Skill->WeaponTraceRadius));
+                for (int32 Point = 0; Point <= Intervals; ++Point)
+                {
+                    FVector Closest;
+                    const float Gap = Capsule->GetClosestPointOnCollision(FMath::Lerp(Pose.Base, Pose.Tip, static_cast<double>(Point) / Intervals), Closest);
+                    if (Gap >= 0.f) MinGap = FMath::Min(MinGap, static_cast<double>(Gap));
+                }
+            }
+            Targets += FString::Printf(TEXT(" [%d %s center=%s half=%.1f distance=%.1f gap=%.1f frozenHit=%d]"), Target.UnitId, *Target.Unit->GetClass()->GetName(), *Capsule->GetComponentLocation().ToCompactString(), Capsule->GetScaledCapsuleHalfHeight(), FVector::Dist2D(Source.Unit->GetActorLocation(), Target.Unit->GetActorLocation()), MinGap, FrozenHits.Contains(Target.UnitId));
+        }
+        Test->AddInfo(FString::Printf(TEXT("Sword fixture frozen-pose diagnostics %s source=%s range=%.1f window=%.3f..%.3f radius=%.1f bladeZ=%.1f..%.1f samples=%d%s"), *Key, *Source.Unit->GetActorLocation().ToCompactString(), Skill->HitRange, Skill->WindupSeconds, EndTime, Skill->WeaponTraceRadius, MinZ, MaxZ, Poses.Num(), *Targets));
+    }
+
+    // Scan the complete original montage once at a real close-range cast against the shorter authored enemy.
+    // 작은 원본 적을 향한 실제 근거리 시전에서 원래 몽타주 전체를 한 번 검사합니다.
+    void LogFullSwordGeometry(ACombatRoundCoordinator* Round, const FCombatRoundUnitView& Source, const FCombatRoundSkill& Skill, UAnimMontage* Montage)
+    {
+        if (bFullSwordGeometryRecorded) return;
+        const FCombatRoundUnitView* Target = Round->GetView().Units.FindByPredicate([&Source](const auto& Candidate) { return Candidate.UnitId == Source.Command.TargetUnitId; });
+        if (!Target || !IsValid(Target->Unit) || !Target->Unit->IsUnitAlive() || Target->Unit->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() >= Source.Unit->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()) return;
+        bFullSwordGeometryRecorded = true;
+        const double Length = Montage->GetPlayLength();
+        if (!Check(FMath::IsFinite(Length) && Length > 0.0 && Length <= 60.0 && FMath::IsFinite(Montage->RateScale) && Montage->RateScale > 0.f, TEXT("The full authored swing scan has a bounded length and valid rate."))) return;
+        const UCapsuleComponent* Capsule = Target->Unit->GetCapsuleComponent();
+        Test->AddInfo(FString::Printf(TEXT("Sword full geometry identity source=%s mesh=%s requestedMontage=%s resolvedMontage=%s target=%s targetCenter=%s targetHalf=%.1f targetRadius=%.1f montageLength=%.6f rate=%.6f distance=%.1f"), *Source.Unit->GetClass()->GetName(), *Source.Unit->GetMesh()->GetSkeletalMeshAsset()->GetPathName(), *GetPathNameSafe(Skill.CastMontage), *Montage->GetPathName(), *Target->Unit->GetClass()->GetName(), *Capsule->GetComponentLocation().ToCompactString(), Capsule->GetScaledCapsuleHalfHeight(), Capsule->GetScaledCapsuleRadius(), Length, Montage->RateScale, FVector::Dist2D(Source.Unit->GetActorLocation(), Target->Unit->GetActorLocation())));
+        for (const FSlotAnimationTrack& Track : Montage->SlotAnimTracks)
+        {
+            for (int32 Index = 0; Index < Track.AnimTrack.AnimSegments.Num(); ++Index)
+            {
+                const FAnimSegment& Segment = Track.AnimTrack.AnimSegments[Index];
+                Test->AddInfo(FString::Printf(TEXT("Sword full geometry segment index=%d slot=%s animation=%s montageAsset=%.6f..%.6f animationAsset=%.6f..%.6f rate=%.6f loops=%d"), Index, *Track.SlotName.ToString(), *GetPathNameSafe(Segment.GetAnimReference()), Segment.StartPos, Segment.GetEndPos(), Segment.AnimStartTime, Segment.AnimEndTime, Segment.GetValidPlayRate(), Segment.LoopingCount));
+            }
+        }
+        TArray<FCombatRoundUnitView> TargetOnly = {*Target};
+        CombatWeaponTrace::FBladePose Previous;
+        bool bHasPrevious = false;
+        bool bPreviousContact = false;
+        double MinGap = TNumericLimits<double>::Max();
+        double MinZ = TNumericLimits<double>::Max();
+        double MaxZ = TNumericLimits<double>::Lowest();
+        double FirstContact = -1.0;
+        double LastContact = -1.0;
+        double IntervalStart = -1.0;
+        double PreviousTime = 0.0;
+        FString ContactIntervals;
+        int32 Samples = 0;
+        int32 InvalidSamples = 0;
+        int32 ContactSamples = 0;
+        for (double Time = 0.0; Time <= Length + UE_DOUBLE_SMALL_NUMBER; Time = FMath::Min(Time + 0.005, Length))
+        {
+            CombatWeaponTrace::FBladePose Pose;
+            const bool bSampled = CombatWeaponTrace::SampleBlade(Source.Unit, Skill, Montage, Time, Pose);
+            bool bContact = false;
+            if (bSampled)
+            {
+                ++Samples;
+                MinZ = FMath::Min(MinZ, FMath::Min(Pose.Base.Z, Pose.Tip.Z));
+                MaxZ = FMath::Max(MaxZ, FMath::Max(Pose.Base.Z, Pose.Tip.Z));
+                const int32 Intervals = FMath::Max(1, FMath::CeilToInt(FVector::Dist(Pose.Base, Pose.Tip) / Skill.WeaponTraceRadius));
+                for (int32 Point = 0; Point <= Intervals; ++Point)
+                {
+                    FVector Closest;
+                    const float Gap = Capsule->GetClosestPointOnCollision(FMath::Lerp(Pose.Base, Pose.Tip, static_cast<double>(Point) / Intervals), Closest);
+                    if (Gap >= 0.f) MinGap = FMath::Min(MinGap, static_cast<double>(Gap));
+                }
+                bContact = CombatWeaponTrace::FindFirstHit(Source.Unit->GetWorld(), Source.Unit, TargetOnly, bHasPrevious ? Previous : Pose, Pose, Skill.WeaponTraceRadius) == Target->Unit;
+                Previous = Pose;
+                bHasPrevious = true;
+            }
+            else
+            {
+                ++InvalidSamples;
+                bHasPrevious = false;
+            }
+            if (bContact)
+            {
+                ++ContactSamples;
+                if (FirstContact < 0.0) FirstContact = Time;
+                LastContact = Time;
+                if (!bPreviousContact) IntervalStart = Time;
+            }
+            else if (bPreviousContact) ContactIntervals += FString::Printf(TEXT(" [%.6f..%.6f]"), IntervalStart / Montage->RateScale, PreviousTime / Montage->RateScale);
+            bPreviousContact = bContact;
+            PreviousTime = Time;
+            if (Time + UE_DOUBLE_SMALL_NUMBER >= Length) break;
+        }
+        if (bPreviousContact) ContactIntervals += FString::Printf(TEXT(" [%.6f..%.6f]"), IntervalStart / Montage->RateScale, PreviousTime / Montage->RateScale);
+        Check(Samples > 0, TEXT("The complete authored montage exposes real blade poses for the bounded geometry diagnostic."));
+        Test->AddInfo(FString::Printf(TEXT("Sword full geometry result minGap=%.6f bladeZ=%.6f..%.6f firstContactAsset=%.6f lastContactAsset=%.6f firstContactSeconds=%.6f lastContactSeconds=%.6f validSamples=%d invalidSamples=%d contactSamples=%d contactIntervalsSeconds=%s"), MinGap, MinZ, MaxZ, FirstContact, LastContact, FirstContact < 0.0 ? -1.0 : FirstContact / Montage->RateScale, LastContact < 0.0 ? -1.0 : LastContact / Montage->RateScale, Samples, InvalidSamples, ContactSamples, *ContactIntervals));
+    }
+
     bool Connect()
     {
         Host = nullptr;
@@ -486,15 +666,27 @@ private:
         if (!Check(Saved.IsValid(), TEXT("New Run has a durable save for the acquired-skill fixture."))) return false;
         USkillDefinitionDataAsset* Sword = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"));
         FCombatRoundSkill SwordDefinition;
-        if (!Check(Sword && Sword->ResolveRoundSkill(SwordDefinition, Error) && SwordDefinition.Power > 0.0f, TEXT("The retained sword skill has a valid damage profile."))) return false;
-        SwordPower = SwordDefinition.Power;
+        if (!Check(Sword && Sword->ResolveRoundSkill(SwordDefinition, Error) && SwordDefinition.Power > 0.0f && SwordDefinition.bUseWeaponTrace, TEXT("The retained sword skill has a valid original blade collision profile."))) return false;
+        SwordSkillId = SwordDefinition.SkillId;
         for (FRunPartyMember& Member : Saved->Party)
         {
             if (!Check(Member.bHasSkillLoadout && Member.Skills.Num() == 1 && Member.Gold == 10, TEXT("Every newly initialized character starts unarmed with ten gold."))) return false;
+            USkillDefinitionDataAsset* Unarmed = Cast<USkillDefinitionDataAsset>(Member.Skills[0].TryLoad());
+            FCombatRoundSkill UnarmedDefinition;
+            if (!Check(Unarmed && Unarmed->ResolveRoundSkill(UnarmedDefinition, Error) && UnarmedDefinition.Power > 0.0f && UnarmedDefinition.Kind == ECombatRoundSkillKind::Melee && UnarmedDefinition.TargetRule == ESkillTargetRule::EnemyUnit && UnarmedDefinition.Approach == ECombatRoundApproach::Unit && !UnarmedDefinition.bUseWeaponTrace && !UnarmedDefinition.bUseEffectCollision, TEXT("The saved starting skill retains its original non-blade melee collision profile."))) return false;
+            if (UnarmedSkillId.IsNone()) UnarmedSkillId = UnarmedDefinition.SkillId;
+            if (!Check(UnarmedDefinition.SkillId == UnarmedSkillId && UnarmedSkillId != SwordSkillId, TEXT("All original owners retain the same distinct starting unarmed attack."))) return false;
+            FixtureEnemyHP = FMath::Min(SwordDefinition.Power, UnarmedDefinition.Power);
             Member.Skills.Add(FSoftObjectPath(Sword));
             Member.Gold = 9;
         }
-        if (!Check(UGameplayStatics::SaveGameToSlot(Saved.Get(), Slot, 0) && Run->LoadCheckpoint(Error), *FString::Printf(TEXT("Reload explicitly saved sword attacks for the network combat fixture: %s"), *Error.ToString()))) return false;
+        if (!Check(UGameplayStatics::SaveGameToSlot(Saved.Get(), Slot, 0) && Run->LoadCheckpoint(Error), *FString::Printf(TEXT("Reload both explicitly saved original attacks for the network combat fixture: %s"), *Error.ToString()))) return false;
+        for (const FRunPartyMember& Member : Run->GetPartyMembers())
+        {
+            const FRunPartyMember* Expected = Saved->Party.FindByPredicate([&Member](const FRunPartyMember& Candidate) { return Candidate.CharacterId == Member.CharacterId; });
+            TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
+            if (!Check(Expected && Member.bHasSkillLoadout && Member.Skills.Num() == 2 && Member.Skills == Expected->Skills && Mode->PartyDefinition->ResolveMemberSkills(Member, Skills, Error) && Skills.Num() == 2 && FName(*Skills[0]->GetPrimaryAssetId().ToString()) == UnarmedSkillId && FName(*Skills[1]->GetPrimaryAssetId().ToString()) == SwordSkillId, TEXT("Durable reload preserves the original owner's ordered unarmed and blade DataAsset loadout."))) return false;
+        }
         if (Count == 1)
         {
             FRunAccountId AccountId;
@@ -560,9 +752,14 @@ private:
     int32 RewardParticipant = 0;
     double Started = 0;
     bool bSawMontage = false;
+    bool bSawBladeCast = false;
+    bool bSawUnarmedCast = false;
     bool bPreparedCombatHP = false;
     static constexpr float FixtureMaxHP = 10000.0f;
-    float SwordPower = 0.0f;
+    float FixtureEnemyHP = 0.0f;
+    FName SwordSkillId;
+    FName UnarmedSkillId;
+    TMap<int32, FName> ExpectedSubmittedSkills;
     bool bMoveReserved = false;
     bool bSawServerWalking = false;
     bool bSawRemoteWalking = false;
@@ -582,6 +779,10 @@ private:
     TSet<AGameplayPlayerController*> RemoteMontages;
     TArray<FRunPartyMember> RewardPartyBefore;
     TArray<int32> RewardChoices;
+    TSet<FString> SwordPoseDiagnostics;
+    TSet<FString> SwordOutcomeDiagnostics;
+    bool bGeometryOnly = false;
+    bool bFullSwordGeometryRecorded = false;
 };
 }
 
@@ -600,6 +801,15 @@ bool FRunRoundPIETest::RunTest(const FString& Parameters)
 {
     ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectARunRoundTests::FRunRoundPIE>(this, FCString::Atoi(*Parameters)));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunRoundSwordGeometryTest, "ProjectA.RunRoundSwordGeometry", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunRoundSwordGeometryTest::RunTest(const FString& Parameters)
+{
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Gameplay")));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<ProjectARunRoundTests::FRunRoundPIE>(this, 1, true));
     return true;
 }
 

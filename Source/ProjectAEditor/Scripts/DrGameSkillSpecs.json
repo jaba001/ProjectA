@@ -688,7 +688,7 @@
         ],
         "bool_parameters": {
           "User.AoeVFX_On": true,
-          "User.AudioOn": true,
+          "User.AudioOn": false,
           "User.Optimized": true,
           "User.RemainVFX_On": false
         },
@@ -696,8 +696,9 @@
           "User.AoeVFX_Duration": 2.5,
           "User.RemainVFX_Duration": 2.5
         },
-        "sound": null,
-        "sfx_mode": "Niagara embedded audio",
+        "sound": "/Game/__AoeVFX/_GenericSource/SFX/Sfx_Hit_Poison_Cue",
+        "sfx_mode": "Original SoundCue; Niagara embedded audio disabled",
+        "embedded_audio": false,
         "sound_dependencies": [
           "/Game/__AoeVFX/_GenericSource/SFX/Sfx_Hit_Poison_Cue"
         ]
@@ -1277,9 +1278,7 @@
         "bool_parameters": {
           "User.AudioOn": true
         },
-        "float_parameters": {
-          "User.StepDistance": 250.0
-        },
+        "float_parameters": {},
         "sound": null,
         "sfx_mode": "Niagara embedded audio",
         "sound_dependencies": [
@@ -2055,7 +2054,7 @@
         "translation": [
           0,
           0,
-          -90
+          -60
         ],
         "bool_parameters": {
           "User.AudioON": true,

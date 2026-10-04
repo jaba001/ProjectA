@@ -5,6 +5,7 @@
 #include "Combat/Library/CombatEffectLibrary.h"
 #include "Combat/Library/CombatWeaponTraceLibrary.h"
 #include "Combat/Round/CombatRoundProjectile.h"
+#include "Combat/Round/CombatChainEffectActor.h"
 #include "Combat/Round/CombatSkillEffectActor.h"
 #include "CollisionShape.h"
 #include "Components/CapsuleComponent.h"
@@ -216,7 +217,10 @@ CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleas
         FActorSpawnParameters Params;
         Params.Owner = Context.Owner;
         Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        ACombatSkillEffectActor* Effect = World->SpawnActor<ACombatSkillEffectActor>(Context.Source->GetActorLocation(), FRotator::ZeroRotator, Params);
+        // Chain content follows its gameplay tag into a dedicated executor while retaining the shared round lifecycle.
+        // 체인 콘텐츠는 GameplayTag로 전용 실행기에 연결하며 공통 라운드 생명주기는 유지합니다.
+        const bool bChain = CombatRoundRules::UsesChain(Skill) && Skill.Chain.MaxTargets > 1;
+        ACombatSkillEffectActor* Effect = bChain ? World->SpawnActor<ACombatChainEffectActor>(Context.Source->GetActorLocation(), FRotator::ZeroRotator, Params) : World->SpawnActor<ACombatSkillEffectActor>(Context.Source->GetActorLocation(), FRotator::ZeroRotator, Params);
         if (!Effect)
         {
             Result.Status = FText::FromString(TEXT("효과 충돌 액터 생성 실패"));

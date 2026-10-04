@@ -105,8 +105,9 @@ bool FRunSkillShopLoadoutTest::RunTest(const FString& Parameters)
             const FGuid CharacterId = Fixture.Member(SelectedSlot).CharacterId;
             const FRunAccountId Account = Fixture.Member(SelectedSlot).OwnerAccountId;
             const TArray<FRunSkillShopOffer> Offers = Fixture.Run->GetSkillShopState().Offers;
-            if (!TestEqual(TEXT("Every skill shop displays the retained melee offer"), Offers.Num(), 1)) return false;
+            if (!TestEqual(TEXT("Every current skill shop displays five distinct offers"), Offers.Num(), 5)) return false;
             TSet<FName> DisplayedSkillIds;
+            int32 PurchasedCount = 0;
             for (int32 Index = 0; Index < Offers.Num(); ++Index)
             {
                 const FRunSkillShopOffer& Offer = Offers[Index];
@@ -117,15 +118,18 @@ bool FRunSkillShopLoadoutTest::RunTest(const FString& Parameters)
                 if (!TestTrue(TEXT("Every displayed skill resolves to valid runtime content"), IsValid(Skill) && Skill->ResolveRoundSkill(Definition, Fixture.Error))) return false;
                 TestFalse(TEXT("Displayed skill identities contain no duplicates"), DisplayedSkillIds.Contains(Definition.SkillId));
                 DisplayedSkillIds.Add(Definition.SkillId);
-                TestTrue(TEXT("Every profession can purchase the retained melee skill"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
-                TestFalse(TEXT("A learned skill cannot be bought twice"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+                const bool bCanLearn = Before[SelectedSlot].Skills.Num() + PurchasedCount < 5;
+                const bool bPurchased = Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision);
+                TestEqual(TEXT("Every profession can purchase current offers until the five-skill limit"), bPurchased, bCanLearn);
+                if (bPurchased) ++PurchasedCount;
+                TestFalse(TEXT("Repeated requests cannot bypass learned skills or the loadout limit"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
             }
-            TestEqual(TEXT("The retained melee purchase consumes exactly 1G"), Fixture.Member(SelectedSlot).Gold, Before[SelectedSlot].Gold - 1);
-            TestEqual(TEXT("The buyer retains unarmed and melee attacks"), Fixture.Member(SelectedSlot).Skills.Num(), 2);
+            TestEqual(TEXT("Only successful purchases consume 1G each"), Fixture.Member(SelectedSlot).Gold, Before[SelectedSlot].Gold - PurchasedCount);
+            TestEqual(TEXT("The buyer retains unarmed and four purchased skills"), Fixture.Member(SelectedSlot).Skills.Num(), 5);
             FProfessionDefinition Profession;
             if (!Fixture.Run->PartyDefinition->ResolveProfession(Fixture.Member(SelectedSlot).ClassId, Profession)) return false;
-            TestTrue(TEXT("Every shop can recover every profession with both retained skills"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
-            TestTrue(TEXT("Recovery restores all HP for 1G without changing the retained loadout"), Fixture.Member(SelectedSlot).CurrentHP == Profession.MaxHP && Fixture.Member(SelectedSlot).Gold == Before[SelectedSlot].Gold - 2 && Fixture.Member(SelectedSlot).Skills.Num() == 2);
+            TestTrue(TEXT("Every shop can recover every profession with a full loadout"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+            TestTrue(TEXT("Recovery restores all HP for 1G without changing the purchased loadout"), Fixture.Member(SelectedSlot).CurrentHP == Profession.MaxHP && Fixture.Member(SelectedSlot).Gold == Before[SelectedSlot].Gold - PurchasedCount - 1 && Fixture.Member(SelectedSlot).Skills.Num() == 5);
             for (int32 Index = 0; Index < Before.Num(); ++Index)
             {
                 if (Index != SelectedSlot) TestTrue(TEXT("Companion HP balance and loadout remain unchanged"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[Index], &Fixture.Member(Index), 0));
@@ -133,7 +137,7 @@ bool FRunSkillShopLoadoutTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("Purchases preserve all participant and host identity fields"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Fixture.Run->GetRunIdentity(), 0));
             TestTrue(TEXT("The next battle starts with the purchased Run loadout"), Fixture.Run->LeaveRunEncounter() && Fixture.Run->BeginEncounter(TEXT("Combat_02")) && Fixture.Run->MarkCombatStarted());
             TArray<TObjectPtr<USkillDefinitionDataAsset>> ResolvedSkills;
-            TestTrue(TEXT("Spawn resolution includes the retained acquired skill"), Fixture.Run->PartyDefinition->ResolveMemberSkills(Fixture.Member(SelectedSlot), ResolvedSkills, Fixture.Error) && ResolvedSkills.Num() == 2);
+            TestTrue(TEXT("Spawn resolution includes all acquired skills"), Fixture.Run->PartyDefinition->ResolveMemberSkills(Fixture.Member(SelectedSlot), ResolvedSkills, Fixture.Error) && ResolvedSkills.Num() == 5);
         }
     }
     return true;
@@ -292,12 +296,12 @@ bool FRunSkillShopRerollPersistenceTest::RunTest(const FString& Parameters)
     const FRunSkillShopState Initial = Fixture.Run->GetSkillShopState();
     const TArray<FRunPartyMember> BeforeParty = Fixture.Run->GetPartyMembers();
     const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
-    TestEqual(TEXT("New skill shops freeze only the retained melee product"), Initial.Catalog.Num(), 1);
+    TestEqual(TEXT("New skill shops freeze melee and all sixty current VFX skills"), Initial.Catalog.Num(), 61);
     TestEqual(TEXT("Entering a skill shop resets the first reroll to 1G"), Initial.RerollPrice, 1);
     TestTrue(TEXT("New skill-shop stock carries a positive revision"), Initial.Revision > 0);
     const auto CheckOffers = [this, &Fixture](const FRunSkillShopState& State)
     {
-        if (!TestEqual(TEXT("Every skill reroll uses the available retained product"), State.Offers.Num(), 1)) return false;
+        if (!TestEqual(TEXT("Every skill reroll displays five distinct current products"), State.Offers.Num(), 5)) return false;
         TSet<FName> SkillIds;
         TSet<FName> OfferIds;
         for (const FRunSkillShopOffer& Offer : State.Offers)
@@ -353,14 +357,14 @@ bool FRunSkillShopRerollPersistenceTest::RunTest(const FString& Parameters)
         if (!Product) return false;
         FiveProducts.Add(*Product);
     }
-    // The retained catalog makes reappearance mandatory without depending on random samples.
-    // 유지된 후보로 무작위 표본에 의존하지 않고 이전 상품 재등장을 검증합니다.
+    // Limit the catalog to five displayed products so reappearance does not depend on random samples.
+    // 후보를 이미 표시된 상품 다섯 개로 제한하여 무작위 표본에 의존하지 않고 재등장을 검증합니다.
     LimitedCatalog->SkillShopState.Catalog = FiveProducts;
     if (!FRunCheckpointStorage::Save(LimitedCatalog.Get(), Fixture.Slot, Fixture.Error) || !Restored->LoadStandaloneCheckpoint(Fixture.Error)) return false;
     const int32 ReappearanceRevision = Restored->GetSkillShopState().Revision;
     if (!TestTrue(TEXT("Already displayed products remain eligible for the next skill reroll"), Restored->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunSkillShopState::GetRerollOfferId(), Fixture.Error, ReappearanceRevision))) return false;
     if (!CheckOffers(Restored->GetSkillShopState())) return false;
-    TestTrue(TEXT("The third reroll costs 3G and retains the previously displayed skill candidate"), Restored->GetPartyMembers()[3].Gold == Buyer.Gold - 6 && Restored->GetSkillShopState().RerollPrice == 4 && Restored->GetSkillShopState().Catalog.Num() == 1);
+    TestTrue(TEXT("The third reroll costs 3G and retains all five previously displayed candidates"), Restored->GetPartyMembers()[3].Gold == Buyer.Gold - 6 && Restored->GetSkillShopState().RerollPrice == 4 && Restored->GetSkillShopState().Catalog.Num() == FiveProducts.Num());
     TStrongObjectPtr<URunSaveGame> EmptyBalance(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
     if (!EmptyBalance) return false;
     EmptyBalance->Party[3].Gold = 0;
@@ -584,7 +588,7 @@ bool FRunItemShopPersistenceTest::RunTest(const FString& Parameters)
     const FRunPartyMember Buyer = Fixture.Member(3);
     const FRunItemShopState Initial = Fixture.Run->GetItemShopState();
     if (!TestEqual(TEXT("The item shop displays exactly five offers"), Initial.Offers.Num(), 5)) return false;
-    TestEqual(TEXT("The whole authored CSV is available"), Initial.Catalog.Num(), 295);
+    TestEqual(TEXT("The whole authored CSV is available"), Initial.Catalog.Num(), 289);
     TestTrue(TEXT("New runs load authored gameplay names"), Initial.Catalog.ContainsByPredicate([](const FRunItemDefinition& Item) { return Item.DisplayName.ToString() != Item.Asset.GetAssetName(); }));
     TSet<FSoftObjectPath> Assets;
     for (const FRunItemShopOffer& Offer : Initial.Offers)

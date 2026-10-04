@@ -788,7 +788,7 @@ bool FCombatRoundCheckpointRemovedSkillTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Independent movement remains reserved"), Loaded->CombatCheckpoint.RoundPlans[0].bHasMovePlan && Loaded->CombatCheckpoint.RoundPlans[0].MoveDestinationCoord == Checkpoint.RoundPlans[0].MoveDestinationCoord);
         for (int32 Index = 0; Index < Checkpoint.Units.Num(); ++Index) TestTrue(TEXT("No AP or SAP is charged for cancelled reservations"), Loaded->CombatCheckpoint.Units[Index].AP == Checkpoint.Units[Index].AP && Loaded->CombatCheckpoint.Units[Index].SubAP == Checkpoint.Units[Index].SubAP);
         TestEqual(TEXT("All unit snapshot and command removals change the planning revision once"), Loaded->CombatCheckpoint.PlanRevision, Checkpoint.PlanRevision + 1);
-        if (!TestEqual(TEXT("Removing deleted stock retains the available melee offer"), Loaded->SkillShopState.Offers.Num(), 1)) return false;
+        if (!TestEqual(TEXT("Removing injected deleted stock preserves the original current offers"), Loaded->SkillShopState.Offers.Num(), RetainedStock.Num())) return false;
         TestEqual(TEXT("Frozen candidates preserve their original count after removing injected deleted stock"), Loaded->SkillShopState.Catalog.Num(), OriginalCatalogCount);
         for (int32 Index = 0; Index < RetainedStock.Num(); ++Index) TestTrue(TEXT("Retained real products keep every price identity and metadata field"), FRunSkillShopOffer::StaticStruct()->CompareScriptStruct(&RetainedStock[Index], &Loaded->SkillShopState.Offers[Index], 0));
         TestTrue(TEXT("Repairing two real stock holes changes one shop revision without a reroll charge"), Loaded->SkillShopState.Revision == OriginalRevision + 1 && Loaded->SkillShopState.RerollPrice == OriginalRerollPrice);

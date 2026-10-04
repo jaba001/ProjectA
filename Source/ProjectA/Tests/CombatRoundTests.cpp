@@ -7,6 +7,7 @@
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Combat/Library/CombatEffectLibrary.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
+#include "Combat/Round/CombatChainEffectActor.h"
 #include "Combat/Round/CombatPlanValidator.h"
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
 #include "GameplayEffect.h"
@@ -30,6 +31,7 @@
 #include "Unit/UnitBase.h"
 #include "Unit/PlayerUnit.h"
 #include "UObject/StrongObjectPtr.h"
+#include "Tests/CombatChainTestHelpers.h"
 #include <limits>
 
 namespace CombatRoundTests
@@ -2757,6 +2759,76 @@ bool FCombatRoundDebugSkillTimingTest::RunTest(const FString& Parameters)
         if (!TestTrue(TEXT("Adding a debug enemy rebuilds the complete skill cache"), Added && Fixture.GiveRoundSkill(Added, nullptr, AddedSkillId) && Fixture.Round->AddDebugUnit(Fixture.Controllers[0], Added, Fixture.Error))) return false;
         if (!TestNotNull(TEXT("Roster reconstruction retains the existing skill"), Fixture.Round->FindSkill(SkillId))) return false;
         TestEqual(TEXT("Roster reconstruction retains existing timing overrides"), Fixture.Round->FindSkill(SkillId)->WindupSeconds, Current.WindupSeconds);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundChainLifecycleTest, "ProjectA.Combat.Chain.CoordinatorPowerCostsRoundLockAndStopCleanup", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatRoundChainLifecycleTest::RunTest(const FString& Parameters)
+{
+    for (bool bStopDuringChain : {false, true})
+    {
+        CombatRoundTests::FFixture Fixture;
+        FCombatRoundSkill Skill = CombatChainTests::Skill();
+        Skill.Chain.JumpDistance = 250.f;
+        Skill.Chain.JumpIntervalSeconds = 0.5f;
+        if (!TestTrue(TEXT("The existing owned round fixture equips a transient chain with four passive enemies"), Fixture.Initialize(1, 20.f, nullptr, FIntPoint(0, 3), 4, &Skill, 20.f, false))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        ACombatRoundCoordinator* Round = Fixture.Round;
+        const int32 InitialRound = Round->GetView().RoundNumber;
+        bool bOriginalGasContext = true;
+        int32 AppliedEffects = 0;
+        const FDelegateHandle Applied = Source->GetAbilitySystemComponent()->OnGameplayEffectAppliedDelegateToTarget.AddLambda([&](UAbilitySystemComponent*, const FGameplayEffectSpec& Spec, FActiveGameplayEffectHandle)
+        {
+            bOriginalGasContext &= Spec.GetContext().GetOriginalInstigator() == Source && Spec.GetContext().GetSourceObject() == Source;
+            ++AppliedEffects;
+        });
+        if (!TestTrue(TEXT("The server validates and locks the chain plan through the normal command API"), Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Fixture.Enemies[0])) && Fixture.Ready(0))) return false;
+        TestEqual(TEXT("Locking a multi-target attack pays one action cost"), Source->GetCurrentActionPoint(), 1);
+        for (int32 Step = 0; Step < 100 && Fixture.Enemies[0]->GetAttributeSet()->GetHP() == 100.f; ++Step) Round->Tick(0.01f);
+        TestTrue(TEXT("The first actual GAS hit leaves the next delayed target untouched"), Fixture.Enemies[0]->GetAttributeSet()->GetHP() == 80.f && Fixture.Enemies[1]->GetAttributeSet()->GetHP() == 100.f);
+        bool bActionsSettled = true;
+        for (const FCombatRoundUnitView& Unit : Round->GetView().Units) bActionsSettled &= CombatRoundRules::IsTerminal(Unit.ActionPhase);
+        TestTrue(TEXT("The managed chain keeps a completed action set in the same resolving round"), bActionsSettled && Round->GetView().PendingEffects == 1 && Round->GetView().Phase == ECombatRoundPhase::Resolving && Round->GetView().RoundNumber == InitialRound);
+        TestEqual(TEXT("The first jump does not charge another action point"), Source->GetCurrentActionPoint(), 1);
+        if (bStopDuringChain)
+        {
+            ACombatChainEffectActor* Chain = nullptr;
+            for (TActorIterator<ACombatChainEffectActor> It(Fixture.World.Get()); It; ++It)
+            {
+                if (It->GetOwner() == Round && !It->HasResolved()) Chain = *It;
+            }
+            if (!TestNotNull(TEXT("The coordinator owns a live chain effect for cleanup"), Chain)) return false;
+            // Initialize actors through the engine before routing EndPlay; BeginPlay alone does not initialize a native fixture actor.
+            // BeginPlay만으로 네이티브 픽스처 액터가 초기화되지 않으므로 엔진 액터 초기화 후 EndPlay를 연결합니다.
+            Fixture.World->InitializeActorsForPlay(FURL(), false);
+            if (!TestTrue(TEXT("The engine initializes the disposable effect without beginning the world"), Chain->IsActorInitialized() && !Fixture.World->HasBegunPlay())) return false;
+            Chain->DispatchBeginPlay();
+            Round->StopRound();
+            Chain->AdvanceEffect(10.f, 10.0);
+            TestTrue(TEXT("Stopping the round destroys the effect and removes its pending lock"), Chain->IsActorBeingDestroyed() && Chain->HasResolved() && Round->GetView().PendingEffects == 0 && Round->GetView().Phase == ECombatRoundPhase::Finished);
+            TestTrue(TEXT("Round cleanup prevents remaining chained GAS damage"), AppliedEffects == 1 && Fixture.Enemies[1]->GetAttributeSet()->GetHP() == 100.f && Fixture.Enemies[2]->GetAttributeSet()->GetHP() == 100.f);
+            int32 RemainingHolders = 0;
+            for (TActorIterator<AActor> It(Fixture.World.Get()); It; ++It)
+            {
+                if (It->GetOwner() == Chain && !It->IsActorBeingDestroyed()) ++RemainingHolders;
+            }
+            TestEqual(TEXT("EndPlay also destroys independent segment holders"), RemainingHolders, 0);
+        }
+        else
+        {
+            for (int32 Step = 0; Step < 1000 && Round->GetView().Phase == ECombatRoundPhase::Resolving; ++Step)
+            {
+                TestEqual(TEXT("Every delayed jump preserves the single paid action point"), Source->GetCurrentActionPoint(), 1);
+                Round->Tick(0.01f);
+            }
+            TestTrue(TEXT("The round resumes planning only after chain completion"), Round->GetView().Phase == ECombatRoundPhase::Planning && Round->GetView().RoundNumber == InitialRound + 1 && Round->GetView().PendingEffects == 0);
+            TestTrue(TEXT("Coordinator OnImpact forwards actual cumulative power to GAS"), Fixture.Enemies[0]->GetAttributeSet()->GetHP() == 80.f && Fixture.Enemies[1]->GetAttributeSet()->GetHP() == 90.f && Fixture.Enemies[2]->GetAttributeSet()->GetHP() == 95.f);
+            TestTrue(TEXT("The fourth eligible enemy remains untouched at the configured total limit"), AppliedEffects == 3 && Fixture.Enemies[3]->GetAttributeSet()->GetHP() == 100.f);
+        }
+        TestTrue(TEXT("Coordinator execution retains the original caster in every GAS context"), bOriginalGasContext);
+        Source->GetAbilitySystemComponent()->OnGameplayEffectAppliedDelegateToTarget.Remove(Applied);
     }
     return true;
 }

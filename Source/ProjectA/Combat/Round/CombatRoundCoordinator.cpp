@@ -1352,7 +1352,12 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
         ActiveEffects.Add(Effect);
         Effect->OnImpact.AddWeakLambda(this, [this, Skill](AUnitBase* Source, AUnitBase* Target, float Power)
         {
-            ApplyHit(Source, Target, Skill);
+            if (!FMath::IsFinite(Power) || Power < 0.f || Power > Skill.Power) return;
+            // Preserve the caster and GAS tags while honoring each chain hop's authored power multiplier.
+            // 시전자와 GAS 태그를 보존하며 체인의 각 점프에 작성된 피해 배율을 실제 적용합니다.
+            FCombatRoundSkill ImpactSkill = Skill;
+            ImpactSkill.Power = Power;
+            ApplyHit(Source, Target, ImpactSkill);
         });
         Effect->OnResolved.AddUObject(this, &ACombatRoundCoordinator::HandleEffectResolved);
     });
