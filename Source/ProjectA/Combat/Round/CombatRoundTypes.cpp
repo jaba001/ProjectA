@@ -50,10 +50,13 @@ bool FCombatSkillVfx::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuc
     Ar << SoundPitch;
     Ar << SoundMaxDuration;
     Ar << StartPositionParameter;
+    Ar << StartPositionSpace;
     Ar << StartPositionOffset;
     Ar << EndPositionParameter;
+    Ar << EndPositionSpace;
     SerializeVisualParameters(Ar, BoolParameters);
     SerializeVisualParameters(Ar, FloatParameters);
+    if (StartPositionSpace > ECombatVfxEndpointSpace::World || EndPositionSpace > ECombatVfxEndpointSpace::World) Ar.SetError();
     bOutSuccess = !Ar.IsError();
     return true;
 }
@@ -118,6 +121,7 @@ bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
         if ((!Vfx.Niagara.IsNull() && !Vfx.Cascade.IsNull()) || Vfx.RelativeTransform.ContainsNaN() || !Vfx.RelativeTransform.GetRotation().IsNormalized() || Vfx.RelativeTransform.GetScale3D().GetMin() <= 0.0) return false;
         if (!FMath::IsFinite(Vfx.SoundVolume) || Vfx.SoundVolume < 0.f || Vfx.SoundVolume > 10.f || !FMath::IsFinite(Vfx.SoundPitch) || Vfx.SoundPitch < 0.125f || Vfx.SoundPitch > 4.f || !FMath::IsFinite(Vfx.SoundMaxDuration) || Vfx.SoundMaxDuration < 0.01f || Vfx.SoundMaxDuration > 60.f) return false;
         if (Vfx.StartPositionOffset.ContainsNaN() || Vfx.StartPositionOffset.GetAbsMax() > 100000.f || Vfx.BoolParameters.Num() > 64 || Vfx.FloatParameters.Num() > 64) return false;
+        if (Vfx.StartPositionSpace > ECombatVfxEndpointSpace::World || Vfx.EndPositionSpace > ECombatVfxEndpointSpace::World) return false;
         if (Vfx.Niagara.IsNull() && (!Vfx.StartPositionParameter.IsNone() || !Vfx.EndPositionParameter.IsNone() || !Vfx.BoolParameters.IsEmpty() || !Vfx.FloatParameters.IsEmpty())) return false;
         if (!Vfx.StartPositionParameter.IsNone() && Vfx.StartPositionParameter == Vfx.EndPositionParameter) return false;
         for (const TPair<FName, bool>& Parameter : Vfx.BoolParameters)

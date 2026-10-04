@@ -16,11 +16,12 @@ ROOT = Path(unreal.Paths.project_dir()).resolve()
 SPEC = json.loads(Path(__file__).with_name("DrGameSkillSpecs.json").read_text(encoding="utf-8"))
 VERIFY = "-DrGameSkillsVerifyOnly" in unreal.SystemLibrary.get_command_line()
 ADD_CLASSIFICATION_TAGS = "-DrGameSkillsAddClassificationTags" in unreal.SystemLibrary.get_command_line()
+UPDATE_VFX_DIRECTIONS = "-DrGameSkillsUpdateVfxDirections" in unreal.SystemLibrary.get_command_line()
 ASSETS = unreal.EditorAssetLibrary
 TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
 OWNER_KEY = "ProjectA.DrGameSkills"
 OWNER = "DrGameSkills.v1"
-REPORT_DIR = ROOT / "Saved/Automation" / ("ChainSkillFilter" if ADD_CLASSIFICATION_TAGS else "DrGameSkills")
+REPORT_DIR = ROOT / "Saved/Automation" / ("SkillVfxDirection" if UPDATE_VFX_DIRECTIONS else "ChainSkillFilter" if ADD_CLASSIFICATION_TAGS else "DrGameSkills")
 
 
 def require(value, reason):
@@ -73,6 +74,7 @@ def obtain(path, asset_class):
         require(isinstance(asset, asset_class) and ASSETS.get_metadata_tag(asset, OWNER_KEY) == OWNER, "Unowned destination: " + path)
         return asset, False
     require(not VERIFY, "Missing authored package: " + path)
+    require(not UPDATE_VFX_DIRECTIONS, "Endpoint migration cannot create packages: " + path)
     folder, name = path.rsplit("/", 1)
     factory = unreal.DataAssetFactory()
     factory.set_editor_property("data_asset_class", asset_class)
@@ -105,6 +107,44 @@ def add_classification_tags(asset, actual, expected):
     return True
 
 
+def update_vfx_directions(asset, actual, expected):
+    changes = []
+    for slot in ("vfx", "impact_vfx"):
+        actual_vfx, expected_vfx = actual.get_editor_property(slot), expected.get_editor_property(slot)
+        for name in ("start_position_space", "end_position_space", "niagara"):
+            previous, desired = actual_vfx.get_editor_property(name), expected_vfx.get_editor_property(name)
+            if previous == desired:
+                continue
+            if name == "niagara":
+                permitted = any(normalized(previous) == normalized(load(entry["source"])) and normalized(desired) == normalized(load(entry["destination"])) for entry in SPEC.get("direction_derivatives", []))
+                if not permitted:
+                    return False
+            elif previous != unreal.CombatVfxEndpointSpace.PARAMETER_TYPE or desired == unreal.CombatVfxEndpointSpace.PARAMETER_TYPE:
+                return False
+            changes.append((slot, name, previous, desired))
+    if not changes:
+        return False
+    # Change only legacy endpoint spaces or declared direction derivatives when all other saved fields match.
+    # 다른 저장 필드가 모두 일치할 때만 기존 기본 끝점 공간이나 명시된 방향 파생본 참조를 변경합니다.
+    for slot, name, previous, desired in changes:
+        visual = expected.get_editor_property(slot)
+        visual.set_editor_property(name, previous)
+        expected.set_editor_property(slot, visual)
+    unchanged = normalized(actual) == normalized(expected)
+    for slot, name, previous, desired in changes:
+        visual = expected.get_editor_property(slot)
+        visual.set_editor_property(name, desired)
+        expected.set_editor_property(slot, visual)
+    if not unchanged:
+        return False
+    for slot, name, previous, desired in changes:
+        visual = actual.get_editor_property(slot)
+        visual.set_editor_property(name, desired)
+        actual.set_editor_property(slot, visual)
+    asset.set_editor_property("round_definition", actual)
+    return True
+
+
 def set_or_check(asset, properties, created):
     modified = False
     for name, expected in properties.items():
@@ -114,6 +154,9 @@ def set_or_check(asset, properties, created):
             actual = asset.get_editor_property(name)
             if normalized(actual) != normalized(expected):
                 if ADD_CLASSIFICATION_TAGS and not VERIFY and name == "round_definition" and add_classification_tags(asset, actual, expected):
+                    modified = True
+                    continue
+                if UPDATE_VFX_DIRECTIONS and not VERIFY and name == "round_definition" and update_vfx_directions(asset, actual, expected):
                     modified = True
                     continue
                 REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -146,9 +189,13 @@ def make_vfx(entry, inspections):
     vfx.set_editor_property("float_parameters", entry.get("float_parameters", {}))
     if entry.get("start_position_parameter"):
         vfx.set_editor_property("start_position_parameter", entry["start_position_parameter"])
+        require(entry.get("start_position_space") in ("ComponentLocal", "World"), "Start endpoint space must be explicit")
+        vfx.set_editor_property("start_position_space", getattr(unreal.CombatVfxEndpointSpace, "COMPONENT_LOCAL" if entry["start_position_space"] == "ComponentLocal" else "WORLD"))
         vfx.set_editor_property("start_position_offset", unreal.Vector(*entry.get("start_position_offset", [0, 0, 0])))
     if entry.get("end_position_parameter"):
         vfx.set_editor_property("end_position_parameter", entry["end_position_parameter"])
+        require(entry.get("end_position_space") in ("ComponentLocal", "World"), "End endpoint space must be explicit")
+        vfx.set_editor_property("end_position_space", getattr(unreal.CombatVfxEndpointSpace, "COMPONENT_LOCAL" if entry["end_position_space"] == "ComponentLocal" else "WORLD"))
     return vfx
 
 
@@ -187,6 +234,7 @@ def description(entry):
 
 
 def main():
+    require(not (ADD_CLASSIFICATION_TAGS and UPDATE_VFX_DIRECTIONS), "Run classification and endpoint migrations separately")
     selected = [entry for entry in SPEC["entries"] if entry["profile"]]
     require(len(selected) == 60 and len({entry["skill_id"] for entry in selected}) == 60 and len({entry["destination"] for entry in selected}) == 60, "Specification identities must be unique")
     require(all(entry["skill_id"].startswith("DrGame_") for entry in selected), "New skill IDs must be distinct from the retired catalog")
@@ -249,6 +297,7 @@ def main():
     require(previous_pool is None or previous_pool == run_pool, "Party has an unrelated Run pool; preserve it for review")
     party_changed = previous_pool != run_pool
     require(not VERIFY or not party_changed, "Saved party is not connected to the new Run shop pool")
+    require(not UPDATE_VFX_DIRECTIONS or not party_changed, "Endpoint migration cannot change the party Run pool")
     before = {name: normalized(party.get_editor_property(name)) for name in ["unarmed_starting_skill", "encounter_skill_pool", "fallback_player_unit_class"]}
     professions = party.get_editor_property("professions")
     profession_values = {str(name): normalized(value) for name, value in professions.items()}

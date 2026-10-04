@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "NiagaraTypes.h"
 #include "CombatVfxAssetLibrary.generated.h"
 
 class UNiagaraSystem;
@@ -16,6 +17,16 @@ public:
     // 에셋 변경 없이 작성된 이미터 공간, 렌더러와 빠른 반복 파라미터 값을 검사합니다.
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
     static FString InspectNiagaraSpace(UNiagaraSystem* System);
+
+    // Read actual coordinate-space module inputs and their literal or linked overrides without recompiling.
+    // 다시 컴파일하지 않고 실제 좌표 공간 모듈 입력과 리터럴 또는 연결된 재정의를 읽습니다.
+    UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
+    static FString InspectNiagaraModuleInputSpaces(UNiagaraSystem* System);
+
+    // Change one verified World input to Local in an owned derivative; repeated Local writes are harmless.
+    // 소유한 파생본에서 검증된 World 입력 하나만 Local로 변경하며 Local 재실행은 변경하지 않습니다.
+    UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
+    static FString ConfigureNiagaraModuleInputSpace(UNiagaraSystem* System, FName EmitterName, FName FunctionName, FName InputName, ENiagaraCoordinateSpace Space);
 
     // Change selected emitter spaces only in project-owned derivatives; source packages are rejected.
     // 원본 패키지를 거절하고 프로젝트 전용 파생본에서 선택한 이미터의 공간만 변경합니다.

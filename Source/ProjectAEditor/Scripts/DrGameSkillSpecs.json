@@ -33,6 +33,16 @@
     }
   ],
   "prototype_tuning": "기존 시험 기본 수치 유지; 확정 밸런스·가중치 정책 아님",
+  "direction_derivatives": [
+    {
+      "source": "/Game/__GroundAttackVFX/NS/NS_BrambleTusk",
+      "destination": "/Game/User_JeHoon/__GroundAttackVFX/NS/NS_BrambleTusk",
+      "emitter": "GPU_Fang",
+      "module": "AddVelocity",
+      "input": "Module.RotationCoordinateSpace",
+      "space": "Local"
+    }
+  ],
   "defaults": {
     "power": 25.0,
     "action_point_cost": 1,
@@ -390,6 +400,7 @@
           "/Game/__AoeVFX/_GenericSource/SFX/Sfx_shoot_arrow_01_Cue"
         ],
         "start_position_parameter": "User.Launch_Position",
+        "start_position_space": "ComponentLocal",
         "start_position_offset": [
           0,
           0,
@@ -476,6 +487,7 @@
           "/Game/__AoeVFX/_GenericSource/SFX/Sfx_Loop_waterWind_Cue2"
         ],
         "start_position_parameter": "User.Launch_Position",
+        "start_position_space": "ComponentLocal",
         "start_position_offset": [
           0,
           0,
@@ -907,7 +919,7 @@
         "Skill.Element.Chaos"
       ],
       "vfx": {
-        "source": "/Game/__GroundAttackVFX/NS/NS_BrambleTusk",
+        "source": "/Game/User_JeHoon/__GroundAttackVFX/NS/NS_BrambleTusk",
         "translation": [
           -350,
           0,
@@ -1487,7 +1499,8 @@
         "sound_dependencies": [
           "/Game/___LinkChainVFX/_GenericSource/SFX/Sfx_devilwake_1_Cue"
         ],
-        "end_position_parameter": "User.EndPos_V"
+        "end_position_parameter": "User.EndPos_V",
+        "end_position_space": "World"
       },
       "notes": "시험 수치이며 연출·판정 정합 및 실제 사운드는 사용자 확인 대기",
       "impact": {
@@ -1543,7 +1556,8 @@
           "/Game/___LinkChainVFX/_GenericSource/SFX/Sfx_Loop_Eletric_Cue",
           "/Game/___LinkChainVFX/_GenericSource/SFX/Sfx_Shoot_SonicArrow_Cue"
         ],
-        "end_position_parameter": "User.EndPos_V"
+        "end_position_parameter": "User.EndPos_V",
+        "end_position_space": "World"
       },
       "notes": "시험 수치이며 연출·판정 정합 및 실제 사운드는 사용자 확인 대기",
       "impact": {
@@ -1601,7 +1615,8 @@
           "/Game/___LinkChainVFX/_GenericSource/SFX/Sfx_Loop_WolfSquall_Cue",
           "/Game/___LinkChainVFX/_GenericSource/SFX/Sfx_Shoot_SonicArrow_Cue"
         ],
-        "end_position_parameter": "User.EndPos_V"
+        "end_position_parameter": "User.EndPos_V",
+        "end_position_space": "World"
       },
       "notes": "시험 수치이며 연출·판정 정합 및 실제 사운드는 사용자 확인 대기",
       "impact": {
@@ -1657,7 +1672,8 @@
           "/Game/___LinkChainVFX/_GenericSource/SFX/sfx_fire_sun_Cue",
           "/Game/___LinkChainVFX/_GenericSource/SFX/Sfx_Loop_AirFire_Cue"
         ],
-        "end_position_parameter": "User.EndPos_V"
+        "end_position_parameter": "User.EndPos_V",
+        "end_position_space": "World"
       },
       "notes": "시험 수치이며 연출·판정 정합 및 실제 사운드는 사용자 확인 대기",
       "impact": {
@@ -1715,7 +1731,8 @@
           "/Game/___LinkChainVFX/_GenericSource/SFX/Sfx_Loop_AirFire_Cue1",
           "/Game/___LinkChainVFX/_GenericSource/SFX/Sfx_Shoot_BigFire_Cue1"
         ],
-        "end_position_parameter": "User.EndPos_V"
+        "end_position_parameter": "User.EndPos_V",
+        "end_position_space": "World"
       },
       "notes": "시험 수치이며 연출·판정 정합 및 실제 사운드는 사용자 확인 대기",
       "impact": {

@@ -7,6 +7,7 @@
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/App.h"
+#include "Misc/LargeWorldRenderPosition.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
@@ -65,15 +66,29 @@ namespace
         return true;
     }
 
+    void BindNiagaraEndpoint(UNiagaraComponent* Component, UNiagaraSystem* System, FName Name, ECombatVfxEndpointSpace Space, const FVector& WorldPosition, const FVector& Offset)
+    {
+        if (Name.IsNone()) return;
+        const bool bVector = HasNiagaraParameter(System, Name, FNiagaraTypeDefinition::GetVec3Def());
+        const bool bPosition = HasNiagaraParameter(System, Name, FNiagaraTypeDefinition::GetPositionDef());
+        if (!bVector && !bPosition) return;
+        const bool bWorldSpace = Space == ECombatVfxEndpointSpace::World || (Space == ECombatVfxEndpointSpace::ParameterType && bPosition);
+        const FVector Value = (bWorldSpace ? WorldPosition : Component->GetComponentTransform().InverseTransformPosition(WorldPosition)) + Offset;
+        // Match the system's LWC tile before activation; Niagara Position setters always accept world coordinates.
+        // 활성화 전에 시스템의 LWC 타일을 맞추며 Niagara Position 설정 함수에는 항상 월드 좌표를 전달합니다.
+        const FVector TileOrigin = System->SupportsLargeWorldCoordinates() ? FVector(FVector3f(FLargeWorldRenderScalar::GetTileFor(Component->GetComponentLocation()))) * FLargeWorldRenderScalar::GetTileSize() : FVector::ZeroVector;
+        const FNiagaraLWCConverter Converter(TileOrigin);
+        if (bVector) Component->SetVariableVec3(Name, bWorldSpace ? FVector(Converter.ConvertWorldToSimulationVector(Value)) : Value);
+        else Component->SetVariablePosition(Name, bWorldSpace ? Value : Converter.ConvertSimulationVectorToWorld(FVector3f(Value)));
+    }
+
     void BindNiagaraOverrides(UNiagaraComponent* Component, UNiagaraSystem* System, const FCombatSkillVfx& Visual, const CombatSkillPresentation::FEndpointParameters& Endpoints)
     {
         if (!IsValid(Component) || !IsValid(System)) return;
-        // Vector endpoints live in the actual component space, including authored relative translation and scale.
-        // Vector 끝점은 작성된 상대 위치와 크기를 반영한 실제 컴포넌트 공간에 놓입니다.
-        if (HasNiagaraParameter(System, Visual.StartPositionParameter, FNiagaraTypeDefinition::GetVec3Def())) Component->SetVariableVec3(Visual.StartPositionParameter, Component->GetComponentTransform().InverseTransformPosition(Endpoints.SourceWorldPosition) + Visual.StartPositionOffset);
-        else if (HasNiagaraParameter(System, Visual.StartPositionParameter, FNiagaraTypeDefinition::GetPositionDef())) Component->SetVariablePosition(Visual.StartPositionParameter, Endpoints.SourceWorldPosition + Visual.StartPositionOffset);
-        if (HasNiagaraParameter(System, Visual.EndPositionParameter, FNiagaraTypeDefinition::GetVec3Def())) Component->SetVariableVec3(Visual.EndPositionParameter, Component->GetComponentTransform().InverseTransformPosition(Endpoints.TargetWorldPosition));
-        else if (HasNiagaraParameter(System, Visual.EndPositionParameter, FNiagaraTypeDefinition::GetPositionDef())) Component->SetVariablePosition(Visual.EndPositionParameter, Endpoints.TargetWorldPosition);
+        // Bind both endpoint types in their authored space, including relative translation, rotation and scale.
+        // 상대 위치·회전·크기를 반영하며 두 끝점 자료형 모두 작성된 공간으로 연결합니다.
+        BindNiagaraEndpoint(Component, System, Visual.StartPositionParameter, Visual.StartPositionSpace, Endpoints.SourceWorldPosition, Visual.StartPositionOffset);
+        BindNiagaraEndpoint(Component, System, Visual.EndPositionParameter, Visual.EndPositionSpace, Endpoints.TargetWorldPosition, FVector::ZeroVector);
         for (const TPair<FName, bool>& Parameter : Visual.BoolParameters) Component->SetVariableBool(Parameter.Key, Parameter.Value);
         for (const TPair<FName, float>& Parameter : Visual.FloatParameters) Component->SetVariableFloat(Parameter.Key, Parameter.Value);
     }

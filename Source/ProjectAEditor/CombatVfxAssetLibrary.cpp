@@ -1,5 +1,7 @@
 #include "CombatVfxAssetLibrary.h"
 #include "Dom/JsonObject.h"
+#include "EdGraph/EdGraphPin.h"
+#include "EdGraphSchema_Niagara.h"
 #include "Engine/StaticMesh.h"
 #include "Misc/App.h"
 #include "NiagaraEmitter.h"
@@ -11,6 +13,7 @@
 #include "NiagaraScript.h"
 #include "NiagaraScriptSource.h"
 #include "NiagaraScriptSourceBase.h"
+#include "NiagaraScriptVariable.h"
 #include "NiagaraSystem.h"
 #include "Serialization/JsonSerializer.h"
 #include "UObject/Package.h"
@@ -21,6 +24,117 @@
 
 namespace
 {
+    struct FCoordinateInput
+    {
+        FNiagaraVariable Variable;
+        FNiagaraParameterHandle AliasedHandle;
+        UEdGraphPin* OverridePin = nullptr;
+        const UNiagaraScriptVariable* ScriptVariable = nullptr;
+        bool bHidden = false;
+        bool bValueKnown = false;
+        int32 Value = INDEX_NONE;
+    };
+
+    bool ReadCoordinatePin(const UEdGraphPin* Pin, int32& Value)
+    {
+        if (!Pin || !Pin->LinkedTo.IsEmpty() || Pin->DefaultValue.IsEmpty()) return false;
+        const FNiagaraVariable Variable = UEdGraphSchema_Niagara::PinToNiagaraVariable(Pin, true);
+        if (!Variable.IsDataAllocated() || Variable.GetType().GetEnum() != StaticEnum<ENiagaraCoordinateSpace>() || Variable.GetSizeInBytes() != sizeof(int32)) return false;
+        FMemory::Memcpy(&Value, Variable.GetData(), sizeof(Value));
+        return StaticEnum<ENiagaraCoordinateSpace>()->IsValidEnumValue(Value);
+    }
+
+    UEdGraphPin* FindCoordinateOverridePin(UNiagaraNodeFunctionCall* Node, const FNiagaraParameterHandle& Handle)
+    {
+        // Follow the function's real parameter-map input rather than guessing an override node or pin name.
+        // 재정의 노드나 핀 이름을 추정하지 않고 함수의 실제 파라미터 맵 입력 연결을 따라갑니다.
+        for (UEdGraphPin* Pin : Node->Pins)
+        {
+            if (!Pin || Pin->Direction != EGPD_Input || Pin->PinType.PinSubCategoryObject != FNiagaraTypeDefinition::GetParameterMapStruct() || Pin->LinkedTo.Num() != 1) continue;
+            const UEdGraphNode* OverrideNode = Pin->LinkedTo[0]->GetOwningNode();
+            for (UEdGraphPin* Candidate : OverrideNode->Pins)
+            {
+                if (Candidate && Candidate->Direction == EGPD_Input && Candidate->PinName == Handle.GetParameterHandleString()) return Candidate;
+            }
+        }
+        return nullptr;
+    }
+
+    TArray<FCoordinateInput> ReadCoordinateInputs(const FVersionedNiagaraEmitter& Emitter, UNiagaraNodeFunctionCall* Node)
+    {
+        TArray<FCoordinateInput> Result;
+        if (!IsValid(Node) || !IsValid(Node->FunctionScript)) return Result;
+        FCompileConstantResolver Resolver(Emitter, FNiagaraStackGraphUtilities::GetOutputNodeUsage(*Node));
+        TArray<FNiagaraVariable> Variables;
+        TSet<FNiagaraVariable> Hidden;
+        FNiagaraStackGraphUtilities::GetStackFunctionInputs(*Node, Variables, Hidden, Resolver, FNiagaraStackGraphUtilities::ENiagaraGetStackFunctionInputPinsOptions::ModuleInputsOnly);
+        TArray<UEdGraphPin*> StaticPins;
+        TSet<UEdGraphPin*> HiddenStaticPins;
+        FNiagaraStackGraphUtilities::GetStackFunctionStaticSwitchPins(*Node, StaticPins, HiddenStaticPins, Resolver);
+        for (UEdGraphPin* Pin : StaticPins)
+        {
+            if (!Pin || UEdGraphSchema_Niagara::PinToTypeDefinition(Pin).GetEnum() != StaticEnum<ENiagaraCoordinateSpace>()) continue;
+            const FNiagaraVariable Variable = UEdGraphSchema_Niagara::PinToNiagaraVariable(Pin);
+            Variables.AddUnique(Variable);
+            if (HiddenStaticPins.Contains(Pin)) Hidden.Add(Variable);
+        }
+        const UNiagaraScriptSource* FunctionSource = Node->GetFunctionScriptSource();
+        for (const FNiagaraVariable& Variable : Variables)
+        {
+            if (Variable.GetType().GetEnum() != StaticEnum<ENiagaraCoordinateSpace>() || Variable.GetSizeInBytes() != sizeof(int32)) continue;
+            FCoordinateInput Input;
+            Input.Variable = Variable;
+            Input.AliasedHandle = FNiagaraParameterHandle::CreateAliasedModuleParameterHandle(FNiagaraParameterHandle(Variable.GetName()), Node);
+            Input.bHidden = Hidden.Contains(Variable);
+            for (UEdGraphPin* Pin : StaticPins)
+            {
+                if (Pin && Pin->PinName == Variable.GetName()) Input.OverridePin = Pin;
+            }
+            if (!Input.OverridePin) Input.OverridePin = FindCoordinateOverridePin(Node, Input.AliasedHandle);
+            if (IsValid(FunctionSource) && IsValid(FunctionSource->NodeGraph)) Input.ScriptVariable = FunctionSource->NodeGraph->GetScriptVariable(Variable.GetName());
+            if (Input.OverridePin) Input.bValueKnown = ReadCoordinatePin(Input.OverridePin, Input.Value);
+            else if (IsValid(Input.ScriptVariable) && Input.ScriptVariable->DefaultMode == ENiagaraDefaultMode::Value && Input.ScriptVariable->Variable.GetType() == Variable.GetType() && Input.ScriptVariable->GetDefaultValueVariant().GetNumBytes() == sizeof(int32) && Input.ScriptVariable->GetDefaultValueData())
+            {
+                FMemory::Memcpy(&Input.Value, Input.ScriptVariable->GetDefaultValueData(), sizeof(Input.Value));
+                Input.bValueKnown = StaticEnum<ENiagaraCoordinateSpace>()->IsValidEnumValue(Input.Value);
+            }
+            Result.Add(Input);
+        }
+        return Result;
+    }
+
+    TSharedRef<FJsonObject> DescribeCoordinateInput(const FCoordinateInput& Input)
+    {
+        TSharedRef<FJsonObject> Row = MakeShared<FJsonObject>();
+        Row->SetStringField(TEXT("name"), Input.Variable.GetName().ToString());
+        Row->SetStringField(TEXT("alias"), Input.AliasedHandle.GetParameterHandleString().ToString());
+        Row->SetStringField(TEXT("type"), Input.Variable.GetType().GetName());
+        Row->SetBoolField(TEXT("static"), Input.Variable.GetType().IsStatic());
+        Row->SetBoolField(TEXT("hidden"), Input.bHidden);
+        Row->SetBoolField(TEXT("hasOverride"), Input.OverridePin != nullptr);
+        Row->SetBoolField(TEXT("valueKnown"), Input.bValueKnown);
+        if (Input.bValueKnown)
+        {
+            Row->SetNumberField(TEXT("value"), Input.Value);
+            Row->SetStringField(TEXT("space"), StaticEnum<ENiagaraCoordinateSpace>()->GetNameStringByValue(Input.Value));
+        }
+        if (IsValid(Input.ScriptVariable))
+        {
+            Row->SetStringField(TEXT("defaultVariable"), Input.ScriptVariable->GetPathName());
+            Row->SetStringField(TEXT("defaultMode"), StaticEnum<ENiagaraDefaultMode>()->GetNameStringByValue(static_cast<int64>(Input.ScriptVariable->DefaultMode)));
+        }
+        if (Input.OverridePin)
+        {
+            Row->SetStringField(TEXT("pin"), Input.OverridePin->PinName.ToString());
+            Row->SetStringField(TEXT("pinOwner"), Input.OverridePin->GetOwningNode()->GetPathName());
+            Row->SetStringField(TEXT("literal"), Input.OverridePin->DefaultValue);
+            TArray<TSharedPtr<FJsonValue>> Linked;
+            for (const UEdGraphPin* Pin : Input.OverridePin->LinkedTo) Linked.Add(MakeShared<FJsonValueString>(Pin->GetOwningNode()->GetPathName() + TEXT(" : ") + Pin->PinName.ToString()));
+            Row->SetArrayField(TEXT("linked"), Linked);
+        }
+        return Row;
+    }
+
     bool IsLocationEventModule(const UNiagaraNodeFunctionCall* Node)
     {
         if (!IsValid(Node) || !IsValid(Node->FunctionScript)) return false;
@@ -60,6 +174,131 @@ namespace
         }
         return Row;
     }
+}
+
+FString UCombatVfxAssetLibrary::InspectNiagaraModuleInputSpaces(UNiagaraSystem* System)
+{
+    TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+    Root->SetBoolField(TEXT("valid"), IsValid(System));
+    TArray<TSharedPtr<FJsonValue>> Emitters;
+    if (IsValid(System))
+    {
+        Root->SetStringField(TEXT("asset"), System->GetPathName());
+        for (const FNiagaraEmitterHandle& Handle : System->GetEmitterHandles())
+        {
+            TSharedRef<FJsonObject> Row = MakeShared<FJsonObject>();
+            const FVersionedNiagaraEmitter Instance = Handle.GetInstance();
+            const FVersionedNiagaraEmitterData* Data = Instance.GetEmitterData();
+            const UNiagaraScriptSource* Source = Data ? Cast<UNiagaraScriptSource>(Data->GraphSource) : nullptr;
+            Row->SetStringField(TEXT("name"), Handle.GetName().ToString());
+            Row->SetBoolField(TEXT("enabled"), Handle.GetIsEnabled());
+            Row->SetStringField(TEXT("emitter"), GetPathNameSafe(Instance.Emitter));
+            Row->SetStringField(TEXT("source"), GetPathNameSafe(Source));
+            Row->SetStringField(TEXT("graph"), IsValid(Source) ? GetPathNameSafe(Source->NodeGraph) : TEXT("None"));
+            TArray<TSharedPtr<FJsonValue>> Modules;
+            if (IsValid(Source) && IsValid(Source->NodeGraph))
+            {
+                TArray<UNiagaraNodeFunctionCall*> Nodes;
+                Source->NodeGraph->GetNodesOfClass(Nodes);
+                for (UNiagaraNodeFunctionCall* Node : Nodes)
+                {
+                    const TArray<FCoordinateInput> Inputs = ReadCoordinateInputs(Instance, Node);
+                    if (Inputs.IsEmpty()) continue;
+                    TSharedRef<FJsonObject> Module = MakeShared<FJsonObject>();
+                    Module->SetStringField(TEXT("name"), Node->GetFunctionName());
+                    Module->SetStringField(TEXT("node"), Node->GetPathName());
+                    Module->SetStringField(TEXT("script"), GetPathNameSafe(Node->FunctionScript));
+                    Module->SetStringField(TEXT("versionGuid"), Node->SelectedScriptVersion.ToString(EGuidFormats::DigitsWithHyphens));
+                    TArray<TSharedPtr<FJsonValue>> Descriptions;
+                    for (const FCoordinateInput& Input : Inputs) Descriptions.Add(MakeShared<FJsonValueObject>(DescribeCoordinateInput(Input)));
+                    Module->SetArrayField(TEXT("inputs"), Descriptions);
+                    Modules.Add(MakeShared<FJsonValueObject>(Module));
+                }
+            }
+            Row->SetArrayField(TEXT("modules"), Modules);
+            Emitters.Add(MakeShared<FJsonValueObject>(Row));
+        }
+    }
+    Root->SetArrayField(TEXT("emitters"), Emitters);
+    FString Result;
+    FJsonSerializer::Serialize(Root, TJsonWriterFactory<>::Create(&Result));
+    return Result;
+}
+
+FString UCombatVfxAssetLibrary::ConfigureNiagaraModuleInputSpace(UNiagaraSystem* System, FName EmitterName, FName FunctionName, FName InputName, ENiagaraCoordinateSpace Space)
+{
+    if (!IsValid(System) || !System->GetOutermost()->GetName().StartsWith(TEXT("/Game/User_JeHoon/"))) return FString::Printf(TEXT("Module space change requires a project derivative: %s / 모듈 공간 변경에는 프로젝트 전용 파생본이 필요합니다."), *GetPathNameSafe(System));
+    if (EmitterName.IsNone() || FunctionName.IsNone() || InputName.IsNone() || Space != ENiagaraCoordinateSpace::Local) return TEXT("Explicit world-space-to-Local input selection is required. / 명시적인 월드 공간에서 Local로 변경할 입력 선택이 필요합니다.");
+    FVersionedNiagaraEmitter Selected;
+    int32 EmitterMatches = 0;
+    for (const FNiagaraEmitterHandle& Handle : System->GetEmitterHandles())
+    {
+        if (Handle.GetName() != EmitterName) continue;
+        Selected = Handle.GetInstance();
+        ++EmitterMatches;
+    }
+    FVersionedNiagaraEmitterData* Data = Selected.GetEmitterData();
+    UNiagaraScriptSource* Source = Data ? Cast<UNiagaraScriptSource>(Data->GraphSource) : nullptr;
+    if (EmitterMatches != 1 || !IsValid(Selected.Emitter) || !Selected.Emitter->IsIn(System) || !IsValid(Source) || !Source->IsIn(System) || !IsValid(Source->NodeGraph) || !Source->NodeGraph->IsIn(System)) return TEXT("Emitter or graph ownership is missing, shared or ambiguous. / 이미터 또는 그래프 소유권이 누락·공유·중복 상태입니다.");
+    TArray<UNiagaraScript*> Scripts;
+    Data->GetScripts(Scripts, false);
+    if (Scripts.IsEmpty()) return TEXT("Selected emitter has no scripts. / 선택한 이미터에 스크립트가 없습니다.");
+    for (const UNiagaraScript* Script : Scripts)
+    {
+        if (!IsValid(Script) || !Script->IsIn(System)) return FString::Printf(TEXT("Script ownership rejected: %s / 스크립트가 파생본에 속하지 않습니다."), *GetPathNameSafe(Script));
+    }
+    TArray<UNiagaraNodeFunctionCall*> Nodes;
+    Source->NodeGraph->GetNodesOfClass(Nodes);
+    UNiagaraNodeFunctionCall* Node = nullptr;
+    int32 FunctionMatches = 0;
+    for (UNiagaraNodeFunctionCall* Candidate : Nodes)
+    {
+        if (FName(*Candidate->GetFunctionName()) != FunctionName) continue;
+        Node = Candidate;
+        ++FunctionMatches;
+    }
+    if (FunctionMatches != 1 || !IsValid(Node) || !Node->IsIn(System) || Node->GetGraph() != Source->NodeGraph || !IsValid(Node->FunctionScript)) return TEXT("Module selection is missing, shared or ambiguous. / 모듈 선택이 누락·공유·중복 상태입니다.");
+    FCoordinateInput Input;
+    int32 InputMatches = 0;
+    for (const FCoordinateInput& Candidate : ReadCoordinateInputs(Selected, Node))
+    {
+        if (Candidate.Variable.GetName() != InputName) continue;
+        Input = Candidate;
+        ++InputMatches;
+    }
+    if (InputMatches != 1 || Input.bHidden || !Input.bValueKnown) return TEXT("Coordinate input is missing, hidden, linked or ambiguous. / 좌표 공간 입력이 누락·숨김·연결·중복 상태입니다.");
+    if (Input.OverridePin && (!Input.OverridePin->GetOwningNode()->IsIn(System) || Input.OverridePin->GetOwningNode()->GetGraph() != Source->NodeGraph || UEdGraphSchema_Niagara::PinToTypeDefinition(Input.OverridePin) != Input.Variable.GetType())) return TEXT("Override pin ownership or type is invalid. / 재정의 핀의 소유권 또는 자료형이 올바르지 않습니다.");
+    if (Input.Value == static_cast<int32>(ENiagaraCoordinateSpace::Local)) return FString();
+    const bool bWorldInput = Input.Value == static_cast<int32>(ENiagaraCoordinateSpace::World) || (Input.Value == static_cast<int32>(ENiagaraCoordinateSpace::Simulation) && !Data->bLocalSpace);
+    if (!bWorldInput) return TEXT("Only a verified world-space input may be changed to Local. / 검증된 월드 공간 입력만 Local로 변경할 수 있습니다.");
+    FNiagaraVariable Desired(Input.Variable.GetType(), Input.Variable.GetName());
+    const int32 DesiredValue = static_cast<int32>(Space);
+    Desired.SetData(reinterpret_cast<const uint8*>(&DesiredValue));
+    FString Literal;
+    const UEdGraphSchema_Niagara* Schema = GetDefault<UEdGraphSchema_Niagara>();
+    if (!Schema->TryGetPinDefaultValueFromNiagaraVariable(Desired, Literal)) return TEXT("Coordinate enum literal cannot be represented. / 좌표 공간 enum 리터럴을 작성할 수 없습니다.");
+    // World-space emitters resolve Simulation as World; validate that effective space before changing one override.
+    // 월드 공간 이미터의 Simulation은 World로 해석되므로 실제 공간을 검사한 후 재정의 하나만 변경합니다.
+    System->Modify();
+    Selected.Emitter->Modify();
+    Source->Modify();
+    Source->NodeGraph->Modify();
+    Node->Modify();
+    const FGuid VariableGuid = IsValid(Input.ScriptVariable) ? Input.ScriptVariable->Metadata.GetVariableGuid() : FGuid();
+    UEdGraphPin& Pin = FNiagaraStackGraphUtilities::GetOrCreateStackFunctionInputOverridePin(*Node, Input.AliasedHandle, Input.Variable.GetType(), VariableGuid, FGuid());
+    if (!Pin.LinkedTo.IsEmpty() || !Pin.GetOwningNode()->IsIn(System) || Pin.GetOwningNode()->GetGraph() != Source->NodeGraph || UEdGraphSchema_Niagara::PinToTypeDefinition(&Pin) != Input.Variable.GetType()) return TEXT("Created override pin is unsafe; do not save. / 작성된 재정의 핀이 안전하지 않으므로 저장하지 마세요.");
+    Pin.Modify();
+    Schema->TrySetDefaultValue(Pin, Literal);
+    int32 Written = INDEX_NONE;
+    if (!ReadCoordinatePin(&Pin, Written) || Written != DesiredValue) return TEXT("Coordinate enum write failed; do not save. / 좌표 공간 enum 작성에 실패했으므로 저장하지 마세요.");
+    if (UNiagaraNode* OverrideNode = Cast<UNiagaraNode>(Pin.GetOwningNode())) OverrideNode->MarkNodeRequiresSynchronization(TEXT("Project VFX module coordinate-space override changed."), true);
+    Data->GraphSource->MarkNotSynchronized(TEXT("Project VFX direction module input changed."));
+    System->PrepareRapidIterationParametersForCompilation();
+    System->MarkPackageDirty();
+    System->RequestCompile(true);
+    System->WaitForCompilationComplete(true, false);
+    if (!System->IsValid() || (FApp::CanEverRender() && !System->IsReadyToRun())) return FString::Printf(TEXT("Module space compilation failed: %s; do not save. / 모듈 공간 컴파일에 실패했으므로 저장하지 마세요."), *System->GetPathName());
+    return FString();
 }
 
 FString UCombatVfxAssetLibrary::InspectNiagaraSpace(UNiagaraSystem* System)

@@ -12,6 +12,16 @@ class UNiagaraSystem;
 class UParticleSystem;
 class USoundBase;
 
+// Endpoint space belongs to the authored Niagara graph; ParameterType preserves legacy defaults.
+// 끝점 공간은 작성된 Niagara 그래프가 결정하며 ParameterType은 기존 기본 동작을 보존합니다.
+UENUM(BlueprintType)
+enum class ECombatVfxEndpointSpace : uint8
+{
+    ParameterType,
+    ComponentLocal,
+    World
+};
+
 // Reference source effects without duplicating their packages or running third-party Blueprint logic.
 // 원본 패키지를 복제하거나 외부 Blueprint 로직을 실행하지 않고 효과를 참조합니다.
 USTRUCT(BlueprintType)
@@ -47,13 +57,19 @@ struct PROJECTA_API FCombatSkillVfx
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Niagara Parameters")
     FName StartPositionParameter;
 
-    // Vector parameters use local offsets; Position parameters use the captured caster world position.
-    // Vector 파라미터는 로컬 오프셋을 사용하고 Position 파라미터는 저장한 시전자 월드 위치를 사용합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Niagara Parameters")
+    ECombatVfxEndpointSpace StartPositionSpace = ECombatVfxEndpointSpace::ParameterType;
+
+    // Apply the start offset in the selected endpoint space, independently of its Niagara data type.
+    // Niagara 자료형과 별개로 선택한 끝점 공간에서 시작 오프셋을 적용합니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Niagara Parameters")
     FVector StartPositionOffset = FVector::ZeroVector;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Niagara Parameters")
     FName EndPositionParameter;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Niagara Parameters")
+    ECombatVfxEndpointSpace EndPositionSpace = ECombatVfxEndpointSpace::ParameterType;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, NotReplicated, Category = "Niagara Parameters")
     TMap<FName, bool> BoolParameters;
