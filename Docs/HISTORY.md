@@ -1,11 +1,12 @@
 # ProjectA 완료 작업과 검증 기록
 
-갱신일: 2026-10-03. 완료 범위·기준 커밋·실행 근거를 기록한다. 현행 구현은 [PROJECT_PLAN](PROJECT_PLAN.md), 확정 기획은 [GAME_DESIGN](GAME_DESIGN.md), 다음 콘텐츠·온라인 서비스·에셋 도입은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
+갱신일: 2026-10-04. 완료 범위·기준 커밋·실행 근거를 기록한다. 현행 구현은 [PROJECT_PLAN](PROJECT_PLAN.md), 확정 기획은 [GAME_DESIGN](GAME_DESIGN.md), 다음 콘텐츠·온라인 서비스·에셋 도입은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다.
 
 ## 최근 변경
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-10-04 사망 유닛 HP 표시 숨김 | HP 오버레이가 사망 유닛을 그리기 전에 제외하도록 수정하여 HP·보호막·체력바 전체를 숨기고 디버그 부활 후 재표시한다. UE 5.8.3 Development Editor / Win64 컴파일·링크 19.87초 성공, 코드·문서·diff 정적 검사 통과. 게임·PIE·자동화 테스트 미실행. [사용자 확인](TODO.md#20-사망-시-hp-표시-숨김-확인) |
 | 2026-10-03 구입 VFX/SFX와 신규 스킬 도입 | Fab 6팩 원본 1,900파일·1,355,489,933바이트를 설치하고 Niagara 123개 중 스킬 60개·보조 63개를 명세로 구분했다. 신규 DA 60개·상점/Run 풀 2개를 작성하고 기본 파티를 61후보 상점에 연결했다. 기존 공격 14개·원본·퇴역 명세를 보존했으며 CSV 기존 577행 바이트를 유지하여 각각 700행으로 확장하고 SFX 234행을 추가했다. Development Editor / Win64 컴파일·에셋 작성·독립 재로드·DataValidation·원본/보존 공격 해시·CSV·문서·diff 정적 검사 통과. 원본 데모 입력 경고 20개, 작성/재로드 오류·경고 0. 시험 수치·판정 프로필이며 게임·PIE·자동화 테스트·실제 VFX/SFX 재생은 미실행. 근거: `Saved/Automation/DrGameSkills/Author.json`·`Reload.json`·`FinalPreservation.json`·`CsvValidation.json`; [도입 기준](PROJECT_PLAN.md#4-9-구입-vfx와-sfx-도입)·[사용자 확인](TODO.md#19-구입-vfxsfx-스킬-확인) |
 | 2026-10-03 VFX 스킬과 기존 원본 팩 정리 | 생성 스킬 176개·원본 VFX 팩·방향 파생·전용 의존·풀·테스트 투사체의 2,813패키지·2,430,314,679바이트(약 2.26GiB)와 관련 17폴더 루트를 삭제했다. 두 기본 공격·몬스터 전용 공격 12개·공격 애니메이션·공유 원본을 보존하고 저장 호환·가용 후보 상점·생성 폐기·CSV 이력을 반영했다. UE 5.8.3 Development Editor / Win64 최종 컴파일·링크 4.74초, 엔진 삭제·독립 읽기 전용 재로드 모두 종료 0. 남은 스킬 14개·생존 Registry 20,963패키지 참조 검사, 추적 Content 293파일 SHA·남은 Content 17,844파일 메타데이터 보존과 CSV·문서·diff 정적 검사 통과. 적용 시 폐기 데모·Transient 경고 11개, 독립 재로드 오류·경고 0. 게임·PIE·자동화 테스트 미실행. 근거: `Saved/Automation/SkillReset/Apply.json`·`Reload.json`; [정리 범위](PROJECT_PLAN.md#4-8-기본-공격-외-스킬-정리)·[사용자 확인](TODO.md#18-기본-공격-외-스킬-정리-확인) |
 | 2026-10-03 CSV 보관 폴더 통합 | CSV 5개를 프로젝트 루트 `DataCatalogs/`로 이동하고 런타임 무기 로드·UFS 패키징 의존성·스킬 생성 명세·문서 링크를 갱신했다. CSV 내용·SHA·행 수와 스킬 원본 해시를 보존했다. UE 5.8.3 Development Editor / Win64 컴파일·링크 16.92초 성공, 생성된 타깃 receipt의 무기 CSV UFS 경로·문서 링크·diff 정적 검사 통과. 게임·PIE·패키징 미실행. [사용자 확인](TODO.md#16-csv-보관-경로-변경-확인) |

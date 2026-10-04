@@ -169,7 +169,7 @@ GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메
 
 `UCombatUnitHealthDebugWidget`은 라운드 UI의 배경 레이어에서 전투에 참여한 아군·적의 캡슐 상단 24cm 위에 현재/최대 HP 숫자와 작은 체력바를 표시한다. 그리기 갱신마다 GAS AttributeSet의 실제 HP/MaxHP를 읽어 최대 소수 한 자리로 표시하고 유닛 이동·카메라·공통 DPI를 따라 위치를 갱신한다. 어두운 배경과 아군 청록색·적 주황색을 사용하며 마우스 입력을 통과시킨다.
 
-Debug/Development에서 기본 활성화하며 콘솔 `projecta.Debug.UnitHP 0`으로 숨기고 `projecta.Debug.UnitHP 1`로 표시한다. Shipping/Test에서는 표시 생성과 명령 등록을 제외한다. 카메라 뒤·숨김·파괴 유닛은 제외하고 사망 후 Actor가 남아 있으면 HP 0을 표시한다. 구현과 실행 검증의 범위는 [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
+Debug/Development에서 기본 활성화하며 콘솔 `projecta.Debug.UnitHP 0`으로 숨기고 `projecta.Debug.UnitHP 1`로 표시한다. Shipping/Test에서는 표시 생성과 명령 등록을 제외한다. 카메라 뒤·숨김·파괴·사망 유닛은 제외한다. 사망 Actor가 남아 있어도 `IsUnitAlive()`가 false이면 HP·보호막 숫자와 체력바를 그리지 않고 디버그 부활 시 다시 표시한다. 기존 실행 검증은 [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)으로 구분하며 현재 변경의 작동 확인은 [TODO 20절](TODO.md#20-사망-시-hp-표시-숨김-확인)에서 수행한다.
 
 ### 7-2 전투 디버그 도구
 

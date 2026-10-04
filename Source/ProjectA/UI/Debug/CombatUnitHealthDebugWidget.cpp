@@ -47,11 +47,11 @@ int32 UCombatUnitHealthDebugWidget::NativePaint(const FPaintArgs& Args, const FG
     for (const FCombatRoundUnitView& Entry : Coordinator->GetView().Units)
     {
         const AUnitBase* Unit = Entry.Unit;
-        if (!IsValid(Unit) || Unit->IsActorBeingDestroyed() || Unit->IsHidden()) continue;
+        if (!IsValid(Unit) || !Unit->IsUnitAlive() || Unit->IsActorBeingDestroyed() || Unit->IsHidden()) continue;
         const UAS_Unit* Attributes = Unit->GetAttributeSet();
         const UCapsuleComponent* Capsule = Unit->GetCapsuleComponent();
         if (!IsValid(Attributes) || !IsValid(Capsule) || !FMath::IsFinite(Attributes->GetHP()) || !FMath::IsFinite(Attributes->GetMaxHP()) || Attributes->GetMaxHP() <= 0.f) continue;
-        const float HP = Unit->IsUnitAlive() ? FMath::Max(0.f, Attributes->GetHP()) : 0.f;
+        const float HP = FMath::Max(0.f, Attributes->GetHP());
         const float MaxHP = Attributes->GetMaxHP();
         const FVector Anchor = Capsule->GetComponentLocation() + FVector(0.f, 0.f, Capsule->GetScaledCapsuleHalfHeight() + 24.f);
         FVector2D ScreenPosition;

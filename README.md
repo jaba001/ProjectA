@@ -29,7 +29,7 @@ Unreal Engine 5.8 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 | 시작 메뉴 설정 | 해상도·전체 화면/테두리 없는 전체 화면/창 모드·그래픽 품질·VSync. 화면 변경은 15초 확인 후 저장, 미확인 시 복원 |
 | 공통 UI 외형 | 기존 DemonicUI의 청동 장식·붉은 버튼·성 배경 적용. 장비 슬롯과 포더킹 참고 목록형 인벤토리를 상점과 `I` 창에서 공유. 분류 탭·개별 사본 목록·클릭 상세 제공, 사용자 작동 확인은 [TODO 8절](Docs/TODO.md#8-목록형-인벤토리-확인) |
 | 공통 UI 배율 | 1920×1080 기준 공통 DPI. 전투는 상단 라운드·우측 대상·좌하단 파티·하단 중앙 스킬·우하단 행동 패널, 카메라는 고정 화면 비율 제한 해제 |
-| 개발용 유닛 HP | `Source/ProjectA/UI/Debug/`에서 관리. Debug/Development 전투에서 머리 위 현재/최대 HP와 체력바 표시. 콘솔 `projecta.Debug.UnitHP 0`으로 끄고 `1`로 켜기. Shipping/Test 제외. [구현 기준](Docs/UI_README.md#7-1-개발용-유닛-hp-표시) |
+| 개발용 유닛 HP | `Source/ProjectA/UI/Debug/`에서 관리. Debug/Development 전투에서 머리 위 현재/최대 HP와 체력바 표시. 사망 시 숨기고 디버그 부활 시 다시 표시. 콘솔 `projecta.Debug.UnitHP 0`으로 끄고 `1`로 켜기. Shipping/Test 제외. [구현 기준](Docs/UI_README.md#7-1-개발용-유닛-hp-표시) |
 | 지하 던전 비교 레벨 | `DungeonFantasy`·`DungeonStone` 생성·navigation 저장·독립 재로드 검사 통과. FANTASTIC·Modular Dungeon Collection 원본 직접 참조, 기존 기본 Run 진입 유지. 실제 화면·플레이는 [TODO 10절](Docs/TODO.md#10-지하-던전-비교-레벨-확인)에서 사용자 확인 |
 | 환경 비교 레벨 | 초원·숲·사막·얼음·여름 계열 12맵 생성·navigation 저장·독립 재로드 정적 검사 통과. 배치 메시 3,240개를 맵별 ISM 9~17개 그룹으로 구성. 사용자 화면·입력·성능 확인은 [TODO 11절](Docs/TODO.md#11-환경-비교-레벨-확인) |
 | 몬스터 콘텐츠 | 오크·트롤·늑대인간·골렘·늑대·곰·멧돼지·거미·악어·두꺼비와 설원 늑대/곰 재질 변형의 12개 Blueprint 작성·저장·독립 재로드 정적 검사 통과. 기본 편성은 오크·트롤·늑대·골렘, 기존 검 적은 디버그 13번째 항목으로 보존. 실제 플레이는 [TODO 12절](Docs/TODO.md#12-몬스터-콘텐츠-확인)에서 사용자 확인. [구성 기준](Docs/PROJECT_PLAN.md#4-5-몬스터-콘텐츠) |
