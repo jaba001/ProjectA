@@ -131,8 +131,8 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "UnitBase")
     int32 UnitIndex = 0;
 
-    // Current dexterity gives one point of round initiative per point; movement speeds remain separate.
-    // 현재 민첩 1당 라운드 시작 속도 1을 사용하며 이동 속도는 별도로 지정합니다.
+    // Read the current GAS speed for round initiative and melee approach timing.
+    // 라운드 시작 순서와 근접 접근 시간에 사용할 현재 GAS 속도를 읽습니다.
     UFUNCTION(BlueprintPure, Category = "UnitBase|Round")
     float GetCombatSpeed() const;
 
@@ -464,7 +464,7 @@ public:
     bool ConfigureMoveRange(int32 InMoveRange);
     // Apply resolved profession data before the spawned unit enters combat.
     // 스폰 유닛이 전투에 들어가기 전에 해석된 직업 데이터를 적용합니다.
-    bool ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Strength = 10.0f, float Dexterity = 10.0f, float Intelligence = 10.0f);
+    bool ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Speed = 10.0f);
 private:
     friend class ACombatRoundCoordinator;
     // The coordinator validates debug access and the complete catalog before replacing this loadout.

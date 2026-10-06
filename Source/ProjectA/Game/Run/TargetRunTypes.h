@@ -21,9 +21,33 @@ struct PROJECTA_API FTargetRunGroup
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     float MaxHPGrowth = 5.0f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    float AttributeGrowth = 1.0f;
+    float SpeedGrowth = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TArray<int32> GoldChoices;
+
+    void PostSerialize(const FArchive& Ar)
+    {
+        if (Ar.IsLoading() && AttributeGrowth_DEPRECATED != -MAX_flt)
+        {
+            SpeedGrowth = AttributeGrowth_DEPRECATED;
+            AttributeGrowth_DEPRECATED = -MAX_flt;
+        }
+    }
+
+private:
+    // Carry only the former dexterity growth into speed while preserving the frozen Run table.
+    // Run에 고정된 표를 유지하며 기존 공통 성장 중 민첩 성장분만 속도로 이관합니다.
+    UPROPERTY(SaveGame)
+    float AttributeGrowth_DEPRECATED = -MAX_flt;
+};
+
+template<>
+struct TStructOpsTypeTraits<FTargetRunGroup> : public TStructOpsTypeTraitsBase2<FTargetRunGroup>
+{
+    enum
+    {
+        WithPostSerialize = true
+    };
 };
 
 // Freeze the trial table and chosen encounters in the Run, independent of external sample saves.

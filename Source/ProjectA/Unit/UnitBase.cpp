@@ -62,8 +62,8 @@ UAbilitySystemComponent* AUnitBase::GetAbilitySystemComponent() const
 
 float AUnitBase::GetCombatSpeed() const
 {
-    const float Dexterity = AttributeSet ? AttributeSet->GetDexterity() : 0.0f;
-    return FMath::IsFinite(Dexterity) ? FMath::Max(0.0f, Dexterity) : 0.0f;
+    const float Speed = AttributeSet ? AttributeSet->GetSpeed() : 0.0f;
+    return FMath::IsFinite(Speed) ? FMath::Max(0.0f, Speed) : 0.0f;
 }
 
 void AUnitBase::BeginPlay()
@@ -573,13 +573,13 @@ USkillDefinitionDataAsset* AUnitBase::FindSkillDataByAbilityClass(TSubclassOf<UG
     return nullptr;
 }
 
-bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Strength, float Dexterity, float Intelligence)
+bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Speed)
 {
     if (!HasAuthority() || IsBusy() || IsActiveTurn() || !AbilitySystem || !AttributeSet || !UnitDataRules::IsValidMaxHP(MaxHP) || !UnitDataRules::IsValidActionPoints(AP, SubAP))
     {
         return false;
     }
-    if (!UnitDataRules::IsValidAttributes(Strength, Dexterity, Intelligence))
+    if (!UnitDataRules::IsValidSpeed(Speed))
     {
         return false;
     }
@@ -603,9 +603,7 @@ bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TA
     AbilitySystem->ClearAllAbilities();
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetMaxHPAttribute(), MaxHP);
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), MaxHP);
-    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetStrengthAttribute(), Strength);
-    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), Dexterity);
-    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetIntelligenceAttribute(), Intelligence);
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), Speed);
     RefreshSkillPresentation();
     return true;
 }

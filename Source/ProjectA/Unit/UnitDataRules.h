@@ -16,7 +16,7 @@ namespace UnitDataRules
     PROJECTA_API bool IsValidMaxHP(float MaxHP);
     PROJECTA_API bool IsValidHealth(float MaxHP, float CurrentHP);
     PROJECTA_API bool IsValidAttribute(float Value);
-    PROJECTA_API bool IsValidAttributes(float Strength, float Dexterity, float Intelligence);
+    PROJECTA_API bool IsValidSpeed(float Speed);
     PROJECTA_API bool IsValidActionPoints(int32 AP, int32 SubAP);
     PROJECTA_API bool IsValidMoveRange(int32 MoveRange);
     PROJECTA_API bool IsValidSkillCount(int32 Count, bool bRequireSkill);

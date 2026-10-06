@@ -4,7 +4,7 @@
 #include "Profession/ArcherProfession.h"
 #include "Profession/RogueProfession.h"
 
-UProfessionBase::UProfessionBase() : MaxHP(100.0f), Strength(10.0f), Dexterity(10.0f), Intelligence(10.0f)
+UProfessionBase::UProfessionBase() : MaxHP(100.0f), Speed(10.0f)
 {
 }
 

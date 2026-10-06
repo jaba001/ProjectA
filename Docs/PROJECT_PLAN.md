@@ -85,7 +85,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 `ChangeEquipment`는 상점 단계·신뢰 소유자·생존 Human·아이템 인덱스·Revision과 원본 메시를 검증하고 저장 후보를 원자 반영한다. 실패하면 파티·Revision·원본 파일·상태 알림을 유지한다. `CharacterEquipmentComponent`는 선택 몸체의 소켓에 원본 Static/Skeletal Mesh를 붙이며 명시 장비 상태의 기존 스킬 검 표시는 숨긴다. 검 스킬의 기존 판정 컴포넌트·GAS·스킬·능력치는 유지한다. 손잡이 위치·회전·배율은 프로필의 에셋별 `Attachments.RelativeTransform`으로 조정한다.
 
-이전 저장의 누락된 장비 상태는 과거 스킬 외형을 유지하며 첫 명시 장착부터 새 상태를 적용한다. 시작 아이템을 재지급하거나 저장 카탈로그를 바꾸지 않는다. 비무기 슬롯 콘텐츠·나머지 240개 분류·능력치/부여 스킬·Snapshot `EquipmentIds` 연결은 후속 기획 대상이다. 아이템·장비 조작과 새 에셋 부착 재생은 사용자 지시로 이번 실행에서 제외했다. [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
+이전 저장의 누락된 장비 상태는 과거 스킬 외형을 유지하며 첫 명시 장착부터 새 상태를 적용한다. 시작 아이템을 재지급하거나 저장 카탈로그를 바꾸지 않는다. 비무기 슬롯 콘텐츠·나머지 240개 분류·속도 보정/부여 스킬·Snapshot `EquipmentIds` 연결은 후속 기획 대상이다. 아이템·장비 조작과 새 에셋 부착 재생은 사용자 지시로 이번 실행에서 제외했다. [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
 ### 3-2 상점 인카운터
 
@@ -148,10 +148,10 @@ CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한�
 - `CombatClass`가 없으면 기존 `PlayerUnitClasses`와 명시적인 `FallbackPlayerUnitClass`를 사용한다. 전사 `BP_WarriorUnit`·마법사 `BP_MageUnit`·도적 `BP_RogueUnit`·궁수 `BP_PlayerUnit`은 공통 외형 카탈로그의 Primitive 남자·여자 몸체를 사용한다. Blueprint의 이전 기본 스킬과 별개로 새 Run은 비무장 스킬만 시작한다.
 - 외형은 `FCharacterAppearanceSelection.BodyId`로 선택하고 기존 appearance 구조를 통해 Run·Snapshot·체크포인트·복제에 전달한다. `UCharacterAppearanceCatalog.BodyVariants` 배열의 원본 메시를 공통 `UCharacterAppearanceComponent`가 적용하며 기존 저장에 `BodyId`가 없으면 남자 기본값을 사용한다. ROG 의상 UI·착용은 중지하고 `ItemIds`·103개 항목·원본 에셋은 향후 아이템용으로 보존한다. 마법사 Blueprint의 고정 스태프 표시는 제거하고 실제 시작 장비로 표시한다. 기존 `LegacyEnemyClasses` 체크포인트 호환·래그돌을 유지하며 장비 능력치 연결과 개발용 협동 로비의 캐릭터 생성 UI는 이번 범위에 포함하지 않는다.
 - 수정하지 않은 이름은 직업 표시명과 슬롯 번호를 사용한다. 개별 이름 변경은 `SetSlotCharacterName`으로 반영한다.
-- 네 직업의 현재 시작값은 HP 100·힘/민첩/지능 각 10이다. 첫 스폰은 직업 정의의 HP와 능력치를 사용하고 이후 전투는 저장한 결과 HP를 유지한다. HP 0인 멤버는 다음 전투에 스폰하지 않는다. 목표 Run은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 시험 성장을 공통 직업 해석에 적용하며 최종 밸런스·피해 보정 공식은 별도다.
-- 전투 속도는 현재 GAS 민첩과 1:1이다. 기본 아군 속도는 10이며 일반 `AEnemyUnit`의 시작 힘/민첩/지능은 각각 5·속도 5다. 일반 적 HP 150·AP 2는 유지하고 Snapshot 적은 스폰 후 저장된 세 능력치로 설정한다.
+- 네 직업의 현재 시작값은 HP 100·속도 10이다. 첫 스폰은 직업 정의의 HP와 속도를 사용하고 이후 전투는 저장한 결과 HP를 유지한다. HP 0인 멤버는 다음 전투에 스폰하지 않는다. 목표 Run은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 시험 성장을 공통 직업 해석에 적용하며 최종 밸런스·피해 보정 공식은 별도다.
+- 전투 속도는 GAS `Speed`를 직접 사용한다. 기본 아군 속도는 10, 일반 `AEnemyUnit`은 5다. 일반 적 HP 150·AP 2는 유지하고 Snapshot 적은 스폰 후 저장된 속도를 적용한다. 힘·민첩·지능은 실행 속성에서 제거했다.
 
-`UPartyDefinitionDataAsset::IsDataValid`는 Unreal Data Validation에서 동일한 `ResolveProfession` 검사를 사용한다. 에셋 경로·직업 ID와 함께 누락 또는 Abstract/Deprecated 클래스, 유효하지 않은 HP/AP와 힘·민첩·지능, 빈·누락·중복 시작 스킬과 잘못된 라운드 프로필을 보고한다. 전투 Actor의 `CombatClass` → `PlayerUnitClasses` → 명시 fallback 순서를 유지한다. 직업 정의용 `ProfessionClass`는 별도로 필수이며 목록의 ClassId와 일치해야 한다. 실제 선택된 전투 클래스만 검사하며 잘못된 명시 클래스를 fallback으로 대체하지 않는다. 제작 파티 에셋을 Content Browser에서 선택해 **Validate Assets**로 사전 확인할 수 있으며, 전투 실행 검증과 구분한다.
+`UPartyDefinitionDataAsset::IsDataValid`는 Unreal Data Validation에서 동일한 `ResolveProfession` 검사를 사용한다. 에셋 경로·직업 ID와 함께 누락 또는 Abstract/Deprecated 클래스, 유효하지 않은 HP/AP와 속도, 빈·누락·중복 시작 스킬과 잘못된 라운드 프로필을 보고한다. 전투 Actor의 `CombatClass` → `PlayerUnitClasses` → 명시 fallback 순서를 유지한다. 직업 정의용 `ProfessionClass`는 별도로 필수이며 목록의 ClassId와 일치해야 한다. 실제 선택된 전투 클래스만 검사하며 잘못된 명시 클래스를 fallback으로 대체하지 않는다. 제작 파티 에셋을 Content Browser에서 선택해 **Validate Assets**로 사전 확인할 수 있으며, 전투 실행 검증과 구분한다.
 
 ### 3-4 행동과 결과
 
@@ -159,11 +159,11 @@ CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한�
 
 준비 취소의 지도 저장이 실패하면 `AEncounterManager`가 취소 대기와 원래 준비 오류를 보존한다. `URunStateSubsystem::AbortEncounter`는 일반·관리 Run 모두 저장 실패 시 기존 단계·노드를 복구한다. Host의 기존 **저장 다시 시도**로 취소를 반복하며 저장 성공 후 Map으로 돌아간다. 저장 중 동기 Map 통지와 취소 대기 중 새 노드 시작·중복 스폰은 허용하지 않는다. 화면의 전투 입력은 Combat 단계뿐 아니라 실제 전투 활성 상태도 요구한다. 로컬·복제 표시 모두 준비·저장 오류를 중복 없이 함께 유지한다. 이전 실행 결과는 [완료 이력](HISTORY.md#9-3-전투-준비-취소와-저장-실패), Ready 값 데이터 검사와 Actor 재구성 제외 범위는 [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)를 따른다.
 
-`ACombatRoundCoordinator`가 계획·준비·잠금·해결을 관리한다. 서버가 Planning 진입 시 양 팀 생존자의 `GetCombatSpeed()`로 현재 GAS 민첩을 읽어 속도·시작 지연을 고정하며 라운드마다 AP/SubAP를 초기화한다. 복제용 `RoundView.Speed`는 float로 소수 값을 유지한다. 서버가 명령의 소유권·전투 ID·라운드·수정 번호·부여 스킬·자원·대상·최종 배치를 검증한다. 이동 SAP 1과 공격 SubAP 비용을 합산하고 준비 완료 상태 저장 성공 뒤 Ready Phase 종료 시 AP/SAP를 즉시 한 번 차감한다. 이후 불발·실패·사망에도 환불하지 않는다. 예약·변경·취소와 저장 실패는 비용을 차감하지 않는다.
+`ACombatRoundCoordinator`가 계획·준비·잠금·해결을 관리한다. 서버가 Planning 진입 시 양 팀 생존자의 `GetCombatSpeed()`로 현재 GAS `Speed`를 읽어 속도·시작 지연을 고정하며 라운드마다 AP/SubAP를 초기화한다. 복제용 `RoundView.Speed`는 float로 소수 값을 유지한다. 서버가 명령의 소유권·전투 ID·라운드·수정 번호·부여 스킬·자원·대상·최종 배치를 검증한다. 이동 SAP 1과 공격 SubAP 비용을 합산하고 준비 완료 상태 저장 성공 뒤 Ready Phase 종료 시 AP/SAP를 즉시 한 번 차감한다. 이후 불발·실패·사망에도 환불하지 않는다. 예약·변경·취소와 저장 실패는 비용을 차감하지 않는다.
 
 계획·이동 예약을 수정한 소유자의 준비만 해제하며 다른 팀원의 준비는 유지한다. `SkillId == NAME_None`은 인간·AI 공통 내부 대기로 처리하며 별도 스킬을 부여하지 않는다. 스킬 미선택 Ready도 기존 schema 3의 계획·준비 상태로 저장·복구한다. 첫 라운드·다음 라운드 Planning과 준비 완료·수정·취소는 복구 상태를 먼저 저장한 뒤 공개한다. 저장 실패 시 기존 준비·계획·파일을 보존하고 전투 시작을 확정하지 않는다. 저장된 Ready 경계는 비용 차감 전 상태이며 복구 후 정상 잠금 경로에서 비용을 한 번 차감한다.
 
-근접 접근·복귀는 DA `MoveSpeed`와 Planning에 고정한 `RoundView.Speed`로 [초기 속도 튜닝](GAME_DESIGN.md#8-4-공격-접근과-복귀)을 적용한다. 실행 중 민첩 변경은 다음 라운드부터 반영한다. 비근접 시전·이동과 투사체의 민첩 연동은 보류하며 투사체 공통 비행 감속은 [4-1절](#4-1-스킬-이펙트-에셋-목록)을 따른다. SAP 이동은 아래의 고정 속도를 사용한다.
+근접 접근·복귀는 DA `MoveSpeed`와 Planning에 고정한 `RoundView.Speed`로 [초기 속도 튜닝](GAME_DESIGN.md#8-4-공격-접근과-복귀)을 적용한다. 실행 중 속도 변경은 다음 라운드부터 반영한다. 비근접 시전·이동과 투사체의 속도 스탯 연동은 보류하며 투사체 공통 비행 감속은 [4-1절](#4-1-스킬-이펙트-에셋-목록)을 따른다. SAP 이동은 아래의 고정 속도를 사용한다.
 
 `CanPlanCommand`는 Planning 단계에서 서버의 `ValidateCommand`와 같은 명령 조건을 검사한다. UI는 적용 전 AP/SubAP·타일·대상을 검사하고, 자신에게 인간 조작이 허용된 모든 생존 유닛에 적용된 계획이 유효한지 확인한 뒤 준비 요청을 허용한다. 이 사전 검사는 소유권·수정 번호·관리 lease·최종 목적지 예약 충돌에 대한 서버 검증을 대체하지 않는다.
 
@@ -171,7 +171,7 @@ CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한�
 
 UnitBase의 기존 순차 이동/행동 수명·유닛 체크포인트 capture/restore와 UnitAIController의 경로 완료 루프는 제거했다. Coordinator의 `CanMoveUnit → SubmitMove`는 SAP 이동 예약·변경이며 `CancelMove`는 예약 취소다. 캐릭터별 목적지 하나를 복제하고 예약 단계에서는 위치·자원을 유지한다. 기존 8방향 BFS·MoveRange·빈 아군 칸 조건과 다른 출발/예약 칸 중복 금지를 유지한다. 복귀형 공격의 임시 타일 접근 목적지도 예약에 포함한다. 잠금 후 서버가 모든 예약 SAP 이동을 처리하고, 도착 위치·방향을 AP 행동의 새 복귀점으로 저장한 뒤 AP 시간차 실행을 시작한다. AP 시계는 SAP 단계 뒤 0초부터 시작한다. 실행 중 입력을 막고 실패·중단 시 생존자를 출발점으로 복원하며 잠금 시 차감한 자원은 환불하지 않는다.
 
-SAP 이동은 Coordinator의 `SAPMoveSpeed=350cm/s`를 사용하며 민첩·`RoundView.Speed`·CharacterMovement의 `MaxWalkSpeed`와 무관하다. 예약·비용·경로·실행 순서는 유지한다.
+SAP 이동은 Coordinator의 `SAPMoveSpeed=350cm/s`를 사용하며 `RoundView.Speed`·CharacterMovement의 `MaxWalkSpeed`와 무관하다. 예약·비용·경로·실행 순서는 유지한다.
 
 `AUnitBase`의 기본 CharacterMovement는 `UUnitCharacterMovementComponent`를 사용한다. 조정자의 수동 이동이 SAP·접근·복귀에서 속도와 보행용 가속도를 함께 공급하고 정지·시전·중단·사망에서 초기화한다. 기존 `ABP_Unarmed`의 속도/가속도 조건을 유지하며, 클라이언트 `MOVE_None`의 생략된 가속도 갱신은 기존 복제 속도로 보완한다. 엔진 보간과 서버 위치 권위는 유지한다. 이전 싱글·2/4인 실행 결과는 [완료 이력](HISTORY.md#9-11-전장-대상-선택과-sap-이동-예약), 현행 진행용 fixture의 범위는 [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)를 따른다.
 
@@ -399,7 +399,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 
 | 항목 | 현재 규칙 |
 |---|---|
-| 직업 편집 | Edit에서 이름 1~32자·직업 편집. 저장 시 적용, 취소 시 기존 값 유지. ClassInfo는 HP·힘/민첩/지능·민첩에서 구한 전투 속도·AP/SubAP·시작 스킬 표시 |
+| 직업 편집 | Edit에서 이름 1~32자·직업 편집. 저장 시 적용, 취소 시 기존 값 유지. ClassInfo는 HP·속도·AP/SubAP·시작 스킬 표시 |
 | 직업 데이터 | `bUseUnitClassDefaults`의 능력치/AP 해석과 CombatClass fallback 유지. 새 Run은 `UnarmedStartingSkill`을 사용하고 다음 전투는 파티에 저장된 습득 목록을 사용. 명시 스킬 목록이 없는 기존 저장만 과거 직업 기본값 해석 유지. 미지원 직업·잘못된 수치·중복 스킬 ID 거절 |
 | 회복약 | 기존 즉시 회복 프로퍼티는 호환용이며 이전 HUD 실행은 제거 상태 유지. 새 목표 Run만 태그 기반 GAS 소모 행동·별도 재고를 사용하며 수치·저장 경계는 [5-1절](#5-1-목표-run과-회복-시험-데이터) 적용 |
 | 추가 스킬 | 전투 진입 시 EncounterSkillPool 자동 추첨·장착 제거. 실제 시작/명시 장착 DA만 사용하며 장착 최대 5개·계획/해결 중 변경 거절 유지. 기존 풀 에셋과 명시 획득 API는 보존 |
@@ -430,7 +430,7 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 
 ### 4-12 타겟·행동 세부 규칙
 
-- `GetCombatSpeed()`는 현재 GAS 민첩을 그대로 사용하며 독립 `CombatSpeed=20` 값은 제거했다. 시작 지연은 `(최고 속도 − 해당 속도) × 0.1초`이고 기본 아군 10·일반 적 5에서는 적이 0.5초 늦게 시작한다. Planning에서 고정한 속도는 근접 접근·복귀에도 적용한다. [이전 검증](HISTORY.md#9-9-민첩-기반-전투-속도)
+- `GetCombatSpeed()`는 현재 GAS `Speed`를 직접 사용한다. 시작 지연은 `(최고 속도 − 해당 속도) × 0.1초`이고 기본 아군 10·일반 적 5에서는 적이 0.5초 늦게 시작한다. Planning에서 고정한 속도는 근접 접근·복귀에도 적용한다. [이전 검증](HISTORY.md#9-9-민첩-기반-전투-속도)
 - 현재 검·비무장은 `Approach=Unit`으로 대상 Actor의 현재 월드 위치를 추적하며 타일은 배치·복귀 기준이다. 접근 범위에 들어오면 즉시 `Casting`으로 전환하고 검의 접근 거리 105cm보다 가까워도 간격을 맞추려고 후퇴하지 않는다. 상호 접근·시전 전환의 화면 품질은 2026-10-01 자동화 범위에 포함되지 않았다. [검증 범위](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 - 현재 사용자 스킬은 두 기본 공격·신규 VFX 60종이며 몬스터 전용 공격 12개도 유지한다. 새 Run의 상점은 근접 공격·신규 60종의 61후보이고 개발용 일반 카탈로그는 유효 DA 74종이다. 새 목표 Run의 회복 DA 1개는 `Item.Consumable` 태그로 이 일반 목록과 분리한다. 범위·투사체 공통 C++·GAS·FX와 `RoundDefinition.bUseMeleeAreaCollision`·`MeleeAreaHalfExtent`, 타일 기반 `TargetAndSides` 계산·타일 범위 라이브러리는 신규 스킬 도입을 위한 기능으로 보존한다.
 - `SkillDefinitionDataAsset.bUseRoundDefinition`과 `RoundDefinition`으로 스킬별 실제 시간·범위·접근·복귀·투사체 정책을 편집한다. 근접·투사체의 발동 전 대상 사망은 가장 가까운 유효 생존 적 재선택으로 공통 해석한다. 공격자의 현재 위치로 거리를 계산하고 `IsValidUnitTarget` 조건을 재사용하며, 유닛 접근형은 접근·미발동 시전·칼날 궤적을 다시 시작한다. 후보가 없으면 불발 후 복귀하고 추가 비용은 차감하지 않는다. 지점 공격·발사 후 투사체·기존 저장 프로필 값은 유지한다. 미지정 장착 스킬은 [GAME_DESIGN 8-7](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)의 초기 변환을 사용한다.
@@ -456,7 +456,7 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 
 `UTargetRunDefinitionDataAsset`의 기본 정의 또는 PartyDefinition의 선택적 정의를 새 싱글 Run 생성 때 값으로 고정한다. `FRunTargetState` schema 1은 10묶음의 적 편성·로컬 Snapshot·성장·골드 후보·인카운터 선택과 회복 규칙을 보존한다. 각 전투 전에 후보 3개 중 하나를 고르는 인카운터를 세 번 방문한다. 지원 태그와 `GameplayTagQuery`로 적격 후보를 정하고 개발 시험은 고정 순환으로 제시한다.
 
-기본 후보는 스킬상점·아이템상점·회복소·소모품상점·부활소다. PvE 적은 기존 10종에서 묶음별 1~4마리로 지정하며, 최대 HP +5와 힘·민첩·지능 각각 +1은 PvE 승리마다 적용한다. 현재 HP를 자동 회복하지 않으며 Snapshot은 성장·골드를 지급하지 않는다. 묶음 i(0~9)의 PvE 골드 후보는 5+i·7+i·10+i다. 최종 난이도와 구분한 사용자 위임 시험값이다.
+기본 후보는 스킬상점·아이템상점·회복소·소모품상점·부활소다. PvE 적은 기존 10종에서 묶음별 1~4마리로 지정하며, 최대 HP +5와 속도 +1은 PvE 승리마다 적용한다. 현재 HP를 자동 회복하지 않으며 Snapshot은 성장·골드를 지급하지 않는다. 묶음 i(0~9)의 PvE 골드 후보는 5+i·7+i·10+i다. 최종 난이도와 구분한 사용자 위임 시험값이다.
 
 회복 소모품은 정식 `DA_HealthPotion`의 GAS Instant Heal과 `Item.Consumable.Healing` 태그를 사용한다. HP 25/AP 1, 시작 1개·추가 구입 1G이며 습득 스킬 5칸과 별도로 보관한다. 일반 스킬 카탈로그·장착·Snapshot 스킬 필드는 `Item.Consumable` 태그를 거절하고 소모품 재고만 정식 DA 경로를 보존한다. 본인 생존 Human의 부상 상태에서만 사용할 수 있고 실제 회복 발동 성공 후 수량 1개를 차감한다. 발동 전 사망·중단은 수량을 소모하지 않는다. 비용 차감 전 Ready 경계에 HP/AP·재고·정식 DA·명령을 함께 저장하며 복구 시 해당 경계부터 다시 실행한다. HP·재고는 다음 준비 완료 또는 결과 경계에서 함께 저장하고 진행 중 임의 시점 저장은 추가하지 않는다.
 
@@ -484,9 +484,9 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 
 현재 메뉴 항복은 별도 정책 선택 응답이 없어 기존 자율 진행 위임 범위에서 **확인 후 현재 일반 싱글 Run의 저장을 포기하는 기본안**으로 적용했다. 유효한 Standalone Continue 대상만 허용하고 확인창을 연 시점의 저장과 실제 삭제 직전의 슬롯·내용이 일치해야 한다. 취소는 무변경이며 삭제 실패는 파일·메모리를 보존하고 재시도한다. 성공 후 해당 슬롯과 현재 Run 메모리를 정리하여 이어하기를 비활성화한다. 지원하지 않는 협동·관리·계정 제공자 저장, 완료/패배 저장, 이전 Combat 저장을 이 버튼으로 삭제하지 않는다. 패배 결과 보존·랭크 반영 정책은 추가하지 않았다. [이전 검증](HISTORY.md#9-8-시작-모드-선택과-싱글-여정-항복)
 
-현재 네 직업 외의 이전 테스트 ClassId는 파티 해석에서 거절하며 Continue 오류에 해당 ID와 원인을 표시한다. 저장 원본과 현재 Run은 유지하고 새 직업으로 자동 대응하지 않는다. Snapshot 카탈로그도 새 ClassId 4개만 허용하며 힘·민첩·지능은 Snapshot 값 데이터와 GAS 속성으로 전달한다. DA 폴더의 PackageRedirect는 객체 경로만 연결하므로 구직업 저장을 수용하는 근거가 아니다. [직업 기준](GAME_DESIGN.md#6-2-네-직업과-공통-시작-능력치)
+현재 네 직업 외의 이전 테스트 ClassId는 파티 해석에서 거절하며 Continue 오류에 해당 ID와 원인을 표시한다. 저장 원본과 현재 Run은 유지하고 새 직업으로 자동 대응하지 않는다. Snapshot 카탈로그도 새 ClassId 4개만 허용하며 속도는 Snapshot 값 데이터와 GAS `Speed` 속성으로 전달한다. DA 폴더의 PackageRedirect는 객체 경로만 연결하므로 구직업 저장을 수용하는 근거가 아니다. [직업 기준](GAME_DESIGN.md#6-2-네-직업과-공통-시작-능력치)
 
-Snapshot 적의 전투 속도는 전달된 민첩을 사용한다. 저장/복구 경로에 별도 속도 필드를 만들지 않으며 소수 민첩을 일반 적 기본값 5나 이전 독립 속도 20으로 대체하지 않는다.
+Snapshot·체크포인트는 `Speed`, 목표 Run 성장 데이터는 `SpeedGrowth`를 저장한다. 이전 `Dexterity`·`AttributeGrowth`는 같은 값의 속도·속도 성장으로 이관하고 구 힘·지능은 실행에 사용하지 않는다. 소수 속도와 진행 중 Run의 기존 성장을 유지하며 기존 저장 파일을 일괄 재작성하지 않는다.
 
 ## 6 Gameplay 에셋과 배치
 
@@ -585,7 +585,7 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 
 ## 8 현재 한계와 보존 대상
 
-- 새 싱글의 PvE/로컬 Snapshot 20전투·60선택과 시험 편성·성장·보상·회복/부활·전투 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 구현 범위다. 기존 2/10전투 저장과 개발 협동 10전투 경로는 보존한다. 직업별 고유 스킬·최종 밸런스·나머지 240종 장비 분류·추가 비무기 콘텐츠·장비 능력치/부여 스킬·Snapshot 장비 연결은 미구현이며 실행 검수 결과는 [TODO](TODO.md)를 따른다.
+- 새 싱글의 PvE/로컬 Snapshot 20전투·60선택과 시험 편성·성장·보상·회복/부활·전투 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 구현 범위다. 기존 2/10전투 저장과 개발 협동 10전투 경로는 보존한다. 직업별 고유 스킬·최종 밸런스·나머지 240종 장비 분류·추가 비무기 콘텐츠·장비 속도 보정/부여 스킬·Snapshot 장비 연결은 미구현이며 실행 검수 결과는 [TODO](TODO.md)를 따른다.
 - 4×4 Grid·ASC HP/AP·기존 외형/사망 표현과 시전 몽타주를 연결한다. 순차 턴·AI·기존 GAS/몽타주 알림의 효과 실행은 기본 전투에서 제외하며 장착 스킬은 초기 라운드 변환을 사용한다. 미지원 이전 대상/범위/커스텀 능력은 명시 프로필을 요구하며 자동으로 다른 효과로 바꾸지 않는다. Streaming/Level Instance는 현재 흐름에 없다.
 - 2026-09-11부터 작업 폴더에서 삭제된 TestMap·BP_PartyPlayerController·TestGameModebase의 삭제 이력을 2026-09-16 Git에 반영한다. 자동 복원하지 않으며 최초 생성 도구의 TestMap 입력은 별도 원본 확보가 필요하다. 현재 Audit 도구는 실제 역할 3맵(MainMenu·Gameplay·DebugCombat)을 새 경로로 검사한다. WorldMap 레벨은 기존 사용자 변경으로 삭제했으며 native class는 deprecated 호환 상태로 유지한다.
 - 삭제 전 WorldMap의 WorldSettings가 참조하던 WorldMapGameModeBase는 호환을 위해 보존한다.

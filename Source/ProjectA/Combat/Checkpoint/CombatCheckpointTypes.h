@@ -51,16 +51,10 @@ struct PROJECTA_API FCombatCheckpointUnit
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     float MaxHP = 100.0f;
 
-    // Older serialized checkpoints receive the original baseline for newly added primary stats.
-    // 기존 직렬화 체크포인트는 새로 추가된 기본 능력치에 최초 기준값을 사용합니다.
+    // Checkpoints predating primary stats retain the original speed baseline.
+    // 기본 능력치 도입 이전 체크포인트는 기존 속도 기준값을 유지합니다.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
-    float Strength = 10.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
-    float Dexterity = 10.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
-    float Intelligence = 10.0f;
+    float Speed = 10.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     int32 AP = 0;
@@ -103,6 +97,30 @@ struct PROJECTA_API FCombatCheckpointUnit
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     FSoftObjectPath DefaultAttackAbility;
+
+    void PostSerialize(const FArchive& Ar)
+    {
+        if (Ar.IsLoading() && Dexterity_DEPRECATED != -MAX_flt)
+        {
+            Speed = Dexterity_DEPRECATED;
+            Dexterity_DEPRECATED = -MAX_flt;
+        }
+    }
+
+private:
+    // Preserve old checkpoint speed without serializing retired stats into new saves.
+    // 기존 체크포인트의 속도를 보존하며 새 저장에는 폐기된 능력치를 기록하지 않습니다.
+    UPROPERTY(SaveGame)
+    float Dexterity_DEPRECATED = -MAX_flt;
+};
+
+template<>
+struct TStructOpsTypeTraits<FCombatCheckpointUnit> : public TStructOpsTypeTraitsBase2<FCombatCheckpointUnit>
+{
+    enum
+    {
+        WithPostSerialize = true
+    };
 };
 
 // Commands reference round-local identifiers instead of live actors or network authority tokens.

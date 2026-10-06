@@ -18,6 +18,7 @@
 #include "Unit/EnemyUnit.h"
 #include "Unit/PlayerUnit.h"
 #include "UObject/StrongObjectPtr.h"
+#include <limits>
 
 namespace
 {
@@ -69,6 +70,7 @@ namespace
             Player.CharacterName = Run->GetPartyMembers()[0].CharacterName;
             Player.HP = 73.0f;
             Player.MaxHP = FMath::Max(100.0f, Profession.MaxHP);
+            Player.Speed = 21.25f;
             Player.MaxAP = Profession.ActionPoints;
             Player.AP = 0;
             Player.MaxSubAP = Profession.SubActionPoints;
@@ -92,6 +94,7 @@ namespace
             Enemy.UnitClass = FSoftObjectPath(AEnemyUnit::StaticClass());
             Enemy.CharacterName = FText::FromString(TEXT("Checkpoint Enemy"));
             Enemy.HP = 42.0f;
+            Enemy.Speed = 5.25f;
             Enemy.GridCoord = FIntPoint(1, 2);
             Enemy.Transform = FTransform(FRotator(0.0f, -90.0f, 0.0f), FVector(-200.0f, 400.0f, 98.15f));
             Enemy.HealingItemCount = 0;
@@ -218,6 +221,11 @@ bool FCombatCheckpointValueTest::RunTest(const FString& Parameters)
     Reject(TEXT("AP above its maximum is rejected"));
     Invalid.Units[0].HP = -1.0f;
     Reject(TEXT("Uninitialized or negative battle HP is rejected"));
+    for (float InvalidSpeed : {-1.0f, 1000001.0f, std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity()})
+    {
+        Invalid.Units[0].Speed = InvalidSpeed;
+        Reject(TEXT("Invalid checkpoint speed is rejected before restoration"));
+    }
     Invalid.Units[0].bDead = true;
     Reject(TEXT("Death must agree with zero HP"));
     const FSoftObjectPath DuplicateSkill = Invalid.Units[0].Skills[0];
@@ -266,6 +274,7 @@ bool FCombatCheckpointRoundTripTest::RunTest(const FString& Parameters)
     Enemy.UnitClass = FSoftObjectPath(ClassEntry.Value().Get());
     Enemy.CharacterName = FText::FromString(Opponent.CharacterName);
     Enemy.MaxHP = Opponent.Stats.MaxHP;
+    Enemy.Speed = Opponent.Stats.Speed;
     Enemy.MaxAP = Opponent.Stats.MaxActionPoints;
     Enemy.MaxSubAP = Opponent.Stats.MaxSubActionPoints;
     Enemy.MoveRange = Opponent.Stats.MoveRange;
@@ -275,6 +284,9 @@ bool FCombatCheckpointRoundTripTest::RunTest(const FString& Parameters)
     MismatchedOpponent.Units[1].MaxHP += 1.0f;
     TestFalse(TEXT("Frozen opponent maximum stats cannot diverge from the Snapshot"), UCombatCheckpointLibrary::Validate(MismatchedOpponent, Fixture.Run->GetPartyMembers(), Error));
     TestFalse(TEXT("Frozen build mismatch explains why"), Error.IsEmpty());
+    MismatchedOpponent = Checkpoint;
+    MismatchedOpponent.Units[1].Speed += 0.25f;
+    TestFalse(TEXT("Frozen opponent speed cannot diverge from its Snapshot"), UCombatCheckpointLibrary::Validate(MismatchedOpponent, Fixture.Run->GetPartyMembers(), Error));
     MismatchedOpponent = Checkpoint;
     MismatchedOpponent.Units[1].MoveRange += 1;
     TestFalse(TEXT("Frozen opponent move range cannot diverge"), UCombatCheckpointLibrary::Validate(MismatchedOpponent, Fixture.Run->GetPartyMembers(), Error));
@@ -293,6 +305,7 @@ bool FCombatCheckpointRoundTripTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Native serialization still reads retired data without executing it"), Disk.IsValid())) return false;
     TestEqual(TEXT("Historical bytes retain version three"), Disk->Version, 3);
     TestTrue(TEXT("Native serialization preserves the frozen opponent and original Host"), SameCheckpoint(Disk->CombatCheckpoint, Checkpoint) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Disk->Identity, &Checkpoint.Identity, 0));
+    TestEqual(TEXT("Checkpoint serialization preserves fractional player speed"), Disk->CombatCheckpoint.Units[0].Speed, 21.25f);
     TestFalse(TEXT("General Continue rejects retired sequential combat"), Fixture.Run->CanContinueSavedRun(Error));
     TestTrue(TEXT("The rejection identifies the retired combat contract"), Error.ToString().Contains(TEXT("순차 턴")));
     TestFalse(TEXT("Standalone Continue rejects the same payload"), Fixture.Run->CanContinueStandaloneSavedRun(Error));
@@ -737,9 +750,7 @@ bool FCombatRoundCheckpointRemovedSkillTest::RunTest(const FString& Parameters)
         Enemy.CharacterName = FText::FromString(Opponent.CharacterName);
         Opponent.Stats.MaxHP = Enemy.MaxHP;
         Opponent.Stats.CurrentHP = Enemy.HP;
-        Opponent.Stats.Strength = Enemy.Strength;
-        Opponent.Stats.Dexterity = Enemy.Dexterity;
-        Opponent.Stats.Intelligence = Enemy.Intelligence;
+        Opponent.Stats.Speed = Enemy.Speed;
         Opponent.Stats.MaxActionPoints = Enemy.MaxAP;
         Opponent.Stats.MaxSubActionPoints = Enemy.MaxSubAP;
         Opponent.Stats.MoveRange = Enemy.MoveRange;

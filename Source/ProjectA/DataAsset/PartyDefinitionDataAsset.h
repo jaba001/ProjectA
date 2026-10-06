@@ -32,18 +32,14 @@ struct PROJECTA_API FProfessionDefinition
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TObjectPtr<UCharacterAppearanceCatalog> AppearanceCatalog;
-    // Reuse the unit's AP and starting skills with the profession's initial attributes.
-    // 직업의 초기 능력치와 유닛의 AP 및 시작 스킬 기본값을 사용합니다.
+    // Reuse the unit's AP and starting skills with the profession's initial HP and speed.
+    // 직업의 초기 HP·속도와 유닛의 AP 및 시작 스킬 기본값을 사용합니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     bool bUseUnitClassDefaults = true;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1", ClampMax = "1000000"))
     float MaxHP = 100.0f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0", ClampMax = "1000000"))
-    float Strength = 10.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0", ClampMax = "1000000"))
-    float Dexterity = 10.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0", ClampMax = "1000000"))
-    float Intelligence = 10.0f;
+    float Speed = 10.0f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1", ClampMax = "100"))
     int32 ActionPoints = 2;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0", ClampMax = "100"))

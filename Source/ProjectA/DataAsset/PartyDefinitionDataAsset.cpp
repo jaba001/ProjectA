@@ -34,9 +34,7 @@ UPartyDefinitionDataAsset::UPartyDefinitionDataAsset()
         Definition.DisplayName = Profession->DisplayName;
         Definition.Description = Profession->Description;
         Definition.MaxHP = Profession->MaxHP;
-        Definition.Strength = Profession->Strength;
-        Definition.Dexterity = Profession->Dexterity;
-        Definition.Intelligence = Profession->Intelligence;
+        Definition.Speed = Profession->Speed;
     }
 }
 
@@ -94,9 +92,7 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
     if (OutDefinition.bUseUnitClassDefaults)
     {
         OutDefinition.MaxHP = Profession->MaxHP;
-        OutDefinition.Strength = Profession->Strength;
-        OutDefinition.Dexterity = Profession->Dexterity;
-        OutDefinition.Intelligence = Profession->Intelligence;
+        OutDefinition.Speed = Profession->Speed;
         OutDefinition.ActionPoints = Defaults->GetMaxActionPoint();
         OutDefinition.SubActionPoints = Defaults->GetMaxSubActionPoint();
         OutDefinition.StartingSkills = Defaults->GetEquippedSkillDataAssets();
@@ -105,12 +101,9 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
     {
         return Fail(NSLOCTEXT("PartyDefinition", "InvalidHPRange", "Resolved MaxHP must be finite, positive and at most 1000000. / 실제 MaxHP는 1000000 이하의 유한한 양수여야 합니다."));
     }
-    for (float Attribute : {OutDefinition.Strength, OutDefinition.Dexterity, OutDefinition.Intelligence})
+    if (!UnitDataRules::IsValidSpeed(OutDefinition.Speed))
     {
-        if (!UnitDataRules::IsValidAttribute(Attribute))
-        {
-            return Fail(NSLOCTEXT("PartyDefinition", "InvalidAttributes", "Strength, Dexterity and Intelligence must be finite values between 0 and 1000000. / 힘·민첩·지능은 0~1000000 범위의 유한한 값이어야 합니다."));
-        }
+        return Fail(NSLOCTEXT("PartyDefinition", "InvalidSpeed", "Speed must be a finite value between 0 and 1000000. / 속도는 0~1000000 범위의 유한한 값이어야 합니다."));
     }
     if (!UnitDataRules::IsValidActionPoints(OutDefinition.ActionPoints, OutDefinition.SubActionPoints))
     {
@@ -245,6 +238,6 @@ FText UPartyDefinitionDataAsset::GetProfessionDetails(FName ClassId) const
         FCombatRoundSkill Resolved;
         if (Skill->ResolveRoundSkill(Resolved, Error)) Skills += FString::Printf(TEXT("\n• %s (AP %d · 보조 AP %d)"), *Skill->SkillName.ToString(), Resolved.ActionPointCost, Resolved.SubActionPointCost);
     }
-    const FString Dexterity = FText::AsNumber(Definition.Dexterity).ToString();
-    return FText::FromString(FString::Printf(TEXT("%s\n%s\n\nHP %.0f · 힘 %.0f · 민첩 %s · 지능 %.0f\n속도 %s (민첩 1당 1)\nAP %d · 보조 AP %d\n\n시작 스킬%s"), *Definition.DisplayName.ToString(), *Definition.Description.ToString(), Definition.MaxHP, Definition.Strength, *Dexterity, Definition.Intelligence, *Dexterity, Definition.ActionPoints, Definition.SubActionPoints, *Skills));
+    const FString Speed = FText::AsNumber(Definition.Speed).ToString();
+    return FText::FromString(FString::Printf(TEXT("%s\n%s\n\nHP %.0f · 속도 %s\nAP %d · 보조 AP %d\n\n시작 스킬%s"), *Definition.DisplayName.ToString(), *Definition.Description.ToString(), Definition.MaxHP, *Speed, Definition.ActionPoints, Definition.SubActionPoints, *Skills));
 }

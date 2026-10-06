@@ -1,16 +1,51 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Combat/Checkpoint/CombatCheckpointTypes.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "Game/Snapshot/PartySnapshotSaveGame.h"
 #include "Game/Run/RunSaveGame.h"
+#include "Game/Run/TargetRunTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Serialization/MemoryReader.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
+#include "Unit/UnitDataRules.h"
+#include "UObject/UnrealType.h"
 #include <limits>
 
 namespace
 {
+    // Author legacy tagged bytes without changing reflected property flags or production asset data.
+    // 반사 프로퍼티 플래그나 원본 에셋을 바꾸지 않고 이전 형식의 태그 바이트를 작성합니다.
+    class FSpeedMigrationArchive : public FObjectAndNameAsStringProxyArchive
+    {
+    public:
+        FSpeedMigrationArchive(FArchive& Inner, FName SkippedProperty, bool bWriteLegacy, bool bSaveGame) : FObjectAndNameAsStringProxyArchive(Inner, true), SkippedPropertyName(SkippedProperty)
+        {
+            if (bWriteLegacy) ArPortFlags |= PPF_UseDeprecatedProperties;
+            ArIsSaveGame = bSaveGame;
+        }
+
+        virtual bool ShouldSkipProperty(const FProperty* Property) const override
+        {
+            return Property->GetFName() == SkippedPropertyName || FObjectAndNameAsStringProxyArchive::ShouldSkipProperty(Property);
+        }
+
+        virtual FArchive& operator<<(FName& Name) override
+        {
+            if (IsSaving()) SerializedNames.Add(Name);
+            return FNameAsStringProxyArchive::operator<<(Name);
+        }
+
+        TSet<FName> SerializedNames;
+
+    private:
+        FName SkippedPropertyName;
+    };
+
     FPartySnapshot MakeStorageTestSnapshot()
     {
         FPartySnapshot Snapshot;
@@ -23,9 +58,7 @@ namespace
         Member.CharacterName = TEXT("저장된 궁수");
         Member.Stats.MaxHP = 185.5f;
         Member.Stats.CurrentHP = 71.25f;
-        Member.Stats.Strength = 13.5f;
-        Member.Stats.Dexterity = 21.25f;
-        Member.Stats.Intelligence = 8.75f;
+        Member.Stats.Speed = 21.25f;
         Member.Stats.MaxActionPoints = 3;
         Member.Stats.MaxSubActionPoints = 2;
         Member.Stats.MoveRange = 4;
@@ -72,7 +105,7 @@ bool FPartySnapshotValidationTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Valid build accepts opaque equipment and tactics for later catalog resolution"), UPartySnapshotLibrary::ValidateSnapshot(Valid, Error));
     TestTrue(TEXT("Successful validation clears the error"), Error.IsEmpty());
     const FPartySnapshotStats DefaultStats;
-    TestTrue(TEXT("New primary stat fields default to ten when older data supplies no value"), DefaultStats.Strength == 10.0f && DefaultStats.Dexterity == 10.0f && DefaultStats.Intelligence == 10.0f);
+    TestEqual(TEXT("Speed defaults to ten when serialized data supplies no value"), DefaultStats.Speed, 10.0f);
 
     FPartySnapshot Invalid = Valid;
     const auto Reject = [this, &Valid, &Invalid, &Error](const TCHAR* Label)
@@ -128,12 +161,8 @@ bool FPartySnapshotValidationTest::RunTest(const FString& Parameters)
     Reject(TEXT("Current HP above max is rejected"));
     for (float Value : {-1.0f, 1000001.0f, std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity()})
     {
-        Invalid.Members[0].Stats.Strength = Value;
-        Reject(*FString::Printf(TEXT("Invalid strength %g is rejected"), Value));
-        Invalid.Members[0].Stats.Dexterity = Value;
-        Reject(*FString::Printf(TEXT("Invalid dexterity %g is rejected"), Value));
-        Invalid.Members[0].Stats.Intelligence = Value;
-        Reject(*FString::Printf(TEXT("Invalid intelligence %g is rejected"), Value));
+        Invalid.Members[0].Stats.Speed = Value;
+        Reject(*FString::Printf(TEXT("Invalid speed %g is rejected"), Value));
     }
     Invalid.Members[0].Stats.MaxActionPoints = 0;
     Reject(TEXT("Zero AP is rejected"));
@@ -172,17 +201,13 @@ bool FPartySnapshotValidationTest::RunTest(const FString& Parameters)
     FPartySnapshot Boundary = Valid;
     Boundary.Members[0].Stats.MaxHP = 1000000.0f;
     Boundary.Members[0].Stats.CurrentHP = 1000000.0f;
-    Boundary.Members[0].Stats.Strength = 1000000.0f;
-    Boundary.Members[0].Stats.Dexterity = 1000000.0f;
-    Boundary.Members[0].Stats.Intelligence = 1000000.0f;
+    Boundary.Members[0].Stats.Speed = 1000000.0f;
     Boundary.Members[0].Stats.MaxActionPoints = 100;
     Boundary.Members[0].Stats.MaxSubActionPoints = 100;
     Boundary.Members[0].Stats.MoveRange = 32;
     Boundary.Members[1].Stats.MaxSubActionPoints = 0;
     Boundary.Members[1].Stats.MoveRange = 0;
-    Boundary.Members[1].Stats.Strength = 0.0f;
-    Boundary.Members[1].Stats.Dexterity = 0.0f;
-    Boundary.Members[1].Stats.Intelligence = 0.0f;
+    Boundary.Members[1].Stats.Speed = 0.0f;
     TestTrue(TEXT("Inclusive stat bounds and zero HP are accepted"), UPartySnapshotLibrary::ValidateSnapshot(Boundary, Error));
     TestTrue(TEXT("Valid input clears an earlier validation error"), Error.IsEmpty());
 
@@ -230,16 +255,14 @@ bool FPartySnapshotStorageTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Formation order remains distinct from array order"), Restored.Members[0].FormationSlot, 3);
     TestEqual(TEXT("Unicode character name survives serialization"), Restored.Members[0].CharacterName, FString(TEXT("저장된 궁수")));
     TestEqual(TEXT("Fractional current HP survives serialization"), Restored.Members[0].Stats.CurrentHP, 71.25f);
-    TestEqual(TEXT("Authored strength survives serialization instead of reverting to ten"), Restored.Members[0].Stats.Strength, 13.5f);
-    TestEqual(TEXT("Authored dexterity survives serialization instead of reverting to ten"), Restored.Members[0].Stats.Dexterity, 21.25f);
-    TestEqual(TEXT("Authored intelligence survives serialization instead of reverting to ten"), Restored.Members[0].Stats.Intelligence, 8.75f);
+    TestEqual(TEXT("Authored speed survives serialization instead of reverting to ten"), Restored.Members[0].Stats.Speed, 21.25f);
 
     FPartySnapshot Invalid = Original;
     Invalid.SchemaVersion = 999;
     TestFalse(TEXT("Invalid write is rejected"), UPartySnapshotLibrary::SaveSnapshot(Slot.Id, Invalid, Error));
     FPartySnapshot InvalidStats = Original;
-    InvalidStats.Members[0].Stats.Strength = std::numeric_limits<float>::infinity();
-    TestFalse(TEXT("Invalid primary stats are rejected before replacing a valid save"), UPartySnapshotLibrary::SaveSnapshot(Slot.Id, InvalidStats, Error));
+    InvalidStats.Members[0].Stats.Speed = std::numeric_limits<float>::infinity();
+    TestFalse(TEXT("Invalid speed is rejected before replacing a valid save"), UPartySnapshotLibrary::SaveSnapshot(Slot.Id, InvalidStats, Error));
     TestFalse(TEXT("Invalid slot write is rejected"), UPartySnapshotLibrary::SaveSnapshot(TEXT("../Run"), Original, Error));
     TestTrue(TEXT("Previous save remains readable after rejected writes"), UPartySnapshotLibrary::LoadSnapshot(Slot.Id, Restored, Error));
     TestTrue(TEXT("Rejected writes preserve the previous file"), AreSnapshotsEqual(Restored, Original));
@@ -261,10 +284,10 @@ bool FPartySnapshotStorageTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Invalid data preserves every output field"), AreSnapshotsEqual(Restored, Original));
 
     InvalidSave->Snapshot = Original;
-    InvalidSave->Snapshot.Members[0].Stats.Dexterity = std::numeric_limits<float>::quiet_NaN();
-    TestTrue(TEXT("Corrupted primary stats fixture writes directly"), UGameplayStatics::SaveGameToSlot(InvalidSave, SlotName, 0));
-    TestFalse(TEXT("Corrupted primary stats are rejected on read"), UPartySnapshotLibrary::LoadSnapshot(Slot.Id, Restored, Error));
-    TestTrue(TEXT("Rejected primary stats preserve every output field"), AreSnapshotsEqual(Restored, Original));
+    InvalidSave->Snapshot.Members[0].Stats.Speed = std::numeric_limits<float>::quiet_NaN();
+    TestTrue(TEXT("Corrupted speed fixture writes directly"), UGameplayStatics::SaveGameToSlot(InvalidSave, SlotName, 0));
+    TestFalse(TEXT("Corrupted speed is rejected on read"), UPartySnapshotLibrary::LoadSnapshot(Slot.Id, Restored, Error));
+    TestTrue(TEXT("Rejected speed preserves every output field"), AreSnapshotsEqual(Restored, Original));
 
     URunSaveGame* WrongSave = Cast<URunSaveGame>(UGameplayStatics::CreateSaveGameObject(URunSaveGame::StaticClass()));
     TestTrue(TEXT("Wrong SaveGame class fixture writes directly"), UGameplayStatics::SaveGameToSlot(WrongSave, SlotName, 0));
@@ -329,6 +352,60 @@ bool FPartySnapshotRemovedSkillMigrationTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Rejected migration never rewrites deleted-only original bytes"), CurrentBytes == RejectedBytes);
     }
     return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLegacySpeedSerializationTest, "ProjectA.Snapshot.LegacySpeedAndGrowthTaggedSerialization", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FLegacySpeedSerializationTest::RunTest(const FString& Parameters)
+{
+    const auto CheckMigration = [this](auto Original, FName LegacyName, FName CurrentName, bool bSaveGame)
+    {
+        using FValue = decltype(Original);
+        UScriptStruct* Type = FValue::StaticStruct();
+        const FFloatProperty* Legacy = FindFProperty<FFloatProperty>(Type, LegacyName);
+        const FFloatProperty* Current = FindFProperty<FFloatProperty>(Type, CurrentName);
+        if (!TestTrue(TEXT("Only the legacy field carries the deprecated serialization flag"), Legacy && Current && Legacy->HasAnyPropertyFlags(CPF_Deprecated) && !Current->HasAnyPropertyFlags(CPF_Deprecated))) return false;
+        for (float Value : {0.0f, 21.25f, -1.0f, std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()})
+        {
+            Legacy->SetPropertyValue_InContainer(&Original, Value);
+            Current->SetPropertyValue_InContainer(&Original, 45.0f);
+            TArray<uint8> Bytes;
+            {
+                FMemoryWriter Writer(Bytes);
+                FSpeedMigrationArchive Archive(Writer, CurrentName, true, bSaveGame);
+                Type->SerializeItem(Archive, &Original, nullptr);
+                if (!TestTrue(TEXT("The legacy payload contains the old tag and excludes the new speed tag"), !Archive.IsError() && Archive.SerializedNames.Contains(LegacyName) && !Archive.SerializedNames.Contains(CurrentName))) return false;
+            }
+            FValue Restored;
+            {
+                FMemoryReader Reader(Bytes);
+                FSpeedMigrationArchive Archive(Reader, NAME_None, false, bSaveGame);
+                Type->SerializeItem(Archive, &Restored, nullptr);
+                const float Loaded = Current->GetPropertyValue_InContainer(&Restored);
+                TestTrue(TEXT("Legacy tagged loading preserves fractional zero and invalid speed values without silently resetting them"), !Archive.IsError() && (FMath::IsNaN(Value) ? FMath::IsNaN(Loaded) : Loaded == Value));
+                TestEqual(TEXT("The migrated legacy field resets to its internal sentinel"), Legacy->GetPropertyValue_InContainer(&Restored), -MAX_flt);
+                TestEqual(TEXT("Migrated invalid values remain invalid for the normal speed validators"), UnitDataRules::IsValidSpeed(Loaded), FMath::IsFinite(Value) && Value >= 0.0f);
+                Current->SetPropertyValue_InContainer(&Restored, 7.25f);
+                Restored.PostSerialize(Archive);
+                TestEqual(TEXT("A later load callback cannot reapply already migrated data"), Current->GetPropertyValue_InContainer(&Restored), 7.25f);
+            }
+            Legacy->SetPropertyValue_InContainer(&Restored, 99.0f);
+            Bytes.Reset();
+            {
+                FMemoryWriter Writer(Bytes);
+                FSpeedMigrationArchive Archive(Writer, NAME_None, false, bSaveGame);
+                Type->SerializeItem(Archive, &Restored, nullptr);
+                if (!TestTrue(TEXT("New tagged saves contain speed and omit the retired field even when its memory is populated"), !Archive.IsError() && Archive.SerializedNames.Contains(CurrentName) && !Archive.SerializedNames.Contains(LegacyName))) return false;
+            }
+            FValue NewSave;
+            FMemoryReader Reader(Bytes);
+            FSpeedMigrationArchive Archive(Reader, NAME_None, false, bSaveGame);
+            Type->SerializeItem(Archive, &NewSave, nullptr);
+            TestTrue(TEXT("A new save restores the explicit fractional speed without a legacy override"), !Archive.IsError() && Current->GetPropertyValue_InContainer(&NewSave) == 7.25f && Legacy->GetPropertyValue_InContainer(&NewSave) == -MAX_flt);
+        }
+        return true;
+    };
+    return CheckMigration(FPartySnapshotStats(), TEXT("Dexterity"), TEXT("Speed"), true) && CheckMigration(FCombatCheckpointUnit(), TEXT("Dexterity"), TEXT("Speed"), true) && CheckMigration(FTargetRunGroup(), TEXT("AttributeGrowth"), TEXT("SpeedGrowth"), false);
 }
 
 #endif

@@ -79,8 +79,9 @@ bool FTargetRunProgressTest::RunTest(const FString& Parameters)
     UTargetRunDefinitionDataAsset::ApplyGrowth(Target, 1, AfterPve);
     UTargetRunDefinitionDataAsset::ApplyGrowth(Target, 2, AfterSnapshot);
     TestEqual(TEXT("PvE grants the trial HP growth"), AfterPve.MaxHP, 105.0f);
+    TestEqual(TEXT("PvE grants direct speed growth"), AfterPve.Speed, 11.0f);
     TestEqual(TEXT("Snapshot grants no additional HP growth"), AfterSnapshot.MaxHP, AfterPve.MaxHP);
-    TestEqual(TEXT("Snapshot grants no additional attribute growth"), AfterSnapshot.Strength, AfterPve.Strength);
+    TestEqual(TEXT("Snapshot grants no additional speed growth"), AfterSnapshot.Speed, AfterPve.Speed);
     return true;
 }
 
@@ -91,6 +92,7 @@ bool FTargetRunSaveValuesTest::RunTest(const FString& Parameters)
     TStrongObjectPtr<URunSaveGame> Save(NewObject<URunSaveGame>());
     Save->TargetRun.SchemaVersion = 1;
     Save->TargetRun.Groups = GetDefault<UTargetRunDefinitionDataAsset>()->Groups;
+    Save->TargetRun.Groups[0].SpeedGrowth = 1.25f;
     Save->TargetRun.EncounterPool = GetDefault<UTargetRunDefinitionDataAsset>()->EncounterPool;
     Save->TargetRun.EncounterQuery = GetDefault<UTargetRunDefinitionDataAsset>()->EncounterQuery;
     Save->TargetRun.CompletedEncounterChoices = {TEXT("TargetOffer_01"), TEXT("TargetOffer_02"), TEXT("TargetOffer_03")};
@@ -103,6 +105,7 @@ bool FTargetRunSaveValuesTest::RunTest(const FString& Parameters)
     TStrongObjectPtr<URunSaveGame> Restored(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
     if (!TestNotNull(TEXT("Deserialize the same SaveGame class"), Restored.Get())) return false;
     TestTrue(TEXT("All fixed lineups, snapshots, rewards, growth and history survive serialization"), FRunTargetState::StaticStruct()->CompareScriptStruct(&Save->TargetRun, &Restored->TargetRun, 0));
+    TestEqual(TEXT("Frozen fractional speed growth survives serialization"), Restored->TargetRun.Groups[0].SpeedGrowth, 1.25f);
     TestEqual(TEXT("Visit index survives serialization"), Restored->EncounterProgress.VisitIndex, 2);
     Save->TargetRun.Groups[0].Opponent.Members[0].Stats.MaxHP += 99.0f;
     TestEqual(TEXT("Restored snapshot owns its frozen value independently"), Restored->TargetRun.Groups[0].Opponent.Members[0].Stats.MaxHP, 100.0f);
@@ -243,9 +246,7 @@ bool FTargetRunDurableSyntheticResultsTest::RunTest(const FString& Parameters)
         const bool bPve = CombatIndex % 2 == 0;
         const FTargetRunGroup& Group = FrozenTarget.Groups[CombatIndex / 2];
         TestEqual(TEXT("Only PvE results add the frozen maximum-HP growth"), AfterGrowth.MaxHP, BeforeGrowth.MaxHP + (bPve ? Group.MaxHPGrowth : 0.f));
-        TestEqual(TEXT("Only PvE results add the frozen strength growth"), AfterGrowth.Strength, BeforeGrowth.Strength + (bPve ? Group.AttributeGrowth : 0.f));
-        TestEqual(TEXT("Only PvE results add the frozen dexterity growth"), AfterGrowth.Dexterity, BeforeGrowth.Dexterity + (bPve ? Group.AttributeGrowth : 0.f));
-        TestEqual(TEXT("Only PvE results add the frozen intelligence growth"), AfterGrowth.Intelligence, BeforeGrowth.Intelligence + (bPve ? Group.AttributeGrowth : 0.f));
+        TestEqual(TEXT("Only PvE results add the frozen speed growth"), AfterGrowth.Speed, BeforeGrowth.Speed + (bPve ? Group.SpeedGrowth : 0.f));
         if (bPve)
         {
             ++PveResults;

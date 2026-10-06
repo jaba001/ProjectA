@@ -295,7 +295,7 @@ bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FTe
         if (Saved.Team == ETeam::Player) PartyActors.Add(Saved.PartySlot, Unit);
         TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;
         for (const FSoftObjectPath& Path : Saved.Skills) Skills.Add(Cast<USkillDefinitionDataAsset>(Path.TryLoad()));
-        if (!Unit->ConfigureProfession(Saved.MaxHP, Saved.MaxAP, Saved.MaxSubAP, Skills, Saved.Strength, Saved.Dexterity, Saved.Intelligence) || !Unit->ConfigureMoveRange(Saved.MoveRange)) return FailRestore();
+        if (!Unit->ConfigureProfession(Saved.MaxHP, Saved.MaxAP, Saved.MaxSubAP, Skills, Saved.Speed) || !Unit->ConfigureMoveRange(Saved.MoveRange)) return FailRestore();
         Unit->Consumables = Saved.Consumables;
         Unit->UnitIndex = Saved.RoundUnitId;
         Unit->RuntimeCharacterName = Saved.CharacterName;
@@ -492,7 +492,7 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         }
         // Preserve the Run's purchased loadout while applying the profession's combat attributes.
         // 직업 전투 능력치를 적용하면서 Run에서 구매한 장착 스킬을 유지합니다.
-        if (!Unit->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, MemberSkills, Profession.Strength, Profession.Dexterity, Profession.Intelligence))
+        if (!Unit->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, MemberSkills, Profession.Speed))
         {
             return false;
         }
@@ -539,7 +539,7 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
                 FlowMessage = NSLOCTEXT("Encounter", "OpponentAppearance", "상대 캐릭터의 선택한 의상을 적용하지 못했습니다.");
                 return false;
             }
-            if (!Unit->ConfigureProfession(Member->Stats.MaxHP, Member->Stats.MaxActionPoints, Member->Stats.MaxSubActionPoints, SnapshotSkills[Index], Member->Stats.Strength, Member->Stats.Dexterity, Member->Stats.Intelligence))
+            if (!Unit->ConfigureProfession(Member->Stats.MaxHP, Member->Stats.MaxActionPoints, Member->Stats.MaxSubActionPoints, SnapshotSkills[Index], Member->Stats.Speed))
             {
                 FlowMessage = FText::FromString(TEXT("Opponent Snapshot unit configuration failed. / 상대 스냅샷 유닛 설정에 실패했습니다."));
                 return false;

@@ -39,23 +39,11 @@ public:
     FGameplayAttributeData Shield;
     ATTRIBUTE_ACCESSORS(UAS_Unit, Shield)
 
-    // Base strength is stored without defining a damage formula.
-    // 피해 공식을 정의하지 않고 기본 힘을 저장합니다.
-    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Strength, Category = "Attributes")
-    FGameplayAttributeData Strength;
-    ATTRIBUTE_ACCESSORS(UAS_Unit, Strength)
-
-    // Current dexterity determines round initiative at one speed point per point without changing action points.
-    // 현재 민첩 1당 라운드 시작 속도 1을 사용하며 행동력은 변경하지 않습니다.
-    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Dexterity, Category = "Attributes")
-    FGameplayAttributeData Dexterity;
-    ATTRIBUTE_ACCESSORS(UAS_Unit, Dexterity)
-
-    // Base intelligence is stored without defining a skill scaling formula.
-    // 스킬 계수 공식을 정의하지 않고 기본 지능을 저장합니다.
-    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Intelligence, Category = "Attributes")
-    FGameplayAttributeData Intelligence;
-    ATTRIBUTE_ACCESSORS(UAS_Unit, Intelligence)
+    // Speed directly controls round timing without changing action points.
+    // 속도는 행동력을 변경하지 않고 라운드 실행 시간을 직접 결정합니다.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Speed, Category = "Attributes")
+    FGameplayAttributeData Speed;
+    ATTRIBUTE_ACCESSORS(UAS_Unit, Speed)
 
 public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -82,11 +70,5 @@ protected:
     void OnRep_Shield(const FGameplayAttributeData& PreviousShield);
 
     UFUNCTION()
-    void OnRep_Strength(const FGameplayAttributeData& PreviousStrength);
-
-    UFUNCTION()
-    void OnRep_Dexterity(const FGameplayAttributeData& PreviousDexterity);
-
-    UFUNCTION()
-    void OnRep_Intelligence(const FGameplayAttributeData& PreviousIntelligence);
+    void OnRep_Speed(const FGameplayAttributeData& PreviousSpeed);
 };

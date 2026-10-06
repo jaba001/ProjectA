@@ -29,13 +29,7 @@ public:
     float MaxHP;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats")
-    float Strength;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats")
-    float Dexterity;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats")
-    float Intelligence;
+    float Speed;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
     TArray<FRunStartingEquipment> StartingEquipment;

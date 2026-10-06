@@ -137,13 +137,13 @@ public:
         Member.MemberId = TEXT("FirstOpponent");
         Member.ClassId = TEXT("Archer");
         Member.CharacterName = TEXT("First opponent");
-        Member.Stats.Dexterity = 12.5f;
+        Member.Stats.Speed = 12.5f;
         Member.SkillIds.Add(Mode->LocalOpponentCatalog->Skills.CreateConstIterator().Key());
         Snapshot.Members.Add(Member);
         Member.MemberId = TEXT("SecondOpponent");
         Member.CharacterName = TEXT("Second opponent");
         Member.FormationSlot = 1;
-        Member.Stats.Dexterity = 5.25f;
+        Member.Stats.Speed = 5.25f;
         Snapshot.Members.Add(Member);
         if (!Test->TestTrue(TEXT("Distinct formation slots pass snapshot/catalog validation."), Mode->LocalOpponentCatalog->ValidateForEncounter(Snapshot, Arena->EnemyCoords.Num(), Error)) || !Test->TestTrue(TEXT("The valid formation fixture is saved."), UPartySnapshotLibrary::SaveSnapshot(SlotId, Snapshot, Error)))
         {
@@ -160,7 +160,7 @@ public:
         const FCombatRoundUnitView* Fast = Round->GetView().Units.FindByPredicate([](const auto& Unit) { return Unit.bEnemy && FMath::IsNearlyEqual(Unit.Speed, 12.5f); });
         const FCombatRoundUnitView* Slow = Round->GetView().Units.FindByPredicate([](const auto& Unit) { return Unit.bEnemy && FMath::IsNearlyEqual(Unit.Speed, 5.25f); });
         const FCombatRoundUnitView* PlayerView = Round->GetView().Units.FindByPredicate([](const auto& Unit) { return !Unit.bEnemy; });
-        Test->TestTrue(TEXT("Snapshot restoration retains fractional Dexterity and action delays."), Fast && Slow && PlayerView && FMath::IsNearlyZero(Fast->StartDelay) && FMath::IsNearlyEqual(Slow->StartDelay, 0.725f) && FMath::IsNearlyEqual(PlayerView->StartDelay, 0.25f));
+        Test->TestTrue(TEXT("Snapshot restoration retains fractional Speed and action delays."), Fast && Slow && PlayerView && FMath::IsNearlyZero(Fast->StartDelay) && FMath::IsNearlyEqual(Slow->StartDelay, 0.725f) && FMath::IsNearlyEqual(PlayerView->StartDelay, 0.25f));
         return true;
     }
 

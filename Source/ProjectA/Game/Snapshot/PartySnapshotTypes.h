@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Serialization/Archive.h"
 #include "Unit/CharacterAppearanceTypes.h"
 #include "PartySnapshotTypes.generated.h"
 
@@ -15,16 +16,10 @@ struct PROJECTA_API FPartySnapshotStats
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
     float CurrentHP = 100.0f;
 
-    // Additive defaults preserve snapshots authored before primary stats were introduced.
-    // 기본 능력치 도입 전에 작성한 스냅샷은 새 필드의 기본값을 사용합니다.
+    // Snapshots predating primary stats retain the original speed baseline.
+    // 기본 능력치 도입 이전 스냅샷은 기존 속도 기준값을 유지합니다.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
-    float Strength = 10.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
-    float Dexterity = 10.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
-    float Intelligence = 10.0f;
+    float Speed = 10.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
     int32 MaxActionPoints = 2;
@@ -34,6 +29,30 @@ struct PROJECTA_API FPartySnapshotStats
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
     int32 MoveRange = 1;
+
+    void PostSerialize(const FArchive& Ar)
+    {
+        if (Ar.IsLoading() && Dexterity_DEPRECATED != -MAX_flt)
+        {
+            Speed = Dexterity_DEPRECATED;
+            Dexterity_DEPRECATED = -MAX_flt;
+        }
+    }
+
+private:
+    // Load legacy values even when cooked SaveGame archives do not apply property redirects; never write them again.
+    // cooked SaveGame이 프로퍼티 리디렉션을 적용하지 않아도 기존 값을 읽으며 새 저장에는 기록하지 않습니다.
+    UPROPERTY(SaveGame)
+    float Dexterity_DEPRECATED = -MAX_flt;
+};
+
+template<>
+struct TStructOpsTypeTraits<FPartySnapshotStats> : public TStructOpsTypeTraitsBase2<FPartySnapshotStats>
+{
+    enum
+    {
+        WithPostSerialize = true
+    };
 };
 
 // Stable identifiers describe a build without owning actors or loading arbitrary assets.

@@ -1077,7 +1077,7 @@ private:
     bool ConfigureUnit(AUnitBase* Unit, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float ObservationMaxHP = 0.f)
     {
         const UAS_Unit* Attributes = Unit ? Unit->GetAttributeSet() : nullptr;
-        return Attributes && Unit->ConfigureProfession(FMath::Max(Attributes->GetMaxHP(), ObservationMaxHP), Unit->GetMaxActionPoint(), Unit->GetMaxSubActionPoint(), Skills, Attributes->GetStrength(), Attributes->GetDexterity(), Attributes->GetIntelligence());
+        return Attributes && Unit->ConfigureProfession(FMath::Max(Attributes->GetMaxHP(), ObservationMaxHP), Unit->GetMaxActionPoint(), Unit->GetMaxSubActionPoint(), Skills, Attributes->GetSpeed());
     }
 
     void MoveFixtureActor(AActor* Actor, const FTransform& Transform)

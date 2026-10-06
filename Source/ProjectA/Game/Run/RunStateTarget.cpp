@@ -32,7 +32,7 @@ bool URunStateSubsystem::ResolveMemberProfession(const FRunPartyMember& Member, 
     const UPartyDefinitionDataAsset* Catalog = PartyDefinition ? PartyDefinition.Get() : GetDefault<UPartyDefinitionDataAsset>();
     if (!Catalog->ResolveProfession(Member.ClassId, OutProfession, OutError)) return false;
     if (IsTargetRun()) UTargetRunDefinitionDataAsset::ApplyGrowth(TargetRun, CompletedNodes.Num(), OutProfession);
-    if (!UnitDataRules::IsValidMaxHP(OutProfession.MaxHP) || !UnitDataRules::IsValidAttributes(OutProfession.Strength, OutProfession.Dexterity, OutProfession.Intelligence))
+    if (!UnitDataRules::IsValidMaxHP(OutProfession.MaxHP) || !UnitDataRules::IsValidSpeed(OutProfession.Speed))
     {
         OutError = NSLOCTEXT("TargetRun", "GrowthLimits", "성장 적용 후 캐릭터 능력치가 허용 범위를 벗어났습니다.");
         return false;

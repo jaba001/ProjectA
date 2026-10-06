@@ -357,7 +357,7 @@ bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
         const UProfessionBase* Profession = UProfessionBase::FindProfession(Id);
         if (!TestNotNull(TEXT("Each profession ID resolves a class default definition"), Profession)) return false;
         TestTrue(TEXT("Each profession is a concrete native UObject child instead of a combat actor"), Profession->GetClass() == ExpectedClasses[Index].Get() && Profession->GetClass()->HasAnyClassFlags(CLASS_Native) && !Profession->GetClass()->HasAnyClassFlags(CLASS_Abstract) && !Profession->GetClass()->IsChildOf(AActor::StaticClass()));
-        TestTrue(TEXT("Every profession starts with HP 100 and three attributes at 10"), Profession->MaxHP == 100.0f && Profession->Strength == 10.0f && Profession->Dexterity == 10.0f && Profession->Intelligence == 10.0f);
+        TestTrue(TEXT("Every profession starts with HP 100 and speed 10"), Profession->MaxHP == 100.0f && Profession->Speed == 10.0f);
         FProfessionDefinition Definition;
         if (!TestTrue(TEXT("Profession resolves combat defaults"), Catalog->ResolveProfession(Id, Definition)))
         {
@@ -366,14 +366,12 @@ bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("Profession has a readable name"), Definition.DisplayName.IsEmpty());
         TestFalse(TEXT("Profession has a description"), Definition.Description.IsEmpty());
         TestTrue(TEXT("The authored catalog uses the matching native profession child"), Definition.ProfessionClass == ExpectedClasses[Index]);
-        TestTrue(TEXT("Resolved starting attributes match the profession class"), Definition.MaxHP == 100.0f && Definition.Strength == 10.0f && Definition.Dexterity == 10.0f && Definition.Intelligence == 10.0f);
-        TestTrue(TEXT("Preview shows all actual starting attributes"), Catalog->GetProfessionDetails(Id).ToString().Contains(TEXT("HP 100 · 힘 10 · 민첩 10 · 지능 10")));
+        TestTrue(TEXT("Resolved starting HP and speed match the profession class"), Definition.MaxHP == 100.0f && Definition.Speed == 10.0f);
+        TestTrue(TEXT("Preview shows actual starting HP and speed"), Catalog->GetProfessionDetails(Id).ToString().Contains(TEXT("HP 100 · 속도 10")));
         APlayerUnit* Unit = Scope.SpawnUnit<APlayerUnit>(FVector::ZeroVector);
-        if (!TestTrue(TEXT("Spawn configuration accepts the resolved profession"), Unit->ConfigureProfession(Definition.MaxHP, Definition.ActionPoints, Definition.SubActionPoints, Definition.StartingSkills, Definition.Strength, Definition.Dexterity, Definition.Intelligence))) return false;
+        if (!TestTrue(TEXT("Spawn configuration accepts the resolved profession"), Unit->ConfigureProfession(Definition.MaxHP, Definition.ActionPoints, Definition.SubActionPoints, Definition.StartingSkills, Definition.Speed))) return false;
         TestEqual(TEXT("Spawn HP equals preview"), Unit->GetAttributeSet()->GetHP(), Definition.MaxHP);
-        TestEqual(TEXT("Spawn strength equals preview"), Unit->GetAttributeSet()->GetStrength(), Definition.Strength);
-        TestEqual(TEXT("Spawn dexterity equals preview"), Unit->GetAttributeSet()->GetDexterity(), Definition.Dexterity);
-        TestEqual(TEXT("Spawn intelligence equals preview"), Unit->GetAttributeSet()->GetIntelligence(), Definition.Intelligence);
+        TestEqual(TEXT("Spawn speed equals preview"), Unit->GetAttributeSet()->GetSpeed(), Definition.Speed);
         TestEqual(TEXT("Spawn AP equals preview"), Unit->GetMaxActionPoint(), Definition.ActionPoints);
         TestEqual(TEXT("Spawn sub AP equals preview"), Unit->GetMaxSubActionPoint(), Definition.SubActionPoints);
         for (USkillDefinitionDataAsset* Skill : Definition.StartingSkills)
@@ -390,37 +388,29 @@ bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
     Catalog->ResolveProfession(TEXT("Mage"), Base);
     AEnemyUnit* Enemy = Scope.SpawnUnit<AEnemyUnit>(FVector::ZeroVector);
     TestTrue(TEXT("The native enemy keeps its HP 150 and AP 2 defaults"), Enemy->GetInitialMaxHP() == 150.0f && Enemy->GetMaxActionPoint() == 2);
-    TestTrue(TEXT("The native enemy starts with strength dexterity and intelligence at five"), Enemy->GetAttributeSet()->GetStrength() == 5.0f && Enemy->GetAttributeSet()->GetDexterity() == 5.0f && Enemy->GetAttributeSet()->GetIntelligence() == 5.0f);
-    TestEqual(TEXT("Native enemy combat speed follows its default dexterity"), Enemy->GetCombatSpeed(), 5.0f);
-    if (!TestTrue(TEXT("Snapshot configuration replaces the native enemy defaults"), Enemy->ConfigureProfession(150.0f, 2, 1, Base.StartingSkills, 13.0f, 17.0f, 19.0f))) return false;
-    TestTrue(TEXT("Snapshot enemy attributes preserve their supplied values"), Enemy->GetAttributeSet()->GetStrength() == 13.0f && Enemy->GetAttributeSet()->GetDexterity() == 17.0f && Enemy->GetAttributeSet()->GetIntelligence() == 19.0f);
-    TestEqual(TEXT("Snapshot enemy combat speed follows its supplied dexterity"), Enemy->GetCombatSpeed(), 17.0f);
+    TestEqual(TEXT("The native enemy starts with speed five"), Enemy->GetAttributeSet()->GetSpeed(), 5.0f);
+    TestEqual(TEXT("Native enemy combat speed uses its GAS speed directly"), Enemy->GetCombatSpeed(), 5.0f);
+    if (!TestTrue(TEXT("Snapshot configuration replaces the native enemy defaults"), Enemy->ConfigureProfession(150.0f, 2, 1, Base.StartingSkills, 17.0f))) return false;
+    TestEqual(TEXT("Snapshot enemy preserves the supplied GAS speed"), Enemy->GetAttributeSet()->GetSpeed(), 17.0f);
+    TestEqual(TEXT("Snapshot enemy combat speed uses its supplied value directly"), Enemy->GetCombatSpeed(), 17.0f);
     Override.bUseUnitClassDefaults = false;
     Override.StartingSkills = Base.StartingSkills;
     Override.MaxHP = 137.0f;
-    Override.Strength = 12.0f;
-    Override.Dexterity = 0.0f;
-    Override.Intelligence = 24.0f;
+    Override.Speed = 0.0f;
     Override.ActionPoints = 3;
     Override.SubActionPoints = 2;
     FProfessionDefinition Resolved;
-    if (!TestTrue(TEXT("Explicit profession tuning resolves including a zero attribute"), Custom->ResolveProfession(TEXT("Mage"), Resolved))) return false;
+    if (!TestTrue(TEXT("Explicit profession tuning resolves including zero speed"), Custom->ResolveProfession(TEXT("Mage"), Resolved))) return false;
     APlayerUnit* Tuned = Scope.SpawnUnit<APlayerUnit>(FVector::ZeroVector);
-    TestTrue(TEXT("Spawn accepts explicit profession tuning"), Tuned->ConfigureProfession(Resolved.MaxHP, Resolved.ActionPoints, Resolved.SubActionPoints, Resolved.StartingSkills, Resolved.Strength, Resolved.Dexterity, Resolved.Intelligence));
+    TestTrue(TEXT("Spawn accepts explicit profession tuning"), Tuned->ConfigureProfession(Resolved.MaxHP, Resolved.ActionPoints, Resolved.SubActionPoints, Resolved.StartingSkills, Resolved.Speed));
     TestEqual(TEXT("Override applies HP"), Tuned->GetAttributeSet()->GetHP(), 137.0f);
     TestEqual(TEXT("Override applies AP"), Tuned->GetMaxActionPoint(), 3);
-    TestTrue(TEXT("Explicit attributes reach GAS"), Tuned->GetAttributeSet()->GetStrength() == 12.0f && Tuned->GetAttributeSet()->GetDexterity() == 0.0f && Tuned->GetAttributeSet()->GetIntelligence() == 24.0f);
-    TestTrue(TEXT("Override also changes every preview attribute"), Custom->GetProfessionDetails(TEXT("Mage")).ToString().Contains(TEXT("HP 137 · 힘 12 · 민첩 0 · 지능 24")));
+    TestEqual(TEXT("Explicit zero speed reaches GAS"), Tuned->GetAttributeSet()->GetSpeed(), 0.0f);
+    TestTrue(TEXT("Override also changes preview HP and speed"), Custom->GetProfessionDetails(TEXT("Mage")).ToString().Contains(TEXT("HP 137 · 속도 0")));
     for (float InvalidValue : {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(), -1.0f, 1000001.0f})
     {
-        for (int32 AttributeIndex = 0; AttributeIndex < 3; ++AttributeIndex)
-        {
-            const float Strength = AttributeIndex == 0 ? InvalidValue : 12.0f;
-            const float Dexterity = AttributeIndex == 1 ? InvalidValue : 0.0f;
-            const float Intelligence = AttributeIndex == 2 ? InvalidValue : 24.0f;
-            TestFalse(TEXT("Invalid runtime attributes reject the entire new loadout"), Tuned->ConfigureProfession(999.0f, 1, 0, Resolved.StartingSkills, Strength, Dexterity, Intelligence));
-            TestTrue(TEXT("Rejected configuration preserves HP AP skills and all attributes"), Tuned->GetAttributeSet()->GetHP() == 137.0f && Tuned->GetMaxActionPoint() == 3 && Tuned->GetMaxSubActionPoint() == 2 && Tuned->GetEquippedSkillDataAssets() == Resolved.StartingSkills && Tuned->GetAttributeSet()->GetStrength() == 12.0f && Tuned->GetAttributeSet()->GetDexterity() == 0.0f && Tuned->GetAttributeSet()->GetIntelligence() == 24.0f);
-        }
+        TestFalse(TEXT("Invalid runtime speed rejects the entire new loadout"), Tuned->ConfigureProfession(999.0f, 1, 0, Resolved.StartingSkills, InvalidValue));
+        TestTrue(TEXT("Rejected configuration preserves HP AP skills and speed"), Tuned->GetAttributeSet()->GetHP() == 137.0f && Tuned->GetMaxActionPoint() == 3 && Tuned->GetMaxSubActionPoint() == 2 && Tuned->GetEquippedSkillDataAssets() == Resolved.StartingSkills && Tuned->GetAttributeSet()->GetSpeed() == 0.0f);
     }
     const TObjectPtr<USkillDefinitionDataAsset> DuplicateSkill = Override.StartingSkills[0];
     Override.StartingSkills.Add(DuplicateSkill);
@@ -605,19 +595,14 @@ bool FProfessionDataValidationTest::RunTest(const FString& Parameters)
     Definition.MaxHP = Base.MaxHP;
     for (float InvalidValue : {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(), -1.0f, 1000001.0f})
     {
-        for (float* Attribute : {&Definition.Strength, &Definition.Dexterity, &Definition.Intelligence})
-        {
-            const float PreviousValue = *Attribute;
-            *Attribute = InvalidValue;
-            Validate(TEXT("Each explicit profession attribute must be finite and within range"), false, TEXT("Strength"));
-            *Attribute = PreviousValue;
-        }
+        Definition.Speed = InvalidValue;
+        Validate(TEXT("Explicit profession speed must be finite and within range"), false, TEXT("Speed"));
     }
-    Definition.Strength = 0.0f;
-    Definition.Dexterity = 1000000.0f;
-    Validate(TEXT("Attribute range boundaries are inclusive"), true);
-    Definition.Strength = Base.Strength;
-    Definition.Dexterity = Base.Dexterity;
+    Definition.Speed = 0.0f;
+    Validate(TEXT("Zero speed is accepted"), true);
+    Definition.Speed = 1000000.0f;
+    Validate(TEXT("The maximum speed boundary is inclusive"), true);
+    Definition.Speed = Base.Speed;
     Definition.ActionPoints = 0;
     Validate(TEXT("Nonpositive explicit AP is rejected"), false, TEXT("ActionPoints"));
     Definition.ActionPoints = Base.ActionPoints;
@@ -645,9 +630,7 @@ bool FProfessionDataValidationTest::RunTest(const FString& Parameters)
     FProfessionDefinition Resolved;
     const bool bClassDefaultsValid = Custom->ResolveProfession(TEXT("Archer"), Resolved);
     Definition.MaxHP = std::numeric_limits<float>::quiet_NaN();
-    Definition.Strength = std::numeric_limits<float>::quiet_NaN();
-    Definition.Dexterity = -1.0f;
-    Definition.Intelligence = 1000001.0f;
+    Definition.Speed = std::numeric_limits<float>::quiet_NaN();
     Definition.ActionPoints = 0;
     Definition.SubActionPoints = -1;
     Definition.StartingSkills.Reset();

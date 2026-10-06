@@ -104,7 +104,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
         {
             return false;
         }
-        if (!UnitDataRules::IsValidAttributes(Unit.Strength, Unit.Dexterity, Unit.Intelligence))
+        if (!UnitDataRules::IsValidSpeed(Unit.Speed))
         {
             return false;
         }
@@ -228,7 +228,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
             // 현재 HP, AP와 위치는 전투 중 바뀔 수 있지만 원래 빌드는 고정됩니다.
             const FPartySnapshotMember& Member = Checkpoint.OpponentSnapshot.Members[MemberIndex++];
             if (!FCharacterAppearanceSelection::StaticStruct()->CompareScriptStruct(&Member.Appearance, &Unit.Appearance, 0)) return false;
-            if (!Catalog->MatchesSavedUnitClass(Member, Unit.UnitClass) || Unit.MaxHP != Member.Stats.MaxHP || Unit.Strength != Member.Stats.Strength || Unit.Dexterity != Member.Stats.Dexterity || Unit.Intelligence != Member.Stats.Intelligence || Unit.MaxAP != Member.Stats.MaxActionPoints || Unit.MaxSubAP != Member.Stats.MaxSubActionPoints || Unit.MoveRange != Member.Stats.MoveRange || Unit.Skills.Num() != Member.SkillIds.Num())
+            if (!Catalog->MatchesSavedUnitClass(Member, Unit.UnitClass) || Unit.MaxHP != Member.Stats.MaxHP || Unit.Speed != Member.Stats.Speed || Unit.MaxAP != Member.Stats.MaxActionPoints || Unit.MaxSubAP != Member.Stats.MaxSubActionPoints || Unit.MoveRange != Member.Stats.MoveRange || Unit.Skills.Num() != Member.SkillIds.Num())
             {
                 return false;
             }

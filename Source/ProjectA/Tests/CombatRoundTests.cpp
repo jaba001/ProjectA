@@ -221,7 +221,7 @@ namespace CombatRoundTests
                     if (!GiveRoundSkill(Unit, FirstHumanSkill, HumanSkillId, bUseFixtureSkills)) return false;
                 }
                 else if (bUseFixtureSkills && !GiveFixtureSkills(Unit)) return false;
-                Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), FirstHumanSpeed - Index * 2.0f);
+                Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), FirstHumanSpeed - Index * 2.0f);
                 World->AddController(Controller);
                 Controller->SetCombatContext(Combat, true);
                 if (Index == 0) Controller->SetAsLocalPlayerController();
@@ -245,7 +245,7 @@ namespace CombatRoundTests
             {
                 AUnitBase* Enemy = AddUnit(EnemyCoord + FIntPoint(Index, 0), ETeam::Enemy);
                 if (!Enemy || (!bEnemyWithoutSkills && !GiveRoundSkill(Enemy, EnemySkill, EnemySkillId))) return false;
-                Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), EnemySpeed);
+                Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), EnemySpeed);
                 Enemies.Add(Enemy);
                 Units.Add(Enemy);
             }
@@ -313,14 +313,14 @@ namespace CombatRoundTests
                 if (Member.CurrentHP == 0.0f) continue;
                 AUnitBase* Unit = AddUnit(FIntPoint(Index * 2, 0), ETeam::Player, APlayerUnit::StaticClass());
                 if (!Unit || !GiveRoundSkill(Unit, &Skill, HumanSkillId, true)) return false;
-                Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 20.0f);
+                Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), 20.0f);
                 Humans[Index] = Unit;
                 PartyActors.Add(Index, Unit);
                 Units.Add(Unit);
             }
             AUnitBase* Enemy = AddUnit(FIntPoint(0, 3), ETeam::Enemy);
             if (!Enemy || !GiveRoundSkill(Enemy, nullptr, EnemySkillId)) return false;
-            Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 0.0f);
+            Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), 0.0f);
             Enemies.Add(Enemy);
             Units.Add(Enemy);
             Combat->RegisterUnits(Units);
@@ -352,8 +352,8 @@ namespace CombatRoundTests
             Controllers.Add(Controller);
             Humans.Add(Human);
             Enemies.Add(Enemy);
-            Human->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 20.f);
-            Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 0.f);
+            Human->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), 20.f);
+            Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), 0.f);
             Combat->RegisterUnits({Human, Enemy});
             Combat->StartCombat_Internal();
             Round = Combat->GetRoundCoordinator();
@@ -851,10 +851,10 @@ bool FCombatRoundMoveBarrierTest::RunTest(const FString& Parameters)
     Round->Tick(0.1f);
     TestTrue(TEXT("SAP movement covers 35 centimeters in 0.1 seconds despite a different MaxWalkSpeed"), FMath::IsNearlyEqual(FVector::Dist2D(MoveStart, Source->GetActorLocation()), 35.0, 0.01));
     Source->GetCharacterMovement()->MaxWalkSpeed = 0.0f;
-    Source->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 40.0f);
+    Source->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), 40.0f);
     const FVector BeforeAttributeChange = Source->GetActorLocation();
     Round->Tick(0.1f);
-    TestTrue(TEXT("Changing Dexterity and disabling MaxWalkSpeed keeps SAP movement at 350 centimeters per second"), FMath::IsNearlyEqual(FVector::Dist2D(BeforeAttributeChange, Source->GetActorLocation()), 35.0, 0.01) && FMath::IsNearlyEqual(Source->GetVelocity().Size2D(), 350.0, 0.01));
+    TestTrue(TEXT("Changing Speed and disabling MaxWalkSpeed keeps SAP movement at 350 centimeters per second"), FMath::IsNearlyEqual(FVector::Dist2D(BeforeAttributeChange, Source->GetActorLocation()), 35.0, 0.01) && FMath::IsNearlyEqual(Source->GetVelocity().Size2D(), 350.0, 0.01));
     bool bObservedFirstArrival = false;
     bool bAPClockPaused = true;
     bool bNoEarlyDamage = true;
@@ -877,7 +877,7 @@ bool FCombatRoundMoveBarrierTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("One participant arrives while the other is still moving"), bObservedFirstArrival) || !TestFalse(TEXT("Every reserved move finishes in bounded time"), Round->IsPlanningMoveInProgress())) return false;
     TestTrue(TEXT("The AP stage starts only after both new homes are occupied"), Source->GetCurrentTile() == SourceDestination && Friend->GetCurrentTile() == FriendDestination && SourceDestination->GetOccupyingUnit() == Source && FriendDestination->GetOccupyingUnit() == Friend);
     TestEqual(TEXT("Completing movement does not release the wound-up attack immediately"), Enemy->GetAttributeSet()->GetHP(), 100.0f);
-    TestTrue(TEXT("AP speed delays remain based on the planned Dexterity values"), FMath::IsNearlyEqual(Round->GetView().Units[0].StartDelay, 0.0f) && FMath::IsNearlyEqual(Round->GetView().Units[1].StartDelay, 0.2f) && FMath::IsNearlyEqual(Round->GetView().Units[2].StartDelay, 1.0f));
+    TestTrue(TEXT("AP speed delays remain based on the planned Speed values"), FMath::IsNearlyEqual(Round->GetView().Units[0].StartDelay, 0.0f) && FMath::IsNearlyEqual(Round->GetView().Units[1].StartDelay, 0.2f) && FMath::IsNearlyEqual(Round->GetView().Units[2].StartDelay, 1.0f));
     Round->Tick(0.05f);
     TestTrue(TEXT("The attack approaches its enemy only after the complete movement stage"), !Source->GetActorLocation().Equals(NewHome, 2.0f));
     if (!TestTrue(TEXT("The staged movement and attack round settles"), Fixture.AdvanceUntilNextRound(1))) return false;
@@ -1080,41 +1080,41 @@ bool FCombatRoundPlanOwnershipTest::RunTest(const FString& Parameters)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundDexterityScheduleTest, "ProjectA.Combat.Round.DexteritySchedulesRoundActions", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatRoundSpeedScheduleTest, "ProjectA.Combat.Round.SpeedSchedulesRoundActions", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FCombatRoundDexterityScheduleTest::RunTest(const FString& Parameters)
+bool FCombatRoundSpeedScheduleTest::RunTest(const FString& Parameters)
 {
     using namespace CombatRoundTests;
     FFixture Fixture;
-    if (!TestTrue(TEXT("The ten versus five Dexterity fixture initializes"), Fixture.Initialize(1, 5.0f, nullptr, FIntPoint(0, 3), 1, nullptr, 10.0f))) return false;
+    if (!TestTrue(TEXT("The ten versus five Speed fixture initializes"), Fixture.Initialize(1, 5.0f, nullptr, FIntPoint(0, 3), 1, nullptr, 10.0f))) return false;
     ACombatRoundCoordinator* Round = Fixture.Round;
     AUnitBase* Human = Fixture.Humans[0];
     AUnitBase* Enemy = Fixture.Enemies[0];
-    TestEqual(TEXT("One human Dexterity point provides one combat speed point"), Human->GetCombatSpeed(), 10.0f);
-    TestEqual(TEXT("Enemy combat speed uses its own Dexterity"), Enemy->GetCombatSpeed(), 5.0f);
-    TestEqual(TEXT("The planning view exposes human Dexterity as speed"), Round->GetView().Units[0].Speed, 10.0f);
-    TestEqual(TEXT("The planning view exposes enemy Dexterity as speed"), Round->GetView().Units[1].Speed, 5.0f);
+    TestEqual(TEXT("One human Speed point provides one combat speed point"), Human->GetCombatSpeed(), 10.0f);
+    TestEqual(TEXT("Enemy combat speed uses its own Speed"), Enemy->GetCombatSpeed(), 5.0f);
+    TestEqual(TEXT("The planning view exposes human Speed as speed"), Round->GetView().Units[0].Speed, 10.0f);
+    TestEqual(TEXT("The planning view exposes enemy Speed as speed"), Round->GetView().Units[1].Speed, 5.0f);
     TestEqual(TEXT("The fastest planned action starts immediately"), Round->GetView().Units[0].StartDelay, 0.0f);
-    TestEqual(TEXT("A five-point Dexterity difference schedules half a second"), Round->GetView().Units[1].StartDelay, 0.5f);
+    TestEqual(TEXT("A five-point Speed difference schedules half a second"), Round->GetView().Units[1].StartDelay, 0.5f);
 
     // Attribute changes take effect in the next planning snapshot, preserving already scheduled actions.
     // 어트리뷰트 변경은 다음 계획 스냅샷에 반영하여 이미 예약한 행동 시각을 유지합니다.
-    Human->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 21.25f);
-    TestEqual(TEXT("Live combat speed preserves fractional Dexterity"), Human->GetCombatSpeed(), 21.25f);
+    Human->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), 21.25f);
+    TestEqual(TEXT("Live combat speed preserves fractional Speed"), Human->GetCombatSpeed(), 21.25f);
     if (!TestTrue(TEXT("The owner submits a wait through the public planning API"), Fixture.Submit(0, Fixture.Command(Human, TEXT("Wait")))) || !TestTrue(TEXT("The owner locks the planned actions"), Fixture.Ready(0))) return false;
     TestEqual(TEXT("Planning edits do not replace the human speed snapshot"), Round->GetView().Units[0].Speed, 10.0f);
     TestTrue(TEXT("The scheduled fastest wait completes at time zero"), Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Complete);
     TestTrue(TEXT("The slower enemy remains scheduled"), Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
-    Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 10.0f);
+    Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), 10.0f);
     Round->Tick(0.49f);
     TestEqual(TEXT("Resolution keeps the original enemy speed snapshot"), Round->GetView().Units[1].Speed, 5.0f);
     TestEqual(TEXT("Resolution keeps the original half-second start time"), Round->GetView().Units[1].StartDelay, 0.5f);
     TestTrue(TEXT("The enemy has not started before its half-second deadline"), Round->GetView().RoundNumber == 1 && Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
     Round->Tick(0.02f);
     if (!TestTrue(TEXT("The enemy wait settles the round immediately after its original deadline"), Round->GetView().RoundNumber == 2 && Round->GetView().Phase == ECombatRoundPhase::Planning)) return false;
-    TestEqual(TEXT("The next planning snapshot keeps all fractional human Dexterity"), Round->GetView().Units[0].Speed, 21.25f);
-    TestEqual(TEXT("The next planning snapshot includes the enemy Dexterity change"), Round->GetView().Units[1].Speed, 10.0f);
-    TestEqual(TEXT("Fractional Dexterity contributes to the next scheduled delay"), Round->GetView().Units[1].StartDelay, 1.125f);
+    TestEqual(TEXT("The next planning snapshot keeps all fractional human Speed"), Round->GetView().Units[0].Speed, 21.25f);
+    TestEqual(TEXT("The next planning snapshot includes the enemy Speed change"), Round->GetView().Units[1].Speed, 10.0f);
+    TestEqual(TEXT("Fractional Speed contributes to the next scheduled delay"), Round->GetView().Units[1].StartDelay, 1.125f);
     if (!TestTrue(TEXT("The owner submits the next wait"), Fixture.Submit(0, Fixture.Command(Human, TEXT("Wait")))) || !TestTrue(TEXT("The next round locks successfully"), Fixture.Ready(0))) return false;
     Round->Tick(0.5f);
     Round->Tick(0.5f);
@@ -1465,12 +1465,12 @@ bool FCombatRoundMeleeSpeedTest::RunTest(const FString& Parameters)
         TestTrue(Context + TEXT(" keeps damage behind approach and windup"), Target->GetAttributeSet()->GetHP() == 100.0f && Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Approaching);
         if (Case == 2)
         {
-            Source->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetDexterityAttribute(), 20.0f);
+            Source->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), 20.0f);
             const FVector BeforeChange = Source->GetActorLocation();
             Round->Tick(0.1f);
-            TestEqual(TEXT("Live Dexterity changes immediately while the round snapshot stays fixed"), Source->GetCombatSpeed(), 20.0f);
+            TestEqual(TEXT("Live Speed changes immediately while the round snapshot stays fixed"), Source->GetCombatSpeed(), 20.0f);
             TestEqual(TEXT("The active round retains its planned speed"), Round->GetView().Units[0].Speed, 10.0f);
-            TestTrue(TEXT("Changing Dexterity mid-approach does not accelerate the active movement"), FMath::IsNearlyEqual(FVector::Dist2D(BeforeChange, Source->GetActorLocation()), 35.0, 0.01));
+            TestTrue(TEXT("Changing Speed mid-approach does not accelerate the active movement"), FMath::IsNearlyEqual(FVector::Dist2D(BeforeChange, Source->GetActorLocation()), 35.0, 0.01));
         }
         for (int32 Step = 0; Step < 400 && Round->GetView().Phase == ECombatRoundPhase::Resolving && Round->GetView().Units[0].ActionPhase != ECombatRoundActionPhase::Returning; ++Step) Round->Tick(0.01f);
         if (!TestTrue(Context + TEXT(" releases one attack before returning"), Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Returning && Target->GetAttributeSet()->GetHP() == 75.0f)) return false;
@@ -1482,7 +1482,7 @@ bool FCombatRoundMeleeSpeedTest::RunTest(const FString& Parameters)
         TestTrue(Context + TEXT(" returns to the original tile with one damage application"), Source->GetCurrentTile() == Home && Source->GetActorLocation().Equals(Origin, 2.0f) && Target->GetAttributeSet()->GetHP() == 75.0f);
         if (Case == 2)
         {
-            TestEqual(TEXT("The next planning snapshot adopts the changed Dexterity"), Round->GetView().Units[0].Speed, 20.0f);
+            TestEqual(TEXT("The next planning snapshot adopts the changed Speed"), Round->GetView().Units[0].Speed, 20.0f);
             if (!TestTrue(TEXT("The next melee plan submits"), Fixture.Submit(0, Command)) || !TestTrue(TEXT("The next melee round locks"), Fixture.Ready(0))) return false;
             const FVector NextOrigin = Source->GetActorLocation();
             Round->Tick(0.1f);

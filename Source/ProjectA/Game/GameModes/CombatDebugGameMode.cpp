@@ -279,7 +279,7 @@ AUnitBase* ACombatDebugGameMode::SpawnConfiguredDebugUnit(bool bEnemy, FName Opt
     if (!bEnemy)
     {
         APlayerUnit* Player = Cast<APlayerUnit>(Unit);
-        if (!Player || !Player->CharacterAppearance || !Player->CharacterAppearance->SetAppearance(Profession.AppearanceCatalog, FCharacterAppearanceSelection()) || !Player->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, StartingSkills, Profession.Strength, Profession.Dexterity, Profession.Intelligence) || !Player->CharacterEquipment || !Player->CharacterEquipment->SetEquipment(true, TArray<FRunEquipmentVisual>()))
+        if (!Player || !Player->CharacterAppearance || !Player->CharacterAppearance->SetAppearance(Profession.AppearanceCatalog, FCharacterAppearanceSelection()) || !Player->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, StartingSkills, Profession.Speed) || !Player->CharacterEquipment || !Player->CharacterEquipment->SetEquipment(true, TArray<FRunEquipmentVisual>()))
         {
             OutError = FText::FromString(TEXT("캐릭터 외형·능력치·시작 스킬 구성에 실패했습니다."));
             Unit->Destroy();

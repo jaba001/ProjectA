@@ -101,9 +101,9 @@ bool UPartySnapshotLibrary::ValidateSnapshot(const FPartySnapshot& Snapshot, FTe
             OutError = NSLOCTEXT("PartySnapshot", "Health", "파티원의 최대 HP 또는 현재 HP가 허용 범위를 벗어났습니다.");
             return false;
         }
-        if (!UnitDataRules::IsValidAttributes(Stats.Strength, Stats.Dexterity, Stats.Intelligence))
+        if (!UnitDataRules::IsValidSpeed(Stats.Speed))
         {
-            OutError = NSLOCTEXT("PartySnapshot", "PrimaryStats", "파티원의 힘, 민첩 또는 지능이 허용 범위를 벗어났습니다.");
+            OutError = NSLOCTEXT("PartySnapshot", "Speed", "파티원의 속도가 허용 범위를 벗어났습니다.");
             return false;
         }
         if (!UnitDataRules::IsValidActionPoints(Stats.MaxActionPoints, Stats.MaxSubActionPoints) || !UnitDataRules::IsValidMoveRange(Stats.MoveRange))

@@ -18,9 +18,9 @@ bool UnitDataRules::IsValidAttribute(float Value)
     return FMath::IsFinite(Value) && Value >= 0.0f && Value <= MaxStatValue;
 }
 
-bool UnitDataRules::IsValidAttributes(float Strength, float Dexterity, float Intelligence)
+bool UnitDataRules::IsValidSpeed(float Speed)
 {
-    return IsValidAttribute(Strength) && IsValidAttribute(Dexterity) && IsValidAttribute(Intelligence);
+    return IsValidAttribute(Speed);
 }
 
 bool UnitDataRules::IsValidActionPoints(int32 AP, int32 SubAP)

@@ -54,7 +54,7 @@ UTargetRunDefinitionDataAsset::UTargetRunDefinitionDataAsset()
             Member.FormationSlot = Index;
             Member.SkillIds.Add(TEXT("DefaultAttack"));
             Member.Stats.MaxHP = Member.Stats.CurrentHP = 100.0f + 5.0f * GroupIndex;
-            Member.Stats.Strength = Member.Stats.Dexterity = Member.Stats.Intelligence = 10.0f + GroupIndex;
+            Member.Stats.Speed = 10.0f + GroupIndex;
         }
     }
 }
@@ -108,9 +108,7 @@ void UTargetRunDefinitionDataAsset::ApplyGrowth(const FRunTargetState& State, in
     for (int32 Index = 0; Index < FMath::Min((CompletedCombats + 1) / 2, State.Groups.Num()); ++Index)
     {
         Profession.MaxHP += State.Groups[Index].MaxHPGrowth;
-        Profession.Strength += State.Groups[Index].AttributeGrowth;
-        Profession.Dexterity += State.Groups[Index].AttributeGrowth;
-        Profession.Intelligence += State.Groups[Index].AttributeGrowth;
+        Profession.Speed += State.Groups[Index].SpeedGrowth;
     }
 }
 
@@ -134,7 +132,7 @@ bool UTargetRunDefinitionDataAsset::Validate(const FRunTargetState& State, const
     }
     for (const FTargetRunGroup& Group : State.Groups)
     {
-        if (Group.Tags.IsEmpty() || Group.EnemyClasses.IsEmpty() || Group.EnemyClasses.Num() > 4 || !FMath::IsFinite(Group.MaxHPGrowth) || Group.MaxHPGrowth < 0.0f || Group.MaxHPGrowth > 100.0f || !FMath::IsFinite(Group.AttributeGrowth) || Group.AttributeGrowth < 0.0f || Group.AttributeGrowth > 100.0f || Group.GoldChoices.Num() != 3 || Group.GoldChoices.ContainsByPredicate([](int32 Gold) { return Gold <= 0 || Gold > 1000; })) return false;
+        if (Group.Tags.IsEmpty() || Group.EnemyClasses.IsEmpty() || Group.EnemyClasses.Num() > 4 || !FMath::IsFinite(Group.MaxHPGrowth) || Group.MaxHPGrowth < 0.0f || Group.MaxHPGrowth > 100.0f || !FMath::IsFinite(Group.SpeedGrowth) || Group.SpeedGrowth < 0.0f || Group.SpeedGrowth > 100.0f || Group.GoldChoices.Num() != 3 || Group.GoldChoices.ContainsByPredicate([](int32 Gold) { return Gold <= 0 || Gold > 1000; })) return false;
         for (const FSoftClassPath& Path : Group.EnemyClasses)
         {
             UClass* Class = Path.TryLoadClass<AEnemyUnit>();

@@ -69,15 +69,17 @@ bool FUnitDataValidationAgreementTest::RunTest(const FString& Parameters)
         FText Error;
         Member.Stats.MaxHP = Definition.MaxHP;
         Member.Stats.CurrentHP = Definition.MaxHP;
+        Member.Stats.Speed = Definition.Speed;
         Member.Stats.MaxActionPoints = Definition.ActionPoints;
         Member.Stats.MaxSubActionPoints = Definition.SubActionPoints;
         TestEqual(Label, Catalog->ResolveProfession(TEXT("Warrior"), Resolved, Error), bExpected);
-        TestEqual(TEXT("Live unit agrees with catalog boundaries"), Unit->ConfigureProfession(Definition.MaxHP, Definition.ActionPoints, Definition.SubActionPoints, Definition.StartingSkills), bExpected);
+        TestEqual(TEXT("Live unit agrees with catalog boundaries"), Unit->ConfigureProfession(Definition.MaxHP, Definition.ActionPoints, Definition.SubActionPoints, Definition.StartingSkills, Definition.Speed), bExpected);
         TestEqual(TEXT("Snapshot agrees with catalog boundaries"), UPartySnapshotLibrary::ValidateSnapshot(Snapshot, Error), bExpected);
     };
     Definition.MaxHP = UnitDataRules::MaxStatValue;
     Definition.ActionPoints = UnitDataRules::MaxActionPoints;
     Definition.SubActionPoints = UnitDataRules::MaxActionPoints;
+    Definition.Speed = UnitDataRules::MaxStatValue;
     CheckAgreement(TEXT("Upper boundaries are accepted at all entry points"), true);
     Definition.ActionPoints++;
     CheckAgreement(TEXT("AP beyond checkpoint capacity is rejected before spawning"), false);
@@ -92,6 +94,17 @@ bool FUnitDataValidationAgreementTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Rejected data preserves the previous live AP"), Unit->GetMaxActionPoint(), UnitDataRules::MaxActionPoints);
     TestEqual(TEXT("Rejected data preserves the previous live HP"), Unit->GetAttributeSet()->GetMaxHP(), UnitDataRules::MaxStatValue);
     Definition.MaxHP = 100.0f;
+    for (float InvalidSpeed : {-1.0f, UnitDataRules::MaxStatValue + 1.0f, std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity()})
+    {
+        Definition.Speed = InvalidSpeed;
+        TestFalse(TEXT("The shared speed rule rejects out-of-range and nonfinite values"), UnitDataRules::IsValidSpeed(InvalidSpeed));
+        CheckAgreement(TEXT("Invalid speed is rejected at every entry point"), false);
+        TestEqual(TEXT("Rejected speed preserves the previous live value"), Unit->GetAttributeSet()->GetSpeed(), UnitDataRules::MaxStatValue);
+    }
+    Definition.Speed = 0.0f;
+    TestTrue(TEXT("Zero is within the shared speed range"), UnitDataRules::IsValidSpeed(Definition.Speed));
+    CheckAgreement(TEXT("Zero speed is accepted at every entry point"), true);
+    TestEqual(TEXT("Accepted zero speed reaches the live GAS attribute"), Unit->GetAttributeSet()->GetSpeed(), 0.0f);
     Definition.StartingSkills.Add(Skill);
     FProfessionDefinition Resolved;
     FText Error;
