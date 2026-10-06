@@ -206,6 +206,7 @@ struct FObservedSegment
     bool bCaptured = false;
     bool bLateCaptured = false;
     bool bFollowingVerified = false;
+    bool bRetiredBeforeNext = false;
 };
 
 struct FMovedActor
@@ -526,7 +527,7 @@ public:
 
 private:
     bool NeedsLateCaptures(const FCase& Current, const FCombatRoundSkill& Skill) const { return !Current.bChain && !Current.bBasicAttack && (Current.bFocusedExtraPhases || Current.bFalling || Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Shape_Area) || Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Heal) || Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Shield)); }
-    int32 CapturePlanCount(const FCase& Current, const FCombatRoundSkill& Skill) const { return Current.bChain ? (bAuthoredChainReview ? Skill.Chain.MaxTargets * 2 : 3) : Current.bMonster ? 3 : 2 + (NeedsLateCaptures(Current, Skill) ? 2 : 0) + (Current.bNinjaShortPhases ? 2 : 0) + (Current.bFocusedFinalBurstPhase ? 1 : 0) + (!Current.bBasicAttack && !Skill.ImpactVfx.Niagara.IsNull() ? 1 : 0); }
+    int32 CapturePlanCount(const FCase& Current, const FCombatRoundSkill& Skill) const { return Current.bChain ? (bAuthoredChainReview ? Skill.Chain.MaxTargets + 1 : 3) : Current.bMonster ? 3 : 2 + (NeedsLateCaptures(Current, Skill) ? 2 : 0) + (Current.bNinjaShortPhases ? 2 : 0) + (Current.bFocusedFinalBurstPhase ? 1 : 0) + (!Current.bBasicAttack && !Skill.ImpactVfx.Niagara.IsNull() ? 1 : 0); }
     int32 AttackCaptureCount(const FCase& Current) const { return CapturePlanCount(Current, Definition); }
 
     bool PrepareFocusedView(AActor* Camera, const FVector& Focus)
@@ -1468,6 +1469,11 @@ private:
                 }
             }
             if (!Check(Sequence >= 0 && Sequence < Definition.Chain.MaxTargets && Enemies.IsValidIndex(Sequence) && !Segments.ContainsByPredicate([Sequence](const FObservedSegment& Existing) { return Existing.Sequence == Sequence; }), TEXT("Each launched chain has a unique bounded presentation sequence."))) return false;
+            for (FObservedSegment& Previous : Segments)
+            {
+                if (!Check(Previous.Sequence < Sequence && !Previous.Component.IsValid(), TEXT("A new chain segment immediately removes every previous main VFX component."))) return false;
+                Previous.bRetiredBeforeNext = true;
+            }
             FObservedSegment& Added = Segments.AddDefaulted_GetRef();
             Added.Component = Component;
             Added.Target = Enemies[Sequence];
@@ -1529,15 +1535,15 @@ private:
         }
         if (!Check(FVector::DotProduct(Component->GetForwardVector().GetSafeNormal2D(), (Expected - Segment->FixedSource).GetSafeNormal2D()) > 0.95, TEXT("Every live chain beam faces from its own source capsule toward the target capsule."))) return false;
         Segment->bFollowingVerified = true;
-        if (!Segment->bCaptured && Age >= 0.15f && Particles > 0 && PendingScreenshot.IsEmpty())
+        if (!Segment->bCaptured && Age >= (bAuthoredChainReview ? 0.08f : 0.15f) && Particles > 0 && PendingScreenshot.IsEmpty())
         {
             Test->AddInfo(FString::Printf(TEXT("%s segment%d: source=%s; decoded endpoint=%s; expected capsule=%s; LWCtile=%s; particleAge=%.3f; particles=%d."), *Cases[CaseIndex].Label, Segment->Sequence, *Segment->FixedSource.ToString(), *Endpoint.ToString(), *Expected.ToString(), *FVector(Instance->GetSystemInstance_Unsafe()->GetLWCTile()).ToString(), Age, Particles));
             Segment->bCaptured = QueueCapture(FString::Printf(TEXT("segment%d"), Segment->Sequence), Age);
         }
-        if (bAuthoredChainReview && Segment->bCaptured && !Segment->bLateCaptured && Age >= 0.6f && Particles > 0 && PendingScreenshot.IsEmpty())
+        if (bAuthoredChainReview && Segment->Sequence == Definition.Chain.MaxTargets - 1 && Segment->bCaptured && !Segment->bLateCaptured && Age >= 0.6f && Particles > 0 && PendingScreenshot.IsEmpty())
         {
-            // Observe the original beam after natural playback has reached its main visible phase.
-            // 자연 재생이 주 표현 단계에 도달한 뒤 원본 빔을 관측합니다.
+            // Only the final beam reaches its natural main phase; earlier beams end when the next target is selected.
+            // 마지막 빔만 자연 재생의 주 표현 단계까지 유지하며 앞선 빔은 다음 대상 선택 시 종료합니다.
             Segment->bLateCaptured = QueueCapture(FString::Printf(TEXT("segment%d_main"), Segment->Sequence), Age);
         }
         return true;
@@ -1874,7 +1880,11 @@ private:
             bValid &= Check(AppliedEffects == Definition.Chain.MaxTargets && ChainHitIds == Expected && Segments.Num() == Definition.Chain.MaxTargets, TEXT("The real coordinator follows nearest distinct enemies and honors the active profile's total limit."));
             for (int32 Index = 0; Index < Definition.Chain.MaxTargets; ++Index) bValid &= Check(FMath::IsNearlyEqual(Enemies[Index]->GetAttributeSet()->GetHP(), InitialHP.FindChecked(Enemies[Index]) - Definition.Power * FMath::Pow(Definition.Chain.DamageMultiplierPerJump, static_cast<float>(Index)), 0.001f), TEXT("Every actual chained GAS hit uses the active profile's cumulative power exactly once."));
             if (!bAuthoredChainReview) bValid &= Check(Enemies[3]->GetAttributeSet()->GetHP() == InitialHP.FindChecked(Enemies[3]), TEXT("The three-target fixture leaves the fourth enemy untouched."));
-            for (const FObservedSegment& Segment : Segments) bValid &= Check(Segment.bFollowingVerified && Segment.bCaptured && (!bAuthoredChainReview || Segment.bLateCaptured), TEXT("Every chain segment follows the moving target, retains height and supplies its requested early and natural main-phase PNGs."));
+            for (const FObservedSegment& Segment : Segments)
+            {
+                const bool bFinalSegment = Segment.Sequence == Definition.Chain.MaxTargets - 1;
+                bValid &= Check(Segment.bFollowingVerified && Segment.bCaptured && (bFinalSegment ? !bAuthoredChainReview || Segment.bLateCaptured : Segment.bRetiredBeforeNext && !Segment.Component.IsValid()), TEXT("Every chain segment follows its moving target before the next segment removes it; only the final beam supplies a natural main-phase PNG."));
+            }
             bValid &= Check(FCombatChainSettings::StaticStruct()->CompareScriptStruct(&OriginalChainSettings, &AuthoredSkill->RoundDefinition.Chain, 0), TEXT("The original saved chain settings remain unchanged after review."));
             if (bAuthoredChainReview) bValid &= Check(!Prototype.IsValid() && FCombatChainSettings::StaticStruct()->CompareScriptStruct(&Definition.Chain, &OriginalChainSettings, 0), TEXT("The actual four-target review executes the original DataAsset without a chain override."));
         }
@@ -1901,8 +1911,9 @@ private:
         Record->SetNumberField(TEXT("chain_jump_distance_cm"), Definition.Chain.JumpDistance);
         Record->SetNumberField(TEXT("chain_jump_interval_seconds"), Definition.Chain.JumpIntervalSeconds);
         Record->SetNumberField(TEXT("chain_damage_multiplier_per_jump"), Definition.Chain.DamageMultiplierPerJump);
-        Record->SetBoolField(TEXT("chain_main_phases_required"), Current.bChain && bAuthoredChainReview);
-        Record->SetBoolField(TEXT("chain_main_phases_captured"), Current.bChain && bAuthoredChainReview && Segments.Num() == Definition.Chain.MaxTargets && !Segments.ContainsByPredicate([](const FObservedSegment& Segment) { return !Segment.bLateCaptured; }));
+        Record->SetBoolField(TEXT("chain_final_main_phase_required"), Current.bChain && bAuthoredChainReview);
+        Record->SetBoolField(TEXT("chain_final_main_phase_captured"), Current.bChain && bAuthoredChainReview && Segments.ContainsByPredicate([this](const FObservedSegment& Segment) { return Segment.Sequence == Definition.Chain.MaxTargets - 1 && Segment.bLateCaptured; }));
+        Record->SetBoolField(TEXT("chain_previous_vfx_removed_on_next_segment"), Current.bChain && Segments.Num() == Definition.Chain.MaxTargets && !Segments.ContainsByPredicate([this](const FObservedSegment& Segment) { return Segment.Sequence < Definition.Chain.MaxTargets - 1 && (!Segment.bRetiredBeforeNext || Segment.Component.IsValid()); }));
         Record->SetBoolField(TEXT("large_world"), Current.bLargeWorld);
         Record->SetBoolField(TEXT("passed_runtime_contract"), bValid);
         Record->SetNumberField(TEXT("captures"), CapturedThisCase);
@@ -2073,7 +2084,7 @@ private:
         Summary->SetStringField(TEXT("optional_audio_environment"), TEXT("Recording only: temporarily set official au.DisableAppVolume and au.NeverDisableSubmixes with console value/priority restoration; wait for the audio-thread start fence, actual master-submix sample callbacks and one real second before casting. Source audio, saved editor settings and FApp unfocused-volume configuration remain unchanged. Live device/listener/sound diagnostics and PCM signal analysis are separate from listening quality."));
         Summary->SetStringField(TEXT("scope"), bMonsterReview ? TEXT("Original 12 monster classes plus the retained skeleton; real enemy AI, authored montage, approach, recovery, GAS and AP; subsequent lethal GAS ragdoll, tile release and Restart restores the original single-enemy roster with 10,000 current/maximum HP on both units. Preserve four early PNG and add a fifth at 2.5 actual world seconds with finite physical body velocities and awake state. A late sample does not establish final settling or floor penetration. Transient actors and human observation HP only; original physics, assets and saves stay unchanged. PNG review remains required for body pose and floor contact; audio listening, FPS and multiplayer are not measured.") : TEXT("Rendered local standalone PIE; preserve the 39 casts and append 48 distinct official DrGame assets. All 60 DrGame plus two retained human attacks. Original early observations plus required active main ages 0.3/0.6 for falling/area/healing/shield and actual impact PNG where authored; per-case phase ages are recorded. Chain capture starts at live age 0.15. Transient chain prototype=3/400cm/0.4s/1. PNG review remains required for visible direction and floor height; audio listening, FPS baseline and multiplayer are not measured."));
         if (bFocusedReview) Summary->SetStringField(TEXT("scope"), Summary->GetStringField(TEXT("focused_scope")));
-        if (bAuthoredChainReview) Summary->SetStringField(TEXT("scope"), TEXT("All five authored chain DataAssets, four directions and LWC, four real targets each: 25 casts and 200 rendered early/main-phase segment captures. Original saved 4/600cm/0.15s/0.8 settings execute without a profile override; nearest unhit order, original-caster GAS attenuation, one AP payment, endpoint tracking and main audio first-segment-only flags are checked. Optional actual submix recording is separate from individual listening quality. Original assets and saves remain unchanged."));
+        if (bAuthoredChainReview) Summary->SetStringField(TEXT("scope"), TEXT("All five authored chain DataAssets, four directions and LWC, four real targets each: 25 casts and 125 rendered captures, with each early segment sampled from age 0.08 and only the final main phase from age 0.6. Original saved 4/600cm/0.15s/0.8 settings execute without a profile override; nearest unhit order, original-caster GAS attenuation, one AP payment, endpoint tracking, immediate previous-main-VFX removal and main audio first-segment-only flags are checked. Optional actual submix recording is separate from individual listening quality. Original assets and saves remain unchanged."));
         if (bSettlingReview)
         {
             Summary->SetBoolField(TEXT("ragdoll_settling_review"), true);

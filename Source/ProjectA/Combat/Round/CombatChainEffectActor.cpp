@@ -88,8 +88,8 @@ void ACombatChainEffectActor::InitializeEffect(AUnitBase* Source, AUnitBase* Tar
     ChainPresentation.Vfx = Skill.Vfx;
     ChainPresentation.ImpactVfx = Skill.ImpactVfx;
     ChainPresentation.EffectOffset = Skill.EffectOffset;
-    // Collision timing does not end authored audio or particles; keep the base effect's bounded natural-completion allowance.
-    // 충돌 시간으로 원본 사운드·파티클을 끊지 않고 기본 효과와 같은 유한 자연 완료 여유를 유지합니다.
+    // Keep a bounded natural tail for the final segment and separate audio; each jump retires earlier particles.
+    // 마지막 구간과 별도 사운드의 자연 완료 시간을 제한하며 각 점프에서 이전 파티클을 제거합니다.
     ChainPresentation.VisualLifetime = FMath::Max(Skill.EffectHitDelaySeconds + Skill.EffectDuration, Skill.Chain.JumpIntervalSeconds + Skill.EffectDuration) + NaturalPresentationLimit(Skill.Vfx);
     ChainPresentation.MaxTargets = Skill.Chain.MaxTargets;
     ChainPresentation.bReady = true;
@@ -301,45 +301,53 @@ void ACombatChainEffectActor::OnRep_ChainPresentation()
     UWorld* World = GetWorld();
     if (!World || GetNetMode() == NM_DedicatedServer) return;
     SetActorTickEnabled(true);
-    const double ServerTime = GetServerTime();
+    const FCombatChainSegment* LatestSegment = nullptr;
     for (const FCombatChainSegment& Segment : Segments)
     {
-        if (Segment.Sequence < 0 || Segment.Sequence >= ChainPresentation.MaxTargets || PresentedSequences.Contains(Segment.Sequence) || Segment.SourcePosition.ContainsNaN() || Segment.TargetPosition.ContainsNaN() || !FMath::IsFinite(Segment.ServerStartedAt)) continue;
-        if (ServerTime >= Segment.ServerStartedAt + ChainPresentation.VisualLifetime)
-        {
-            PresentedSequences.Add(Segment.Sequence);
-            continue;
-        }
-        FActorSpawnParameters Params;
-        Params.Owner = this;
-        Params.ObjectFlags |= RF_Transient;
-        Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        FVector Direction = Segment.TargetPosition - Segment.SourcePosition;
-        Direction.Z = 0.f;
-        const FQuat Rotation = Direction.IsNearlyZero() ? GetActorQuat() : Direction.Rotation().Quaternion();
-        const FVector Origin = Segment.SourcePosition + Rotation.RotateVector(ChainPresentation.EffectOffset);
-        AActor* Holder = World->SpawnActor<AActor>(Origin, Rotation.Rotator(), Params);
-        if (!Holder) continue;
-        Holder->SetReplicates(false);
-        Holder->SetActorEnableCollision(false);
-        Holder->SetActorTickEnabled(false);
-        USceneComponent* Root = NewObject<USceneComponent>(Holder, TEXT("ChainSegmentOrigin"));
-        Holder->SetRootComponent(Root);
-        Root->RegisterComponent();
-        Holder->SetActorLocationAndRotation(Origin, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
-        FCombatChainSegmentPresentation& Presentation = Presentations.AddDefaulted_GetRef();
-        Presentation.Holder = Holder;
-        Presentation.Sequence = Segment.Sequence;
-        FCombatSkillVfx SegmentVisual = ChainPresentation.Vfx;
-        if (Segment.Sequence > 0)
-        {
-            if (bool* AudioOn = SegmentVisual.BoolParameters.Find(TEXT("User.AudioOn"))) *AudioOn = false;
-            SegmentVisual.Sound.Reset();
-        }
-        const CombatSkillPresentation::FEndpointParameters Endpoints{Segment.SourcePosition, Segment.TargetPosition};
-        CombatSkillPresentation::Attach(Holder, SegmentVisual, Presentation.Components, Presentation.Audio, Endpoints, true);
-        PresentedSequences.Add(Segment.Sequence);
+        if (Segment.Sequence < 0 || Segment.Sequence >= ChainPresentation.MaxTargets || Segment.SourcePosition.ContainsNaN() || Segment.TargetPosition.ContainsNaN() || !FMath::IsFinite(Segment.ServerStartedAt)) continue;
+        if (!LatestSegment || Segment.Sequence > LatestSegment->Sequence) LatestSegment = &Segment;
     }
+    if (!LatestSegment || LatestSegment->Sequence <= LatestPresentedSequence) return;
+    // Remove old particles before launching the next connection, including when replication skips several hops.
+    // 복제로 여러 점프를 건너뛴 경우에도 다음 연결을 표시하기 전에 이전 파티클을 제거합니다.
+    for (FCombatChainSegmentPresentation& Presentation : Presentations) CombatSkillPresentation::Destroy(Presentation.Components);
+    const FCombatChainSegment& Segment = *LatestSegment;
+    if (GetServerTime() >= Segment.ServerStartedAt + ChainPresentation.VisualLifetime)
+    {
+        LatestPresentedSequence = Segment.Sequence;
+        return;
+    }
+    FActorSpawnParameters Params;
+    Params.Owner = this;
+    Params.ObjectFlags |= RF_Transient;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    FVector Direction = Segment.TargetPosition - Segment.SourcePosition;
+    Direction.Z = 0.f;
+    const FQuat Rotation = Direction.IsNearlyZero() ? GetActorQuat() : Direction.Rotation().Quaternion();
+    const FVector Origin = Segment.SourcePosition + Rotation.RotateVector(ChainPresentation.EffectOffset);
+    AActor* Holder = World->SpawnActor<AActor>(Origin, Rotation.Rotator(), Params);
+    if (!Holder) return;
+    Holder->SetReplicates(false);
+    Holder->SetActorEnableCollision(false);
+    Holder->SetActorTickEnabled(false);
+    USceneComponent* Root = NewObject<USceneComponent>(Holder, TEXT("ChainSegmentOrigin"));
+    Holder->SetRootComponent(Root);
+    Root->RegisterComponent();
+    Holder->SetActorLocationAndRotation(Origin, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+    FCombatChainSegmentPresentation& Presentation = Presentations.AddDefaulted_GetRef();
+    Presentation.Holder = Holder;
+    Presentation.Sequence = Segment.Sequence;
+    FCombatSkillVfx SegmentVisual = ChainPresentation.Vfx;
+    // Play main audio once on the first observed connection, even when replication skips earlier segments.
+    // 이전 구간을 건너뛰어 수신하더라도 처음 표시하는 연결에서 주 사운드를 한 번 재생합니다.
+    if (LatestPresentedSequence != INDEX_NONE)
+    {
+        if (bool* AudioOn = SegmentVisual.BoolParameters.Find(TEXT("User.AudioOn"))) *AudioOn = false;
+        SegmentVisual.Sound.Reset();
+    }
+    const CombatSkillPresentation::FEndpointParameters Endpoints{Segment.SourcePosition, Segment.TargetPosition};
+    CombatSkillPresentation::Attach(Holder, SegmentVisual, Presentation.Components, Presentation.Audio, Endpoints, true);
+    LatestPresentedSequence = Segment.Sequence;
 }
 
 void ACombatChainEffectActor::UpdatePresentations()

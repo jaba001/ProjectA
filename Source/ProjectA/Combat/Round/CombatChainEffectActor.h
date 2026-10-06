@@ -50,8 +50,8 @@ struct PROJECTA_API FCombatChainRuntimeData
     bool bContactWindowStarted = false;
 };
 
-// Replicate each launched segment once; missed replication frames retain the ordered visual history.
-// 발동한 각 구간을 복제하며 복제 프레임을 놓쳐도 순서가 있는 연출 이력을 유지합니다.
+// Replicate ordered segment history while presenting only the latest received connection.
+// 구간 이력은 순서대로 복제하며 수신한 최신 연결만 표시합니다.
 USTRUCT()
 struct PROJECTA_API FCombatChainSegment
 {
@@ -102,8 +102,8 @@ struct PROJECTA_API FCombatChainPresentation
     bool bReady = false;
 };
 
-// Local holders keep each original effect's transform, components and audio independent of later segments.
-// 로컬 보관 액터로 각 원본 효과의 변환·컴포넌트·사운드를 이후 구간과 독립적으로 유지합니다.
+// Retire old segment particles immediately while allowing separate audio to finish on its local holder.
+// 이전 구간 파티클은 즉시 제거하고 별도 사운드는 로컬 보관 액터에서 완료하도록 유지합니다.
 USTRUCT()
 struct FCombatChainSegmentPresentation
 {
@@ -180,7 +180,7 @@ private:
     TArray<FCombatChainSegmentPresentation> Presentations;
 
     TMap<int32, TWeakObjectPtr<AUnitBase>> RegisteredUnits;
-    TSet<int32> PresentedSequences;
+    int32 LatestPresentedSequence = INDEX_NONE;
     double SegmentPresentationStartedAt = -1.0;
     bool bChainInitialized = false;
 };

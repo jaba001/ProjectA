@@ -6,15 +6,18 @@
 #include "Combat/Round/CombatSkillEffectActor.h"
 #include "Combat/Round/CombatSkillExecutor.h"
 #include "Tests/CombatChainTestHelpers.h"
+#include "Components/AudioComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameplayEffect.h"
+#include "Particles/ParticleSystemComponent.h"
 #include "Sound/SoundWave.h"
 #include "Unit/UnitBase.h"
 #include "UObject/StrongObjectPtr.h"
+#include "UObject/UnrealType.h"
 #include <limits>
 
 namespace CombatSkillEffectTests
@@ -777,6 +780,118 @@ bool FCombatChainAuthoredSoundBudgetTest::RunTest(const FString& Parameters)
         Chain->AdvanceEffect(60.f, 60.125);
         TestTrue(TEXT("A longer cosmetic sound budget never extends authoritative hits or completion callbacks"), Hits == 1 && Resolutions == 1 && Chain->GetChainRuntimeData().HitUnitIds.Num() == 1);
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatChainVisualReplacementTest, "ProjectA.Combat.Chain.NextSegmentRemovesPreviousVfxAndPreservesExternalAudio", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatChainVisualReplacementTest::RunTest(const FString& Parameters)
+{
+    CombatSkillEffectTests::FFixture Fixture;
+    AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
+    AUnitBase* First = Fixture.AddUnit(FVector(200.f, 0.f, 100.f), ETeam::Enemy);
+    AUnitBase* Second = Fixture.AddUnit(FVector(400.f, 0.f, 100.f), ETeam::Enemy);
+    AUnitBase* Third = Fixture.AddUnit(FVector(600.f, 0.f, 100.f), ETeam::Enemy);
+    ACombatChainEffectActor* Chain = Fixture.World->SpawnActor<ACombatChainEffectActor>();
+    const FArrayProperty* Property = FindFProperty<FArrayProperty>(ACombatChainEffectActor::StaticClass(), TEXT("Presentations"));
+    if (!Source || !First || !Second || !Third || !Chain || !TestNotNull(TEXT("Reflected presentation storage exists"), Property)) return false;
+    TArray<FCombatChainSegmentPresentation>& Presentations = *Property->ContainerPtrToValuePtr<TArray<FCombatChainSegmentPresentation>>(Chain);
+    Chain->InitializeEffect(Source, First, First->GetActorLocation(), CombatChainTests::Skill(), Fixture.Roster, 0.0);
+    if (!TestEqual(TEXT("The first segment owns one local holder"), Presentations.Num(), 1)) return false;
+    AActor* FirstHolder = Presentations[0].Holder;
+    UParticleSystemComponent* FirstComponent = NewObject<UParticleSystemComponent>(FirstHolder);
+    FirstComponent->SetupAttachment(FirstHolder->GetRootComponent());
+    FirstComponent->RegisterComponent();
+    Presentations[0].Components.Add(FirstComponent);
+    UAudioComponent* Audio = NewObject<UAudioComponent>(FirstHolder);
+    Audio->SetupAttachment(FirstHolder->GetRootComponent());
+    Audio->RegisterComponent();
+    Presentations[0].Audio.Component = Audio;
+    Presentations[0].Audio.bStarted = true;
+    First->AddActorWorldOffset(FVector(0.f, 30.f, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
+    Chain->AdvanceEffect(0.125f, 0.125);
+    if (!TestEqual(TEXT("The next target starts its own holder"), Presentations.Num(), 2)) return false;
+    TestTrue(TEXT("Changing targets immediately destroys the old VFX before another actor tick"), !IsValid(FirstComponent) && Presentations[0].Components.IsEmpty());
+    TestTrue(TEXT("Visual replacement preserves the external audio object and its holder"), IsValid(Audio) && IsValid(FirstHolder) && Presentations[0].Audio.Component == Audio && Presentations[0].Audio.bStarted);
+    AActor* SecondHolder = Presentations[1].Holder;
+    UParticleSystemComponent* SecondComponent = NewObject<UParticleSystemComponent>(SecondHolder);
+    SecondComponent->SetupAttachment(SecondHolder->GetRootComponent());
+    SecondComponent->RegisterComponent();
+    Presentations[1].Components.Add(SecondComponent);
+    // The muted fixture checks object lifetime after audio is inactive, without claiming playback or listening results.
+    // 무음 fixture로 오디오 비활성 뒤 객체 수명을 확인하며 실제 재생·청취 결과로 기록하지 않습니다.
+    Chain->Tick(0.f);
+    Chain->Tick(0.f);
+    TestTrue(TEXT("Inactive old audio releases its holder while repeated ticks preserve the same current visual"), !IsValid(Audio) && (!IsValid(FirstHolder) || FirstHolder->IsActorBeingDestroyed()) && Presentations.Num() == 1 && Presentations[0].Holder == SecondHolder && Presentations[0].Components.Contains(SecondComponent));
+    Chain->AdvanceEffect(0.125f, 0.25);
+    TestTrue(TEXT("A later jump also destroys the preceding main component immediately"), !IsValid(SecondComponent));
+    FCombatChainSegmentPresentation* FinalPresentation = Presentations.FindByPredicate([](const FCombatChainSegmentPresentation& Entry) { return Entry.Sequence == 2; });
+    if (!TestNotNull(TEXT("The last target creates its final presentation"), FinalPresentation)) return false;
+    UParticleSystemComponent* FinalComponent = NewObject<UParticleSystemComponent>(FinalPresentation->Holder);
+    FinalComponent->SetupAttachment(FinalPresentation->Holder->GetRootComponent());
+    FinalComponent->RegisterComponent();
+    FinalPresentation->Components.Add(FinalComponent);
+    Chain->AdvanceEffect(0.125f, 0.375);
+    Chain->Tick(0.f);
+    TestTrue(TEXT("The last hit resolves once while its final visual keeps its existing natural lifetime"), Chain->HasResolved() && Chain->GetChainRuntimeData().HitUnitIds.Num() == 3 && IsValid(FinalComponent) && Presentations.Num() == 1 && Presentations[0].Sequence == 2);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatChainReplicatedVisualHistoryTest, "ProjectA.Combat.Chain.ReplicatedHistoryPresentsOnlyLatestWithoutReplay", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatChainReplicatedVisualHistoryTest::RunTest(const FString& Parameters)
+{
+    CombatSkillEffectTests::FFixture Fixture;
+    ACombatChainEffectActor* Chain = Fixture.World->SpawnActor<ACombatChainEffectActor>();
+    TStrongObjectPtr<USoundWave> Sound(NewObject<USoundWave>());
+    const FStructProperty* SettingsProperty = FindFProperty<FStructProperty>(ACombatChainEffectActor::StaticClass(), TEXT("ChainPresentation"));
+    const FArrayProperty* SegmentsProperty = FindFProperty<FArrayProperty>(ACombatChainEffectActor::StaticClass(), TEXT("Segments"));
+    const FArrayProperty* PresentationsProperty = FindFProperty<FArrayProperty>(ACombatChainEffectActor::StaticClass(), TEXT("Presentations"));
+    UFunction* Notify = Chain ? Chain->FindFunction(TEXT("OnRep_ChainPresentation")) : nullptr;
+    if (!Chain || !Sound.IsValid() || !SettingsProperty || !SegmentsProperty || !PresentationsProperty || !TestNotNull(TEXT("The replicated presentation callback exists"), Notify)) return false;
+    FCombatChainPresentation& Settings = *SettingsProperty->ContainerPtrToValuePtr<FCombatChainPresentation>(Chain);
+    TArray<FCombatChainSegment>& Segments = *SegmentsProperty->ContainerPtrToValuePtr<TArray<FCombatChainSegment>>(Chain);
+    TArray<FCombatChainSegmentPresentation>& Presentations = *PresentationsProperty->ContainerPtrToValuePtr<TArray<FCombatChainSegmentPresentation>>(Chain);
+    Settings.bReady = true;
+    Settings.MaxTargets = 4;
+    Settings.VisualLifetime = 1.f;
+    Settings.Vfx.Sound = Sound.Get();
+    for (int32 Sequence : {0, 2, 1})
+    {
+        FCombatChainSegment& Segment = Segments.AddDefaulted_GetRef();
+        Segment.Sequence = Sequence;
+        Segment.SourcePosition = FVector(Sequence * 200.f, 0.f, 100.f);
+        Segment.TargetPosition = Segment.SourcePosition + FVector(200.f, 0.f, 0.f);
+        Segment.ServerStartedAt = Fixture.World->GetTimeSeconds();
+    }
+    // Feed the actual replicated-state callback an accumulated history; this does not simulate network transport.
+    // 실제 복제 상태 콜백에 누적 이력을 전달하며 네트워크 전송을 모사하지 않습니다.
+    Chain->ProcessEvent(Notify, nullptr);
+    if (!TestTrue(TEXT("An accumulated unordered history creates only its newest valid segment"), Presentations.Num() == 1 && Presentations[0].Sequence == 2)) return false;
+    TestTrue(TEXT("The first received connection requests main audio even when earlier visual segments are skipped"), Presentations[0].Audio.bStarted);
+    AActor* Holder = Presentations[0].Holder;
+    UParticleSystemComponent* Component = NewObject<UParticleSystemComponent>(Holder);
+    Component->SetupAttachment(Holder->GetRootComponent());
+    Component->RegisterComponent();
+    Presentations[0].Components.Add(Component);
+    Chain->ProcessEvent(Notify, nullptr);
+    Chain->Tick(0.f);
+    TestTrue(TEXT("Repeated notifications and ticks retain the same latest component without replay"), Presentations.Num() == 1 && Presentations[0].Holder == Holder && Presentations[0].Components.Contains(Component));
+    const TArray<FCombatChainSegment> History = Segments;
+    Segments.SetNum(1);
+    Chain->Tick(0.f);
+    TestTrue(TEXT("A delayed older state cannot create a retired beam"), Presentations.IsEmpty() && !IsValid(Component));
+    Segments = History;
+    Chain->ProcessEvent(Notify, nullptr);
+    TestTrue(TEXT("Restoring an already presented sequence does not restart it"), Presentations.IsEmpty());
+    FCombatChainSegment& Expired = Segments.AddDefaulted_GetRef();
+    Expired.Sequence = 3;
+    Expired.ServerStartedAt = Fixture.World->GetTimeSeconds() - 2.0;
+    Chain->ProcessEvent(Notify, nullptr);
+    TestTrue(TEXT("An expired newest segment does not expose an older beam from the history"), Presentations.IsEmpty());
+    Segments = History;
+    Chain->ProcessEvent(Notify, nullptr);
+    TestTrue(TEXT("History older than an expired latest segment remains retired"), Presentations.IsEmpty());
     return true;
 }
 
