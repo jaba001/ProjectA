@@ -568,7 +568,7 @@ bool FCombatChainAuthoredSkillsTest::RunTest(const FString& Parameters)
         FText Error;
         if (!TestTrue(TEXT("The actual saved chain DataAsset resolves: ") + Theme, Asset.IsValid() && Asset->ResolveRoundSkill(Skill, Error))) return false;
         const FCombatRoundSkill Before = Asset->RoundDefinition;
-        if (!TestTrue(TEXT("The selected authored values reach runtime without a fixture override"), CombatRoundRules::UsesChain(Skill) && Skill.Chain.MaxTargets == 4 && FMath::IsNearlyEqual(Skill.Chain.JumpDistance, 600.f) && FMath::IsNearlyEqual(Skill.Chain.JumpIntervalSeconds, 0.15f) && FMath::IsNearlyEqual(Skill.Chain.DamageMultiplierPerJump, 0.8f))) return false;
+        if (!TestTrue(TEXT("The selected authored values reach runtime without a fixture override"), CombatRoundRules::UsesChain(Skill) && Skill.Chain.MaxTargets == 4 && FMath::IsNearlyEqual(Skill.Chain.JumpDistance, 600.f) && FMath::IsNearlyEqual(Skill.Chain.JumpIntervalSeconds, 0.4f) && FMath::IsNearlyEqual(Skill.Chain.DamageMultiplierPerJump, 0.8f))) return false;
         CombatSkillEffectTests::FFixture Fixture;
         AUnitBase* Source = Fixture.AddUnit(FVector(0.f, 0.f, 100.f), ETeam::Player);
         TArray<AUnitBase*> Enemies;
@@ -613,11 +613,12 @@ bool FCombatChainAuthoredSkillsTest::RunTest(const FString& Parameters)
         Time += 0.02;
         Chain->AdvanceEffect(0.02f, Time);
         TestEqual(TEXT("The first original target is hit once after its authored delay"), Hits.Num(), 1);
+        const float BeforeJumpInterval = Skill.Chain.JumpIntervalSeconds - 0.01f;
         for (int32 Index = 1; Index < 4; ++Index)
         {
-            Time += 0.14;
-            Chain->AdvanceEffect(0.14f, Time);
-            TestEqual(TEXT("A subsequent hit cannot precede the selected 0.15-second interval"), Hits.Num(), Index);
+            Time += BeforeJumpInterval;
+            Chain->AdvanceEffect(BeforeJumpInterval, Time);
+            TestEqual(TEXT("A subsequent hit cannot precede the authored jump interval"), Hits.Num(), Index);
             Time += 0.02;
             Chain->AdvanceEffect(0.02f, Time);
             TestEqual(TEXT("The next nearest unhit enemy receives exactly one delayed hit"), Hits.Num(), Index + 1);

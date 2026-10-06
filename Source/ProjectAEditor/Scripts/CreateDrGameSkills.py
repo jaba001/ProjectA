@@ -18,12 +18,13 @@ VERIFY = "-DrGameSkillsVerifyOnly" in unreal.SystemLibrary.get_command_line()
 ADD_CLASSIFICATION_TAGS = "-DrGameSkillsAddClassificationTags" in unreal.SystemLibrary.get_command_line()
 UPDATE_VFX_DIRECTIONS = "-DrGameSkillsUpdateVfxDirections" in unreal.SystemLibrary.get_command_line()
 ENABLE_CHAIN = "-DrGameSkillsEnableChain" in unreal.SystemLibrary.get_command_line()
+UPDATE_CHAIN_TIMING = "-DrGameSkillsUpdateChainTiming" in unreal.SystemLibrary.get_command_line()
 REPAIR_CHAIN_WRITE = "-DrGameSkillsRepairChainWrite" in unreal.SystemLibrary.get_command_line()
 ASSETS = unreal.EditorAssetLibrary
 TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
 OWNER_KEY = "ProjectA.DrGameSkills"
 OWNER = "DrGameSkills.v1"
-REPORT_DIR = ROOT / "Saved/Automation" / ("ChainSkills" if ENABLE_CHAIN else "SkillVfxDirection" if UPDATE_VFX_DIRECTIONS else "ChainSkillFilter" if ADD_CLASSIFICATION_TAGS else "DrGameSkills")
+REPORT_DIR = ROOT / "Saved/Automation" / ("ChainTiming" if UPDATE_CHAIN_TIMING else "ChainSkills" if ENABLE_CHAIN else "SkillVfxDirection" if UPDATE_VFX_DIRECTIONS else "ChainSkillFilter" if ADD_CLASSIFICATION_TAGS else "DrGameSkills")
 
 
 def require(value, reason):
@@ -77,7 +78,7 @@ def obtain(path, asset_class):
         return asset, False
     require(not VERIFY, "Missing authored package: " + path)
     require(not UPDATE_VFX_DIRECTIONS, "Endpoint migration cannot create packages: " + path)
-    require(not ENABLE_CHAIN, "Chain migration cannot create packages: " + path)
+    require(not ENABLE_CHAIN and not UPDATE_CHAIN_TIMING, "Chain migration cannot create packages: " + path)
     folder, name = path.rsplit("/", 1)
     factory = unreal.DataAssetFactory()
     factory.set_editor_property("data_asset_class", asset_class)
@@ -177,7 +178,7 @@ def enable_chain(asset, properties, entry):
 
 
 def set_or_check(asset, properties, created, entry=None):
-    modified = ENABLE_CHAIN and not VERIFY and not created and enable_chain(asset, properties, entry)
+    modified = not VERIFY and not created and ((ENABLE_CHAIN and enable_chain(asset, properties, entry)) or (UPDATE_CHAIN_TIMING and update_chain_timing(asset, properties, entry)))
     for name, expected in properties.items():
         if created:
             asset.set_editor_property(name, expected)
@@ -194,6 +195,34 @@ def set_or_check(asset, properties, created, entry=None):
                 (REPORT_DIR / "PropertyDifference.json").write_text(json.dumps({"asset": asset.get_path_name(), "property": name, "actual": normalized(actual), "expected": normalized(expected)}, ensure_ascii=False, indent=2), encoding="utf-8")
                 raise RuntimeError("Existing authored value changed; review without overwriting: " + asset.get_path_name() + " / " + name)
     return modified
+
+
+def update_chain_timing(asset, properties, entry):
+    if entry is None or entry["profile"] != "link":
+        return False
+    settings = SPEC["profiles"]["link"]["chain"]
+    previous_settings = {**settings, "jump_interval_seconds": 0.15}
+    actual = asset.get_editor_property("round_definition")
+    expected = properties["round_definition"]
+    actual_chain = actual.get_editor_property("chain")
+    expected_chain = make_chain(settings)
+    previous_chain = make_chain(previous_settings)
+    actual_description = normalized(asset.get_editor_property("skill_description"))
+    if normalized(actual_chain) == normalized(expected_chain) and actual_description == properties["skill_description"]:
+        return False
+    if normalized(actual_chain) != normalized(previous_chain) or actual_description != description(entry, previous_settings):
+        return False
+    # Keep independent chain structs while comparing the full round definition through Unreal's live nested views.
+    # Unreal의 중첩 구조체 뷰로 전체 라운드 정의를 비교할 때 이전·목표 체인은 독립 구조체로 보존합니다.
+    expected.set_editor_property("chain", previous_chain)
+    unchanged = normalized(actual) == normalized(expected)
+    expected.set_editor_property("chain", expected_chain)
+    if not unchanged or any(normalized(asset.get_editor_property(name)) != normalized(value) for name, value in properties.items() if name not in ("round_definition", "skill_description")):
+        return False
+    actual.set_editor_property("chain", expected_chain)
+    asset.set_editor_property("round_definition", actual)
+    asset.set_editor_property("skill_description", properties["skill_description"])
+    return True
 
 
 def make_vfx(entry, inspections):
@@ -286,9 +315,9 @@ def legacy_link_description(entry):
     return f"선택한 적 하나를 연결해 {SPEC['defaults']['power']:g} 피해를 줍니다."
 
 
-def description(entry):
+def description(entry, chain_settings=None):
     power = SPEC["defaults"]["power"]
-    chain = SPEC["profiles"][entry["profile"]].get("chain")
+    chain = chain_settings if chain_settings is not None else SPEC["profiles"][entry["profile"]].get("chain")
     if entry["profile"] == "link" and chain and chain["max_targets"] > 1:
         decrease = (1.0 - chain["damage_multiplier_per_jump"]) * 100.0
         damage = f"첫 피해 {power:g}, 점프마다 피해 {decrease:g}% 감소." if decrease > 0.0 else f"대상마다 {power:g} 피해를 줍니다."
@@ -297,12 +326,14 @@ def description(entry):
 
 
 def main():
-    require(sum((ADD_CLASSIFICATION_TAGS, UPDATE_VFX_DIRECTIONS, ENABLE_CHAIN)) <= 1, "Run classification, endpoint and chain migrations separately")
+    require(sum((ADD_CLASSIFICATION_TAGS, UPDATE_VFX_DIRECTIONS, ENABLE_CHAIN, UPDATE_CHAIN_TIMING)) <= 1, "Run classification, endpoint and chain migrations separately")
     require(not REPAIR_CHAIN_WRITE or (ENABLE_CHAIN and not VERIFY), "Partial chain repair requires the author-only chain migration")
     selected = [entry for entry in SPEC["entries"] if entry["profile"]]
-    if ENABLE_CHAIN:
+    if ENABLE_CHAIN or UPDATE_CHAIN_TIMING:
         require(SPEC["profiles"]["link"].get("chain") and len([entry for entry in selected if entry["profile"] == "link"]) == 5, "Chain migration requires the five declared link skills")
         require(all(not settings.get("chain") or name == "link" for name, settings in SPEC["profiles"].items()), "Chain migration only supports the declared link profile")
+    if UPDATE_CHAIN_TIMING:
+        require(SPEC["profiles"]["link"]["chain"] == {"max_targets": 4, "jump_distance": 600.0, "jump_interval_seconds": 0.4, "damage_multiplier_per_jump": 0.8}, "Chain timing migration requires the reviewed 0.4-second settings")
     if REPAIR_CHAIN_WRITE:
         # Repair only the hash-bound five-package partial write documented by the failed independent reload.
         # 독립 재로드 실패로 기록된 해시 고정 5개 패키지의 부분 작성 상태만 복구합니다.
@@ -377,14 +408,14 @@ def main():
     party_changed = previous_pool != run_pool
     require(not VERIFY or not party_changed, "Saved party is not connected to the new Run shop pool")
     require(not UPDATE_VFX_DIRECTIONS or not party_changed, "Endpoint migration cannot change the party Run pool")
-    require(not ENABLE_CHAIN or not party_changed, "Chain migration cannot change the party Run pool")
+    require(not (ENABLE_CHAIN or UPDATE_CHAIN_TIMING) or not party_changed, "Chain migration cannot change the party Run pool")
     before = {name: normalized(party.get_editor_property(name)) for name in ["unarmed_starting_skill", "encounter_skill_pool", "fallback_player_unit_class"]}
     professions = party.get_editor_property("professions")
     profession_values = {str(name): normalized(value) for name, value in professions.items()}
     if party_changed:
         party.set_editor_property("run_encounter_pool", run_pool)
     require({name: normalized(party.get_editor_property(name)) for name in before} == before and {str(name): normalized(value) for name, value in party.get_editor_property("professions").items()} == profession_values, "Party starting content changed")
-    if ENABLE_CHAIN:
+    if ENABLE_CHAIN or UPDATE_CHAIN_TIMING:
         permitted = {entry["destination"] for entry in selected if entry["profile"] == "link"}
         require(not created and not party_changed and all(asset.get_path_name().split(".")[0] in permitted for asset in updated), "Chain migration may only save the five existing link DataAssets")
     if not VERIFY:
@@ -398,10 +429,12 @@ def main():
         require(file_hash(ROOT / filename) == expected, "Protected package changed: " + filename)
     report = {"mode": "reload" if VERIFY else "author", "specification_sha256": file_hash(Path(__file__).with_name("DrGameSkillSpecs.json")), "skills": len(skills), "profiles": dict(Counter(entry["profile"] for entry in selected)), "source_effects": len(SPEC["entries"]), "auxiliary_effects": len(SPEC["entries"]) - len(skills), "created_packages": len(created), "shop_candidates": len(entries), "pool": SPEC["pool"], "run_pool": SPEC["run_pool"], "party": SPEC["party"], "party_reference_changed": party_changed, "retained_skill_count": len(retained_hashes), "source_files_unchanged": len(source_hashes), "data_validation": "passed", "warnings": warnings, "assets": [skill.get_path_name() for skill in skills], "niagara": inspections, "gameplay_test": "not run", "visual_alignment": "user verification pending", "sfx_playback": "user verification pending"}
     report.update({"updated_packages": len(updated), "updated_assets": [asset.get_path_name() for asset in updated], "untouched_authored_skills_unchanged": len(protected_authored)})
-    if ENABLE_CHAIN:
+    if ENABLE_CHAIN or UPDATE_CHAIN_TIMING:
         report["chain_settings"] = SPEC["profiles"]["link"]["chain"]
         report["chain_assets"] = [entry["destination"] for entry in selected if entry["profile"] == "link"]
         report["partial_chain_write_repaired"] = REPAIR_CHAIN_WRITE
+        if UPDATE_CHAIN_TIMING:
+            report["previous_jump_interval_seconds"] = 0.15
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     output = REPORT_DIR / ("Reload.json" if VERIFY else "Author.json")
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
