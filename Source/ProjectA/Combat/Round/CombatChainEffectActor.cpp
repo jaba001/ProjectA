@@ -88,8 +88,8 @@ void ACombatChainEffectActor::InitializeEffect(AUnitBase* Source, AUnitBase* Tar
     ChainPresentation.Vfx = Skill.Vfx;
     ChainPresentation.ImpactVfx = Skill.ImpactVfx;
     ChainPresentation.EffectOffset = Skill.EffectOffset;
-    // Keep a bounded natural tail for the final segment and separate audio; each jump retires earlier particles.
-    // 마지막 구간과 별도 사운드의 자연 완료 시간을 제한하며 각 점프에서 이전 파티클을 제거합니다.
+    // Bound active presentation lifetime and separate audio; jumps and chain completion retire particles immediately.
+    // 활성 연출과 별도 사운드의 수명을 제한하며 점프와 체인 완료 시 파티클을 즉시 제거합니다.
     ChainPresentation.VisualLifetime = FMath::Max(Skill.EffectHitDelaySeconds + Skill.EffectDuration, Skill.Chain.JumpIntervalSeconds + Skill.EffectDuration) + NaturalPresentationLimit(Skill.Vfx);
     ChainPresentation.MaxTargets = Skill.Chain.MaxTargets;
     ChainPresentation.bReady = true;
@@ -281,6 +281,9 @@ void ACombatChainEffectActor::AdvanceEffect(float DeltaSeconds, double Presentat
 void ACombatChainEffectActor::ResolveChain()
 {
     if (!HasAuthority() || HasResolved()) return;
+    ChainPresentation.bFinished = true;
+    OnRep_ChainPresentation();
+    ForceNetUpdate();
     ResolveEffect(false);
     if (IsActorBeingDestroyed()) return;
     SetLifeSpan(NaturalPresentationLimit(ChainPresentation.Vfx));
@@ -297,7 +300,15 @@ double ACombatChainEffectActor::GetServerTime() const
 
 void ACombatChainEffectActor::OnRep_ChainPresentation()
 {
-    if (IsActorBeingDestroyed() || !ChainPresentation.bReady || ChainPresentation.MaxTargets < 1 || ChainPresentation.MaxTargets > 32 || Segments.Num() > ChainPresentation.MaxTargets || !FMath::IsFinite(ChainPresentation.VisualLifetime) || ChainPresentation.VisualLifetime <= 0.f || ChainPresentation.EffectOffset.ContainsNaN()) return;
+    if (IsActorBeingDestroyed()) return;
+    // Completion also retires the final beam and prevents late replicated history from replaying it.
+    // 완료 시 마지막 연결도 제거하고 늦게 도착한 복제 이력이 재생되는 것을 차단합니다.
+    if (ChainPresentation.bFinished)
+    {
+        for (FCombatChainSegmentPresentation& Presentation : Presentations) CombatSkillPresentation::Destroy(Presentation.Components);
+        return;
+    }
+    if (!ChainPresentation.bReady || ChainPresentation.MaxTargets < 1 || ChainPresentation.MaxTargets > 32 || Segments.Num() > ChainPresentation.MaxTargets || !FMath::IsFinite(ChainPresentation.VisualLifetime) || ChainPresentation.VisualLifetime <= 0.f || ChainPresentation.EffectOffset.ContainsNaN()) return;
     UWorld* World = GetWorld();
     if (!World || GetNetMode() == NM_DedicatedServer) return;
     SetActorTickEnabled(true);

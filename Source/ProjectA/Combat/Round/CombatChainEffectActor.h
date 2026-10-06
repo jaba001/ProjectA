@@ -100,6 +100,9 @@ struct PROJECTA_API FCombatChainPresentation
 
     UPROPERTY()
     bool bReady = false;
+
+    UPROPERTY()
+    bool bFinished = false;
 };
 
 // Retire old segment particles immediately while allowing separate audio to finish on its local holder.
