@@ -186,6 +186,12 @@ private:
     bool PrepareRoster()
     {
         ACombatRoundCoordinator* Round = Controller->GetRoundCoordinator();
+        if (!Check(Round->GetView().Units.Num() == 2 && Round->GetView().Units.FilterByPredicate([](const FCombatRoundUnitView& Unit) { return Unit.bEnemy; }).Num() == 1, TEXT("The authored debug roster starts with one ally and one enemy."))) return false;
+        for (const FCombatRoundUnitView& Entry : Round->GetView().Units)
+        {
+            const UAS_Unit* Attributes = IsValid(Entry.Unit) ? Entry.Unit->GetAttributeSet() : nullptr;
+            if (!Check(Attributes && Attributes->GetHP() == 10000.f && Attributes->GetMaxHP() == 10000.f, TEXT("Both authored debug units start with 10,000 current and maximum HP."))) return false;
+        }
         const FCombatRoundUnitView* Existing = Round->GetView().Units.FindByPredicate([](const FCombatRoundUnitView& Unit) { return !Unit.bEnemy && IsValid(Unit.Unit); });
         if (!Check(Existing != nullptr, TEXT("The authored debug roster contains an allied character."))) return false;
         RevivedUnit = Existing->Unit;
@@ -208,6 +214,8 @@ private:
             if (!Check(Mode->SpawnDebugUnit(Controller, bEnemy, Ids[0], AddedId, Error), FString::Printf(TEXT("Spawn authored %s: %s"), bEnemy ? TEXT("enemy") : TEXT("profession"), *Error.ToString()))) return false;
             const FCombatRoundUnitView* Added = Round->GetView().Units.FindByPredicate([AddedId](const FCombatRoundUnitView& Unit) { return Unit.UnitId == AddedId; });
             if (!Check(Added && Added->bEnemy == bEnemy && Added->Unit && Added->Unit->GetMesh()->GetSkeletalMeshAsset() && Added->Unit->GetMesh()->GetAnimInstance(), TEXT("Added authored units have the requested team, skeletal mesh and animation instance."))) return false;
+            const UAS_Unit* AddedAttributes = Added->Unit->GetAttributeSet();
+            if (!Check(AddedAttributes && AddedAttributes->GetHP() == 10000.f && AddedAttributes->GetMaxHP() == 10000.f, TEXT("Added allies and enemies use the same 10,000 current and maximum HP debug defaults."))) return false;
             if (!bEnemy && !Check(Controller->GetDebugLoadout()->GetEquipmentMember(AddedId) != nullptr, TEXT("A newly added ally receives an editable equipment record in the same combat."))) return false;
         }
         return Check(Round->GetView().Units.Num() == OriginalCount + 2 && Round->GetView().CombatId == CombatId && Mode->GetCombatManager()->GetRuntimeUnitId(RevivedUnit) == UnitId && RevivedUnit->GetEquippedSkillDataAssets() == OriginalSkills, TEXT("Authored spawning preserves the current combat, original character and loadout."));
@@ -374,7 +382,7 @@ private:
         // Stabilize real-frame observation in this disposable combat without changing content or normal difficulty.
         // 콘텐츠나 정상 난이도를 변경하지 않고 폐기할 전투에서 실제 프레임 관찰을 안정화합니다.
         if (!Check(Round->SetDebugUnitHealth(Controller, Ally->UnitId, 10000.f, 10000.f, Error), FString::Printf(TEXT("Apply transient observation HP fixture: %s"), *Error.ToString()))) return false;
-        Test->AddInfo(TEXT("The observation fixture sets only the disposable debug ally to 10,000 HP; this is not a normal-difficulty or persistent Run test."));
+        Test->AddInfo(TEXT("The observation fixture retains the disposable debug ally's 10,000 HP; this is not a normal-difficulty or persistent Run test."));
         if (!Check(Skill->ResolveRoundSkill(Definition, Error) && Round->SetDebugUnitSkills(Controller, Ally->UnitId, {Skill.Get()}, Error), FString::Printf(TEXT("Equip authored skill %s: %s"), *Samples[SampleIndex], *Error.ToString()))) return false;
         if (!Check(CombatRoundRules::IsValidSkill(Definition) && Definition.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Damage) && !Definition.Vfx.Niagara.IsNull(), TEXT("Each current representative uses its resolved authored target, collision, tags and Niagara profile."))) return false;
         FCombatRoundCommand Command;

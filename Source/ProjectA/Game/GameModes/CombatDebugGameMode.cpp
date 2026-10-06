@@ -1,4 +1,5 @@
 #include "Game/GameModes/CombatDebugGameMode.h"
+#include "AbilitySystemComponent.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "Components/CapsuleComponent.h"
@@ -11,6 +12,7 @@
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "GameFramework/HUD.h"
+#include "GAS/Attribute/AS_Unit.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "TimerManager.h"
@@ -21,6 +23,8 @@
 
 namespace
 {
+    constexpr float DebugMaxHP = 10000.f;
+
     bool IsUsableEnemyClass(const UClass* Class)
     {
         return IsValid(Class) && Class->IsChildOf(AEnemyUnit::StaticClass()) && !Class->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists);
@@ -131,7 +135,7 @@ bool ACombatDebugGameMode::RestartCombat()
 
 bool ACombatDebugGameMode::SpawnDebugUnits()
 {
-    if (Arena->PlayerCoords.IsEmpty() || !EnemyDefinition->OpponentSnapshotSlot.IsNone() || EnemyDefinition->EnemyUnitClasses.IsEmpty() || EnemyDefinition->EnemyUnitClasses.Num() > Arena->EnemyCoords.Num())
+    if (Arena->PlayerCoords.IsEmpty() || Arena->EnemyCoords.IsEmpty() || !EnemyDefinition->OpponentSnapshotSlot.IsNone() || EnemyDefinition->EnemyUnitClasses.IsEmpty())
     {
         StatusMessage = NSLOCTEXT("CombatDebug", "InvalidFormation", "디버그 전투에는 플레이어 배치와 유효한 기본 적 목록이 필요합니다.");
         return false;
@@ -139,14 +143,11 @@ bool ACombatDebugGameMode::SpawnDebugUnits()
     AUnitBase* Player = SpawnConfiguredDebugUnit(false, TEXT("Warrior"), Arena->Grid->GetTileAtCoord(Arena->PlayerCoords[0]), StatusMessage);
     if (!IsValid(Player)) return false;
     SpawnedUnits.Add(Player);
-    for (int32 Index = 0; Index < EnemyDefinition->EnemyUnitClasses.Num(); ++Index)
-    {
-        const TSubclassOf<AEnemyUnit> EnemyClass = EnemyDefinition->EnemyUnitClasses[Index];
-        if (!EnemyClass) return false;
-        AUnitBase* Enemy = SpawnConfiguredDebugUnit(true, FName(*EnemyClass->GetPathName()), Arena->Grid->GetTileAtCoord(Arena->EnemyCoords[Index]), StatusMessage);
-        if (!IsValid(Enemy)) return false;
-        SpawnedUnits.Add(Enemy);
-    }
+    const TSubclassOf<AEnemyUnit> EnemyClass = EnemyDefinition->EnemyUnitClasses[0];
+    if (!EnemyClass) return false;
+    AUnitBase* Enemy = SpawnConfiguredDebugUnit(true, FName(*EnemyClass->GetPathName()), Arena->Grid->GetTileAtCoord(Arena->EnemyCoords[0]), StatusMessage);
+    if (!IsValid(Enemy)) return false;
+    SpawnedUnits.Add(Enemy);
     return true;
 }
 
@@ -286,6 +287,17 @@ AUnitBase* ACombatDebugGameMode::SpawnConfiguredDebugUnit(bool bEnemy, FName Opt
         }
         Player->RuntimeCharacterName = FText::Format(NSLOCTEXT("CombatDebug", "ProfessionName", "디버그 {0}"), Profession.DisplayName);
     }
+    // Apply debug health after class and profession initialization without changing shared definitions.
+    // 공용 정의를 변경하지 않고 클래스·직업 초기화가 끝난 뒤 디버그 체력을 적용합니다.
+    UAbilitySystemComponent* AbilitySystem = Unit->GetAbilitySystemComponent();
+    if (!AbilitySystem || !Unit->GetAttributeSet())
+    {
+        OutError = FText::FromString(TEXT("캐릭터의 디버그 체력 초기화에 필요한 능력치가 없습니다."));
+        Unit->Destroy();
+        return nullptr;
+    }
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetMaxHPAttribute(), DebugMaxHP);
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), DebugMaxHP);
     Unit->SetTeam(bEnemy ? ETeam::Enemy : ETeam::Player);
     Unit->SetActorLocation(Tile->GetActorLocation() + FVector(0.f, 0.f, Unit->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), false, nullptr, ETeleportType::TeleportPhysics);
     Unit->SetCurrentTile(Tile);

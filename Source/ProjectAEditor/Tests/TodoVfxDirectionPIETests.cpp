@@ -20,6 +20,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Controller/CombatDebugPlayerController.h"
+#include "DataAsset/EncounterDefinitionDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Dom/JsonObject.h"
 #include "Editor.h"
@@ -74,6 +75,7 @@
 #include "Sound/SoundBase.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "TodoReviewWindowPlacement.h"
+#include "Unit/EnemyUnit.h"
 #include "Unit/UnitBase.h"
 #include "UnrealClient.h"
 #include "UObject/StrongObjectPtr.h"
@@ -891,17 +893,17 @@ private:
             }
             if (Unit->GetTeam() == ETeam::Enemy) RestoredEnemyClasses.Add(Unit->GetClass()->GetPathName());
             else ++AliveHumans;
-            bResourcesRestored &= Unit->IsUnitAlive() && !Unit->GetMesh()->IsSimulatingPhysics() && Unit->GetAttributeSet()->GetHP() == Unit->GetAttributeSet()->GetMaxHP() && Unit->GetCurrentActionPoint() == Unit->GetMaxActionPoint() && Unit->GetCurrentSubActionPoint() == Unit->GetMaxSubActionPoint() && Unit->GetCurrentTile() && Unit->GetCurrentTile()->GetOccupyingUnit() == Unit;
+            bResourcesRestored &= Unit->IsUnitAlive() && !Unit->GetMesh()->IsSimulatingPhysics() && Unit->GetAttributeSet()->GetHP() == 10000.f && Unit->GetAttributeSet()->GetMaxHP() == 10000.f && Unit->GetCurrentActionPoint() == Unit->GetMaxActionPoint() && Unit->GetCurrentSubActionPoint() == Unit->GetMaxSubActionPoint() && Unit->GetCurrentTile() && Unit->GetCurrentTile()->GetOccupyingUnit() == Unit;
         }
         RestoredEnemyClasses.Sort();
-        if (!Check(Restored.Num() == 5 && AliveHumans == 1 && RestoredEnemyClasses == DefaultEnemyClasses && bResourcesRestored && Controller->GetRoundCoordinator()->GetView().Phase == ECombatRoundPhase::Planning, TEXT("Restart restores the original four enemy classes, living human, full HP/AP/SAP, occupied home tiles and planning round."))) return End();
+        if (!Check(Restored.Num() == 2 && AliveHumans == 1 && RestoredEnemyClasses == DefaultEnemyClasses && bResourcesRestored && Controller->GetRoundCoordinator()->GetView().Phase == ECombatRoundPhase::Planning, TEXT("Restart restores the original single enemy, living human, 10,000 current/maximum HP, full AP/SAP, occupied home tiles and planning round."))) return End();
         TSharedPtr<FJsonObject> Record = Records.Last()->AsObject();
         Record->SetNumberField(TEXT("captures"), CapturedThisCase);
         Record->SetArrayField(TEXT("capture_phases"), CaseCaptureRecords);
         Record->SetBoolField(TEXT("actual_gas_death_ragdoll_tile_release"), true);
         Record->SetBoolField(TEXT("restart_restores_saved_default_roster"), true);
         Record->SetBoolField(TEXT("passed_runtime_contract"), true);
-        Test->AddInfo(FString::Printf(TEXT("Completed %s death/restart: PNG=%d; initial and late actual ragdoll, tile release; original four enemy classes and full resources restored. Engine sleep is a separately recorded observation."), *Cases[CaseIndex].Label, CapturedThisCase));
+        Test->AddInfo(FString::Printf(TEXT("Completed %s death/restart: PNG=%d; initial and late actual ragdoll, tile release; original single enemy and full resources restored. Engine sleep is a separately recorded observation."), *Cases[CaseIndex].Label, CapturedThisCase));
         ++CaseIndex;
         if (CaseIndex == Cases.Num())
         {
@@ -987,7 +989,7 @@ private:
                 if (IsValid(Unit) && Unit->GetTeam() == ETeam::Enemy) DefaultEnemyClasses.Add(Unit->GetClass()->GetPathName());
             }
             DefaultEnemyClasses.Sort();
-            if (!Check(DefaultEnemyClasses.Num() == 4, TEXT("The saved baseline contains exactly four original enemy classes for restart comparison."))) return false;
+            if (!Check(DefaultEnemyClasses.Num() == 1, TEXT("The debug baseline contains exactly one original enemy class for restart comparison."))) return false;
             TSet<FName> Unique;
             for (FName Id : Ids)
             {
@@ -1088,7 +1090,7 @@ private:
     {
         FCase& Current = Cases[CaseIndex];
         ACombatManager* Manager = Mode->GetCombatManager();
-        if (!Check(Manager && Manager->GetRegisteredUnits().Num() == 5, TEXT("Each original monster fixture starts from the saved debug roster."))) return false;
+        if (!Check(Manager && Manager->GetRegisteredUnits().Num() == 2, TEXT("Each original monster fixture starts from the single-enemy debug roster."))) return false;
         AUnitBase* Human = nullptr;
         ACombatGridTile* EnemyTile = nullptr;
         TArray<AUnitBase*> PreviousEnemies;
@@ -1101,7 +1103,7 @@ private:
             }
             else Human = Entry.Unit;
         }
-        if (!Check(Human && EnemyTile && PreviousEnemies.Num() == 4, TEXT("The real arena supplies its original human and a registered enemy home tile."))) return false;
+        if (!Check(Human && EnemyTile && PreviousEnemies.Num() == 1, TEXT("The real arena supplies its original human and a registered enemy home tile."))) return false;
         Controller->SetCombatContext(nullptr, false);
         Manager->ResetCombat();
         for (AUnitBase* Enemy : PreviousEnemies) Enemy->Destroy();
@@ -1164,9 +1166,25 @@ private:
         const FCase& Current = Cases[CaseIndex];
         NinjaVisibilityDiagnostics.Reset();
         LastNinjaDiagnosticAge = -1.f;
-        if (Current.bMonster) return PrepareMonsterCase();
         ACombatManager* Manager = Mode->GetCombatManager();
-        if (!Check(IsValid(Manager) && Manager->GetRegisteredUnits().Num() == 5 && Manager->GetCombatGrid(), TEXT("The saved debug map provides one ally, four enemies and its real grid."))) return false;
+        if (!Check(IsValid(Manager) && Manager->GetRegisteredUnits().Num() == 2 && Manager->GetCombatGrid(), TEXT("The debug map starts each case with one ally, one enemy and its real grid."))) return false;
+        for (AUnitBase* Unit : Manager->GetRegisteredUnits())
+        {
+            const UAS_Unit* Attributes = IsValid(Unit) ? Unit->GetAttributeSet() : nullptr;
+            if (!Check(Attributes && Attributes->GetHP() == 10000.f && Attributes->GetMaxHP() == 10000.f, TEXT("Every fresh debug case starts with 10,000 current and maximum HP on both units."))) return false;
+        }
+        if (Current.bMonster) return PrepareMonsterCase();
+        const int32 RequiredEnemies = Current.bChain || Current.bCardinal ? 4 : Current.TargetIndex + 1;
+        if (!Check(Current.TargetIndex >= 0 && Mode->EnemyDefinition && Mode->EnemyDefinition->EnemyUnitClasses.Num() >= RequiredEnemies, TEXT("The shared encounter retains the original classes required by this target fixture."))) return false;
+        // Add original enemy classes through the public debug API only when this case needs extra target bodies.
+        // 추가 대상 몸체가 필요한 검수에서만 공개 디버그 API로 원래 적 클래스를 추가합니다.
+        for (int32 Index = 1; Index < RequiredEnemies; ++Index)
+        {
+            const UClass* EnemyClass = Mode->EnemyDefinition->EnemyUnitClasses[Index].Get();
+            int32 AddedId = INDEX_NONE;
+            FText SpawnError;
+            if (!Check(EnemyClass && Mode->SpawnDebugUnit(Controller, true, FName(*EnemyClass->GetPathName()), AddedId, SpawnError), TEXT("Add an original enemy for the multi-target observation: ") + SpawnError.ToString())) return false;
+        }
         const TArray<AUnitBase*> Units = Manager->GetRegisteredUnits();
         Source = nullptr;
         Enemies.Reset();
@@ -1175,7 +1193,7 @@ private:
             if (!Entry.bEnemy) Source = Entry.Unit;
             else Enemies.Add(Entry.Unit);
         }
-        if (!Check(Source && Enemies.Num() == 4, TEXT("The live roster resolves the original caster and all four candidate bodies."))) return false;
+        if (!Check(Source && Enemies.Num() == RequiredEnemies && Units.Num() == RequiredEnemies + 1, TEXT("The live roster resolves the original caster and exactly the required candidate bodies."))) return false;
         const FString AssetPath = Current.Asset + TEXT(".") + FPaths::GetCleanFilename(Current.Asset);
         AuthoredSkill.Reset(LoadObject<USkillDefinitionDataAsset>(nullptr, *AssetPath));
         FText Error;
@@ -2053,7 +2071,7 @@ private:
         }
         Summary->SetBoolField(TEXT("optional_master_submix_recording_requested"), bRecordRequested);
         Summary->SetStringField(TEXT("optional_audio_environment"), TEXT("Recording only: temporarily set official au.DisableAppVolume and au.NeverDisableSubmixes with console value/priority restoration; wait for the audio-thread start fence, actual master-submix sample callbacks and one real second before casting. Source audio, saved editor settings and FApp unfocused-volume configuration remain unchanged. Live device/listener/sound diagnostics and PCM signal analysis are separate from listening quality."));
-        Summary->SetStringField(TEXT("scope"), bMonsterReview ? TEXT("Original 12 monster classes plus the retained skeleton; real enemy AI, authored montage, approach, recovery, GAS and AP; subsequent lethal GAS ragdoll, tile release and Restart restores original four-enemy roster. Preserve four early PNG and add a fifth at 2.5 actual world seconds with finite physical body velocities and awake state. A late sample does not establish final settling or floor penetration. Transient actors and human observation HP only; original physics, assets and saves stay unchanged. PNG review remains required for body pose and floor contact; audio listening, FPS and multiplayer are not measured.") : TEXT("Rendered local standalone PIE; preserve the 39 casts and append 48 distinct official DrGame assets. All 60 DrGame plus two retained human attacks. Original early observations plus required active main ages 0.3/0.6 for falling/area/healing/shield and actual impact PNG where authored; per-case phase ages are recorded. Chain capture starts at live age 0.15. Transient chain prototype=3/400cm/0.4s/1. PNG review remains required for visible direction and floor height; audio listening, FPS baseline and multiplayer are not measured."));
+        Summary->SetStringField(TEXT("scope"), bMonsterReview ? TEXT("Original 12 monster classes plus the retained skeleton; real enemy AI, authored montage, approach, recovery, GAS and AP; subsequent lethal GAS ragdoll, tile release and Restart restores the original single-enemy roster with 10,000 current/maximum HP on both units. Preserve four early PNG and add a fifth at 2.5 actual world seconds with finite physical body velocities and awake state. A late sample does not establish final settling or floor penetration. Transient actors and human observation HP only; original physics, assets and saves stay unchanged. PNG review remains required for body pose and floor contact; audio listening, FPS and multiplayer are not measured.") : TEXT("Rendered local standalone PIE; preserve the 39 casts and append 48 distinct official DrGame assets. All 60 DrGame plus two retained human attacks. Original early observations plus required active main ages 0.3/0.6 for falling/area/healing/shield and actual impact PNG where authored; per-case phase ages are recorded. Chain capture starts at live age 0.15. Transient chain prototype=3/400cm/0.4s/1. PNG review remains required for visible direction and floor height; audio listening, FPS baseline and multiplayer are not measured."));
         if (bFocusedReview) Summary->SetStringField(TEXT("scope"), Summary->GetStringField(TEXT("focused_scope")));
         if (bAuthoredChainReview) Summary->SetStringField(TEXT("scope"), TEXT("All five authored chain DataAssets, four directions and LWC, four real targets each: 25 casts and 200 rendered early/main-phase segment captures. Original saved 4/600cm/0.15s/0.8 settings execute without a profile override; nearest unhit order, original-caster GAS attenuation, one AP payment, endpoint tracking and main audio first-segment-only flags are checked. Optional actual submix recording is separate from individual listening quality. Original assets and saves remain unchanged."));
         if (bSettlingReview)

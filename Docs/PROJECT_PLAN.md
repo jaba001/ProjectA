@@ -1,6 +1,6 @@
 # ProjectA 구현 구조와 설정
 
-기준일: 2026-10-04. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다. 엔진 기준은 UE 5.8.3이며 현재 검수와 제한은 [최신 실행 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)을 따른다. UE 5.7 결과와 아래의 기존 실행 결과는 당시 코드의 이력으로 보존한다. HP 화면 보완과 데이터 읽기 검사를 포함한 native 회귀 175개·Development 패키지 검수는 목표 Run·회복 소모품 도입 전 결과이며 이번 변경의 검증을 대신하지 않는다.
+기준일: 2026-10-06. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다. 엔진 기준은 UE 5.8.3이며 현재 검수와 제한은 [최신 실행 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)을 따른다. UE 5.7 결과와 아래의 기존 실행 결과는 당시 코드의 이력으로 보존한다. HP 화면 보완과 데이터 읽기 검사를 포함한 native 회귀 175개·Development 패키지 검수는 목표 Run·회복 소모품 도입 전 결과이며 이번 변경의 검증을 대신하지 않는다.
 
 기본 Combat는 [GAME_DESIGN 8절](GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 2026-09-18 UE 5.7 위임 실행은 당시 두 전투 경로의 싱글 Run·같은 PC 2/4인 PIE와 저장·전투 예외 회귀 결과다. 2026-10-01 UE 5.7의 당시 코드로 1인·같은 PC 2/4인 PIE에서 각 10전투·9상점 선택/퇴장·개인 보상과 저장 재로드를 확인했다. 진행용 HP fixture이며 정상 난이도·실제 서비스·다중 PC·지연/손실 검증은 별도다. 2026-10-04 UE 5.8.3에서도 1/2/4인 PIE의 10전투·9상점·개인 보상·Host Continue를 확인했다. [과거 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)·[현재 검수](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)
 
@@ -224,7 +224,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 ### 4-2 전투 디버그 레벨
 
-`/Game/User_JeHoon/LEVEL/Development/DebugCombat`은 프로젝트 소유 Gameplay 맵의 배치·카메라·Grid를 Unreal API로 복제한 독립 개발 레벨이다. `BP_CombatDebugGameMode`는 기존 Party·Enemy 정의를 참조하고 전사 1명·적 4명을 생성한다. `ACombatDebugPlayerController`와 기존 라운드 계획 UI를 사용하며 일반 인카운터 진행·결과·저장 경로에는 연결하지 않는다. 로컬 Standalone·비 Shipping에서만 동작하고 활성 관리 Run이 있으면 시작을 거절한다.
+`/Game/User_JeHoon/LEVEL/Development/DebugCombat`은 프로젝트 소유 Gameplay 맵의 배치·카메라·Grid를 Unreal API로 복제한 독립 개발 레벨이다. `BP_CombatDebugGameMode`는 기존 Party·Enemy 정의를 참조하고 전사 1명과 기존 적 목록의 첫 번째 적 1명을 생성한다. 초기·수동 추가 생성 모두 직업·클래스 초기화 이후 GAS 현재·최대 HP를 각각 10000으로 설정하며 전투 초기화도 같은 구성으로 복원한다. 공용 Party·Enemy 정의와 일반 Run의 편성·체력은 유지한다. `ACombatDebugPlayerController`와 기존 라운드 계획 UI를 사용하며 일반 인카운터 진행·결과·저장 경로에는 연결하지 않는다. 로컬 Standalone·비 Shipping에서만 동작하고 활성 관리 Run이 있으면 시작을 거절한다.
 
 `UCombatDebugLoadout`은 Skills 하위의 유효 DataAsset 74종(기본 2·몬스터 전용 12·신규 60)과 태그 장착 프로필이 있는 장비 49종을 제공한다. 몬스터 공격도 개발용 일반 카탈로그에 포함되며 새 Run의 상점 후보 61종과 구분한다. `Item.Consumable` 태그의 회복약은 일반 카탈로그·스킬 5칸·상점 스킬 풀에서 제외하고 목표 Run의 별도 재고에서만 사용한다. 장비 후보는 기존 `RunEquipmentRules`로 검증하고 임시 보유 상태에만 기록한다. 획득은 지정 슬롯에 즉시 장착하며 밀려난 장비는 임시 보유 목록에 남는다. 제거는 장착 해제·보유 삭제·참조 인덱스 보정을 함께 수행한다. 장비는 현재 외형만 바꾸며 능력치·스킬은 부여하지 않는다.
 
@@ -251,7 +251,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 | `DungeonFantasy` | 108·9·6 |
 | `DungeonStone` | 101·8·6 |
 
-`ConfigureDungeonLevels.py`는 프로젝트 소유 Gameplay 맵을 Unreal 기능으로 복제하여 기존 전장·Grid·GameplayCamera를 보존하고 신규 맵에 환경 장식을 배치한다. 두 비교 맵만 기존 `/Game/User_JeHoon/Blueprint/Game/BP_CombatDebugGameMode`를 지정하여 관리 Run이 없는 로컬 1인 Standalone·Non-Shipping Play에서 전사 1명·적 4명의 독립 전투를 시작하도록 구성한다. 메시·Material·텍스처는 외부 팩 원본을 직접 참조하며 `User_JeHoon`으로 복제하지 않는다. 기존 GameMode Blueprint·Gameplay·DebugCombat과 기본 Run의 레벨 전환은 유지한다.
+`ConfigureDungeonLevels.py`는 프로젝트 소유 Gameplay 맵을 Unreal 기능으로 복제하여 기존 전장·Grid·GameplayCamera를 보존하고 신규 맵에 환경 장식을 배치한다. 두 비교 맵만 기존 `/Game/User_JeHoon/Blueprint/Game/BP_CombatDebugGameMode`를 지정하여 관리 Run이 없는 로컬 1인 Standalone·Non-Shipping Play에서 전사 1명·적 1명, 양쪽 현재·최대 HP 10000의 독립 전투를 시작하도록 구성한다. 메시·Material·텍스처는 외부 팩 원본을 직접 참조하며 `User_JeHoon`으로 복제하지 않는다. 기존 GameMode Blueprint·Gameplay·DebugCombat과 기본 Run의 레벨 전환은 유지한다.
 
 기본 명령은 신규 맵을 작성하고, `-DungeonVerifyOnly`는 저장본을 읽기 전용으로 검사한다. `-DungeonRebuild`는 기존 비교 맵의 장식을 다시 구성하는 명시적 재작성 옵션으로 수동 장식 수정을 덮어쓴다. `DungeonFantasySpec.json`·`DungeonStoneSpec.json`이 원본 에셋·배치 명세를 관리하며 결과는 `Saved/Automation/Dungeons/Configuration.json`·`Reload.json`에 기록한다.
 
@@ -369,13 +369,13 @@ Spawn_Ninja_Root의 원본과 두 높이 대안은 3조건·15장으로 비교�
 
 ### 4-10 레벨 폴더와 이전 경로 호환
 
-[LevelFolderLayout.json](../Source/ProjectAEditor/Scripts/LevelFolderLayout.json)을 18개 고유 맵의 경로 기준으로 사용한다. `name`은 기존 맵 이름, `old_path`는 이동 전 경로, `path`는 현재 경로이며 `legacy_redirectors`는 먼저 존재하던 별칭이다. 원본 Fab 팩·맵 배치·게임 모드·navigation·필수 파생 재질은 보존하고 폴더만 용도와 테마로 나눈다.
+[LevelFolderLayout.json](../Source/ProjectAEditor/Scripts/LevelFolderLayout.json)은 당시 18개 고유 맵의 이동 명세로 보존한다. 2026-10-06 기존 사용자 변경인 `Legacy/WorldMap` 삭제를 반영하여 현재 맵은 17개이며 해당 맵의 옛 PackageRedirect와 현행 감사 로드 목록을 정리했다. 아래 18맵·20경로 검증은 삭제 전 이력이고 당시 이동 도구의 검증 대상에도 삭제된 맵이 포함된다. `name`은 기존 맵 이름, `old_path`는 이동 전 경로, `path`는 현재 경로이며 `legacy_redirectors`는 먼저 존재하던 별칭이다. 원본 Fab 팩·맵 배치·게임 모드·navigation·필수 파생 재질은 보존하고 폴더만 용도와 테마로 나눈다.
 
 | `LEVEL/` 기준 폴더 | 맵 |
 |---|---|
 | `Core` | `MainMenu`, `Gameplay` |
 | `Development` | `DebugCombat` |
-| `Legacy` | `WorldMap` — 현재 Run 흐름에서 제외된 보존 맵 |
+| `Legacy` | `WorldMap` — 2026-10-06 기존 사용자 삭제 반영, 현행 맵에서 제외 |
 | `Environment/Dungeon` | `DungeonFantasy`, `DungeonStone` |
 | `Environment/Grassland` | `MeadowBloom`, `SavannahGrove` |
 | `Environment/Forest` | `PineRidge`, `CrimsonForest`, `BambooGarden`, `DarkMarsh` |
@@ -587,8 +587,8 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 
 - 새 싱글의 PvE/로컬 Snapshot 20전투·60선택과 시험 편성·성장·보상·회복/부활·전투 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 구현 범위다. 기존 2/10전투 저장과 개발 협동 10전투 경로는 보존한다. 직업별 고유 스킬·최종 밸런스·나머지 240종 장비 분류·추가 비무기 콘텐츠·장비 능력치/부여 스킬·Snapshot 장비 연결은 미구현이며 실행 검수 결과는 [TODO](TODO.md)를 따른다.
 - 4×4 Grid·ASC HP/AP·기존 외형/사망 표현과 시전 몽타주를 연결한다. 순차 턴·AI·기존 GAS/몽타주 알림의 효과 실행은 기본 전투에서 제외하며 장착 스킬은 초기 라운드 변환을 사용한다. 미지원 이전 대상/범위/커스텀 능력은 명시 프로필을 요구하며 자동으로 다른 효과로 바꾸지 않는다. Streaming/Level Instance는 현재 흐름에 없다.
-- 2026-09-11부터 작업 폴더에서 삭제된 TestMap·BP_PartyPlayerController·TestGameModebase의 삭제 이력을 2026-09-16 Git에 반영한다. 자동 복원하지 않으며 최초 생성 도구의 TestMap 입력은 별도 원본 확보가 필요하다. 현재 Audit 도구는 실제 역할 4맵을 새 경로로 검사한다. WorldMap 레벨/native class는 deprecated 상태이며 실행 흐름에서 제외한다.
-- WorldMap의 WorldSettings가 참조하는 WorldMapGameModeBase는 호환을 위해 보존한다.
+- 2026-09-11부터 작업 폴더에서 삭제된 TestMap·BP_PartyPlayerController·TestGameModebase의 삭제 이력을 2026-09-16 Git에 반영한다. 자동 복원하지 않으며 최초 생성 도구의 TestMap 입력은 별도 원본 확보가 필요하다. 현재 Audit 도구는 실제 역할 3맵(MainMenu·Gameplay·DebugCombat)을 새 경로로 검사한다. WorldMap 레벨은 기존 사용자 변경으로 삭제했으며 native class는 deprecated 호환 상태로 유지한다.
+- 삭제 전 WorldMap의 WorldSettings가 참조하던 WorldMapGameModeBase는 호환을 위해 보존한다.
 - 로컬 Snapshot·Listen Server·개발용 관리 저장의 구현을 실제 계정 인증, Steam 연결, PlayFab 운영, 경쟁 결과 검증이나 MMR 완료로 기록하지 않는다.
 - 빌드·자동화 결과와 사용자의 실제 조작 검증을 구분한다. 향후 Run·온라인·에셋 도입 조건은 [TODO](TODO.md), 현재 시험 구현의 실행 결과와 제한은 [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 - 2026-09-16 계획 입력·AI 보완의 Editor 컴파일은 최종 초안 보존 수정을 포함해 성공했다. 당시 코드·문서 정적 검사는 통과했고 작동 검증은 미실행이었다. 이후 변경의 실제 실행 결과는 [재검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관), 후속 콘텐츠의 결정 기준은 [기획](GAME_DESIGN.md#6-구현-원칙과-다음-콘텐츠)을 따른다.

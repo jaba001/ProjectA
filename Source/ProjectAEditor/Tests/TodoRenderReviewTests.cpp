@@ -271,7 +271,7 @@ public:
                 return false;
             }
             FTodoHealthPaintObservation Alive = Observe();
-            if (!Check(Alive.Labels.Num() == 5 && Alive.BoxCount == 15, TEXT("The actual gameplay geometry paints five HP labels, five backgrounds and ten health-bar boxes.")) || !VerifyHealthPlacement(Alive)) return End();
+            if (!Check(Alive.Labels.Num() == 2 && Alive.BoxCount == 6, TEXT("The actual gameplay geometry paints two HP labels, two backgrounds and four health-bar boxes.")) || !VerifyHealthPlacement(Alive)) return End();
             if (!bHealth)
             {
                 const FString Suffix = ScreenIndex == 0 ? TEXT("gameplay_ui_16x9") : ScreenIndex == 1 ? TEXT("gameplay_ui_21x9") : TEXT("gameplay_ui_4x3");
@@ -309,7 +309,7 @@ public:
         {
             if (!Warm(5, 0.1)) return false;
             const FTodoHealthPaintObservation Shielded = Observe();
-            if (!Check(Shielded.Labels.Num() == 5 && Shielded.BoxCount == 15 && Shielded.Labels.ContainsByPredicate([](const FString& Label) { return Label.Contains(TEXT("보호막")); }), TEXT("The real NativePaint emits the shield text alongside the live HP and bar draws.")) || !VerifyHealthPlacement(Shielded) || !Capture(TEXT("alive_shield_ui"))) return End();
+            if (!Check(Shielded.Labels.Num() == 2 && Shielded.BoxCount == 6 && Shielded.Labels.ContainsByPredicate([](const FString& Label) { return Label.Contains(TEXT("보호막")); }), TEXT("The real NativePaint emits the shield text alongside the live HP and bar draws.")) || !VerifyHealthPlacement(Shielded) || !Capture(TEXT("alive_shield_ui"))) return End();
             const UAS_Unit* Attributes = Ally->GetAttributeSet();
             if (!Check(UCombatEffectLibrary::ApplyDamageToUnit(Enemy.Get(), Ally.Get(), UGE_Damage::StaticClass(), Attributes->GetHP() + Attributes->GetShield() + 1.f), TEXT("Actual GAS damage kills the shielded ally."))) return End();
             Advance(4);
@@ -319,7 +319,7 @@ public:
         {
             if (!Warm(5, 0.1)) return false;
             const FTodoHealthPaintObservation Dead = Observe();
-            if (!Check(!Ally->IsUnitAlive() && Dead.Labels.Num() == 4 && Dead.BoxCount == 12 && !Dead.Labels.ContainsByPredicate([](const FString& Label) { return Label.Contains(TEXT("보호막")); }), TEXT("GAS death removes the ally's actual HP text, shield text, background and both bar draws.")) || !VerifyHealthPlacement(Dead) || !Capture(TEXT("dead_ui"))) return End();
+            if (!Check(!Ally->IsUnitAlive() && Dead.Labels.Num() == 1 && Dead.BoxCount == 3 && !Dead.Labels.ContainsByPredicate([](const FString& Label) { return Label.Contains(TEXT("보호막")); }), TEXT("GAS death removes the ally's actual HP text, shield text, background and both bar draws.")) || !VerifyHealthPlacement(Dead) || !Capture(TEXT("dead_ui"))) return End();
             FText Error;
             if (!Check(Round->ReviveDebugUnit(Controller.Get(), AllyId, Error), TEXT("The public debug revival succeeds: ") + Error.ToString())) return End();
             Advance(5);
@@ -329,7 +329,7 @@ public:
         {
             if (!Warm(5, 0.1)) return false;
             const FTodoHealthPaintObservation Revived = Observe();
-            if (!Check(Ally->IsUnitAlive() && Revived.Labels.Num() == 5 && Revived.BoxCount == 15 && !Revived.Labels.ContainsByPredicate([](const FString& Label) { return Label.Contains(TEXT("보호막")); }), TEXT("Debug revival restores the actual HP/background/bar output and clears the spent shield.")) || !VerifyHealthPlacement(Revived)) return End();
+            if (!Check(Ally->IsUnitAlive() && Revived.Labels.Num() == 2 && Revived.BoxCount == 6 && !Revived.Labels.ContainsByPredicate([](const FString& Label) { return Label.Contains(TEXT("보호막")); }), TEXT("Debug revival restores the actual HP/background/bar output and clears the spent shield.")) || !VerifyHealthPlacement(Revived)) return End();
             UGameViewportClient* Viewport = Controller->GetWorld()->GetGameViewport();
             const TSharedPtr<SViewport> Widget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
             const TSharedPtr<SWindow> Window = Widget.IsValid() ? FSlateApplication::Get().FindWidgetWindow(Widget.ToSharedRef()) : nullptr;
@@ -376,7 +376,7 @@ public:
             int32 NativeHeight = 0;
             if (!Check(Window.IsValid() && Window->GetNativeWindow().IsValid() && Window->GetNativeWindow()->GetRestoredDimensions(NativeX, NativeY, NativeWidth, NativeHeight) && (FVector2D(NativeX, NativeY) - FVector2D(OriginalNativePosition)).Size() > 16.0 && FIntPoint(NativeWidth, NativeHeight) == OriginalNativeWindowSize, TEXT("A second actual native window position changes the desktop offset while retaining the original window size.")) || !TodoReviewWindowPlacement::Ensure(Test, Controller->GetWorld())) return End();
             const FTodoHealthPaintObservation Moved = Observe();
-            if (!Check(Moved.Labels.Num() == 5 && Moved.BoxCount == 15, TEXT("The moved review window retains five real live HP labels and their original draw counts.")) || !VerifyHealthPlacement(Moved) || !Capture(TEXT("revived_ui"))) return End();
+            if (!Check(Moved.Labels.Num() == 2 && Moved.BoxCount == 6, TEXT("The moved review window retains two real live HP labels and their original draw counts.")) || !VerifyHealthPlacement(Moved) || !Capture(TEXT("revived_ui"))) return End();
             return End();
         }
         if (Stage == 10)
@@ -600,6 +600,8 @@ private:
         for (const FCombatRoundUnitView& Entry : Round->GetView().Units)
         {
             if (!Check(IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive() && Entry.Unit->GetCurrentTile() && Entry.Unit->GetCurrentTile()->GetOccupyingUnit() == Entry.Unit, TEXT("Each authored combat unit has a live actor and matching tile occupancy."))) return false;
+            const UAS_Unit* Attributes = Entry.Unit->GetAttributeSet();
+            if (!Check(Attributes && Attributes->GetHP() == 10000.f && Attributes->GetMaxHP() == 10000.f, TEXT("Both initial debug units start with 10,000 current and maximum HP."))) return false;
             if (Entry.bEnemy)
             {
                 Enemy = Entry.Unit;
@@ -613,7 +615,7 @@ private:
         }
         FProfessionDefinition Warrior;
         FText Error;
-        return Check(Round->GetView().Units.Num() == 5 && EnemyCount == 4 && Ally.IsValid() && Mode->PartyDefinition && Mode->PartyDefinition->ResolveProfession(TEXT("Warrior"), Warrior, Error) && Ally->IsA(Warrior.CombatClass), TEXT("The existing map spawns the configured warrior and four enemies without a test asset copy."));
+        return Check(Round->GetView().Units.Num() == 2 && EnemyCount == 1 && Ally.IsValid() && Mode->PartyDefinition && Mode->PartyDefinition->ResolveProfession(TEXT("Warrior"), Warrior, Error) && Ally->IsA(Warrior.CombatClass), TEXT("The existing map spawns the configured warrior and one enemy without a test asset copy."));
     }
 
     FTodoHealthPaintObservation Observe()

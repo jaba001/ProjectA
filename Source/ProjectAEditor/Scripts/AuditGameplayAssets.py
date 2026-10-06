@@ -53,7 +53,7 @@ for data in registry.get_assets_by_path("/Game/User_JeHoon", recursive=True):
             entry["error"] = str(error)
     report["assets"].append(entry)
 
-map_names = ["MainMenu", "Gameplay", "DebugCombat", "WorldMap"]
+map_names = ["MainMenu", "Gameplay", "DebugCombat"]
 for map_name in map_names:
     world = unreal.EditorLoadingAndSavingUtils.load_map(project_level_path(map_name))
     entry = {"name": map_name, "loaded": bool(world), "actors": []}
