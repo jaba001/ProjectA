@@ -6,6 +6,7 @@
 #include "Unit/EnemyUnit.h"
 #include "Unit/CharacterAppearanceComponent.h"
 #include "DataAsset/CharacterAppearanceCatalog.h"
+#include "Unit/UnitDataRules.h"
 
 bool UOpponentSnapshotCatalogDataAsset::MatchesSavedUnitClass(const FPartySnapshotMember& Member, const FSoftObjectPath& SavedClass) const
 {
@@ -21,9 +22,9 @@ bool UOpponentSnapshotCatalogDataAsset::ResolveSkills(const FPartySnapshotMember
 {
     TArray<TObjectPtr<USkillDefinitionDataAsset>> Resolved;
     TSet<FPrimaryAssetId> AssetIds;
-    if (Member.SkillIds.IsEmpty() || Member.SkillIds.Num() > 5)
+    if (!UnitDataRules::IsValidSkillCount(Member.SkillIds.Num(), true))
     {
-        OutError = NSLOCTEXT("Snapshot", "SkillCount", "Snapshot requires 1–5 ordered skills. / 스킬은 순서가 있는 1~5개여야 합니다.");
+        OutError = NSLOCTEXT("Snapshot", "SkillCount", "Snapshot requires at least one ordered skill. / Snapshot에 순서가 있는 스킬이 한 개 이상 필요합니다.");
         return false;
     }
     for (FName SkillId : Member.SkillIds)

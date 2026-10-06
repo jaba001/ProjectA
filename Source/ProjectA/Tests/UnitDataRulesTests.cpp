@@ -3,10 +3,12 @@
 #include "Misc/AutomationTest.h"
 #include "AbilitySystemComponent.h"
 #include "Combat/Library/CombatEffectLibrary.h"
+#include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/World.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
+#include "Game/Run/RunTypes.h"
 #include "GAS/Effect/GE_Damage.h"
 #include "Unit/PlayerUnit.h"
 #include "Unit/UnitDataRules.h"
@@ -111,6 +113,63 @@ bool FUnitDataValidationAgreementTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Catalog rejects duplicate skills"), Catalog->ResolveProfession(TEXT("Warrior"), Resolved, Error));
     TestFalse(TEXT("Live loadout rejects the same duplicate skills"), Unit->ConfigureProfession(100.0f, 2, 1, Definition.StartingSkills));
     TestEqual(TEXT("Invalid loadout leaves equipped skills intact"), Unit->GetEquippedSkillDataAssets().Num(), 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitUnlimitedSkillLoadoutTest, "ProjectA.Party.UnlimitedOrderedSkillLoadout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FUnitUnlimitedSkillLoadoutTest::RunTest(const FString& Parameters)
+{
+    UnitDataRulesTests::FScopedWorld Scope;
+    APlayerUnit* Unit = Scope.SpawnUnit();
+    UPartyDefinitionDataAsset* Catalog = NewObject<UPartyDefinitionDataAsset>();
+    UOpponentSnapshotCatalogDataAsset* OpponentCatalog = NewObject<UOpponentSnapshotCatalogDataAsset>();
+    FProfessionDefinition& Definition = Catalog->Professions.FindChecked(TEXT("Warrior"));
+    Definition.bUseUnitClassDefaults = false;
+    Definition.CombatClass = APlayerUnit::StaticClass();
+    Definition.StartingSkills.Reset();
+    FRunPartyMember Member;
+    Member.ClassId = TEXT("Warrior");
+    Member.bHasSkillLoadout = true;
+    FPartySnapshotMember Opponent;
+    for (int32 Index = 0; Index < 6; ++Index)
+    {
+        USkillDefinitionDataAsset* Skill = NewObject<USkillDefinitionDataAsset>(Catalog);
+        Skill->bUseRoundDefinition = true;
+        Definition.StartingSkills.Add(Skill);
+        Member.Skills.Add(FSoftObjectPath(Skill));
+        const FName SkillId(*FString::Printf(TEXT("UnlimitedSkill_%d"), Index));
+        Opponent.SkillIds.Add(SkillId);
+        OpponentCatalog->Skills.Add(SkillId, Skill);
+    }
+    FText Error;
+    FProfessionDefinition Resolved;
+    TArray<TObjectPtr<USkillDefinitionDataAsset>> ResolvedSkills;
+    TestTrue(TEXT("A profession may define more than five unique skills"), Catalog->ResolveProfession(TEXT("Warrior"), Resolved, Error));
+    TestTrue(TEXT("A live unit accepts the complete ordered loadout"), Unit->ConfigureProfession(100.0f, 2, 1, Definition.StartingSkills));
+    TestTrue(TEXT("A stored party member resolves more than five skills"), Catalog->ResolveMemberSkills(Member, ResolvedSkills, Error));
+    TestTrue(TEXT("Stored member resolution preserves every skill in order"), ResolvedSkills == Definition.StartingSkills);
+    TestTrue(TEXT("An opponent catalog resolves more than five skills"), OpponentCatalog->ResolveSkills(Opponent, ResolvedSkills, Error));
+    TestTrue(TEXT("Opponent resolution preserves every skill in order"), ResolvedSkills == Definition.StartingSkills);
+    TestTrue(TEXT("Skill counts have no gameplay upper limit"), UnitDataRules::IsValidSkillCount(500, true));
+    TestFalse(TEXT("Negative skill counts remain invalid"), UnitDataRules::IsValidSkillCount(-1, false));
+    TestFalse(TEXT("Required skill loadouts still reject zero skills"), UnitDataRules::IsValidSkillCount(0, true));
+    TestTrue(TEXT("Optional skill loadouts still allow zero skills"), UnitDataRules::IsValidSkillCount(0, false));
+    USkillDefinitionDataAsset* DuplicateSkill = Definition.StartingSkills[0];
+    Definition.StartingSkills.Add(DuplicateSkill);
+    TestFalse(TEXT("An unlimited profession still rejects duplicate skill IDs"), Catalog->ResolveProfession(TEXT("Warrior"), Resolved, Error));
+    TestFalse(TEXT("An unlimited live loadout still rejects duplicate skill IDs"), Unit->ConfigureProfession(100.0f, 2, 1, Definition.StartingSkills));
+    TestEqual(TEXT("Duplicate rejection preserves all six equipped skills"), Unit->GetEquippedSkillDataAssets().Num(), 6);
+    Definition.StartingSkills.Last() = nullptr;
+    TestFalse(TEXT("An unlimited profession still rejects missing skill assets"), Catalog->ResolveProfession(TEXT("Warrior"), Resolved, Error));
+    TestFalse(TEXT("An unlimited live loadout still rejects missing skill assets"), Unit->ConfigureProfession(100.0f, 2, 1, Definition.StartingSkills));
+    Definition.StartingSkills.Pop();
+    const FSoftObjectPath DuplicatePath = Member.Skills[0];
+    Member.Skills.Add(DuplicatePath);
+    TestFalse(TEXT("An unlimited stored member still rejects duplicate skill assets"), Catalog->ResolveMemberSkills(Member, ResolvedSkills, Error));
+    const FName DuplicateId = Opponent.SkillIds[0];
+    Opponent.SkillIds.Add(DuplicateId);
+    TestFalse(TEXT("An unlimited opponent still rejects duplicate skill assets"), OpponentCatalog->ResolveSkills(Opponent, ResolvedSkills, Error));
     return true;
 }
 

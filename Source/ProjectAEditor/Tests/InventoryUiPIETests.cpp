@@ -227,6 +227,17 @@ public:
         if (!Run) return false;
         if (Stage == 4)
         {
+            if (!bLegacyPrototypePrepared)
+            {
+                if (Run->GetPhase() == ERunPhase::None) return false;
+                const TArray<FRunPartyMember> Party = Run->GetPartyMembers();
+                FText Error;
+                // Keep the full CSV inventory fixture in the historical acquisition mode through public initialization.
+                // 공개 초기화로 전체 CSV 인벤토리 fixture를 기존 획득 모드에 유지합니다.
+                if (!Check(Run->IsTargetRun() && Run->InitializeRun(Party, Error) && !Run->IsTargetRun() && !Run->UsesWeaponSkills() && Run->GetWeaponSkillRules().SchemaVersion == 0 && Run->GetNodes().Num() == 10 && Run->GetSkillShopState().SchemaVersion == 1 && Run->GetSaveError().IsEmpty(), TEXT("The isolated inventory review explicitly creates and saves its legacy0 ten-combat prototype: ") + Error.ToString())) return End();
+                bLegacyPrototypePrepared = true;
+                return false;
+            }
             if (!Active<URunMapWidget>(World) || Run->GetPhase() != ERunPhase::Map) return false;
             if (!PrepareViewport()) return bViewportFailed ? End() : false;
             if (!InstallFixture(Run)) return End();
@@ -503,7 +514,7 @@ private:
         if (!Check(RunItemShopCatalog::Load(Catalog, Error) && Catalog.Num() == 289, TEXT("The real runtime CSV loader reads all 289 catalog definitions."))) return false;
         TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));
         FRunPartyMember* Member = Saved.IsValid() ? Saved->Party.FindByPredicate([](const FRunPartyMember& Item) { return Item.bCreated && Item.bPlayerControlled; }) : nullptr;
-        if (!Check(Member && Saved->Party.FilterByPredicate([](const FRunPartyMember& Item) { return Item.bCreated; }).Num() == 4, TEXT("The newly created Run durably retains the real four-character party."))) return false;
+        if (!Check(Member && Saved->WeaponSkillAcquisitionVersion == 0 && Saved->WeaponSkillRules.SchemaVersion == 0 && Saved->Party.FilterByPredicate([](const FRunPartyMember& Item) { return Item.bCreated; }).Num() == 4, TEXT("The explicit legacy0 prototype durably retains the menu-created four-character party."))) return false;
         for (FRunPartyMember& Companion : Saved->Party) if (Companion.bCreated && Companion.CurrentHP < 0.f) Companion.CurrentHP = 1000.f;
         CharacterId = Member->CharacterId;
         const FGameplayTag MainHand = URunEquipmentCatalog::GetWeaponSlot(0);
@@ -1278,6 +1289,7 @@ private:
     int32 Frames = 0;
     int32 ViewportWarmFrames = 0;
     int32 ViewportResizeRetries = 0;
+    bool bLegacyPrototypePrepared = false;
     bool bViewportResizeRequested = false;
     bool bViewportNativeBaselineRequested = false;
     double ViewportNativeBaselineStarted = 0.0;
@@ -1354,6 +1366,7 @@ void FInventoryUiReviewTest::GetTests(TArray<FString>& Names, TArray<FString>& C
 
 bool FInventoryUiReviewTest::RunTest(const FString& Parameters)
 {
+    AddInfo(TEXT("InventoryUI reviews an explicit legacy0 prototype and disposable CSV item fixture. Ordinary new Target menu and weapon acquisition coverage belongs to NormalTargetRunPIETests."));
     const FIntPoint Size = Parameters == TEXT("4x3") ? FIntPoint(1024, 768) : Parameters == TEXT("16x9") ? FIntPoint(1280, 720) : FIntPoint(1680, 720);
     if (Parameters != TEXT("4x3") && Parameters != TEXT("16x9") && Parameters != TEXT("21x9")) return false;
     if (!GEditor || !GEngine || !FApp::CanEverRender() || !FSlateApplication::IsInitialized() || FParse::Param(FCommandLine::Get(), TEXT("nullrhi")))

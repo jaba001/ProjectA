@@ -22,6 +22,7 @@
 #include "GameFramework/PlayerController.h"
 #include "UI/Gameplay/EquipmentDragDropOperation.h"
 #include "UI/Gameplay/EquipmentItemSlotWidget.h"
+#include "UI/Gameplay/RunItemPresentation.h"
 #include "UI/Theme/DemonicUITheme.h"
 
 namespace
@@ -34,11 +35,6 @@ namespace
         Category.Query = Query;
         Category.bSkills = bSkills;
         return Category;
-    }
-
-    FText ItemName(const FRunItemDefinition& Item)
-    {
-        return Item.DisplayName.IsEmpty() ? FText::FromString(Item.Asset.GetAssetName()) : Item.DisplayName;
     }
 
     FText SlotName(FGameplayTag Slot)
@@ -197,7 +193,7 @@ void UCharacterInventoryPanel::AddItem(const FRunItemDefinition& Item, int32 Ite
     Row->ItemSelected.BindUObject(this, &UCharacterInventoryPanel::SelectItem);
     Row->CanAcceptDrop.BindUObject(this, &UCharacterInventoryPanel::CanAcceptDrop);
     Row->ReceiveDrop.BindUObject(this, &UCharacterInventoryPanel::HandleDrop);
-    Row->RefreshSlot(DisplayedMember.CharacterId, DisplayedMember.Equipment.Revision, ItemIndex, &Item, FGameplayTag(), NAME_None, FText::GetEmpty(), bCanChangeEquipment);
+    Row->RefreshSlot(DisplayedMember.CharacterId, DisplayedMember.Equipment.Revision, ItemIndex, &Item, FGameplayTag(), NAME_None, FText::GetEmpty(), bCanChangeEquipment, DisplayedRarities);
     ItemList->AddChildToVerticalBox(Row)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 2.0f));
     ItemRows.Add(Row);
     VisibleItemIndices.Add(ItemIndex);
@@ -215,8 +211,10 @@ void UCharacterInventoryPanel::AddSkill(const USkillDefinitionDataAsset* Skill)
     Theme.StyleInset(Card);
     Card->SetPadding(FMargin(8.0f, 6.0f));
     SkillList->AddChildToVerticalBox(Card)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 2.0f));
+    UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>();
+    Card->SetContent(Content);
     UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
-    Card->SetContent(Row);
+    Content->AddChildToVerticalBox(Row);
     USizeBox* IconSize = WidgetTree->ConstructWidget<USizeBox>();
     IconSize->SetWidthOverride(24.0f);
     IconSize->SetHeightOverride(24.0f);
@@ -239,7 +237,32 @@ void UCharacterInventoryPanel::AddSkill(const USkillDefinitionDataAsset* Skill)
     Cost->SetText(Skill->GetActionPointCostText());
     Theme.StyleText(Cost, false, 13);
     Row->AddChildToHorizontalBox(Cost)->SetPadding(FMargin(8.0f, 0.0f, 0.0f, 0.0f));
-    Card->SetToolTipText(FText::Format(NSLOCTEXT("Inventory", "SkillTooltip", "{0}\n{1}\n{2}"), Name, Skill->GetActionPointCostText(), Skill->SkillDescription));
+    TArray<FText> Sources;
+    TSet<int32> SourceItems;
+    FCombatRoundSkill DisplayedSkill;
+    FText Error;
+    const bool bResolvedSkill = Skill->ResolveRoundSkill(DisplayedSkill, Error);
+    for (const FRunEquipmentSlot& EquipmentSlot : DisplayedMember.Equipment.Slots)
+    {
+        if (!DisplayedMember.Items.IsValidIndex(EquipmentSlot.ItemIndex) || SourceItems.Contains(EquipmentSlot.ItemIndex)) continue;
+        const FRunItemDefinition& Item = DisplayedMember.Items[EquipmentSlot.ItemIndex];
+        if (Item.GenerationVersion == 0) continue;
+        const bool bGrantsSkill = Item.GrantedSkills.ContainsByPredicate([Skill, bResolvedSkill, &DisplayedSkill](const FSoftObjectPath& Path)
+        {
+            const USkillDefinitionDataAsset* GrantedSkill = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
+            if (GrantedSkill == Skill) return true;
+            FCombatRoundSkill Granted;
+            FText GrantedError;
+            return bResolvedSkill && GrantedSkill && GrantedSkill->ResolveRoundSkill(Granted, GrantedError) && Granted.SkillId == DisplayedSkill.SkillId;
+        });
+        if (!bGrantsSkill) continue;
+        SourceItems.Add(EquipmentSlot.ItemIndex);
+        Sources.Add(FText::Format(NSLOCTEXT("Inventory", "EquippedSkillSource", "{0} ({1})"), RunItemPresentation::Name(Item, DisplayedRarities), SlotName(EquipmentSlot.SlotTag)));
+    }
+    const FText SourceText = Sources.IsEmpty() ? FText::GetEmpty() : FText::Format(NSLOCTEXT("Inventory", "EquippedSkillSources", "장착 무기: {0}"), FText::Join(FText::FromString(TEXT(" · ")), Sources));
+    if (!SourceText.IsEmpty()) AddText(Content, SourceText, 13, 0.0f)->SetVisibility(ESlateVisibility::HitTestInvisible);
+    const FText Tooltip = FText::Format(NSLOCTEXT("Inventory", "SkillTooltip", "{0}\n{1}\n{2}"), Name, Skill->GetActionPointCostText(), Skill->SkillDescription);
+    Card->SetToolTipText(SourceText.IsEmpty() ? Tooltip : FText::Format(NSLOCTEXT("Inventory", "SkillSourceTooltip", "{0}\n{1}"), Tooltip, SourceText));
 }
 
 void UCharacterInventoryPanel::ResolveDisplayedSkills()
@@ -277,9 +300,10 @@ void UCharacterInventoryPanel::RefreshInventory(const FGameplayViewState& View, 
     // Preserve a selection only when the same character still owns the same indexed copy and definition.
     // 같은 캐릭터가 동일 인덱스의 사본과 정의를 계속 보유할 때만 선택을 유지합니다.
     const FRunItemDefinition* Candidate = Member && Member->Items.IsValidIndex(SelectedItemIndex) ? &Member->Items[SelectedItemIndex] : nullptr;
-    if (!Candidate || Member->CharacterId != DisplayedMember.CharacterId || Candidate->Asset != SelectedItem.Asset || !Candidate->DisplayName.EqualTo(SelectedItem.DisplayName) || Candidate->Tags != SelectedItem.Tags || Candidate->Price != SelectedItem.Price) SelectedItemIndex = INDEX_NONE;
+    if (!Candidate || Member->CharacterId != DisplayedMember.CharacterId || Candidate->Asset != SelectedItem.Asset || !Candidate->DisplayName.EqualTo(SelectedItem.DisplayName) || Candidate->Tags != SelectedItem.Tags || Candidate->Price != SelectedItem.Price || Candidate->ItemInstanceId != SelectedItem.ItemInstanceId) SelectedItemIndex = INDEX_NONE;
     const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
     DisplayedMember = Member ? *Member : FRunPartyMember();
+    DisplayedRarities = View.ItemRarities;
     bCanChangeEquipment = Member && Controller && Controller->CanChangeEquipment(View, CharacterId);
     GoldText->SetVisibility(Member ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     ItemCountText->SetVisibility(Member ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -362,7 +386,9 @@ void UCharacterInventoryPanel::RefreshSelectedItem()
     SelectedItem = bHasItem ? DisplayedMember.Items[SelectedItemIndex] : FRunItemDefinition();
     if (!bHasItem) return;
     UDemonicUITheme::Get().SetItemIcon(DetailsIcon, SelectedItem.Tags);
-    DetailsName->SetText(ItemName(SelectedItem));
+    DetailsName->SetText(RunItemPresentation::Name(SelectedItem, DisplayedRarities));
+    UDemonicUITheme::Get().StyleText(DetailsName, false, 20);
+    if (const FRunWeaponRarityRule* Rarity = RunItemPresentation::FindRarity(SelectedItem, DisplayedRarities)) DetailsName->SetColorAndOpacity(Rarity->Color);
     FText CategoryLabel = Categories[0].Label;
     for (const FInventoryDisplayCategory& Category : Categories)
     {
@@ -373,6 +399,8 @@ void UCharacterInventoryPanel::RefreshSelectedItem()
         }
     }
     DetailsSummary->SetText(FText::Format(NSLOCTEXT("Inventory", "ItemDetails", "{0} · 보관 1개\n카탈로그 기준 가격 {1}G"), CategoryLabel, FText::AsNumber(SelectedItem.Price)));
+    const FText GrantedSkills = RunItemPresentation::GrantedSkills(SelectedItem);
+    if (!GrantedSkills.IsEmpty()) DetailsSummary->SetText(FText::Format(NSLOCTEXT("Inventory", "ItemSkillDetails", "{0}\n{1}"), DetailsSummary->GetText(), GrantedSkills));
     const FRunEquipmentProfile* Profile = URunEquipmentCatalog::Get().ResolveProfile(SelectedItem);
     if (!Profile)
     {

@@ -4,6 +4,7 @@
 #include "CommonUserWidget.h"
 #include "Components/Button.h"
 #include "Game/Run/RunTypes.h"
+#include "Game/Run/RunWeaponSkillTypes.h"
 #include "CharacterInventoryPanel.generated.h"
 
 class USkillDefinitionDataAsset;
@@ -72,6 +73,9 @@ private:
 
     UPROPERTY(Transient)
     FRunPartyMember DisplayedMember;
+
+    UPROPERTY(Transient)
+    TArray<FRunWeaponRarityRule> DisplayedRarities;
 
     bool bCanChangeEquipment = false;
     bool bSkillsUnavailable = false;

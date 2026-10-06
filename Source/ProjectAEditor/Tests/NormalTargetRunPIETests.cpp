@@ -21,6 +21,7 @@
 #include "Game/Encounter/CombatArena.h"
 #include "Game/GameState/GameplayGameState.h"
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "GameplayEffect.h"
@@ -167,11 +168,13 @@ namespace NormalTargetRunReview
                 if (!Check(Run->GetPartyMembers().FilterByPredicate([](const FRunPartyMember& Member) { return Member.bCreated; }).Num() == 4 && Run->GetNodes().Num() == 20, TEXT("The target Run retains four original characters and its twenty authored combat nodes."))) return End();
                 OriginalIdentity = Run->GetRunIdentity();
                 OriginalParty = Run->GetPartyMembers();
+                if (!Check(Run->UsesWeaponSkills() && Run->GetWeaponSkillRules().SchemaVersion == 1 && Run->GetSkillShopState().SchemaVersion == 0, TEXT("Normal menu creation freezes weapon acquisition without the retired skill shop."))) return End();
                 for (const FRunPartyMember& Member : OriginalParty)
                 {
                     FProfessionDefinition Profession;
                     FText Error;
-                    if (!Check(Run->ResolveMemberProfession(Member, Profession, Error) && FMath::IsNearlyEqual(Member.CurrentHP, Profession.MaxHP) && Member.Skills.Num() == 1 && Member.Consumables.Num() == 1 && Member.Consumables[0].Quantity == Run->GetRecoveryState().StartingQuantity, TEXT("Every freshly created character retains authored maximum health, its starting skill and normal consumable quantity: ") + Error.ToString())) return End();
+                    TArray<FSoftObjectPath> EquippedSkills;
+                    if (!Check(Run->ResolveMemberProfession(Member, Profession, Error) && FMath::IsNearlyEqual(Member.CurrentHP, Profession.MaxHP) && Member.InnateSkills.Num() == 1 && Member.Skills.Num() == 2 && Member.Skills.Contains(Member.InnateSkills[0]) && RunEquipmentRules::BuildEquippedSkills(Member, EquippedSkills, Error) && Member.Skills == EquippedSkills && Member.Consumables.Num() == 1 && Member.Consumables[0].Quantity == Run->GetRecoveryState().StartingQuantity, TEXT("Every freshly created character retains authored maximum health, unarmed plus its equipped weapon skill and normal consumable quantity: ") + Error.ToString())) return End();
                 }
                 bInitialPartyRecorded = true;
                 Event(Run, TEXT("normal_party_created"));
@@ -279,8 +282,8 @@ namespace NormalTargetRunReview
 
         bool SameSavedBoundary(const URunSaveGame& Saved, URunStateSubsystem* Run)
         {
-            if (Saved.Phase != Run->GetPhase() || Saved.Result != Run->GetLastResult() || Saved.CurrentNode != Run->GetCurrentNodeId() || Saved.CurrentEncounter != Run->GetCurrentEncounterId() || Saved.CompletedNodes != Run->GetCompletedNodes() || Saved.Party.Num() != Run->GetPartyMembers().Num()) return false;
-            if (!FRunIdentityData::StaticStruct()->CompareScriptStruct(&Saved.Identity, &Run->GetRunIdentity(), 0) || !FRunTargetState::StaticStruct()->CompareScriptStruct(&Saved.TargetRun, &Run->GetTargetRunState(), 0) || !FRunEncounterProgress::StaticStruct()->CompareScriptStruct(&Saved.EncounterProgress, &Run->GetEncounterProgress(), 0) || !FRunGoldRewardState::StaticStruct()->CompareScriptStruct(&Saved.GoldRewardState, &Run->GetGoldRewardState(), 0) || !FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Saved.SkillShopState, &Run->GetSkillShopState(), 0) || !FRunItemShopState::StaticStruct()->CompareScriptStruct(&Saved.ItemShopState, &Run->GetItemShopState(), 0)) return false;
+            if (Saved.Phase != Run->GetPhase() || Saved.Result != Run->GetLastResult() || Saved.CurrentNode != Run->GetCurrentNodeId() || Saved.CurrentEncounter != Run->GetCurrentEncounterId() || Saved.CompletedNodes != Run->GetCompletedNodes() || Saved.Party.Num() != Run->GetPartyMembers().Num() || Saved.WeaponSkillAcquisitionVersion != (Run->UsesWeaponSkills() ? 1 : 0)) return false;
+            if (!FRunWeaponSkillRulesState::StaticStruct()->CompareScriptStruct(&Saved.WeaponSkillRules, &Run->GetWeaponSkillRules(), 0) || !FRunIdentityData::StaticStruct()->CompareScriptStruct(&Saved.Identity, &Run->GetRunIdentity(), 0) || !FRunTargetState::StaticStruct()->CompareScriptStruct(&Saved.TargetRun, &Run->GetTargetRunState(), 0) || !FRunEncounterProgress::StaticStruct()->CompareScriptStruct(&Saved.EncounterProgress, &Run->GetEncounterProgress(), 0) || !FRunGoldRewardState::StaticStruct()->CompareScriptStruct(&Saved.GoldRewardState, &Run->GetGoldRewardState(), 0) || !FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Saved.SkillShopState, &Run->GetSkillShopState(), 0) || !FRunItemShopState::StaticStruct()->CompareScriptStruct(&Saved.ItemShopState, &Run->GetItemShopState(), 0)) return false;
             for (int32 Index = 0; Index < Saved.Party.Num(); ++Index) if (!FRunPartyMember::StaticStruct()->CompareScriptStruct(&Saved.Party[Index], &Run->GetPartyMembers()[Index], 0)) return false;
             return true;
         }
@@ -427,34 +430,31 @@ namespace NormalTargetRunReview
                     LastProgress = FPlatformTime::Seconds();
                     return false;
                 }
-                if (Member->Skills.Num() < 5)
+                const FRunSkillShopOffer* Best = nullptr;
+                float BestPower = 0.f;
+                for (const FRunSkillShopOffer& Offer : Shop.Offers)
                 {
-                    const FRunSkillShopOffer* Best = nullptr;
-                    float BestPower = 0.f;
-                    for (const FRunSkillShopOffer& Offer : Shop.Offers)
+                    const FString Key = VisitKey + TEXT(":") + Offer.OfferId.ToString();
+                    if (Offer.Price > Member->Gold || Member->Skills.Contains(Offer.Skill) || AttemptedServices.Contains(Key)) continue;
+                    const USkillDefinitionDataAsset* Asset = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());
+                    FCombatRoundSkill Skill;
+                    if (!Asset || !Asset->ResolveRoundSkill(Skill, Error)) continue;
+                    const FGameplayTagContainer Tags = EffectiveTags(Skill);
+                    float Utility = Tags.HasTag(ProjectACombatTags::Skill_Effect_Damage) ? Skill.Power : Tags.HasTag(ProjectACombatTags::Skill_Effect_Heal) ? Skill.Power * 2.f : 0.f;
+                    if (CombatRoundRules::UsesChain(Skill)) for (int32 Jump = 1; Jump < Skill.Chain.MaxTargets; ++Jump) Utility += Skill.Power * FMath::Pow(Skill.Chain.DamageMultiplierPerJump, static_cast<float>(Jump));
+                    if (!Best || Utility > BestPower)
                     {
-                        const FString Key = VisitKey + TEXT(":") + Offer.OfferId.ToString();
-                        if (Offer.Price > Member->Gold || Member->Skills.Contains(Offer.Skill) || AttemptedServices.Contains(Key)) continue;
-                        const USkillDefinitionDataAsset* Asset = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());
-                        FCombatRoundSkill Skill;
-                        if (!Asset || !Asset->ResolveRoundSkill(Skill, Error)) continue;
-                        const FGameplayTagContainer Tags = EffectiveTags(Skill);
-                        float Utility = Tags.HasTag(ProjectACombatTags::Skill_Effect_Damage) ? Skill.Power : Tags.HasTag(ProjectACombatTags::Skill_Effect_Heal) ? Skill.Power * 2.f : 0.f;
-                        if (CombatRoundRules::UsesChain(Skill)) for (int32 Jump = 1; Jump < Skill.Chain.MaxTargets; ++Jump) Utility += Skill.Power * FMath::Pow(Skill.Chain.DamageMultiplierPerJump, static_cast<float>(Jump));
-                        if (!Best || Utility > BestPower)
-                        {
-                            Best = &Offer;
-                            BestPower = Utility;
-                        }
+                        Best = &Offer;
+                        BestPower = Utility;
                     }
-                    if (Best && BestPower > 0.f)
-                    {
-                        AttemptedServices.Add(VisitKey + TEXT(":") + Best->OfferId.ToString());
-                        Event(Run, TEXT("request_offered_skill_purchase"), Best->OfferId.ToString());
-                        Controller->RequestPurchaseShopOffer(Member->CharacterId, Best->OfferId, Shop.Revision);
-                        LastProgress = FPlatformTime::Seconds();
-                        return false;
-                    }
+                }
+                if (Best && BestPower > 0.f)
+                {
+                    AttemptedServices.Add(VisitKey + TEXT(":") + Best->OfferId.ToString());
+                    Event(Run, TEXT("request_offered_skill_purchase"), Best->OfferId.ToString());
+                    Controller->RequestPurchaseShopOffer(Member->CharacterId, Best->OfferId, Shop.Revision);
+                    LastProgress = FPlatformTime::Seconds();
+                    return false;
                 }
             }
             Event(Run, TEXT("request_leave_encounter"), Controller->GetShopPurchaseMessage().ToString());

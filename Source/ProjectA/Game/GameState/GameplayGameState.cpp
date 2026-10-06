@@ -35,6 +35,7 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
         View.SkillShopState.Catalog.Reset();
         View.SkillShopState.Query = FGameplayTagQuery();
         View.ItemShopState = Run->GetItemShopState();
+        View.ItemRarities = Run->GetWeaponSkillRules().Rarities;
         View.RecoveryState = Run->GetRecoveryState();
         View.bTargetRun = Run->IsTargetRun();
         View.TargetCompletedSteps = Run->GetCompletedNodes().Num() + Run->GetTargetRunState().CompletedEncounterChoices.Num();

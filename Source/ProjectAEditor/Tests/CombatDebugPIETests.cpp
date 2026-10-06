@@ -320,7 +320,7 @@ private:
         if (!Check(ChainAssets.Num() == ExpectedUnownedChains.Num() && ChainAssets.Includes(ExpectedUnownedChains), TEXT("The clicked chain tab exactly matches all five catalog chains after excluding the selected ally's owned skills."))) return false;
         Test->AddInfo(FString::Printf(TEXT("Chain filter: complete catalog=%d, already owned=%d, displayed unowned=%d."), CatalogChains.Num(), CatalogChains.Num() - ExpectedUnownedChains.Num(), ChainAssets.Num()));
         USkillDefinitionDataAsset* ProbeSkill = Cast<USkillDefinitionDataAsset>(OwnershipProbe.TryLoad());
-        if (!Check(ProbeSkill && SavedSkills.Num() < 5, TEXT("A current unowned chain is available for an isolated ownership filter probe."))) return false;
+        if (!Check(ProbeSkill != nullptr, TEXT("A current unowned chain is available for an isolated ownership filter probe."))) return false;
         TArray<TObjectPtr<USkillDefinitionDataAsset>> ProbeSkills = SavedSkills;
         ProbeSkills.Add(ProbeSkill);
         FText Error;

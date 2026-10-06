@@ -182,6 +182,17 @@ bool FCombatSkillAcquisitionTest::RunTest(const FString& Parameters)
     TestNull(TEXT("Owned skill is excluded from pool"), Unit->AcquireSkillFromPool(Pool));
     TestFalse(TEXT("Duplicate direct acquisition is rejected"), Unit->AcquireAndEquipSkill(Skill));
     TestNull(TEXT("Data acquisition does not grant a retired executable ability"), Unit->GetAbilitySystemComponent()->FindAbilitySpecFromClass(Skill->AbilityClass));
+    const int32 OriginalCount = Unit->GetEquippedSkillDataAssets().Num();
+    for (int32 Index = 0; Index < 6; ++Index)
+    {
+        USkillDefinitionDataAsset* Additional = MakeSkill(Unit, UGA_AreaAttack::StaticClass());
+        if (!TestTrue(TEXT("Each additional unique skill is acquired beyond the former five-skill cap"), Unit->AcquireAndEquipSkill(Additional))) return false;
+        TestEqual(TEXT("Acquisition preserves the ordered definition at its new index"), Unit->GetEquippedSkillDataAssets()[OriginalCount + Index].Get(), Additional);
+    }
+    TestEqual(TEXT("Every acquired skill is retained"), Unit->GetEquippedSkillDataAssets().Num(), OriginalCount + 6);
+    TestFalse(TEXT("Duplicate rejection continues after acquiring more than five skills"), Unit->AcquireAndEquipSkill(Skill));
+    TestFalse(TEXT("Missing skill acquisition is still rejected"), Unit->AcquireAndEquipSkill(nullptr));
+    TestEqual(TEXT("Rejected acquisitions preserve the expanded loadout"), Unit->GetEquippedSkillDataAssets().Num(), OriginalCount + 6);
     return true;
 }
 

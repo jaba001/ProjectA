@@ -1145,6 +1145,18 @@ public:
         URunStateSubsystem* Run = Controller->GetGameInstance()->GetSubsystem<URunStateSubsystem>();
         if (Stage == 3)
         {
+            if (!Run) return false;
+            if (!bLegacyPrototypePrepared)
+            {
+                if (Run->GetPhase() == ERunPhase::None) return false;
+                const TArray<FRunPartyMember> Party = Run->GetPartyMembers();
+                FText Error;
+                // Retain the historical saved-loadout fixture through explicit prototype initialization.
+                // 명시적 prototype 초기화로 기존 저장 스킬 fixture를 유지합니다.
+                if (!Require(Run->IsTargetRun() && Run->InitializeRun(Party, Error) && !Run->IsTargetRun() && !Run->UsesWeaponSkills() && Run->GetWeaponSkillRules().SchemaVersion == 0 && Run->GetNodes().Num() == 10 && Run->GetSkillShopState().SchemaVersion == 1 && Run->GetSaveError().IsEmpty(), *FString::Printf(TEXT("The isolated saved-loadout review explicitly creates and saves its legacy0 ten-combat prototype: %s"), *Error.ToString()))) return true;
+                bLegacyPrototypePrepared = true;
+                return false;
+            }
             URunMapWidget* Map = FindActiveWidget<URunMapWidget>(World);
             if (!Map || !Run || Run->GetPhase() != ERunPhase::Map) return false;
             if (!ViewportPreparation.Update(Test, World, ExpectedViewportSize)) return ViewportPreparation.HasFailed();
@@ -1153,7 +1165,7 @@ public:
             {
                 const FRunPartyMember* Member = Run->GetPartyMembers().FindByPredicate([](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.bPlayerControlled; });
                 FProfessionDefinition Profession;
-                if (!Require(Member && Member->bHasSkillLoadout && Member->Skills.Num() == 1 && Member->Gold == 10 && Run->PartyDefinition && Run->PartyDefinition->ResolveProfession(Member->ClassId, Profession), TEXT("The unmodified new Run retains its starting unarmed skill, ten gold and resolved authored profession."))) return true;
+                if (!Require(Member && Member->bHasSkillLoadout && Member->InnateSkills.IsEmpty() && Member->Skills.Num() == 1 && Member->Gold == 10 && Run->PartyDefinition && Run->PartyDefinition->ResolveProfession(Member->ClassId, Profession), TEXT("The explicit legacy0 prototype retains its acquired unarmed skill, ten gold and resolved authored profession."))) return true;
                 EntryMember = *Member;
                 EntryMaxHP = Profession.MaxHP;
                 EntryAP = Profession.ActionPoints;
@@ -1166,9 +1178,9 @@ public:
             {
                 const FString Slot = URunStateSubsystem::ResolveCheckpointSlot(FCommandLine::Get());
                 TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));
-                if (!Require(Saved.IsValid() && Saved->Party.Num() >= 1, TEXT("A fresh Run has a durable party before preparing the acquired-loadout fixture."))) return true;
+                if (!Require(Saved.IsValid() && Saved->WeaponSkillAcquisitionVersion == 0 && Saved->WeaponSkillRules.SchemaVersion == 0 && Saved->Party.Num() >= 1, TEXT("The explicit legacy0 prototype has a durable party before preparing the acquired-loadout fixture."))) return true;
                 FRunPartyMember* Member = Saved->Party.FindByPredicate([](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.bPlayerControlled; });
-                if (!Require(Member && Member->bHasSkillLoadout && Member->Skills.Num() == 1 && Member->Gold == 10, TEXT("A new controlled character starts with one unarmed skill and ten gold."))) return true;
+                if (!Require(Member && Member->bHasSkillLoadout && Member->InnateSkills.IsEmpty() && Member->Skills.Num() == 1 && Member->Gold == 10, TEXT("The legacy0 controlled fixture starts with one acquired unarmed skill and ten gold."))) return true;
                 Member->Skills.Reset();
                 for (const FCombatRoundSkill& Skill : Skills)
                 {
@@ -1191,7 +1203,7 @@ public:
                 Advance();
                 return false;
             }
-            return !Require(false, TEXT("The new Run has an enabled first encounter button."));
+            return !Require(false, TEXT("The explicit legacy0 prototype has an enabled first encounter button."));
         }
         ACombatRoundCoordinator* Round = Controller->GetRoundCoordinator();
         if (Stage == 7)
@@ -1222,7 +1234,7 @@ public:
             SourceId = Controlled->UnitId;
             if (bNewGameEntryOnly)
             {
-                if (!Require(bRecordedNewParty && Source->GetAttributeSet() && Run && Run->GetPhase() == ERunPhase::Combat && Round->GetView().RoundNumber == 1 && Controlled->SkillIds.Num() == 1 && !bInstalledSavedLoadout && !bPreparedSurvival, TEXT("The fresh first encounter starts at its real first planning round without acquired-loadout or survival overrides."))) return true;
+                if (!Require(bLegacyPrototypePrepared && bRecordedNewParty && Source->GetAttributeSet() && Run && !Run->UsesWeaponSkills() && Run->GetPhase() == ERunPhase::Combat && Round->GetView().RoundNumber == 1 && Controlled->SkillIds.Num() == 1 && !bInstalledSavedLoadout && !bPreparedSurvival, TEXT("The legacy0 prototype entry starts at its real first planning round without acquired-loadout or survival overrides."))) return true;
                 const FRunPartyMember* Member = Run->GetPartyMembers().FindByPredicate([this](const FRunPartyMember& Candidate) { return Candidate.CharacterId == EntryMember.CharacterId; });
                 if (!Require(Member && Member->OwnerAccountId == EntryMember.OwnerAccountId && Member->ClassId == EntryMember.ClassId && Member->CharacterName.EqualTo(EntryMember.CharacterName) && Member->Skills == EntryMember.Skills && Member->Gold == EntryMember.Gold && FMath::IsNearlyEqual(Source->GetAttributeSet()->GetHP(), EntryMaxHP) && FMath::IsNearlyEqual(Source->GetAttributeSet()->GetMaxHP(), EntryMaxHP) && Source->GetCurrentActionPoint() == EntryAP && Source->GetCurrentSubActionPoint() == EntrySAP, TEXT("New-game travel preserves character ownership, identity, starting content and the unmodified profession HP/AP/SAP."))) return true;
                 if (++EntryWarmFrames < 12) return false;
@@ -1231,7 +1243,7 @@ public:
                 if (!TodoReviewWindowPlacement::OutputRoot(Test, EntryOutputRoot)) return true;
                 const FString CapturePath = EntryOutputRoot / TEXT("Screenshots") / (Slot + TEXT("_NewGame.png"));
                 if (!CaptureGameplayUI(Test, World, CapturePath, ExpectedViewportSize)) return true;
-                Test->AddInfo(FString::Printf(TEXT("NewGameEntry passed: actual New Game/Single/Create/Control/Start/node delegates; Core/Gameplay; HP %.3f/%.3f AP %d SAP %d; no save-content, skill, enemy or survival overrides; screenshot=%s. This entry-only observation does not assert normal-difficulty victory or subjective play quality."), Source->GetAttributeSet()->GetHP(), Source->GetAttributeSet()->GetMaxHP(), Source->GetCurrentActionPoint(), Source->GetCurrentSubActionPoint(), *CapturePath));
+                Test->AddInfo(FString::Printf(TEXT("LegacyPrototypeEntry passed: actual New Game/Single/Create/Control/Start delegates followed by explicit legacy0 InitializeRun and node dispatch; Core/Gameplay; HP %.3f/%.3f AP %d SAP %d; no acquired-loadout, enemy or survival overrides; screenshot=%s. Ordinary new Target entry is covered separately; this prototype observation does not assert normal-difficulty victory or subjective play quality."), Source->GetAttributeSet()->GetHP(), Source->GetAttributeSet()->GetMaxHP(), Source->GetCurrentActionPoint(), Source->GetCurrentSubActionPoint(), *CapturePath));
                 return true;
             }
             if (!bPreparedSurvival)
@@ -1463,6 +1475,7 @@ private:
     TArray<FCombatRoundSkill> Skills;
     int32 SkillIndex;
     bool bInstalledSavedLoadout = false;
+    bool bLegacyPrototypePrepared = false;
     bool bPreparedSurvival = false;
     bool bNewGameEntryOnly = false;
     bool bRecordedNewParty = false;
@@ -1578,7 +1591,7 @@ bool FVerticalSliceSavedSkillLoadoutTest::RunTest(const FString& Parameters)
         Skills.Add(Skill);
     }
     const bool bNewGameEntryOnly = FParse::Param(FCommandLine::Get(), TEXT("ProjectANewGameEntryOnly"));
-    AddInfo(bNewGameEntryOnly ? TEXT("Runs one actual new-game entry with the original starting skill, gold and HP/AP/SAP. Combat actions, acquired-loadout fixture and survival overrides are excluded.") : TEXT("Runs two saved-menu/encounter PIE sessions; enemy selection uses one Slate mouse press/release through the viewport and controller, skill/menu buttons use their delegates."));
+    AddInfo(bNewGameEntryOnly ? TEXT("Runs one explicit legacy0 prototype entry after actual menu character creation, with its original acquired starting skill, gold and HP/AP/SAP. Combat actions, acquired-loadout fixture and survival overrides are excluded. Ordinary new Target entry is covered by NormalTargetRunPIETests.") : TEXT("Runs two explicit legacy0 prototype saved-loadout sessions after menu character creation; enemy selection uses one Slate mouse press/release through the viewport and controller, skill/menu buttons use their delegates. Ordinary new Target entry is covered by NormalTargetRunPIETests."));
     for (int32 Index = 0; Index < (bNewGameEntryOnly ? 1 : Skills.Num()); ++Index)
     {
         ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu")));

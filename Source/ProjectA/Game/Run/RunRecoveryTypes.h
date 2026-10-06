@@ -6,8 +6,8 @@
 
 struct FCombatRoundSkill;
 
-// Keep consumable quantities separate from the five acquired skill slots.
-// 소모품 수량은 습득 스킬 다섯 칸과 분리하여 보존합니다.
+// Keep consumable quantities separate from acquired skills.
+// 소모품 수량은 습득 스킬과 분리하여 보존합니다.
 USTRUCT(BlueprintType)
 struct PROJECTA_API FRunConsumableStack
 {
@@ -52,6 +52,9 @@ struct PROJECTA_API FRunRecoveryState
 
 namespace RunRecoveryRules
 {
+    // Preserve the consumable type limit independently of unlimited acquired skills.
+    // 소지 스킬 제한과 독립적으로 기존 소모품 종류 제한을 유지합니다.
+    inline constexpr int32 MaximumStackTypes = 5;
     inline constexpr int32 MaximumQuantity = 1000;
     PROJECTA_API FGameplayTag GetConsumableTag();
     PROJECTA_API FGameplayTag GetHealingItemTag();

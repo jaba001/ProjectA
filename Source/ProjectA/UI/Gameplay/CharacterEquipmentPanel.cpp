@@ -123,7 +123,7 @@ void UCharacterEquipmentPanel::RefreshEquipment(const FGameplayViewState& View, 
     {
         const int32 ItemIndex = Member ? RunEquipmentRules::FindItemIndexAtSlot(*Member, SlotTags[Index]) : INDEX_NONE;
         const FRunItemDefinition* Item = Member && Member->Items.IsValidIndex(ItemIndex) ? &Member->Items[ItemIndex] : nullptr;
-        SlotWidgets[Index]->RefreshSlot(CharacterId, DisplayedMember.Equipment.Revision, ItemIndex, Item, SlotTags[Index], SlotIcons[Index], SlotLabels[Index], bCanChangeEquipment);
+        SlotWidgets[Index]->RefreshSlot(CharacterId, DisplayedMember.Equipment.Revision, ItemIndex, Item, SlotTags[Index], SlotIcons[Index], SlotLabels[Index], bCanChangeEquipment, View.ItemRarities);
     }
     HintText->SetText(bCanChangeEquipment ? NSLOCTEXT("Equipment", "DragHint", "아이템을 슬롯으로 끌어 장착·교체하세요.\n가방으로 끌면 해제됩니다.\n양손 장비는 두 무기 슬롯을 사용합니다.") : NSLOCTEXT("Equipment", "ReadOnlyHint", "장비 변경은 상점에서만 가능합니다."));
     if (Controller && Controller->IsEquipmentChangePending()) HintText->SetText(NSLOCTEXT("Equipment", "Pending", "장비 변경을 저장하고 있습니다."));

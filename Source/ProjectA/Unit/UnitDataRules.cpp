@@ -35,7 +35,7 @@ bool UnitDataRules::IsValidMoveRange(int32 MoveRange)
 
 bool UnitDataRules::IsValidSkillCount(int32 Count, bool bRequireSkill)
 {
-    return Count >= (bRequireSkill ? 1 : 0) && Count <= MaxSkills;
+    return Count >= (bRequireSkill ? 1 : 0);
 }
 
 bool UnitDataRules::ValidateSkills(const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, bool bRequireSkill, FText& OutError)
@@ -43,7 +43,7 @@ bool UnitDataRules::ValidateSkills(const TArray<TObjectPtr<USkillDefinitionDataA
     OutError = FText::GetEmpty();
     if (!IsValidSkillCount(Skills.Num(), bRequireSkill))
     {
-        OutError = NSLOCTEXT("UnitDataRules", "SkillCount", "The skill loadout is empty or exceeds its capacity. / 스킬 장착이 비어 있거나 허용 개수를 초과했습니다.");
+        OutError = NSLOCTEXT("UnitDataRules", "SkillCount", "At least one skill is required. / 스킬이 한 개 이상 필요합니다.");
         return false;
     }
     TSet<FName> SkillIds;

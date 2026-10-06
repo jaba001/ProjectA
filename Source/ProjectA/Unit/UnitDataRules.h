@@ -11,7 +11,6 @@ namespace UnitDataRules
     inline constexpr float MaxStatValue = 1000000.0f;
     inline constexpr int32 MaxActionPoints = 100;
     inline constexpr int32 MaxMoveRange = 32;
-    inline constexpr int32 MaxSkills = 5;
 
     PROJECTA_API bool IsValidMaxHP(float MaxHP);
     PROJECTA_API bool IsValidHealth(float MaxHP, float CurrentHP);

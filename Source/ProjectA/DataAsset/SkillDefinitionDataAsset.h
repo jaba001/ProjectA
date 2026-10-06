@@ -27,6 +27,7 @@ public:
 
     // Resolve and validate the same execution profile for runtime, catalogues and editor validation.
     // 실행 중 처리, 카탈로그, 에디터 검증에서 동일한 실행 프로필을 해석하고 검사합니다.
+    UFUNCTION(BlueprintCallable, Category = "Skill|Round")
     bool ResolveRoundSkill(FCombatRoundSkill& OutSkill, FText& OutError) const;
 
 #if WITH_EDITOR

@@ -193,18 +193,24 @@ def main():
     source_before = hashes_for([ROOT / filename for filename in baseline])
     require(source_before == baseline, "Purchased source differs from the installation baseline")
     skill_directory = ROOT / "Content" / SKILL_ROOT.removeprefix("/Game/")
-    skill_before = hashes_for(skill_directory.rglob("*.uasset"))
-    require(len(skill_before) == 74, "Expected 74 existing skill packages")
+    skill_files = sorted(skill_directory.rglob("*.uasset"))
+    skill_before = hashes_for(skill_files)
+    require(skill_files, "No existing skill packages were found")
+    # Match every disk package to one supported DataAsset without fixing the content count.
+    # 콘텐츠 개수를 고정하지 않고 디스크 패키지마다 지원 DataAsset 하나가 정확히 대응하는지 검사합니다.
+    expected_skill_paths = {"/Game/" + path.relative_to(ROOT / "Content").with_suffix("").as_posix() + "." + path.stem for path in skill_files}
     registry = unreal.AssetRegistryHelpers.get_asset_registry()
     registry.search_all_assets(True)
     entries = sorted(registry.get_assets_by_path(SKILL_ROOT, recursive=True), key=lambda item: str(item.package_name))
     niagara, cascade, skills, errors = {}, {}, [], []
+    resolved_skill_paths = set()
     for entry in entries:
-        if str(entry.asset_class_path.asset_name) != "SkillDefinitionDataAsset":
-            continue
         skill = require(entry.get_asset(), "Skill package failed to load: " + str(entry.package_name))
-        require(isinstance(skill, unreal.SkillDefinitionDataAsset), "Unexpected skill asset class")
         path = skill.get_path_name()
+        require(isinstance(skill, unreal.SkillDefinitionDataAsset), "Unexpected skill asset class: " + path)
+        require(path in expected_skill_paths, "Skill asset has no matching disk package: " + path)
+        require(path not in resolved_skill_paths, "Asset registry resolved a duplicate skill: " + path)
+        resolved_skill_paths.add(path)
         valid = unreal.MonsterAssetLibrary.validate_monster_skill(skill)
         if not valid:
             errors.append("Runtime skill validation failed: " + path)
@@ -215,7 +221,7 @@ def main():
         row["resolved"]["vfx"] = inspect_visual(profile.get_editor_property("vfx"), niagara, cascade, errors, path, "vfx")
         row["resolved"]["impact_vfx"] = inspect_visual(profile.get_editor_property("impact_vfx"), niagara, cascade, errors, path, "impact_vfx")
         skills.append(row)
-    require(len(skills) == 74, "Asset registry must resolve all 74 skill DataAssets")
+    require(resolved_skill_paths == expected_skill_paths, "Asset registry is missing skill DataAssets: " + ", ".join(sorted(expected_skill_paths - resolved_skill_paths)))
     for inspected in niagara.values():
         inspected["directionParameters"] = direction_parameters(inspected)
     # Compare on-disk packages again after every inspection, including any Niagara compile readiness checks.

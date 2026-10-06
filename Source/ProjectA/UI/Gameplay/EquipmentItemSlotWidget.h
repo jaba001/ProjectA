@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "CommonUserWidget.h"
 #include "Game/Run/RunItemShopTypes.h"
+#include "Game/Run/RunWeaponSkillTypes.h"
 #include "EquipmentItemSlotWidget.generated.h"
 
 class UBorder;
@@ -22,7 +23,7 @@ class PROJECTA_API UEquipmentItemSlotWidget : public UCommonUserWidget
 public:
     void UseListPresentation();
     void SetSelected(bool bSelected);
-    void RefreshSlot(FGuid CharacterId, int32 Revision, int32 ItemIndex, const FRunItemDefinition* Item, FGameplayTag TargetSlot, FName EmptyIcon, const FText& SlotLabel, bool bCanDrag);
+    void RefreshSlot(FGuid CharacterId, int32 Revision, int32 ItemIndex, const FRunItemDefinition* Item, FGameplayTag TargetSlot, FName EmptyIcon, const FText& SlotLabel, bool bCanDrag, const TArray<FRunWeaponRarityRule>& Rarities = {});
     FEquipmentSlotDropDelegate CanAcceptDrop;
     FEquipmentSlotDropDelegate ReceiveDrop;
     FEquipmentItemSelectedDelegate ItemSelected;
@@ -65,6 +66,9 @@ private:
 
     UPROPERTY(Transient)
     FRunItemDefinition DisplayedItem;
+
+    UPROPERTY(Transient)
+    TArray<FRunWeaponRarityRule> DisplayedRarities;
 
     FGuid CharacterId;
     FGameplayTag TargetSlot;

@@ -1,4 +1,5 @@
 #include "Game/Run/RunItemShopCatalog.h"
+#include "Game/Run/RunWeaponSkillRules.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
@@ -103,7 +104,7 @@ namespace
         TSet<FSoftObjectPath> Assets;
         for (const FRunItemDefinition& Item : Catalog)
         {
-            if (!RunItemShopCatalog::ValidateItem(Item) || Assets.Contains(Item.Asset)) return false;
+            if (!RunItemShopCatalog::ValidateItem(Item) || Item.GenerationVersion != 0 || Assets.Contains(Item.Asset)) return false;
             Assets.Add(Item.Asset);
         }
         return true;
@@ -118,7 +119,16 @@ FGameplayTag RunItemShopCatalog::GetWeaponTag()
 bool RunItemShopCatalog::ValidateItem(const FRunItemDefinition& Item)
 {
     const FString AssetPath = Item.Asset.ToString();
-    return Item.Asset.IsValid() && Item.Asset.GetSubPathUtf8String().IsEmpty() && AssetPath.StartsWith(TEXT("/Game/")) && FPackageName::IsValidObjectPath(AssetPath) && IsValidDisplayName(Item.DisplayName.ToString()) && Item.Tags.HasTag(TAG_ItemWeapon) && Item.Price > 0;
+    if (!Item.Asset.IsValid() || !Item.Asset.GetSubPathUtf8String().IsEmpty() || !AssetPath.StartsWith(TEXT("/Game/")) || !FPackageName::IsValidObjectPath(AssetPath) || !IsValidDisplayName(Item.DisplayName.ToString()) || !Item.Tags.HasTag(TAG_ItemWeapon) || Item.Price <= 0) return false;
+    if (Item.GenerationVersion == 0) return !Item.ItemInstanceId.IsValid() && !Item.RarityTag.IsValid() && Item.GrantedSkills.IsEmpty();
+    if (Item.GenerationVersion != 1 || !Item.ItemInstanceId.IsValid() || !Item.RarityTag.IsValid()) return false;
+    TSet<FSoftObjectPath> Skills;
+    for (const FSoftObjectPath& Skill : Item.GrantedSkills)
+    {
+        if (!Skill.IsValid() || !Skill.GetSubPathUtf8String().IsEmpty() || !Skill.ToString().StartsWith(TEXT("/Game/")) || !FPackageName::IsValidObjectPath(Skill.ToString()) || Skills.Contains(Skill)) return false;
+        Skills.Add(Skill);
+    }
+    return true;
 }
 
 bool RunItemShopCatalog::IsSameDefinition(const FRunItemDefinition& Left, const FRunItemDefinition& Right)
@@ -129,6 +139,22 @@ bool RunItemShopCatalog::IsSameDefinition(const FRunItemDefinition& Left, const 
     FRunItemDefinition Comparable = Right;
     Comparable.DisplayName = Left.DisplayName;
     return FRunItemDefinition::StaticStruct()->CompareScriptStruct(&Left, &Comparable, 0);
+}
+
+bool RunItemShopCatalog::IsSameBaseDefinition(const FRunItemDefinition& Left, const FRunItemDefinition& Right)
+{
+    // Catalog identity excludes per-copy results while full copy comparison retains them.
+    // 카탈로그 동일성에서는 사본별 결과를 제외하며 전체 사본 비교에서는 유지합니다.
+    FRunItemDefinition LeftBase = Left;
+    FRunItemDefinition RightBase = Right;
+    for (FRunItemDefinition* Item : { &LeftBase, &RightBase })
+    {
+        Item->GenerationVersion = 0;
+        Item->ItemInstanceId.Invalidate();
+        Item->RarityTag = FGameplayTag();
+        Item->GrantedSkills.Reset();
+    }
+    return IsSameDefinition(LeftBase, RightBase);
 }
 
 bool RunItemShopCatalog::Load(TArray<FRunItemDefinition>& OutCatalog, FText& OutError)
@@ -188,9 +214,10 @@ bool RunItemShopCatalog::LoadFromString(FString CsvText, TArray<FRunItemDefiniti
     return true;
 }
 
-bool RunItemShopCatalog::Validate(const FRunItemShopState& State, FText& OutError)
+bool RunItemShopCatalog::Validate(const FRunItemShopState& State, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
 {
     OutError = FText::GetEmpty();
+    if (WeaponSkillRules && !RunWeaponSkillRules::Validate(*WeaponSkillRules, OutError)) return false;
     if (State.SchemaVersion == 0 && State.Catalog.IsEmpty() && State.Offers.IsEmpty() && State.Revision == 0 && State.RerollPrice == 1) return true;
     const auto Fail = [&OutError]()
     {
@@ -201,20 +228,28 @@ bool RunItemShopCatalog::Validate(const FRunItemShopState& State, FText& OutErro
     if (State.Revision == 0) return State.Offers.IsEmpty() ? true : Fail();
     if (State.Offers.Num() != OfferCount) return Fail();
 
+    const bool bGenerated = WeaponSkillRules && WeaponSkillRules->SchemaVersion == 1;
     TSet<FName> OfferIds;
+    TSet<FGuid> ItemInstanceIds;
     for (const FRunItemShopOffer& Offer : State.Offers)
     {
         if (Offer.OfferId.IsNone() || Offer.OfferId == FRunItemShopState::GetRerollOfferId() || OfferIds.Contains(Offer.OfferId) || !ValidateItem(Offer.Item)) return Fail();
         const FRunItemDefinition* CatalogItem = State.Catalog.FindByPredicate([&Offer](const FRunItemDefinition& Item) { return Item.Asset == Offer.Item.Asset; });
-        if (!CatalogItem || !IsSameDefinition(*CatalogItem, Offer.Item)) return Fail();
+        if (!CatalogItem || !IsSameBaseDefinition(*CatalogItem, Offer.Item)) return Fail();
+        if (bGenerated)
+        {
+            if (!RunWeaponSkillRules::ValidateGeneratedCopy(Offer.Item, *WeaponSkillRules, OutError) || ItemInstanceIds.Contains(Offer.Item.ItemInstanceId)) return Fail();
+            ItemInstanceIds.Add(Offer.Item.ItemInstanceId);
+        }
+        else if (Offer.Item.GenerationVersion != 0) return Fail();
         OfferIds.Add(Offer.OfferId);
     }
     return true;
 }
 
-bool RunItemShopCatalog::Roll(FRunItemShopState& State, bool bAllowDuplicates, const FGameplayTagQuery& Query, FText& OutError)
+bool RunItemShopCatalog::Roll(FRunItemShopState& State, bool bAllowDuplicates, const FGameplayTagQuery& Query, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
 {
-    if (!Validate(State, OutError)) return false;
+    if (!Validate(State, OutError, WeaponSkillRules)) return false;
     if (State.SchemaVersion != 1 || State.Revision == MAX_int32)
     {
         OutError = NSLOCTEXT("RunItemShop", "CannotRollShop", "아이템 상점의 상품을 갱신할 수 없습니다.");
@@ -227,7 +262,7 @@ bool RunItemShopCatalog::Roll(FRunItemShopState& State, bool bAllowDuplicates, c
     {
         FGameplayTagWeightedCandidate& Candidate = Candidates.AddDefaulted_GetRef();
         Candidate.Tags = Item.Tags;
-        Candidate.BaseWeight = 1.0f;
+        Candidate.BaseWeight = WeaponSkillRules && WeaponSkillRules->SchemaVersion == 1 && !RunWeaponSkillRules::CanGenerate(Item, *WeaponSkillRules) ? 0.0f : 1.0f;
     }
     FRandomStream Random(FMath::Rand());
     TArray<int32> SelectedIndices;
@@ -244,6 +279,7 @@ bool RunItemShopCatalog::Roll(FRunItemShopState& State, bool bAllowDuplicates, c
         FRunItemShopOffer& Offer = Offers.AddDefaulted_GetRef();
         Offer.OfferId = FName(*FString::Printf(TEXT("Weapon_%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits)));
         Offer.Item = State.Catalog[Index];
+        if (WeaponSkillRules && WeaponSkillRules->SchemaVersion == 1 && !RunWeaponSkillRules::Generate(State.Catalog[Index], *WeaponSkillRules, Random, Offer.Item, OutError)) return false;
     }
     State.Offers = MoveTemp(Offers);
     ++State.Revision;

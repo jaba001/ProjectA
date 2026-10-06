@@ -62,7 +62,7 @@ namespace
         Member.Stats.MaxActionPoints = 3;
         Member.Stats.MaxSubActionPoints = 2;
         Member.Stats.MoveRange = 4;
-        Member.SkillIds = { TEXT("BasicAttack"), TEXT("Sweep") };
+        Member.SkillIds = { TEXT("BasicAttack"), TEXT("Sweep"), TEXT("Shield"), TEXT("Charge"), TEXT("Volley"), TEXT("Flame") };
         Member.EquipmentIds = { TEXT("Equipment.Bow"), TEXT("Equipment.Ring") };
         Member.TacticsId = TEXT("Tactics.Aggressive");
         Member.FormationSlot = 3;
@@ -104,6 +104,7 @@ bool FPartySnapshotValidationTest::RunTest(const FString& Parameters)
     const FPartySnapshot Valid = MakeStorageTestSnapshot();
     TestTrue(TEXT("Valid build accepts opaque equipment and tactics for later catalog resolution"), UPartySnapshotLibrary::ValidateSnapshot(Valid, Error));
     TestTrue(TEXT("Successful validation clears the error"), Error.IsEmpty());
+    TestEqual(TEXT("Snapshot validation accepts every skill beyond the former five-skill cap"), Valid.Members[0].SkillIds.Num(), 6);
     const FPartySnapshotStats DefaultStats;
     TestEqual(TEXT("Speed defaults to ten when serialized data supplies no value"), DefaultStats.Speed, 10.0f);
 
@@ -178,8 +179,8 @@ bool FPartySnapshotValidationTest::RunTest(const FString& Parameters)
     Reject(TEXT("Oversized move range is rejected"));
     Invalid.Members[0].SkillIds.Empty();
     Reject(TEXT("Missing skills are rejected"));
-    Invalid.Members[0].SkillIds.SetNum(6);
-    Reject(TEXT("Oversized skill list is rejected"));
+    Invalid.Members[0].SkillIds.Add(NAME_None);
+    Reject(TEXT("Additional skills still require valid identifiers"));
     const FName DuplicateSkillId = Invalid.Members[0].SkillIds[0];
     Invalid.Members[0].SkillIds.Add(DuplicateSkillId);
     Reject(TEXT("Duplicate skills are rejected"));
@@ -256,6 +257,7 @@ bool FPartySnapshotStorageTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Unicode character name survives serialization"), Restored.Members[0].CharacterName, FString(TEXT("저장된 궁수")));
     TestEqual(TEXT("Fractional current HP survives serialization"), Restored.Members[0].Stats.CurrentHP, 71.25f);
     TestEqual(TEXT("Authored speed survives serialization instead of reverting to ten"), Restored.Members[0].Stats.Speed, 21.25f);
+    TestEqual(TEXT("All six ordered skills survive save and load"), Restored.Members[0].SkillIds.Num(), 6);
 
     FPartySnapshot Invalid = Original;
     Invalid.SchemaVersion = 999;

@@ -22,6 +22,20 @@ struct PROJECTA_API FRunItemDefinition
 
     UPROPERTY(BlueprintReadOnly, Category = "Shop")
     int32 Price = 1;
+
+    // Generated copies keep their original result; version zero preserves legacy catalog items.
+    // 생성 사본은 최초 결과를 유지하며 버전 0은 기존 카탈로그 아이템을 보존합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Item|Generation")
+    int32 GenerationVersion = 0;
+
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Item|Generation")
+    FGuid ItemInstanceId;
+
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Item|Generation")
+    FGameplayTag RarityTag;
+
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Item|Generation")
+    TArray<FSoftObjectPath> GrantedSkills;
 };
 
 USTRUCT(BlueprintType)

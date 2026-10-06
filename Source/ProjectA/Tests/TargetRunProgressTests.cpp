@@ -3,11 +3,15 @@
 #include "Misc/AutomationTest.h"
 #include "DataAsset/TargetRunDefinitionDataAsset.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
+#include "DataAsset/RunEncounterPoolDataAsset.h"
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunEquipmentRules.h"
+#include "Game/Run/RunItemShopCatalog.h"
 #include "Game/Run/RunProgressRules.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/Run/RunWeaponSkillRules.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/StrongObjectPtr.h"
 
@@ -129,7 +133,7 @@ namespace
 
     bool SameTargetTransactionState(const URunSaveGame& Saved, const URunStateSubsystem& Run)
     {
-        return Saved.Phase == Run.GetPhase() && Saved.Result == Run.GetLastResult() && Saved.CurrentNode == Run.GetCurrentNodeId() && Saved.CurrentEncounter == Run.GetCurrentEncounterId() && Saved.CompletedNodes == Run.GetCompletedNodes() && SameTargetTransactionParty(Saved.Party, Run.GetPartyMembers()) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Saved.Identity, &Run.GetRunIdentity(), 0) && FRunTargetState::StaticStruct()->CompareScriptStruct(&Saved.TargetRun, &Run.GetTargetRunState(), 0) && FRunEncounterProgress::StaticStruct()->CompareScriptStruct(&Saved.EncounterProgress, &Run.GetEncounterProgress(), 0) && FRunGoldRewardState::StaticStruct()->CompareScriptStruct(&Saved.GoldRewardState, &Run.GetGoldRewardState(), 0) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Saved.SkillShopState, &Run.GetSkillShopState(), 0) && FRunItemShopState::StaticStruct()->CompareScriptStruct(&Saved.ItemShopState, &Run.GetItemShopState(), 0);
+        return Saved.Phase == Run.GetPhase() && Saved.Result == Run.GetLastResult() && Saved.CurrentNode == Run.GetCurrentNodeId() && Saved.CurrentEncounter == Run.GetCurrentEncounterId() && Saved.CompletedNodes == Run.GetCompletedNodes() && Saved.WeaponSkillAcquisitionVersion == (Run.UsesWeaponSkills() ? 1 : 0) && FRunWeaponSkillRulesState::StaticStruct()->CompareScriptStruct(&Saved.WeaponSkillRules, &Run.GetWeaponSkillRules(), 0) && SameTargetTransactionParty(Saved.Party, Run.GetPartyMembers()) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Saved.Identity, &Run.GetRunIdentity(), 0) && FRunTargetState::StaticStruct()->CompareScriptStruct(&Saved.TargetRun, &Run.GetTargetRunState(), 0) && FRunEncounterProgress::StaticStruct()->CompareScriptStruct(&Saved.EncounterProgress, &Run.GetEncounterProgress(), 0) && FRunGoldRewardState::StaticStruct()->CompareScriptStruct(&Saved.GoldRewardState, &Run.GetGoldRewardState(), 0) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Saved.SkillShopState, &Run.GetSkillShopState(), 0) && FRunItemShopState::StaticStruct()->CompareScriptStruct(&Saved.ItemShopState, &Run.GetItemShopState(), 0);
     }
 
     struct FTargetRunTransactionFixture
@@ -150,6 +154,23 @@ namespace
         {
             Run->OnRunStateChanged.Clear();
             UGameplayStatics::DeleteGameInSlot(Slot, 0);
+        }
+
+        bool InitializeEveryProfession()
+        {
+            if (!Run->PartyDefinition) return false;
+            TArray<FRunPartyMember> Party;
+            const FName Classes[] = {TEXT("Warrior"), TEXT("Archer"), TEXT("Mage"), TEXT("Rogue")};
+            for (int32 Index = 0; Index < UE_ARRAY_COUNT(Classes); ++Index)
+            {
+                FRunPartyMember& Member = Party.AddDefaulted_GetRef();
+                Member.SlotIndex = Index;
+                Member.ClassId = Classes[Index];
+                Member.CharacterName = FText::FromString(FString::Printf(TEXT("Weapon transaction %d"), Index));
+                Member.bCreated = true;
+                Member.bPlayerControlled = Index == 0;
+            }
+            return Run->InitializeTargetRun(Party, Error);
         }
 
         TArray<uint8> ReadBytes() const
@@ -197,6 +218,8 @@ bool FTargetRunDurableSyntheticResultsTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Public initialization commits a fresh target Run and its real consumable asset"), Fixture.Run->InitializeTargetRun(Party, Fixture.Error) && Fixture.ReloadBoundary(*this))) return false;
     const FRunIdentityData OriginalIdentity = Fixture.Run->GetRunIdentity();
     const FRunTargetState FrozenTarget = Fixture.Run->GetTargetRunState();
+    const FRunWeaponSkillRulesState FrozenWeaponRules = Fixture.Run->GetWeaponSkillRules();
+    TestTrue(TEXT("New target Runs freeze weapon acquisition and exclude every skill-shop candidate"), Fixture.Run->UsesWeaponSkills() && Fixture.Run->GetSkillShopState().SchemaVersion == 0 && !FrozenTarget.EncounterPool.ContainsByPredicate([](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag().MatchesTag(FRunEncounterOffer::GetSkillShopTag()); }));
     const FGuid BuyerId = Fixture.Run->GetPartyMembers()[0].CharacterId;
     const FRunAccountId BuyerAccount = Fixture.Run->GetPartyMembers()[0].OwnerAccountId;
     int32 ExpectedGold = Fixture.Run->GetPartyMembers()[0].Gold;
@@ -207,6 +230,7 @@ bool FTargetRunDurableSyntheticResultsTest::RunTest(const FString& Parameters)
         const FName Node = Fixture.Run->GetNodes()[CombatIndex].NodeId;
         for (int32 VisitIndex = 0; VisitIndex < 3; ++VisitIndex)
         {
+            TestFalse(TEXT("No encounter rotation reintroduces the retired skill shop"), Fixture.Run->GetEncounterProgress().Offers.ContainsByPredicate([](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag().MatchesTag(FRunEncounterOffer::GetSkillShopTag()); }));
             if (!TestTrue(TEXT("Every combat requires its next persisted three-candidate encounter"), Fixture.Run->GetPhase() == ERunPhase::EncounterChoice && Fixture.Run->GetEncounterProgress().Offers.Num() == 3 && Fixture.Run->GetTargetRunState().CompletedEncounterChoices.Num() == CombatIndex * 3 + VisitIndex && !Fixture.Run->CanStartNode(Node))) return false;
             const FName Offer = Fixture.Run->GetEncounterProgress().Offers[(CombatIndex + VisitIndex) % 3].EncounterId;
             if (!TestTrue(TEXT("The public encounter selection is durable"), Fixture.Run->SelectRunEncounter(Offer) && Fixture.Run->GetPhase() == ERunPhase::Shop && Fixture.ReloadBoundary(*this))) return false;
@@ -265,6 +289,7 @@ bool FTargetRunDurableSyntheticResultsTest::RunTest(const FString& Parameters)
         }
         TestEqual(TEXT("Only one selected PvE reward changes the human balance"), Fixture.Run->GetPartyMembers()[0].Gold, ExpectedGold);
         if (!TestTrue(TEXT("Public Continue commits the next target boundary"), Fixture.Run->CanContinueAfterRewards() && Fixture.Run->ContinueRun())) return false;
+        TestTrue(TEXT("Every Continue retains the frozen generation rules"), FRunWeaponSkillRulesState::StaticStruct()->CompareScriptStruct(&FrozenWeaponRules, &Fixture.Run->GetWeaponSkillRules(), 0));
         if (CombatIndex < 19 && !Fixture.ReloadBoundary(*this)) return false;
     }
     TestEqual(TEXT("The durable route includes ten synthetic PvE results"), PveResults, 10);
@@ -278,6 +303,134 @@ bool FTargetRunDurableSyntheticResultsTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Menu Continue rejects the completed Run"), Fixture.Run->CanContinueStandaloneSavedRun(Fixture.Error));
     TestFalse(TEXT("Direct standalone loading also rejects completed progress"), Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error));
     TestTrue(TEXT("Rejected completion requests preserve the terminal bytes and in-memory completion"), CompletedBytes == Fixture.ReadBytes() && Fixture.Run->GetPhase() == ERunPhase::Complete);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTargetRunWeaponTransactionsTest, "ProjectA.Run.Target.WeaponCopiesPurchaseEquipmentAtomicAndContinue", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTargetRunWeaponTransactionsTest::RunTest(const FString& Parameters)
+{
+    FTargetRunTransactionFixture Fixture;
+    if (!TestTrue(TEXT("Every profession initializes with the new frozen weapon contract"), Fixture.InitializeEveryProfession() && Fixture.ReloadBoundary(*this))) return false;
+    const FRunWeaponSkillRulesState Rules = Fixture.Run->GetWeaponSkillRules();
+    TestTrue(TEXT("The delegated trial data freezes one skill and five equally weighted grades"), Fixture.Run->UsesWeaponSkills() && Rules.SchemaVersion == 1 && Rules.SkillCount == 1 && Rules.Rarities.Num() == 5 && Rules.Rarities.ContainsByPredicate([](const FRunWeaponRarityRule& Rarity) { return Rarity.BaseWeight == 1.f; }));
+    for (const FRunWeaponRarityRule& Rarity : Rules.Rarities) TestEqual(TEXT("Each development grade has the same weight"), Rarity.BaseWeight, 1.f);
+    TSet<FGuid> StartingIds;
+    const FSoftObjectPath Unarmed = Fixture.Run->PartyDefinition->UnarmedStartingSkill.ToSoftObjectPath();
+    for (const FRunPartyMember& Member : Fixture.Run->GetPartyMembers())
+    {
+        if (!TestTrue(TEXT("Every profession retains unarmed plus its equipped starting weapon skill"), Member.InnateSkills == TArray<FSoftObjectPath>{Unarmed} && Member.Skills.Num() == 2 && Member.Skills[0] == Unarmed && !Member.Items.IsEmpty())) return false;
+        for (const FRunItemDefinition& Item : Member.Items)
+        {
+            TestTrue(TEXT("All starting copies have independent persistent identities and tag-compatible fixed results"), Item.GenerationVersion == 1 && !StartingIds.Contains(Item.ItemInstanceId) && RunWeaponSkillRules::ValidateGeneratedCopy(Item, Rules, Fixture.Error));
+            TestEqual(TEXT("Only a matching starting weapon receives the delegated skill count"), Item.GrantedSkills.Num(), Rules.WeaponQuery.Matches(Item.Tags) ? 1 : 0);
+            StartingIds.Add(Item.ItemInstanceId);
+            for (const FSoftObjectPath& Skill : Item.GrantedSkills) TestTrue(TEXT("An equipped starting weapon exposes its fixed skill"), Member.Skills.Contains(Skill));
+        }
+    }
+    const FRunEncounterOffer* ItemVisit = Fixture.Run->GetEncounterProgress().Offers.FindByPredicate([](const FRunEncounterOffer& Offer) { return Offer.IsItemShop(); });
+    if (!TestTrue(TEXT("The initial ordinary Target choices include an item shop"), ItemVisit && Fixture.Run->SelectRunEncounter(ItemVisit->EncounterId) && Fixture.ReloadBoundary(*this))) return false;
+    const FRunItemShopState Displayed = Fixture.Run->GetItemShopState();
+    if (!TestEqual(TEXT("The new shop displays five generated fixed copies"), Displayed.Offers.Num(), 5)) return false;
+    const FRunItemShopOffer Offer = Displayed.Offers[0];
+    const FRunPartyMember Buyer = Fixture.Run->GetPartyMembers()[0];
+    const TArray<FRunPartyMember> BeforePurchase = Fixture.Run->GetPartyMembers();
+    const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
+    int32 Publications = 0;
+    Fixture.Run->OnRunStateChanged.AddLambda([&Publications]() { ++Publications; });
+    FRunAccountId Stranger = Buyer.OwnerAccountId;
+    Stranger.Subject += TEXT("-weapon-stranger");
+    TestFalse(TEXT("Generated items retain original buyer ownership checks"), Fixture.Run->PurchaseShopOffer(Stranger, Buyer.CharacterId, Offer.OfferId, Fixture.Error, Displayed.Revision));
+    TestFalse(TEXT("An AI companion cannot purchase a generated copy"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, BeforePurchase[1].CharacterId, Offer.OfferId, Fixture.Error, Displayed.Revision));
+    TestFalse(TEXT("A stale displayed-copy revision cannot purchase"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error, Displayed.Revision - 1));
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("A failed generated-item purchase rejects its durable write"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error, Displayed.Revision));
+    TestTrue(TEXT("Purchase failure preserves exact displayed results stock party balances bytes and publication count"), BeforeBytes == Fixture.ReadBytes() && SameTargetTransactionParty(BeforePurchase, Fixture.Run->GetPartyMembers()) && FRunItemShopState::StaticStruct()->CompareScriptStruct(&Displayed, &Fixture.Run->GetItemShopState(), 0) && Publications == 0);
+    if (!TestTrue(TEXT("The same generated-copy purchase can retry once"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error, Displayed.Revision) && Publications == 1)) return false;
+    Fixture.Run->OnRunStateChanged.Clear();
+    const FRunPartyMember Purchased = Fixture.Run->GetPartyMembers()[0];
+    TestTrue(TEXT("Buying copies the displayed ID grade and skill result without granting bag skills"), Purchased.Items.Num() == Buyer.Items.Num() + 1 && RunItemShopCatalog::IsSameDefinition(Purchased.Items.Last(), Offer.Item) && Purchased.Skills == Buyer.Skills && Purchased.Gold == Buyer.Gold - Offer.Item.Price && Offer.Item.Price == 1);
+    TestFalse(TEXT("An accepted displayed copy cannot be bought twice"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetItemShopState().Revision));
+    if (!Fixture.ReloadBoundary(*this)) return false;
+    const FRunPartyMember Equipped = Fixture.Run->GetPartyMembers()[0];
+    const FRunEquipmentSlot* WeaponSlot = Equipped.Equipment.Slots.FindByPredicate([&Equipped](const FRunEquipmentSlot& Slot) { return !Equipped.Items[Slot.ItemIndex].GrantedSkills.IsEmpty(); });
+    if (!TestNotNull(TEXT("The initial human owns an equipped skill-bearing weapon"), WeaponSlot)) return false;
+    const FGameplayTag OriginalSlot = WeaponSlot->SlotTag;
+    FRunEquipmentCommand Command;
+    Command.CharacterId = Buyer.CharacterId;
+    Command.ItemIndex = WeaponSlot->ItemIndex;
+    Command.ExpectedRevision = Equipped.Equipment.Revision;
+    const TArray<FRunPartyMember> BeforeUnequip = Fixture.Run->GetPartyMembers();
+    const TArray<uint8> BeforeUnequipBytes = Fixture.ReadBytes();
+    Publications = 0;
+    Fixture.Run->OnRunStateChanged.AddLambda([&Publications]() { ++Publications; });
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("A failed unequip cannot revoke a weapon skill"), Fixture.Run->ChangeEquipment(Buyer.OwnerAccountId, Command, Fixture.Error));
+    TestTrue(TEXT("Equipment failure preserves every owned result skill revision save byte and publication"), BeforeUnequipBytes == Fixture.ReadBytes() && SameTargetTransactionParty(BeforeUnequip, Fixture.Run->GetPartyMembers()) && Publications == 0);
+    if (!TestTrue(TEXT("Unequip retry atomically removes the final weapon source"), Fixture.Run->ChangeEquipment(Buyer.OwnerAccountId, Command, Fixture.Error) && Publications == 1 && Fixture.Run->GetPartyMembers()[0].Skills == Equipped.InnateSkills)) return false;
+    TestFalse(TEXT("An accepted equipment revision cannot execute again"), Fixture.Run->ChangeEquipment(Buyer.OwnerAccountId, Command, Fixture.Error));
+    Fixture.Run->OnRunStateChanged.Clear();
+    if (!Fixture.ReloadBoundary(*this)) return false;
+    const FRunPartyMember Unequipped = Fixture.Run->GetPartyMembers()[0];
+    TestTrue(TEXT("Unequip preserves the copy result independently of its active skill right"), RunItemShopCatalog::IsSameDefinition(Unequipped.Items[Command.ItemIndex], Equipped.Items[Command.ItemIndex]) && Unequipped.Gold == Equipped.Gold);
+    Command.TargetSlot = OriginalSlot;
+    Command.ExpectedRevision = Unequipped.Equipment.Revision;
+    if (!TestTrue(TEXT("Re-equipping the same copy restores its original fixed skill"), Fixture.Run->ChangeEquipment(Buyer.OwnerAccountId, Command, Fixture.Error) && Fixture.Run->GetPartyMembers()[0].Skills == Equipped.Skills && Fixture.ReloadBoundary(*this))) return false;
+    const FRunItemShopState BeforeReroll = Fixture.Run->GetItemShopState();
+    const TArray<FRunPartyMember> BeforeRerollParty = Fixture.Run->GetPartyMembers();
+    const TArray<uint8> BeforeRerollBytes = Fixture.ReadBytes();
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("A failed item reroll cannot replace fixed displayed copies"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunItemShopState::GetRerollOfferId(), Fixture.Error, BeforeReroll.Revision));
+    TestTrue(TEXT("Reroll failure retains saved displayed copies and buyer balance"), BeforeRerollBytes == Fixture.ReadBytes() && SameTargetTransactionParty(BeforeRerollParty, Fixture.Run->GetPartyMembers()) && FRunItemShopState::StaticStruct()->CompareScriptStruct(&BeforeReroll, &Fixture.Run->GetItemShopState(), 0));
+    if (!TestTrue(TEXT("A successful reroll publishes new generated copies with the frozen rules"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, FRunItemShopState::GetRerollOfferId(), Fixture.Error, BeforeReroll.Revision) && Fixture.ReloadBoundary(*this))) return false;
+    for (const FRunItemShopOffer& NewOffer : Fixture.Run->GetItemShopState().Offers) TestFalse(TEXT("A reroll creates fresh display identities while acquired copies remain owned"), BeforeReroll.Offers.ContainsByPredicate([&NewOffer](const FRunItemShopOffer& OldOffer) { return OldOffer.Item.ItemInstanceId == NewOffer.Item.ItemInstanceId; }));
+    TestTrue(TEXT("Continue preserves frozen rules and the purchased copy through every transaction"), FRunWeaponSkillRulesState::StaticStruct()->CompareScriptStruct(&Rules, &Fixture.Run->GetWeaponSkillRules(), 0) && RunItemShopCatalog::IsSameDefinition(Fixture.Run->GetPartyMembers()[0].Items.Last(), Offer.Item));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTargetRunLegacyAcquisitionTest, "ProjectA.Run.Target.LegacyAcquiredSkillsAndShopsRemainFrozen", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTargetRunLegacyAcquisitionTest::RunTest(const FString& Parameters)
+{
+    FTargetRunTransactionFixture Fixture;
+    if (!Fixture.InitializeEveryProfession()) return false;
+    TStrongObjectPtr<URunSaveGame> Save(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+    if (!Save) return false;
+    // Reconstruct the historical Target acquisition contract only in a disposable saved fixture.
+    // 일회성 저장 fixture에만 기존 Target 획득 계약을 구성합니다.
+    Save->WeaponSkillAcquisitionVersion = 0;
+    Save->WeaponSkillRules = FRunWeaponSkillRulesState();
+    const URunEncounterPoolDataAsset* Pool = Fixture.Run->PartyDefinition->RunEncounterPool ? Fixture.Run->PartyDefinition->RunEncounterPool.Get() : GetDefault<URunEncounterPoolDataAsset>();
+    if (!Pool->BuildSkillShop(Save->SkillShopState, Fixture.Error) || Save->SkillShopState.Catalog.Num() < 5) return false;
+    const UTargetRunDefinitionDataAsset* Definition = Fixture.Run->PartyDefinition->TargetRunDefinition ? Fixture.Run->PartyDefinition->TargetRunDefinition.Get() : GetDefault<UTargetRunDefinitionDataAsset>();
+    Save->TargetRun.EncounterPool = Definition->EncounterPool;
+    Save->TargetRun.EncounterQuery = Definition->EncounterQuery;
+    if (!UTargetRunDefinitionDataAsset::BuildOffers(Save->TargetRun, 0, 0, Save->EncounterProgress.Offers)) return false;
+    for (FRunPartyMember& Member : Save->Party)
+    {
+        Member.Skills = Member.InnateSkills;
+        Member.InnateSkills.Reset();
+        for (int32 Index = 0; Index < 5; ++Index) Member.Skills.Add(Save->SkillShopState.Catalog[Index].Skill);
+        for (FRunItemDefinition& Item : Member.Items)
+        {
+            const FRunItemDefinition* Base = Save->ItemShopState.Catalog.FindByPredicate([&Item](const FRunItemDefinition& Candidate) { return Candidate.Asset == Item.Asset; });
+            if (!Base) return false;
+            Item = *Base;
+        }
+    }
+    if (!TestTrue(TEXT("The historical Target save is accepted without adopting the new acquisition contract"), FRunCheckpointStorage::Save(Save.Get(), Fixture.Slot, Fixture.Error) && Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error) && Fixture.ReloadBoundary(*this))) return false;
+    TestTrue(TEXT("Legacy Continue preserves six acquired skills and its original skill shop"), !Fixture.Run->UsesWeaponSkills() && Fixture.Run->GetWeaponSkillRules().SchemaVersion == 0 && Fixture.Run->GetSkillShopState().SchemaVersion == 1 && SameTargetTransactionParty(Save->Party, Fixture.Run->GetPartyMembers()));
+    const FRunEncounterOffer* SkillVisit = Fixture.Run->GetEncounterProgress().Offers.FindByPredicate([](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag().MatchesTag(FRunEncounterOffer::GetSkillShopTag()); });
+    if (!TestTrue(TEXT("An already saved legacy Target still opens its original skill shop"), SkillVisit && Fixture.Run->SelectRunEncounter(SkillVisit->EncounterId) && Fixture.ReloadBoundary(*this))) return false;
+    TestEqual(TEXT("Historical skill-shop display still contains five candidates"), Fixture.Run->GetSkillShopState().Offers.Num(), 5);
+    TestTrue(TEXT("Opening the old shop never replaces acquired skills with equipment-derived skills"), SameTargetTransactionParty(Save->Party, Fixture.Run->GetPartyMembers()));
+    const FRunPartyMember Buyer = Fixture.Run->GetPartyMembers()[0];
+    if (!TestTrue(TEXT("The legacy human still has starting equipment"), !Buyer.Equipment.Slots.IsEmpty())) return false;
+    FRunEquipmentCommand Command;
+    Command.CharacterId = Buyer.CharacterId;
+    Command.ItemIndex = Buyer.Equipment.Slots[0].ItemIndex;
+    Command.ExpectedRevision = Buyer.Equipment.Revision;
+    TestTrue(TEXT("Legacy unequip keeps its original acquired skill rights"), Fixture.Run->ChangeEquipment(Buyer.OwnerAccountId, Command, Fixture.Error) && Fixture.Run->GetPartyMembers()[0].Skills == Buyer.Skills && Fixture.ReloadBoundary(*this));
     return true;
 }
 

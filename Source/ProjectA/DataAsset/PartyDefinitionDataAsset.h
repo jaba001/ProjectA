@@ -9,6 +9,7 @@ class UTexture2D;
 class USkillDefinitionDataAsset;
 class URunEncounterPoolDataAsset;
 class UTargetRunDefinitionDataAsset;
+class URunWeaponSkillRulesDataAsset;
 class UProfessionBase;
 class UCharacterAppearanceCatalog;
 struct FRunPartyMember;
@@ -65,6 +66,8 @@ public:
     TObjectPtr<URunEncounterPoolDataAsset> RunEncounterPool;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run")
     TObjectPtr<UTargetRunDefinitionDataAsset> TargetRunDefinition;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run")
+    TObjectPtr<URunWeaponSkillRulesDataAsset> WeaponSkillRules;
     // Draw one encounter-local skill after profession setup; v3 turn checkpoints preserve the chosen loadout.
     // 직업 설정 후 전투 한정 스킬 하나를 획득하며 v3 턴 체크포인트는 선택된 장착을 보존합니다.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Party")

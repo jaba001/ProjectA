@@ -8,6 +8,7 @@
 #include "Engine/GameInstance.h"
 #include "Game/GameState/GameplayViewTypes.h"
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Kismet/GameplayStatics.h"
@@ -99,6 +100,7 @@ bool FRunRecoveryLegacyCompatibilityTest::RunTest(const FString& Parameters)
     FRecoveryFixture Legacy;
     if (!TestTrue(TEXT("The existing prototype initializes unchanged"), Legacy.Initialize(false))) return false;
     TestEqual(TEXT("The old route remains ten combats"), Legacy.Run->GetNodes().Num(), 10);
+    TestTrue(TEXT("The prototype retains the historical acquired-skill and shop policy"), !Legacy.Run->UsesWeaponSkills() && Legacy.Run->GetWeaponSkillRules().SchemaVersion == 0 && Legacy.Run->GetSkillShopState().SchemaVersion == 1);
     TestTrue(TEXT("Older run initialization grants no consumables"), Legacy.Run->GetPartyMembers().ContainsByPredicate([](const FRunPartyMember& Member) { return Member.Consumables.IsEmpty(); }));
     if (!TestTrue(TEXT("The old save reloads without recovery migration"), Legacy.Run->LoadStandaloneCheckpoint(Legacy.Error))) return false;
     for (const FRunPartyMember& Member : Legacy.Run->GetPartyMembers()) TestTrue(TEXT("Reload grants no retroactive stock"), Member.Consumables.IsEmpty());
@@ -106,13 +108,19 @@ bool FRunRecoveryLegacyCompatibilityTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("The new target route creates its frozen trial recovery contract"), Target.Initialize())) return false;
     TestEqual(TEXT("The new target route contains twenty combats"), Target.Run->GetNodes().Num(), 20);
     const FRunRecoveryState Rules = Target.Run->GetRecoveryState();
+    const FRunWeaponSkillRulesState WeaponRules = Target.Run->GetWeaponSkillRules();
+    TestTrue(TEXT("The new recovery services operate without a skill shop"), Target.Run->UsesWeaponSkills() && WeaponRules.SchemaVersion == 1 && Target.Run->GetSkillShopState().SchemaVersion == 0);
     USkillDefinitionDataAsset* Consumable = Cast<USkillDefinitionDataAsset>(Rules.HealingSkill.TryLoad());
     TestFalse(TEXT("The stock-only ability cannot be equipped or acquired as a normal skill"), UnitDataRules::ValidateSkills({Consumable}, true, Target.Error));
     TestTrue(TEXT("Trial service values are saved"), Rules.SchemaVersion == 1 && Rules.StartingQuantity == 1 && Rules.ConsumablePrice == 1 && Rules.RecoveryHP == 25.f && Rules.RecoveryPrice == 1 && Rules.RevivalFraction == .25f && Rules.RevivalPrice == 1);
     const TArray<FRunPartyMember> Before = Target.Run->GetPartyMembers();
-    for (const FRunPartyMember& Member : Before) TestTrue(TEXT("Each new character owns exactly one tagged consumable outside acquired skill slots"), Member.Consumables.Num() == 1 && Member.Consumables[0].Quantity == 1 && Member.Consumables[0].Skill == Rules.HealingSkill && Member.Skills.Num() == 1);
+    for (const FRunPartyMember& Member : Before)
+    {
+        TArray<FSoftObjectPath> EquippedSkills;
+        TestTrue(TEXT("Each new character owns one tagged consumable outside innate and equipped weapon skills"), Member.Consumables.Num() == 1 && Member.Consumables[0].Quantity == 1 && Member.Consumables[0].Skill == Rules.HealingSkill && Member.InnateSkills.Num() == 1 && Member.Skills.Num() == 2 && !Member.Skills.Contains(Rules.HealingSkill) && RunEquipmentRules::BuildEquippedSkills(Member, EquippedSkills, Target.Error) && Member.Skills == EquippedSkills);
+    }
     if (!Target.Run->LoadStandaloneCheckpoint(Target.Error)) return false;
-    TestTrue(TEXT("Continue preserves quantities and frozen rules without another starting grant"), SameRecoveryParty(Before, Target.Run->GetPartyMembers()) && FRunRecoveryState::StaticStruct()->CompareScriptStruct(&Rules, &Target.Run->GetRecoveryState(), 0));
+    TestTrue(TEXT("Continue preserves quantities weapon copies and both frozen contracts without another starting grant"), SameRecoveryParty(Before, Target.Run->GetPartyMembers()) && FRunRecoveryState::StaticStruct()->CompareScriptStruct(&Rules, &Target.Run->GetRecoveryState(), 0) && FRunWeaponSkillRulesState::StaticStruct()->CompareScriptStruct(&WeaponRules, &Target.Run->GetWeaponSkillRules(), 0));
     return true;
 }
 
@@ -127,6 +135,8 @@ bool FRunRecoveryTransactionTest::RunTest(const FString& Parameters)
         FRecoveryFixture Fixture;
         if (!TestTrue(TEXT("The public route reaches each tagged service"), Fixture.Initialize() && Fixture.SetFixtureHealth(bRevival ? 0.f : 30.f) && Fixture.SelectService(Tag))) return false;
         const TArray<FRunPartyMember> Before = Fixture.Run->GetPartyMembers();
+        const FRunWeaponSkillRulesState WeaponRules = Fixture.Run->GetWeaponSkillRules();
+        TestTrue(TEXT("Each service is available under the new weapon policy with no skill shop"), Fixture.Run->UsesWeaponSkills() && Fixture.Run->GetSkillShopState().SchemaVersion == 0);
         const FRunPartyMember Buyer = Before[0];
         const FName OfferId = Tag.GetTagName();
         const int32 Revision = Fixture.Run->GetRecoveryState().Revision;
@@ -151,12 +161,18 @@ bool FRunRecoveryTransactionTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Exactly one trial price is charged"), After.Gold, Buyer.Gold - 1);
         TestEqual(TEXT("The service changes only its intended stock quantity"), After.Consumables[0].Quantity, bConsumable ? 2 : 1);
         TestEqual(TEXT("Recovery and revival use their frozen trial values"), After.CurrentHP, bConsumable ? 30.f : bRevival ? Profession.MaxHP * .25f : 55.f);
+        FRunPartyMember UnchangedEquipment = After;
+        UnchangedEquipment.CurrentHP = Buyer.CurrentHP;
+        UnchangedEquipment.Gold = Buyer.Gold;
+        UnchangedEquipment.Consumables = Buyer.Consumables;
+        TestTrue(TEXT("Recovery purchases preserve all fixed weapon copies equipment innate skills and active skill rights"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Buyer, &UnchangedEquipment, 0));
         const TArray<uint8> Committed = Fixture.Bytes();
         TestFalse(TEXT("A duplicated accepted revision never charges or applies twice"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, OfferId, Fixture.Error, Revision));
         TestTrue(TEXT("Duplicate rejection preserves durable bytes and emits no extra publication"), Committed == Fixture.Bytes() && Publications == 1);
         Fixture.Run->OnRunStateChanged.Clear();
         if (!TestTrue(TEXT("Continue restores the service visit"), Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error))) return false;
         TestTrue(TEXT("Resume preserves healed or revived HP, gold and consumable quantity"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&After, &Fixture.Run->GetPartyMembers()[0], 0));
+        TestTrue(TEXT("Recovery Continue preserves the frozen weapon generation contract"), FRunWeaponSkillRulesState::StaticStruct()->CompareScriptStruct(&WeaponRules, &Fixture.Run->GetWeaponSkillRules(), 0));
         for (int32 Index = 1; Index < Before.Num(); ++Index) TestTrue(TEXT("Every AI companion remains unchanged"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[Index], &Fixture.Run->GetPartyMembers()[Index], 0));
     }
     FRecoveryFixture Full;
@@ -204,7 +220,7 @@ bool FRunConsumableCheckpointTest::RunTest(const FString& Parameters)
             Plan.Command.TargetUnitId = Unit.RoundUnitId;
         }
     }
-    if (!TestTrue(TEXT("A Ready consumable command validates separately from the five acquired skills"), CombatPlanValidation::ValidateCheckpointPlans(Checkpoint, Error))) return false;
+    if (!TestTrue(TEXT("A Ready consumable command validates separately from acquired and equipped weapon skills"), CombatPlanValidation::ValidateCheckpointPlans(Checkpoint, Error))) return false;
     TArray<uint8> Bytes;
     if (!UGameplayStatics::SaveGameToMemory(Save.Get(), Bytes)) return false;
     TStrongObjectPtr<URunSaveGame> Restored(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));

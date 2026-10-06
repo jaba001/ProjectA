@@ -20,6 +20,7 @@
 #include "UI/Gameplay/GameplayActionButton.h"
 #include "UI/Gameplay/CharacterEquipmentPanel.h"
 #include "UI/Gameplay/CharacterInventoryPanel.h"
+#include "UI/Gameplay/RunItemPresentation.h"
 #include "UI/Theme/DemonicUITheme.h"
 
 TOptional<FUIInputConfig> URunEncounterWidget::GetDesiredInputConfig() const
@@ -162,7 +163,8 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
         {
             ShopHint->SetText(View.ItemShopState.SchemaVersion == 0 ? NSLOCTEXT("RunItemShop", "LegacyRun", "이전 저장에는 아이템 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다.") : NSLOCTEXT("RunItemShop", "InventoryRules", "중복 없이 5개 추첨 · 구매한 아이템은 오른쪽 인벤토리에 보관됩니다."));
         }
-        else if (View.SkillShopState.SchemaVersion == 0) ShopHint->SetText(NSLOCTEXT("RunSkillShop", "LegacyRun", "이전 저장에는 스킬 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다."));
+        else if (bService) ShopHint->SetText(FText::GetEmpty());
+        else if (View.SkillShopState.SchemaVersion == 0) ShopHint->SetText(NSLOCTEXT("RunSkillShop", "ShopUnavailable", "이 저장에서는 스킬 상점을 이용할 수 없습니다."));
         else if (View.SkillShopState.Revision == 0) ShopHint->SetText(NSLOCTEXT("RunSkillShop", "LegacyStock", "이전 저장의 스킬 상품과 HP 회복은 그대로 구매할 수 있습니다. 리롤은 새 Run에서 이용할 수 있습니다."));
         else ShopHint->SetText(NSLOCTEXT("RunSkillShop", "RerollRules", "가용 스킬 최대 5개 진열 · 전체 리롤 · 비용 1 → 2 → 3G… · 구매한 스킬은 본인에게 Run 동안 적용되며 같은 스킬은 한 번만 구매할 수 있습니다."));
         const int32 OfferCount = bService ? 0 : bItemShop ? View.ItemShopState.Offers.Num() : View.SkillShopState.Offers.Num();
@@ -214,27 +216,33 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             const bool bVisible = Index < OfferCount;
             ShopCards[Index]->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
             if (!bVisible) continue;
+            Theme.StyleText(ShopNames[Index], true, 17);
             if (bItemShop)
             {
                 const FRunItemShopOffer& Offer = View.ItemShopState.Offers[Index];
                 const bool bAffordable = Buyer && Offer.Item.Price > 0 && Buyer->Gold >= Offer.Item.Price;
                 const FText Status = Offer.bSold ? NSLOCTEXT("RunItemShop", "Sold", "판매 완료") : bAffordable ? NSLOCTEXT("RunItemShop", "Buy", "구매") : NSLOCTEXT("RunItemShop", "CannotBuy", "구매 불가");
                 Button->Configure(Offer.OfferId, Status);
-                ShopNames[Index]->SetText(Offer.Item.DisplayName);
+                ShopNames[Index]->SetText(RunItemPresentation::Name(Offer.Item, View.ItemRarities));
+                if (const FRunWeaponRarityRule* Rarity = RunItemPresentation::FindRarity(Offer.Item, View.ItemRarities)) ShopNames[Index]->SetColorAndOpacity(Rarity->Color);
                 ShopPrices[Index]->SetText(FText::Format(NSLOCTEXT("RunItemShop", "Price", "{0}G"), FText::AsNumber(Offer.Item.Price)));
+                const FText GrantedSkills = RunItemPresentation::GrantedSkills(Offer.Item);
+                if (!GrantedSkills.IsEmpty()) ShopPrices[Index]->SetText(FText::Format(NSLOCTEXT("RunItemShop", "PriceAndSkills", "{0}\n{1}"), ShopPrices[Index]->GetText(), GrantedSkills));
+                ShopPrices[Index]->SetAutoWrapText(true);
+                ShopPrices[Index]->SetWrapTextAt(320.0f);
                 Theme.SetItemIcon(ShopIcons[Index], Offer.Item.Tags);
                 ShopIcons[Index]->SetVisibility(ESlateVisibility::HitTestInvisible);
                 ShopCards[Index]->SetRenderOpacity(Offer.bSold ? 0.55f : 1.0f);
-                ShopCards[Index]->SetToolTipText(Offer.Item.DisplayName);
-                Button->SetToolTipText(Offer.Item.DisplayName);
+                const FText Tooltip = RunItemPresentation::Tooltip(Offer.Item, View.ItemRarities);
+                ShopCards[Index]->SetToolTipText(Tooltip);
+                Button->SetToolTipText(Tooltip);
                 Button->SetIsEnabled(View.ItemShopState.SchemaVersion == 1 && !Offer.bSold && bAffordable && Controller && !Controller->IsShopPurchasePending());
                 continue;
             }
             const FRunSkillShopOffer& Offer = View.SkillShopState.Offers[Index];
             const bool bOwned = Buyer && Buyer->Skills.Contains(Offer.Skill);
-            const bool bLoadoutFull = Buyer && Buyer->Skills.Num() >= 5;
             const bool bAffordable = Buyer && Offer.Price > 0 && Buyer->Gold >= Offer.Price;
-            const FText Status = bOwned ? NSLOCTEXT("RunSkillShop", "Owned", "보유 중") : bLoadoutFull ? NSLOCTEXT("RunSkillShop", "FullLoadout", "스킬 5개 보유") : bAffordable ? NSLOCTEXT("RunSkillShop", "Buy", "구매") : NSLOCTEXT("RunSkillShop", "CannotBuy", "구매 불가");
+            const FText Status = bOwned ? NSLOCTEXT("RunSkillShop", "Owned", "보유 중") : bAffordable ? NSLOCTEXT("RunSkillShop", "Buy", "구매") : NSLOCTEXT("RunSkillShop", "CannotBuy", "구매 불가");
             Button->Configure(Offer.OfferId, Status);
             const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());
             // Refresh renamed skill labels without changing the saved shop offer.
@@ -246,7 +254,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             ShopCards[Index]->SetRenderOpacity(bOwned ? 0.55f : 1.0f);
             ShopCards[Index]->SetToolTipText(Offer.Description);
             Button->SetToolTipText(Offer.Description);
-            Button->SetIsEnabled(!bOwned && !bLoadoutFull && bAffordable && Controller && !Controller->IsShopPurchasePending());
+            Button->SetIsEnabled(!bOwned && bAffordable && Controller && !Controller->IsShopPurchasePending());
         }
         const bool bCanRecover = Buyer && BuyerView && Buyer->CurrentHP > 0.f && Buyer->CurrentHP < BuyerView->MaxHP;
         const bool bRecoveryAffordable = Buyer && View.SkillShopState.Recovery.Price > 0 && Buyer->Gold >= View.SkillShopState.Recovery.Price;

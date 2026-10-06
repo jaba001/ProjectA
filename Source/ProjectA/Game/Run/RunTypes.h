@@ -91,6 +91,13 @@ struct PROJECTA_API FRunPartyMember
     UPROPERTY(BlueprintReadOnly, Category = "Run|Skills")
     TArray<FSoftObjectPath> Skills;
 
+    // Preserve innate skills while equipped item copies retain each grant's source in Items and ItemIndex.
+    // 기본 스킬을 보존하며 장착 사본의 부여 출처는 Items와 ItemIndex에 유지합니다.
+    // Missing innate data keeps historical acquired-skill rules for older Runs.
+    // 기본 스킬 데이터가 없는 이전 Run은 기존 습득 스킬 규칙을 유지합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Run|Skills")
+    TArray<FSoftObjectPath> InnateSkills;
+
     UPROPERTY(BlueprintReadOnly, Category = "Run|Consumables")
     TArray<FRunConsumableStack> Consumables;
 };

@@ -92,7 +92,7 @@ bool FRunSkillShopLoadoutTest::RunTest(const FString& Parameters)
         for (int32 ShopIndex : {1, 3})
         {
             FSkillShopFixture Fixture;
-            if (!TestTrue(TEXT("Every direct-control profession initializes"), Fixture.Initialize(SelectedSlot))) return false;
+            if (!TestTrue(TEXT("Every direct-control profession initializes a durable Run"), Fixture.Initialize(SelectedSlot, true))) return false;
             const FSoftObjectPath Unarmed = Fixture.Run->PartyDefinition->UnarmedStartingSkill.ToSoftObjectPath();
             for (const FRunPartyMember& Member : Fixture.Run->GetPartyMembers())
             {
@@ -118,26 +118,28 @@ bool FRunSkillShopLoadoutTest::RunTest(const FString& Parameters)
                 if (!TestTrue(TEXT("Every displayed skill resolves to valid runtime content"), IsValid(Skill) && Skill->ResolveRoundSkill(Definition, Fixture.Error))) return false;
                 TestFalse(TEXT("Displayed skill identities contain no duplicates"), DisplayedSkillIds.Contains(Definition.SkillId));
                 DisplayedSkillIds.Add(Definition.SkillId);
-                const bool bCanLearn = Before[SelectedSlot].Skills.Num() + PurchasedCount < 5;
                 const bool bPurchased = Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision);
-                TestEqual(TEXT("Every profession can purchase current offers until the five-skill limit"), bPurchased, bCanLearn);
+                TestTrue(TEXT("Every profession can purchase every distinct offer beyond five owned skills"), bPurchased);
                 if (bPurchased) ++PurchasedCount;
-                TestFalse(TEXT("Repeated requests cannot bypass learned skills or the loadout limit"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+                TestFalse(TEXT("Repeated requests cannot purchase an already learned skill"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
             }
             TestEqual(TEXT("Only successful purchases consume 1G each"), Fixture.Member(SelectedSlot).Gold, Before[SelectedSlot].Gold - PurchasedCount);
-            TestEqual(TEXT("The buyer retains unarmed and four purchased skills"), Fixture.Member(SelectedSlot).Skills.Num(), 5);
+            TestEqual(TEXT("The buyer retains unarmed and all five purchased skills"), Fixture.Member(SelectedSlot).Skills.Num(), 6);
             FProfessionDefinition Profession;
             if (!Fixture.Run->PartyDefinition->ResolveProfession(Fixture.Member(SelectedSlot).ClassId, Profession)) return false;
-            TestTrue(TEXT("Every shop can recover every profession with a full loadout"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
-            TestTrue(TEXT("Recovery restores all HP for 1G without changing the purchased loadout"), Fixture.Member(SelectedSlot).CurrentHP == Profession.MaxHP && Fixture.Member(SelectedSlot).Gold == Before[SelectedSlot].Gold - PurchasedCount - 1 && Fixture.Member(SelectedSlot).Skills.Num() == 5);
+            TestTrue(TEXT("Every shop can recover every profession with six owned skills"), Fixture.Run->PurchaseShopOffer(Account, CharacterId, FRunSkillShopState::GetRecoveryOfferId(), Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
+            TestTrue(TEXT("Recovery restores all HP for 1G without changing the purchased loadout"), Fixture.Member(SelectedSlot).CurrentHP == Profession.MaxHP && Fixture.Member(SelectedSlot).Gold == Before[SelectedSlot].Gold - PurchasedCount - 1 && Fixture.Member(SelectedSlot).Skills.Num() == 6);
             for (int32 Index = 0; Index < Before.Num(); ++Index)
             {
                 if (Index != SelectedSlot) TestTrue(TEXT("Companion HP balance and loadout remain unchanged"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[Index], &Fixture.Member(Index), 0));
             }
             TestTrue(TEXT("Purchases preserve all participant and host identity fields"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Fixture.Run->GetRunIdentity(), 0));
-            TestTrue(TEXT("The next battle starts with the purchased Run loadout"), Fixture.Run->LeaveRunEncounter() && Fixture.Run->BeginEncounter(TEXT("Combat_02")) && Fixture.Run->MarkCombatStarted());
+            TStrongObjectPtr<URunStateSubsystem> Restored(NewObject<URunStateSubsystem>(Fixture.Instance.Get()));
+            Restored->EnableCheckpointSaving(Fixture.Slot);
+            if (!TestTrue(TEXT("Standalone Continue accepts six owned skills without changing their order or identity"), Restored->LoadStandaloneCheckpoint(Fixture.Error) && SameShopParty(Fixture.Run->GetPartyMembers(), Restored->GetPartyMembers()) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &Restored->GetRunIdentity(), 0))) return false;
+            TestTrue(TEXT("The next battle starts with all six restored skills"), Restored->LeaveRunEncounter() && Restored->BeginEncounter(TEXT("Combat_02")) && Restored->MarkCombatStarted());
             TArray<TObjectPtr<USkillDefinitionDataAsset>> ResolvedSkills;
-            TestTrue(TEXT("Spawn resolution includes all acquired skills"), Fixture.Run->PartyDefinition->ResolveMemberSkills(Fixture.Member(SelectedSlot), ResolvedSkills, Fixture.Error) && ResolvedSkills.Num() == 5);
+            TestTrue(TEXT("Spawn resolution includes all six restored skills"), Restored->PartyDefinition->ResolveMemberSkills(Restored->GetPartyMembers()[SelectedSlot], ResolvedSkills, Fixture.Error) && ResolvedSkills.Num() == 6);
         }
     }
     return true;
@@ -204,6 +206,13 @@ bool FRunSkillShopAtomicPersistenceTest::RunTest(const FString& Parameters)
 {
     FSkillShopFixture Fixture;
     if (!TestTrue(TEXT("The purchase fixture reaches a durable shop"), Fixture.Initialize(3, true) && Fixture.ReachShop())) return false;
+    const TArray<FRunSkillShopOffer> Offers = Fixture.Run->GetSkillShopState().Offers;
+    for (int32 Index = 1; Index < Offers.Num(); ++Index)
+    {
+        const FRunPartyMember CurrentBuyer = Fixture.Member(3);
+        if (!TestTrue(TEXT("The durable buyer learns the other current products before the sixth-skill transaction"), Fixture.Run->PurchaseShopOffer(CurrentBuyer.OwnerAccountId, CurrentBuyer.CharacterId, Offers[Index].OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision))) return false;
+    }
+    if (!TestEqual(TEXT("The atomic purchase crosses the former five-skill boundary"), Fixture.Member(3).Skills.Num(), 5)) return false;
     const FRunPartyMember Buyer = Fixture.Member(3);
     const FRunSkillShopOffer Offer = Fixture.Run->GetSkillShopState().Offers[0];
     const TArray<FRunPartyMember> Before = Fixture.Run->GetPartyMembers();
@@ -215,14 +224,14 @@ bool FRunSkillShopAtomicPersistenceTest::RunTest(const FString& Parameters)
     {
         ++Events;
         TStrongObjectPtr<URunSaveGame> Durable(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
-        bEventObservedDurablePurchase = Durable && Durable->Party[3].Gold == Buyer.Gold - 1 && Durable->Party[3].Skills.Contains(Offer.Skill) && Fixture.Member(3).Gold == Buyer.Gold - 1 && Fixture.Member(3).Skills.Contains(Offer.Skill);
+        bEventObservedDurablePurchase = Durable && Durable->Party[3].Gold == Buyer.Gold - 1 && Durable->Party[3].Skills.Contains(Offer.Skill) && Fixture.Member(3).Gold == Buyer.Gold - 1 && Fixture.Member(3).Skills.Contains(Offer.Skill) && SameShopParty(Durable->Party, Fixture.Run->GetPartyMembers());
     });
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("A failed durable write rejects the purchase"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
     TestTrue(TEXT("Failed writes preserve every member and the complete original file"), SameShopParty(Before, Fixture.Run->GetPartyMembers()) && BeforeBytes == Fixture.ReadBytes());
     TestEqual(TEXT("Failed persistence emits no purchase notification"), Events, 0);
     TestTrue(TEXT("The same purchase can retry after storage recovers"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
-    TestTrue(TEXT("The single success notification observes committed memory and disk"), Events == 1 && bEventObservedDurablePurchase);
+    TestTrue(TEXT("The single success notification observes all six committed skills in memory and disk"), Events == 1 && bEventObservedDurablePurchase && Fixture.Member(3).Skills.Num() == 6);
     TestFalse(TEXT("A retried successful request cannot charge twice"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, Offer.OfferId, Fixture.Error, Fixture.Run->GetSkillShopState().Revision));
     TestEqual(TEXT("A duplicate request adds no notification"), Events, 1);
     Fixture.Run->OnRunStateChanged.Clear();
@@ -703,6 +712,71 @@ bool FRunEquipmentSwapTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Unequip clears both hands without deleting owned copies"), Member.Equipment.Slots.IsEmpty() && Member.Items.Num() == 4);
     Member.Equipment = FRunEquipmentState();
     TestTrue(TEXT("A saved legacy inventory supports its first explicit equipment command"), Change(0, Main) && Member.Equipment.bHasLoadout);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunEquipmentGrantedSkillRightsTest, "ProjectA.Run.Equipment.GrantedSkillSourcesAndAtomicChange", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunEquipmentGrantedSkillRightsTest::RunTest(const FString& Parameters)
+{
+    FSkillShopFixture Fixture;
+    if (!Fixture.Initialize() || Fixture.Member(0).Items.Num() != 2 || Fixture.Member(1).Items.IsEmpty() || Fixture.Member(3).Items.IsEmpty()) return false;
+    FRunPartyMember Member = Fixture.Member(0);
+    Member.InnateSkills = {Fixture.Run->PartyDefinition->UnarmedStartingSkill.ToSoftObjectPath()};
+    TStrongObjectPtr<USkillDefinitionDataAsset> Shared(NewObject<USkillDefinitionDataAsset>());
+    TStrongObjectPtr<USkillDefinitionDataAsset> SwordOnly(NewObject<USkillDefinitionDataAsset>());
+    TStrongObjectPtr<USkillDefinitionDataAsset> BowOnly(NewObject<USkillDefinitionDataAsset>());
+    Shared->bUseRoundDefinition = true;
+    SwordOnly->bUseRoundDefinition = true;
+    BowOnly->bUseRoundDefinition = true;
+    const FSoftObjectPath SharedPath(Shared.Get());
+    const FSoftObjectPath SwordPath(SwordOnly.Get());
+    const FSoftObjectPath BowPath(BowOnly.Get());
+    Member.Items[0].GrantedSkills = {SharedPath, SwordPath};
+    Member.Items[1].GrantedSkills.Reset();
+    const int32 Dagger = Member.Items.Add(Fixture.Member(3).Items[0]);
+    const int32 Bow = Member.Items.Add(Fixture.Member(1).Items[0]);
+    Member.Items[Dagger].GrantedSkills = {SharedPath};
+    Member.Items[Bow].GrantedSkills = {BowPath};
+    const FGameplayTag Main = URunEquipmentCatalog::GetWeaponSlot(0);
+    const FGameplayTag Off = URunEquipmentCatalog::GetWeaponSlot(1);
+    const auto Change = [&Member, &Fixture](int32 ItemIndex, FGameplayTag Target)
+    {
+        FRunEquipmentCommand Command;
+        Command.CharacterId = Member.CharacterId;
+        Command.ItemIndex = ItemIndex;
+        Command.TargetSlot = Target;
+        Command.ExpectedRevision = Member.Equipment.Revision;
+        return RunEquipmentRules::Apply(Member, Command, Fixture.Error);
+    };
+    if (!TestTrue(TEXT("Equipping two sources merges their shared skill into one button"), Change(Dagger, Off))) return false;
+    TArray<FSoftObjectPath> Expected = Member.InnateSkills;
+    Expected.Add(SharedPath);
+    Expected.Add(SwordPath);
+    TestTrue(TEXT("Innate then equipped source order is preserved without duplicate skill IDs"), Member.Skills == Expected);
+    TestTrue(TEXT("Each weapon retains its original independent grant source"), Member.Items[0].GrantedSkills == TArray<FSoftObjectPath>{SharedPath, SwordPath} && Member.Items[Dagger].GrantedSkills == TArray<FSoftObjectPath>{SharedPath});
+    if (!TestTrue(TEXT("The first shared-skill source can be unequipped"), Change(0, FGameplayTag()))) return false;
+    Expected = Member.InnateSkills;
+    Expected.Add(SharedPath);
+    TestTrue(TEXT("The remaining equipped source keeps the shared skill and removes the sword-only skill"), Member.Skills == Expected && Member.Items[0].GrantedSkills.Contains(SwordPath));
+    if (!TestTrue(TEXT("The final shared-skill source can be unequipped"), Change(Dagger, FGameplayTag()))) return false;
+    TestTrue(TEXT("Removing the last source retains only innate skills"), Member.Skills == Member.InnateSkills);
+    if (!TestTrue(TEXT("Re-equipping a copy restores its fixed grants"), Change(0, Main) && Change(Dagger, Off))) return false;
+    if (!TestTrue(TEXT("A two-handed bow replaces both equipped weapon sources"), Change(Bow, Main))) return false;
+    Expected = Member.InnateSkills;
+    Expected.Add(BowPath);
+    TestTrue(TEXT("Both occupied hands provide one bow source and one bow skill"), Member.Equipment.Slots.Num() == 1 && RunEquipmentRules::FindItemIndexAtSlot(Member, Main) == Bow && RunEquipmentRules::FindItemIndexAtSlot(Member, Off) == Bow && Member.Skills == Expected);
+    Member.Items[Dagger].GrantedSkills = {SharedPath, SharedPath};
+    const FRunPartyMember Before = Member;
+    TestFalse(TEXT("Duplicate grants inside one weapon reject the equipment transaction"), Change(Dagger, Off));
+    TestTrue(TEXT("Failed grant validation preserves equipment revision skills and all owned copies"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Member, &Before, 0));
+    Member.Items[Dagger].GrantedSkills = {FSoftObjectPath(TEXT("/Game/User_JeHoon/Validation/T12/MissingWeaponSkill.MissingWeaponSkill"))};
+    const FRunPartyMember BeforeMissing = Member;
+    TestFalse(TEXT("A missing granted skill rejects the equipment transaction"), Change(Dagger, Off));
+    TestTrue(TEXT("Missing grant rejection publishes no equipment or skill changes"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Member, &BeforeMissing, 0));
+    Member.InnateSkills.Reset();
+    const TArray<FSoftObjectPath> LegacySkills = Member.Skills;
+    TestTrue(TEXT("An older Run can unequip without adopting weapon-driven skill rights"), Change(Bow, FGameplayTag()) && Member.Skills == LegacySkills);
     return true;
 }
 

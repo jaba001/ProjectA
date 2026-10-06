@@ -2,8 +2,11 @@
 
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
+#include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Run/RunEquipmentCatalog.h"
+#include "Game/Run/RunItemShopCatalog.h"
 #include "Profession/ProfessionBase.h"
+#include "Unit/UnitDataRules.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRunEquipment, Log, All);
 
@@ -54,6 +57,51 @@ int32 RunEquipmentRules::FindItemIndexAtSlot(const FRunPartyMember& Member, FGam
 bool RunEquipmentRules::IsItemEquipped(const FRunPartyMember& Member, int32 ItemIndex)
 {
     return Member.Equipment.Slots.ContainsByPredicate([ItemIndex](const FRunEquipmentSlot& Slot) { return Slot.ItemIndex == ItemIndex; });
+}
+
+bool RunEquipmentRules::BuildEquippedSkills(const FRunPartyMember& Member, TArray<FSoftObjectPath>& OutSkills, FText& OutError)
+{
+    if (!Validate(Member, OutError)) return false;
+    TArray<FSoftObjectPath> Candidate;
+    TSet<FName> SkillIds;
+    const auto AppendSource = [&Candidate, &SkillIds, &OutError](const TArray<FSoftObjectPath>& Paths)
+    {
+        TArray<TObjectPtr<USkillDefinitionDataAsset>> Definitions;
+        for (const FSoftObjectPath& Path : Paths) Definitions.Add(Cast<USkillDefinitionDataAsset>(Path.TryLoad()));
+        if (!UnitDataRules::ValidateSkills(Definitions, false, OutError)) return false;
+        for (int32 Index = 0; Index < Definitions.Num(); ++Index)
+        {
+            FCombatRoundSkill Skill;
+            if (!Definitions[Index]->ResolveRoundSkill(Skill, OutError)) return false;
+            if (SkillIds.Contains(Skill.SkillId)) continue;
+            SkillIds.Add(Skill.SkillId);
+            Candidate.Add(Paths[Index]);
+        }
+        return true;
+    };
+    if (!AppendSource(Member.InnateSkills)) return false;
+    TSet<int32> Sources;
+    for (const FRunEquipmentSlot& Slot : Member.Equipment.Slots)
+    {
+        // A two-handed copy grants its skills once even when its profile occupies both weapon slots.
+        // 양손 무기 프로필이 두 무기 슬롯을 점유해도 같은 사본의 스킬은 한 번만 부여합니다.
+        if (Sources.Contains(Slot.ItemIndex)) continue;
+        Sources.Add(Slot.ItemIndex);
+        const FRunItemDefinition& Item = Member.Items[Slot.ItemIndex];
+        if (!Item.Tags.HasTag(RunItemShopCatalog::GetWeaponTag()))
+        {
+            if (!Item.GrantedSkills.IsEmpty())
+            {
+                OutError = NSLOCTEXT("RunEquipment", "NonWeaponSkills", "Only tagged weapons may grant equipment skills. / 무기 태그가 있는 아이템만 장착 스킬을 부여할 수 있습니다.");
+                return false;
+            }
+            continue;
+        }
+        if (!AppendSource(Item.GrantedSkills)) return false;
+    }
+    OutSkills = MoveTemp(Candidate);
+    OutError = FText::GetEmpty();
+    return true;
 }
 
 bool RunEquipmentRules::Apply(FRunPartyMember& Member, const FRunEquipmentCommand& Command, FText& OutError)
@@ -108,7 +156,8 @@ bool RunEquipmentRules::Apply(FRunPartyMember& Member, const FRunEquipmentComman
     FRunPartyMember Validated = Member;
     Validated.Equipment = Candidate;
     if (!Validate(Validated, OutError)) return false;
-    Member.Equipment = MoveTemp(Candidate);
+    if (!Member.InnateSkills.IsEmpty() && !BuildEquippedSkills(Validated, Validated.Skills, OutError)) return false;
+    Member = MoveTemp(Validated);
     OutError = FText::GetEmpty();
     return true;
 }

@@ -113,7 +113,7 @@ bool UPartySnapshotLibrary::ValidateSnapshot(const FPartySnapshot& Snapshot, FTe
         }
         if (!UnitDataRules::IsValidSkillCount(Member.SkillIds.Num(), true) || !HasUniqueIdentifiers(Member.SkillIds))
         {
-            OutError = NSLOCTEXT("PartySnapshot", "Skills", "파티원은 중복 없는 스킬 식별자를 1~5개 가져야 합니다.");
+            OutError = NSLOCTEXT("PartySnapshot", "Skills", "파티원은 중복 없는 스킬 식별자를 한 개 이상 가져야 합니다.");
             return false;
         }
         if (Member.SkillIds.ContainsByPredicate([](FName SkillId) { return RunContentMigration::IsRemovedSkillId(SkillId); }))

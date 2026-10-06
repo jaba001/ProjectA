@@ -15,6 +15,7 @@
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "InputCoreTypes.h"
 #include "UI/Gameplay/EquipmentDragDropOperation.h"
+#include "UI/Gameplay/RunItemPresentation.h"
 #include "UI/Theme/DemonicUITheme.h"
 
 void UEquipmentItemSlotWidget::NativeOnInitialized()
@@ -99,13 +100,14 @@ void UEquipmentItemSlotWidget::SetSelected(bool bInSelected)
     UpdateListHighlight();
 }
 
-void UEquipmentItemSlotWidget::RefreshSlot(FGuid InCharacterId, int32 InRevision, int32 InItemIndex, const FRunItemDefinition* Item, FGameplayTag InTargetSlot, FName EmptyIcon, const FText& SlotLabel, bool bAllowDrag)
+void UEquipmentItemSlotWidget::RefreshSlot(FGuid InCharacterId, int32 InRevision, int32 InItemIndex, const FRunItemDefinition* Item, FGameplayTag InTargetSlot, FName EmptyIcon, const FText& SlotLabel, bool bAllowDrag, const TArray<FRunWeaponRarityRule>& Rarities)
 {
     CharacterId = InCharacterId;
     Revision = InRevision;
     ItemIndex = Item ? InItemIndex : INDEX_NONE;
     TargetSlot = InTargetSlot;
     DisplayedItem = Item ? *Item : FRunItemDefinition();
+    DisplayedRarities = Rarities;
     const bool bEquipmentSlot = TargetSlot.IsValid();
     const bool bSupported = Item && URunEquipmentCatalog::Get().ResolveProfile(*Item);
     bCanDrag = bAllowDrag && Item && (bEquipmentSlot || bSupported);
@@ -121,11 +123,14 @@ void UEquipmentItemSlotWidget::RefreshSlot(FGuid InCharacterId, int32 InRevision
     else Theme.SetEquipmentIcon(Icon, EmptyIcon);
     Icon->SetColorAndOpacity(Item ? FLinearColor::White : FLinearColor(0.62f, 0.56f, 0.46f, 0.72f));
     Card->SetRenderOpacity(bListPresentation || !Item || bSupported ? 1.0f : 0.6f);
-    const FText ItemName = Item ? (Item->DisplayName.IsEmpty() ? FText::FromString(Item->Asset.GetAssetName()) : Item->DisplayName) : NSLOCTEXT("Equipment", "Empty", "미장착");
+    const FText ItemName = Item ? RunItemPresentation::Name(*Item, DisplayedRarities) : NSLOCTEXT("Equipment", "Empty", "미장착");
+    Theme.StyleText(ItemText, false, bListPresentation ? 16 : 13);
+    if (const FRunWeaponRarityRule* Rarity = RunItemPresentation::FindRarity(DisplayedItem, DisplayedRarities)) ItemText->SetColorAndOpacity(Rarity->Color);
     ItemText->SetText(bListPresentation && Item ? FText::Format(NSLOCTEXT("Equipment", "ListItem", "{0} (1)"), ItemName) : ItemName);
     StateText->SetText(!Item ? FText::GetEmpty() : bEquipmentSlot ? NSLOCTEXT("Equipment", "Equipped", "장착 중") : bSupported ? NSLOCTEXT("Equipment", "Stored", "보관 중") : NSLOCTEXT("Equipment", "Unsupported", "장착 미지원"));
     StateText->SetVisibility(Item && !bListPresentation ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-    if (bListPresentation) SetToolTipText(Item ? FText::Format(NSLOCTEXT("Equipment", "ListItemTooltip", "{0}\n{1}"), ItemName, StateText->GetText()) : SlotLabel);
+    if (Item && Item->GenerationVersion > 0) SetToolTipText(FText::Format(NSLOCTEXT("Equipment", "GeneratedItemTooltip", "{0}\n{1}"), RunItemPresentation::Tooltip(*Item, DisplayedRarities), StateText->GetText()));
+    else if (bListPresentation) SetToolTipText(Item ? FText::Format(NSLOCTEXT("Equipment", "ListItemTooltip", "{0}\n{1}"), ItemName, StateText->GetText()) : SlotLabel);
     else SetToolTipText(Item ? FText::Format(NSLOCTEXT("Equipment", "ItemTooltip", "{0}\n{1}\n{2}"), ItemName, StateText->GetText(), FText::FromString(Item->Asset.ToString())) : SlotLabel);
     ResetDropHighlight();
 }
@@ -177,7 +182,7 @@ void UEquipmentItemSlotWidget::NativeOnDragDetected(const FGeometry& Geometry, c
     Drag->ItemIndex = ItemIndex;
     Drag->ExpectedRevision = Revision;
     UEquipmentItemSlotWidget* Preview = CreateWidget<UEquipmentItemSlotWidget>(GetOwningPlayer());
-    Preview->RefreshSlot(CharacterId, Revision, ItemIndex, &DisplayedItem, FGameplayTag(), NAME_None, FText::GetEmpty(), false);
+    Preview->RefreshSlot(CharacterId, Revision, ItemIndex, &DisplayedItem, FGameplayTag(), NAME_None, FText::GetEmpty(), false, DisplayedRarities);
     Preview->SetVisibility(ESlateVisibility::HitTestInvisible);
     Preview->SetRenderOpacity(0.9f);
     Drag->DefaultDragVisual = Preview;
@@ -226,5 +231,6 @@ void UEquipmentItemSlotWidget::UpdateListHighlight()
     else if (bSelected) Background = FLinearColor(0.34f, 0.28f, 0.2f, 0.94f);
     else if (bListHovered) Background = FLinearColor(0.18f, 0.15f, 0.11f, 0.88f);
     Card->SetBrushColor(Background);
-    ItemText->SetColorAndOpacity(bSelected || bListHovered ? FLinearColor(1.0f, 0.96f, 0.84f) : FLinearColor(0.91f, 0.87f, 0.81f));
+    const FRunWeaponRarityRule* Rarity = RunItemPresentation::FindRarity(DisplayedItem, DisplayedRarities);
+    ItemText->SetColorAndOpacity(Rarity ? Rarity->Color : bSelected || bListHovered ? FLinearColor(1.0f, 0.96f, 0.84f) : FLinearColor(0.91f, 0.87f, 0.81f));
 }

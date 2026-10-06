@@ -163,7 +163,7 @@ bool UPartyDefinitionDataAsset::ResolveMemberSkills(const FRunPartyMember& Membe
     }
     if (!UnitDataRules::IsValidSkillCount(Member.Skills.Num(), true))
     {
-        OutError = NSLOCTEXT("PartyDefinition", "InvalidMemberSkillCount", "캐릭터의 저장된 스킬은 1~5개여야 합니다.");
+        OutError = NSLOCTEXT("PartyDefinition", "InvalidMemberSkillCount", "캐릭터의 저장된 스킬이 한 개 이상 필요합니다.");
         return false;
     }
     TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills;

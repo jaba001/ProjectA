@@ -107,7 +107,7 @@ namespace SkillShopUiReview
         {
             Paths = {TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/___LinkChainVFX/DA_DrGame_LinkChainVFX_Link_Electric.DA_DrGame_LinkChainVFX_Link_Electric"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_LevelUp_Ascend_Root.DA_DrGame_LevelUpSpawn_LevelUp_Ascend_Root"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_Spawn_Ground_Root.DA_DrGame_LevelUpSpawn_Spawn_Ground_Root")};
             Report->SetStringField(TEXT("slot"), Slot);
-            Report->SetStringField(TEXT("scope"), TEXT("Fresh four-character standalone Run; public isolated first-result/reward transitions with authored profession HP; original 61-candidate catalog/tags/prices preserved, valid five-offer disposable snapshot fixed for four authored card clicks. Original menu Continue, Leave and the authored Combat_02 map card lead to the next combat; four independent restores execute purchased melee/Chain/heal/shield via public coordinator requests. Only healing current HP is lowered transiently during observed combat. No production/content/balance change, random-selection coverage, audio listening or multiplayer claim. Card delegates and actual Slate I input are distinct from physical mouse purchase."));
+            Report->SetStringField(TEXT("scope"), TEXT("Explicit legacy0 ten-combat standalone prototype created with public InitializeRun after menu character creation; ordinary new Target acquisition is covered separately. Public isolated first-result/reward transitions use authored profession HP; original 61-candidate catalog/tags/prices are preserved, valid five-offer disposable snapshot is fixed for four authored card clicks. Original menu Continue, Leave and the prototype Combat_02 map card lead to the next combat; four independent restores execute purchased melee/Chain/heal/shield via public coordinator requests. Only healing current HP is lowered transiently during observed combat. No production/content/balance change, random-selection coverage, audio listening or multiplayer claim. Card delegates and actual Slate I input are distinct from physical mouse purchase."));
         }
 
         virtual ~FReview() override
@@ -207,9 +207,20 @@ namespace SkillShopUiReview
             if (!Controller.IsValid()) return false;
             if (Stage == 4)
             {
+                if (!bLegacyPrototypePrepared)
+                {
+                    if (Run->GetPhase() == ERunPhase::None) return false;
+                    const TArray<FRunPartyMember> Party = Run->GetPartyMembers();
+                    FText Error;
+                    // Preserve historical shop coverage in an explicit prototype instead of changing the new Target contract.
+                    // 새 Target 계약을 변경하지 않고 명시적 prototype에서 기존 상점 검증을 유지합니다.
+                    if (!Check(Run->IsTargetRun() && Run->InitializeRun(Party, Error) && !Run->IsTargetRun() && !Run->UsesWeaponSkills() && Run->GetWeaponSkillRules().SchemaVersion == 0 && Run->GetNodes().Num() == 10 && Run->GetSkillShopState().SchemaVersion == 1 && Run->GetSaveError().IsEmpty(), TEXT("The isolated shop review explicitly creates and saves its legacy0 ten-combat prototype: ") + Error.ToString())) return End(false);
+                    bLegacyPrototypePrepared = true;
+                    return false;
+                }
                 if (Run->GetPhase() != ERunPhase::Map || !Active<URunMapWidget>(World)) return false;
                 const FRunPartyMember* Buyer = Run->GetPartyMembers().FindByPredicate([](const FRunPartyMember& Member) { return Member.bCreated && Member.bPlayerControlled; });
-                if (!Check(Buyer && Buyer->Skills.Num() == 1 && Buyer->Gold == 10 && Run->GetPartyMembers().Num() == 4 && Run->GetSkillShopState().Catalog.Num() == 61, TEXT("The authored fresh Run has four characters, one free unarmed skill, 10G and all 61 frozen candidates."))) return End(false);
+                if (!Check(Buyer && Buyer->Skills.Num() == 1 && Buyer->InnateSkills.IsEmpty() && Buyer->Gold == 10 && Run->GetPartyMembers().Num() == 4 && Run->GetSkillShopState().Catalog.Num() == 61, TEXT("The explicit legacy0 prototype has four characters, one acquired unarmed skill, 10G and all 61 frozen candidates."))) return End(false);
                 CharacterId = Buyer->CharacterId;
                 OriginalShop = Run->GetSkillShopState();
                 Identity = Run->GetRunIdentity();
@@ -695,6 +706,7 @@ namespace SkillShopUiReview
         float OriginalSpawnHP = 0.f;
         float InitialShield = 0.f;
         bool bPassed = true;
+        bool bLegacyPrototypePrepared = false;
         bool bPurchased = false;
         bool bContinueAfterTeardown = false;
         bool bOriginalCaster = true;
@@ -710,6 +722,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSkillShopUiReviewTest, "ProjectA.TodoReview.Sk
 
 bool FSkillShopUiReviewTest::RunTest(const FString& Parameters)
 {
+    AddInfo(TEXT("SkillShopUI reviews an explicit legacy0 prototype. Ordinary new Target menu and weapon acquisition coverage belongs to NormalTargetRunPIETests."));
     FString Slot;
     FString RuntimeSlot;
     if (!GEditor || !GEngine || !FApp::CanEverRender() || FParse::Param(FCommandLine::Get(), TEXT("nullrhi")))

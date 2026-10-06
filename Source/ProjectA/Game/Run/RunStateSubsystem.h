@@ -5,6 +5,7 @@
 #include "Game/Run/RunTypes.h"
 #include "Game/Run/RunEncounterTypes.h"
 #include "Game/Run/RunSkillShopTypes.h"
+#include "Game/Run/RunWeaponSkillTypes.h"
 #include "Game/Run/RunGoldRewardTypes.h"
 #include "Game/Run/TargetRunTypes.h"
 #include "Game/Run/ManagedRunTypes.h"
@@ -122,6 +123,8 @@ public:
     bool ChangeEquipment(const FRunAccountId& AccountId, const FRunEquipmentCommand& Command, FText& OutError);
     const FRunSkillShopState& GetSkillShopState() const { return SkillShopState; }
     const FRunItemShopState& GetItemShopState() const { return ItemShopState; }
+    const FRunWeaponSkillRulesState& GetWeaponSkillRules() const { return WeaponSkillRules; }
+    bool UsesWeaponSkills() const { return WeaponSkillAcquisitionVersion == 1; }
     const FRunEncounterProgress& GetEncounterProgress() const { return EncounterProgress; }
     void UpdatePartyMemberHP(int32 SlotIndex, float CurrentHP);
 
@@ -203,6 +206,12 @@ private:
 
     UPROPERTY(Transient)
     FRunItemShopState ItemShopState;
+
+    UPROPERTY(Transient)
+    int32 WeaponSkillAcquisitionVersion = 0;
+
+    UPROPERTY(Transient)
+    FRunWeaponSkillRulesState WeaponSkillRules;
 
     UPROPERTY(Transient)
     FRunGoldRewardState GoldRewardState;

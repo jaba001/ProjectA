@@ -250,7 +250,7 @@ void UCombatDebugWidget::NativeOnInitialized()
     LoadoutPanel->AddChildToVerticalBox(LoadoutScroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     UVerticalBox* LoadoutBody = WidgetTree->ConstructWidget<UVerticalBox>();
     LoadoutScroll->AddChild(LoadoutBody);
-    AddText(LoadoutBody, TEXT("계획 단계에서 무료 추가·제거 · 스킬 최대 5개 · 장비는 외형만 변경"));
+    AddText(LoadoutBody, TEXT("계획 단계에서 무료 추가·제거 · 스킬 소지 제한 없음 · 장비는 외형만 변경"));
     Status = AddText(LoadoutBody, TEXT("전투 준비 중"));
     SkillCategoryTabs = WidgetTree->ConstructWidget<UWrapBox>();
     SkillCategoryTabs->SetInnerSlotPadding(FVector2D(6.f, 4.f));
@@ -978,7 +978,7 @@ void UCombatDebugWidget::RebuildLists()
     if (!bEquipment)
     {
         const auto& Skills = Selected->Unit->GetEquippedSkillDataAssets();
-        AddText(OwnedList, FString::Printf(TEXT("현재 스킬 %d / 5"), Skills.Num()), 18);
+        AddText(OwnedList, FString::Printf(TEXT("현재 스킬 %d개"), Skills.Num()), 18);
         for (int32 Index = 0; Index < Skills.Num(); ++Index)
         {
             if (Skills[Index]) AddAction(OwnedList, TEXT("제거 · ") + Loadout->GetSkillLabel(FSoftObjectPath(Skills[Index])).ToString(), ECombatDebugAction::RemoveSkill, FSoftObjectPath(Skills[Index]), Index);

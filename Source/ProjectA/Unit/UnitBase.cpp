@@ -622,7 +622,7 @@ bool AUnitBase::AcquireAndEquipSkill(USkillDefinitionDataAsset* Skill)
 {
     FCombatRoundSkill Definition;
     FText Error;
-    if (!HasAuthority() || IsBusy() || !IsUnitAlive() || !IsValid(Skill) || !Skill->ResolveRoundSkill(Definition, Error) || !UnitDataRules::IsValidSkillCount(EquippedSkillDataAssets.Num() + 1, true))
+    if (!HasAuthority() || IsBusy() || !IsUnitAlive() || !IsValid(Skill) || !Skill->ResolveRoundSkill(Definition, Error))
     {
         return false;
     }

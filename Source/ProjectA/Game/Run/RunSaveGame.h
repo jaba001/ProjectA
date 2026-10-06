@@ -5,6 +5,7 @@
 #include "Game/Run/RunTypes.h"
 #include "Game/Run/RunEncounterTypes.h"
 #include "Game/Run/RunSkillShopTypes.h"
+#include "Game/Run/RunWeaponSkillTypes.h"
 #include "Game/Run/RunGoldRewardTypes.h"
 #include "Game/Run/RunParticipationTypes.h"
 #include "Game/Run/TargetRunTypes.h"
@@ -48,6 +49,12 @@ public:
     FRunSkillShopState SkillShopState;
     UPROPERTY()
     FRunItemShopState ItemShopState;
+    // Default to the original acquisition policy when loading an existing Run.
+    // 기존 Run을 불러올 때 기본값은 원래 획득 정책을 유지합니다.
+    UPROPERTY()
+    int32 WeaponSkillAcquisitionVersion = 0;
+    UPROPERTY()
+    FRunWeaponSkillRulesState WeaponSkillRules;
     UPROPERTY()
     FRunGoldRewardState GoldRewardState;
     UPROPERTY()

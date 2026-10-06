@@ -17,6 +17,7 @@
 #include "Misc/Paths.h"
 #include "Unit/EnemyUnit.h"
 #include "Unit/PlayerUnit.h"
+#include "UObject/Package.h"
 #include "UObject/StrongObjectPtr.h"
 #include <limits>
 
@@ -239,6 +240,42 @@ bool FCombatCheckpointValueTest::RunTest(const FString& Parameters)
     Reject(TEXT("Terminal combat and a dead next turn are rejected"));
     Invalid.OpponentSnapshot.SnapshotId = TEXT("UnmarkedSnapshot");
     Reject(TEXT("Unmarked opponent metadata is rejected"));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatCheckpointUnlimitedSkillsTest, "ProjectA.Checkpoint.UnlimitedOrderedSkills", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatCheckpointUnlimitedSkillsTest::RunTest(const FString& Parameters)
+{
+    FCheckpointStorageFixture Fixture;
+    FText Error;
+    if (!TestTrue(TEXT("The unlimited-skill checkpoint fixture initializes"), Fixture.Initialize(Error))) return false;
+    FCombatCheckpointData Checkpoint = Fixture.MakeRoundCheckpoint();
+    const FString PackageName = TEXT("/Game/User_JeHoon/Validation/T12/UnlimitedSkillTest_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    TStrongObjectPtr<UPackage> SkillPackage(CreatePackage(*PackageName));
+    SkillPackage->SetFlags(RF_Transient);
+    TArray<TStrongObjectPtr<USkillDefinitionDataAsset>> Skills;
+    for (int32 Index = 0; Index < 6; ++Index)
+    {
+        USkillDefinitionDataAsset* Skill = NewObject<USkillDefinitionDataAsset>(SkillPackage.Get(), FName(*FString::Printf(TEXT("Skill_%d"), Index)), RF_Transient);
+        Skill->bUseRoundDefinition = true;
+        Skills.Emplace(Skill);
+        Checkpoint.Units[0].Skills.Add(FSoftObjectPath(Skill));
+    }
+    if (!TestTrue(TEXT("A round checkpoint accepts every unique skill beyond the former five-skill cap"), UCombatCheckpointLibrary::Validate(Checkpoint, Fixture.Run->GetPartyMembers(), Error))) return false;
+    TStrongObjectPtr<URunSaveGame> Save(NewObject<URunSaveGame>());
+    Save->CombatCheckpoint = Checkpoint;
+    TArray<uint8> Bytes;
+    if (!TestTrue(TEXT("The expanded checkpoint serializes through Unreal SaveGame"), UGameplayStatics::SaveGameToMemory(Save.Get(), Bytes))) return false;
+    TStrongObjectPtr<URunSaveGame> Restored(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+    if (!TestNotNull(TEXT("The expanded checkpoint deserializes through Unreal SaveGame"), Restored.Get())) return false;
+    TestTrue(TEXT("Every ordered skill and checkpoint field survives serialization"), SameCheckpoint(Restored->CombatCheckpoint, Checkpoint));
+    TestTrue(TEXT("The restored expanded loadout remains valid"), UCombatCheckpointLibrary::Validate(Restored->CombatCheckpoint, Fixture.Run->GetPartyMembers(), Error));
+    const FSoftObjectPath DuplicateSkill = Checkpoint.Units[0].Skills[0];
+    Checkpoint.Units[0].Skills.Add(DuplicateSkill);
+    TestFalse(TEXT("An expanded checkpoint still rejects duplicate skill paths"), UCombatCheckpointLibrary::Validate(Checkpoint, Fixture.Run->GetPartyMembers(), Error));
+    Checkpoint.Units[0].Skills.Last() = FSoftObjectPath(TEXT("/Game/User_JeHoon/Validation/T12/MissingSkill.MissingSkill"));
+    TestFalse(TEXT("An expanded checkpoint still rejects missing skill assets"), UCombatCheckpointLibrary::Validate(Checkpoint, Fixture.Run->GetPartyMembers(), Error));
     return true;
 }
 

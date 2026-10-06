@@ -27,7 +27,7 @@ bool RunRecoveryRules::ResolveStack(const FRunConsumableStack& Stack, FCombatRou
 
 bool RunRecoveryRules::ValidateStacks(const TArray<FRunConsumableStack>& Stacks, FText& OutError)
 {
-    if (Stacks.Num() > UnitDataRules::MaxSkills) return false;
+    if (Stacks.Num() > MaximumStackTypes) return false;
     TSet<FGameplayTag> Tags;
     TSet<FName> Skills;
     for (const FRunConsumableStack& Stack : Stacks)

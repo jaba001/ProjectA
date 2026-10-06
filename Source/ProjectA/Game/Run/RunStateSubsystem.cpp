@@ -8,6 +8,7 @@
 #include "Game/Run/RunSaveFormat.h"
 #include "Game/Run/RunItemShopCatalog.h"
 #include "Game/Run/RunEquipmentRules.h"
+#include "Game/Run/RunWeaponSkillRules.h"
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
@@ -34,6 +35,8 @@ void URunStateSubsystem::ResetDevelopmentRun()
     TargetRun = FRunTargetState();
     SkillShopState = FRunSkillShopState();
     ItemShopState = FRunItemShopState();
+    WeaponSkillAcquisitionVersion = 0;
+    WeaponSkillRules = FRunWeaponSkillRulesState();
     GoldRewardState = FRunGoldRewardState();
     PendingGoldRewardState = FRunGoldRewardState();
     PartyMembers.Reset();
@@ -185,6 +188,9 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
     const FRunProgressView Progress{Save->Nodes, Save->CompletedNodes, Save->CurrentNode, Save->CurrentEncounter, Save->Phase, Save->Result};
     if (!RunProgressRules::ValidateNodes(Route, Progress) || !RunProgressRules::ValidateEncounterProgress(Route, Progress, Save->EncounterProgress)) return false;
     if (!UTargetRunDefinitionDataAsset::Validate(Save->TargetRun, Progress, Save->EncounterProgress, OutError)) return false;
+    if (Save->WeaponSkillAcquisitionVersion < 0 || Save->WeaponSkillAcquisitionVersion > 1 || (Save->WeaponSkillAcquisitionVersion == 1 && Save->TargetRun.SchemaVersion != 1)) return false;
+    if (!RunWeaponSkillRules::Validate(Save->WeaponSkillRules, OutError) || Save->WeaponSkillRules.SchemaVersion != Save->WeaponSkillAcquisitionVersion) return false;
+    if (Save->WeaponSkillAcquisitionVersion == 1 && (Save->SkillShopState.SchemaVersion != 0 || Save->TargetRun.EncounterPool.ContainsByPredicate([](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag().MatchesTag(FRunEncounterOffer::GetSkillShopTag()); }))) return false;
     if (!ValidateRecoverySave(Save, OutError)) return false;
     if (Save->TargetRun.SchemaVersion == 1 && (Format.bManaged || Save->Identity.Origin != ERunIdentityOrigin::LocalDevelopment || Save->Identity.OriginalParticipants.Num() != 1)) return false;
     if (Save->EncounterProgress.SchemaVersion != 0 && Save->Identity.Origin == ERunIdentityOrigin::LegacyOffline) return false;
@@ -195,13 +201,14 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
         OutError = ShopError;
         return false;
     }
-    if (!RunItemShopCatalog::Validate(Save->ItemShopState, ShopError))
+    const FRunWeaponSkillRulesState* FrozenWeaponRules = Save->WeaponSkillRules.SchemaVersion == 1 ? &Save->WeaponSkillRules : nullptr;
+    if (!RunItemShopCatalog::Validate(Save->ItemShopState, ShopError, FrozenWeaponRules))
     {
         OutError = ShopError;
         return false;
     }
     const bool bItemShopSelected = Save->EncounterProgress.IsItemShop();
-    if (Save->ItemShopState.SchemaVersion == 1 && (Save->SkillShopState.SchemaVersion != 1 || (Save->EncounterProgress.SchemaVersion != 1 && Save->EncounterProgress.SchemaVersion != 2) || (bItemShopSelected && Save->ItemShopState.Revision <= 0) || (!Route.bRepeatEncounters && (Save->ItemShopState.Revision > 0) != bItemShopSelected))) return false;
+    if (Save->ItemShopState.SchemaVersion == 1 && ((Save->EncounterProgress.SchemaVersion != 1 && Save->EncounterProgress.SchemaVersion != 2) || (bItemShopSelected && Save->ItemShopState.Revision <= 0) || (!Route.bRepeatEncounters && (Save->ItemShopState.Revision > 0) != bItemShopSelected))) return false;
     TSet<FSoftObjectPath> DisplayedItemAssets;
     for (const FRunItemShopOffer& Offer : Save->ItemShopState.Offers)
     {
@@ -259,6 +266,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
     TSet<int32> Slots;
     int32 Created = 0;
     int32 Living = 0;
+    TSet<FGuid> OwnedItemIds;
     for (const FRunPartyMember& Member : Save->Party)
     {
         if (Member.SlotIndex < 0 || Member.SlotIndex >= 4 || Slots.Contains(Member.SlotIndex) || !FMath::IsFinite(Member.CurrentHP) || Member.CurrentHP < -1.0f || Member.Gold < 0)
@@ -278,8 +286,20 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
         for (const FRunItemDefinition& Item : Member.Items)
         {
             const FRunItemDefinition* CatalogItem = Save->ItemShopState.Catalog.FindByPredicate([&Item](const FRunItemDefinition& Candidate) { return Candidate.Asset == Item.Asset; });
-            if (!CatalogItem || !RunItemShopCatalog::IsSameDefinition(*CatalogItem, Item)) return false;
+            if (!CatalogItem || !RunItemShopCatalog::IsSameBaseDefinition(*CatalogItem, Item)) return false;
+            if (FrozenWeaponRules ? !RunWeaponSkillRules::ValidateGeneratedCopy(Item, *FrozenWeaponRules, OutError) : !RunItemShopCatalog::IsSameDefinition(*CatalogItem, Item)) return false;
+            if (FrozenWeaponRules)
+            {
+                if (OwnedItemIds.Contains(Item.ItemInstanceId)) return false;
+                OwnedItemIds.Add(Item.ItemInstanceId);
+            }
         }
+        if (Save->WeaponSkillAcquisitionVersion == 1 && Member.bCreated)
+        {
+            TArray<FSoftObjectPath> ExpectedSkills;
+            if (Member.InnateSkills.IsEmpty() || !RunEquipmentRules::BuildEquippedSkills(Member, ExpectedSkills, OutError) || ExpectedSkills != Member.Skills) return false;
+        }
+        else if (!Member.InnateSkills.IsEmpty()) return false;
         if (Member.bCreated)
         {
             FProfessionDefinition Definition;
@@ -379,6 +399,8 @@ URunSaveGame* URunStateSubsystem::CreateSaveData() const
     Save->TargetRun = TargetRun;
     Save->SkillShopState = SkillShopState;
     Save->ItemShopState = ItemShopState;
+    Save->WeaponSkillAcquisitionVersion = WeaponSkillAcquisitionVersion;
+    Save->WeaponSkillRules = WeaponSkillRules;
     Save->GoldRewardState = GoldRewardState;
     Save->Party = PartyMembers;
     Save->Nodes = Nodes;
@@ -602,6 +624,9 @@ bool URunStateSubsystem::SurrenderStandaloneSavedRun(const FString& ExpectedToke
     EncounterProgress = FRunEncounterProgress();
     SkillShopState = FRunSkillShopState();
     ItemShopState = FRunItemShopState();
+    TargetRun = FRunTargetState();
+    WeaponSkillAcquisitionVersion = 0;
+    WeaponSkillRules = FRunWeaponSkillRulesState();
     GoldRewardState = FRunGoldRewardState();
     PendingGoldRewardState = FRunGoldRewardState();
     PartyMembers.Reset();
@@ -645,6 +670,8 @@ void URunStateSubsystem::ApplySaveData(const URunSaveGame* Save, bool bResetPend
     TargetRun = Save->TargetRun;
     SkillShopState = Save->SkillShopState;
     ItemShopState = Save->ItemShopState;
+    WeaponSkillAcquisitionVersion = Save->WeaponSkillAcquisitionVersion;
+    WeaponSkillRules = Save->WeaponSkillRules;
     GoldRewardState = Save->GoldRewardState;
     if (bResetPendingReward) PendingGoldRewardState = FRunGoldRewardState();
     bManagedRun = FRunSaveFormat::IsManaged(Save->Version);
@@ -720,6 +747,7 @@ URunSaveGame* URunStateSubsystem::CreateInitialSaveData(const TArray<FRunPartyMe
         Member.Gold = 0;
         Member.bHasSkillLoadout = Member.bCreated;
         Member.Skills.Reset();
+        Member.InnateSkills.Reset();
         Member.Items.Reset();
         Member.Equipment = FRunEquipmentState();
         Member.Consumables.Reset();
@@ -953,6 +981,8 @@ void URunStateSubsystem::CloseManagedRun()
     TargetRun = FRunTargetState();
     SkillShopState = FRunSkillShopState();
     ItemShopState = FRunItemShopState();
+    WeaponSkillAcquisitionVersion = 0;
+    WeaponSkillRules = FRunWeaponSkillRulesState();
     GoldRewardState = FRunGoldRewardState();
     PendingGoldRewardState = FRunGoldRewardState();
     PartyMembers.Reset();
@@ -1300,7 +1330,8 @@ bool URunStateSubsystem::SelectRunEncounter(FName EncounterId)
         if (Save->TargetRun.Recovery.Revision == MAX_int32) return false;
         ++Save->TargetRun.Recovery.Revision;
     }
-    if (Offer->IsItemShop() && Save->ItemShopState.SchemaVersion == 1 && !RunItemShopCatalog::Roll(Save->ItemShopState, false, FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag()), SaveError)) return false;
+    const FRunWeaponSkillRulesState* FrozenWeaponRules = Save->WeaponSkillRules.SchemaVersion == 1 ? &Save->WeaponSkillRules : nullptr;
+    if (Offer->IsItemShop() && Save->ItemShopState.SchemaVersion == 1 && !RunItemShopCatalog::Roll(Save->ItemShopState, false, FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag()), SaveError, FrozenWeaponRules)) return false;
     if (!Offer->IsItemShop() && !Offer->IsService() && URunEncounterPoolDataAsset::GetSkillShopOfferCount(Save->SkillShopState) > 0 && !URunEncounterPoolDataAsset::RollSkillShop(Save->SkillShopState, true, SaveError)) return false;
     return CommitSaveCandidate(Save.Get(), SaveError);
 }
@@ -1308,9 +1339,10 @@ bool URunStateSubsystem::SelectRunEncounter(FName EncounterId)
 bool URunStateSubsystem::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError, int32 ExpectedShopRevision)
 {
     OutError = NSLOCTEXT("RunSkillShop", "Unavailable", "현재 상점에서 구매할 수 없습니다.");
-    if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::Shop || EncounterProgress.bCompleted || EncounterProgress.SelectedEncounterId.IsNone() || SkillShopState.SchemaVersion != 1) return false;
+    if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::Shop || EncounterProgress.bCompleted || EncounterProgress.SelectedEncounterId.IsNone()) return false;
     const bool bItemShop = EncounterProgress.IsItemShop();
     if (const FRunEncounterOffer* Selected = EncounterProgress.FindSelectedOffer(); Selected && Selected->IsService()) return PurchaseRecoveryOffer(BuyerAccountId, CharacterId, OfferId, OutError, ExpectedShopRevision);
+    if (!bItemShop && (UsesWeaponSkills() || SkillShopState.SchemaVersion != 1)) return false;
     const bool bItemReroll = bItemShop && OfferId == FRunItemShopState::GetRerollOfferId();
     const bool bSkillReroll = !bItemShop && OfferId == FRunSkillShopState::GetRerollOfferId();
     const FRunItemShopOffer* ItemOffer = bItemShop ? ItemShopState.Offers.FindByPredicate([OfferId](const FRunItemShopOffer& Candidate) { return Candidate.OfferId == OfferId; }) : nullptr;
@@ -1377,11 +1409,6 @@ bool URunStateSubsystem::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, 
                 return false;
             }
         }
-        if (Member->Skills.Num() >= 5)
-        {
-            OutError = NSLOCTEXT("RunSkillShop", "LoadoutFull", "스킬은 최대 5개까지 습득할 수 있습니다.");
-            return false;
-        }
     }
     if (Member->Gold < Price)
     {
@@ -1395,7 +1422,8 @@ bool URunStateSubsystem::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, 
     PurchasedMember->Gold -= Price;
     if (bItemReroll)
     {
-        if (!RunItemShopCatalog::Roll(Save->ItemShopState, false, FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag()), OutError)) return false;
+        const FRunWeaponSkillRulesState* FrozenWeaponRules = Save->WeaponSkillRules.SchemaVersion == 1 ? &Save->WeaponSkillRules : nullptr;
+        if (!RunItemShopCatalog::Roll(Save->ItemShopState, false, FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag()), OutError, FrozenWeaponRules)) return false;
     }
     else if (bSkillReroll)
     {
