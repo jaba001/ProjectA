@@ -97,7 +97,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 ### 3-2 상점 인카운터
 
-스킬상점 폐지 구현은 `FRunSkillShopState`에 연결된 아이템 구매·회복·골드 보상 검증을 분리하고 인카운터 후보·저장된 선택 이력·현재 방문의 호환을 함께 처리해야 한다. 스킬 소지와 장착은 단일 목록이며 Run·유닛·Snapshot·체크포인트·디버그에 개수 상한을 두지 않는다. `UnitDataRules::IsValidSkillCount`의 경로별 최소 필요 수와 스킬 ID·중복·태그·유효성 검증은 유지한다. 소모품 종류 상한은 `RunRecoveryRules::MaximumStackTypes=5`로 분리했으며 상점 진열 최대 5개도 유지한다. [구현·검증 상태](HISTORY.md#9-21-2026-10-06-스킬-소지-상한-제거)
+새 일반 Run에서는 `FRunSkillShopState`에 연결된 아이템 구매·회복·골드 보상 검증의 의존을 분리하고 스킬상점을 후보에서 제외했다. 기존 저장의 선택 이력·현재 방문은 유지한다. 스킬 소지와 장착은 단일 목록이며 Run·유닛·Snapshot·체크포인트·디버그에 개수 상한을 두지 않는다. `UnitDataRules::IsValidSkillCount`의 경로별 최소 필요 수와 스킬 ID·중복·태그·유효성 검증은 유지한다. 소모품 종류 상한은 `RunRecoveryRules::MaximumStackTypes=5`로 분리했으며 상점 진열 최대 5개도 유지한다. [구현·검증 상태](HISTORY.md#9-21-2026-10-06-스킬-소지-상한-제거)
 
 **전투 승리 보상**
 
