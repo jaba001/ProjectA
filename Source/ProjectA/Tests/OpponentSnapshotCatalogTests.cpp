@@ -4,12 +4,17 @@
 #include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
+#include "Game/Snapshot/PartySnapshotSelectionLibrary.h"
 #include "GAS/Ability/GA_AreaAttack.h"
 #include "GAS/Ability/GA_DefaultAttack.h"
+#include "NativeGameplayTags.h"
 #include "Unit/EnemyUnit.h"
 
 namespace
 {
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_SnapshotSelectionAllowed, "Validation.Snapshot.Allowed");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_SnapshotSelectionExcluded, "Validation.Snapshot.Excluded");
+
     struct FSnapshotCatalogFixture
     {
         UOpponentSnapshotCatalogDataAsset* Catalog = NewObject<UOpponentSnapshotCatalogDataAsset>();
@@ -168,6 +173,92 @@ bool FOpponentSnapshotSkillResolutionTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Explicit round profile resolves without an executable ability class"), Fixture.Catalog->ResolveSkills(Member, Resolved, Error));
     TestEqual(TEXT("Explicit profile preserves its ordered data asset"), Resolved[1].Get(), Fixture.AreaAttack);
     TestTrue(TEXT("Snapshot encounter accepts a trusted null-GA round profile"), Fixture.Catalog->ValidateForEncounter(Fixture.Snapshot, 4, Error));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPartySnapshotCandidateSelectionTest, "ProjectA.Snapshot.CandidateSelection", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPartySnapshotCandidateSelectionTest::RunTest(const FString& Parameters)
+{
+    FSnapshotCatalogFixture Fixture;
+    FPartySnapshotCandidate Valid;
+    Valid.Snapshot = Fixture.Snapshot;
+    Valid.Snapshot.Members[0].Stats.CurrentHP = 37.0f;
+    Valid.ProgressStage = 7;
+    Valid.Tags.AddTag(TAG_SnapshotSelectionAllowed);
+    TArray<FPartySnapshotCandidate> Candidates;
+    FPartySnapshotCandidate Rejected = Valid;
+    Rejected.Snapshot.SnapshotId = TEXT("WrongVersion");
+    ++Rejected.Snapshot.ContentVersion;
+    Candidates.Add(Rejected);
+    Rejected = Valid;
+    Rejected.Snapshot.SnapshotId = TEXT("WrongStage");
+    ++Rejected.ProgressStage;
+    Candidates.Add(Rejected);
+    Rejected = Valid;
+    Rejected.Snapshot.SnapshotId = TEXT("WrongTags");
+    Rejected.Tags.Reset();
+    Rejected.Tags.AddTag(TAG_SnapshotSelectionExcluded);
+    Candidates.Add(Rejected);
+    Rejected = Valid;
+    Rejected.Snapshot.SnapshotId = TEXT("DeadOpponent");
+    Rejected.Snapshot.Members[0].Stats.CurrentHP = 0.0f;
+    Candidates.Add(Rejected);
+    Rejected = Valid;
+    Rejected.Snapshot.SnapshotId = TEXT("UntrustedClass");
+    Rejected.Snapshot.Members[0].ClassId = TEXT("/Game/Untrusted/BP_Opponent.BP_Opponent_C");
+    Candidates.Add(Rejected);
+    Rejected = Valid;
+    Rejected.Snapshot.SnapshotId = TEXT("UnknownSkill");
+    Rejected.Snapshot.Members[0].SkillIds = {TEXT("UnknownSkill")};
+    Candidates.Add(Rejected);
+    Rejected = Valid;
+    Rejected.Snapshot.SnapshotId = TEXT("UnsupportedEquipment");
+    Rejected.Snapshot.Members[0].EquipmentIds.Add(TEXT("Sword"));
+    Candidates.Add(Rejected);
+    Rejected = Valid;
+    Rejected.Snapshot.SnapshotId = TEXT("UnsupportedSchema");
+    ++Rejected.Snapshot.SchemaVersion;
+    Candidates.Add(Rejected);
+
+    const FGameplayTagQuery Query = FGameplayTagQuery::MakeQuery_MatchTag(TAG_SnapshotSelectionAllowed);
+    FRandomStream Random(731);
+    FPartySnapshot Selected = Fixture.Snapshot;
+    Selected.SnapshotId = TEXT("PreviousSelection");
+    const FPartySnapshot Previous = Selected;
+    FText Error;
+    TestFalse(TEXT("A pool without a compatible living trusted opponent is rejected"), UPartySnapshotSelectionLibrary::SelectOpponent(Candidates, Fixture.Catalog, 7, Query, 4, Random, Selected, Error));
+    TestTrue(TEXT("Rejected pools preserve the previous selection"), FPartySnapshot::StaticStruct()->CompareScriptStruct(&Selected, &Previous, 0));
+    TestEqual(TEXT("Rejected pools do not consume the seeded draw"), Random.GetCurrentSeed(), 731);
+    TestFalse(TEXT("Rejected pools explain why no selection was made"), Error.IsEmpty());
+
+    Candidates.Add(Valid);
+    TestTrue(TEXT("The matching living candidate is selected through the trusted catalog"), UPartySnapshotSelectionLibrary::SelectOpponent(Candidates, Fixture.Catalog, 7, Query, 4, Random, Selected, Error));
+    TestTrue(TEXT("Selection preserves the complete submitted stats, ordered skills and formation"), FPartySnapshot::StaticStruct()->CompareScriptStruct(&Selected, &Valid.Snapshot, 0));
+    TestTrue(TEXT("Successful selection clears prior failure text"), Error.IsEmpty());
+    Selected.Members[0].Stats.CurrentHP = 1.0f;
+    TestEqual(TEXT("Changing the selected value cannot consume the candidate owner's stored HP"), Candidates.Last().Snapshot.Members[0].Stats.CurrentHP, 37.0f);
+
+    Candidates.Add(Valid);
+    const FPartySnapshot BeforeDuplicate = Selected;
+    const int32 BeforeDuplicateSeed = Random.GetCurrentSeed();
+    TestFalse(TEXT("Duplicate eligible snapshot IDs cannot bias the uniform draw"), UPartySnapshotSelectionLibrary::SelectOpponent(Candidates, Fixture.Catalog, 7, Query, 4, Random, Selected, Error));
+    TestTrue(TEXT("Duplicate rejection preserves the previous selection"), FPartySnapshot::StaticStruct()->CompareScriptStruct(&Selected, &BeforeDuplicate, 0));
+    TestEqual(TEXT("Duplicate rejection preserves the random stream"), Random.GetCurrentSeed(), BeforeDuplicateSeed);
+    TestFalse(TEXT("Missing trusted catalogs cannot select an opponent"), UPartySnapshotSelectionLibrary::SelectOpponent(Candidates, nullptr, 7, Query, 4, Random, Selected, Error));
+    TestFalse(TEXT("Unspecified progress stages cannot select an opponent"), UPartySnapshotSelectionLibrary::SelectOpponent(Candidates, Fixture.Catalog, INDEX_NONE, Query, 4, Random, Selected, Error));
+    TestFalse(TEXT("Unsupported formation slot counts cannot select an opponent"), UPartySnapshotSelectionLibrary::SelectOpponent(Candidates, Fixture.Catalog, 7, Query, 5, Random, Selected, Error));
+
+    Candidates = {Valid, Valid};
+    Candidates[1].Snapshot.SnapshotId = TEXT("SecondEligible");
+    FRandomStream SelectionRandom(961);
+    FRandomStream ReplayRandom(961);
+    FPartySnapshot Replayed;
+    if (!TestTrue(TEXT("Multiple valid opponents can be selected with a saved seed"), UPartySnapshotSelectionLibrary::SelectOpponent(Candidates, Fixture.Catalog, 7, Query, 4, SelectionRandom, Selected, Error))) return false;
+    if (!TestTrue(TEXT("The same pool and seed can reproduce a local selection"), UPartySnapshotSelectionLibrary::SelectOpponent(Candidates, Fixture.Catalog, 7, Query, 4, ReplayRandom, Replayed, Error))) return false;
+    TestTrue(TEXT("Selection resolves back to an eligible submitted snapshot"), Candidates.ContainsByPredicate([&Selected](const FPartySnapshotCandidate& Candidate) { return FPartySnapshot::StaticStruct()->CompareScriptStruct(&Selected, &Candidate.Snapshot, 0); }));
+    TestTrue(TEXT("Replaying the draw preserves the complete selected opponent"), FPartySnapshot::StaticStruct()->CompareScriptStruct(&Selected, &Replayed, 0));
+    TestEqual(TEXT("Replayed selection advances the random stream identically"), SelectionRandom.GetCurrentSeed(), ReplayRandom.GetCurrentSeed());
     return true;
 }
 

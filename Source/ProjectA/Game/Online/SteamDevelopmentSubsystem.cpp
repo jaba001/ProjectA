@@ -18,6 +18,7 @@
 #include "OnlineSessionSettings.h"
 #include "OnlineSubsystem.h"
 #include "Online/OnlineSessionNames.h"
+#include "TimerManager.h"
 #if PROJECTA_WITH_STEAM_DEV
 #include "OnlineAuthInterfaceUtilsSteam.h"
 #include "OnlineSubsystemSteam.h"
@@ -29,6 +30,7 @@ namespace
     const FString ProbeValue(TEXT("ProjectA.SteamDev.480.v1"));
     const FString DriverPath(TEXT("/Script/SteamSockets.SteamSocketsNetDriver"));
     const FName MenuMap(TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu"));
+    const FString SearchFriendList = EFriendsLists::ToString(EFriendsLists::InGamePlayers);
 }
 
 bool USteamDevelopmentSubsystem::IsRequested()
@@ -82,7 +84,7 @@ void USteamDevelopmentSubsystem::ClearSessionDelegates()
 {
     if (!Sessions) return;
     Sessions->ClearOnCreateSessionCompleteDelegate_Handle(CreateHandle);
-    Sessions->ClearOnFindSessionsCompleteDelegate_Handle(FindHandle);
+    Sessions->ClearOnFindFriendSessionCompleteDelegate_Handle(0, FindHandle);
     Sessions->ClearOnJoinSessionCompleteDelegate_Handle(JoinHandle);
     Sessions->ClearOnDestroySessionCompleteDelegate_Handle(DestroyHandle);
     CreateHandle.Reset();
@@ -93,11 +95,15 @@ void USteamDevelopmentSubsystem::ClearSessionDelegates()
 
 void USteamDevelopmentSubsystem::Deinitialize()
 {
+    const bool bFinding = Operation == EOperation::Finding && bFriendRequestPending;
+    Operation = EOperation::Idle;
+    bFriendRequestPending = false;
+    SearchFriends.Reset();
     ClearSessionDelegates();
     if (Sessions)
     {
         Sessions->ClearOnSessionUserInviteAcceptedDelegate_Handle(InviteHandle);
-        if (Operation == EOperation::Finding) Sessions->CancelFindSessions();
+        if (bFinding) Sessions->CancelFindSessions();
         if (HasSession()) Sessions->DestroySession(NAME_GameSession);
     }
 #if PROJECTA_WITH_STEAM_DEV
@@ -186,6 +192,12 @@ void USteamDevelopmentSubsystem::HandleCreated(FName Name, bool bSuccess)
     if (!bSuccess)
     {
         SetStatus(TEXT("Steam 방 생성에 실패했습니다. 로컬 방으로 대체하지 않습니다."));
+        if (!HasSession())
+        {
+            bOwnsSession = false;
+            SessionCapacity = 0;
+        }
+        if (bLeaveRequested) Leave();
         return;
     }
     if (bLeaveRequested || !IsReady() || !RequestController.IsValid())
@@ -202,16 +214,17 @@ bool USteamDevelopmentSubsystem::Find(APlayerController* Controller)
     if (!CanBegin(Controller)) return false;
     Results.Reset();
     ResultLabels.Reset();
-    Search = MakeShared<FOnlineSessionSearch>();
-    Search->MaxSearchResults = 50;
-    Search->bIsLanQuery = false;
-    Search->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
-    Search->QuerySettings.Set(ProbeKey, ProbeValue, EOnlineComparisonOp::Equals);
-    Operation = EOperation::Finding;
-    SetStatus(TEXT("같은 ProjectA 480 연결 확인 방을 찾는 중입니다."));
-    FindHandle = Sessions->AddOnFindSessionsCompleteDelegate_Handle(FOnFindSessionsCompleteDelegate::CreateUObject(this, &USteamDevelopmentSubsystem::HandleFound));
-    if (Sessions->FindSessions(*LocalId, Search.ToSharedRef())) return true;
-    HandleFound(false);
+    SearchFriends.Reset();
+    NextSearchFriend = 0;
+    bFriendRequestPending = false;
+    Operation = EOperation::ReadingFriends;
+    const uint64 RequestId = ++FriendSearchRequestId;
+    SetStatus(TEXT("Steam 친구의 ProjectA 480 연결 확인 방을 찾는 중입니다."));
+    // Friends-only Steam lobbies are excluded from public lobby searches.
+    // Steam 친구 전용 로비는 일반 로비 검색에서 제외되므로 친구별 세션을 조회합니다.
+    const IOnlineFriendsPtr Friends = Steam->GetFriendsInterface();
+    if (Friends && Friends->ReadFriendsList(0, SearchFriendList, FOnReadFriendsListComplete::CreateUObject(this, &USteamDevelopmentSubsystem::HandleFriendsRead, RequestId))) return true;
+    if (Operation == EOperation::ReadingFriends && RequestId == FriendSearchRequestId) FinishFinding(false);
     return false;
 }
 
@@ -219,26 +232,79 @@ bool USteamDevelopmentSubsystem::IsCompatible(const FOnlineSessionSearchResult& 
 {
     FString Marker;
     const FOnlineSessionSettings& Settings = Result.Session.SessionSettings;
-    return Result.IsValid() && Result.Session.OwningUserId && Result.Session.OwningUserId->GetType() == FName(TEXT("STEAM")) && Settings.Get(ProbeKey, Marker) && Marker == ProbeValue && Settings.BuildUniqueId == GetBuildUniqueId() && !Settings.bIsLANMatch && Settings.bUseLobbiesIfAvailable && Settings.bUsesPresence && Settings.bAllowJoinViaPresenceFriendsOnly && Settings.NumPublicConnections >= 2 && Settings.NumPublicConnections <= 4 && Result.Session.NumOpenPublicConnections > 0;
+    return Result.IsValid() && Result.Session.OwningUserId && IsAllowedFriend(*Result.Session.OwningUserId) && Settings.Get(ProbeKey, Marker) && Marker == ProbeValue && Settings.BuildUniqueId == GetBuildUniqueId() && !Settings.bIsLANMatch && Settings.bUseLobbiesIfAvailable && Settings.bUsesPresence && Settings.bAllowJoinViaPresenceFriendsOnly && Settings.NumPublicConnections >= 2 && Settings.NumPublicConnections <= 4 && Result.Session.NumOpenPublicConnections > 0;
 }
 
-void USteamDevelopmentSubsystem::HandleFound(bool bSuccess)
+void USteamDevelopmentSubsystem::HandleFriendsRead(int32 LocalUserNum, bool bSuccess, const FString& ListName, const FString&, uint64 RequestId)
 {
-    if (Operation != EOperation::Finding) return;
-    Sessions->ClearOnFindSessionsCompleteDelegate_Handle(FindHandle);
-    FindHandle.Reset();
-    Operation = EOperation::Idle;
-    if (bSuccess && Search && IsReady())
+    if (Operation != EOperation::ReadingFriends || LocalUserNum != 0 || ListName != SearchFriendList || RequestId != FriendSearchRequestId) return;
+    if (bLeaveRequested || !bSuccess || !IsReady())
     {
-        for (const FOnlineSessionSearchResult& Result : Search->SearchResults)
+        FinishFinding(false);
+        return;
+    }
+    TArray<TSharedRef<FOnlineFriend>> Friends;
+    const IOnlineFriendsPtr FriendsInterface = Steam->GetFriendsInterface();
+    if (!FriendsInterface || !FriendsInterface->GetFriendsList(0, ListName, Friends))
+    {
+        FinishFinding(false);
+        return;
+    }
+    for (const TSharedRef<FOnlineFriend>& Friend : Friends) if (IsAllowedFriend(*Friend->GetUserId())) SearchFriends.Add(Friend->GetUserId());
+    Operation = EOperation::Finding;
+    FindNextFriendSession();
+}
+
+void USteamDevelopmentSubsystem::FindNextFriendSession()
+{
+    if (Operation != EOperation::Finding || bFriendRequestPending) return;
+    if (bLeaveRequested || !IsReady() || !RequestController.IsValid())
+    {
+        FinishFinding(false);
+        return;
+    }
+    if (!SearchFriends.IsValidIndex(NextSearchFriend))
+    {
+        FinishFinding(true);
+        return;
+    }
+    const FUniqueNetIdRef FriendId = SearchFriends[NextSearchFriend++];
+    const uint64 RequestId = ++FriendSearchRequestId;
+    bFriendRequestPending = true;
+    FindHandle = Sessions->AddOnFindFriendSessionCompleteDelegate_Handle(0, FOnFindFriendSessionCompleteDelegate::CreateUObject(this, &USteamDevelopmentSubsystem::HandleFriendSessionFound, RequestId));
+    if (!Sessions->FindFriendSession(0, *FriendId) && bFriendRequestPending && RequestId == FriendSearchRequestId) HandleFriendSessionFound(0, false, TArray<FOnlineSessionSearchResult>(), RequestId);
+}
+
+void USteamDevelopmentSubsystem::HandleFriendSessionFound(int32 LocalUserNum, bool bSuccess, const TArray<FOnlineSessionSearchResult>& FriendResults, uint64 RequestId)
+{
+    if (Operation != EOperation::Finding || LocalUserNum != 0 || !bFriendRequestPending || RequestId != FriendSearchRequestId) return;
+    Sessions->ClearOnFindFriendSessionCompleteDelegate_Handle(0, FindHandle);
+    FindHandle.Reset();
+    bFriendRequestPending = false;
+    if (bSuccess && !bLeaveRequested && IsReady())
+    {
+        for (const FOnlineSessionSearchResult& Result : FriendResults)
         {
-            if (!IsCompatible(Result)) continue;
+            if (!IsCompatible(Result) || Results.ContainsByPredicate([&Result](const FOnlineSessionSearchResult& Existing) { return Existing.GetSessionIdStr() == Result.GetSessionIdStr(); })) continue;
             Results.Add(Result);
             ResultLabels.Add(FString::Printf(TEXT("%s · %d/%d명"), *Result.Session.OwningUserName.Left(40), Result.Session.SessionSettings.NumPublicConnections - Result.Session.NumOpenPublicConnections, Result.Session.SessionSettings.NumPublicConnections));
         }
     }
-    Search.Reset();
-    SetStatus(bSuccess ? FString::Printf(TEXT("연결 확인 방 %d개를 찾았습니다. 친구 초대로도 참가할 수 있습니다."), Results.Num()) : TEXT("Steam 방 검색에 실패했습니다."));
+    // Advance after synchronous failure callbacks return to avoid recursive searches.
+    // 동기 실패 콜백이 반환된 뒤 진행하여 검색이 재귀적으로 중첩되지 않게 합니다.
+    if (GetWorld()) GetWorld()->GetTimerManager().SetTimerForNextTick(this, &USteamDevelopmentSubsystem::FindNextFriendSession);
+    else FinishFinding(false);
+}
+
+void USteamDevelopmentSubsystem::FinishFinding(bool bSuccess)
+{
+    if (Operation != EOperation::ReadingFriends && Operation != EOperation::Finding) return;
+    Sessions->ClearOnFindFriendSessionCompleteDelegate_Handle(0, FindHandle);
+    FindHandle.Reset();
+    SearchFriends.Reset();
+    bFriendRequestPending = false;
+    Operation = EOperation::Idle;
+    SetStatus(bSuccess ? FString::Printf(TEXT("친구의 연결 확인 방 %d개를 찾았습니다. 친구 초대로도 참가할 수 있습니다."), Results.Num()) : TEXT("Steam 친구 방 검색에 실패했거나 취소되었습니다."));
     if (bLeaveRequested) Leave();
 }
 
@@ -280,6 +346,12 @@ void USteamDevelopmentSubsystem::HandleJoined(FName Name, EOnJoinSessionComplete
     if (Result != EOnJoinSessionCompleteResult::Success)
     {
         SetStatus(FString::Printf(TEXT("Steam 방 참가 실패 (%d). 로컬 계정으로 대체하지 않습니다."), static_cast<int32>(Result)));
+        if (!HasSession())
+        {
+            bOwnsSession = false;
+            SessionCapacity = 0;
+        }
+        if (bLeaveRequested) Leave();
         return;
     }
     FString URL;
@@ -323,6 +395,8 @@ void USteamDevelopmentSubsystem::Leave()
     if (!HasSession())
     {
         bOwnsSession = false;
+        bLeaveRequested = false;
+        SessionCapacity = 0;
         if (GetWorld() && (GetWorld()->GetNetMode() != NM_Standalone || Cast<ASteamDevelopmentPlayerController>(GetGameInstance()->GetFirstLocalPlayerController()))) UGameplayStatics::OpenLevel(GetGameInstance(), MenuMap, true);
         return;
     }
@@ -361,6 +435,11 @@ void USteamDevelopmentSubsystem::HandleAuthentication(const FUniqueNetId& UserId
 bool USteamDevelopmentSubsystem::HasAuthentication(const FUniqueNetId& UserId) const
 {
     return CanAcceptProbeConnection() && UserId.GetType() == FName(TEXT("STEAM")) && AuthenticatedUsers.Contains(UserId.ToString());
+}
+
+void USteamDevelopmentSubsystem::ForgetAuthentication(const FUniqueNetId& UserId)
+{
+    AuthenticatedUsers.Remove(UserId.ToString());
 }
 
 bool USteamDevelopmentSubsystem::IsAllowedFriend(const FUniqueNetId& UserId) const

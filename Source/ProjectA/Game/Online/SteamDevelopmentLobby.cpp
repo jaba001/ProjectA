@@ -80,3 +80,13 @@ void ASteamDevelopmentLobbyGameMode::PostLogin(APlayerController* NewPlayer)
     // 새 연결은 집계가 같아도 다음 tick에서 현재 판정을 받습니다.
     LastStatus = FText::GetEmpty();
 }
+
+void ASteamDevelopmentLobbyGameMode::Logout(AController* Exiting)
+{
+    // A later connection must receive a fresh verdict instead of reusing the previous observation.
+    // 같은 계정의 다음 연결은 이전 관측값 대신 새로운 인증 판정을 받아야 합니다.
+    USteamDevelopmentSubsystem* Probe = GetGameInstance()->GetSubsystem<USteamDevelopmentSubsystem>();
+    if (Probe && Exiting && Exiting->PlayerState && Exiting->PlayerState->GetUniqueId().IsValid()) Probe->ForgetAuthentication(*Exiting->PlayerState->GetUniqueId().GetUniqueNetId());
+    Super::Logout(Exiting);
+    LastStatus = FText::GetEmpty();
+}

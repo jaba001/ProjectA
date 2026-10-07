@@ -127,6 +127,8 @@ Snapshot은 실시간 상대 접속 없이 상대 빌드 하나로 Encounter를 
 
 온라인은 제안 12의 선택 1을 채택했다. 현재 지원 범위의 생존 상대·저장 HP·스킬·배치를 게시하고 같은 콘텐츠 버전·진행 단계의 태그 조건 일치 후보 중 균등 추첨한다. 게시 시점·보존 기간·같은 상대 중복·버전 변경·소모 반영의 세부 값과 서비스 구현은 후속이며 현재 로컬 고정 편성을 온라인 매칭으로 취급하지 않는다.
 
+`UPartySnapshotSelectionLibrary::SelectOpponent`는 값 데이터 후보의 진행 단계·카탈로그 콘텐츠 버전·GameplayTagQuery와 기존 생존/배치/스킬 검증을 적용하고 공통 후보 추첨에서 가중치 1로 한 명의 상대 파티를 선택한다. 적격 후보의 중복 Snapshot ID는 추첨을 거절하며 실패 시 출력·난수 상태, 성공 시 원본 후보를 보존한다. 결과는 저장 HP·스킬·배치를 유지한 값 사본이다. 기존 Target Run 생성·저장과 연결하지 않은 로컬 개발 API이며 게시 승인·계정 인증·중앙 매칭·이중 소모 방지의 구현을 뜻하지 않는다.
+
 ## 6 준비 완료 경계와 파일 저장
 
 기존 순차 턴 실행·저장/복원 경로는 폐기했다. `CompletedTurnSerial`·`NextTurnIndex`와 schema 1/2는 이전 파일을 인식하는 호환 필드이며 새 라운드 번호로 재해석하지 않는다. 새 Ready 경계는 schema 3의 라운드·계획 필드를 사용한다. 이전 파일은 삭제·다운그레이드하지 않는다.
@@ -233,6 +235,8 @@ Unreal Online Subsystem·공식 SDK·엔진 비동기 delegate를 우선하며 �
 | 관리 저장 | 현재 `FLocalRunAuthorityStore`는 같은 PC 동기 파일/OS lease, 개발 호출자만 지원. Steam 계정 ID만 주입해 온라인 관리 Run으로 승격하지 않음 |
 
 `USteamDevelopmentSubsystem`은 세션 생성·검색·참가·종료와 Steam 친구 초대 수락 delegate를 연결한다. 2~4명, 전용 `PROJECTA_PROBE` 표식·빌드 ID·lobby 설정을 검사하며 서버는 현재 Steam 친구 관계도 확인한다. 기존 `Core/MainMenu`를 연결 전용 C++ GameMode로 열고 연결 수와 공식 인증 성공 수를 구분한다. 새 맵 복제, Run 생성, 관리 저장 조회·승계, 대체 참가 또는 관전 권한 배정은 하지 않는다.
+
+친구 전용 로비는 일반 공개 검색에서 제외되므로 `ReadFriendsList(InGamePlayers)` 후 친구마다 `FindFriendSession`을 순차 호출한다. 같은 세션은 한 번만 표시하고 방 소유자의 친구 관계를 다시 확인한다. 요청 번호·대기 상태로 오래되거나 중복된 완료를 거절하고 검색 중 나가기는 현재 요청 완료 후 정리한다. 생성·참가 실패도 예약된 나가기를 처리하며 Logout에서 해당 계정의 이전 SteamAuth 관측을 삭제한다. [Steam 로비 공개 범위](https://partner.steamgames.com/doc/api/isteammatchmaking#ELobbyType) · [구현·검증 이력](HISTORY.md#9-25-2026-10-07-todo-권장안의-로컬-구현)
 
 Steam 로그인·UniqueNetId 문자열은 원격 인증 완료로 취급하지 않는다. 공식 `FOnlineAuthUtilsSteam::OnAuthenticationResultDelegate`의 성공 판정을 관측하고 기본 인증 실패 추방을 유지한다. 다른 처리기가 인증 delegate를 소유한 경우 시제품을 시작하지 않는다. 로그아웃·인증 실패·세션/이동 실패는 명시적인 실패로 남기며 Development 계정으로 치환하지 않는다. [공식 SteamAuth 계약](https://dev.epicgames.com/documentation/en-us/unreal-engine/online-subsystem-steam-interface-in-unreal-engine#steam-online-authentication)
 

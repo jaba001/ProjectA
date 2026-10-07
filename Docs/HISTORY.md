@@ -1,11 +1,12 @@
 # ProjectA 완료 작업과 검증 기록
 
-갱신일: 2026-10-06. 완료 범위·기준 커밋·실행 근거를 기록한다. 현행 구현은 [PROJECT_PLAN](PROJECT_PLAN.md), 확정 기획은 [GAME_DESIGN](GAME_DESIGN.md), 다음 콘텐츠·온라인 서비스·에셋 도입은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다. 과거 로그·맵 경로는 실행 당시 기준이며 현행 경로는 [레벨 폴더 기준](PROJECT_PLAN.md#4-10-레벨-폴더와-이전-경로-호환)을 따른다.
+갱신일: 2026-10-07. 완료 범위·기준 커밋·실행 근거를 기록한다. 현행 구현은 [PROJECT_PLAN](PROJECT_PLAN.md), 확정 기획은 [GAME_DESIGN](GAME_DESIGN.md), 다음 콘텐츠·온라인 서비스·에셋 도입은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다. 과거 로그·맵 경로는 실행 당시 기준이며 현행 경로는 [레벨 폴더 기준](PROJECT_PLAN.md#4-10-레벨-폴더와-이전-경로-호환)을 따른다.
 
 ## 최근 변경
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-10-07 TODO 권장안 로컬 구현 | T14 제안 9·10의 Steam 친구별 방 검색·요청 정리·재접속 인증 표시와 제안 12의 태그 기반 Snapshot 후보 선택 API를 보완했다. 프로젝트 파일 재생성 9.67초와 Development Editor / Win64 컴파일·링크 45.82초, 독립 코드·문서 정적 검사를 통과했다. 기존 Run·저장·에셋은 유지하며 게임·PIE·자동화·실제 Steam/PlayFab 연결은 미실행이다. [범위·근거](#9-25-2026-10-07-todo-권장안의-로컬-구현) |
 | 2026-10-06 TODO 완료 항목 이관 규칙 | AGENTS에 완료 근거를 HISTORY로 통합한 뒤 TODO에서 삭제하는 규칙을 추가했다. 완료·중복 절 14개와 혼합 절의 완료 부분을 정리하고 실행 조건·과거 수치·검증 한계를 보존했다. 제안 선택 9개와 실제 미완료 확인을 유지하며 삭제 절의 참조를 갱신했다. 문서·링크·체크 보존·diff 정적 검사만 수행했으며 새로운 컴파일·작동 테스트는 하지 않았다. [이관 범위](#9-20-2026-10-06-todo-완료-기록-정리) |
 | 2026-10-06 무기 랜덤 스킬·등급 기획 | 스킬상점·스킬 소지 상한 폐기, 무기만 태그 조건에 맞는 스킬 무작위 부여, 흰색·초록색·파란색·보라색·주황색 5등급을 목표 기획에 반영했다. 기존 GAS/아이템 태그·공통 추첨·상점/저장 의존을 정적으로 확인하고 기존 스킬상점 CSV를 폐기 대상으로 표시했다. 사용권·등급별 차이·추첨 시점·중복·기존 Run 전환은 당시 미선택 제안으로 남겼으며 이후 채택 결과는 [9-23절](#9-23-2026-10-06-무기-스킬-정책-선택)을 따른다. 문서·CSV·링크·diff 정적 확인만 수행했으며 코드·에셋·저장 변경과 컴파일·게임 실행은 하지 않았다. |
 | 2026-10-06 속도 단일 스탯 | 힘·민첩·지능을 제거하고 GAS·직업 상세·전투·Snapshot·체크포인트·성장을 Speed 하나로 연결했다. HP/AP/SAP/보호막, 속도 10/5와 기존 행동·접근 시간은 유지한다. 이전 민첩·공통 성장은 로드 전용 필드로 속도에 이관하고 에셋 속성 Redirect 3개를 추가했다. 관련 회귀와 구태그 이관·재저장 검사를 작성하고, UE 5.8.3 Development Editor / Win64 최종 증분 컴파일·링크 6.36초, 독립 코드·엔진 소스 대조·문서 링크·diff 정적 검사를 통과했다. 프로젝트 에셋 339개의 바이트 조사에서 구 스탯 정확명은 기존 파티 DA만 확인했으며 에셋·저장 파일은 수정하지 않았다. 게임·PIE·자동화 테스트 미실행, [TODO 28절](TODO.md#28-속도-단일-스탯-확인)의 화면·이전 저장 이어하기 확인 대기. 근거: `Saved/Logs/SpeedOnlyStatsFinalBuild.log`. |
@@ -636,3 +637,17 @@ TODO 29절의 확정 정책 중 스킬 소지 상한 제거를 구현했다. `Un
 작성 명령의 프로젝트 절대경로를 생략한 표기는 UE 5.8.3 `UnrealEditor-Cmd.exe ProjectA.uproject -ExecutePythonScript=Source/ProjectAEditor/Scripts/CreateWeaponSkills.py -unattended -nop4 -nosplash -NullRHI -NoSound -NoLiveCoding`이며 절대 `-abslog`에 위 작성 로그를 지정했다. 최종 C++ 빌드 대상은 `ProjectAEditor Win64 Development -WaitMutex -FromMsBuild -architecture=x64`다. 기존 UI 회귀 3개는 명시적 legacy prototype 초기화를 사용하고 정상 목표 Run 회귀는 실제 메뉴 생성의 비무장 1+무기 1스킬·스킬상점 비활성·고정 규칙 저장을 검사하도록 보완했다. 해당 검사는 소스 컴파일만 수행했다.
 
 `AuditSkillVfxDirections.py`는 고정 74개 검사를 제거하고 디스크 패키지와 레지스트리 스킬 경로의 완전 일치·누락·중복·타 클래스 거절을 검사하도록 갱신했다. 원본 해시 보존과 소모품을 포함한 전체 VFX 검수 범위는 유지한다. 이 도구는 Python AST·diff 정적 검사만 통과했으며 실행하지 않았다. 최종 문서 10개의 로컬 파일/앵커 링크 637개와 `git diff --check`를 통과했다.
+
+### 9-25 2026-10-07 TODO 권장안의 로컬 구현
+
+2026-10-07 권장안 진행 위임에 따라 기존 제안 7·9~14의 채택 선택을 유지하고 외부 준비와 독립적인 T14 제안 9·10·12를 구현했다. 작업 시작 기준은 `71211b13`이며 기존 미커밋 변경은 없었다. 계정·PlayFab Title·무료 사용 조건·서로 다른 PC 2대의 준비를 가정하지 않았다. 제안 11·13·14의 중앙 정본·결과 검증·MMR과 신규 에셋 선정은 여전히 미완료다.
+
+제안 9·10: Steam friends-only 로비는 일반 공개 검색에서 제외되므로 같은 게임의 친구 목록을 읽고 UE 5.8의 단일 `FindFriendSession`을 순차 호출한다. 동일 세션 중복·비친구 Host·잘못된 표식/빌드/정원을 제외하고 요청 번호·대기 상태로 오래된 콜백과 동기 실패의 이중 처리를 막는다. 다음 검색은 다음 tick에서 진행하며 검색·생성·참가 중 예약한 나가기를 처리한다. 로그아웃한 계정의 SteamAuth 관측을 삭제하고 엔진 기본 실패 추방을 유지한다. 검색 버튼도 친구 검색으로 명시했다. 설치 엔진의 `OnlineSessionInterfaceSteam.cpp`·`OnlineSessionAsyncLobbySteam.cpp`·`OnlineFriendsInterfaceSteam.cpp`와 [공식 로비 공개 범위](https://partner.steamgames.com/doc/api/isteammatchmaking#ELobbyType)를 대조했다. 기존 Run·소유권·관리 저장과 Steam 비활성 기본 설정은 유지했다.
+
+제안 12: `FPartySnapshotCandidate`와 `UPartySnapshotSelectionLibrary::SelectOpponent`에 Snapshot·진행 단계·GameplayTagContainer 값 데이터를 추가했다. 같은 콘텐츠 버전·진행 단계·GameplayTagQuery 조건과 기존 카탈로그의 생존·배치·정식 클래스/스킬·지원 형식을 검증한 뒤 공통 후보 선택기로 가중치 1의 균등 추첨을 수행한다. 적격 후보의 같은 ID는 거절하며 실패 시 이전 출력·난수 상태, 성공 시 원본 후보를 보존한다. 기존 Run의 고정 상대 생성·저장에는 연결하지 않은 로컬 개발 API다. 온라인 게시·승인·매칭·보존·소모품 AI·소유자 자산의 이중 소모 방지는 포함하지 않는다.
+
+`ProjectA.Snapshot.CandidateSelection` 회귀 소스에 잘못된 버전·단계·태그·사망·임의 클래스/스킬·장비·스키마와 중복 ID 거절, 실패 보존·독립 값 사본·시드 재현을 추가했다. 독립 정적 리뷰는 후보 검증·비동기 완료 순서·실패/나가기·재접속 관측을 확인했으며 추가 결함을 찾지 못했다. TODO 23·26·27·28·29의 체인 정리·Debug HP·저장 선확정·이전 속도 이관·새 Run 규칙도 정적으로 대조했으며 실제 플레이 확인으로 확대하지 않는다.
+
+재생성된 `Automation_ProjectA.sln`은 기존 줄의 내용·개수가 같고 순서만 변경됐으며 함께 반영했다. TODO의 기존 채택 체크 7개와 사용자 확인 항목을 보존하고 완료 작업 체크를 추가하지 않았다. 문서 10개의 로컬 파일·앵커 링크 646개와 전체 diff 정적 검사를 통과했다.
+
+UE 5.8.3 `Build.bat -ProjectFiles -Project="C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject" -Game -Engine`은 9.67초, `Build.bat ProjectAEditor Win64 Development -Project="C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject" -WaitMutex -FromMsBuild -architecture=x64`는 UHT 포함 19개 작업·45.82초로 성공했다. 컴파일 오류·경고는 없으며 프로젝트 생성의 VS2022/.NET 10 안내는 기존 C++/Automation 솔루션 분리 조건이다. 근거는 `Saved/Logs/TodoRecommendedProjectFiles.log`·`Saved/Logs/TodoRecommendedBuild.log`, 문서 파일/앵커 검사는 `Saved/Automation/TodoRecommended/DocumentationValidation.json`에 기록한다. 게임·PIE·Unreal 자동화·에셋 작성/재로드는 실행하지 않았다. [제안 10의 실제 2PC 검색·초대·재접속 확인](TODO.md#4-1-2-제안-10-초대재접속관전)과 [제안 12의 로컬 회귀 실행·온라인 구현](TODO.md#4-2-2-제안-12-온라인-snapshot과-상대-선정)은 남아 있다.

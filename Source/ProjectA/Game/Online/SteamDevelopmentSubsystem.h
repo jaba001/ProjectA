@@ -9,7 +9,6 @@
 
 class APlayerController;
 class IOnlineSubsystem;
-class FOnlineSessionSearch;
 class FOnlineAuthUtilsSteam;
 
 // This transport probe never creates, loads, or grants authority over a Run.
@@ -32,6 +31,7 @@ public:
     bool HasSession() const;
     bool IsReady() const;
     bool HasAuthentication(const FUniqueNetId& UserId) const;
+    void ForgetAuthentication(const FUniqueNetId& UserId);
     bool IsAllowedFriend(const FUniqueNetId& UserId) const;
     bool CanAcceptProbeConnection() const;
     const FText& GetStatus() const { return Status; }
@@ -39,13 +39,16 @@ public:
     int32 GetCapacity() const { return SessionCapacity; }
 
 private:
-    enum class EOperation : uint8 { Idle, Creating, Finding, Joining, Destroying };
+    enum class EOperation : uint8 { Idle, Creating, ReadingFriends, Finding, Joining, Destroying };
     bool CanBegin(APlayerController* Controller);
     bool JoinResult(APlayerController* Controller, const FOnlineSessionSearchResult& Result);
     bool IsCompatible(const FOnlineSessionSearchResult& Result) const;
     void SetStatus(const FString& Message);
     void HandleCreated(FName Name, bool bSuccess);
-    void HandleFound(bool bSuccess);
+    void HandleFriendsRead(int32 LocalUserNum, bool bSuccess, const FString& ListName, const FString& Error, uint64 RequestId);
+    void FindNextFriendSession();
+    void HandleFriendSessionFound(int32 LocalUserNum, bool bSuccess, const TArray<FOnlineSessionSearchResult>& FriendResults, uint64 RequestId);
+    void FinishFinding(bool bSuccess);
     void HandleJoined(FName Name, EOnJoinSessionCompleteResult::Type Result);
     void HandleDestroyed(FName Name, bool bSuccess);
     void HandleInvite(bool bSuccess, int32 LocalUserNum, FUniqueNetIdPtr UserId, const FOnlineSessionSearchResult& Result);
@@ -57,7 +60,7 @@ private:
     IOnlineSubsystem* Steam = nullptr;
     IOnlineSessionPtr Sessions;
     FUniqueNetIdPtr LocalId;
-    TSharedPtr<FOnlineSessionSearch> Search;
+    TArray<FUniqueNetIdRef> SearchFriends;
     TArray<FOnlineSessionSearchResult> Results;
     TArray<FString> ResultLabels;
     TSet<FString> AuthenticatedUsers;
@@ -71,6 +74,9 @@ private:
     FDelegateHandle TravelHandle;
     EOperation Operation = EOperation::Idle;
     int32 SessionCapacity = 0;
+    int32 NextSearchFriend = 0;
+    uint64 FriendSearchRequestId = 0;
+    bool bFriendRequestPending = false;
     bool bLeaveRequested = false;
     bool bOwnsAuthenticationDelegate = false;
     bool bOwnsSession = false;

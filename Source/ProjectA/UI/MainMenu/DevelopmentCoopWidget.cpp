@@ -228,7 +228,7 @@ void UDevelopmentCoopWidget::BuildSteamControls(UVerticalBox* Box)
     Box->AddChildToVerticalBox(Capacity);
     HostButton = AddButton(Box, TEXT("Button_SteamProbeHost"), FText::FromString(TEXT("친구 전용 연결 확인 방 만들기")));
     HostButton->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleSteamHost);
-    SteamFindButton = AddButton(Box, TEXT("Button_SteamProbeFind"), FText::FromString(TEXT("연결 확인 방 검색")));
+    SteamFindButton = AddButton(Box, TEXT("Button_SteamProbeFind"), FText::FromString(TEXT("Steam 친구의 연결 확인 방 검색")));
     SteamFindButton->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleSteamFind);
     SteamResults = WidgetTree->ConstructWidget<UDemonicComboBoxString>(UDemonicComboBoxString::StaticClass(), TEXT("Combo_SteamProbeResults"));
     Box->AddChildToVerticalBox(SteamResults);
