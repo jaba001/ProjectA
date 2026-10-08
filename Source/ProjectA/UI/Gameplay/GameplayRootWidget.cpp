@@ -279,7 +279,7 @@ void UGameplayRootWidget::HandleRetryCheckpoint()
     }
 }
 
-void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands, bool bCanRetryCheckpoint)
+void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands, bool bCanRetryCheckpoint, bool bWorldPresentation, bool bPresentationTransition)
 {
     CurrentView = View;
     const ERunPhase Phase = View.Phase;
@@ -325,11 +325,16 @@ void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool b
 
     if (RunMapWidget)
     {
-        RunMapWidget->RefreshRunMapView(View, bAllowRunCommands);
-        RunMapWidget->SetIsEnabled(Phase != ERunPhase::Preparing);
+        RunMapWidget->RefreshRunMapView(View, bAllowRunCommands, bWorldPresentation);
+        RunMapWidget->SetIsEnabled(Phase != ERunPhase::Preparing && !bPresentationTransition);
     }
 
-    if (RunEncounterWidget) RunEncounterWidget->RefreshEncounter(View, bAllowRunCommands);
+    if (RunEncounterWidget)
+    {
+        RunEncounterWidget->RefreshEncounter(View, bAllowRunCommands, bWorldPresentation);
+        RunEncounterWidget->SetIsEnabled(!bPresentationTransition);
+    }
+    if (RunMapWidget || RunEncounterWidget) RunLayer->SetVisibility(bPresentationTransition ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 
     if (ResultWidget)
     {

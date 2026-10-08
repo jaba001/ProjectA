@@ -68,6 +68,7 @@ void URunMapWidget::NativeOnInitialized()
 
     if (Root && Background && Background->GetParent() == Root)
     {
+        WorldBackdrop = Background;
         Theme.StyleBackdrop(Background);
         UOverlaySlot* BackgroundSlot = CastChecked<UOverlaySlot>(Background->Slot);
         BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
@@ -107,9 +108,10 @@ void URunMapWidget::RefreshRunMap(const URunStateSubsystem* RunState, const FTex
     RefreshRunMapView(FGameplayViewState::FromRun(RunState, FlowMessage), true);
 }
 
-void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllowRunCommands)
+void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllowRunCommands, bool bWorldPresentation)
 {
     bRunCommandsAllowed = bAllowRunCommands;
+    if (WorldBackdrop) WorldBackdrop->SetRenderOpacity(bWorldPresentation ? 0.65f : 1.f);
     if (!NodeList)
     {
         return;

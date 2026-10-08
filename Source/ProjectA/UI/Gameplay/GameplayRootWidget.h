@@ -28,9 +28,10 @@ class PROJECTA_API UGameplayRootWidget : public UCommonUserWidget
 
 public:
     void RefreshFlow(const URunStateSubsystem* RunState, const FText& FlowMessage);
-    void RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands, bool bCanRetryCheckpoint = false);
+    void RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands, bool bCanRetryCheckpoint = false, bool bWorldPresentation = false, bool bPresentationTransition = false);
     void RefreshDevelopmentLobby(ADevelopmentCoopLobby* Lobby);
     bool IsUtilityMenuOpen() const;
+    void ToggleInventory();
 
 protected:
     virtual void NativeOnInitialized() override;
@@ -57,7 +58,6 @@ protected:
 
 private:
     void RegisterGameplayShortcuts();
-    void ToggleInventory();
     void ToggleSettings();
     void RefreshInventory();
     void RefreshGold();

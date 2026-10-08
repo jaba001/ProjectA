@@ -31,23 +31,25 @@ TOptional<FUIInputConfig> URunEncounterWidget::GetDesiredInputConfig() const
 void URunEncounterWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
+    SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     const UDemonicUITheme& Theme = UDemonicUITheme::Get();
     UOverlay* Root = WidgetTree->ConstructWidget<UOverlay>();
+    Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     WidgetTree->RootWidget = Root;
-    UBorder* Background = WidgetTree->ConstructWidget<UBorder>();
-    Theme.StyleBackdrop(Background);
-    UOverlaySlot* BackgroundSlot = Root->AddChildToOverlay(Background);
+    Backdrop = WidgetTree->ConstructWidget<UBorder>();
+    Theme.StyleBackdrop(Backdrop);
+    UOverlaySlot* BackgroundSlot = Root->AddChildToOverlay(Backdrop);
     BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
     BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
-    UScaleBox* Fit = WidgetTree->ConstructWidget<UScaleBox>();
-    Fit->SetStretch(EStretch::ScaleToFit);
-    Fit->SetStretchDirection(EStretchDirection::DownOnly);
-    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Fit);
+    ContentFit = WidgetTree->ConstructWidget<UScaleBox>();
+    ContentFit->SetStretch(EStretch::ScaleToFit);
+    ContentFit->SetStretchDirection(EStretchDirection::DownOnly);
+    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(ContentFit);
     ContentSlot->SetHorizontalAlignment(HAlign_Fill);
     ContentSlot->SetVerticalAlignment(VAlign_Fill);
     ContentSlot->SetPadding(FMargin(32.0f, 64.0f, 32.0f, 32.0f));
     UHorizontalBox* Columns = WidgetTree->ConstructWidget<UHorizontalBox>();
-    Fit->SetContent(Columns);
+    ContentFit->SetContent(Columns);
     EquipmentSize = WidgetTree->ConstructWidget<USizeBox>();
     EquipmentSize->SetWidthOverride(300.0f);
     EquipmentSize->SetHeightOverride(840.0f);
@@ -108,6 +110,10 @@ void URunEncounterWidget::NativeOnInitialized()
     LeaveButton->Configure(TEXT("Leave"), NSLOCTEXT("RunEncounter", "Leave", "나가기"));
     LeaveButton->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandleLeave);
     Content->AddChildToVerticalBox(LeaveButton)->SetPadding(FMargin(0.0f, 5.0f));
+    InventoryButton = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), TEXT("Button_ShopInventory"));
+    InventoryButton->Configure(TEXT("Inventory"), NSLOCTEXT("RunEncounter", "Inventory", "인벤토리 · 장비 보기 (I)"));
+    InventoryButton->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandleInventory);
+    Content->AddChildToVerticalBox(InventoryButton)->SetPadding(FMargin(0.0f, 5.0f));
     Message = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_EncounterMessage"));
     Message->SetAutoWrapText(true);
     Message->SetWrapTextAt(540.0f);
@@ -125,7 +131,7 @@ void URunEncounterWidget::NativeOnInitialized()
     Theme.StyleText(Message, false, 14);
 }
 
-void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool bAllowRunCommands)
+void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool bAllowRunCommands, bool bWorldPresentation)
 {
     if (!Actions) return;
     bRunCommandsAllowed = bAllowRunCommands;
@@ -138,8 +144,12 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     const FRunEncounterOffer* SelectedOffer = View.EncounterProgress.FindSelectedOffer();
     const bool bService = bInShop && SelectedOffer && SelectedOffer->IsService();
     const UDemonicUITheme& Theme = UDemonicUITheme::Get();
-    EquipmentSize->SetVisibility(bInShop ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-    InventorySize->SetVisibility(bInShop ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+    Backdrop->SetVisibility(bWorldPresentation ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+    if (UOverlaySlot* ContentSlot = Cast<UOverlaySlot>(ContentFit->Slot)) ContentSlot->SetHorizontalAlignment(bWorldPresentation ? HAlign_Right : HAlign_Fill);
+    MerchantSize->SetWidthOverride(bWorldPresentation ? 780.f : 620.f);
+    EquipmentSize->SetVisibility(bInShop && !bWorldPresentation ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+    InventorySize->SetVisibility(bInShop && !bWorldPresentation ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+    InventoryButton->SetVisibility(bInShop && bWorldPresentation ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     MerchantSize->SetHeightOverride(bInShop ? 840.0f : 440.0f);
     if (bInShop)
     {
@@ -161,7 +171,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
         if (Buyer && BuyerView) ShopBalance->SetText(FText::Format(NSLOCTEXT("RunSkillShop", "BalanceAndHP", "{0} · 보유 골드 {1}G · HP {2}/{3}"), Buyer->CharacterName, FText::AsNumber(Buyer->Gold), FText::AsNumber(Buyer->CurrentHP), FText::AsNumber(BuyerView->MaxHP)));
         if (bItemShop)
         {
-            ShopHint->SetText(View.ItemShopState.SchemaVersion == 0 ? NSLOCTEXT("RunItemShop", "LegacyRun", "이전 저장에는 아이템 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다.") : NSLOCTEXT("RunItemShop", "InventoryRules", "상점 조건에 맞는 상품 최대 5개 · 중복 없이 추첨 · 구매한 아이템은 오른쪽 인벤토리에 보관됩니다."));
+            ShopHint->SetText(View.ItemShopState.SchemaVersion == 0 ? NSLOCTEXT("RunItemShop", "LegacyRun", "이전 저장에는 아이템 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다.") : NSLOCTEXT("RunItemShop", "InventoryRules", "상점 조건에 맞는 상품 최대 5개 · 중복 없이 추첨 · 구매한 아이템은 인벤토리에서 확인하고 장착할 수 있습니다."));
         }
         else if (bService) ShopHint->SetText(FText::GetEmpty());
         else if (View.SkillShopState.SchemaVersion == 0) ShopHint->SetText(NSLOCTEXT("RunSkillShop", "ShopUnavailable", "이 저장에서는 스킬 상점을 이용할 수 없습니다."));
@@ -341,4 +351,9 @@ void URunEncounterWidget::HandlePurchase(FName OfferId)
 {
     if (!BuyerCharacterId.IsValid()) return;
     if (AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>()) Controller->RequestPurchaseShopOffer(BuyerCharacterId, OfferId, ShopRevision);
+}
+
+void URunEncounterWidget::HandleInventory(FName)
+{
+    if (AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>()) Controller->RequestToggleInventory();
 }

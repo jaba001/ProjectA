@@ -3,9 +3,11 @@
 #include "CoreMinimal.h"
 #include "Controller/PartyPlayerController.h"
 #include "Game/Run/RunEquipmentTypes.h"
+#include "Game/Run/RunTypes.h"
 #include "GameplayPlayerController.generated.h"
 
 class AEncounterManager;
+class AEncounterPrototypeStage;
 class UGameplayRootWidget;
 class URunStateSubsystem;
 class AGameplayGameState;
@@ -33,6 +35,7 @@ public:
     void RequestContinueRun();
     void RequestSelectRunEncounter(FName EncounterId);
     void RequestLeaveRunEncounter();
+    void RequestToggleInventory();
     void RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision = INDEX_NONE);
     FGuid GetShopBuyerCharacterId(const FGameplayViewState& View) const;
     const FText& GetShopPurchaseMessage() const { return ShopPurchaseMessage; }
@@ -56,6 +59,7 @@ protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual bool CanActivateRoundCamera() const override;
 
     UPROPERTY(EditDefaultsOnly, Category = "Gameplay|UI")
     TSubclassOf<UGameplayRootWidget> GameplayRootWidgetClass;
@@ -66,6 +70,9 @@ private:
 #endif
 
     void RefreshGameplayFlow();
+    void RefreshEncounterPresentation(const FGameplayViewState& View);
+    void ResetEncounterPresentation();
+    void FinishEncounterPresentation(uint32 Generation);
     void ExecuteShopPurchase(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision);
     void ExecuteEquipmentChange(const FRunEquipmentCommand& Command);
     void ExecuteGoldRewardSelection(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex);
@@ -113,6 +120,17 @@ private:
     bool CanRetryGameplayRecovery() const;
     void TryBindGameplayState();
     FTimerHandle BindStateTimer;
+    FTimerHandle EncounterPresentationTimer;
+    TWeakObjectPtr<AEncounterPrototypeStage> PresentedStage;
+    TWeakObjectPtr<AActor> PresentationViewTarget;
+    ERunPhase PresentationPhase = ERunPhase::None;
+    FName PresentedEncounterId;
+    int32 PresentedCompletedCount = INDEX_NONE;
+    int32 PresentedVisitIndex = INDEX_NONE;
+    uint32 PresentationGeneration = 0;
+    bool bWorldEncounterPresentation = false;
+    bool bEncounterPresentationTransition = false;
+    bool bPresentationEnding = false;
 
     UPROPERTY(Transient)
     TObjectPtr<AGameplayGameState> GameplayState;

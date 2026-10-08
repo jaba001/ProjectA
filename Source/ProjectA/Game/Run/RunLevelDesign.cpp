@@ -25,7 +25,7 @@ UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_LevelDevelopment, "Monster.Development");
 namespace
 {
     constexpr int32 GroupCount = 10;
-    constexpr int32 MaximumCatalogSize = 1024;
+    constexpr int32 MaximumLevelDesignCatalogSize = 1024;
 
     bool ValidText(const FString& Text, int32 MaximumLength, bool bAllowEmpty = false)
     {
@@ -147,7 +147,7 @@ namespace
     bool ValidPolicy(const FRunTargetState& State)
     {
         const FRunLevelDesignState& Policy = State.LevelDesign;
-        if (State.SchemaVersion != 1 || Policy.SchemaVersion != 1 || Policy.PartySize < 1 || Policy.PartySize > 4 || Policy.Catalog.IsEmpty() || Policy.Catalog.Num() > MaximumCatalogSize || Policy.Rules.Num() != GroupCount || State.Groups.Num() != GroupCount) return false;
+        if (State.SchemaVersion != 1 || Policy.SchemaVersion != 1 || Policy.PartySize < 1 || Policy.PartySize > 4 || Policy.Catalog.IsEmpty() || Policy.Catalog.Num() > MaximumLevelDesignCatalogSize || Policy.Rules.Num() != GroupCount || State.Groups.Num() != GroupCount) return false;
         TSet<FName> Ids;
         TSet<FSoftClassPath> Classes;
         for (const FRunMonsterDefinition& Monster : Policy.Catalog)
@@ -235,7 +235,7 @@ namespace
         const FCsvParser Parser(MoveTemp(Text));
         const FCsvParser::FRows& Rows = Parser.GetRows();
         const TCHAR* Headers[] = {TEXT("몬스터 ID"), TEXT("몬스터 이름"), TEXT("Blueprint 클래스 경로"), TEXT("분류 태그"), TEXT("최대 HP"), TEXT("AP"), TEXT("SAP"), TEXT("속도"), TEXT("이동거리(타일)"), TEXT("스킬 경로"), TEXT("공격 피해(참고)"), TEXT("공격 선딜(초·참고)"), TEXT("비고")};
-        if (Rows.Num() < 2 || Rows.Num() > MaximumCatalogSize + 1 || Rows[0].Num() != UE_ARRAY_COUNT(Headers)) return false;
+        if (Rows.Num() < 2 || Rows.Num() > MaximumLevelDesignCatalogSize + 1 || Rows[0].Num() != UE_ARRAY_COUNT(Headers)) return false;
         for (int32 Index = 0; Index < UE_ARRAY_COUNT(Headers); ++Index) if (FCString::Strcmp(Rows[0][Index], Headers[Index]) != 0) return false;
         for (int32 RowIndex = 1; RowIndex < Rows.Num(); ++RowIndex)
         {

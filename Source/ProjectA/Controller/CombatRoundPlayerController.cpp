@@ -95,7 +95,7 @@ bool ACombatRoundPlayerController::HandleRoundWorldTileClicked(ACombatGridTile* 
 void ACombatRoundPlayerController::PlayerTick(float DeltaSeconds)
 {
     Super::PlayerTick(DeltaSeconds);
-    if (IsLocalController() && !bCameraInitialized && IsValid(Coordinator) && IsValid(Coordinator->GetArena()))
+    if (IsLocalController() && CanActivateRoundCamera() && !bCameraInitialized && IsValid(Coordinator) && IsValid(Coordinator->GetArena()))
     {
         Coordinator->GetArena()->ActivateArena(this);
         bCameraInitialized = true;

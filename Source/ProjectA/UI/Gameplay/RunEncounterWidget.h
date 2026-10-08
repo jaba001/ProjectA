@@ -12,6 +12,7 @@ class UImage;
 class USizeBox;
 class UCharacterEquipmentPanel;
 class UCharacterInventoryPanel;
+class UScaleBox;
 struct FGameplayViewState;
 
 UCLASS()
@@ -21,7 +22,7 @@ class PROJECTA_API URunEncounterWidget : public UCommonActivatableWidget
 
 public:
     virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
-    void RefreshEncounter(const FGameplayViewState& View, bool bAllowRunCommands);
+    void RefreshEncounter(const FGameplayViewState& View, bool bAllowRunCommands, bool bWorldPresentation = false);
 
 protected:
     virtual void NativeOnInitialized() override;
@@ -30,9 +31,16 @@ private:
     void HandleSelection(FName EncounterId);
     void HandleLeave(FName ActionId);
     void HandlePurchase(FName OfferId);
+    void HandleInventory(FName ActionId);
     bool bRunCommandsAllowed = false;
     FGuid BuyerCharacterId;
     int32 ShopRevision = INDEX_NONE;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UBorder> Backdrop;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UScaleBox> ContentFit;
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> Title;
@@ -93,4 +101,7 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UGameplayActionButton> LeaveButton;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UGameplayActionButton> InventoryButton;
 };

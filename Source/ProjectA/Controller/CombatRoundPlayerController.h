@@ -42,6 +42,7 @@ public:
 
 protected:
     virtual void SetupInputComponent() override;
+    virtual bool CanActivateRoundCamera() const { return true; }
 
 private:
     bool CanSelectRoundWorldTarget() const;

@@ -298,3 +298,12 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 ```
 
 작성 후 별도 프로세스에서 `-RecoverySkillVerifyOnly`를 실행한다. 결과는 `Saved/Automation/RecoverySkill/Author.json`·`Verify.json`에 기록한다. 회복량·AP 변경은 기존 결과를 자동 덮어쓰는 용도로 지원하지 않으며 정식 데이터 변경과 저장 호환 검토가 필요하다. 이 스크립트는 PIE나 게임을 실행하지 않는다.
+
+31. `ConfigureUnifiedGameplay.py`: `UnifiedGameplaySpecs.json`에 따라 기존 환경 12개·던전 2개의 장식 명세를 12,000cm 간격으로 기존 Core/Gameplay에 합성하고 기본 도형 NPC 무대 5개와 전체 보기 카메라를 작성한다. 전용 소유 태그의 연출만 재작성하며 기존 전투 코어·원점·물리 바닥·navigation·GameMode·조명과 원본 맵 14개를 보존한다. 원본 메시·기존 재질을 직접 참조하고 ISM·거리 culling을 적용하며 NPC와 카메라 예약 공간의 장식을 제외한다. native `EncounterPrototypeStage` 컴파일 후 실행한다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureUnifiedGameplay.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false -nowrite
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureUnifiedGameplay.py") -UnifiedGameplayVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false -nowrite
+```
+
+두 번째 명령은 별도 프로세스에서 저장된 ISM·원본 참조·무대 설정·코어 보존을 검사한다. Content 전체에서 Gameplay와 지정된 신규 `M_EncounterPrototype`만 작성 대상으로 허용하고 Config·Saved/Config·Saved/SaveGames의 스크립트 전후 해시를 확인한다. `-nowrite`는 엔진의 INI 저장을 막고 에셋 저장은 허용한다. 엔진 시작·종료의 과거 진단 파일 정리는 이 해시 범위와 구분한다. 기존 프로토타입 재질은 소유권·그래프 검사만 수행하고 덮어쓰지 않는다. 보고서는 `Saved/Automation/UnifiedGameplay_20261008/{Author,Reload,PreservedLayout,ProtectedAuthor,ProtectedReload}.json`에 기록한다. 게임·PIE·자동화 테스트와 화면·FPS 검수는 실행하지 않는다.

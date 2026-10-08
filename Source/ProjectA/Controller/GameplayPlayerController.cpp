@@ -1,6 +1,7 @@
 #include "Controller/GameplayPlayerController.h"
 
 #include "Combat/CombatManager.h"
+#include "Camera/CameraActor.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
@@ -8,11 +9,13 @@
 #include "Framework/Application/SlateUser.h"
 #include "Game/Encounter/EncounterManager.h"
 #include "Game/Encounter/CombatArena.h"
+#include "Game/Encounter/EncounterPrototypeStage.h"
 #include "Game/GameModes/GameplayGameModeBase.h"
 #include "Game/GameState/GameplayGameState.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "UI/Gameplay/GameplayRootWidget.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "TimerManager.h"
 #include "Game/Development/DevelopmentCoopLobby.h"
 #include "Game/Development/DevelopmentCoopSubsystem.h"
@@ -108,6 +111,8 @@ void AGameplayPlayerController::BeginPlay()
 
 void AGameplayPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    bPresentationEnding = true;
+    ResetEncounterPresentation();
     GetWorldTimerManager().ClearTimer(BindStateTimer);
     if (GameplayState)
     {
@@ -193,6 +198,11 @@ void AGameplayPlayerController::RequestSelectRunEncounter(FName EncounterId)
 void AGameplayPlayerController::RequestLeaveRunEncounter()
 {
     if (CanIssueRunCommands() && EncounterManager) EncounterManager->LeaveRunEncounter();
+}
+
+void AGameplayPlayerController::RequestToggleInventory()
+{
+    if (IsLocalController() && GameplayRootWidget) GameplayRootWidget->ToggleInventory();
 }
 
 void AGameplayPlayerController::RefreshRunFlowPermissions()
@@ -450,8 +460,103 @@ bool AGameplayPlayerController::CanRetryGameplayRecovery() const
     return !CurrentRun || !CurrentRun->IsManagedRun() || (Mode && Mode->CanControlRunFlow(this, true));
 }
 
+bool AGameplayPlayerController::CanActivateRoundCamera() const
+{
+    const ERunPhase Phase = HasAuthority() && RunState ? RunState->GetPhase() : GameplayState ? GameplayState->GetViewState().Phase : ERunPhase::None;
+    return !bPresentationEnding && Phase == ERunPhase::Combat;
+}
+
+void AGameplayPlayerController::ResetEncounterPresentation()
+{
+    GetWorldTimerManager().ClearTimer(EncounterPresentationTimer);
+    ++PresentationGeneration;
+    if (PresentedStage.IsValid()) PresentedStage->StopPresentation();
+    PresentedStage.Reset();
+    PresentationViewTarget.Reset();
+    bWorldEncounterPresentation = false;
+    bEncounterPresentationTransition = false;
+}
+
+void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayViewState& View)
+{
+    if (!IsLocalController() || bPresentationEnding) return;
+    const FRunEncounterProgress& Progress = View.EncounterProgress;
+    const bool bSameVisit = PresentationPhase == View.Phase && PresentedEncounterId == Progress.SelectedEncounterId && PresentedCompletedCount == Progress.AfterCompletedNodeCount && PresentedVisitIndex == Progress.VisitIndex;
+    if (!bSameVisit)
+    {
+        ResetEncounterPresentation();
+        PresentationPhase = View.Phase;
+        PresentedEncounterId = Progress.SelectedEncounterId;
+        PresentedCompletedCount = Progress.AfterCompletedNodeCount;
+        PresentedVisitIndex = Progress.VisitIndex;
+    }
+    if (View.Phase != ERunPhase::Shop && View.Phase != ERunPhase::Map && View.Phase != ERunPhase::EncounterChoice) return;
+    if (PresentationViewTarget.IsValid()) return;
+    if (bWorldEncounterPresentation) ResetEncounterPresentation();
+    AActor* ViewTarget = nullptr;
+    if (View.Phase == ERunPhase::Shop)
+    {
+        const FRunEncounterOffer* Offer = Progress.FindSelectedOffer();
+        AEncounterPrototypeStage* SelectedStage = nullptr;
+        if (Offer)
+        {
+            for (TActorIterator<AEncounterPrototypeStage> It(GetWorld()); It; ++It)
+            {
+                AEncounterPrototypeStage* Candidate = *It;
+                if (!Candidate->MatchesOffer(*Offer)) continue;
+                if (!SelectedStage || Candidate->Priority > SelectedStage->Priority || (Candidate->Priority == SelectedStage->Priority && Candidate->GetPathName() < SelectedStage->GetPathName())) SelectedStage = Candidate;
+            }
+        }
+        if (SelectedStage)
+        {
+            PresentedStage = SelectedStage;
+            ViewTarget = SelectedStage;
+        }
+    }
+    else
+    {
+        for (TActorIterator<ACameraActor> It(GetWorld()); It; ++It)
+        {
+            if (It->ActorHasTag(TEXT("GameplayEncounterOverview")) && (!ViewTarget || It->GetPathName() < ViewTarget->GetPathName())) ViewTarget = *It;
+        }
+    }
+    // Missing stages keep legacy maps and their existing full-screen encounter layout usable.
+    // 무대가 없는 기존 맵에서는 원래 전체 화면 인카운터 구성을 그대로 사용합니다.
+    if (!ViewTarget) return;
+    PresentationViewTarget = ViewTarget;
+    bWorldEncounterPresentation = true;
+    bEncounterPresentationTransition = GetViewTarget() != ViewTarget;
+    if (!bEncounterPresentationTransition)
+    {
+        if (PresentedStage.IsValid()) PresentedStage->StartPresentation();
+        return;
+    }
+    SetViewTargetWithBlend(ViewTarget, 0.65f, VTBlend_Cubic);
+    GetWorldTimerManager().SetTimer(EncounterPresentationTimer, FTimerDelegate::CreateUObject(this, &AGameplayPlayerController::FinishEncounterPresentation, PresentationGeneration), 0.65f, false);
+}
+
+void AGameplayPlayerController::FinishEncounterPresentation(uint32 Generation)
+{
+    if (!IsLocalController() || bPresentationEnding || Generation != PresentationGeneration) return;
+    const FGameplayViewState View = HasAuthority() && RunState ? FGameplayViewState::FromRun(RunState, FText::GetEmpty()) : GameplayState ? GameplayState->GetViewState() : FGameplayViewState();
+    const FRunEncounterProgress& Progress = View.EncounterProgress;
+    if (View.Phase != PresentationPhase || Progress.SelectedEncounterId != PresentedEncounterId || Progress.AfterCompletedNodeCount != PresentedCompletedCount || Progress.VisitIndex != PresentedVisitIndex || !PresentationViewTarget.IsValid())
+    {
+        ResetEncounterPresentation();
+        RefreshGameplayFlow();
+        return;
+    }
+    // Complete the local blend before exposing buttons, independently of purchase and save revisions.
+    // 구매 및 저장 revision과 별개로 로컬 카메라 이동을 끝낸 뒤 버튼을 표시합니다.
+    SetViewTargetWithBlend(PresentationViewTarget.Get(), 0.f);
+    if (PresentedStage.IsValid()) PresentedStage->StartPresentation();
+    bEncounterPresentationTransition = false;
+    RefreshGameplayFlow();
+}
+
 void AGameplayPlayerController::RefreshGameplayFlow()
 {
+    if (bPresentationEnding) return;
     const ERunPhase CurrentPhase = HasAuthority() && RunState ? RunState->GetPhase() : GameplayState ? GameplayState->GetViewState().Phase : ERunPhase::None;
     if (CurrentPhase != ERunPhase::Shop)
     {
@@ -527,7 +632,8 @@ void AGameplayPlayerController::RefreshGameplayFlow()
         if (GameplayState && GameplayRootWidget)
         {
             const FGameplayViewState& View = GameplayState->GetViewState();
-            GameplayRootWidget->RefreshFlowView(View, false);
+            RefreshEncounterPresentation(View);
+            GameplayRootWidget->RefreshFlowView(View, false, false, bWorldEncounterPresentation, bEncounterPresentationTransition);
             if (View.Phase == ERunPhase::Combat && GameplayState->GetArena())
             {
                 GameplayState->GetArena()->ActivateArena(this);
@@ -555,7 +661,9 @@ void AGameplayPlayerController::RefreshGameplayFlow()
 
     if (GameplayRootWidget)
     {
-        GameplayRootWidget->RefreshFlowView(FGameplayViewState::FromRun(RunState, FlowMessage), CanIssueRunCommands(), CanRetryGameplayRecovery());
+        const FGameplayViewState View = FGameplayViewState::FromRun(RunState, FlowMessage);
+        RefreshEncounterPresentation(View);
+        GameplayRootWidget->RefreshFlowView(View, CanIssueRunCommands(), CanRetryGameplayRecovery(), bWorldEncounterPresentation, bEncounterPresentationTransition);
     }
 
     // Active CommonUI screens own the input config; the controller keeps combat authorization.

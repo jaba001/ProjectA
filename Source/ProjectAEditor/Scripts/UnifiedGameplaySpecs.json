@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "level": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+  "material": "/Game/User_JeHoon/Materials/Prototype/M_EncounterPrototype",
+  "regions": [
+    {"name": "PineRidge", "offset": [0, 0, 0]},
+    {"name": "MeadowBloom", "offset": [-12000, 0, 0]},
+    {"name": "BambooGarden", "offset": [12000, 0, 0]},
+    {"name": "CrimsonForest", "offset": [-12000, 12000, 0]},
+    {"name": "DarkMarsh", "offset": [0, 12000, 0]},
+    {"name": "SavannahGrove", "offset": [12000, 12000, 0]},
+    {"name": "DesertCanyon", "offset": [-12000, -12000, 0]},
+    {"name": "DesertOasis", "offset": [0, -12000, 0]},
+    {"name": "PalmCoast", "offset": [12000, -12000, 0]},
+    {"name": "SunsetLagoon", "offset": [24000, -12000, 0]},
+    {"name": "FrozenPass", "offset": [-12000, 24000, 0]},
+    {"name": "IceCitadel", "offset": [0, 24000, 0]},
+    {"name": "DungeonFantasy", "offset": [12000, 24000, 0]},
+    {"name": "DungeonStone", "offset": [24000, 24000, 0]}
+  ],
+  "stage_clearance_min": [-1100, -700, -50],
+  "stage_clearance_max": [600, 700, 800],
+  "stages": [
+    {"id": "Market", "title": "MARKET", "position": [-3800, -1000, 20], "required": ["Encounter.Shop"], "excluded": ["Encounter.Shop.Item.Tag", "Encounter.Shop.Consumable"], "priority": 0, "style": 0, "tint": [0.72, 0.43, 0.16, 1]},
+    {"id": "Forge", "title": "FORGE", "position": [3400, -1600, 20], "required": ["Encounter.Shop.Item.Tag"], "excluded": [], "priority": 10, "style": 1, "tint": [0.28, 0.36, 0.48, 1]},
+    {"id": "Camp", "title": "REST CAMP", "position": [-3000, 2800, 20], "required": ["Encounter.Service.Recovery"], "excluded": [], "priority": 10, "style": 2, "tint": [0.23, 0.55, 0.28, 1]},
+    {"id": "Alchemy", "title": "ALCHEMY", "position": [3000, 2800, 20], "required": ["Encounter.Shop.Consumable"], "excluded": [], "priority": 10, "style": 3, "tint": [0.45, 0.22, 0.62, 1]},
+    {"id": "Shrine", "title": "REVIVAL SHRINE", "position": [0, 4200, 20], "required": ["Encounter.Service.Revival"], "excluded": [], "priority": 10, "style": 4, "tint": [0.75, 0.66, 0.35, 1]}
+  ],
+  "overview": {"position": [-5200, -4000, 7800], "target": [-300, 700, 0], "fov": 70},
+  "central_cull_distance": 18000,
+  "region_cull_distance": 12000
+}
