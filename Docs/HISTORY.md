@@ -709,3 +709,13 @@ CSV 재읽기에서 15열·43행·활성 28개·보존 15개·그룹 가중치 �
 `ProjectA.Run.Target.ItemRewards`의 `AtomicResultAndClaimRetry`·`LegacyGoldAndMalformedCopies` 통합 회귀 소스 2개를 추가하고 기존 80단계 합성 진행의 보상 검증을 갱신했다. 결과 저장 실패의 동일 추첨 재시도, 수령 실패의 인벤토리·골드·수령 기록 불변, 한 번 지급·재개·중복 거절, 이전 골드 보상 수령 후 다음 PvE 전환과 잘못된 사본/골드/수령 기록 로드 거절을 검사한다. 테스트 소스 컴파일과 실제 실행은 구분한다.
 
 `Build.bat -ProjectFiles -Project=ProjectA.uproject -Game -Engine`(4.50초)와 `Build.bat ProjectAEditor Win64 Development -Project=ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`(23 actions, 39.43초)가 성공했다. 로그는 `Saved/Logs/CombatRewardsProjectFiles.log`·`Saved/Logs/CombatRewardsBuild.log`다. CSV는 `D2:D6` 범위 표기만 변경하고 확률 합계 100과 나머지 셀 보존·재읽기를 확인했다(`Saved/Automation/CombatRewards/CsvValidation.json`). 문서 10개의 로컬 파일·앵커 링크 700개와 diff·최신 코드 정적 검토를 통과했다. 링크 근거는 `Saved/Automation/TodoRecommended/DocumentationValidation.json`이다. 게임·PIE·자동화 테스트는 실행하지 않았으며 실제 카드·수령·Continue·저장 실패 재시도·기존 보상 호환 확인은 [TODO 26절](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남겼다.
+
+### 9-30 2026-10-08 몬스터 스탯과 출현 자료 정리
+
+사용자의 몬스터 스탯·확률 CSV 정리 요청에 따라 `MONSTER_STATS.csv` 13종, `MONSTER_SPAWN_PROBABILITIES.csv` 13종, `MONSTER_ENCOUNTERS.csv` 10묶음을 추가했다. 스탯 자료는 기본 HP 150·AP 2·SAP 1·속도 5·보호막 0·이동거리 1과 공격 수치·선딜·스킬 경로를 기본값·작성 명세·과거 재로드 기록에 대조한다. 현재 에셋을 엔진으로 재조회한 결과와 구분하며 기존 `MONSTER_ASSETS.csv`의 ID·원본 경로는 유지한다. [자료 기준](PROJECT_PLAN.md#4-5-몬스터-콘텐츠)
+
+출현 자료는 현재 고정 편성 집계와 권장 가중치·정규화 확률을 별도로 기록한다. 권장 가중치의 합은 100이며 공통 후보 전체가 적격인 첫 1슬롯 기준이다. 향후 태그 필터에는 남은 가중치의 재정규화가 필요하고 최종 밸런스나 런타임 적용 완료로 해석하지 않는다. 편성 자료는 기본 목표 Run의 10 PvE 묶음·25개체·4슬롯 순서와 진행 단계 `4+8i`·전투 순번 `2i+1`을 정리한다. 등장 100%는 해당 묶음 도달 조건이며 PvE 적의 스탯 성장은 없다. 기존 최대 HP +5·속도 +1 성장은 아군 규칙이다. [목표 Run 기준](PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터)
+
+공격 피해 50·AP 1은 `ConfigureMonsterContent.py`의 해석된 기본 공격 복사와 2026-10-04 `Saved/Automation/TodoCompletion_20261004/RagdollFinal.d4b67380eb78483abdea7f0856794adf/Console.log`의 13종 실행 이력을 대조했다. 12종 선딜은 `MonsterContentSpecs.json`, 기존 검병의 0.23초 선딜과 무기 궤적은 `Saved/Automation/MeleeSkillName/Baseline.json`을 기준으로 한다. 기본 HP/AP는 `Saved/Automation/Monsters/Reload.json`과 대조하며 SAP·속도·보호막·이동거리는 현행 C++ 기본값이다.
+
+CSV 3개의 재읽기·13/13/10행·25개체 집계·권장 가중치와 확률 합계 100·13종 스킬 파일 존재를 확인하고 표시 미리보기 5개를 검토했다. 작성·재읽기 근거는 `Saved/Automation/MonsterBalance_20261008/CsvValidation.json`이다. 문서 10개의 로컬 링크 712개·diff 검사를 통과했으며 링크 근거는 `Saved/Automation/TodoRecommended/DocumentationValidation.json`이다. C++·설정·원본 에셋·기존 CSV·TODO·현재 런타임·기존 저장은 변경하지 않았다. 컴파일이 필요한 코드 변경은 없으며 게임·PIE·자동화 테스트와 에셋 재로드는 실행하지 않았다. 이전 몬스터 실행 이력과 TODO의 미완료 확인 항목은 보존한다.

@@ -84,7 +84,7 @@ Windows의 긴 사용자 경로에서도 체크포인트 교체·토큰 확인 �
 
 전투 디버그의 **캐릭터·체력 → 적군 추가**에서 신규 12개와 기존 `BP_EnemyUnit`을 선택한다. `Fantasy_Pack`·`StylizedCreaturesBundle`의 원본 메시·재질·애니메이션을 직접 참조하고 늑대인간·골렘의 Manny 공격 2개만 리타깃한다. 기존 기본 비무장 공격의 피해·AP·GAS 조건과 전체 래그돌을 유지한다. 기존 시험 Run은 기본 편성 4개, 새 목표 Run은 저장된 단계별 편성을 사용하며 13개 카탈로그는 디버그 목록 조회 시 로드한다. [작성 명령](Source/ProjectAEditor/Scripts/README.md)·[구성 명세](Source/ProjectAEditor/Scripts/MonsterContentSpecs.json)
 
-전체 13개 몬스터의 이름·기본 편성·원본 팩·에셋 경로는 [몬스터 목록 CSV](DataCatalogs/MONSTER_ASSETS.csv)에서 확인한다. 한글 호환용 UTF-8 BOM이며 목록 편집은 게임 설정에 자동 반영되지 않는다.
+전체 13개 몬스터의 이름·원본 팩·에셋 경로는 [몬스터 목록](DataCatalogs/MONSTER_ASSETS.csv), 기본 스탯·공격은 [스탯 자료](DataCatalogs/MONSTER_STATS.csv), 현재 출현 집계와 미적용 권장 가중치는 [출현 자료](DataCatalogs/MONSTER_SPAWN_PROBABILITIES.csv), 목표 Run의 10 PvE 묶음·25개체는 [고정 편성](DataCatalogs/MONSTER_ENCOUNTERS.csv)에서 확인한다. 기본값·작성 명세·과거 재로드 기록을 대조한 UTF-8 BOM 자료이며 현재 에셋을 엔진으로 다시 조회한 결과는 아니다. CSV 편집은 게임 설정에 자동 반영되지 않으며 몬스터 확률 추첨은 런타임 미적용이다.
 
 **환경 비교 레벨**은 `/Game/User_JeHoon/LEVEL/Environment/`의 `Grassland`·`Forest`·`Desert`·`Ice`·`Summer` 하위 폴더에 있는 12맵이다. 초원·숲·대나무·사막·습지·얼음·해변을 원본 메시와 ISM으로 구성하고 표면 Material 9개·자식 MI 44개를 작성했다. 폴더 이동 전 독립 재로드와 실제 Windows 창의 4:3·16:9·21:9 화면·Slate 좌표 클릭·SAP 이동/자원/점유 검수를 통과했다. 두 던전과 합계 14맵·42장 화면을 직접 확인했다. 원본 팩은 Git에 포함하지 않으므로 다른 PC에서도 설치가 필요하다. 동일 품질 180프레임의 wall 간격 표본은 CPU/GPU·화면 제시 시각·변경 전후 FPS 비교를 측정하지 않는다. [맵 목록·구성 기준](Docs/PROJECT_PLAN.md#4-4-환경-비교-레벨)
 
@@ -164,7 +164,7 @@ UI는 1920×1080을 기준으로 뷰포트에 맞춰 같은 비율로 확대·�
 | [MULTIPLAYER](Docs/MULTIPLAYER.md) | 식별·소유권·저장·네트워크 계약 |
 | [HISTORY](Docs/HISTORY.md) | 완료 이력·검증 결과·기준 커밋 |
 
-프로젝트 루트 `DataCatalogs/`는 에셋·SFX 목록·생성 현황·기획 풀·등장 확률 CSV 7개를 함께 보관한다. 새 일반 Run은 이 폴더의 무기·등급 확률·인카운터 풀 CSV를 읽으며 세 파일을 패키징 대상으로 포함한다.
+프로젝트 루트 `DataCatalogs/`는 에셋·SFX 목록·생성 현황·기획 풀·등장 확률 CSV 10개를 함께 보관한다. 새 일반 Run은 이 폴더의 무기·등급 확률·인카운터 풀 CSV를 읽으며 세 파일을 패키징 대상으로 포함한다. 몬스터 CSV 4개는 자료·권장안이며 런타임 입력과 구분한다.
 
 | 데이터 카탈로그 | 내용 |
 |---|---|
@@ -175,6 +175,9 @@ UI는 1920×1080을 기준으로 뷰포트에 맞춰 같은 비율로 확대·�
 | [SKILL_SOUND_ASSETS.csv](DataCatalogs/SKILL_SOUND_ASSETS.csv) | 구입 원본 SoundCue 120개·SoundWave 114개. 실제 팩·objectpath·VFX 및 생성 스킬/발동 단계와 연결 근거·원본 길이/looping·확인 상태를 기록 |
 | [ENCOUNTER_POOL.csv](DataCatalogs/ENCOUNTER_POOL.csv) | 15열·43행. 기본·등급별·아이템 태그별 상점과 기존 서비스의 활성 28개, 기존 저장·과거 기획 보존 15개를 `활성 여부`로 구분. 그룹/변형 가중치·상품 필터·진열 정책은 새 일반 Run 생성 시 저장 |
 | [MONSTER_ASSETS.csv](DataCatalogs/MONSTER_ASSETS.csv) | 몬스터 13개의 이름·기본 편성·원본 팩·Blueprint·메시·교체 재질 경로. 목록 편집은 게임 설정에 자동 반영되지 않음 |
+| [MONSTER_STATS.csv](DataCatalogs/MONSTER_STATS.csv) | 13종의 기본 스탯·공격 수치·선딜·스킬 경로. 기본값·명세·과거 재로드 기록을 대조한 자료 |
+| [MONSTER_SPAWN_PROBABILITIES.csv](DataCatalogs/MONSTER_SPAWN_PROBABILITIES.csv) | 13종의 현재 고정 편성 출현 집계와 별도의 권장 가중치·정규화 확률. 가중치 합 100, 런타임 미적용·최종 밸런스 미확정 |
+| [MONSTER_ENCOUNTERS.csv](DataCatalogs/MONSTER_ENCOUNTERS.csv) | 목표 Run 기본 정의의 10 PvE 묶음·25개체·진행 단계·4슬롯 고정 편성. 해당 묶음 도달 시 기재 편성 등장 100%, 무작위 확률 아님 |
 
 무기 목록의 중복 `게임 내 이름`은 기존 행 순서의 `이름 1`, `이름 2` 번호를 유지한다. 이펙트 목록의 퇴역 577행·표시명은 고정하고 신규 설치 목록 안에서 중복 표시명을 구분한다. 원본 에셋 이름·경로는 유지하며 번호는 등급·강화 단계를 의미하지 않는다. [표시명 규칙](Docs/PROJECT_PLAN.md#4-1-스킬-이펙트-에셋-목록)
 
