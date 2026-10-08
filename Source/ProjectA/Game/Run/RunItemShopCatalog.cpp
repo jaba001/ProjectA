@@ -98,6 +98,20 @@ namespace
         return Tag ? *Tag : FGameplayTag();
     }
 
+    FGameplayTag FindRarityTag(const FString& Rarity)
+    {
+        static const TMap<FString, FName> RarityTags =
+        {
+            {TEXT("흰색"), TEXT("Item.Rarity.White")},
+            {TEXT("초록색"), TEXT("Item.Rarity.Green")},
+            {TEXT("파란색"), TEXT("Item.Rarity.Blue")},
+            {TEXT("보라색"), TEXT("Item.Rarity.Purple")},
+            {TEXT("주황색"), TEXT("Item.Rarity.Orange")}
+        };
+        const FName* Tag = RarityTags.Find(Rarity);
+        return Tag ? FGameplayTag::RequestGameplayTag(*Tag, false) : FGameplayTag();
+    }
+
     bool ValidateCatalog(const TArray<FRunItemDefinition>& Catalog)
     {
         if (Catalog.Num() < OfferCount || Catalog.Num() > MaximumCatalogSize) return false;
@@ -122,6 +136,7 @@ bool RunItemShopCatalog::ValidateItem(const FRunItemDefinition& Item)
     if (!Item.Asset.IsValid() || !Item.Asset.GetSubPathUtf8String().IsEmpty() || !AssetPath.StartsWith(TEXT("/Game/")) || !FPackageName::IsValidObjectPath(AssetPath) || !IsValidDisplayName(Item.DisplayName.ToString()) || !Item.Tags.HasTag(TAG_ItemWeapon) || Item.Price <= 0) return false;
     if (Item.GenerationVersion == 0) return !Item.ItemInstanceId.IsValid() && !Item.RarityTag.IsValid() && Item.GrantedSkills.IsEmpty();
     if (Item.GenerationVersion != 1 || !Item.ItemInstanceId.IsValid() || !Item.RarityTag.IsValid()) return false;
+    if (Item.CatalogRarityTag.IsValid() && Item.CatalogRarityTag != Item.RarityTag) return false;
     TSet<FSoftObjectPath> Skills;
     for (const FSoftObjectPath& Skill : Item.GrantedSkills)
     {
@@ -143,8 +158,8 @@ bool RunItemShopCatalog::IsSameDefinition(const FRunItemDefinition& Left, const 
 
 bool RunItemShopCatalog::IsSameBaseDefinition(const FRunItemDefinition& Left, const FRunItemDefinition& Right)
 {
-    // Catalog identity excludes per-copy results while full copy comparison retains them.
-    // 카탈로그 동일성에서는 사본별 결과를 제외하며 전체 사본 비교에서는 유지합니다.
+    // Catalog identity retains authored grade metadata and excludes only per-copy results.
+    // 카탈로그 동일성은 작성 등급 메타데이터를 보존하며 사본별 생성 결과만 제외합니다.
     FRunItemDefinition LeftBase = Left;
     FRunItemDefinition RightBase = Right;
     for (FRunItemDefinition* Item : { &LeftBase, &RightBase })
@@ -175,8 +190,10 @@ bool RunItemShopCatalog::LoadFromString(FString CsvText, TArray<FRunItemDefiniti
     const FCsvParser Parser(MoveTemp(CsvText));
     const FCsvParser::FRows& Rows = Parser.GetRows();
     const int32 ColumnCount = Rows.IsEmpty() ? 0 : Rows[0].Num();
-    const bool bHasGameName = ColumnCount == 5;
-    if (Rows.Num() < OfferCount + 1 || Rows.Num() > MaximumCatalogSize + 1 || (ColumnCount != 4 && ColumnCount != 5) || FCString::Strcmp(Rows[0][0], TEXT("무기 종류")) != 0 || FCString::Strcmp(Rows[0][1], TEXT("위치")) != 0 || FCString::Strcmp(Rows[0][2], TEXT("에셋 이름")) != 0 || FCString::Strcmp(Rows[0][3], TEXT("가격(G)")) != 0 || (bHasGameName && FCString::Strcmp(Rows[0][4], TEXT("게임 내 이름")) != 0))
+    const bool bHasGameName = ColumnCount >= 5;
+    const bool bHasRarity = ColumnCount >= 6;
+    const bool bHasRationale = ColumnCount == 7;
+    if (Rows.Num() < OfferCount + 1 || Rows.Num() > MaximumCatalogSize + 1 || ColumnCount < 4 || ColumnCount > 7 || FCString::Strcmp(Rows[0][0], TEXT("무기 종류")) != 0 || FCString::Strcmp(Rows[0][1], TEXT("위치")) != 0 || FCString::Strcmp(Rows[0][2], TEXT("에셋 이름")) != 0 || FCString::Strcmp(Rows[0][3], TEXT("가격(G)")) != 0 || (bHasGameName && FCString::Strcmp(Rows[0][4], TEXT("게임 내 이름")) != 0) || (bHasRarity && FCString::Strcmp(Rows[0][5], TEXT("등급")) != 0) || (bHasRationale && FCString::Strcmp(Rows[0][6], TEXT("분류 근거")) != 0))
     {
         OutError = NSLOCTEXT("RunItemShop", "InvalidCatalogHeader", "무기 에셋 CSV의 열 또는 상품 개수가 올바르지 않습니다.");
         return false;
@@ -196,8 +213,14 @@ bool RunItemShopCatalog::LoadFromString(FString CsvText, TArray<FRunItemDefiniti
         const FGameplayTag CategoryTag = FindCategoryTag(Row[0]);
         Item.Asset = FSoftObjectPath(FString::Printf(TEXT("%s/%s.%s"), Row[1], Row[2], Row[2]));
         Item.DisplayName = FText::FromString(Row[bHasGameName ? 4 : 2]);
+        if (bHasRarity) Item.CatalogRarityTag = FindRarityTag(Row[5]);
         Item.Tags.AddTag(TAG_ItemWeapon);
         if (CategoryTag.IsValid()) Item.Tags.AddTag(CategoryTag);
+        if ((bHasRarity && !Item.CatalogRarityTag.IsValid()) || (bHasRationale && !IsValidDisplayName(Row[6])))
+        {
+            OutError = FText::Format(NSLOCTEXT("RunItemShop", "InvalidCatalogRarity", "무기 에셋 CSV의 {0}행 등급 또는 분류 근거가 올바르지 않습니다. 등급은 흰색·초록색·파란색·보라색·주황색을 사용합니다."), FText::AsNumber(RowIndex + 1));
+            return false;
+        }
         if (!CategoryTag.IsValid() || !ParsePrice(Row[3], Item.Price) || !ValidateItem(Item))
         {
             OutError = FText::Format(NSLOCTEXT("RunItemShop", "InvalidCatalogItem", "무기 에셋 CSV의 {0}행 분류·경로·이름·가격이 올바르지 않습니다."), FText::AsNumber(RowIndex + 1));

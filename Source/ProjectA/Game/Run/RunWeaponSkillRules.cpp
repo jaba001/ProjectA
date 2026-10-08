@@ -37,6 +37,11 @@ namespace
         }
         return Count;
     }
+
+    bool CanUseRarity(const FRunItemDefinition& Item, const FRunWeaponSkillRulesState& State, const FRunWeaponRarityRule& Rarity, bool bWeapon)
+    {
+        return Rarity.RarityTag.IsValid() && (!Item.CatalogRarityTag.IsValid() || Item.CatalogRarityTag == Rarity.RarityTag) && FMath::IsFinite(Rarity.BaseWeight) && Rarity.BaseWeight > 0.0f && (!bWeapon || CountEligibleSkills(Item, State, Rarity) >= State.SkillCount);
+    }
 }
 
 bool RunWeaponSkillRules::Validate(const FRunWeaponSkillRulesState& State, FText& OutError)
@@ -80,7 +85,7 @@ bool RunWeaponSkillRules::CanGenerate(const FRunItemDefinition& BaseItem, const 
     const bool bWeapon = State.WeaponQuery.Matches(BaseItem.Tags);
     for (const FRunWeaponRarityRule& Rarity : State.Rarities)
     {
-        if (Rarity.RarityTag.IsValid() && FMath::IsFinite(Rarity.BaseWeight) && Rarity.BaseWeight > 0.0f && (!bWeapon || CountEligibleSkills(BaseItem, State, Rarity) >= State.SkillCount)) return true;
+        if (CanUseRarity(BaseItem, State, Rarity, bWeapon)) return true;
     }
     return false;
 }
@@ -89,6 +94,7 @@ bool RunWeaponSkillRules::ValidateGeneratedCopy(const FRunItemDefinition& Item, 
 {
     OutError = NSLOCTEXT("RunWeaponSkills", "InvalidGeneratedCopy", "아이템 사본의 생성 버전·식별자·등급·부여 스킬이 저장된 규칙과 일치하지 않습니다.");
     if (State.SchemaVersion != 1 || State.SkillCount <= 0 || State.WeaponQuery.IsEmpty() || !IsValidBaseItem(Item) || Item.GenerationVersion != State.SchemaVersion || !Item.ItemInstanceId.IsValid()) return false;
+    if (Item.CatalogRarityTag.IsValid() && Item.CatalogRarityTag != Item.RarityTag) return false;
     const FRunWeaponRarityRule* Rarity = State.Rarities.FindByPredicate([&Item](const FRunWeaponRarityRule& Rule) { return Rule.RarityTag == Item.RarityTag; });
     if (!Rarity || !Rarity->RarityTag.IsValid() || !FMath::IsFinite(Rarity->BaseWeight) || Rarity->BaseWeight <= 0.0f) return false;
     const bool bWeapon = State.WeaponQuery.Matches(Item.Tags);
@@ -113,21 +119,34 @@ bool RunWeaponSkillRules::Generate(const FRunItemDefinition& BaseItem, const FRu
     if (!Validate(State, OutError)) return false;
     OutError = NSLOCTEXT("RunWeaponSkills", "InvalidBaseItem", "새 사본 생성에는 기존 생성 결과가 없는 유효한 아이템 정의가 필요합니다.");
     if (State.SchemaVersion != 1 || !IsValidBaseItem(BaseItem) || BaseItem.GenerationVersion != 0 || BaseItem.ItemInstanceId.IsValid() || BaseItem.RarityTag.IsValid() || !BaseItem.GrantedSkills.IsEmpty()) return false;
-    // Filter impossible grades before drawing rather than retrying or filling with unrelated skills.
-    // 재시도하거나 무관한 스킬로 보충하지 않고 추첨 전에 생성 불가능한 등급을 제외합니다.
-    TArray<FGameplayTagWeightedCandidate> RarityCandidates;
-    RarityCandidates.Reserve(State.Rarities.Num());
+    FRandomStream GeneratedRandom = Random;
     const bool bWeapon = State.WeaponQuery.Matches(BaseItem.Tags);
-    for (const FRunWeaponRarityRule& Rarity : State.Rarities)
-    {
-        FGameplayTagWeightedCandidate& Candidate = RarityCandidates.AddDefaulted_GetRef();
-        Candidate.Tags.AddTag(Rarity.RarityTag);
-        Candidate.BaseWeight = !bWeapon || CountEligibleSkills(BaseItem, State, Rarity) >= State.SkillCount ? Rarity.BaseWeight : 0.0f;
-    }
-    TArray<int32> RarityIndices;
+    const FRunWeaponRarityRule* SelectedRarity = nullptr;
     OutError = NSLOCTEXT("RunWeaponSkills", "NoCompatibleCandidates", "아이템과 등급의 태그 조건을 만족하는 서로 다른 스킬 후보가 부족합니다.");
-    if (!GameplayTagCandidateSelection::Select(RarityCandidates, FGameplayTagQuery(), 1, false, Random, RarityIndices)) return false;
-    const FRunWeaponRarityRule& Rarity = State.Rarities[RarityIndices[0]];
+    if (BaseItem.CatalogRarityTag.IsValid())
+    {
+        // Authored grades never draw a replacement grade or fall back to an unrelated skill pool.
+        // 작성된 등급은 대체 등급을 추첨하거나 무관한 스킬 풀로 대체하지 않습니다.
+        SelectedRarity = State.Rarities.FindByPredicate([&BaseItem](const FRunWeaponRarityRule& Rarity) { return Rarity.RarityTag == BaseItem.CatalogRarityTag; });
+        if (!SelectedRarity || !CanUseRarity(BaseItem, State, *SelectedRarity, bWeapon)) return false;
+    }
+    else
+    {
+        // Preserve the frozen legacy catalog's random grade policy when authored grade metadata is absent.
+        // 작성 등급 메타데이터가 없으면 저장된 기존 카탈로그의 무작위 등급 정책을 유지합니다.
+        TArray<FGameplayTagWeightedCandidate> RarityCandidates;
+        RarityCandidates.Reserve(State.Rarities.Num());
+        for (const FRunWeaponRarityRule& Rarity : State.Rarities)
+        {
+            FGameplayTagWeightedCandidate& Candidate = RarityCandidates.AddDefaulted_GetRef();
+            Candidate.Tags.AddTag(Rarity.RarityTag);
+            Candidate.BaseWeight = CanUseRarity(BaseItem, State, Rarity, bWeapon) ? Rarity.BaseWeight : 0.0f;
+        }
+        TArray<int32> RarityIndices;
+        if (!GameplayTagCandidateSelection::Select(RarityCandidates, FGameplayTagQuery(), 1, false, GeneratedRandom, RarityIndices)) return false;
+        SelectedRarity = &State.Rarities[RarityIndices[0]];
+    }
+    const FRunWeaponRarityRule& Rarity = *SelectedRarity;
     FRunItemDefinition Copy = BaseItem;
     Copy.GenerationVersion = State.SchemaVersion;
     Copy.ItemInstanceId = FGuid::NewGuid();
@@ -144,11 +163,12 @@ bool RunWeaponSkillRules::Generate(const FRunItemDefinition& BaseItem, const FRu
             Candidate.BaseWeight = MatchesCandidate(Entry, BaseItem, Rarity) ? Entry.BaseWeight : 0.0f;
         }
         TArray<int32> Indices;
-        if (!GameplayTagCandidateSelection::Select(Candidates, Rarity.SkillQuery, State.SkillCount, false, Random, Indices)) return false;
+        if (!GameplayTagCandidateSelection::Select(Candidates, Rarity.SkillQuery, State.SkillCount, false, GeneratedRandom, Indices)) return false;
         for (const int32 Index : Indices) Copy.GrantedSkills.Add(State.Candidates[Index].Skill);
     }
     if (!ValidateGeneratedCopy(Copy, State, OutError)) return false;
     OutCopy = MoveTemp(Copy);
+    Random = GeneratedRandom;
     OutError = FText::GetEmpty();
     return true;
 }

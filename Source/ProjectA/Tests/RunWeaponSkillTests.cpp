@@ -150,6 +150,7 @@ bool FRunWeaponSkillFrozenCopyTest::RunTest(const FString& Parameters)
     for (int32 Index = 0; Index < Shop.Offers.Num(); ++Index)
     {
         TestTrue(TEXT("Every saved offer preserves its original per-copy result"), RunItemShopCatalog::IsSameDefinition(Restored->ItemShopState.Offers[Index].Item, Shop.Offers[Index].Item));
+        TestFalse(TEXT("Restoring legacy random grades does not inject current authored grade metadata"), Restored->ItemShopState.Offers[Index].Item.CatalogRarityTag.IsValid());
     }
     FRunWeaponSkillRulesState Insufficient = Fixture.Rules;
     Insufficient.SkillCount = 2;
@@ -163,6 +164,71 @@ bool FRunWeaponSkillFrozenCopyTest::RunTest(const FString& Parameters)
     DifferentCopy.ItemInstanceId = FGuid::NewGuid();
     TestTrue(TEXT("Catalog identity is independent of per-copy generation identity"), RunItemShopCatalog::IsSameBaseDefinition(DifferentCopy, Shop.Offers[0].Item));
     TestFalse(TEXT("Full copy comparison still rejects a changed generation identity"), RunItemShopCatalog::IsSameDefinition(DifferentCopy, Shop.Offers[0].Item));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunWeaponSkillAuthoredRarityTest, "ProjectA.Run.WeaponSkills.AuthoredRarityAndFrozenSave", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunWeaponSkillAuthoredRarityTest::RunTest(const FString& Parameters)
+{
+    FWeaponSkillFixture Fixture;
+    FRunItemDefinition Sword = Fixture.Item(TEXT("Item.Weapon.Sword"));
+    Sword.CatalogRarityTag = TAG_ValidationRarityHigh;
+    FRandomStream Random(371);
+    FText Error;
+    FRunItemDefinition Copy;
+    if (!TestTrue(TEXT("A fixed high grade generates only from its compatible skill pool"), RunWeaponSkillRules::CanGenerate(Sword, Fixture.Rules) && RunWeaponSkillRules::Generate(Sword, Fixture.Rules, Random, Copy, Error))) return false;
+    TestTrue(TEXT("Generated copies retain their authored base grade and compatible skill"), Copy.CatalogRarityTag == TAG_ValidationRarityHigh && Copy.RarityTag == TAG_ValidationRarityHigh && Copy.GrantedSkills == TArray<FSoftObjectPath>{Fixture.Rules.Candidates[0].Skill} && Copy.Price == Sword.Price);
+    FRunItemDefinition Altered = Copy;
+    Altered.RarityTag = TAG_ValidationRarityLow;
+    TestFalse(TEXT("A generated copy cannot substitute a different grade"), RunWeaponSkillRules::ValidateGeneratedCopy(Altered, Fixture.Rules, Error));
+    TestFalse(TEXT("Basic item validation also rejects a changed fixed grade"), RunItemShopCatalog::ValidateItem(Altered));
+    Altered = Copy;
+    Altered.CatalogRarityTag = FGameplayTag();
+    TestFalse(TEXT("Removing authored metadata cannot match the saved base catalog"), RunItemShopCatalog::IsSameBaseDefinition(Altered, Sword));
+
+    FRunItemDefinition Bow = Fixture.Item(TEXT("Item.Weapon.Bow"));
+    Bow.CatalogRarityTag = TAG_ValidationRarityHigh;
+    const FRunItemDefinition BeforeFailure = Copy;
+    const int32 BeforeSeed = Random.GetCurrentSeed();
+    TestFalse(TEXT("An incompatible fixed grade is excluded without downgrading the weapon"), RunWeaponSkillRules::CanGenerate(Bow, Fixture.Rules));
+    TestFalse(TEXT("An incompatible fixed grade cannot use the otherwise valid low bow pool"), RunWeaponSkillRules::Generate(Bow, Fixture.Rules, Random, Copy, Error));
+    TestTrue(TEXT("Rejected fixed grade generation preserves the complete old copy"), RunItemShopCatalog::IsSameDefinition(Copy, BeforeFailure));
+    TestEqual(TEXT("Rejected fixed grade generation preserves the random stream"), Random.GetCurrentSeed(), BeforeSeed);
+    Bow.CatalogRarityTag = FGameplayTag();
+    TestTrue(TEXT("Unclassified legacy bows retain their original compatible random-grade policy"), RunWeaponSkillRules::Generate(Bow, Fixture.Rules, Random, Copy, Error) && Copy.RarityTag == TAG_ValidationRarityLow && !Copy.CatalogRarityTag.IsValid());
+    FRunItemDefinition Unknown = Sword;
+    Unknown.CatalogRarityTag = TAG_ValidationHighPool;
+    TestFalse(TEXT("A valid tag outside the frozen rarity rules cannot become a grade"), RunWeaponSkillRules::CanGenerate(Unknown, Fixture.Rules) || RunWeaponSkillRules::Generate(Unknown, Fixture.Rules, Random, Copy, Error));
+
+    FRunItemDefinition NonWeapon = Fixture.Item(TEXT("Item.Consumable.Healing"));
+    NonWeapon.CatalogRarityTag = TAG_ValidationRarityHigh;
+    const int32 BeforeNonWeaponSeed = Random.GetCurrentSeed();
+    TestTrue(TEXT("Fixed nonweapon grades receive no weapon skills"), RunWeaponSkillRules::Generate(NonWeapon, Fixture.Rules, Random, Copy, Error) && Copy.RarityTag == TAG_ValidationRarityHigh && Copy.GrantedSkills.IsEmpty());
+    TestEqual(TEXT("Fixed grade assignment itself never consumes a random draw"), Random.GetCurrentSeed(), BeforeNonWeaponSeed);
+
+    FRunItemShopState Shop;
+    Shop.SchemaVersion = 1;
+    for (int32 Index = 0; Index < 5; ++Index)
+    {
+        FRunItemDefinition Base = Fixture.Item(TEXT("Item.Weapon.Sword"), Index);
+        Base.CatalogRarityTag = Index % 2 == 0 ? TAG_ValidationRarityLow : TAG_ValidationRarityHigh;
+        Shop.Catalog.Add(Base);
+    }
+    if (!TestTrue(TEXT("Shop generation uses the grade frozen in each catalog entry"), RunItemShopCatalog::Roll(Shop, false, Fixture.Rules.WeaponQuery, Error, &Fixture.Rules))) return false;
+    for (const FRunItemShopOffer& Offer : Shop.Offers) TestEqual(TEXT("Each offer retains the authored color independently of item sampling"), Offer.Item.RarityTag, Offer.Item.CatalogRarityTag);
+    TStrongObjectPtr<URunSaveGame> Save(NewObject<URunSaveGame>());
+    Save->WeaponSkillRules = Fixture.Rules;
+    Save->ItemShopState = Shop;
+    Save->ItemShopState.Offers[0].bSold = true;
+    Save->Party.AddDefaulted_GetRef().Items.Add(Shop.Offers[0].Item);
+    TArray<uint8> Bytes;
+    if (!TestTrue(TEXT("Authored grades and purchased copies serialize through Unreal SaveGame"), UGameplayStatics::SaveGameToMemory(Save.Get(), Bytes))) return false;
+    TStrongObjectPtr<URunSaveGame> Restored(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+    if (!TestNotNull(TEXT("Authored-grade item data deserializes"), Restored.Get())) return false;
+    if (!TestTrue(TEXT("Continue validates saved grades and skill choices without consulting the current CSV"), RunItemShopCatalog::Validate(Restored->ItemShopState, Error, &Restored->WeaponSkillRules))) return false;
+    TestTrue(TEXT("Purchased copy identity grade skills and sold stock remain frozen"), Restored->Party.Num() == 1 && Restored->Party[0].Items.Num() == 1 && Restored->ItemShopState.Offers[0].bSold && RunItemShopCatalog::IsSameDefinition(Restored->Party[0].Items[0], Shop.Offers[0].Item));
+    for (int32 Index = 0; Index < Shop.Offers.Num(); ++Index) TestTrue(TEXT("Saved offers preserve their complete authored and generated metadata"), RunItemShopCatalog::IsSameDefinition(Restored->ItemShopState.Offers[Index].Item, Shop.Offers[Index].Item));
     return true;
 }
 

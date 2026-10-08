@@ -651,3 +651,15 @@ TODO 29절의 확정 정책 중 스킬 소지 상한 제거를 구현했다. `Un
 재생성된 `Automation_ProjectA.sln`은 기존 줄의 내용·개수가 같고 순서만 변경됐으며 함께 반영했다. TODO의 기존 채택 체크 7개와 사용자 확인 항목을 보존하고 완료 작업 체크를 추가하지 않았다. 문서 10개의 로컬 파일·앵커 링크 646개와 전체 diff 정적 검사를 통과했다.
 
 UE 5.8.3 `Build.bat -ProjectFiles -Project="C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject" -Game -Engine`은 9.67초, `Build.bat ProjectAEditor Win64 Development -Project="C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject" -WaitMutex -FromMsBuild -architecture=x64`는 UHT 포함 19개 작업·45.82초로 성공했다. 컴파일 오류·경고는 없으며 프로젝트 생성의 VS2022/.NET 10 안내는 기존 C++/Automation 솔루션 분리 조건이다. 근거는 `Saved/Logs/TodoRecommendedProjectFiles.log`·`Saved/Logs/TodoRecommendedBuild.log`, 문서 파일/앵커 검사는 `Saved/Automation/TodoRecommended/DocumentationValidation.json`에 기록한다. 게임·PIE·Unreal 자동화·에셋 작성/재로드는 실행하지 않았다. [제안 10의 실제 2PC 검색·초대·재접속 확인](TODO.md#4-1-2-제안-10-초대재접속관전)과 [제안 12의 로컬 회귀 실행·온라인 구현](TODO.md#4-2-2-제안-12-온라인-snapshot과-상대-선정)은 남아 있다.
+
+### 9-26 2026-10-08 에셋별 아이템 등급
+
+사용자의 에셋 외형별 등급 분류 요청에 따라 제안 16·17의 5색·무기당 1스킬·사본 생성 시 확정 정책을 유지하고 새 Run의 등급 선정만 에셋별 고정값으로 변경했다. [무기 CSV](../DataCatalogs/WEAPON_ASSETS.csv) 289행에 `등급`·`분류 근거`를 추가했다. 흰색 62·초록색 110·파란색 95·보라색 20·주황색 2개이며 기준은 [GAME_DESIGN 2-4-4](GAME_DESIGN.md#2-4-4-에셋별-등급-분류)를 따른다. 기존 행 순서·종류·경로·이름·가격 5열은 유지했다. 가격 1G·상품 후보 가중치·전투 수치·장착 지원 범위는 변경하지 않았다.
+
+엔진을 실행하지 않고 uasset에 저장된 PNG/JPEG 미리보기 288개를 추출하여 직접 비교했다. 자체 미리보기가 없는 기존 `User_JeHoon/Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Sword`는 원본과 FBX `FileMD5=faa9e75e1e63051605a506c9eff7e332` 및 원본 재질 참조가 같음을 확인하고 원본의 초록색을 배정했다. 이는 현재 형상 동일성을 입증한 결과가 아니며 사본 외형 확인을 TODO에 남겼다. 원본 에셋 복제·수정·이동·삭제는 없고 289개 SHA256이 작업 전과 같다. 근거는 `Saved/Automation/ItemRarity/previews.json`·`classification.json`·`StaticVerification.json`, CSV 재읽기와 원래 열 보존 결과는 `catalog_verification.json`이다. `catalog_before.png`·`catalog_after.png`·`catalog_after_rare.png`로 카탈로그 표시도 확인했다.
+
+`FRunItemDefinition.CatalogRarityTag`를 카탈로그·사본에 저장하고 6/7열 CSV의 색 이름을 기존 `Item.Rarity.*`로 엄격 해석한다. 새 사본은 기준 등급의 무기 태그·등급 Query 후보에서 스킬만 추첨하며 후보가 부족해도 다른 등급이나 무관한 스킬로 대체하지 않는다. 4/5열 CSV와 기준 태그가 없는 기존 저장은 당시 무작위 등급 정책을 유지한다. 기존 저장 카탈로그·보유품·진열 사본을 현재 CSV로 이관하지 않으며 기준 등급 변조와 실패 시 카탈로그·출력 사본·난수 상태 변경을 막는다. 독립 정적 검토에서 시작 장비·상점·저장 경로의 추가 회귀를 찾지 못했다.
+
+`ProjectA.Run.Shop.CatalogAuthoredRarity`, `ProjectA.Run.WeaponSkills.AuthoredRarityAndFrozenSave` 회귀 소스를 추가하고 `DevelopmentRuleData`에 실제 카탈로그 등급·무기 후보 호환 검사를 보완했다. UE 5.8.3 `Build.bat ProjectAEditor Win64 Development -Project="C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject" -WaitMutex -FromMsBuild -architecture=x64`는 UHT 포함 19개 작업·46.50초로 성공했다. 로그는 `Saved/Logs/ItemRarityBuild.log`다. 추가 회귀는 컴파일만 수행했으며 게임·PIE·Unreal 자동화 테스트는 실행하지 않았다. [TODO 29절](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)의 새 Run 표시·구매/장착·Continue·기존 저장 보존과 사본 외형 확인은 미완료로 유지한다.
+
+문서 10개의 로컬 파일·앵커 링크 654개와 `git diff --check`를 통과했다. `verify_catalog.py`로 기존 5열·289개 원본 해시·등급과 근거의 전 행 일치·경로 중복 없음·UTF-8 BOM/CRLF를 확인했다. TODO의 채택 체크 7개와 미완료 항목을 유지하고 완료 작업 체크나 빈 절을 추가하지 않았다. 문서 검사 결과는 `Saved/Automation/TodoRecommended/DocumentationValidation.json`이다.

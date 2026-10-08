@@ -588,6 +588,45 @@ bool FRunItemShopCatalogPriceTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopCatalogRarityTest, "ProjectA.Run.Shop.CatalogAuthoredRarity", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunItemShopCatalogRarityTest::RunTest(const FString& Parameters)
+{
+    const TCHAR* ColorNames[] = {TEXT("흰색"), TEXT("초록색"), TEXT("파란색"), TEXT("보라색"), TEXT("주황색")};
+    const FName ColorTags[] = {TEXT("Item.Rarity.White"), TEXT("Item.Rarity.Green"), TEXT("Item.Rarity.Blue"), TEXT("Item.Rarity.Purple"), TEXT("Item.Rarity.Orange")};
+    for (const bool bHasRationale : {false, true})
+    {
+        FString Csv = bHasRationale ? TEXT("무기 종류,위치,에셋 이름,가격(G),게임 내 이름,등급,분류 근거\n") : TEXT("무기 종류,위치,에셋 이름,가격(G),게임 내 이름,등급\n");
+        for (int32 Index = 0; Index < 5; ++Index) Csv += FString::Printf(TEXT("검,/Game/Test,Weapon_%d,1,등급 검증 %d,%s%s\n"), Index, Index, ColorNames[Index], bHasRationale ? TEXT(",\"원본 형태, 장식 확인\"") : TEXT(""));
+        TArray<FRunItemDefinition> Catalog;
+        FText Error;
+        if (!TestTrue(TEXT("Both authored rarity CSV schemas retain five source definitions"), RunItemShopCatalog::LoadFromString(Csv, Catalog, Error) && Catalog.Num() == 5)) return false;
+        for (int32 Index = 0; Index < Catalog.Num(); ++Index)
+        {
+            const FRunItemDefinition& Item = Catalog[Index];
+            TestEqual(TEXT("Authored Korean colors resolve to existing gameplay rarity tags"), Item.CatalogRarityTag, FGameplayTag::RequestGameplayTag(ColorTags[Index]));
+            TestTrue(TEXT("Catalog parsing does not generate item copies or change prices"), Item.GenerationVersion == 0 && !Item.ItemInstanceId.IsValid() && !Item.RarityTag.IsValid() && Item.GrantedSkills.IsEmpty() && Item.Price == 1);
+            FRunItemDefinition Legacy = Item;
+            Legacy.CatalogRarityTag = FGameplayTag();
+            TestFalse(TEXT("The frozen authored grade is part of base catalog identity"), RunItemShopCatalog::IsSameBaseDefinition(Item, Legacy));
+        }
+        const TArray<FRunItemDefinition> Before = Catalog;
+        for (const FString InvalidColor : {TEXT(""), TEXT(" "), TEXT("검은색"), TEXT("Item.Rarity.White"), TEXT("흰색 ")})
+        {
+            TestFalse(TEXT("Empty or unsupported authored grades cannot fall back to random rarity"), RunItemShopCatalog::LoadFromString(Csv.Replace(TEXT("흰색"), *InvalidColor), Catalog, Error));
+            if (!TestEqual(TEXT("Rejected rarity CSV preserves the complete previous catalog size"), Catalog.Num(), Before.Num())) return false;
+            for (int32 Index = 0; Index < Catalog.Num(); ++Index) TestTrue(TEXT("Rejected rarity CSV preserves every original catalog definition"), RunItemShopCatalog::IsSameDefinition(Catalog[Index], Before[Index]));
+        }
+        TestFalse(TEXT("Unknown rarity column headers are rejected"), RunItemShopCatalog::LoadFromString(Csv.Replace(TEXT("등급,분류"), TEXT("알수없음,분류")).Replace(TEXT("등급\n"), TEXT("알수없음\n")), Catalog, Error));
+        if (bHasRationale)
+        {
+            TestFalse(TEXT("Unknown rationale column headers are rejected"), RunItemShopCatalog::LoadFromString(Csv.Replace(TEXT("분류 근거"), TEXT("알수없음")), Catalog, Error));
+            TestFalse(TEXT("Declared rationale columns cannot contain only whitespace"), RunItemShopCatalog::LoadFromString(Csv.Replace(TEXT("원본 형태, 장식 확인"), TEXT(" ")), Catalog, Error));
+        }
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopPersistenceTest, "ProjectA.Run.Shop.ItemPurchaseRerollAndReload", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FRunItemShopPersistenceTest::RunTest(const FString& Parameters)

@@ -23,6 +23,11 @@ struct PROJECTA_API FRunItemDefinition
     UPROPERTY(BlueprintReadOnly, Category = "Shop")
     int32 Price = 1;
 
+    // Freeze authored rarity in the Run catalog; an absent tag preserves legacy random rarity selection.
+    // 작성된 등급을 Run 카탈로그에 고정하며 태그가 없으면 기존 무작위 등급 선정을 유지합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Item|Generation")
+    FGameplayTag CatalogRarityTag;
+
     // Generated copies keep their original result; version zero preserves legacy catalog items.
     // 생성 사본은 최초 결과를 유지하며 버전 0은 기존 카탈로그 아이템을 보존합니다.
     UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Item|Generation")
