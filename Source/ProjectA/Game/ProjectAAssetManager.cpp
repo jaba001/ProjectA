@@ -2,6 +2,8 @@
 
 #if WITH_EDITOR
 #include "Game/Run/RunItemShopCatalog.h"
+#include "DataAsset/TargetRunDefinitionDataAsset.h"
+#include "Game/Run/RunLevelDesign.h"
 #include "Game/Run/RunRecoveryTypes.h"
 #include "Misc/PackageName.h"
 
@@ -38,6 +40,30 @@ void UProjectAAssetManager::ModifyCook(TConstArrayView<const ITargetPlatform*> T
             continue;
         }
         PackagesToCook.AddUnique(Package);
+    }
+
+    // Cook every authored monster candidate, including candidates absent from this seed's roster.
+    // 이 시드의 편성에 뽑히지 않은 후보까지 제작된 몬스터 카탈로그 전체를 쿠킹에 포함합니다.
+    FRunTargetState Monsters;
+    Monsters.SchemaVersion = 1;
+    Monsters.Groups = GetDefault<UTargetRunDefinitionDataAsset>()->Groups;
+    if (!RunLevelDesign::Load(Monsters, 4, Error))
+    {
+        UE_LOG(LogProjectAAssetManager, Error, TEXT("Cannot collect monster catalog packages for cooking: %s"), *Error.ToString());
+        return;
+    }
+    for (const FRunMonsterDefinition& Monster : Monsters.LevelDesign.Catalog)
+    {
+        const FName Packages[] = {Monster.UnitClass.GetLongPackageFName(), Monster.Skill.GetLongPackageFName()};
+        for (const FName Package : Packages)
+        {
+            if (PackagesToNeverCook.Contains(Package) || !FPackageName::DoesPackageExist(Package.ToString()))
+            {
+                UE_LOG(LogProjectAAssetManager, Error, TEXT("Monster catalog package is missing or excluded from cooking: %s"), *Package.ToString());
+                continue;
+            }
+            PackagesToCook.AddUnique(Package);
+        }
     }
 }
 #endif

@@ -43,6 +43,9 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
         // 표시 중인 재고만 복제하고 고정된 후보 카탈로그는 서버에 보관합니다.
         View.ItemShopState.Catalog.Reset();
         View.GoldRewardState = Run->GetGoldRewardState();
+        const FRunLevelDesignState& LevelDesign = Run->GetTargetRunState().LevelDesign;
+        const int32 CompletedCount = View.CompletedNodes.Num();
+        if (View.Phase == ERunPhase::Result && View.LastResult == ECombatResult::Victory && CompletedCount % 2 == 1 && LevelDesign.SchemaVersion == 1 && LevelDesign.Rules.IsValidIndex(CompletedCount / 2)) View.VictoryRestHP = LevelDesign.Rules[CompletedCount / 2].RestHP;
         View.GoldRewardRecipientIds = Run->GetGoldRewardRecipientIds();
         View.bCanContinueAfterRewards = Run->CanContinueAfterRewards();
         const bool bOrdinarySinglePlayer = !Run->IsManagedRun() && Run->GetRunIdentity().Origin == ERunIdentityOrigin::LocalDevelopment && Run->GetRunIdentity().OriginalParticipants.Num() == 1;

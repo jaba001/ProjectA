@@ -101,7 +101,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 **전투 승리 보상**
 
-`WeaponSkillAcquisitionVersion=1`의 일반 Target Run은 다음 PvE 승리부터 `FRunGoldRewardState` 스키마 2에 노드·아이템 3후보·공통 골드·캐릭터별 수령 기록을 저장하고 복제 뷰로 표시한다. 공통 골드는 저장된 해당 `Group.GoldChoices`의 최솟값~최댓값 사이 정수를 양 끝값을 포함해 추첨하며 선택 인덱스와 무관하다. 기본 묶음 i(0~9)는 `5+i~10+iG`다. 아이템은 저장된 `FRunItemShopState.Catalog/RarityProbabilities`와 무기 스킬 규칙의 공통 추첨·사본 생성 경로를 사용하고 직전 상점의 `ActiveItemQuery`는 적용하지 않는다. 중복 없는 에셋 3개를 제시하며 선택한 사본은 자동 장착 없이 가방에 추가한다.
+`WeaponSkillAcquisitionVersion=1`의 일반 Target Run은 다음 PvE 승리부터 `FRunGoldRewardState` 스키마 2에 노드·아이템 3후보·공통 골드·캐릭터별 수령 기록을 저장하고 복제 뷰로 표시한다. 공통 골드는 저장된 해당 `Group.GoldChoices`의 최솟값~최댓값 사이 정수를 양 끝값을 포함해 추첨하며 선택 인덱스와 무관하다. 새 기본 난이도의 구간별 범위는 [5-1절](#5-1-목표-run과-회복-시험-데이터)을 따르며 이전 Run의 `5+i~10+iG` 등 저장된 값은 유지한다. 아이템은 저장된 `FRunItemShopState.Catalog/RarityProbabilities`와 무기 스킬 규칙의 공통 추첨·사본 생성 경로를 사용하고 직전 상점의 `ActiveItemQuery`는 적용하지 않는다. 중복 없는 에셋 3개를 제시하며 선택한 사본은 자동 장착 없이 가방에 추가한다.
 
 서버는 연결 소유자·현재 Human·노드·선택 인덱스·미수령·아이템 사본·잔액 범위를 검증하고 아이템·골드·수령을 같은 저장 후보로 확정한다. 결과 저장 실패의 재시도는 캐시된 아이템·골드를 유지하고, 수령 저장 실패는 가방·잔액·수령 상태를 바꾸지 않는다. 파티 승리 시 사망한 직접 조작 캐릭터도 수령할 수 있으며 AI는 제외한다. 보상 대상 인간이 모두 선택해야 Continue를 허용한다. Snapshot과 패배에는 보상을 지급하지 않는다.
 
@@ -131,7 +131,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 새 일반 Target Run을 구성하는 `ConfigureTargetRun`은 [ITEM_RARITY_PROBABILITIES.csv](../DataCatalogs/ITEM_RARITY_PROBABILITIES.csv)를 읽어 `FRunItemShopState.RarityProbabilities`에 확률 스키마 1을 저장한다. 각 항목에는 `RarityTag`와 정수 0~10000의 `ProbabilityBasisPoints`를 보관하며 확률의 전체 합은 10000이다. 최초 진열·재입장·리롤마다 적격 후보의 등급을 먼저 추첨하고 같은 등급 안에서 에셋을 균등 추첨한다. 동일 진열의 에셋 중복은 금지하고 등급 반복은 허용한다. 빈 등급·소진·0%는 제외하여 다시 정규화하고 기본상점은 양수 확률의 적격 에셋이 5개 미만이면 기존 상태를 보존하며 실패한다. 전문 상점은 저장된 Query 안에서 적격 에셋 수와 5 중 작은 수를 진열한다. 전투 보상도 같은 저장 카탈로그·확률의 공통 선택을 사용하되 직전 상점 Query 없이 중복 없는 에셋 3개를 추첨한다. CSV 변경은 이후 새 일반 Run에만 반영한다. 확률 스키마 0·빈 목록의 이전 저장은 고정 등급 도입 이후 생성분도 기존 아이템 균등 추첨을 유지하며 prototype·개발 협동·지정된 직업별 시작 장비의 선택은 변경하지 않는다. [확률표와 적용 범위](GAME_DESIGN.md#2-4-5-아이템-등급별-등장-확률)
 
-프로젝트 루트 `DataCatalogs/`에 무기·아이템 등급 확률·스킬 이펙트·스킬 생성 현황·SFX·인카운터 풀·몬스터 CSV를 함께 보관한다. 런타임은 `DataCatalogs/WEAPON_ASSETS.csv`·`DataCatalogs/ITEM_RARITY_PROBABILITIES.csv`·`DataCatalogs/ENCOUNTER_POOL.csv`를 읽고 빌드의 UFS RuntimeDependency에도 세 경로를 지정한다. VFX·SFX CSV는 원본 설치·퇴역 이력과 새 생성 상태를 기록하는 목록이다. 기존 카탈로그 생성 도구는 폐기 상태를 유지하고 새 생성 입력은 `DrGameSkillSpecs.json`을 사용한다.
+프로젝트 루트 `DataCatalogs/`에 무기·아이템 등급 확률·스킬 이펙트·스킬 생성 현황·SFX·인카운터 풀·몬스터 CSV를 함께 보관한다. 런타임은 `WEAPON_ASSETS.csv`·`ITEM_RARITY_PROBABILITIES.csv`·`ENCOUNTER_POOL.csv`와 새 기본 난이도의 `MONSTER_STATS.csv`·`MONSTER_SPAWN_PROBABILITIES.csv`·`MONSTER_ENCOUNTERS.csv`를 읽고 같은 여섯 경로를 빌드의 UFS RuntimeDependency에 지정한다. VFX·SFX·`MONSTER_ASSETS.csv`는 원본·제작 상태를 기록하는 자료 목록이다. 기존 카탈로그 생성 도구는 폐기 상태를 유지하고 새 생성 입력은 `DrGameSkillSpecs.json`을 사용한다.
 
 CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한다. 앞뒤 공백·선행 `+`·선행 0은 허용하며 소수·접미 문자·쉼표·지수 표기·범위 초과는 카탈로그 전체를 거절하고 기존 출력을 보존한다. 기존 4/5열 CSV와 저장된 카탈로그의 해석을 유지하며 같은 가격 검증을 6/7열에도 적용한다.
 
@@ -165,7 +165,7 @@ CSV 열은 `인카운터 ID,게임 내 이름,상점 종류,속성,분류 태그
 - 외형은 `FCharacterAppearanceSelection.BodyId`로 선택하고 기존 appearance 구조를 통해 Run·Snapshot·체크포인트·복제에 전달한다. `UCharacterAppearanceCatalog.BodyVariants` 배열의 원본 메시를 공통 `UCharacterAppearanceComponent`가 적용하며 기존 저장에 `BodyId`가 없으면 남자 기본값을 사용한다. ROG 의상 UI·착용은 중지하고 `ItemIds`·103개 항목·원본 에셋은 향후 아이템용으로 보존한다. 마법사 Blueprint의 고정 스태프 표시는 제거하고 실제 시작 장비로 표시한다. 기존 `LegacyEnemyClasses` 체크포인트 호환·래그돌을 유지하며 장비 능력치 연결과 개발용 협동 로비의 캐릭터 생성 UI는 이번 범위에 포함하지 않는다.
 - 수정하지 않은 이름은 직업 표시명과 슬롯 번호를 사용한다. 개별 이름 변경은 `SetSlotCharacterName`으로 반영한다.
 - 네 직업의 현재 시작값은 HP 100·속도 10이다. 첫 스폰은 직업 정의의 HP와 속도를 사용하고 이후 전투는 저장한 결과 HP를 유지한다. HP 0인 멤버는 다음 전투에 스폰하지 않는다. 목표 Run은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 시험 성장을 공통 직업 해석에 적용하며 최종 밸런스·피해 보정 공식은 별도다.
-- 전투 속도는 GAS `Speed`를 직접 사용한다. 기본 아군 속도는 10, 일반 `AEnemyUnit`은 5다. 일반 적 HP 150·AP 2는 유지하고 Snapshot 적은 스폰 후 저장된 속도를 적용한다. 힘·민첩·지능은 실행 속성에서 제거했다.
+- 전투 속도는 GAS `Speed`를 직접 사용한다. 기본 아군 속도는 10, 일반 `AEnemyUnit`의 클래스 기본값은 HP 150·AP 2·속도 5다. 새 기본 Run의 몬스터와 Snapshot은 스폰 후 저장된 난이도 수치를 적용한다. 힘·민첩·지능은 실행 속성에서 제거했다.
 
 `UPartyDefinitionDataAsset::IsDataValid`는 Unreal Data Validation에서 동일한 `ResolveProfession` 검사를 사용한다. 에셋 경로·직업 ID와 함께 누락 또는 Abstract/Deprecated 클래스, 유효하지 않은 HP/AP와 속도, 빈·누락·중복 시작 스킬과 잘못된 라운드 프로필을 보고한다. 전투 Actor의 `CombatClass` → `PlayerUnitClasses` → 명시 fallback 순서를 유지한다. 직업 정의용 `ProfessionClass`는 별도로 필수이며 목록의 ClassId와 일치해야 한다. 실제 선택된 전투 클래스만 검사하며 잘못된 명시 클래스를 fallback으로 대체하지 않는다. 제작 파티 에셋을 Content Browser에서 선택해 **Validate Assets**로 사전 확인할 수 있으며, 전투 실행 검증과 구분한다.
 
@@ -306,15 +306,15 @@ Gameplay의 전장·Grid·GameplayCamera·물리 바닥·NavBounds를 복제하�
 
 [MONSTER_ASSETS.csv](../DataCatalogs/MONSTER_ASSETS.csv)는 현재 카탈로그 13개의 이름·구분·기본 편성 순서·원본 팩·Blueprint·메시·교체 재질 경로를 정리한 UTF-8 BOM 목록이다. 명세와 저장 재로드 기록을 대조하고 에셋 파일 존재를 확인했다. 기본 편성 순서는 `DA_DefaultEncounter`의 4종 편성을 뜻하며 빈칸은 미포함, 교체 재질 경로의 빈칸은 별도 지정 없음이다. 기존 `BP_EnemyUnit`의 ‘스켈레톤 검병’은 목록용 설명명이며 원본 메시 기준은 [WarriorContentPaths.py](../Source/ProjectAEditor/Scripts/WarriorContentPaths.py)의 `ENEMY_SOURCE`다. CSV 편집은 게임 설정에 자동 반영되지 않는다.
 
-[MONSTER_STATS.csv](../DataCatalogs/MONSTER_STATS.csv)는 13종의 기본 HP 150·AP 2·SAP 1·속도 5·보호막 0·이동거리 1과 공격 수치·선딜·스킬 경로를 정리한다. 기본값·작성 명세·과거 재로드 기록을 대조한 자료이며 현재 에셋을 엔진으로 재조회한 결과가 아니다. DebugCombat의 HP 10000 시험 설정과 일반 적의 기본 스탯을 구분한다.
+[MONSTER_STATS.csv](../DataCatalogs/MONSTER_STATS.csv)는 기존 13종 ID를 유지한 13열의 새 기본 Run 입력이다. 클래스·지역/역할 GameplayTag·종별 HP·AP·SAP·속도·이동거리·원본 스킬 경로를 저장한다. 현재 HP 65~220·속도 3~12를 구간 배율과 결합하며 AP 2·SAP 1·이동거리 1은 유지한다. 공격 피해 50·선딜은 참고 열로만 읽고 원본 스킬 DataAsset을 변경하지 않는다. 클래스 기본값·DebugCombat HP 10000과 새 Run 수치를 구분한다.
 
-[MONSTER_SPAWN_PROBABILITIES.csv](../DataCatalogs/MONSTER_SPAWN_PROBABILITIES.csv)는 현재 고정 편성의 출현 묶음·횟수와 런타임 미적용 권장 가중치를 구분한다. 권장값은 Wolf 15, Orc·Spider·Boar 각 12, Bear 10, Troll·Crocodile·Toad 각 8, Werewolf·SnowWolf 각 5, SnowBear 3, Golem 2, BP_EnemyUnit 0이며 합계 100이다. 정규화 확률은 공통 후보 전체가 적격인 첫 1슬롯 기준이며 `해당 가중치 / 적격 가중치 합 × 100`으로 계산한다. CSV에는 계산 결과를 기록하므로 가중치 편집 시 확률도 다시 계산해야 한다. 향후 태그 조건으로 후보를 제한하면 남은 가중치로 재정규화해야 하며 최종 밸런스나 현재 등장 확률로 해석하지 않는다. 현재 기본 편성은 [5-1절](#5-1-목표-run과-회복-시험-데이터)을 따른다.
+[MONSTER_SPAWN_PROBABILITIES.csv](../DataCatalogs/MONSTER_SPAWN_PROBABILITIES.csv)는 같은 13종 ID의 활성 여부·출현 가중치·전체 후보 기준 확률을 관리한다. 활성 12종은 Wolf 15, Orc·Spider·Boar 각 12, Bear 10, Troll·Crocodile·Toad 각 8, Werewolf·SnowWolf 각 5, SnowBear 3, Golem 2로 합계 100이며 개발용 `BP_EnemyUnit`은 비활성·0이다. CSV 확률은 전체 양수 후보 기준이고 실제 추첨은 구간 Query·선봉·이미 선정한 동종을 반영한 남은 후보 가중치로 재정규화한다. 데이터 합류·저장·구간 수치는 [5-1절](#5-1-목표-run과-회복-시험-데이터)을 따른다.
 
-[MonsterContentSpecs.json](../Source/ProjectAEditor/Scripts/MonsterContentSpecs.json)은 오크 망치병·동굴 트롤·늑대인간·바위 골렘과 늑대·곰·멧돼지·거미·악어·두꺼비 10종, 설원 늑대·설원 곰 재질 변형 2개의 프로젝트 전용 Blueprint를 정의한다. `DA_DefaultEncounter`의 신규 기본 편성은 `Orc`·`Troll`·`Wolf`·`Golem` 4개다. 기존 `BP_EnemyUnit`과 근접 공격은 보존하고 디버그 적군 목록의 13번째 항목으로 제공한다. 별도 확률 추첨·종별 밸런스 정책은 추가하지 않는다.
+[MonsterContentSpecs.json](../Source/ProjectAEditor/Scripts/MonsterContentSpecs.json)은 오크 망치병·동굴 트롤·늑대인간·바위 골렘과 늑대·곰·멧돼지·거미·악어·두꺼비 10종, 설원 늑대·설원 곰 재질 변형 2개의 프로젝트 전용 Blueprint를 정의한다. `DA_DefaultEncounter`의 기본 편성은 `Orc`·`Troll`·`Wolf`·`Golem` 4개다. 기존 `BP_EnemyUnit`과 근접 공격은 보존하고 디버그 적군 목록의 13번째 항목으로 제공한다. 새 기본 Run의 CSV 편성은 이 제작 명세와 원본 에셋을 수정하지 않고 스폰 시 적용한다.
 
 원본 `/Game/Fantasy_Pack`·`/Game/StylizedCreaturesBundle`의 메시·Skeleton·PhysicsAsset·재질·시퀀스를 직접 참조한다. 새 생물 팩은 약 661MiB이며 Git에서 무시되는 원본은 다른 PC에서도 설치가 필요하다. 새 Blueprint·BlendSpace·AnimBlueprint·몽타주는 `/Game/User_JeHoon/` 아래 원본 팩·하위 구조를 유지하고, 공격 Skill DataAsset은 `Blueprint/DataAsset/Skills/Monsters/`에 작성한다. 늑대인간·골렘의 Manny 비무장 공격 2개만 필수 리타깃 결과로 작성하며 원본 메시·재질·애니메이션을 복제하지 않는다. 설원 변형은 해당 늑대/곰의 애니메이션을 공유한다.
 
-`UMonsterAnimInstance.GroundSpeed`는 라운드가 제공하는 실제 수평 속도로 Idle/Walk/Run을 선택하고 `DefaultSlot`으로 공격을 표시한다. 미등록 슬롯은 UE 기본 `DefaultGroup` 해석을 사용하며 원본 Skeleton 패키지를 저장하지 않는다. `ResolveRoundSkill`의 기존 기본 비무장 공격 피해 50·AP 1·GAS 효과와 태그/Query 조건을 유지하고 몬스터별 몽타주·발동 시간만 연결한다. 적의 기본 HP 150·AP 2·SAP 1·속도 5·보호막 0·이동거리 1, 서버 이동·발동·피격과 기존 래그돌을 유지한다. 생성 위치는 각 캡슐 반높이에 맞춰 타일에 배치한다.
+`UMonsterAnimInstance.GroundSpeed`는 라운드가 제공하는 실제 수평 속도로 Idle/Walk/Run을 선택하고 `DefaultSlot`으로 공격을 표시한다. 미등록 슬롯은 UE 기본 `DefaultGroup` 해석을 사용하며 원본 Skeleton 패키지를 저장하지 않는다. `ResolveRoundSkill`의 기존 기본 비무장 공격 피해 50·AP 1·GAS 효과와 태그/Query 조건을 유지하고 몬스터별 몽타주·발동 시간만 연결한다. 적 클래스의 기본 HP 150·AP 2·SAP 1·속도 5·보호막 0·이동거리 1은 유지하며 새 기본 Run만 저장된 난이도를 스폰 후 적용한다. 서버 이동·발동·피격과 기존 래그돌을 유지하고 각 캡슐 반높이에 맞춰 타일에 배치한다.
 
 `EnemyCatalogClasses`는 소프트 클래스 13개를 보관하며 기존 2/10전투 경로는 `EnemyUnitClasses`의 기본 편성 4개를 로드하고 새 목표 Run은 저장한 묶음별 편성을 사용한다. 디버그 목록 조회 시 유효한 소프트 카탈로그와 기본 편성을 중복 없이 해석한다. `ConfigureMonsterContent.py`가 명세를 적용하고 `-MonsterVerifyOnly`는 저장본을 읽기 전용으로 검사한다. Development Editor / Win64 컴파일과 작성·저장·독립 재로드 정적 검사를 통과했다. 작성 근거는 `Saved/Automation/Monsters/Configuration.json`·`Reload.json`이다. 2026-10-04 UE 5.8.3 실제 PIE에서 13종의 접근·몽타주·대상 방향·복귀·원래 GAS 피해/AP와 사망/래그돌/타일 해제·기본 편성 초기화를 통과했다. 초기 52장·사망 2.5초 후 13장의 총 65장에서 크기·재질·지면 접촉·공격 방향을 직접 확인했다. 2.5초의 엔진 수면 표본은 깨어 있는 몸체 12종·수면 1종이며 최종 안착 판정은 아니다. 원본 물리를 유지한 8초 추가 13장의 총 78장 검수를 통과했다. 8초에는 수면 9종·깨어 있는 몸체 4종이었으며 전체 최종 안착은 미확인이다. [최신 검수 이력](HISTORY.md#9-17-2026-10-04-ue-58-todo-실행-검수)·[추가 확인](TODO.md#12-몬스터-콘텐츠-확인)
 
@@ -476,11 +476,17 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 
 ### 5-1 목표 Run과 회복 시험 데이터
 
-`UTargetRunDefinitionDataAsset`의 기본 정의 또는 PartyDefinition의 선택적 정의를 새 싱글 Run 생성 때 값으로 고정한다. `FRunTargetState` schema 1은 10묶음의 적 편성·로컬 Snapshot·성장·골드 후보·인카운터 선택과 회복 규칙을 보존한다. 각 전투 전에 후보 3개 중 하나를 고르는 인카운터를 세 번 방문한다. 새 일반 Run은 CSV 기반 인카운터 선택 정책·가중치·시드와 GameplayTagQuery를 추가로 저장하며 이전 정책의 목표 Run은 고정 순환을 유지한다. [인카운터 저장과 추첨](#3-2-상점-인카운터)
+`UTargetRunDefinitionDataAsset`의 기본 정의 또는 PartyDefinition의 선택적 정의를 새 싱글 Run 생성 때 값으로 고정한다. `FRunTargetState` schema 1은 10묶음의 적 편성·로컬 Snapshot·성장·골드 후보·인카운터 선택과 회복 규칙을 보존한다. 각 전투 전에 후보 3개 중 하나를 고르는 인카운터를 세 번 방문하며 총 60선택·20전투의 80단계를 유지한다. 인카운터 선택은 별도 정책·가중치·시드·GameplayTagQuery를 저장한다. [인카운터 저장과 추첨](#3-2-상점-인카운터)
 
-새 일반 Run의 활성 후보는 기본·등급별·태그별 상점과 회복소·소모품상점·부활소이며 스킬상점을 제외한다. 기존 목표 Run 저장의 고정 후보는 그대로 유지한다. PvE 적은 기존 10종에서 묶음별 1~4마리로 지정하며, 아군의 최대 HP +5와 속도 +1은 PvE 승리마다 적용한다. 현재 HP를 자동 회복하지 않으며 Snapshot은 성장·아이템·골드를 지급하지 않는다. 묶음 i(0~9)에 저장된 골드 값은 5+i·7+i·10+i다. 무기 스킬 획득 버전 1은 이 범위에서 공통 골드를 추첨해 아이템 선택과 함께 지급하고 버전 0은 기존 골드 3택1을 유지한다. 최종 난이도와 구분한 사용자 위임 시험값이다.
+2026-10-08 새 기본 Run은 `ConfigureTargetRun`에서 몬스터 CSV 3개를 읽어 `FRunTargetState.LevelDesign` 버전 1에 시드·시작 시 생성 파티 인원·카탈로그·10개 규칙을 저장한다. `FTargetRunGroup.EnemyRoster`에 선정된 클래스·스탯·원본 스킬을 고정하고 기존 `EnemyClasses`와 순서를 일치시킨다. 명시적인 `PartyDefinition.TargetRunDefinition`은 CSV로 덮어쓰지 않는다. 이전 저장과 맞춤 정의의 LevelDesign 버전 0은 새 필드가 비어 있는 기존 편성·성장·보상·휴식 없는 정책을 유지한다. 재개와 검증은 저장된 입력을 사용하며 CSV 변경·파티 사망으로 편성을 재추첨하지 않는다.
 
-[MONSTER_ENCOUNTERS.csv](../DataCatalogs/MONSTER_ENCOUNTERS.csv)는 기본 정의의 10 PvE 묶음·총 25개체를 4슬롯 순서로 정리한다. 묶음 i(0~9)의 PvE 진행 단계는 `4+8i`, 전투 순번은 `2i+1`이다. 기재 편성의 등장 100%는 해당 묶음 도달을 조건으로 하며 무작위 추첨 확률이 아니다. PvE 적에게 단계별 스탯 성장을 적용하지 않는다. 위 HP·속도 성장은 아군 규칙이다. CSV 3종은 자료 정리이며 현재 고정 편성·기존 Run 저장·런타임 입력을 변경하지 않는다.
+[MONSTER_ENCOUNTERS.csv](../DataCatalogs/MONSTER_ENCOUNTERS.csv)의 17열·10행은 숲 1~2·늪 3~4·동굴 5~6·설원 7~8·최종 9~10묶음의 태그 조건·선봉·기준 적 수·HP/속도 배율·골드·성장·휴식·Snapshot 수치를 정의한다. 구간 7은 기준 적 수를 3에서 2로 줄인 재정비 구간이다. 파서가 ID 합류·중복·수치·등록 태그·후보 부족을 검사하고 필수/제외 조건을 실제 GameplayTagQuery로 실행한다. 공통 `GameplayTagCandidateSelection`은 적격 후보의 가중치를 재정규화하며 같은 묶음의 동종을 중복하지 않는다. 5묶음은 적격 `Monster.Role.Brute`, 10묶음은 `Monster.Role.Boss`를 첫 슬롯에 우선 선정하고 남은 슬롯을 채운다. 현재 CSV에서는 각각 트롤·골렘이 선봉이다.
+
+시작 파티 인원 `P`는 생성된 1~4명으로 고정한다. PvE와 Snapshot 인원은 각각 `ceil(기준 인원 × P / 4)`, PvE HP는 `ceil(종별 HP × 구간 HP 배율 × (0.4 + 0.15 × P))`, 속도는 `종별 속도 × 구간 속도 배율`이다. Snapshot HP·속도는 구간 값을 그대로 사용하고 기존 클래스·외형·스킬을 유지한다. PvE의 AP 2·SAP 1·이동거리 1과 기존 공격 피해 50·공격 AP 1·선딜·스킬 에셋은 변경하지 않는다. 생성 시 `ConfigureProfession/ConfigureMoveRange`로 저장된 스탯·원본 스킬을 적용한다. 체크포인트 schema 3의 기존 필드를 재사용하며 PvE 적의 수·순서·클래스·최대 스탯·스킬을 고정 편성과 대조하고 현재 HP·잔여 AP/SAP·사망 상태는 보존한다.
+
+PvE 승리마다 아군 최대 HP +5·속도 +1을 적용하고 살아 있는 모든 파티원만 구간별 휴식 HP 20·20·25·25·30·30·35·35·40·40을 성장 후 최대 HP까지 회복한다. 사망자는 HP 0을 유지하며 Snapshot·패배에는 성장·보상·휴식이 없다. 회복 전에 기존/최종 HP를 현재 상한으로 검사하고 결과 후보 안에서만 반영하므로 잘못된 값을 보정으로 숨기거나 저장 실패 시 먼저 회복하지 않는다. 아이템 선택과 휴식 적용은 별개다.
+
+아이템 3택1과 공통 골드의 규칙은 유지하며 구간별 골드는 3~5·3~6·4~7·4~8·5~9·5~10·6~11·6~12·7~13·8~15G다. 양 끝값을 포함한 균등 정수 추첨의 10회 기대 합계는 73.5G이며 시작 10G와 현재 아이템 가격 1G를 유지한다. 이전 Run의 `5+i/7+i/10+i` 등 저장된 범위·이미 제시된 보상·수령 기록은 변경하지 않는다. 이 난이도·경제 값은 사용자 위임 개발 초기값이며 강제 승리 없는 완주·실제 생존률·최종 밸런스는 [TODO 26절](TODO.md#26-재개-후-로컬-검수와-저장-보완)의 사용자 확인 대상이다. [구현·검증 이력](HISTORY.md#9-31-2026-10-08-csv-기반-레벨-난이도)
 
 회복 소모품은 정식 `DA_HealthPotion`의 GAS Instant Heal과 `Item.Consumable.Healing` 태그를 사용한다. HP 25/AP 1, 시작 1개·추가 구입 1G이며 습득 스킬 목록과 별도로 보관하며 소모품 종류는 최대 5개로 제한한다. 일반 스킬 카탈로그·장착·Snapshot 스킬 필드는 `Item.Consumable` 태그를 거절하고 소모품 재고만 정식 DA 경로를 보존한다. 본인 생존 Human의 부상 상태에서만 사용할 수 있고 실제 회복 발동 성공 후 수량 1개를 차감한다. 발동 전 사망·중단은 수량을 소모하지 않는다. 비용 차감 전 Ready 경계에 HP/AP·재고·정식 DA·명령을 함께 저장하며 복구 시 해당 경계부터 다시 실행한다. HP·재고는 다음 준비 완료 또는 결과 경계에서 함께 저장하고 진행 중 임의 시점 저장은 추가하지 않는다.
 

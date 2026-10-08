@@ -12,6 +12,7 @@
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunWeaponSkillRules.h"
+#include "Game/GameState/GameplayViewTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UnrealType.h"
@@ -304,11 +305,12 @@ bool FTargetRunDurableSyntheticResultsTest::RunTest(const FString& Parameters)
         else if (!TestTrue(TEXT("The explicit synthetic victory passes the production result/save validators"), Fixture.Run->CompleteEncounter(ECombatResult::Victory, FinalHP, FinalStock))) return false;
         if (!Fixture.ReloadBoundary(*this)) return false;
         TestEqual(TEXT("Each result persists exactly one new combat completion"), Fixture.Run->GetCompletedNodes().Num(), CombatIndex + 1);
-        TestEqual(TEXT("Result publication preserves the supplied HP instead of healing during growth"), Fixture.Run->GetPartyMembers()[0].CurrentHP, FinalHP[0]);
         FProfessionDefinition AfterGrowth;
         if (!Fixture.Run->ResolveMemberProfession(Fixture.Run->GetPartyMembers()[0], AfterGrowth, Fixture.Error)) return false;
         const bool bPve = CombatIndex % 2 == 0;
         const FTargetRunGroup& Group = FrozenTarget.Groups[CombatIndex / 2];
+        const float RestHP = bPve && FrozenTarget.LevelDesign.SchemaVersion == 1 ? FrozenTarget.LevelDesign.Rules[CombatIndex / 2].RestHP : 0.f;
+        TestEqual(TEXT("Only versioned PvE rest heals supplied survivor HP within the grown maximum"), Fixture.Run->GetPartyMembers()[0].CurrentHP, FMath::Min(AfterGrowth.MaxHP, FinalHP[0] + RestHP));
         TestEqual(TEXT("Only PvE results add the frozen maximum-HP growth"), AfterGrowth.MaxHP, BeforeGrowth.MaxHP + (bPve ? Group.MaxHPGrowth : 0.f));
         TestEqual(TEXT("Only PvE results add the frozen speed growth"), AfterGrowth.Speed, BeforeGrowth.Speed + (bPve ? Group.SpeedGrowth : 0.f));
         if (bPve)
@@ -347,6 +349,83 @@ bool FTargetRunDurableSyntheticResultsTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Menu Continue rejects the completed Run"), Fixture.Run->CanContinueStandaloneSavedRun(Fixture.Error));
     TestFalse(TEXT("Direct standalone loading also rejects completed progress"), Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error));
     TestTrue(TEXT("Rejected completion requests preserve the terminal bytes and in-memory completion"), CompletedBytes == Fixture.ReadBytes() && Fixture.Run->GetPhase() == ERunPhase::Complete);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTargetRunLevelRestTest, "ProjectA.Run.Target.LevelDesign.SurvivorRestAndAtomicRetry", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTargetRunLevelRestTest::RunTest(const FString& Parameters)
+{
+    FTargetRunTransactionFixture Fixture;
+    if (!TestTrue(TEXT("A default four-person target freezes a new level policy before its first PvE"), Fixture.InitializeEveryProfession() && Fixture.Run->GetTargetRunState().LevelDesign.SchemaVersion == 1 && Fixture.BeginNextSyntheticCombat())) return false;
+    const FRunTargetState FrozenTarget = Fixture.Run->GetTargetRunState();
+    const float RestHP = FrozenTarget.LevelDesign.Rules[0].RestHP;
+    if (!TestTrue(TEXT("The live default policy has positive survivor rest for this integration scenario"), RestHP > FrozenTarget.Groups[0].MaxHPGrowth)) return false;
+    const TArray<FRunPartyMember> BeforeParty = Fixture.Run->GetPartyMembers();
+    const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
+    TMap<int32, float> FinalHP;
+    TMap<int32, TArray<FRunConsumableStack>> FinalStock;
+    for (const FRunPartyMember& Member : BeforeParty)
+    {
+        FProfessionDefinition Profession;
+        if (!Fixture.Run->ResolveMemberProfession(Member, Profession, Fixture.Error)) return false;
+        const float HP = Member.SlotIndex == 1 ? 0.f : Member.SlotIndex == 2 ? Profession.MaxHP - 1.f : 40.f;
+        FinalHP.Add(Member.SlotIndex, HP);
+        FinalStock.Add(Member.SlotIndex, Member.Consumables);
+    }
+    FProfessionDefinition BeforeGrowth;
+    if (!Fixture.Run->ResolveMemberProfession(BeforeParty[0], BeforeGrowth, Fixture.Error)) return false;
+    TMap<int32, float> InvalidHP = FinalHP;
+    InvalidHP[0] = BeforeGrowth.MaxHP + 1.f;
+    TestFalse(TEXT("Rest cannot hide final HP that exceeded the pre-victory maximum"), Fixture.Run->CompleteEncounter(ECombatResult::Victory, InvalidHP, FinalStock));
+    TestTrue(TEXT("Invalid pre-rest HP preserves the party save bytes and combat boundary"), SameTargetTransactionParty(BeforeParty, Fixture.Run->GetPartyMembers()) && BeforeBytes == Fixture.ReadBytes() && Fixture.Run->GetPhase() == ERunPhase::Combat);
+    int32 Publications = 0;
+    Fixture.Run->OnRunStateChanged.AddLambda([&Publications]() { ++Publications; });
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("Rest and reward publication reject an injected result-write failure together"), Fixture.Run->CompleteEncounter(ECombatResult::Victory, FinalHP, FinalStock));
+    TestTrue(TEXT("A failed result leaves every human and AI HP value, previous bytes and publication count unchanged"), SameTargetTransactionParty(BeforeParty, Fixture.Run->GetPartyMembers()) && BeforeBytes == Fixture.ReadBytes() && Fixture.Run->GetCompletedNodes().IsEmpty() && Publications == 0);
+    const bool bRetried = Fixture.Run->CompleteEncounter(ECombatResult::Victory, FinalHP, FinalStock);
+    Fixture.Run->OnRunStateChanged.Clear();
+    if (!TestTrue(TEXT("The same final-HP input retries as one durable result"), bRetried && Publications == 1)) return false;
+    for (const FRunPartyMember& Member : Fixture.Run->GetPartyMembers())
+    {
+        FProfessionDefinition Grown;
+        if (!Fixture.Run->ResolveMemberProfession(Member, Grown, Fixture.Error)) return false;
+        const float ExpectedHP = FinalHP[Member.SlotIndex] == 0.f ? 0.f : FMath::Min(Grown.MaxHP, FinalHP[Member.SlotIndex] + RestHP);
+        TestEqual(TEXT("Every survivor including AI rests exactly once and dead members remain zero"), Member.CurrentHP, ExpectedHP);
+        if (Member.SlotIndex == 2) TestEqual(TEXT("Near-full survivors cap at the new grown maximum"), Member.CurrentHP, Grown.MaxHP);
+    }
+    TestTrue(TEXT("Rest does not alter the frozen original party size or future lineups"), FrozenTarget.LevelDesign.PartySize == 4 && FRunLevelDesignState::StaticStruct()->CompareScriptStruct(&FrozenTarget.LevelDesign, &Fixture.Run->GetTargetRunState().LevelDesign, 0));
+    if (!Fixture.ReloadBoundary(*this)) return false;
+    const TArray<FRunPartyMember> AfterRest = Fixture.Run->GetPartyMembers();
+    TestEqual(TEXT("The public PvE result view exposes the already committed rest amount"), FGameplayViewState::FromRun(Fixture.Run.Get(), FText::GetEmpty()).VictoryRestHP, RestHP);
+    TestFalse(TEXT("Repeating an already accepted combat result cannot heal twice"), Fixture.Run->CompleteEncounter(ECombatResult::Victory, FinalHP, FinalStock));
+    TestTrue(TEXT("Duplicate result rejection preserves the entire rested party"), SameTargetTransactionParty(AfterRest, Fixture.Run->GetPartyMembers()));
+    const FRunPartyMember Buyer = Fixture.Run->GetPartyMembers()[0];
+    const FRunGoldRewardState Reward = Fixture.Run->GetGoldRewardState();
+    if (!TestTrue(TEXT("The normal reward and Continue flow reaches the following Snapshot"), Fixture.Run->SelectGoldReward(Buyer.OwnerAccountId, Buyer.CharacterId, Reward.NodeId, 0, Fixture.Error) && Fixture.Run->ContinueRun() && Fixture.BeginNextSyntheticCombat())) return false;
+    for (const FRunPartyMember& Member : Fixture.Run->GetPartyMembers()) FinalHP[Member.SlotIndex] = Member.CurrentHP == 0.f ? 0.f : 20.f;
+    if (!TestTrue(TEXT("The subsequent synthetic Snapshot victory is accepted"), Fixture.Run->CompleteEncounter(ECombatResult::Victory, FinalHP, FinalStock) && Fixture.ReloadBoundary(*this))) return false;
+    TestEqual(TEXT("The public Snapshot result view does not advertise rest"), FGameplayViewState::FromRun(Fixture.Run.Get(), FText::GetEmpty()).VictoryRestHP, 0.f);
+    for (const FRunPartyMember& Member : Fixture.Run->GetPartyMembers()) TestEqual(TEXT("Snapshot victory provides no rest to either human or AI survivors"), Member.CurrentHP, FinalHP[Member.SlotIndex]);
+    if (!TestTrue(TEXT("The next PvE remains accessible with the original frozen party-size policy"), Fixture.Run->ContinueRun() && Fixture.BeginNextSyntheticCombat())) return false;
+    for (TPair<int32, float>& Entry : FinalHP) Entry.Value = 0.f;
+    if (!TestTrue(TEXT("A synthetic party defeat is accepted without victory rest"), Fixture.Run->CompleteEncounter(ECombatResult::Defeat, FinalHP, FinalStock))) return false;
+    for (const FRunPartyMember& Member : Fixture.Run->GetPartyMembers()) TestEqual(TEXT("Defeat never revives a member through rest"), Member.CurrentHP, 0.f);
+    TestTrue(TEXT("Defeat preserves two prior victories and creates no new rewards"), Fixture.Run->GetCompletedNodes().Num() == 2 && Fixture.Run->GetGoldRewardState().SchemaVersion == 0 && Fixture.Run->GetPhase() == ERunPhase::Defeat);
+    TestEqual(TEXT("The public defeat view does not advertise rest"), FGameplayViewState::FromRun(Fixture.Run.Get(), FText::GetEmpty()).VictoryRestHP, 0.f);
+    FTargetRunTransactionFixture LegacyFixture;
+    if (!LegacyFixture.InitializeEveryProfession()) return false;
+    TStrongObjectPtr<URunSaveGame> Legacy(Cast<URunSaveGame>(FRunCheckpointStorage::Load(LegacyFixture.Slot, LegacyFixture.Error)));
+    if (!Legacy) return false;
+    Legacy->TargetRun.LevelDesign = FRunLevelDesignState();
+    for (FTargetRunGroup& Group : Legacy->TargetRun.Groups) Group.EnemyRoster.Reset();
+    if (!TestTrue(TEXT("An old target policy reloads without adopting the available CSV policy"), FRunCheckpointStorage::Save(Legacy.Get(), LegacyFixture.Slot, LegacyFixture.Error) && LegacyFixture.Run->LoadStandaloneCheckpoint(LegacyFixture.Error) && LegacyFixture.Run->GetTargetRunState().LevelDesign.SchemaVersion == 0 && LegacyFixture.BeginNextSyntheticCombat())) return false;
+    TMap<int32, float> LegacyHP;
+    for (const FRunPartyMember& Member : LegacyFixture.Run->GetPartyMembers()) LegacyHP.Add(Member.SlotIndex, 40.f);
+    if (!TestTrue(TEXT("A legacy PvE victory remains valid without the new rest policy"), LegacyFixture.Run->CompleteEncounter(ECombatResult::Victory, LegacyHP))) return false;
+    for (const FRunPartyMember& Member : LegacyFixture.Run->GetPartyMembers()) TestEqual(TEXT("Legacy PvE victory preserves supplied HP without retroactive rest"), Member.CurrentHP, 40.f);
+    TestEqual(TEXT("Legacy result views do not advertise new rest"), FGameplayViewState::FromRun(LegacyFixture.Run.Get(), FText::GetEmpty()).VictoryRestHP, 0.f);
     return true;
 }
 

@@ -78,6 +78,11 @@ struct PROJECTA_API FGameplayViewState
     UPROPERTY()
     FRunGoldRewardState GoldRewardState;
 
+    // Show the completed party rest independently of the unclaimed item choice.
+    // 아직 고르지 않은 아이템 보상과 별도로 완료된 파티 휴식을 표시합니다.
+    UPROPERTY()
+    float VictoryRestHP = 0.0f;
+
     UPROPERTY()
     TArray<FGuid> GoldRewardRecipientIds;
 

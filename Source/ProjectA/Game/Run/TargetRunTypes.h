@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "Game/Run/RunEncounterTypes.h"
+#include "Game/Run/RunLevelDesignTypes.h"
 #include "Game/Run/RunRecoveryTypes.h"
 #include "Game/Snapshot/PartySnapshotTypes.h"
 #include "TargetRunTypes.generated.h"
@@ -16,6 +17,10 @@ struct PROJECTA_API FTargetRunGroup
     FGameplayTagContainer Tags;
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TArray<FSoftClassPath> EnemyClasses;
+    // New level policies freeze the selected monsters while keeping legacy class paths intact.
+    // 새 레벨 정책은 기존 클래스 경로를 유지하면서 선택한 몬스터를 고정합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
+    TArray<FRunMonsterDefinition> EnemyRoster;
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FPartySnapshot Opponent;
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -61,6 +66,10 @@ struct PROJECTA_API FRunTargetState
     int32 SchemaVersion = 0;
     UPROPERTY(BlueprintReadOnly)
     TArray<FTargetRunGroup> Groups;
+    // Version zero preserves authored and older Runs without applying current CSV values.
+    // 버전 0은 현재 CSV 값을 적용하지 않고 맞춤 정의와 이전 Run을 보존합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame)
+    FRunLevelDesignState LevelDesign;
     UPROPERTY(BlueprintReadOnly)
     TArray<FRunEncounterOffer> EncounterPool;
     UPROPERTY(BlueprintReadOnly)

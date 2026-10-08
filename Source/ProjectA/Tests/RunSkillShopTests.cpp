@@ -592,19 +592,19 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopCatalogRarityTest, "ProjectA.Run.Sh
 
 bool FRunItemShopCatalogRarityTest::RunTest(const FString& Parameters)
 {
-    const TCHAR* ColorNames[] = {TEXT("흰색"), TEXT("초록색"), TEXT("파란색"), TEXT("보라색"), TEXT("주황색")};
-    const FName ColorTags[] = {TEXT("Item.Rarity.White"), TEXT("Item.Rarity.Green"), TEXT("Item.Rarity.Blue"), TEXT("Item.Rarity.Purple"), TEXT("Item.Rarity.Orange")};
+    const TCHAR* ShopColorNames[] = {TEXT("흰색"), TEXT("초록색"), TEXT("파란색"), TEXT("보라색"), TEXT("주황색")};
+    const FName ShopColorTags[] = {TEXT("Item.Rarity.White"), TEXT("Item.Rarity.Green"), TEXT("Item.Rarity.Blue"), TEXT("Item.Rarity.Purple"), TEXT("Item.Rarity.Orange")};
     for (const bool bHasRationale : {false, true})
     {
         FString Csv = bHasRationale ? TEXT("무기 종류,위치,에셋 이름,가격(G),게임 내 이름,등급,분류 근거\n") : TEXT("무기 종류,위치,에셋 이름,가격(G),게임 내 이름,등급\n");
-        for (int32 Index = 0; Index < 5; ++Index) Csv += FString::Printf(TEXT("검,/Game/Test,Weapon_%d,1,등급 검증 %d,%s%s\n"), Index, Index, ColorNames[Index], bHasRationale ? TEXT(",\"원본 형태, 장식 확인\"") : TEXT(""));
+        for (int32 Index = 0; Index < 5; ++Index) Csv += FString::Printf(TEXT("검,/Game/Test,Weapon_%d,1,등급 검증 %d,%s%s\n"), Index, Index, ShopColorNames[Index], bHasRationale ? TEXT(",\"원본 형태, 장식 확인\"") : TEXT(""));
         TArray<FRunItemDefinition> Catalog;
         FText Error;
         if (!TestTrue(TEXT("Both authored rarity CSV schemas retain five source definitions"), RunItemShopCatalog::LoadFromString(Csv, Catalog, Error) && Catalog.Num() == 5)) return false;
         for (int32 Index = 0; Index < Catalog.Num(); ++Index)
         {
             const FRunItemDefinition& Item = Catalog[Index];
-            TestEqual(TEXT("Authored Korean colors resolve to existing gameplay rarity tags"), Item.CatalogRarityTag, FGameplayTag::RequestGameplayTag(ColorTags[Index]));
+            TestEqual(TEXT("Authored Korean colors resolve to existing gameplay rarity tags"), Item.CatalogRarityTag, FGameplayTag::RequestGameplayTag(ShopColorTags[Index]));
             TestTrue(TEXT("Catalog parsing does not generate item copies or change prices"), Item.GenerationVersion == 0 && !Item.ItemInstanceId.IsValid() && !Item.RarityTag.IsValid() && Item.GrantedSkills.IsEmpty() && Item.Price == 1);
             FRunItemDefinition Legacy = Item;
             Legacy.CatalogRarityTag = FGameplayTag();

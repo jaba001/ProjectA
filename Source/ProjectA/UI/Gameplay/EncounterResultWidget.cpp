@@ -242,6 +242,7 @@ void UEncounterResultWidget::ShowResult(ECombatResult Result, const FText& Messa
 void UEncounterResultWidget::RefreshResult(const FGameplayViewState& View)
 {
     ShowResult(View.LastResult, View.FlowMessage);
+    if (View.VictoryRestHP > 0.0f) Text_Result->SetText(FText::Format(NSLOCTEXT("CombatItemReward", "PartyRestComplete", "{0}\n휴식 완료 · 생존 파티 HP 최대 +{1}"), Text_Result->GetText(), FText::AsNumber(View.VictoryRestHP)));
     const FRunGoldRewardState& Rewards = View.GoldRewardState;
     const bool bItemRewards = Rewards.SchemaVersion == 2;
     const bool bHasRewards = View.LastResult == ECombatResult::Victory && (Rewards.SchemaVersion == 1 || bItemRewards);

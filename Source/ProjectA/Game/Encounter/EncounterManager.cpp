@@ -453,6 +453,18 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
     {
         return false;
     }
+    const TArray<FRunMonsterDefinition>* FrozenRoster = nullptr;
+    if (!bUseSnapshot && RunState->IsTargetRun() && RunState->GetTargetRunState().LevelDesign.SchemaVersion == 1)
+    {
+        const FRunTargetState& Target = RunState->GetTargetRunState();
+        const int32 GroupIndex = RunState->GetCompletedNodes().Num() / 2;
+        if (!Target.Groups.IsValidIndex(GroupIndex) || Target.Groups[GroupIndex].EnemyRoster.Num() != Definition->EnemyUnitClasses.Num()) return false;
+        FrozenRoster = &Target.Groups[GroupIndex].EnemyRoster;
+        for (int32 Index = 0; Index < FrozenRoster->Num(); ++Index)
+        {
+            if ((*FrozenRoster)[Index].UnitClass != FSoftClassPath(Definition->EnemyUnitClasses[Index].Get())) return false;
+        }
+    }
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     Params.Owner = this;
@@ -553,6 +565,19 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
             // 적 아이템 판단은 미지원이므로 스냅샷 액터에는 암묵적인 회복 아이템을 지급하지 않습니다.
             Unit->HealingItemCount = 0;
             Unit->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), Member->Stats.CurrentHP);
+        }
+        else if (FrozenRoster)
+        {
+            // Spawn only the frozen stats and original skill asset, without rereading CSV or rerolling the monster.
+            // CSV 재조회나 몬스터 재추첨 없이 고정 능력치와 원본 스킬 에셋만 생성에 적용합니다.
+            const FRunMonsterDefinition& Monster = (*FrozenRoster)[Index];
+            const TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills = {Cast<USkillDefinitionDataAsset>(Monster.Skill.TryLoad())};
+            if (!Unit->ConfigureProfession(Monster.MaxHP, Monster.AP, Monster.SAP, Skills, Monster.Speed) || !Unit->ConfigureMoveRange(Monster.MoveRange))
+            {
+                FlowMessage = NSLOCTEXT("RunLevelDesign", "MonsterConfiguration", "저장된 몬스터 능력치와 원본 스킬을 적용하지 못했습니다.");
+                return false;
+            }
+            Unit->RuntimeCharacterName = Monster.DisplayName;
         }
         // Match each enemy body's capsule to the tile so shorter monsters do not float at the fixed spawn height.
         // 작은 몬스터가 고정 생성 높이에서 뜨지 않도록 각 적 몸체의 캡슐 높이를 타일에 맞춥니다.

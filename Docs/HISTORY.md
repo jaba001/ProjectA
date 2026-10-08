@@ -719,3 +719,17 @@ CSV 재읽기에서 15열·43행·활성 28개·보존 15개·그룹 가중치 �
 공격 피해 50·AP 1은 `ConfigureMonsterContent.py`의 해석된 기본 공격 복사와 2026-10-04 `Saved/Automation/TodoCompletion_20261004/RagdollFinal.d4b67380eb78483abdea7f0856794adf/Console.log`의 13종 실행 이력을 대조했다. 12종 선딜은 `MonsterContentSpecs.json`, 기존 검병의 0.23초 선딜과 무기 궤적은 `Saved/Automation/MeleeSkillName/Baseline.json`을 기준으로 한다. 기본 HP/AP는 `Saved/Automation/Monsters/Reload.json`과 대조하며 SAP·속도·보호막·이동거리는 현행 C++ 기본값이다.
 
 CSV 3개의 재읽기·13/13/10행·25개체 집계·권장 가중치와 확률 합계 100·13종 스킬 파일 존재를 확인하고 표시 미리보기 5개를 검토했다. 작성·재읽기 근거는 `Saved/Automation/MonsterBalance_20261008/CsvValidation.json`이다. 문서 10개의 로컬 링크 712개·diff 검사를 통과했으며 링크 근거는 `Saved/Automation/TodoRecommended/DocumentationValidation.json`이다. C++·설정·원본 에셋·기존 CSV·TODO·현재 런타임·기존 저장은 변경하지 않았다. 컴파일이 필요한 코드 변경은 없으며 게임·PIE·자동화 테스트와 에셋 재로드는 실행하지 않았다. 이전 몬스터 실행 이력과 TODO의 미완료 확인 항목은 보존한다.
+
+### 9-31 2026-10-08 CSV 기반 레벨 난이도
+
+사용자의 레벨 디자인 난이도 적용 위임에 따라 앞선 자료 CSV 3개를 새 기본 Run 입력으로 연결했다. `MONSTER_STATS.csv`는 기존 13종 ID와 원본 경로를 유지한 13열의 종별 스탯·지역/역할 태그·스킬 목록, `MONSTER_SPAWN_PROBABILITIES.csv`는 활성 12종 합계 100과 개발용 검병 0, `MONSTER_ENCOUNTERS.csv`는 17열·10묶음의 숲·늪·동굴·설원·최종 구간 규칙이다. 5묶음 Brute·10묶음 Boss 선봉을 먼저 고르고 남은 적을 태그 Query·공통 가중 추첨으로 동종 중복 없이 선정한다. 원본 Blueprint·스킬·공격 피해 50·공격 AP 1·선딜은 변경하지 않았다. [현재 수치·구조](PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터)
+
+기본 `ConfigureTargetRun`만 LevelDesign 버전 1의 최초 시드·시작 파티 인원·카탈로그·규칙·최종 몬스터 편성을 저장한다. 시작 1~4명에 따라 적 수와 PvE HP를 조정하고 7묶음은 기준 적 수를 줄인다. 기존 `EnemyClasses`를 보존하면서 `EnemyRoster`의 클래스·HP/AP/SAP/속도/이동거리·원본 스킬을 스폰에 적용한다. 저장된 입력으로 편성을 검증하고 체크포인트의 적 수·순서·불변 스탯·스킬을 대조한다. 이전 저장과 명시적 맞춤 정의는 버전 0의 당시 편성·클래스 기본값·보상·회복 정책을 유지하며 CSV를 소급 적용하지 않는다.
+
+60선택·20전투와 아이템 3택1을 유지하고 새 기본 난이도의 골드를 첫 3~5G에서 마지막 8~15G로 조정했다. 10회 수령 시 기대 골드 73.5G·시작 10G·현재 아이템 가격 1G를 개발 초기값으로 둔다. PvE 승리마다 생존 파티에 휴식 HP 20~40을 성장 후 최대 HP까지 회복하며 사망자·Snapshot·패배에는 적용하지 않는다. 기존/최종 HP를 회복 전에 검증하고 결과·보상과 같은 후보로 저장하여 실패 재시도에서 중복 회복하지 않는다. 중앙 결과 뷰의 `VictoryRestHP`로 휴식 적용을 표시하고 지도 이름에 구간 주제를 반영했다. 런타임 CSV 6개를 UFS 패키징 대상으로 지정했다.
+
+`ProjectA.Run.LevelDesign`에 CSV 합류·오류 거절·실패 시 원본 보존, 파티 인원 배율·태그·선봉·시드, 직렬화·기존 정책·변조 거절의 회귀 소스를 추가했다. `ProjectA.Run.Target.LevelDesign.SurvivorRestAndAtomicRetry`는 생존 동료 회복·최대 HP·사망 보존·결과 저장 실패/재시도·Snapshot/패배/이전 정책의 회복 제외를 다루며 기존 합성 진행 검증도 새 휴식을 반영했다. 회귀 소스와 실제 실행 결과는 구분한다.
+
+2026-10-08 `Build.bat -ProjectFiles -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -Game -Engine`의 프로젝트 생성 6.43초와 `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`의 최종 컴파일·링크 10.38초가 성공했다. 최초 빌드의 Unity 재분할로 드러난 기존 상점 회귀의 변수명 가림 C4459는 로컬 이름만 구분해 해소했다. 근거는 `Saved/Logs/LevelDesignProjectFiles.log`·`LevelDesignBuild.Initial.log`·`LevelDesignBuild.log`이며 최종 빌드 오류·경고는 0이다. 생성된 `Automation_ProjectA.sln`은 행 순서만 변경되고 전체 행 집합은 동일하다.
+
+CSV 재계산·수식 오류 0·렌더 확인·내보내기/재입력 일치와 실제 13/13/10행, 클래스·스킬 경로 각 13개, 양수 후보 12개·합계 100, 1~4인×10구간의 40조합 후보 수·배율·선봉을 정적으로 확인했다. 근거는 `Saved/Automation/LevelDesign_20261008/CsvValidation.json`·`independent_validation.json`·`Preservation.json`이다. 문서 10개 로컬 링크·앵커 724개와 `git diff --check`를 통과했고 TODO의 기존 미완료 33개·선택 7개 및 HISTORY 이전 본문을 보존했다. Content와 원본 몬스터 목록은 변경하지 않았다. 게임·PIE·Unreal 자동화 테스트는 실행하지 않았다. 새 난이도의 강제 승리 없는 80단계 완주·실제 Continue·CSV 변경 전후 저장 호환·휴식 표시와 중복 방지는 [TODO 26절](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 미완료로 유지한다. 9-30의 자료 정리 및 과거 실행 근거를 최신 난이도 성공 근거로 대체하지 않는다.

@@ -25,6 +25,7 @@
 #include "Misc/Parse.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Game/Development/DevelopmentCoopSubsystem.h"
+#include "Unit/UnitDataRules.h"
 
 void URunStateSubsystem::ResetDevelopmentRun()
 {
@@ -374,6 +375,11 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
                 OutError = FText::Format(NSLOCTEXT("RunCheckpoint", "SavedProfessionUnsupported", "저장된 직업 '{0}'을 현재 직업 설정으로 불러올 수 없습니다. 저장 원본을 유지합니다. {1}"), FText::FromName(Member.ClassId), ProfessionError);
                 return false;
             }
+            if (Save->TargetRun.LevelDesign.SchemaVersion == 1)
+            {
+                UTargetRunDefinitionDataAsset::ApplyGrowth(Save->TargetRun, Save->CompletedNodes.Num(), Definition);
+                if (!UnitDataRules::IsValidHealth(Definition.MaxHP, Member.CurrentHP)) return false;
+            }
             if (!Catalog->ValidateMemberAppearance(Member, MemberError))
             {
                 if (!MemberError.IsEmpty()) OutError = MemberError;
@@ -391,6 +397,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
             Living += Member.CurrentHP != 0.0f ? 1 : 0;
         }
     }
+    if (Save->TargetRun.LevelDesign.SchemaVersion == 1 && Save->TargetRun.LevelDesign.PartySize != Created) return false;
     const bool bCombat = Save->Phase == ERunPhase::Combat;
     if (!RunProgressRules::ValidatePhase(Progress, Created > 0, Living > 0) || (bCombat && !Format.bSupportsCombat) || (Format.bRequiresCombat && !bCombat))
     {
@@ -404,6 +411,21 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
             const bool bSnapshot = Save->CompletedNodes.Num() % 2 != 0;
             if (Checkpoint.bHasOpponentSnapshot != bSnapshot) return false;
             if (bSnapshot && (Checkpoint.OpponentCatalog != Save->TargetRun.OpponentCatalog || !FPartySnapshot::StaticStruct()->CompareScriptStruct(&Checkpoint.OpponentSnapshot, &Save->TargetRun.Groups[Save->CompletedNodes.Num() / 2].Opponent, 0))) return false;
+            if (!bSnapshot && Save->TargetRun.LevelDesign.SchemaVersion == 1)
+            {
+                // Match immutable enemy values to the frozen roster while preserving live combat costs and damage.
+                // 전투 중 비용과 피해를 유지하며 적의 불변 값을 고정 편성과 대조합니다.
+                const TArray<FRunMonsterDefinition>& Roster = Save->TargetRun.Groups[Save->CompletedNodes.Num() / 2].EnemyRoster;
+                int32 EnemyIndex = 0;
+                for (const FCombatCheckpointUnit& Unit : Checkpoint.Units)
+                {
+                    if (Unit.Team != ETeam::Enemy) continue;
+                    if (!Roster.IsValidIndex(EnemyIndex)) return false;
+                    const FRunMonsterDefinition& Monster = Roster[EnemyIndex++];
+                    if (Unit.UnitClass != Monster.UnitClass || Unit.MaxHP != Monster.MaxHP || Unit.MaxAP != Monster.AP || Unit.MaxSubAP != Monster.SAP || Unit.Speed != Monster.Speed || Unit.MoveRange != Monster.MoveRange || Unit.Skills.Num() != 1 || Unit.Skills[0] != Monster.Skill) return false;
+                }
+                if (EnemyIndex != Roster.Num()) return false;
+            }
         }
         if ((Format.bRequiresCurrentCheckpoint && Checkpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion) || (Format.bRejectsCurrentCheckpoint && Checkpoint.SchemaVersion == UCombatCheckpointLibrary::CurrentSchemaVersion)) return false;
         if (!FRunIdentityData::StaticStruct()->CompareScriptStruct(&Save->Identity, &Checkpoint.Identity, 0) || Checkpoint.NodeId != Save->CurrentNode || Checkpoint.EncounterId != Save->CurrentEncounter)
@@ -1255,6 +1277,33 @@ bool URunStateSubsystem::CompleteEncounter(ECombatResult Result, const TMap<int3
         Member->Consumables = Entry.Value;
     }
     if (!ValidateRecoverySave(Save.Get(), SaveError)) return false;
+    if (Result == ECombatResult::Victory && Save->TargetRun.LevelDesign.SchemaVersion == 1 && CompletedNodes.Num() % 2 == 0)
+    {
+        // Apply rest inside the unpublished result only after checking both saved and final HP against the old cap.
+        // 이전 상한으로 저장 체력과 최종 체력을 확인한 뒤 미공개 결과 안에서만 휴식 회복을 적용합니다.
+        const int32 GroupIndex = CompletedNodes.Num() / 2;
+        const UPartyDefinitionDataAsset* Catalog = Cast<UPartyDefinitionDataAsset>(Save->Catalog.TryLoad());
+        if (!Catalog || !Save->TargetRun.LevelDesign.Rules.IsValidIndex(GroupIndex)) return false;
+        const float RestHP = Save->TargetRun.LevelDesign.Rules[GroupIndex].RestHP;
+        if (!UnitDataRules::IsValidAttribute(RestHP)) return false;
+        for (FRunPartyMember& Member : Save->Party)
+        {
+            if (!Member.bCreated) continue;
+            const FRunPartyMember* Previous = PartyMembers.FindByPredicate([&Member](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.SlotIndex == Member.SlotIndex; });
+            FProfessionDefinition Profession;
+            if (!Previous || !Catalog->ResolveProfession(Member.ClassId, Profession, SaveError)) return false;
+            FProfessionDefinition Current = Profession;
+            UTargetRunDefinitionDataAsset::ApplyGrowth(Save->TargetRun, Save->CompletedNodes.Num(), Current);
+            if (!UnitDataRules::IsValidHealth(Current.MaxHP, Previous->CurrentHP) || !UnitDataRules::IsValidHealth(Current.MaxHP, Member.CurrentHP))
+            {
+                SaveError = NSLOCTEXT("RunLevelDesign", "RestInvalidHP", "휴식 회복 전 체력이 현재 최대 체력을 벗어났습니다. 기존 파티와 저장을 유지합니다.");
+                return false;
+            }
+            UTargetRunDefinitionDataAsset::ApplyGrowth(Save->TargetRun, Save->CompletedNodes.Num() + 1, Profession);
+            if (!UnitDataRules::IsValidMaxHP(Profession.MaxHP)) return false;
+            if (Member.CurrentHP > 0.0f) Member.CurrentHP = FMath::Min(Profession.MaxHP, Member.CurrentHP + RestHP);
+        }
+    }
     if (Result == ECombatResult::Victory && IsTargetRun())
     {
         Save->GoldRewardState = FRunGoldRewardState();
