@@ -6,11 +6,28 @@ UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EncounterSkillShop, "Encounter.Shop.Skill");
 // 제거된 상점 태그의 저장 호환을 유지하면서 일반 스킬상점으로 해석합니다.
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_RetiredTestSkillShop, "Encounter.Shop.Skill.Test");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EncounterItemShop, "Encounter.Shop.Item");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EncounterBasicItemShop, "Encounter.Shop.Item.Basic");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EncounterRarityItemShop, "Encounter.Shop.Item.Rarity");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EncounterTagItemShop, "Encounter.Shop.Item.Tag");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EncounterRecovery, "Encounter.Service.Recovery");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EncounterRevival, "Encounter.Service.Revival");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EncounterConsumables, "Encounter.Shop.Consumable");
 
 FGameplayTag FRunEncounterOffer::GetRecoveryTag() { return TAG_EncounterRecovery; }
+FGameplayTag FRunEncounterOffer::GetBasicItemShopTag()
+{
+    return TAG_EncounterBasicItemShop;
+}
+
+FGameplayTag FRunEncounterOffer::GetRarityItemShopTag()
+{
+    return TAG_EncounterRarityItemShop;
+}
+
+FGameplayTag FRunEncounterOffer::GetTagItemShopTag()
+{
+    return TAG_EncounterTagItemShop;
+}
 FGameplayTag FRunEncounterOffer::GetRevivalTag() { return TAG_EncounterRevival; }
 FGameplayTag FRunEncounterOffer::GetConsumableShopTag() { return TAG_EncounterConsumables; }
 

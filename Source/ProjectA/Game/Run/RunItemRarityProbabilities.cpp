@@ -58,6 +58,32 @@ namespace
         for (const TCHAR Character : Note) if (Character < TEXT(' ') || Character == 0x7f) return false;
         return true;
     }
+
+    // Share eligibility between selection, specialized stock size and frozen-stock validation.
+    // 추첨·전문 상점 상품 수·저장된 진열 검증에서 같은 적격 조건을 사용합니다.
+    bool BuildSelectionData(const TArray<FRunItemDefinition>& Catalog, const FRunItemRarityProbabilityState& State, const FGameplayTagQuery& Query, TArray<FGameplayTagWeightedCandidate>& OutCandidates, TArray<int32>& OutEligibleIndices, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
+    {
+        if (!RunItemRarityProbabilities::Validate(State, OutError) || (WeaponSkillRules && !RunWeaponSkillRules::Validate(*WeaponSkillRules, OutError))) return false;
+        OutError = NSLOCTEXT("ItemRarityProbabilities", "InvalidCatalog", "등급별 추첨에는 유효한 원본 아이템 카탈로그와 양수 상품 개수가 필요합니다.");
+        if (Catalog.IsEmpty()) return false;
+        TSet<FSoftObjectPath> Assets;
+        OutCandidates.Reserve(Catalog.Num());
+        for (int32 Index = 0; Index < Catalog.Num(); ++Index)
+        {
+            const FRunItemDefinition& Item = Catalog[Index];
+            if (!RunItemShopCatalog::ValidateItem(Item) || Item.GenerationVersion != 0 || Assets.Contains(Item.Asset)) return false;
+            const FRunItemRarityProbability* Rarity = State.Entries.FindByPredicate([&Item](const FRunItemRarityProbability& Entry) { return Entry.RarityTag == Item.CatalogRarityTag; });
+            if (State.SchemaVersion == 1 && !Rarity) return false;
+            Assets.Add(Item.Asset);
+            FGameplayTagWeightedCandidate& Candidate = OutCandidates.AddDefaulted_GetRef();
+            Candidate.Tags = Item.Tags;
+            if (State.SchemaVersion == 1) Candidate.Tags.AddTag(Item.CatalogRarityTag);
+            Candidate.BaseWeight = WeaponSkillRules && WeaponSkillRules->SchemaVersion == 1 && !RunWeaponSkillRules::CanGenerate(Item, *WeaponSkillRules) ? 0.0f : 1.0f;
+            if (Candidate.BaseWeight > 0.0f && (Query.IsEmpty() || Query.Matches(Candidate.Tags)) && (!Rarity || Rarity->ProbabilityBasisPoints > 0)) OutEligibleIndices.Add(Index);
+        }
+        OutError = FText::GetEmpty();
+        return true;
+    }
 }
 
 bool RunItemRarityProbabilities::Load(FRunItemRarityProbabilityState& OutState, FText& OutError)
@@ -122,26 +148,22 @@ bool RunItemRarityProbabilities::Validate(const FRunItemRarityProbabilityState& 
     return true;
 }
 
+bool RunItemRarityProbabilities::GetEligibleIndices(const TArray<FRunItemDefinition>& Catalog, const FRunItemRarityProbabilityState& State, const FGameplayTagQuery& Query, TArray<int32>& OutIndices, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
+{
+    TArray<FGameplayTagWeightedCandidate> Candidates;
+    TArray<int32> EligibleIndices;
+    if (!BuildSelectionData(Catalog, State, Query, Candidates, EligibleIndices, OutError, WeaponSkillRules)) return false;
+    OutIndices = MoveTemp(EligibleIndices);
+    return true;
+}
+
 bool RunItemRarityProbabilities::Select(const TArray<FRunItemDefinition>& Catalog, const FRunItemRarityProbabilityState& State, const FGameplayTagQuery& Query, int32 Count, bool bAllowDuplicates, FRandomStream& Random, TArray<int32>& OutIndices, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
 {
-    if (!Validate(State, OutError) || (WeaponSkillRules && !RunWeaponSkillRules::Validate(*WeaponSkillRules, OutError))) return false;
-    OutError = NSLOCTEXT("ItemRarityProbabilities", "InvalidCatalog", "등급별 추첨에는 유효한 원본 아이템 카탈로그와 양수 상품 개수가 필요합니다.");
-    if (Count <= 0 || Catalog.IsEmpty()) return false;
     TArray<FGameplayTagWeightedCandidate> Candidates;
-    TSet<FSoftObjectPath> Assets;
-    Candidates.Reserve(Catalog.Num());
-    for (const FRunItemDefinition& Item : Catalog)
-    {
-        if (!RunItemShopCatalog::ValidateItem(Item) || Item.GenerationVersion != 0 || Assets.Contains(Item.Asset)) return false;
-        if (State.SchemaVersion == 1 && !State.Entries.ContainsByPredicate([&Item](const FRunItemRarityProbability& Entry) { return Entry.RarityTag == Item.CatalogRarityTag; })) return false;
-        Assets.Add(Item.Asset);
-        FGameplayTagWeightedCandidate& Candidate = Candidates.AddDefaulted_GetRef();
-        Candidate.Tags = Item.Tags;
-        if (State.SchemaVersion == 1) Candidate.Tags.AddTag(Item.CatalogRarityTag);
-        Candidate.BaseWeight = WeaponSkillRules && WeaponSkillRules->SchemaVersion == 1 && !RunWeaponSkillRules::CanGenerate(Item, *WeaponSkillRules) ? 0.0f : 1.0f;
-    }
-
+    TArray<int32> EligibleIndices;
+    if (!BuildSelectionData(Catalog, State, Query, Candidates, EligibleIndices, OutError, WeaponSkillRules)) return false;
     OutError = NSLOCTEXT("ItemRarityProbabilities", "InsufficientCandidates", "태그·등급 확률·스킬 조건을 만족하는 아이템 상점 후보가 부족합니다.");
+    if (Count <= 0 || EligibleIndices.IsEmpty() || (!bAllowDuplicates && EligibleIndices.Num() < Count)) return false;
     FRandomStream SelectionRandom = Random;
     TArray<int32> SelectedIndices;
     if (State.SchemaVersion == 0)
@@ -154,11 +176,10 @@ bool RunItemRarityProbabilities::Select(const TArray<FRunItemDefinition>& Catalo
         TArray<FGameplayTagWeightedCandidate> RarityCandidates;
         RarityItems.SetNum(State.Entries.Num());
         RarityCandidates.SetNum(State.Entries.Num());
-        for (int32 Index = 0; Index < Catalog.Num(); ++Index)
+        for (const int32 Index : EligibleIndices)
         {
-            if (Candidates[Index].BaseWeight <= 0.0f || (!Query.IsEmpty() && !Query.Matches(Candidates[Index].Tags))) continue;
             const int32 RarityIndex = State.Entries.IndexOfByPredicate([&Catalog, Index](const FRunItemRarityProbability& Entry) { return Entry.RarityTag == Catalog[Index].CatalogRarityTag; });
-            if (State.Entries[RarityIndex].ProbabilityBasisPoints > 0) RarityItems[RarityIndex].Add(Index);
+            RarityItems[RarityIndex].Add(Index);
         }
         for (int32 RarityIndex = 0; RarityIndex < State.Entries.Num(); ++RarityIndex)
         {

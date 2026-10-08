@@ -339,4 +339,142 @@ bool FRunItemRarityFrozenSaveTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopProfileStockTest, "ProjectA.Run.Shop.Profiles.FixedAndSpecializedStock", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunItemShopProfileStockTest::RunTest(const FString& Parameters)
+{
+    FText Error;
+    FRunItemShopState Shop;
+    Shop.SchemaVersion = 1;
+    Shop.SelectionVersion = 1;
+    Shop.Catalog = MakeProbabilityCatalog({5, 0, 0, 0, 2});
+    Shop.Catalog[0] = MakeProbabilityItem(0, 0, TAG_ProbabilityEligible, TEXT("Item.Weapon.Spellbook"));
+    if (!RunItemRarityProbabilities::LoadFromString(DefaultProbabilityCsv(), Shop.RarityProbabilities, Error)) return false;
+    TestTrue(TEXT("A new unvisited profile has no active filter or stock"), RunItemShopCatalog::Validate(Shop, Error));
+    TestFalse(TEXT("An unvisited profile cannot be rerolled"), RunItemShopCatalog::Reroll(Shop, Error));
+    const FGameplayTagQuery AllWeapons = FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag());
+    const FGameplayTagQuery Orange = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Rarity.Orange")));
+    const FGameplayTagQuery Spellbook = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Spellbook")));
+    if (!TestTrue(TEXT("The basic profile still requires five products"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Basic"), AllWeapons, 0, Error) && Shop.Offers.Num() == 5)) return false;
+    const int32 BasicRevision = Shop.Revision;
+    if (!TestTrue(TEXT("Switching from basic stock to two eligible orange products succeeds atomically"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Orange"), Orange, 1, Error) && Shop.Offers.Num() == 2 && Shop.Revision == BasicRevision + 1)) return false;
+    TestEqual(TEXT("Specialization retains the full catalog used by owned and starting items"), Shop.Catalog.Num(), 7);
+    TestTrue(TEXT("The active encounter and stock policy are frozen with the display"), Shop.ActiveEncounterId == TEXT("Orange") && Shop.ActiveStockPolicyVersion == 1);
+    TSet<FSoftObjectPath> Seen;
+    for (const FRunItemShopOffer& Offer : Shop.Offers)
+    {
+        TestTrue(TEXT("Every specialized product has the selected fixed grade and a unique asset"), Offer.Item.CatalogRarityTag == FGameplayTag::RequestGameplayTag(TEXT("Item.Rarity.Orange")) && !Seen.Contains(Offer.Item.Asset));
+        Seen.Add(Offer.Item.Asset);
+    }
+    Shop.Offers[0].bSold = true;
+    TestTrue(TEXT("Sold products remain part of the frozen display's expected size"), RunItemShopCatalog::Validate(Shop, Error));
+    if (!TestTrue(TEXT("Reroll uses the saved grade filter and restores the same two-product capacity"), RunItemShopCatalog::Reroll(Shop, Error) && Shop.Offers.Num() == 2)) return false;
+    for (const FRunItemShopOffer& Offer : Shop.Offers) TestTrue(TEXT("Rerolled products are unsold and still match the saved grade"), !Offer.bSold && Offer.Item.CatalogRarityTag == FGameplayTag::RequestGameplayTag(TEXT("Item.Rarity.Orange")));
+    if (!TestTrue(TEXT("A category with one eligible asset displays exactly one product"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Spellbook"), Spellbook, 1, Error) && Shop.Offers.Num() == 1 && Shop.Offers[0].Item.Asset == Shop.Catalog[0].Asset)) return false;
+    if (!TestTrue(TEXT("Returning from specialized stock to the basic profile restores five products"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Basic"), AllWeapons, 0, Error) && Shop.Offers.Num() == 5)) return false;
+    FRunItemShopState Altered = Shop;
+    Altered.Offers.Pop();
+    TestFalse(TEXT("A basic profile cannot silently shrink below five products"), RunItemShopCatalog::Validate(Altered, Error));
+    Altered = Shop;
+    Altered.Offers[1].Item = Altered.Offers[0].Item;
+    TestFalse(TEXT("A new profile rejects duplicate displayed assets even with distinct offer IDs"), RunItemShopCatalog::Validate(Altered, Error));
+    Altered = Shop;
+    Altered.ActiveItemQuery = Spellbook;
+    TestFalse(TEXT("Saved stock must satisfy its saved active query"), RunItemShopCatalog::Validate(Altered, Error));
+    TestFalse(TEXT("The legacy roll API cannot bypass a new profile's saved filter"), RunItemShopCatalog::Roll(Shop, false, FGameplayTagQuery(), Error));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopProfileEligibilityTest, "ProjectA.Run.Shop.Profiles.EligibilityAndAtomicity", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunItemShopProfileEligibilityTest::RunTest(const FString& Parameters)
+{
+    FText Error;
+    FRunItemShopState Shop;
+    Shop.SchemaVersion = 1;
+    Shop.SelectionVersion = 1;
+    Shop.Catalog = MakeProbabilityCatalog({3, 0, 0, 0, 2});
+    Shop.Catalog[0] = MakeProbabilityItem(0, 0, TAG_ProbabilityEligible, TEXT("Item.Weapon.Bow"));
+    if (!RunItemRarityProbabilities::LoadFromString(MakeProbabilityCsv({TEXT("100"), TEXT("0"), TEXT("0"), TEXT("0"), TEXT("0")}), Shop.RarityProbabilities, Error)) return false;
+    FProbabilitySkillFixture Fixture;
+    TArray<int32> Eligible{99};
+    if (!TestTrue(TEXT("Shared eligibility removes zero-probability grades and unavailable weapon skills"), RunItemRarityProbabilities::GetEligibleIndices(Shop.Catalog, Shop.RarityProbabilities, FGameplayTagQuery(), Eligible, Error, &Fixture.Rules))) return false;
+    TestTrue(TEXT("The exact available assets determine specialized capacity"), Eligible == TArray<int32>{1, 2});
+    const FGameplayTagQuery Missing = FGameplayTagQuery::MakeQuery_MatchTag(TAG_ProbabilityExcluded);
+    TestTrue(TEXT("A valid query with no candidates returns an empty eligible list"), RunItemRarityProbabilities::GetEligibleIndices(Shop.Catalog, Shop.RarityProbabilities, Missing, Eligible, Error, &Fixture.Rules) && Eligible.IsEmpty());
+    TArray<FRunItemDefinition> InvalidCatalog = Shop.Catalog;
+    InvalidCatalog[1].Asset = InvalidCatalog[0].Asset;
+    Eligible = {91, 92};
+    TestFalse(TEXT("Invalid catalog data fails shared eligibility"), RunItemRarityProbabilities::GetEligibleIndices(InvalidCatalog, Shop.RarityProbabilities, FGameplayTagQuery(), Eligible, Error, &Fixture.Rules));
+    TestTrue(TEXT("Failed eligibility leaves the caller output unchanged"), Eligible == TArray<int32>{91, 92});
+    if (!TestTrue(TEXT("Specialized stock uses only products that can generate their frozen skills"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Available"), FGameplayTagQuery(), 1, Error, &Fixture.Rules) && Shop.Offers.Num() == 2)) return false;
+    Shop.Offers[0].bSold = true;
+    const FRunItemShopState Before = Shop;
+    const auto ExpectUnchanged = [this, &Shop, &Before]()
+    {
+        TestTrue(TEXT("A failed transition preserves the full previous profile, sold stock and revision"), FRunItemShopState::StaticStruct()->CompareScriptStruct(&Shop, &Before, 0));
+    };
+    TestFalse(TEXT("A zero-candidate specialized visit is rejected"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Missing"), Missing, 1, Error, &Fixture.Rules));
+    ExpectUnchanged();
+    TestFalse(TEXT("A basic profile cannot use the specialized smaller-capacity rule"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Basic"), FGameplayTagQuery(), 0, Error, &Fixture.Rules));
+    ExpectUnchanged();
+    TestFalse(TEXT("Unknown stock policy versions cannot replace the current visit"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Future"), FGameplayTagQuery(), 2, Error, &Fixture.Rules));
+    ExpectUnchanged();
+    TestFalse(TEXT("An absent encounter identity cannot replace the current visit"), RunItemShopCatalog::BeginVisit(Shop, NAME_None, FGameplayTagQuery(), 1, Error, &Fixture.Rules));
+    ExpectUnchanged();
+    FRunItemShopState Overflow = Shop;
+    Overflow.Revision = MAX_int32;
+    const FRunItemShopState BeforeOverflow = Overflow;
+    TestFalse(TEXT("A reroll cannot wrap the revision"), RunItemShopCatalog::Reroll(Overflow, Error, &Fixture.Rules));
+    TestTrue(TEXT("A failed reroll preserves the entire saved profile"), FRunItemShopState::StaticStruct()->CompareScriptStruct(&Overflow, &BeforeOverflow, 0));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopProfileSaveTest, "ProjectA.Run.Shop.Profiles.FrozenSaveAndLegacyPolicy", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunItemShopProfileSaveTest::RunTest(const FString& Parameters)
+{
+    FText Error;
+    FRunItemShopState Shop;
+    Shop.SchemaVersion = 1;
+    Shop.SelectionVersion = 1;
+    Shop.Catalog = MakeProbabilityCatalog({5, 0, 0, 0, 2});
+    if (!RunItemRarityProbabilities::LoadFromString(DefaultProbabilityCsv(), Shop.RarityProbabilities, Error)) return false;
+    const FGameplayTagQuery Orange = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Rarity.Orange")));
+    FProbabilitySkillFixture Fixture;
+    if (!RunItemShopCatalog::BeginVisit(Shop, TEXT("FrozenOrange"), Orange, 1, Error, &Fixture.Rules)) return false;
+    Shop.Offers[0].bSold = true;
+    TStrongObjectPtr<URunSaveGame> Save(NewObject<URunSaveGame>());
+    Save->ItemShopState = Shop;
+    Save->WeaponSkillRules = Fixture.Rules;
+    TArray<uint8> Bytes;
+    if (!UGameplayStatics::SaveGameToMemory(Save.Get(), Bytes)) return false;
+    TStrongObjectPtr<URunSaveGame> Restored(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+    if (!TestNotNull(TEXT("Specialized stock and its active profile deserialize"), Restored.Get())) return false;
+    TestTrue(TEXT("The active profile and its smaller display validate without source CSV"), RunItemShopCatalog::Validate(Restored->ItemShopState, Error, &Restored->WeaponSkillRules));
+    TestTrue(TEXT("The active identity capacity policy and query survive together"), Restored->ItemShopState.SelectionVersion == 1 && Restored->ItemShopState.ActiveEncounterId == Shop.ActiveEncounterId && Restored->ItemShopState.ActiveStockPolicyVersion == 1 && Restored->ItemShopState.ActiveItemQuery == Shop.ActiveItemQuery);
+    if (!TestEqual(TEXT("The saved specialized display is not expanded to five on load"), Restored->ItemShopState.Offers.Num(), 2)) return false;
+    for (int32 Index = 0; Index < Shop.Offers.Num(); ++Index)
+    {
+        const FRunItemShopOffer& Original = Shop.Offers[Index];
+        const FRunItemShopOffer& Loaded = Restored->ItemShopState.Offers[Index];
+        TestTrue(TEXT("Saved specialized products retain their IDs sold flags grades and skills"), Original.OfferId == Loaded.OfferId && Original.bSold == Loaded.bSold && RunItemShopCatalog::IsSameDefinition(Original.Item, Loaded.Item));
+    }
+    TestTrue(TEXT("The restored profile rerolls through its frozen query"), RunItemShopCatalog::Reroll(Restored->ItemShopState, Error, &Restored->WeaponSkillRules) && Restored->ItemShopState.Offers.Num() == 2);
+    for (int32 PolicyVersion = 0; PolicyVersion <= 1; ++PolicyVersion)
+    {
+        FRunItemShopState Legacy;
+        Legacy.SchemaVersion = 1;
+        Legacy.Catalog = Shop.Catalog;
+        if (PolicyVersion == 1) Legacy.RarityProbabilities = Shop.RarityProbabilities;
+        if (!TestTrue(TEXT("Both uniform and previously weighted Runs retain legacy five-product displays"), RunItemShopCatalog::Reroll(Legacy, Error) && Legacy.Offers.Num() == 5 && Legacy.SelectionVersion == 0 && Legacy.ActiveEncounterId.IsNone() && Legacy.ActiveItemQuery.IsEmpty())) return false;
+        const FRunItemShopState Before = Legacy;
+        TestFalse(TEXT("An older Run cannot be silently upgraded by a specialized visit"), RunItemShopCatalog::BeginVisit(Legacy, TEXT("Orange"), Orange, 1, Error));
+        TestTrue(TEXT("Legacy stock and policy remain untouched after a rejected upgrade"), FRunItemShopState::StaticStruct()->CompareScriptStruct(&Legacy, &Before, 0));
+        Legacy.ActiveEncounterId = TEXT("Injected");
+        TestFalse(TEXT("Legacy saves cannot contain a newly injected active profile"), RunItemShopCatalog::Validate(Legacy, Error));
+    }
+    return true;
+}
+
 #endif

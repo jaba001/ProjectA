@@ -180,6 +180,22 @@ namespace
             return Bytes;
         }
 
+        bool FreezeInitialBasicShop()
+        {
+            TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Slot, Error)));
+            if (!Saved || Saved->ItemShopState.Revision != 0 || !Saved->TargetRun.CompletedEncounterChoices.IsEmpty()) return false;
+            // Use a deterministic test-only seed with a basic shop so transaction checks do not depend on random themes.
+            // 거래 검증이 무작위 테마에 의존하지 않도록 기본상점이 있는 테스트 전용 시드를 고정합니다.
+            for (int32 Seed = 0; Seed < 10000; ++Seed)
+            {
+                Saved->TargetRun.EncounterSeed = Seed;
+                if (!UTargetRunDefinitionDataAsset::BuildOffers(Saved->TargetRun, 0, 0, Saved->EncounterProgress.Offers)) return false;
+                if (!Saved->EncounterProgress.Offers.ContainsByPredicate([](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag() == FRunEncounterOffer::GetBasicItemShopTag(); })) continue;
+                return FRunCheckpointStorage::Save(Saved.Get(), Slot, Error) && Run->LoadStandaloneCheckpoint(Error);
+            }
+            return false;
+        }
+
         bool ReloadBoundary(FAutomationTestBase& Test)
         {
             TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Slot, Error)));
@@ -311,7 +327,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTargetRunWeaponTransactionsTest, "ProjectA.Run
 bool FTargetRunWeaponTransactionsTest::RunTest(const FString& Parameters)
 {
     FTargetRunTransactionFixture Fixture;
-    if (!TestTrue(TEXT("Every profession initializes with the new frozen weapon contract"), Fixture.InitializeEveryProfession() && Fixture.ReloadBoundary(*this))) return false;
+    if (!TestTrue(TEXT("Every profession initializes with the new frozen weapon contract"), Fixture.InitializeEveryProfession() && Fixture.FreezeInitialBasicShop() && Fixture.ReloadBoundary(*this))) return false;
     const FRunWeaponSkillRulesState Rules = Fixture.Run->GetWeaponSkillRules();
     TestTrue(TEXT("The delegated trial data freezes one skill and five equally weighted grades"), Fixture.Run->UsesWeaponSkills() && Rules.SchemaVersion == 1 && Rules.SkillCount == 1 && Rules.Rarities.Num() == 5 && Rules.Rarities.ContainsByPredicate([](const FRunWeaponRarityRule& Rarity) { return Rarity.BaseWeight == 1.f; }));
     for (const FRunWeaponRarityRule& Rarity : Rules.Rarities) TestEqual(TEXT("Each development grade has the same weight"), Rarity.BaseWeight, 1.f);
@@ -328,8 +344,8 @@ bool FTargetRunWeaponTransactionsTest::RunTest(const FString& Parameters)
             for (const FSoftObjectPath& Skill : Item.GrantedSkills) TestTrue(TEXT("An equipped starting weapon exposes its fixed skill"), Member.Skills.Contains(Skill));
         }
     }
-    const FRunEncounterOffer* ItemVisit = Fixture.Run->GetEncounterProgress().Offers.FindByPredicate([](const FRunEncounterOffer& Offer) { return Offer.IsItemShop(); });
-    if (!TestTrue(TEXT("The initial ordinary Target choices include an item shop"), ItemVisit && Fixture.Run->SelectRunEncounter(ItemVisit->EncounterId) && Fixture.ReloadBoundary(*this))) return false;
+    const FRunEncounterOffer* ItemVisit = Fixture.Run->GetEncounterProgress().Offers.FindByPredicate([](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag() == FRunEncounterOffer::GetBasicItemShopTag(); });
+    if (!TestTrue(TEXT("The deterministic fixture opens its initial basic shop"), ItemVisit && Fixture.Run->SelectRunEncounter(ItemVisit->EncounterId) && Fixture.ReloadBoundary(*this))) return false;
     const FRunItemShopState Displayed = Fixture.Run->GetItemShopState();
     if (!TestEqual(TEXT("The new shop displays five generated fixed copies"), Displayed.Offers.Num(), 5)) return false;
     const FRunItemShopOffer Offer = Displayed.Offers[0];
@@ -400,6 +416,9 @@ bool FTargetRunLegacyAcquisitionTest::RunTest(const FString& Parameters)
     // 일회성 저장 fixture에만 기존 Target 획득 계약을 구성합니다.
     Save->WeaponSkillAcquisitionVersion = 0;
     Save->WeaponSkillRules = FRunWeaponSkillRulesState();
+    Save->TargetRun.EncounterSelectionVersion = 0;
+    Save->TargetRun.EncounterSeed = 0;
+    Save->ItemShopState.SelectionVersion = 0;
     const URunEncounterPoolDataAsset* Pool = Fixture.Run->PartyDefinition->RunEncounterPool ? Fixture.Run->PartyDefinition->RunEncounterPool.Get() : GetDefault<URunEncounterPoolDataAsset>();
     if (!Pool->BuildSkillShop(Save->SkillShopState, Fixture.Error) || Save->SkillShopState.Catalog.Num() < 5) return false;
     const UTargetRunDefinitionDataAsset* Definition = Fixture.Run->PartyDefinition->TargetRunDefinition ? Fixture.Run->PartyDefinition->TargetRunDefinition.Get() : GetDefault<UTargetRunDefinitionDataAsset>();

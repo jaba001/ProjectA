@@ -122,6 +122,38 @@ namespace
         }
         return true;
     }
+
+    bool GenerateStock(FRunItemShopState& State, bool bAllowDuplicates, const FGameplayTagQuery& Query, int32 Count, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
+    {
+        if (State.SchemaVersion != 1 || State.Revision == MAX_int32)
+        {
+            OutError = NSLOCTEXT("RunItemShop", "CannotRollShop", "아이템 상점의 상품을 갱신할 수 없습니다.");
+            return false;
+        }
+        FRandomStream Random(FMath::Rand());
+        TArray<int32> SelectedIndices;
+        if (!RunItemRarityProbabilities::Select(State.Catalog, State.RarityProbabilities, Query, Count, bAllowDuplicates, Random, SelectedIndices, OutError, WeaponSkillRules)) return false;
+        TArray<FRunItemShopOffer> Offers;
+        Offers.Reserve(Count);
+        for (const int32 Index : SelectedIndices)
+        {
+            FRunItemShopOffer& Offer = Offers.AddDefaulted_GetRef();
+            Offer.OfferId = FName(*FString::Printf(TEXT("Weapon_%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+            Offer.Item = State.Catalog[Index];
+            if (WeaponSkillRules && WeaponSkillRules->SchemaVersion == 1 && !RunWeaponSkillRules::Generate(State.Catalog[Index], *WeaponSkillRules, Random, Offer.Item, OutError)) return false;
+        }
+        State.Offers = MoveTemp(Offers);
+        ++State.Revision;
+        return true;
+    }
+
+    bool GenerateProfileStock(FRunItemShopState& State, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
+    {
+        TArray<int32> EligibleIndices;
+        if (!RunItemRarityProbabilities::GetEligibleIndices(State.Catalog, State.RarityProbabilities, State.ActiveItemQuery, EligibleIndices, OutError, WeaponSkillRules)) return false;
+        const int32 Count = State.ActiveStockPolicyVersion == 1 ? FMath::Min(OfferCount, EligibleIndices.Num()) : OfferCount;
+        return GenerateStock(State, false, State.ActiveItemQuery, Count, OutError, WeaponSkillRules) && RunItemShopCatalog::Validate(State, OutError, WeaponSkillRules);
+    }
 }
 
 FGameplayTag RunItemShopCatalog::GetWeaponTag()
@@ -257,12 +289,14 @@ bool RunItemShopCatalog::Validate(const FRunItemShopState& State, FText& OutErro
     OutError = FText::GetEmpty();
     if (WeaponSkillRules && !RunWeaponSkillRules::Validate(*WeaponSkillRules, OutError)) return false;
     if (!RunItemRarityProbabilities::Validate(State.RarityProbabilities, OutError)) return false;
-    if (State.SchemaVersion == 0 && State.Catalog.IsEmpty() && State.Offers.IsEmpty() && State.Revision == 0 && State.RerollPrice == 1 && State.RarityProbabilities.SchemaVersion == 0) return true;
     const auto Fail = [&OutError]()
     {
         OutError = NSLOCTEXT("RunItemShop", "InvalidShopState", "아이템 상점의 저장된 상품·가격·갱신 상태가 올바르지 않습니다.");
         return false;
     };
+    const bool bEmptyProfile = State.ActiveEncounterId.IsNone() && State.ActiveItemQuery.IsEmpty() && State.ActiveStockPolicyVersion == 0;
+    if (State.SelectionVersion < 0 || State.SelectionVersion > 1 || (State.SelectionVersion == 0 && !bEmptyProfile)) return Fail();
+    if (State.SchemaVersion == 0 && State.Catalog.IsEmpty() && State.Offers.IsEmpty() && State.Revision == 0 && State.RerollPrice == 1 && State.RarityProbabilities.SchemaVersion == 0 && State.SelectionVersion == 0) return true;
     if (State.SchemaVersion != 1 || !ValidateCatalog(State.Catalog) || State.Revision < 0 || State.RerollPrice <= 0) return Fail();
     if (State.RarityProbabilities.SchemaVersion == 1)
     {
@@ -271,17 +305,28 @@ bool RunItemShopCatalog::Validate(const FRunItemShopState& State, FText& OutErro
             if (!State.RarityProbabilities.Entries.ContainsByPredicate([&Item](const FRunItemRarityProbability& Entry) { return Entry.RarityTag == Item.CatalogRarityTag; })) return Fail();
         }
     }
-    if (State.Revision == 0) return State.Offers.IsEmpty() ? true : Fail();
-    if (State.Offers.Num() != OfferCount) return Fail();
+    if (State.Revision == 0) return State.Offers.IsEmpty() && bEmptyProfile ? true : Fail();
+    TArray<int32> EligibleIndices;
+    int32 ExpectedCount = OfferCount;
+    if (State.SelectionVersion == 1)
+    {
+        if (State.ActiveEncounterId.IsNone() || State.ActiveStockPolicyVersion < 0 || State.ActiveStockPolicyVersion > 1) return Fail();
+        if (!RunItemRarityProbabilities::GetEligibleIndices(State.Catalog, State.RarityProbabilities, State.ActiveItemQuery, EligibleIndices, OutError, WeaponSkillRules)) return false;
+        if (State.ActiveStockPolicyVersion == 1) ExpectedCount = FMath::Min(OfferCount, EligibleIndices.Num());
+        if (ExpectedCount <= 0 || EligibleIndices.Num() < ExpectedCount) return Fail();
+    }
+    if (State.Offers.Num() != ExpectedCount) return Fail();
 
     const bool bGenerated = WeaponSkillRules && WeaponSkillRules->SchemaVersion == 1;
     TSet<FName> OfferIds;
     TSet<FGuid> ItemInstanceIds;
+    TSet<FSoftObjectPath> OfferedAssets;
     for (const FRunItemShopOffer& Offer : State.Offers)
     {
         if (Offer.OfferId.IsNone() || Offer.OfferId == FRunItemShopState::GetRerollOfferId() || OfferIds.Contains(Offer.OfferId) || !ValidateItem(Offer.Item)) return Fail();
-        const FRunItemDefinition* CatalogItem = State.Catalog.FindByPredicate([&Offer](const FRunItemDefinition& Item) { return Item.Asset == Offer.Item.Asset; });
-        if (!CatalogItem || !IsSameBaseDefinition(*CatalogItem, Offer.Item)) return Fail();
+        const int32 CatalogIndex = State.Catalog.IndexOfByPredicate([&Offer](const FRunItemDefinition& Item) { return Item.Asset == Offer.Item.Asset; });
+        if (CatalogIndex == INDEX_NONE || !IsSameBaseDefinition(State.Catalog[CatalogIndex], Offer.Item)) return Fail();
+        if (State.SelectionVersion == 1 && (!EligibleIndices.Contains(CatalogIndex) || OfferedAssets.Contains(Offer.Item.Asset))) return Fail();
         if (State.RarityProbabilities.SchemaVersion == 1 && !State.RarityProbabilities.Entries.ContainsByPredicate([&Offer](const FRunItemRarityProbability& Entry) { return Entry.RarityTag == Offer.Item.CatalogRarityTag && Entry.ProbabilityBasisPoints > 0; })) return Fail();
         if (bGenerated)
         {
@@ -290,6 +335,7 @@ bool RunItemShopCatalog::Validate(const FRunItemShopState& State, FText& OutErro
         }
         else if (Offer.Item.GenerationVersion != 0) return Fail();
         OfferIds.Add(Offer.OfferId);
+        OfferedAssets.Add(Offer.Item.Asset);
     }
     return true;
 }
@@ -297,26 +343,44 @@ bool RunItemShopCatalog::Validate(const FRunItemShopState& State, FText& OutErro
 bool RunItemShopCatalog::Roll(FRunItemShopState& State, bool bAllowDuplicates, const FGameplayTagQuery& Query, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
 {
     if (!Validate(State, OutError, WeaponSkillRules)) return false;
-    if (State.SchemaVersion != 1 || State.Revision == MAX_int32)
+    if (State.SelectionVersion != 0)
     {
-        OutError = NSLOCTEXT("RunItemShop", "CannotRollShop", "아이템 상점의 상품을 갱신할 수 없습니다.");
+        OutError = NSLOCTEXT("RunItemShop", "RequiresSavedProfile", "새 상점은 저장된 상품 조건으로 갱신해야 합니다.");
         return false;
     }
+    return GenerateStock(State, bAllowDuplicates, Query, OfferCount, OutError, WeaponSkillRules);
+}
 
-    FRandomStream Random(FMath::Rand());
-    TArray<int32> SelectedIndices;
-    if (!RunItemRarityProbabilities::Select(State.Catalog, State.RarityProbabilities, Query, OfferCount, bAllowDuplicates, Random, SelectedIndices, OutError, WeaponSkillRules)) return false;
-
-    TArray<FRunItemShopOffer> Offers;
-    Offers.Reserve(OfferCount);
-    for (const int32 Index : SelectedIndices)
+bool RunItemShopCatalog::BeginVisit(FRunItemShopState& State, FName EncounterId, const FGameplayTagQuery& Query, int32 StockPolicyVersion, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
+{
+    if (!Validate(State, OutError, WeaponSkillRules)) return false;
+    if (State.SchemaVersion != 1 || State.SelectionVersion != 1 || EncounterId.IsNone() || StockPolicyVersion < 0 || StockPolicyVersion > 1)
     {
-        FRunItemShopOffer& Offer = Offers.AddDefaulted_GetRef();
-        Offer.OfferId = FName(*FString::Printf(TEXT("Weapon_%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits)));
-        Offer.Item = State.Catalog[Index];
-        if (WeaponSkillRules && WeaponSkillRules->SchemaVersion == 1 && !RunWeaponSkillRules::Generate(State.Catalog[Index], *WeaponSkillRules, Random, Offer.Item, OutError)) return false;
+        OutError = NSLOCTEXT("RunItemShop", "InvalidProfile", "아이템 상점의 방문 대상·상품 조건 버전이 올바르지 않습니다.");
+        return false;
     }
-    State.Offers = MoveTemp(Offers);
-    ++State.Revision;
+    // Validate old stock before switching profiles, then publish the new profile and stock together.
+    // 조건 전환 전에 기존 진열을 검증하고 새 조건과 상품을 함께 확정합니다.
+    FRunItemShopState Candidate = State;
+    Candidate.ActiveEncounterId = EncounterId;
+    Candidate.ActiveItemQuery = Query;
+    Candidate.ActiveStockPolicyVersion = StockPolicyVersion;
+    if (!GenerateProfileStock(Candidate, OutError, WeaponSkillRules)) return false;
+    State = MoveTemp(Candidate);
+    return true;
+}
+
+bool RunItemShopCatalog::Reroll(FRunItemShopState& State, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
+{
+    if (State.SelectionVersion == 0) return Roll(State, false, FGameplayTagQuery::MakeQuery_MatchTag(GetWeaponTag()), OutError, WeaponSkillRules);
+    if (!Validate(State, OutError, WeaponSkillRules)) return false;
+    if (State.Revision <= 0)
+    {
+        OutError = NSLOCTEXT("RunItemShop", "UnvisitedProfile", "아직 방문하지 않은 아이템 상점은 갱신할 수 없습니다.");
+        return false;
+    }
+    FRunItemShopState Candidate = State;
+    if (!GenerateProfileStock(Candidate, OutError, WeaponSkillRules)) return false;
+    State = MoveTemp(Candidate);
     return true;
 }

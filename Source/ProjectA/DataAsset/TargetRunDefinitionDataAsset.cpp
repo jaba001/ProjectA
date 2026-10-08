@@ -3,6 +3,7 @@
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Run/RunProgressRules.h"
+#include "Game/Run/RunEncounterPool.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "NativeGameplayTags.h"
 #include "Unit/EnemyUnit.h"
@@ -61,6 +62,9 @@ UTargetRunDefinitionDataAsset::UTargetRunDefinitionDataAsset()
 
 bool UTargetRunDefinitionDataAsset::BuildOffers(const FRunTargetState& State, int32 CombatIndex, int32 VisitIndex, TArray<FRunEncounterOffer>& OutOffers)
 {
+    FText SelectionError;
+    if (State.EncounterSelectionVersion == 1) return RunEncounterPool::Select(State, CombatIndex, VisitIndex, OutOffers, SelectionError);
+    if (!RunEncounterPool::Validate(State, SelectionError)) return false;
     if (CombatIndex < 0 || CombatIndex >= 20 || VisitIndex < 0 || VisitIndex >= 3) return false;
     TArray<FRunEncounterOffer> Eligible;
     for (const FRunEncounterOffer& Offer : State.EncounterPool)
@@ -122,6 +126,12 @@ bool UTargetRunDefinitionDataAsset::Validate(const FRunTargetState& State, const
         return !bTargetRoute && FRunTargetState::StaticStruct()->CompareScriptStruct(&State, &Empty, 0);
     }
     if (State.SchemaVersion != 1 || !bTargetRoute || State.Groups.Num() != 10 || State.EncounterPool.Num() < 3 || State.EncounterPool.Num() > 32 || Encounter.SchemaVersion != 2 || State.CompletedEncounterChoices.Num() > 60) return false;
+    FText PoolError;
+    if (!RunEncounterPool::Validate(State, PoolError))
+    {
+        OutError = PoolError;
+        return false;
+    }
     UOpponentSnapshotCatalogDataAsset* Catalog = Cast<UOpponentSnapshotCatalogDataAsset>(State.OpponentCatalog.TryLoad());
     if (!Catalog) return false;
     TSet<FName> OfferIds;
@@ -162,7 +172,7 @@ bool UTargetRunDefinitionDataAsset::Validate(const FRunTargetState& State, const
     if (!BuildOffers(State, Encounter.AfterCompletedNodeCount, Encounter.VisitIndex, ExpectedOffers) || ExpectedOffers.Num() != Encounter.Offers.Num()) return false;
     for (int32 Index = 0; Index < ExpectedOffers.Num(); ++Index)
     {
-        if (!FRunEncounterOffer::StaticStruct()->CompareScriptStruct(&ExpectedOffers[Index], &Encounter.Offers[Index], 0)) return false;
+        if (!RunEncounterPool::IsSameOffer(ExpectedOffers[Index], Encounter.Offers[Index])) return false;
     }
     OutError = FText::GetEmpty();
     return true;

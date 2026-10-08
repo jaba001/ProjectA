@@ -65,6 +65,15 @@ struct PROJECTA_API FRunTargetState
     TArray<FRunEncounterOffer> EncounterPool;
     UPROPERTY(BlueprintReadOnly)
     FGameplayTagQuery EncounterQuery;
+
+    // Version zero keeps saved fixed rotation; new Runs freeze a weighted policy and one original seed.
+    // 버전 0은 저장된 고정 순환을 유지하며 새 Run은 가중치 정책과 최초 시드 하나를 고정합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame)
+    int32 EncounterSelectionVersion = 0;
+
+    UPROPERTY(BlueprintReadOnly, SaveGame)
+    int32 EncounterSeed = 0;
+
     UPROPERTY(BlueprintReadOnly)
     TArray<FName> CompletedEncounterChoices;
     UPROPERTY(BlueprintReadOnly)

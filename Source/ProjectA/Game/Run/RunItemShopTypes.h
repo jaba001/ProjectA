@@ -109,6 +109,22 @@ struct PROJECTA_API FRunItemShopState
     UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Rarity")
     FRunItemRarityProbabilityState RarityProbabilities;
 
+    // Version zero preserves the original five-slot shop; new Runs freeze the visited shop profile.
+    // 버전 0은 기존 5칸 상점을 보존하며 새 Run은 방문한 상점의 상품 조건을 고정합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Selection")
+    int32 SelectionVersion = 0;
+
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Selection")
+    FName ActiveEncounterId;
+
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Selection")
+    FGameplayTagQuery ActiveItemQuery;
+
+    // Basic shops require five products; specialized shops use up to five eligible products.
+    // 기본 상점은 상품 5개를 요구하며 전문 상점은 적격 상품을 최대 5개 사용합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Selection")
+    int32 ActiveStockPolicyVersion = 0;
+
     static FName GetEncounterId() { return TEXT("Shop_02"); }
     static FName GetRerollOfferId() { return TEXT("ItemShopReroll"); }
 };

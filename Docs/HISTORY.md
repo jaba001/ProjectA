@@ -677,3 +677,21 @@ UE 5.8.3 `Build.bat -ProjectFiles -Project="C:/Users/jaba0/Desktop/MyProjects/Pr
 UE 5.8.3 `Build.bat -ProjectFiles -Project="C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject" -Game -Engine`은 9.60초, `Build.bat ProjectAEditor Win64 Development -Project="C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject" -WaitMutex -FromMsBuild -architecture=x64`는 18개 작업·36.51초로 성공했다. 근거는 `Saved/Logs/ItemRarityProbabilitiesProjectFiles.log`·`Saved/Logs/ItemRarityProbabilitiesBuild.log`다. 프로젝트 생성의 VS2022/.NET 10 안내는 기존 C++/Automation 솔루션 분리 조건이며, 재생성된 `Automation_ProjectA.sln`의 580줄은 내용·개수가 같고 순서만 바뀌어 함께 반영했다.
 
 확률 CSV 재읽기·합계 100%·5색 고유 태그·UTF-8 BOM/CRLF와 기존 무기 CSV 보존을 확인하고 `probabilities_preview.png`를 검토했다. 근거는 `Saved/Automation/ItemRarityProbabilities/CsvValidation.json`·`StaticVerification.json`이다. 문서 10개의 로컬 파일·앵커 링크 670개와 전체 diff 정적 검사를 통과했다. TODO의 기존 채택 체크 7개와 미완료 항목을 보존하고 새 확률 회귀·작동 확인만 추가했다. 문서 검사 결과는 `Saved/Automation/TodoRecommended/DocumentationValidation.json`이다.
+
+### 9-28 2026-10-08 상점 분류와 인카운터 가중치
+
+사용자의 기본상점·등급별상점·태그별상점 구성과 인카운터 풀 가중치·CSV 정리 요청을 반영했다. [ENCOUNTER_POOL.csv](../DataCatalogs/ENCOUNTER_POOL.csv)는 기존 18개 ID를 보존하고 신규 25개를 추가한 15열·43행이다. `활성 여부` 1인 28개는 기본 1·등급별 5·기존 `Item.Weapon` 종류 태그별 19·회복/소모품/부활 서비스 3개이며 나머지 15개는 기존 저장·과거 기획 기록이다. 신규 기본상점은 `Shop_Item_Basic`, 전문 상점은 `Shop_Item_Rarity_*`·`Shop_Item_Tag_*` ID를 사용하며 기존 `TargetOffer_03/04/05`의 서비스 ID를 유지한다. 이전 스킬상점과 속성별 무기상점 ID를 새 상점으로 재사용하지 않고 속성 태그를 추정하지 않는다.
+
+그룹 가중치는 기본 40·등급 전체 20·태그 전체 20·회복 10·소모품 7·부활 3이다. 그룹을 먼저 추첨하고 해당 그룹의 변형을 추첨하여 같은 ID 없이 3개를 제시한다. 선택한 ID·고갈 그룹·0 가중치를 제외해 재정규화하며 변형 수가 그룹 총비중을 늘리지 않는다. 활성 행의 0 가중치 후보는 저장된 풀에 보존하되 추첨에서 제외한다. 등급 상점 내부 가중치는 흰색 50·초록색 30·파란색 15·보라색 4·주황색 1, 태그 상점은 각각 1이다. 상점 변형 가중치는 기존 `ITEM_RARITY_PROBABILITIES.csv`의 상품 등급 확률과 별도 데이터다. [기획 기준](GAME_DESIGN.md#2-3-상점-분류와-인카운터-가중치)
+
+새 일반 Run만 CSV의 활성 풀·그룹/변형 가중치·상품 Query·진열 정책을 읽어 고정하고 `FRunTargetState.EncounterSelectionVersion=1`과 `EncounterSeed`를 저장한다. 동일 전투·방문 회차의 제시를 재현하여 Continue·저장 검증에서 현재 CSV로 재추첨하지 않는다. 기존 정책 버전 0의 목표 Run은 당시 고정 순환과 선택 이력을 유지하고 prototype·개발 협동 경로도 보존한다. 새 아이템상점은 `SelectionVersion=1`에 `ActiveEncounterId/ActiveItemQuery/ActiveStockPolicyVersion`을 저장하여 입장·리롤·재개에서 같은 상점 조건을 사용한다.
+
+기본상점은 중복 없는 상품 5개, 전문 상점은 적격 상품 수와 5 중 작은 수를 진열한다. 주황색 2개·마법서 1개 등 소수 후보를 지원하고 양수 그룹/변형 가중치와 인카운터 Query를 만족하는 선택 가능 상점에 적격 상품이 0개이면 새 Run 설정을 거절한다. 기존 상품 등급 확률·에셋별 고정 등급·무기 스킬 Query·가격/리롤 1G·시작 장비·전투 수치는 유지한다. 새 확률을 기존 저장에 소급 적용하지 않으며 원본 에셋·온라인 서비스·신규 보상 구현은 포함하지 않는다. 인카운터 CSV를 UFS 패키징 목록에 추가한다.
+
+`ProjectA.Run.Shop.Profiles`의 `FixedAndSpecializedStock`·`EligibilityAndAtomicity`·`FrozenSaveAndLegacyPolicy` 회귀 소스를 추가했다. 기본 5개·등급 2개·태그 1개 진열, 필터 전환/리롤·0 확률·스킬 적합성·실패 시 전체 상태 보존·저장된 필터와 기존 균등/가중 5칸 상점 보존을 검사하며 실행 결과와 구분한다.
+
+`ProjectA.Run.EncounterPool`에 CSV 오류·초기화 원자성, 그룹/변형 추첨·0 가중치·고갈·기존 60회차 순환, 저장 시드·Query·CSV 표시 문구 직렬화 회귀 소스 3개를 추가했다. 기존 거래 검증은 기본상점이 제시되는 시험용 저장 시드를 사용하고 이전 Run fixture는 새 정책 메타데이터를 초기화한다. 저장된 인카운터 표시 문구는 문자열을 비교하며 나머지 필드를 그대로 검사한다.
+
+CSV 재읽기에서 15열·43행·활성 28개·보존 15개·그룹 가중치 합 100을 확인했다. 289개 아이템과 대조하여 25개 상품 조건의 등록 태그·양수 확률 후보 수를 정적으로 확인했다. 근거는 `Saved/Automation/EncounterShops/CsvValidation.json`·`CatalogValidation.json`이며 실제 스킬 생성 실행과 구분한다. 문서 10개의 로컬 파일·앵커 링크 685개와 diff 검사를 통과했고 링크 근거는 `Saved/Automation/TodoRecommended/DocumentationValidation.json`이다.
+
+`Build.bat -ProjectFiles -Project=ProjectA.uproject -Game -Engine`(6.12초)와 `Build.bat ProjectAEditor Win64 Development -Project=ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`(26 actions, 41.88초)가 성공했다. 로그는 `Saved/Logs/EncounterShopsProjectFiles.log`·`Saved/Logs/EncounterShopsBuild.log`다. 새 CSV 파서·가중 추첨·상품 필터·저장 검증·회귀 소스를 포함한 최신 컴파일과 코드 정적 검토 결과이며 게임·PIE·자동화 테스트는 실행하지 않았다. 실제 상점 필터·소수 후보 진열·구매/리롤·CSV 변경 후 새/기존 Run·Continue 확인은 [TODO 26절](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남겼다.

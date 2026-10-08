@@ -29,8 +29,28 @@ struct PROJECTA_API FRunEncounterOffer
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter", meta = (Categories = "Encounter"))
     FGameplayTag EncounterTag;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, Category = "Encounter|Items")
+    FGameplayTagQuery ItemQuery;
+
+    // Zero retains five-item stock; specialized new shops may show fewer available distinct assets.
+    // 0은 기존 5개 진열을 유지하며 새 전문 상점은 가용한 서로 다른 에셋만 진열합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, Category = "Encounter|Items")
+    int32 ItemStockPolicyVersion = 0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, Category = "Encounter|Selection")
+    FGameplayTag SelectionGroupTag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, Category = "Encounter|Selection")
+    float GroupWeight = 0.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, Category = "Encounter|Selection")
+    float VariantWeight = 0.0f;
+
     static FGameplayTag GetSkillShopTag();
     static FGameplayTag GetItemShopTag();
+    static FGameplayTag GetBasicItemShopTag();
+    static FGameplayTag GetRarityItemShopTag();
+    static FGameplayTag GetTagItemShopTag();
     static FGameplayTag GetRecoveryTag();
     static FGameplayTag GetRevivalTag();
     static FGameplayTag GetConsumableShopTag();

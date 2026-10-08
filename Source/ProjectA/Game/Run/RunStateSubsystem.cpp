@@ -7,6 +7,7 @@
 #include "Game/Run/RunProgressRules.h"
 #include "Game/Run/RunSaveFormat.h"
 #include "Game/Run/RunItemShopCatalog.h"
+#include "Game/Run/RunItemRarityProbabilities.h"
 #include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
@@ -208,6 +209,33 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
         return false;
     }
     const bool bItemShopSelected = Save->EncounterProgress.IsItemShop();
+    if (Save->ItemShopState.SelectionVersion != Save->TargetRun.EncounterSelectionVersion) return false;
+    if (Save->ItemShopState.SelectionVersion == 1)
+    {
+        if (Save->WeaponSkillAcquisitionVersion != 1 || Save->ItemShopState.RarityProbabilities.SchemaVersion != 1) return false;
+        // Validate selectable shops against their frozen catalog, then bind saved stock to its encounter profile.
+        // 선택 가능한 상점의 저장된 카탈로그 적합성을 확인하고 진열 상태를 인카운터 조건에 연결합니다.
+        for (const FRunEncounterOffer& Shop : Save->TargetRun.EncounterPool)
+        {
+            if (!Shop.IsItemShop() || Shop.GroupWeight <= 0.0f || Shop.VariantWeight <= 0.0f) continue;
+            FGameplayTagContainer ShopTags(Shop.GetResolvedTag());
+            ShopTags.AddTag(Shop.SelectionGroupTag);
+            if (!Save->TargetRun.EncounterQuery.IsEmpty() && !Save->TargetRun.EncounterQuery.Matches(ShopTags)) continue;
+            TArray<int32> EligibleItems;
+            if (!RunItemRarityProbabilities::GetEligibleIndices(Save->ItemShopState.Catalog, Save->ItemShopState.RarityProbabilities, Shop.ItemQuery, EligibleItems, OutError, FrozenWeaponRules)) return false;
+            if (EligibleItems.Num() < (Shop.ItemStockPolicyVersion == 1 ? 1 : 5))
+            {
+                OutError = FText::Format(NSLOCTEXT("RunItemShop", "EmptyProfile", "{0}의 조건에 맞는 상품이 부족합니다. 인카운터 태그와 등급 확률을 확인하세요."), Shop.DisplayName);
+                return false;
+            }
+        }
+        if (Save->ItemShopState.Revision > 0)
+        {
+            const FRunEncounterOffer* ActiveShop = Save->TargetRun.EncounterPool.FindByPredicate([Save](const FRunEncounterOffer& Shop) { return Shop.EncounterId == Save->ItemShopState.ActiveEncounterId; });
+            if (!ActiveShop || !ActiveShop->IsItemShop() || ActiveShop->ItemStockPolicyVersion != Save->ItemShopState.ActiveStockPolicyVersion || !FGameplayTagQuery::StaticStruct()->CompareScriptStruct(&ActiveShop->ItemQuery, &Save->ItemShopState.ActiveItemQuery, 0)) return false;
+            if (bItemShopSelected && Save->EncounterProgress.SelectedEncounterId != Save->ItemShopState.ActiveEncounterId) return false;
+        }
+    }
     if (Save->ItemShopState.SchemaVersion == 1 && ((Save->EncounterProgress.SchemaVersion != 1 && Save->EncounterProgress.SchemaVersion != 2) || (bItemShopSelected && Save->ItemShopState.Revision <= 0) || (!Route.bRepeatEncounters && (Save->ItemShopState.Revision > 0) != bItemShopSelected))) return false;
     TSet<FSoftObjectPath> DisplayedItemAssets;
     for (const FRunItemShopOffer& Offer : Save->ItemShopState.Offers)
@@ -1331,7 +1359,11 @@ bool URunStateSubsystem::SelectRunEncounter(FName EncounterId)
         ++Save->TargetRun.Recovery.Revision;
     }
     const FRunWeaponSkillRulesState* FrozenWeaponRules = Save->WeaponSkillRules.SchemaVersion == 1 ? &Save->WeaponSkillRules : nullptr;
-    if (Offer->IsItemShop() && Save->ItemShopState.SchemaVersion == 1 && !RunItemShopCatalog::Roll(Save->ItemShopState, false, FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag()), SaveError, FrozenWeaponRules)) return false;
+    if (Offer->IsItemShop() && Save->ItemShopState.SchemaVersion == 1)
+    {
+        const bool bRolled = Save->ItemShopState.SelectionVersion == 1 ? RunItemShopCatalog::BeginVisit(Save->ItemShopState, Offer->EncounterId, Offer->ItemQuery, Offer->ItemStockPolicyVersion, SaveError, FrozenWeaponRules) : RunItemShopCatalog::Roll(Save->ItemShopState, false, FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag()), SaveError, FrozenWeaponRules);
+        if (!bRolled) return false;
+    }
     if (!Offer->IsItemShop() && !Offer->IsService() && URunEncounterPoolDataAsset::GetSkillShopOfferCount(Save->SkillShopState) > 0 && !URunEncounterPoolDataAsset::RollSkillShop(Save->SkillShopState, true, SaveError)) return false;
     return CommitSaveCandidate(Save.Get(), SaveError);
 }
@@ -1423,7 +1455,7 @@ bool URunStateSubsystem::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, 
     if (bItemReroll)
     {
         const FRunWeaponSkillRulesState* FrozenWeaponRules = Save->WeaponSkillRules.SchemaVersion == 1 ? &Save->WeaponSkillRules : nullptr;
-        if (!RunItemShopCatalog::Roll(Save->ItemShopState, false, FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag()), OutError, FrozenWeaponRules)) return false;
+        if (!RunItemShopCatalog::Reroll(Save->ItemShopState, OutError, FrozenWeaponRules)) return false;
     }
     else if (bSkillReroll)
     {

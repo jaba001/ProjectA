@@ -6,6 +6,7 @@
 #include "DataAsset/RunWeaponSkillRulesDataAsset.h"
 #include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunItemRarityProbabilities.h"
+#include "Game/Run/RunEncounterPool.h"
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Unit/UnitDataRules.h"
 
@@ -19,6 +20,8 @@ bool URunStateSubsystem::ConfigureTargetRun(URunSaveGame* Save, FText& OutError)
     const URunWeaponSkillRulesDataAsset* WeaponRules = PartyDefinition && PartyDefinition->WeaponSkillRules ? PartyDefinition->WeaponSkillRules.Get() : GetDefault<URunWeaponSkillRulesDataAsset>();
     if (!WeaponRules->BuildState(Save->WeaponSkillRules, OutError)) return false;
     if (!RunItemRarityProbabilities::Load(Save->ItemShopState.RarityProbabilities, OutError)) return false;
+    if (!RunEncounterPool::Load(Save->TargetRun, OutError)) return false;
+    Save->ItemShopState.SelectionVersion = 1;
     Save->SkillShopState = FRunSkillShopState();
     Save->TargetRun.EncounterPool.RemoveAll([](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag().MatchesTag(FRunEncounterOffer::GetSkillShopTag()); });
     Save->Nodes = RunProgressRules::GetTargetRoute().Nodes;

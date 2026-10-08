@@ -77,7 +77,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 ## 3 파티와 전투 규약
 
-2026-10-06 새 일반 Target Run은 `WeaponSkillAcquisitionVersion=1`로 스킬상점을 제외하고 장착 무기 스킬을 사용한다. 제안 15~19 선택 1과 추가 결정 위임에 따라 비무장 기본 공격·시작 무기 생성 시 부여·무기당 1스킬·1G를 시험값으로 적용했다. 현재 새 카탈로그의 5등급은 에셋별 CSV 값으로 고정하고 해당 등급·무기 태그의 스킬만 추첨하며 전투 수치는 유지한다. 새 일반 Run의 아이템상점은 별도로 저장한 [등급별 확률](GAME_DESIGN.md#2-4-5-아이템-등급별-등장-확률)을 사용한다. 무기 스킬 도입 전 Run과 명시적 prototype·개발 협동은 버전 0의 기존 상점/습득 경로를 유지한다. 최신 구현·검증 상태는 [HISTORY 9-27](HISTORY.md#9-27-2026-10-08-아이템-등급별-등장-확률), 작동 확인은 [TODO 29절](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)을 따른다.
+2026-10-06 새 일반 Target Run은 `WeaponSkillAcquisitionVersion=1`로 스킬상점을 제외하고 장착 무기 스킬을 사용한다. 제안 15~19 선택 1과 추가 결정 위임에 따라 비무장 기본 공격·시작 무기 생성 시 부여·무기당 1스킬·1G를 시험값으로 적용했다. 현재 새 카탈로그의 5등급은 에셋별 CSV 값으로 고정하고 해당 등급·무기 태그의 스킬만 추첨하며 전투 수치는 유지한다. 새 일반 Run의 아이템상점은 별도로 저장한 [등급별 확률](GAME_DESIGN.md#2-4-5-아이템-등급별-등장-확률)을 사용한다. 무기 스킬 도입 전 Run과 명시적 prototype·개발 협동은 버전 0의 기존 상점/습득 경로를 유지한다. 최신 상점 구현·검증 상태는 [HISTORY 9-28](HISTORY.md#9-28-2026-10-08-상점-분류와-인카운터-가중치), 작동 확인은 [TODO 29절](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)을 따른다.
 
 ### 3-1 시작 장비와 장착
 
@@ -125,11 +125,11 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 카탈로그가 없는 기존 schema 1은 고정 상품에서 삭제 스킬을 제외하고 두 기본 공격·골드를 유지하며 새 리롤 규칙을 소급 적용하지 않는다. 회복 필드 누락은 기본값 1G로 읽는다. schema 0에는 상품·골드를 소급 지급하지 않으며 명시 장착이 없는 기존 파티의 직업 기본값도 남은 두 기본 공격으로 제한한다. RunSaveGame에는 전체 상태를 저장하고 GameState 표시 뷰에는 현재 진열·비용·Revision 등 표시 상태를 전달하여 후보 `Catalog/Query`를 복제하지 않는다. 이전 상점 실행 결과는 [과거 검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
-2026-09-25 아이템상점 시험: [WEAPON_ASSETS.csv](../DataCatalogs/WEAPON_ASSETS.csv)의 방패·탄환·화살·기타를 포함한 현재 289개를 사용하고 `가격(G)`은 모두 1이다. 현재 CSV는 `무기 종류,위치,에셋 이름,가격(G),게임 내 이름,등급,분류 근거`의 7열이다. 새 Run은 `게임 내 이름`을 표시하고 에셋별 `등급`을 카탈로그에 고정하며 첫 입장과 1G 리롤마다 중복 없는 5개를 추첨한다. 같은 이름을 시작 장비·인벤토리·장비창에서도 사용하며 기존 저장의 고정 카탈로그·상품·보유 사본은 저장 당시 이름을 유지한다. 이전 4열 CSV는 원본 이름을 사용하고 5열부터 빈 게임 내 이름을 거절한다. 4/5열은 기존 등급 정책을 유지하며 6열의 `등급`은 5개 색 이름과 정확히 일치해야 한다. 7열의 `분류 근거`는 빈 값·공백만 있는 값·제어 문자·256자 초과를 거절하며 잘못된 행은 기존 카탈로그 출력을 보존한다. 표시명은 식별자가 아니며 경로 기반 ID·GameplayTag 분류·장착 프로필은 유지한다. 이전 진열·구매 상품은 다음 리롤에서 다시 등장할 수 있다. 구매한 슬롯은 판매 완료로 바뀌고 `FRunPartyMember.Items`의 개인 보유 사본으로 추가한다. 구매와 장착은 별도 명령이다.
+2026-09-25 아이템상점 시험: [WEAPON_ASSETS.csv](../DataCatalogs/WEAPON_ASSETS.csv)의 방패·탄환·화살·기타를 포함한 현재 289개를 사용하고 `가격(G)`은 모두 1이다. 현재 CSV는 `무기 종류,위치,에셋 이름,가격(G),게임 내 이름,등급,분류 근거`의 7열이다. 새 Run은 `게임 내 이름`을 표시하고 에셋별 `등급`을 카탈로그에 고정하며 첫 입장과 1G 리롤마다 기본상점은 중복 없는 5개, 등급별·태그별 전문 상점은 조건에 맞는 최대 5개를 추첨한다. 같은 이름을 시작 장비·인벤토리·장비창에서도 사용하며 기존 저장의 고정 카탈로그·상품·보유 사본은 저장 당시 이름을 유지한다. 이전 4열 CSV는 원본 이름을 사용하고 5열부터 빈 게임 내 이름을 거절한다. 4/5열은 기존 등급 정책을 유지하며 6열의 `등급`은 5개 색 이름과 정확히 일치해야 한다. 7열의 `분류 근거`는 빈 값·공백만 있는 값·제어 문자·256자 초과를 거절하며 잘못된 행은 기존 카탈로그 출력을 보존한다. 표시명은 식별자가 아니며 경로 기반 ID·GameplayTag 분류·장착 프로필은 유지한다. 이전 진열·구매 상품은 다음 리롤에서 다시 등장할 수 있다. 구매한 슬롯은 판매 완료로 바뀌고 `FRunPartyMember.Items`의 개인 보유 사본으로 추가한다. 구매와 장착은 별도 명령이다.
 
-새 일반 Target Run을 구성하는 `ConfigureTargetRun`은 [ITEM_RARITY_PROBABILITIES.csv](../DataCatalogs/ITEM_RARITY_PROBABILITIES.csv)를 읽어 `FRunItemShopState.RarityProbabilities`에 확률 스키마 1을 저장한다. 각 항목에는 `RarityTag`와 정수 0~10000의 `ProbabilityBasisPoints`를 보관하며 확률의 전체 합은 10000이다. 최초 진열·재입장·리롤마다 적격 후보의 등급을 먼저 추첨하고 같은 등급 안에서 에셋을 균등 추첨한다. 동일 진열의 에셋 중복은 금지하고 등급 반복은 허용한다. 빈 등급·소진·0%는 제외하여 다시 정규화하고 양수 확률의 적격 에셋이 5개 미만이면 기존 상태를 보존하며 실패한다. CSV 변경은 이후 새 일반 Run에만 반영한다. 확률 스키마 0·빈 목록의 이전 저장은 고정 등급 도입 이후 생성분도 기존 아이템 균등 추첨을 유지하며 prototype·개발 협동·지정된 직업별 시작 장비의 선택은 변경하지 않는다. [확률표와 적용 범위](GAME_DESIGN.md#2-4-5-아이템-등급별-등장-확률)
+새 일반 Target Run을 구성하는 `ConfigureTargetRun`은 [ITEM_RARITY_PROBABILITIES.csv](../DataCatalogs/ITEM_RARITY_PROBABILITIES.csv)를 읽어 `FRunItemShopState.RarityProbabilities`에 확률 스키마 1을 저장한다. 각 항목에는 `RarityTag`와 정수 0~10000의 `ProbabilityBasisPoints`를 보관하며 확률의 전체 합은 10000이다. 최초 진열·재입장·리롤마다 적격 후보의 등급을 먼저 추첨하고 같은 등급 안에서 에셋을 균등 추첨한다. 동일 진열의 에셋 중복은 금지하고 등급 반복은 허용한다. 빈 등급·소진·0%는 제외하여 다시 정규화하고 기본상점은 양수 확률의 적격 에셋이 5개 미만이면 기존 상태를 보존하며 실패한다. 전문 상점은 저장된 Query 안에서 적격 에셋 수와 5 중 작은 수를 진열한다. CSV 변경은 이후 새 일반 Run에만 반영한다. 확률 스키마 0·빈 목록의 이전 저장은 고정 등급 도입 이후 생성분도 기존 아이템 균등 추첨을 유지하며 prototype·개발 협동·지정된 직업별 시작 장비의 선택은 변경하지 않는다. [확률표와 적용 범위](GAME_DESIGN.md#2-4-5-아이템-등급별-등장-확률)
 
-프로젝트 루트 `DataCatalogs/`에 무기·아이템 등급 확률·스킬 이펙트·스킬 생성 현황·SFX·인카운터 풀·몬스터 CSV를 함께 보관한다. 런타임은 `DataCatalogs/WEAPON_ASSETS.csv`와 `DataCatalogs/ITEM_RARITY_PROBABILITIES.csv`를 읽고 빌드의 UFS RuntimeDependency에도 두 경로를 지정한다. VFX·SFX CSV는 원본 설치·퇴역 이력과 새 생성 상태를 기록하는 목록이다. 기존 카탈로그 생성 도구는 폐기 상태를 유지하고 새 생성 입력은 `DrGameSkillSpecs.json`을 사용한다.
+프로젝트 루트 `DataCatalogs/`에 무기·아이템 등급 확률·스킬 이펙트·스킬 생성 현황·SFX·인카운터 풀·몬스터 CSV를 함께 보관한다. 런타임은 `DataCatalogs/WEAPON_ASSETS.csv`·`DataCatalogs/ITEM_RARITY_PROBABILITIES.csv`·`DataCatalogs/ENCOUNTER_POOL.csv`를 읽고 빌드의 UFS RuntimeDependency에도 세 경로를 지정한다. VFX·SFX CSV는 원본 설치·퇴역 이력과 새 생성 상태를 기록하는 목록이다. 기존 카탈로그 생성 도구는 폐기 상태를 유지하고 새 생성 입력은 `DrGameSkillSpecs.json`을 사용한다.
 
 CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한다. 앞뒤 공백·선행 `+`·선행 0은 허용하며 소수·접미 문자·쉼표·지수 표기·범위 초과는 카탈로그 전체를 거절하고 기존 출력을 보존한다. 기존 4/5열 CSV와 저장된 카탈로그의 해석을 유지하며 같은 가격 검증을 6/7열에도 적용한다.
 
@@ -139,15 +139,17 @@ CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한�
 |---|---|
 | `URunEncounterPoolDataAsset` | 기존 경로의 `FixedOffers`에 인카운터 3개, `FixedSkillOffers/SkillShopPool/SkillShopQuery`에 스킬 후보·태그 조건, `Recovery`에 전체 회복 가격, `StartingGold`에 개인 시작 골드 정의. 인카운터 후보 3개는 고정 제시 |
 | `FRunSkillShopState` | schema 1의 `Catalog/Offers/Query/Revision/RerollPrice`에 스킬 후보·가용 후보 최대 5개 진열·태그 조건·변경 버전·현재 리롤 비용 저장. 기존 개발 경로는 근접 공격 1종·신규 60종의 61후보. 이전 고정 상품·확정 카탈로그 저장 보존 |
-| `FRunEncounterOffer` | `EncounterId`·`DisplayName`·`Type`·`EncounterTag`의 USTRUCT 값 데이터. `GetResolvedTag/IsSupportedEncounter/IsService/IsItemShop/GetDisplayName`으로 태그 분류·표시 이름 해석 |
+| `FRunEncounterOffer` | 안정 ID·표시명·인카운터 태그·등장 그룹/가중치·상품 Query·진열 규칙의 USTRUCT 값 데이터. `GetResolvedTag/IsSupportedEncounter/IsService/IsItemShop/GetDisplayName`으로 태그 분류·표시 이름 해석 |
 | `FRunEncounterProgress` | schema·제시 목록·선택 ID·퇴장 완료 여부·`AfterCompletedNodeCount` 방문 회차. Run 저장과 GameState 표시 뷰에 포함 |
-| `UPartyDefinitionDataAsset::RunEncounterPool` | 일반 상점 상품·태그 조건·시작 골드 정의. 기존 경로의 인카운터 기본값은 스킬상점·아이템상점·상점3이며 목표 Run 후보는 `TargetRunDefinition`에서 별도로 고정 |
+| `UPartyDefinitionDataAsset::RunEncounterPool` | 일반 상점 상품·태그 조건·시작 골드 정의. 기존 경로의 인카운터 기본값은 스킬상점·아이템상점·상점3이며 새 일반 Target Run의 후보는 CSV에서 읽어 별도로 고정 |
 
 기존 경로의 상점 풀을 직접 편집하려면 `Content/User_JeHoon/Blueprint/DataAsset` 아래에 `RunEncounterPoolDataAsset` 유형의 DataAsset을 만들고 `DA_VerticalSliceParty.RunEncounterPool`에 연결한다. 서로 다른 ID와 이름을 가진 Shop 인카운터 3개에 `Encounter.Shop.Skill` 또는 `Encounter.Shop.Item` 태그를 지정한다. 기본 동작에는 에셋 생성·WBP 재생성이 필요 없다. 정의는 새 Run 초기화 시 분류 태그·표시 이름을 포함한 값으로 복사하며 진행 중 풀 수정으로 저장된 선택지가 바뀌지 않는다.
 
-[ENCOUNTER_POOL.csv](../DataCatalogs/ENCOUNTER_POOL.csv)는 기존 상점 3개·미연동 속성별 상점 10개와 목표 Run의 실제 `TargetOffer_01`~`TargetOffer_05`를 기록한 18행 목록이다. 기존 13행과 미정 속성·빈 가중치를 보존하며 추가 5행은 native 정의의 ID·분류 태그·시험 가격·서비스 규칙과 대응한다. 목표 후보는 저장된 정의와 태그 조건에 따라 고정 순환으로 제시하며 CSV 자체를 런타임에 읽지 않는다. 속성별 상품 필터·확률 가중치 제시는 미구현이다. [확정 범위와 미정 항목](GAME_DESIGN.md#2-3-속성별-상점-인카운터)
+[ENCOUNTER_POOL.csv](../DataCatalogs/ENCOUNTER_POOL.csv)는 15열·43행이며 기존 18개 ID를 보존하고 신규 상점 25개를 추가했다. 활성 28개는 기본 1·등급별 5·기존 아이템 종류 태그별 19·기존 서비스 3개다. `활성 여부` 1/0으로 활성 행과 기존 저장·과거 기획 기록 15개를 구분한다. `TargetOffer_03/04/05`의 기존 회복·소모품·부활 서비스 ID는 유지하고 기존 기본/스킬/속성 상점 ID를 새 전문 상점으로 재사용하지 않는다. 상품 필터는 실제 `Item.Weapon.*`·`Item.Rarity.*` 태그를 사용하며 표시명·속성 추정으로 판정하지 않는다. [분류와 가중치 기준](GAME_DESIGN.md#2-3-상점-분류와-인카운터-가중치)
 
-향후 인카운터 후보의 확률 제시는 정의와 별도의 `FRunEncounterPoolEntry` USTRUCT에 정의 ID/참조·상대 가중치·출현 구간·조건을 두는 구성을 권장한다. 에디터 중심 편집은 DataAsset의 배열, 대량 수치·CSV 편집이 필요하면 `FTableRowBase` 기반 DataTable을 사용한다. 추첨은 Host에서 확정하고 제시 결과를 Run에 저장한다. 인카운터 후보의 가중치·추첨은 미구현이며 스킬·아이템상점 상품의 시험 추첨·리롤과 구분한다.
+CSV 열은 `인카운터 ID,게임 내 이름,상점 종류,속성,분류 태그,판매 대상,활성 여부,그룹 태그,그룹 가중치,변형 가중치,상품 필수 태그,상품 제외 태그,진열 정책,구현 상태,확인 사항`이다. 필수 태그는 모두 일치해야 하고 제외 태그는 하나라도 일치하면 제외한다. 아이템상점의 진열 정책은 `기본5`·`최대5`를 사용한다.
+
+새 일반 Run 생성 때 CSV의 활성 후보·그룹/변형 가중치·상품 Query·진열 정책과 `FRunTargetState.EncounterSelectionVersion=1`·`EncounterSeed`를 값으로 고정한다. 새 `FRunItemShopState.SelectionVersion=1`의 `ActiveEncounterId/ActiveItemQuery/ActiveStockPolicyVersion`에는 방문한 상점의 ID·필터·진열 정책을 저장한다. 그룹을 먼저, 해당 그룹의 변형을 다음으로 추첨하여 중복 ID 없이 3개를 제시하며 선택한 ID와 고갈된 그룹은 제외하고 재정규화한다. 같은 Run의 전투·방문 회차에는 저장된 시드로 같은 제시를 재현하고 Continue·검증 중 현재 CSV를 다시 읽지 않는다. 이전 목표 Run은 기존 고정 순환과 저장된 후보를 유지한다. 활성 행의 0 가중치 후보는 풀에 보존하되 추첨에서 제외한다. 입장·리롤 모두 선택한 상점의 저장된 Query를 적용하며 양수 그룹/변형 가중치와 인카운터 Query를 만족하는 선택 가능 상점에 적격 상품이 0개이면 새 Run 설정에서 거절한다. 컴파일·정적 검사와 실제 실행 확인은 [HISTORY 9-28](HISTORY.md#9-28-2026-10-08-상점-분류와-인카운터-가중치)을 따른다.
 
 전이는 후보 저장 객체에 계산하고 저장 성공 후 선택·퇴장 상태를 반영한다. 실패하면 기존 상태를 유지하며 같은 버튼으로 재시도한다. 기존 schema 0의 상점 없는 경로와 schema 1의 10전투 상점 흐름을 유지하며 새 목표 Run의 인카운터 schema 2와 구분한다. 상점 내부 재개·관리 lease·Host 진행 권한은 [MULTIPLAYER](MULTIPLAYER.md), 진행·저장 검증 범위는 [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다.
 
@@ -468,9 +470,9 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 
 ### 5-1 목표 Run과 회복 시험 데이터
 
-`UTargetRunDefinitionDataAsset`의 기본 정의 또는 PartyDefinition의 선택적 정의를 새 싱글 Run 생성 때 값으로 고정한다. `FRunTargetState` schema 1은 10묶음의 적 편성·로컬 Snapshot·성장·골드 후보·인카운터 선택과 회복 규칙을 보존한다. 각 전투 전에 후보 3개 중 하나를 고르는 인카운터를 세 번 방문한다. 지원 태그와 `GameplayTagQuery`로 적격 후보를 정하고 개발 시험은 고정 순환으로 제시한다.
+`UTargetRunDefinitionDataAsset`의 기본 정의 또는 PartyDefinition의 선택적 정의를 새 싱글 Run 생성 때 값으로 고정한다. `FRunTargetState` schema 1은 10묶음의 적 편성·로컬 Snapshot·성장·골드 후보·인카운터 선택과 회복 규칙을 보존한다. 각 전투 전에 후보 3개 중 하나를 고르는 인카운터를 세 번 방문한다. 새 일반 Run은 CSV 기반 인카운터 선택 정책·가중치·시드와 GameplayTagQuery를 추가로 저장하며 이전 정책의 목표 Run은 고정 순환을 유지한다. [인카운터 저장과 추첨](#3-2-상점-인카운터)
 
-새 일반 Run의 기본 후보는 아이템상점·회복소·소모품상점·부활소이며 스킬상점을 제외한다. 기존 목표 Run 저장의 고정 후보는 그대로 유지한다. PvE 적은 기존 10종에서 묶음별 1~4마리로 지정하며, 최대 HP +5와 속도 +1은 PvE 승리마다 적용한다. 현재 HP를 자동 회복하지 않으며 Snapshot은 성장·골드를 지급하지 않는다. 묶음 i(0~9)의 PvE 골드 후보는 5+i·7+i·10+i다. 최종 난이도와 구분한 사용자 위임 시험값이다.
+새 일반 Run의 활성 후보는 기본·등급별·태그별 상점과 회복소·소모품상점·부활소이며 스킬상점을 제외한다. 기존 목표 Run 저장의 고정 후보는 그대로 유지한다. PvE 적은 기존 10종에서 묶음별 1~4마리로 지정하며, 최대 HP +5와 속도 +1은 PvE 승리마다 적용한다. 현재 HP를 자동 회복하지 않으며 Snapshot은 성장·골드를 지급하지 않는다. 묶음 i(0~9)의 PvE 골드 후보는 5+i·7+i·10+i다. 최종 난이도와 구분한 사용자 위임 시험값이다.
 
 회복 소모품은 정식 `DA_HealthPotion`의 GAS Instant Heal과 `Item.Consumable.Healing` 태그를 사용한다. HP 25/AP 1, 시작 1개·추가 구입 1G이며 습득 스킬 목록과 별도로 보관하며 소모품 종류는 최대 5개로 제한한다. 일반 스킬 카탈로그·장착·Snapshot 스킬 필드는 `Item.Consumable` 태그를 거절하고 소모품 재고만 정식 DA 경로를 보존한다. 본인 생존 Human의 부상 상태에서만 사용할 수 있고 실제 회복 발동 성공 후 수량 1개를 차감한다. 발동 전 사망·중단은 수량을 소모하지 않는다. 비용 차감 전 Ready 경계에 HP/AP·재고·정식 DA·명령을 함께 저장하며 복구 시 해당 경계부터 다시 실행한다. HP·재고는 다음 준비 완료 또는 결과 경계에서 함께 저장하고 진행 중 임의 시점 저장은 추가하지 않는다.
 
