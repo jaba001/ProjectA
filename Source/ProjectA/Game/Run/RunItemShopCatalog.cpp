@@ -1,11 +1,11 @@
 #include "Game/Run/RunItemShopCatalog.h"
+#include "Game/Run/RunItemRarityProbabilities.h"
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
 #include "NativeGameplayTags.h"
 #include "Serialization/Csv/CsvParser.h"
-#include "Types/GameplayTagCandidateSelection.h"
 #include "UObject/TextProperty.h"
 
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ItemWeapon, "Item.Weapon");
@@ -98,7 +98,7 @@ namespace
         return Tag ? *Tag : FGameplayTag();
     }
 
-    FGameplayTag FindRarityTag(const FString& Rarity)
+    const TMap<FString, FName>& GetRarityTagNames()
     {
         static const TMap<FString, FName> RarityTags =
         {
@@ -108,8 +108,7 @@ namespace
             {TEXT("보라색"), TEXT("Item.Rarity.Purple")},
             {TEXT("주황색"), TEXT("Item.Rarity.Orange")}
         };
-        const FName* Tag = RarityTags.Find(Rarity);
-        return Tag ? FGameplayTag::RequestGameplayTag(*Tag, false) : FGameplayTag();
+        return RarityTags;
     }
 
     bool ValidateCatalog(const TArray<FRunItemDefinition>& Catalog)
@@ -128,6 +127,22 @@ namespace
 FGameplayTag RunItemShopCatalog::GetWeaponTag()
 {
     return TAG_ItemWeapon;
+}
+
+FGameplayTag RunItemShopCatalog::ResolveRarityTag(const FString& Name)
+{
+    const FName* Tag = GetRarityTagNames().Find(Name);
+    return Tag ? FGameplayTag::RequestGameplayTag(*Tag, false) : FGameplayTag();
+}
+
+bool RunItemShopCatalog::IsSupportedRarityTag(FGameplayTag Tag)
+{
+    if (!Tag.IsValid()) return false;
+    for (const TPair<FString, FName>& Entry : GetRarityTagNames())
+    {
+        if (Tag == FGameplayTag::RequestGameplayTag(Entry.Value, false)) return true;
+    }
+    return false;
 }
 
 bool RunItemShopCatalog::ValidateItem(const FRunItemDefinition& Item)
@@ -213,7 +228,7 @@ bool RunItemShopCatalog::LoadFromString(FString CsvText, TArray<FRunItemDefiniti
         const FGameplayTag CategoryTag = FindCategoryTag(Row[0]);
         Item.Asset = FSoftObjectPath(FString::Printf(TEXT("%s/%s.%s"), Row[1], Row[2], Row[2]));
         Item.DisplayName = FText::FromString(Row[bHasGameName ? 4 : 2]);
-        if (bHasRarity) Item.CatalogRarityTag = FindRarityTag(Row[5]);
+        if (bHasRarity) Item.CatalogRarityTag = ResolveRarityTag(Row[5]);
         Item.Tags.AddTag(TAG_ItemWeapon);
         if (CategoryTag.IsValid()) Item.Tags.AddTag(CategoryTag);
         if ((bHasRarity && !Item.CatalogRarityTag.IsValid()) || (bHasRationale && !IsValidDisplayName(Row[6])))
@@ -241,13 +256,21 @@ bool RunItemShopCatalog::Validate(const FRunItemShopState& State, FText& OutErro
 {
     OutError = FText::GetEmpty();
     if (WeaponSkillRules && !RunWeaponSkillRules::Validate(*WeaponSkillRules, OutError)) return false;
-    if (State.SchemaVersion == 0 && State.Catalog.IsEmpty() && State.Offers.IsEmpty() && State.Revision == 0 && State.RerollPrice == 1) return true;
+    if (!RunItemRarityProbabilities::Validate(State.RarityProbabilities, OutError)) return false;
+    if (State.SchemaVersion == 0 && State.Catalog.IsEmpty() && State.Offers.IsEmpty() && State.Revision == 0 && State.RerollPrice == 1 && State.RarityProbabilities.SchemaVersion == 0) return true;
     const auto Fail = [&OutError]()
     {
         OutError = NSLOCTEXT("RunItemShop", "InvalidShopState", "아이템 상점의 저장된 상품·가격·갱신 상태가 올바르지 않습니다.");
         return false;
     };
     if (State.SchemaVersion != 1 || !ValidateCatalog(State.Catalog) || State.Revision < 0 || State.RerollPrice <= 0) return Fail();
+    if (State.RarityProbabilities.SchemaVersion == 1)
+    {
+        for (const FRunItemDefinition& Item : State.Catalog)
+        {
+            if (!State.RarityProbabilities.Entries.ContainsByPredicate([&Item](const FRunItemRarityProbability& Entry) { return Entry.RarityTag == Item.CatalogRarityTag; })) return Fail();
+        }
+    }
     if (State.Revision == 0) return State.Offers.IsEmpty() ? true : Fail();
     if (State.Offers.Num() != OfferCount) return Fail();
 
@@ -259,6 +282,7 @@ bool RunItemShopCatalog::Validate(const FRunItemShopState& State, FText& OutErro
         if (Offer.OfferId.IsNone() || Offer.OfferId == FRunItemShopState::GetRerollOfferId() || OfferIds.Contains(Offer.OfferId) || !ValidateItem(Offer.Item)) return Fail();
         const FRunItemDefinition* CatalogItem = State.Catalog.FindByPredicate([&Offer](const FRunItemDefinition& Item) { return Item.Asset == Offer.Item.Asset; });
         if (!CatalogItem || !IsSameBaseDefinition(*CatalogItem, Offer.Item)) return Fail();
+        if (State.RarityProbabilities.SchemaVersion == 1 && !State.RarityProbabilities.Entries.ContainsByPredicate([&Offer](const FRunItemRarityProbability& Entry) { return Entry.RarityTag == Offer.Item.CatalogRarityTag && Entry.ProbabilityBasisPoints > 0; })) return Fail();
         if (bGenerated)
         {
             if (!RunWeaponSkillRules::ValidateGeneratedCopy(Offer.Item, *WeaponSkillRules, OutError) || ItemInstanceIds.Contains(Offer.Item.ItemInstanceId)) return Fail();
@@ -279,21 +303,9 @@ bool RunItemShopCatalog::Roll(FRunItemShopState& State, bool bAllowDuplicates, c
         return false;
     }
 
-    TArray<FGameplayTagWeightedCandidate> Candidates;
-    Candidates.Reserve(State.Catalog.Num());
-    for (const FRunItemDefinition& Item : State.Catalog)
-    {
-        FGameplayTagWeightedCandidate& Candidate = Candidates.AddDefaulted_GetRef();
-        Candidate.Tags = Item.Tags;
-        Candidate.BaseWeight = WeaponSkillRules && WeaponSkillRules->SchemaVersion == 1 && !RunWeaponSkillRules::CanGenerate(Item, *WeaponSkillRules) ? 0.0f : 1.0f;
-    }
     FRandomStream Random(FMath::Rand());
     TArray<int32> SelectedIndices;
-    if (!GameplayTagCandidateSelection::Select(Candidates, Query, OfferCount, bAllowDuplicates, Random, SelectedIndices))
-    {
-        OutError = NSLOCTEXT("RunItemShop", "InsufficientCandidates", "태그 조건을 만족하는 아이템 상점 후보가 부족합니다.");
-        return false;
-    }
+    if (!RunItemRarityProbabilities::Select(State.Catalog, State.RarityProbabilities, Query, OfferCount, bAllowDuplicates, Random, SelectedIndices, OutError, WeaponSkillRules)) return false;
 
     TArray<FRunItemShopOffer> Offers;
     Offers.Reserve(OfferCount);

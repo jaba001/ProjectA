@@ -59,6 +59,34 @@ struct PROJECTA_API FRunItemShopOffer
 };
 
 USTRUCT(BlueprintType)
+struct PROJECTA_API FRunItemRarityProbability
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Rarity")
+    FGameplayTag RarityTag;
+
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Rarity")
+    int32 ProbabilityBasisPoints = 0;
+};
+
+// Freeze shop selection independently of fixed item grades and generated weapon skill rules.
+// 고정 아이템 등급·부여 스킬 규칙과 별개로 상점 추첨 정책을 저장합니다.
+USTRUCT(BlueprintType)
+struct PROJECTA_API FRunItemRarityProbabilityState
+{
+    GENERATED_BODY()
+
+    // Missing policy metadata preserves the original uniform item selection in older Runs.
+    // 정책 메타데이터가 없으면 기존 Run의 아이템 균등 추첨을 유지합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Rarity")
+    int32 SchemaVersion = 0;
+
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Rarity")
+    TArray<FRunItemRarityProbability> Entries;
+};
+
+USTRUCT(BlueprintType)
 struct PROJECTA_API FRunItemShopState
 {
     GENERATED_BODY()
@@ -77,6 +105,9 @@ struct PROJECTA_API FRunItemShopState
 
     UPROPERTY(BlueprintReadOnly, Category = "Shop")
     int32 RerollPrice = 1;
+
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Rarity")
+    FRunItemRarityProbabilityState RarityProbabilities;
 
     static FName GetEncounterId() { return TEXT("Shop_02"); }
     static FName GetRerollOfferId() { return TEXT("ItemShopReroll"); }

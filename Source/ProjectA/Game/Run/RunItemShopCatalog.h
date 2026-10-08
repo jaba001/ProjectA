@@ -8,6 +8,8 @@ struct FRunWeaponSkillRulesState;
 namespace RunItemShopCatalog
 {
     PROJECTA_API FGameplayTag GetWeaponTag();
+    PROJECTA_API FGameplayTag ResolveRarityTag(const FString& Name);
+    PROJECTA_API bool IsSupportedRarityTag(FGameplayTag Tag);
     PROJECTA_API bool Load(TArray<FRunItemDefinition>& OutCatalog, FText& OutError);
     PROJECTA_API bool LoadFromString(FString CsvText, TArray<FRunItemDefinition>& OutCatalog, FText& OutError);
     PROJECTA_API bool Roll(FRunItemShopState& State, bool bAllowDuplicates, const FGameplayTagQuery& Query, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules = nullptr);

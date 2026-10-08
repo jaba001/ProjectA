@@ -663,3 +663,17 @@ UE 5.8.3 `Build.bat -ProjectFiles -Project="C:/Users/jaba0/Desktop/MyProjects/Pr
 `ProjectA.Run.Shop.CatalogAuthoredRarity`, `ProjectA.Run.WeaponSkills.AuthoredRarityAndFrozenSave` 회귀 소스를 추가하고 `DevelopmentRuleData`에 실제 카탈로그 등급·무기 후보 호환 검사를 보완했다. UE 5.8.3 `Build.bat ProjectAEditor Win64 Development -Project="C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject" -WaitMutex -FromMsBuild -architecture=x64`는 UHT 포함 19개 작업·46.50초로 성공했다. 로그는 `Saved/Logs/ItemRarityBuild.log`다. 추가 회귀는 컴파일만 수행했으며 게임·PIE·Unreal 자동화 테스트는 실행하지 않았다. [TODO 29절](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)의 새 Run 표시·구매/장착·Continue·기존 저장 보존과 사본 외형 확인은 미완료로 유지한다.
 
 문서 10개의 로컬 파일·앵커 링크 654개와 `git diff --check`를 통과했다. `verify_catalog.py`로 기존 5열·289개 원본 해시·등급과 근거의 전 행 일치·경로 중복 없음·UTF-8 BOM/CRLF를 확인했다. TODO의 채택 체크 7개와 미완료 항목을 유지하고 완료 작업 체크나 빈 절을 추가하지 않았다. 문서 검사 결과는 `Saved/Automation/TodoRecommended/DocumentationValidation.json`이다.
+
+### 9-27 2026-10-08 아이템 등급별 등장 확률
+
+사용자의 등급별 확률·CSV 기록 요청과 권장안 위임에 따라 [ITEM_RARITY_PROBABILITIES.csv](../DataCatalogs/ITEM_RARITY_PROBABILITIES.csv)에 흰색 50%·초록색 30%·파란색 15%·보라색 4%·주황색 1%의 개발 기본값을 추가했다. 기본·실전형 장비의 공급과 상위 외형의 희소성을 구분한 초기값이며 최종 밸런스 검증과 구분한다. 5열은 등급·기존 GAS 등급 태그·확률·아이템상점 범위·비고다. 5색의 중복·누락·이름/태그 불일치, 범위·비고 오류와 잘못된 수치를 거절한다. 확률은 소수 둘째 자리까지 0~100을 허용하고 0.01% 단위 정수의 합계 10000을 검사한다. 에셋별 등급·이름·가격을 담은 기존 무기 CSV는 변경하지 않았다.
+
+새 일반 Run 생성의 `ConfigureTargetRun`에서만 확률 목록·버전 1을 `ItemShopState.RarityProbabilities`에 저장하고 최초 진열·다음 방문·리롤은 저장된 정책을 사용한다. `RunItemRarityProbabilities::Select`는 아이템 태그와 기준 등급 태그·스킬 적합성으로 후보를 선별하고 공통 `GameplayTagCandidateSelection`으로 등급을 먼저, 해당 등급 안에서 에셋을 균등 추첨한다. 같은 진열의 에셋은 중복하지 않으며 비어 있거나 소진된 등급은 제외하고 재정규화한다. 0%는 대체 후보로 사용하지 않는다. 적격 에셋 부족 등 실패 시 상품·Revision과 선택 API의 출력·주입 난수 상태를 보존한다. 기존 `Roll`의 전역 난수 시드 생성 방식은 유지한다.
+
+확률 필드가 없는 기존 Run은 에셋별 고정 등급을 사용하는 저장도 버전 0의 기존 균등 아이템 추첨을 유지한다. 현재 CSV로 저장된 카탈로그·상품·보유 사본·스킬을 이관하거나 재추첨하지 않는다. 직업별 지정 시작 장비·무기 스킬 후보·가격 1G·전투 수치·에셋과 장착 지원 범위는 변경하지 않았다. 상점 테마·전리품·인카운터 확률로 범위를 확대하지 않았다. 패키징의 UFS 목록에 확률 CSV를 추가했다. [기획 기준](GAME_DESIGN.md#2-4-5-아이템-등급별-등장-확률)
+
+`ProjectA.Run.Shop.RarityProbabilities` 아래 `CsvValidation`·`GradeFirstSelection`·`EligibilityAndAtomicity`·`FrozenSaveAndLegacyPolicy` 회귀 소스를 추가했다. 등급별 에셋 개수가 다른 카탈로그의 동일 시드 등급 선택, 첫 슬롯 분포와 등급 내 균등 추첨, Query·스킬 부적합·0%·소진·중복 제한·실패 보존·저장 왕복·기존 균등 결과를 검사한다. 독립 정적 리뷰에서 추가 결함을 찾지 못했다. 게임·PIE·자동화 테스트는 실행하지 않았으며 [TODO 29절](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)의 실제 상점·CSV 변경 이후 저장 복원·회귀 실행 확인은 미완료다.
+
+UE 5.8.3 `Build.bat -ProjectFiles -Project="C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject" -Game -Engine`은 9.60초, `Build.bat ProjectAEditor Win64 Development -Project="C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject" -WaitMutex -FromMsBuild -architecture=x64`는 18개 작업·36.51초로 성공했다. 근거는 `Saved/Logs/ItemRarityProbabilitiesProjectFiles.log`·`Saved/Logs/ItemRarityProbabilitiesBuild.log`다. 프로젝트 생성의 VS2022/.NET 10 안내는 기존 C++/Automation 솔루션 분리 조건이며, 재생성된 `Automation_ProjectA.sln`의 580줄은 내용·개수가 같고 순서만 바뀌어 함께 반영했다.
+
+확률 CSV 재읽기·합계 100%·5색 고유 태그·UTF-8 BOM/CRLF와 기존 무기 CSV 보존을 확인하고 `probabilities_preview.png`를 검토했다. 근거는 `Saved/Automation/ItemRarityProbabilities/CsvValidation.json`·`StaticVerification.json`이다. 문서 10개의 로컬 파일·앵커 링크 670개와 전체 diff 정적 검사를 통과했다. TODO의 기존 채택 체크 7개와 미완료 항목을 보존하고 새 확률 회귀·작동 확인만 추가했다. 문서 검사 결과는 `Saved/Automation/TodoRecommended/DocumentationValidation.json`이다.

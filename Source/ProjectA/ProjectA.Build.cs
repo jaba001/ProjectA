@@ -11,6 +11,7 @@ public class ProjectA : ModuleRules
         // Stage the authored catalog at the same project-relative path for packaged reads.
         // 패키지에서도 같은 프로젝트 상대 경로로 읽도록 원본 카탈로그를 포함합니다.
         RuntimeDependencies.Add("$(ProjectDir)/DataCatalogs/WEAPON_ASSETS.csv", StagedFileType.UFS);
+        RuntimeDependencies.Add("$(ProjectDir)/DataCatalogs/ITEM_RARITY_PROBABILITIES.csv", StagedFileType.UFS);
 
 		PublicDependencyModuleNames.AddRange(new string[] {
 			"Core",
