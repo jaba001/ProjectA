@@ -64,7 +64,7 @@ namespace
     bool BuildSelectionData(const TArray<FRunItemDefinition>& Catalog, const FRunItemRarityProbabilityState& State, const FGameplayTagQuery& Query, TArray<FGameplayTagWeightedCandidate>& OutCandidates, TArray<int32>& OutEligibleIndices, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
     {
         if (!RunItemRarityProbabilities::Validate(State, OutError) || (WeaponSkillRules && !RunWeaponSkillRules::Validate(*WeaponSkillRules, OutError))) return false;
-        OutError = NSLOCTEXT("ItemRarityProbabilities", "InvalidCatalog", "등급별 추첨에는 유효한 원본 아이템 카탈로그와 양수 상품 개수가 필요합니다.");
+        OutError = NSLOCTEXT("ItemRarityProbabilities", "InvalidCatalog", "등급별 추첨에는 유효한 원본 아이템 카탈로그와 양수 선택 개수가 필요합니다.");
         if (Catalog.IsEmpty()) return false;
         TSet<FSoftObjectPath> Assets;
         OutCandidates.Reserve(Catalog.Num());
@@ -99,7 +99,7 @@ bool RunItemRarityProbabilities::Load(FRunItemRarityProbabilityState& OutState, 
 
 bool RunItemRarityProbabilities::LoadFromString(FString CsvText, FRunItemRarityProbabilityState& OutState, FText& OutError)
 {
-    OutError = NSLOCTEXT("ItemRarityProbabilities", "InvalidCsv", "아이템 등급 확률 CSV의 열·5개 등급·태그·상점 범위·비고 또는 확률이 올바르지 않습니다.");
+    OutError = NSLOCTEXT("ItemRarityProbabilities", "InvalidCsv", "아이템 등급 확률 CSV의 열·5개 등급·태그·적용 범위·비고 또는 확률이 올바르지 않습니다.");
     const FCsvParser Parser(MoveTemp(CsvText));
     const FCsvParser::FRows& Rows = Parser.GetRows();
     if (Rows.Num() != SupportedRarityCount + 1 || Rows[0].Num() != 5) return false;
@@ -113,7 +113,8 @@ bool RunItemRarityProbabilities::LoadFromString(FString CsvText, FRunItemRarityP
         const TArray<const TCHAR*>& Row = Rows[RowIndex];
         if (Row.Num() != UE_ARRAY_COUNT(Headers)) return false;
         const FGameplayTag Tag = RunItemShopCatalog::ResolveRarityTag(Row[0]);
-        if (!Tag.IsValid() || Tag.ToString() != Row[1] || FCString::Strcmp(Row[3], TEXT("아이템상점")) != 0 || !IsValidNote(Row[4])) return false;
+        const FString Scope(Row[3]);
+        if (!Tag.IsValid() || Tag.ToString() != Row[1] || (Scope != TEXT("아이템상점") && Scope != TEXT("아이템상점·전투보상")) || !IsValidNote(Row[4])) return false;
         FRunItemRarityProbability Entry;
         Entry.RarityTag = Tag;
         if (!ParseProbability(Row[2], Entry.ProbabilityBasisPoints)) return false;
@@ -162,7 +163,7 @@ bool RunItemRarityProbabilities::Select(const TArray<FRunItemDefinition>& Catalo
     TArray<FGameplayTagWeightedCandidate> Candidates;
     TArray<int32> EligibleIndices;
     if (!BuildSelectionData(Catalog, State, Query, Candidates, EligibleIndices, OutError, WeaponSkillRules)) return false;
-    OutError = NSLOCTEXT("ItemRarityProbabilities", "InsufficientCandidates", "태그·등급 확률·스킬 조건을 만족하는 아이템 상점 후보가 부족합니다.");
+    OutError = NSLOCTEXT("ItemRarityProbabilities", "InsufficientCandidates", "태그·등급 확률·스킬 조건을 만족하는 아이템 후보가 부족합니다.");
     if (Count <= 0 || EligibleIndices.IsEmpty() || (!bAllowDuplicates && EligibleIndices.Num() < Count)) return false;
     FRandomStream SelectionRandom = Random;
     TArray<int32> SelectedIndices;

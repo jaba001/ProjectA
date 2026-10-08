@@ -8,6 +8,7 @@
 #include "Game/Run/RunSaveFormat.h"
 #include "Game/Run/RunItemShopCatalog.h"
 #include "Game/Run/RunItemRarityProbabilities.h"
+#include "Game/Run/RunCombatRewards.h"
 #include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
@@ -138,20 +139,30 @@ void URunStateSubsystem::AutoSaveCheckpoint()
 bool URunStateSubsystem::ValidateGoldRewardState(const URunSaveGame* Save) const
 {
     const FRunGoldRewardState& Reward = Save->GoldRewardState;
-    const bool bEmpty = Reward.NodeId.IsNone() && Reward.GoldChoices.IsEmpty() && Reward.Claims.IsEmpty();
+    const bool bItemReward = Reward.SchemaVersion == 2;
+    const bool bEmpty = Reward.NodeId.IsNone() && Reward.GoldChoices.IsEmpty() && Reward.Claims.IsEmpty() && Reward.ItemChoices.IsEmpty() && Reward.BonusGold == 0;
+    if (!bItemReward && (!Reward.ItemChoices.IsEmpty() || Reward.BonusGold != 0)) return false;
+    if (bItemReward && (Save->TargetRun.SchemaVersion != 1 || Save->WeaponSkillAcquisitionVersion != 1)) return false;
     if (Save->TargetRun.SchemaVersion == 1)
     {
         const bool bRewardPhase = Save->Phase == ERunPhase::Result || Save->Phase == ERunPhase::EncounterChoice || Save->Phase == ERunPhase::Shop || Save->Phase == ERunPhase::Map;
         const bool bPveReward = bRewardPhase && Save->Result == ECombatResult::Victory && Save->CompletedNodes.Num() % 2 != 0;
         if (!bPveReward) return Reward.SchemaVersion == 0 && bEmpty;
         const int32 GroupIndex = Save->CompletedNodes.Num() / 2;
-        if (!Save->TargetRun.Groups.IsValidIndex(GroupIndex) || Reward.SchemaVersion != 1 || Reward.GoldChoices != Save->TargetRun.Groups[GroupIndex].GoldChoices) return false;
+        if (!Save->TargetRun.Groups.IsValidIndex(GroupIndex)) return false;
+        if (bItemReward)
+        {
+            FText RewardError;
+            if (!RunCombatRewards::Validate(Reward, Save->ItemShopState, Save->WeaponSkillRules, Save->TargetRun.Groups[GroupIndex].GoldChoices, RewardError)) return false;
+        }
+        else if (Reward.SchemaVersion != 1 || Reward.GoldChoices != Save->TargetRun.Groups[GroupIndex].GoldChoices) return false;
     }
     if (Reward.SchemaVersion == 0) return bEmpty;
-    if (Reward.SchemaVersion != 1) return false;
+    if (Reward.SchemaVersion != 1 && !bItemReward) return false;
     const bool bPostVictory = Save->Phase == ERunPhase::Result || Save->Phase == ERunPhase::EncounterChoice || Save->Phase == ERunPhase::Shop || Save->Phase == ERunPhase::Complete;
     if (bEmpty) return !bPostVictory;
-    if (Save->Result != ECombatResult::Victory || Save->CompletedNodes.IsEmpty() || Reward.NodeId != Save->CompletedNodes.Last() || Reward.NodeId != Save->CurrentNode || Reward.GoldChoices.Num() != 3 || Reward.Claims.Num() > Save->Party.Num() || (!bPostVictory && Save->Phase != ERunPhase::Map)) return false;
+    const int32 ChoiceCount = bItemReward ? Reward.ItemChoices.Num() : Reward.GoldChoices.Num();
+    if (Save->Result != ECombatResult::Victory || Save->CompletedNodes.IsEmpty() || Reward.NodeId != Save->CompletedNodes.Last() || Reward.NodeId != Save->CurrentNode || ChoiceCount != 3 || Reward.Claims.Num() > Save->Party.Num() || (!bPostVictory && Save->Phase != ERunPhase::Map)) return false;
     for (int32 Amount : Reward.GoldChoices)
     {
         if (Amount <= 0) return false;
@@ -162,8 +173,29 @@ bool URunStateSubsystem::ValidateGoldRewardState(const URunSaveGame* Save) const
     for (const FRunGoldRewardClaim& Claim : Reward.Claims)
     {
         const FRunPartyMember* Member = Save->Party.FindByPredicate([&Claim](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.CharacterId == Claim.CharacterId; });
-        if (!Member || !Member->bHasSkillLoadout || !Claim.CharacterId.IsValid() || Member->OwnerAccountId.IsEmpty() || (bSinglePlayer && !Member->bPlayerControlled) || Claimed.Contains(Claim.CharacterId) || !Reward.GoldChoices.IsValidIndex(Claim.ChoiceIndex)) return false;
+        if (!Member || !Member->bHasSkillLoadout || !Claim.CharacterId.IsValid() || Member->OwnerAccountId.IsEmpty() || (bSinglePlayer && !Member->bPlayerControlled) || Claimed.Contains(Claim.CharacterId) || Claim.ChoiceIndex < 0 || Claim.ChoiceIndex >= ChoiceCount) return false;
         Claimed.Add(Claim.CharacterId);
+    }
+    if (bItemReward)
+    {
+        // A claimed generated copy belongs to its recipient exactly once; unselected copies never enter inventory.
+        // 수령한 생성 사본은 해당 수령인의 인벤토리에 한 번만 존재하며 미선택 사본은 지급되지 않습니다.
+        for (int32 Index = 0; Index < Reward.ItemChoices.Num(); ++Index)
+        {
+            const FRunItemDefinition& Choice = Reward.ItemChoices[Index];
+            const FRunGoldRewardClaim* Claim = Reward.Claims.FindByPredicate([Index](const FRunGoldRewardClaim& Entry) { return Entry.ChoiceIndex == Index; });
+            int32 OwnedCount = 0;
+            for (const FRunPartyMember& Member : Save->Party)
+            {
+                for (const FRunItemDefinition& Item : Member.Items)
+                {
+                    if (Item.ItemInstanceId != Choice.ItemInstanceId) continue;
+                    if (!Claim || Claim->CharacterId != Member.CharacterId || !RunItemShopCatalog::IsSameDefinition(Choice, Item)) return false;
+                    ++OwnedCount;
+                }
+            }
+            if (OwnedCount != (Claim ? 1 : 0)) return false;
+        }
     }
     if (Save->Phase != ERunPhase::Result)
     {
@@ -1228,9 +1260,21 @@ bool URunStateSubsystem::CompleteEncounter(ECombatResult Result, const TMap<int3
         Save->GoldRewardState = FRunGoldRewardState();
         if (CompletedNodes.Num() % 2 == 0)
         {
-            Save->GoldRewardState.SchemaVersion = 1;
-            Save->GoldRewardState.NodeId = CurrentNodeId;
-            Save->GoldRewardState.GoldChoices = TargetRun.Groups[CompletedNodes.Num() / 2].GoldChoices;
+            if (UsesWeaponSkills())
+            {
+                if (PendingGoldRewardState.NodeId != CurrentNodeId || PendingGoldRewardState.SchemaVersion != 2)
+                {
+                    FRandomStream RewardRandom(FMath::Rand());
+                    if (!RunCombatRewards::Build(CurrentNodeId, ItemShopState, WeaponSkillRules, TargetRun.Groups[CompletedNodes.Num() / 2].GoldChoices, RewardRandom, PendingGoldRewardState, SaveError)) return false;
+                }
+                Save->GoldRewardState = PendingGoldRewardState;
+            }
+            else
+            {
+                Save->GoldRewardState.SchemaVersion = 1;
+                Save->GoldRewardState.NodeId = CurrentNodeId;
+                Save->GoldRewardState.GoldChoices = TargetRun.Groups[CompletedNodes.Num() / 2].GoldChoices;
+            }
         }
     }
     else if (Result == ECombatResult::Victory && (GoldRewardState.SchemaVersion == 1 || SkillShopState.SchemaVersion == 1))
@@ -1275,7 +1319,7 @@ bool URunStateSubsystem::AbortEncounter()
 
 TArray<FGuid> URunStateSubsystem::GetGoldRewardRecipientIds() const
 {
-    if (GoldRewardState.SchemaVersion != 1 || GoldRewardState.NodeId.IsNone()) return {};
+    if ((GoldRewardState.SchemaVersion != 1 && GoldRewardState.SchemaVersion != 2) || GoldRewardState.NodeId.IsNone()) return {};
     return ResolveGoldRewardRecipients(RunIdentity, Participation, PartyMembers, bManagedRun);
 }
 
@@ -1283,7 +1327,8 @@ bool URunStateSubsystem::CanContinueAfterRewards() const
 {
     if (Phase != ERunPhase::Result || LastResult != ECombatResult::Victory) return false;
     if (GoldRewardState.SchemaVersion == 0) return true;
-    if (GoldRewardState.SchemaVersion != 1 || GoldRewardState.NodeId != CurrentNodeId || GoldRewardState.GoldChoices.Num() != 3) return false;
+    const int32 ChoiceCount = GoldRewardState.SchemaVersion == 2 ? GoldRewardState.ItemChoices.Num() : GoldRewardState.GoldChoices.Num();
+    if ((GoldRewardState.SchemaVersion != 1 && GoldRewardState.SchemaVersion != 2) || GoldRewardState.NodeId != CurrentNodeId || ChoiceCount != 3) return false;
     for (const FGuid& CharacterId : GetGoldRewardRecipientIds())
     {
         if (!GoldRewardState.Claims.ContainsByPredicate([CharacterId](const FRunGoldRewardClaim& Claim) { return Claim.CharacterId == CharacterId; })) return false;
@@ -1294,20 +1339,23 @@ bool URunStateSubsystem::CanContinueAfterRewards() const
 bool URunStateSubsystem::SelectGoldReward(const FRunAccountId& AccountId, FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex, FText& OutError)
 {
     OutError = NSLOCTEXT("RunGoldReward", "Unavailable", "현재 전투 보상을 선택할 수 없습니다.");
-    if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::Result || LastResult != ECombatResult::Victory || GoldRewardState.SchemaVersion != 1 || ExpectedNodeId != CurrentNodeId || GoldRewardState.NodeId != ExpectedNodeId || !GoldRewardState.GoldChoices.IsValidIndex(ChoiceIndex)) return false;
+    const bool bItemReward = GoldRewardState.SchemaVersion == 2;
+    const bool bValidChoice = bItemReward ? GoldRewardState.ItemChoices.IsValidIndex(ChoiceIndex) : GoldRewardState.GoldChoices.IsValidIndex(ChoiceIndex);
+    if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::Result || LastResult != ECombatResult::Victory || (GoldRewardState.SchemaVersion != 1 && !bItemReward) || ExpectedNodeId != CurrentNodeId || GoldRewardState.NodeId != ExpectedNodeId || !bValidChoice) return false;
     OutError = NSLOCTEXT("RunGoldReward", "OwnCharacterOnly", "본인이 직접 조작하는 캐릭터의 보상만 선택할 수 있습니다.");
     if (!GetGoldRewardRecipientIds().Contains(CharacterId) || !URunIdentityLibrary::IsCharacterOwner(RunIdentity, PartyMembers, CharacterId, AccountId)) return false;
     OutError = NSLOCTEXT("RunGoldReward", "AlreadyClaimed", "이 캐릭터는 전투 보상을 이미 받았습니다.");
     if (GoldRewardState.Claims.ContainsByPredicate([CharacterId](const FRunGoldRewardClaim& Claim) { return Claim.CharacterId == CharacterId; })) return false;
     const FRunPartyMember* Member = PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.CharacterId == CharacterId; });
-    const int32 Amount = GoldRewardState.GoldChoices[ChoiceIndex];
+    const int32 Amount = bItemReward ? GoldRewardState.BonusGold : GoldRewardState.GoldChoices[ChoiceIndex];
     OutError = NSLOCTEXT("RunGoldReward", "GoldOverflow", "보유 골드가 최대값을 초과하여 보상을 받을 수 없습니다.");
     if (!Member || Member->Gold < 0 || Amount <= 0 || Member->Gold > MAX_int32 - Amount) return false;
-    // Persist the balance and receipt atomically before exposing the completed choice.
-    // 선택 완료를 공개하기 전에 잔액과 수령 내역을 한 번에 저장합니다.
+    // Persist the selected copy, common bonus and receipt together before exposing the completed choice.
+    // 선택 완료를 공개하기 전에 선택 사본·공통 골드·수령 내역을 한 번에 저장합니다.
     TStrongObjectPtr<URunSaveGame> Save(CreateSaveData());
     FRunPartyMember* RewardedMember = Save->Party.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.CharacterId == CharacterId; });
     RewardedMember->Gold += Amount;
+    if (bItemReward) RewardedMember->Items.Add(GoldRewardState.ItemChoices[ChoiceIndex]);
     FRunGoldRewardClaim& Claim = Save->GoldRewardState.Claims.AddDefaulted_GetRef();
     Claim.CharacterId = CharacterId;
     Claim.ChoiceIndex = ChoiceIndex;

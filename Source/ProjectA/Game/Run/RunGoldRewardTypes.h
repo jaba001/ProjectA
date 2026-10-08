@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Game/Run/RunItemShopTypes.h"
 #include "RunGoldRewardTypes.generated.h"
 
 USTRUCT(BlueprintType)
@@ -35,4 +36,12 @@ struct PROJECTA_API FRunGoldRewardState
 
     UPROPERTY(BlueprintReadOnly, Category = "Reward")
     TArray<FRunGoldRewardClaim> Claims;
+
+    // Version two freezes three item copies and one gold award independently of the selected card.
+    // 버전 2는 선택한 카드와 무관하게 아이템 사본 3개와 골드 보상 하나를 고정합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Reward")
+    TArray<FRunItemDefinition> ItemChoices;
+
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Reward")
+    int32 BonusGold = 0;
 };

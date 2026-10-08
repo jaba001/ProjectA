@@ -6,6 +6,8 @@
 #include "EncounterResultWidget.generated.h"
 
 class UButton;
+class UImage;
+class USizeBox;
 class UTextBlock;
 class UVerticalBox;
 class UGameplayActionButton;
@@ -44,6 +46,10 @@ private:
     FGuid RewardCharacterId;
     FName RewardNodeId;
     TArray<FName> RewardChoiceIds;
+    int32 PendingChoiceIndex = INDEX_NONE;
+
+    UPROPERTY(Transient)
+    TObjectPtr<USizeBox> ResultContentSize;
 
     UPROPERTY(Transient)
     TObjectPtr<UWidget> RewardsContainer;
@@ -53,6 +59,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> RewardInstruction;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> RewardBonusGold;
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> RewardBalance;
@@ -65,6 +74,15 @@ private:
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UTextBlock>> RewardAmounts;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<USizeBox>> RewardIconSizes;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UImage>> RewardIcons;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UTextBlock>> RewardItemDetails;
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UTextBlock>> RewardStatuses;

@@ -105,6 +105,8 @@ bool FRunItemRarityProbabilityCsvTest::RunTest(const FString& Parameters)
     FRunItemRarityProbabilityState State;
     FText Error;
     if (!TestTrue(TEXT("The complete five-grade policy loads"), RunItemRarityProbabilities::LoadFromString(Csv, State, Error) && State.SchemaVersion == 1 && State.Entries.Num() == 5)) return false;
+    FRunItemRarityProbabilityState SharedScope;
+    TestTrue(TEXT("Shared shop and combat scope preserves the same probabilities while the previous scope remains readable"), RunItemRarityProbabilities::LoadFromString(Csv.Replace(TEXT("아이템상점"), TEXT("아이템상점·전투보상")), SharedScope, Error) && SameProbabilityState(State, SharedScope));
     for (int32 Grade = 0; Grade < 5; ++Grade)
     {
         const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(ColorTags[Grade]));

@@ -14,6 +14,7 @@
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/StrongObjectPtr.h"
+#include "UObject/UnrealType.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTargetRunProgressTest, "ProjectA.Run.Target.SixtyChoicesTwentyCombats", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -121,6 +122,20 @@ bool FTargetRunSaveValuesTest::RunTest(const FString& Parameters)
 
 namespace
 {
+    bool SameTargetRewards(const FRunGoldRewardState& Left, const FRunGoldRewardState& Right)
+    {
+        if (Left.SchemaVersion != Right.SchemaVersion || Left.NodeId != Right.NodeId || Left.GoldChoices != Right.GoldChoices || Left.BonusGold != Right.BonusGold || Left.ItemChoices.Num() != Right.ItemChoices.Num() || Left.Claims.Num() != Right.Claims.Num()) return false;
+        for (int32 Index = 0; Index < Left.ItemChoices.Num(); ++Index)
+        {
+            if (!RunItemShopCatalog::IsSameDefinition(Left.ItemChoices[Index], Right.ItemChoices[Index])) return false;
+        }
+        for (int32 Index = 0; Index < Left.Claims.Num(); ++Index)
+        {
+            if (Left.Claims[Index].CharacterId != Right.Claims[Index].CharacterId || Left.Claims[Index].ChoiceIndex != Right.Claims[Index].ChoiceIndex) return false;
+        }
+        return true;
+    }
+
     bool SameTargetTransactionParty(const TArray<FRunPartyMember>& Left, const TArray<FRunPartyMember>& Right)
     {
         if (Left.Num() != Right.Num()) return false;
@@ -133,7 +148,7 @@ namespace
 
     bool SameTargetTransactionState(const URunSaveGame& Saved, const URunStateSubsystem& Run)
     {
-        return Saved.Phase == Run.GetPhase() && Saved.Result == Run.GetLastResult() && Saved.CurrentNode == Run.GetCurrentNodeId() && Saved.CurrentEncounter == Run.GetCurrentEncounterId() && Saved.CompletedNodes == Run.GetCompletedNodes() && Saved.WeaponSkillAcquisitionVersion == (Run.UsesWeaponSkills() ? 1 : 0) && FRunWeaponSkillRulesState::StaticStruct()->CompareScriptStruct(&Saved.WeaponSkillRules, &Run.GetWeaponSkillRules(), 0) && SameTargetTransactionParty(Saved.Party, Run.GetPartyMembers()) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Saved.Identity, &Run.GetRunIdentity(), 0) && FRunTargetState::StaticStruct()->CompareScriptStruct(&Saved.TargetRun, &Run.GetTargetRunState(), 0) && FRunEncounterProgress::StaticStruct()->CompareScriptStruct(&Saved.EncounterProgress, &Run.GetEncounterProgress(), 0) && FRunGoldRewardState::StaticStruct()->CompareScriptStruct(&Saved.GoldRewardState, &Run.GetGoldRewardState(), 0) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Saved.SkillShopState, &Run.GetSkillShopState(), 0) && FRunItemShopState::StaticStruct()->CompareScriptStruct(&Saved.ItemShopState, &Run.GetItemShopState(), 0);
+        return Saved.Phase == Run.GetPhase() && Saved.Result == Run.GetLastResult() && Saved.CurrentNode == Run.GetCurrentNodeId() && Saved.CurrentEncounter == Run.GetCurrentEncounterId() && Saved.CompletedNodes == Run.GetCompletedNodes() && Saved.WeaponSkillAcquisitionVersion == (Run.UsesWeaponSkills() ? 1 : 0) && FRunWeaponSkillRulesState::StaticStruct()->CompareScriptStruct(&Saved.WeaponSkillRules, &Run.GetWeaponSkillRules(), 0) && SameTargetTransactionParty(Saved.Party, Run.GetPartyMembers()) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Saved.Identity, &Run.GetRunIdentity(), 0) && FRunTargetState::StaticStruct()->CompareScriptStruct(&Saved.TargetRun, &Run.GetTargetRunState(), 0) && FRunEncounterProgress::StaticStruct()->CompareScriptStruct(&Saved.EncounterProgress, &Run.GetEncounterProgress(), 0) && SameTargetRewards(Saved.GoldRewardState, Run.GetGoldRewardState()) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Saved.SkillShopState, &Run.GetSkillShopState(), 0) && FRunItemShopState::StaticStruct()->CompareScriptStruct(&Saved.ItemShopState, &Run.GetItemShopState(), 0);
     }
 
     struct FTargetRunTransactionFixture
@@ -178,6 +193,15 @@ namespace
             TArray<uint8> Bytes;
             UGameplayStatics::LoadDataFromSlot(Bytes, Slot, 0);
             return Bytes;
+        }
+
+        bool BeginNextSyntheticCombat()
+        {
+            while (Run->GetPhase() == ERunPhase::EncounterChoice)
+            {
+                if (Run->GetEncounterProgress().Offers.Num() != 3 || !Run->SelectRunEncounter(Run->GetEncounterProgress().Offers[0].EncounterId) || !Run->LeaveRunEncounter()) return false;
+            }
+            return Run->GetPhase() == ERunPhase::Map && Run->GetNodes().IsValidIndex(Run->GetCompletedNodes().Num()) && Run->BeginEncounter(Run->GetNodes()[Run->GetCompletedNodes().Num()].NodeId) && Run->MarkCombatStarted();
         }
 
         bool FreezeInitialBasicShop()
@@ -290,10 +314,14 @@ bool FTargetRunDurableSyntheticResultsTest::RunTest(const FString& Parameters)
         if (bPve)
         {
             ++PveResults;
-            if (!TestTrue(TEXT("PvE requires exactly the frozen three-way reward before Continue"), Fixture.Run->GetGoldRewardState().SchemaVersion == 1 && Fixture.Run->GetGoldRewardState().GoldChoices == Group.GoldChoices && !Fixture.Run->CanContinueAfterRewards() && !Fixture.Run->ContinueRun())) return false;
+            const FRunGoldRewardState Rewards = Fixture.Run->GetGoldRewardState();
+            const FRunPartyMember BeforeClaim = Fixture.Run->GetPartyMembers()[0];
+            if (!TestTrue(TEXT("PvE requires three fixed items and one gold award within its frozen group range before Continue"), Rewards.SchemaVersion == 2 && Rewards.GoldChoices.IsEmpty() && Rewards.ItemChoices.Num() == 3 && Rewards.BonusGold >= FMath::Min3(Group.GoldChoices[0], Group.GoldChoices[1], Group.GoldChoices[2]) && Rewards.BonusGold <= FMath::Max3(Group.GoldChoices[0], Group.GoldChoices[1], Group.GoldChoices[2]) && !Fixture.Run->CanContinueAfterRewards() && !Fixture.Run->ContinueRun())) return false;
             const int32 Choice = (CombatIndex / 2) % 3;
             if (!TestTrue(TEXT("The original human claims the public PvE reward"), Fixture.Run->SelectGoldReward(BuyerAccount, BuyerId, Node, Choice, Fixture.Error) && Fixture.ReloadBoundary(*this))) return false;
-            ExpectedGold += Group.GoldChoices[Choice];
+            const FRunPartyMember& AfterClaim = Fixture.Run->GetPartyMembers()[0];
+            TestTrue(TEXT("Claiming appends only the displayed copy without changing equipped skills or slots"), AfterClaim.Items.Num() == BeforeClaim.Items.Num() + 1 && RunItemShopCatalog::IsSameDefinition(AfterClaim.Items.Last(), Rewards.ItemChoices[Choice]) && AfterClaim.Skills == BeforeClaim.Skills && AfterClaim.InnateSkills == BeforeClaim.InnateSkills && FRunEquipmentState::StaticStruct()->CompareScriptStruct(&BeforeClaim.Equipment, &AfterClaim.Equipment, 0));
+            ExpectedGold += Rewards.BonusGold;
             TestFalse(TEXT("An accepted reward cannot be claimed twice after reloading"), Fixture.Run->SelectGoldReward(BuyerAccount, BuyerId, Node, Choice, Fixture.Error));
         }
         else
@@ -320,6 +348,117 @@ bool FTargetRunDurableSyntheticResultsTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Direct standalone loading also rejects completed progress"), Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error));
     TestTrue(TEXT("Rejected completion requests preserve the terminal bytes and in-memory completion"), CompletedBytes == Fixture.ReadBytes() && Fixture.Run->GetPhase() == ERunPhase::Complete);
     return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTargetRunItemRewardAtomicTest, "ProjectA.Run.Target.ItemRewards.AtomicResultAndClaimRetry", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTargetRunItemRewardAtomicTest::RunTest(const FString& Parameters)
+{
+    FTargetRunTransactionFixture Fixture;
+    if (!TestTrue(TEXT("A normal weapon-based Target Run reaches its first synthetic PvE"), Fixture.InitializeEveryProfession() && Fixture.BeginNextSyntheticCombat())) return false;
+    TStrongObjectPtr<URunSaveGame> BeforeResult(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+    if (!TestNotNull(TEXT("The preceding stable boundary remains durable before result generation"), BeforeResult.Get())) return false;
+    // Synthetic combat has no confirmed turn checkpoint, so retain the stable file separately from its current public state.
+    // 합성 전투에는 확정 턴 체크포인트가 없으므로 안정된 파일과 현재 공개 상태를 따로 보관합니다.
+    BeforeResult->Phase = Fixture.Run->GetPhase();
+    BeforeResult->Result = Fixture.Run->GetLastResult();
+    BeforeResult->CurrentNode = Fixture.Run->GetCurrentNodeId();
+    BeforeResult->CurrentEncounter = Fixture.Run->GetCurrentEncounterId();
+    BeforeResult->GoldRewardState = Fixture.Run->GetGoldRewardState();
+    const TArray<uint8> BeforeResultBytes = Fixture.ReadBytes();
+    int32 Publications = 0;
+    Fixture.Run->OnRunStateChanged.AddLambda([&Publications]() { ++Publications; });
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("An injected result write failure rejects the new item and gold offer"), Fixture.Run->CompleteEncounter(ECombatResult::Victory));
+    TestTrue(TEXT("Failed result publication preserves every public value, previous save bytes and event count"), SameTargetTransactionState(*BeforeResult.Get(), *Fixture.Run.Get()) && BeforeResultBytes == Fixture.ReadBytes() && Publications == 0);
+    // Inspect only the unpublished test fixture value; production does not expose a reroll or pending-reward API.
+    // 테스트 fixture의 미공개 값만 조회하며 운영 코드에 재추첨·대기 보상 API를 노출하지 않습니다.
+    const FStructProperty* PendingProperty = FindFProperty<FStructProperty>(URunStateSubsystem::StaticClass(), TEXT("PendingGoldRewardState"));
+    if (!TestTrue(TEXT("The private pending reward is reflected with its expected structure"), PendingProperty && PendingProperty->Struct == FRunGoldRewardState::StaticStruct())) return false;
+    const FRunGoldRewardState Pending = *PendingProperty->ContainerPtrToValuePtr<FRunGoldRewardState>(Fixture.Run.Get());
+    if (!TestTrue(TEXT("The rejected result retains three generated copies and its common gold privately"), Pending.SchemaVersion == 2 && Pending.ItemChoices.Num() == 3 && Pending.BonusGold > 0)) return false;
+    if (!TestTrue(TEXT("Result retry publishes the exact pending IDs grades skills and gold once"), Fixture.Run->CompleteEncounter(ECombatResult::Victory) && SameTargetRewards(Pending, Fixture.Run->GetGoldRewardState()) && Publications == 1)) return false;
+    Fixture.Run->OnRunStateChanged.Clear();
+    if (!Fixture.ReloadBoundary(*this)) return false;
+    const FRunPartyMember Buyer = Fixture.Run->GetPartyMembers()[0];
+    const FRunGoldRewardState Rewards = Fixture.Run->GetGoldRewardState();
+    const TArray<uint8> BeforeClaimBytes = Fixture.ReadBytes();
+    TStrongObjectPtr<URunSaveGame> BeforeClaim(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+    if (!BeforeClaim) return false;
+    Publications = 0;
+    Fixture.Run->OnRunStateChanged.AddLambda([&Publications]() { ++Publications; });
+    FRunCheckpointStorage::FailNextWriteForTesting();
+    TestFalse(TEXT("An injected claim write failure rejects the item gold and receipt together"), Fixture.Run->SelectGoldReward(Buyer.OwnerAccountId, Buyer.CharacterId, Rewards.NodeId, 1, Fixture.Error));
+    TestTrue(TEXT("Failed claim preserves inventory skills equipment balance receipt offers and save bytes"), SameTargetTransactionState(*BeforeClaim.Get(), *Fixture.Run.Get()) && BeforeClaimBytes == Fixture.ReadBytes() && Publications == 0);
+    if (!TestTrue(TEXT("The same claim retries with one successful publication"), Fixture.Run->SelectGoldReward(Buyer.OwnerAccountId, Buyer.CharacterId, Rewards.NodeId, 1, Fixture.Error) && Publications == 1)) return false;
+    Fixture.Run->OnRunStateChanged.Clear();
+    const FRunPartyMember& Awarded = Fixture.Run->GetPartyMembers()[0];
+    TestTrue(TEXT("Retry adds exactly the selected frozen copy and common gold while preserving active equipment and skills"), Awarded.Items.Num() == Buyer.Items.Num() + 1 && RunItemShopCatalog::IsSameDefinition(Awarded.Items.Last(), Rewards.ItemChoices[1]) && Awarded.Gold == Buyer.Gold + Rewards.BonusGold && Awarded.Skills == Buyer.Skills && Awarded.InnateSkills == Buyer.InnateSkills && FRunEquipmentState::StaticStruct()->CompareScriptStruct(&Awarded.Equipment, &Buyer.Equipment, 0));
+    TestTrue(TEXT("A successful claim leaves all three displayed choices unchanged and records only the recipient index"), Fixture.Run->GetGoldRewardState().Claims.Num() == 1 && Fixture.Run->GetGoldRewardState().Claims[0].CharacterId == Buyer.CharacterId && Fixture.Run->GetGoldRewardState().Claims[0].ChoiceIndex == 1 && Fixture.Run->GetGoldRewardState().BonusGold == Rewards.BonusGold);
+    for (int32 Index = 0; Index < Rewards.ItemChoices.Num(); ++Index)
+    {
+        TestTrue(TEXT("The displayed card retains its original generated copy after claiming"), RunItemShopCatalog::IsSameDefinition(Rewards.ItemChoices[Index], Fixture.Run->GetGoldRewardState().ItemChoices[Index]));
+    }
+    if (!Fixture.ReloadBoundary(*this)) return false;
+    TStrongObjectPtr<URunSaveGame> Claimed(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+    if (!Claimed) return false;
+    const TArray<uint8> ClaimedBytes = Fixture.ReadBytes();
+    for (int32 Choice = 0; Choice < 3; ++Choice)
+    {
+        TestFalse(TEXT("No card can claim another item or gold after reloading the receipt"), Fixture.Run->SelectGoldReward(Buyer.OwnerAccountId, Buyer.CharacterId, Rewards.NodeId, Choice, Fixture.Error));
+    }
+    TestTrue(TEXT("Duplicate requests preserve the complete durable claim and allow Continue"), SameTargetTransactionState(*Claimed.Get(), *Fixture.Run.Get()) && ClaimedBytes == Fixture.ReadBytes() && Fixture.Run->CanContinueAfterRewards());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTargetRunItemRewardCompatibilityTest, "ProjectA.Run.Target.ItemRewards.LegacyGoldAndMalformedCopies", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTargetRunItemRewardCompatibilityTest::RunTest(const FString& Parameters)
+{
+    FTargetRunTransactionFixture Fixture;
+    if (!TestTrue(TEXT("A weapon-based target fixture creates its first PvE result"), Fixture.InitializeEveryProfession() && Fixture.BeginNextSyntheticCombat() && Fixture.Run->CompleteEncounter(ECombatResult::Victory))) return false;
+    TStrongObjectPtr<URunSaveGame> Legacy(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+    if (!Legacy) return false;
+    // Reconstruct a saved gold-only result without changing the existing Run's weapon acquisition contract.
+    // 기존 Run의 무기 획득 계약을 바꾸지 않고 저장된 골드 전용 결과를 구성합니다.
+    Legacy->GoldRewardState = FRunGoldRewardState();
+    Legacy->GoldRewardState.SchemaVersion = 1;
+    Legacy->GoldRewardState.NodeId = Legacy->CurrentNode;
+    Legacy->GoldRewardState.GoldChoices = Legacy->TargetRun.Groups[0].GoldChoices;
+    const FRunPartyMember Buyer = Legacy->Party[0];
+    const FRunGoldRewardState OldOffers = Legacy->GoldRewardState;
+    if (!TestTrue(TEXT("Already saved gold choices load unchanged on a weapon-based Run"), FRunCheckpointStorage::Save(Legacy.Get(), Fixture.Slot, Fixture.Error) && Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error) && SameTargetRewards(OldOffers, Fixture.Run->GetGoldRewardState()) && Fixture.ReloadBoundary(*this))) return false;
+    if (!TestTrue(TEXT("A saved gold-only choice still grants its exact gold without adding an item"), Fixture.Run->SelectGoldReward(Buyer.OwnerAccountId, Buyer.CharacterId, OldOffers.NodeId, 2, Fixture.Error) && Fixture.ReloadBoundary(*this))) return false;
+    const FRunGoldRewardState OldClaim = Fixture.Run->GetGoldRewardState();
+    TestTrue(TEXT("The historical offer and receipt remain schema one with no retroactive item grant"), OldClaim.SchemaVersion == 1 && OldClaim.GoldChoices == OldOffers.GoldChoices && OldClaim.ItemChoices.IsEmpty() && OldClaim.BonusGold == 0 && OldClaim.Claims.Num() == 1 && OldClaim.Claims[0].ChoiceIndex == 2 && Fixture.Run->GetPartyMembers()[0].Items.Num() == Buyer.Items.Num() && Fixture.Run->GetPartyMembers()[0].Gold == Buyer.Gold + OldOffers.GoldChoices[2]);
+    TestFalse(TEXT("The historical receipt also rejects duplicate collection"), Fixture.Run->SelectGoldReward(Buyer.OwnerAccountId, Buyer.CharacterId, OldOffers.NodeId, 0, Fixture.Error));
+    if (!TestTrue(TEXT("Continue keeps the previous offer and receipt until the next combat begins"), Fixture.Run->ContinueRun() && SameTargetRewards(OldClaim, Fixture.Run->GetGoldRewardState()) && Fixture.ReloadBoundary(*this) && Fixture.BeginNextSyntheticCombat() && Fixture.Run->CompleteEncounter(ECombatResult::Victory) && Fixture.ReloadBoundary(*this))) return false;
+    const FRunGoldRewardState Empty;
+    TestTrue(TEXT("The intervening Snapshot offers no items gold recipients or claim requirement"), SameTargetRewards(Empty, Fixture.Run->GetGoldRewardState()) && Fixture.Run->GetGoldRewardRecipientIds().IsEmpty() && Fixture.Run->CanContinueAfterRewards() && Fixture.Run->GetPartyMembers()[0].Items.Num() == Buyer.Items.Num());
+    if (!TestTrue(TEXT("Only the next PvE result adopts the new item and common-gold reward"), Fixture.Run->ContinueRun() && Fixture.BeginNextSyntheticCombat() && Fixture.Run->CompleteEncounter(ECombatResult::Victory) && Fixture.Run->GetGoldRewardState().SchemaVersion == 2 && Fixture.ReloadBoundary(*this))) return false;
+    TStrongObjectPtr<URunSaveGame> Valid(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+    if (!TestTrue(TEXT("The new valid PvE save contains three frozen item copies"), Valid.IsValid() && Valid->GoldRewardState.ItemChoices.Num() == 3)) return false;
+    const TArray<int32>& Range = Valid->TargetRun.Groups[1].GoldChoices;
+    for (int32 Case = 0; Case < 5; ++Case)
+    {
+        TStrongObjectPtr<URunSaveGame> Invalid(DuplicateObject<URunSaveGame>(Valid.Get(), GetTransientPackage()));
+        FRunGoldRewardState& Rewards = Invalid->GoldRewardState;
+        if (Case == 0) Rewards.BonusGold = FMath::Min3(Range[0], Range[1], Range[2]) - 1;
+        else if (Case == 1) Rewards.BonusGold = FMath::Max3(Range[0], Range[1], Range[2]) + 1;
+        else if (Case == 2) Rewards.ItemChoices[1] = Rewards.ItemChoices[0];
+        else if (Case == 3) Rewards.ItemChoices[0].GrantedSkills.Add(FSoftObjectPath(TEXT("/Game/User_JeHoon/Validation/T12/UnknownRewardSkill.UnknownRewardSkill")));
+        else
+        {
+            FRunGoldRewardClaim& Claim = Rewards.Claims.AddDefaulted_GetRef();
+            Claim.CharacterId = Buyer.CharacterId;
+            Claim.ChoiceIndex = 0;
+        }
+        if (!TestTrue(TEXT("A malformed disposable reward fixture can be serialized for the loader"), FRunCheckpointStorage::Save(Invalid.Get(), Fixture.Slot, Fixture.Error))) return false;
+        const TArray<uint8> InvalidBytes = Fixture.ReadBytes();
+        TestFalse(TEXT("Loading rejects out-of-range gold duplicate copies unknown skills and a receipt without its item"), Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error));
+        TestTrue(TEXT("Rejected loading preserves public progression inventory gold offers and the original file"), SameTargetTransactionState(*Valid.Get(), *Fixture.Run.Get()) && InvalidBytes == Fixture.ReadBytes());
+    }
+    return TestTrue(TEXT("Restoring the valid frozen reward fixture allows a fresh reload"), FRunCheckpointStorage::Save(Valid.Get(), Fixture.Slot, Fixture.Error) && Fixture.ReloadBoundary(*this));
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTargetRunWeaponTransactionsTest, "ProjectA.Run.Target.WeaponCopiesPurchaseEquipmentAtomicAndContinue", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

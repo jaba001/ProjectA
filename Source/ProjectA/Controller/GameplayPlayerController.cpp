@@ -414,7 +414,7 @@ void AGameplayPlayerController::ExecuteGoldRewardSelection(FGuid CharacterId, FN
         AEncounterManager* Manager = Mode->GetEncounterManager();
         if (Manager) bSucceeded = Manager->SelectGoldReward(AccountId, CharacterId, ExpectedNodeId, ChoiceIndex, Error);
     }
-    if (bSucceeded) Error = NSLOCTEXT("RunGoldReward", "Claimed", "선택한 골드를 받았습니다.");
+    if (bSucceeded) Error = NSLOCTEXT("RunGoldReward", "RewardClaimed", "전투 보상을 받았습니다.");
     ClientReceiveGoldRewardResult(CharacterId, ExpectedNodeId, bSucceeded, Error);
 }
 
