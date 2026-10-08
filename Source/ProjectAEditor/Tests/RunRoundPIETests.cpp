@@ -3,6 +3,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "RunEncounterPIEHelpers.h"
+#include "TodoReviewWindowPlacement.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequenceBase.h"
 #include "AbilitySystemComponent.h"
@@ -89,6 +90,7 @@ public:
             Settings->NewWindowWidth = 1280;
             Settings->NewWindowHeight = 720;
             Settings->SetClientWindowSize(FIntPoint(1280, 720));
+            if (!TodoReviewWindowPlacement::Configure(Test, Settings.Get())) return true;
             FRequestPlaySessionParams Params;
             Params.EditorPlaySettings = Settings.Get();
             Params.SessionDestination = EPlaySessionDestinationType::InProcess;
@@ -616,6 +618,8 @@ private:
             }
         }
         if (!Host || Clients.Num() != Count - 1 || ServerControllers.Num() != Count - 1) return false;
+        if (!TodoReviewWindowPlacement::Ensure(Test, Host->GetWorld())) return false;
+        for (AGameplayPlayerController* Client : Clients) if (!TodoReviewWindowPlacement::Ensure(Test, Client->GetWorld())) return false;
         AGameplayGameModeBase* Mode = Host->GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
         if (!Mode || !Mode->PartyDefinition || !Mode->GetEncounterManager() || !Mode->GetEncounterManager()->GetCombatManager()) return false;
         HostHandle = Host;

@@ -1,11 +1,12 @@
 # ProjectA 완료 작업과 검증 기록
 
-갱신일: 2026-10-07. 완료 범위·기준 커밋·실행 근거를 기록한다. 현행 구현은 [PROJECT_PLAN](PROJECT_PLAN.md), 확정 기획은 [GAME_DESIGN](GAME_DESIGN.md), 다음 콘텐츠·온라인 서비스·에셋 도입은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다. 과거 로그·맵 경로는 실행 당시 기준이며 현행 경로는 [레벨 폴더 기준](PROJECT_PLAN.md#4-10-레벨-폴더와-이전-경로-호환)을 따른다.
+갱신일: 2026-10-08. 완료 범위·기준 커밋·실행 근거를 기록한다. 현행 구현은 [PROJECT_PLAN](PROJECT_PLAN.md), 확정 기획은 [GAME_DESIGN](GAME_DESIGN.md), 다음 콘텐츠·온라인 서비스·에셋 도입은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다. 과거 로그·맵 경로는 실행 당시 기준이며 현행 경로는 [레벨 폴더 기준](PROJECT_PLAN.md#4-10-레벨-폴더와-이전-경로-호환)을 따른다.
 
 ## 최근 변경
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-10-08 위임 실행 검수와 협동 보완 | 초기 저장 원자성·새 협동 1인 1캐릭터·Snapshot 소모품 차단·NPC 지붕 가림을 보완했다. 고유 Native 222개, 동일 PC 1/2/4인 30전투·27상점, NPC 18경우, 기존 저장 사본·소모 후 Continue와 새 Win64 패키지를 검수했다. 정상 Run은 9전투·30선택 후 자연 패배이며 80단계 완주·최종 밸런스·Steam/PlayFab은 미완료다. [범위·근거](#9-33-2026-10-08-위임-실행-검수와-협동-보완) |
 | 2026-10-07 TODO 권장안 로컬 구현 | T14 제안 9·10의 Steam 친구별 방 검색·요청 정리·재접속 인증 표시와 제안 12의 태그 기반 Snapshot 후보 선택 API를 보완했다. 프로젝트 파일 재생성 9.67초와 Development Editor / Win64 컴파일·링크 45.82초, 독립 코드·문서 정적 검사를 통과했다. 기존 Run·저장·에셋은 유지하며 게임·PIE·자동화·실제 Steam/PlayFab 연결은 미실행이다. [범위·근거](#9-25-2026-10-07-todo-권장안의-로컬-구현) |
 | 2026-10-06 TODO 완료 항목 이관 규칙 | AGENTS에 완료 근거를 HISTORY로 통합한 뒤 TODO에서 삭제하는 규칙을 추가했다. 완료·중복 절 14개와 혼합 절의 완료 부분을 정리하고 실행 조건·과거 수치·검증 한계를 보존했다. 제안 선택 9개와 실제 미완료 확인을 유지하며 삭제 절의 참조를 갱신했다. 문서·링크·체크 보존·diff 정적 검사만 수행했으며 새로운 컴파일·작동 테스트는 하지 않았다. [이관 범위](#9-20-2026-10-06-todo-완료-기록-정리) |
 | 2026-10-06 무기 랜덤 스킬·등급 기획 | 스킬상점·스킬 소지 상한 폐기, 무기만 태그 조건에 맞는 스킬 무작위 부여, 흰색·초록색·파란색·보라색·주황색 5등급을 목표 기획에 반영했다. 기존 GAS/아이템 태그·공통 추첨·상점/저장 의존을 정적으로 확인하고 기존 스킬상점 CSV를 폐기 대상으로 표시했다. 사용권·등급별 차이·추첨 시점·중복·기존 Run 전환은 당시 미선택 제안으로 남겼으며 이후 채택 결과는 [9-23절](#9-23-2026-10-06-무기-스킬-정책-선택)을 따른다. 문서·CSV·링크·diff 정적 확인만 수행했으며 코드·에셋·저장 변경과 컴파일·게임 실행은 하지 않았다. |
@@ -747,3 +748,74 @@ CSV 재계산·수식 오류 0·렌더 확인·내보내기/재입력 일치와 
 작성·재로드 스크립트 전후의 보호 대상 19,873파일 해시가 일치했다. 커맨들릿 시작·종료에서는 `Saved/Config`의 에디터 로컬 설정 1개 갱신과 CrashReportClient 설정의 자동 생성·정리가 발생했으며, 원본 Content·프로젝트 Config·게임 저장 보존과 구분한다. 재로드와 문서의 재실행 명령에는 엔진 INI 저장 방지 옵션 `-nowrite`를 사용한다. 전체 프로세스 이후 보호 대상의 추가 변화는 없으며 근거는 `Saved/Automation/UnifiedGameplay_20261008/AfterProcessPreservation.json`이다.
 
 Python·JSON·문서 링크·diff 정적 검사와 카메라·UI 전환 수명 읽기 검토를 수행했다. 솔루션 행 집합, 런타임 CSV, TODO의 기존 미완료 36개·선택 7개와 HISTORY 이전 본문을 보존하고 사용자 확인 2개를 추가했다. 근거는 `Saved/Automation/UnifiedGameplay_20261008/StaticChecks.json`이다. 게임·PIE·자동화 테스트·패키지 실행과 실제 화면/FPS 검수는 수행하지 않았다. NPC 인사·카메라·패널·인벤토리, 이전 Run Continue와 화면비·성능의 수용 조건은 [TODO 26절](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 미완료로 유지한다.
+
+### 9-33 2026-10-08 위임 실행 검수와 협동 보완
+
+2026-10-08 사용자가 권장안 구현·실행 검수·멀티플레이 작업을 추가 질문 없이 진행하도록 위임했다. 판단 근거와 외부 준비의 한계는 사용자 요청으로 작성한 [위임 판단](EXECUTION_DECISIONS.md)에 기록한다. 아래 결과는 이번 코드의 로컬 Native 회귀·동일 PC PIE·새 Win64 패키지 실행이며 과거 검증을 재사용한 것이 아니다.
+
+식별 Run의 prototype·개발 협동 초기화를 기존 `CommitSaveCandidate`에 연결하여 체크포인트 저장 성공 뒤에만 새 상태를 적용·통지한다. 실패 시 기존 Run·파일을 보존하며 메모리 전용 동작은 유지한다. 제안 7의 `ValidateNewRunRoster`를 일반/관리 새 협동 생성에 적용하여 원래 참가자마다 한 캐릭터만 허용한다. 기존 저장의 로드·재개에 새 편성 제한을 소급하지 않고 저장 schema·원래 소유권·참가 번호·관리 lease 계약을 유지한다. 저장 거절 과정에서 하위 검증 성공이 오류 문구를 비운 뒤 후속 검사가 실패하던 경로도 보완하여 누락된 이유를 제공한다.
+
+제안 12의 Snapshot 카탈로그는 해석한 스킬의 `Item.Consumable` 및 자식 태그를 공통 규칙으로 거절한다. 별칭 ID로 수량 없는 소모품을 일반 스킬처럼 실행할 수 없다. 개발용 `LoadAndSelectOpponent`는 슬롯 이름·중복 검사 뒤 진행 단계·GameplayTagQuery가 일치하는 파일을 읽어 기존 균등 선별 API에 연결한다. 일치 슬롯의 누락·손상을 제외 재추첨으로 숨기지 않으며 실패 시 출력·난수, 성공/실패 모두 원본 파일을 보존한다. Snapshot schema 1과 기본 Run의 고정 상대는 유지하며 이 API는 기본 Run·온라인 공급자에 연결하지 않은 준비 기능이다. [현재 계약](MULTIPLAYER.md#5-async-pvp-상대-snapshot)
+
+Development Editor / Win64 명령 `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`가 회귀 수정 후 12.22초, 후속 표시 코드 포함 6.85초에 성공했다. 근거는 `Saved/Automation/Autonomous_20261008/EditorBuild.RegressionFix.log`·`EditorBuild.Presentation.log`다. 컴파일 성공을 화면 검수로 확대하지 않는다.
+
+실행 명령은 `powershell -ExecutionPolicy Bypass -File Saved/Automation/Autonomous_20261008/RunEditor.ps1 -Group NativeFull`이다. UUID 시험 슬롯·`-nowrite`·`-NullRHI`를 사용했다. NativeFull은 `Source/ProjectA/Tests`의 EditorContext 회귀와 메뉴 에셋·체크포인트 효과 계약을 선택하며 별도 프로세스 probe 2개와 ClientContext 전용 패키지 검사는 제외한다. 실행별 `RequestedTests.json`·`Invocation.json`에 정확한 필터·인수를, `Engine.log`·`Report/index.json`에 결과를 보존한다.
+
+최초 `Saved/Automation/Autonomous_20261008/NativeFull.56e41d02035c4695a26f5f120eacce98`는 213개 성공(142성공·71경고 포함 성공), 8실패였다. 저장 거절 이유 누락, 초기화 전 격리 월드의 네이티브 복제 콜백 실행 조건, 가중치 도입 뒤에도 세 방문 안에 서비스가 나온다고 가정한 회복 fixture를 수정했다. 체인 fixture만 `FEditorScriptExecutionGuard`를 사용하며 실제 네트워크 전송을 모사하지 않는다. 회복 fixture는 실제 저장 풀과 `BuildOffers`로 서비스가 제시되는 결정적 시드를 고정하고 공개 구매·저장 경로를 검증한다.
+
+수정 후 `Saved/Automation/Autonomous_20261008/NativeFull.3f9528c5049e44ec80e34de68ef2b83e`의 `Report/index.json`은 148성공·73경고 포함 성공, 실행된 221개 통과·실패 0·보고서상 미실행 0·진행 중 0, 72.408초를 기록했다. 경고를 0으로 처리하지 않으며 상세 내용은 해당 보고서·로그에 유지한다.
+
+요청 선언 222개와 실제 결과 221개의 차집합에서 `ProjectA.Snapshot.CandidateSelection` 1개의 실행 누락을 확인했다. 같은 이름 아래 새 `LocalSlots` 테스트가 생기면서 부모/자식 경로가 충돌한 경우이며 보고서의 미실행 0만으로 요청 전부 완료로 판정하지 않는다. 기존 테스트의 조건은 유지하고 이름을 `ProjectA.Snapshot.CandidateSelection.InMemory`로 변경했다.
+
+후속 명령 `powershell -ExecutionPolicy Bypass -File Saved/Automation/Autonomous_20261008/RunEditor.ps1 -Group Snapshot`은 `ProjectA.Snapshot.CandidateSelection` 필터를 실행했다. `Saved/Automation/Autonomous_20261008/Snapshot.e684c464b8774a5481e03b4777d341d6/Invocation.json`·`Report/index.json`을 대조하여 `InMemory`·`LocalSlots` 두 실제 테스트명이 모두 성공 결과에 포함됨을 확인했다. 2성공·경고/실패/미실행 0, 0.021초·프로세스 종료 코드 0이다. 전체 221개와 새로 실행된 `InMemory` 1개를 합쳐 고유 Native 회귀 222개가 통과했으며 `LocalSlots` 재검증은 중복 가산하지 않는다. 다음 표는 실제 실행 결과로 이관한 범위다.
+
+| 필터 | 이번 Native 실행으로 확인한 범위 |
+|---|---|
+| `ProjectA.Persistence.InitialRunAtomicRetry`, `ProjectA.Recovery.NewCoopRoster` | 초기 저장 실패 시 상태·파일·통지 보존과 재시도, 새 협동 한 참가자당 한 캐릭터 검사와 기존 저장 호환 |
+| `ProjectA.Snapshot` 9개 | 값 데이터·카탈로그·로컬 슬롯의 태그 조건/중복 ID 거절, 실패 시 출력/난수와 원본 파일 보존, 소모품 차단 및 순서 있는 6개 일반 스킬. 후속 `CandidateSelection.InMemory`에서 전체 부적합 후보·선택 결과의 원본 독립성·동일 시드 재현까지 확인 |
+| `ProjectA.Run.EncounterPool`, `ProjectA.Run.Shop.Profiles`, `ProjectA.Run.Shop.RarityProbabilities` | CSV 거절·그룹/등급 우선 추첨·시드 재현·태그 조건·부족 상품·빈 등급/0% 처리·중복 금지·실패 원자성·저장된 정책과 기존 균등/순환 보존 |
+| `ProjectA.Run.Target.ItemRewards`, `ProjectA.Run.Target.LevelDesign.SurvivorRestAndAtomicRetry`, `ProjectA.Run.Recovery` | 아이템/골드 결과·수령 저장 실패 재시도와 중복 방지·기존 보상 보존, 생존자 휴식·최대 HP·사망 보존·Snapshot/패배 제외, 서비스 권한·원자 저장·재로드 |
+
+위 Native 결과는 실제 상점 화면·소모 후 메뉴 Continue·강제 승리 없는 80단계 완주·사용자 선호·성능·다중 PC·Steam/PlayFab·패키지 실행의 통과 근거가 아니다. 해당 수용 조건과 제안 7·9~14의 선택은 [TODO](TODO.md)에 보존한다. 서비스 자격·유료 리소스를 활성화하거나 미정 MMR 정책을 확정하지 않았다.
+
+동일 PC 협동 검수는 `powershell -ExecutionPolicy Bypass -File Saved/Automation/Autonomous_20261008/RunEditor.ps1 -Group Coop`로 실행했다. `Saved/Automation/Autonomous_20261008/Coop.e90d4eff1cf44c659cd1f1097ca0bc5a/Invocation.json`·`Engine.log`·`Report/index.json`이 정확한 실행 인수와 결과를 보존한다. `ProjectA.RunRoundPIE.1Players`·`2Players`·`4Players`는 각각 284.666초·147.329초·93.051초에 성공했고 합계 525.047초, 실패 0·미실행 0·진행 중 0·프로세스 종료 코드 0이다. 세 시험 모두 경고 포함 성공이며 각 2건, 합계 6건의 경고는 보고서에 보존한다. CrowdManager/RecastNavMesh 경고와 1인 종료 검사에서 의도적으로 잘못된 몽타주 속도를 주입한 경고를 무경고 성공으로 기록하지 않는다.
+
+각 실행은 prototype의 실제 10전투·중간 9상점을 완료하여 합계 30전투·27상점을 진행했다. 1인은 Standalone, 2/4인은 같은 에디터 프로세스 안의 별도 PIE 월드와 실제 Listen Server·Client NetDriver를 사용했다. 수동 시험 계정·원래 소유자 바인딩, 시험 저장의 검 스킬 추가·1G 차감, 매 전투 아군 최대/현재 HP 10000과 적 HP `min(기존 HP, 검·비무장 공격의 최소 Power)` 보정이 있는 개발 fixture다. 원본 공격·충돌 프로필은 유지하며 모든 전투에서 검·비무장 공격을 실제 시전한다. 일반 메뉴의 새 Run 생성이나 CSV 난이도의 무보정 완주 시험이 아니다.
+
+서버/원격의 CombatId·계획 revision·단계·유닛 소유 슬롯·HP·스킬/대상, 원격 AP 차감·몽타주·SAP 보행, 개인 골드 카드의 한 번 지급·복제와 수령 전 Continue 잠금, Host 전용 결과/상점 진행을 검사했다. 매 결과를 새 Run subsystem으로 읽어 Run ID·인원·HP·개인 골드·수령 기록을 대조했다. 이는 같은 프로세스의 결과 저장 재로드이며 독립 프로세스 재개·관리 Host 승계 시험과 구분한다.
+
+중간 상점은 기존 `Shop_02`를 반복 선택했다. 공통 `RunEncounterPIEHelpers`가 각 Host/Client의 카메라 blend 종료·자기 월드의 선택 태그에 맞는 NPC ViewTarget·저장된 상점 제목, Client 선택/퇴장 권한 거절, 퇴장 후 `GameplayEncounterOverview` 복귀를 확인했다. NPC 전체 5무대·화면비·리롤/인벤토리 중 카메라·성능·수동 조작 품질은 이 결과에 포함하지 않는다. 실제 메뉴 lobby 생성/접속·Steam 두 PC 인증·온라인 저장/재개·영구 AI 전환·관전은 미완료이며 제안 7의 선택 체크와 남은 수용 조건을 유지한다.
+
+정상 메뉴 관측은 `powershell -ExecutionPolicy Bypass -File Saved/Automation/Autonomous_20261008/RunEditor.ps1 -Group NormalTarget`로 실행했다. 근거 루트는 `Saved/Automation/Autonomous_20261008/NormalTarget.96eda816f0514d2580d5b9eba22705f8`이며 `Invocation.json`·`Engine.log`·`Report/index.json`과 `NormalRun/ProjectA_Automation_NormalRun_96eda816f0514d2580d5b9eba22705f8/NormalTargetRun.json`을 대조했다. `ProjectA.TodoReview.NormalTargetRun`은 126.984초, 오류 0·경고 3·프로세스 종료 코드 0으로 관측 계약을 통과했다. 경고는 CrowdManager/RecastNavMesh 2건과 자연 패배를 완주 성공으로 해석하지 말라는 안내 1건이다.
+
+정상 새 게임의 기본 캐릭터 4명·직접 조작 1명·동료 AI 3명을 사용하고 HP·피해·AP·상점 재고·골드·적 편성·결과를 보정하지 않았다. 공개 계획/Ready 요청과 실제 UI delegate로 16라운드를 제출했으며 9전투·30선택 완료 후 `TargetCombat_10`에서 자연 패배했다. 결과는 `ObservedNaturalDefeat`, `passed_observation_contract=true`, `completed_all_eighty_stages=false`다. 2026-10-04의 6승 후 패배와 별개의 최신 관측이며 60선택·20전투 완주나 최종 밸런스 승인이 아니다.
+
+첫 승리 `TargetCombat_01`의 보상 선택 전 PIE 종료·재시작 후 실제 메뉴 Continue가 저장된 파티·진행·보상 후보를 복원했고 `actual_menu_continue_verified=true`다. 전체 진행에서 안정 경계 저장을 126회 역직렬화하여 공개 상태와 대조했다. 소모품은 이후 `TargetCombat_05`부터 실제 사용되었으므로 이 메뉴 Continue를 소모 후 메뉴 재개 검증으로 계산하지 않는다.
+
+회복약 UI 계획/Ready 요청 7회가 모두 실제 GAS 적용으로 이어졌다. 각 관측은 동일 효과 문맥, GAS 적용 1회·AP 1 차감·관련 HP 변화와 저장 경계의 재고 1 감소를 확인했다. 실제 서비스 UI 구매는 회복 2회·소모품점 7회다. 아이템 구매 요청·장비 변경 요청은 각각 0회, 부활 구매도 0회여서 해당 동선은 검증 완료로 처리하지 않는다. 이 첫 관측은 실제 delegate와 공개 요청의 실행이며 물리 마우스 조작·체감 품질·소모 후 메뉴 Continue·협동의 다른 무대/화면비·80단계 완주를 완료 처리하지 않았다. 소모 후 Continue·부활의 후속 결과는 아래 최종 c8ac 관측과 구분한다.
+
+NPC 화면은 `powershell -ExecutionPolicy Bypass -File Saved/Automation/Autonomous_20261008/RunEditor.ps1 -Group Presentation`으로 확인했다. 최초 `Presentation.6e88b136bc014127bf4fc1f4ec5511fa`는 요청한 창 크기와 실제 viewport 크기의 차이를 검사하여 실패했다. 저장된 사용자 설정은 변경하지 않고 시험 창의 실제 viewport를 확인하며 제한된 횟수로 크기를 맞추도록 수정했다. 후속 `Presentation.d2feb3b5e6014a5db695bf14b46e51ae`는 자동 검사를 통과했으나 실제 PNG 검토에서 회복소 지붕의 얼굴 가림을 발견했다. 투영 좌표만으로 실제 가림까지 판정할 수 없음을 보고서에 명시했다.
+
+`EncounterPrototypeStage`의 회복소 지붕 중심을 223→310cm로 높이고 기둥 높이를 맞췄다. 기존 재구성 경로를 사용하므로 Content 재작성이나 사본 에셋 추가는 없다. `EditorBuild.Shelter.log`의 Development Editor / Win64 컴파일 15.75초가 성공했다. 최종 `Presentation.5171c74f09ad41e9aca5758847622f64/Report/index.json`은 114.702초·실패 0·경고 포함 성공 1을 기록했다. 기본·등급별·태그별·회복·소모품·부활 6종을 960×720·1280×720·1260×540에서 확인한 18경우와 Shop/Inventory PNG 36개를 해당 UUID 하위 폴더에 보존했다.
+
+각 경우에 실제 메뉴의 4캐릭터 생성, 저장된 선택의 태그에 맞는 NPC·카메라 blend 완료·활성 패널, 실제 인벤토리 열기/닫기 delegate, 진열/revision/카메라 보존, 퇴장 후 전경 복귀와 NPC tick 정지를 검사했다. 지정 종류가 제시되도록 시험 저장의 초기 시드와 그 시드로 계산한 후보만 고정한 fixture이며 자연 출현 빈도·구매·리롤·장착·스크롤 입력을 검증한 것은 아니다. `NPCVisualReview.Root.json`의 회복소 3개와 `NPCVisualReview.Agent.json`의 나머지 15개 Shop PNG를 직접 검토하여 얼굴·눈·오른쪽 패널의 가림 해소를 확인했다. 상점 18화면의 정적 시각 검토와 Inventory 18화면의 자동 상태/캡처를 구분하며 실제 입력 품질·협동의 다른 무대·성능은 TODO에 유지한다.
+
+새 Development / Win64 패키지는 `powershell -ExecutionPolicy Bypass -File Saved/Automation/Autonomous_20261008/Package.ps1`의 `BuildCookRun -platform=Win64 -clientconfig=Development -build -cook -stage -pak -archive -unattended -utf8output`으로 생성했다. `Package.Arguments.json`·`Package.Build.log`에 전체 명령을 보존하며 코드 빌드 35.86초·쿠킹 130.24초·전체 186.36초, `BUILD SUCCESSFUL`·종료 코드 0이다. `Package.RuntimeCsvManifest.json`에서 런타임 CSV 6개를 확인하고 실행 파일과 컨테이너 등의 SHA256을 `Package.Manifest.json`에 고정했다.
+
+같은 패키지를 `RunPackage.ps1 -Mode Csv`, `TargetWrite`, `TargetContinue`, `LongCheckpoint`, `Quit` 순서로 별도 프로세스에서 실행했다. 각 실행은 왼쪽 모니터·격리 UserDir·UUID 시험 슬롯과 `-nowrite`를 사용하며 전후 패키지 해시를 대조했다. `Package.Csv.f7270fd69d484f4facdf456db35d8af6`는 289개 아이템 CSV/원본 패키지와 61개 스킬·수정 프로필 2검사, `Package.TargetWrite.678bc9db43bc4adca2bb11e5794d2da0`는 공개 기본 Target 초기화·체크포인트 작성, `Package.TargetContinue.1851f39f0f1846229dc13b8ebeb2000a`는 같은 파일의 실제 메뉴 Continue·3선택·첫 Planning 저장, `Package.LongCheckpoint.128bcd2433114260a1648d39b1428738`는 긴 경로의 원자 저장 검사를 통과했다. 각각 0.086초·0.735초·3.139초·0.110초, 합계 5검사 모두 오류·경고 0이며 실제 전투/80단계 완주와 구분한다.
+
+`Package.Quit.f04aeeb3404a48eaadf8766e4c3271eb`는 `-TestExit` 없이 실제 MainMenu Quit delegate로 정상 종료했다. 로그의 성공 결과·`UGameEngine::HandleExitCommand`·`Exiting`과 종료 코드 0을 확인했다. 모든 `Invocation.json`·`Result.json`·`Engine.log`를 위 경로에 보존하며 패키지 검수도 테스트용 저장만 정리한다. 이전 패키지의 실행 이력을 이번 결과로 재사용하지 않았다.
+
+기존 저장 사본 검수는 `RunEditor.ps1 -Group ExistingContinue`로 실행했다. 최초 `ExistingContinue.874326592e9b47668def497e7fee179a`는 원본이 반드시 Combat 단계라고 가정한 기존 fixture에서 실패했다. 실제 원본은 `EncounterChoice`였으므로 검사 대상을 저장된 단계별로 분기하고 공통 파티·진행·편성·카탈로그·거래·규칙 비교를 유지했다. Combat은 기존 실제 유닛/체크포인트 검사를 유지하고 Shop·선택·Map·Result는 해당 화면·카메라 준비를 검사한다. 종료/관리/세션 저장의 올바른 거부는 복원 성공과 분리하고 손상·이관 실패는 통과로 처리하지 않는다. 원본 저장이나 eligibility를 변경하지 않았다.
+
+`EditorBuild.Continue.log`의 Development Editor / Win64 컴파일 17.25초 성공 뒤 실행한 `ExistingContinue.8d9272bf7c6d42f79da9f373e689e573`는 3.789초·실패 0·경고 포함 성공 1·종료 코드 0이다. 동일 이름의 UUID JSON에서 실제 메뉴 delegate·일반 저장 버전 2·4캐릭터·기존 스킬 61개/아이템 289개 카탈로그와 선택 단계 복원을 확인했다. 실제 PNG는 전경과 5/80 선택 화면·이전 스킬상점 후보를 유지했고 `original_bytes_unchanged=true`·`owned_clone_cleaned=true`다. 원본 슬롯을 Unreal에서 직접 로드/저장하지 않았으며 이 사본의 선택 단계 성공을 기존 상점/전투/다른 스키마 전체 호환으로 확대하지 않는다.
+
+소모 후 메뉴 Continue 검수를 추가한 첫 `NormalTarget.086dfa711d4c459a8b23a39894ffb206`는 해당 복원 비교는 통과했지만 전체 관측은 실패했다. 직접 캐릭터의 자연 사망 이후 참가 슬롯 0을 AI 동료의 소유 슬롯 0과 같다고 판단한 fixture가 동료 명령을 요청했고 서버가 정상 거절했다. 검수에서 양수 참가 슬롯·원래 캐릭터 ID·생존 여부를 함께 검사하고 사망 후에는 AI 진행만 관측하도록 수정했다. 실제 권한·AI·HP·결과는 변경하지 않았으며 기존 무진행 180초·전투 100라운드 제한을 유지했다. 수정 후 `EditorBuild.Spectator.log`의 Development Editor / Win64 컴파일 8.26초가 성공했다.
+
+최종 `RunEditor.ps1 -Group NormalTarget`의 `NormalTarget.c8acb8712df742dab5a47c264cefb7b1`는 133.499초·실패 0·경고 포함 성공 1·종료 코드 0이다. 해당 `NormalRun/ProjectA_Automation_NormalRun_c8acb8712df742dab5a47c264cefb7b1/NormalTargetRun.json`은 첫 승리 결과 화면 Continue와 회복약 사용 후 `TargetCombat_05`의 2라운드 Planning에서 실제 PIE 재시작·메뉴 Continue를 각각 확인했다. 복원 전후 전체 파티·진행·체크포인트와 실제 유닛의 HP/최대 HP·AP/SAP·속도·소모품·사망·소유권·타일 점유·계획/Ready가 일치했고 새 CombatId를 사용했다. 전후 PNG와 실제 복원 화면도 확인했으며 임의 시전 중 강제 종료나 온라인 재접속 검증으로 확대하지 않는다.
+
+최종 일반 관측은 실제 17라운드 요청·저장 경계 대조 135회, 소모품 GAS 사용 7회·회복 서비스 6회·소모품점 구매 6회·자연 사망 후 부활 구매 1회를 확인했다. 직접 캐릭터 사망 후 두 전투에서 동료 AI만 관측했으며 동료에게 명령·Ready를 보내지 않았다. 9전투·30선택 뒤 자연 패배했고 80단계는 완주하지 못했다. 아이템 구매/장비 변경 요청은 각각 0회다. 앞선 96eda 관측과 별도 실행으로 보존하며 일반 관측 통과를 완주·최종 밸런스 승인으로 해석하지 않는다. 소모 후 실제 메뉴 Continue의 해당 수용 조건만 TODO에서 이관했다.
+
+모든 실행 종료 후 `Protect.py verify`의 `ProtectedAfter.json`에서 Content 19,809개와 보호한 사용자 저장·설정 52개가 시작 해시와 일치하며 추가 저장 사본 0임을 확인했다. 전체 쿠킹이 변경한 에디터 설정은 ProjectA/ProjectAEditor 모듈 컴파일 시간 두 필드뿐임을 대조한 뒤 백업 바이트로 복원했다. 원본 게임 저장이나 사용자 설정의 다른 변경을 덮어쓰지 않았으며 `CookMetadataRestoration.json`에 근거를 보존했다. 검수 프로세스는 모두 종료하고 에디터·IDE를 열린 상태로 남기지 않았다.
+
+`NativeCoverage.json`은 현재 요청 선언과 성공 결과의 고유 222개 이름이 정확히 일치함을 확인했다. 최종 문서 11개·로컬 링크/앵커 753개·`git diff --check`가 통과했고 TODO의 기존 선택 7개를 보존했다. 새 판단 문서 외에 별도 테스트 문서를 만들지 않았으며 `Docs/TEST_REPORT.md`도 복원하지 않았다. 생성된 솔루션의 변경은 580개 전체 행 집합을 유지한 순서 변경이다. 빌드·실행·시각 검토·보존 검사의 집계와 한계는 `Saved/Automation/Autonomous_20261008/FinalSummary.json`에 보존한다. 작업 시작 시 기존 미커밋 변경은 없었다.

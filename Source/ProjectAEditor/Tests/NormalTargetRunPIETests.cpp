@@ -19,9 +19,11 @@
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Game/Encounter/CombatArena.h"
+#include "Game/Encounter/EncounterPrototypeStage.h"
 #include "Game/GameState/GameplayGameState.h"
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Run/RunEquipmentRules.h"
+#include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "GameplayEffect.h"
@@ -32,6 +34,7 @@
 #include "GAS/Effect/GE_Heal.h"
 #include "GAS/Effect/GE_Shield.h"
 #include "Grid/Combat/CombatGridManager.h"
+#include "Grid/Combat/CombatGridTile.h"
 #include "HAL/FileManager.h"
 #include "ImageUtils.h"
 #include "Kismet/GameplayStatics.h"
@@ -179,7 +182,21 @@ namespace NormalTargetRunReview
                 bInitialPartyRecorded = true;
                 Event(Run, TEXT("normal_party_created"));
             }
-            if (Stage == 7)
+            ACombatRoundCoordinator* Round = Controller->GetRoundCoordinator();
+            if (Stage == 7 && bResumingConsumableBoundary)
+            {
+                if (Run->GetPhase() != ERunPhase::Combat || !Round || Round->GetView().Phase != ECombatRoundPhase::Planning || Controller->IsRoundRequestPending() || !Controller->IsRoundInputEnabled()) return false;
+                if (!Check(ConsumableRestartSave.IsValid() && SameSavedBoundary(*ConsumableRestartSave.Get(), Run) && FCombatCheckpointData::StaticStruct()->CompareScriptStruct(&ConsumableRestartSave->CombatCheckpoint, &Run->GetCombatCheckpoint(), 0), TEXT("Actual post-consumable menu Continue preserves the saved party HP, stock, progress and complete planning checkpoint."))) return End();
+                if (!Check(Round->GetView().CombatId.IsValid() && Round->GetView().CombatId != ConsumableRestartCombatId, TEXT("Post-consumable Continue creates a new live combat session without reusing its old command identity.")) || !VerifyLivePlanningBoundary(ConsumableRestartSave->CombatCheckpoint, Round)) return End();
+                if (!Capture(World, TEXT("AfterConsumableActualContinue"))) return End();
+                bConsumableRestartVerified = true;
+                bResumingConsumableBoundary = false;
+                Event(Run, TEXT("actual_post_consumable_menu_continue_verified"), FString::Printf(TEXT("attempt=%s revision=%lld round=%d"), *Run->GetCombatCheckpoint().AttemptId.ToString(), Run->GetCombatCheckpoint().Revision, Run->GetCombatCheckpoint().RoundNumber));
+                ConsumableRestartSave.Reset();
+                Stage = 4;
+                LastProgress = Now;
+            }
+            else if (Stage == 7)
             {
                 if (Run->GetPhase() != ERunPhase::Result) return false;
                 if (!Check(RestartSave.IsValid() && SameSavedBoundary(*RestartSave.Get(), Run), TEXT("Actual post-restart Continue restores the saved first-victory party, progress, rewards and target choices."))) return End();
@@ -190,7 +207,6 @@ namespace NormalTargetRunReview
                 LastProgress = Now;
             }
             if (!VerifyIdentity(Run)) return End();
-            ACombatRoundCoordinator* Round = Controller->GetRoundCoordinator();
             const FString Signature = FString::Printf(TEXT("%d:%s:%s:%d:%d:%d:%d:%d:%d:%d:%d:%d"), static_cast<int32>(Run->GetPhase()), *Run->GetCurrentNodeId().ToString(), *Run->GetEncounterProgress().SelectedEncounterId.ToString(), Run->GetCompletedNodes().Num(), Run->GetTargetRunState().CompletedEncounterChoices.Num(), Round ? static_cast<int32>(Round->GetView().Phase) : -1, Round ? Round->GetView().RoundNumber : 0, Round ? Round->GetView().PlanRevision : 0, Run->GetSkillShopState().Revision, Run->GetItemShopState().Revision, Run->GetRecoveryState().Revision, Run->GetGoldRewardState().Claims.Num());
             if (Signature != LastSignature)
             {
@@ -200,6 +216,7 @@ namespace NormalTargetRunReview
             const bool bStable = Run->GetPhase() != ERunPhase::Preparing && (Run->GetPhase() != ERunPhase::Combat || (Round && Round->GetView().Phase == ECombatRoundPhase::Planning && !Controller->IsRoundRequestPending()));
             if (bStable && !VerifySavedBoundary(Run, Signature)) return End();
             if (bObserveConsumableResolving && !ObserveConsumableBoundary(Run, Round)) return bPassed ? false : End();
+            if (ConsumableUIUses > 0 && !bConsumableRestartRequested && bStable && Run->GetPhase() == ERunPhase::Combat && Round && Controller->IsRoundInputEnabled() && FindLivingDirectUnit(Run, Round->GetView())) return RestartAfterConsumable(Run, Round);
             if (Run->GetPhase() == ERunPhase::Defeat || Run->GetPhase() == ERunPhase::Complete)
             {
                 if (TerminalStarted == 0.0)
@@ -306,6 +323,20 @@ namespace NormalTargetRunReview
             return Run->GetPartyMembers().FindByPredicate([](const FRunPartyMember& Member) { return Member.bCreated && Member.bPlayerControlled; });
         }
 
+        // Spectator slot zero never grants control over a companion with the same zero owner slot.
+        // 관전자 슬롯 0은 소유 슬롯이 같은 0인 동료의 조작 권한을 부여하지 않습니다.
+        const FCombatRoundUnitView* FindLivingDirectUnit(URunStateSubsystem* Run, const FCombatRoundView& View) const
+        {
+            const FRunPartyMember* Member = DirectMember(Run);
+            ACombatManager* Manager = Controller.IsValid() ? Controller->GetCombatManager() : nullptr;
+            const int32 ParticipantSlot = Controller.IsValid() ? Controller->GetRoundParticipantSlot() : 0;
+            if (!Member || !Manager || ParticipantSlot <= 0) return nullptr;
+            return View.Units.FindByPredicate([Member, Manager, ParticipantSlot](const FCombatRoundUnitView& Entry)
+            {
+                return !Entry.bEnemy && Entry.OwnerSlot == ParticipantSlot && Entry.Unit && Entry.Unit->IsUnitAlive() && Manager->GetCharacterId(Entry.Unit) == Member->CharacterId;
+            });
+        }
+
         bool SelectEncounter(URunStateSubsystem* Run)
         {
             const FRunPartyMember* Member = DirectMember(Run);
@@ -390,7 +421,7 @@ namespace NormalTargetRunReview
 
         bool VisitShop(URunStateSubsystem* Run)
         {
-            if (Controller->IsShopPurchasePending()) return false;
+            if (Controller->IsShopPurchasePending() || Controller->IsEquipmentChangePending()) return false;
             if (!ExpectedServiceParty.IsEmpty() && !ObserveServiceUI(Run)) return bPassed ? false : End();
             const FRunPartyMember* Member = DirectMember(Run);
             const FRunEncounterOffer* Encounter = Run->GetEncounterProgress().FindSelectedOffer();
@@ -405,7 +436,15 @@ namespace NormalTargetRunReview
                 ServiceUIReadyAt = FPlatformTime::Seconds();
                 return false;
             }
-            if (FPlatformTime::Seconds() - ServiceUIReadyAt < 0.25) return false;
+            if (FPlatformTime::Seconds() - ServiceUIReadyAt < 1.2) return false;
+            AEncounterPrototypeStage* NPC = Cast<AEncounterPrototypeStage>(Controller->GetViewTarget());
+            if (!Check(NPC && NPC->MatchesOffer(*Encounter), TEXT("The committed shop reaches its matching authored NPC camera before interaction."))) return End();
+            if (!ObservedStages.Contains(NPC->StageId))
+            {
+                if (!Capture(Controller->GetWorld(), TEXT("NPC_") + NPC->StageId.ToString())) return End();
+                ObservedStages.Add(NPC->StageId);
+            }
+            if (Member->CurrentHP > 0.f && ImproveEquipment(Run, *Member, VisitKey)) return false;
             const FGameplayTag Tag = Encounter->GetResolvedTag();
             const bool bRecovery = Tag.MatchesTag(FRunEncounterOffer::GetRecoveryTag());
             const bool bRevival = Tag.MatchesTag(FRunEncounterOffer::GetRevivalTag());
@@ -473,6 +512,7 @@ namespace NormalTargetRunReview
                 if (!Capture(Controller->GetWorld(), TEXT("BeforeActualContinue"))) return End();
                 Event(Run, TEXT("request_real_menu_restart"));
                 bRestartRequested = true;
+                UnbindConsumable();
                 RetainViewport(Controller->GetWorld());
                 GEditor->RequestEndPlayMap();
                 Stage = 5;
@@ -484,10 +524,19 @@ namespace NormalTargetRunReview
             for (const FGuid& CharacterId : Run->GetGoldRewardRecipientIds())
             {
                 if (Reward.Claims.ContainsByPredicate([CharacterId](const FRunGoldRewardClaim& Claim) { return Claim.CharacterId == CharacterId; })) continue;
-                if (!Check(!Reward.GoldChoices.IsEmpty(), TEXT("A pending human reward has actual authored choices."))) return End();
                 int32 Choice = 0;
-                for (int32 Index = 1; Index < Reward.GoldChoices.Num(); ++Index) if (Reward.GoldChoices[Index] > Reward.GoldChoices[Choice]) Choice = Index;
-                Event(Run, TEXT("request_offered_gold_reward"), FString::FromInt(Reward.GoldChoices[Choice]));
+                if (Reward.SchemaVersion == 2)
+                {
+                    if (!Check(Reward.ItemChoices.Num() == 3 && Reward.GoldChoices.IsEmpty() && Reward.BonusGold > 0, TEXT("A normal weapon Run offers three actual items and one shared gold amount."))) return End();
+                    for (int32 Index = 1; Index < Reward.ItemChoices.Num(); ++Index) if (SkillUtility(Reward.ItemChoices[Index].GrantedSkills) > SkillUtility(Reward.ItemChoices[Choice].GrantedSkills)) Choice = Index;
+                    Event(Run, TEXT("request_offered_item_reward"), Reward.ItemChoices[Choice].DisplayName.ToString());
+                }
+                else
+                {
+                    if (!Check(!Reward.GoldChoices.IsEmpty(), TEXT("A legacy pending human reward has actual authored choices."))) return End();
+                    for (int32 Index = 1; Index < Reward.GoldChoices.Num(); ++Index) if (Reward.GoldChoices[Index] > Reward.GoldChoices[Choice]) Choice = Index;
+                    Event(Run, TEXT("request_offered_gold_reward"), FString::FromInt(Reward.GoldChoices[Choice]));
+                }
                 Controller->RequestSelectGoldReward(CharacterId, Run->GetCurrentNodeId(), Choice);
                 LastProgress = FPlatformTime::Seconds();
                 return false;
@@ -496,6 +545,88 @@ namespace NormalTargetRunReview
             Event(Run, TEXT("request_continue_run"));
             Controller->RequestContinueRun();
             return false;
+        }
+
+        // Evaluate visible loadouts on copies; the production requests still validate and save every change.
+        // 표시된 장비를 사본에서 평가하며 실제 변경은 기존 요청의 검증과 저장을 거칩니다.
+        static float SkillUtility(const TArray<FSoftObjectPath>& Paths)
+        {
+            float Damage = 0.f;
+            float Healing = 0.f;
+            float Shield = 0.f;
+            for (const FSoftObjectPath& Path : Paths)
+            {
+                const USkillDefinitionDataAsset* Asset = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
+                FCombatRoundSkill Skill;
+                FText Error;
+                if (!Asset || !Asset->ResolveRoundSkill(Skill, Error)) continue;
+                const FGameplayTagContainer Tags = EffectiveTags(Skill);
+                float Power = Skill.Power / FMath::Max(1, Skill.ActionPointCost);
+                if (CombatRoundRules::UsesChain(Skill)) for (int32 Jump = 1; Jump < Skill.Chain.MaxTargets; ++Jump) Power += Skill.Power * FMath::Pow(Skill.Chain.DamageMultiplierPerJump, static_cast<float>(Jump)) / FMath::Max(1, Skill.ActionPointCost);
+                if (Tags.HasTag(ProjectACombatTags::Skill_Effect_Damage)) Damage = FMath::Max(Damage, Power);
+                if (Tags.HasTag(ProjectACombatTags::Skill_Effect_Heal)) Healing = FMath::Max(Healing, Power);
+                if (Tags.HasTag(ProjectACombatTags::Skill_Effect_Shield)) Shield = FMath::Max(Shield, Power);
+            }
+            return Damage + Healing * 0.8f + Shield * 0.3f;
+        }
+
+        bool ImproveEquipment(URunStateSubsystem* Run, const FRunPartyMember& Member, const FString& VisitKey)
+        {
+            const float CurrentUtility = SkillUtility(Member.Skills);
+            float BestUtility = CurrentUtility;
+            FRunEquipmentCommand Best;
+            Best.CharacterId = Member.CharacterId;
+            Best.ExpectedRevision = Member.Equipment.Revision;
+            for (int32 Index = 0; Index < Member.Items.Num(); ++Index)
+            {
+                for (int32 SlotIndex = 0; SlotIndex < 2; ++SlotIndex)
+                {
+                    FRunEquipmentCommand Command = Best;
+                    Command.ItemIndex = Index;
+                    Command.TargetSlot = URunEquipmentCatalog::GetWeaponSlot(SlotIndex);
+                    FRunPartyMember Candidate = Member;
+                    FText Error;
+                    if (!RunEquipmentRules::Apply(Candidate, Command, Error)) continue;
+                    const float Utility = SkillUtility(Candidate.Skills);
+                    if (Utility <= BestUtility + KINDA_SMALL_NUMBER) continue;
+                    BestUtility = Utility;
+                    Best = Command;
+                }
+            }
+            if (Best.ItemIndex != INDEX_NONE)
+            {
+                Event(Run, TEXT("request_owned_equipment_upgrade"), FString::FromInt(Best.ItemIndex));
+                Controller->RequestChangeEquipment(Best);
+                ++EquipmentRequests;
+                return true;
+            }
+            if (!Run->GetEncounterProgress().IsItemShop()) return false;
+            const FRunItemShopOffer* Purchase = nullptr;
+            for (const FRunItemShopOffer& Offer : Run->GetItemShopState().Offers)
+            {
+                if (Offer.bSold || Offer.Item.Price > Member.Gold - 2 || AttemptedServices.Contains(VisitKey + TEXT(":") + Offer.OfferId.ToString())) continue;
+                for (int32 SlotIndex = 0; SlotIndex < 2; ++SlotIndex)
+                {
+                    FRunPartyMember Candidate = Member;
+                    FRunEquipmentCommand Command;
+                    Command.CharacterId = Member.CharacterId;
+                    Command.ExpectedRevision = Member.Equipment.Revision;
+                    Command.ItemIndex = Candidate.Items.Add(Offer.Item);
+                    Command.TargetSlot = URunEquipmentCatalog::GetWeaponSlot(SlotIndex);
+                    FText Error;
+                    if (!RunEquipmentRules::Apply(Candidate, Command, Error)) continue;
+                    const float Utility = SkillUtility(Candidate.Skills);
+                    if (Utility <= BestUtility + KINDA_SMALL_NUMBER) continue;
+                    BestUtility = Utility;
+                    Purchase = &Offer;
+                }
+            }
+            if (!Purchase) return false;
+            AttemptedServices.Add(VisitKey + TEXT(":") + Purchase->OfferId.ToString());
+            Event(Run, TEXT("request_offered_item_purchase"), Purchase->OfferId.ToString());
+            Controller->RequestPurchaseShopOffer(Member.CharacterId, Purchase->OfferId, Run->GetItemShopState().Revision);
+            ++ItemPurchaseRequests;
+            return true;
         }
 
         static FGameplayTagContainer EffectiveTags(const FCombatRoundSkill& Skill)
@@ -519,6 +650,64 @@ namespace NormalTargetRunReview
             }
             ConsumableGasHandle.Reset();
             ConsumableHealthHandle.Reset();
+            ConsumableSource.Reset();
+            ConsumableEffectContext = FGameplayEffectContextHandle();
+        }
+
+        // Compare restored actors as well as serialized data before any new plan can spend AP or stock.
+        // 새 계획이 AP나 재고를 사용하기 전에 직렬화 데이터와 복구된 액터를 함께 대조합니다.
+        bool VerifyLivePlanningBoundary(const FCombatCheckpointData& Checkpoint, ACombatRoundCoordinator* Round)
+        {
+            const FCombatRoundView& View = Round->GetView();
+            ACombatManager* Manager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(Controller->GetWorld(), ACombatManager::StaticClass()));
+            if (!Check(Manager && View.Phase == ECombatRoundPhase::Planning && View.RoundNumber == Checkpoint.RoundNumber && View.PlanRevision == Checkpoint.PlanRevision && View.Units.Num() == Checkpoint.Units.Num(), TEXT("The live planning session retains the saved round, plan revision and complete unit roster."))) return false;
+            for (const FCombatCheckpointUnit& Saved : Checkpoint.Units)
+            {
+                const FCombatRoundUnitView* Entry = View.Units.FindByPredicate([&Saved](const FCombatRoundUnitView& Candidate) { return Candidate.UnitId == Saved.RoundUnitId; });
+                const FCombatCheckpointRoundPlan* Plan = Checkpoint.RoundPlans.FindByPredicate([&Saved](const FCombatCheckpointRoundPlan& Candidate) { return Candidate.UnitId == Saved.RoundUnitId; });
+                AUnitBase* Unit = Entry ? Entry->Unit.Get() : nullptr;
+                const UAS_Unit* Attributes = Unit ? Unit->GetAttributeSet() : nullptr;
+                if (!Check(Unit && Attributes && Plan && FSoftObjectPath(Unit->GetClass()) == Saved.UnitClass && Unit->GetTeam() == Saved.Team && Unit->IsUnitAlive() == !Saved.bDead && Manager->GetCharacterId(Unit) == Saved.CharacterId && Manager->GetOwnerAccountId(Unit) == Saved.OwnerAccountId, TEXT("Each live checkpoint unit keeps its class, team, identity, owner and natural death state."))) return false;
+                if (!Check(FMath::IsNearlyEqual(Attributes->GetHP(), Saved.HP) && FMath::IsNearlyEqual(Attributes->GetMaxHP(), Saved.MaxHP) && FMath::IsNearlyEqual(Attributes->GetSpeed(), Saved.Speed) && Attributes->GetShield() == 0.f && Unit->GetCurrentActionPoint() == Saved.AP && Unit->GetMaxActionPoint() == Saved.MaxAP && Unit->GetCurrentSubActionPoint() == Saved.SubAP && Unit->GetMaxSubActionPoint() == Saved.MaxSubAP && Unit->GetMoveRange() == Saved.MoveRange, TEXT("Each live unit preserves saved HP, maximum stats, AP and SAP without a reset or replayed consumable cost."))) return false;
+                if (!Check(Unit->Consumables.Num() == Saved.Consumables.Num() && Unit->HealingItemCount == Saved.HealingItemCount && FMath::IsNearlyEqual(Unit->HealingItemAmount, Saved.HealingItemAmount), TEXT("Each live unit retains the complete saved consumable inventory."))) return false;
+                for (int32 Index = 0; Index < Saved.Consumables.Num(); ++Index) if (!Check(FRunConsumableStack::StaticStruct()->CompareScriptStruct(&Unit->Consumables[Index], &Saved.Consumables[Index], 0), TEXT("Every restored consumable stack preserves its exact tag, skill and decremented quantity."))) return false;
+                if (!Check(Entry->HomeCoord == Saved.GridCoord && (Saved.bHasTile ? Unit->GetCurrentTile() && Unit->GetCurrentTile()->GridCoord == Saved.GridCoord && Unit->GetCurrentTile()->GetOccupyingUnit() == Unit : Unit->GetCurrentTile() == nullptr), TEXT("The saved live grid placement and dead-unit vacancy are preserved."))) return false;
+                // CapturePlanningCheckpoint clears unused dead-unit coordinates; normalize only this comparison copy.
+                // 저장기가 사망자의 미사용 명령 좌표를 지우므로 비교용 사본만 동일하게 정규화합니다.
+                FCombatRoundCommand ComparableCommand = Entry->Command;
+                if (Saved.bDead)
+                {
+                    ComparableCommand.TargetCoord = FIntPoint::ZeroValue;
+                    ComparableCommand.DestinationCoord = FIntPoint::ZeroValue;
+                }
+                if (!Check(FCombatRoundCommand::StaticStruct()->CompareScriptStruct(&ComparableCommand, &Plan->Command, 0) && Entry->bHasMovePlan == Plan->bHasMovePlan && Entry->MoveDestinationCoord == Plan->MoveDestinationCoord && Entry->bReady == (Saved.bDead || Entry->OwnerSlot == 0 || Plan->bReady), TEXT("The actual restored plans and readiness equal the saved boundary before another normal request."))) return false;
+            }
+            return true;
+        }
+
+        bool RestartAfterConsumable(URunStateSubsystem* Run, ACombatRoundCoordinator* Round)
+        {
+            FText Error;
+            ConsumableRestartSave.Reset(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Slot, Error)));
+            if (!Check(ConsumableRestartSave.IsValid() && SameSavedBoundary(*ConsumableRestartSave.Get(), Run) && FCombatCheckpointData::StaticStruct()->CompareScriptStruct(&ConsumableRestartSave->CombatCheckpoint, &Run->GetCombatCheckpoint(), 0), TEXT("The next stable planning boundary after an observed consumable release is durable before real menu restart: ") + Error.ToString()) || !VerifyLivePlanningBoundary(ConsumableRestartSave->CombatCheckpoint, Round)) return End();
+            if (!Capture(Controller->GetWorld(), TEXT("BeforeConsumableActualContinue"))) return End();
+            Event(Run, TEXT("request_post_consumable_real_menu_restart"), FString::Printf(TEXT("consumable_combat=%s consumable_round=%d attempt=%s revision=%lld round=%d"), *ConsumableCombatId.ToString(), ConsumableRound, *Run->GetCombatCheckpoint().AttemptId.ToString(), Run->GetCombatCheckpoint().Revision, Run->GetCombatCheckpoint().RoundNumber));
+            ConsumableRestartCombatId = Round->GetView().CombatId;
+            bConsumableRestartRequested = bResumingConsumableBoundary = true;
+            // Discard only observer state from the old world; production checkpoint plans remain untouched.
+            // 이전 월드의 관측기 상태만 비우고 실제 체크포인트 계획은 변경하지 않습니다.
+            UnbindConsumable();
+            bAwaitingPlan = false;
+            PendingCommand = FCombatRoundCommand();
+            PlannedRounds.Reset();
+            VerifiedBoundaries.Reset();
+            LastSignature.Reset();
+            ConsumablePlanningWaitKey.Reset();
+            RetainViewport(Controller->GetWorld());
+            GEditor->RequestEndPlayMap();
+            Stage = 5;
+            LastProgress = FPlatformTime::Seconds();
+            return false;
         }
 
         bool AwaitConsumablePlanningUI(URunStateSubsystem* Run, ACombatRoundCoordinator* Round, const FCombatRoundSkill& Skill)
@@ -663,9 +852,26 @@ namespace NormalTargetRunReview
 
         bool PlanRound(URunStateSubsystem* Run, ACombatRoundCoordinator* Round)
         {
-            if (Controller->IsRoundRequestPending() || !Controller->IsRoundInputEnabled()) return false;
+            if (Controller->IsRoundRequestPending()) return false;
             const FCombatRoundView View = Round->GetView();
             if (!Check(View.RoundNumber <= 100, TEXT("One normal combat stays within the one-hundred-round observation budget; no forced result is applied."))) return End();
+            const FCombatRoundUnitView* Direct = FindLivingDirectUnit(Run, View);
+            if (!Direct)
+            {
+                const FRunPartyMember* Member = DirectMember(Run);
+                if (Member && Member->CurrentHP == 0.f)
+                {
+                    bAwaitingPlan = false;
+                    PendingCommand = FCombatRoundCommand();
+                    if (!ObservedSpectatorCombats.Contains(View.CombatId))
+                    {
+                        ObservedSpectatorCombats.Add(View.CombatId);
+                        Event(Run, TEXT("observe_companions_after_direct_death"), FString::Printf(TEXT("participant_slot=%d; original_character=%s; no companion plan or Ready request is issued"), Controller->GetRoundParticipantSlot(), *Member->CharacterId.ToString()));
+                    }
+                }
+                return false;
+            }
+            if (!Controller->IsRoundInputEnabled()) return false;
             if (!VerifiedCombatStats.Contains(View.CombatId))
             {
                 ACombatManager* Manager = Cast<ACombatManager>(UGameplayStatics::GetActorOfClass(Controller->GetWorld(), ACombatManager::StaticClass()));
@@ -696,8 +902,6 @@ namespace NormalTargetRunReview
                 if (!Capture(Controller->GetWorld(), TEXT("NormalFirstPlanning"))) return End();
                 bCapturedFirstPlanning = true;
             }
-            const FCombatRoundUnitView* Direct = View.Units.FindByPredicate([this](const FCombatRoundUnitView& Entry) { return !Entry.bEnemy && Entry.OwnerSlot == Controller->GetRoundParticipantSlot() && Entry.Unit && Entry.Unit->IsUnitAlive(); });
-            if (!Direct) return false;
             if (bAwaitingPlan)
             {
                 if (!Check(FCombatRoundCommand::StaticStruct()->CompareScriptStruct(&Direct->Command, &PendingCommand, 0), TEXT("The normal player's public plan is accepted without changing any companion AI plan: ") + Controller->GetRoundRequestStatus().ToString())) return End();
@@ -923,10 +1127,17 @@ namespace NormalTargetRunReview
             Report->SetBoolField(TEXT("passed_observation_contract"), bPassed && bTerminalObserved);
             Report->SetBoolField(TEXT("completed_all_eighty_stages"), Outcome == TEXT("Completed80Stages") && bPassed);
             Report->SetBoolField(TEXT("actual_menu_continue_verified"), bRestartVerified);
+            Report->SetBoolField(TEXT("post_consumable_menu_restart_requested"), bConsumableRestartRequested);
+            Report->SetBoolField(TEXT("actual_post_consumable_menu_continue_verified"), bConsumableRestartVerified);
+            Report->SetStringField(TEXT("post_consumable_menu_continue_status"), bConsumableRestartVerified ? TEXT("Actual menu Continue after PIE restart preserved the next stable planning save and live unit HP/AP/SAP, stock, death, position and plans after a successful consumable release.") : bConsumableRestartRequested ? TEXT("Unverified: post-consumable menu restart was requested but restoration validation did not finish.") : TEXT("Unobserved: no eligible stable controllable planning boundary after a successful natural consumable release was reached; no HP, stock or result was forced."));
             Report->SetNumberField(TEXT("completed_combats"), CompletedCombats);
             Report->SetNumberField(TEXT("completed_encounter_choices"), CompletedChoices);
             Report->SetNumberField(TEXT("normal_rounds_submitted"), RoundsSubmitted);
+            Report->SetNumberField(TEXT("spectator_combats_after_direct_death"), ObservedSpectatorCombats.Num());
             Report->SetNumberField(TEXT("saved_boundary_deserializations"), SavedBoundaryReads);
+            Report->SetNumberField(TEXT("item_purchase_requests"), ItemPurchaseRequests);
+            Report->SetNumberField(TEXT("equipment_change_requests"), EquipmentRequests);
+            Report->SetNumberField(TEXT("npc_stages_observed"), ObservedStages.Num());
             Report->SetNumberField(TEXT("consumable_ui_requests"), ConsumableUIRequests);
             Report->SetNumberField(TEXT("consumable_ui_uses_observed"), ConsumableUIUses);
             Report->SetArrayField(TEXT("consumable_ui_observations"), ConsumableObservations);
@@ -935,12 +1146,12 @@ namespace NormalTargetRunReview
             Report->SetNumberField(TEXT("revival_ui_purchases"), RevivalUIPurchases);
             Report->SetStringField(TEXT("revival_ui_status"), RevivalUIPurchases > 0 ? TEXT("Observed through the offered original UI after natural death.") : TEXT("Unobserved: no eligible natural-death revival UI purchase was reached; no death or result was forced."));
             Report->SetStringField(TEXT("consumable_ui_status"), ConsumableUIUses > 0 ? TEXT("Actual UI plan/Ready, GAS healing, AP cost, quantity and saved boundary observed.") : TEXT("Unobserved: no successful natural consumable UI release was reached; no health or stock override was applied."));
-            Report->SetStringField(TEXT("scope"), TEXT("Actual normal single-player menu creates four default characters with one direct and three production companions. Public encounter/shop/reward/node/plan/Ready requests only. No HP, damage, AP, skill catalog, stock, gold, enemy roster, timing, physics or result overrides. Test-only strategy prioritizes legal critical healing or full-value self-healing before visible queued attack power crosses the danger boundary, then finishing a visible enemy, damage and support. Consumable plans use original world-selection/skill/Ready delegates and services use the actual recovery button; these are UI delegates, not physical mouse clicks. For equal legal healing utility, observe an owned consumable once. Observe actual self-heal GAS HP/AP/quantity and durable boundaries; natural death/revival may remain unobserved. Takes offered recovery and skills and maximum offered gold. Actual first-victory menu restart when reached, plus checkpoint deserialization at stable boundaries. A natural defeat ends observation honestly; one run does not establish overall balance, all strategies, online PvP or manual play quality."));
+            Report->SetStringField(TEXT("scope"), TEXT("Actual normal single-player menu creates four default characters with one direct and three production companions. Public encounter/shop/reward/node/plan/Ready requests only. Planning requires a positive participant slot and the original direct character identity; after its natural death, surviving companions remain production AI while the test only observes under the unchanged timeout. No HP, damage, AP, skill catalog, stock, gold, enemy roster, timing, physics or result overrides. Test-only strategy prioritizes legal critical healing or full-value self-healing before visible queued attack power crosses the danger boundary, then finishing a visible enemy, damage and support. Consumable plans use original world-selection/skill/Ready delegates and services use the actual recovery button; these are UI delegates, not physical mouse clicks. For equal legal healing utility, observe an owned consumable once. Observe actual self-heal GAS HP/AP/quantity and durable boundaries; natural death/revival may remain unobserved. Takes offered recovery and usable weapon upgrades through public purchase/equipment requests, reserves two gold for services, and selects offered item rewards by visible skill utility; legacy gold choices still choose the maximum. Actual first-victory menu restart when reached, separately followed or preceded by one actual menu restart at the next controllable planning boundary after successful consumable use. The latter compares the saved HP/AP/stock/progress/checkpoint and restored live units before new plans; it remains unobserved if no eligible boundary occurs. Stable boundaries also undergo checkpoint deserialization. A natural defeat ends observation honestly; one run does not establish overall balance, all strategies, online PvP or manual play quality."));
             Report->SetArrayField(TEXT("events"), Events);
             Report->SetObjectField(TEXT("first_planning_presentation"), PresentationReport);
             FString JSON;
             Check(FJsonSerializer::Serialize(Report, TJsonWriterFactory<>::Create(&JSON)) && FFileHelper::SaveStringToFile(JSON, *(Output / TEXT("NormalTargetRun.json"))), TEXT("The complete normal-run outcome and unmodified boundary history are saved."));
-            Test->AddInfo(FString::Printf(TEXT("Normal target Run outcome=%s; combat=%d/20 encounter=%d/60; actual Continue=%d; file=%s."), *Outcome, CompletedCombats, CompletedChoices, bRestartVerified, *(Output / TEXT("NormalTargetRun.json"))));
+            Test->AddInfo(FString::Printf(TEXT("Normal target Run outcome=%s; combat=%d/20 encounter=%d/60; result Continue=%d; post-consumable planning Continue=%d; file=%s."), *Outcome, CompletedCombats, CompletedChoices, bRestartVerified, bConsumableRestartVerified, *(Output / TEXT("NormalTargetRun.json"))));
         }
 
         FAutomationTestBase* Test;
@@ -950,6 +1161,7 @@ namespace NormalTargetRunReview
         FString LastSignature;
         TStrongObjectPtr<ULevelEditorPlaySettings> Settings;
         TStrongObjectPtr<URunSaveGame> RestartSave;
+        TStrongObjectPtr<URunSaveGame> ConsumableRestartSave;
         TWeakObjectPtr<AGameplayPlayerController> Controller;
         TSharedPtr<ISlateViewport> RetainedViewport;
         TArray<FRunPartyMember> OriginalParty;
@@ -957,8 +1169,12 @@ namespace NormalTargetRunReview
         TArray<TSharedPtr<FJsonValue>> Events;
         TSet<FString> VerifiedBoundaries;
         TSet<FString> AttemptedServices;
+        TSet<FName> ObservedStages;
+        int32 ItemPurchaseRequests = 0;
+        int32 EquipmentRequests = 0;
         TSet<FString> PlannedRounds;
         TSet<FGuid> VerifiedCombatStats;
+        TSet<FGuid> ObservedSpectatorCombats;
         FCombatRoundCommand PendingCommand;
         FString ServiceUIVisit;
         FString ConsumablePlanningWaitKey;
@@ -970,6 +1186,7 @@ namespace NormalTargetRunReview
         FCombatRoundSkill ObservedConsumableSkill;
         FGameplayEffectContextHandle ConsumableEffectContext;
         FGuid ConsumableCombatId;
+        FGuid ConsumableRestartCombatId;
         FGuid ConsumableCharacterId;
         FDelegateHandle ConsumableGasHandle;
         FDelegateHandle ConsumableHealthHandle;
@@ -1010,6 +1227,9 @@ namespace NormalTargetRunReview
         bool bInitialPartyRecorded = false;
         bool bRestartRequested = false;
         bool bRestartVerified = false;
+        bool bConsumableRestartRequested = false;
+        bool bConsumableRestartVerified = false;
+        bool bResumingConsumableBoundary = false;
         bool bTerminalObserved = false;
         bool bAwaitingPlan = false;
         bool bCapturedFirstPlanning = false;

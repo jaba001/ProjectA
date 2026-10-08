@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Game/Run/RunIdentityLibrary.h"
 #include "Game/Run/RunParticipationLibrary.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
@@ -89,6 +90,73 @@ bool FRunParticipationValidationTest::RunTest(const FString& Parameters)
     for (int32 Index = 0; Index < Members.Num(); ++Index)
     {
         TestTrue(TEXT("Validation and serialization never transfer a character"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Members[Index], &OriginalMembers[Index], 0));
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunNewCoopRosterTest, "ProjectA.Recovery.NewCoopRoster", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunNewCoopRosterTest::RunTest(const FString& Parameters)
+{
+    FText Error;
+    for (int32 ParticipantCount = 1; ParticipantCount <= 4; ++ParticipantCount)
+    {
+        FRunIdentityData Identity;
+        Identity.SchemaVersion = URunIdentityLibrary::CurrentSchemaVersion;
+        Identity.Origin = ERunIdentityOrigin::LocalDevelopment;
+        Identity.RunId = FGuid::NewGuid();
+        Identity.HostEpoch = 1;
+        FRunParticipationData Participation;
+        TArray<FRunPartyMember> Members;
+        for (int32 Index = 0; Index < ParticipantCount; ++Index)
+        {
+            FRunParticipantData& Participant = Identity.OriginalParticipants.AddDefaulted_GetRef();
+            Participant.AccountId.Provider = TEXT("Development");
+            Participant.AccountId.Subject = FString::Printf(TEXT("NewRosterOwner%d"), Index + 1);
+            Participant.JoinOrdinal = Index + 1;
+            Participation.HumanParticipants.Add(Participant.AccountId);
+            FRunPartyMember& Member = Members.AddDefaulted_GetRef();
+            Member.SlotIndex = 3 - Index;
+            Member.CharacterId = FGuid::NewGuid();
+            Member.OwnerAccountId = Participant.AccountId;
+            Member.bCreated = true;
+        }
+        Identity.HostAccountId = Identity.OriginalParticipants[0].AccountId;
+        const FRunIdentityData OriginalIdentity = Identity;
+        const TArray<FRunPartyMember> OriginalMembers = Members;
+        TestTrue(TEXT("One character per original participant is accepted regardless of slot order"), URunParticipationLibrary::ValidateNewRunRoster(Identity, Members, Error));
+        TestTrue(TEXT("Creation validation preserves original participant numbers and Host"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Identity, &OriginalIdentity, 0));
+        for (int32 Index = 0; Index < Members.Num(); ++Index)
+        {
+            TestTrue(TEXT("Creation validation never remaps character ownership or slots"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Members[Index], &OriginalMembers[Index], 0));
+        }
+        if (ParticipantCount < 4)
+        {
+            for (int32 Slot = 0; Slot < 4 - ParticipantCount; ++Slot)
+            {
+                FRunPartyMember& Empty = Members.AddDefaulted_GetRef();
+                Empty.SlotIndex = Slot;
+            }
+            TestTrue(TEXT("Unoccupied character slots remain empty instead of requiring extra AI"), URunParticipationLibrary::ValidateNewRunRoster(Identity, Members, Error));
+            for (int32 Index = ParticipantCount; Index < Members.Num(); ++Index)
+            {
+                Members[Index].bCreated = true;
+                Members[Index].CharacterId = FGuid::NewGuid();
+                Members[Index].OwnerAccountId = Identity.HostAccountId;
+            }
+            TestTrue(TEXT("Older identity validation continues to accept additional characters owned by an original participant"), URunIdentityLibrary::ValidateIdentity(Identity, Members, Error));
+            TestTrue(TEXT("Existing participation validation preserves compatible older roster layouts"), URunParticipationLibrary::Validate(Participation, Identity, Members, Error));
+            TestEqual(TEXT("New cooperative runs reject extra characters while standalone parties retain up to four"), URunParticipationLibrary::ValidateNewRunRoster(Identity, Members, Error), ParticipantCount == 1);
+        }
+        Members = OriginalMembers;
+        if (ParticipantCount > 1)
+        {
+            Members[1].OwnerAccountId = Identity.HostAccountId;
+            TestFalse(TEXT("Matching counts cannot hide a missing original character owner"), URunParticipationLibrary::ValidateNewRunRoster(Identity, Members, Error));
+            Members = OriginalMembers;
+            Members[1].CharacterId = Members[0].CharacterId;
+            TestFalse(TEXT("One character per participant still requires unique character identities"), URunParticipationLibrary::ValidateNewRunRoster(Identity, Members, Error));
+        }
     }
     return true;
 }

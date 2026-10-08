@@ -187,6 +187,15 @@ bool FManagedRunContextTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Failure after successful participation validation retains an explanation"), Fixture.Error.IsEmpty());
     TestTrue(TEXT("Missing catalog creates no lease or partial Run"), !Host->IsManagedRun() && !Host->HasManagedLease() && Host->GetPhase() == ERunPhase::None);
     Host->PartyDefinition = Catalog.Get();
+    TArray<FRunPartyMember> ExtraCharacterParty = Fixture.Party;
+    FRunPartyMember ExtraCharacter = Fixture.Party[0];
+    ExtraCharacter.SlotIndex = 2;
+    ExtraCharacter.CharacterId = FGuid::NewGuid();
+    ExtraCharacterParty.Add(ExtraCharacter);
+    TestTrue(TEXT("An older two-owner three-character identity remains structurally compatible"), URunIdentityLibrary::ValidateIdentity(Fixture.Identity, ExtraCharacterParty, Fixture.Error));
+    TestFalse(TEXT("New managed cooperative creation rejects more than one character per original participant"), Host->CreateManagedRun(ExtraCharacterParty, Fixture.Identity, Fixture.Error));
+    TestTrue(TEXT("Rejected creation publishes no memory, lease or authority record"), Host->GetPhase() == ERunPhase::None && !Host->HasManagedLease() && Fixture.FileBytes().IsEmpty());
+    TestEqual(TEXT("Rejected roster emits no state change"), Events, 0);
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("Failed initial publication cannot create a managed session"), Host->CreateManagedRun(Fixture.Party, Fixture.Identity, Fixture.Error));
     TestTrue(TEXT("Failed creation preserves empty memory, target and lease"), !Host->IsManagedRun() && !Host->HasManagedLease() && Host->GetPhase() == ERunPhase::None && !Host->GetManagedResumeTarget().IsValid());

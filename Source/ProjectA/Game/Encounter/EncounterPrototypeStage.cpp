@@ -150,7 +150,11 @@ void AEncounterPrototypeStage::RefreshPrototype()
         break;
     case 2:
         ConfigureShape(Counter, CylinderMesh, FVector(-65.f, -130.f, 49.f), FVector(2.1f, 2.8f, 0.78f), Tint * 0.55f);
-        ConfigureShape(Canopy, ConeMesh, FVector(70.f, -130.f, 223.f), FVector(3.4f, 3.4f, 0.9f), Tint);
+        // Keep the shelter above the camera-to-face sightline while preserving its native primitive geometry.
+        // 기본 도형 형태를 유지하며 지붕이 카메라에서 NPC 얼굴을 향한 시선을 가리지 않도록 높입니다.
+        ConfigureShape(Canopy, ConeMesh, FVector(70.f, -130.f, 310.f), FVector(3.4f, 3.4f, 0.9f), Tint);
+        ConfigureShape(LeftPost, CylinderMesh, FVector(70.f, -280.f, 145.f), FVector(0.12f, 0.12f, 2.7f), Wood);
+        ConfigureShape(RightPost, CylinderMesh, FVector(70.f, 20.f, 145.f), FVector(0.12f, 0.12f, 2.7f), Wood);
         ConfigureShape(DisplayBase, CubeMesh, FVector(-174.f, -130.f, 80.f), FVector(0.08f, 0.17f, 0.65f), FLinearColor::White);
         ConfigureShape(DisplayAccent, CubeMesh, FVector(-176.f, -130.f, 80.f), FVector(0.08f, 0.65f, 0.17f), FLinearColor::White);
         SignBoard->SetRelativeLocation(FVector(-163.f, -130.f, 28.f));

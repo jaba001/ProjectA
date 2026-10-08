@@ -193,6 +193,9 @@ namespace
             for (TActorIterator<AEncounterManager> It(World); It; ++It) Encounter = *It;
             ACombatRoundCoordinator* Round = Encounter && Encounter->GetCombatManager() ? Encounter->GetCombatManager()->GetRoundCoordinator() : nullptr;
             if (Run->GetPhase() != ERunPhase::Combat || !Round || Round->GetView().Phase != ECombatRoundPhase::Planning || !Run->HasCombatCheckpoint()) return false;
+            const FTargetRunGroup& FirstGroup = Run->GetTargetRunState().Groups[0];
+            const int32 ExpectedEnemies = FirstGroup.EnemyClasses.Num();
+            if (!Test->TestTrue(TEXT("The cooked first PvE encounter uses its nonempty frozen CSV roster."), Run->GetTargetRunState().LevelDesign.SchemaVersion == 1 && ExpectedEnemies > 0 && FirstGroup.EnemyRoster.Num() == ExpectedEnemies)) return true;
             int32 Players = 0;
             int32 Enemies = 0;
             for (AUnitBase* Unit : Encounter->GetSpawnedUnits())
@@ -207,16 +210,16 @@ namespace
                 }
                 else
                 {
+                    if (!Test->TestTrue(TEXT("Every actual cooked enemy follows its own frozen first-PvE class and slot."), FirstGroup.EnemyClasses.IsValidIndex(Enemies) && FSoftClassPath(Unit->GetClass()) == FirstGroup.EnemyClasses[Enemies] && FirstGroup.EnemyRoster[Enemies].UnitClass == FirstGroup.EnemyClasses[Enemies])) return true;
                     ++Enemies;
-                    if (!Test->TestTrue(TEXT("The actual cooked enemy uses the frozen first PvE class."), FSoftClassPath(Unit->GetClass()) == Run->GetTargetRunState().Groups[0].EnemyClasses[0])) return true;
                 }
             }
-            if (!Test->TestTrue(TEXT("Cooked public progression spawns four allies and the first target enemy without executing combat."), Players == 4 && Enemies == 1 && Run->GetCompletedNodes().IsEmpty() && Run->GetTargetRunState().CompletedEncounterChoices.Num() == 3)) return true;
+            if (!Test->TestTrue(TEXT("Cooked public progression spawns four allies and the complete frozen first target roster without executing combat."), Players == 4 && Enemies == ExpectedEnemies && Run->GetCompletedNodes().IsEmpty() && Run->GetTargetRunState().CompletedEncounterChoices.Num() == 3)) return true;
             FText Error;
             TStrongObjectPtr<URunSaveGame> Checkpoint(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Slot, Error)));
-            if (!Test->TestTrue(TEXT("The actual cooked Planning boundary persists the target and all five spawned units."), Checkpoint && Checkpoint->Phase == ERunPhase::Combat && Checkpoint->TargetRun.SchemaVersion == 1 && Checkpoint->CombatCheckpoint.Units.Num() == 5)) return true;
+            if (!Test->TestTrue(TEXT("The actual cooked Planning boundary persists the target and every spawned ally and frozen enemy."), Checkpoint && Checkpoint->Phase == ERunPhase::Combat && Checkpoint->TargetRun.SchemaVersion == 1 && Checkpoint->CombatCheckpoint.Units.Num() == Players + ExpectedEnemies)) return true;
             if (!Test->TestTrue(TEXT("Only this UUID-owned cooked checkpoint is removed after successful verification."), UGameplayStatics::DeleteGameInSlot(Slot, 0) && !UGameplayStatics::DoesSaveGameExist(Slot, 0))) return true;
-            Test->AddInfo(FString::Printf(TEXT("Cooked target Continue passed: slot=%s; actualMenu=1; choices=3; allies=4; enemies=1; planningSaved=1; deleted=1; combatExecuted=0; normalCompletion=0."), *Slot));
+            Test->AddInfo(FString::Printf(TEXT("Cooked target Continue passed: slot=%s; actualMenu=1; choices=3; allies=%d; enemies=%d; planningSaved=1; deleted=1; combatExecuted=0; normalCompletion=0."), *Slot, Players, Enemies));
             return true;
         }
 

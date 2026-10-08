@@ -23,6 +23,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Misc/ScopeExit.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Game/Development/DevelopmentCoopSubsystem.h"
 #include "Unit/UnitDataRules.h"
@@ -210,7 +211,15 @@ bool URunStateSubsystem::ValidateGoldRewardState(const URunSaveGame* Save) const
 
 bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError) const
 {
-    OutError = FText::FromString(TEXT("저장 파일이 손상되었거나 현재 버전·직업 설정과 호환되지 않습니다."));
+    const FText DefaultError = NSLOCTEXT("RunCheckpoint", "InvalidSaveData", "저장 파일이 손상되었거나 현재 버전·직업 설정과 호환되지 않습니다.");
+    bool bValid = false;
+    // Successful nested validators may clear their output before a later structural check rejects the save.
+    // 하위 검증이 성공하며 오류를 비운 뒤 구조 검사에서 저장을 거절해도 실패 이유를 유지합니다.
+    ON_SCOPE_EXIT
+    {
+        if (!bValid && OutError.IsEmpty()) OutError = DefaultError;
+    };
+    OutError = DefaultError;
     FRunSaveFormat Format;
     if (!Save || !FRunSaveFormat::Resolve(Save->Version, Format) || Save->Party.IsEmpty() || Save->Party.Num() > 4)
     {
@@ -228,7 +237,11 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
     if (!ValidateRecoverySave(Save, OutError)) return false;
     if (Save->TargetRun.SchemaVersion == 1 && (Format.bManaged || Save->Identity.Origin != ERunIdentityOrigin::LocalDevelopment || Save->Identity.OriginalParticipants.Num() != 1)) return false;
     if (Save->EncounterProgress.SchemaVersion != 0 && Save->Identity.Origin == ERunIdentityOrigin::LegacyOffline) return false;
-    if (!ValidateGoldRewardState(Save)) return false;
+    if (!ValidateGoldRewardState(Save))
+    {
+        OutError = NSLOCTEXT("RunCheckpoint", "InvalidRewardState", "저장된 전투 보상 또는 수령 기록이 현재 진행·캐릭터 정보와 일치하지 않습니다.");
+        return false;
+    }
     FText ShopError;
     if (!URunEncounterPoolDataAsset::ValidateSkillShop(Save->SkillShopState, ShopError))
     {
@@ -322,6 +335,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
     UPartyDefinitionDataAsset* Catalog = Cast<UPartyDefinitionDataAsset>(Save->Catalog.TryLoad());
     if (!Catalog)
     {
+        OutError = NSLOCTEXT("RunCheckpoint", "MissingPartyCatalog", "저장에 필요한 파티 직업 설정이 없거나 불러올 수 없습니다.");
         return false;
     }
     TSet<int32> Slots;
@@ -467,6 +481,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
             }
         }
     }
+    bValid = true;
     OutError = FText::GetEmpty();
     return true;
 }
@@ -855,7 +870,7 @@ bool URunStateSubsystem::CreateManagedRun(const TArray<FRunPartyMember>& Members
 {
     OutError = NSLOCTEXT("ManagedRun", "CreateContext", "관리 Run은 고정된 개발용 최초 Host가 번호를 가진 원래 참가자 2~4명으로 새로 생성해야 합니다.");
     if (!bHasLocalCallerContext || bManagedRun || ManagedLease || Phase == ERunPhase::Combat || Phase == ERunPhase::Preparing || Identity.Origin != ERunIdentityOrigin::LocalDevelopment || Identity.SchemaVersion != URunIdentityLibrary::CurrentSchemaVersion || Identity.HostEpoch != 1 || Identity.HostAccountId != LocalCallerContext.AccountId || Identity.OriginalParticipants.Num() < 2 || Identity.OriginalParticipants.Num() > 4 || Identity.RunId == RunIdentity.RunId) return false;
-    if (!URunIdentityLibrary::ValidateIdentity(Identity, Members, OutError)) return false;
+    if (!URunParticipationLibrary::ValidateNewRunRoster(Identity, Members, OutError)) return false;
     TStrongObjectPtr<URunSaveGame> Save(CreateInitialSaveData(Members, Identity, OutError));
     if (!Save) return false;
     Save->Version = FRunSaveFormat::Select(true, Identity.Origin, Save->Phase);
@@ -1175,7 +1190,7 @@ bool URunStateSubsystem::InitializeIdentifiedRun(const TArray<FRunPartyMember>& 
         OutError = FText::FromString(TEXT("새 진행에는 Run·참가자·캐릭터 식별 정보가 필요합니다."));
         return false;
     }
-    if (!URunIdentityLibrary::ValidateIdentity(Identity, Members, OutError))
+    if (!URunParticipationLibrary::ValidateNewRunRoster(Identity, Members, OutError))
     {
         return false;
     }
@@ -1192,10 +1207,7 @@ bool URunStateSubsystem::InitializeIdentifiedRun(const TArray<FRunPartyMember>& 
         if (!ConfigureTargetRun(Save.Get(), OutError) || !ValidateSave(Save.Get(), OutError)) return false;
         return CommitSaveCandidate(Save.Get(), OutError);
     }
-    ApplySaveData(Save.Get());
-    AutoSaveCheckpoint();
-    OnRunStateChanged.Broadcast();
-    return true;
+    return CommitSaveCandidate(Save.Get(), OutError);
 }
 
 bool URunStateSubsystem::CanStartNode(FName NodeId) const

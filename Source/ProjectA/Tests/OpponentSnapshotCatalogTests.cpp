@@ -5,10 +5,14 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "Game/Snapshot/PartySnapshotSelectionLibrary.h"
+#include "Game/Snapshot/PartySnapshotSaveGame.h"
+#include "Game/Run/RunRecoveryTypes.h"
 #include "GAS/Ability/GA_AreaAttack.h"
 #include "GAS/Ability/GA_DefaultAttack.h"
+#include "Kismet/GameplayStatics.h"
 #include "NativeGameplayTags.h"
 #include "Unit/EnemyUnit.h"
+#include "UObject/StrongObjectPtr.h"
 
 namespace
 {
@@ -150,8 +154,8 @@ bool FOpponentSnapshotSkillResolutionTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("An empty skill list cannot execute"), Fixture.Catalog->ResolveSkills(Member, Resolved, Error));
     TestTrue(TEXT("Empty input preserves the caller's previous loadout"), Resolved == Previous);
     Member.SkillIds.Init(Fixture.BasicAttack->SkillId, 6);
-    TestFalse(TEXT("More than five skill slots cannot execute"), Fixture.Catalog->ResolveSkills(Member, Resolved, Error));
-    TestTrue(TEXT("Excess skill slots preserve the caller's previous loadout"), Resolved == Previous);
+    TestFalse(TEXT("Six duplicate identifiers cannot execute"), Fixture.Catalog->ResolveSkills(Member, Resolved, Error));
+    TestTrue(TEXT("Duplicate skill slots preserve the caller's previous loadout"), Resolved == Previous);
 
     Member.SkillIds = { Fixture.BasicAttack->SkillId, Fixture.BasicAttack->SkillId };
     TestFalse(TEXT("Duplicate skill asset resolution cannot collapse two slots into one"), Fixture.Catalog->ResolveSkills(Member, Resolved, Error));
@@ -176,7 +180,7 @@ bool FOpponentSnapshotSkillResolutionTest::RunTest(const FString& Parameters)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPartySnapshotCandidateSelectionTest, "ProjectA.Snapshot.CandidateSelection", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPartySnapshotCandidateSelectionTest, "ProjectA.Snapshot.CandidateSelection.InMemory", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FPartySnapshotCandidateSelectionTest::RunTest(const FString& Parameters)
 {
@@ -259,6 +263,153 @@ bool FPartySnapshotCandidateSelectionTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Selection resolves back to an eligible submitted snapshot"), Candidates.ContainsByPredicate([&Selected](const FPartySnapshotCandidate& Candidate) { return FPartySnapshot::StaticStruct()->CompareScriptStruct(&Selected, &Candidate.Snapshot, 0); }));
     TestTrue(TEXT("Replaying the draw preserves the complete selected opponent"), FPartySnapshot::StaticStruct()->CompareScriptStruct(&Selected, &Replayed, 0));
     TestEqual(TEXT("Replayed selection advances the random stream identically"), SelectionRandom.GetCurrentSeed(), ReplayRandom.GetCurrentSeed());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPartySnapshotConsumableBoundaryTest, "ProjectA.Snapshot.ConsumableBoundary", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPartySnapshotConsumableBoundaryTest::RunTest(const FString& Parameters)
+{
+    FSnapshotCatalogFixture Fixture;
+    FText Error;
+    TArray<TObjectPtr<USkillDefinitionDataAsset>> Resolved;
+    if (!TestTrue(TEXT("Ordinary trusted skills resolve before the boundary check"), Fixture.Catalog->ResolveSkills(Fixture.Snapshot.Members[0], Resolved, Error))) return false;
+    const TArray<TObjectPtr<USkillDefinitionDataAsset>> Previous = Resolved;
+    USkillDefinitionDataAsset* Consumable = NewObject<USkillDefinitionDataAsset>(Fixture.Catalog);
+    Consumable->SkillId = TEXT("ConsumableAlias");
+    Consumable->bUseRoundDefinition = true;
+    Consumable->RoundDefinition.Kind = ECombatRoundSkillKind::Wait;
+    Consumable->RoundDefinition.Approach = ECombatRoundApproach::None;
+    Consumable->RoundDefinition.ActionPointCost = 0;
+    Consumable->RoundDefinition.Power = 0.f;
+    Consumable->RoundDefinition.EffectTags.AddTag(RunRecoveryRules::GetHealingItemTag());
+    FCombatRoundSkill ConsumableProfile;
+    if (!TestTrue(TEXT("The fixture has a valid round profile carrying the consumable child tag"), Consumable->ResolveRoundSkill(ConsumableProfile, Error))) return false;
+    Fixture.Catalog->Skills.Add(Consumable->SkillId, Consumable);
+    Fixture.Snapshot.Members[0].SkillIds.Add(Consumable->SkillId);
+    TestTrue(TEXT("Opaque snapshot storage does not resolve catalog skill semantics"), UPartySnapshotLibrary::ValidateSnapshot(Fixture.Snapshot, Error));
+    TestFalse(TEXT("Consumable tags cannot enter an opponent's ordinary skill slots"), Fixture.Catalog->ResolveSkills(Fixture.Snapshot.Members[0], Resolved, Error));
+    TestTrue(TEXT("A late consumable rejection preserves the complete previous resolved list"), Resolved == Previous);
+    TestFalse(TEXT("Encounter validation rejects quantity-free consumable execution"), Fixture.Catalog->ValidateForEncounter(Fixture.Snapshot, 4, Error));
+    FPartySnapshotCandidate Candidate;
+    Candidate.Snapshot = Fixture.Snapshot;
+    Candidate.ProgressStage = 3;
+    FPartySnapshot Selected;
+    Selected.SnapshotId = TEXT("PreservedBeforeConsumable");
+    const FPartySnapshot PreviousSelection = Selected;
+    FRandomStream Random(213);
+    TestFalse(TEXT("The candidate selector also rejects consumable-bearing opponents"), UPartySnapshotSelectionLibrary::SelectOpponent({Candidate}, Fixture.Catalog, 3, FGameplayTagQuery(), 4, Random, Selected, Error));
+    TestTrue(TEXT("Consumable rejection preserves the prior selection"), FPartySnapshot::StaticStruct()->CompareScriptStruct(&Selected, &PreviousSelection, 0));
+    TestEqual(TEXT("Consumable rejection preserves the draw seed"), Random.GetCurrentSeed(), 213);
+
+    Fixture.Snapshot.Members[0].SkillIds.Reset();
+    for (int32 Index = 0; Index < 6; ++Index)
+    {
+        USkillDefinitionDataAsset* Skill = NewObject<USkillDefinitionDataAsset>(Fixture.Catalog);
+        Skill->SkillId = FName(*FString::Printf(TEXT("TrustedOrderedSkill_%d"), Index));
+        Skill->AbilityClass = UGA_DefaultAttack::StaticClass();
+        Fixture.Catalog->Skills.Add(Skill->SkillId, Skill);
+        Fixture.Snapshot.Members[0].SkillIds.Add(Skill->SkillId);
+    }
+    if (!TestTrue(TEXT("Six distinct trusted nonconsumable skills retain the current unlimited loadout contract"), Fixture.Catalog->ResolveSkills(Fixture.Snapshot.Members[0], Resolved, Error))) return false;
+    TestEqual(TEXT("No former five-skill limit truncates the opponent loadout"), Resolved.Num(), 6);
+    for (int32 Index = 0; Index < Resolved.Num(); ++Index) TestEqual(TEXT("Every skill retains its submitted order"), Resolved[Index]->SkillId, Fixture.Snapshot.Members[0].SkillIds[Index]);
+    TestTrue(TEXT("The extended ordinary loadout remains encounter-compatible"), Fixture.Catalog->ValidateForEncounter(Fixture.Snapshot, 4, Error));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPartySnapshotLocalSlotSelectionTest, "ProjectA.Snapshot.CandidateSelection.LocalSlots", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPartySnapshotLocalSlotSelectionTest::RunTest(const FString& Parameters)
+{
+    struct FSnapshotSelectionSlot
+    {
+        const FName Id = FName(*(TEXT("T14_Selection_") + FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+
+        ~FSnapshotSelectionSlot()
+        {
+            UGameplayStatics::DeleteGameInSlot(UPartySnapshotLibrary::GetSaveSlotName(Id), 0);
+        }
+    };
+
+    FSnapshotCatalogFixture Fixture;
+    TStrongObjectPtr<UOpponentSnapshotCatalogDataAsset> KeepCatalog(Fixture.Catalog);
+    FSnapshotSelectionSlot FirstSlot;
+    FSnapshotSelectionSlot SecondSlot;
+    FSnapshotSelectionSlot MissingSlot;
+    FSnapshotSelectionSlot InvalidSlot;
+    FText Error;
+    FPartySnapshot First = Fixture.Snapshot;
+    First.SnapshotId = TEXT("StoredFirstOpponent");
+    First.Members[0].Stats.CurrentHP = 37.f;
+    FPartySnapshot Second = First;
+    Second.SnapshotId = TEXT("StoredSecondOpponent");
+    Second.Members[0].Stats.CurrentHP = 63.f;
+    if (!TestTrue(TEXT("The first disposable opponent is saved"), UPartySnapshotLibrary::SaveSnapshot(FirstSlot.Id, First, Error))) return false;
+    if (!TestTrue(TEXT("The second disposable opponent is saved"), UPartySnapshotLibrary::SaveSnapshot(SecondSlot.Id, Second, Error))) return false;
+    TArray<uint8> FirstBytes;
+    TArray<uint8> SecondBytes;
+    if (!TestTrue(TEXT("The first original save bytes are captured"), UGameplayStatics::LoadDataFromSlot(FirstBytes, UPartySnapshotLibrary::GetSaveSlotName(FirstSlot.Id), 0))) return false;
+    if (!TestTrue(TEXT("The second original save bytes are captured"), UGameplayStatics::LoadDataFromSlot(SecondBytes, UPartySnapshotLibrary::GetSaveSlotName(SecondSlot.Id), 0))) return false;
+    FPartySnapshotSlotCandidate FirstEntry;
+    FirstEntry.SlotId = FirstSlot.Id;
+    FirstEntry.ProgressStage = 7;
+    FirstEntry.Tags.AddTag(TAG_SnapshotSelectionAllowed);
+    FPartySnapshotSlotCandidate SecondEntry = FirstEntry;
+    SecondEntry.SlotId = SecondSlot.Id;
+    const FGameplayTagQuery Query = FGameplayTagQuery::MakeQuery_MatchTag(TAG_SnapshotSelectionAllowed);
+    FRandomStream Random(819);
+    FRandomStream ReplayRandom(819);
+    FPartySnapshot Selected;
+    FPartySnapshot Replayed;
+    if (!TestTrue(TEXT("Matching local saved slots feed the common candidate selector"), UPartySnapshotSelectionLibrary::LoadAndSelectOpponent({FirstEntry, SecondEntry}, Fixture.Catalog, 7, Query, 4, Random, Selected, Error))) return false;
+    if (!TestTrue(TEXT("The same saved slots and seed replay the same selection"), UPartySnapshotSelectionLibrary::LoadAndSelectOpponent({FirstEntry, SecondEntry}, Fixture.Catalog, 7, Query, 4, ReplayRandom, Replayed, Error))) return false;
+    TestTrue(TEXT("Local slot selection preserves the full saved value"), FPartySnapshot::StaticStruct()->CompareScriptStruct(&Selected, &First, 0) || FPartySnapshot::StaticStruct()->CompareScriptStruct(&Selected, &Second, 0));
+    TestTrue(TEXT("Local replay preserves the complete selected build"), FPartySnapshot::StaticStruct()->CompareScriptStruct(&Selected, &Replayed, 0));
+    TestEqual(TEXT("Local replay advances the stream identically"), Random.GetCurrentSeed(), ReplayRandom.GetCurrentSeed());
+    TestTrue(TEXT("Successful local selection clears the error"), Error.IsEmpty());
+    Selected.Members[0].Stats.CurrentHP = 1.f;
+    const FPartySnapshot BeforeFailure = Selected;
+    const int32 SeedBeforeFailure = Random.GetCurrentSeed();
+    const auto Reject = [this, &Fixture, &Query, &Random, &Selected, &Error, &BeforeFailure, SeedBeforeFailure](const TArray<FPartySnapshotSlotCandidate>& Entries, const TCHAR* Label)
+    {
+        TestFalse(Label, UPartySnapshotSelectionLibrary::LoadAndSelectOpponent(Entries, Fixture.Catalog, 7, Query, 4, Random, Selected, Error));
+        TestTrue(TEXT("Rejected local requests preserve the previous opponent"), FPartySnapshot::StaticStruct()->CompareScriptStruct(&Selected, &BeforeFailure, 0));
+        TestEqual(TEXT("Rejected local requests preserve the exact next draw"), Random.GetCurrentSeed(), SeedBeforeFailure);
+        TestFalse(TEXT("Rejected local requests explain the failure"), Error.IsEmpty());
+    };
+    Reject({}, TEXT("An empty local pool cannot select a fallback opponent"));
+    Reject({FirstEntry, FirstEntry}, TEXT("One save slot cannot be submitted twice to bias a draw"));
+    FPartySnapshotSlotCandidate RejectedEntry = FirstEntry;
+    RejectedEntry.SlotId = TEXT("../InvalidSlot");
+    Reject({FirstEntry, RejectedEntry}, TEXT("Invalid slot syntax fails before reading the local pool"));
+    RejectedEntry = FirstEntry;
+    RejectedEntry.ProgressStage = INDEX_NONE;
+    Reject({RejectedEntry}, TEXT("Unspecified candidate progress cannot enter the local pool"));
+    RejectedEntry = FirstEntry;
+    RejectedEntry.SlotId = MissingSlot.Id;
+    Reject({FirstEntry, RejectedEntry}, TEXT("A later missing matching slot fails instead of drawing from a reduced pool"));
+    TStrongObjectPtr<UPartySnapshotSaveGame> InvalidSave(NewObject<UPartySnapshotSaveGame>());
+    InvalidSave->Snapshot = First;
+    InvalidSave->Snapshot.SchemaVersion = 99;
+    if (!TestTrue(TEXT("The disposable malformed snapshot fixture is saved"), UGameplayStatics::SaveGameToSlot(InvalidSave.Get(), UPartySnapshotLibrary::GetSaveSlotName(InvalidSlot.Id), 0))) return false;
+    RejectedEntry.SlotId = InvalidSlot.Id;
+    Reject({FirstEntry, RejectedEntry}, TEXT("A later malformed matching slot preserves the previous selection"));
+    if (!TestTrue(TEXT("The disposable alternate slot can represent a duplicate stored snapshot ID"), UPartySnapshotLibrary::SaveSnapshot(InvalidSlot.Id, First, Error))) return false;
+    Reject({FirstEntry, RejectedEntry}, TEXT("Distinct slot files cannot duplicate one eligible snapshot ID"));
+
+    RejectedEntry.SlotId = MissingSlot.Id;
+    RejectedEntry.ProgressStage = 8;
+    if (!TestTrue(TEXT("Metadata from another progress stage is filtered before local file loading"), UPartySnapshotSelectionLibrary::LoadAndSelectOpponent({FirstEntry, RejectedEntry}, Fixture.Catalog, 7, Query, 4, Random, Selected, Error))) return false;
+    RejectedEntry.ProgressStage = 7;
+    RejectedEntry.Tags.Reset();
+    RejectedEntry.Tags.AddTag(TAG_SnapshotSelectionExcluded);
+    if (!TestTrue(TEXT("GameplayTagQuery excludes an unrelated missing slot before file loading"), UPartySnapshotSelectionLibrary::LoadAndSelectOpponent({FirstEntry, RejectedEntry}, Fixture.Catalog, 7, Query, 4, Random, Selected, Error))) return false;
+    TArray<uint8> AfterBytes;
+    TestTrue(TEXT("The first source slot remains readable"), UGameplayStatics::LoadDataFromSlot(AfterBytes, UPartySnapshotLibrary::GetSaveSlotName(FirstSlot.Id), 0));
+    TestTrue(TEXT("Selection and caller mutations preserve first source bytes"), AfterBytes == FirstBytes);
+    TestTrue(TEXT("The second source slot remains readable"), UGameplayStatics::LoadDataFromSlot(AfterBytes, UPartySnapshotLibrary::GetSaveSlotName(SecondSlot.Id), 0));
+    TestTrue(TEXT("Selection and failures preserve second source bytes"), AfterBytes == SecondBytes);
     return true;
 }
 

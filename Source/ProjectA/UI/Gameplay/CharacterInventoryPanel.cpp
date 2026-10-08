@@ -363,7 +363,8 @@ void UCharacterInventoryPanel::RebuildList()
         if (DisplayedSkills.IsEmpty() && !bSkillsUnavailable) AddText(SkillList, NSLOCTEXT("Inventory", "EmptySkills", "보유한 스킬이 없습니다."), 16);
     }
     const bool bEmptyItems = !bSkills && VisibleItemIndices.IsEmpty() && DisplayedMember.bCreated;
-    EmptyItemsText->SetText(BagCount == 0 ? NSLOCTEXT("Inventory", "EmptyBag", "가방이 비어 있습니다.\n장착 아이템을 이곳으로 끌어 해제할 수 있습니다.") : FText::Format(NSLOCTEXT("Inventory", "EmptyCategory", "{0} 분류에 보관된 아이템이 없습니다.\n전체 탭에서 다른 아이템을 확인하세요."), Categories[SelectedCategoryIndex].Label));
+    const FText EmptyBag = bCanChangeEquipment ? NSLOCTEXT("Inventory", "EmptyBag", "가방이 비어 있습니다.\n장착 아이템을 이곳으로 끌어 해제할 수 있습니다.") : NSLOCTEXT("Inventory", "EmptyReadOnlyBag", "가방이 비어 있습니다.\n장착 중인 아이템은 현재 장비에서 확인하세요.");
+    EmptyItemsText->SetText(BagCount == 0 ? EmptyBag : FText::Format(NSLOCTEXT("Inventory", "EmptyCategory", "{0} 분류에 보관된 아이템이 없습니다.\n전체 탭에서 다른 아이템을 확인하세요."), Categories[SelectedCategoryIndex].Label));
     EmptyItemsText->SetVisibility(bEmptyItems ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     if (!VisibleItemIndices.Contains(SelectedItemIndex)) SelectedItemIndex = VisibleItemIndices.IsEmpty() ? INDEX_NONE : VisibleItemIndices[0];
     RefreshSelectedItem();

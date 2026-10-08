@@ -17,6 +17,10 @@ public:
     // 선택이 없으면 호환을 위해 가장 앞 생성 슬롯을 사용하며 사망한 선택 캐릭터도 유지합니다.
     static bool ResolveStandalonePlayerSlot(const TArray<FRunPartyMember>& Members, int32& OutSlot, FText& OutError);
 
+    // New cooperative runs assign one character per original participant without reinterpreting older saves.
+    // 새 협동 Run은 원래 참가자마다 한 캐릭터를 배정하며 기존 저장의 편성을 다시 해석하지 않습니다.
+    static bool ValidateNewRunRoster(const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, FText& OutError);
+
     // Structural validation does not authenticate accounts or approve a resume, start or return policy.
     // 구조 검증은 계정 인증이나 재개·시작·복귀 정책의 승인을 대신하지 않습니다.
     UFUNCTION(BlueprintCallable, Category = "Run|Participation")

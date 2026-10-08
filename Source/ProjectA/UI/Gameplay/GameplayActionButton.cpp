@@ -10,6 +10,9 @@ void UGameplayActionButton::Configure(FName InActionId, const FText& Label)
     UTextBlock* Text = Cast<UTextBlock>(GetContent());
     if (!Text) Text = NewObject<UTextBlock>(this);
     Text->SetText(Label);
+    Text->SetAutoWrapText(true);
+    Text->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
+    Text->SetJustification(ETextJustify::Center);
     const UDemonicUITheme& Theme = UDemonicUITheme::Get();
     Theme.StyleText(Text, false, 18);
     UButtonSlot* ButtonSlot = Cast<UButtonSlot>(Text->Slot);

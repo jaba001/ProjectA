@@ -35,6 +35,20 @@ bool URunParticipationLibrary::ResolveStandalonePlayerSlot(const TArray<FRunPart
     return true;
 }
 
+bool URunParticipationLibrary::ValidateNewRunRoster(const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, FText& OutError)
+{
+    if (!URunIdentityLibrary::ValidateIdentity(Identity, Members, OutError)) return false;
+    int32 CreatedCount = 0;
+    for (const FRunPartyMember& Member : Members) if (Member.bCreated) ++CreatedCount;
+    if (Identity.OriginalParticipants.Num() > 1 && CreatedCount != Identity.OriginalParticipants.Num())
+    {
+        OutError = NSLOCTEXT("RunParticipation", "NewCoopRoster", "새 협동 Run은 원래 참가자마다 한 캐릭터만 배정하고 나머지 슬롯은 비워야 합니다.");
+        return false;
+    }
+    OutError = FText::GetEmpty();
+    return true;
+}
+
 bool URunParticipationLibrary::Validate(const FRunParticipationData& Participation, const FRunIdentityData& Identity, const TArray<FRunPartyMember>& Members, FText& OutError)
 {
     if (!URunIdentityLibrary::ValidateIdentity(Identity, Members, OutError))

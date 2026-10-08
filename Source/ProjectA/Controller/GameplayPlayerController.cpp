@@ -304,6 +304,7 @@ void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName Off
     const bool bItemShop = CurrentRun && CurrentRun->GetEncounterProgress().IsItemShop();
     const FRunEncounterOffer* Selected = CurrentRun ? CurrentRun->GetEncounterProgress().FindSelectedOffer() : nullptr;
     const bool bService = Selected && Selected->IsService();
+    const FGameplayTag ServiceTag = bService ? Selected->GetResolvedTag() : FGameplayTag();
     FRunAccountId BuyerAccountId;
     bool bSucceeded = false;
     if (Mode && Mode->ResolveRunParticipant(this, BuyerAccountId))
@@ -313,9 +314,12 @@ void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName Off
     }
     if (bSucceeded)
     {
-        if (bService) Error = NSLOCTEXT("RunRecovery", "Purchased", "회복 서비스를 구매하고 진행을 저장했습니다.");
-        else if (bItemShop) Error = OfferId == FRunItemShopState::GetRerollOfferId() ? NSLOCTEXT("RunItemShop", "Rerolled", "아이템 상점의 상품을 다시 추첨했습니다.") : NSLOCTEXT("RunItemShop", "PurchasedEquipment", "아이템을 구매했습니다. 장착 가능한 아이템은 장비 슬롯으로 드래그하세요.");
-        else if (OfferId == FRunSkillShopState::GetRerollOfferId()) Error = NSLOCTEXT("RunSkillShop", "Rerolled", "스킬 상점의 5개 상품을 다시 추첨했습니다. 다음 리롤 비용이 1G 증가했습니다.");
+        if (bService)
+        {
+            Error = ServiceTag.MatchesTag(FRunEncounterOffer::GetConsumableShopTag()) ? NSLOCTEXT("RunRecovery", "ConsumablePurchased", "회복 소모품 1개를 구매하고 진행을 저장했습니다.") : ServiceTag.MatchesTag(FRunEncounterOffer::GetRevivalTag()) ? NSLOCTEXT("RunRecovery", "RevivalPurchased", "캐릭터를 부활시키고 진행을 저장했습니다.") : NSLOCTEXT("RunRecovery", "Purchased", "회복 서비스를 구매하고 진행을 저장했습니다.");
+        }
+        else if (bItemShop) Error = OfferId == FRunItemShopState::GetRerollOfferId() ? NSLOCTEXT("RunItemShop", "Rerolled", "아이템 상점의 상품을 다시 추첨했습니다.") : NSLOCTEXT("RunItemShop", "PurchasedInventory", "아이템을 구매해 인벤토리에 보관했습니다. 인벤토리(I)를 열어 장비 슬롯으로 드래그하여 장착하세요.");
+        else if (OfferId == FRunSkillShopState::GetRerollOfferId()) Error = FText::Format(NSLOCTEXT("RunSkillShop", "RerolledCount", "스킬 상품 {0}개를 다시 추첨했습니다. 다음 리롤 비용이 1G 증가했습니다."), FText::AsNumber(CurrentRun->GetSkillShopState().Offers.Num()));
         else Error = OfferId == FRunSkillShopState::GetRecoveryOfferId() ? NSLOCTEXT("RunSkillShop", "Recovered", "HP를 회복했습니다.") : NSLOCTEXT("RunSkillShop", "Purchased", "스킬을 구매했습니다. 다음 전투부터 사용할 수 있습니다.");
     }
     const int32 ConfirmedShopRevision = bSucceeded && CurrentRun ? (bService ? CurrentRun->GetRecoveryState().Revision : bItemShop ? CurrentRun->GetItemShopState().Revision : CurrentRun->GetSkillShopState().Revision) : INDEX_NONE;

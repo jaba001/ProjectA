@@ -16,6 +16,7 @@
 #include "Particles/ParticleSystemComponent.h"
 #include "Sound/SoundWave.h"
 #include "Unit/UnitBase.h"
+#include "UObject/Script.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UnrealType.h"
 #include <limits>
@@ -843,6 +844,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatChainReplicatedVisualHistoryTest, "Proje
 
 bool FCombatChainReplicatedVisualHistoryTest::RunTest(const FString& Parameters)
 {
+    // Allow the native replication callback in this uninitialized isolated world; no network transport is simulated.
+    // 초기화 전 격리 월드에서 네이티브 복제 콜백을 허용하며 네트워크 전송을 모사하지 않습니다.
+    FEditorScriptExecutionGuard ScriptGuard;
     CombatSkillEffectTests::FFixture Fixture;
     ACombatChainEffectActor* Chain = Fixture.World->SpawnActor<ACombatChainEffectActor>();
     TStrongObjectPtr<USoundWave> Sound(NewObject<USoundWave>());
@@ -901,6 +905,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatChainReplicatedCompletionTest, "ProjectA
 
 bool FCombatChainReplicatedCompletionTest::RunTest(const FString& Parameters)
 {
+    // Permit reflected callbacks for the isolated fixture without changing gameplay actor initialization.
+    // 게임 액터의 초기화는 변경하지 않고 격리 fixture의 리플렉션 콜백을 허용합니다.
+    FEditorScriptExecutionGuard ScriptGuard;
     for (bool bFinishedBeforeHistory : {false, true})
     {
         CombatSkillEffectTests::FFixture Fixture;

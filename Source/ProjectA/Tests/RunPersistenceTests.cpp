@@ -3,6 +3,8 @@
 #include "Misc/AutomationTest.h"
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunIdentityLibrary.h"
 #include "Tests/RunRewardTestHelpers.h"
 #include "Game/Run/RunSaveGame.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
@@ -10,6 +12,114 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/ScopeExit.h"
+#include "UObject/StrongObjectPtr.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunInitialPublicationTest, "ProjectA.Persistence.InitialRunAtomicRetry", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunInitialPublicationTest::RunTest(const FString& Parameters)
+{
+    TStrongObjectPtr<UPartyDefinitionDataAsset> Catalog(LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty")));
+    if (!TestNotNull(TEXT("Initial publication uses the authored party catalog"), Catalog.Get())) return false;
+    for (const int32 ParticipantCount : { 2, 4 })
+    {
+        const FString Slot = TEXT("ProjectA_Automation_InitialPublication_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+        TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+        TStrongObjectPtr<URunStateSubsystem> Run(NewObject<URunStateSubsystem>(Instance.Get()));
+        Run->PartyDefinition = Catalog.Get();
+        Run->EnableCheckpointSaving(Slot);
+        int32 Events = 0;
+        Run->OnRunStateChanged.AddLambda([&Events]() { ++Events; });
+        ON_SCOPE_EXIT
+        {
+            Run->OnRunStateChanged.Clear();
+            UGameplayStatics::DeleteGameInSlot(Slot, 0);
+        };
+        FRunIdentityData Identity;
+        Identity.SchemaVersion = URunIdentityLibrary::CurrentSchemaVersion;
+        Identity.Origin = ERunIdentityOrigin::LocalDevelopment;
+        Identity.RunId = FGuid::NewGuid();
+        Identity.HostEpoch = 1;
+        TArray<FRunPartyMember> Members;
+        for (int32 Index = 0; Index < ParticipantCount; ++Index)
+        {
+            FRunParticipantData& Participant = Identity.OriginalParticipants.AddDefaulted_GetRef();
+            Participant.AccountId.Provider = TEXT("Development");
+            Participant.AccountId.Subject = FString::Printf(TEXT("InitialPublicationOwner%d"), Index + 1);
+            Participant.JoinOrdinal = Index + 1;
+            FRunPartyMember& Member = Members.AddDefaulted_GetRef();
+            Member.SlotIndex = Index;
+            Member.CharacterName = FText::FromString(FString::Printf(TEXT("Initial Archer %d"), Index + 1));
+            Member.ClassId = TEXT("Archer");
+            Member.CharacterId = FGuid::NewGuid();
+            Member.OwnerAccountId = Participant.AccountId;
+            Member.bCreated = true;
+        }
+        Identity.HostAccountId = Identity.OriginalParticipants[0].AccountId;
+        FText Error;
+        FRunCheckpointStorage::FailNextWriteForTesting();
+        TestFalse(TEXT("The first cooperative checkpoint failure is reported to the lobby caller"), Run->InitializeRunWithIdentity(Members, Identity, Error));
+        TestFalse(TEXT("Initial save failure returns an actionable explanation"), Error.IsEmpty());
+        TestTrue(TEXT("A failed first checkpoint publishes no Run, party or event"), Run->GetPhase() == ERunPhase::None && !Run->GetRunIdentity().RunId.IsValid() && Run->GetPartyMembers().IsEmpty() && Events == 0);
+        TestFalse(TEXT("A failed first checkpoint leaves no save file"), UGameplayStatics::DoesSaveGameExist(Slot, 0));
+        if (!TestTrue(TEXT("The exact same cooperative identity retries successfully"), Run->InitializeRunWithIdentity(Members, Identity, Error))) return false;
+        TestTrue(TEXT("A successful retry publishes the intended Run once and clears the storage error"), Run->GetPhase() == ERunPhase::Map && Run->GetRunIdentity().RunId == Identity.RunId && Events == 1 && Run->GetSaveError().IsEmpty());
+        TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));
+        if (!TestNotNull(TEXT("Successful retry has a durable native checkpoint"), Saved.Get())) return false;
+        TestTrue(TEXT("Durable creation preserves original participant numbers and Host"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&Saved->Identity, &Identity, 0));
+        TestEqual(TEXT("Durable creation stores one character per original participant"), Saved->Party.Num(), ParticipantCount);
+        TArray<uint8> BeforeBytes;
+        if (!TestTrue(TEXT("The previous checkpoint bytes can be captured"), UGameplayStatics::LoadDataFromSlot(BeforeBytes, Slot, 0))) return false;
+        const FRunIdentityData BeforeIdentity = Run->GetRunIdentity();
+        const TArray<FRunPartyMember> BeforeParty = Run->GetPartyMembers();
+        FRunIdentityData Replacement = Identity;
+        Replacement.RunId = FGuid::NewGuid();
+        if (ParticipantCount == 2)
+        {
+            TArray<FRunPartyMember> ExtraParty = Members;
+            FRunPartyMember ExtraMember = Members[0];
+            ExtraMember.SlotIndex = 2;
+            ExtraMember.CharacterId = FGuid::NewGuid();
+            ExtraParty.Add(ExtraMember);
+            TestFalse(TEXT("New ordinary cooperative creation rejects an extra character before publication"), Run->InitializeRunWithIdentity(ExtraParty, Replacement, Error));
+        }
+        FRunCheckpointStorage::FailNextWriteForTesting();
+        TestFalse(TEXT("A replacement Run cannot succeed when its first checkpoint write fails"), Run->InitializeRunWithIdentity(Members, Replacement, Error));
+        TestTrue(TEXT("Rejected replacement preserves the complete previous identity"), FRunIdentityData::StaticStruct()->CompareScriptStruct(&BeforeIdentity, &Run->GetRunIdentity(), 0));
+        TestEqual(TEXT("Rejected replacement publishes no extra event"), Events, 1);
+        TestEqual(TEXT("Rejected replacement preserves the previous party size"), Run->GetPartyMembers().Num(), BeforeParty.Num());
+        for (int32 Index = 0; Index < BeforeParty.Num(); ++Index)
+        {
+            TestTrue(TEXT("Rejected replacement preserves every previous character field"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&BeforeParty[Index], &Run->GetPartyMembers()[Index], 0));
+        }
+        TArray<uint8> AfterBytes;
+        TestTrue(TEXT("The previous checkpoint remains readable after rejection"), UGameplayStatics::LoadDataFromSlot(AfterBytes, Slot, 0));
+        TestTrue(TEXT("Rejected creation preserves exact previous durable bytes"), BeforeBytes == AfterBytes);
+        if (!TestTrue(TEXT("Failed replacement retries with the same identity without resetting the Run"), Run->InitializeRunWithIdentity(Members, Replacement, Error))) return false;
+        TestTrue(TEXT("Replacement retry publishes once"), Events == 2 && Run->GetRunIdentity().RunId == Replacement.RunId && Run->GetSaveError().IsEmpty());
+
+        if (ParticipantCount == 2)
+        {
+            // Earlier cooperative saves may contain extra owned characters; loading must retain their roster.
+            // 이전 협동 저장에는 추가 소유 캐릭터가 있을 수 있으므로 불러올 때 기존 편성을 보존해야 합니다.
+            FRunPartyMember ExtraMember = Saved->Party[0];
+            ExtraMember.SlotIndex = 2;
+            ExtraMember.CharacterId = FGuid::NewGuid();
+            ExtraMember.Items.Reset();
+            ExtraMember.Equipment = FRunEquipmentState();
+            Saved->Party.Add(ExtraMember);
+            if (!TestTrue(TEXT("An older compatible multi-character fixture is serialized"), UGameplayStatics::SaveGameToSlot(Saved.Get(), Slot, 0))) return false;
+            TStrongObjectPtr<URunStateSubsystem> Reader(NewObject<URunStateSubsystem>(Instance.Get()));
+            Reader->EnableCheckpointSaving(Slot);
+            if (!TestTrue(TEXT("Creation-only limits do not reject an existing cooperative save"), Reader->LoadCheckpoint(Error)))
+            {
+                AddError(Error.ToString());
+                return false;
+            }
+            TestTrue(TEXT("Existing extra characters retain their identity and original owner"), Reader->GetPartyMembers().Num() == 3 && Reader->GetPartyMembers()[2].CharacterId == ExtraMember.CharacterId && Reader->GetPartyMembers()[2].OwnerAccountId == ExtraMember.OwnerAccountId);
+        }
+    }
+    return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunLegacyCatalogPathTest, "ProjectA.Persistence.LegacyCatalogPath", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 

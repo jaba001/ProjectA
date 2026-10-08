@@ -3,6 +3,7 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "Game/Run/RunContentMigration.h"
+#include "Game/Run/RunRecoveryTypes.h"
 #include "Unit/EnemyUnit.h"
 #include "Unit/CharacterAppearanceComponent.h"
 #include "DataAsset/CharacterAppearanceCatalog.h"
@@ -42,6 +43,13 @@ bool UOpponentSnapshotCatalogDataAsset::ResolveSkills(const FPartySnapshotMember
         }
         FCombatRoundSkill RoundSkill;
         if (!Skill->ResolveRoundSkill(RoundSkill, OutError)) return false;
+        // Snapshot skill slots have no consumable inventory or spending contract.
+        // Snapshot 스킬 슬롯에는 소모품 재고와 차감 계약이 없습니다.
+        if (RunRecoveryRules::IsConsumable(RoundSkill))
+        {
+            OutError = NSLOCTEXT("Snapshot", "UnsupportedConsumable", "소모품은 재고가 없는 상대 Snapshot의 일반 스킬로 사용할 수 없습니다.");
+            return false;
+        }
         const FPrimaryAssetId AssetId = Skill->GetPrimaryAssetId();
         if (AssetIds.Contains(AssetId))
         {

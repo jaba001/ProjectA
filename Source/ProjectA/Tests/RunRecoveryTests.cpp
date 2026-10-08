@@ -4,6 +4,7 @@
 #include "Combat/Round/CombatPlanValidator.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "DataAsset/TargetRunDefinitionDataAsset.h"
 #include "Unit/UnitDataRules.h"
 #include "Engine/GameInstance.h"
 #include "Game/GameState/GameplayViewTypes.h"
@@ -62,16 +63,28 @@ namespace
             return FRunCheckpointStorage::Save(Save.Get(), Slot, Error) && Run->LoadStandaloneCheckpoint(Error);
         }
 
-        bool SelectService(FGameplayTag Tag)
+        bool FreezeInitialService(FGameplayTag Tag)
         {
-            for (int32 Visit = 0; Visit < 3 && Run->GetPhase() == ERunPhase::EncounterChoice; ++Visit)
+            TStrongObjectPtr<URunSaveGame> Save(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Slot, Error)));
+            if (!Save || Save->Phase != ERunPhase::EncounterChoice || Save->TargetRun.EncounterSelectionVersion != 1 || !Save->TargetRun.CompletedEncounterChoices.IsEmpty() || Save->EncounterProgress.AfterCompletedNodeCount != 0 || Save->EncounterProgress.VisitIndex != 0 || !Save->EncounterProgress.SelectedEncounterId.IsNone()) return false;
+            // Freeze a deterministic service fixture through the real weighted selector; three random visits cannot guarantee every service.
+            // 실제 가중치 선택기로 결정적인 서비스 시나리오를 고정하며 무작위 세 방문 안의 서비스 등장을 가정하지 않습니다.
+            for (int32 Seed = 0; Seed < 10000; ++Seed)
             {
-                const TArray<FRunEncounterOffer> Offers = Run->GetEncounterProgress().Offers;
-                const FRunEncounterOffer* Desired = Offers.FindByPredicate([Tag](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag() == Tag; });
-                if (Desired) return Run->SelectRunEncounter(Desired->EncounterId);
-                if (Offers.IsEmpty() || !Run->SelectRunEncounter(Offers[0].EncounterId) || !Run->LeaveRunEncounter()) return false;
+                Save->TargetRun.EncounterSeed = Seed;
+                if (!UTargetRunDefinitionDataAsset::BuildOffers(Save->TargetRun, 0, 0, Save->EncounterProgress.Offers)) return false;
+                if (!Save->EncounterProgress.Offers.ContainsByPredicate([Tag](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag() == Tag; })) continue;
+                return FRunCheckpointStorage::Save(Save.Get(), Slot, Error) && Run->LoadStandaloneCheckpoint(Error);
             }
             return false;
+        }
+
+        bool SelectService(FGameplayTag Tag)
+        {
+            if (Run->GetPhase() != ERunPhase::EncounterChoice) return false;
+            const TArray<FRunEncounterOffer> Offers = Run->GetEncounterProgress().Offers;
+            const FRunEncounterOffer* Desired = Offers.FindByPredicate([Tag](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag() == Tag; });
+            return Desired && Run->SelectRunEncounter(Desired->EncounterId);
         }
 
         TArray<uint8> Bytes() const
@@ -133,7 +146,7 @@ bool FRunRecoveryTransactionTest::RunTest(const FString& Parameters)
         const bool bRevival = Tag == FRunEncounterOffer::GetRevivalTag();
         const bool bConsumable = Tag == FRunEncounterOffer::GetConsumableShopTag();
         FRecoveryFixture Fixture;
-        if (!TestTrue(TEXT("The public route reaches each tagged service"), Fixture.Initialize() && Fixture.SetFixtureHealth(bRevival ? 0.f : 30.f) && Fixture.SelectService(Tag))) return false;
+        if (!TestTrue(TEXT("A deterministic weighted fixture reaches the tagged service through the public route: ") + Tag.ToString(), Fixture.Initialize() && Fixture.SetFixtureHealth(bRevival ? 0.f : 30.f) && Fixture.FreezeInitialService(Tag) && Fixture.SelectService(Tag))) return false;
         const TArray<FRunPartyMember> Before = Fixture.Run->GetPartyMembers();
         const FRunWeaponSkillRulesState WeaponRules = Fixture.Run->GetWeaponSkillRules();
         TestTrue(TEXT("Each service is available under the new weapon policy with no skill shop"), Fixture.Run->UsesWeaponSkills() && Fixture.Run->GetSkillShopState().SchemaVersion == 0);
@@ -176,11 +189,11 @@ bool FRunRecoveryTransactionTest::RunTest(const FString& Parameters)
         for (int32 Index = 1; Index < Before.Num(); ++Index) TestTrue(TEXT("Every AI companion remains unchanged"), FRunPartyMember::StaticStruct()->CompareScriptStruct(&Before[Index], &Fixture.Run->GetPartyMembers()[Index], 0));
     }
     FRecoveryFixture Full;
-    if (!Full.Initialize() || !Full.SelectService(FRunEncounterOffer::GetRecoveryTag())) return false;
+    if (!TestTrue(TEXT("The full-health fixture reaches recovery deterministically"), Full.Initialize() && Full.FreezeInitialService(FRunEncounterOffer::GetRecoveryTag()) && Full.SelectService(FRunEncounterOffer::GetRecoveryTag()))) return false;
     const FRunPartyMember FullBuyer = Full.Run->GetPartyMembers()[0];
     TestFalse(TEXT("Full HP rejects paid recovery"), Full.Run->PurchaseShopOffer(FullBuyer.OwnerAccountId, FullBuyer.CharacterId, FRunEncounterOffer::GetRecoveryTag().GetTagName(), Full.Error, Full.Run->GetRecoveryState().Revision));
     FRecoveryFixture Poor;
-    if (!Poor.Initialize() || !Poor.SetFixtureHealth(30.f, true) || !Poor.SelectService(FRunEncounterOffer::GetConsumableShopTag())) return false;
+    if (!TestTrue(TEXT("The empty-wallet fixture reaches the consumable shop deterministically"), Poor.Initialize() && Poor.SetFixtureHealth(30.f, true) && Poor.FreezeInitialService(FRunEncounterOffer::GetConsumableShopTag()) && Poor.SelectService(FRunEncounterOffer::GetConsumableShopTag()))) return false;
     const FRunPartyMember PoorBuyer = Poor.Run->GetPartyMembers()[0];
     TestFalse(TEXT("Insufficient gold cannot buy a consumable"), Poor.Run->PurchaseShopOffer(PoorBuyer.OwnerAccountId, PoorBuyer.CharacterId, FRunEncounterOffer::GetConsumableShopTag().GetTagName(), Poor.Error, Poor.Run->GetRecoveryState().Revision));
     return true;

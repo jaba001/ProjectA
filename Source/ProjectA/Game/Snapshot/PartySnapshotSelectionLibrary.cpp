@@ -1,12 +1,21 @@
 #include "Game/Snapshot/PartySnapshotSelectionLibrary.h"
 
 #include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
+#include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "Types/GameplayTagCandidateSelection.h"
+
+namespace
+{
+    bool ValidateSelectionRequest(const UOpponentSnapshotCatalogDataAsset* Catalog, int32 ProgressStage, int32 FormationSlotCount, FText& OutError)
+    {
+        OutError = NSLOCTEXT("SnapshotSelection", "InvalidRequest", "상대 후보 선정에 유효한 카탈로그·진행 단계·1~4개 배치 슬롯이 필요합니다.");
+        return IsValid(Catalog) && Catalog->ContentVersion > 0 && ProgressStage >= 0 && FormationSlotCount >= 1 && FormationSlotCount <= 4;
+    }
+}
 
 bool UPartySnapshotSelectionLibrary::SelectOpponent(const TArray<FPartySnapshotCandidate>& Candidates, const UOpponentSnapshotCatalogDataAsset* Catalog, int32 ProgressStage, const FGameplayTagQuery& Query, int32 FormationSlotCount, FRandomStream& Random, FPartySnapshot& OutSnapshot, FText& OutError)
 {
-    OutError = NSLOCTEXT("SnapshotSelection", "InvalidRequest", "상대 후보 선정에 유효한 카탈로그·진행 단계·1~4개 배치 슬롯이 필요합니다.");
-    if (!IsValid(Catalog) || Catalog->ContentVersion <= 0 || ProgressStage < 0 || FormationSlotCount < 1 || FormationSlotCount > 4) return false;
+    if (!ValidateSelectionRequest(Catalog, ProgressStage, FormationSlotCount, OutError)) return false;
 
     TArray<FGameplayTagWeightedCandidate> Eligible;
     TArray<int32> CandidateIndices;
@@ -40,4 +49,33 @@ bool UPartySnapshotSelectionLibrary::SelectOpponent(const TArray<FPartySnapshotC
     Random = SelectedRandom;
     OutError = FText::GetEmpty();
     return true;
+}
+
+bool UPartySnapshotSelectionLibrary::LoadAndSelectOpponent(const TArray<FPartySnapshotSlotCandidate>& Slots, const UOpponentSnapshotCatalogDataAsset* Catalog, int32 ProgressStage, const FGameplayTagQuery& Query, int32 FormationSlotCount, FRandomStream& Random, FPartySnapshot& OutSnapshot, FText& OutError)
+{
+    if (!ValidateSelectionRequest(Catalog, ProgressStage, FormationSlotCount, OutError)) return false;
+    TSet<FName> SlotIds;
+    for (const FPartySnapshotSlotCandidate& Slot : Slots)
+    {
+        if (Slot.ProgressStage < 0 || UPartySnapshotLibrary::GetSaveSlotName(Slot.SlotId).IsEmpty() || SlotIds.Contains(Slot.SlotId))
+        {
+            OutError = NSLOCTEXT("SnapshotSelection", "InvalidLocalSlots", "로컬 상대 후보에는 중복 없는 유효한 Snapshot 슬롯과 진행 단계가 필요합니다.");
+            return false;
+        }
+        SlotIds.Add(Slot.SlotId);
+    }
+
+    TArray<FPartySnapshotCandidate> Candidates;
+    for (const FPartySnapshotSlotCandidate& Slot : Slots)
+    {
+        if (Slot.ProgressStage != ProgressStage || (!Query.IsEmpty() && !Query.Matches(Slot.Tags))) continue;
+        FPartySnapshotCandidate Candidate;
+        // A missing or corrupt matching slot is a failed request, not permission to reroll a reduced pool.
+        // 일치하는 슬롯의 누락·손상은 축소된 후보군 재추첨의 허가가 아니라 요청 실패입니다.
+        if (!UPartySnapshotLibrary::LoadSnapshot(Slot.SlotId, Candidate.Snapshot, OutError)) return false;
+        Candidate.ProgressStage = Slot.ProgressStage;
+        Candidate.Tags = Slot.Tags;
+        Candidates.Add(MoveTemp(Candidate));
+    }
+    return SelectOpponent(Candidates, Catalog, ProgressStage, Query, FormationSlotCount, Random, OutSnapshot, OutError);
 }
