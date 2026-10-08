@@ -4,6 +4,7 @@
 #include "Engine/GameInstance.h"
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Encounter/EncounterManager.h"
+#include "Game/Run/RunItemShopCatalog.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Net/UnrealNetwork.h"
 #include "Game/Development/DevelopmentCoopLobby.h"
@@ -35,6 +36,8 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
         View.SkillShopState.Catalog.Reset();
         View.SkillShopState.Query = FGameplayTagQuery();
         View.ItemShopState = Run->GetItemShopState();
+        const FRunWeaponSkillRulesState* FrozenWeaponRules = Run->GetWeaponSkillRules().SchemaVersion == 1 ? &Run->GetWeaponSkillRules() : nullptr;
+        View.bCanRerollItemShop = View.Phase == ERunPhase::Shop && View.EncounterProgress.IsItemShop() && RunItemShopCatalog::CanReroll(Run->GetItemShopState(), FrozenWeaponRules);
         View.ItemRarities = Run->GetWeaponSkillRules().Rarities;
         View.RecoveryState = Run->GetRecoveryState();
         View.bTargetRun = Run->IsTargetRun();

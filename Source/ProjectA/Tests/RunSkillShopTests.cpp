@@ -524,8 +524,8 @@ bool FRunItemShopCatalogNamesTest::RunTest(const FString& Parameters)
     FString NamedCsv = TEXT("무기 종류,위치,에셋 이름,가격(G),게임 내 이름\n");
     for (int32 Index = 0; Index < 5; ++Index)
     {
-        LegacyCsv += FString::Printf(TEXT("검,/Game/Test,Weapon_%d,1\n"), Index);
-        NamedCsv += FString::Printf(TEXT("검,/Game/Test,Weapon_%d,1,\"서약의 검, %d\"\n"), Index, Index);
+        LegacyCsv += FString::Printf(TEXT("단검,/Game/Test,Weapon_%d,1\n"), Index);
+        NamedCsv += FString::Printf(TEXT("단검,/Game/Test,Weapon_%d,1,\"서약의 검, %d\"\n"), Index, Index);
     }
     TArray<FRunItemDefinition> Legacy;
     TArray<FRunItemDefinition> Named;
@@ -627,6 +627,62 @@ bool FRunItemShopCatalogRarityTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopEquipmentSupportTest, "ProjectA.Run.Shop.CatalogEquipmentSupport", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunItemShopEquipmentSupportTest::RunTest(const FString& Parameters)
+{
+    TArray<FRunItemDefinition> Catalog;
+    FText Error;
+    if (!TestTrue(TEXT("The authored catalog loads all 49 supported equipment definitions"), RunItemShopCatalog::Load(Catalog, Error) && Catalog.Num() == 49)) return false;
+    for (const FRunItemDefinition& Item : Catalog)
+    {
+        const FRunEquipmentProfile* Profile = URunEquipmentCatalog::Get().ResolveProfile(Item);
+        if (!TestNotNull(FString::Printf(TEXT("Every retained item resolves an enabled equipment profile: %s"), *Item.Asset.ToString()), Profile)) return false;
+        bool bHasAttachment = false;
+        for (const FGameplayTag& Slot : Profile->AllowedSlots)
+        {
+            const FGameplayTag ResolvedSlot = URunEquipmentCatalog::ResolveSlot(*Profile, Slot);
+            FName Socket;
+            FTransform Transform;
+            bHasAttachment |= ResolvedSlot.IsValid() && URunEquipmentCatalog::GetAttachment(*Profile, ResolvedSlot, Socket, Transform);
+        }
+        if (!TestTrue(FString::Printf(TEXT("Every retained item has a usable slot and authored attachment: %s"), *Item.Asset.ToString()), bHasAttachment)) return false;
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopUnsupportedLegacyPurchaseTest, "ProjectA.Run.Shop.UnsupportedLegacyPurchaseAtomicity", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunItemShopUnsupportedLegacyPurchaseTest::RunTest(const FString& Parameters)
+{
+    FSkillShopFixture Fixture;
+    if (!TestTrue(TEXT("The isolated saved Run reaches its original item shop"), Fixture.Initialize(3, true) && Fixture.ReachShop(FRunItemShopState::GetEncounterId()))) return false;
+    TStrongObjectPtr<URunSaveGame> Legacy(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Fixture.Slot, 0)));
+    if (!TestTrue(TEXT("The original legacy fixture contains five frozen offers"), Legacy.IsValid() && Legacy->ItemShopState.Offers.Num() == 5)) return false;
+    FRunItemDefinition Unsupported = Legacy->ItemShopState.Catalog[0];
+    Unsupported.Asset = FSoftObjectPath(TEXT("/Game/User_JeHoon/Validation/T12/UnsupportedShopAxe.UnsupportedShopAxe"));
+    Unsupported.DisplayName = FText::FromString(TEXT("Legacy unsupported axe"));
+    Unsupported.Tags.Reset();
+    Unsupported.Tags.AddTag(RunItemShopCatalog::GetWeaponTag());
+    Unsupported.Tags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Axe")));
+    Legacy->ItemShopState.Catalog.Add(Unsupported);
+    Legacy->ItemShopState.Offers[0].Item = Unsupported;
+    Legacy->ItemShopState.EquipmentSelectionVersion = 0;
+    if (!TestTrue(TEXT("Only the owned UUID fixture is saved and loaded with its original unsupported display"), UGameplayStatics::SaveGameToSlot(Legacy.Get(), Fixture.Slot, 0) && Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error))) return false;
+    const FRunItemShopState BeforeShop = Fixture.Run->GetItemShopState();
+    const TArray<FRunPartyMember> BeforeParty = Fixture.Run->GetPartyMembers();
+    const TArray<uint8> BeforeBytes = Fixture.ReadBytes();
+    TestTrue(TEXT("Loading retains legacy stock without silently replacing the unsupported offer"), BeforeShop.EquipmentSelectionVersion == 0 && BeforeShop.Offers.Num() == 5 && RunItemShopCatalog::IsSameDefinition(BeforeShop.Offers[0].Item, Unsupported));
+    int32 Publications = 0;
+    Fixture.Run->OnRunStateChanged.AddLambda([&Publications]() { ++Publications; });
+    const FRunPartyMember& Buyer = Fixture.Member(3);
+    TestFalse(TEXT("The public purchase request rejects an unsupported item from a legacy display"), Fixture.Run->PurchaseShopOffer(Buyer.OwnerAccountId, Buyer.CharacterId, BeforeShop.Offers[0].OfferId, Fixture.Error, BeforeShop.Revision));
+    TestFalse(TEXT("The unsupported purchase explains its rejection"), Fixture.Error.IsEmpty());
+    TestTrue(TEXT("Rejected legacy purchase preserves gold items stock revision file bytes and notifications"), SameShopParty(BeforeParty, Fixture.Run->GetPartyMembers()) && FRunItemShopState::StaticStruct()->CompareScriptStruct(&BeforeShop, &Fixture.Run->GetItemShopState(), 0) && BeforeBytes == Fixture.ReadBytes() && Publications == 0);
+    Fixture.Run->OnRunStateChanged.Clear();
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopPersistenceTest, "ProjectA.Run.Shop.ItemPurchaseRerollAndReload", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FRunItemShopPersistenceTest::RunTest(const FString& Parameters)
@@ -636,7 +692,7 @@ bool FRunItemShopPersistenceTest::RunTest(const FString& Parameters)
     const FRunPartyMember Buyer = Fixture.Member(3);
     const FRunItemShopState Initial = Fixture.Run->GetItemShopState();
     if (!TestEqual(TEXT("The item shop displays exactly five offers"), Initial.Offers.Num(), 5)) return false;
-    TestEqual(TEXT("The whole authored CSV is available"), Initial.Catalog.Num(), 289);
+    TestEqual(TEXT("The complete supported equipment catalog is available"), Initial.Catalog.Num(), 49);
     TestTrue(TEXT("New runs load authored gameplay names"), Initial.Catalog.ContainsByPredicate([](const FRunItemDefinition& Item) { return Item.DisplayName.ToString() != Item.Asset.GetAssetName(); }));
     TSet<FSoftObjectPath> Assets;
     for (const FRunItemShopOffer& Offer : Initial.Offers)

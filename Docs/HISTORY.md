@@ -1,11 +1,12 @@
 # ProjectA 완료 작업과 검증 기록
 
-갱신일: 2026-10-08. 완료 범위·기준 커밋·실행 근거를 기록한다. 현행 구현은 [PROJECT_PLAN](PROJECT_PLAN.md), 확정 기획은 [GAME_DESIGN](GAME_DESIGN.md), 다음 콘텐츠·온라인 서비스·에셋 도입은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다. 과거 로그·맵 경로는 실행 당시 기준이며 현행 경로는 [레벨 폴더 기준](PROJECT_PLAN.md#4-10-레벨-폴더와-이전-경로-호환)을 따른다.
+갱신일: 2026-10-09. 완료 범위·기준 커밋·실행 근거를 기록한다. 현행 구현은 [PROJECT_PLAN](PROJECT_PLAN.md), 확정 기획은 [GAME_DESIGN](GAME_DESIGN.md), 다음 콘텐츠·온라인 서비스·에셋 도입은 [TODO](TODO.md)를 따른다. 삭제 전 상세 보고서는 Git 이력에 보존한다. 과거 검증은 이후 변경의 통과 근거로 사용하지 않는다. 과거 로그·맵 경로는 실행 당시 기준이며 현행 경로는 [레벨 폴더 기준](PROJECT_PLAN.md#4-10-레벨-폴더와-이전-경로-호환)을 따른다.
 
 ## 최근 변경
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-10-09 장착 가능 아이템만 판매 | 장착 지원 49개만 판매·신규 보상 후보로 유지하고 미지원 240행·빈 전문점 15행을 제거했다. 기존 보유품·원본 에셋·저장된 보상은 보존하며 이전 미지원 진열은 숨기고 구매를 거절한다. [범위·근거](#9-34-2026-10-09-장착-가능-아이템만-판매) |
 | 2026-10-08 위임 실행 검수와 협동 보완 | 초기 저장 원자성·새 협동 1인 1캐릭터·Snapshot 소모품 차단·NPC 지붕 가림을 보완했다. 고유 Native 222개, 동일 PC 1/2/4인 30전투·27상점, NPC 18경우, 기존 저장 사본·소모 후 Continue와 새 Win64 패키지를 검수했다. 정상 Run은 9전투·30선택 후 자연 패배이며 80단계 완주·최종 밸런스·Steam/PlayFab은 미완료다. [범위·근거](#9-33-2026-10-08-위임-실행-검수와-협동-보완) |
 | 2026-10-07 TODO 권장안 로컬 구현 | T14 제안 9·10의 Steam 친구별 방 검색·요청 정리·재접속 인증 표시와 제안 12의 태그 기반 Snapshot 후보 선택 API를 보완했다. 프로젝트 파일 재생성 9.67초와 Development Editor / Win64 컴파일·링크 45.82초, 독립 코드·문서 정적 검사를 통과했다. 기존 Run·저장·에셋은 유지하며 게임·PIE·자동화·실제 Steam/PlayFab 연결은 미실행이다. [범위·근거](#9-25-2026-10-07-todo-권장안의-로컬-구현) |
 | 2026-10-06 TODO 완료 항목 이관 규칙 | AGENTS에 완료 근거를 HISTORY로 통합한 뒤 TODO에서 삭제하는 규칙을 추가했다. 완료·중복 절 14개와 혼합 절의 완료 부분을 정리하고 실행 조건·과거 수치·검증 한계를 보존했다. 제안 선택 9개와 실제 미완료 확인을 유지하며 삭제 절의 참조를 갱신했다. 문서·링크·체크 보존·diff 정적 검사만 수행했으며 새로운 컴파일·작동 테스트는 하지 않았다. [이관 범위](#9-20-2026-10-06-todo-완료-기록-정리) |
@@ -819,3 +820,20 @@ NPC 화면은 `powershell -ExecutionPolicy Bypass -File Saved/Automation/Autonom
 모든 실행 종료 후 `Protect.py verify`의 `ProtectedAfter.json`에서 Content 19,809개와 보호한 사용자 저장·설정 52개가 시작 해시와 일치하며 추가 저장 사본 0임을 확인했다. 전체 쿠킹이 변경한 에디터 설정은 ProjectA/ProjectAEditor 모듈 컴파일 시간 두 필드뿐임을 대조한 뒤 백업 바이트로 복원했다. 원본 게임 저장이나 사용자 설정의 다른 변경을 덮어쓰지 않았으며 `CookMetadataRestoration.json`에 근거를 보존했다. 검수 프로세스는 모두 종료하고 에디터·IDE를 열린 상태로 남기지 않았다.
 
 `NativeCoverage.json`은 현재 요청 선언과 성공 결과의 고유 222개 이름이 정확히 일치함을 확인했다. 최종 문서 11개·로컬 링크/앵커 753개·`git diff --check`가 통과했고 TODO의 기존 선택 7개를 보존했다. 새 판단 문서 외에 별도 테스트 문서를 만들지 않았으며 `Docs/TEST_REPORT.md`도 복원하지 않았다. 생성된 솔루션의 변경은 580개 전체 행 집합을 유지한 순서 변경이다. 빌드·실행·시각 검토·보존 검사의 집계와 한계는 `Saved/Automation/Autonomous_20261008/FinalSummary.json`에 보존한다. 작업 시작 시 기존 미커밋 변경은 없었다.
+
+### 9-34 2026-10-09 장착 가능 아이템만 판매
+
+2026-10-09 사용자 요청에 따라 판매 카탈로그의 미지원 항목을 제거했다. 기준 커밋은 `86cbbaf1`이며 작업 시작에 기존 미커밋 변경은 없었다. `WEAPON_ASSETS.csv`는 289→49행(검 2·단검 20·방패 15·활 11·스태프 1), `ENCOUNTER_POOL.csv`는 43→28행·활성 13개다. 후보가 없는 태그 전문점 14개와 주황 등급 전문점 1개를 제거하고 과거 18개 ID·남은 행의 원본 경로·이름·등급·가격·순서를 보존했다. 현재 등급은 흰색 9·초록색 17·파란색 19·보라색 4·주황색 0이며 기존 확률 CSV를 수정하지 않고 유효 후보에서 50:30:15:4를 재정규화한다.
+
+현재 CSV 로더는 모든 상품의 태그 기반 장착 프로필을 요구한다. 신규 진열·리롤·전투 보상은 공통 후보 로직의 장착 필터를 사용한다. `EquipmentSelectionVersion=0`의 이전 진열은 저장 검증을 유지하고 새 진열 생성 시 버전 1로 고정한다. 이전 검·스태프 전문점도 지원 후보 2/1개로 리롤할 수 있으며 후보가 없는 이전 전문점은 빈 진열·퇴장을 허용하고 유료 리롤은 차단한다. UI는 미지원 진열만 숨겨 상품 ID·리비전 연결을 유지하며 서버도 구매를 거절한다. 리롤 가능 여부는 서버가 계산한 값만 표시 뷰로 전달한다. 보유품·장착 인덱스·저장 카탈로그·이미 확정된 전투 보상과 원본 Content는 삭제하지 않는다.
+
+TODO 29의 `SM_Sword` 외형·등급 추가 확인은 해당 미지원 행이 판매 목록에서 제거되어 폐기했다. 외형 확인을 완료한 것으로 처리하지 않으며 원본·사용자 사본도 삭제하지 않는다. 신규 상품과 이전 저장의 화면·입력 확인은 [TODO 29](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)에 유지한다.
+
+| 검증 | 실제 결과·근거 |
+|---|---|
+| CSV | artifact-tool 원본 import/반환 대조·셀 삭제·재import·preview와 독립 CSV 검사 통과. 49개 uasset 존재, 남은 필드·과거 18행·BOM/CRLF 보존. `Saved/Automation/EquipableCatalog_20261009/Validation.json` |
+| 컴파일 | `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64` 최초 43.10초·호환 수정 후 최종 5.59초 성공. `Saved/Automation/EquipableCatalog_20261009/EditorBuild.log`·`EditorBuild.Compatibility.log` |
+| Native 회귀 | 최초 `RunEditor.ps1 -Group NativeFull`은 226개 중 225개 통과·1개 실패(25.619초). 기존 정책의 초기 `Reroll` 호출을 새 UI 제한이 막아 `SelectionVersion=0`의 기존 초기화 분기를 복원했다. 최종 `-Group CatalogRegression` 관련 49개 통과(48 성공·1 경고 성공, 15.631초). 두 보고서의 최신 결과로 고유 226개·누락/미해결 실패 0개를 확인했다. 근거: `Saved/Automation/EquipableCatalog_20261009/NativeCoverage.json`과 `NativeFull.3b7bb48a262347e5961fa78e08187072/Report/`, `CatalogRegression.41e1972e55914e9cb02966d1c5c02f1b/Report/` |
+| 정적·보존 | 독립 코드·문서 검토, 문서 11개·로컬 링크 757개·diff 검사 통과. 원본 Content 19,809개·사용자 저장/설정 52개의 해시 동일, 추가 시험 저장 0개. TODO 선택 7개 보존. `Saved/Automation/EquipableCatalog_20261009/FinalSummary.json`·`ProtectedAfter.json`·`DocumentationValidation.json` |
+
+현재 변경의 실제 상점 화면·물리 입력·다중 PC·패키지 실행은 검수하지 않았다. 이전 실행 이력은 최신 변경의 작동 확인 근거로 대체하지 않는다.

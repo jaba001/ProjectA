@@ -114,6 +114,11 @@ struct PROJECTA_API FRunItemShopState
     UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Selection")
     int32 SelectionVersion = 0;
 
+    // Version zero preserves saved stock; newly generated stock requires an equipment profile.
+    // 버전 0은 저장된 진열을 보존하며 새로 생성한 진열은 장착 프로필을 요구합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Selection")
+    int32 EquipmentSelectionVersion = 0;
+
     UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Shop|Selection")
     FName ActiveEncounterId;
 

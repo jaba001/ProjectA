@@ -64,6 +64,9 @@ struct PROJECTA_API FGameplayViewState
     FRunItemShopState ItemShopState;
 
     UPROPERTY()
+    bool bCanRerollItemShop = false;
+
+    UPROPERTY()
     TArray<FRunWeaponRarityRule> ItemRarities;
 
     UPROPERTY()

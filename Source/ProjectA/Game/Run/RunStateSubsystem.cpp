@@ -10,6 +10,7 @@
 #include "Game/Run/RunItemRarityProbabilities.h"
 #include "Game/Run/RunCombatRewards.h"
 #include "Game/Run/RunEquipmentRules.h"
+#include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
@@ -1491,6 +1492,11 @@ bool URunStateSubsystem::PurchaseShopOffer(const FRunAccountId& BuyerAccountId, 
     {
         OutError = NSLOCTEXT("RunItemShop", "ChangedStock", "상점 상품이 변경되었거나 구매할 수 없습니다. 최신 목록에서 다시 선택하세요.");
         if (ItemShopState.SchemaVersion != 1 || ItemShopState.Revision <= 0 || ItemShopState.Revision == MAX_int32 || ExpectedShopRevision != ItemShopState.Revision || (!bItemReroll && (!ItemOffer || ItemOffer->bSold))) return false;
+        if (!bItemReroll && !URunEquipmentCatalog::Get().ResolveProfile(ItemOffer->Item))
+        {
+            OutError = NSLOCTEXT("RunItemShop", "UnsupportedPurchase", "장착할 수 없는 상품은 더 이상 판매하지 않습니다. 리롤하거나 상점을 나가세요.");
+            return false;
+        }
     }
     else if (SkillShopState.Revision > 0)
     {

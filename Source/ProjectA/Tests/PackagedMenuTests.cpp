@@ -12,6 +12,7 @@
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunItemShopCatalog.h"
+#include "Game/Run/RunEquipmentCatalog.h"
 #include "Controller/GameplayPlayerController.h"
 #include "Game/GameState/GameplayGameState.h"
 #include "UI/Gameplay/EncounterResultWidget.h"
@@ -52,11 +53,12 @@ bool FTodoPackagedCatalogTest::RunTest(const FString& Parameters)
         AddError(Error.ToString());
         return false;
     }
-    if (!TestEqual(TEXT("The staged authored catalog retains all 289 available item definitions."), Catalog.Num(), 289)) return false;
+    if (!TestEqual(TEXT("The staged authored catalog retains all 49 supported equipment definitions."), Catalog.Num(), 49)) return false;
     TSet<FSoftObjectPath> Assets;
     for (const FRunItemDefinition& Item : Catalog)
     {
         if (!TestTrue(TEXT("Every catalog item retains its unique original asset path, display name, whole price and gameplay tags."), !Item.Asset.IsNull() && !Assets.Contains(Item.Asset) && !Item.DisplayName.IsEmpty() && Item.Price == 1 && Item.Tags.HasTag(RunItemShopCatalog::GetWeaponTag()))) return false;
+        if (!TestNotNull(FString::Printf(TEXT("Every staged catalog item resolves an equipment profile: %s"), *Item.Asset.ToString()), URunEquipmentCatalog::Get().ResolveProfile(Item))) return false;
         if (!TestTrue(FString::Printf(TEXT("The original item package exists in the runtime filesystem: %s"), *Item.Asset.GetLongPackageName()), FPackageName::DoesPackageExist(Item.Asset.GetLongPackageName()))) return false;
         Assets.Add(Item.Asset);
     }

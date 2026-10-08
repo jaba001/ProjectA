@@ -28,7 +28,7 @@ namespace
         {
             Package.Reset(CreatePackage(*(TEXT("/Game/User_JeHoon/Validation/T12/CombatRewardSkills_") + FGuid::NewGuid().ToString(EGuidFormats::Digits))));
             Package->SetFlags(RF_Transient);
-            Skill.Reset(NewObject<USkillDefinitionDataAsset>(Package.Get(), TEXT("SwordSkill"), RF_Transient));
+            Skill.Reset(NewObject<USkillDefinitionDataAsset>(Package.Get(), TEXT("DaggerSkill"), RF_Transient));
             Skill->bUseRoundDefinition = true;
             Skill->RoundDefinition.EffectTags.AddTag(ProjectACombatTags::Skill_Effect_Damage);
             Skill->RoundDefinition.EffectTags.AddTag(ProjectACombatTags::Skill_Element_Physical);
@@ -37,7 +37,7 @@ namespace
             Skill->RoundDefinition.Approach = ECombatRoundApproach::None;
             Rules.SchemaVersion = 1;
             Rules.SkillCount = 1;
-            Rules.WeaponQuery = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Sword")));
+            Rules.WeaponQuery = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Dagger")));
             FRunWeaponSkillCandidate& Candidate = Rules.Candidates.AddDefaulted_GetRef();
             Candidate.Skill = FSoftObjectPath(Skill.Get());
             Candidate.Tags = Skill->RoundDefinition.EffectTags;
@@ -59,7 +59,7 @@ namespace
             }
         }
 
-        FRunItemDefinition Item(int32 Index, int32 Grade, FName Category = TEXT("Item.Weapon.Sword")) const
+        FRunItemDefinition Item(int32 Index, int32 Grade, FName Category = TEXT("Item.Weapon.Dagger")) const
         {
             FRunItemDefinition Result;
             Result.Asset = FSoftObjectPath(FString::Printf(TEXT("/Game/User_JeHoon/Validation/T12/CombatRewardItem_%d.CombatRewardItem_%d"), Index, Index));
@@ -92,7 +92,7 @@ bool FRunCombatRewardBuildTest::RunTest(const FString& Parameters)
         FRandomStream ExpectedRandom(9173);
         FRandomStream ActualRandom = ExpectedRandom;
         TArray<int32> Selected;
-        if (!RunItemRarityProbabilities::Select(Shop.Catalog, Shop.RarityProbabilities, FullQuery, 3, false, ExpectedRandom, Selected, Error, &Fixture.Rules)) return false;
+        if (!RunItemRarityProbabilities::Select(Shop.Catalog, Shop.RarityProbabilities, FullQuery, 3, false, ExpectedRandom, Selected, Error, &Fixture.Rules, true)) return false;
         TArray<FRunItemDefinition> ExpectedItems;
         for (const int32 Index : Selected)
         {
@@ -119,14 +119,14 @@ bool FRunCombatRewardBuildTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Generating rewards never modifies the frozen shop or current display"), FRunItemShopState::StaticStruct()->CompareScriptStruct(&Shop, &OriginalShop, 0));
     }
     FRunItemShopState Mixed = Fixture.Shop;
-    Mixed.Catalog = {Fixture.Item(0, 0), Fixture.Item(1, 0, TEXT("Item.Weapon.Shield")), Fixture.Item(2, 0, TEXT("Item.Weapon.Bullet"))};
+    Mixed.Catalog = {Fixture.Item(0, 0), Fixture.Item(1, 0, TEXT("Item.Weapon.Shield")), Fixture.Item(2, 0, TEXT("Item.Weapon.Bow"))};
     Mixed.SelectionVersion = 1;
     Mixed.ActiveEncounterId = TEXT("UnrelatedOrangeShop");
     Mixed.ActiveItemQuery = FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::ResolveRarityTag(TEXT("주황색")));
     Mixed.ActiveStockPolicyVersion = 1;
     FRandomStream Random(107);
     FRunGoldRewardState MixedReward;
-    if (!TestTrue(TEXT("Combat rewards include shields and ammunition and ignore an unrelated shop filter"), RunCombatRewards::Build(TEXT("Combat_01"), Mixed, Fixture.Rules, {7, 7, 7}, Random, MixedReward, Error) && MixedReward.ItemChoices.Num() == 3 && MixedReward.BonusGold == 7)) return false;
+    if (!TestTrue(TEXT("Combat rewards include supported shields and bows and ignore an unrelated shop filter"), RunCombatRewards::Build(TEXT("Combat_01"), Mixed, Fixture.Rules, {7, 7, 7}, Random, MixedReward, Error) && MixedReward.ItemChoices.Num() == 3 && MixedReward.BonusGold == 7)) return false;
     for (const FRunItemDefinition& Item : MixedReward.ItemChoices) TestEqual(TEXT("Only items matching the frozen skill weapon query receive skills"), Item.GrantedSkills.Num(), Fixture.Rules.WeaponQuery.Matches(Item.Tags) ? 1 : 0);
     return true;
 }

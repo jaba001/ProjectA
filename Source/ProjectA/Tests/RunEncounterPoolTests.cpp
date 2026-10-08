@@ -88,7 +88,7 @@ bool FRunEncounterPoolCsvTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("Rejected CSV explains its failure"), Error.IsEmpty());
     }
     FRunTargetState Current = MakeUnconfiguredTarget();
-    TestTrue(TEXT("The repository CSV exposes 28 active grouped encounters"), RunEncounterPool::Load(Current, Error) && Current.EncounterPool.Num() == 28 && Current.EncounterSelectionVersion == 1);
+    TestTrue(TEXT("The repository CSV exposes 13 active grouped encounters with supported stock"), RunEncounterPool::Load(Current, Error) && Current.EncounterPool.Num() == 13 && Current.EncounterSelectionVersion == 1);
     return true;
 }
 

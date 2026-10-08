@@ -33,12 +33,12 @@ bool RunCombatRewards::Build(FName NodeId, const FRunItemShopState& Shop, const 
     if (!ResolveGoldRange(Shop, Rules, GoldChoices, Minimum, Maximum, OutError)) return false;
     OutError = NSLOCTEXT("RunCombatRewards", "MissingNode", "전투 보상을 생성할 노드가 유효하지 않습니다.");
     if (NodeId.IsNone()) return false;
-    // Use the complete frozen item pool; the last visited shop's profile never changes combat rewards.
-    // 마지막에 방문한 상점 조건과 무관하게 저장된 전체 아이템 풀에서 전투 보상을 생성합니다.
+    // Use equippable items from the frozen pool independently of the last visited shop's profile.
+    // 마지막 방문 상점 조건과 무관하게 저장된 풀의 장착 가능한 아이템으로 전투 보상을 생성합니다.
     FRandomStream RewardRandom = Random;
     const FGameplayTagQuery Query = FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag());
     TArray<int32> Indices;
-    if (!RunItemRarityProbabilities::Select(Shop.Catalog, Shop.RarityProbabilities, Query, ItemChoiceCount, false, RewardRandom, Indices, OutError, &Rules)) return false;
+    if (!RunItemRarityProbabilities::Select(Shop.Catalog, Shop.RarityProbabilities, Query, ItemChoiceCount, false, RewardRandom, Indices, OutError, &Rules, true)) return false;
     FRunGoldRewardState State;
     State.SchemaVersion = 2;
     State.NodeId = NodeId;

@@ -15,6 +15,7 @@ namespace RunItemShopCatalog
     PROJECTA_API bool Roll(FRunItemShopState& State, bool bAllowDuplicates, const FGameplayTagQuery& Query, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules = nullptr);
     PROJECTA_API bool BeginVisit(FRunItemShopState& State, FName EncounterId, const FGameplayTagQuery& Query, int32 StockPolicyVersion, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules = nullptr);
     PROJECTA_API bool Reroll(FRunItemShopState& State, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules = nullptr);
+    PROJECTA_API bool CanReroll(const FRunItemShopState& State, const FRunWeaponSkillRulesState* WeaponSkillRules = nullptr);
     PROJECTA_API bool Validate(const FRunItemShopState& State, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules = nullptr);
     PROJECTA_API bool ValidateItem(const FRunItemDefinition& Item);
     PROJECTA_API bool IsSameDefinition(const FRunItemDefinition& Left, const FRunItemDefinition& Right);

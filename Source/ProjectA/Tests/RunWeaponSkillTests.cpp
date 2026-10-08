@@ -31,7 +31,7 @@ namespace
             Rules.SchemaVersion = 1;
             Rules.SkillCount = 1;
             Rules.WeaponQuery = FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag());
-            AddSkill(TEXT("Melee"), TEXT("Item.Weapon.Sword"), ProjectACombatTags::Skill_Shape_Slash);
+            AddSkill(TEXT("Melee"), TEXT("Item.Weapon.Dagger"), ProjectACombatTags::Skill_Shape_Slash);
             Rules.Candidates[0].SelectionTags.AddTag(TAG_ValidationHighPool);
             AddSkill(TEXT("Arrow"), TEXT("Item.Weapon.Bow"), ProjectACombatTags::Skill_Shape_Projectile);
             FRunWeaponRarityRule& Low = Rules.Rarities.AddDefaulted_GetRef();
@@ -81,22 +81,22 @@ bool FRunWeaponSkillCompatibilityTest::RunTest(const FString& Parameters)
     FWeaponSkillFixture Fixture;
     FText Error;
     if (!TestTrue(TEXT("Injected tag-based generation rules validate"), RunWeaponSkillRules::Validate(Fixture.Rules, Error))) return false;
-    const FRunItemDefinition Sword = Fixture.Item(TEXT("Item.Weapon.Sword"));
+    const FRunItemDefinition Dagger = Fixture.Item(TEXT("Item.Weapon.Dagger"));
     const FRunItemDefinition Bow = Fixture.Item(TEXT("Item.Weapon.Bow"));
     FRandomStream Random(731);
-    FRunItemDefinition SwordCopy;
+    FRunItemDefinition DaggerCopy;
     FRunItemDefinition BowCopy;
-    if (!TestTrue(TEXT("A sword receives its compatible melee skill"), RunWeaponSkillRules::Generate(Sword, Fixture.Rules, Random, SwordCopy, Error) && SwordCopy.GrantedSkills == TArray<FSoftObjectPath>{Fixture.Rules.Candidates[0].Skill})) return false;
+    if (!TestTrue(TEXT("A dagger receives its compatible melee skill"), RunWeaponSkillRules::Generate(Dagger, Fixture.Rules, Random, DaggerCopy, Error) && DaggerCopy.GrantedSkills == TArray<FSoftObjectPath>{Fixture.Rules.Candidates[0].Skill})) return false;
     if (!TestTrue(TEXT("A bow receives its arrow skill and excludes a grade with no compatible candidates"), RunWeaponSkillRules::Generate(Bow, Fixture.Rules, Random, BowCopy, Error) && BowCopy.GrantedSkills == TArray<FSoftObjectPath>{Fixture.Rules.Candidates[1].Skill} && BowCopy.RarityTag == TAG_ValidationRarityLow)) return false;
     TestFalse(TEXT("Selection metadata never rewrites the original GAS execution tags"), Fixture.Rules.Candidates[0].Tags.HasTag(TAG_ValidationHighPool));
     FRunWeaponSkillRulesState HighOnly = Fixture.Rules;
     HighOnly.Rarities[0].BaseWeight = 0.0f;
     FRunItemDefinition HighCopy;
-    TestTrue(TEXT("Separate selection tags participate in the actual grade candidate query"), RunWeaponSkillRules::Generate(Sword, HighOnly, Random, HighCopy, Error) && HighCopy.RarityTag == TAG_ValidationRarityHigh);
+    TestTrue(TEXT("Separate selection tags participate in the actual grade candidate query"), RunWeaponSkillRules::Generate(Dagger, HighOnly, Random, HighCopy, Error) && HighCopy.RarityTag == TAG_ValidationRarityHigh);
     FRunItemDefinition Tampered = BowCopy;
-    Tampered.GrantedSkills = SwordCopy.GrantedSkills;
+    Tampered.GrantedSkills = DaggerCopy.GrantedSkills;
     TestFalse(TEXT("Stored bow copies reject a melee skill even when it belongs to the frozen catalog"), RunWeaponSkillRules::ValidateGeneratedCopy(Tampered, Fixture.Rules, Error));
-    Tampered = SwordCopy;
+    Tampered = DaggerCopy;
     const FSoftObjectPath Duplicate = Tampered.GrantedSkills[0];
     Tampered.GrantedSkills.Add(Duplicate);
     TestFalse(TEXT("A stored copy never gains duplicate skills"), RunWeaponSkillRules::ValidateGeneratedCopy(Tampered, Fixture.Rules, Error));
@@ -105,7 +105,7 @@ bool FRunWeaponSkillCompatibilityTest::RunTest(const FString& Parameters)
     FRunItemDefinition Preserved = BowCopy;
     TestFalse(TEXT("Missing compatible candidates do not fill a weapon with unrelated skills"), RunWeaponSkillRules::Generate(Unsupported, Fixture.Rules, Random, Preserved, Error));
     TestTrue(TEXT("Failed generation preserves the complete prior output copy"), RunItemShopCatalog::IsSameDefinition(Preserved, BowCopy));
-    TestFalse(TEXT("An existing generated copy cannot be rerolled through the creation API"), RunWeaponSkillRules::Generate(SwordCopy, Fixture.Rules, Random, Preserved, Error));
+    TestFalse(TEXT("An existing generated copy cannot be rerolled through the creation API"), RunWeaponSkillRules::Generate(DaggerCopy, Fixture.Rules, Random, Preserved, Error));
     const FRunItemDefinition NonWeapon = Fixture.Item(TEXT("Item.Consumable.Healing"));
     FRunItemDefinition NonWeaponCopy;
     TestTrue(TEXT("An item outside WeaponQuery may receive a grade but never weapon skills"), RunWeaponSkillRules::Generate(NonWeapon, Fixture.Rules, Random, NonWeaponCopy, Error) && NonWeaponCopy.ItemInstanceId.IsValid() && NonWeaponCopy.RarityTag.IsValid() && NonWeaponCopy.GrantedSkills.IsEmpty());
@@ -125,7 +125,7 @@ bool FRunWeaponSkillFrozenCopyTest::RunTest(const FString& Parameters)
     FWeaponSkillFixture Fixture;
     FRunItemShopState Shop;
     Shop.SchemaVersion = 1;
-    for (int32 Index = 0; Index < 5; ++Index) Shop.Catalog.Add(Fixture.Item(TEXT("Item.Weapon.Sword"), Index));
+    for (int32 Index = 0; Index < 5; ++Index) Shop.Catalog.Add(Fixture.Item(TEXT("Item.Weapon.Dagger"), Index));
     FText Error;
     if (!TestTrue(TEXT("Shop display creates fixed individual copies before any purchase"), RunItemShopCatalog::Roll(Shop, false, Fixture.Rules.WeaponQuery, Error, &Fixture.Rules))) return false;
     TSet<FGuid> CopyIds;
@@ -172,20 +172,20 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunWeaponSkillAuthoredRarityTest, "ProjectA.Ru
 bool FRunWeaponSkillAuthoredRarityTest::RunTest(const FString& Parameters)
 {
     FWeaponSkillFixture Fixture;
-    FRunItemDefinition Sword = Fixture.Item(TEXT("Item.Weapon.Sword"));
-    Sword.CatalogRarityTag = TAG_ValidationRarityHigh;
+    FRunItemDefinition Dagger = Fixture.Item(TEXT("Item.Weapon.Dagger"));
+    Dagger.CatalogRarityTag = TAG_ValidationRarityHigh;
     FRandomStream Random(371);
     FText Error;
     FRunItemDefinition Copy;
-    if (!TestTrue(TEXT("A fixed high grade generates only from its compatible skill pool"), RunWeaponSkillRules::CanGenerate(Sword, Fixture.Rules) && RunWeaponSkillRules::Generate(Sword, Fixture.Rules, Random, Copy, Error))) return false;
-    TestTrue(TEXT("Generated copies retain their authored base grade and compatible skill"), Copy.CatalogRarityTag == TAG_ValidationRarityHigh && Copy.RarityTag == TAG_ValidationRarityHigh && Copy.GrantedSkills == TArray<FSoftObjectPath>{Fixture.Rules.Candidates[0].Skill} && Copy.Price == Sword.Price);
+    if (!TestTrue(TEXT("A fixed high grade generates only from its compatible skill pool"), RunWeaponSkillRules::CanGenerate(Dagger, Fixture.Rules) && RunWeaponSkillRules::Generate(Dagger, Fixture.Rules, Random, Copy, Error))) return false;
+    TestTrue(TEXT("Generated copies retain their authored base grade and compatible skill"), Copy.CatalogRarityTag == TAG_ValidationRarityHigh && Copy.RarityTag == TAG_ValidationRarityHigh && Copy.GrantedSkills == TArray<FSoftObjectPath>{Fixture.Rules.Candidates[0].Skill} && Copy.Price == Dagger.Price);
     FRunItemDefinition Altered = Copy;
     Altered.RarityTag = TAG_ValidationRarityLow;
     TestFalse(TEXT("A generated copy cannot substitute a different grade"), RunWeaponSkillRules::ValidateGeneratedCopy(Altered, Fixture.Rules, Error));
     TestFalse(TEXT("Basic item validation also rejects a changed fixed grade"), RunItemShopCatalog::ValidateItem(Altered));
     Altered = Copy;
     Altered.CatalogRarityTag = FGameplayTag();
-    TestFalse(TEXT("Removing authored metadata cannot match the saved base catalog"), RunItemShopCatalog::IsSameBaseDefinition(Altered, Sword));
+    TestFalse(TEXT("Removing authored metadata cannot match the saved base catalog"), RunItemShopCatalog::IsSameBaseDefinition(Altered, Dagger));
 
     FRunItemDefinition Bow = Fixture.Item(TEXT("Item.Weapon.Bow"));
     Bow.CatalogRarityTag = TAG_ValidationRarityHigh;
@@ -197,7 +197,7 @@ bool FRunWeaponSkillAuthoredRarityTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Rejected fixed grade generation preserves the random stream"), Random.GetCurrentSeed(), BeforeSeed);
     Bow.CatalogRarityTag = FGameplayTag();
     TestTrue(TEXT("Unclassified legacy bows retain their original compatible random-grade policy"), RunWeaponSkillRules::Generate(Bow, Fixture.Rules, Random, Copy, Error) && Copy.RarityTag == TAG_ValidationRarityLow && !Copy.CatalogRarityTag.IsValid());
-    FRunItemDefinition Unknown = Sword;
+    FRunItemDefinition Unknown = Dagger;
     Unknown.CatalogRarityTag = TAG_ValidationHighPool;
     TestFalse(TEXT("A valid tag outside the frozen rarity rules cannot become a grade"), RunWeaponSkillRules::CanGenerate(Unknown, Fixture.Rules) || RunWeaponSkillRules::Generate(Unknown, Fixture.Rules, Random, Copy, Error));
 
@@ -211,7 +211,7 @@ bool FRunWeaponSkillAuthoredRarityTest::RunTest(const FString& Parameters)
     Shop.SchemaVersion = 1;
     for (int32 Index = 0; Index < 5; ++Index)
     {
-        FRunItemDefinition Base = Fixture.Item(TEXT("Item.Weapon.Sword"), Index);
+        FRunItemDefinition Base = Fixture.Item(TEXT("Item.Weapon.Dagger"), Index);
         Base.CatalogRarityTag = Index % 2 == 0 ? TAG_ValidationRarityLow : TAG_ValidationRarityHigh;
         Shop.Catalog.Add(Base);
     }

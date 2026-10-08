@@ -1,6 +1,7 @@
 #include "Game/Run/RunItemRarityProbabilities.h"
 
 #include "Game/Run/RunItemShopCatalog.h"
+#include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -61,7 +62,7 @@ namespace
 
     // Share eligibility between selection, specialized stock size and frozen-stock validation.
     // 추첨·전문 상점 상품 수·저장된 진열 검증에서 같은 적격 조건을 사용합니다.
-    bool BuildSelectionData(const TArray<FRunItemDefinition>& Catalog, const FRunItemRarityProbabilityState& State, const FGameplayTagQuery& Query, TArray<FGameplayTagWeightedCandidate>& OutCandidates, TArray<int32>& OutEligibleIndices, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
+    bool BuildSelectionData(const TArray<FRunItemDefinition>& Catalog, const FRunItemRarityProbabilityState& State, const FGameplayTagQuery& Query, TArray<FGameplayTagWeightedCandidate>& OutCandidates, TArray<int32>& OutEligibleIndices, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules, bool bRequireEquipment)
     {
         if (!RunItemRarityProbabilities::Validate(State, OutError) || (WeaponSkillRules && !RunWeaponSkillRules::Validate(*WeaponSkillRules, OutError))) return false;
         OutError = NSLOCTEXT("ItemRarityProbabilities", "InvalidCatalog", "등급별 추첨에는 유효한 원본 아이템 카탈로그와 양수 선택 개수가 필요합니다.");
@@ -79,6 +80,7 @@ namespace
             Candidate.Tags = Item.Tags;
             if (State.SchemaVersion == 1) Candidate.Tags.AddTag(Item.CatalogRarityTag);
             Candidate.BaseWeight = WeaponSkillRules && WeaponSkillRules->SchemaVersion == 1 && !RunWeaponSkillRules::CanGenerate(Item, *WeaponSkillRules) ? 0.0f : 1.0f;
+            if (bRequireEquipment && !URunEquipmentCatalog::Get().ResolveProfile(Item)) Candidate.BaseWeight = 0.0f;
             if (Candidate.BaseWeight > 0.0f && (Query.IsEmpty() || Query.Matches(Candidate.Tags)) && (!Rarity || Rarity->ProbabilityBasisPoints > 0)) OutEligibleIndices.Add(Index);
         }
         OutError = FText::GetEmpty();
@@ -149,20 +151,20 @@ bool RunItemRarityProbabilities::Validate(const FRunItemRarityProbabilityState& 
     return true;
 }
 
-bool RunItemRarityProbabilities::GetEligibleIndices(const TArray<FRunItemDefinition>& Catalog, const FRunItemRarityProbabilityState& State, const FGameplayTagQuery& Query, TArray<int32>& OutIndices, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
+bool RunItemRarityProbabilities::GetEligibleIndices(const TArray<FRunItemDefinition>& Catalog, const FRunItemRarityProbabilityState& State, const FGameplayTagQuery& Query, TArray<int32>& OutIndices, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules, bool bRequireEquipment)
 {
     TArray<FGameplayTagWeightedCandidate> Candidates;
     TArray<int32> EligibleIndices;
-    if (!BuildSelectionData(Catalog, State, Query, Candidates, EligibleIndices, OutError, WeaponSkillRules)) return false;
+    if (!BuildSelectionData(Catalog, State, Query, Candidates, EligibleIndices, OutError, WeaponSkillRules, bRequireEquipment)) return false;
     OutIndices = MoveTemp(EligibleIndices);
     return true;
 }
 
-bool RunItemRarityProbabilities::Select(const TArray<FRunItemDefinition>& Catalog, const FRunItemRarityProbabilityState& State, const FGameplayTagQuery& Query, int32 Count, bool bAllowDuplicates, FRandomStream& Random, TArray<int32>& OutIndices, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
+bool RunItemRarityProbabilities::Select(const TArray<FRunItemDefinition>& Catalog, const FRunItemRarityProbabilityState& State, const FGameplayTagQuery& Query, int32 Count, bool bAllowDuplicates, FRandomStream& Random, TArray<int32>& OutIndices, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules, bool bRequireEquipment)
 {
     TArray<FGameplayTagWeightedCandidate> Candidates;
     TArray<int32> EligibleIndices;
-    if (!BuildSelectionData(Catalog, State, Query, Candidates, EligibleIndices, OutError, WeaponSkillRules)) return false;
+    if (!BuildSelectionData(Catalog, State, Query, Candidates, EligibleIndices, OutError, WeaponSkillRules, bRequireEquipment)) return false;
     OutError = NSLOCTEXT("ItemRarityProbabilities", "InsufficientCandidates", "태그·등급 확률·스킬 조건을 만족하는 아이템 후보가 부족합니다.");
     if (Count <= 0 || EligibleIndices.IsEmpty() || (!bAllowDuplicates && EligibleIndices.Num() < Count)) return false;
     FRandomStream SelectionRandom = Random;

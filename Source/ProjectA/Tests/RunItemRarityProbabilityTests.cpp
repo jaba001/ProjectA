@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunItemRarityProbabilities.h"
 #include "Game/Run/RunItemShopCatalog.h"
 #include "Game/Run/RunSaveGame.h"
@@ -34,7 +35,7 @@ namespace
         return MakeProbabilityCsv({TEXT("50"), TEXT("30"), TEXT("15"), TEXT("4"), TEXT("1")});
     }
 
-    FRunItemDefinition MakeProbabilityItem(int32 Index, int32 Grade, FGameplayTag Eligibility = TAG_ProbabilityEligible, FName Category = TEXT("Item.Weapon.Sword"))
+    FRunItemDefinition MakeProbabilityItem(int32 Index, int32 Grade, FGameplayTag Eligibility = TAG_ProbabilityEligible, FName Category = TEXT("Item.Weapon.Dagger"))
     {
         FRunItemDefinition Item;
         Item.Asset = FSoftObjectPath(FString::Printf(TEXT("/Game/User_JeHoon/Validation/T12/ProbabilityItem_%d.ProbabilityItem_%d"), Index, Index));
@@ -71,7 +72,7 @@ namespace
         {
             Package.Reset(CreatePackage(*(TEXT("/Game/User_JeHoon/Validation/T12/ProbabilitySkills_") + FGuid::NewGuid().ToString(EGuidFormats::Digits))));
             Package->SetFlags(RF_Transient);
-            Skill.Reset(NewObject<USkillDefinitionDataAsset>(Package.Get(), TEXT("SwordSkill"), RF_Transient));
+            Skill.Reset(NewObject<USkillDefinitionDataAsset>(Package.Get(), TEXT("DaggerSkill"), RF_Transient));
             Skill->bUseRoundDefinition = true;
             Skill->RoundDefinition.EffectTags.AddTag(ProjectACombatTags::Skill_Effect_Damage);
             Skill->RoundDefinition.EffectTags.AddTag(ProjectACombatTags::Skill_Element_Physical);
@@ -84,7 +85,7 @@ namespace
             FRunWeaponSkillCandidate& Candidate = Rules.Candidates.AddDefaulted_GetRef();
             Candidate.Skill = FSoftObjectPath(Skill.Get());
             Candidate.Tags = Skill->RoundDefinition.EffectTags;
-            Candidate.AllowedItemQuery = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Sword")));
+            Candidate.AllowedItemQuery = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Dagger")));
             Candidate.BaseWeight = 1.0f;
             for (int32 Grade = 0; Grade < 5; ++Grade)
             {
@@ -341,6 +342,90 @@ bool FRunItemRarityFrozenSaveTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemEquipmentEligibilityTest, "ProjectA.Run.Shop.RarityProbabilities.EquipmentEligibilityAndLegacy", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunItemEquipmentEligibilityTest::RunTest(const FString& Parameters)
+{
+    const TArray<FRunItemDefinition> Catalog = {MakeProbabilityItem(0, 0), MakeProbabilityItem(1, 1), MakeProbabilityItem(2, 2), MakeProbabilityItem(3, 4, TAG_ProbabilityEligible, TEXT("Item.Weapon.Spellbook"))};
+    const FGameplayTagQuery UnsupportedOnly = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Spellbook")));
+    FText Error;
+    for (int32 PolicyVersion = 0; PolicyVersion <= 1; ++PolicyVersion)
+    {
+        FRunItemRarityProbabilityState Policy;
+        if (PolicyVersion == 1 && !RunItemRarityProbabilities::LoadFromString(DefaultProbabilityCsv(), Policy, Error)) return false;
+        TArray<int32> Eligible;
+        if (!TestTrue(TEXT("Legacy eligibility retains every frozen item without adopting equipment restrictions"), RunItemRarityProbabilities::GetEligibleIndices(Catalog, Policy, FGameplayTagQuery(), Eligible, Error) && Eligible == TArray<int32>{0, 1, 2, 3})) return false;
+        if (!TestTrue(TEXT("Equipment eligibility excludes only unsupported item definitions"), RunItemRarityProbabilities::GetEligibleIndices(Catalog, Policy, FGameplayTagQuery(), Eligible, Error, nullptr, true) && Eligible == TArray<int32>{0, 1, 2})) return false;
+        FRandomStream Random(7351);
+        TArray<int32> Selected;
+        if (!TestTrue(TEXT("Filtered selection exhausts the three supported items without entering an unsupported grade"), RunItemRarityProbabilities::Select(Catalog, Policy, FGameplayTagQuery(), 3, false, Random, Selected, Error, nullptr, true) && Selected.Num() == 3)) return false;
+        TSet<int32> Seen;
+        for (const int32 Index : Selected)
+        {
+            if (!TestTrue(TEXT("Every filtered result is a distinct item with an enabled equipment profile"), Catalog.IsValidIndex(Index) && URunEquipmentCatalog::Get().ResolveProfile(Catalog[Index]) && !Seen.Contains(Index))) return false;
+            Seen.Add(Index);
+        }
+        if (!TestTrue(TEXT("An explicit legacy selection still includes the unsupported frozen item"), RunItemRarityProbabilities::Select(Catalog, Policy, FGameplayTagQuery(), 4, false, Random, Selected, Error, nullptr, false) && Selected.Num() == 4 && Selected.Contains(3))) return false;
+        const int32 BeforeSeed = Random.GetCurrentSeed();
+        Selected = {93, 94};
+        TestFalse(TEXT("Equipment filtering cannot fill a request larger than its supported pool"), RunItemRarityProbabilities::Select(Catalog, Policy, FGameplayTagQuery(), 4, false, Random, Selected, Error, nullptr, true));
+        TestTrue(TEXT("Insufficient equipment selection preserves output and random stream"), Selected == TArray<int32>{93, 94} && Random.GetCurrentSeed() == BeforeSeed && !Error.IsEmpty());
+        TestTrue(TEXT("A frozen unsupported specialty resolves to an empty supported pool"), RunItemRarityProbabilities::GetEligibleIndices(Catalog, Policy, UnsupportedOnly, Eligible, Error, nullptr, true) && Eligible.IsEmpty());
+        TestFalse(TEXT("A direct nonempty selection cannot draw from an unsupported specialty"), RunItemRarityProbabilities::Select(Catalog, Policy, UnsupportedOnly, 1, false, Random, Selected, Error, nullptr, true));
+        TestTrue(TEXT("Empty equipment selection preserves the caller's previous output and random stream"), Selected == TArray<int32>{93, 94} && Random.GetCurrentSeed() == BeforeSeed && !Error.IsEmpty());
+        TArray<FRunItemDefinition> Invalid = Catalog;
+        Invalid.Last().Asset = Invalid[0].Asset;
+        Eligible = {95};
+        TestFalse(TEXT("An unsupported item cannot hide a malformed duplicate catalog entry"), RunItemRarityProbabilities::GetEligibleIndices(Invalid, Policy, FGameplayTagQuery(), Eligible, Error, nullptr, true));
+        TestTrue(TEXT("Invalid filtered eligibility preserves the caller output"), Eligible == TArray<int32>{95} && !Error.IsEmpty());
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemLegacyEquipmentStockTest, "ProjectA.Run.Shop.Profiles.LegacyEquipmentStockReroll", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunItemLegacyEquipmentStockTest::RunTest(const FString& Parameters)
+{
+    TArray<FRunItemDefinition> Catalog;
+    FText Error;
+    if (!RunItemShopCatalog::Load(Catalog, Error)) return false;
+    const FName Categories[] = {TEXT("Item.Weapon.Sword"), TEXT("Item.Weapon.StaffWand")};
+    const int32 SupportedCounts[] = {2, 1};
+    for (int32 CategoryIndex = 0; CategoryIndex < UE_ARRAY_COUNT(Categories); ++CategoryIndex)
+    {
+        const FGameplayTag Category = FGameplayTag::RequestGameplayTag(Categories[CategoryIndex]);
+        FRunItemShopState Legacy;
+        Legacy.SchemaVersion = 1;
+        Legacy.SelectionVersion = 1;
+        Legacy.Revision = 1;
+        Legacy.ActiveEncounterId = FName(*FString::Printf(TEXT("LegacyCategory_%d"), CategoryIndex));
+        Legacy.ActiveItemQuery = FGameplayTagQuery::MakeQuery_MatchTag(Category);
+        Legacy.ActiveStockPolicyVersion = 1;
+        Legacy.Catalog = Catalog.FilterByPredicate([Category](const FRunItemDefinition& Item) { return Item.Tags.HasTag(Category); });
+        if (!TestEqual(TEXT("The retained exact-asset equipment category has its authored supported count"), Legacy.Catalog.Num(), SupportedCounts[CategoryIndex])) return false;
+        while (Legacy.Catalog.Num() < 5) Legacy.Catalog.Add(MakeProbabilityItem(100 + CategoryIndex * 10 + Legacy.Catalog.Num(), 0, TAG_ProbabilityEligible, Categories[CategoryIndex]));
+        for (int32 Index = 0; Index < Legacy.Catalog.Num(); ++Index)
+        {
+            FRunItemShopOffer& Offer = Legacy.Offers.AddDefaulted_GetRef();
+            Offer.OfferId = FName(*FString::Printf(TEXT("LegacyOffer_%d"), Index));
+            Offer.Item = Legacy.Catalog[Index];
+            Offer.bSold = Index == 0;
+        }
+        if (!TestTrue(TEXT("Historical specialty stock validates all five frozen supported and unsupported offers"), RunItemShopCatalog::Validate(Legacy, Error))) return false;
+        TStrongObjectPtr<URunSaveGame> Save(NewObject<URunSaveGame>());
+        Save->ItemShopState = Legacy;
+        TArray<uint8> Bytes;
+        if (!UGameplayStatics::SaveGameToMemory(Save.Get(), Bytes)) return false;
+        TStrongObjectPtr<URunSaveGame> Restored(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+        if (!TestTrue(TEXT("Deserialization preserves legacy equipment policy, sold state and all five offers"), Restored.IsValid() && Restored->ItemShopState.EquipmentSelectionVersion == 0 && Restored->ItemShopState.Offers.Num() == 5 && Restored->ItemShopState.Offers[0].bSold && RunItemShopCatalog::Validate(Restored->ItemShopState, Error))) return false;
+        FRunItemShopState& Updated = Restored->ItemShopState;
+        if (!TestTrue(TEXT("An explicit reroll replaces legacy stock with only the supported category items"), RunItemShopCatalog::CanReroll(Updated) && RunItemShopCatalog::Reroll(Updated, Error) && Updated.EquipmentSelectionVersion == 1 && Updated.Revision == 2 && Updated.Offers.Num() == SupportedCounts[CategoryIndex])) return false;
+        TestTrue(TEXT("Reroll retains the historical catalog and active filter for existing owned copies"), Updated.Catalog.Num() == 5 && Updated.ActiveItemQuery == Legacy.ActiveItemQuery && RunItemShopCatalog::Validate(Updated, Error));
+        for (const FRunItemShopOffer& Offer : Updated.Offers) TestTrue(TEXT("Every replacement offer is unsold and resolves an equipment profile"), !Offer.bSold && URunEquipmentCatalog::Get().ResolveProfile(Offer.Item));
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunItemShopProfileStockTest, "ProjectA.Run.Shop.Profiles.FixedAndSpecializedStock", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FRunItemShopProfileStockTest::RunTest(const FString& Parameters)
@@ -350,13 +435,13 @@ bool FRunItemShopProfileStockTest::RunTest(const FString& Parameters)
     Shop.SchemaVersion = 1;
     Shop.SelectionVersion = 1;
     Shop.Catalog = MakeProbabilityCatalog({5, 0, 0, 0, 2});
-    Shop.Catalog[0] = MakeProbabilityItem(0, 0, TAG_ProbabilityEligible, TEXT("Item.Weapon.Spellbook"));
+    Shop.Catalog[0] = MakeProbabilityItem(0, 0, TAG_ProbabilityEligible, TEXT("Item.Weapon.Bow"));
     if (!RunItemRarityProbabilities::LoadFromString(DefaultProbabilityCsv(), Shop.RarityProbabilities, Error)) return false;
     TestTrue(TEXT("A new unvisited profile has no active filter or stock"), RunItemShopCatalog::Validate(Shop, Error));
     TestFalse(TEXT("An unvisited profile cannot be rerolled"), RunItemShopCatalog::Reroll(Shop, Error));
     const FGameplayTagQuery AllWeapons = FGameplayTagQuery::MakeQuery_MatchTag(RunItemShopCatalog::GetWeaponTag());
     const FGameplayTagQuery Orange = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Rarity.Orange")));
-    const FGameplayTagQuery Spellbook = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Spellbook")));
+    const FGameplayTagQuery Bow = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Bow")));
     if (!TestTrue(TEXT("The basic profile still requires five products"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Basic"), AllWeapons, 0, Error) && Shop.Offers.Num() == 5)) return false;
     const int32 BasicRevision = Shop.Revision;
     if (!TestTrue(TEXT("Switching from basic stock to two eligible orange products succeeds atomically"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Orange"), Orange, 1, Error) && Shop.Offers.Num() == 2 && Shop.Revision == BasicRevision + 1)) return false;
@@ -372,7 +457,7 @@ bool FRunItemShopProfileStockTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Sold products remain part of the frozen display's expected size"), RunItemShopCatalog::Validate(Shop, Error));
     if (!TestTrue(TEXT("Reroll uses the saved grade filter and restores the same two-product capacity"), RunItemShopCatalog::Reroll(Shop, Error) && Shop.Offers.Num() == 2)) return false;
     for (const FRunItemShopOffer& Offer : Shop.Offers) TestTrue(TEXT("Rerolled products are unsold and still match the saved grade"), !Offer.bSold && Offer.Item.CatalogRarityTag == FGameplayTag::RequestGameplayTag(TEXT("Item.Rarity.Orange")));
-    if (!TestTrue(TEXT("A category with one eligible asset displays exactly one product"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Spellbook"), Spellbook, 1, Error) && Shop.Offers.Num() == 1 && Shop.Offers[0].Item.Asset == Shop.Catalog[0].Asset)) return false;
+    if (!TestTrue(TEXT("A category with one eligible asset displays exactly one product"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Bow"), Bow, 1, Error) && Shop.Offers.Num() == 1 && Shop.Offers[0].Item.Asset == Shop.Catalog[0].Asset)) return false;
     if (!TestTrue(TEXT("Returning from specialized stock to the basic profile restores five products"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Basic"), AllWeapons, 0, Error) && Shop.Offers.Num() == 5)) return false;
     FRunItemShopState Altered = Shop;
     Altered.Offers.Pop();
@@ -381,7 +466,7 @@ bool FRunItemShopProfileStockTest::RunTest(const FString& Parameters)
     Altered.Offers[1].Item = Altered.Offers[0].Item;
     TestFalse(TEXT("A new profile rejects duplicate displayed assets even with distinct offer IDs"), RunItemShopCatalog::Validate(Altered, Error));
     Altered = Shop;
-    Altered.ActiveItemQuery = Spellbook;
+    Altered.ActiveItemQuery = Bow;
     TestFalse(TEXT("Saved stock must satisfy its saved active query"), RunItemShopCatalog::Validate(Altered, Error));
     TestFalse(TEXT("The legacy roll API cannot bypass a new profile's saved filter"), RunItemShopCatalog::Roll(Shop, false, FGameplayTagQuery(), Error));
     return true;
@@ -416,7 +501,13 @@ bool FRunItemShopProfileEligibilityTest::RunTest(const FString& Parameters)
     {
         TestTrue(TEXT("A failed transition preserves the full previous profile, sold stock and revision"), FRunItemShopState::StaticStruct()->CompareScriptStruct(&Shop, &Before, 0));
     };
-    TestFalse(TEXT("A zero-candidate specialized visit is rejected"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Missing"), Missing, 1, Error, &Fixture.Rules));
+    FRunItemShopState EmptySpecialty = Shop;
+    if (!TestTrue(TEXT("A frozen specialty without supported candidates opens with empty stock"), RunItemShopCatalog::BeginVisit(EmptySpecialty, TEXT("Missing"), Missing, 1, Error, &Fixture.Rules) && EmptySpecialty.Offers.IsEmpty() && EmptySpecialty.EquipmentSelectionVersion == 1)) return false;
+    TestTrue(TEXT("An empty specialized display remains a valid saved visit"), RunItemShopCatalog::Validate(EmptySpecialty, Error, &Fixture.Rules));
+    const FRunItemShopState BeforeEmptyReroll = EmptySpecialty;
+    TestFalse(TEXT("An empty specialty cannot offer a paid reroll"), RunItemShopCatalog::CanReroll(EmptySpecialty, &Fixture.Rules));
+    TestFalse(TEXT("The public reroll rejects an empty specialty"), RunItemShopCatalog::Reroll(EmptySpecialty, Error, &Fixture.Rules));
+    TestTrue(TEXT("A rejected empty reroll preserves the profile stock revision and price"), FRunItemShopState::StaticStruct()->CompareScriptStruct(&EmptySpecialty, &BeforeEmptyReroll, 0));
     ExpectUnchanged();
     TestFalse(TEXT("A basic profile cannot use the specialized smaller-capacity rule"), RunItemShopCatalog::BeginVisit(Shop, TEXT("Basic"), FGameplayTagQuery(), 0, Error, &Fixture.Rules));
     ExpectUnchanged();

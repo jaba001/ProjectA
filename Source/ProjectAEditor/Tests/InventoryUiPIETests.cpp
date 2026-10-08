@@ -293,7 +293,7 @@ public:
         {
             URunEncounterWidget* Screen = Active<URunEncounterWidget>(World);
             if (!Screen || !Warm()) return false;
-            if (!Check(Run->GetItemShopState().Catalog.Num() == 289 && Run->GetItemShopState().Offers.Num() == 5, TEXT("The authored item shop loads all 289 CSV definitions and five actual offers."))) return End();
+            if (!Check(Run->GetItemShopState().Catalog.Num() == 49 && Run->GetItemShopState().Offers.Num() == 5, TEXT("The authored item shop loads all 49 supported CSV definitions and five actual offers."))) return End();
             if (!Capture(TEXT("Shop"))) return End();
             if (!Purchase(Screen, Run)) return End();
             SendKey(EKeys::I);
@@ -511,7 +511,7 @@ private:
     bool InstallFixture(URunStateSubsystem* Run)
     {
         FText Error;
-        if (!Check(RunItemShopCatalog::Load(Catalog, Error) && Catalog.Num() == 289, TEXT("The real runtime CSV loader reads all 289 catalog definitions."))) return false;
+        if (!Check(RunItemShopCatalog::Load(Catalog, Error) && Catalog.Num() == 49, TEXT("The real runtime CSV loader reads all 49 supported catalog definitions."))) return false;
         TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));
         FRunPartyMember* Member = Saved.IsValid() ? Saved->Party.FindByPredicate([](const FRunPartyMember& Item) { return Item.bCreated && Item.bPlayerControlled; }) : nullptr;
         if (!Check(Member && Saved->WeaponSkillAcquisitionVersion == 0 && Saved->WeaponSkillRules.SchemaVersion == 0 && Saved->Party.FilterByPredicate([](const FRunPartyMember& Item) { return Item.bCreated; }).Num() == 4, TEXT("The explicit legacy0 prototype durably retains the menu-created four-character party."))) return false;
@@ -540,7 +540,7 @@ private:
         ReadOnlyCharacterId = ReadOnlyMember->CharacterId;
         ReadOnlyItemIndex = ReadOnlyMember->Items.Add(Catalog[OriginalIndex]);
         if (!Check(UGameplayStatics::SaveGameToSlot(Saved.Get(), Slot, 0) && Run->LoadCheckpoint(Error), TEXT("Disposable items and the existing melee skill survive actual save/load in the guarded slot."))) return false;
-        return Check(FindMember(Run) && FindMember(Run)->Items.Num() == 290, TEXT("Reload retains every CSV definition plus one separate duplicate copy."));
+        return Check(FindMember(Run) && FindMember(Run)->Items.Num() == Catalog.Num() + 1, TEXT("Reload retains every CSV definition plus one separate duplicate copy."));
     }
 
     bool Purchase(URunEncounterWidget* Screen, URunStateSubsystem* Run)
@@ -585,7 +585,7 @@ private:
             const FRunItemShopOffer* After = Run->GetItemShopState().Offers.FindByPredicate([&Before](const FRunItemShopOffer& Item) { return Item.OfferId == Before.OfferId; });
             bOtherOffersUnchanged &= After && RunItemShopCatalog::IsSameDefinition(After->Item, Before.Item) && (Before.OfferId == Offer.OfferId || After->bSold == Before.bSold);
         }
-        return Check(Member && Member->Items.Num() == 291 && RunItemShopCatalog::IsSameDefinition(Member->Items.Last(), Offer.Item) && Member->Gold == Gold - Offer.Item.Price && Updated && Updated->bSold && bOtherOffersUnchanged, TEXT("The actual merchant click appends its item, charges its CSV price and marks only its offer sold."));
+        return Check(Member && Member->Items.Num() == Catalog.Num() + 2 && RunItemShopCatalog::IsSameDefinition(Member->Items.Last(), Offer.Item) && Member->Gold == Gold - Offer.Item.Price && Updated && Updated->bSold && bOtherOffersUnchanged, TEXT("The actual merchant click appends its item, charges its CSV price and marks only its offer sold."));
     }
 
     bool CheckCatalogAndTabs(UCharacterInventoryPanel* Panel, URunStateSubsystem* Run)
@@ -594,7 +594,7 @@ private:
         UVerticalBox* Rows = Panel ? Cast<UVerticalBox>(Panel->GetWidgetFromName(TEXT("InventoryItems"))) : nullptr;
         UVerticalBox* Skills = Panel ? Cast<UVerticalBox>(Panel->GetWidgetFromName(TEXT("InventorySkills"))) : nullptr;
         UWidget* Details = Panel ? Panel->GetWidgetFromName(TEXT("SelectedInventoryItem")) : nullptr;
-        if (!Check(Tabs && Tabs->GetChildrenCount() == 6 && Rows && Rows->GetChildrenCount() == 291 && Skills && Details, TEXT("Actual I opens all six inventory tabs and preserves 291 individual unequipped rows."))) return false;
+        if (!Check(Tabs && Tabs->GetChildrenCount() == 6 && Rows && Rows->GetChildrenCount() == Catalog.Num() + 2 && Skills && Details, TEXT("Actual I opens all six inventory tabs and preserves every catalog item, duplicate and purchased copy as individual unequipped rows."))) return false;
         bool bNames = true;
         bool bPrices = true;
         bool bSupport = true;
@@ -606,9 +606,9 @@ private:
             const FString Detail = Text(Details);
             bNames &= Text(Row).Contains(Catalog[Index].DisplayName.ToString()) && Detail.Contains(Catalog[Index].DisplayName.ToString());
             bPrices &= Detail.Contains(TEXT("카탈로그 기준 가격 ") + FText::AsNumber(Catalog[Index].Price).ToString() + TEXT("G"));
-            bSupport &= URunEquipmentCatalog::Get().ResolveProfile(Catalog[Index]) ? Detail.Contains(TEXT("장착 위치:")) : Detail.Contains(TEXT("장착을 지원하지"));
+            bSupport &= URunEquipmentCatalog::Get().ResolveProfile(Catalog[Index]) && Detail.Contains(TEXT("장착 위치:"));
         }
-        if (!Check(bNames && bPrices && bSupport, TEXT("All 289 actual row selection delegates display their CSV name, reference price and authored equipment support."))) return false;
+        if (!Check(bNames && bPrices && bSupport, TEXT("All 49 actual row selection delegates display their CSV name, reference price and supported equipment slot."))) return false;
         int32 PartitionTotal = 0;
         for (int32 Index = 1; Index < 5; ++Index)
         {
@@ -621,7 +621,7 @@ private:
             Texts(Tab, Labels);
             if (!Check(Labels.Contains(FText::AsNumber(Count).ToString()), TEXT("The category counter matches its actual individual-copy rows."))) return false;
         }
-        if (!Check(PartitionTotal == 291, TEXT("Weapon shield ammo and other tab rows partition every bag copy exactly once."))) return false;
+        if (!Check(PartitionTotal == Catalog.Num() + 2, TEXT("Weapon shield ammo and other tab rows partition every bag copy exactly once."))) return false;
         CastChecked<UButton>(Tabs->GetChildAt(5))->OnClicked.Broadcast();
         if (!Check(Skills->GetChildrenCount() == FindMember(Run)->Skills.Num() && Text(Skills).Contains(TEXT("근접 공격")), TEXT("The actual skill tab matches the saved loadout and displays the preserved melee skill name."))) return false;
         CastChecked<UButton>(Tabs->GetChildAt(0))->OnClicked.Broadcast();
