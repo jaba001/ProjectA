@@ -84,6 +84,13 @@ void ACombatArena::ActivateArena(APlayerController* Controller)
             Camera->SetConstraintAspectRatio(false);
             Camera->bOverrideAspectRatioAxisConstraint = true;
             Camera->SetAspectRatioAxisConstraint(AspectRatio_MaintainYFOV);
+            if (!Camera->PostProcessSettings.bOverride_ColorSaturation)
+            {
+                // Apply a stable default without compounding it on later visits or changing exposure.
+                // 반복 방문 때 누적하거나 노출을 바꾸지 않고 일정한 기본값을 적용합니다.
+                Camera->PostProcessSettings.bOverride_ColorSaturation = true;
+                Camera->PostProcessSettings.ColorSaturation = FVector4(1.f, 1.f, 1.f, FMath::Clamp(DefaultSceneSaturation, 0.f, 1.f));
+            }
         }
         Controller->SetViewTargetWithBlend(ViewTarget, 0.f);
     }

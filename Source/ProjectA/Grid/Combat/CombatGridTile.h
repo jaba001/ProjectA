@@ -97,6 +97,23 @@ private:
     UPROPERTY(EditAnywhere, Category = "CombatGridTile")
     FLinearColor ProtectedByFrontColor = FLinearColor(1.0f, 0.0f, 1.0f, 1.0f);
 
+    // State opacity scales the authored sprite alpha without changing its source asset or gameplay state.
+    // 상태별 불투명도는 원본 에셋이나 게임 상태를 바꾸지 않고 제작된 스프라이트 알파에 곱합니다.
+    UPROPERTY(EditAnywhere, Category = "CombatGridTile|Presentation", meta = (ClampMin = "0", ClampMax = "1"))
+    float IdleOpacity = 0.24f;
+    UPROPERTY(EditAnywhere, Category = "CombatGridTile|Presentation", meta = (ClampMin = "0", ClampMax = "1"))
+    float OccupiedOpacity = 0.42f;
+    UPROPERTY(EditAnywhere, Category = "CombatGridTile|Presentation", meta = (ClampMin = "0", ClampMax = "1"))
+    float MovableOpacity = 0.65f;
+    UPROPERTY(EditAnywhere, Category = "CombatGridTile|Presentation", meta = (ClampMin = "0", ClampMax = "1"))
+    float SkillTargetOpacity = 0.78f;
+    UPROPERTY(EditAnywhere, Category = "CombatGridTile|Presentation", meta = (ClampMin = "0", ClampMax = "1"))
+    float HoverOpacityBoost = 0.12f;
+    UPROPERTY(EditAnywhere, Category = "CombatGridTile|Presentation", meta = (ClampMin = "0", ClampMax = "1"))
+    float MaximumHoverOpacity = 0.9f;
+    UPROPERTY(EditAnywhere, Category = "CombatGridTile|Presentation", meta = (ClampMin = "0", ClampMax = "1"))
+    float ProtectedTintStrength = 0.25f;
+
 private:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CombatGridTile", meta = (AllowPrivateAccess = "true"))
     UBoxComponent* CollisionBox;
@@ -161,6 +178,11 @@ private:
     void OnRep_TileState();
 
 private:
+    // Hover is local presentation state and is recomputed alongside movement and target feedback.
+    // 마우스 오버는 이동·대상 피드백과 함께 다시 계산하는 로컬 표시 상태입니다.
+    UPROPERTY(Transient)
+    bool bCursorHovered = false;
+
     // Whether this tile is currently highlighted as a reachable movement tile
     UPROPERTY()
     bool bMovableHighlighted = false;

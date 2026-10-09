@@ -18,6 +18,7 @@ TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
 COMMAND_LINE = unreal.SystemLibrary.get_command_line()
 VERIFY_ONLY = "-EnvironmentSurfacesVerifyOnly" in COMMAND_LINE
 REBUILD = "-EnvironmentSurfacesRebuild" in COMMAND_LINE
+SURFACES_ONLY = "-EnvironmentSurfacesOnly" in COMMAND_LINE
 OWNER_TAG = unreal.Name("ProjectAEnvironmentSurface")
 OWNER_VALUE = "1"
 PACKAGE_SUFFIXES = [".uasset", ".umap", ".uexp", ".ubulk", ".uptnl"]
@@ -54,20 +55,58 @@ def source_root(path):
     return "/" + "/".join(source_path(path).split("/")[1:3])
 
 
+def palette_settings(item):
+    return {"macro_texture": item.get("macro_texture", item["texture"]), "macro_uv_scale": item.get("macro_uv_scale", item["uv_scale"] * 0.125), "detail_weight": item.get("detail_weight", 0.35), "macro_strength": item.get("macro_strength", 0.1)}
+
+
+def has_macro(item):
+    return "color_low" in item or any(field in item for field in ["macro_texture", "macro_uv_scale", "macro_strength"])
+
+
+def report_directory():
+    arguments = re.findall(r'(?:^|\s)-EnvironmentSurfacesReportDir=(?:"([^"]*)"|(\S*))', COMMAND_LINE)
+    require(len(arguments) <= 1, "Declare the surface report directory only once")
+    if not arguments:
+        require("-EnvironmentSurfacesReportDir" not in COMMAND_LINE, "Surface report directory requires a relative path")
+        return ROOT / "Saved/Automation/Environments"
+    value = next((part for part in arguments[0] if part), "")
+    relative = Path(value)
+    require(value and not relative.is_absolute() and not relative.drive and ".." not in relative.parts, "Surface report directory must be a workspace-relative path")
+    resolved = (ROOT / relative).resolve()
+    require(resolved != ROOT and ROOT in resolved.parents, "Surface report directory must stay inside the workspace")
+    return resolved
+
+
 def read_specs():
     require(not (VERIFY_ONLY and REBUILD), "Surface verify and rebuild are mutually exclusive")
+    report_directory()
     document = json.loads(SPEC_FILE.read_text(encoding="utf-8"))
     surfaces, instances = document.get("surfaces", []), document.get("instances", [])
     require(isinstance(surfaces, list) and isinstance(instances, list) and surfaces + instances, "Declare at least one surface or instance")
     outputs = [owned_path(item["asset"]) for item in surfaces + instances]
     require(len(outputs) == len(set(outputs)), "Environment surface output paths must be unique")
     for item in surfaces:
-        require(set(item).issubset({"asset", "texture", "normal", "color", "uv_scale", "roughness"}), "Unknown environment surface field")
+        require(set(item).issubset({"asset", "texture", "normal", "color", "uv_scale", "roughness", "color_low", "color_high", "macro_texture", "macro_uv_scale", "detail_weight", "macro_strength", "normal_strength"}), "Unknown environment surface field")
         source_path(item["texture"])
         if item.get("normal"):
             source_path(item["normal"])
         require(isinstance(item["color"], list) and len(item["color"]) == 3 and all(finite(value) and value >= 0.0 for value in item["color"]), "Surface tint must be three nonnegative linear values")
         require(finite(item["uv_scale"]) and item["uv_scale"] > 0.0 and finite(item["roughness"]) and 0.0 <= item["roughness"] <= 1.0, "Invalid surface UV scale or roughness")
+        has_palette = "color_low" in item or "color_high" in item
+        require(not has_palette or "color_low" in item and "color_high" in item, "Surface palette requires both low and high colors")
+        require(has_palette or "detail_weight" not in item, "Detail weight requires a surface palette")
+        require(not has_palette or "macro_strength" not in item, "Macro strength applies only to RGB surfaces without a palette")
+        if has_palette:
+            for field in ["color_low", "color_high"]:
+                require(isinstance(item[field], list) and len(item[field]) == 3 and all(finite(value) and value >= 0.0 for value in item[field]), "Surface palette must contain three nonnegative linear values: " + field)
+        if has_macro(item):
+            palette = palette_settings(item)
+            source_path(palette["macro_texture"])
+            require(finite(palette["macro_uv_scale"]) and palette["macro_uv_scale"] > 0.0, "Invalid macro UV scale")
+            require(finite(palette["detail_weight"]) and 0.0 <= palette["detail_weight"] <= 1.0, "Detail weight must be within zero and one")
+            require(finite(palette["macro_strength"]) and 0.0 <= palette["macro_strength"] <= 1.0, "Macro strength must be within zero and one")
+        if "normal_strength" in item:
+            require(item.get("normal") and finite(item["normal_strength"]) and 0.0 <= item["normal_strength"] <= 1.0, "Normal strength requires a normal texture and a value within zero and one")
     for item in instances:
         require(set(item).issubset({"asset", "parent", "static_switches", "scalar_parameters", "vector_parameters", "instanced_mesh_usage"}), "Unknown environment instance field")
         source_path(item["parent"])
@@ -84,8 +123,14 @@ def read_specs():
                     require(isinstance(value, list) and len(value) in [3, 4] and all(finite(channel) for channel in value), "Vector parameter must have three or four finite channels: " + name)
     roots = {source_path(root.rstrip("/")) for level in document.get("levels", []) for root in level.get("source_roots", [])}
     roots.add("/Game/User_JeHoon")
-    roots.update(source_root(item[field]) for item in surfaces for field in ["texture", "normal"] if item.get(field))
+    roots.update(source_root(item[field]) for item in surfaces for field in ["texture", "normal", "macro_texture"] if item.get(field))
     roots.update(source_root(item["parent"]) for item in instances)
+    if SURFACES_ONLY:
+        # Unselected instances stay inside the protected hash set and are never loaded or saved by this pass.
+        # 미선택 인스턴스는 보호 해시 대상에 남기며 이번 작업에서 로드하거나 저장하지 않습니다.
+        require(surfaces, "Surface-only mode requires at least one surface")
+        instances = []
+        outputs = [item["asset"] for item in surfaces]
     return surfaces, instances, set(outputs), roots
 
 
@@ -131,9 +176,10 @@ def sampler_type(texture):
 
 def validate_sources(surfaces, instances):
     for item in surfaces:
-        texture = load_source(item["texture"], unreal.Texture2D)
-        require(texture.get_editor_property("compression_settings") != unreal.TextureCompressionSettings.TC_NORMALMAP, "Diffuse source cannot be a normal map")
-        sampler_type(texture)
+        for path in [item["texture"]] + ([palette_settings(item)["macro_texture"]] if has_macro(item) else []):
+            texture = load_source(path, unreal.Texture2D)
+            require(texture.get_editor_property("compression_settings") != unreal.TextureCompressionSettings.TC_NORMALMAP, "Diffuse or macro source cannot be a normal map")
+            sampler_type(texture)
         if item.get("normal"):
             normal = load_source(item["normal"], unreal.Texture2D)
             require(normal.get_editor_property("compression_settings") == unreal.TextureCompressionSettings.TC_NORMALMAP, "Normal source must already use Normalmap compression")
@@ -213,21 +259,62 @@ def configure_surface(item, outputs):
     connect(world, mask, "", "XYZ")
     connect(mask, uv, "A")
     connect(scale, uv, "B")
+    macro_uv = None
+    if has_macro(item):
+        palette = palette_settings(item)
+        macro_scale = make_node(material, unreal.MaterialExpressionConstant, "MacroUVScale", -900, 650)
+        macro_scale.set_editor_property("r", palette["macro_uv_scale"])
+        macro_uv = make_node(material, unreal.MaterialExpressionMultiply, "MacroWorldUV", -700, 650)
+        connect(mask, macro_uv, "A")
+        connect(macro_scale, macro_uv, "B")
     samples = {}
-    for role, path in [("Diffuse", item["texture"])] + ([("Normal", item["normal"])] if item.get("normal") else []):
+    sample_definitions = [("Diffuse", item["texture"])] + ([("Normal", item["normal"])] if item.get("normal") else []) + ([("Macro", palette["macro_texture"])] if macro_uv else [])
+    for role, path in sample_definitions:
         texture = load_source(path, unreal.Texture2D)
-        sample = make_node(material, unreal.MaterialExpressionTextureSample, role, -500, 0 if role == "Diffuse" else 450)
+        sample = make_node(material, unreal.MaterialExpressionTextureSample, role, -500, {"Diffuse": 0, "Normal": 450, "Macro": 850}[role])
         sample.set_editor_property("texture", texture)
         sample.set_editor_property("sampler_type", sampler_type(texture))
         sample.set_editor_property("sampler_source", unreal.SamplerSourceMode.SSM_WRAP_WORLD_GROUP_SETTINGS)
-        connect(uv, sample, "")
+        connect(macro_uv if role == "Macro" else uv, sample, "")
         samples[role] = sample
+    color_source = samples["Diffuse"]
+    if "color_low" in item:
+        # Blend the two red-channel scales inside a controlled linear palette, then retain the authored final tint.
+        # 두 크기의 R 채널을 제한된 선형 색상 범위로 변환하고 마지막 제작 tint는 유지합니다.
+        weight = make_node(material, unreal.MaterialExpressionConstant, "DetailWeight", -250, 900)
+        weight.set_editor_property("r", palette["detail_weight"])
+        detail = make_node(material, unreal.MaterialExpressionLinearInterpolate, "DetailBlend", 0, 700)
+        connect(samples["Macro"], detail, "A", "R")
+        connect(samples["Diffuse"], detail, "B", "R")
+        connect(weight, detail, "Alpha")
+        low = make_node(material, unreal.MaterialExpressionConstant3Vector, "ColorLow", 0, 950)
+        high = make_node(material, unreal.MaterialExpressionConstant3Vector, "ColorHigh", 0, 1100)
+        low.set_editor_property("constant", unreal.LinearColor(*item["color_low"], 1.0))
+        high.set_editor_property("constant", unreal.LinearColor(*item["color_high"], 1.0))
+        color_source = make_node(material, unreal.MaterialExpressionLinearInterpolate, "PaletteColor", 250, 700)
+        connect(low, color_source, "A")
+        connect(high, color_source, "B")
+        connect(detail, color_source, "Alpha")
+    elif macro_uv:
+        # Preserve source hue while a low-strength scalar macro pattern varies its brightness.
+        # 낮은 강도의 큰 무늬로 밝기만 변화시키며 원본 색상은 보존합니다.
+        low = make_node(material, unreal.MaterialExpressionConstant, "MacroLow", -250, 900)
+        high = make_node(material, unreal.MaterialExpressionConstant, "MacroHigh", -250, 1050)
+        low.set_editor_property("r", 1.0 - palette["macro_strength"])
+        high.set_editor_property("r", 1.0 + palette["macro_strength"])
+        variation = make_node(material, unreal.MaterialExpressionLinearInterpolate, "MacroVariation", 0, 700)
+        connect(low, variation, "A")
+        connect(high, variation, "B")
+        connect(samples["Macro"], variation, "Alpha", "R")
+        color_source = make_node(material, unreal.MaterialExpressionMultiply, "MacroColor", 250, 700)
+        connect(samples["Diffuse"], color_source, "A")
+        connect(variation, color_source, "B")
     tint = make_node(material, unreal.MaterialExpressionConstant3Vector, "LinearTint", -500, 220)
     tint.set_editor_property("constant", unreal.LinearColor(*item["color"], 1.0))
     base = make_node(material, unreal.MaterialExpressionMultiply, "BaseColor", -200, 0)
     # TextureSample output zero is RGB; UE 5.8's name resolver handles single channels but not an unnamed RGB output.
     # TextureSample의 출력 0은 RGB이며 UE 5.8 이름 변환기는 이름 없는 RGB 대신 단일 채널만 인식합니다.
-    connect(samples["Diffuse"], base, "A")
+    connect(color_source, base, "A")
     connect(tint, base, "B")
     require(EDITING.connect_material_property(base, "", unreal.MaterialProperty.MP_BASE_COLOR), "Could not connect surface base color")
     for role, value, material_property, y in [("Roughness", item["roughness"], unreal.MaterialProperty.MP_ROUGHNESS, 270), ("Metallic", 0.0, unreal.MaterialProperty.MP_METALLIC, 350)]:
@@ -235,7 +322,19 @@ def configure_surface(item, outputs):
         constant.set_editor_property("r", value)
         require(EDITING.connect_material_property(constant, "", material_property), "Could not connect surface " + role)
     if "Normal" in samples:
-        require(EDITING.connect_material_property(samples["Normal"], "", unreal.MaterialProperty.MP_NORMAL), "Could not connect surface normal")
+        normal_source = samples["Normal"]
+        if "normal_strength" in item:
+            flat = make_node(material, unreal.MaterialExpressionConstant3Vector, "FlatNormal", -250, 1300)
+            flat.set_editor_property("constant", unreal.LinearColor(0.0, 0.0, 1.0, 1.0))
+            strength = make_node(material, unreal.MaterialExpressionConstant, "NormalStrength", -250, 1450)
+            strength.set_editor_property("r", item["normal_strength"])
+            blend = make_node(material, unreal.MaterialExpressionLinearInterpolate, "NormalBlend", 0, 1300)
+            connect(flat, blend, "A")
+            connect(normal_source, blend, "B")
+            connect(strength, blend, "Alpha")
+            normal_source = make_node(material, unreal.MaterialExpressionNormalize, "NormalizedNormal", 250, 1300)
+            connect(blend, normal_source, "")
+        require(EDITING.connect_material_property(normal_source, "", unreal.MaterialProperty.MP_NORMAL), "Could not connect surface normal")
     errors = [str(error) for error in EDITING.recompile_material(material)]
     require(not errors, "Environment material compilation failed: " + str(errors))
     save_output(material, outputs)
@@ -293,6 +392,14 @@ def verify_surface(item):
     classes = {"WorldPosition": unreal.MaterialExpressionWorldPosition, "WorldXY": unreal.MaterialExpressionComponentMask, "UVScale": unreal.MaterialExpressionConstant, "WorldUV": unreal.MaterialExpressionMultiply, "Diffuse": unreal.MaterialExpressionTextureSample, "LinearTint": unreal.MaterialExpressionConstant3Vector, "BaseColor": unreal.MaterialExpressionMultiply, "Roughness": unreal.MaterialExpressionConstant, "Metallic": unreal.MaterialExpressionConstant}
     if item.get("normal"):
         classes["Normal"] = unreal.MaterialExpressionTextureSample
+    if has_macro(item):
+        classes.update({"MacroUVScale": unreal.MaterialExpressionConstant, "MacroWorldUV": unreal.MaterialExpressionMultiply, "Macro": unreal.MaterialExpressionTextureSample})
+        if "color_low" in item:
+            classes.update({"DetailWeight": unreal.MaterialExpressionConstant, "DetailBlend": unreal.MaterialExpressionLinearInterpolate, "ColorLow": unreal.MaterialExpressionConstant3Vector, "ColorHigh": unreal.MaterialExpressionConstant3Vector, "PaletteColor": unreal.MaterialExpressionLinearInterpolate})
+        else:
+            classes.update({"MacroLow": unreal.MaterialExpressionConstant, "MacroHigh": unreal.MaterialExpressionConstant, "MacroVariation": unreal.MaterialExpressionLinearInterpolate, "MacroColor": unreal.MaterialExpressionMultiply})
+    if "normal_strength" in item:
+        classes.update({"FlatNormal": unreal.MaterialExpressionConstant3Vector, "NormalStrength": unreal.MaterialExpressionConstant, "NormalBlend": unreal.MaterialExpressionLinearInterpolate, "NormalizedNormal": unreal.MaterialExpressionNormalize})
     nodes = {}
     expressions = list(EDITING.get_material_expressions(material))
     details = [describe_node(node) for node in expressions]
@@ -303,20 +410,56 @@ def verify_surface(item):
     require(set(nodes) == set(classes) and len(expressions) == len(classes), "Saved surface graph is incomplete: " + json.dumps({"expected_roles": list(classes), "all_expressions": details}, ensure_ascii=False))
     require(EDITING.has_material_usage(material, unreal.MaterialUsage.MATUSAGE_INSTANCED_STATIC_MESHES) and nodes["WorldPosition"].get_editor_property("world_position_shader_offset") == unreal.WorldPositionIncludedOffsets.WPT_EXCLUDE_ALL_SHADER_OFFSETS, "Saved surface instancing usage or absolute world coordinates differ")
     require(all(nodes["WorldXY"].get_editor_property(channel) == value for channel, value in {"r": True, "g": True, "b": False, "a": False}.items()), "Saved world XY mask differs")
-    require(close(nodes["UVScale"].get_editor_property("r"), item["uv_scale"]) and close(nodes["Roughness"].get_editor_property("r"), item["roughness"]) and nodes["Metallic"].get_editor_property("r") == 0.0, "Saved surface constants differ")
-    tint = nodes["LinearTint"].get_editor_property("constant")
-    require(all(close(getattr(tint, channel), value) for channel, value in zip(["r", "g", "b"], item["color"])), "Saved linear surface tint differs")
-    for role, field in [("Diffuse", "texture")] + ([("Normal", "normal")] if item.get("normal") else []):
-        texture = load_source(item[field], unreal.Texture2D)
+    constants = {"UVScale": item["uv_scale"], "Roughness": item["roughness"], "Metallic": 0.0}
+    vectors = {"LinearTint": item["color"]}
+    sample_definitions = [("Diffuse", item["texture"], "WorldUV")] + ([("Normal", item["normal"], "WorldUV")] if item.get("normal") else [])
+    connections = [("WorldXY", 0, "WorldPosition", "XYZ"), ("WorldUV", 0, "WorldXY", ""), ("WorldUV", 1, "UVScale", ""), ("BaseColor", 1, "LinearTint", "")]
+    color_role, normal_role = "Diffuse", "Normal" if item.get("normal") else None
+    if has_macro(item):
+        palette = palette_settings(item)
+        constants["MacroUVScale"] = palette["macro_uv_scale"]
+        sample_definitions.append(("Macro", palette["macro_texture"], "MacroWorldUV"))
+        connections.extend([("MacroWorldUV", 0, "WorldXY", ""), ("MacroWorldUV", 1, "MacroUVScale", "")])
+        if "color_low" in item:
+            constants["DetailWeight"] = palette["detail_weight"]
+            vectors.update({"ColorLow": item["color_low"], "ColorHigh": item["color_high"]})
+            connections.extend([("DetailBlend", 0, "Macro", "R"), ("DetailBlend", 1, "Diffuse", "R"), ("DetailBlend", 2, "DetailWeight", ""), ("PaletteColor", 0, "ColorLow", ""), ("PaletteColor", 1, "ColorHigh", ""), ("PaletteColor", 2, "DetailBlend", "")])
+            color_role = "PaletteColor"
+        else:
+            constants.update({"MacroLow": 1.0 - palette["macro_strength"], "MacroHigh": 1.0 + palette["macro_strength"]})
+            connections.extend([("MacroVariation", 0, "MacroLow", ""), ("MacroVariation", 1, "MacroHigh", ""), ("MacroVariation", 2, "Macro", "R"), ("MacroColor", 0, "Diffuse", ""), ("MacroColor", 1, "MacroVariation", "")])
+            color_role = "MacroColor"
+    if "normal_strength" in item:
+        constants["NormalStrength"] = item["normal_strength"]
+        vectors["FlatNormal"] = [0.0, 0.0, 1.0]
+        connections.extend([("NormalBlend", 0, "FlatNormal", ""), ("NormalBlend", 1, "Normal", ""), ("NormalBlend", 2, "NormalStrength", ""), ("NormalizedNormal", 0, "NormalBlend", "")])
+        normal_role = "NormalizedNormal"
+    connections.append(("BaseColor", 0, color_role, ""))
+    for role, value in constants.items():
+        require(close(nodes[role].get_editor_property("r"), value), "Saved surface constant differs: " + role)
+    for role, values in vectors.items():
+        actual = nodes[role].get_editor_property("constant")
+        require(all(close(getattr(actual, channel), value) for channel, value in zip(["r", "g", "b", "a"], values + [1.0])), "Saved linear surface vector differs: " + role)
+    for role, path, uv_role in sample_definitions:
+        texture = load_source(path, unreal.Texture2D)
         sample = nodes[role]
         require(sample.get_editor_property("texture") == texture and sample.get_editor_property("sampler_type") == sampler_type(texture) and sample.get_editor_property("sampler_source") == unreal.SamplerSourceMode.SSM_WRAP_WORLD_GROUP_SETTINGS, "Saved source texture or sampler differs")
-        check_input(material, sample, 0, nodes["WorldUV"])
-    for role, input_index, source, output_name in [("WorldXY", 0, "WorldPosition", "XYZ"), ("WorldUV", 0, "WorldXY", ""), ("WorldUV", 1, "UVScale", ""), ("BaseColor", 0, "Diffuse", ""), ("BaseColor", 1, "LinearTint", "")]:
+        check_input(material, sample, 0, nodes[uv_role])
+    for role, input_index, source, output_name in connections:
         check_input(material, nodes[role], input_index, nodes[source], output_name)
     for role, material_property in [("BaseColor", unreal.MaterialProperty.MP_BASE_COLOR), ("Roughness", unreal.MaterialProperty.MP_ROUGHNESS), ("Metallic", unreal.MaterialProperty.MP_METALLIC)]:
         require(EDITING.get_material_property_input_node(material, material_property) == nodes[role], "Saved surface output differs: " + role)
-    require(EDITING.get_material_property_input_node(material, unreal.MaterialProperty.MP_NORMAL) == nodes.get("Normal"), "Saved normal output differs")
-    return {"asset": item["asset"], "texture": item["texture"], "normal": item.get("normal"), "color_linear": item["color"], "uv_scale_per_cm": item["uv_scale"], "repeat_distance_cm": 1.0 / item["uv_scale"], "roughness": item["roughness"], "graph_nodes": len(nodes), "graph_validation": "passed", "graph_validation_scope": "node classes, constants, texture references, ordered input nodes and exposed output names; indices of unnamed outputs are not exposed by this API", "gamma": "source texture sRGB retained", "sampler": str(nodes["Diffuse"].get_editor_property("sampler_type")), "visual_test": "not run"}
+    require(EDITING.get_material_property_input_node(material, unreal.MaterialProperty.MP_NORMAL) == nodes.get(normal_role), "Saved normal output differs")
+    report = {"asset": item["asset"], "texture": item["texture"], "normal": item.get("normal"), "color_linear": item["color"], "uv_scale_per_cm": item["uv_scale"], "repeat_distance_cm": 1.0 / item["uv_scale"], "roughness": item["roughness"], "graph_nodes": len(nodes), "graph_validation": "passed", "graph_validation_scope": "node classes, constants, texture references, ordered input nodes and exposed output names; indices of unnamed outputs are not exposed by this API", "gamma": "source texture sRGB retained", "sampler": str(nodes["Diffuse"].get_editor_property("sampler_type")), "visual_test": "not run"}
+    if has_macro(item):
+        report.update(macro_texture=palette["macro_texture"], macro_uv_scale_per_cm=palette["macro_uv_scale"], macro_repeat_distance_cm=1.0 / palette["macro_uv_scale"])
+        if "color_low" in item:
+            report.update(color_low_linear=item["color_low"], color_high_linear=item["color_high"], detail_weight=palette["detail_weight"], variation="linear palette from weighted diffuse R and macro R")
+        else:
+            report.update(macro_strength=palette["macro_strength"], variation="source RGB multiplied by scalar macro variation")
+    if "normal_strength" in item:
+        report["normal_strength"] = item["normal_strength"]
+    return report
 
 
 def verify_instance(item):
@@ -338,7 +481,7 @@ def verify_instance(item):
 
 
 def write_report(report):
-    output = ROOT / "Saved/Automation/Environments" / ("SurfacesReload.json" if VERIFY_ONLY else "SurfacesConfiguration.json")
+    output = report_directory() / ("SurfacesReload.json" if VERIFY_ONLY else "SurfacesConfiguration.json")
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
@@ -355,7 +498,7 @@ def main():
             load_output(item["asset"], unreal.Material if item in surfaces else unreal.MaterialInstanceConstant)
     unreal.log("ENVIRONMENT_SURFACES_PROTECTED_HASHES_START")
     before = protected_hashes(outputs, roots)
-    report = {"mode": "verify" if VERIFY_ONLY else "configure", "process_id": os.getpid(), "status": "in progress", "surfaces": [], "instances": [], "protected_roots": sorted(roots), "protected_external_roots": ["/Game/__ExternalActors__/User_JeHoon", "/Game/__ExternalObjects__/User_JeHoon"], "protected_asset_files": len(before), "shader_execution": "not run", "visual_performance_test": "not run", "reload_validation": "loaded package graph and parameters checked; use verify-only in a fresh process to validate disk reload"}
+    report = {"mode": "verify" if VERIFY_ONLY else "configure", "process_id": os.getpid(), "status": "in progress", "surfaces_only": SURFACES_ONLY, "surfaces": [], "instances": [], "protected_roots": sorted(roots), "protected_external_roots": ["/Game/__ExternalActors__/User_JeHoon", "/Game/__ExternalObjects__/User_JeHoon"], "protected_asset_files": len(before), "shader_execution": "not run", "visual_performance_test": "not run", "reload_validation": "loaded package graph and parameters checked; use verify-only in a fresh process to validate disk reload"}
     error = None
     try:
         validate_sources(surfaces, instances)

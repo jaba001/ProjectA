@@ -29,6 +29,11 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Arena")
     FTransform CameraTransform;
 
+    // Reduce scene saturation only when the placed camera has no authored saturation override.
+    // 배치된 카메라에 채도 재정의가 없을 때만 장면의 채도를 완화합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Arena|Presentation", meta = (ClampMin = "0", ClampMax = "1"))
+    float DefaultSceneSaturation = 0.88f;
+
     // Arena owns placement and visibility; encounters own units and results.
     // 아레나는 배치와 표시를 담당하고 인카운터는 유닛과 결과를 소유합니다.
     virtual bool PrepareArena(FText& OutError);

@@ -142,26 +142,15 @@ void ACombatGridTile::NotifyActorBeginCursorOver()
         return;
     }
 
-    //if (PC->GetTileInputMode() != ETileInputMode::Move)
-    //{
-    //    return;
-    //}
-
-    if (TileSprite)
-    {
-        TileSprite->SetSpriteColor(FLinearColor::Gray);
-    }
+    bCursorHovered = true;
+    UpdateTileVisual();
 }
 
 void ACombatGridTile::NotifyActorEndCursorOver()
 {
     Super::NotifyActorEndCursorOver();
 
-    //if (TileSprite)
-    //{
-    //    TileSprite->SetSpriteColor(OriginalColor);
-    //}
-
+    bCursorHovered = false;
     UpdateTileVisual();
 }
 
@@ -193,13 +182,16 @@ void ACombatGridTile::UpdateTileVisual()
         bOriginalColorCached = true;
     }
 
+    float VisualOpacity = OccupyingUnit ? OccupiedOpacity : IdleOpacity;
     if (bSkillTargetHighlighted && ActiveSprite)
     {
         TileSprite->SetSprite(ActiveSprite);
+        VisualOpacity = SkillTargetOpacity;
     }
     else if (bMovableHighlighted && MovableSprite)
     {
         TileSprite->SetSprite(MovableSprite);
+        VisualOpacity = MovableOpacity;
     }
     else if (!OccupyingUnit)
     {
@@ -223,14 +215,13 @@ void ACombatGridTile::UpdateTileVisual()
         }
     }
 
-    if (bProtectedByFront)
-    {
-        TileSprite->SetSpriteColor(ProtectedByFrontColor);
-    }
-    else
-    {
-        TileSprite->SetSpriteColor(OriginalColor);
-    }
+    // Tint the authored color gently and derive hover from current state so no full-opacity override remains.
+    // 제작된 색을 옅게 착색하고 현재 상태로부터 마우스 오버를 계산하여 불투명도 덮어쓰기를 방지합니다.
+    FLinearColor VisualColor = OriginalColor;
+    if (bProtectedByFront) VisualColor *= FMath::Lerp(FLinearColor::White, ProtectedByFrontColor, FMath::Clamp(ProtectedTintStrength, 0.f, 1.f));
+    if (bCursorHovered) VisualOpacity = FMath::Min(VisualOpacity + HoverOpacityBoost, MaximumHoverOpacity);
+    VisualColor.A = FMath::Clamp(OriginalColor.A, 0.f, 1.f) * FMath::Clamp(VisualOpacity, 0.f, 1.f);
+    TileSprite->SetSpriteColor(VisualColor);
 }
 
 void ACombatGridTile::ApplyMovableTileVisual()

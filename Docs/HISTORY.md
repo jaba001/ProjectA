@@ -6,6 +6,7 @@
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-10-09 전투장 바닥과 표시 폴리싱 | 중앙 지면의 흑백 점무늬를 흙색으로 변환하고 표면 9개의 큰 무늬·색조·노멀 강도, 타일 상태별 투명도와 기본 전투 채도를 보완했다. 표면 저장·그래프 검사와 C++ 컴파일은 통과했으며 실제 화면·입력 검수는 남아 있다. [범위·근거](#9-40-2026-10-09-전투장-바닥과-표시-폴리싱) |
 | 2026-10-09 라이브러리 NPC와 서비스 무대 | 원본 캐릭터 5종·호환 idle 2종·소품 22종을 직접 참조하여 상점·회복소·소모품점·부활소에 소품 34개를 배치했다. 컴파일·정적 검사는 통과했고 실제 화면·idle·협동 검수는 남아 있다. [범위·근거](#9-39-2026-10-09-라이브러리-npc와-서비스-무대) |
 | 2026-10-09 지하 미로 갈림길 연출 | 후보 순서에 맞춘 좌·직진·우 통로와 코너·벽·천장을 로컬 런타임에 구성하고 선택 하단 3열·NPC 도착 후 오른쪽 거래 패널을 연결했다. Development Editor / Win64 컴파일·정적 검사를 통과했으며 실제 이동·화면·협동 확인은 남아 있다. [범위·상태](#9-35-2026-10-09-지하-미로-갈림길-연출) |
 | 2026-10-09 장착 가능 아이템만 판매 | 장착 지원 49개만 판매·신규 보상 후보로 유지하고 미지원 240행·빈 전문점 15행을 제거했다. 기존 보유품·원본 에셋·저장된 보상은 보존하며 이전 미지원 진열은 숨기고 구매를 거절한다. [범위·근거](#9-34-2026-10-09-장착-가능-아이템만-판매) |
@@ -913,3 +914,19 @@ CSV 숫자형 작성·export/reimport·미리보기와 독립 정적 검사, 문
 원본 내장 썸네일을 확인하고 현재 파일의 스켈레톤 참조·SHA256과 기존 Asset Registry 정보를 대조했다. 선택 캐릭터 5개와 idle의 공통 스켈레톤 참조를 확인했으며 Primitive 정면은 저장된 ref pose·기존 프리뷰 설정으로, Dwarf 방향은 같은 팩의 기존 사용 코드로 판단했다. Dwarf 정면은 직접 렌더 확인이 아닌 추론이다. 원본 경로 29개·소품 34개·받침 높이·바닥 포함 범위와 대략적인 카메라 시선/소품 AABB를 정적으로 검사했다. 저장된 bounds를 사용하며 검 1개는 요청 크기를 보수적 상자로 대입했다. 이 계산은 실제 idle·옷·UI 가림 검수를 대신하지 않는다. 근거는 `Saved/Automation/NpcLibrary_20261009/NpcRecommendations.json`·`ThumbnailSources.json`·`StaticChecks.json`이다.
 
 문서 링크·전체 diff 검사를 통과하고 TODO의 기존 선택 7개·미완료 38개를 보존했으며 사용자 확인 1개를 추가했다. 문서 검사 근거는 `Saved/Automation/NpcLibrary_20261009/DocumentationValidation.json`이다. 게임·PIE·자동화 테스트·cook·패키지는 실행하지 않았으며 에디터·IDE도 열지 않았다. 실제 방향·가림·idle·반복 방문·Continue·2인 외형·로딩과 성능은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 미완료로 유지한다. 이전 도형 NPC 실행 성공을 이번 외형의 검증으로 대체하지 않는다.
+
+### 9-40 2026-10-09 전투장 바닥과 표시 폴리싱
+
+2026-10-09 전투맵 품질과 바닥 개선 요청을 반영했다. 시작 기준은 `06f5c435`이며 기존 미커밋 변경은 없었다. 현재 Run은 전투마다 맵을 전환하지 않고 통합 Gameplay 중앙 PineRidge의 배치된 아레나를 재사용한다. 기존 `NormalTarget` 전투 캡처와 원본 메타데이터를 대조하여 `T_Dirt_basecolor`의 G16·비감마 흑백 점무늬가 별도 색상 보정 없이 RGB로 표시되는 것을 확인했다. 현재 자료로 바닥의 높이 충돌이나 메시 구멍을 확정하지는 않았다.
+
+프로젝트 전용 표면 Material 9개를 같은 경로에 저장했다. PineRidge는 낮은 대비의 흙색 범위·세부 비중 0.18·600cm 반복으로 변경했다. 나머지 8개는 원본 RGB를 유지하며 색조·거칠기·밝기 변화를 조절했다. 공통 큰 무늬는 기존 원본 `T_TilingNoise03_M` 512×512를 약 2,600cm마다 샘플링하고 기존 노멀 4개는 0.35~0.40 강도로 혼합·정규화한다. 환경 비교 12맵과 통합 배치가 공유하는 재질에 적용되며 던전 전용 원본 바닥 메시·재질은 교체하지 않았다. [수치·구성](PROJECT_PLAN.md#4-4-환경-비교-레벨)
+
+`CombatGridTile`은 빈칸/점유/이동/스킬의 알파를 0.24/0.42/0.65/0.78로 구분하고 hover 증가·상한과 전열 보호의 옅은 착색을 같은 표시 갱신 경로로 처리한다. 원본 스프라이트와 상태 우선순위는 보존한다. `CombatArena`는 명시적인 채도 재정의가 없는 카메라에만 0.88을 적용하며 재입장 때 누적하지 않는다. 원본 텍스처·맵 배치·재질 인스턴스 44개·광원·노출·Grid 좌표·클릭 박스·충돌·navigation·저장·Replication 계약은 유지했다.
+
+`ConfigureEnvironmentSurfaces.py`에 색상 범위·원본 RGB의 큰 무늬·노멀 강도와 해당 그래프 검사를 추가했다. `-EnvironmentSurfacesOnly`는 mutable 출력 범위를 9개 표면으로 제한하고 나머지 MI를 보호 해시에 포함한다. `-EnvironmentSurfacesReportDir`는 작업공간 내부 상대 경로만 허용한다. 기존 옵션을 생략한 그래프와 생성 경로를 보존하며 표면 이외의 에셋을 다시 생성하지 않는다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64` 컴파일·링크는 36.26초에 성공했다. 로그는 `Saved/Automation/BattleFloor_20261009/EditorBuild.log`다. 이후 `UnrealEditor-Cmd.exe ProjectA.uproject -run=pythonscript -script=Source/ProjectAEditor/Scripts/ConfigureEnvironmentSurfaces.py -EnvironmentSurfacesRebuild -EnvironmentSurfacesOnly -EnvironmentSurfacesReportDir=Saved/Automation/BattleFloor_20261009 -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false`로 에셋 작성만 수행했다. 실제 절대 경로를 쓰는 재현 명령은 [에셋 도구 20번](../Source/ProjectAEditor/Scripts/README.md)에 기록한다.
+
+에셋 작성 커맨들릿은 12.33초·종료 코드 0·오류 0·경고 0으로 표면 9개를 저장하고 노드·상수·입력 연결·원본 샘플러·출력을 확인했다. 보호 파일 2,564개의 SHA는 동일하며 변경 Content는 지정된 기존 Material 9개뿐이다. 결과는 `Saved/Automation/BattleFloor_20261009/SurfacesConfiguration.json`, 로그는 `SurfacesAuthor.log`·`SurfacesAuthor.Console.log`다. NullRHI 작성 중 재질 컴파일 API 오류는 없었지만 GPU shader 실행·화면 평가·별도 프로세스 재로드는 수행하지 않았다. 원본 조사 근거는 `SurfaceTextureMetadata.json`·`MacroMaskCandidates.json`이며 작성 전 9개 재질의 해시는 `BeforeMaterials.json`에 기록했다.
+
+독립 읽기 검토와 Python 구문·명세·변경 경로·문서 링크·diff 정적 검사를 수행했다. TODO의 기존 선택 7개·미완료 39개를 보존하고 사용자 확인 1개를 추가했다. 근거는 `Saved/Automation/BattleFloor_20261009/StaticChecks.json`·`DocumentationValidation.json`이다. 게임·PIE·Unreal 자동화 테스트·cook·패키지·신규 화면 캡처는 실행하지 않았고 Editor 창·IDE도 열지 않았다. 실제 바닥의 반복·이음새·접지, 타일 상태의 구분·입력·Continue·2인 표시와 성능은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남긴다. 과거 캡처는 문제 진단에만 사용하며 최신 결과의 검수 근거로 대체하지 않는다.
