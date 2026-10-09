@@ -6,8 +6,11 @@
 #include "EncounterPrototypeStage.generated.h"
 
 class UCameraComponent;
+class UEncounterStageVisualCatalog;
 class UMaterialInterface;
+class UPointLightComponent;
 class USceneComponent;
+class USkeletalMeshComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
 class UTextRenderComponent;
@@ -44,6 +47,10 @@ public:
     FLinearColor Tint = FLinearColor(0.12f, 0.32f, 0.42f, 1.0f);
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter Stage")
     TObjectPtr<UMaterialInterface> PrototypeMaterial;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter Stage")
+    TObjectPtr<UEncounterStageVisualCatalog> VisualCatalog;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter Stage")
+    bool bUseLibraryVisuals = true;
 
     // Style changes geometry only; gameplay classification always uses the authored tags.
     // 스타일은 도형 표현만 바꾸며 게임플레이 분류는 항상 작성된 태그를 사용합니다.
@@ -61,6 +68,11 @@ public:
     void StartPresentation();
     UFUNCTION(BlueprintCallable, Category = "Encounter Stage")
     void StopPresentation();
+    void SetPresentationVisible(bool bVisible);
+    bool IsUsingLibraryVisuals() const { return bUsingLibraryVisuals; }
+    FName GetLibraryProfileId() const { return LibraryProfileId; }
+    int32 GetLibraryPropCount() const { return LibraryProps.Num(); }
+    bool GetPresentationFocus(FVector& OutCenter, float& OutRadius) const;
 
 protected:
     virtual void BeginPlay() override;
@@ -68,6 +80,27 @@ protected:
 private:
     void ConfigureShape(UStaticMeshComponent* Component, UStaticMesh* Mesh, const FVector& Location, const FVector& Scale, const FLinearColor& Color);
     void ResetPose();
+    void RebuildLibraryVisuals();
+    void ClearLibraryVisuals();
+    void UpdateLibraryPlayback();
+
+    UPROPERTY()
+    TObjectPtr<USceneComponent> LibraryRoot;
+    UPROPERTY()
+    TObjectPtr<USkeletalMeshComponent> LibraryCharacter;
+    UPROPERTY()
+    TObjectPtr<UPointLightComponent> LibraryLight;
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UStaticMeshComponent>> LibraryProps;
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<USkeletalMeshComponent>> LibraryParts;
+    UPROPERTY(Transient)
+    FName LibraryProfileId;
+    UPROPERTY(Transient)
+    FName LibraryFaceBone;
+    bool bUsingLibraryVisuals = false;
+    bool bRefreshingLibrary = false;
+    bool bPresentationVisible = true;
 
     UPROPERTY()
     TObjectPtr<USceneComponent> StageRoot;

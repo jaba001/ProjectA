@@ -1,6 +1,7 @@
 #include "Game/ProjectAAssetManager.h"
 
 #if WITH_EDITOR
+#include "DataAsset/EncounterStageVisualCatalog.h"
 #include "Game/Run/RunItemShopCatalog.h"
 #include "DataAsset/TargetRunDefinitionDataAsset.h"
 #include "Game/Run/RunLevelDesign.h"
@@ -21,6 +22,20 @@ void UProjectAAssetManager::ModifyCook(TConstArrayView<const ITargetPlatform*> T
         return;
     }
     PackagesToCook.AddUnique(RecoveryPackage);
+    // Include only the selected library scenery and its dependencies, never an entire source pack.
+    // 원본 팩 전체가 아니라 선택한 라이브러리 무대 에셋과 해당 의존성만 포함합니다.
+    TArray<FSoftObjectPath> StageAssets;
+    GetDefault<UEncounterStageVisualCatalog>()->GetReferencedAssets(StageAssets);
+    for (const FSoftObjectPath& Asset : StageAssets)
+    {
+        const FName Package = Asset.GetLongPackageFName();
+        if (PackagesToNeverCook.Contains(Package) || !FPackageName::DoesPackageExist(Package.ToString()))
+        {
+            UE_LOG(LogProjectAAssetManager, Error, TEXT("Encounter stage package is missing or excluded from cooking: %s"), *Package.ToString());
+            continue;
+        }
+        PackagesToCook.AddUnique(Package);
+    }
     TArray<FRunItemDefinition> Catalog;
     FText Error;
     if (!RunItemShopCatalog::Load(Catalog, Error))

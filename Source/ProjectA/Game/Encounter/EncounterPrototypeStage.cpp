@@ -1,9 +1,16 @@
 #include "Game/Encounter/EncounterPrototypeStage.h"
 
 #include "Camera/CameraComponent.h"
+#include "Animation/AnimSequence.h"
+#include "Animation/AnimSingleNodeInstance.h"
+#include "Animation/Skeleton.h"
+#include "Components/PointLightComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
+#include "DataAsset/EncounterStageVisualCatalog.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -26,6 +33,21 @@ AEncounterPrototypeStage::AEncounterPrototypeStage()
     StageTitle = NSLOCTEXT("EncounterPrototype", "DefaultTitle", "GENERAL STORE");
     StageRoot = CreateDefaultSubobject<USceneComponent>(TEXT("StageRoot"));
     SetRootComponent(StageRoot);
+    LibraryRoot = CreateDefaultSubobject<USceneComponent>(TEXT("LibraryRoot"));
+    LibraryRoot->SetupAttachment(StageRoot);
+    LibraryCharacter = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("LibraryCharacter"));
+    LibraryCharacter->SetupAttachment(LibraryRoot);
+    LibraryCharacter->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    LibraryCharacter->SetGenerateOverlapEvents(false);
+    LibraryCharacter->SetCanEverAffectNavigation(false);
+    LibraryCharacter->PrimaryComponentTick.bStartWithTickEnabled = false;
+    LibraryCharacter->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+    LibraryLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("LibraryLight"));
+    LibraryLight->SetupAttachment(LibraryRoot);
+    LibraryLight->SetMobility(EComponentMobility::Movable);
+    LibraryLight->SetCastShadows(false);
+    LibraryLight->SetAttenuationRadius(600.f);
+    LibraryLight->SetVisibility(false);
     NPCBody = CreateDefaultSubobject<USceneComponent>(TEXT("NPCBody"));
     NPCBody->SetupAttachment(StageRoot);
     RightArmPivot = CreateDefaultSubobject<USceneComponent>(TEXT("RightArmPivot"));
@@ -194,6 +216,155 @@ void AEncounterPrototypeStage::RefreshPrototype()
     Camera->bOverrideAspectRatioAxisConstraint = true;
     Camera->SetAspectRatioAxisConstraint(AspectRatio_MaintainYFOV);
     ResetPose();
+    RebuildLibraryVisuals();
+    SetActorTickEnabled(bPresenting && bPresentationVisible && !IsHidden() && !bUsingLibraryVisuals);
+}
+
+void AEncounterPrototypeStage::ClearLibraryVisuals()
+{
+    for (UStaticMeshComponent* Prop : LibraryProps) if (IsValid(Prop)) Prop->DestroyComponent();
+    for (USkeletalMeshComponent* Part : LibraryParts) if (IsValid(Part)) Part->DestroyComponent();
+    LibraryProps.Reset();
+    LibraryParts.Reset();
+    LibraryCharacter->Stop();
+    LibraryCharacter->SetComponentTickEnabled(false);
+    LibraryCharacter->SetSkeletalMesh(nullptr);
+    LibraryCharacter->OverrideMaterials.Reset();
+    LibraryRoot->SetVisibility(false, true);
+    LibraryLight->SetVisibility(false);
+    LibraryProfileId = NAME_None;
+    LibraryFaceBone = NAME_None;
+    bUsingLibraryVisuals = false;
+}
+
+void AEncounterPrototypeStage::RebuildLibraryVisuals()
+{
+    if (bRefreshingLibrary || IsTemplate() || !GetWorld()) return;
+    TGuardValue<bool> RefreshGuard(bRefreshingLibrary, true);
+    ClearLibraryVisuals();
+    if (!bUseLibraryVisuals || GetNetMode() == NM_DedicatedServer) return;
+    const UEncounterStageVisualCatalog* Catalog = VisualCatalog ? VisualCatalog.Get() : GetDefault<UEncounterStageVisualCatalog>();
+    const FEncounterStageVisualProfile* Profile = Catalog->Resolve(RequiredTags);
+    if (!Profile) return;
+    USkeletalMesh* Character = Profile->CharacterMesh.LoadSynchronous();
+    UAnimSequence* Idle = Profile->IdleAnimation.LoadSynchronous();
+    if (!Character || !Idle || !Idle->GetSkeleton() || !Idle->GetSkeleton()->IsCompatibleMesh(Character))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Encounter stage %s retained prototype scenery: missing or incompatible character/idle for %s."), *GetName(), *Profile->ProfileId.ToString());
+        return;
+    }
+    const FBox CharacterBounds = Character->GetBounds().GetBox();
+    if (!CharacterBounds.IsValid || CharacterBounds.Min.ContainsNaN() || CharacterBounds.Max.ContainsNaN() || CharacterBounds.GetSize().Z <= UE_SMALL_NUMBER || !FMath::IsFinite(Profile->CharacterHeight) || Profile->CharacterHeight <= 0.f || Profile->CharacterLocation.ContainsNaN() || Profile->CharacterRotation.ContainsNaN()) return;
+    TArray<USkeletalMesh*> Parts;
+    for (const TSoftObjectPtr<USkeletalMesh>& PartPath : Profile->CharacterParts)
+    {
+        USkeletalMesh* Part = PartPath.LoadSynchronous();
+        if (!Part || Part->GetSkeleton() != Character->GetSkeleton()) return;
+        Parts.Add(Part);
+    }
+    TArray<UStaticMesh*> Props;
+    for (const FEncounterStageProp& Prop : Profile->Props)
+    {
+        UStaticMesh* Mesh = Prop.Mesh.LoadSynchronous();
+        if (!Mesh || !Mesh->GetBoundingBox().IsValid || Mesh->GetBoundingBox().Min.ContainsNaN() || Mesh->GetBoundingBox().Max.ContainsNaN() || Mesh->GetBoundingBox().GetSize().GetMin() <= UE_SMALL_NUMBER || Prop.MaxSize.ContainsNaN() || Prop.MaxSize.GetMin() <= 0.f || Prop.Location.ContainsNaN() || Prop.Rotation.ContainsNaN()) return;
+        Props.Add(Mesh);
+    }
+
+    // Fit original meshes at their feet and preserve all authored material slots.
+    // 원본 메시의 발을 바닥에 맞추고 작성된 모든 재질 슬롯을 유지합니다.
+    const float CharacterScale = Profile->CharacterHeight / CharacterBounds.GetSize().Z;
+    const FVector CharacterBottom(CharacterBounds.GetCenter().X, CharacterBounds.GetCenter().Y, CharacterBounds.Min.Z);
+    LibraryCharacter->SetSkeletalMesh(Character);
+    LibraryCharacter->SetRelativeTransform(FTransform(Profile->CharacterRotation, Profile->CharacterLocation - Profile->CharacterRotation.RotateVector(CharacterBottom * CharacterScale), FVector(CharacterScale)));
+    LibraryCharacter->SetSimulatePhysics(false);
+    LibraryCharacter->PlayAnimation(Idle, true);
+    LibraryCharacter->SetPosition(0.f, false);
+    LibraryCharacter->TickAnimation(0.f, false);
+    LibraryCharacter->RefreshBoneTransforms();
+    for (USkeletalMesh* Mesh : Parts)
+    {
+        USkeletalMeshComponent* Part = NewObject<USkeletalMeshComponent>(this, NAME_None, RF_Transient);
+        Part->SetupAttachment(LibraryCharacter);
+        Part->SetSkeletalMesh(Mesh);
+        Part->SetMobility(EComponentMobility::Movable);
+        Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Part->SetGenerateOverlapEvents(false);
+        Part->SetCanEverAffectNavigation(false);
+        Part->SetLeaderPoseComponent(LibraryCharacter);
+        Part->PrimaryComponentTick.bStartWithTickEnabled = false;
+        AddInstanceComponent(Part);
+        Part->RegisterComponent();
+        Part->SetComponentTickEnabled(false);
+        LibraryParts.Add(Part);
+    }
+    for (int32 Index = 0; Index < Props.Num(); ++Index)
+    {
+        const FEncounterStageProp& Spec = Profile->Props[Index];
+        const FBox Bounds = Props[Index]->GetBoundingBox();
+        const FVector Size = Bounds.GetSize();
+        const float Scale = FMath::Min3(Spec.MaxSize.X / Size.X, Spec.MaxSize.Y / Size.Y, Spec.MaxSize.Z / Size.Z);
+        const FVector Bottom(Bounds.GetCenter().X, Bounds.GetCenter().Y, Bounds.Min.Z);
+        UStaticMeshComponent* Prop = NewObject<UStaticMeshComponent>(this, NAME_None, RF_Transient);
+        Prop->SetupAttachment(LibraryRoot);
+        Prop->SetStaticMesh(Props[Index]);
+        Prop->SetMobility(EComponentMobility::Movable);
+        Prop->SetRelativeTransform(FTransform(Spec.Rotation, Spec.Location - Spec.Rotation.RotateVector(Bottom * Scale), FVector(Scale)));
+        Prop->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Prop->SetGenerateOverlapEvents(false);
+        Prop->SetCanEverAffectNavigation(false);
+        AddInstanceComponent(Prop);
+        Prop->RegisterComponent();
+        LibraryProps.Add(Prop);
+    }
+
+    UStaticMeshComponent* ReplacedShapes[] = {Counter, Canopy, LeftPost, RightPost, Torso, Head, LeftArm, RightArm, LeftEye, RightEye, Hat, DisplayBase, DisplayAccent};
+    for (UStaticMeshComponent* Shape : ReplacedShapes) Shape->SetVisibility(false);
+    ConfigureShape(Platform, CubeMesh, FVector(0.f, 0.f, 2.f), FVector(5.4f, 7.6f, 0.2f), FLinearColor(0.08f, 0.11f, 0.12f));
+    SignBoard->SetRelativeLocation(FVector(-235.f, -130.f, 35.f));
+    SignBoard->SetRelativeScale3D(FVector(0.1f, 2.f, 0.4f));
+    SignText->SetRelativeLocation(FVector(-243.f, -130.f, 35.f));
+    SignText->SetWorldSize(15.f);
+    LibraryProfileId = Profile->ProfileId;
+    LibraryFaceBone = Profile->FaceBone;
+    bUsingLibraryVisuals = true;
+    LibraryRoot->SetVisibility(true, true);
+    LibraryLight->SetRelativeLocation(Profile->LightLocation);
+    LibraryLight->SetLightColor(Profile->LightColor);
+    LibraryLight->SetIntensity(FMath::Max(0.f, Profile->LightIntensity));
+    UpdateLibraryPlayback();
+}
+
+void AEncounterPrototypeStage::UpdateLibraryPlayback()
+{
+    const bool bActive = bUsingLibraryVisuals && bPresenting && bPresentationVisible && !IsHidden();
+    LibraryCharacter->bPauseAnims = !bActive;
+    if (UAnimSingleNodeInstance* Animation = LibraryCharacter->GetSingleNodeInstance()) Animation->SetPlaying(bActive);
+    LibraryCharacter->SetComponentTickEnabled(bActive);
+    LibraryLight->SetVisibility(bUsingLibraryVisuals && bPresentationVisible && !IsHidden());
+}
+
+void AEncounterPrototypeStage::SetPresentationVisible(bool bVisible)
+{
+    bPresentationVisible = bVisible;
+    SetActorHiddenInGame(!bVisible);
+    UpdateLibraryPlayback();
+    SetActorTickEnabled(bPresenting && bVisible && !bUsingLibraryVisuals);
+}
+
+bool AEncounterPrototypeStage::GetPresentationFocus(FVector& OutCenter, float& OutRadius) const
+{
+    if (IsHidden()) return false;
+    if (bUsingLibraryVisuals && LibraryCharacter->GetSkeletalMeshAsset())
+    {
+        if (LibraryCharacter->GetBoneIndex(LibraryFaceBone) != INDEX_NONE) OutCenter = LibraryCharacter->GetBoneLocation(LibraryFaceBone);
+        else OutCenter = LibraryCharacter->Bounds.Origin + FVector(0.f, 0.f, LibraryCharacter->Bounds.BoxExtent.Z * 0.7f);
+        OutRadius = 16.f * GetActorScale3D().GetAbsMax();
+        return true;
+    }
+    if (!Head->IsVisible()) return false;
+    OutCenter = Head->Bounds.Origin;
+    OutRadius = Head->Bounds.SphereRadius;
+    return true;
 }
 
 void AEncounterPrototypeStage::ResetPose()
@@ -209,7 +380,8 @@ void AEncounterPrototypeStage::StartPresentation()
     bPresenting = true;
     PresentationSeconds = 0.0f;
     ResetPose();
-    SetActorTickEnabled(true);
+    UpdateLibraryPlayback();
+    SetActorTickEnabled(bPresentationVisible && !bUsingLibraryVisuals);
 }
 
 void AEncounterPrototypeStage::StopPresentation()
@@ -217,13 +389,14 @@ void AEncounterPrototypeStage::StopPresentation()
     bPresenting = false;
     PresentationSeconds = 0.0f;
     SetActorTickEnabled(false);
+    UpdateLibraryPlayback();
     ResetPose();
 }
 
 void AEncounterPrototypeStage::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
-    if (!bPresenting || !FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.0f) return;
+    if (!bPresenting || bUsingLibraryVisuals || !FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.0f) return;
     PresentationSeconds += DeltaSeconds;
     NPCBody->SetRelativeLocation(FVector(35.f, -130.f, 22.f + FMath::Sin(PresentationSeconds * 2.1f) * 1.2f));
     float Wave = 0.0f;

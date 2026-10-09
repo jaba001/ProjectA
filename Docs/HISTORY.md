@@ -6,6 +6,7 @@
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-10-09 라이브러리 NPC와 서비스 무대 | 원본 캐릭터 5종·호환 idle 2종·소품 22종을 직접 참조하여 상점·회복소·소모품점·부활소에 소품 34개를 배치했다. 컴파일·정적 검사는 통과했고 실제 화면·idle·협동 검수는 남아 있다. [범위·근거](#9-39-2026-10-09-라이브러리-npc와-서비스-무대) |
 | 2026-10-09 지하 미로 갈림길 연출 | 후보 순서에 맞춘 좌·직진·우 통로와 코너·벽·천장을 로컬 런타임에 구성하고 선택 하단 3열·NPC 도착 후 오른쪽 거래 패널을 연결했다. Development Editor / Win64 컴파일·정적 검사를 통과했으며 실제 이동·화면·협동 확인은 남아 있다. [범위·상태](#9-35-2026-10-09-지하-미로-갈림길-연출) |
 | 2026-10-09 장착 가능 아이템만 판매 | 장착 지원 49개만 판매·신규 보상 후보로 유지하고 미지원 240행·빈 전문점 15행을 제거했다. 기존 보유품·원본 에셋·저장된 보상은 보존하며 이전 미지원 진열은 숨기고 구매를 거절한다. [범위·근거](#9-34-2026-10-09-장착-가능-아이템만-판매) |
 | 2026-10-08 위임 실행 검수와 협동 보완 | 초기 저장 원자성·새 협동 1인 1캐릭터·Snapshot 소모품 차단·NPC 지붕 가림을 보완했다. 고유 Native 222개, 동일 PC 1/2/4인 30전투·27상점, NPC 18경우, 기존 저장 사본·소모 후 Continue와 새 Win64 패키지를 검수했다. 정상 Run은 9전투·30선택 후 자연 패배이며 80단계 완주·최종 밸런스·Steam/PlayFab은 미완료다. [범위·근거](#9-33-2026-10-08-위임-실행-검수와-협동-보완) |
@@ -898,3 +899,17 @@ Native 회귀 4개(`ProjectA.Run.PveDifficulty.StrictCsvAndAtomicity`, `PreviewS
 CSV 숫자형 작성·export/reimport·미리보기와 독립 정적 검사, 문서 11개·로컬 링크 792개·전체 diff 검사를 통과했다. TODO의 기존 선택 7개·미완료 37개를 보존하고 사용자 확인 1개를 추가했다. 근거는 `Saved/Automation/PveDifficulty_20261009/DifficultyCsvValidation.json`·`DifficultyCsvPreview.png`·`DocumentationValidation.json`·`StaticChecks.json`이다. 독립 코드 검토에서 선택·스폰·보상·체크포인트 복원의 배율 일치와 기존 저장 경로를 확인했다. Content·원본 에셋 변경은 없다.
 
 게임·PIE·자동화 테스트·패키지는 실행하지 않았으며 에디터·IDE도 열지 않았다. 실제 카드 입력·난이도 체감·Continue·준비 실패 복구 확인은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남긴다. 이전 실행 성공을 최신 동작 확인으로 대체하지 않는다.
+
+### 9-39 2026-10-09 라이브러리 NPC와 서비스 무대
+
+2026-10-09 요청에 따라 기존 기본 도형 NPC의 표시를 설치된 라이브러리 원본으로 교체했다. 시작 기준은 `36eb8879`이며 기존 미커밋 변경은 없었다. Primitive 캐릭터 4종과 Fantasy Dwarf, 각 원본 스켈레톤의 idle 2종, Fantastic Dungeon·Dungeon Modular·PurePoly 소품 22종을 직접 참조한다. 네이티브 `UEncounterStageVisualCatalog`의 GameplayTagQuery·우선순위로 6개 인카운터 그룹을 5개 외형에 연결하고 총 34개 소품을 배치한다. [역할별 구성](PROJECT_PLAN.md#4-13-통합-gameplay와-npc-상점)
+
+회복소는 치유사·벤치·모닥불·회복 물품, 소모품점은 약초사·약병·책장·가마솥, 부활소는 뿔 장식 사제·제단·의식서·촛대를 사용한다. 상인은 거래 테이블·장부, 대장장이는 작업대·화덕·검 진열로 구분한다. 원본 재질을 유지하고 bounds를 기준으로 균일 배율·바닥 위치를 계산한다. 소품 받침 높이와 공통 바닥 크기도 배치에 맞췄다. 원본 에셋 복제·수정·리타깃·맵 재작성은 없다.
+
+무대 재구성은 직접 생성한 소품·부품만 정리하며 태그 설정과 카탈로그를 미로 표시 Actor에 복사한다. 숨김·퇴장 시 실제 skeletal component의 idle 재생·tick을 멈추고 숨긴 무대의 조명도 끈다. 장식의 충돌·navigation·복제는 비활성화한다. 로컬 카메라 경로·거래·저장·Host 권위는 유지한다. `UProjectAAssetManager::ModifyCook`은 선택된 원본 패키지 29개만 열거하며 원본 팩 전체를 추가하지 않는다. 외형 참조 실패 또는 명시적 비활성에서는 기존 도형 표현을 사용한다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64` 컴파일·링크는 최초 39.94초, 소품 높이·재구성 보완 후 12.62초, 바닥 크기 최종 변경 후 4.88초에 성공했다. 로그는 `Saved/Automation/NpcLibrary_20261009/EditorBuild.log`·`EditorBuild.Final.log`·`EditorBuild.FinalPlatform.log`다. Native 회귀 `ProjectA.Run.EncounterPresentation.LibraryProfilesAndCookReferences`와 기존 PIE 검수 보완을 작성·컴파일했다. 실제 원본 NPC·idle·소품·비충돌·퇴장 정지와 실제 얼굴 뼈의 투영을 확인하도록 구성했으며 실행하지 않았다.
+
+원본 내장 썸네일을 확인하고 현재 파일의 스켈레톤 참조·SHA256과 기존 Asset Registry 정보를 대조했다. 선택 캐릭터 5개와 idle의 공통 스켈레톤 참조를 확인했으며 Primitive 정면은 저장된 ref pose·기존 프리뷰 설정으로, Dwarf 방향은 같은 팩의 기존 사용 코드로 판단했다. Dwarf 정면은 직접 렌더 확인이 아닌 추론이다. 원본 경로 29개·소품 34개·받침 높이·바닥 포함 범위와 대략적인 카메라 시선/소품 AABB를 정적으로 검사했다. 저장된 bounds를 사용하며 검 1개는 요청 크기를 보수적 상자로 대입했다. 이 계산은 실제 idle·옷·UI 가림 검수를 대신하지 않는다. 근거는 `Saved/Automation/NpcLibrary_20261009/NpcRecommendations.json`·`ThumbnailSources.json`·`StaticChecks.json`이다.
+
+문서 링크·전체 diff 검사를 통과하고 TODO의 기존 선택 7개·미완료 38개를 보존했으며 사용자 확인 1개를 추가했다. 문서 검사 근거는 `Saved/Automation/NpcLibrary_20261009/DocumentationValidation.json`이다. 게임·PIE·자동화 테스트·cook·패키지는 실행하지 않았으며 에디터·IDE도 열지 않았다. 실제 방향·가림·idle·반복 방문·Continue·2인 외형·로딩과 성능은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 미완료로 유지한다. 이전 도형 NPC 실행 성공을 이번 외형의 검증으로 대체하지 않는다.

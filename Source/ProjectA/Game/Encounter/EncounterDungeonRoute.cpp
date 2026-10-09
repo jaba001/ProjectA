@@ -108,7 +108,7 @@ void AEncounterDungeonRoute::SetPresentationVisible(bool bVisible)
     {
         if (IsValid(Light) && Light->GetOwner() == this) Light->SetVisibility(bVisible);
     }
-    if (IsValid(PresentedStage) && PresentedStage->GetOwner() == this) PresentedStage->SetActorHiddenInGame(!bVisible);
+    if (IsValid(PresentedStage) && PresentedStage->GetOwner() == this) PresentedStage->SetPresentationVisible(bVisible);
 }
 
 void AEncounterDungeonRoute::ClearGeometry()
@@ -210,7 +210,7 @@ AEncounterPrototypeStage* AEncounterDungeonRoute::ConfigureStage(const AEncounte
     Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     AEncounterPrototypeStage* Stage = GetWorld()->SpawnActor<AEncounterPrototypeStage>(AEncounterPrototypeStage::StaticClass(), EncounterDungeonLayout::GetStageTransform(Direction, LayoutVariant) * GetActorTransform(), Parameters);
     if (!Stage) return nullptr;
-    Stage->SetActorHiddenInGame(!bPresentationVisible);
+    Stage->SetPresentationVisible(bPresentationVisible);
     Stage->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
     Stage->StageId = Template->StageId;
     Stage->StageTitle = Template->StageTitle;
@@ -220,6 +220,8 @@ AEncounterPrototypeStage* AEncounterDungeonRoute::ConfigureStage(const AEncounte
     Stage->Tint = Template->Tint;
     Stage->PrototypeMaterial = Template->PrototypeMaterial;
     Stage->VisualStyle = Template->VisualStyle;
+    Stage->VisualCatalog = Template->VisualCatalog;
+    Stage->bUseLibraryVisuals = Template->bUseLibraryVisuals;
     Stage->RefreshPrototype();
     Stage->Camera->SetRelativeLocation(FVector(-800.f, 0.f, EncounterDungeonLayout::EyeHeight));
     Stage->Camera->SetRelativeRotation(FRotator(-2.f, 20.f, 0.f));

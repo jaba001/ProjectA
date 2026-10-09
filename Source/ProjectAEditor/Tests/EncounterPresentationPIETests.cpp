@@ -1,18 +1,25 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Animation/AnimSingleNodeInstance.h"
+#include "Animation/AnimSequence.h"
+#include "Animation/Skeleton.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Camera/CameraComponent.h"
 #include "Components/Border.h"
 #include "Components/Button.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/VerticalBox.h"
 #include "Controller/GameplayPlayerController.h"
+#include "DataAsset/EncounterStageVisualCatalog.h"
 #include "Dom/JsonObject.h"
 #include "Editor.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
+#include "Engine/SkeletalMesh.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Game/Encounter/EncounterPrototypeStage.h"
@@ -214,7 +221,7 @@ namespace EncounterPresentationPIE
                 const int32 Visit = RunDungeonPlan::FindVisit(Plan, Run->GetEncounterProgress());
                 const int32 NextVisit = Plan.Visits.IsValidIndex(Visit + 1) ? Visit + 1 : INDEX_NONE;
                 if (!Check(Plan.Visits.IsValidIndex(Visit) && ArrivedRoute->GetLayoutVariant() == Plan.Visits[Visit].LayoutVariant && Controller->GetResidentDungeonRouteCount() >= 1 && Controller->GetResidentDungeonRouteCount() <= 2 && Controller->GetPreparedDungeonVisitIndex() == NextVisit, TEXT("The arrived room uses its frozen variant and keeps only the current and next logical visit resident."))) return End();
-                if (!Capture(World, TEXT("Shop")) || !CheckFraming(World, Screen)) return End();
+                if (!CheckLibraryVisuals() || !Capture(World, TEXT("Shop")) || !CheckFraming(World, Screen)) return End();
                 BeforeInventory = Run->GetItemShopState();
                 if (!Click(Screen, TEXT("Button_ShopInventory"))) return End();
                 Advance(8);
@@ -241,6 +248,15 @@ namespace EncounterPresentationPIE
                 if (!RunEncounterPIE::PresentationReady(Controller.Get(), Active<URunEncounterWidget>(World)) || !Warm()) return false;
                 const AEncounterDungeonRoute* Route = Cast<AEncounterDungeonRoute>(Controller->GetViewTarget());
                 if (!Check(Run->GetPhase() == ERunPhase::EncounterChoice && Route && !Route->IsTraveling() && (!Presented.IsValid() || !Presented->IsActorTickEnabled()), TEXT("Leaving returns to the idle dungeon junction and stops or releases the old NPC animation."))) return End();
+                if (Presented.IsValid())
+                {
+                    TInlineComponentArray<USkeletalMeshComponent*> Meshes(Presented.Get());
+                    for (USkeletalMeshComponent* Mesh : Meshes)
+                    {
+                        const UAnimSingleNodeInstance* Animation = Mesh->GetSingleNodeInstance();
+                        if (!Check(!Mesh->IsComponentTickEnabled() && (!Animation || !Animation->IsPlaying()), TEXT("A retained NPC also stops its independent skeletal component and idle playback after leaving."))) return End();
+                    }
+                }
                 ++CompletedCases;
                 if (++GroupIndex >= Groups.Num()) return End();
                 Advance(5);
@@ -361,23 +377,70 @@ namespace EncounterPresentationPIE
             return true;
         }
 
+        bool CheckLibraryVisuals()
+        {
+            if (!Check(Presented.IsValid() && Presented->IsUsingLibraryVisuals() && !Presented->IsHidden() && !Presented->GetIsReplicated(), TEXT("The arrived stage uses visible library scenery without replicated gameplay authority."))) return false;
+            const UEncounterStageVisualCatalog* Catalog = Presented->VisualCatalog ? Presented->VisualCatalog.Get() : GetDefault<UEncounterStageVisualCatalog>();
+            const FEncounterStageVisualProfile* Profile = Catalog->Resolve(Presented->RequiredTags);
+            if (!Check(Profile && Presented->GetLibraryProfileId() == Profile->ProfileId && Presented->GetLibraryPropCount() == Profile->Props.Num(), TEXT("The copied stage preserves the tag-selected library profile and full prop count."))) return false;
+            TArray<FSoftObjectPath> ExpectedCharacters = {Profile->CharacterMesh.ToSoftObjectPath()};
+            for (const auto& Part : Profile->CharacterParts) ExpectedCharacters.Add(Part.ToSoftObjectPath());
+            USkeletalMeshComponent* Body = nullptr;
+            TInlineComponentArray<USkeletalMeshComponent*> Characters(Presented.Get());
+            for (USkeletalMeshComponent* Character : Characters)
+            {
+                if (!Character->GetSkeletalMeshAsset()) continue;
+                const FSoftObjectPath Asset(Character->GetSkeletalMeshAsset());
+                const int32 ExpectedIndex = ExpectedCharacters.IndexOfByKey(Asset);
+                if (!Check(ExpectedIndex != INDEX_NONE && Character->IsVisible() && Character->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Character->CanEverAffectNavigation(), TEXT("Each rendered NPC body or modular part uses the selected source mesh without collision or navigation."))) return false;
+                ExpectedCharacters.RemoveAt(ExpectedIndex);
+                if (Asset == Profile->CharacterMesh.ToSoftObjectPath()) Body = Character;
+            }
+            if (!Check(ExpectedCharacters.IsEmpty() && Body && Body->IsComponentTickEnabled(), TEXT("All selected character parts exist and the actual body animation is ticking."))) return false;
+            const UAnimSingleNodeInstance* Animation = Body->GetSingleNodeInstance();
+            if (!Check(Animation && Animation->IsPlaying() && Animation->IsLooping() && FSoftObjectPath(Animation->GetAnimationAsset()) == Profile->IdleAnimation.ToSoftObjectPath() && Animation->GetAnimationAsset()->GetSkeleton() && Animation->GetAnimationAsset()->GetSkeleton()->IsCompatibleMesh(Body->GetSkeletalMeshAsset()), TEXT("The actual NPC plays its selected compatible source idle in a loop."))) return false;
+            for (USkeletalMeshComponent* Character : Characters)
+            {
+                if (Character != Body && Character->GetSkeletalMeshAsset() && !Check(Character->LeaderPoseComponent.Get() == Body, TEXT("Every modular outfit part follows the actual animated body pose."))) return false;
+            }
+            TArray<FSoftObjectPath> ExpectedProps;
+            for (const FEncounterStageProp& Prop : Profile->Props) ExpectedProps.Add(Prop.Mesh.ToSoftObjectPath());
+            TInlineComponentArray<UStaticMeshComponent*> Shapes(Presented.Get());
+            for (UStaticMeshComponent* Shape : Shapes)
+            {
+                if (!Shape->GetStaticMesh()) continue;
+                const FSoftObjectPath Asset(Shape->GetStaticMesh());
+                if (!Asset.GetLongPackageName().StartsWith(TEXT("/Game/"))) continue;
+                const int32 ExpectedIndex = ExpectedProps.IndexOfByKey(Asset);
+                if (!Check(ExpectedIndex != INDEX_NONE && Shape->IsVisible() && Shape->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Shape->CanEverAffectNavigation(), TEXT("Every library prop uses its selected source mesh without collision or navigation."))) return false;
+                ExpectedProps.RemoveAt(ExpectedIndex);
+            }
+            if (!Check(ExpectedProps.IsEmpty(), TEXT("All selected library props are present in the arrived stage."))) return false;
+            const TSharedPtr<FJsonObject> Record = Records.Last()->AsObject();
+            Record->SetStringField(TEXT("library_profile"), Profile->ProfileId.ToString());
+            Record->SetStringField(TEXT("npc_source_mesh"), Profile->CharacterMesh.ToString());
+            Record->SetStringField(TEXT("npc_idle"), Profile->IdleAnimation.ToString());
+            Record->SetNumberField(TEXT("library_prop_count"), Presented->GetLibraryPropCount());
+            Record->SetBoolField(TEXT("library_components_verified"), true);
+            return true;
+        }
+
         bool CheckFraming(UWorld* World, URunEncounterWidget* Screen)
         {
             if (!TodoReviewWindowPlacement::Ensure(Test, World)) return Check(false, TEXT("The fixture remains on the requested monitor."));
             UGameViewportClient* Viewport = World->GetGameViewport();
             const TSharedPtr<SViewport> Widget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
             UBorder* Panel = Cast<UBorder>(Screen->GetWidgetFromName(TEXT("EncounterPanel")));
-            UStaticMeshComponent* Head = nullptr;
-            TInlineComponentArray<UStaticMeshComponent*> Shapes(Presented.Get());
-            for (UStaticMeshComponent* Shape : Shapes) if (Shape->GetFName() == TEXT("Head")) Head = Shape;
-            if (!Check(Widget.IsValid() && Viewport && Viewport->Viewport && Panel && Head && Presented->Camera, TEXT("Actual viewport, merchant panel and primitive NPC head are available for projection."))) return false;
+            FVector Focus = FVector::ZeroVector;
+            float FocusRadius = 0.f;
+            if (!Check(Widget.IsValid() && Viewport && Viewport->Viewport && Panel && Presented->Camera && Presented->GetPresentationFocus(Focus, FocusRadius) && !Focus.ContainsNaN() && FMath::IsFinite(FocusRadius) && FocusRadius > 0.f, TEXT("Actual viewport, merchant panel and active NPC face focus are available for projection."))) return false;
             const FIntPoint Size = Viewport->Viewport->GetSizeXY();
             const FGeometry& ViewGeometry = Widget->GetCachedGeometry();
             const FGeometry& PanelGeometry = Panel->GetCachedGeometry();
             FVector2D HeadPixel = FVector2D::ZeroVector;
             FVector2D HeadRightPixel = FVector2D::ZeroVector;
-            const FVector HeadRight = Head->GetComponentLocation() + Presented->Camera->GetRightVector() * Head->Bounds.BoxExtent.GetMax();
-            const bool bHeadProjected = Controller->ProjectWorldLocationToScreen(Head->GetComponentLocation(), HeadPixel);
+            const FVector HeadRight = Focus + Presented->Camera->GetRightVector() * FocusRadius;
+            const bool bHeadProjected = Controller->ProjectWorldLocationToScreen(Focus, HeadPixel);
             const bool bHeadRightProjected = Controller->ProjectWorldLocationToScreen(HeadRight, HeadRightPixel);
             TSharedPtr<FJsonObject> Record = Records.Last()->AsObject();
             Record->SetStringField(TEXT("stage"), Presented->StageId.ToString());
@@ -452,7 +515,7 @@ namespace EncounterPresentationPIE
             const FString VisualReviewRequirement = TEXT("Directly inspect the saved Shop PNGs for all 6 encounter groups at all 3 ratios. Automatic projection/panel checks do not detect opaque stage decorations covering the NPC face. A passing fixture alone is not a completed visual review.");
             Report->SetStringField(TEXT("required_visual_review"), VisualReviewRequirement);
             Test->AddInfo(VisualReviewRequirement);
-            Report->SetStringField(TEXT("scope"), TEXT("18 isolated UI fixtures: menu-created new Target, 6 authored encounter groups (basic, rarity, tag, recovery, consumable, revival) sharing 5 NPC stages x 3 actual viewport ratios, with 36 expected screenshots. Only each disposable initial save's EncounterSeed and seed-derived Offers are changed; pool, weights, party, gold, items and balance remain authored. Public save/load validates each fixture. Actual card/inventory/leave delegates, NPC/overview camera, face/panel geometry and screenshots are observed. No combat, purchase, input-device navigation, random-frequency, multiplayer or normal-run completion claim."));
+            Report->SetStringField(TEXT("scope"), TEXT("18 isolated UI fixtures: menu-created new Target, 6 authored encounter groups (basic, rarity, tag, recovery, consumable, revival) sharing 5 NPC stages x 3 actual viewport ratios, with 36 expected screenshots. Only each disposable initial save's EncounterSeed, seed-derived Offers and matching frozen dungeon plan are changed; pool, weights, party, gold, items and balance remain authored. Public save/load validates each fixture. Actual card/inventory/leave delegates, dungeon/NPC camera, selected source character/idle/props, skeletal cleanup, face/panel geometry and screenshots are observed. No combat, purchase, input-device navigation, random-frequency, multiplayer or normal-run completion claim."));
             Report->SetNumberField(TEXT("expected_cases"), ExpectedCases);
             Report->SetNumberField(TEXT("expected_captures"), ExpectedCases * 2);
             Report->SetNumberField(TEXT("completed_cases"), CompletedCases);
