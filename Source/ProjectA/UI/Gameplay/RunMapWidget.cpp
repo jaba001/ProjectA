@@ -3,15 +3,19 @@
 #include "Blueprint/WidgetTree.h"
 #include "CommonInputModeTypes.h"
 #include "Components/Border.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/ScrollBox.h"
+#include "Components/ScrollBoxSlot.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Controller/GameplayPlayerController.h"
 #include "Engine/EngineBaseTypes.h"
+#include "Game/Encounter/EncounterDungeonLayout.h"
 #include "Game/GameState/GameplayViewTypes.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "UI/Gameplay/GameplayActionButton.h"
@@ -49,6 +53,20 @@ void URunMapWidget::NativeOnInitialized()
         Content->AddChildToVerticalBox(Text_FlowMessage)->SetPadding(FMargin(0.0f, 16.0f, 0.0f, 0.0f));
     }
 
+    // Preserve custom map roots while always providing an overlay for required difficulty choices.
+    // 필수 난이도 선택을 위한 오버레이를 항상 제공하면서 사용자 지도 루트를 보존합니다.
+    if (!Root)
+    {
+        UWidget* PreviousRoot = WidgetTree->RootWidget;
+        Root = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("RunMapPresentationRoot"));
+        WidgetTree->RootWidget = Root;
+        if (PreviousRoot)
+        {
+            Root->AddChildToOverlay(PreviousRoot);
+            MapPanel = PreviousRoot;
+        }
+    }
+
     // Keep every node reachable while retaining the known scaffold's list binding and slot layout.
     // 알려진 생성 구조의 목록 바인딩과 슬롯 배치를 유지하면서 모든 노드를 스크롤로 확인할 수 있게 합니다.
     if (Root && Content && Content->GetParent() == Root && NodeList->GetParent() == Content)
@@ -81,6 +99,7 @@ void URunMapWidget::NativeOnInitialized()
     {
         Content->RemoveFromParent();
         UBorder* Panel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("RunMapPanel"));
+        MapPanel = Panel;
         Theme.StylePanel(Panel);
         Panel->SetPadding(FMargin(32.0f));
         UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Panel);
@@ -95,8 +114,73 @@ void URunMapWidget::NativeOnInitialized()
         Text_FlowMessage->SetAutoWrapText(true);
         Text_FlowMessage->SetWrapTextAt(580.0f);
     }
+    if (!MapPanel)
+    {
+        UWidget* LegacyContent = NodeList;
+        while (LegacyContent && LegacyContent->GetParent() && LegacyContent->GetParent() != Root) LegacyContent = LegacyContent->GetParent();
+        if (LegacyContent && LegacyContent->GetParent() == Root) MapPanel = LegacyContent;
+    }
+
+    if (Root)
+    {
+        // Keep the three choices in direction order while allowing narrow screens to scroll instead of clipping.
+        // 세 선택의 방향 순서를 유지하고 좁은 화면에서는 잘리지 않고 스크롤로 접근할 수 있게 합니다.
+        PveDifficultyPanel = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("PveDifficultyPanel"));
+        PveDifficultyPanel->SetMaxDesiredHeight(360.f);
+        PveDifficultyPanel->SetVisibility(ESlateVisibility::Collapsed);
+        UOverlaySlot* DifficultySlot = Root->AddChildToOverlay(PveDifficultyPanel);
+        DifficultySlot->SetHorizontalAlignment(HAlign_Fill);
+        DifficultySlot->SetVerticalAlignment(VAlign_Bottom);
+        DifficultySlot->SetPadding(FMargin(24.f));
+        UBorder* DifficultyBorder = WidgetTree->ConstructWidget<UBorder>();
+        Theme.StylePanel(DifficultyBorder);
+        DifficultyBorder->SetPadding(FMargin(16.f, 12.f));
+        PveDifficultyPanel->SetContent(DifficultyBorder);
+        UScrollBox* DifficultyScroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("PveDifficultyScroll"));
+        DifficultyScroll->SetAllowOverscroll(false);
+        DifficultyScroll->SetScrollWhenFocusChanges(EScrollWhenFocusChanges::InstantScroll);
+        DifficultyBorder->SetContent(DifficultyScroll);
+        UVerticalBox* DifficultyContent = WidgetTree->ConstructWidget<UVerticalBox>();
+        DifficultyScroll->AddChild(DifficultyContent);
+        PveDifficultyTitle = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_PveDifficultyTitle"));
+        PveDifficultyTitle->SetJustification(ETextJustify::Center);
+        PveDifficultyTitle->SetAutoWrapText(true);
+        DifficultyContent->AddChildToVerticalBox(PveDifficultyTitle)->SetPadding(FMargin(0.f, 0.f, 0.f, 8.f));
+        UScrollBox* ChoiceScroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("PveDifficultyChoiceScroll"));
+        ChoiceScroll->SetOrientation(Orient_Horizontal);
+        ChoiceScroll->SetAllowOverscroll(false);
+        ChoiceScroll->SetScrollWhenFocusChanges(EScrollWhenFocusChanges::InstantScroll);
+        DifficultyContent->AddChildToVerticalBox(ChoiceScroll);
+        UHorizontalBox* Choices = WidgetTree->ConstructWidget<UHorizontalBox>();
+        CastChecked<UScrollBoxSlot>(ChoiceScroll->AddChild(Choices))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+        for (int32 Index = 0; Index < 3; ++Index)
+        {
+            USizeBox* CardSize = WidgetTree->ConstructWidget<USizeBox>();
+            CardSize->SetMinDesiredWidth(320.f);
+            CardSize->SetMinDesiredHeight(196.f);
+            UHorizontalBoxSlot* CardSlot = Choices->AddChildToHorizontalBox(CardSize);
+            CardSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+            CardSlot->SetPadding(FMargin(6.f, 0.f));
+            UGameplayActionButton* Button = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), FName(*FString::Printf(TEXT("Button_PveDifficulty_%d"), Index)));
+            Button->OnActionRequested.AddUObject(this, &URunMapWidget::HandlePveDifficultySelected);
+            CardSize->SetContent(Button);
+            PveDifficultyButtons.Add(Button);
+        }
+        UTextBlock* RewardHint = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_PveRewardHint"));
+        RewardHint->SetText(FText::FromString(TEXT("승리 보상: 아이템 3개 중 1개 + 랜덤 골드\n아이템 등급·스킬 확률은 모든 난이도에서 동일합니다. 선택하면 전투를 시작합니다.")));
+        RewardHint->SetJustification(ETextJustify::Center);
+        RewardHint->SetAutoWrapText(true);
+        DifficultyContent->AddChildToVerticalBox(RewardHint)->SetPadding(FMargin(0.f, 8.f, 0.f, 0.f));
+        PveDifficultyMessage = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_PveDifficultyMessage"));
+        PveDifficultyMessage->SetJustification(ETextJustify::Center);
+        PveDifficultyMessage->SetAutoWrapText(true);
+        DifficultyContent->AddChildToVerticalBox(PveDifficultyMessage)->SetPadding(FMargin(0.f, 8.f, 0.f, 0.f));
+        Theme.StyleText(RewardHint, false, 16);
+    }
     Theme.ApplyControls(WidgetTree);
     Theme.StyleText(Text_Progress, true, 28);
+    Theme.StyleText(PveDifficultyTitle, true, 22);
+    Theme.StyleText(PveDifficultyMessage, false, 16);
 }
 
 void URunMapWidget::RefreshRunMap(const URunStateSubsystem* RunState, const FText& FlowMessage)
@@ -111,7 +195,45 @@ void URunMapWidget::RefreshRunMap(const URunStateSubsystem* RunState, const FTex
 void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllowRunCommands, bool bWorldPresentation)
 {
     bRunCommandsAllowed = bAllowRunCommands;
-    if (WorldBackdrop) WorldBackdrop->SetRenderOpacity(bWorldPresentation ? 0.65f : 1.f);
+    const int32 NextNodeIndex = View.CompletedNodes.Num();
+    const bool bPveChoice = View.Phase == ERunPhase::Map && View.PveDifficultyOffers.Num() == 3 && View.Nodes.IsValidIndex(NextNodeIndex) && View.AvailableNodes.Contains(View.Nodes[NextNodeIndex].NodeId);
+    PveNodeId = bPveChoice ? View.Nodes[NextNodeIndex].NodeId : NAME_None;
+    PveDifficultyTags.Reset();
+    if (WorldBackdrop)
+    {
+        WorldBackdrop->SetVisibility(bPveChoice && bWorldPresentation ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+        WorldBackdrop->SetRenderOpacity(bWorldPresentation ? 0.65f : 1.f);
+    }
+    if (MapPanel) MapPanel->SetVisibility(bPveChoice ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+    if (PveDifficultyPanel)
+    {
+        PveDifficultyPanel->SetVisibility(bPveChoice ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+        CastChecked<UOverlaySlot>(PveDifficultyPanel->Slot)->SetVerticalAlignment(bWorldPresentation ? VAlign_Bottom : VAlign_Center);
+    }
+    for (int32 Index = 0; Index < PveDifficultyButtons.Num(); ++Index)
+    {
+        UGameplayActionButton* Button = PveDifficultyButtons[Index];
+        Button->SetIsEnabled(bPveChoice && bRunCommandsAllowed);
+        if (!bPveChoice) continue;
+        const FRunPveDifficultyOffer& Offer = View.PveDifficultyOffers[Index];
+        PveDifficultyTags.Add(Offer.DifficultyTag);
+        const FString Heading = bWorldPresentation ? FString::Printf(TEXT("%s · %s"), *EncounterDungeonLayout::GetDirectionLabel(Index).ToString(), *Offer.DisplayName.ToString()) : Offer.DisplayName.ToString();
+        const FString Label = FString::Printf(TEXT("%s\n적 %d명 · 총 HP %.0f\nHP %d%% · 속도 %d%%\n골드 %d~%d G (%d%%)"), *Heading, Offer.EnemyCount, Offer.TotalEnemyHP, FMath::RoundToInt(Offer.HPScale * 100.f), FMath::RoundToInt(Offer.SpeedScale * 100.f), Offer.GoldMin, Offer.GoldMax, FMath::RoundToInt(Offer.GoldScale * 100.f));
+        Button->Configure(Offer.DifficultyTag.GetTagName(), FText::FromString(Label));
+        Button->SetToolTipText(FText::FromString(Label + TEXT("\n이 난이도로 전투를 시작합니다.")));
+        if (UTextBlock* LabelText = Cast<UTextBlock>(Button->GetContent()))
+        {
+            const FLinearColor Colors[] = {FLinearColor(0.6f, 0.95f, 0.65f), FLinearColor(1.f, 0.9f, 0.65f), FLinearColor(1.f, 0.6f, 0.55f)};
+            LabelText->SetColorAndOpacity(Colors[Index]);
+            LabelText->SetWrapTextAt(276.f);
+        }
+    }
+    if (bPveChoice)
+    {
+        PveDifficultyTitle->SetText(FText::FromString(FString::Printf(TEXT("%s · PvE 난이도 선택  %d / 80"), *View.Nodes[NextNodeIndex].DisplayName.ToString(), View.TargetCompletedSteps)));
+        const FText HostMessage = bRunCommandsAllowed ? FText::GetEmpty() : FText::FromString(TEXT("Host가 전투 난이도를 선택하고 있습니다."));
+        PveDifficultyMessage->SetText(HostMessage.IsEmpty() ? View.FlowMessage : View.FlowMessage.IsEmpty() ? HostMessage : FText::Format(FText::FromString(TEXT("{0}\n{1}")), HostMessage, View.FlowMessage));
+    }
     if (!NodeList)
     {
         return;
@@ -142,7 +264,7 @@ void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllo
         }
 
         Button->Configure(Node.NodeId, FText::FromString(Label));
-        Button->SetIsEnabled(bRunCommandsAllowed && View.AvailableNodes.Contains(Node.NodeId));
+        Button->SetIsEnabled(!bPveChoice && bRunCommandsAllowed && View.AvailableNodes.Contains(Node.NodeId));
         Button->OnActionRequested.AddUObject(this, &URunMapWidget::HandleNodeSelected);
         NodeList->AddChildToVerticalBox(Button)->SetPadding(FMargin(0.0f, 4.0f));
     }
@@ -159,12 +281,23 @@ void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllo
 
 void URunMapWidget::HandleNodeSelected(FName NodeId)
 {
-    if (!bRunCommandsAllowed)
+    if (!bRunCommandsAllowed || !PveNodeId.IsNone())
     {
         return;
     }
     if (AGameplayPlayerController* Controller = Cast<AGameplayPlayerController>(GetOwningPlayer()))
     {
         Controller->RequestStartNode(NodeId);
+    }
+}
+
+void URunMapWidget::HandlePveDifficultySelected(FName DifficultyName)
+{
+    if (!bRunCommandsAllowed || PveNodeId.IsNone()) return;
+    const FGameplayTag* Difficulty = PveDifficultyTags.FindByPredicate([DifficultyName](FGameplayTag Tag) { return Tag.GetTagName() == DifficultyName; });
+    if (!Difficulty) return;
+    if (AGameplayPlayerController* Controller = Cast<AGameplayPlayerController>(GetOwningPlayer()))
+    {
+        Controller->RequestStartNode(PveNodeId, *Difficulty);
     }
 }

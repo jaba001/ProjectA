@@ -164,11 +164,11 @@ void AGameplayPlayerController::InitializeGameplay(AEncounterManager* InEncounte
     RefreshRunFlowPermissions();
 }
 
-void AGameplayPlayerController::RequestStartNode(FName NodeId)
+void AGameplayPlayerController::RequestStartNode(FName NodeId, FGameplayTag DifficultyTag)
 {
     if (CanIssueRunCommands() && EncounterManager)
     {
-        EncounterManager->RequestStartNode(NodeId);
+        EncounterManager->RequestStartNode(NodeId, DifficultyTag);
     }
 }
 

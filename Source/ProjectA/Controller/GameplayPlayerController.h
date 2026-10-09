@@ -4,6 +4,7 @@
 #include "Controller/PartyPlayerController.h"
 #include "Game/Run/RunEquipmentTypes.h"
 #include "Game/Run/RunTypes.h"
+#include "GameplayTagContainer.h"
 #include "GameplayPlayerController.generated.h"
 
 class AEncounterManager;
@@ -33,7 +34,7 @@ public:
     FGuid GetInventoryCharacterId(const FGameplayViewState& View) const;
 
     UFUNCTION(BlueprintCallable, Category = "Gameplay")
-    void RequestStartNode(FName NodeId);
+    void RequestStartNode(FName NodeId, FGameplayTag DifficultyTag = FGameplayTag());
 
     UFUNCTION(BlueprintCallable, Category = "Gameplay")
     void RequestContinueRun();

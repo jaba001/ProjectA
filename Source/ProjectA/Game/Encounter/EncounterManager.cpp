@@ -17,6 +17,7 @@
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunEquipmentRules.h"
+#include "Game/Run/RunPveDifficulty.h"
 #include "Game/Run/RunParticipationLibrary.h"
 #include "Game/GameModes/GameplayGameModeBase.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
@@ -75,7 +76,7 @@ void AEncounterManager::HandleCombatViewChanged()
     OnFlowChanged.Broadcast();
 }
 
-bool AEncounterManager::RequestStartNode(FName NodeId)
+bool AEncounterManager::RequestStartNode(FName NodeId, FGameplayTag DifficultyTag)
 {
     if (!HasAuthority() || bShuttingDown || bPreparing || bPreparationAbortPending || PendingResult != ECombatResult::None || !RunState || !RunState->CanStartNode(NodeId))
     {
@@ -90,9 +91,11 @@ bool AEncounterManager::RequestStartNode(FName NodeId)
     PreparationFailureMessage = FText::GetEmpty();
     FlowMessage = FText::GetEmpty();
     SetPlayerCombatInput(false);
-    if (!RunState->BeginEncounter(NodeId))
+    if (!RunState->BeginEncounter(NodeId, DifficultyTag))
     {
         bPreparing = false;
+        FlowMessage = RunState->GetSaveError();
+        OnFlowChanged.Broadcast();
         return false;
     }
     OnFlowChanged.Broadcast();
@@ -453,13 +456,14 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
     {
         return false;
     }
+    TArray<FRunMonsterDefinition> ResolvedRoster;
     const TArray<FRunMonsterDefinition>* FrozenRoster = nullptr;
     if (!bUseSnapshot && RunState->IsTargetRun() && RunState->GetTargetRunState().LevelDesign.SchemaVersion == 1)
     {
         const FRunTargetState& Target = RunState->GetTargetRunState();
-        const int32 GroupIndex = RunState->GetCompletedNodes().Num() / 2;
-        if (!Target.Groups.IsValidIndex(GroupIndex) || Target.Groups[GroupIndex].EnemyRoster.Num() != Definition->EnemyUnitClasses.Num()) return false;
-        FrozenRoster = &Target.Groups[GroupIndex].EnemyRoster;
+        TArray<int32> GoldChoices;
+        if (!RunPveDifficulty::Resolve(Target, RunState->GetCompletedNodes().Num(), ResolvedRoster, GoldChoices, FlowMessage) || ResolvedRoster.Num() != Definition->EnemyUnitClasses.Num()) return false;
+        FrozenRoster = &ResolvedRoster;
         for (int32 Index = 0; Index < FrozenRoster->Num(); ++Index)
         {
             if ((*FrozenRoster)[Index].UnitClass != FSoftClassPath(Definition->EnemyUnitClasses[Index].Get())) return false;

@@ -5,6 +5,7 @@
 #include "Game/Run/RunProgressRules.h"
 #include "Game/Run/RunEncounterPool.h"
 #include "Game/Run/RunLevelDesign.h"
+#include "Game/Run/RunPveDifficulty.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "NativeGameplayTags.h"
 #include "Unit/EnemyUnit.h"
@@ -129,6 +130,7 @@ bool UTargetRunDefinitionDataAsset::Validate(const FRunTargetState& State, const
     }
     if (State.SchemaVersion != 1 || !bTargetRoute || State.Groups.Num() != 10 || State.EncounterPool.Num() < 3 || State.EncounterPool.Num() > 32 || Encounter.SchemaVersion != 2 || State.CompletedEncounterChoices.Num() > 60) return false;
     if (!RunLevelDesign::Validate(State, OutError)) return false;
+    if (!RunPveDifficulty::Validate(State, Progress, OutError)) return false;
     FText PoolError;
     if (!RunEncounterPool::Validate(State, PoolError))
     {

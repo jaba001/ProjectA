@@ -4,6 +4,7 @@
 #include "GameplayTagContainer.h"
 #include "Game/Run/RunEncounterTypes.h"
 #include "Game/Run/RunLevelDesignTypes.h"
+#include "Game/Run/RunPveDifficultyTypes.h"
 #include "Game/Run/RunRecoveryTypes.h"
 #include "Game/Snapshot/PartySnapshotTypes.h"
 #include "TargetRunTypes.generated.h"
@@ -70,6 +71,10 @@ struct PROJECTA_API FRunTargetState
     // 버전 0은 현재 CSV 값을 적용하지 않고 맞춤 정의와 이전 Run을 보존합니다.
     UPROPERTY(BlueprintReadOnly, SaveGame)
     FRunLevelDesignState LevelDesign;
+    // Freeze the PvE choice policy and selected tags without altering the baseline groups.
+    // 기준 편성을 변경하지 않고 PvE 선택 규칙과 선택한 태그를 고정합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame)
+    FRunPveDifficultyState PveDifficulty;
     UPROPERTY(BlueprintReadOnly)
     TArray<FRunEncounterOffer> EncounterPool;
     UPROPERTY(BlueprintReadOnly)

@@ -9,6 +9,7 @@
 #include "Game/Run/RunItemRarityProbabilities.h"
 #include "Game/Run/RunEncounterPool.h"
 #include "Game/Run/RunLevelDesign.h"
+#include "Game/Run/RunPveDifficulty.h"
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Unit/UnitDataRules.h"
 
@@ -23,6 +24,7 @@ bool URunStateSubsystem::ConfigureTargetRun(URunSaveGame* Save, FText& OutError)
         int32 PartySize = 0;
         for (const FRunPartyMember& Member : Save->Party) PartySize += Member.bCreated ? 1 : 0;
         if (!RunLevelDesign::Load(Save->TargetRun, PartySize, OutError)) return false;
+        if (!RunPveDifficulty::Load(Save->TargetRun.PveDifficulty, OutError)) return false;
     }
     // Freeze the new acquisition policy only for new ordinary Runs, preserving existing saved routes.
     // 기존 저장 경로를 보존하며 새 일반 Run에만 새 획득 정책을 고정합니다.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "GameFramework/Actor.h"
 #include "Game/Run/RunIdentityTypes.h"
 #include "Types/CombatResult.h"
@@ -26,7 +27,7 @@ public:
     void InitializeEncounter(ACombatArena* InArena, ACombatManager* InCombatManager, UPartyDefinitionDataAsset* InPartyDefinition, const TMap<FName, TObjectPtr<UEncounterDefinitionDataAsset>>& InDefinitions);
 
     UFUNCTION(BlueprintCallable, Category = "Run")
-    bool RequestStartNode(FName NodeId);
+    bool RequestStartNode(FName NodeId, FGameplayTag DifficultyTag = FGameplayTag());
 
     UFUNCTION(BlueprintCallable, Category = "Run")
     bool ContinueRun();

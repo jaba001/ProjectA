@@ -17,6 +17,7 @@
 #include "Game/Encounter/EncounterManager.h"
 #include "Game/GameState/GameplayGameState.h"
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunPveDifficulty.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "GenericPlatform/GenericApplication.h"
@@ -186,7 +187,8 @@ namespace
                     return false;
                 }
                 if (!Test->TestTrue(TEXT("Exactly three completed choices open the first cooked PvE node."), Visit == 3 && Run->GetPhase() == ERunPhase::Map && Run->CanStartNode(TEXT("TargetCombat_01")))) return true;
-                Controller->RequestStartNode(TEXT("TargetCombat_01"));
+                const FGameplayTag Difficulty = Run->GetTargetRunState().PveDifficulty.SchemaVersion == 1 ? RunPveDifficulty::GetMediumTag() : FGameplayTag();
+                Controller->RequestStartNode(TEXT("TargetCombat_01"), Difficulty);
                 Stage = 3;
                 return false;
             }
@@ -219,6 +221,7 @@ namespace
             FText Error;
             TStrongObjectPtr<URunSaveGame> Checkpoint(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Slot, Error)));
             if (!Test->TestTrue(TEXT("The actual cooked Planning boundary persists the target and every spawned ally and frozen enemy."), Checkpoint && Checkpoint->Phase == ERunPhase::Combat && Checkpoint->TargetRun.SchemaVersion == 1 && Checkpoint->CombatCheckpoint.Units.Num() == Players + ExpectedEnemies)) return true;
+            if (Run->GetTargetRunState().PveDifficulty.SchemaVersion == 1 && !Test->TestTrue(TEXT("The cooked Planning boundary preserves the explicit medium PvE selection."), Checkpoint->TargetRun.PveDifficulty.SelectedTags == TArray<FGameplayTag>{RunPveDifficulty::GetMediumTag()})) return true;
             if (!Test->TestTrue(TEXT("Only this UUID-owned cooked checkpoint is removed after successful verification."), UGameplayStatics::DeleteGameInSlot(Slot, 0) && !UGameplayStatics::DoesSaveGameExist(Slot, 0))) return true;
             Test->AddInfo(FString::Printf(TEXT("Cooked target Continue passed: slot=%s; actualMenu=1; choices=3; allies=%d; enemies=%d; planningSaved=1; deleted=1; combatExecuted=0; normalCompletion=0."), *Slot, Players, Enemies));
             return true;

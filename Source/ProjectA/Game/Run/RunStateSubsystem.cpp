@@ -10,6 +10,7 @@
 #include "Game/Run/RunItemShopCatalog.h"
 #include "Game/Run/RunItemRarityProbabilities.h"
 #include "Game/Run/RunCombatRewards.h"
+#include "Game/Run/RunPveDifficulty.h"
 #include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunWeaponSkillRules.h"
@@ -155,12 +156,15 @@ bool URunStateSubsystem::ValidateGoldRewardState(const URunSaveGame* Save) const
         if (!bPveReward) return Reward.SchemaVersion == 0 && bEmpty;
         const int32 GroupIndex = Save->CompletedNodes.Num() / 2;
         if (!Save->TargetRun.Groups.IsValidIndex(GroupIndex)) return false;
+        TArray<FRunMonsterDefinition> Roster;
+        TArray<int32> GoldChoices;
+        FText RewardError;
+        if (!RunPveDifficulty::Resolve(Save->TargetRun, GroupIndex * 2, Roster, GoldChoices, RewardError)) return false;
         if (bItemReward)
         {
-            FText RewardError;
-            if (!RunCombatRewards::Validate(Reward, Save->ItemShopState, Save->WeaponSkillRules, Save->TargetRun.Groups[GroupIndex].GoldChoices, RewardError)) return false;
+            if (!RunCombatRewards::Validate(Reward, Save->ItemShopState, Save->WeaponSkillRules, GoldChoices, RewardError)) return false;
         }
-        else if (Reward.SchemaVersion != 1 || Reward.GoldChoices != Save->TargetRun.Groups[GroupIndex].GoldChoices) return false;
+        else if (Reward.SchemaVersion != 1 || Reward.GoldChoices != GoldChoices) return false;
     }
     if (Reward.SchemaVersion == 0) return bEmpty;
     if (Reward.SchemaVersion != 1 && !bItemReward) return false;
@@ -433,7 +437,9 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
             {
                 // Match immutable enemy values to the frozen roster while preserving live combat costs and damage.
                 // 전투 중 비용과 피해를 유지하며 적의 불변 값을 고정 편성과 대조합니다.
-                const TArray<FRunMonsterDefinition>& Roster = Save->TargetRun.Groups[Save->CompletedNodes.Num() / 2].EnemyRoster;
+                TArray<FRunMonsterDefinition> Roster;
+                TArray<int32> GoldChoices;
+                if (!RunPveDifficulty::Resolve(Save->TargetRun, Save->CompletedNodes.Num(), Roster, GoldChoices, OutError)) return false;
                 int32 EnemyIndex = 0;
                 for (const FCombatCheckpointUnit& Unit : Checkpoint.Units)
                 {
@@ -565,9 +571,10 @@ bool URunStateSubsystem::CommitSaveCandidate(URunSaveGame* Save, FText& OutError
     // 단계 변경은 검증 전에 저장 형식을 선택하며 비전투 경계에 전투 본문을 남기지 않습니다.
     Save->Version = FRunSaveFormat::Select(bManagedRun, Save->Identity.Origin, Save->Phase);
     if (Save->Phase != ERunPhase::Combat) Save->CombatCheckpoint = FCombatCheckpointData();
-    // Memory-only development Runs must also preserve the frozen encounter-to-layout mapping.
-    // 메모리 전용 개발 Run도 고정한 인카운터와 배치 연결을 유지해야 합니다.
-    if (!bCheckpointSaving && !bRequirePersistence && !RunDungeonPlan::Validate(*Save, OutError))
+    // Memory-only Runs preserve both the frozen layout and the difficulty selection boundary.
+    // 메모리 전용 Run도 고정된 배치와 난이도 선택 경계를 유지합니다.
+    const FRunProgressView Progress{Save->Nodes, Save->CompletedNodes, Save->CurrentNode, Save->CurrentEncounter, Save->Phase, Save->Result};
+    if (!bCheckpointSaving && !bRequirePersistence && (!RunDungeonPlan::Validate(*Save, OutError) || !RunPveDifficulty::Validate(Save->TargetRun, Progress, OutError)))
     {
         SaveError = OutError;
         return false;
@@ -1236,14 +1243,28 @@ bool URunStateSubsystem::CanStartNode(FName NodeId) const
     return Nodes[CompletedNodes.Num()].NodeId == NodeId && !CompletedNodes.Contains(NodeId);
 }
 
-bool URunStateSubsystem::BeginEncounter(FName NodeId)
+bool URunStateSubsystem::BeginEncounter(FName NodeId, FGameplayTag DifficultyTag)
 {
-    if (!CanStartNode(NodeId))
+    if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanStartNode(NodeId))
     {
         return false;
     }
 
     const FRunNodeDefinition& Node = Nodes[CompletedNodes.Num()];
+    const bool bDifficultyChoice = TargetRun.PveDifficulty.SchemaVersion == 1 && CompletedNodes.Num() % 2 == 0;
+    FRunTargetState Candidate = TargetRun;
+    SaveError = NSLOCTEXT("RunPveDifficulty", "RequiredChoice", "표시된 PvE 난이도 하·중·상 중 하나를 선택해 주세요.");
+    if (bDifficultyChoice)
+    {
+        if (Candidate.PveDifficulty.SelectedTags.Num() != CompletedNodes.Num() / 2 || !Candidate.PveDifficulty.Rules.ContainsByPredicate([DifficultyTag](const FRunPveDifficultyRule& Rule) { return Rule.DifficultyTag == DifficultyTag; })) return false;
+        Candidate.PveDifficulty.SelectedTags.Add(DifficultyTag);
+    }
+    else if (DifficultyTag.IsValid()) return false;
+    const FRunProgressView Progress{Nodes, CompletedNodes, Node.NodeId, Node.EncounterId, ERunPhase::Preparing, ECombatResult::None};
+    if (!RunPveDifficulty::Validate(Candidate, Progress, SaveError)) return false;
+    // Commit the selection together with preparation only after every choice check succeeds.
+    // 모든 선택 검사가 성공한 뒤 준비 상태와 난이도를 함께 확정합니다.
+    TargetRun = MoveTemp(Candidate);
     GoldRewardState = FRunGoldRewardState();
     if (!IsTargetRun() && SkillShopState.SchemaVersion == 1) GoldRewardState.SchemaVersion = 1;
     PendingGoldRewardState = FRunGoldRewardState();
@@ -1337,12 +1358,15 @@ bool URunStateSubsystem::CompleteEncounter(ECombatResult Result, const TMap<int3
         Save->GoldRewardState = FRunGoldRewardState();
         if (CompletedNodes.Num() % 2 == 0)
         {
+            TArray<FRunMonsterDefinition> Roster;
+            TArray<int32> GoldChoices;
+            if (!RunPveDifficulty::Resolve(TargetRun, CompletedNodes.Num(), Roster, GoldChoices, SaveError)) return false;
             if (UsesWeaponSkills())
             {
                 if (PendingGoldRewardState.NodeId != CurrentNodeId || PendingGoldRewardState.SchemaVersion != 2)
                 {
                     FRandomStream RewardRandom(FMath::Rand());
-                    if (!RunCombatRewards::Build(CurrentNodeId, ItemShopState, WeaponSkillRules, TargetRun.Groups[CompletedNodes.Num() / 2].GoldChoices, RewardRandom, PendingGoldRewardState, SaveError)) return false;
+                    if (!RunCombatRewards::Build(CurrentNodeId, ItemShopState, WeaponSkillRules, GoldChoices, RewardRandom, PendingGoldRewardState, SaveError)) return false;
                 }
                 Save->GoldRewardState = PendingGoldRewardState;
             }
@@ -1350,7 +1374,7 @@ bool URunStateSubsystem::CompleteEncounter(ECombatResult Result, const TMap<int3
             {
                 Save->GoldRewardState.SchemaVersion = 1;
                 Save->GoldRewardState.NodeId = CurrentNodeId;
-                Save->GoldRewardState.GoldChoices = TargetRun.Groups[CompletedNodes.Num() / 2].GoldChoices;
+                Save->GoldRewardState.GoldChoices = MoveTemp(GoldChoices);
             }
         }
     }
@@ -1388,6 +1412,11 @@ bool URunStateSubsystem::AbortEncounter()
     }
 
     TStrongObjectPtr<URunSaveGame> Save(CreateSaveData());
+    if (Save->TargetRun.PveDifficulty.SchemaVersion == 1 && Save->CompletedNodes.Num() % 2 == 0)
+    {
+        if (Save->TargetRun.PveDifficulty.SelectedTags.Num() != Save->CompletedNodes.Num() / 2 + 1) return false;
+        Save->TargetRun.PveDifficulty.SelectedTags.Pop();
+    }
     Save->CurrentNode = NAME_None;
     Save->CurrentEncounter = NAME_None;
     Save->Phase = ERunPhase::Map;

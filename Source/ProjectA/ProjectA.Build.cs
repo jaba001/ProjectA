@@ -18,6 +18,7 @@ public class ProjectA : ModuleRules
         RuntimeDependencies.Add("$(ProjectDir)/DataCatalogs/MONSTER_STATS.csv", StagedFileType.UFS);
         RuntimeDependencies.Add("$(ProjectDir)/DataCatalogs/MONSTER_SPAWN_PROBABILITIES.csv", StagedFileType.UFS);
         RuntimeDependencies.Add("$(ProjectDir)/DataCatalogs/MONSTER_ENCOUNTERS.csv", StagedFileType.UFS);
+        RuntimeDependencies.Add("$(ProjectDir)/DataCatalogs/PVE_DIFFICULTIES.csv", StagedFileType.UFS);
 
 		PublicDependencyModuleNames.AddRange(new string[] {
 			"Core",

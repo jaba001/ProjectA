@@ -882,3 +882,19 @@ Native 회귀 5개(`ProjectA.Run.SkillBalance.CsvAtomicityAndFrozenSave`, `Equip
 CSV 작성 도구의 숫자형·재읽기·미리보기와 별도 CSV 정적 검증에서 62개 ID/원본 경로·등급 분포·25개 가중치·행 합계 100을 확인했다. 문서 11개·로컬 링크 784개·전체 diff 정적 검사를 통과했으며 TODO의 선택 7개와 미완료 37개를 보존했다. 근거는 `Saved/Automation/SkillBalance_20261009/Validation.json`·`IndependentValidation.json`·`DocumentationValidation.json`·`StaticChecks.json`이다. 원본 에셋 변경·기존 미커밋 변경은 없다.
 
 게임·PIE·자동화 테스트·패키지는 실행하지 않았으며 에디터·IDE도 열지 않았다. 이전 이력의 성공을 이번 변경의 동작 근거로 사용하지 않는다. 실제 화면·등급 추첨·CSV 변경 후 재개·전투 수치와 체크포인트 복원은 [TODO 29](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)에 유지한다.
+
+### 9-38 2026-10-09 PvE 하·중·상 선택
+
+2026-10-09 요청에 따라 새 기본 싱글 Run의 각 PvE 직전에 좌회전·하/직진·중/우회전·상 3후보를 제공한다. 시작 기준은 `a2728329`이며 기존 미커밋 변경은 없었다. 기존 Map 진입에 선택을 통합하여 서비스 60방문·전투 20회·80단계를 유지한다. Snapshot·이전 저장·맞춤 정의·개발 협동은 원래 진입 정책을 유지한다. 실제 구간 이동을 추가하지 않고 갈림길의 선택 확정 후 기존 전투 카메라로 전환한다.
+
+[PVE_DIFFICULTIES.csv](../DataCatalogs/PVE_DIFFICULTIES.csv) 6열·3행에 HP/속도/골드 배율을 하 `0.8/0.9/0.75`, 중 `1/1/1`, 상 `1.3/1.1/1.5`로 기록하고 패키지 UFS 의존성에 포함했다. 항상 세 후보를 제공하므로 등장 확률은 두지 않는다. `RunPveDifficulty` 공통 규칙은 GameplayTag로 선택을 해석하고 미리보기·스폰·체크포인트 불변 스탯·보상 생성/검증에 같은 값을 적용한다. 기준 몬스터 편성·태그 조건·피해·AP/SAP·아이템 등급 확률·성장·휴식은 유지한다. [수치·저장 기준](PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터)
+
+Run의 독립 정책 버전 1에 CSV 규칙과 PvE별 선택 태그를 저장하고 이전 버전 0은 원래 값을 사용한다. 요청의 현재 노드·난이도·선택 수를 검사한 뒤 준비와 함께 메모리에 반영하며 준비 실패 시 선택을 제거한다. 기존 Ready 경계부터 전투·선택을 함께 영속 저장하므로 클릭 즉시 저장을 추가하지 않는다. CSV 변경은 이후 새 Run에만 적용한다. 표시 View는 값만 복제하고 명령의 기존 권위·Host 조건을 유지한다. 싱글 Target을 협동 지원 완료로 확대하지 않는다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64` 컴파일·링크를 최종 6.88초에 통과했다. 첫 빌드에서 발견한 신규 회귀의 int32/int64 비교 오버로드 모호성을 명시적인 예상값 자료형으로 수정했다. 로그는 `Saved/Automation/PveDifficulty_20261009/EditorBuild.log`·`EditorBuild.Final.log`다.
+
+Native 회귀 4개(`ProjectA.Run.PveDifficulty.StrictCsvAndAtomicity`, `PreviewScalingAndFailurePreservation`, `ProgressAndFrozenSave`, `ProjectA.Run.Target.PveDifficulty.ChoiceAbortAndFrozenSave`)를 작성·컴파일했다. CSV 실패 원자성·모든 구간 배율 상한·미리보기/해석 일치·20개 진행 경계·SaveGame 왕복·하/상 선택·Abort 저장 실패와 재시도·위조 선택 거절을 검사하도록 구성했다. 기존 Target·정상 PIE·패키지 검수 코드는 PvE만 명시적으로 중 난이도를 선택하도록 보완했다. 회귀 코드는 실행하지 않았다.
+
+CSV 숫자형 작성·export/reimport·미리보기와 독립 정적 검사, 문서 11개·로컬 링크 792개·전체 diff 검사를 통과했다. TODO의 기존 선택 7개·미완료 37개를 보존하고 사용자 확인 1개를 추가했다. 근거는 `Saved/Automation/PveDifficulty_20261009/DifficultyCsvValidation.json`·`DifficultyCsvPreview.png`·`DocumentationValidation.json`·`StaticChecks.json`이다. 독립 코드 검토에서 선택·스폰·보상·체크포인트 복원의 배율 일치와 기존 저장 경로를 확인했다. Content·원본 에셋 변경은 없다.
+
+게임·PIE·자동화 테스트·패키지는 실행하지 않았으며 에디터·IDE도 열지 않았다. 실제 카드 입력·난이도 체감·Continue·준비 실패 복구 확인은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남긴다. 이전 실행 성공을 최신 동작 확인으로 대체하지 않는다.

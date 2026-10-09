@@ -104,7 +104,7 @@ public:
     UFUNCTION(BlueprintPure, Category = "Run")
     bool CanStartNode(FName NodeId) const;
 
-    bool BeginEncounter(FName NodeId);
+    bool BeginEncounter(FName NodeId, FGameplayTag DifficultyTag = FGameplayTag());
     bool MarkCombatStarted();
     bool CompleteEncounter(ECombatResult Result);
     // Publish final party HP in the same durable transaction as the encounter result.

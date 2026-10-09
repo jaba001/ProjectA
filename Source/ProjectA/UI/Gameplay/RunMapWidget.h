@@ -2,12 +2,15 @@
 
 #include "CoreMinimal.h"
 #include "CommonActivatableWidget.h"
+#include "GameplayTagContainer.h"
 #include "RunMapWidget.generated.h"
 
 class URunStateSubsystem;
 class UTextBlock;
 class UVerticalBox;
 class UBorder;
+class UGameplayActionButton;
+class USizeBox;
 struct FGameplayViewState;
 
 UCLASS()
@@ -42,6 +45,24 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<UBorder> WorldBackdrop;
 
+    UPROPERTY(Transient)
+    TObjectPtr<UWidget> MapPanel;
+
+    UPROPERTY(Transient)
+    TObjectPtr<USizeBox> PveDifficultyPanel;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> PveDifficultyTitle;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> PveDifficultyMessage;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UGameplayActionButton>> PveDifficultyButtons;
+
+    FName PveNodeId;
+    TArray<FGameplayTag> PveDifficultyTags;
     bool bRunCommandsAllowed = true;
     void HandleNodeSelected(FName NodeId);
+    void HandlePveDifficultySelected(FName DifficultyName);
 };

@@ -10,6 +10,7 @@
 #include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunItemShopCatalog.h"
 #include "Game/Run/RunProgressRules.h"
+#include "Game/Run/RunPveDifficulty.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunWeaponSkillRules.h"
@@ -204,7 +205,8 @@ namespace
             {
                 if (Run->GetEncounterProgress().Offers.Num() != 3 || !Run->SelectRunEncounter(Run->GetEncounterProgress().Offers[0].EncounterId) || !Run->LeaveRunEncounter()) return false;
             }
-            return Run->GetPhase() == ERunPhase::Map && Run->GetNodes().IsValidIndex(Run->GetCompletedNodes().Num()) && Run->BeginEncounter(Run->GetNodes()[Run->GetCompletedNodes().Num()].NodeId) && Run->MarkCombatStarted();
+            const FGameplayTag Difficulty = Run->GetTargetRunState().PveDifficulty.SchemaVersion == 1 && Run->GetCompletedNodes().Num() % 2 == 0 ? RunPveDifficulty::GetMediumTag() : FGameplayTag();
+            return Run->GetPhase() == ERunPhase::Map && Run->GetNodes().IsValidIndex(Run->GetCompletedNodes().Num()) && Run->BeginEncounter(Run->GetNodes()[Run->GetCompletedNodes().Num()].NodeId, Difficulty) && Run->MarkCombatStarted();
         }
 
         bool FreezeInitialBasicShop()
@@ -296,7 +298,13 @@ bool FTargetRunDurableSyntheticResultsTest::RunTest(const FString& Parameters)
             FinalHP.Add(Member.SlotIndex, Member.CurrentHP - 1.f);
             FinalStock.Add(Member.SlotIndex, Member.Consumables);
         }
-        if (!TestTrue(TEXT("The public API enters synthetic combat without creating actor or Ready evidence"), Fixture.Run->BeginEncounter(Node) && Fixture.Run->MarkCombatStarted())) return false;
+        const FGameplayTag Difficulty = Fixture.Run->GetTargetRunState().PveDifficulty.SchemaVersion == 1 && CombatIndex % 2 == 0 ? RunPveDifficulty::GetMediumTag() : FGameplayTag();
+        if (!TestTrue(TEXT("The public API explicitly selects medium PvE before synthetic combat without creating actor or Ready evidence"), Fixture.Run->BeginEncounter(Node, Difficulty) && Fixture.Run->MarkCombatStarted())) return false;
+        if (FrozenTarget.PveDifficulty.SchemaVersion == 1)
+        {
+            const TArray<FGameplayTag>& Selected = Fixture.Run->GetTargetRunState().PveDifficulty.SelectedTags;
+            TestTrue(TEXT("Each PvE appends one explicit medium choice while Snapshot adds no choice"), Selected.Num() == CombatIndex / 2 + 1 && Selected.Last() == RunPveDifficulty::GetMediumTag());
+        }
         if (CombatIndex == 19)
         {
             const TArray<uint8> BeforeWrite = Fixture.ReadBytes();
@@ -427,13 +435,83 @@ bool FTargetRunLevelRestTest::RunTest(const FString& Parameters)
     TStrongObjectPtr<URunSaveGame> Legacy(Cast<URunSaveGame>(FRunCheckpointStorage::Load(LegacyFixture.Slot, LegacyFixture.Error)));
     if (!Legacy) return false;
     Legacy->TargetRun.LevelDesign = FRunLevelDesignState();
+    Legacy->TargetRun.PveDifficulty = FRunPveDifficultyState();
     for (FTargetRunGroup& Group : Legacy->TargetRun.Groups) Group.EnemyRoster.Reset();
-    if (!TestTrue(TEXT("An old target policy reloads without adopting the available CSV policy"), FRunCheckpointStorage::Save(Legacy.Get(), LegacyFixture.Slot, LegacyFixture.Error) && LegacyFixture.Run->LoadStandaloneCheckpoint(LegacyFixture.Error) && LegacyFixture.Run->GetTargetRunState().LevelDesign.SchemaVersion == 0 && LegacyFixture.BeginNextSyntheticCombat())) return false;
+    if (!TestTrue(TEXT("An old target policy reloads without adopting CSV levels or difficulty selection"), FRunCheckpointStorage::Save(Legacy.Get(), LegacyFixture.Slot, LegacyFixture.Error) && LegacyFixture.Run->LoadStandaloneCheckpoint(LegacyFixture.Error) && LegacyFixture.Run->GetTargetRunState().LevelDesign.SchemaVersion == 0 && LegacyFixture.Run->GetTargetRunState().PveDifficulty.SchemaVersion == 0 && LegacyFixture.BeginNextSyntheticCombat())) return false;
     TMap<int32, float> LegacyHP;
     for (const FRunPartyMember& Member : LegacyFixture.Run->GetPartyMembers()) LegacyHP.Add(Member.SlotIndex, 40.f);
     if (!TestTrue(TEXT("A legacy PvE victory remains valid without the new rest policy"), LegacyFixture.Run->CompleteEncounter(ECombatResult::Victory, LegacyHP))) return false;
     for (const FRunPartyMember& Member : LegacyFixture.Run->GetPartyMembers()) TestEqual(TEXT("Legacy PvE victory preserves supplied HP without retroactive rest"), Member.CurrentHP, 40.f);
     TestEqual(TEXT("Legacy result views do not advertise new rest"), FGameplayViewState::FromRun(LegacyFixture.Run.Get(), FText::GetEmpty()).VictoryRestHP, 0.f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTargetRunPveDifficultyTransactionTest, "ProjectA.Run.Target.PveDifficulty.ChoiceAbortAndFrozenSave", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTargetRunPveDifficultyTransactionTest::RunTest(const FString& Parameters)
+{
+    for (FGameplayTag SelectedTag : {RunPveDifficulty::GetLowTag(), RunPveDifficulty::GetHighTag()})
+    {
+        FTargetRunTransactionFixture Fixture;
+        if (!TestTrue(TEXT("The new default Target freezes a difficulty policy"), Fixture.InitializeEveryProfession() && Fixture.Run->GetTargetRunState().PveDifficulty.SchemaVersion == 1)) return false;
+        for (int32 Visit = 0; Visit < 3; ++Visit)
+        {
+            const FRunEncounterProgress& Progress = Fixture.Run->GetEncounterProgress();
+            if (!TestTrue(TEXT("Three public encounter choices precede the difficulty choice"), Fixture.Run->GetPhase() == ERunPhase::EncounterChoice && Progress.Offers.Num() == 3 && Fixture.Run->SelectRunEncounter(Progress.Offers[0].EncounterId) && Fixture.Run->LeaveRunEncounter())) return false;
+        }
+        const FName Node = Fixture.Run->GetNodes()[0].NodeId;
+        TStrongObjectPtr<URunSaveGame> BeforeMap(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+        if (!TestNotNull(TEXT("The stable pre-combat Map is durable"), BeforeMap.Get())) return false;
+        const TArray<uint8> BeforeMapBytes = Fixture.ReadBytes();
+        int32 Publications = 0;
+        Fixture.Run->OnRunStateChanged.AddLambda([&Publications]() { ++Publications; });
+        TestFalse(TEXT("A new PvE cannot silently choose medium when its tag is missing"), Fixture.Run->BeginEncounter(Node));
+        TestFalse(TEXT("A registered non-difficulty content tag cannot start PvE"), Fixture.Run->BeginEncounter(Node, FRunEncounterOffer::GetRecoveryTag()));
+        TestTrue(TEXT("Rejected choices preserve phase history rewards party bytes and publication count"), SameTargetTransactionState(*BeforeMap.Get(), *Fixture.Run.Get()) && BeforeMapBytes == Fixture.ReadBytes() && Publications == 0);
+        if (!TestTrue(TEXT("An explicit high choice atomically enters preparation"), Fixture.Run->BeginEncounter(Node, RunPveDifficulty::GetHighTag()) && Fixture.Run->GetPhase() == ERunPhase::Preparing && Fixture.Run->GetTargetRunState().PveDifficulty.SelectedTags == TArray<FGameplayTag>{RunPveDifficulty::GetHighTag()})) return false;
+        TestTrue(TEXT("Preparation retains the previous durable Map until a supported checkpoint"), BeforeMapBytes == Fixture.ReadBytes());
+        const FRunTargetState BeforeAbort = Fixture.Run->GetTargetRunState();
+        Publications = 0;
+        FRunCheckpointStorage::FailNextWriteForTesting();
+        TestFalse(TEXT("Failed cancellation cannot discard the selected difficulty from memory"), Fixture.Run->AbortEncounter());
+        TestTrue(TEXT("Rejected Abort retains the selected high policy phase and original file"), Fixture.Run->GetPhase() == ERunPhase::Preparing && FRunTargetState::StaticStruct()->CompareScriptStruct(&BeforeAbort, &Fixture.Run->GetTargetRunState(), 0) && BeforeMapBytes == Fixture.ReadBytes() && Publications == 0);
+        if (!TestTrue(TEXT("Abort retry commits one Map transition and removes only the unfinished choice"), Fixture.Run->AbortEncounter() && Fixture.Run->GetPhase() == ERunPhase::Map && Fixture.Run->GetTargetRunState().PveDifficulty.SelectedTags.IsEmpty() && Publications == 1)) return false;
+        Fixture.Run->OnRunStateChanged.Clear();
+        if (!TestTrue(TEXT("The same node accepts a new explicit choice after a successful Abort"), Fixture.Run->BeginEncounter(Node, SelectedTag) && Fixture.Run->MarkCombatStarted())) return false;
+        const FRunTargetState& Target = Fixture.Run->GetTargetRunState();
+        const FRunPveDifficultyRule* Rule = Target.PveDifficulty.Rules.FindByPredicate([SelectedTag](const FRunPveDifficultyRule& Entry) { return Entry.DifficultyTag == SelectedTag; });
+        TArray<FRunMonsterDefinition> Roster;
+        TArray<int32> GoldChoices;
+        if (!TestTrue(TEXT("The chosen tag resolves its frozen combat roster and reward range"), Rule && RunPveDifficulty::Resolve(Target, 0, Roster, GoldChoices, Fixture.Error) && Roster.Num() == Target.Groups[0].EnemyRoster.Num() && GoldChoices.Num() == 3)) return false;
+        for (int32 Index = 0; Index < Roster.Num(); ++Index)
+        {
+            const FRunMonsterDefinition& Base = Target.Groups[0].EnemyRoster[Index];
+            const float ExpectedHP = FMath::CeilToFloat(static_cast<float>(static_cast<double>(Base.MaxHP) * Rule->HPScale));
+            const float ExpectedSpeed = static_cast<float>(static_cast<double>(Base.Speed) * Rule->SpeedScale);
+            TestTrue(TEXT("Only HP and speed scale while roster identity AP SAP movement and skill remain fixed"), Roster[Index].MaxHP == ExpectedHP && Roster[Index].Speed == ExpectedSpeed && Roster[Index].MonsterId == Base.MonsterId && Roster[Index].UnitClass == Base.UnitClass && Roster[Index].AP == Base.AP && Roster[Index].SAP == Base.SAP && Roster[Index].MoveRange == Base.MoveRange && Roster[Index].Skill == Base.Skill);
+        }
+        int32 MinimumGold = MAX_int32;
+        int32 MaximumGold = 0;
+        for (int32 Index = 0; Index < GoldChoices.Num(); ++Index)
+        {
+            const int32 ExpectedGold = FMath::Max(1, FMath::RoundToInt(static_cast<double>(Target.Groups[0].GoldChoices[Index]) * Rule->GoldScale));
+            TestEqual(TEXT("Gold uses the selected frozen multiplier and integer rounding"), GoldChoices[Index], ExpectedGold);
+            MinimumGold = FMath::Min(MinimumGold, GoldChoices[Index]);
+            MaximumGold = FMath::Max(MaximumGold, GoldChoices[Index]);
+        }
+        // Synthetic victory checks transaction and reward policy only, without asserting spawned combat or play quality.
+        // 합성 승리는 거래와 보상 정책만 검사하며 생성된 전투나 플레이 품질을 검증했다고 취급하지 않습니다.
+        if (!TestTrue(TEXT("The public result path persists the chosen difficulty and bounded common gold"), Fixture.Run->CompleteEncounter(ECombatResult::Victory) && Fixture.Run->GetGoldRewardState().BonusGold >= MinimumGold && Fixture.Run->GetGoldRewardState().BonusGold <= MaximumGold && Fixture.ReloadBoundary(*this))) return false;
+        TestTrue(TEXT("Continue data retains exactly the chosen PvE difficulty"), Fixture.Run->GetTargetRunState().PveDifficulty.SelectedTags == TArray<FGameplayTag>{SelectedTag});
+        TStrongObjectPtr<URunSaveGame> Valid(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+        TStrongObjectPtr<URunSaveGame> Forged(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
+        if (!Valid || !Forged) return false;
+        Forged->TargetRun.PveDifficulty.SelectedTags.Add(RunPveDifficulty::GetHighTag());
+        if (!TestTrue(TEXT("Only the disposable fixture file receives a fabricated future difficulty choice"), UGameplayStatics::SaveGameToSlot(Forged.Get(), Fixture.Slot, 0))) return false;
+        const TArray<uint8> ForgedBytes = Fixture.ReadBytes();
+        TestFalse(TEXT("A future selected difficulty cannot be accepted by saved progression validation"), Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error));
+        TestTrue(TEXT("Rejected continuation preserves the active valid Run and never rewrites the malformed file"), !Fixture.Error.IsEmpty() && SameTargetTransactionState(*Valid.Get(), *Fixture.Run.Get()) && ForgedBytes == Fixture.ReadBytes());
+    }
     return true;
 }
 
@@ -452,6 +530,7 @@ bool FTargetRunItemRewardAtomicTest::RunTest(const FString& Parameters)
     BeforeResult->CurrentNode = Fixture.Run->GetCurrentNodeId();
     BeforeResult->CurrentEncounter = Fixture.Run->GetCurrentEncounterId();
     BeforeResult->GoldRewardState = Fixture.Run->GetGoldRewardState();
+    BeforeResult->TargetRun = Fixture.Run->GetTargetRunState();
     const TArray<uint8> BeforeResultBytes = Fixture.ReadBytes();
     int32 Publications = 0;
     Fixture.Run->OnRunStateChanged.AddLambda([&Publications]() { ++Publications; });
@@ -644,6 +723,7 @@ bool FTargetRunLegacyAcquisitionTest::RunTest(const FString& Parameters)
     Save->WeaponSkillRules = FRunWeaponSkillRulesState();
     Save->TargetRun.EncounterSelectionVersion = 0;
     Save->TargetRun.EncounterSeed = 0;
+    Save->TargetRun.PveDifficulty = FRunPveDifficultyState();
     Save->DungeonState = FRunDungeonState();
     Save->ItemShopState.SelectionVersion = 0;
     const URunEncounterPoolDataAsset* Pool = Fixture.Run->PartyDefinition->RunEncounterPool ? Fixture.Run->PartyDefinition->RunEncounterPool.Get() : GetDefault<URunEncounterPoolDataAsset>();

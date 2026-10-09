@@ -5,6 +5,7 @@
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Encounter/EncounterManager.h"
 #include "Game/Run/RunItemShopCatalog.h"
+#include "Game/Run/RunPveDifficulty.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Net/UnrealNetwork.h"
 #include "Game/Development/DevelopmentCoopLobby.h"
@@ -76,6 +77,19 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
             if (Run->CanStartNode(Node.NodeId))
             {
                 View.AvailableNodes.Add(Node.NodeId);
+            }
+        }
+        const FRunTargetState& Target = Run->GetTargetRunState();
+        if (View.Phase == ERunPhase::Map && View.bTargetRun && Target.PveDifficulty.SchemaVersion == 1 && CompletedCount % 2 == 0 && View.Nodes.IsValidIndex(CompletedCount) && View.AvailableNodes.Contains(View.Nodes[CompletedCount].NodeId))
+        {
+            FText DifficultyError;
+            if (!RunPveDifficulty::BuildOffers(Target, CompletedCount, View.PveDifficultyOffers, DifficultyError))
+            {
+                // Invalid previews cannot expose a legacy start button that omits the required choice.
+                // 잘못된 미리보기에서는 필수 선택을 누락하는 기존 시작 버튼을 노출하지 않습니다.
+                View.AvailableNodes.Reset();
+                if (View.FlowMessage.IsEmpty()) View.FlowMessage = DifficultyError;
+                else if (!View.FlowMessage.ToString().Contains(DifficultyError.ToString())) View.FlowMessage = FText::Format(FText::FromString(TEXT("{0}\n{1}")), View.FlowMessage, DifficultyError);
             }
         }
         if (!Run->GetSaveError().IsEmpty())

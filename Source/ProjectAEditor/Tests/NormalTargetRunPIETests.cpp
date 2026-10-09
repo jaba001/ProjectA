@@ -24,6 +24,7 @@
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunEquipmentCatalog.h"
+#include "Game/Run/RunPveDifficulty.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunWeaponSkillRules.h"
@@ -243,7 +244,8 @@ namespace NormalTargetRunReview
                 const FRunNodeDefinition* Next = Run->GetNodes().FindByPredicate([Run](const FRunNodeDefinition& Node) { return Run->CanStartNode(Node.NodeId); });
                 if (!Check(Next != nullptr, TEXT("An unfinished normal route exposes an eligible authored next combat."))) return End();
                 Event(Run, TEXT("request_start_node"), Next->NodeId.ToString());
-                Controller->RequestStartNode(Next->NodeId);
+                const FGameplayTag Difficulty = Run->GetTargetRunState().PveDifficulty.SchemaVersion == 1 && Run->GetCompletedNodes().Num() % 2 == 0 ? RunPveDifficulty::GetMediumTag() : FGameplayTag();
+                Controller->RequestStartNode(Next->NodeId, Difficulty);
                 return false;
             }
             if (Run->GetPhase() == ERunPhase::Result) return ClaimAndContinue(Run);

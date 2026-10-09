@@ -7,6 +7,7 @@
 #include "Game/Run/RunSkillShopTypes.h"
 #include "Game/Run/RunWeaponSkillTypes.h"
 #include "Game/Run/RunGoldRewardTypes.h"
+#include "Game/Run/RunPveDifficultyTypes.h"
 #include "Types/CombatResult.h"
 #include "GameplayViewTypes.generated.h"
 
@@ -54,6 +55,11 @@ struct PROJECTA_API FGameplayViewState
 
     UPROPERTY()
     TArray<FName> AvailableNodes;
+
+    // Send derived difficulty previews without exposing editable Run rules to clients.
+    // 클라이언트에 수정 가능한 Run 규칙을 노출하지 않고 파생 난이도 미리보기를 전달합니다.
+    UPROPERTY()
+    TArray<FRunPveDifficultyOffer> PveDifficultyOffers;
 
     UPROPERTY()
     FRunEncounterProgress EncounterProgress;
