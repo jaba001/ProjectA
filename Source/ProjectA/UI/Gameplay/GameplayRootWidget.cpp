@@ -223,7 +223,7 @@ void UGameplayRootWidget::NativeOnInitialized()
     NoticeContent->AddChildToVerticalBox(CheckpointMessage);
     RetryCheckpointButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_RetryCheckpoint"));
     UTextBlock* RetryLabel = WidgetTree->ConstructWidget<UTextBlock>();
-    RetryLabel->SetText(FText::FromString(TEXT("저장 다시 시도")));
+    RetryLabel->SetText(NSLOCTEXT("GameplayRoot", "TextB0D2D689", "저장 다시 시도"));
     RetryCheckpointButton->SetContent(RetryLabel);
     RetryCheckpointButton->OnClicked.AddDynamic(this, &UGameplayRootWidget::HandleRetryCheckpoint);
     NoticeContent->AddChildToVerticalBox(RetryCheckpointButton);
@@ -246,7 +246,7 @@ void UGameplayRootWidget::NativeOnInitialized()
     DevelopmentContent->AddChildToVerticalBox(DevelopmentMessage);
     UButton* Leave = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_LeaveDevelopmentCoop"));
     UTextBlock* LeaveLabel = WidgetTree->ConstructWidget<UTextBlock>();
-    LeaveLabel->SetText(FText::FromString(TEXT("개발 협동 나가기 · Host는 방 종료")));
+    LeaveLabel->SetText(NSLOCTEXT("GameplayRoot", "Text2BED3A7F", "개발 협동 나가기 · Host는 방 종료"));
     Leave->SetContent(LeaveLabel);
     Leave->OnClicked.AddDynamic(this, &UGameplayRootWidget::HandleLeaveDevelopmentCoop);
     DevelopmentContent->AddChildToVerticalBox(Leave);

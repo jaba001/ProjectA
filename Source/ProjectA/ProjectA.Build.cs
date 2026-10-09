@@ -19,6 +19,11 @@ public class ProjectA : ModuleRules
         RuntimeDependencies.Add("$(ProjectDir)/DataCatalogs/MONSTER_SPAWN_PROBABILITIES.csv", StagedFileType.UFS);
         RuntimeDependencies.Add("$(ProjectDir)/DataCatalogs/MONSTER_ENCOUNTERS.csv", StagedFileType.UFS);
         RuntimeDependencies.Add("$(ProjectDir)/DataCatalogs/PVE_DIFFICULTIES.csv", StagedFileType.UFS);
+        // Load native localization before the startup loading screen, including packaged games.
+        // 패키지에서도 시작 로딩 화면 이전에 기본 현지화 리소스를 읽을 수 있게 포함합니다.
+        RuntimeDependencies.Add("$(ProjectDir)/Content/User_JeHoon/Localization/Game/Game.locmeta", StagedFileType.UFS);
+        RuntimeDependencies.Add("$(ProjectDir)/Content/User_JeHoon/Localization/Game/ko/Game.locres", StagedFileType.UFS);
+        RuntimeDependencies.Add("$(ProjectDir)/Content/User_JeHoon/Localization/Game/en/Game.locres", StagedFileType.UFS);
         // Ship the upstream license with the loading screen plugin in packaged games.
         // 패키지 게임에도 로딩 화면 플러그인의 원본 라이선스를 동봉합니다.
         RuntimeDependencies.Add("$(ProjectDir)/Plugins/AsyncLoadingScreen/LICENSE", StagedFileType.NonUFS);

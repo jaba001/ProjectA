@@ -6,6 +6,7 @@
 #include "Unit/UnitDataRules.h"
 #include "Unit/CharacterAppearanceComponent.h"
 #include "DataAsset/CharacterAppearanceCatalog.h"
+#include "UI/ProjectALocalization.h"
 
 TSubclassOf<APlayerUnit> UPartyDefinitionDataAsset::ResolvePlayerClass(FName ClassId) const
 {
@@ -230,14 +231,15 @@ FText UPartyDefinitionDataAsset::GetProfessionDetails(FName ClassId) const
     FText Error;
     if (!ResolveProfession(ClassId, Definition) || !ResolveStartingSkills(ClassId, StartingSkills, Error))
     {
-        return FText::FromString(TEXT("직업 전투 설정을 확인해 주세요."));
+        return NSLOCTEXT("CharacterCreation", "InvalidProfessionCombat", "직업 전투 설정을 확인해 주세요.");
     }
-    FString Skills;
+    TArray<FText> Skills;
     for (USkillDefinitionDataAsset* Skill : StartingSkills)
     {
         FCombatRoundSkill Resolved;
-        if (Skill->ResolveRoundSkill(Resolved, Error)) Skills += FString::Printf(TEXT("\n• %s (AP %d · 보조 AP %d)"), *Skill->SkillName.ToString(), Resolved.ActionPointCost, Resolved.SubActionPointCost);
+        if (Skill->ResolveRoundSkill(Resolved, Error)) Skills.Add(FText::Format(NSLOCTEXT("CharacterCreation", "StartingSkill", "• {0} (AP {1} · 보조 AP {2})"), ProjectALocalization::SkillName(Resolved.SkillId, Skill->SkillName), FText::AsNumber(Resolved.ActionPointCost), FText::AsNumber(Resolved.SubActionPointCost)));
     }
-    const FString Speed = FText::AsNumber(Definition.Speed).ToString();
-    return FText::FromString(FString::Printf(TEXT("%s\n%s\n\nHP %.0f · 속도 %s\nAP %d · 보조 AP %d\n\n시작 스킬%s"), *Definition.DisplayName.ToString(), *Definition.Description.ToString(), Definition.MaxHP, *Speed, Definition.ActionPoints, Definition.SubActionPoints, *Skills));
+    FNumberFormattingOptions HPFormat;
+    HPFormat.SetMaximumFractionalDigits(0);
+    return FText::Format(NSLOCTEXT("CharacterCreation", "ProfessionDetails", "{0}\n{1}\n\nHP {2} · 속도 {3}\nAP {4} · 보조 AP {5}\n\n시작 스킬\n{6}"), ProjectALocalization::Content(TEXT("Profession.") + ClassId.ToString() + TEXT(".Name"), Definition.DisplayName), ProjectALocalization::Content(TEXT("Profession.") + ClassId.ToString() + TEXT(".Description"), Definition.Description), FText::AsNumber(Definition.MaxHP, &HPFormat), FText::AsNumber(Definition.Speed), FText::AsNumber(Definition.ActionPoints), FText::AsNumber(Definition.SubActionPoints), FText::Join(FText::AsCultureInvariant(TEXT("\n")), Skills));
 }

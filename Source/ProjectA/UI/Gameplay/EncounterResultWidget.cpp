@@ -46,7 +46,7 @@ void UEncounterResultWidget::NativeOnInitialized()
         Text_Result = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_Result"));
         Button_Continue = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_Continue"));
         UTextBlock* ContinueText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_Continue"));
-        ContinueText->SetText(FText::FromString(TEXT("Continue / 계속")));
+        ContinueText->SetText(NSLOCTEXT("EncounterResult", "Text6D195380", "Continue / 계속"));
         UButtonSlot* ButtonSlot = Cast<UButtonSlot>(Button_Continue->AddChild(ContinueText));
         ButtonSlot->SetPadding(FMargin(24.0f, 12.0f));
         Content->AddChildToVerticalBox(Text_Result);
@@ -231,12 +231,12 @@ void UEncounterResultWidget::ShowResult(ECombatResult Result, const FText& Messa
     const bool bVictory = Result == ECombatResult::Victory;
     Button_Continue->SetIsEnabled(bVictory && bContinueAllowed);
     Button_Continue->SetVisibility(ESlateVisibility::Collapsed);
-    Text_Result->SetText(FText::FromString(TEXT("Defeat / 패배\nThe run has ended. / 진행이 종료되었습니다.")));
+    Text_Result->SetText(NSLOCTEXT("EncounterResult", "TextB97C5DC9", "Defeat / 패배\nThe run has ended. / 진행이 종료되었습니다."));
 
     if (bVictory)
     {
         Button_Continue->SetVisibility(ESlateVisibility::Visible);
-        Text_Result->SetText(FText::FromString(TEXT("Victory / 승리\nEncounter complete. / 전투를 완료했습니다.")));
+        Text_Result->SetText(NSLOCTEXT("EncounterResult", "TextC349D382", "Victory / 승리\nEncounter complete. / 전투를 완료했습니다."));
     }
     if (!Message.IsEmpty())
     {

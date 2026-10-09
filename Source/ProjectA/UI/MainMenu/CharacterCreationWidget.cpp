@@ -29,6 +29,7 @@
 #include "InputCoreTypes.h"
 #include "UI/MainMenu/MainMenuPreviewStage.h"
 #include "UI/MainMenu/MainMenuRootWidget.h"
+#include "UI/ProjectALocalization.h"
 #include "UI/Theme/DemonicUITheme.h"
 
 namespace
@@ -376,7 +377,7 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
 
     if (StartGameText)
     {
-        StartGameText->SetText(FText::FromString(TEXT("게임 시작")));
+        StartGameText->SetText(NSLOCTEXT("CharacterCreation", "StartGame", "게임 시작"));
         UButtonSlot* StartGameTextSlot = Cast<UButtonSlot>(Button_StartGame->AddChild(StartGameText));
 
         if (StartGameTextSlot)
@@ -577,7 +578,7 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
         }
 
         SlotPanel->SetContent(SlotContentOverlay);
-        CreateButtonText(CreateSlotButton, FText::FromString(TEXT("캐릭터 생성하기")));
+        CreateButtonText(CreateSlotButton, NSLOCTEXT("CharacterCreation", "CreateCharacter", "캐릭터 생성하기"));
 
         UOverlaySlot* CreateButtonSlot = SlotContentOverlay->AddChildToOverlay(CreateSlotButton);
 
@@ -643,9 +644,9 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
             }
         }
 
-        UButton* EditButton = AddButtonToHorizontalBox(ActionBox, FName(*FString::Printf(TEXT("Button_Slot%d_Edit"), SlotIndex)), FText::FromString(TEXT("Edit")));
+        UButton* EditButton = AddButtonToHorizontalBox(ActionBox, FName(*FString::Printf(TEXT("Button_Slot%d_Edit"), SlotIndex)), NSLOCTEXT("CharacterCreation", "Edit", "수정"));
         UButton* DeleteButton = AddButtonToHorizontalBox(ActionBox, FName(*FString::Printf(TEXT("Button_Slot%d_Delete"), SlotIndex)), FText::FromString(TEXT("X")));
-        UButton* ClassInfoButton = AddButtonToVerticalBox(SlotEditorBox, FName(*FString::Printf(TEXT("Button_Slot%d_ClassInfo"), SlotIndex)), FText::FromString(TEXT("클래스 정보")), FMargin(0.0f, 0.0f, 0.0f, 0.0f));
+        UButton* ClassInfoButton = AddButtonToVerticalBox(SlotEditorBox, FName(*FString::Printf(TEXT("Button_Slot%d_ClassInfo"), SlotIndex)), NSLOCTEXT("CharacterCreation", "ClassInfo", "클래스 정보"), FMargin(0.0f, 0.0f, 0.0f, 0.0f));
 
         AssignSlotWidgets(SlotIndex, CreateSlotButton, SlotEditorBox, TitleText, PrevButton, NextButton, ClassIcon, ClassNameText, EditButton, DeleteButton, ClassInfoButton);
 
@@ -790,7 +791,7 @@ void UCharacterCreationWidget::BuildPlayerControlButtons()
         UHorizontalBox* Actions = SlotPresentation.Edit ? Cast<UHorizontalBox>(SlotPresentation.Edit->GetParent()) : nullptr;
         if (!Actions) continue;
         SlotPresentation.PlayerControl = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*FString::Printf(TEXT("Button_Slot%d_PlayerControl"), SlotIndex)));
-        CreateButtonText(SlotPresentation.PlayerControl, FText::FromString(TEXT("직접 조작")));
+        CreateButtonText(SlotPresentation.PlayerControl, NSLOCTEXT("CharacterCreation", "PlayerControl", "직접 조작"));
         Actions->AddChildToHorizontalBox(SlotPresentation.PlayerControl)->SetPadding(FMargin(2.0f, 0.0f));
     }
     if (SlotWidgets[0].PlayerControl) SlotWidgets[0].PlayerControl->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleSlot0ControlClicked);
@@ -816,14 +817,14 @@ void UCharacterCreationWidget::RefreshPlayerControlSelection()
         {
             UButton* Button = SlotWidgets[SlotIndex].PlayerControl;
             Button->SetIsEnabled(IsSlotCreated(SlotIndex) && !bSelected);
-            if (UTextBlock* Label = Cast<UTextBlock>(Button->GetChildAt(0))) Label->SetText(FText::FromString(bSelected ? TEXT("선택됨") : TEXT("직접 조작")));
+            if (UTextBlock* Label = Cast<UTextBlock>(Button->GetChildAt(0))) Label->SetText(bSelected ? NSLOCTEXT("CharacterCreation", "Selected", "선택됨") : NSLOCTEXT("CharacterCreation", "PlayerControl", "직접 조작"));
         }
         if (SlotWidgets.IsValidIndex(SlotIndex) && SlotWidgets[SlotIndex].ClassName)
         {
-            SlotWidgets[SlotIndex].ClassName->SetText(FText::FromString(FString::Printf(TEXT("%s · %s"), *GetDisplayNameForClassId(SlotClassIds[SlotIndex]).ToString(), bSelected ? TEXT("직접 조작") : TEXT("AI"))));
+            SlotWidgets[SlotIndex].ClassName->SetText(FText::Format(NSLOCTEXT("CharacterCreation", "ClassControl", "{0} · {1}"), GetDisplayNameForClassId(SlotClassIds[SlotIndex]), bSelected ? NSLOCTEXT("CharacterCreation", "PlayerControl", "직접 조작") : NSLOCTEXT("CharacterCreation", "AIControl", "AI")));
         }
     }
-    const FText Status = bHasSelection ? FText::FromString(FString::Printf(TEXT("직접 조작: 슬롯 %d · 나머지 동료는 AI가 조작합니다."), PartyDraft.GetControlledSlot() + 1)) : FText::FromString(TEXT("캐릭터를 생성한 뒤 직접 조작할 1명을 선택하세요. 나머지 동료는 AI가 조작합니다."));
+    const FText Status = bHasSelection ? FText::Format(NSLOCTEXT("CharacterCreation", "ControlledSlot", "직접 조작: 슬롯 {0} · 나머지 동료는 AI가 조작합니다."), FText::AsNumber(PartyDraft.GetControlledSlot() + 1)) : NSLOCTEXT("CharacterCreation", "SelectControlledSlot", "캐릭터를 생성한 뒤 직접 조작할 1명을 선택하세요. 나머지 동료는 AI가 조작합니다.");
     if (Text_StartGameStatus) Text_StartGameStatus->SetText(Status);
     if (Button_StartGame)
     {
@@ -961,7 +962,7 @@ bool UCharacterCreationWidget::HasDeferredSlotCreationWidgets() const
 FText UCharacterCreationWidget::GetDisplayNameForClassId(FName ClassId) const
 {
     const UProfessionBase* Definition = UProfessionBase::FindProfession(ClassId);
-    return Definition ? Definition->DisplayName : FText::FromName(ClassId);
+    return Definition ? ProjectALocalization::Content(TEXT("Profession.") + ClassId.ToString() + TEXT(".Name"), Definition->DisplayName) : FText::FromName(ClassId);
 }
 
 void UCharacterCreationWidget::UpdatePreviewStageSlot(int32 SlotIndex, FName ClassId)
@@ -1303,7 +1304,7 @@ FText UCharacterCreationWidget::GetSelectedClassText() const
 
 FText UCharacterCreationWidget::GetStatPreviewText() const
 {
-    return PartyDefinition ? PartyDefinition->GetProfessionDetails(CurrentCharacterClassId) : FText::FromString(TEXT("직업 데이터를 불러올 수 없습니다."));
+    return PartyDefinition ? PartyDefinition->GetProfessionDetails(CurrentCharacterClassId) : NSLOCTEXT("CharacterCreation", "MissingProfessionData", "직업 데이터를 불러올 수 없습니다.");
 }
 
 void UCharacterCreationWidget::RequestBack()
@@ -1351,7 +1352,7 @@ void UCharacterCreationWidget::RequestStartGame()
         {
             if (Text_StartGameStatus)
             {
-                Text_StartGameStatus->SetText(FText::FromString(TEXT("직업 전투 설정을 확인해 주세요.")));
+                Text_StartGameStatus->SetText(NSLOCTEXT("CharacterCreation", "InvalidProfessionCombat", "직업 전투 설정을 확인해 주세요."));
             }
             return;
         }
@@ -1407,7 +1408,7 @@ void UCharacterCreationWidget::BuildDetailPanel()
     UVerticalBox* PanelContent = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
     Size->SetContent(PanelContent);
     UTextBlock* Heading = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-    Heading->SetText(FText::FromString(TEXT("캐릭터 설정")));
+    Heading->SetText(NSLOCTEXT("CharacterCreation", "CharacterSettings", "캐릭터 설정"));
     UDemonicUITheme::Get().StyleText(Heading, true, 24);
     PanelContent->AddChildToVerticalBox(Heading)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
     UScrollBox* Scroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("CharacterDetailScroll"));
@@ -1415,18 +1416,18 @@ void UCharacterCreationWidget::BuildDetailPanel()
     PanelContent->AddChildToVerticalBox(Scroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
     Scroll->AddChild(Content);
-    const auto AddLabel = [this, Content](const TCHAR* Text)
+    const auto AddLabel = [this, Content](const FText& Text)
     {
         UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-        Label->SetText(FText::FromString(Text));
+        Label->SetText(Text);
         UDemonicUITheme::Get().StyleText(Label, false, 16);
         Content->AddChildToVerticalBox(Label)->SetPadding(FMargin(0.0f, 6.0f));
     };
-    AddLabel(TEXT("이름"));
+    AddLabel(NSLOCTEXT("CharacterCreation", "Name", "이름"));
     DetailName = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass(), TEXT("ProfessionNameInput"));
-    DetailName->SetHintText(FText::FromString(TEXT("캐릭터 이름")));
+    DetailName->SetHintText(NSLOCTEXT("CharacterCreation", "NameHint", "캐릭터 이름"));
     Content->AddChildToVerticalBox(DetailName)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
-    AddLabel(TEXT("직업"));
+    AddLabel(NSLOCTEXT("CharacterCreation", "Profession", "직업"));
     DetailClass = WidgetTree->ConstructWidget<UDemonicComboBoxString>(UDemonicComboBoxString::StaticClass(), TEXT("ProfessionClassSelect"));
     for (FName ClassId : GetAvailablePartyClassIds())
     {
@@ -1434,15 +1435,15 @@ void UCharacterCreationWidget::BuildDetailPanel()
     }
     DetailClass->OnSelectionChanged.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleDetailClassChanged);
     Content->AddChildToVerticalBox(DetailClass)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
-    AddLabel(TEXT("몸체"));
+    AddLabel(NSLOCTEXT("CharacterCreation", "Body", "몸체"));
     UHorizontalBox* BodyControls = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("AppearanceBodyControls"));
     Content->AddChildToVerticalBox(BodyControls)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 4.0f));
     DetailPreviousBody = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("AppearanceBodyPrevious"));
     DetailNextBody = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("AppearanceBodyNext"));
     CreateButtonText(DetailPreviousBody, FText::FromString(TEXT("◀")));
     CreateButtonText(DetailNextBody, FText::FromString(TEXT("▶")));
-    DetailPreviousBody->SetToolTipText(FText::FromString(TEXT("이전 몸체")));
-    DetailNextBody->SetToolTipText(FText::FromString(TEXT("다음 몸체")));
+    DetailPreviousBody->SetToolTipText(NSLOCTEXT("CharacterCreation", "PreviousBody", "이전 몸체"));
+    DetailNextBody->SetToolTipText(NSLOCTEXT("CharacterCreation", "NextBody", "다음 몸체"));
     USizeBox* PreviousBodySize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
     PreviousBodySize->SetWidthOverride(64.0f);
     PreviousBodySize->SetContent(DetailPreviousBody);
@@ -1465,15 +1466,15 @@ void UCharacterCreationWidget::BuildDetailPanel()
     DetailBodyPosition->SetJustification(ETextJustify::Center);
     UDemonicUITheme::Get().StyleText(DetailBodyPosition, false, 14);
     Content->AddChildToVerticalBox(DetailBodyPosition)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 8.0f));
-    DetailResetBody = CreateButton(Content, FText::FromString(TEXT("기본 몸체로 초기화")));
+    DetailResetBody = CreateButton(Content, NSLOCTEXT("CharacterCreation", "ResetBody", "기본 몸체로 초기화"));
     DetailResetBody->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleResetBody);
-    AddLabel(TEXT("미리보기"));
+    AddLabel(NSLOCTEXT("CharacterCreation", "Preview", "미리보기"));
     UTextBlock* RotationHint = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("AppearanceRotationHint"));
-    RotationHint->SetText(FText::FromString(TEXT("캐릭터가 보이는 영역을 우클릭한 채 좌우로 드래그하여 회전")));
+    RotationHint->SetText(NSLOCTEXT("CharacterCreation", "RotationHint", "캐릭터가 보이는 영역을 우클릭한 채 좌우로 드래그하여 회전"));
     RotationHint->SetAutoWrapText(true);
     UDemonicUITheme::Get().StyleText(RotationHint, false, 14);
     Content->AddChildToVerticalBox(RotationHint)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
-    AddLabel(TEXT("직업 정보"));
+    AddLabel(NSLOCTEXT("CharacterCreation", "ProfessionInfo", "직업 정보"));
     DetailText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ProfessionDetailText"));
     DetailText->SetAutoWrapText(true);
     Content->AddChildToVerticalBox(DetailText)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 16.0f));
@@ -1481,9 +1482,9 @@ void UCharacterCreationWidget::BuildDetailPanel()
     DetailError->SetColorAndOpacity(FLinearColor(1.0f, 0.45f, 0.35f));
     DetailError->SetAutoWrapText(true);
     PanelContent->AddChildToVerticalBox(DetailError)->SetPadding(FMargin(0.0f, 8.0f));
-    DetailSave = CreateButton(PanelContent, FText::FromString(TEXT("저장")));
+    DetailSave = CreateButton(PanelContent, NSLOCTEXT("CharacterCreation", "Save", "저장"));
     DetailSave->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::SaveSlotDetails);
-    UButton* Close = CreateButton(PanelContent, FText::FromString(TEXT("닫기 / 취소")));
+    UButton* Close = CreateButton(PanelContent, NSLOCTEXT("CharacterCreation", "CloseCancel", "닫기 / 취소"));
     Close->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::CloseSlotDetails);
     DetailPanel->SetVisibility(ESlateVisibility::Collapsed);
 }
@@ -1505,6 +1506,10 @@ void UCharacterCreationWidget::ShowSlotDetails(int32 SlotIndex, bool bEditable)
     DetailName->SetText(GetPartyMembers()[SlotIndex].CharacterName);
     DetailName->SetIsReadOnly(!bEditable);
     bUpdatingDetail = true;
+    // Rebuild string-backed profession labels after returning from a language change in Options.
+    // 설정에서 언어를 바꾼 뒤 돌아왔을 때 문자열 기반 직업 선택 문구를 다시 구성합니다.
+    DetailClass->ClearOptions();
+    for (FName ClassId : GetAvailablePartyClassIds()) DetailClass->AddOption(GetDisplayNameForClassId(ClassId).ToString());
     DetailClass->SetSelectedIndex(GetAvailablePartyClassIds().IndexOfByKey(PendingClassId));
     bUpdatingDetail = false;
     DetailClass->SetIsEnabled(bEditable);
@@ -1555,8 +1560,8 @@ void UCharacterCreationWidget::RefreshBodySelector()
     const FCharacterAppearanceBodyVariant* Body = Catalog ? Catalog->FindBodyVariant(PendingAppearance.BodyId) : nullptr;
     const int32 BodyCount = Catalog ? Catalog->BodyVariants.Num() : 0;
     const int32 BodyIndex = Body ? Catalog->BodyVariants.IndexOfByPredicate([Body](const FCharacterAppearanceBodyVariant& Variant) { return Variant.BodyId == Body->BodyId; }) : INDEX_NONE;
-    DetailBodyName->SetText(Body ? Body->DisplayName : FText::FromString(TEXT("기본 몸체")));
-    DetailBodyPosition->SetText(BodyIndex != INDEX_NONE ? FText::FromString(FString::Printf(TEXT("%d / %d"), BodyIndex + 1, BodyCount)) : FText::GetEmpty());
+    DetailBodyName->SetText(Body ? ProjectALocalization::Content(Catalog->GetPathName() + TEXT(".Body.") + Body->BodyId.ToString() + TEXT(".Name"), Body->DisplayName) : NSLOCTEXT("CharacterCreation", "DefaultBody", "기본 몸체"));
+    DetailBodyPosition->SetText(BodyIndex != INDEX_NONE ? FText::Format(NSLOCTEXT("CharacterCreation", "BodyPosition", "{0} / {1}"), FText::AsNumber(BodyIndex + 1), FText::AsNumber(BodyCount)) : FText::GetEmpty());
     DetailPreviousBody->SetIsEnabled(bDetailEditable && BodyCount > 1);
     DetailNextBody->SetIsEnabled(bDetailEditable && BodyCount > 1);
     DetailResetBody->SetVisibility(bDetailEditable && BodyCount > 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -1603,7 +1608,7 @@ void UCharacterCreationWidget::RefreshDetailPreview(bool bReplaceActor)
     AMainMenuPreviewStage* Stage = Controller ? Controller->GetPreviewStage() : nullptr;
     if (!Stage) return;
     if (bReplaceActor) Stage->SetPreviewActorForSlot(DetailSlot, PendingClassId);
-    if (!Stage->SetPreviewAppearance(DetailSlot, GetAppearanceCatalog(PendingClassId), PendingAppearance)) DetailError->SetText(FText::FromString(TEXT("몸체를 표시할 수 없습니다. 선택을 다시 확인해 주세요.")));
+    if (!Stage->SetPreviewAppearance(DetailSlot, GetAppearanceCatalog(PendingClassId), PendingAppearance)) DetailError->SetText(NSLOCTEXT("CharacterCreation", "BodyUnavailable", "몸체를 표시할 수 없습니다. 선택을 다시 확인해 주세요."));
 }
 
 void UCharacterCreationWidget::HandleResetBody()
@@ -1699,12 +1704,12 @@ void UCharacterCreationWidget::SaveSlotDetails()
     FProfessionDefinition Definition;
     if (Name.IsEmpty() || Name.Len() > 32)
     {
-        DetailError->SetText(FText::FromString(TEXT("이름은 1~32자로 입력해 주세요.")));
+        DetailError->SetText(NSLOCTEXT("CharacterCreation", "InvalidName", "이름은 1~32자로 입력해 주세요."));
         return;
     }
     if (!GetAvailablePartyClassIds().IsValidIndex(Index) || !PartyDefinition || !PartyDefinition->ResolveProfession(GetAvailablePartyClassIds()[Index], Definition))
     {
-        DetailError->SetText(FText::FromString(TEXT("직업 전투 설정을 확인해 주세요.")));
+        DetailError->SetText(NSLOCTEXT("CharacterCreation", "InvalidProfessionCombat", "직업 전투 설정을 확인해 주세요."));
         return;
     }
     FText AppearanceError;

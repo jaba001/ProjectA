@@ -1,0 +1,1806 @@
+{
+  "nativeCulture": "ko",
+  "culture": "en",
+  "entries": [
+    {
+      "namespace": "CombatCheckpoint",
+      "key": "Invalid",
+      "source": "전투 체크포인트가 손상되었거나 현재 콘텐츠와 호환되지 않습니다.",
+      "translation": "The battle checkpoint is damaged or incompatible with the current content."
+    },
+    {
+      "namespace": "CombatCheckpoint",
+      "key": "Units",
+      "source": "전투 체크포인트의 유닛·소유권·스탯·장착·점유 정보가 올바르지 않습니다.",
+      "translation": "The battle checkpoint contains invalid unit, ownership, stat, equipment, or occupancy data."
+    },
+    {
+      "namespace": "CombatCheckpoint",
+      "key": "OpponentBuild",
+      "source": "저장된 상대 유닛의 빌드가 고정된 Snapshot과 일치하지 않습니다.",
+      "translation": "The saved opponent build does not match the frozen Snapshot."
+    },
+    {
+      "namespace": "CombatCheckpoint",
+      "key": "RoundPlans",
+      "source": "저장된 준비 계획·대상·이동 예약·비용이 현재 전투 상태와 일치하지 않습니다.",
+      "translation": "Saved ready plans, targets, move plans, or costs do not match the current battle state."
+    },
+    {
+      "namespace": "CombatRequest",
+      "key": "ConfigureContext",
+      "source": "Run 소유권은 서버에서 전투 시작 전에 설정해야 합니다.",
+      "translation": "Run ownership must be configured on the server before battle starts."
+    },
+    {
+      "namespace": "CombatRequest",
+      "key": "ManagedConfigure",
+      "source": "관리 전투는 현재 Host의 유효한 실행 lease와 동일한 Run 데이터로만 설정할 수 있습니다.",
+      "translation": "A managed battle requires the current host's valid execution lease and matching Run data."
+    },
+    {
+      "namespace": "CombatRequest",
+      "key": "EmptyPartyActor",
+      "source": "빈 파티 슬롯에는 전투 유닛을 연결할 수 없습니다.",
+      "translation": "A battle unit cannot be assigned to an empty party slot."
+    },
+    {
+      "namespace": "CombatRequest",
+      "key": "PartyActor",
+      "source": "파티 캐릭터는 중복 없이 등록된 아군 전투 유닛에 연결해야 합니다.",
+      "translation": "Each party character must be assigned to a distinct registered allied battle unit."
+    },
+    {
+      "namespace": "CombatRequest",
+      "key": "UnknownPartyActor",
+      "source": "Run에 없는 파티 슬롯의 전투 유닛이 있습니다.",
+      "translation": "A battle unit is assigned to a party slot that does not exist in this Run."
+    },
+    {
+      "namespace": "CombatRequest",
+      "key": "UnmappedPlayer",
+      "source": "등록된 아군 전투 유닛의 원래 캐릭터를 확인할 수 없습니다.",
+      "translation": "The original character of a registered allied battle unit could not be identified."
+    },
+    {
+      "namespace": "CombatRequest",
+      "key": "SequentialRemoved",
+      "source": "개별 턴 즉시 실행은 지원하지 않습니다. 라운드 행동 계획을 제출해 주세요.",
+      "translation": "Immediate individual turns are not supported. Submit a round action plan instead."
+    },
+    {
+      "namespace": "CombatRequest",
+      "key": "ManagedControlMode",
+      "source": "관리 Run의 영속 인간 참가 목록과 다른 조작 방식은 적용할 수 없습니다.",
+      "translation": "The control mode must match the managed Run's persistent human participant list."
+    },
+    {
+      "namespace": "CombatRound",
+      "key": "MovePending",
+      "source": "이동 예약을 서버에서 확인하고 있습니다.",
+      "translation": "The server is checking your move plan."
+    },
+    {
+      "namespace": "CombatRound",
+      "key": "CancelMovePending",
+      "source": "이동 예약 취소를 서버에서 확인하고 있습니다.",
+      "translation": "The server is checking your move cancellation."
+    },
+    {
+      "namespace": "CombatRound",
+      "key": "MoveNoSession",
+      "source": "라운드 세션에 연결되지 않았습니다.",
+      "translation": "Not connected to a round session."
+    },
+    {
+      "namespace": "CombatRound",
+      "key": "MoveAccepted",
+      "source": "이동을 예약했습니다. 준비 완료 후 SAP 이동을 먼저 실행하고 AP 행동을 진행합니다.",
+      "translation": "Move planned. Once everyone is ready, SAP moves resolve before AP actions."
+    },
+    {
+      "namespace": "CombatRound",
+      "key": "CancelMoveNoSession",
+      "source": "라운드 세션에 연결되지 않았습니다.",
+      "translation": "Not connected to a round session."
+    },
+    {
+      "namespace": "CombatRound",
+      "key": "CancelMoveAccepted",
+      "source": "이동 예약을 취소했습니다. AP 행동 계획을 확인해 주세요.",
+      "translation": "Move plan cancelled. Please review your AP action plan."
+    },
+    {
+      "namespace": "CombatRound",
+      "key": "Rejected",
+      "source": "요청 불가: {0}",
+      "translation": "Request rejected: {0}"
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "DisconnectedBuyer",
+      "source": "협동 참가자의 연결 상태를 확인해 주세요.",
+      "translation": "Please check the co-op participant's connection."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "UnboundBuyer",
+      "source": "현재 연결에 배정된 직접 조작 캐릭터만 구매할 수 있습니다.",
+      "translation": "Only the directly controlled character assigned to this connection can make purchases."
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "ConsumablePurchased",
+      "source": "회복 소모품 1개를 구매하고 진행을 저장했습니다.",
+      "translation": "Purchased one healing consumable and saved your progress."
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "RevivalPurchased",
+      "source": "캐릭터를 부활시키고 진행을 저장했습니다.",
+      "translation": "Revived the character and saved your progress."
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "Purchased",
+      "source": "회복 서비스를 구매하고 진행을 저장했습니다.",
+      "translation": "Purchased a healing service and saved your progress."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "Rerolled",
+      "source": "아이템 상점의 상품을 다시 추첨했습니다.",
+      "translation": "The item shop stock has been rerolled."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "PurchasedInventory",
+      "source": "아이템을 구매해 인벤토리에 보관했습니다. 인벤토리(I)를 열어 장비 슬롯으로 드래그하여 장착하세요.",
+      "translation": "Item purchased and stored in your inventory. Press I and drag it onto an equipment slot to equip it."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "RerolledCount",
+      "source": "스킬 상품 {0}개를 다시 추첨했습니다. 다음 리롤 비용이 1G 증가했습니다.",
+      "translation": "Rerolled {0} skill offers. The next reroll costs 1G more."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "Recovered",
+      "source": "HP를 회복했습니다.",
+      "translation": "HP restored."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "Purchased",
+      "source": "스킬을 구매했습니다. 다음 전투부터 사용할 수 있습니다.",
+      "translation": "Skill purchased. It will be available in the next battle."
+    },
+    {
+      "namespace": "RunEquipment",
+      "key": "Disconnected",
+      "source": "협동 참가자의 연결 상태를 확인해 주세요.",
+      "translation": "Please check the co-op participant's connection."
+    },
+    {
+      "namespace": "RunEquipment",
+      "key": "UnboundOwner",
+      "source": "현재 연결에 배정된 캐릭터의 장비만 변경할 수 있습니다.",
+      "translation": "You can only change equipment for the character assigned to this connection."
+    },
+    {
+      "namespace": "RunEquipment",
+      "key": "Changed",
+      "source": "장비 구성을 저장했습니다.",
+      "translation": "Equipment saved."
+    },
+    {
+      "namespace": "RunGoldReward",
+      "key": "DisconnectedRecipient",
+      "source": "협동 참가자의 연결 상태를 확인해 주세요.",
+      "translation": "Please check the co-op participant's connection."
+    },
+    {
+      "namespace": "RunGoldReward",
+      "key": "UnboundRecipient",
+      "source": "현재 연결에 배정된 본인 캐릭터의 보상만 선택할 수 있습니다.",
+      "translation": "You can only choose rewards for your own character assigned to this connection."
+    },
+    {
+      "namespace": "RunGoldReward",
+      "key": "RewardClaimed",
+      "source": "전투 보상을 받았습니다.",
+      "translation": "Battle reward claimed."
+    },
+    {
+      "namespace": "MainMenu",
+      "key": "SurrenderUnavailable",
+      "source": "현재 메뉴에서는 저장된 싱글플레이 여정을 포기할 수 없습니다.",
+      "translation": "You cannot abandon the saved single-player journey from this menu."
+    },
+    {
+      "namespace": "ManagedRunMenu",
+      "key": "Unavailable",
+      "source": "이어갈 파티 저장과 본인 참가 정보가 필요합니다.",
+      "translation": "A saved party and your participant information are required to resume."
+    },
+    {
+      "namespace": "ManagedRunMenu",
+      "key": "Running",
+      "source": "현재 진행을 종료한 뒤 저장에서 이어갈 수 있습니다.",
+      "translation": "End the current session before resuming from a save."
+    },
+    {
+      "namespace": "ManagedRunMenu",
+      "key": "MissingMap",
+      "source": "Gameplay 레벨을 찾을 수 없습니다.",
+      "translation": "The Gameplay level could not be found."
+    },
+    {
+      "namespace": "ManagedRunMenu",
+      "key": "RosterChanged",
+      "source": "참가 상태가 바뀌었거나 이미 AI로 전환된 캐릭터입니다. 해당 Run에서는 인간 조작으로 복귀할 수 없습니다.",
+      "translation": "Participation has changed or this character has already switched to AI. Human control cannot be restored during this Run."
+    },
+    {
+      "namespace": "CharacterAppearance",
+      "key": "InvalidCatalogSize",
+      "source": "의상 목록 또는 선택 개수가 올바르지 않습니다.",
+      "translation": "The appearance catalog or selection count is invalid."
+    },
+    {
+      "namespace": "CharacterAppearance",
+      "key": "InvalidBodyVariant",
+      "source": "몸체 식별자·메시·변환 설정이 없거나 올바르지 않습니다.",
+      "translation": "A body identifier, mesh, or transform is missing or invalid."
+    },
+    {
+      "namespace": "CharacterAppearance",
+      "key": "InvalidDefaultBody",
+      "source": "기본 몸체가 몸체 목록에 등록되지 않았습니다.",
+      "translation": "The default body is not registered in the body catalog."
+    },
+    {
+      "namespace": "CharacterAppearance",
+      "key": "InvalidSelectedBody",
+      "source": "목록에 없는 몸체가 선택되었습니다.",
+      "translation": "The selected body is not in the catalog."
+    },
+    {
+      "namespace": "CharacterAppearance",
+      "key": "InvalidSlot",
+      "source": "의상 부위 태그가 없거나 중복되었습니다.",
+      "translation": "An appearance slot tag is missing or duplicated."
+    },
+    {
+      "namespace": "CharacterAppearance",
+      "key": "InvalidBody",
+      "source": "기본 신체 파츠가 올바르지 않습니다.",
+      "translation": "A default body part is invalid."
+    },
+    {
+      "namespace": "CharacterAppearance",
+      "key": "MissingBodyMaterial",
+      "source": "기본 신체 파츠의 교체 재질이 지정되지 않았습니다.",
+      "translation": "A replacement material is not specified for a default body part."
+    },
+    {
+      "namespace": "CharacterAppearance",
+      "key": "InvalidItem",
+      "source": "의상 항목의 식별자·부위·메시 설정이 올바르지 않습니다.",
+      "translation": "An appearance item has an invalid identifier, slot, or mesh setting."
+    },
+    {
+      "namespace": "CharacterAppearance",
+      "key": "MissingItemMesh",
+      "source": "의상 메시가 지정되지 않았습니다.",
+      "translation": "An appearance mesh is not specified."
+    },
+    {
+      "namespace": "CharacterAppearance",
+      "key": "InvalidSelection",
+      "source": "목록에 없는 의상 또는 같은 부위의 중복 의상이 선택되었습니다.",
+      "translation": "An appearance selection is not in the catalog or uses the same slot more than once."
+    },
+    {
+      "namespace": "CharacterAppearance",
+      "key": "TooManyMeshes",
+      "source": "선택한 의상 파츠가 너무 많습니다.",
+      "translation": "Too many appearance parts are selected."
+    },
+    {
+      "namespace": "Snapshot",
+      "key": "SkillCount",
+      "source": "Snapshot requires at least one ordered skill. / Snapshot에 순서가 있는 스킬이 한 개 이상 필요합니다.",
+      "translation": "Snapshot requires at least one ordered skill."
+    },
+    {
+      "namespace": "Snapshot",
+      "key": "RemovedSkill",
+      "source": "삭제된 스킬은 상대 파티에 장착할 수 없습니다.",
+      "translation": "Removed skills cannot be equipped by the opponent party."
+    },
+    {
+      "namespace": "Snapshot",
+      "key": "UnknownSkill",
+      "source": "Unsupported or duplicate skill: {0}. / 미지원 또는 중복 스킬: {0}.",
+      "translation": "Unsupported or duplicate skill: {0}."
+    },
+    {
+      "namespace": "Snapshot",
+      "key": "UnsupportedConsumable",
+      "source": "소모품은 재고가 없는 상대 Snapshot의 일반 스킬로 사용할 수 없습니다.",
+      "translation": "Consumables cannot be used as regular skills in an opponent Snapshot without stock."
+    },
+    {
+      "namespace": "Snapshot",
+      "key": "DuplicateSkillAsset",
+      "source": "Catalog identifiers resolve to the same skill asset: {0}. / 카탈로그 식별자가 동일한 스킬 에셋을 가리킵니다: {0}.",
+      "translation": "Catalog identifiers resolve to the same skill asset: {0}."
+    },
+    {
+      "namespace": "Snapshot",
+      "key": "ContentVersion",
+      "source": "Snapshot content version is incompatible. / Snapshot 콘텐츠 버전이 호환되지 않습니다.",
+      "translation": "Snapshot content version is incompatible."
+    },
+    {
+      "namespace": "Snapshot",
+      "key": "UnknownClass",
+      "source": "Unknown opponent class: {0}. / 알 수 없는 상대 직업: {0}.",
+      "translation": "Unknown opponent class: {0}."
+    },
+    {
+      "namespace": "Snapshot",
+      "key": "UnsupportedAppearance",
+      "source": "상대 직업에서 사용할 수 없는 의상 선택입니다.",
+      "translation": "This appearance selection is not supported by the opponent profession."
+    },
+    {
+      "namespace": "Snapshot",
+      "key": "UnsupportedBuild",
+      "source": "Equipment and custom tactics are not supported yet. / 장비와 사용자 전술은 아직 지원하지 않습니다.",
+      "translation": "Equipment and custom tactics are not supported yet."
+    },
+    {
+      "namespace": "Snapshot",
+      "key": "InvalidPlacement",
+      "source": "Opponent requires positive HP and a valid arena formation slot. / 상대에게 양수 HP와 유효한 아레나 배치 슬롯이 필요합니다.",
+      "translation": "Opponent requires positive HP and a valid arena formation slot."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "ProfessionError",
+      "source": "{0} [{1}]: {2}",
+      "translation": "{0} [{1}]: {2}"
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "UnsupportedProfession",
+      "source": "Select Warrior, Mage, Archer or Rogue. Start a new game instead of loading previous test professions. / 전사·마법사·궁수·도적 중 선택하세요. 이전 테스트 직업으로 저장했다면 새 게임을 시작해 주세요.",
+      "translation": "Select Warrior, Mage, Archer or Rogue. Start a new game instead of loading previous test professions."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "MissingProfession",
+      "source": "Profession definition is missing. / 직업 정의가 없습니다.",
+      "translation": "Profession definition is missing."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "MissingProfessionClass",
+      "source": "A concrete ProfessionClass is required. / 생성 가능한 직업 자식 클래스가 필요합니다.",
+      "translation": "A concrete ProfessionClass is required."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "MismatchedProfessionClass",
+      "source": "ProfessionClass must use the same ClassId as its catalog entry. / 직업 클래스와 목록 항목의 ClassId가 일치해야 합니다.",
+      "translation": "ProfessionClass must use the same ClassId as its catalog entry."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "MissingClass",
+      "source": "Set CombatClass, PlayerUnitClasses or FallbackPlayerUnitClass. / CombatClass, PlayerUnitClasses 또는 FallbackPlayerUnitClass를 지정하세요.",
+      "translation": "Set CombatClass, PlayerUnitClasses or FallbackPlayerUnitClass."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "UnspawnableClass",
+      "source": "Resolved CombatClass cannot be abstract or deprecated: {0}. / 실제 CombatClass는 추상 또는 사용 중단 클래스일 수 없습니다: {0}.",
+      "translation": "Resolved CombatClass cannot be abstract or deprecated: {0}."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "AppearanceCatalogMismatch",
+      "source": "직업과 전투 클래스의 의상 목록이 일치해야 합니다.",
+      "translation": "The profession and battle class must use the same appearance catalog."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "InvalidHPRange",
+      "source": "Resolved MaxHP must be finite, positive and at most 1000000. / 실제 MaxHP는 1000000 이하의 유한한 양수여야 합니다.",
+      "translation": "Resolved MaxHP must be finite, positive and at most 1000000."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "InvalidSpeed",
+      "source": "Speed must be a finite value between 0 and 1000000. / 속도는 0~1000000 범위의 유한한 값이어야 합니다.",
+      "translation": "Speed must be a finite value between 0 and 1000000."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "InvalidAPRange",
+      "source": "Resolved ActionPoints must be 1 to 100 and SubActionPoints 0 to 100. / 실제 ActionPoints는 1~100, SubActionPoints는 0~100이어야 합니다.",
+      "translation": "Resolved ActionPoints must be 1 to 100 and SubActionPoints 0 to 100."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "UnsupportedAppearance",
+      "source": "이 직업에서 사용할 수 없는 외형 선택입니다.",
+      "translation": "This appearance selection is not supported by the profession."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "UnsupportedStartingProfession",
+      "source": "비무장 시작 스킬을 받을 수 없는 직업입니다.",
+      "translation": "This profession cannot receive the starting unarmed skill."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "MissingUnarmedSkill",
+      "source": "비무장 시작 스킬 에셋을 불러올 수 없습니다.",
+      "translation": "The starting unarmed skill asset could not be loaded."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "UnversionedMemberSkills",
+      "source": "이전 저장 형식에 명시되지 않은 스킬 장착 데이터가 있습니다.",
+      "translation": "Skill loadout data is present but is not declared by this older save format."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "InvalidMemberSkillCount",
+      "source": "캐릭터의 저장된 스킬이 한 개 이상 필요합니다.",
+      "translation": "The character must have at least one saved skill."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "MissingMemberSkill",
+      "source": "저장된 스킬 에셋을 불러올 수 없습니다: {0}",
+      "translation": "A saved skill asset could not be loaded: {0}"
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "EmptyProfessions",
+      "source": "At least one profession definition is required. / 직업 정의가 한 개 이상 필요합니다.",
+      "translation": "At least one profession definition is required."
+    },
+    {
+      "namespace": "PartyDefinition",
+      "key": "EmptyProfessionId",
+      "source": "A profession ID cannot be None. / 직업 ID는 None일 수 없습니다.",
+      "translation": "A profession ID cannot be None."
+    },
+    {
+      "namespace": "RunGoldReward",
+      "key": "InvalidRange",
+      "source": "골드 보상 범위는 1 이상이며 최소값이 최대값보다 크지 않아야 합니다.",
+      "translation": "Gold rewards must be at least 1, and the minimum cannot exceed the maximum."
+    },
+    {
+      "namespace": "RunGoldReward",
+      "key": "MissingNode",
+      "source": "골드 보상을 생성할 전투 노드가 필요합니다.",
+      "translation": "A battle node is required to generate a gold reward."
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "InvalidPool",
+      "source": "시험용 인카운터는 서로 다른 ID와 이름을 가진 상점 3개가 필요합니다.",
+      "translation": "The prototype encounter requires three shops with distinct IDs and names."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "InvalidCatalog",
+      "source": "스킬 상점의 상품·가격·스킬 데이터가 유효하지 않습니다.",
+      "translation": "The skill shop contains invalid offers, prices, or skill data."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "CannotReroll",
+      "source": "현재 스킬 상점의 상품을 갱신할 수 없습니다.",
+      "translation": "The current skill shop stock cannot be refreshed."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "InsufficientCandidates",
+      "source": "태그 조건을 만족하는 양수 가중치 스킬 상점 후보가 필요합니다.",
+      "translation": "At least one skill shop candidate must match the tag conditions and have positive weight."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "InvalidStartingGold",
+      "source": "시작 골드는 0 이상이어야 합니다.",
+      "translation": "Starting gold cannot be negative."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "MissingPool",
+      "source": "스킬 상점의 후보 풀을 불러올 수 없습니다.",
+      "translation": "The skill shop candidate pool could not be loaded."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "RemovedSkill",
+      "source": "삭제된 스킬은 상점 후보에 포함할 수 없습니다.",
+      "translation": "Removed skills cannot be included in shop candidates."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "MissingProductSkill",
+      "source": "상품 스킬 에셋을 불러올 수 없습니다: {0}",
+      "translation": "An offered skill asset could not be loaded: {0}"
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "SkillDetails",
+      "source": "{0}\nAP {1} · 위력 {2}",
+      "translation": "{0}\nAP {1} · Power {2}"
+    },
+    {
+      "namespace": "RunWeaponSkills",
+      "key": "MissingDefaultCandidate",
+      "source": "Weapon skill candidate is unavailable: {0}. / 무기 스킬 후보를 불러올 수 없습니다: {0}.",
+      "translation": "Weapon skill candidate is unavailable: {0}."
+    },
+    {
+      "namespace": "SkillRound",
+      "key": "AssetError",
+      "source": "{0}: {1}",
+      "translation": "{0}: {1}"
+    },
+    {
+      "namespace": "SkillRound",
+      "key": "MissingId",
+      "source": "A valid primary asset ID is required. / 유효한 기본 에셋 식별자가 필요합니다.",
+      "translation": "A valid primary asset ID is required."
+    },
+    {
+      "namespace": "SkillRound",
+      "key": "ExplicitProfileRequired",
+      "source": "Automatic migration supports EnemyUnit with Single, AroundTarget or approaching TargetAndSides, or EnemyTile with AroundTarget, a nonnegative radius and positive AP cost. Enable bUseRoundDefinition and author RoundDefinition for other semantics. / 자동 이행은 EnemyUnit의 Single·AroundTarget·접근형 TargetAndSides 또는 EnemyTile의 AroundTarget, 0 이상의 반경과 양수 AP 비용만 지원합니다. 그 외 의미는 bUseRoundDefinition을 켜고 RoundDefinition을 직접 작성하세요.",
+      "translation": "Automatic migration supports EnemyUnit with Single, AroundTarget or approaching TargetAndSides, or EnemyTile with AroundTarget, a nonnegative radius and positive AP cost. Enable bUseRoundDefinition and author RoundDefinition for other semantics."
+    },
+    {
+      "namespace": "SkillRound",
+      "key": "ExplicitAbilityProfileRequired",
+      "source": "Automatic migration requires an attack derived from UGA_AttackBase. Custom abilities need an explicit RoundDefinition. / 자동 이행에는 UGA_AttackBase를 상속한 공격이 필요합니다. 사용자 어빌리티는 RoundDefinition을 직접 작성하세요.",
+      "translation": "Automatic migration requires an attack derived from UGA_AttackBase. Custom abilities need an explicit RoundDefinition."
+    },
+    {
+      "namespace": "SkillRound",
+      "key": "UnsupportedEffectDuration",
+      "source": "Unsupported effect duration: round checkpoints support only Instant effects. / 지원하지 않는 효과 지속시간: 현재 라운드 체크포인트는 Instant 효과만 지원합니다.",
+      "translation": "Unsupported effect duration: round checkpoints support only Instant effects."
+    },
+    {
+      "namespace": "SkillRound",
+      "key": "InvalidProfile",
+      "source": "RoundDefinition contains invalid timing, power, range, cost or approach settings. / RoundDefinition의 시간·위력·범위·비용·접근 설정이 유효하지 않습니다.",
+      "translation": "RoundDefinition contains invalid timing, power, range, cost or approach settings."
+    },
+    {
+      "namespace": "SkillCost",
+      "key": "Invalid",
+      "source": "Invalid AP / AP 오류",
+      "translation": "Invalid AP"
+    },
+    {
+      "namespace": "SkillCost",
+      "key": "Amount",
+      "source": "AP {0}",
+      "translation": "AP {0}"
+    },
+    {
+      "namespace": "TargetRun",
+      "key": "Catalog",
+      "source": "목표 Run의 로컬 Snapshot 카탈로그가 유효하지 않습니다.",
+      "translation": "The target Run's local Snapshot catalog is invalid."
+    },
+    {
+      "namespace": "TargetRun",
+      "key": "Invalid",
+      "source": "목표 Run의 고정 편성·선택 기록·콘텐츠 버전이 유효하지 않습니다. 저장 원본을 유지합니다.",
+      "translation": "The target Run's frozen lineups, selection history, or content version are invalid. The original save is preserved."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "EquipmentUnavailable",
+      "source": "디버그 전투의 계획 단계에서만 장비를 변경할 수 있습니다.",
+      "translation": "Equipment can only be changed during the planning phase of a debug battle."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "EquipmentUnitUnavailable",
+      "source": "현재 유닛의 디버그 장비 상태가 준비되지 않았습니다.",
+      "translation": "Debug equipment is not ready for the current unit."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "EquipmentAttachmentFailed",
+      "source": "장비 메시를 현재 캐릭터에 부착할 수 없습니다. 기존 장비를 유지합니다.",
+      "translation": "The equipment mesh could not be attached to this character. Existing equipment is preserved."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "EquipmentNotInCatalog",
+      "source": "장착 가능한 디버그 장비 목록과 유효한 장비 슬롯에서 선택하세요.",
+      "translation": "Choose from the supported debug equipment catalog and a valid equipment slot."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "EquipmentMissingCopy",
+      "source": "현재 보유 목록에 있는 장비만 제거할 수 있습니다.",
+      "translation": "Only equipment in the current inventory can be removed."
+    },
+    {
+      "namespace": "EncounterDungeon",
+      "key": "Left",
+      "source": "좌회전",
+      "translation": "Turn left"
+    },
+    {
+      "namespace": "EncounterDungeon",
+      "key": "Straight",
+      "source": "직진",
+      "translation": "Go straight"
+    },
+    {
+      "namespace": "EncounterDungeon",
+      "key": "Right",
+      "source": "우회전",
+      "translation": "Turn right"
+    },
+    {
+      "namespace": "TargetRun",
+      "key": "MissingGroup",
+      "source": "목표 Run의 전투 묶음이 없습니다.",
+      "translation": "The target Run battle group is missing."
+    },
+    {
+      "namespace": "Encounter",
+      "key": "StandalonePlayerClass",
+      "source": "싱글플레이 파티원에 올바른 플레이어 유닛이 필요합니다.",
+      "translation": "Each single-player party member requires a valid player unit."
+    },
+    {
+      "namespace": "Encounter",
+      "key": "RestoreEquipment",
+      "source": "저장된 캐릭터 장비 메시를 복구하지 못했습니다.",
+      "translation": "The saved character's equipment meshes could not be restored."
+    },
+    {
+      "namespace": "Encounter",
+      "key": "PartyAppearance",
+      "source": "캐릭터의 선택한 의상을 적용하지 못했습니다.",
+      "translation": "The character's selected appearance could not be applied."
+    },
+    {
+      "namespace": "Encounter",
+      "key": "PartyEquipment",
+      "source": "캐릭터의 장착 아이템 메시를 적용하지 못했습니다.",
+      "translation": "The character's equipped item meshes could not be applied."
+    },
+    {
+      "namespace": "Encounter",
+      "key": "OpponentAppearance",
+      "source": "상대 캐릭터의 선택한 의상을 적용하지 못했습니다.",
+      "translation": "The opponent's selected appearance could not be applied."
+    },
+    {
+      "namespace": "RunLevelDesign",
+      "key": "MonsterConfiguration",
+      "source": "저장된 몬스터 능력치와 원본 스킬을 적용하지 못했습니다.",
+      "translation": "The saved monster stats and original skill could not be applied."
+    },
+    {
+      "namespace": "RunGoldReward",
+      "key": "SelectionsPending",
+      "source": "모든 플레이어가 골드 보상을 선택해야 계속할 수 있습니다.",
+      "translation": "All players must choose their gold reward before continuing."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "Unavailable",
+      "source": "현재 상점에서 구매할 수 없습니다.",
+      "translation": "Purchases are not available in the current shop."
+    },
+    {
+      "namespace": "RunEquipment",
+      "key": "ShopOnly",
+      "source": "장비 변경은 상점 페이즈에서만 가능합니다.",
+      "translation": "Equipment can only be changed during the shop phase."
+    },
+    {
+      "namespace": "RunGoldReward",
+      "key": "Unavailable",
+      "source": "현재 전투 보상을 선택할 수 없습니다.",
+      "translation": "You cannot choose a battle reward right now."
+    },
+    {
+      "namespace": "EncounterPrototype",
+      "key": "DefaultTitle",
+      "source": "GENERAL STORE",
+      "translation": "GENERAL STORE"
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "Unavailable",
+      "source": "디버그 전투는 관리 Run이 없는 로컬 개발 실행에서만 사용할 수 있습니다.",
+      "translation": "Debug battles are only available in local development sessions without a managed Run."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "MissingSetup",
+      "source": "디버그 컨트롤러, 파티 또는 적 정의가 없습니다.",
+      "translation": "The debug controller, party, or enemy definition is missing."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "MultipleArenas",
+      "source": "디버그 레벨에는 전투장이 하나만 있어야 합니다.",
+      "translation": "A debug level must contain exactly one battle arena."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "MissingArena",
+      "source": "디버그 전투장이 없습니다.",
+      "translation": "The debug battle arena is missing."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "SpawnFailed",
+      "source": "디버그 전투 유닛을 생성하지 못했습니다.",
+      "translation": "A debug battle unit could not be spawned."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "StartFailed",
+      "source": "디버그 전투를 시작하지 못했습니다. 전투 설정 로그를 확인하세요.",
+      "translation": "The debug battle could not start. Check the battle setup log."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "Ready",
+      "source": "독립 디버그 전투 · Run 저장에 반영되지 않습니다.",
+      "translation": "Standalone debug battle · Run saves are not affected."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "InvalidFormation",
+      "source": "디버그 전투에는 플레이어 배치와 유효한 기본 적 목록이 필요합니다.",
+      "translation": "A debug battle requires a player formation and a valid default enemy roster."
+    },
+    {
+      "namespace": "CombatDebug",
+      "key": "ProfessionName",
+      "source": "디버그 {0}",
+      "translation": "Debug {0}"
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "Write",
+      "source": "진행을 저장하지 못했습니다. 이전 확정 저장을 유지합니다.",
+      "translation": "Your progress could not be saved. The previous confirmed save is preserved."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "Platform",
+      "source": "현재 체크포인트 파일 교체는 Win64에서만 지원합니다.",
+      "translation": "Checkpoint file replacement is currently supported only on Win64."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "Read",
+      "source": "이어할 저장이 없거나 파일이 손상되었습니다.",
+      "translation": "No save is available to continue, or the file is damaged."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "Delete",
+      "source": "진행을 포기하지 못했습니다. 기존 저장을 유지하며 다시 시도할 수 있습니다.",
+      "translation": "The journey could not be abandoned. The existing save is preserved; you can try again."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "DeletePlatform",
+      "source": "현재 진행 포기는 Win64에서만 지원합니다.",
+      "translation": "Abandoning a journey is currently supported only on Win64."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "DeleteChanged",
+      "source": "확인 후 저장이 변경되었습니다. 최신 진행을 확인한 뒤 다시 포기해 주세요.",
+      "translation": "The save changed after confirmation. Review the latest progress, then try abandoning it again."
+    },
+    {
+      "namespace": "RunCombatRewards",
+      "key": "InvalidSource",
+      "source": "전투 보상의 저장된 아이템·스킬 규칙 또는 골드 범위가 올바르지 않습니다.",
+      "translation": "The battle reward's saved item or skill rules, or its gold range, are invalid."
+    },
+    {
+      "namespace": "RunCombatRewards",
+      "key": "MissingNode",
+      "source": "전투 보상을 생성할 노드가 유효하지 않습니다.",
+      "translation": "The node for generating a battle reward is invalid."
+    },
+    {
+      "namespace": "RunCombatRewards",
+      "key": "InvalidReward",
+      "source": "저장된 전투 보상의 아이템·등급·스킬 또는 골드가 고정된 규칙과 일치하지 않습니다.",
+      "translation": "The saved battle reward's items, rarities, skills, or gold do not match the frozen rules."
+    },
+    {
+      "namespace": "RunContentMigration",
+      "key": "MissingUnarmedFallback",
+      "source": "삭제된 스킬의 대체 비무장 공격을 불러올 수 없습니다. 원본 저장을 유지합니다.",
+      "translation": "The unarmed attack that replaces a removed skill could not be loaded. The original save is preserved."
+    },
+    {
+      "namespace": "RunContentMigration",
+      "key": "PlanRevision",
+      "source": "삭제된 스킬 제거 후 저장된 준비 계획을 갱신할 수 없습니다. 원본 저장을 유지합니다.",
+      "translation": "The saved ready plans could not be updated after removing retired skills. The original save is preserved."
+    },
+    {
+      "namespace": "RunContentMigration",
+      "key": "ShopRepair",
+      "source": "삭제된 스킬 상품을 현재 상점 후보로 교체할 수 없습니다. 원본 저장을 유지합니다.",
+      "translation": "A removed skill offer could not be replaced with a current shop candidate. The original save is preserved."
+    },
+    {
+      "namespace": "RunDungeon",
+      "key": "BuildFailed",
+      "source": "Run의 경로·시드·인카운터 후보로 던전을 구성할 수 없습니다.",
+      "translation": "A dungeon could not be built from this Run's route, seed, and encounter candidates."
+    },
+    {
+      "namespace": "RunDungeon",
+      "key": "InvalidPlan",
+      "source": "저장된 던전 버전·배치·인카운터 경로가 Run과 일치하지 않습니다. 기존 저장을 유지합니다.",
+      "translation": "The saved dungeon version, layout, or encounter route does not match the Run. The existing save is preserved."
+    },
+    {
+      "namespace": "RunDungeon",
+      "key": "MissingVisit",
+      "source": "저장된 던전에서 다음 인카운터 후보를 찾을 수 없습니다.",
+      "translation": "The next encounter candidates could not be found in the saved dungeon."
+    },
+    {
+      "namespace": "RunEncounterPool",
+      "key": "MissingCsv",
+      "source": "인카운터 풀 CSV를 읽을 수 없습니다.",
+      "translation": "The encounter pool CSV could not be read."
+    },
+    {
+      "namespace": "RunEncounterPool",
+      "key": "InvalidCsv",
+      "source": "인카운터 CSV의 열·식별자·태그·가중치·상품 조건·진열 정책 또는 활성 후보가 올바르지 않습니다.",
+      "translation": "The encounter CSV contains invalid columns, identifiers, tags, weights, item conditions, stock policies, or active candidates."
+    },
+    {
+      "namespace": "RunEncounterPool",
+      "key": "InvalidState",
+      "source": "저장된 인카운터 정책·태그·그룹 가중치·상품 조건 또는 선택 가능한 후보 수가 올바르지 않습니다.",
+      "translation": "The saved encounter policies, tags, group weights, item conditions, or eligible candidate count are invalid."
+    },
+    {
+      "namespace": "RunEncounterPool",
+      "key": "InvalidSelection",
+      "source": "가중치 인카운터를 제시할 수 있는 방문 경계 또는 후보가 아닙니다.",
+      "translation": "Weighted encounters cannot be offered at this visit boundary or from these candidates."
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "RetiredTestShop",
+      "source": "스킬상점",
+      "translation": "Skill Shop"
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "SkillShop",
+      "source": "스킬상점",
+      "translation": "Skill Shop"
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "ItemShop",
+      "source": "아이템상점",
+      "translation": "Item Shop"
+    },
+    {
+      "namespace": "RunEquipment",
+      "key": "InvalidState",
+      "source": "저장된 장비 슬롯 또는 보유 아이템 연결이 올바르지 않습니다.",
+      "translation": "Saved equipment slots or inventory item references are invalid."
+    },
+    {
+      "namespace": "RunEquipment",
+      "key": "NonWeaponSkills",
+      "source": "Only tagged weapons may grant equipment skills. / 무기 태그가 있는 아이템만 장착 스킬을 부여할 수 있습니다.",
+      "translation": "Only tagged weapons may grant equipment skills."
+    },
+    {
+      "namespace": "RunEquipment",
+      "key": "Stale",
+      "source": "장비 상태가 변경되었습니다. 현재 목록에서 다시 드래그하세요.",
+      "translation": "Equipment has changed. Drag the item again from the current list."
+    },
+    {
+      "namespace": "RunEquipment",
+      "key": "InvalidItem",
+      "source": "보유한 아이템만 장착하거나 해제할 수 있습니다.",
+      "translation": "Only items you own can be equipped or unequipped."
+    },
+    {
+      "namespace": "RunEquipment",
+      "key": "UnsupportedSlot",
+      "source": "이 아이템은 해당 슬롯에 장착할 수 없습니다. 장착 분류가 없는 아이템은 보관만 가능합니다.",
+      "translation": "This item cannot be equipped in that slot. Items without an equipment classification can only be stored."
+    },
+    {
+      "namespace": "RunEquipment",
+      "key": "MissingMesh",
+      "source": "장비의 원본 메시를 불러올 수 없습니다. 기존 장비를 유지합니다.",
+      "translation": "The original equipment mesh could not be loaded. Existing equipment is preserved."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "SchemaOrigin",
+      "source": "지원하지 않는 Run 식별 정보 버전 또는 출처입니다.",
+      "translation": "The Run identity version or origin is not supported."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "Header",
+      "source": "Run 식별자, 원래 참가자 수 또는 Host 세대가 올바르지 않습니다.",
+      "translation": "The Run ID, original participant count, or host generation is invalid."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "Participant",
+      "source": "원래 참가자 식별자 또는 AI 동의 기록이 올바르지 않거나 참가자가 중복됩니다.",
+      "translation": "An original participant ID or AI consent record is invalid, or a participant is duplicated."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "JoinOrdinal",
+      "source": "구버전은 참가 번호를 추정할 수 없으며 새 번호는 1부터 참가자 수까지 중복 없이 연속되어야 합니다.",
+      "translation": "Join order cannot be inferred for older saves. New participant numbers must be unique and consecutive from 1 to the participant count."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "Host",
+      "source": "Host는 원래 참가자 중 한 명이어야 합니다.",
+      "translation": "The host must be one of the original participants."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "InitialHostOrdinal",
+      "source": "최초 Host는 원래 합류 번호 1번이어야 합니다.",
+      "translation": "The initial host must have original join number 1."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "Slots",
+      "source": "파티 슬롯은 중복 없이 0~3번을 사용해야 합니다.",
+      "translation": "Party slots must be unique and numbered 0 through 3."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "LegacyIdentity",
+      "source": "이전 오프라인 진행에는 추정한 Run 소유권이나 Host 정보를 추가할 수 없습니다.",
+      "translation": "Inferred Run ownership or host information cannot be added to older offline progress."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "LegacyOwner",
+      "source": "이전 오프라인 캐릭터에는 추정한 식별자나 소유자를 추가할 수 없습니다.",
+      "translation": "Inferred identifiers or owners cannot be added to older offline characters."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "EmptyMember",
+      "source": "빈 파티 슬롯에는 캐릭터 식별자나 소유자가 없어야 합니다.",
+      "translation": "An empty party slot must not have a character ID or owner."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "CharacterOwner",
+      "source": "생성된 캐릭터에는 고유 식별자와 원래 참가자인 소유자가 필요합니다.",
+      "translation": "Each created character requires a unique ID and an owner who is an original participant."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "OwnedCharacters",
+      "source": "생성된 캐릭터는 1~4명이며 각 원래 참가자는 최소 한 명을 소유해야 합니다.",
+      "translation": "There must be 1 to 4 created characters, and each original participant must own at least one."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "UnknownJoinOrder",
+      "source": "이 저장에는 명시적인 최초 합류 번호가 없습니다.",
+      "translation": "This save does not contain explicit original join numbers."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "JoinAccount",
+      "source": "참가 번호를 조회할 계정은 원래 참가자여야 합니다.",
+      "translation": "The account whose join number is requested must be an original participant."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "CandidateCount",
+      "source": "Host 후보 조회에는 원래 참가자 중 한 명 이상의 명시적인 인간 참가자가 필요합니다.",
+      "translation": "Host candidate lookup requires at least one explicitly listed human participant from the original roster."
+    },
+    {
+      "namespace": "RunIdentity",
+      "key": "CandidateAccounts",
+      "source": "명시적인 인간 참가자는 중복되지 않는 원래 참가자여야 합니다.",
+      "translation": "Explicit human participants must be unique members of the original roster."
+    },
+    {
+      "namespace": "ItemRarityProbabilities",
+      "key": "InvalidCatalog",
+      "source": "등급별 추첨에는 유효한 원본 아이템 카탈로그와 양수 선택 개수가 필요합니다.",
+      "translation": "Rarity selection requires a valid original item catalog and a positive selection count."
+    },
+    {
+      "namespace": "ItemRarityProbabilities",
+      "key": "MissingCsv",
+      "source": "아이템 등급 확률 CSV를 읽을 수 없습니다.",
+      "translation": "The item rarity probability CSV could not be read."
+    },
+    {
+      "namespace": "ItemRarityProbabilities",
+      "key": "InvalidCsv",
+      "source": "아이템 등급 확률 CSV의 열·5개 등급·태그·적용 범위·비고 또는 확률이 올바르지 않습니다.",
+      "translation": "The item rarity probability CSV has invalid columns, five-rarity entries, tags, scope, notes, or probabilities."
+    },
+    {
+      "namespace": "ItemRarityProbabilities",
+      "key": "InvalidState",
+      "source": "저장된 아이템 등급 확률의 버전·5개 등급 또는 100% 합계가 올바르지 않습니다.",
+      "translation": "The saved item rarity probability version, five-rarity entries, or 100% total is invalid."
+    },
+    {
+      "namespace": "ItemRarityProbabilities",
+      "key": "InsufficientCandidates",
+      "source": "태그·등급 확률·스킬 조건을 만족하는 아이템 후보가 부족합니다.",
+      "translation": "Not enough item candidates match the tag, rarity probability, and skill conditions."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "CannotRollShop",
+      "source": "아이템 상점의 상품을 갱신할 수 없습니다.",
+      "translation": "The item shop stock cannot be refreshed."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "MissingCatalog",
+      "source": "무기 에셋 CSV를 읽을 수 없습니다.",
+      "translation": "The weapon asset CSV could not be read."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "UnsupportedCatalogItem",
+      "source": "판매 카탈로그에 장착할 수 없는 아이템이 있습니다: {0}",
+      "translation": "The sales catalog contains an item that cannot be equipped: {0}"
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "InvalidCatalogHeader",
+      "source": "무기 에셋 CSV의 열 또는 상품 개수가 올바르지 않습니다.",
+      "translation": "The weapon asset CSV has invalid columns or item count."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "InvalidCatalogRow",
+      "source": "무기 에셋 CSV의 {0}행이 올바르지 않습니다.",
+      "translation": "Row {0} of the weapon asset CSV is invalid."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "InvalidCatalogRarity",
+      "source": "무기 에셋 CSV의 {0}행 등급 또는 분류 근거가 올바르지 않습니다. 등급은 흰색·초록색·파란색·보라색·주황색을 사용합니다.",
+      "translation": "Row {0} of the weapon asset CSV has an invalid rarity or classification reason. Use the CSV values 흰색 (White), 초록색 (Green), 파란색 (Blue), 보라색 (Purple), or 주황색 (Orange)."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "InvalidCatalogItem",
+      "source": "무기 에셋 CSV의 {0}행 분류·경로·이름·가격이 올바르지 않습니다.",
+      "translation": "Row {0} of the weapon asset CSV has an invalid classification, path, name, or price."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "DuplicateCatalogItem",
+      "source": "무기 에셋 CSV에 중복되거나 잘못된 상품이 있습니다.",
+      "translation": "The weapon asset CSV contains a duplicate or invalid item."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "InvalidShopState",
+      "source": "아이템 상점의 저장된 상품·가격·갱신 상태가 올바르지 않습니다.",
+      "translation": "The item shop's saved offers, prices, or refresh state are invalid."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "RequiresSavedProfile",
+      "source": "새 상점은 저장된 상품 조건으로 갱신해야 합니다.",
+      "translation": "New shops must be refreshed using their saved item conditions."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "InvalidProfile",
+      "source": "아이템 상점의 방문 대상·상품 조건 버전이 올바르지 않습니다.",
+      "translation": "The item shop's visit target or item condition version is invalid."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "NoEquippableReroll",
+      "source": "이 상점에 다시 진열할 수 있는 장착 가능한 상품이 없습니다.",
+      "translation": "This shop has no equippable items available for another reroll."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "UnvisitedProfile",
+      "source": "아직 방문하지 않은 아이템 상점은 갱신할 수 없습니다.",
+      "translation": "An item shop cannot be refreshed before it has been visited."
+    },
+    {
+      "namespace": "RunLevelDesign",
+      "key": "MissingCsv",
+      "source": "몬스터 스탯·출현 가중치·레벨 디자인 CSV를 읽을 수 없습니다.",
+      "translation": "The monster stats, spawn weights, or level design CSV could not be read."
+    },
+    {
+      "namespace": "RunLevelDesign",
+      "key": "MissingContent",
+      "source": "몬스터 클래스 또는 원본 공격 스킬을 불러올 수 없습니다.",
+      "translation": "A monster class or its original attack skill could not be loaded."
+    },
+    {
+      "namespace": "RunLevelDesign",
+      "key": "InvalidCsv",
+      "source": "몬스터·가중치·레벨 CSV의 열·식별자·등록 태그·수치·후보 수 또는 새 Run 상태가 올바르지 않습니다.",
+      "translation": "The monster, weight, or level CSV has invalid columns, identifiers, registered tags, values, candidate counts, or initial Run state."
+    },
+    {
+      "namespace": "RunLevelDesign",
+      "key": "InvalidBuild",
+      "source": "레벨 디자인의 저장 조건 또는 후보 수가 유효하지 않습니다.",
+      "translation": "The saved level design conditions or candidate count are invalid."
+    },
+    {
+      "namespace": "RunLevelDesign",
+      "key": "InvalidState",
+      "source": "저장된 몬스터 카탈로그·레벨 규칙·시드 또는 확정 편성이 일치하지 않습니다. 저장 원본을 유지합니다.",
+      "translation": "The saved monster catalog, level rules, seed, or confirmed lineups do not match. The original save is preserved."
+    },
+    {
+      "namespace": "RunParticipation",
+      "key": "StandaloneSlots",
+      "source": "파티 슬롯은 중복 없이 0~3번을 사용해야 합니다.",
+      "translation": "Party slots must be unique and numbered 0 through 3."
+    },
+    {
+      "namespace": "RunParticipation",
+      "key": "StandaloneSelection",
+      "source": "직접 조작할 캐릭터는 생성한 파티원 중 한 명만 선택할 수 있습니다.",
+      "translation": "Select exactly one created party member for direct control."
+    },
+    {
+      "namespace": "RunParticipation",
+      "key": "StandaloneEmpty",
+      "source": "직접 조작할 캐릭터를 생성해 주세요.",
+      "translation": "Create a character for direct control."
+    },
+    {
+      "namespace": "RunParticipation",
+      "key": "NewCoopRoster",
+      "source": "새 협동 Run은 원래 참가자마다 한 캐릭터만 배정하고 나머지 슬롯은 비워야 합니다.",
+      "translation": "A new co-op Run must assign exactly one character to each original participant and leave the remaining slots empty."
+    },
+    {
+      "namespace": "RunParticipation",
+      "key": "Invalid",
+      "source": "Run 참여 상태가 원래 참가자·Host와 일치하지 않습니다.",
+      "translation": "The Run participation state does not match the original participants and host."
+    },
+    {
+      "namespace": "RunParticipation",
+      "key": "Character",
+      "source": "원래 파티에 없는 캐릭터의 조작 상태를 조회할 수 없습니다.",
+      "translation": "Control status cannot be requested for a character outside the original party."
+    },
+    {
+      "namespace": "RunParticipation",
+      "key": "Transition",
+      "source": "재개는 원래 소유권과 번호를 유지하고 기존 인간 참가자만 남길 수 있으며 다음 Host 세대를 사용해야 합니다.",
+      "translation": "Resuming must preserve original ownership and join numbers, retain only existing human participants, and use the next host generation."
+    },
+    {
+      "namespace": "RunParticipation",
+      "key": "PermanentAI",
+      "source": "이 Run에서 이미 AI로 전환된 참가자는 인간 조작으로 복귀할 수 없습니다.",
+      "translation": "A participant already switched to AI cannot regain human control during this Run."
+    },
+    {
+      "namespace": "RunParticipation",
+      "key": "HostOrder",
+      "source": "재개할 인간 참가자 중 최초 합류 번호가 가장 낮은 참가자가 Host여야 합니다.",
+      "translation": "Among the humans resuming the Run, the participant with the lowest original join number must be the host."
+    },
+    {
+      "namespace": "RunPveDifficulty",
+      "key": "MissingCsv",
+      "source": "PvE 난이도 CSV를 읽을 수 없습니다.",
+      "translation": "The PvE difficulty CSV could not be read."
+    },
+    {
+      "namespace": "RunPveDifficulty",
+      "key": "InvalidCsv",
+      "source": "PvE 난이도 CSV의 열·순서·등록 태그·배율 또는 초기 저장 상태가 올바르지 않습니다.",
+      "translation": "The PvE difficulty CSV has invalid columns, order, registered tags, multipliers, or initial save state."
+    },
+    {
+      "namespace": "RunPveDifficulty",
+      "key": "InvalidState",
+      "source": "저장된 PvE 난이도 규칙·선택 기록·전투 배율이 진행 상태와 일치하지 않습니다.",
+      "translation": "The saved PvE difficulty rules, selection history, or battle multipliers do not match the current progress."
+    },
+    {
+      "namespace": "RunPveDifficulty",
+      "key": "InvalidSelection",
+      "source": "해당 PvE에 확정된 난이도 또는 저장된 편성·보상 배율이 올바르지 않습니다.",
+      "translation": "The confirmed difficulty, saved lineup, or reward multipliers for this PvE battle are invalid."
+    },
+    {
+      "namespace": "RunPveDifficulty",
+      "key": "InvalidOffers",
+      "source": "PvE 난이도 선택지를 구성할 수 없습니다.",
+      "translation": "The PvE difficulty choices could not be prepared."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "InvalidSaveData",
+      "source": "저장 파일이 손상되었거나 현재 버전·직업 설정과 호환되지 않습니다.",
+      "translation": "The save file is damaged or incompatible with the current version or profession settings."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "InvalidRewardState",
+      "source": "저장된 전투 보상 또는 수령 기록이 현재 진행·캐릭터 정보와 일치하지 않습니다.",
+      "translation": "The saved battle rewards or claim records do not match the current progress and character data."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "EmptyProfile",
+      "source": "{0}의 조건에 맞는 상품이 부족합니다. 인카운터 태그와 등급 확률을 확인하세요.",
+      "translation": "Not enough items match the conditions for {0}. Check the encounter tags and rarity probabilities."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "MissingPartyCatalog",
+      "source": "저장에 필요한 파티 직업 설정이 없거나 불러올 수 없습니다.",
+      "translation": "The party profession settings required for this save are missing or could not be loaded."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "SavedProfessionUnsupported",
+      "source": "저장된 직업 '{0}'을 현재 직업 설정으로 불러올 수 없습니다. 저장 원본을 유지합니다. {1}",
+      "translation": "The saved profession '{0}' could not be loaded with the current profession settings. The original save is preserved. {1}"
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "PartyHP",
+      "source": "전투 체크포인트와 파티의 체력이 일치하지 않습니다.",
+      "translation": "The battle checkpoint HP does not match the party HP."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "PartySkills",
+      "source": "전투 체크포인트와 캐릭터의 습득 스킬이 일치하지 않습니다.",
+      "translation": "The battle checkpoint skills do not match the character's acquired skills."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "ManagedMode",
+      "source": "전투 조작 방식이 관리 Run의 영구 참여 상태와 일치하지 않습니다.",
+      "translation": "The battle control mode does not match the managed Run's permanent participation state."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "ManagedLease",
+      "source": "현재 관리 Run Host의 유효한 실행 lease가 있어야 저장할 수 있습니다.",
+      "translation": "Saving requires a valid execution lease for the current managed Run host."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "ManagedSerialize",
+      "source": "관리 Run을 저장 데이터로 변환하지 못했습니다.",
+      "translation": "The managed Run could not be serialized as save data."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "ExplicitBoundary",
+      "source": "전투는 준비 계획과 상태를 함께 검증한 명시적 체크포인트로만 저장할 수 있습니다.",
+      "translation": "Battles can only be saved as explicit checkpoints that validate both ready plans and battle state."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "PlanningBoundary",
+      "source": "현재 전투의 유효한 준비 계획과 저장 권한이 필요합니다. 저장 실패 시 준비 완료를 확정하지 않습니다.",
+      "translation": "Valid ready plans and save authority are required for the current battle. Ready status will not be confirmed if saving fails."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "Host",
+      "source": "기존 Host만 이 전투 체크포인트를 복구할 수 있습니다.",
+      "translation": "Only the existing host can restore this battle checkpoint."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "ManagedActive",
+      "source": "현재 관리 세션을 먼저 닫아야 다른 진행을 불러올 수 있습니다.",
+      "translation": "Close the current managed session before loading other progress."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "InvalidSave",
+      "source": "이어할 저장이 없거나 Run 저장 파일이 아닙니다.",
+      "translation": "No save is available to continue, or the file is not a Run save."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "RetiredCombatSave",
+      "source": "기존 순차 턴 전투 저장은 준비 계획 체크포인트로 복구할 수 없습니다. 기존 저장 파일은 보존됩니다.",
+      "translation": "Older sequential-turn battle saves cannot be restored as ready-plan checkpoints. The existing save file is preserved."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "ManagedResumeRequired",
+      "source": "관리 Run은 기준 저장소에서 실행 lease를 획득하는 명시적 재개를 사용해야 합니다.",
+      "translation": "Managed Runs require explicit resumption with an execution lease from the authoritative store."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "SessionRequired",
+      "source": "계정 연결 또는 협동 세션이 필요한 저장입니다. 현재 싱글플레이 이어하기 대신 기존 Host와 원래 참가자가 연결된 세션에서 복원해야 합니다.",
+      "translation": "This save requires an account connection or co-op session. Restore it in a session with the existing host and original participants instead of single-player Continue."
+    },
+    {
+      "namespace": "RunSurrender",
+      "key": "Session",
+      "source": "현재 싱글플레이 메뉴에서 이어갈 수 있는 진행만 포기할 수 있습니다.",
+      "translation": "Only progress that can be continued from the current single-player menu can be abandoned."
+    },
+    {
+      "namespace": "RunSurrender",
+      "key": "ActiveIdentity",
+      "source": "협동 또는 계정 세션의 진행은 싱글플레이 메뉴에서 포기할 수 없습니다.",
+      "translation": "Co-op or account-session progress cannot be abandoned from the single-player menu."
+    },
+    {
+      "namespace": "RunSurrender",
+      "key": "Changed",
+      "source": "확인 후 저장이 변경되었습니다. 최신 진행을 확인한 뒤 다시 포기해 주세요.",
+      "translation": "The save changed after confirmation. Review the latest progress, then try abandoning it again."
+    },
+    {
+      "namespace": "ManagedRun",
+      "key": "CallerContext",
+      "source": "유효한 개발용 호출자 문맥이 필요하며 같은 GameInstance에서 계정이나 저장소를 변경할 수 없습니다.",
+      "translation": "A valid development caller context is required. The account and store cannot be changed within the same GameInstance."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "EmptySlotAppearance",
+      "source": "빈 캐릭터 슬롯에 의상을 저장할 수 없습니다.",
+      "translation": "Appearance data cannot be saved in an empty character slot."
+    },
+    {
+      "namespace": "ManagedRun",
+      "key": "CreateContext",
+      "source": "관리 Run은 고정된 개발용 최초 Host가 번호를 가진 원래 참가자 2~4명으로 새로 생성해야 합니다.",
+      "translation": "A managed Run must be created by the fixed initial development host with 2 to 4 numbered original participants."
+    },
+    {
+      "namespace": "ManagedRun",
+      "key": "ReadContext",
+      "source": "관리 Run을 조회하려면 원래 참가자로 배정된 개발용 호출자 문맥이 필요합니다.",
+      "translation": "Reading a managed Run requires a development caller context assigned to an original participant."
+    },
+    {
+      "namespace": "ManagedRun",
+      "key": "InvalidPayload",
+      "source": "기준 저장소 본문이 유효한 개발용 v4 관리 Run이 아닙니다.",
+      "translation": "The authoritative store payload is not a valid development v4 managed Run."
+    },
+    {
+      "namespace": "ManagedRun",
+      "key": "RecordIdentity",
+      "source": "기준 저장의 Run·Host 세대 또는 조회자의 원래 참가 기록이 일치하지 않습니다.",
+      "translation": "The authoritative record's Run, host generation, or reader's original participation record does not match."
+    },
+    {
+      "namespace": "ManagedRun",
+      "key": "ActiveTarget",
+      "source": "활성 관리 Run을 닫기 전에는 재개 대상을 바꿀 수 없습니다.",
+      "translation": "The resume target cannot be changed until the active managed Run is closed."
+    },
+    {
+      "namespace": "ManagedRun",
+      "key": "ResumeContext",
+      "source": "이전 실행을 닫고 최신 확정 기록으로 명시적으로 재개해야 합니다.",
+      "translation": "Close the previous execution and explicitly resume from the latest confirmed record."
+    },
+    {
+      "namespace": "ManagedRun",
+      "key": "StaleOrEnded",
+      "source": "기록이 변경되었거나 종료된 Run입니다. 최신 기록을 다시 확인해 주세요.",
+      "translation": "The record has changed or the Run has ended. Check the latest record again."
+    },
+    {
+      "namespace": "ManagedRun",
+      "key": "RetiredCombatSave",
+      "source": "기존 순차 턴 관리 전투는 준비 계획 체크포인트로 재개할 수 없습니다. 기준 저장과 실행 권한은 변경하지 않습니다.",
+      "translation": "Older sequential-turn managed battles cannot be resumed as ready-plan checkpoints. The authoritative save and execution authority remain unchanged."
+    },
+    {
+      "namespace": "ManagedRun",
+      "key": "ConfirmLease",
+      "source": "재개를 확정하려면 현재 Host의 실행 lease가 필요합니다.",
+      "translation": "The current host's execution lease is required to confirm resumption."
+    },
+    {
+      "namespace": "ManagedRun",
+      "key": "TravelContext",
+      "source": "현재 GameInstance의 대기 중인 관리 Run만 메뉴에서 이동할 수 있습니다.",
+      "translation": "Only the pending managed Run in the current GameInstance can travel from the menu."
+    },
+    {
+      "namespace": "TargetRun",
+      "key": "Standalone",
+      "source": "목표 Run의 Snapshot 전투는 현재 로컬 싱글플레이에서만 사용할 수 있습니다.",
+      "translation": "Target Run Snapshot battles are currently available only in local single-player."
+    },
+    {
+      "namespace": "RunPveDifficulty",
+      "key": "RequiredChoice",
+      "source": "표시된 PvE 난이도 하·중·상 중 하나를 선택해 주세요.",
+      "translation": "Choose one of the displayed PvE difficulties: Low, Medium, or High."
+    },
+    {
+      "namespace": "RunCheckpoint",
+      "key": "FinalPartyHP",
+      "source": "전투 결과의 캐릭터 슬롯 또는 최종 체력이 유효하지 않습니다. 기존 파티와 저장을 유지합니다.",
+      "translation": "A battle result character slot or final HP is invalid. The existing party and save are preserved."
+    },
+    {
+      "namespace": "RunLevelDesign",
+      "key": "RestInvalidHP",
+      "source": "휴식 회복 전 체력이 현재 최대 체력을 벗어났습니다. 기존 파티와 저장을 유지합니다.",
+      "translation": "HP before rest healing is outside the current maximum HP range. The existing party and save are preserved."
+    },
+    {
+      "namespace": "RunGoldReward",
+      "key": "OwnCharacterOnly",
+      "source": "본인이 직접 조작하는 캐릭터의 보상만 선택할 수 있습니다.",
+      "translation": "You can only choose rewards for a character you directly control."
+    },
+    {
+      "namespace": "RunGoldReward",
+      "key": "AlreadyClaimed",
+      "source": "이 캐릭터는 전투 보상을 이미 받았습니다.",
+      "translation": "This character has already claimed the battle reward."
+    },
+    {
+      "namespace": "RunGoldReward",
+      "key": "GoldOverflow",
+      "source": "보유 골드가 최대값을 초과하여 보상을 받을 수 없습니다.",
+      "translation": "The reward would exceed the maximum gold amount and cannot be claimed."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "ChangedStock",
+      "source": "상점 상품이 변경되었거나 구매할 수 없습니다. 최신 목록에서 다시 선택하세요.",
+      "translation": "Shop stock has changed or is unavailable. Choose again from the latest list."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "UnsupportedPurchase",
+      "source": "장착할 수 없는 상품은 더 이상 판매하지 않습니다. 리롤하거나 상점을 나가세요.",
+      "translation": "Items that cannot be equipped are no longer sold. Reroll or leave the shop."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "ChangedStock",
+      "source": "스킬 상점이 변경되었습니다. 최신 목록에서 다시 선택하세요.",
+      "translation": "The skill shop has changed. Choose again from the latest list."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "OwnCharacterOnly",
+      "source": "본인이 직접 조작하는 생존 캐릭터만 구매할 수 있습니다.",
+      "translation": "Only a living character you directly control can make purchases."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "AlreadyFullHP",
+      "source": "HP가 이미 가득 차 있습니다.",
+      "translation": "HP is already full."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "InvalidSkill",
+      "source": "구매할 스킬 데이터가 유효하지 않습니다.",
+      "translation": "The skill data for this purchase is invalid."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "AlreadyOwned",
+      "source": "이미 습득한 스킬입니다.",
+      "translation": "This skill has already been acquired."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "InsufficientGold",
+      "source": "골드가 부족합니다.",
+      "translation": "Not enough gold."
+    },
+    {
+      "namespace": "RunEquipment",
+      "key": "OwnerOnly",
+      "source": "본인이 직접 조작하는 생존 캐릭터의 장비만 변경할 수 있습니다.",
+      "translation": "You can only change equipment for a living character you directly control."
+    },
+    {
+      "namespace": "RunLevelDesign",
+      "key": "NodeName",
+      "source": "{0} · {1}/10 · {2}",
+      "translation": "{0} · {1}/10 · {2}"
+    },
+    {
+      "namespace": "TargetRun",
+      "key": "GrowthLimits",
+      "source": "성장 적용 후 캐릭터 능력치가 허용 범위를 벗어났습니다.",
+      "translation": "Character stats exceed the allowed range after growth is applied."
+    },
+    {
+      "namespace": "RunWeaponSkills",
+      "key": "MissingSkill",
+      "source": "스킬 정의를 불러올 수 없습니다.",
+      "translation": "The skill definition could not be loaded."
+    },
+    {
+      "namespace": "RunWeaponSkills",
+      "key": "UnknownBalance",
+      "source": "지원하지 않는 스킬 밸런스 버전입니다.",
+      "translation": "This skill balance version is not supported."
+    },
+    {
+      "namespace": "RunWeaponSkills",
+      "key": "InvalidRules",
+      "source": "무기 스킬 생성 규칙의 버전·개수·태그·후보·등급이 올바르지 않습니다.",
+      "translation": "The weapon skill generation rules have an invalid version, count, tags, candidates, or rarities."
+    },
+    {
+      "namespace": "RunWeaponSkills",
+      "key": "InvalidGeneratedCopy",
+      "source": "아이템 사본의 생성 버전·식별자·등급·부여 스킬이 저장된 규칙과 일치하지 않습니다.",
+      "translation": "The item copy's generation version, identifier, rarity, or granted skills do not match the saved rules."
+    },
+    {
+      "namespace": "RunWeaponSkills",
+      "key": "InvalidBaseItem",
+      "source": "새 사본 생성에는 기존 생성 결과가 없는 유효한 아이템 정의가 필요합니다.",
+      "translation": "Creating a new copy requires a valid item definition without existing generation results."
+    },
+    {
+      "namespace": "RunWeaponSkills",
+      "key": "NoCompatibleCandidates",
+      "source": "아이템과 등급의 태그 조건을 만족하는 서로 다른 스킬 후보가 부족합니다.",
+      "translation": "Not enough distinct skill candidates match the item and rarity tag conditions."
+    },
+    {
+      "namespace": "RunAuthority",
+      "key": "InvalidRequest",
+      "source": "권위 저장 요청의 이름, 버전 또는 실행 권한이 올바르지 않습니다.",
+      "translation": "The authoritative save request has an invalid name, version, or execution authority."
+    },
+    {
+      "namespace": "RunAuthority",
+      "key": "NotFound",
+      "source": "권위 저장소에 해당 Run이 없습니다.",
+      "translation": "The Run does not exist in the authoritative store."
+    },
+    {
+      "namespace": "RunAuthority",
+      "key": "AlreadyExists",
+      "source": "해당 Run의 권위 저장이 이미 존재합니다.",
+      "translation": "An authoritative save already exists for this Run."
+    },
+    {
+      "namespace": "RunAuthority",
+      "key": "Busy",
+      "source": "다른 실행 또는 저장 작업이 해당 Run의 잠금을 보유하고 있습니다.",
+      "translation": "Another execution or save operation holds the lock for this Run."
+    },
+    {
+      "namespace": "RunAuthority",
+      "key": "Conflict",
+      "source": "권위 저장 버전이 변경되었습니다. 최신 기록을 다시 확인해야 합니다.",
+      "translation": "The authoritative save version has changed. Check the latest record again."
+    },
+    {
+      "namespace": "RunAuthority",
+      "key": "InvalidRecord",
+      "source": "권위 저장 파일이 손상되었거나 지원하지 않는 형식입니다.",
+      "translation": "The authoritative save file is damaged or uses an unsupported format."
+    },
+    {
+      "namespace": "RunAuthority",
+      "key": "UnsupportedPlatform",
+      "source": "현재 로컬 권위 저장소는 Win64에서만 지원합니다.",
+      "translation": "The local authoritative store is currently supported only on Win64."
+    },
+    {
+      "namespace": "RunAuthority",
+      "key": "StorageFailure",
+      "source": "권위 저장을 완료하지 못했습니다. 이전 확정 기록을 유지합니다.",
+      "translation": "The authoritative save could not be completed. The previous confirmed record is preserved."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "SchemaVersion",
+      "source": "지원하지 않는 Snapshot 저장 버전입니다. v1 데이터가 필요합니다.",
+      "translation": "This Snapshot save version is not supported. Version 1 data is required."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "Header",
+      "source": "Snapshot 식별자, 콘텐츠 버전 또는 파티 인원수가 올바르지 않습니다.",
+      "translation": "The Snapshot ID, content version, or party size is invalid."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "Identity",
+      "source": "파티원의 식별자, 직업 또는 이름이 올바르지 않거나 중복됩니다.",
+      "translation": "A party member ID, profession, or name is invalid or duplicated."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "Formation",
+      "source": "파티 배치는 중복 없이 0~3번 슬롯을 사용해야 합니다.",
+      "translation": "Party formation slots must be unique and numbered 0 through 3."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "Health",
+      "source": "파티원의 최대 HP 또는 현재 HP가 허용 범위를 벗어났습니다.",
+      "translation": "A party member's maximum or current HP is outside the allowed range."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "Speed",
+      "source": "파티원의 속도가 허용 범위를 벗어났습니다.",
+      "translation": "A party member's speed is outside the allowed range."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "ActionStats",
+      "source": "파티원의 AP, SubAP 또는 이동 범위가 허용 범위를 벗어났습니다.",
+      "translation": "A party member's AP, SubAP, or movement range is outside the allowed range."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "Skills",
+      "source": "파티원은 중복 없는 스킬 식별자를 한 개 이상 가져야 합니다.",
+      "translation": "Each party member must have at least one unique skill identifier."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "RemovedSkill",
+      "source": "삭제된 스킬을 새 Snapshot에 포함할 수 없습니다.",
+      "translation": "Removed skills cannot be included in a new Snapshot."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "EquipmentTactics",
+      "source": "파티원의 장비 또는 전술 식별자가 올바르지 않습니다.",
+      "translation": "A party member's equipment or tactics identifier is invalid."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "Appearance",
+      "source": "파티원의 몸체·의상 식별자가 올바르지 않거나 중복됩니다.",
+      "translation": "A party member's body or appearance identifiers are invalid or duplicated."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "Slot",
+      "source": "Snapshot 슬롯은 영문, 숫자, 밑줄로 이루어진 1~64자 식별자가 필요합니다.",
+      "translation": "A Snapshot slot requires an identifier of 1 to 64 ASCII letters, digits, or underscores."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "Write",
+      "source": "상대 파티 Snapshot을 저장하지 못했습니다.",
+      "translation": "The opponent party Snapshot could not be saved."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "Missing",
+      "source": "저장된 상대 파티 Snapshot이 없습니다.",
+      "translation": "No saved opponent party Snapshot was found."
+    },
+    {
+      "namespace": "PartySnapshot",
+      "key": "Read",
+      "source": "상대 파티 Snapshot을 불러오지 못했거나 저장 형식이 올바르지 않습니다.",
+      "translation": "The opponent party Snapshot could not be loaded, or its save format is invalid."
+    },
+    {
+      "namespace": "SnapshotSelection",
+      "key": "InvalidRequest",
+      "source": "상대 후보 선정에 유효한 카탈로그·진행 단계·1~4개 배치 슬롯이 필요합니다.",
+      "translation": "Opponent selection requires a valid catalog, progress stage, and 1 to 4 formation slots."
+    },
+    {
+      "namespace": "SnapshotSelection",
+      "key": "DuplicateId",
+      "source": "동일한 Snapshot 식별자가 적격 후보에 중복되어 균등 추첨할 수 없습니다.",
+      "translation": "The same Snapshot ID appears more than once among eligible candidates, so uniform selection is not possible."
+    },
+    {
+      "namespace": "SnapshotSelection",
+      "key": "NoCandidate",
+      "source": "동일 콘텐츠 버전·진행 단계·태그 조건을 만족하는 생존 상대 후보가 없습니다.",
+      "translation": "No living opponent candidate matches the content version, progress stage, and tag conditions."
+    },
+    {
+      "namespace": "SnapshotSelection",
+      "key": "InvalidLocalSlots",
+      "source": "로컬 상대 후보에는 중복 없는 유효한 Snapshot 슬롯과 진행 단계가 필요합니다.",
+      "translation": "Local opponent candidates require valid, unique Snapshot slots and a progress stage."
+    },
+    {
+      "namespace": "UnitDataRules",
+      "key": "SkillCount",
+      "source": "At least one skill is required. / 스킬이 한 개 이상 필요합니다.",
+      "translation": "At least one skill is required."
+    },
+    {
+      "namespace": "UnitDataRules",
+      "key": "MissingSkill",
+      "source": "StartingSkills[{0}] is missing or invalid. / StartingSkills[{0}] 참조가 없거나 유효하지 않습니다.",
+      "translation": "StartingSkills[{0}] is missing or invalid."
+    },
+    {
+      "namespace": "UnitDataRules",
+      "key": "ConsumableStockRequired",
+      "source": "Consumables require tagged Run stock instead of an acquired skill slot. / 소모품은 습득 스킬 슬롯 대신 태그가 지정된 Run 재고가 필요합니다.",
+      "translation": "Consumables require tagged Run stock instead of an acquired skill slot."
+    },
+    {
+      "namespace": "UnitDataRules",
+      "key": "DuplicateSkill",
+      "source": "Skill asset ID is duplicated: {0}. / 스킬 에셋 ID가 중복됩니다: {0}.",
+      "translation": "Skill asset ID is duplicated: {0}."
+    }
+  ]
+}

@@ -1,0 +1,2110 @@
+{
+  "entries": [
+    {
+      "namespace": "Equipment",
+      "key": "Body",
+      "source": "갑옷",
+      "translation": "Body"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "Feet",
+      "source": "신발",
+      "translation": "Feet"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "Hands",
+      "source": "장갑",
+      "translation": "Hands"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "Head",
+      "source": "투구",
+      "translation": "Head"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "MainHand",
+      "source": "주 무기",
+      "translation": "Main Hand"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "Neck",
+      "source": "목걸이",
+      "translation": "Neck"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "OffHand",
+      "source": "보조 무기",
+      "translation": "Off Hand"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "RingOne",
+      "source": "반지 1",
+      "translation": "Ring 1"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "RingTwo",
+      "source": "반지 2",
+      "translation": "Ring 2"
+    },
+    {
+      "namespace": "Profession",
+      "key": "ArcherDescription",
+      "source": "궁수 계열",
+      "translation": "Archer class"
+    },
+    {
+      "namespace": "Profession",
+      "key": "ArcherName",
+      "source": "궁수",
+      "translation": "Archer"
+    },
+    {
+      "namespace": "Profession",
+      "key": "MageDescription",
+      "source": "마법사 계열",
+      "translation": "Mage class"
+    },
+    {
+      "namespace": "Profession",
+      "key": "MageName",
+      "source": "마법사",
+      "translation": "Mage"
+    },
+    {
+      "namespace": "Profession",
+      "key": "RogueDescription",
+      "source": "도적 계열",
+      "translation": "Rogue class"
+    },
+    {
+      "namespace": "Profession",
+      "key": "RogueName",
+      "source": "도적",
+      "translation": "Rogue"
+    },
+    {
+      "namespace": "Profession",
+      "key": "WarriorDescription",
+      "source": "전사 계열",
+      "translation": "Warrior class"
+    },
+    {
+      "namespace": "Profession",
+      "key": "WarriorName",
+      "source": "전사",
+      "translation": "Warrior"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/Adventures_Pack/Mesh/Adventure_01/Mesh_UE4/Separate/SM_Adventure_01_Knife.SM_Adventure_01_Knife.Name",
+      "source": "노련한 모험가의 칼",
+      "translation": "Veteran Adventurer's Knife"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/Adventures_Pack/Mesh/Adventure_03/Weapons/SM_Knife.SM_Knife.Name",
+      "source": "떠돌이 정찰병의 칼",
+      "translation": "Wandering Scout's Knife"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/Adventures_Pack/Mesh/Adventure_05/Shield_And_Club/SM_Shield.SM_Shield.Name",
+      "source": "모험가의 방패",
+      "translation": "Adventurer's Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/Assassin/Mesh/Separated_Mesh/Weapon/SM_dagger_Mesh.SM_dagger_Mesh.Name",
+      "source": "침묵하는 암살자의 단검",
+      "translation": "Silent Assassin's Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Bow_001_01.SM_Bow_001_01.Name",
+      "source": "새벽 순찰자의 활",
+      "translation": "Dawn Patrol Bow"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Bow_001_02.SM_Bow_001_02.Name",
+      "source": "잿빛 나그네의 활",
+      "translation": "Ashen Wanderer's Bow"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Bow_001_03.SM_Bow_001_03.Name",
+      "source": "황혼 파수꾼의 활",
+      "translation": "Twilight Watcher's Bow"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Bow_001_04.SM_Bow_001_04.Name",
+      "source": "돌무덤 기사의 활",
+      "translation": "Stone Tomb Knight's Bow"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Bow_001_05.SM_Bow_001_05.Name",
+      "source": "안개 숲지기의 활",
+      "translation": "Mistwood Keeper's Bow"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Bow_001_06.SM_Bow_001_06.Name",
+      "source": "붉은 성채의 활",
+      "translation": "Crimson Citadel Bow"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Bow_001_07.SM_Bow_001_07.Name",
+      "source": "달그늘 사냥꾼의 활",
+      "translation": "Moonshadow Hunter's Bow"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Bow_001_08.SM_Bow_001_08.Name",
+      "source": "고요한 맹세의 활",
+      "translation": "Silent Oath Bow"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Bow_001_09.SM_Bow_001_09.Name",
+      "source": "흰 늑대의 활",
+      "translation": "White Wolf Bow"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Bow_001_10.SM_Bow_001_10.Name",
+      "source": "잊힌 왕국의 활",
+      "translation": "Forgotten Kingdom Bow"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Dagger_001_01.SM_Dagger_001_01.Name",
+      "source": "새벽 순찰자의 단검",
+      "translation": "Dawn Patrol Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Dagger_001_02.SM_Dagger_001_02.Name",
+      "source": "잿빛 나그네의 단검",
+      "translation": "Ashen Wanderer's Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Dagger_001_03.SM_Dagger_001_03.Name",
+      "source": "황혼 파수꾼의 단검",
+      "translation": "Twilight Watcher's Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Dagger_001_04.SM_Dagger_001_04.Name",
+      "source": "돌무덤 기사의 단검",
+      "translation": "Stone Tomb Knight's Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Dagger_001_05.SM_Dagger_001_05.Name",
+      "source": "안개 숲지기의 단검",
+      "translation": "Mistwood Keeper's Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Dagger_001_06.SM_Dagger_001_06.Name",
+      "source": "붉은 성채의 단검",
+      "translation": "Crimson Citadel Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Dagger_001_07.SM_Dagger_001_07.Name",
+      "source": "달그늘 사냥꾼의 단검",
+      "translation": "Moonshadow Hunter's Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Dagger_001_08.SM_Dagger_001_08.Name",
+      "source": "고요한 맹세의 단검",
+      "translation": "Silent Oath Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Dagger_001_09.SM_Dagger_001_09.Name",
+      "source": "흰 늑대의 단검",
+      "translation": "White Wolf Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Dagger_001_10.SM_Dagger_001_10.Name",
+      "source": "잊힌 왕국의 단검",
+      "translation": "Forgotten Kingdom Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Shield_001_01.SM_Shield_001_01.Name",
+      "source": "새벽 순찰자의 방패",
+      "translation": "Dawn Patrol Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Shield_001_02.SM_Shield_001_02.Name",
+      "source": "잿빛 나그네의 방패",
+      "translation": "Ashen Wanderer's Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Shield_001_03.SM_Shield_001_03.Name",
+      "source": "황혼 파수꾼의 방패",
+      "translation": "Twilight Watcher's Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Shield_001_04.SM_Shield_001_04.Name",
+      "source": "돌무덤 기사의 방패",
+      "translation": "Stone Tomb Knight's Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Shield_001_05.SM_Shield_001_05.Name",
+      "source": "안개 숲지기의 방패",
+      "translation": "Mistwood Keeper's Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Shield_001_06.SM_Shield_001_06.Name",
+      "source": "붉은 성채의 방패",
+      "translation": "Crimson Citadel Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Shield_001_07.SM_Shield_001_07.Name",
+      "source": "달그늘 사냥꾼의 방패",
+      "translation": "Moonshadow Hunter's Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Shield_001_08.SM_Shield_001_08.Name",
+      "source": "고요한 맹세의 방패",
+      "translation": "Silent Oath Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Shield_001_09.SM_Shield_001_09.Name",
+      "source": "흰 늑대의 방패",
+      "translation": "White Wolf Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/CR/LQ/Weapon/Weapon_001_Ravi/Mesh/SM_Shield_001_10.SM_Shield_001_10.Name",
+      "source": "잊힌 왕국의 방패",
+      "translation": "Forgotten Kingdom Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/MageStaff_FreeWeapons/SM_Staff_01.SM_Staff_01.Name",
+      "source": "별길 마법사의 지팡이",
+      "translation": "Starpath Mage's Staff"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/Primitive_Characters_Pack/Mesh/Primitive_01/Mesh_Weapon/SM_Primitive_Weapon_03.SM_Primitive_Weapon_03.Name",
+      "source": "들판 사냥꾼의 단검",
+      "translation": "Field Hunter's Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/Primitive_Characters_Pack/Mesh/Primitive_01/Mesh_Weapon/SM_Primitive_Weapon_04.SM_Primitive_Weapon_04.Name",
+      "source": "골짜기 사냥꾼의 단검",
+      "translation": "Valley Hunter's Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/PurePoly/FreeLowPolyFantasyRPGWeapons/Meshes/SM_PP_Theme_01_Shield_005.SM_PP_Theme_01_Shield_005.Name",
+      "source": "산맥 수호자의 방패",
+      "translation": "Mountain Guardian's Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/PurePoly/FreeLowPolyFantasyRPGWeapons/Meshes/SM_PP_Theme_02_Bow_001.SM_PP_Theme_02_Bow_001.Name",
+      "source": "숲길 사냥꾼의 활",
+      "translation": "Forest Trail Hunter's Bow"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/PurePoly/FreeLowPolyFantasyRPGWeapons/Meshes/SM_PP_Theme_06_Shield_002.SM_PP_Theme_06_Shield_002.Name",
+      "source": "오래된 맹세의 방패",
+      "translation": "Ancient Oath Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/PurePoly/FreeLowPolyFantasyRPGWeapons/Meshes/SM_PP_Theme_06_Sword_Two-Handed_001.SM_PP_Theme_06_Sword_Two-Handed_001.Name",
+      "source": "성채 수호자의 대검",
+      "translation": "Citadel Guardian's Greatsword"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/PurePoly/FreeLowPolyFantasyRPGWeapons/Meshes/SM_PP_Theme_10_Dagger_002.SM_PP_Theme_10_Dagger_002.Name",
+      "source": "달빛 나그네의 단검",
+      "translation": "Moonlit Wanderer's Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/PurePoly/FreeLowPolyFantasyRPGWeapons/Meshes/SM_PP_Theme_11_Sword_One-Handed_003.SM_PP_Theme_11_Sword_One-Handed_003.Name",
+      "source": "떠돌이 기사의 검",
+      "translation": "Wandering Knight's Sword"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/Blueprint/Unit/BP_EnemyUnit.BP_EnemyUnit_C.Name",
+      "source": "스켈레톤 검병",
+      "translation": "Skeleton Swordsman"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/Fantasy_Pack/Characters/Golem/Blueprints/BP_Monster_Golem.BP_Monster_Golem_C.Name",
+      "source": "바위 골렘",
+      "translation": "Rock Golem"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/Fantasy_Pack/Characters/Orc_Hummer/Blueprints/BP_Monster_Orc.BP_Monster_Orc_C.Name",
+      "source": "오크 망치병",
+      "translation": "Orc Hammerer"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/Fantasy_Pack/Characters/Troll/Blueprints/BP_Monster_Troll.BP_Monster_Troll_C.Name",
+      "source": "동굴 트롤",
+      "translation": "Cave Troll"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/Fantasy_Pack/Characters/Werewolf/Blueprints/BP_Monster_Werewolf.BP_Monster_Werewolf_C.Name",
+      "source": "늑대인간",
+      "translation": "Werewolf"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/ROG_Modular_Armor/DA_MannyAppearance.DA_MannyAppearance.Body.Female.Name",
+      "source": "여자",
+      "translation": "Female"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/ROG_Modular_Armor/DA_MannyAppearance.DA_MannyAppearance.Body.Male.Name",
+      "source": "남자",
+      "translation": "Male"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Bear/BP_Monster_Bear.BP_Monster_Bear_C.Name",
+      "source": "숲 곰",
+      "translation": "Forest Bear"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Bear/BP_Monster_SnowBear.BP_Monster_SnowBear_C.Name",
+      "source": "설원 곰",
+      "translation": "Snow Bear"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Boar/BP_Monster_Boar.BP_Monster_Boar_C.Name",
+      "source": "멧돼지",
+      "translation": "Boar"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Crocodile/BP_Monster_Crocodile.BP_Monster_Crocodile_C.Name",
+      "source": "늪 악어",
+      "translation": "Swamp Crocodile"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Spider/BP_Monster_Spider.BP_Monster_Spider_C.Name",
+      "source": "동굴 거미",
+      "translation": "Cave Spider"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Toad/BP_Monster_Toad.BP_Monster_Toad_C.Name",
+      "source": "늪 두꺼비",
+      "translation": "Swamp Toad"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Wolf/BP_Monster_SnowWolf.BP_Monster_SnowWolf_C.Name",
+      "source": "설원 늑대",
+      "translation": "Snow Wolf"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Wolf/BP_Monster_Wolf.BP_Monster_Wolf_C.Name",
+      "source": "숲 늑대",
+      "translation": "Forest Wolf"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Dagger_1.SM_Dagger_1.Name",
+      "source": "골목 그림자의 단검",
+      "translation": "Alley Shadow Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Dagger_2.SM_Dagger_2.Name",
+      "source": "밤안개 단검",
+      "translation": "Night Mist Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Shield.SM_Shield.Name",
+      "source": "변경 수비대의 방패",
+      "translation": "Frontier Guard's Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/Weapon_Pack/Skeletal_Mesh/SK_Dagger_1.SK_Dagger_1.Name",
+      "source": "검은 망토의 단검",
+      "translation": "Black Cloak Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/Weapon_Pack/Skeletal_Mesh/SK_Dagger_2.SK_Dagger_2.Name",
+      "source": "빈 거리의 단검",
+      "translation": "Empty Street Dagger"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "/Game/Weapon_Pack/Skeletal_Mesh/SK_Shield.SK_Shield.Name",
+      "source": "전열 기사의 방패",
+      "translation": "Vanguard Knight's Shield"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Difficulty.Encounter.Combat.PvE.Difficulty.High.Name",
+      "source": "상",
+      "translation": "High"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Difficulty.Encounter.Combat.PvE.Difficulty.Low.Name",
+      "source": "하",
+      "translation": "Low"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Difficulty.Encounter.Combat.PvE.Difficulty.Medium.Name",
+      "source": "중",
+      "translation": "Medium"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_01.Name",
+      "source": "스킬상점",
+      "translation": "Skill Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_02.Name",
+      "source": "아이템상점",
+      "translation": "Item Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_03.Name",
+      "source": "상점3",
+      "translation": "Shop 3"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Item_Basic.Name",
+      "source": "기본상점",
+      "translation": "General Store"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Item_Rarity_Blue.Name",
+      "source": "파란색 등급 상점",
+      "translation": "Blue Rarity Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Item_Rarity_Green.Name",
+      "source": "초록색 등급 상점",
+      "translation": "Green Rarity Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Item_Rarity_Purple.Name",
+      "source": "보라색 등급 상점",
+      "translation": "Purple Rarity Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Item_Rarity_White.Name",
+      "source": "흰색 등급 상점",
+      "translation": "White Rarity Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Item_Tag_Bow.Name",
+      "source": "활 태그 상점",
+      "translation": "Bow Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Item_Tag_Dagger.Name",
+      "source": "단검 태그 상점",
+      "translation": "Dagger Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Item_Tag_Shield.Name",
+      "source": "방패 태그 상점",
+      "translation": "Shield Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Item_Tag_StaffWand.Name",
+      "source": "지팡이·완드 태그 상점",
+      "translation": "Staff & Wand Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Item_Tag_Sword.Name",
+      "source": "검 태그 상점",
+      "translation": "Sword Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Skill_Chaos.Name",
+      "source": "카오스 스킬 상점",
+      "translation": "Chaos Skill Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Skill_Cold.Name",
+      "source": "냉기 스킬 상점",
+      "translation": "Cold Skill Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Skill_Fire.Name",
+      "source": "불 스킬 상점",
+      "translation": "Fire Skill Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Skill_Lightning.Name",
+      "source": "번개 스킬 상점",
+      "translation": "Lightning Skill Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Skill_Physical.Name",
+      "source": "물리 스킬 상점",
+      "translation": "Physical Skill Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Weapon_Chaos.Name",
+      "source": "카오스 무기 상점",
+      "translation": "Chaos Weapon Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Weapon_Cold.Name",
+      "source": "냉기 무기 상점",
+      "translation": "Cold Weapon Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Weapon_Fire.Name",
+      "source": "불 무기 상점",
+      "translation": "Fire Weapon Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Weapon_Lightning.Name",
+      "source": "번개 무기 상점",
+      "translation": "Lightning Weapon Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.Shop_Weapon_Physical.Name",
+      "source": "물리 무기 상점",
+      "translation": "Physical Weapon Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.TargetOffer_01.Name",
+      "source": "스킬상점",
+      "translation": "Skill Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.TargetOffer_02.Name",
+      "source": "아이템상점",
+      "translation": "Item Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.TargetOffer_03.Name",
+      "source": "회복소",
+      "translation": "Recovery Camp"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.TargetOffer_04.Name",
+      "source": "소모품상점",
+      "translation": "Consumables Shop"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Encounter.TargetOffer_05.Name",
+      "source": "부활소",
+      "translation": "Revival Shrine"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "ItemRarity.Item.Rarity.Blue.Name",
+      "source": "파란색",
+      "translation": "Blue"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "ItemRarity.Item.Rarity.Green.Name",
+      "source": "초록색",
+      "translation": "Green"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "ItemRarity.Item.Rarity.Orange.Name",
+      "source": "주황색",
+      "translation": "Orange"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "ItemRarity.Item.Rarity.Purple.Name",
+      "source": "보라색",
+      "translation": "Purple"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "ItemRarity.Item.Rarity.White.Name",
+      "source": "흰색",
+      "translation": "White"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.Combat_01.Name",
+      "source": "Combat 1 / 전투 1",
+      "translation": "Combat 1"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.Combat_02.Name",
+      "source": "Combat 2 / 전투 2",
+      "translation": "Combat 2"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.Combat_03.Name",
+      "source": "Combat 3 / 전투 3",
+      "translation": "Combat 3"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.Combat_04.Name",
+      "source": "Combat 4 / 전투 4",
+      "translation": "Combat 4"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.Combat_05.Name",
+      "source": "Combat 5 / 전투 5",
+      "translation": "Combat 5"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.Combat_06.Name",
+      "source": "Combat 6 / 전투 6",
+      "translation": "Combat 6"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.Combat_07.Name",
+      "source": "Combat 7 / 전투 7",
+      "translation": "Combat 7"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.Combat_08.Name",
+      "source": "Combat 8 / 전투 8",
+      "translation": "Combat 8"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.Combat_09.Name",
+      "source": "Combat 9 / 전투 9",
+      "translation": "Combat 9"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.Combat_10.Name",
+      "source": "Combat 10 / 전투 10",
+      "translation": "Combat 10"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_01.Name",
+      "source": "숲길 입문 · 1/10 · PvE",
+      "translation": "Forest Trail · 1/10 · PvE"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_02.Name",
+      "source": "숲길 입문 · 1/10 · 로컬 Snapshot",
+      "translation": "Forest Trail · 1/10 · Local Snapshot"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_03.Name",
+      "source": "숲의 경계 · 2/10 · PvE",
+      "translation": "Forest Border · 2/10 · PvE"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_04.Name",
+      "source": "숲의 경계 · 2/10 · 로컬 Snapshot",
+      "translation": "Forest Border · 2/10 · Local Snapshot"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_05.Name",
+      "source": "늪지 진입 · 3/10 · PvE",
+      "translation": "Into the Swamp · 3/10 · PvE"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_06.Name",
+      "source": "늪지 진입 · 3/10 · 로컬 Snapshot",
+      "translation": "Into the Swamp · 3/10 · Local Snapshot"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_07.Name",
+      "source": "늪의 포위 · 4/10 · PvE",
+      "translation": "Swamp Encirclement · 4/10 · PvE"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_08.Name",
+      "source": "늪의 포위 · 4/10 · 로컬 Snapshot",
+      "translation": "Swamp Encirclement · 4/10 · Local Snapshot"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_09.Name",
+      "source": "동굴 문지기 · 5/10 · PvE",
+      "translation": "Cave Gatekeeper · 5/10 · PvE"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_10.Name",
+      "source": "동굴 문지기 · 5/10 · 로컬 Snapshot",
+      "translation": "Cave Gatekeeper · 5/10 · Local Snapshot"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_11.Name",
+      "source": "동굴 혼전 · 6/10 · PvE",
+      "translation": "Cave Melee · 6/10 · PvE"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_12.Name",
+      "source": "동굴 혼전 · 6/10 · 로컬 Snapshot",
+      "translation": "Cave Melee · 6/10 · Local Snapshot"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_13.Name",
+      "source": "설원 숨고르기 · 7/10 · PvE",
+      "translation": "Snowfield Respite · 7/10 · PvE"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_14.Name",
+      "source": "설원 숨고르기 · 7/10 · 로컬 Snapshot",
+      "translation": "Snowfield Respite · 7/10 · Local Snapshot"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_15.Name",
+      "source": "설원 추격 · 8/10 · PvE",
+      "translation": "Snowfield Pursuit · 8/10 · PvE"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_16.Name",
+      "source": "설원 추격 · 8/10 · 로컬 Snapshot",
+      "translation": "Snowfield Pursuit · 8/10 · Local Snapshot"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_17.Name",
+      "source": "최종 전초전 · 9/10 · PvE",
+      "translation": "Final Approach · 9/10 · PvE"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_18.Name",
+      "source": "최종 전초전 · 9/10 · 로컬 Snapshot",
+      "translation": "Final Approach · 9/10 · Local Snapshot"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_19.Name",
+      "source": "골렘 최종전 · 10/10 · PvE",
+      "translation": "Golem Showdown · 10/10 · PvE"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Node.TargetCombat_20.Name",
+      "source": "골렘 최종전 · 10/10 · 로컬 Snapshot",
+      "translation": "Golem Showdown · 10/10 · Local Snapshot"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Profession.Archer.Description",
+      "source": "궁수 계열",
+      "translation": "Archer class"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Profession.Archer.Name",
+      "source": "궁수",
+      "translation": "Archer"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Profession.Mage.Description",
+      "source": "마법사 계열",
+      "translation": "Mage class"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Profession.Mage.Name",
+      "source": "마법사",
+      "translation": "Mage"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Profession.Rogue.Description",
+      "source": "도적 계열",
+      "translation": "Rogue class"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Profession.Rogue.Name",
+      "source": "도적",
+      "translation": "Rogue"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Profession.Warrior.Description",
+      "source": "전사 계열",
+      "translation": "Warrior class"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Profession.Warrior.Name",
+      "source": "전사",
+      "translation": "Warrior"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:BPDA_DefaulatAttack.Description",
+      "source": "기본공격",
+      "translation": "Basic attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:BPDA_DefaulatAttack.Name",
+      "source": "비무장 공격",
+      "translation": "Unarmed Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:BPDA_swoard_attack.Description",
+      "source": "대상에게 접근해 칼날이 닿은 첫 적을 한 번 타격한 뒤 원래 자리로 복귀합니다.",
+      "translation": "Approaches the target, strikes the first enemy touched by the blade once, then returns to the starting position."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:BPDA_swoard_attack.Name",
+      "source": "근접 공격",
+      "translation": "Melee Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_CrossbowAttack.Description",
+      "source": "무기에 부여된 기본 공격입니다.",
+      "translation": "A basic attack granted by the weapon."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_CrossbowAttack.Name",
+      "source": "석궁 공격",
+      "translation": "Crossbow Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_BlazeBlast.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_BlazeBlast.Name",
+      "source": "화염 폭풍",
+      "translation": "Firestorm"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_Blizzard.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_Blizzard.Name",
+      "source": "눈보라 영역",
+      "translation": "Blizzard Field"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_CrystalFlower.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_CrystalFlower.Name",
+      "source": "수정 꽃",
+      "translation": "Crystal Flower"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_FireArrow.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_FireArrow.Name",
+      "source": "화염 화살비",
+      "translation": "Rain of Fire Arrows"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_Guardian.Description",
+      "source": "대상 아군에게 피해 25을 흡수하는 보호막을 부여합니다. 남은 보호막은 라운드 종료 시 사라집니다.",
+      "translation": "Grants the target ally a shield that absorbs 25 damage. Any remaining shield expires at the end of the round."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_Guardian.Name",
+      "source": "수호자의 결계",
+      "translation": "Guardian's Ward"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_Hail.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_Hail.Name",
+      "source": "우박 폭격",
+      "translation": "Hail Barrage"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_IceSpiral.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_IceSpiral.Name",
+      "source": "얼음 나선",
+      "translation": "Ice Spiral"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_LavaLotus.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_LavaLotus.Name",
+      "source": "용암 연꽃",
+      "translation": "Lava Lotus"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_LightningHoop.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_LightningHoop.Name",
+      "source": "번개 고리",
+      "translation": "Lightning Ring"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_Meteoroid_lite.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_Meteoroid_lite.Name",
+      "source": "낙하 운석",
+      "translation": "Falling Meteor"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_PoisonCarousel.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_PoisonCarousel.Name",
+      "source": "독의 회전목마",
+      "translation": "Poison Carousel"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_TimeSpell.Description",
+      "source": "대상 아군의 HP를 25 회복합니다.",
+      "translation": "Restores 25 HP to the target ally."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_AoeVFX_AOE_TimeSpell.Name",
+      "source": "시간의 회복진",
+      "translation": "Circle of Renewal"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_AberrateObelisk.Description",
+      "source": "전방 직선 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy in a straight line ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_AberrateObelisk.Name",
+      "source": "수정 첨탑",
+      "translation": "Crystal Spire"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_BrambleTusk.Description",
+      "source": "전방 직선 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy in a straight line ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_BrambleTusk.Name",
+      "source": "가시 엄니",
+      "translation": "Bramble Fang"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_DashMagma.Description",
+      "source": "전방 직선 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy in a straight line ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_DashMagma.Name",
+      "source": "용암 쇄도",
+      "translation": "Magma Rush"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_FeudFang.Description",
+      "source": "전방 직선 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy in a straight line ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_FeudFang.Name",
+      "source": "핏빛 엄니",
+      "translation": "Crimson Fang"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_FreezeCrystal_Ice.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_FreezeCrystal_Ice.Name",
+      "source": "서리 결정",
+      "translation": "Frost Crystal"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_HuntingSharkFin.Description",
+      "source": "전방 직선 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy in a straight line ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_HuntingSharkFin.Name",
+      "source": "심해 지느러미",
+      "translation": "Abyssal Fin"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_IceSpell.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_IceSpell.Name",
+      "source": "얼음 문양",
+      "translation": "Ice Sigil"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_IceSpike.Description",
+      "source": "전방 직선 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy in a straight line ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_IceSpike.Name",
+      "source": "얼음 가시",
+      "translation": "Ice Spike"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_IceSprout.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_IceSprout.Name",
+      "source": "얼음 싹",
+      "translation": "Ice Sprout"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_LavaBurst.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_LavaBurst.Name",
+      "source": "용암 분출",
+      "translation": "Lava Burst"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_Lazurite.Description",
+      "source": "전방 직선 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy in a straight line ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_Lazurite.Name",
+      "source": "청금석 쇄도",
+      "translation": "Lazurite Rush"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_Line_Lava.Description",
+      "source": "전방 직선 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy in a straight line ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_Line_Lava.Name",
+      "source": "용암 파도",
+      "translation": "Lava Wave"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_PoisonCannibalPlant.Description",
+      "source": "선택한 지점의 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy within the selected area."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_PoisonCannibalPlant.Name",
+      "source": "식인 독초",
+      "translation": "Venomous Man-Eater"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_StoneRush.Description",
+      "source": "전방 직선 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Deals 25 damage to each enemy in a straight line ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_GroundAttackVFX_StoneRush.Name",
+      "source": "바위 쇄도",
+      "translation": "Stone Rush"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_LevelUp_Ascend_Root.Description",
+      "source": "대상 아군의 HP를 25 회복합니다.",
+      "translation": "Restores 25 HP to the target ally."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_LevelUp_Ascend_Root.Name",
+      "source": "상승의 치유",
+      "translation": "Ascending Heal"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_LevelUp_Burst_Pivot.Description",
+      "source": "대상 아군의 HP를 25 회복합니다.",
+      "translation": "Restores 25 HP to the target ally."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_LevelUp_Burst_Pivot.Name",
+      "source": "생명의 섬광",
+      "translation": "Flash of Life"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_LevelUp_Descend_Root.Description",
+      "source": "대상 아군의 HP를 25 회복합니다.",
+      "translation": "Restores 25 HP to the target ally."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_LevelUp_Descend_Root.Name",
+      "source": "내림의 치유",
+      "translation": "Descending Heal"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_LevelUp_Lift_root.Description",
+      "source": "대상 아군의 HP를 25 회복합니다.",
+      "translation": "Restores 25 HP to the target ally."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_LevelUp_Lift_root.Name",
+      "source": "회복의 기둥",
+      "translation": "Pillar of Renewal"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_LevelUp_Twist_Root.Description",
+      "source": "대상 아군의 HP를 25 회복합니다.",
+      "translation": "Restores 25 HP to the target ally."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_LevelUp_Twist_Root.Name",
+      "source": "회복의 소용돌이",
+      "translation": "Vortex of Renewal"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_Spawn_Down_Root.Description",
+      "source": "대상 아군에게 피해 25을 흡수하는 보호막을 부여합니다. 남은 보호막은 라운드 종료 시 사라집니다.",
+      "translation": "Grants the target ally a shield that absorbs 25 damage. Any remaining shield expires at the end of the round."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_Spawn_Down_Root.Name",
+      "source": "낙하 수호",
+      "translation": "Descending Ward"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_Spawn_Ground_Root.Description",
+      "source": "대상 아군에게 피해 25을 흡수하는 보호막을 부여합니다. 남은 보호막은 라운드 종료 시 사라집니다.",
+      "translation": "Grants the target ally a shield that absorbs 25 damage. Any remaining shield expires at the end of the round."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_Spawn_Ground_Root.Name",
+      "source": "대지 수호",
+      "translation": "Earth Ward"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_Spawn_Magic_Root.Description",
+      "source": "대상 아군에게 피해 25을 흡수하는 보호막을 부여합니다. 남은 보호막은 라운드 종료 시 사라집니다.",
+      "translation": "Grants the target ally a shield that absorbs 25 damage. Any remaining shield expires at the end of the round."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_Spawn_Magic_Root.Name",
+      "source": "마력 수호",
+      "translation": "Arcane Ward"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_Spawn_Ninja_Root.Description",
+      "source": "대상 아군에게 피해 25을 흡수하는 보호막을 부여합니다. 남은 보호막은 라운드 종료 시 사라집니다.",
+      "translation": "Grants the target ally a shield that absorbs 25 damage. Any remaining shield expires at the end of the round."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_Spawn_Ninja_Root.Name",
+      "source": "연막 수호",
+      "translation": "Smoke Ward"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_Spawn_Teleport_Root.Description",
+      "source": "대상 아군에게 피해 25을 흡수하는 보호막을 부여합니다. 남은 보호막은 라운드 종료 시 사라집니다.",
+      "translation": "Grants the target ally a shield that absorbs 25 damage. Any remaining shield expires at the end of the round."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_Spawn_Teleport_Root.Name",
+      "source": "차원 수호",
+      "translation": "Dimensional Ward"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_Spawn_Up_Root.Description",
+      "source": "대상 아군에게 피해 25을 흡수하는 보호막을 부여합니다. 남은 보호막은 라운드 종료 시 사라집니다.",
+      "translation": "Grants the target ally a shield that absorbs 25 damage. Any remaining shield expires at the end of the round."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LevelUpSpawn_Spawn_Up_Root.Name",
+      "source": "상승 수호",
+      "translation": "Ascending Ward"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LinkChainVFX_Link_Bramble.Description",
+      "source": "선택한 적부터 최근접 미타격 적 순서로 첫 대상을 포함해 최대 4명에게 연쇄합니다. 점프 거리 600cm, 간격 0.4초. 첫 피해 25, 점프마다 피해 20% 감소.",
+      "translation": "Chains from the selected enemy to the nearest enemy not yet hit, affecting up to 4 targets including the first. Jump range: 600 cm; interval: 0.4 seconds. Initial damage: 25, reduced by 20% per jump."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LinkChainVFX_Link_Bramble.Name",
+      "source": "가시 연결",
+      "translation": "Bramble Chain"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LinkChainVFX_Link_Electric.Description",
+      "source": "선택한 적부터 최근접 미타격 적 순서로 첫 대상을 포함해 최대 4명에게 연쇄합니다. 점프 거리 600cm, 간격 0.4초. 첫 피해 25, 점프마다 피해 20% 감소.",
+      "translation": "Chains from the selected enemy to the nearest enemy not yet hit, affecting up to 4 targets including the first. Jump range: 600 cm; interval: 0.4 seconds. Initial damage: 25, reduced by 20% per jump."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LinkChainVFX_Link_Electric.Name",
+      "source": "번개 연결",
+      "translation": "Lightning Chain"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LinkChainVFX_Link_Energy.Description",
+      "source": "선택한 적부터 최근접 미타격 적 순서로 첫 대상을 포함해 최대 4명에게 연쇄합니다. 점프 거리 600cm, 간격 0.4초. 첫 피해 25, 점프마다 피해 20% 감소.",
+      "translation": "Chains from the selected enemy to the nearest enemy not yet hit, affecting up to 4 targets including the first. Jump range: 600 cm; interval: 0.4 seconds. Initial damage: 25, reduced by 20% per jump."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LinkChainVFX_Link_Energy.Name",
+      "source": "에너지 연결",
+      "translation": "Energy Chain"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LinkChainVFX_Link_Fire.Description",
+      "source": "선택한 적부터 최근접 미타격 적 순서로 첫 대상을 포함해 최대 4명에게 연쇄합니다. 점프 거리 600cm, 간격 0.4초. 첫 피해 25, 점프마다 피해 20% 감소.",
+      "translation": "Chains from the selected enemy to the nearest enemy not yet hit, affecting up to 4 targets including the first. Jump range: 600 cm; interval: 0.4 seconds. Initial damage: 25, reduced by 20% per jump."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LinkChainVFX_Link_Fire.Name",
+      "source": "화염 연결",
+      "translation": "Fire Chain"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LinkChainVFX_Link_Magic.Description",
+      "source": "선택한 적부터 최근접 미타격 적 순서로 첫 대상을 포함해 최대 4명에게 연쇄합니다. 점프 거리 600cm, 간격 0.4초. 첫 피해 25, 점프마다 피해 20% 감소.",
+      "translation": "Chains from the selected enemy to the nearest enemy not yet hit, affecting up to 4 targets including the first. Jump range: 600 cm; interval: 0.4 seconds. Initial damage: 25, reduced by 20% per jump."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_LinkChainVFX_Link_Magic.Name",
+      "source": "마력 연결",
+      "translation": "Arcane Chain"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_AerolithCurved.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_AerolithCurved.Name",
+      "source": "유성 편린",
+      "translation": "Meteor Shard"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_Arrow.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_Arrow.Name",
+      "source": "정밀 화살",
+      "translation": "Precision Arrow"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_Comet.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_Comet.Name",
+      "source": "혜성탄",
+      "translation": "Comet Bolt"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_FireBall.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_FireBall.Name",
+      "source": "불덩이",
+      "translation": "Fireball"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_HolyEnergy.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_HolyEnergy.Name",
+      "source": "성스러운 구체",
+      "translation": "Holy Orb"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_IceCrystal.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_IceCrystal.Name",
+      "source": "얼음 결정탄",
+      "translation": "Ice Crystal Bolt"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_Iceicle3D.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_Iceicle3D.Name",
+      "source": "고드름 탄환",
+      "translation": "Icicle Bolt"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_MagicLanceShuriken.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_MagicLanceShuriken.Name",
+      "source": "마력 표창",
+      "translation": "Arcane Shuriken"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_MeteoriteStraight.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_MeteoriteStraight.Name",
+      "source": "직선 유성탄",
+      "translation": "Meteor Bolt"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_PoisonSkullFish.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_PoisonSkullFish.Name",
+      "source": "독해골 물고기",
+      "translation": "Poison Skullfish"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_RockSling.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_RockSling.Name",
+      "source": "바위 투척",
+      "translation": "Rock Sling"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_SonicBlade.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_SonicBlade.Name",
+      "source": "음속 칼날",
+      "translation": "Sonic Blade"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_ThunderBolt.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_ThunderBolt.Name",
+      "source": "번개탄",
+      "translation": "Lightning Bolt"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_VenomDart.Description",
+      "source": "직선 투사체로 처음 부딪힌 적에게 25 피해를 줍니다. 적이나 장애물에 충돌하면 소멸합니다.",
+      "translation": "Fires a straight projectile that deals 25 damage to the first enemy hit. It disappears on contact with an enemy or obstacle."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_ProjectileHitVFX_VenomDart.Name",
+      "source": "독침",
+      "translation": "Venom Dart"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_SlashHitVFX_Slash_Axe.Description",
+      "source": "접근한 뒤 전방 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Approaches the target, then deals 25 damage to each enemy in the area ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_SlashHitVFX_Slash_Axe.Name",
+      "source": "도끼 참격",
+      "translation": "Axe Slash"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_SlashHitVFX_Slash_CurvedSword.Description",
+      "source": "접근한 뒤 전방 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Approaches the target, then deals 25 damage to each enemy in the area ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_SlashHitVFX_Slash_CurvedSword.Name",
+      "source": "곡검 참격",
+      "translation": "Curved Sword Slash"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_SlashHitVFX_Slash_Katana.Description",
+      "source": "접근한 뒤 전방 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Approaches the target, then deals 25 damage to each enemy in the area ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_SlashHitVFX_Slash_Katana.Name",
+      "source": "발도 참격",
+      "translation": "Quickdraw Slash"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_SlashHitVFX_Slash_Reaper.Description",
+      "source": "접근한 뒤 전방 범위 안 적들에게 각각 25 피해를 줍니다.",
+      "translation": "Approaches the target, then deals 25 damage to each enemy in the area ahead."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DrGame_SlashHitVFX_Slash_Reaper.Name",
+      "source": "낫 참격",
+      "translation": "Reaper Slash"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_HealthPotion.Description",
+      "source": "본인 생존 캐릭터의 HP를 25 회복합니다. AP 1을 사용하며 실제 회복 발동 시 소모품 1개가 차감됩니다. 최대 HP이거나 수량이 없으면 사용할 수 없습니다.",
+      "translation": "Restores 25 HP to your living character. Costs 1 AP and consumes one item when the heal takes effect. Cannot be used at full HP or with no items remaining."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_HealthPotion.Name",
+      "source": "회복 소모품",
+      "translation": "Healing Consumable"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_MeleeAttack.Description",
+      "source": "무기에 부여된 기본 공격입니다.",
+      "translation": "A basic attack granted by the weapon."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_MeleeAttack.Name",
+      "source": "근접 공격",
+      "translation": "Melee Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Bear.Description",
+      "source": "기본 근접 공격",
+      "translation": "Basic melee attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Bear.Name",
+      "source": "숲 곰 공격",
+      "translation": "Forest Bear Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Boar.Description",
+      "source": "기본 근접 공격",
+      "translation": "Basic melee attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Boar.Name",
+      "source": "멧돼지 공격",
+      "translation": "Boar Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Crocodile.Description",
+      "source": "기본 근접 공격",
+      "translation": "Basic melee attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Crocodile.Name",
+      "source": "늪 악어 공격",
+      "translation": "Swamp Crocodile Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Golem.Description",
+      "source": "기본 근접 공격",
+      "translation": "Basic melee attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Golem.Name",
+      "source": "바위 골렘 공격",
+      "translation": "Rock Golem Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Orc.Description",
+      "source": "기본 근접 공격",
+      "translation": "Basic melee attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Orc.Name",
+      "source": "오크 망치병 공격",
+      "translation": "Orc Hammerer Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_SnowBear.Description",
+      "source": "기본 근접 공격",
+      "translation": "Basic melee attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_SnowBear.Name",
+      "source": "설원 곰 공격",
+      "translation": "Snow Bear Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_SnowWolf.Description",
+      "source": "기본 근접 공격",
+      "translation": "Basic melee attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_SnowWolf.Name",
+      "source": "설원 늑대 공격",
+      "translation": "Snow Wolf Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Spider.Description",
+      "source": "기본 근접 공격",
+      "translation": "Basic melee attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Spider.Name",
+      "source": "동굴 거미 공격",
+      "translation": "Cave Spider Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Toad.Description",
+      "source": "기본 근접 공격",
+      "translation": "Basic melee attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Toad.Name",
+      "source": "늪 두꺼비 공격",
+      "translation": "Swamp Toad Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Troll.Description",
+      "source": "기본 근접 공격",
+      "translation": "Basic melee attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Troll.Name",
+      "source": "동굴 트롤 공격",
+      "translation": "Cave Troll Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Werewolf.Description",
+      "source": "기본 근접 공격",
+      "translation": "Basic melee attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Werewolf.Name",
+      "source": "늑대인간 공격",
+      "translation": "Werewolf Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Wolf.Description",
+      "source": "기본 근접 공격",
+      "translation": "Basic melee attack."
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_Monster_Wolf.Name",
+      "source": "숲 늑대 공격",
+      "translation": "Forest Wolf Attack"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "AllyTileTarget",
+      "source": "대상: 아군 진영 타일",
+      "translation": "Target: ally tile"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "AllyUnitTarget",
+      "source": "대상: 아군 유닛",
+      "translation": "Target: ally unit"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "AnyTileTarget",
+      "source": "대상: 타일",
+      "translation": "Target: tile"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "AnyUnitTarget",
+      "source": "대상: 아군 또는 적 유닛",
+      "translation": "Target: ally or enemy unit"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "ApproachEffect",
+      "source": "대상에 접근한 뒤 사용합니다.",
+      "translation": "Approaches the target before using the skill."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "AreaEffect",
+      "source": "지정 범위 안의 대상에게 적용합니다.",
+      "translation": "Affects targets within the designated area."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "BalancedSkill",
+      "source": "[{0}] {1} · 위력 {2} · AP {3} / SAP {4}",
+      "translation": "[{0}] {1} · Power {2} · AP {3} / SAP {4}"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "BeamEffect",
+      "source": "전방 직선 범위에 적용합니다.",
+      "translation": "Affects a straight line ahead."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "ChainEffect",
+      "source": "적중 후 주변 적에게 연쇄됩니다.",
+      "translation": "Chains to nearby enemies after hitting a target."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "DamageEffect",
+      "source": "적중한 대상에게 피해를 줍니다.",
+      "translation": "Deals damage to targets hit."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "DetailedSkillName",
+      "source": "[{0}] {1}",
+      "translation": "[{0}] {1}"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "DetailedSkillStats",
+      "source": "위력 {0} · AP {1} / SAP {2} · 선딜 {3}초",
+      "translation": "Power {0} · AP {1} / SAP {2} · Windup {3}s"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "EnemyTileTarget",
+      "source": "대상: 적 진영 타일",
+      "translation": "Target: enemy tile"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "EnemyUnitTarget",
+      "source": "대상: 적 유닛",
+      "translation": "Target: enemy unit"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "EquipmentDescription",
+      "source": "장착 위치: {0}{1}",
+      "translation": "Equipment slots: {0}{1}"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "GrantedSkills",
+      "source": "장착 스킬: {0}",
+      "translation": "Granted skills: {0}"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "HealEffect",
+      "source": "살아 있는 대상의 HP를 회복합니다.",
+      "translation": "Restores HP to a living target."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "MissingEquipmentSlot",
+      "source": "장착 위치를 확인할 수 없습니다.",
+      "translation": "The equipment slot is unavailable."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "MissingFrozenSkillStats",
+      "source": "저장된 스킬 등급·수치 정보를 확인할 수 없습니다.",
+      "translation": "Saved skill rarity and stats are unavailable."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "MissingSkill",
+      "source": "스킬 정보를 불러올 수 없습니다.",
+      "translation": "Skill information could not be loaded."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "MissingSkillEffect",
+      "source": "스킬의 효과 정보를 확인할 수 없습니다.",
+      "translation": "Skill effect information is unavailable."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "MissingSkillStats",
+      "source": "스킬 수치 정보를 확인할 수 없습니다.",
+      "translation": "Skill stats are unavailable."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "OccupiesBothHands",
+      "source": " · 양손 슬롯 사용",
+      "translation": " · Uses both hand slots"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "OtherEffect",
+      "source": "대상에게 스킬 효과를 적용합니다.",
+      "translation": "Applies the skill's effect to the target."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "ProjectileEffect",
+      "source": "투사체를 발사합니다.",
+      "translation": "Fires a projectile."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "RarityName",
+      "source": "[{0}] {1}",
+      "translation": "[{0}] {1}"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "ShieldEffect",
+      "source": "살아 있는 대상에게 피해를 흡수하는 보호막을 부여합니다. 남은 보호막은 라운드 종료 시 사라집니다.",
+      "translation": "Grants a living target a shield that absorbs damage. Any remaining shield expires at the end of the round."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "SkillTooltip",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "SlashEffect",
+      "source": "전방 참격 범위에 적용합니다.",
+      "translation": "Affects the slash area ahead."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "TargetOnlyEffect",
+      "source": "선택한 대상에게만 효과를 적용합니다.",
+      "translation": "Affects only the selected target."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "UnknownSlot",
+      "source": "기타 장비 슬롯",
+      "translation": "Other equipment slot"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "UnknownTarget",
+      "source": "대상 정보를 확인할 수 없습니다.",
+      "translation": "Target information is unavailable."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "UnsupportedEquipment",
+      "source": "현재 장착을 지원하지 않는 아이템입니다.",
+      "translation": "This item cannot currently be equipped."
+    },
+    {
+      "namespace": "RunSkillBalance",
+      "key": "InvalidCsv",
+      "source": "스킬 CSV의 열·경로·등급·수치 또는 가중치 행이 올바르지 않습니다.",
+      "translation": "The skill CSV columns, paths, rarity, stats, or weight rows are invalid."
+    },
+    {
+      "namespace": "RunSkillBalance",
+      "key": "InvalidState",
+      "source": "스킬 밸런스의 버전·등급·수치 또는 장비별 5등급 가중치가 올바르지 않습니다.",
+      "translation": "The skill balance version, rarity, stats, or five-rarity weapon weights are invalid."
+    },
+    {
+      "namespace": "RunSkillBalance",
+      "key": "InvalidTuning",
+      "source": "저장된 스킬 등급·위력·비용·선딜이 올바르지 않습니다.",
+      "translation": "The saved skill rarity, power, costs, or windup is invalid."
+    },
+    {
+      "namespace": "RunSkillBalance",
+      "key": "MissingCsv",
+      "source": "스킬 수치 또는 장비별 스킬 등급 확률 CSV를 읽을 수 없습니다.",
+      "translation": "The skill stats or weapon-to-skill rarity probability CSV could not be read."
+    },
+    {
+      "namespace": "SkillRarity",
+      "key": "Blue",
+      "source": "파란색",
+      "translation": "Blue"
+    },
+    {
+      "namespace": "SkillRarity",
+      "key": "Green",
+      "source": "초록색",
+      "translation": "Green"
+    },
+    {
+      "namespace": "SkillRarity",
+      "key": "Orange",
+      "source": "주황색",
+      "translation": "Orange"
+    },
+    {
+      "namespace": "SkillRarity",
+      "key": "Purple",
+      "source": "보라색",
+      "translation": "Purple"
+    },
+    {
+      "namespace": "SkillRarity",
+      "key": "White",
+      "source": "흰색",
+      "translation": "White"
+    }
+  ]
+}

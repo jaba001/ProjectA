@@ -23,7 +23,11 @@
 #include "GameFramework/GameUserSettings.h"
 #include "GameFramework/InputSettings.h"
 #include "HAL/PlatformTime.h"
+#include "Internationalization/Internationalization.h"
+#include "Internationalization/TextLocalizationManager.h"
+#include "Kismet/KismetInternationalizationLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Misc/ConfigCacheIni.h"
 #include "UI/MainMenu/MainMenuRootWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
 #include "Widgets/SWindow.h"
@@ -45,6 +49,19 @@ int32 GetQualityPreset(const Scalability::FQualityLevels& Quality)
     Scalability::FQualityLevels Preset;
     Preset.SetFromSingleQualityLevel(Level);
     return Quality == Preset ? Level : CustomQualityIndex;
+}
+
+FString GetOptionsLanguage()
+{
+#if WITH_EDITOR
+    if (GIsEditor)
+    {
+        FString SavedLanguage = TEXT("ko");
+        if (GConfig) GConfig->GetString(TEXT("Internationalization"), TEXT("Language"), SavedLanguage, GGameUserSettingsIni);
+        return SavedLanguage;
+    }
+#endif
+    return UKismetInternationalizationLibrary::GetCurrentLanguage();
 }
 }
 
@@ -135,23 +152,20 @@ void UOptionsWidget::NativeOnInitialized()
     UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>();
     SettingsPanel->SetContent(Content);
     AddText(Content, NSLOCTEXT("Options", "Title", "설정"), 32, 8.0f);
-    AddText(Content, NSLOCTEXT("Options", "Subtitle", "화면과 그래픽을 조정합니다. 변경한 값은 적용 후 저장됩니다."), 16, 24.0f);
+    AddText(Content, NSLOCTEXT("Options", "LanguageSubtitle", "언어·화면·그래픽을 조정합니다. 변경한 값은 적용 후 저장됩니다."), 16, 24.0f);
     UDemonicUITheme::Get().AddDivider(WidgetTree, Content);
+    Language = AddSelector(Content, TEXT("LanguageSelect"), NSLOCTEXT("Options", "Language", "언어"));
+    Language->AddOption(TEXT("한국어"));
+    Language->AddOption(TEXT("English"));
+    AddText(Content, NSLOCTEXT("Options", "LanguageHint", "언어는 적용 및 저장 시 변경됩니다. 화면을 함께 바꾸면 유지 및 저장 후 적용됩니다."), 14, 16.0f);
     AddText(Content, NSLOCTEXT("Options", "DisplaySection", "화면"), 22, 6.0f);
     WindowMode = AddSelector(Content, TEXT("WindowModeSelect"), NSLOCTEXT("Options", "WindowMode", "화면 모드"));
-    for (const TCHAR* Label : { TEXT("전체화면"), TEXT("테두리 없는 전체화면"), TEXT("창 모드") })
-    {
-        WindowMode->AddOption(Label);
-    }
     WindowMode->OnSelectionChanged.AddUniqueDynamic(this, &UOptionsWidget::HandleWindowModeChanged);
     Resolution = AddSelector(Content, TEXT("ResolutionSelect"), NSLOCTEXT("Options", "Resolution", "해상도"));
     ResolutionHint = AddText(Content, FText::GetEmpty(), 14, 24.0f);
     AddText(Content, NSLOCTEXT("Options", "GraphicsSection", "그래픽"), 22, 6.0f);
     Quality = AddSelector(Content, TEXT("QualitySelect"), NSLOCTEXT("Options", "Quality", "그래픽 품질"));
-    for (const TCHAR* Label : { TEXT("낮음"), TEXT("중간"), TEXT("높음"), TEXT("최고"), TEXT("시네마틱"), TEXT("사용자 지정 (현재 값 유지)") })
-    {
-        Quality->AddOption(Label);
-    }
+    RefreshLocalizedSelectors();
     AddText(Content, NSLOCTEXT("Options", "QualityHint", "품질이 높을수록 성능 부담이 커집니다. 사용자 지정은 현재 세부 품질을 유지합니다."), 14, 12.0f);
     VSync = WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(), TEXT("VSyncCheck"));
     UTextBlock* VSyncLabel = WidgetTree->ConstructWidget<UTextBlock>();
@@ -211,6 +225,9 @@ void UOptionsWidget::NativeOnInitialized()
 void UOptionsWidget::NativeOnActivated()
 {
     Super::NativeOnActivated();
+    StopObservingLocalization();
+    LocalizationChangedHandle = FTextLocalizationManager::Get().OnTextRevisionChangedEvent.AddUObject(this, &UOptionsWidget::HandleLocalizationChanged);
+    RefreshLocalizedSelectors();
     Status->SetText(NSLOCTEXT("Options", "Ready", "화면 모드나 해상도를 바꾸면 15초 동안 확인 후 저장합니다."));
     RefreshOptions();
     if (GetWorld() && GetWorld()->GetGameViewport())
@@ -231,11 +248,61 @@ void UOptionsWidget::RefreshOptions()
         return;
     }
     bRefreshing = true;
+    Language->SetSelectedIndex(GetOptionsLanguage().StartsWith(TEXT("en"), ESearchCase::IgnoreCase) ? 1 : 0);
     WindowMode->SetSelectedIndex(static_cast<int32>(Settings->GetFullscreenMode()));
     Quality->SetSelectedIndex(GetQualityPreset(Settings->ScalabilityQuality));
     VSync->SetIsChecked(Settings->IsVSyncEnabled());
     RefreshResolutions(Settings->GetScreenResolution());
     bRefreshing = false;
+}
+
+void UOptionsWidget::RefreshLocalizedSelectors()
+{
+    if (!WindowMode || !Quality) return;
+    // Combo boxes store strings, so rebuild their labels only after localized text resources have changed.
+    // 콤보박스는 문자열을 저장하므로 번역 리소스가 갱신된 뒤 표시 문구를 다시 구성합니다.
+    TGuardValue<bool> RefreshGuard(bRefreshing, true);
+    const int32 WindowModeIndex = WindowMode->GetSelectedIndex();
+    const int32 QualityIndex = Quality->GetSelectedIndex();
+    WindowMode->ClearOptions();
+    for (const FText& Label : { NSLOCTEXT("Options", "ModeFullscreen", "전체화면"), NSLOCTEXT("Options", "ModeBorderless", "테두리 없는 전체화면"), NSLOCTEXT("Options", "ModeWindowed", "창 모드") }) WindowMode->AddOption(Label.ToString());
+    WindowMode->SetSelectedIndex(WindowModeIndex);
+    Quality->ClearOptions();
+    for (const FText& Label : { NSLOCTEXT("Options", "QualityLow", "낮음"), NSLOCTEXT("Options", "QualityMedium", "중간"), NSLOCTEXT("Options", "QualityHigh", "높음"), NSLOCTEXT("Options", "QualityEpic", "최고"), NSLOCTEXT("Options", "QualityCinematic", "시네마틱"), NSLOCTEXT("Options", "QualityCustom", "사용자 지정 (현재 값 유지)") }) Quality->AddOption(Label.ToString());
+    Quality->SetSelectedIndex(QualityIndex);
+}
+
+void UOptionsWidget::HandleLocalizationChanged()
+{
+    RefreshLocalizedSelectors();
+    if (bAwaitingConfirmation) UpdateConfirmationText();
+}
+
+void UOptionsWidget::StopObservingLocalization()
+{
+    FTextLocalizationManager::Get().OnTextRevisionChangedEvent.Remove(LocalizationChangedHandle);
+    LocalizationChangedHandle.Reset();
+}
+
+bool UOptionsWidget::ApplyPendingLanguage()
+{
+    const FString LanguageToApply = MoveTemp(PendingLanguage);
+    PendingLanguage.Reset();
+    if (LanguageToApply != TEXT("ko") && LanguageToApply != TEXT("en")) return false;
+#if WITH_EDITOR
+    if (GIsEditor)
+    {
+        FTextLocalizationManager& Localization = FTextLocalizationManager::Get();
+        if (!GConfig || !FInternationalization::Get().GetCulture(LanguageToApply).IsValid() || Localization.GetNativeCultureName(ELocalizedTextSourceCategory::Game).IsEmpty()) return false;
+        // Preview game resources without changing the editor language or its localization preference.
+        // 에디터 언어와 번역 설정을 바꾸지 않고 게임 리소스에만 선택한 언어를 적용합니다.
+        Localization.EnableGameLocalizationPreview(LanguageToApply);
+        GConfig->SetString(TEXT("Internationalization"), TEXT("Language"), *LanguageToApply, GGameUserSettingsIni);
+        GConfig->Flush(false, GGameUserSettingsIni);
+        return true;
+    }
+#endif
+    return UKismetInternationalizationLibrary::SetCurrentLanguage(LanguageToApply, true);
 }
 
 void UOptionsWidget::RefreshResolutions(FIntPoint PreferredResolution)
@@ -323,7 +390,9 @@ void UOptionsWidget::ApplyOptions()
     const FIntPoint SelectedResolution = GetSelectedResolution();
     const int32 ModeIndex = WindowMode->GetSelectedIndex();
     const int32 QualityIndex = Quality->GetSelectedIndex();
-    if (!IsValidResolution(SelectedResolution) || ModeIndex < 0 || ModeIndex > 2 || QualityIndex < 0 || QualityIndex > CustomQualityIndex) return;
+    const int32 LanguageIndex = Language->GetSelectedIndex();
+    if (!IsValidResolution(SelectedResolution) || ModeIndex < 0 || ModeIndex > 2 || QualityIndex < 0 || QualityIndex > CustomQualityIndex || LanguageIndex < 0 || LanguageIndex > 1) return;
+    PendingLanguage = LanguageIndex == 1 ? TEXT("en") : TEXT("ko");
     const EWindowMode::Type SelectedMode = static_cast<EWindowMode::Type>(ModeIndex);
     PreviousResolution = Settings->GetScreenResolution();
     PreviousWindowMode = Settings->GetFullscreenMode();
@@ -344,8 +413,9 @@ void UOptionsWidget::ApplyOptions()
     {
         Settings->ApplyNonResolutionSettings();
         Settings->SaveSettings();
+        const bool bLanguageApplied = ApplyPendingLanguage();
         RefreshOptions();
-        Status->SetText(NSLOCTEXT("Options", "Saved", "설정을 적용하고 저장했습니다."));
+        Status->SetText(bLanguageApplied ? NSLOCTEXT("Options", "Saved", "설정을 적용하고 저장했습니다.") : NSLOCTEXT("Options", "LanguageFailed", "화면·그래픽 설정은 저장했지만 언어를 적용하지 못했습니다. 언어 리소스를 확인한 뒤 다시 시도해 주세요."));
         return;
     }
     // ApplySettings saves immediately; preview without writing the unconfirmed video mode to disk.
@@ -371,18 +441,21 @@ void UOptionsWidget::ConfirmOptions()
         RevertOptions();
         return;
     }
+    bool bLanguageApplied = false;
     if (UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings())
     {
         Settings->ApplyResolutionSettings(false);
         Settings->ConfirmVideoMode();
         Settings->SaveSettings();
+        bLanguageApplied = ApplyPendingLanguage();
     }
+    PendingLanguage.Reset();
     bAwaitingConfirmation = false;
     StopConfirmationTicker();
     SetFullscreenShortcutsBlocked(false);
     SetConfirmationVisible(false);
     RefreshOptions();
-    Status->SetText(NSLOCTEXT("Options", "Saved", "설정을 적용하고 저장했습니다."));
+    Status->SetText(bLanguageApplied ? NSLOCTEXT("Options", "Saved", "설정을 적용하고 저장했습니다.") : NSLOCTEXT("Options", "LanguageFailed", "화면·그래픽 설정은 저장했지만 언어를 적용하지 못했습니다. 언어 리소스를 확인한 뒤 다시 시도해 주세요."));
     ApplyButton->SetFocus();
 }
 
@@ -390,6 +463,7 @@ void UOptionsWidget::RevertOptions()
 {
     if (!bAwaitingConfirmation) return;
     bAwaitingConfirmation = false;
+    PendingLanguage.Reset();
     StopConfirmationTicker();
     SetFullscreenShortcutsBlocked(false);
     if (UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings())
@@ -407,7 +481,7 @@ void UOptionsWidget::RevertOptions()
     }
     SetConfirmationVisible(false);
     RefreshOptions();
-    Status->SetText(NSLOCTEXT("Options", "Restored", "변경을 취소하고 이전 화면·그래픽 설정으로 복구했습니다."));
+    Status->SetText(NSLOCTEXT("Options", "RestoredWithLanguage", "변경을 취소했습니다. 화면·그래픽 설정을 복구하고 기존 언어를 유지합니다."));
     if (IsActivated()) ApplyButton->SetFocus();
 }
 
@@ -482,6 +556,7 @@ UWidget* UOptionsWidget::NativeGetDesiredFocusTarget() const
 
 void UOptionsWidget::NativeOnDeactivated()
 {
+    StopObservingLocalization();
     RevertOptions();
     StopConfirmationTicker();
     if (ObservedViewport.IsValid()) ObservedViewport->OnCloseRequested().RemoveAll(this);
@@ -495,6 +570,7 @@ void UOptionsWidget::NativeOnDeactivated()
 
 void UOptionsWidget::NativeDestruct()
 {
+    StopObservingLocalization();
     RevertOptions();
     StopConfirmationTicker();
     if (ObservedViewport.IsValid()) ObservedViewport->OnCloseRequested().RemoveAll(this);

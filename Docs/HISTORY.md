@@ -987,3 +987,13 @@ Startup/Default MoviePlayer 화면에 기존 DemonicUI 성 배경·하단 밴드
 `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`와 같은 옵션의 `ProjectA Win64 Development` 컴파일·링크가 각각 31.58초·32.36초에 성공했다. 라이선스 스테이징 추가 후 빌드는 5.72초·3.21초, 원본 말미 빈 줄 정리 후 최종 빌드는 4.13초·10.45초이며 오류·경고 0이다. 로그는 `Saved/Automation/LoadingScreen_20261009/EditorBuild.log`·`GameBuild.log`·`EditorBuild.Final.log`·`GameBuild.Final.log`·`EditorBuild.Whitespace.log`·`GameBuild.Whitespace.log`다. 플러그인 출처/소스 대조·INI 구조/필드·배경 경로·빌드 receipt·문서 링크·TODO 보존·전체 diff 정적 검사를 수행하며 근거는 같은 폴더의 `StaticReview.json`·`PluginReview.json`·`DocumentationValidation.json`에 기록한다. 기존 미완료 46개·선택 7개를 보존하고 사용자 확인 1개를 추가했다.
 
 독립 소스 검토에서 일반 PIE 제외와 Gameplay 다음 tick 준비의 수동 종료 교착 가능성을 확인해 엔진의 자동 종료 경로를 유지했다. Editor·게임·PIE·자동화 테스트·cook·패키지·화면 캡처는 실행하지 않았으며 IDE도 열지 않았다. 초기 준비/한글/화면비·재진입·접속 실패·2인 전환·패키지 포함과 원본 배경의 최초 로드/메모리 확인은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남긴다. 같은 월드의 인카운터 이동과 OpenLevel 이전 동기 작업은 [표시 범위](UI_README.md#14-로딩-화면)에서 구분한다.
+
+### 9-46 2026-10-09 한국어영어 설정과 텍스트 현지화
+
+설정의 번역 기능 구현 요청에 따라 한국어 기본·English 선택과 저장을 추가했다. 시작 기준은 `cec00299`이며 기존 미커밋 변경은 없었다. 언어는 비영상 적용 또는 화면 유지 확정 시 저장하며 적용 전 닫기·화면 복구·시간 초과는 기존 언어를 유지한다. 독립 게임은 Unreal 언어 초기화와 사용자 설정을 사용하고 PIE는 게임 리소스 미리보기만 변경한다. 변경 범위와 유지보수 명령은 [UI 15절](UI_README.md#15-언어와-번역-리소스), ICU·UFS 배포는 [PROJECT_PLAN 1-2절](PROJECT_PLAN.md#1-2-언어-리소스와-배포)에 기록한다.
+
+메뉴·캐릭터 생성·전투·인벤토리·상점·보상·난이도의 고정 문자열을 FText로 전환하고 조합 인자를 보존했다. 6개 JSON에 1,046개 번역을 작성했으며 현재 NSLOCTEXT 754개를 모두 포함한다. 아이템 49종·스킬 77종·몬스터 13종·인카운터 28종·난이도 3종·노드 30개 및 직업/몸체를 실제 ID·경로와 원문으로 연결했다. 로딩 제목·팁 6개는 동일 리소스를 사용한다. 사용자 이름·저장·확률·GAS·명령/서버 권위는 유지한다. 미등록 콘텐츠·원문 불일치·일부 기존 개발 진단의 고정 문자열은 원문을 표시한다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64` 및 같은 옵션의 `ProjectA Win64 Development` 컴파일·링크가 각각 45.66초·33.93초에 성공했다. 인벤토리/구형 스킬상점 표시 연결 보완을 포함한 최종 증분 빌드도 11.43초·15.95초에 성공했고 오류·경고는 0이다. 근거는 `Saved/Automation/Localization_20261009/EditorBuild.Final.log`·`GameBuild.Final.log`다. 명령줄 컴파일이며 게임·PIE·Unreal 자동화 테스트·패키지 실행·화면 캡처는 수행하지 않았다.
+
+`python Source/ProjectAEditor/Scripts/BuildLocalization.py --check`는 전체 키·원문·서식 인자·한영 생성물 일치를 확인한다. `ResourceValidation.json`은 독립 바이너리 해석으로 양쪽 리소스 전체와 game receipt의 3개 UFS 의존성을 대조하고, 엔진 기본 영문 locres 66,406개 중 원문과 동일한 66,393개에서 source CRC 일치를 확인한다. `ValidateContentTranslations.json`·`CombatStaticReview.json`·`DocumentationValidation.json`은 콘텐츠 원문·명령 보존·문서 링크 검사의 근거다. 기존 TODO 미완료 47개·제안 선택 7개를 보존하고 언어 실행 확인 1개를 추가했다. 재실행 저장·즉시 갱신·영문 줄바꿈·두 독립 클라이언트의 혼합 언어 동작은 사용자 확인 전이며 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남긴다.

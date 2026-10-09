@@ -46,6 +46,10 @@ private:
     UTextBlock* AddText(UVerticalBox* Parent, const FText& Text, int32 FontSize, float BottomPadding);
     UButton* CreateButton(const FName Name, const FText& Text);
     UComboBoxString* AddSelector(UVerticalBox* Parent, const FName Name, const FText& Label);
+    void RefreshLocalizedSelectors();
+    void HandleLocalizationChanged();
+    void StopObservingLocalization();
+    bool ApplyPendingLanguage();
     void RefreshOptions();
     void RefreshResolutions(FIntPoint PreferredResolution);
     FIntPoint GetSelectedResolution() const;
@@ -60,6 +64,8 @@ private:
     UFUNCTION()
     void HandleWindowModeChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
 
+    UPROPERTY(Transient)
+    TObjectPtr<UComboBoxString> Language;
     UPROPERTY(Transient)
     TObjectPtr<UComboBoxString> Resolution;
     UPROPERTY(Transient)
@@ -94,6 +100,8 @@ private:
     bool bPreviousAltEnter = false;
     bool bPreviousF11 = false;
     double ConfirmationDeadline = 0.0;
+    FString PendingLanguage;
+    FDelegateHandle LocalizationChangedHandle;
     FTSTicker::FDelegateHandle ConfirmationTicker;
     TWeakObjectPtr<UGameViewportClient> ObservedViewport;
 };

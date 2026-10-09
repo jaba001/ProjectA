@@ -59,6 +59,12 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 배경은 기존 `/Game/DemonicUI/Backgrounds/Background.Background`를 직접 참조한다. `UProjectAAssetManager::ModifyCook`은 두 화면에 지정한 배경의 패키지만 중복 없이 추가하며 원본 팩 전체를 포함하지 않는다. 해당 설정 조회 의존성은 Editor 빌드에만 추가한다. 현재 회전 표시는 Slate 색상 브러시, 글자는 엔진 Roboto와 기존 한국어 fallback을 사용한다. 원본 배경은 8000×4501·NeverStream이며 최초 로드/메모리 영향은 실제 확인이 남아 있다. [표시와 검수 범위](UI_README.md#14-로딩-화면)
 
+### 1-2 언어 리소스와 배포
+
+`DefaultGame.ini`의 기본 문화는 `ko`이며 `GameUserSettings.ini`의 `Internationalization.Language`에 저장된 선택값을 엔진이 우선 적용한다. 독립 실행은 시작 MoviePlayer 전에 게임 현지화를 초기화한다. PIE는 `UProjectALanguageSubsystem`이 저장된 언어의 게임 텍스트만 미리보기하며 에디터 전체 언어를 변경하지 않는다. 동일 프로세스의 다중 PIE 창은 같은 게임 언어를 공유한다.
+
+번역 원본은 `Config/Localization/*.json`, 엔진 리소스는 `Content/User_JeHoon/Localization/Game`의 `Game.locmeta`와 `ko/en/Game.locres`다. `ProjectA.Build.cs`에서 3개 리소스를 UFS 의존성으로 포함한다. 패키징은 한국어를 포함하는 ICU `All` 프리셋과 `ko/en` 번역 문화만 지정한다. 외부 번역 서비스나 원본 에셋 복제는 없다. 작성·정적 검사는 `python Source/ProjectAEditor/Scripts/BuildLocalization.py`와 같은 명령의 `--check`로 수행하며 Unreal 프로세스를 실행하지 않는다. [표시·유지보수 계약](UI_README.md#15-언어와-번역-리소스)
+
 ## 2 모듈과 책임
 
 런타임은 `Source/ProjectA`, 에셋 생성·에디터 도구·PIE 테스트는 `Source/ProjectAEditor`에 둔다. Editor 의존성을 런타임 모듈로 옮기지 않는다.

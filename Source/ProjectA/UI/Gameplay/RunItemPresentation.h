@@ -4,6 +4,8 @@
 #include "Game/Run/RunItemShopTypes.h"
 #include "Game/Run/RunWeaponSkillTypes.h"
 
+class USkillDefinitionDataAsset;
+
 namespace RunItemPresentation
 {
     struct FItemSkillDetails
@@ -16,6 +18,8 @@ namespace RunItemPresentation
 
     const FRunWeaponRarityRule* FindRarity(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities);
     FText Name(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities);
+    FText SkillName(const USkillDefinitionDataAsset* Skill);
+    FText SkillDescription(const USkillDefinitionDataAsset* Skill);
     FText GrantedSkills(const FRunItemDefinition& Item, bool bIncludeStats = true);
     FText Tooltip(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities);
     FText EquipmentDescription(const FRunItemDefinition& Item);

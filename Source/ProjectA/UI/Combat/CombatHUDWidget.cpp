@@ -9,5 +9,5 @@ void UCombatHUDWidget::NativeOnInitialized()
 
 FText UCombatHUDWidget::GetTurnInfoText() const
 {
-    return FText::FromString(TEXT("라운드 계획 화면을 사용하세요."));
+    return NSLOCTEXT("CombatHUD", "UseRoundPlanning", "라운드 계획 화면을 사용하세요.");
 }

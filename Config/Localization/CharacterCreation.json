@@ -1,0 +1,190 @@
+{
+  "entries": [
+    {
+      "namespace": "CharacterCreation",
+      "key": "AIControl",
+      "source": "AI",
+      "translation": "AI"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "Body",
+      "source": "몸체",
+      "translation": "Body"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "BodyPosition",
+      "source": "{0} / {1}",
+      "translation": "{0} / {1}"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "BodyUnavailable",
+      "source": "몸체를 표시할 수 없습니다. 선택을 다시 확인해 주세요.",
+      "translation": "The body could not be displayed. Check your selection."
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "CharacterSettings",
+      "source": "캐릭터 설정",
+      "translation": "Character Settings"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "ClassControl",
+      "source": "{0} · {1}",
+      "translation": "{0} · {1}"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "ClassInfo",
+      "source": "클래스 정보",
+      "translation": "Class Info"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "CloseCancel",
+      "source": "닫기 / 취소",
+      "translation": "Close / Cancel"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "ControlledSlot",
+      "source": "직접 조작: 슬롯 {0} · 나머지 동료는 AI가 조작합니다.",
+      "translation": "Player control: Slot {0} · AI controls the other companions."
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "CreateCharacter",
+      "source": "캐릭터 생성하기",
+      "translation": "Create Character"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "DefaultBody",
+      "source": "기본 몸체",
+      "translation": "Default Body"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "Edit",
+      "source": "수정",
+      "translation": "Edit"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "InvalidName",
+      "source": "이름은 1~32자로 입력해 주세요.",
+      "translation": "Enter a name between 1 and 32 characters."
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "InvalidProfessionCombat",
+      "source": "직업 전투 설정을 확인해 주세요.",
+      "translation": "Check the class combat settings."
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "MissingProfessionData",
+      "source": "직업 데이터를 불러올 수 없습니다.",
+      "translation": "Class data could not be loaded."
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "Name",
+      "source": "이름",
+      "translation": "Name"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "NameHint",
+      "source": "캐릭터 이름",
+      "translation": "Character name"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "NextBody",
+      "source": "다음 몸체",
+      "translation": "Next Body"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "PlayerControl",
+      "source": "직접 조작",
+      "translation": "Player Control"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "Preview",
+      "source": "미리보기",
+      "translation": "Preview"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "PreviousBody",
+      "source": "이전 몸체",
+      "translation": "Previous Body"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "Profession",
+      "source": "직업",
+      "translation": "Class"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "ProfessionDetails",
+      "source": "{0}\n{1}\n\nHP {2} · 속도 {3}\nAP {4} · 보조 AP {5}\n\n시작 스킬\n{6}",
+      "translation": "{0}\n{1}\n\nHP {2} · Speed {3}\nAP {4} · SAP {5}\n\nStarting Skills\n{6}"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "ProfessionInfo",
+      "source": "직업 정보",
+      "translation": "Class Info"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "ResetBody",
+      "source": "기본 몸체로 초기화",
+      "translation": "Reset to Default Body"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "RotationHint",
+      "source": "캐릭터가 보이는 영역을 우클릭한 채 좌우로 드래그하여 회전",
+      "translation": "Hold the right mouse button over the character and drag sideways to rotate."
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "Save",
+      "source": "저장",
+      "translation": "Save"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "SelectControlledSlot",
+      "source": "캐릭터를 생성한 뒤 직접 조작할 1명을 선택하세요. 나머지 동료는 AI가 조작합니다.",
+      "translation": "Create characters, then choose one to control. AI controls the other companions."
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "Selected",
+      "source": "선택됨",
+      "translation": "Selected"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "StartGame",
+      "source": "게임 시작",
+      "translation": "Start Game"
+    },
+    {
+      "namespace": "CharacterCreation",
+      "key": "StartingSkill",
+      "source": "• {0} (AP {1} · 보조 AP {2})",
+      "translation": "• {0} (AP {1} · SAP {2})"
+    }
+  ]
+}

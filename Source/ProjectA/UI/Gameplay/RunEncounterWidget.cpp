@@ -1,4 +1,5 @@
 #include "UI/Gameplay/RunEncounterWidget.h"
+#include "UI/ProjectALocalization.h"
 #include "Blueprint/WidgetTree.h"
 #include "CommonInputModeTypes.h"
 #include "Components/Border.h"
@@ -370,14 +371,15 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Offer.Skill.TryLoad());
             // Refresh renamed skill labels without changing the saved shop offer.
             // 저장된 상점 상품을 변경하지 않고 이름이 바뀐 스킬의 표시를 갱신합니다.
-            ShopNames[Index]->SetText(Skill && !Skill->SkillName.IsEmpty() ? Skill->SkillName : Offer.DisplayName);
+            ShopNames[Index]->SetText(Skill ? RunItemPresentation::SkillName(Skill) : Offer.DisplayName);
             ShopPrices[Index]->SetText(FText::Format(NSLOCTEXT("RunSkillShop", "Price", "{0}G"), FText::AsNumber(Offer.Price)));
             ShopIcons[Index]->SetVisibility(Skill && Skill->SkillIcon ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
             if (Skill && Skill->SkillIcon) ShopIcons[Index]->SetBrushFromTexture(Skill->SkillIcon);
             ShopCards[Index]->SetRenderOpacity(bOwned ? 0.55f : 1.0f);
             ShopCards[Index]->SetToolTip(nullptr);
-            ShopCards[Index]->SetToolTipText(Offer.Description);
-            Button->SetToolTipText(FText::Format(NSLOCTEXT("RunShop", "ProductActionTooltip", "{0}\n{1}"), Status, Offer.Description));
+            const FText Description = Skill ? ProjectALocalization::SkillDescription(FName(*Skill->GetPrimaryAssetId().ToString()), Offer.Description) : Offer.Description;
+            ShopCards[Index]->SetToolTipText(Description);
+            Button->SetToolTipText(FText::Format(NSLOCTEXT("RunShop", "ProductActionTooltip", "{0}\n{1}"), Status, Description));
             Button->SetIsEnabled(!bOwned && bAffordable && Controller && !Controller->IsShopPurchasePending());
         }
         const bool bCanRecover = Buyer && BuyerView && Buyer->CurrentHP > 0.f && Buyer->CurrentHP < BuyerView->MaxHP;
@@ -404,12 +406,12 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             const int32 Price = bConsumable ? Rules.ConsumablePrice : bRevival ? Rules.RevivalPrice : Rules.RecoveryPrice;
             const FRunConsumableStack* Stack = Buyer ? Buyer->Consumables.FindByPredicate([&Rules](const FRunConsumableStack& Candidate) { return Candidate.ItemTag == Rules.ConsumableTag && Candidate.Skill == Rules.HealingSkill; }) : nullptr;
             const bool bEligible = Buyer && BuyerView && (bRevival ? Buyer->CurrentHP == 0.f : Buyer->CurrentHP > 0.f) && (bConsumable ? Stack && Stack->Quantity < RunRecoveryRules::MaximumQuantity : bRevival || Buyer->CurrentHP < BuyerView->MaxHP);
-            const FString Product = bConsumable ? FString::Printf(TEXT("회복 소모품 1개 · 보유 %d개"), Stack ? Stack->Quantity : 0) : bRevival ? FString::Printf(TEXT("최대 HP %.0f%%로 부활"), Rules.RevivalFraction * 100.f) : FString::Printf(TEXT("HP %.0f 회복"), Rules.RecoveryHP);
+            const FText Product = bConsumable ? FText::Format(NSLOCTEXT("RunRecovery", "ConsumableQuantity", "회복 소모품 1개 · 보유 {0}개"), Stack ? Stack->Quantity : 0) : bRevival ? FText::Format(NSLOCTEXT("RunRecovery", "RevivalHP", "최대 HP {0}%로 부활"), FMath::RoundToInt(Rules.RevivalFraction * 100.f)) : FText::Format(NSLOCTEXT("RunRecovery", "RecoveryHP", "HP {0} 회복"), FMath::RoundToInt(Rules.RecoveryHP));
             const FText Ineligible = bConsumable ? NSLOCTEXT("RunRecovery", "QuantityLimit", "보유 한도") : bRevival ? NSLOCTEXT("RunRecovery", "LivingCharacter", "사망자만") : NSLOCTEXT("RunRecovery", "FullHP", "HP 가득 참");
             const bool bServiceAvailable = Rules.SchemaVersion == 1 && Rules.Revision > 0;
             const FText Status = ShopActionStatus(bServiceAvailable && (!Buyer || !BuyerView || bEligible), Buyer && BuyerView, Buyer && Buyer->Gold >= Price, Controller && Controller->IsShopPurchasePending(), bServiceAvailable ? Ineligible : NSLOCTEXT("RunShop", "Unavailable", "이용 불가"));
-            RecoveryButton->Configure(Service.GetTagName(), FText::Format(NSLOCTEXT("RunRecovery", "ProductStatus", "{0} · {1}G · {2}"), FText::FromString(Product), FText::AsNumber(Price), Status));
-            const FText Hint = FText::FromString(bConsumable ? TEXT("본인 생존 캐릭터가 구매합니다. 전투에서 본인에게 AP 1로 사용하며 실제 회복이 발동한 경우에만 1개를 소모합니다.") : bRevival ? TEXT("본인이 직접 조작하는 사망 캐릭터를 부활시킵니다. AI 동료와 다른 참가자의 캐릭터는 구매할 수 없습니다.") : TEXT("본인 생존 캐릭터의 HP를 회복합니다. 이미 최대 HP이면 구매할 수 없습니다."));
+            RecoveryButton->Configure(Service.GetTagName(), FText::Format(NSLOCTEXT("RunRecovery", "ProductStatus", "{0} · {1}G · {2}"), Product, FText::AsNumber(Price), Status));
+            const FText Hint = bConsumable ? NSLOCTEXT("RunRecovery", "ConsumableHint", "본인 생존 캐릭터가 구매합니다. 전투에서 본인에게 AP 1로 사용하며 실제 회복이 발동한 경우에만 1개를 소모합니다.") : bRevival ? NSLOCTEXT("RunRecovery", "RevivalHint", "본인이 직접 조작하는 사망 캐릭터를 부활시킵니다. AI 동료와 다른 참가자의 캐릭터는 구매할 수 없습니다.") : NSLOCTEXT("RunRecovery", "RecoveryHint", "본인 생존 캐릭터의 HP를 회복합니다. 이미 최대 HP이면 구매할 수 없습니다.");
             RecoveryButton->SetToolTipText(Hint);
             ShopHint->SetText(Hint);
             RecoveryButton->SetIsEnabled(Rules.SchemaVersion == 1 && Rules.Revision > 0 && bEligible && Buyer->Gold >= Price && Controller && !Controller->IsShopPurchasePending());
@@ -424,7 +426,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
         if (bVisible)
         {
             const FRunEncounterOffer& Offer = View.EncounterProgress.Offers[Index];
-            Button->Configure(Offer.EncounterId, Offer.GetDisplayName());
+            Button->Configure(Offer.EncounterId, ProjectALocalization::Content(TEXT("Encounter.") + Offer.EncounterId.ToString() + TEXT(".Name"), Offer.GetDisplayName()));
             Button->SetToolTipText(EncounterShopDescription(Offer));
         }
     }
@@ -439,8 +441,9 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
         if (!bVisible) continue;
         const FRunEncounterOffer& Offer = View.EncounterProgress.Offers[Index];
         const FText Direction = EncounterDungeonLayout::GetDirectionLabel(Index);
-        Button->Configure(Offer.EncounterId, FText::Format(NSLOCTEXT("RunEncounter", "DungeonDirectionOffer", "{0}\n{1}"), Direction, Offer.GetDisplayName()));
-        Button->SetToolTipText(FText::Format(NSLOCTEXT("RunEncounter", "DungeonDirectionDescription", "{0} · {1}\n{2}"), Direction, Offer.GetDisplayName(), EncounterShopDescription(Offer)));
+        const FText OfferName = ProjectALocalization::Content(TEXT("Encounter.") + Offer.EncounterId.ToString() + TEXT(".Name"), Offer.GetDisplayName());
+        Button->Configure(Offer.EncounterId, FText::Format(NSLOCTEXT("RunEncounter", "DungeonDirectionOffer", "{0}\n{1}"), Direction, OfferName));
+        Button->SetToolTipText(FText::Format(NSLOCTEXT("RunEncounter", "DungeonDirectionDescription", "{0} · {1}\n{2}"), Direction, OfferName, EncounterShopDescription(Offer)));
         if (UTextBlock* Label = Cast<UTextBlock>(Button->GetContent()))
         {
             Label->SetWrapTextAt(300.0f);
@@ -470,7 +473,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     else if (View.Phase == ERunPhase::Shop)
     {
         const FRunEncounterOffer* Selected = View.EncounterProgress.FindSelectedOffer();
-        Title->SetText(Selected ? Selected->GetDisplayName() : NSLOCTEXT("RunEncounter", "Shop", "상점"));
+        Title->SetText(Selected ? ProjectALocalization::Content(TEXT("Encounter.") + Selected->EncounterId.ToString() + TEXT(".Name"), Selected->GetDisplayName()) : NSLOCTEXT("RunEncounter", "Shop", "상점"));
     }
     if (View.bTargetRun && (View.Phase == ERunPhase::EncounterChoice || bInShop)) Title->SetText(FText::Format(NSLOCTEXT("RunEncounter", "TargetProgressTitle", "{0} · {1}/80 완료"), Title->GetText(), FText::AsNumber(View.TargetCompletedSteps)));
     DungeonChoiceTitle->SetText(Title->GetText());

@@ -1,0 +1,208 @@
+{
+  "entries": [
+    {
+      "namespace": "Options",
+      "key": "Apply",
+      "source": "적용 및 저장",
+      "translation": "Apply and Save"
+    },
+    {
+      "namespace": "Options",
+      "key": "BorderlessHint",
+      "source": "테두리 없는 전체화면은 데스크톱 해상도를 사용합니다.",
+      "translation": "Borderless fullscreen uses your desktop resolution."
+    },
+    {
+      "namespace": "Options",
+      "key": "Close",
+      "source": "뒤로 / 적용 전 취소",
+      "translation": "Back / Cancel Changes"
+    },
+    {
+      "namespace": "Options",
+      "key": "ConfirmTitle",
+      "source": "변경한 화면 설정을 유지할까요?",
+      "translation": "Keep these display settings?"
+    },
+    {
+      "namespace": "Options",
+      "key": "Countdown",
+      "source": "{0}초 안에 확인하지 않으면 이전 설정으로 복구합니다.\n화면이 정상적으로 보일 때만 유지 및 저장을 선택하세요.",
+      "translation": "Previous settings will be restored unless you confirm within {0} seconds.\nChoose Keep and Save only if the display looks correct."
+    },
+    {
+      "namespace": "Options",
+      "key": "DisplaySection",
+      "source": "화면",
+      "translation": "Display"
+    },
+    {
+      "namespace": "Options",
+      "key": "GraphicsSection",
+      "source": "그래픽",
+      "translation": "Graphics"
+    },
+    {
+      "namespace": "Options",
+      "key": "Keep",
+      "source": "유지 및 저장",
+      "translation": "Keep and Save"
+    },
+    {
+      "namespace": "Options",
+      "key": "Language",
+      "source": "언어",
+      "translation": "Language"
+    },
+    {
+      "namespace": "Options",
+      "key": "LanguageFailed",
+      "source": "화면·그래픽 설정은 저장했지만 언어를 적용하지 못했습니다. 언어 리소스를 확인한 뒤 다시 시도해 주세요.",
+      "translation": "Display and graphics settings were saved, but the language could not be applied. Check the language resources and try again."
+    },
+    {
+      "namespace": "Options",
+      "key": "LanguageHint",
+      "source": "언어는 적용 및 저장 시 변경됩니다. 화면을 함께 바꾸면 유지 및 저장 후 적용됩니다.",
+      "translation": "Language changes when you apply and save. If you also change the display, confirm with Keep and Save first."
+    },
+    {
+      "namespace": "Options",
+      "key": "LanguageSubtitle",
+      "source": "언어·화면·그래픽을 조정합니다. 변경한 값은 적용 후 저장됩니다.",
+      "translation": "Adjust language, display, and graphics. Changes are saved when applied."
+    },
+    {
+      "namespace": "Options",
+      "key": "ModeBorderless",
+      "source": "테두리 없는 전체화면",
+      "translation": "Borderless Fullscreen"
+    },
+    {
+      "namespace": "Options",
+      "key": "ModeFullscreen",
+      "source": "전체화면",
+      "translation": "Fullscreen"
+    },
+    {
+      "namespace": "Options",
+      "key": "ModeWindowed",
+      "source": "창 모드",
+      "translation": "Windowed"
+    },
+    {
+      "namespace": "Options",
+      "key": "Quality",
+      "source": "그래픽 품질",
+      "translation": "Graphics Quality"
+    },
+    {
+      "namespace": "Options",
+      "key": "QualityCinematic",
+      "source": "시네마틱",
+      "translation": "Cinematic"
+    },
+    {
+      "namespace": "Options",
+      "key": "QualityCustom",
+      "source": "사용자 지정 (현재 값 유지)",
+      "translation": "Custom (keep current values)"
+    },
+    {
+      "namespace": "Options",
+      "key": "QualityEpic",
+      "source": "최고",
+      "translation": "Epic"
+    },
+    {
+      "namespace": "Options",
+      "key": "QualityHigh",
+      "source": "높음",
+      "translation": "High"
+    },
+    {
+      "namespace": "Options",
+      "key": "QualityHint",
+      "source": "품질이 높을수록 성능 부담이 커집니다. 사용자 지정은 현재 세부 품질을 유지합니다.",
+      "translation": "Higher quality requires more performance. Custom keeps your current detailed quality settings."
+    },
+    {
+      "namespace": "Options",
+      "key": "QualityLow",
+      "source": "낮음",
+      "translation": "Low"
+    },
+    {
+      "namespace": "Options",
+      "key": "QualityMedium",
+      "source": "중간",
+      "translation": "Medium"
+    },
+    {
+      "namespace": "Options",
+      "key": "Ready",
+      "source": "화면 모드나 해상도를 바꾸면 15초 동안 확인 후 저장합니다.",
+      "translation": "Display mode or resolution changes require confirmation within 15 seconds before saving."
+    },
+    {
+      "namespace": "Options",
+      "key": "Resolution",
+      "source": "해상도",
+      "translation": "Resolution"
+    },
+    {
+      "namespace": "Options",
+      "key": "ResolutionHint",
+      "source": "모니터가 지원하는 해상도 또는 창 크기를 선택합니다.",
+      "translation": "Select a resolution or window size supported by your monitor."
+    },
+    {
+      "namespace": "Options",
+      "key": "RestoredWithLanguage",
+      "source": "변경을 취소했습니다. 화면·그래픽 설정을 복구하고 기존 언어를 유지합니다.",
+      "translation": "Changes canceled. Display and graphics settings were restored, and the previous language was kept."
+    },
+    {
+      "namespace": "Options",
+      "key": "Revert",
+      "source": "이전 설정으로 복구",
+      "translation": "Restore Previous Settings"
+    },
+    {
+      "namespace": "Options",
+      "key": "Saved",
+      "source": "설정을 적용하고 저장했습니다.",
+      "translation": "Settings applied and saved."
+    },
+    {
+      "namespace": "Options",
+      "key": "Title",
+      "source": "설정",
+      "translation": "Settings"
+    },
+    {
+      "namespace": "Options",
+      "key": "Unavailable",
+      "source": "설정을 불러올 수 없습니다. 메뉴로 돌아간 뒤 다시 시도해 주세요.",
+      "translation": "Settings are unavailable. Return to the menu and try again."
+    },
+    {
+      "namespace": "Options",
+      "key": "VSync",
+      "source": "수직 동기화",
+      "translation": "Vertical Sync"
+    },
+    {
+      "namespace": "Options",
+      "key": "VSyncHint",
+      "source": "화면 찢어짐을 줄이도록 화면 갱신에 맞춥니다. 환경에 따라 입력 반응이 느려질 수 있습니다.",
+      "translation": "Synchronizes frame presentation to reduce screen tearing. Input may feel less responsive on some systems."
+    },
+    {
+      "namespace": "Options",
+      "key": "WindowMode",
+      "source": "화면 모드",
+      "translation": "Display Mode"
+    }
+  ]
+}

@@ -1,0 +1,516 @@
+{
+  "nativeCulture": "ko",
+  "culture": "en",
+  "entries": [
+    {
+      "namespace": "CombatPlanning",
+      "key": "UnitFallback",
+      "source": "{0} #{1}",
+      "translation": "{0} #{1}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "Enemy",
+      "source": "적",
+      "translation": "Enemy"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "Ally",
+      "source": "아군",
+      "translation": "Ally"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "SkillCost",
+      "source": "AP {0} · SAP {1}",
+      "translation": "AP {0} · SAP {1}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "UnitOption",
+      "source": "{0} #{1}",
+      "translation": "{0} #{1}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "SkillCard",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ControlHealth",
+      "source": "{0} · HP {1}",
+      "translation": "{0} · HP {1}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "DetailActionPoints",
+      "source": "{0}\nAP {1} · SAP {2}",
+      "translation": "{0}\nAP {1} · SAP {2}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "DetailPlan",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "DetailMove",
+      "source": "{0}\n이동 ({1},{2})",
+      "translation": "{0}\nMove ({1},{2})"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "DetailReady",
+      "source": "{0}\n준비 완료",
+      "translation": "{0}\nReady"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "RoundHeader",
+      "source": "라운드 {0} · {1}",
+      "translation": "Round {0} · {1}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "EnemyDetail",
+      "source": "{0} · HP {1}\n{2}",
+      "translation": "{0} · HP {1}\n{2}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "EnemyReady",
+      "source": "{0} · 준비 완료",
+      "translation": "{0} · Ready"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "EnemyMove",
+      "source": "{0} · SAP ({1},{2})",
+      "translation": "{0} · SAP ({1},{2})"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "RosterSummary",
+      "source": "아군 {0} · 적 {1}  |  준비 유닛 {2} / {3}",
+      "translation": "Allies {0} · Enemies {1}  |  Ready {2} / {3}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "SelectedUnitStats",
+      "source": "{0}\nHP {1} · AP {2} · SAP {3} · 속도 {4}",
+      "translation": "{0}\nHP {1} · AP {2} · SAP {3} · Speed {4}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ConsumableQuantity",
+      "source": "{0} · 소모품 {1}개",
+      "translation": "{0} · Consumables {1}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "MovePlan",
+      "source": "SAP 이동: ({0},{1}) · 비용 1",
+      "translation": "SAP move: ({0},{1}) · Cost 1"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "NoMovePlan",
+      "source": "SAP 이동: 예약 없음",
+      "translation": "SAP move: none"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "TileLabel",
+      "source": "타일 ({0},{1})",
+      "translation": "Tile ({0},{1})"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "AcceptedSkillPlan",
+      "source": "예약된 스킬: {0} → {1}\n스킬 비용 {2} · 이동 포함 SAP 합계 {3}\n모든 SAP 이동이 끝난 뒤 사용합니다.",
+      "translation": "Planned skill: {0} → {1}\nSkill cost {2} · Total SAP with movement {3}\nUsed after all SAP moves finish."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ChooseMoveTile",
+      "source": "이동할 아군 빈칸을 클릭하세요.",
+      "translation": "Click an empty allied tile to move to."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "SelectedTarget",
+      "source": "지정 대상: {0} · {1} · HP {2}\n스킬 버튼을 눌러 이 대상에게 행동을 예약합니다.",
+      "translation": "Target: {0} · {1} · HP {2}\nChoose a skill to plan an action on this target."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "SelectedTile",
+      "source": "지정 대상: 타일 ({0},{1})\n이 타일에 사용할 스킬을 선택하세요.",
+      "translation": "Target: tile ({0},{1})\nChoose a skill to use on this tile."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ChooseSkillTarget",
+      "source": "스킬 대상을 클릭하세요.\n내 다른 아군을 대상으로 지정하려면 Shift+클릭하세요.",
+      "translation": "Click a skill target.\nShift+click to target another unit you control."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "CombinedStatus",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "PhaseWaiting",
+      "source": "참가자 대기",
+      "translation": "Waiting for players"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "PhasePlanning",
+      "source": "행동 선택",
+      "translation": "Planning"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "PhaseResolving",
+      "source": "전투 진행",
+      "translation": "Resolving"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "PhaseFinished",
+      "source": "전투 종료",
+      "translation": "Battle finished"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "PhaseSuspended",
+      "source": "세션 중단",
+      "translation": "Session suspended"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "PhasePreparing",
+      "source": "준비 중",
+      "translation": "Preparing"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "BattleTitle",
+      "source": "라운드 전투",
+      "translation": "Round battle"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "TargetTitle",
+      "source": "대상 정보",
+      "translation": "Target details"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "TargetInitialHint",
+      "source": "대상을 클릭하세요. 내 아군 대상 지정은 Shift+클릭입니다.",
+      "translation": "Click a target. Shift+click to target a unit you control."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "PartyTitle",
+      "source": "파티 현황",
+      "translation": "Party"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ControlledUnit",
+      "source": "조작할 아군",
+      "translation": "Controlled unit"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "CancelSkill",
+      "source": "스킬 선택 취소",
+      "translation": "Cancel skill"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "PlanTitle",
+      "source": "행동 계획",
+      "translation": "Action plan"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "PlanMove",
+      "source": "이동 예약 · SAP 1",
+      "translation": "Plan move · SAP 1"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "CancelMove",
+      "source": "이동 예약 취소",
+      "translation": "Cancel move"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "Ready",
+      "source": "준비 완료",
+      "translation": "Ready"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "Unready",
+      "source": "준비 취소",
+      "translation": "Unready"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "EmptyMoveTileHint",
+      "source": "이동할 아군 빈칸을 선택하세요. 점유된 칸에는 이동할 수 없습니다.",
+      "translation": "Choose an empty allied tile. Occupied tiles cannot be used."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ChooseSkillHint",
+      "source": "사용할 스킬을 누르세요. 선택한 행동을 확인한 뒤 준비 완료를 누릅니다.",
+      "translation": "Choose a skill, review your plan, then press Ready."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "TileSelectedHint",
+      "source": "타일을 대상으로 지정했습니다. 이 타일에 사용할 수 있는 스킬을 선택하세요.",
+      "translation": "Tile selected. Choose a skill that can be used on this tile."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "MoveChoosingHint",
+      "source": "강조된 아군 빈칸을 한 번 클릭해 이동을 예약하세요. 준비 완료 전에는 이동하거나 SAP를 소모하지 않습니다.",
+      "translation": "Click a highlighted empty allied tile to plan a move. Movement and SAP are not spent before you are ready."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "MoveChoosingClosed",
+      "source": "목적지 선택을 닫았습니다. 이미 적용한 이동 예약은 유지됩니다.",
+      "translation": "Destination selection closed. Your existing move plan is unchanged."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "AI",
+      "source": "AI",
+      "translation": "AI"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "OwnerSelf",
+      "source": "나",
+      "translation": "You"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "OwnerTeammate",
+      "source": "팀원",
+      "translation": "Teammate"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "Dead",
+      "source": "사망",
+      "translation": "Dead"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "SkipTurn",
+      "source": "턴 넘기기",
+      "translation": "Skip turn"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "UnknownSkill",
+      "source": "스킬 확인 필요",
+      "translation": "Check skill"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ExecutingMovement",
+      "source": "SAP 이동 실행",
+      "translation": "Resolving SAP moves"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ExecutingActions",
+      "source": "AP 행동 실행",
+      "translation": "Resolving AP actions"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "Waiting",
+      "source": "대기",
+      "translation": "Waiting"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "UnknownSelectedSkill",
+      "source": "선택한 스킬을 확인할 수 없습니다. 스킬을 다시 선택하거나 취소하세요.",
+      "translation": "The selected skill is unavailable. Select it again or cancel the plan."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "MoveOnlyPlan",
+      "source": "스킬 미선택 · 예약한 이동만 실행합니다.\n스킬 비용 없음 · 이동 SAP 1 소모",
+      "translation": "No skill selected · Only the planned move will run.\nNo skill cost · Movement costs 1 SAP"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "NoActionPlan",
+      "source": "스킬·이동 미선택 · 준비 완료 시 행동 없이 턴을 넘깁니다.\nAP·SAP 비용 없음",
+      "translation": "No skill or move selected · Ready to skip this turn.\nNo AP or SAP cost"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "SpectateTitle",
+      "source": "전투 관전",
+      "translation": "Spectating"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "SpectateHint",
+      "source": "생존한 아군 AI가 자동으로 행동합니다.",
+      "translation": "Surviving allied AI units act automatically."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ExecutingBattle",
+      "source": "전투 실행 중",
+      "translation": "Battle in progress"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "PlansLocked",
+      "source": "계획이 확정되었습니다. 다음 계획 단계에서 변경할 수 있습니다.",
+      "translation": "Plans are locked. You can change them in the next planning phase."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ServerPending",
+      "source": "서버 확인 중",
+      "translation": "Awaiting server"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "Spectating",
+      "source": "관전 중",
+      "translation": "Spectating"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ChoosingDestination",
+      "source": "목적지 선택 중",
+      "translation": "Choosing destination"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "AlreadyReady",
+      "source": "준비 완료됨",
+      "translation": "Ready confirmed"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ReadyNoAction",
+      "source": "행동 없이 준비 완료",
+      "translation": "Ready · Skip turn"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ReadyMoveOnly",
+      "source": "이동만 준비 완료",
+      "translation": "Ready · Move only"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "CloseDestination",
+      "source": "목적지 선택 닫기",
+      "translation": "Close destination selection"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ChangeMovePlan",
+      "source": "이동 예약 변경",
+      "translation": "Change move plan"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ReadyWaitingForConnection",
+      "source": "전투 연결을 기다리고 있습니다.",
+      "translation": "Waiting for the battle connection."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ReadyNoOwnedUnits",
+      "source": "준비를 변경할 생존 직접 조작 캐릭터가 없습니다.",
+      "translation": "No living directly controlled unit can change ready status."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ReadyChooseDestination",
+      "source": "이동 목적지를 선택하거나 목적지 선택을 닫은 뒤 준비하세요.",
+      "translation": "Choose a destination or close destination selection before readying."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "WaitingForConnection",
+      "source": "전투 연결을 기다리고 있습니다.",
+      "translation": "Waiting for the battle connection."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "RequestPending",
+      "source": "요청 결과를 기다리고 있습니다. 확인 후 다시 선택할 수 있습니다.",
+      "translation": "Waiting for the request result. You can choose again after confirmation."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "MenuBlocksPlanning",
+      "source": "열린 메뉴를 닫으면 전투 계획을 변경할 수 있습니다.",
+      "translation": "Close the open menu to change your battle plan."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ReadyAwaitingOthers",
+      "source": "다른 참가자의 준비를 기다립니다. 계획을 바꾸면 내 준비가 해제됩니다.",
+      "translation": "Waiting for the other players. Changing a plan clears your ready status."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ReviewBeforeReady",
+      "source": "내 캐릭터의 예약을 확인한 뒤 준비하세요. 모두 준비하면 실행됩니다.",
+      "translation": "Review your units' plans, then ready up. Battle starts when everyone is ready."
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "OwnPlanSummary",
+      "source": "내 계획 · 스킬 {0}명 · 이동 {1}명 · 무행동 {2}명\n{3}",
+      "translation": "Your plan · Skills {0} · Moves {1} · No action {2}\n{3}"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "ConnectionHeader",
+      "source": "전투 연결 대기",
+      "translation": "Waiting for battle connection"
+    },
+    {
+      "namespace": "CombatPlanning",
+      "key": "SkillAvailability",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "CombatHUD",
+      "key": "UseRoundPlanning",
+      "source": "라운드 계획 화면을 사용하세요.",
+      "translation": "Use the round planning screen."
+    }
+  ]
+}

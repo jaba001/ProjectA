@@ -1,0 +1,1476 @@
+{
+  "nativeCulture": "ko",
+  "culture": "en",
+  "entries": [
+    {
+      "namespace": "Equipment",
+      "key": "Title",
+      "source": "현재 장비",
+      "translation": "Current Equipment"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "NoCharacterHint",
+      "source": "직접 조작할 캐릭터가 생기면 장비를 확인할 수 있습니다.",
+      "translation": "Equipment will be shown once you have a character to control."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "DeadChangeHint",
+      "source": "사망한 캐릭터는 장비를 변경할 수 없습니다.",
+      "translation": "Dead characters cannot change equipment."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "DragHint",
+      "source": "아이템을 슬롯으로 끌어 장착·교체하세요.\n가방으로 끌면 해제됩니다.\n양손 장비는 두 무기 슬롯을 사용합니다.",
+      "translation": "Drag an item to a slot to equip or replace it.\nDrag it to the bag to unequip it.\nTwo-handed equipment uses both weapon slots."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "ReadOnlyHint",
+      "source": "장비 변경은 상점에서만 가능합니다.",
+      "translation": "Equipment can only be changed at shops."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "Pending",
+      "source": "장비 변경을 저장하고 있습니다.",
+      "translation": "Saving equipment changes."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "NoCharacter",
+      "source": "직접 조작 캐릭터가 없습니다.",
+      "translation": "No player-controlled character."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "NoEquipment",
+      "source": "표시할 캐릭터 장비가 없습니다.",
+      "translation": "No character equipment to display."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "Character",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "LegacyEquipment",
+      "source": "이전 저장 · 장비 정보 없음",
+      "translation": "Older save · No equipment data"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "Dead",
+      "source": "사망 · 보관 정보 보기",
+      "translation": "Dead · Viewing stored items"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "EquippedCount",
+      "source": "장착 아이템 {0}개",
+      "translation": "{0} equipped items"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "AllCategory",
+      "source": "전체",
+      "translation": "All"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "WeaponsCategory",
+      "source": "무기",
+      "translation": "Weapons"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "ShieldsCategory",
+      "source": "방패",
+      "translation": "Shields"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "AmmoCategory",
+      "source": "탄약",
+      "translation": "Ammo"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "OtherCategory",
+      "source": "기타",
+      "translation": "Other"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "SkillsCategory",
+      "source": "스킬",
+      "translation": "Skills"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "Title",
+      "source": "인벤토리",
+      "translation": "Inventory"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "MissingSkill",
+      "source": "스킬 정보를 불러올 수 없습니다.",
+      "translation": "Skill information could not be loaded."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "LegacySkillStats",
+      "source": "위력 {0} · AP {1} / SAP {2} · 선딜 {3}초",
+      "translation": "Power {0} · AP {1} / SAP {2} · Windup {3}s"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "MissingSkillStats",
+      "source": "스킬 수치 정보를 확인할 수 없습니다.",
+      "translation": "Skill stats are unavailable."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "MissingSavedSkillDetails",
+      "source": "저장된 스킬 설명을 확인할 수 없습니다.",
+      "translation": "The saved skill description is unavailable."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "MissingSavedSkillStats",
+      "source": "저장된 스킬 등급·수치 정보를 확인할 수 없습니다.",
+      "translation": "The saved skill rarity and stats are unavailable."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "EquippedSkillSource",
+      "source": "{0} ({1})",
+      "translation": "{0} ({1})"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "EquippedSkillSources",
+      "source": "장착 무기: {0}",
+      "translation": "Equipped weapon: {0}"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "ResolvedSkillTooltip",
+      "source": "{0}\n{1}\n{2}",
+      "translation": "{0}\n{1}\n{2}"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "SkillSourceTooltip",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "LegacyUnavailable",
+      "source": "이전 저장의 장착 스킬 정보를 불러올 수 없습니다.",
+      "translation": "Equipped skills from the older save could not be loaded."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "LegacySkills",
+      "source": "이전 저장의 직업 기본 장착 스킬입니다.",
+      "translation": "Default class skills from an older save."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "Gold",
+      "source": "보유 골드 {0}G",
+      "translation": "Gold {0}G"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "NoInventory",
+      "source": "직접 조작 캐릭터가 없어 표시할 인벤토리가 없습니다.",
+      "translation": "No player-controlled character to show inventory for."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "DeadInventory",
+      "source": "사망 · 보유 아이템과 스킬 보기",
+      "translation": "Dead · Viewing items and skills"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "ListDragHint",
+      "source": "선택하여 상세 보기 · 슬롯으로 끌어 장착",
+      "translation": "Select for details · Drag to a slot to equip"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "ListReadOnlyHint",
+      "source": "선택하여 상세 보기 · 장비 변경은 상점에서",
+      "translation": "Select for details · Change equipment at shops"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "UnknownSkillCount",
+      "source": "?",
+      "translation": "?"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "EquipmentItemCounts",
+      "source": "보관 {0}개 · 장착 {1}개 · 전체 {2}개",
+      "translation": "Stored {0} · Equipped {1} · Total {2}"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "EmptySkills",
+      "source": "보유한 스킬이 없습니다.",
+      "translation": "You have no skills."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "EmptyBag",
+      "source": "가방이 비어 있습니다.\n장착 아이템을 이곳으로 끌어 해제할 수 있습니다.",
+      "translation": "Your bag is empty.\nDrag equipped items here to unequip them."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "EmptyReadOnlyBag",
+      "source": "가방이 비어 있습니다.\n장착 중인 아이템은 현재 장비에서 확인하세요.",
+      "translation": "Your bag is empty.\nSee Current Equipment for equipped items."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "EmptyCategory",
+      "source": "{0} 분류에 보관된 아이템이 없습니다.\n전체 탭에서 다른 아이템을 확인하세요.",
+      "translation": "No stored items in {0}.\nCheck the All tab for other items."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "ItemDetails",
+      "source": "{0} · 보관 1개\n카탈로그 기준 가격 {1}G",
+      "translation": "{0} · 1 stored\nCatalog price {1}G"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "GrantedSkillDetailsTitle",
+      "source": "장착 시 사용할 스킬",
+      "translation": "Skills available when equipped"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "NoGrantedSkills",
+      "source": "이 아이템에 저장된 부여 스킬이 없습니다.",
+      "translation": "No granted skills are saved on this item."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "DetailsDragHint",
+      "source": "목록에서 장비 슬롯으로 끌어 장착하세요.",
+      "translation": "Drag from the list to an equipment slot to equip."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "DetailsReadOnlyHint",
+      "source": "상점에서 장비를 변경할 수 있습니다.",
+      "translation": "You can change equipment at shops."
+    },
+    {
+      "namespace": "Inventory",
+      "key": "ResolvedEquipmentDetails",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "EncounterResult",
+      "key": "Text6D195380",
+      "source": "Continue / 계속",
+      "translation": "Continue"
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "ChooseOne",
+      "source": "전투 보상 · 3개 중 1개 선택",
+      "translation": "Combat Reward · Choose 1 of 3"
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "ChoiceNumber",
+      "source": "선택지 {0}",
+      "translation": "Choice {0}"
+    },
+    {
+      "namespace": "EncounterResult",
+      "key": "TextB97C5DC9",
+      "source": "Defeat / 패배\nThe run has ended. / 진행이 종료되었습니다.",
+      "translation": "Defeat\nYour run has ended."
+    },
+    {
+      "namespace": "EncounterResult",
+      "key": "TextC349D382",
+      "source": "Victory / 승리\nEncounter complete. / 전투를 완료했습니다.",
+      "translation": "Victory\nEncounter complete."
+    },
+    {
+      "namespace": "CombatItemReward",
+      "key": "PartyRestComplete",
+      "source": "{0}\n휴식 완료 · 생존 파티 HP 최대 +{1}",
+      "translation": "{0}\nRest complete · Living party members recover up to {1} HP"
+    },
+    {
+      "namespace": "CombatReward",
+      "key": "ReceiptComplete",
+      "source": "전투 보상 · 수령 완료",
+      "translation": "Combat Reward · Claimed"
+    },
+    {
+      "namespace": "CombatReward",
+      "key": "ProcessingReceipt",
+      "source": "전투 보상 · 지급 처리 중",
+      "translation": "Combat Reward · Processing"
+    },
+    {
+      "namespace": "CombatReward",
+      "key": "WaitingRecipients",
+      "source": "전투 보상 · 참가자 선택 대기",
+      "translation": "Combat Reward · Waiting for players"
+    },
+    {
+      "namespace": "CombatItemReward",
+      "key": "ChooseOne",
+      "source": "전투 보상 · 아이템 3개 중 1개 선택",
+      "translation": "Combat Reward · Choose 1 of 3 Items"
+    },
+    {
+      "namespace": "CombatItemReward",
+      "key": "BonusGoldReceived",
+      "source": "추가 골드 +{0}G · 지급 완료",
+      "translation": "Bonus gold +{0}G · Received"
+    },
+    {
+      "namespace": "CombatItemReward",
+      "key": "BonusGold",
+      "source": "추가 골드 +{0}G · 아이템 선택 시 함께 지급",
+      "translation": "Bonus gold +{0}G · Received with your chosen item"
+    },
+    {
+      "namespace": "CombatReward",
+      "key": "ChooseReward",
+      "source": "이 보상 선택",
+      "translation": "Choose this reward"
+    },
+    {
+      "namespace": "CombatReward",
+      "key": "ChoiceWaiting",
+      "source": "선택 대기",
+      "translation": "Awaiting selection"
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "Claimed",
+      "source": "획득 완료",
+      "translation": "Claimed"
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "NotSelected",
+      "source": "미선택",
+      "translation": "Not selected"
+    },
+    {
+      "namespace": "CombatReward",
+      "key": "ChoiceProcessing",
+      "source": "지급 처리 중",
+      "translation": "Processing reward"
+    },
+    {
+      "namespace": "CombatReward",
+      "key": "OtherChoiceProcessing",
+      "source": "선택 처리 대기",
+      "translation": "Selection pending"
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "GoldAmount",
+      "source": "+{0}G",
+      "translation": "+{0}G"
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "ClaimOnSelection",
+      "source": "선택하면 표시된 골드가 본인 캐릭터에게 지급됩니다. 한 번만 선택할 수 있습니다.",
+      "translation": "The displayed gold is granted to your character. You can choose only once."
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "PersonalBalance",
+      "source": "{0} · 보유 골드 {1}G",
+      "translation": "{0} · Gold {1}G"
+    },
+    {
+      "namespace": "CombatItemReward",
+      "key": "SelectedItem",
+      "source": "선택한 아이템",
+      "translation": "Selected item"
+    },
+    {
+      "namespace": "CombatItemReward",
+      "key": "Pending",
+      "source": "{0}와 {1}G를 지급하는 중입니다.",
+      "translation": "Granting {0} and {1}G."
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "Pending",
+      "source": "보상을 지급하는 중입니다.",
+      "translation": "Granting your reward."
+    },
+    {
+      "namespace": "CombatItemReward",
+      "key": "ClaimComplete",
+      "source": "{0}와 {1}G를 획득했습니다.",
+      "translation": "Received {0} and {1}G."
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "NoRecipient",
+      "source": "보상을 받을 참가자가 선택을 마칠 때까지 기다려 주세요.",
+      "translation": "Wait for the reward recipients to finish choosing."
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "ClaimComplete",
+      "source": "{0}G를 획득했습니다.",
+      "translation": "Received {0}G."
+    },
+    {
+      "namespace": "CombatItemReward",
+      "key": "DetailsSelectionHint",
+      "source": "마우스를 올려 장비와 스킬 상세를 확인하세요. 선택한 아이템은 인벤토리로 지급되며 상점에서 장착할 수 있습니다.",
+      "translation": "Hover to view equipment and skill details. Your choice goes into your inventory and can be equipped at shops."
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "SelectionHint",
+      "source": "원하는 골드를 선택하면 본인 캐릭터에게 즉시 지급됩니다.",
+      "translation": "Choose a gold reward to receive it immediately on your character."
+    },
+    {
+      "namespace": "CombatReward",
+      "key": "WaitingReceiptCount",
+      "source": "보상 수령 {0}/{1} · 남은 캐릭터의 선택을 기다리고 있습니다.",
+      "translation": "Rewards claimed {0}/{1} · Waiting for remaining characters."
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "WaitForHost",
+      "source": "Host가 계속하기를 선택하면 다음으로 진행합니다.",
+      "translation": "The host chooses Continue to proceed."
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "ContinueHint",
+      "source": "계속하기를 눌러 다음으로 진행하세요.",
+      "translation": "Press Continue to proceed."
+    },
+    {
+      "namespace": "CombatGoldReward",
+      "key": "MessageWithContinue",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "ChangeUnavailable",
+      "source": "지금은 장비를 변경할 수 없습니다. 상점에서 변경할 수 있습니다.",
+      "translation": "Equipment cannot be changed here. Visit a shop to change it."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "WrongCharacter",
+      "source": "같은 캐릭터의 장비와 인벤토리 사이에서 이동하세요.",
+      "translation": "Move items between the same character's equipment and inventory."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "StaleDrag",
+      "source": "장비 정보가 변경되었습니다. 아이템을 다시 끌어 주세요.",
+      "translation": "Equipment information has changed. Drag the item again."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "Empty",
+      "source": "미장착",
+      "translation": "Empty"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "ListItem",
+      "source": "{0} (1)",
+      "translation": "{0} (1)"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "Equipped",
+      "source": "장착 중",
+      "translation": "Equipped"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "Stored",
+      "source": "보관 중",
+      "translation": "Stored"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "Unsupported",
+      "source": "장착 미지원",
+      "translation": "Cannot equip"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "TooltipUnequipHint",
+      "source": "가방으로 끌어 해제할 수 있습니다.",
+      "translation": "Drag to the bag to unequip."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "TooltipEquipHint",
+      "source": "장비 슬롯으로 끌어 장착할 수 있습니다.",
+      "translation": "Drag to an equipment slot to equip."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "TooltipItemState",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "Equipment",
+      "key": "EmptySlotTooltip",
+      "source": "{0} · 미장착\n지원하는 아이템을 상점에서 이 슬롯으로 끌어 장착하세요.",
+      "translation": "{0} · Empty\nDrag a compatible item into this slot at a shop."
+    },
+    {
+      "namespace": "Equipment",
+      "key": "SelectedItem",
+      "source": "선택",
+      "translation": "Selected"
+    },
+    {
+      "namespace": "GameplayShortcuts",
+      "key": "Inventory",
+      "source": "인벤토리",
+      "translation": "Inventory"
+    },
+    {
+      "namespace": "GameplayShortcuts",
+      "key": "Settings",
+      "source": "설정",
+      "translation": "Settings"
+    },
+    {
+      "namespace": "GameplayHUD",
+      "key": "PersonalGold",
+      "source": "보유 골드  {0}G",
+      "translation": "Gold  {0}G"
+    },
+    {
+      "namespace": "GameplayHUD",
+      "key": "ShortcutHint",
+      "source": "I  인벤토리    Esc / O  설정",
+      "translation": "I  Inventory    Esc / O  Settings"
+    },
+    {
+      "namespace": "GameplayRoot",
+      "key": "TextB0D2D689",
+      "source": "저장 다시 시도",
+      "translation": "Retry save"
+    },
+    {
+      "namespace": "GameplayRoot",
+      "key": "Text2BED3A7F",
+      "source": "개발 협동 나가기 · Host는 방 종료",
+      "translation": "Leave co-op · Host closes the room"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "Shortcuts",
+      "source": "I · 인벤토리 닫기    Esc / O · 설정 열기",
+      "translation": "I · Close inventory    Esc / O · Open settings"
+    },
+    {
+      "namespace": "Inventory",
+      "key": "Close",
+      "source": "닫기",
+      "translation": "Close"
+    },
+    {
+      "namespace": "RunShop",
+      "key": "NoEligibleBuyer",
+      "source": "대상 없음",
+      "translation": "No eligible character"
+    },
+    {
+      "namespace": "RunShop",
+      "key": "ActionPending",
+      "source": "처리 중",
+      "translation": "Processing"
+    },
+    {
+      "namespace": "RunShop",
+      "key": "InsufficientGold",
+      "source": "골드 부족",
+      "translation": "Not enough gold"
+    },
+    {
+      "namespace": "RunShop",
+      "key": "Buy",
+      "source": "구매",
+      "translation": "Buy"
+    },
+    {
+      "namespace": "RunShop",
+      "key": "RarityStock",
+      "source": "선택한 등급의 상품을 최대 5개 진열합니다. 해당 등급의 가용 상품이 적으면 진열 수도 줄어듭니다.",
+      "translation": "Up to 5 items of the selected rarity are offered. Fewer items appear if the eligible pool is smaller."
+    },
+    {
+      "namespace": "RunShop",
+      "key": "TagStock",
+      "source": "선택한 종류의 상품을 최대 5개 진열합니다. 해당 종류의 가용 상품이 적으면 진열 수도 줄어듭니다.",
+      "translation": "Up to 5 items of the selected type are offered. Fewer items appear if the eligible pool is smaller."
+    },
+    {
+      "namespace": "RunShop",
+      "key": "BasicStock",
+      "source": "이 Run의 아이템 후보에서 서로 다른 상품 5개를 진열합니다.",
+      "translation": "5 different items are offered from this run's item pool."
+    },
+    {
+      "namespace": "RunShop",
+      "key": "RecoveryChoice",
+      "source": "생존한 본인 캐릭터의 HP를 회복합니다. 최대 HP이면 구매할 수 없습니다.",
+      "translation": "Restore your living character's HP. Unavailable at full HP."
+    },
+    {
+      "namespace": "RunShop",
+      "key": "RevivalChoice",
+      "source": "사망한 본인 직접 조작 캐릭터를 부활시킵니다. AI 동료는 대상이 아닙니다.",
+      "translation": "Revive your dead player-controlled character. AI companions are not eligible."
+    },
+    {
+      "namespace": "RunShop",
+      "key": "ConsumableChoice",
+      "source": "전투에서 사용할 회복 소모품을 구매합니다. 본인 생존 캐릭터만 구매할 수 있습니다.",
+      "translation": "Buy a healing consumable for combat. Only your living character can buy it."
+    },
+    {
+      "namespace": "RunShop",
+      "key": "SkillChoice",
+      "source": "이 Run에 저장된 스킬 상품과 HP 회복 서비스를 이용합니다.",
+      "translation": "Use the skill stock and HP recovery service saved in this run."
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "Leave",
+      "source": "나가기",
+      "translation": "Leave"
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "Inventory",
+      "source": "인벤토리 · 장비 보기 (I)",
+      "translation": "Inventory · Equipment (I)"
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "Balance",
+      "source": "{0} · 보유 골드 {1}G",
+      "translation": "{0} · Gold {1}G"
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "NoBuyer",
+      "source": "구매 가능한 직접 조작 캐릭터가 없습니다.",
+      "translation": "No player-controlled character can buy."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "BalanceAndHP",
+      "source": "{0} · 보유 골드 {1}G · HP {2}/{3}",
+      "translation": "{0} · Gold {1}G · HP {2}/{3}"
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "StockSummaryWithDetails",
+      "source": "{0}\n진열 {1}개 · 미판매 {2}개 · 상품 위에 마우스를 올려 상세 확인\n구매한 아이템은 인벤토리에 보관되며 자동 장착되지 않습니다.",
+      "translation": "{0}\nStock {1} · Unsold {2} · Hover for details\nPurchased items are stored in your inventory and are not equipped automatically."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "EmptyStockHint",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "EmptyStockReroll",
+      "source": "현재 진열에 장착 가능한 상품이 없습니다. 리롤하여 새 상품을 확인하거나 나갈 수 있습니다.",
+      "translation": "No equipable items are currently displayed. Reroll for new stock or leave."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "EmptyStockLeave",
+      "source": "이 상점 조건에 맞는 장착 가능 상품이 부족하여 리롤할 수 없습니다. 나가기를 선택해 진행할 수 있습니다.",
+      "translation": "Too few equipable items match this shop to reroll. Choose Leave to proceed."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "SoldStockHint",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "SoldStockReroll",
+      "source": "현재 상품은 모두 판매되었습니다. 리롤하여 새 상품을 확인하거나 나갈 수 있습니다.",
+      "translation": "All current items have sold. Reroll for new stock or leave."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "SoldStockLeave",
+      "source": "현재 상품은 모두 판매되었으며 리롤할 수 없습니다. 나가기를 선택해 진행할 수 있습니다.",
+      "translation": "All current items have sold and rerolling is unavailable. Choose Leave to proceed."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "LegacyRun",
+      "source": "이전 저장에는 아이템 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다.",
+      "translation": "Item shops are unavailable in this older save. Start a new run to use them."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "ShopUnavailable",
+      "source": "이 저장에서는 스킬 상점을 이용할 수 없습니다.",
+      "translation": "Skill shops are unavailable in this save."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "LegacyStock",
+      "source": "이전 저장의 스킬 상품과 HP 회복은 그대로 구매할 수 있습니다. 리롤은 새 Run에서 이용할 수 있습니다.",
+      "translation": "You can still buy saved skills and HP recovery. Rerolling is available in new runs."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "RerollRules",
+      "source": "가용 스킬 최대 5개 진열 · 전체 리롤 · 비용 1 → 2 → 3G… · 구매한 스킬은 본인에게 Run 동안 적용되며 같은 스킬은 한 번만 구매할 수 있습니다.",
+      "translation": "Up to 5 skills · Reroll all · Cost 1 → 2 → 3G… · Purchased skills last for this run; each skill can be bought once."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "Sold",
+      "source": "판매 완료",
+      "translation": "Sold"
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "Price",
+      "source": "{0}G",
+      "translation": "{0}G"
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "PriceAndSkills",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "Owned",
+      "source": "보유 중",
+      "translation": "Owned"
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "Price",
+      "source": "{0}G",
+      "translation": "{0}G"
+    },
+    {
+      "namespace": "RunShop",
+      "key": "ProductActionTooltip",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "FullHP",
+      "source": "HP 가득 참",
+      "translation": "Full HP"
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "RecoveryProduct",
+      "source": "HP 전체 회복 · {0}G · {1}",
+      "translation": "Full HP recovery · {0}G · {1}"
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "RecoveryDescription",
+      "source": "본인 생존 캐릭터의 HP를 즉시 최대치까지 회복합니다. HP가 가득 차 있으면 구매할 수 없습니다.",
+      "translation": "Immediately restore your living character to full HP. Unavailable at full HP."
+    },
+    {
+      "namespace": "RunShop",
+      "key": "Reroll",
+      "source": "리롤 · {0}G",
+      "translation": "Reroll · {0}G"
+    },
+    {
+      "namespace": "RunShop",
+      "key": "RerollStatus",
+      "source": "{0} · {1}",
+      "translation": "{0} · {1}"
+    },
+    {
+      "namespace": "RunShop",
+      "key": "Unavailable",
+      "source": "이용 불가",
+      "translation": "Unavailable"
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "RerollDescription",
+      "source": "본인 골드를 사용하여 같은 상점 조건으로 상품을 최대 5개 다시 추첨합니다. 이전 상품이 다시 나올 수 있습니다.",
+      "translation": "Spend your gold to roll up to 5 items using this shop's conditions. Previous items may appear again."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "UnavailableRerollDescription",
+      "source": "상점 조건에 맞는 장착 가능 상품이 부족하여 리롤할 수 없습니다. 남아 있는 상품을 구매하거나 나가기를 선택할 수 있습니다.",
+      "translation": "Too few equipable items match this shop to reroll. Buy remaining stock or leave."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "LegacyRerollDescription",
+      "source": "현재 저장된 스킬 후보가 없어 리롤을 지원하지 않습니다. 남아 있는 상품과 회복 서비스를 이용할 수 있습니다.",
+      "translation": "There is no saved skill pool to reroll. Remaining skills and recovery are still available."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "RerollDescription",
+      "source": "본인 골드로 가용 스킬 최대 5개를 중복 없이 다시 추첨합니다. 이전 스킬이 다시 나올 수 있으며, 비용은 1G부터 사용마다 1G씩 증가합니다.",
+      "translation": "Spend your gold to roll up to 5 different skills. Previous skills may reappear. Cost starts at 1G and rises by 1G per use."
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "ConsumableQuantity",
+      "source": "회복 소모품 1개 · 보유 {0}개",
+      "translation": "1 healing consumable · Owned {0}"
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "RevivalHP",
+      "source": "최대 HP {0}%로 부활",
+      "translation": "Revive with {0}% max HP"
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "RecoveryHP",
+      "source": "HP {0} 회복",
+      "translation": "Recover {0} HP"
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "QuantityLimit",
+      "source": "보유 한도",
+      "translation": "Inventory limit"
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "LivingCharacter",
+      "source": "사망자만",
+      "translation": "Dead characters only"
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "FullHP",
+      "source": "HP 가득 참",
+      "translation": "Full HP"
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "ProductStatus",
+      "source": "{0} · {1}G · {2}",
+      "translation": "{0} · {1}G · {2}"
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "ConsumableHint",
+      "source": "본인 생존 캐릭터가 구매합니다. 전투에서 본인에게 AP 1로 사용하며 실제 회복이 발동한 경우에만 1개를 소모합니다.",
+      "translation": "Your living character buys this. Use it on yourself in combat for 1 AP. One is consumed only when healing takes effect."
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "RevivalHint",
+      "source": "본인이 직접 조작하는 사망 캐릭터를 부활시킵니다. AI 동료와 다른 참가자의 캐릭터는 구매할 수 없습니다.",
+      "translation": "Revive your dead player-controlled character. AI companions and other players' characters cannot buy this."
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "RecoveryHint",
+      "source": "본인 생존 캐릭터의 HP를 회복합니다. 이미 최대 HP이면 구매할 수 없습니다.",
+      "translation": "Restore your living character's HP. Unavailable at full HP."
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "DungeonDirectionOffer",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "DungeonDirectionDescription",
+      "source": "{0} · {1}\n{2}",
+      "translation": "{0} · {1}\n{2}"
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "FlowAndPurchaseMessage",
+      "source": "{0}\n{1}",
+      "translation": "{0}\n{1}"
+    },
+    {
+      "namespace": "RunShop",
+      "key": "Pending",
+      "source": "상점 요청을 처리하는 중입니다.",
+      "translation": "Processing the shop request."
+    },
+    {
+      "namespace": "RunRecovery",
+      "key": "HostLeaves",
+      "source": "본인 캐릭터의 회복 서비스를 구매할 수 있습니다. 인카운터 나가기는 Host가 결정합니다.",
+      "translation": "You can buy recovery for your character. The host decides when to leave the encounter."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "HostLeaves",
+      "source": "본인 골드로 아이템 구매와 리롤을 할 수 있습니다. 상점 나가기는 Host가 결정합니다.",
+      "translation": "Spend your gold to buy items and reroll. The host decides when to leave the shop."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "HostShopActions",
+      "source": "본인 골드로 스킬 구매, HP 회복과 리롤을 할 수 있습니다. 상점 나가기는 Host가 결정합니다.",
+      "translation": "Spend your gold on skills, HP recovery and rerolls. The host decides when to leave the shop."
+    },
+    {
+      "namespace": "RunSkillShop",
+      "key": "HostLeaves",
+      "source": "본인 캐릭터의 스킬과 HP 회복을 구매할 수 있습니다. 상점 나가기는 Host가 결정합니다.",
+      "translation": "Buy skills and HP recovery for your character. The host decides when to leave the shop."
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "HostOnly",
+      "source": "Host의 진행을 기다리는 중입니다.",
+      "translation": "Waiting for the host to proceed."
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "DungeonChoose",
+      "source": "갈림길 · 이동할 통로 선택",
+      "translation": "Junction · Choose a passage"
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "Choose",
+      "source": "인카운터 선택",
+      "translation": "Choose an encounter"
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "Shop",
+      "source": "상점",
+      "translation": "Shop"
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "TargetProgressTitle",
+      "source": "{0} · {1}/80 완료",
+      "translation": "{0} · {1}/80 complete"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "DifficultyLegend",
+      "source": "100% = 해당 구간 기본값 · 적 구성·공격 피해·AP는 동일\n승리 보상: 아이템 3개 중 1개 + 랜덤 골드 · 아이템 등급·스킬 확률은 동일합니다.",
+      "translation": "100% = base value for this stage · Enemy roster, attack damage and AP are unchanged\nVictory: choose 1 of 3 items + random gold · Item rarity and skill probabilities are unchanged."
+    },
+    {
+      "namespace": "RunMap",
+      "key": "DirectionDifficulty",
+      "source": "{0} · {1}",
+      "translation": "{0} · {1}"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "DifficultyStats",
+      "source": "{0}\n적 {1}명 · 총 HP {2}\n적 HP {3}% · 적 속도 {4}%\n승리 골드 {5}~{6}G ({7}%)",
+      "translation": "{0}\nEnemies {1} · Total HP {2}\nEnemy HP {3}% · Speed {4}%\nVictory gold {5}–{6}G ({7}%)"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "DifficultyTooltip",
+      "source": "{0}\n배율은 해당 구간 기본값을 기준으로 합니다. 골드는 표시된 범위에서 정해집니다.\n이 난이도를 선택하면 전투를 시작합니다.",
+      "translation": "{0}\nMultipliers use this stage's base values. Gold is rolled within the displayed range.\nSelect this difficulty to begin combat."
+    },
+    {
+      "namespace": "RunMap",
+      "key": "DifficultyProgress",
+      "source": "{0} · PvE 난이도 선택 · 진행 {1} / 80 완료",
+      "translation": "{0} · Choose PvE difficulty · {1} / 80 complete"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "SelectDifficultyToStart",
+      "source": "하·중·상 중 하나를 선택하면 전투를 시작합니다.",
+      "translation": "Choose Easy, Normal or Hard to begin combat."
+    },
+    {
+      "namespace": "RunMap",
+      "key": "WaitingHostDifficulty",
+      "source": "선택 대기 · Host가 전투 난이도를 선택합니다.",
+      "translation": "Waiting · The host chooses the combat difficulty."
+    },
+    {
+      "namespace": "RunMap",
+      "key": "Progress",
+      "source": "진행 지도  {0} / {1}",
+      "translation": "Run Map  {0} / {1}"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "CompletedNode",
+      "source": "{0} - 완료",
+      "translation": "{0} - Complete"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "TextC2BDB6BA",
+      "source": "Run complete. / 모든 전투를 완료했습니다.",
+      "translation": "Run complete."
+    },
+    {
+      "namespace": "RunMap",
+      "key": "TextE331F0FD",
+      "source": "Start a new game from MainMenu to create a party. / MainMenu에서 파티를 생성하고 시작해 주세요.",
+      "translation": "Start a new game from the main menu to create a party."
+    },
+    {
+      "namespace": "ShopItemTooltip",
+      "key": "SkillsHeading",
+      "source": "부여 스킬",
+      "translation": "Granted Skills"
+    },
+    {
+      "namespace": "ShopItemTooltip",
+      "key": "NoSkills",
+      "source": "부여된 스킬 없음",
+      "translation": "No granted skills"
+    },
+    {
+      "namespace": "ShopItemTooltip",
+      "key": "Price",
+      "source": "가격 {0}G",
+      "translation": "Price {0}G"
+    },
+    {
+      "namespace": "ShopItemTooltip",
+      "key": "PriceStatus",
+      "source": "가격 {0}G · {1}",
+      "translation": "Price {0}G · {1}"
+    },
+    {
+      "namespace": "ShopItemTooltip",
+      "key": "EquipHint",
+      "source": "구매한 아이템은 인벤토리에 보관됩니다. 상점에서 캐릭터에게 장착하면 부여 스킬을 사용할 수 있습니다.",
+      "translation": "Purchased items go into your inventory. Equip them on a character at a shop to use their skills."
+    },
+    {
+      "namespace": "ItemTooltip",
+      "key": "InventoryHint",
+      "source": "장비 변경은 상점에서 가능합니다. 장비 슬롯으로 끌어 장착하고, 가방으로 끌어 해제합니다.",
+      "translation": "Change equipment at shops. Drag to an equipment slot to equip, or to the bag to unequip."
+    },
+    {
+      "namespace": "ItemTooltip",
+      "key": "RewardHint",
+      "source": "선택한 아이템은 인벤토리로 지급됩니다. 상점에서 장착할 수 있습니다.",
+      "translation": "Your selected item goes into your inventory. You can equip it at a shop."
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "TextEAEE7AFC",
+      "source": "멀티플레이",
+      "translation": "Multiplayer"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "TextC7A08EBE",
+      "source": "같은 PC 또는 LAN에서 2~4명이 함께 플레이합니다.\n각자 궁수 1명을 조작합니다. 현재 저장 이어하기·Steam 초대는 지원하지 않습니다.",
+      "translation": "Play with 2–4 players on the same PC or LAN.\nEach controls one archer. Save resumption and Steam invites are currently unavailable."
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "TextAAC98075",
+      "source": "Steam 480 연결 확인",
+      "translation": "Steam 480 Connection Check"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "Text0BC6E45E",
+      "source": "친구 전용 Steam 연결과 서버 인증을 확인합니다.\n캐릭터 생성·게임 Run·관리 저장·관전·MMR은 연결하지 않습니다.",
+      "translation": "Check friends-only Steam connectivity and server authentication.\nCharacter creation, runs, managed saves, spectating and MMR are not connected."
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "Text7A751931",
+      "source": "선택 인원으로 방 만들기 · Host 1번",
+      "translation": "Create room for selected players · Host #1"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "TextF213C222",
+      "source": "Host IPv4:포트",
+      "translation": "Host IPv4:port"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "TextB2A8785E",
+      "source": "주소로 참가",
+      "translation": "Join address"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "TextD8CADA12",
+      "source": "준비 상태 변경",
+      "translation": "Toggle ready"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "TextE07D2B40",
+      "source": "전원 준비 후 시작 · Host 전용",
+      "translation": "Start when all ready · Host only"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "CancelConnection",
+      "source": "뒤로가기 / 연결 취소",
+      "translation": "Back / Cancel connection"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "ReturnToMenu",
+      "source": "메뉴로 돌아가기",
+      "translation": "Return to menu"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "Waiting",
+      "source": "참가 대기",
+      "translation": "Waiting to join"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "Disconnected",
+      "source": "연결 끊김",
+      "translation": "Disconnected"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "Ready",
+      "source": "준비 완료",
+      "translation": "Ready"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "NotReady",
+      "source": "준비 전",
+      "translation": "Not ready"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "RosterRow",
+      "source": "{0}번{1}{2} · {3}",
+      "translation": "#{0}{1}{2} · {3}"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "Self",
+      "source": " (나)",
+      "translation": " (You)"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "Unready",
+      "source": "준비 취소",
+      "translation": "Cancel ready"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "TextD1F2573E",
+      "source": "친구 전용 연결 확인 방 만들기",
+      "translation": "Create friends-only connection check room"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "Text99EF0979",
+      "source": "Steam 친구의 연결 확인 방 검색",
+      "translation": "Find Steam friends' connection check rooms"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "Text2CEAEF4E",
+      "source": "선택한 연결 확인 방 참가",
+      "translation": "Join selected connection check room"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "TextDDACCCD1",
+      "source": "Steam 친구 초대 창",
+      "translation": "Invite Steam friends"
+    },
+    {
+      "namespace": "DevelopmentCoop",
+      "key": "Text4AC3CC0F",
+      "source": "나가기 / 뒤로가기",
+      "translation": "Leave / Back"
+    },
+    {
+      "namespace": "GameModeSelection",
+      "key": "Title",
+      "source": "게임 모드 선택",
+      "translation": "Select Game Mode"
+    },
+    {
+      "namespace": "GameModeSelection",
+      "key": "SinglePlayer",
+      "source": "싱글플레이",
+      "translation": "Single Player"
+    },
+    {
+      "namespace": "GameModeSelection",
+      "key": "SinglePlayerControlNotice",
+      "source": "직접 조작할 캐릭터 1명을 선택합니다.\n함께 만든 나머지 동료는 AI가 조작합니다.",
+      "translation": "Choose one character to control.\nYour other companions are controlled by AI."
+    },
+    {
+      "namespace": "GameModeSelection",
+      "key": "Multiplayer",
+      "source": "멀티플레이",
+      "translation": "Multiplayer"
+    },
+    {
+      "namespace": "GameModeSelection",
+      "key": "Back",
+      "source": "뒤로가기",
+      "translation": "Back"
+    },
+    {
+      "namespace": "GameModeSelection",
+      "key": "MultiplayerNotice",
+      "source": "같은 PC 또는 LAN에서 2~4명이 함께 플레이합니다.\nSteam 연결은 아직 지원하지 않습니다.",
+      "translation": "Play with 2–4 players on the same PC or LAN.\nSteam connectivity is not yet supported."
+    },
+    {
+      "namespace": "GameModeSelection",
+      "key": "MultiplayerUnavailable",
+      "source": "현재 환경에서는 멀티플레이를 이용할 수 없습니다.\n같은 PC 또는 LAN의 2~4인 방을 지원하며, Steam 연결은 아직 지원하지 않습니다.",
+      "translation": "Multiplayer is unavailable in this environment.\nRooms support 2–4 players on the same PC or LAN. Steam connectivity is not yet supported."
+    },
+    {
+      "namespace": "MainMenu",
+      "key": "StartGame",
+      "source": "게임 시작",
+      "translation": "Start Game"
+    },
+    {
+      "namespace": "MainMenu",
+      "key": "NewGameHint",
+      "source": "새 파티와 여정을 만듭니다. 새 싱글플레이 여정을 시작하면 기존 저장을 교체합니다.",
+      "translation": "Create a new party and journey. Starting a new single-player run replaces the existing save."
+    },
+    {
+      "namespace": "MainMenu",
+      "key": "Continue",
+      "source": "이어하기",
+      "translation": "Continue"
+    },
+    {
+      "namespace": "MainMenu",
+      "key": "Options",
+      "source": "설정",
+      "translation": "Settings"
+    },
+    {
+      "namespace": "MainMenu",
+      "key": "OptionsHint",
+      "source": "언어·화면 모드·해상도·그래픽 품질을 조정합니다.",
+      "translation": "Adjust language, display mode, resolution and graphics quality."
+    },
+    {
+      "namespace": "MainMenu",
+      "key": "Quit",
+      "source": "게임 종료",
+      "translation": "Quit Game"
+    },
+    {
+      "namespace": "ManagedRunMenu",
+      "key": "Convert",
+      "source": "싱글로 전환하기",
+      "translation": "Switch to single player"
+    },
+    {
+      "namespace": "ManagedRunMenu",
+      "key": "Resume",
+      "source": "싱글 진행 이어하기",
+      "translation": "Continue solo run"
+    },
+    {
+      "namespace": "MainMenu",
+      "key": "ContinueHint",
+      "source": "마지막으로 저장된 체크포인트에서 여정을 이어갑니다.",
+      "translation": "Resume the journey from the last saved checkpoint."
+    },
+    {
+      "namespace": "MainMenu",
+      "key": "SurrenderHint",
+      "source": "확인 후 저장된 싱글플레이 여정을 포기합니다.",
+      "translation": "Abandon the saved single-player run after confirmation."
+    },
+    {
+      "namespace": "MainMenuScreen",
+      "key": "Text92BCA7F0",
+      "source": "이어하기: 마지막 체크포인트에서 복원합니다. 새 게임을 시작하면 기존 저장을 교체합니다.",
+      "translation": "Continue restores the last checkpoint. Starting a new game replaces the existing save."
+    },
+    {
+      "namespace": "ManagedRunMenu",
+      "key": "Finished",
+      "source": "종료된 파티 진행입니다.",
+      "translation": "This party run has ended."
+    },
+    {
+      "namespace": "ManagedRunMenu",
+      "key": "AlreadyAI",
+      "source": "본인 캐릭터가 이미 AI로 전환된 진행입니다. 해당 Run에서는 인간 조작으로 복귀할 수 없습니다.",
+      "translation": "Your character is already controlled by AI. Human control cannot be restored for this run."
+    },
+    {
+      "namespace": "ManagedRunMenu",
+      "key": "ConvertSummary",
+      "source": "파티 저장 · 본인 {0}번\n\n본인이 Host가 되어 이어갑니다. 나머지 캐릭터는 이 Run이 끝날 때까지 AI로 유지되며, 돌아와도 직접 조작할 수 없습니다.",
+      "translation": "Party save · You are #{0}\n\nResume as host. Other characters remain AI-controlled until this run ends, even if their owners return."
+    },
+    {
+      "namespace": "ManagedRunMenu",
+      "key": "ResumeSummary",
+      "source": "파티 저장 · 본인 {0}번\n\n본인 캐릭터로 이어갑니다. 나머지 캐릭터는 계속 AI가 조작합니다.",
+      "translation": "Party save · You are #{0}\n\nResume with your character. The other characters remain AI-controlled."
+    },
+    {
+      "namespace": "MainMenu",
+      "key": "Surrender",
+      "source": "항복하기",
+      "translation": "Abandon Run"
+    },
+    {
+      "namespace": "MainMenu",
+      "key": "Surrendered",
+      "source": "현재 여정을 포기했습니다. 게임 시작에서 새 여정을 만들 수 있습니다.",
+      "translation": "You abandoned the current run. Start Game to begin a new journey."
+    },
+    {
+      "namespace": "RunSurrender",
+      "key": "Title",
+      "source": "여정 항복",
+      "translation": "Abandon Run"
+    },
+    {
+      "namespace": "RunSurrender",
+      "key": "Description",
+      "source": "현재 저장된 싱글플레이 여정을 포기합니다. 이후에는 이어할 수 없습니다.",
+      "translation": "Abandon the saved single-player run. You will no longer be able to continue it."
+    },
+    {
+      "namespace": "RunSurrender",
+      "key": "Cancel",
+      "source": "돌아가기",
+      "translation": "Back"
+    },
+    {
+      "namespace": "RunSurrender",
+      "key": "Confirm",
+      "source": "항복하기",
+      "translation": "Abandon"
+    },
+    {
+      "namespace": "RunSurrender",
+      "key": "Failed",
+      "source": "항복 요청을 처리하지 못했습니다. 다시 시도해 주세요.",
+      "translation": "The request could not be completed. Please try again."
+    },
+    {
+      "namespace": "ProjectALoading",
+      "key": "TipEquipment",
+      "source": "장비 변경은 상점에서 가능합니다. I 키로 인벤토리를 열어 장비 슬롯에 끌어 놓으세요.",
+      "translation": "Change equipment at shops. Press I to open your inventory, then drag an item to an equipment slot."
+    },
+    {
+      "namespace": "ProjectALoading",
+      "key": "TipPlanning",
+      "source": "대상을 지정하고 스킬을 선택한 뒤 준비하세요. 예약한 이동은 스킬보다 먼저 실행됩니다.",
+      "translation": "Choose a target and skill, then ready up. Queued movement happens before skills."
+    },
+    {
+      "namespace": "ProjectALoading",
+      "key": "TipRewards",
+      "source": "일반 여정의 PvE 승리 보상은 아이템 1개와 골드입니다. 받은 장비는 상점에서 장착하세요.",
+      "translation": "PvE victories in a normal journey grant one item and gold. Equip your new gear at a shop."
+    },
+    {
+      "namespace": "ProjectALoading",
+      "key": "TipDetails",
+      "source": "상점·가방·보상 아이템에 마우스를 올리면 장착 위치와 스킬의 확정 수치를 확인할 수 있습니다.",
+      "translation": "Hover over shop, bag or reward items to see equipment slots and their saved skill stats."
+    },
+    {
+      "namespace": "ProjectALoading",
+      "key": "TipDifficulty",
+      "source": "PvE 난이도는 적의 HP·속도와 골드를 바꿉니다. 아이템 등급과 스킬 확률은 동일합니다.",
+      "translation": "PvE difficulty changes enemy HP, speed and gold. Item rarity and skill probabilities stay the same."
+    },
+    {
+      "namespace": "ProjectALoading",
+      "key": "TipShortcuts",
+      "source": "I 키는 인벤토리, Esc 또는 O 키는 설정입니다. 열린 메뉴는 같은 키로 닫을 수 있습니다.",
+      "translation": "Press I for inventory, or Esc / O for settings. Press the same key to close an open menu."
+    },
+    {
+      "namespace": "ProjectALoading",
+      "key": "Startup",
+      "source": "PROJECT A · 시작 준비 중",
+      "translation": "PROJECT A · Preparing"
+    },
+    {
+      "namespace": "ProjectALoading",
+      "key": "Travel",
+      "source": "불러오는 중",
+      "translation": "Loading"
+    }
+  ]
+}

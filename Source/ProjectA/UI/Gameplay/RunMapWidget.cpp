@@ -1,4 +1,5 @@
 #include "UI/Gameplay/RunMapWidget.h"
+#include "UI/ProjectALocalization.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "CommonInputModeTypes.h"
@@ -217,10 +218,11 @@ void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllo
         if (!bPveChoice) continue;
         const FRunPveDifficultyOffer& Offer = View.PveDifficultyOffers[Index];
         PveDifficultyTags.Add(Offer.DifficultyTag);
-        const FString Heading = bWorldPresentation ? FString::Printf(TEXT("%s · %s"), *EncounterDungeonLayout::GetDirectionLabel(Index).ToString(), *Offer.DisplayName.ToString()) : Offer.DisplayName.ToString();
-        const FString Label = FString::Printf(TEXT("%s\n적 %d명 · 총 HP %.0f\n적 HP %d%% · 적 속도 %d%%\n승리 골드 %d~%dG (%d%%)"), *Heading, Offer.EnemyCount, Offer.TotalEnemyHP, FMath::RoundToInt(Offer.HPScale * 100.f), FMath::RoundToInt(Offer.SpeedScale * 100.f), Offer.GoldMin, Offer.GoldMax, FMath::RoundToInt(Offer.GoldScale * 100.f));
-        Button->Configure(Offer.DifficultyTag.GetTagName(), FText::FromString(Label));
-        Button->SetToolTipText(FText::FromString(Label + TEXT("\n배율은 해당 구간 기본값을 기준으로 합니다. 골드는 표시된 범위에서 정해집니다.\n이 난이도를 선택하면 전투를 시작합니다.")));
+        const FText Difficulty = ProjectALocalization::Content(TEXT("Difficulty.") + Offer.DifficultyTag.ToString() + TEXT(".Name"), Offer.DisplayName);
+        const FText Heading = bWorldPresentation ? FText::Format(NSLOCTEXT("RunMap", "DirectionDifficulty", "{0} · {1}"), EncounterDungeonLayout::GetDirectionLabel(Index), Difficulty) : Difficulty;
+        const FText Label = FText::Format(NSLOCTEXT("RunMap", "DifficultyStats", "{0}\n적 {1}명 · 총 HP {2}\n적 HP {3}% · 적 속도 {4}%\n승리 골드 {5}~{6}G ({7}%)"), Heading, Offer.EnemyCount, FMath::RoundToInt(Offer.TotalEnemyHP), FMath::RoundToInt(Offer.HPScale * 100.f), FMath::RoundToInt(Offer.SpeedScale * 100.f), Offer.GoldMin, Offer.GoldMax, FMath::RoundToInt(Offer.GoldScale * 100.f));
+        Button->Configure(Offer.DifficultyTag.GetTagName(), Label);
+        Button->SetToolTipText(FText::Format(NSLOCTEXT("RunMap", "DifficultyTooltip", "{0}\n배율은 해당 구간 기본값을 기준으로 합니다. 골드는 표시된 범위에서 정해집니다.\n이 난이도를 선택하면 전투를 시작합니다."), Label));
         if (UTextBlock* LabelText = Cast<UTextBlock>(Button->GetContent()))
         {
             const FLinearColor Colors[] = {FLinearColor(0.6f, 0.95f, 0.65f), FLinearColor(1.f, 0.9f, 0.65f), FLinearColor(1.f, 0.6f, 0.55f)};
@@ -230,7 +232,8 @@ void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllo
     }
     if (bPveChoice)
     {
-        PveDifficultyTitle->SetText(FText::FromString(FString::Printf(TEXT("%s · PvE 난이도 선택 · 진행 %d / 80 완료"), *View.Nodes[NextNodeIndex].DisplayName.ToString(), View.TargetCompletedSteps)));
+        const FRunNodeDefinition& Node = View.Nodes[NextNodeIndex];
+        PveDifficultyTitle->SetText(FText::Format(NSLOCTEXT("RunMap", "DifficultyProgress", "{0} · PvE 난이도 선택 · 진행 {1} / 80 완료"), ProjectALocalization::Content(TEXT("Node.") + Node.NodeId.ToString() + TEXT(".Name"), Node.DisplayName), View.TargetCompletedSteps));
         const FText HostMessage = bRunCommandsAllowed ? NSLOCTEXT("RunMap", "SelectDifficultyToStart", "하·중·상 중 하나를 선택하면 전투를 시작합니다.") : NSLOCTEXT("RunMap", "WaitingHostDifficulty", "선택 대기 · Host가 전투 난이도를 선택합니다.");
         PveDifficultyMessage->SetText(HostMessage.IsEmpty() ? View.FlowMessage : View.FlowMessage.IsEmpty() ? HostMessage : FText::Format(FText::FromString(TEXT("{0}\n{1}")), HostMessage, View.FlowMessage));
     }
@@ -240,7 +243,7 @@ void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllo
     }
     NodeList->ClearChildren();
     Text_FlowMessage->SetText(View.FlowMessage);
-    Text_Progress->SetText(FText::FromString(FString::Printf(TEXT("RUN MAP / 진행 지도  %d / %d"), View.CompletedNodes.Num(), View.Nodes.Num())));
+    Text_Progress->SetText(FText::Format(NSLOCTEXT("RunMap", "Progress", "진행 지도  {0} / {1}"), View.CompletedNodes.Num(), View.Nodes.Num()));
     FString PartyText;
 
     for (const FRunPartyMember& Member : View.PartyMembers)
@@ -256,14 +259,14 @@ void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllo
     for (const FRunNodeDefinition& Node : View.Nodes)
     {
         UGameplayActionButton* Button = WidgetTree->ConstructWidget<UGameplayActionButton>();
-        FString Label = Node.DisplayName.ToString();
+        FText Label = ProjectALocalization::Content(TEXT("Node.") + Node.NodeId.ToString() + TEXT(".Name"), Node.DisplayName);
 
         if (View.CompletedNodes.Contains(Node.NodeId))
         {
-            Label += TEXT(" - Complete / 완료");
+            Label = FText::Format(NSLOCTEXT("RunMap", "CompletedNode", "{0} - 완료"), Label);
         }
 
-        Button->Configure(Node.NodeId, FText::FromString(Label));
+        Button->Configure(Node.NodeId, Label);
         Button->SetIsEnabled(!bPveChoice && bRunCommandsAllowed && View.AvailableNodes.Contains(Node.NodeId));
         Button->OnActionRequested.AddUObject(this, &URunMapWidget::HandleNodeSelected);
         NodeList->AddChildToVerticalBox(Button)->SetPadding(FMargin(0.0f, 4.0f));
@@ -271,11 +274,11 @@ void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllo
 
     if (View.Phase == ERunPhase::Complete)
     {
-        Text_FlowMessage->SetText(FText::FromString(TEXT("Run complete. / 모든 전투를 완료했습니다.")));
+        Text_FlowMessage->SetText(NSLOCTEXT("RunMap", "TextC2BDB6BA", "Run complete. / 모든 전투를 완료했습니다."));
     }
     else if (View.Phase == ERunPhase::None)
     {
-        Text_FlowMessage->SetText(FText::FromString(TEXT("Start a new game from MainMenu to create a party. / MainMenu에서 파티를 생성하고 시작해 주세요.")));
+        Text_FlowMessage->SetText(NSLOCTEXT("RunMap", "TextE331F0FD", "Start a new game from MainMenu to create a party. / MainMenu에서 파티를 생성하고 시작해 주세요."));
     }
 }
 

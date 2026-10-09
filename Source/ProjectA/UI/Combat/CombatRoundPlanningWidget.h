@@ -56,8 +56,8 @@ protected:
     virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
-    UTextBlock* AddText(UVerticalBox* Box, const FString& Text, int32 FontSize = 15);
-    UButton* AddButton(UVerticalBox* Box, const FString& Text);
+    UTextBlock* AddText(UVerticalBox* Box, const FText& Text, int32 FontSize = 15);
+    UButton* AddButton(UVerticalBox* Box, const FText& Text);
     void RefreshView(bool bForce = true);
     FCombatPlanningRefreshState CaptureRefreshState() const;
     void RefreshPartyCards(const ACombatRoundCoordinator* Coordinator, int32 OwnerSlot);
@@ -171,6 +171,7 @@ private:
     bool bHasTargetTile = false;
     bool bChoosingMove = false;
     FText LocalStatus;
+    int32 ObservedTextRevision = INDEX_NONE;
     FGuid ObservedCombatId;
     int32 ObservedRound = INDEX_NONE;
     float RefreshElapsed = 0.f;

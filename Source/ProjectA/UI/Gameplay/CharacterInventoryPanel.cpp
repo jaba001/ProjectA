@@ -226,7 +226,7 @@ void UCharacterInventoryPanel::AddSkill(const USkillDefinitionDataAsset* Skill)
     else Theme.SetItemIcon(Icon, Categories.Last().IconTags);
     Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
     IconSize->SetContent(Icon);
-    const FText Name = Skill->SkillName.IsEmpty() ? FText::FromName(Skill->SkillId) : Skill->SkillName;
+    const FText Name = RunItemPresentation::SkillName(Skill);
     UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
     Label->SetText(Name);
     Label->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);
@@ -242,7 +242,7 @@ void UCharacterInventoryPanel::AddSkill(const USkillDefinitionDataAsset* Skill)
     const bool bResolvedSkill = Skill->ResolveRoundSkill(DisplayedSkill, Error);
     RunItemPresentation::FItemSkillDetails Detail;
     Detail.Name = Name;
-    Detail.Description = Skill->SkillDescription;
+    Detail.Description = RunItemPresentation::SkillDescription(Skill);
     Detail.Stats = bResolvedSkill ? FText::Format(NSLOCTEXT("Inventory", "LegacySkillStats", "위력 {0} · AP {1} / SAP {2} · 선딜 {3}초"), FText::AsNumber(DisplayedSkill.Power), FText::AsNumber(DisplayedSkill.ActionPointCost), FText::AsNumber(DisplayedSkill.SubActionPointCost), FText::AsNumber(DisplayedSkill.WindupSeconds)) : NSLOCTEXT("Inventory", "MissingSkillStats", "스킬 수치 정보를 확인할 수 없습니다.");
     bool bHasSourceDetails = false;
     for (const FRunEquipmentSlot& EquipmentSlot : DisplayedMember.Equipment.Slots)

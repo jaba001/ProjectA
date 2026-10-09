@@ -58,7 +58,7 @@ void UMainMenuScreenWidget::NativeOnInitialized()
     if (Button_Options)
     {
         if (UTextBlock* Label = Cast<UTextBlock>(Button_Options->GetContent())) Label->SetText(NSLOCTEXT("MainMenu", "Options", "설정"));
-        Button_Options->SetToolTipText(NSLOCTEXT("MainMenu", "OptionsHint", "화면 모드·해상도·그래픽 품질을 조정합니다."));
+        Button_Options->SetToolTipText(NSLOCTEXT("MainMenu", "OptionsHint", "언어·화면 모드·해상도·그래픽 품질을 조정합니다."));
         Button_Options->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleOptionsClicked);
     }
 
@@ -197,7 +197,7 @@ void UMainMenuScreenWidget::RefreshSavedActions()
     }
     if (SaveStatus)
     {
-        SaveStatus->SetText(bCanContinue ? FText::FromString(TEXT("이어하기: 마지막 체크포인트에서 복원합니다. 새 게임을 시작하면 기존 저장을 교체합니다.")) : Error);
+        SaveStatus->SetText(bCanContinue ? NSLOCTEXT("MainMenuScreen", "Text92BCA7F0", "이어하기: 마지막 체크포인트에서 복원합니다. 새 게임을 시작하면 기존 저장을 교체합니다.") : Error);
         const FText& DevelopmentStatus = GetGameInstance()->GetSubsystem<UDevelopmentCoopSubsystem>()->GetStatus();
         if (!DevelopmentStatus.IsEmpty()) SaveStatus->SetText(DevelopmentStatus);
     }

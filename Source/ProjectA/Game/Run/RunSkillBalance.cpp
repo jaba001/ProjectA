@@ -56,9 +56,9 @@ FGameplayTag RunSkillBalance::ResolveRarityTag(const FString& Name)
 
 FText RunSkillBalance::RarityName(FGameplayTag Tag)
 {
-    const TCHAR* Names[] = {TEXT("흰색"), TEXT("초록색"), TEXT("파란색"), TEXT("보라색"), TEXT("주황색")};
+    const FText Names[] = {NSLOCTEXT("SkillRarity", "White", "흰색"), NSLOCTEXT("SkillRarity", "Green", "초록색"), NSLOCTEXT("SkillRarity", "Blue", "파란색"), NSLOCTEXT("SkillRarity", "Purple", "보라색"), NSLOCTEXT("SkillRarity", "Orange", "주황색")};
     const int32 Index = RunSkillBalanceInternal::Rarities().IndexOfByKey(Tag);
-    return Index == INDEX_NONE ? FText::GetEmpty() : FText::FromString(Names[Index]);
+    return Index == INDEX_NONE ? FText::GetEmpty() : Names[Index];
 }
 
 bool RunSkillBalance::IsEmpty(const FRunSkillBalance& Balance)

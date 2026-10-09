@@ -4,6 +4,7 @@
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunSkillBalance.h"
 #include "GAS/CombatGameplayTags.h"
+#include "UI/ProjectALocalization.h"
 
 namespace RunItemPresentationInternal
 {
@@ -69,9 +70,21 @@ const FRunWeaponRarityRule* RunItemPresentation::FindRarity(const FRunItemDefini
 
 FText RunItemPresentation::Name(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities)
 {
-    const FText Name = Item.DisplayName.IsEmpty() ? FText::FromString(Item.Asset.GetAssetName()) : Item.DisplayName;
+    const FText Name = ProjectALocalization::AssetName(Item.Asset, Item.DisplayName.IsEmpty() ? FText::FromString(Item.Asset.GetAssetName()) : Item.DisplayName);
     const FRunWeaponRarityRule* Rarity = FindRarity(Item, Rarities);
-    return Rarity ? FText::Format(NSLOCTEXT("RunItem", "RarityName", "[{0}] {1}"), Rarity->DisplayName, Name) : Name;
+    return Rarity ? FText::Format(NSLOCTEXT("RunItem", "RarityName", "[{0}] {1}"), ProjectALocalization::Content(TEXT("ItemRarity.") + Rarity->RarityTag.ToString() + TEXT(".Name"), Rarity->DisplayName), Name) : Name;
+}
+
+FText RunItemPresentation::SkillName(const USkillDefinitionDataAsset* Skill)
+{
+    if (!Skill) return NSLOCTEXT("RunItem", "MissingSkill", "스킬 정보를 불러올 수 없습니다.");
+    const FText Source = Skill->SkillName.IsEmpty() ? FText::FromName(Skill->SkillId) : Skill->SkillName;
+    return ProjectALocalization::SkillName(FName(*Skill->GetPrimaryAssetId().ToString()), Source);
+}
+
+FText RunItemPresentation::SkillDescription(const USkillDefinitionDataAsset* Skill)
+{
+    return Skill ? ProjectALocalization::SkillDescription(FName(*Skill->GetPrimaryAssetId().ToString()), Skill->SkillDescription) : FText::GetEmpty();
 }
 
 FText RunItemPresentation::GrantedSkills(const FRunItemDefinition& Item, bool bIncludeStats)
@@ -82,7 +95,7 @@ FText RunItemPresentation::GrantedSkills(const FRunItemDefinition& Item, bool bI
     {
         const FSoftObjectPath& Path = Item.GrantedSkills[Index];
         const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
-        FText Name = Skill ? Skill->SkillName.IsEmpty() ? FText::FromName(Skill->SkillId) : Skill->SkillName : NSLOCTEXT("RunItem", "MissingSkill", "스킬 정보를 불러올 수 없습니다.");
+        FText Name = SkillName(Skill);
         if (Item.SkillBalanceVersion == 1 && Item.GrantedSkillBalances.IsValidIndex(Index))
         {
             const FRunSkillBalance& Balance = Item.GrantedSkillBalances[Index];
@@ -132,7 +145,7 @@ TArray<RunItemPresentation::FItemSkillDetails> RunItemPresentation::SkillDetails
     {
         FItemSkillDetails& Detail = Details.AddDefaulted_GetRef();
         const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Item.GrantedSkills[Index].TryLoad());
-        Detail.Name = Skill ? Skill->SkillName.IsEmpty() ? FText::FromName(Skill->SkillId) : Skill->SkillName : NSLOCTEXT("RunItem", "MissingSkill", "스킬 정보를 불러올 수 없습니다.");
+        Detail.Name = SkillName(Skill);
         FCombatRoundSkill Resolved;
         FText Error;
         const bool bResolved = Skill && Skill->ResolveRoundSkill(Resolved, Error);
