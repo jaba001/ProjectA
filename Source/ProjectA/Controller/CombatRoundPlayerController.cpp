@@ -1,6 +1,8 @@
 #include "Controller/CombatRoundPlayerController.h"
 
 #include "Combat/Round/CombatRoundCoordinator.h"
+#include "Combat/Presentation/CombatShoulderCamera.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
 #include "Engine/GameViewportClient.h"
@@ -95,11 +97,102 @@ bool ACombatRoundPlayerController::HandleRoundWorldTileClicked(ACombatGridTile* 
 void ACombatRoundPlayerController::PlayerTick(float DeltaSeconds)
 {
     Super::PlayerTick(DeltaSeconds);
-    if (IsLocalController() && CanActivateRoundCamera() && !bCameraInitialized && IsValid(Coordinator) && IsValid(Coordinator->GetArena()))
+    UpdateRoundCamera();
+}
+
+void ACombatRoundPlayerController::EnsureRoundCamera(ACombatArena* Arena)
+{
+    if (!IsLocalController() || !CanActivateRoundCamera() || !IsValid(Arena)) return;
+    if (bCameraInitialized && CameraArena == Arena) return;
+    ReturnToTacticalCamera(true);
+    Arena->ActivateArena(this);
+    TacticalViewTarget = GetViewTarget();
+    CameraArena = Arena;
+    bCameraInitialized = true;
+}
+
+void ACombatRoundPlayerController::SetRoundCameraUnit(int32 UnitId)
+{
+    if (!IsLocalController() || !IsValid(Coordinator) || Coordinator->GetView().Phase != ECombatRoundPhase::Planning) return;
+    const FCombatRoundUnitView* Unit = Coordinator->GetView().Units.FindByPredicate([UnitId](const FCombatRoundUnitView& Entry) { return Entry.UnitId == UnitId; });
+    if (Unit && ParticipantSlot > 0 && !Unit->bEnemy && Unit->OwnerSlot == ParticipantSlot && Unit->HP > 0.f) PreferredCameraUnitId = UnitId;
+}
+
+void ACombatRoundPlayerController::UpdateRoundCamera()
+{
+    if (!IsLocalController()) return;
+    if (!CanActivateRoundCamera() || !IsValid(Coordinator) || !IsValid(Coordinator->GetArena()))
     {
-        Coordinator->GetArena()->ActivateArena(this);
-        bCameraInitialized = true;
+        ReturnToTacticalCamera();
+        ShoulderFocus.Reset();
+        bCameraInitialized = false;
+        return;
     }
+    EnsureRoundCamera(Coordinator->GetArena());
+    // Replicated readiness and action phases drive presentation, never the optimistic Ready request.
+    // 낙관적 준비 요청이 아닌 복제된 준비 상태와 행동 단계로 연출을 구동합니다.
+    const FCombatRoundView& View = Coordinator->GetView();
+    const int32 FocusId = ShoulderFocus.Update(View, ParticipantSlot, PreferredCameraUnitId);
+    const FCombatRoundUnitView* Focus = View.Units.FindByPredicate([FocusId](const FCombatRoundUnitView& Entry) { return FocusId != INDEX_NONE && Entry.UnitId == FocusId; });
+    if (!Focus || !IsValid(Focus->Unit) || !Focus->Unit->IsUnitAlive())
+    {
+        if (bShoulderCameraActive && Focus) ShoulderFocus.Finish();
+        ReturnToTacticalCamera();
+        return;
+    }
+    // Another presentation may take ownership during result, menu or encounter transitions.
+    // 결과·메뉴·인카운터 전환 중에는 다른 연출이 시점 소유권을 가져갈 수 있습니다.
+    if (bShoulderCameraActive && GetViewTarget() != ShoulderCamera)
+    {
+        bShoulderCameraActive = false;
+        ShoulderFocus.Finish();
+        return;
+    }
+    // Replication may skip the planning frame between two actions or replace the owned actor.
+    // 복제는 두 행동 사이의 계획 프레임을 건너뛰거나 소유 액터를 교체할 수 있습니다.
+    if (bShoulderCameraActive && (CameraUnit != Focus->Unit || CameraCombatId != View.CombatId || CameraRoundNumber != View.RoundNumber)) ReturnToTacticalCamera();
+    if (!bShoulderCameraActive)
+    {
+        if (!TacticalViewTarget.IsValid() || GetViewTarget() != TacticalViewTarget.Get()) return;
+        if (!IsValid(ShoulderCamera))
+        {
+            FActorSpawnParameters Params;
+            Params.Owner = this;
+            Params.ObjectFlags |= RF_Transient;
+            Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+            ShoulderCamera = GetWorld()->SpawnActor<ACombatShoulderCamera>(Params);
+        }
+        if (!IsValid(ShoulderCamera)) return;
+        FMinimalViewInfo TacticalPOV;
+        TacticalViewTarget->CalcCamera(0.f, TacticalPOV);
+        ShoulderCamera->FollowUnit(Focus->Unit, TacticalPOV);
+        CameraUnit = Focus->Unit;
+        CameraCombatId = View.CombatId;
+        CameraRoundNumber = View.RoundNumber;
+        SetViewTargetWithBlend(ShoulderCamera, ShoulderBlendInSeconds, VTBlend_Cubic, 0.f, true);
+        bShoulderCameraActive = true;
+    }
+    ShoulderCamera->SetReturning(Focus->ActionPhase == ECombatRoundActionPhase::Returning);
+}
+
+void ACombatRoundPlayerController::ReturnToTacticalCamera(bool bImmediate)
+{
+    if (IsLocalController() && IsValid(ShoulderCamera) && GetViewTarget() == ShoulderCamera && TacticalViewTarget.IsValid())
+    {
+        SetViewTargetWithBlend(TacticalViewTarget.Get(), bImmediate ? 0.f : ShoulderBlendOutSeconds, VTBlend_Cubic, 0.f, true);
+    }
+    bShoulderCameraActive = false;
+    CameraUnit.Reset();
+    CameraCombatId.Invalidate();
+    CameraRoundNumber = 0;
+}
+
+void ACombatRoundPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    ReturnToTacticalCamera(true);
+    if (IsValid(ShoulderCamera)) ShoulderCamera->Destroy();
+    ShoulderCamera = nullptr;
+    Super::EndPlay(EndPlayReason);
 }
 
 void ACombatRoundPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -120,6 +213,11 @@ void ACombatRoundPlayerController::SetRoundSession(ACombatRoundCoordinator* InCo
 
 void ACombatRoundPlayerController::OnRep_RoundSession()
 {
+    ReturnToTacticalCamera(true);
+    ShoulderFocus.Reset();
+    PreferredCameraUnitId = INDEX_NONE;
+    TacticalViewTarget.Reset();
+    CameraArena.Reset();
     bCameraInitialized = false;
     bRequestPending = false;
     bAwaitingReplicatedResult = false;
@@ -189,6 +287,7 @@ void ACombatRoundPlayerController::SetRoundReady(bool bReady)
     bAwaitingReplicatedResult = false;
     RequestStatus = FText::FromString(TEXT("준비 상태를 서버에서 확인하고 있습니다."));
     ServerSetRoundReady(View.CombatId, View.RoundNumber, View.PlanRevision, bReady);
+    UpdateRoundCamera();
 }
 
 void ACombatRoundPlayerController::ServerSubmitRoundPlan_Implementation(FGuid CombatId, int32 RoundNumber, int32 Revision, FCombatRoundCommand Command)

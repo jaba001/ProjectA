@@ -1033,3 +1033,13 @@ PvE 하·중·상에 서로 다른 맵과 등장 몬스터 설명을 제공하�
 `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`는 43.20초에 성공했다. 지면 허용 오차·렌더 설정 보존·환경 회귀 추가를 포함한 최종 증분 빌드도 6.37초에 성공했다. 같은 옵션의 `ProjectA Win64 Development` 컴파일·링크는 31.26초에 성공했으며 오류·경고는 0이다. 로그는 `Saved/Automation/PveArenaChoices_20261010/EditorBuild.log`·`EditorBuild.Final.log`·`GameBuild.log`다. 새 회귀 3개와 기존 선택 취소/저장 실패/재선택/Continue 회귀 보완은 작성·컴파일만 수행했다. `ProjectA.Run.PveDifficulty` 및 `ProjectA.Run.Target.PveDifficulty.ChoiceAbortAndFrozenSave`의 실제 실행은 별도다.
 
 `python Source/ProjectAEditor/Scripts/BuildLocalization.py --check`와 같은 검수 폴더의 `ValidateResources.py`로 한영 바이너리 재해석·원문 CRC·UFS 스테이징 참조를 확인했다. `DocumentationValidation.json`·`StaticReview.json`에 문서 링크·기존 미완료 51개/선택 7개 보존과 확인 1개 추가·전체 diff 정적 근거를 기록한다. 게임·PIE·Unreal 자동화 테스트·패키지·화면 캡처 및 IDE는 실행하지 않았다. 세 배경의 실제 가림/접지·한영 카드 가독성·Continue·늦은 원격 접속·기존 저장 호환은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)의 사용자 확인 전이다. Target의 기존 싱글 경로에 복제 표현을 연결한 것이며 일반 협동 지원 완료를 뜻하지 않는다.
+
+### 9-50 2026-10-10 준비 완료와 행동 종료의 숄더 카메라
+
+전투의 준비 완료 후 직접 조작하는 한 캐릭터를 가까이 따라가도록 구현했다. 시작 기준은 `82c82d92`이며 기존 미커밋 변경은 없었다. 로컬 컨트롤러가 서버 View의 준비·소유자·행동 단계를 확인하여 선택 캐릭터의 오른쪽 숄더뷰로 0.3초에 전환한다. SAP 이동·접근·시전·시전 후 동작·복귀까지 유지하고 해당 행동 종료·취소·사망·중단에는 전술 시점으로 복귀한다. 준비 취소 후 재선택과 전투/라운드/소유 액터 변경을 구분하며 다른 인간·AI 행동으로 초점을 자동 이전하지 않는다. 이미 끝난 무행동을 촬영하기 위해 실행을 지연하지 않는다. [UI 계약](UI_README.md#10-2-전투-배치와-카메라)
+
+로컬 Transient 카메라는 기본 거리 250cm·오른쪽 65cm·FOV 65와 캡슐 기반 높이를 사용한다. 회전·위치 보간과 복귀 중 시선 방향 유지로 급회전을 줄이고, 매 화면 갱신의 Camera 채널 구체 검사와 시작 시 수집한 장식별 경계로 가림 거리를 제한한다. 비충돌 장식의 경계는 보수적인 상자이며 복잡한 나뭇가지·아치의 정확한 삼각형 가림을 보장하지 않는다. 기존 채도·PostProcess를 유지하고 상점 등 다른 연출이 넘겨받은 시점을 복귀로 덮어쓰지 않는다. 클라이언트의 반복 Gameplay View 갱신도 활성 숄더뷰를 초기화하지 않는다. 원본 에셋·맵·저장·RPC·소유권·서버 전투 판정은 변경하지 않았다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`는 41.09초, 기하 회귀·GC 참조·시점 식별자 보완을 포함한 최종 빌드는 40.17초에 성공했다. 같은 옵션의 `ProjectA Win64 Development`는 32.73초에 성공했으며 컴파일 오류·경고는 0이다. `ProjectA.Combat.ShoulderCamera`의 소유권/준비/행동/경계 6개와 회전/장식 가림 2개 회귀를 작성·컴파일했으며 실행하지 않았다. 로그는 `Saved/Automation/ShoulderCamera_20261010/{EditorBuild,EditorBuild.Final,GameBuild}.log`다.
+
+독립 코드 검토와 `python Saved/Automation/ShoulderCamera_20261010/ValidateDocumentation.py`·`ValidateStatic.py`로 문서 링크·기존 미완료 52개/제안 선택 7개 보존·확인 1개 추가·전체 diff를 점검했다. 근거는 같은 폴더의 `DocumentationValidation.json`·`StaticReview.json`이다. 게임·PIE·Unreal 자동화 테스트·패키지·화면 캡처·IDE를 실행하지 않았다. 화면비별 근접/활/마법 구도·가림·준비 취소/복귀·Continue·2인 각자 시점의 수용 확인은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남긴다.

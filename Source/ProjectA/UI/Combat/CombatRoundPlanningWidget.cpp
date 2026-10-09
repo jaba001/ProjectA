@@ -560,7 +560,11 @@ bool UCombatRoundPlanningWidget::CanReadyPlans(FText& OutError) const
 void UCombatRoundPlanningWidget::HandleReady()
 {
     FText Error;
-    if (CanEdit() && CanReadyPlans(Error) && BoundController.IsValid()) BoundController->SetRoundReady(true);
+    if (CanEdit() && CanReadyPlans(Error) && BoundController.IsValid())
+    {
+        BoundController->SetRoundCameraUnit(GetSelectedUnitId());
+        BoundController->SetRoundReady(true);
+    }
     RefreshView();
 }
 

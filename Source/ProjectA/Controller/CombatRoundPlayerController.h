@@ -3,10 +3,14 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Combat/Round/CombatRoundTypes.h"
+#include "Combat/Presentation/CombatShoulderFocus.h"
 #include "CombatRoundPlayerController.generated.h"
 
 class ACombatRoundCoordinator;
 class ACombatGridTile;
+class ACombatArena;
+class ACombatShoulderCamera;
+class AUnitBase;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnRoundWorldUnitClicked, int32);
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnRoundWorldTileClicked, FIntPoint);
@@ -33,6 +37,7 @@ public:
     void SubmitRoundMove(int32 UnitId, FIntPoint Destination);
     void CancelRoundMove(int32 UnitId);
     void SetRoundReady(bool bReady);
+    void SetRoundCameraUnit(int32 UnitId);
     FOnRoundWorldUnitClicked OnRoundWorldUnitClicked;
     FOnRoundWorldTileClicked OnRoundWorldTileClicked;
     bool HandleRoundWorldTileClicked(ACombatGridTile* Tile);
@@ -42,9 +47,19 @@ public:
 
 protected:
     virtual void SetupInputComponent() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual bool CanActivateRoundCamera() const { return true; }
+    void EnsureRoundCamera(ACombatArena* Arena);
+
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|Camera", meta = (ClampMin = "0", ClampMax = "2"))
+    float ShoulderBlendInSeconds = 0.3f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|Camera", meta = (ClampMin = "0", ClampMax = "2"))
+    float ShoulderBlendOutSeconds = 0.45f;
 
 private:
+    void UpdateRoundCamera();
+    void ReturnToTacticalCamera(bool bImmediate = false);
     bool CanSelectRoundWorldTarget() const;
     bool IsCursorOverGameViewport() const;
     void HandleRoundWorldClick();
@@ -77,4 +92,15 @@ private:
     bool bRequestPending = false;
     bool bAwaitingReplicatedResult = false;
     bool bCameraInitialized = false;
+    bool bShoulderCameraActive = false;
+    int32 PreferredCameraUnitId = INDEX_NONE;
+    FCombatShoulderFocus ShoulderFocus;
+    TWeakObjectPtr<AActor> TacticalViewTarget;
+    TWeakObjectPtr<ACombatArena> CameraArena;
+    TWeakObjectPtr<AUnitBase> CameraUnit;
+    FGuid CameraCombatId;
+    int32 CameraRoundNumber = 0;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ACombatShoulderCamera> ShoulderCamera;
 };

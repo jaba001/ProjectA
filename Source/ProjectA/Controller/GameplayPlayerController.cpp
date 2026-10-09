@@ -852,7 +852,7 @@ void AGameplayPlayerController::RefreshGameplayFlow()
             GameplayRootWidget->RefreshFlowView(View, false, false, bWorldEncounterPresentation, bEncounterPresentationTransition);
             if (View.Phase == ERunPhase::Combat && GameplayState->GetArena())
             {
-                GameplayState->GetArena()->ActivateArena(this);
+                EnsureRoundCamera(GameplayState->GetArena());
             }
         }
         return;
