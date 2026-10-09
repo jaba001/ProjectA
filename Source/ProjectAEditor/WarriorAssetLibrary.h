@@ -77,6 +77,14 @@ public:
     UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
     static bool ValidateSwordMontage(UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float RecoveryStartTime);
 
+    // Fit a trimmed draw to the requested duration, then play the release at its original rate without editing source assets.
+    // 잘라낸 준비 동작을 지정 시간에 맞추고 발사 동작은 원속도로 재생하며 원본 에셋은 수정하지 않습니다.
+    UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
+    static bool ConfigureTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime, float ReleaseStartTime, float ReleaseEndTime, float DrawDuration);
+
+    UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
+    static bool ValidateTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime, float ReleaseStartTime, float ReleaseEndTime, float DrawDuration);
+
     UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
     static bool IsOutputSlotConnected(UAnimBlueprint* Blueprint, FName SlotName);
 

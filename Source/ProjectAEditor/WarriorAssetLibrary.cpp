@@ -61,6 +61,45 @@ namespace
         return false;
     }
 
+    struct FWarriorTimedAttackMontagePlan
+    {
+        float DrawPlayRate = 1.f;
+        float ReleaseEndTime = 0.f;
+        float Length = 0.f;
+        FFrameRate FrameRate;
+    };
+
+    bool BuildTimedAttackMontagePlan(const UAnimMontage* Montage, const UAnimSequence* Draw, const UAnimSequence* Release, float DrawStartTime, float DrawEndTime, float ReleaseStartTime, float ReleaseEndTime, float DrawDuration, FWarriorTimedAttackMontagePlan& OutPlan)
+    {
+        if (!IsProjectCopy(Montage) || !IsValid(Draw) || !IsValid(Release) || !IsValid(Montage->GetSkeleton())) return Fail(TEXT("Timed attack montage requires a project-owned destination and valid source animations and skeleton / 시간 조절 공격 몽타주에는 프로젝트 소유 대상과 유효한 원본 애니메이션·스켈레톤이 필요합니다"));
+        if (Draw->GetSkeleton() != Montage->GetSkeleton() || Release->GetSkeleton() != Montage->GetSkeleton()) return Fail(TEXT("Timed attack sources must share the montage's exact skeleton / 시간 조절 공격 원본과 몽타주는 정확히 같은 스켈레톤을 사용해야 합니다"));
+        if (!Montage->GetSkeleton()->ContainsSlotName(FAnimSlotGroup::DefaultSlotName)) return Fail(TEXT("Timed attack skeleton must already contain DefaultSlot / 시간 조절 공격 스켈레톤에는 DefaultSlot이 이미 있어야 합니다"));
+        if (Montage->SlotAnimTracks.Num() != 1 || Montage->SlotAnimTracks[0].SlotName != FAnimSlotGroup::DefaultSlotName || Montage->CompositeSections.Num() != 1 || Montage->CompositeSections[0].SectionName != TEXT("Default") || Montage->CompositeSections[0].GetTime() != 0.f || !Montage->CompositeSections[0].NextSectionName.IsNone() || !Montage->Notifies.IsEmpty()) return Fail(TEXT("Timed attack destination requires one non-looping default slot and section without authored montage notifies / 시간 조절 공격 대상에는 별도 알림 없이 기본 슬롯·비반복 섹션 각 하나가 필요합니다"));
+        const float DrawLength = Draw->GetPlayLength();
+        const float ReleaseLength = Release->GetPlayLength();
+        if (!FMath::IsFinite(DrawLength) || DrawLength <= 0.f || !FMath::IsFinite(ReleaseLength) || ReleaseLength <= 0.f || Draw->RateScale != 1.f || Release->RateScale != 1.f) return Fail(TEXT("Timed attack source lengths and original rates must be valid / 시간 조절 공격 원본 길이는 유효해야 하며 원본 재생 배율은 1이어야 합니다"));
+        if (!FMath::IsFinite(DrawStartTime) || !FMath::IsFinite(DrawEndTime) || DrawStartTime < 0.f || DrawEndTime <= DrawStartTime || DrawEndTime > DrawLength || !FMath::IsFinite(ReleaseStartTime) || !FMath::IsFinite(ReleaseEndTime) || ReleaseStartTime < 0.f || ReleaseEndTime <= ReleaseStartTime || ReleaseEndTime > ReleaseLength || !FMath::IsFinite(DrawDuration) || DrawDuration <= 0.f) return Fail(TEXT("Timed attack trims or draw duration are outside the source ranges / 시간 조절 공격의 준비·발사 구간 또는 준비 시간이 유효한 원본 범위를 벗어납니다"));
+        const FFrameRate DrawFrameRate = Draw->GetSamplingFrameRate();
+        const FFrameRate ReleaseFrameRate = Release->GetSamplingFrameRate();
+        if (!DrawFrameRate.IsValid() || !ReleaseFrameRate.IsValid() || DrawFrameRate.Numerator <= 0 || ReleaseFrameRate.Numerator <= 0 || DrawFrameRate.Denominator <= 0 || ReleaseFrameRate.Denominator <= 0) return Fail(TEXT("Timed attack sources require positive valid frame rates / 시간 조절 공격 원본에는 유효한 양수 프레임 레이트가 필요합니다"));
+        FWarriorTimedAttackMontagePlan Candidate;
+        Candidate.FrameRate = DrawFrameRate;
+        if (DrawFrameRate.IsMultipleOf(ReleaseFrameRate)) Candidate.FrameRate = ReleaseFrameRate;
+        else if (DrawFrameRate != ReleaseFrameRate && !ReleaseFrameRate.IsMultipleOf(DrawFrameRate)) return Fail(TEXT("Timed attack source frame rates do not share a supported montage rate / 시간 조절 공격 원본 프레임 레이트를 공통 몽타주 레이트로 결합할 수 없습니다"));
+        Candidate.DrawPlayRate = (DrawEndTime - DrawStartTime) / DrawDuration;
+        Candidate.ReleaseEndTime = ReleaseEndTime;
+        Candidate.Length = DrawDuration + ReleaseEndTime - ReleaseStartTime;
+        if (!FMath::IsFinite(Candidate.DrawPlayRate) || Candidate.DrawPlayRate <= 0.f || FMath::IsNearlyZero(Candidate.DrawPlayRate) || !FMath::IsFinite(Candidate.Length) || Candidate.Length <= DrawDuration) return Fail(TEXT("Timed attack playback rate or total length is invalid / 시간 조절 공격의 재생 배율 또는 전체 길이가 유효하지 않습니다"));
+        // Validate the frame-quantized montage duration before mutation so authoring never silently shortens a release.
+        // 작성 전에 프레임 단위 몽타주 길이를 검증하여 발사 구간이 조용히 잘리는 것을 방지합니다.
+        const double FrameCount = static_cast<double>(Candidate.Length) * Candidate.FrameRate.AsDecimal();
+        if (!FMath::IsFinite(FrameCount) || FrameCount < 1.0 || FrameCount > MAX_int32 - 1.0) return Fail(TEXT("Timed attack duration exceeds the supported frame range / 시간 조절 공격 길이가 지원하는 프레임 범위를 벗어납니다"));
+        const double QuantizedLength = Candidate.FrameRate.AsSeconds(Candidate.FrameRate.AsFrameTime(Candidate.Length).RoundToFrame());
+        if (!FMath::IsNearlyEqual(static_cast<double>(Candidate.Length), QuantizedLength, 0.0001)) return Fail(TEXT("Timed attack total length must align with its common frame rate / 시간 조절 공격 전체 길이는 공통 프레임 레이트의 경계와 일치해야 합니다"));
+        OutPlan = Candidate;
+        return true;
+    }
+
     USCS_Node* FindComponentNode(UBlueprint* Blueprint, FName ComponentName)
     {
         if (!IsValid(Blueprint) || !Blueprint->SimpleConstructionScript || ComponentName.IsNone()) return nullptr;
@@ -574,6 +613,53 @@ bool UWarriorAssetLibrary::ValidateSwordMontage(UAnimMontage* Montage, UAnimSequ
     if (Segments[0].GetAnimReference() != Attack || Segments[1].GetAnimReference() != Recovery || Segments[0].StartPos != 0.f || Segments[0].AnimStartTime != 0.f || Segments[0].AnimEndTime != AttackLength || Segments[1].StartPos != AttackLength || Segments[1].AnimStartTime != RecoveryStartTime || Segments[1].AnimEndTime != RecoveryLength || Segments[0].AnimPlayRate != 1.f || Segments[1].AnimPlayRate != 1.f || Segments[0].LoopingCount != 1 || Segments[1].LoopingCount != 1) return Fail(TEXT("Sword montage animation segment verification failed / 검 몽타주 애니메이션 구간 검증 실패"));
     if (Montage->BlendModeIn != EMontageBlendMode::Standard || Montage->BlendModeOut != EMontageBlendMode::Standard || !FMath::IsNearlyEqual(Montage->BlendIn.GetBlendTime(), 0.08f, 0.0001f) || !FMath::IsNearlyEqual(Montage->BlendOut.GetBlendTime(), 0.12f, 0.0001f) || Montage->BlendOutTriggerTime != -1.f || !Montage->bEnableAutoBlendOut) return Fail(TEXT("Sword montage blend verification failed / 검 몽타주 블렌드 검증 실패"));
     return FMath::IsFinite(ExpectedLength) && Montage->RateScale == 1.f && Attack->GetSamplingFrameRate().IsValid() && Recovery->GetSamplingFrameRate().IsValid() && Montage->GetCommonTargetFrameRate().IsValid() && FMath::IsNearlyEqual(Montage->GetPlayLength(), ExpectedLength, 0.0001f) && FMath::IsNearlyEqual(Montage->CalculateSequenceLength(), ExpectedLength, 0.0001f);
+}
+
+bool UWarriorAssetLibrary::ConfigureTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime, float ReleaseStartTime, float ReleaseEndTime, float DrawDuration)
+{
+    FWarriorTimedAttackMontagePlan Plan;
+    if (!BuildTimedAttackMontagePlan(Montage, Draw, Release, DrawStartTime, DrawEndTime, ReleaseStartTime, ReleaseEndTime, DrawDuration, Plan)) return false;
+    FAnimSegment DrawSegment;
+    DrawSegment.SetAnimReference(Draw, true);
+    DrawSegment.AnimStartTime = DrawStartTime;
+    DrawSegment.AnimEndTime = DrawEndTime;
+    DrawSegment.AnimPlayRate = Plan.DrawPlayRate;
+    FAnimSegment ReleaseSegment;
+    ReleaseSegment.SetAnimReference(Release, true);
+    ReleaseSegment.StartPos = DrawDuration;
+    ReleaseSegment.AnimStartTime = ReleaseStartTime;
+    ReleaseSegment.AnimEndTime = Plan.ReleaseEndTime;
+    if (!FMath::IsNearlyEqual(DrawSegment.GetLength(), DrawDuration, 0.0001f) || !FMath::IsNearlyEqual(ReleaseSegment.GetEndPos(), Plan.Length, 0.0001f)) return Fail(TEXT("Timed attack segment timing cannot represent the requested duration / 시간 조절 공격 구간으로 요청한 시간을 표현할 수 없습니다"));
+    // The same sequence may supply both trims; only destination segments and blending are authored.
+    // 같은 시퀀스의 서로 다른 구간을 사용할 수 있으며 대상 구간과 블렌딩만 작성합니다.
+    Montage->Modify();
+    Montage->SlotAnimTracks[0].AnimTrack.AnimSegments = {DrawSegment, ReleaseSegment};
+    Montage->RateScale = 1.f;
+    Montage->BlendModeIn = EMontageBlendMode::Standard;
+    Montage->BlendModeOut = EMontageBlendMode::Standard;
+    Montage->BlendIn.SetBlendTime(0.06f);
+    Montage->BlendOut.SetBlendTime(0.12f);
+    Montage->BlendOutTriggerTime = -1.f;
+    Montage->bEnableAutoBlendOut = true;
+    static_cast<UAnimCompositeBase*>(Montage)->UpdateCommonTargetFrameRate();
+    Montage->GetController().SetFrameRate(Plan.FrameRate);
+    Montage->SetCompositeLength(Plan.Length);
+    Montage->PostEditChange();
+    Montage->MarkPackageDirty();
+    return ValidateTimedAttackMontage(Montage, Draw, Release, DrawStartTime, DrawEndTime, ReleaseStartTime, ReleaseEndTime, DrawDuration);
+}
+
+bool UWarriorAssetLibrary::ValidateTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime, float ReleaseStartTime, float ReleaseEndTime, float DrawDuration)
+{
+    FWarriorTimedAttackMontagePlan Plan;
+    if (!BuildTimedAttackMontagePlan(Montage, Draw, Release, DrawStartTime, DrawEndTime, ReleaseStartTime, ReleaseEndTime, DrawDuration, Plan)) return false;
+    const TArray<FAnimSegment>& Segments = Montage->SlotAnimTracks[0].AnimTrack.AnimSegments;
+    if (Segments.Num() != 2) return Fail(TEXT("Timed attack montage must contain exactly two segments / 시간 조절 공격 몽타주는 정확히 두 구간을 포함해야 합니다"));
+    if (Segments[0].GetAnimReference() != Draw || Segments[1].GetAnimReference() != Release || Segments[0].StartPos != 0.f || Segments[0].AnimStartTime != DrawStartTime || Segments[0].AnimEndTime != DrawEndTime || Segments[1].StartPos != DrawDuration || Segments[1].AnimStartTime != ReleaseStartTime || Segments[1].AnimEndTime != ReleaseEndTime || Segments[0].AnimPlayRate != Plan.DrawPlayRate || Segments[1].AnimPlayRate != 1.f || Segments[0].LoopingCount != 1 || Segments[1].LoopingCount != 1) return Fail(TEXT("Timed attack animation references, trims, rate or loop count differ / 시간 조절 공격의 원본 참조·구간·배율·반복 횟수가 다릅니다"));
+    if (!FMath::IsNearlyEqual(Segments[0].GetLength(), DrawDuration, 0.0001f) || !FMath::IsNearlyEqual(Segments[0].GetEndPos(), Segments[1].StartPos, 0.0001f) || !FMath::IsNearlyEqual(Segments[1].GetEndPos(), Plan.Length, 0.0001f)) return Fail(TEXT("Timed attack segment timing has a gap or unexpected length / 시간 조절 공격 구간 사이에 틈이 있거나 길이가 다릅니다"));
+    if (Montage->RateScale != 1.f || Montage->BlendModeIn != EMontageBlendMode::Standard || Montage->BlendModeOut != EMontageBlendMode::Standard || !FMath::IsNearlyEqual(Montage->BlendIn.GetBlendTime(), 0.06f, 0.0001f) || !FMath::IsNearlyEqual(Montage->BlendOut.GetBlendTime(), 0.12f, 0.0001f) || Montage->BlendOutTriggerTime != -1.f || !Montage->bEnableAutoBlendOut) return Fail(TEXT("Timed attack montage blending or playback settings differ / 시간 조절 공격 몽타주의 블렌딩 또는 재생 설정이 다릅니다"));
+    if (Montage->GetCommonTargetFrameRate() != Plan.FrameRate || Montage->GetSamplingFrameRate() != Plan.FrameRate || !FMath::IsNearlyEqual(Montage->GetPlayLength(), Plan.Length, 0.0001f) || !FMath::IsNearlyEqual(Montage->CalculateSequenceLength(), Plan.Length, 0.0001f)) return Fail(TEXT("Timed attack montage frame rate or stored length differs / 시간 조절 공격 몽타주의 프레임 레이트 또는 저장 길이가 다릅니다"));
+    return true;
 }
 
 bool UWarriorAssetLibrary::IsOutputSlotConnected(UAnimBlueprint* Blueprint, FName SlotName)

@@ -277,6 +277,8 @@ def make_profile(entry, inspections):
         profile.set_editor_property(name, value)
     profile.set_editor_property("skill_id", entry["skill_id"])
     profile.set_editor_property("name", entry["name"])
+    if entry.get("cast_montage"):
+        profile.set_editor_property("cast_montage", require(unreal.load_asset(entry["cast_montage"]), "Missing declared cast montage: " + entry["cast_montage"]))
     profile.set_editor_property("kind", getattr(unreal.CombatRoundSkillKind, settings["kind"]))
     profile.set_editor_property("approach", getattr(unreal.CombatRoundApproach, settings["approach"]))
     profile.set_editor_property("target_rule", getattr(unreal.SkillTargetRule, settings["target_rule"]))

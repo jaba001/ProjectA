@@ -187,4 +187,5 @@ def main():
     unreal.log("PARAGON_IMPORT_COMPLETE " + str(len(results)))
 
 
-main()
+if __name__ == "__main__":
+    main()

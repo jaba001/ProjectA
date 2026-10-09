@@ -313,3 +313,11 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 ```
 
 두 번째 명령은 별도 프로세스에서 저장된 ISM·원본 참조·무대 설정·코어 보존을 검사한다. Content 전체에서 Gameplay와 지정된 신규 `M_EncounterPrototype`만 작성 대상으로 허용하고 Config·Saved/Config·Saved/SaveGames의 스크립트 전후 해시를 확인한다. `-nowrite`는 엔진의 INI 저장을 막고 에셋 저장은 허용한다. 엔진 시작·종료의 과거 진단 파일 정리는 이 해시 범위와 구분한다. 기존 프로토타입 재질은 소유권·그래프 검사만 수행하고 덮어쓰지 않는다. 보고서는 `Saved/Automation/UnifiedGameplay_20261008/{Author,Reload,PreservedLayout,ProtectedAuthor,ProtectedReload}.json`에 기록한다. 게임·PIE·자동화 테스트와 화면·FPS 검수는 실행하지 않는다.
+
+32. `ConfigureBowAnimation.py`: [BowAnimationSpecs.json](BowAnimationSpecs.json)의 Sparrow 원본 FBX 1개를 기존 선택 임포터로 작성하고 0.3초 준비·0.4초 발사/회복의 프로젝트 몽타주를 구성한다. 원본 0.50~1.00초와 0.00~0.40초 구간을 사용한다. 기존 SkeletonGuard Rig로 시퀀스 1개만 리타깃한 뒤 같은 구간의 몽타주를 작성하며, 기존 Snapshot BP의 override 한 쌍과 정밀 화살·화염 화살비의 `CastMontage`만 갱신한다. 출력은 신규 4개·기존 3개이며 원본과 비대상 프로젝트 에셋의 해시를 보존한다. 기존 소유 정보·Skeleton·구간·스킬 값이 다르면 거절한다. `ImportParagonAnimations.py`의 직접 실행 기본 범위는 기존 Kwang 2개로 유지한다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureBowAnimation.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
+```
+
+`WarriorAssetLibrary.ConfigureTimedAttackMontage`를 먼저 Development Editor / Win64로 컴파일한다. 작성 과정에서 스켈레톤·DefaultSlot·구간·비반복·블렌드·남녀 포즈 표본과 변경 필드를 검사하며 전체 출력의 원자적 rollback은 제공하지 않는다. 작성 전 기존 출력은 `Saved/Automation/BowAnimation_20261009/BeforeAssets`에 보존하고 결과는 같은 폴더의 `Author.json`·로그에 기록한다. 선딜 명세·스킬 DA·현재 CSV가 준비 시간과 다르면 중단한다. `CreateDrGameSkills.py`는 선언된 몽타주 참조를 재현하고 `CreateWeaponSkills.py`는 석궁에 활 당기기를 상속하지 않는다. 2026-10-09 작성·컴파일은 통과했으며 실제 재생·별도 프로세스 재로드는 실행하지 않았다. [근거·제한](../../../Docs/HISTORY.md#9-41-2026-10-09-라이브러리-활-공격-애니메이션)

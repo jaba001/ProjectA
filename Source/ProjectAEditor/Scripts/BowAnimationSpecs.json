@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "source": "SparrowManny/Attack/Primary_Fire_Slow",
+  "montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/SparrowManny/Attack/AM_BowAttack",
+  "draw_start": 0.5,
+  "draw_end": 1.0,
+  "release_start": 0.0,
+  "release_end": 0.4,
+  "draw_duration": 0.3,
+  "legacy": {
+    "blueprint": "/Game/User_JeHoon/Blueprint/Unit/BP_SnapshotOpponent",
+    "mesh": "/Game/Skeleton_Guard/Mesh_UE4/Full/SKM_Skeleton_Guard_Body",
+    "retargeter": "/Game/User_JeHoon/Skeleton_Guard/Rigs/RTG_SwordEnemy",
+    "suffix": "_SkeletonGuard"
+  },
+  "skills": [
+    "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_Arrow",
+    "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_FireArrow"
+  ]
+}

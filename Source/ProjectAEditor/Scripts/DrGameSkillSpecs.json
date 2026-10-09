@@ -376,6 +376,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_FireArrow",
       "skill_id": "DrGame_AoeVFX_AOE_FireArrow",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/SparrowManny/Attack/AM_BowAttack",
       "theme": "Fire",
       "element_tags": [
         "Skill.Element.Fire"
@@ -2204,6 +2205,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_Arrow",
       "skill_id": "DrGame_ProjectileHitVFX_Arrow",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/SparrowManny/Attack/AM_BowAttack",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"

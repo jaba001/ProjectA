@@ -6,6 +6,7 @@
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-10-09 라이브러리 활 공격 애니메이션 | Sparrow 원본 FBX 1개에서 활 당기기·발사 몽타주를 작성해 정밀 화살·화염 화살비에 연결하고 구형 SkeletonGuard Snapshot을 함께 지원했다. 컴파일·에셋 작성은 통과했으며 실제 재생·그립·협동 확인은 남아 있다. [범위·근거](#9-41-2026-10-09-라이브러리-활-공격-애니메이션) |
 | 2026-10-09 전투장 바닥과 표시 폴리싱 | 중앙 지면의 흑백 점무늬를 흙색으로 변환하고 표면 9개의 큰 무늬·색조·노멀 강도, 타일 상태별 투명도와 기본 전투 채도를 보완했다. 표면 저장·그래프 검사와 C++ 컴파일은 통과했으며 실제 화면·입력 검수는 남아 있다. [범위·근거](#9-40-2026-10-09-전투장-바닥과-표시-폴리싱) |
 | 2026-10-09 라이브러리 NPC와 서비스 무대 | 원본 캐릭터 5종·호환 idle 2종·소품 22종을 직접 참조하여 상점·회복소·소모품점·부활소에 소품 34개를 배치했다. 컴파일·정적 검사는 통과했고 실제 화면·idle·협동 검수는 남아 있다. [범위·근거](#9-39-2026-10-09-라이브러리-npc와-서비스-무대) |
 | 2026-10-09 지하 미로 갈림길 연출 | 후보 순서에 맞춘 좌·직진·우 통로와 코너·벽·천장을 로컬 런타임에 구성하고 선택 하단 3열·NPC 도착 후 오른쪽 거래 패널을 연결했다. Development Editor / Win64 컴파일·정적 검사를 통과했으며 실제 이동·화면·협동 확인은 남아 있다. [범위·상태](#9-35-2026-10-09-지하-미로-갈림길-연출) |
@@ -930,3 +931,17 @@ CSV 숫자형 작성·export/reimport·미리보기와 독립 정적 검사, 문
 에셋 작성 커맨들릿은 12.33초·종료 코드 0·오류 0·경고 0으로 표면 9개를 저장하고 노드·상수·입력 연결·원본 샘플러·출력을 확인했다. 보호 파일 2,564개의 SHA는 동일하며 변경 Content는 지정된 기존 Material 9개뿐이다. 결과는 `Saved/Automation/BattleFloor_20261009/SurfacesConfiguration.json`, 로그는 `SurfacesAuthor.log`·`SurfacesAuthor.Console.log`다. NullRHI 작성 중 재질 컴파일 API 오류는 없었지만 GPU shader 실행·화면 평가·별도 프로세스 재로드는 수행하지 않았다. 원본 조사 근거는 `SurfaceTextureMetadata.json`·`MacroMaskCandidates.json`이며 작성 전 9개 재질의 해시는 `BeforeMaterials.json`에 기록했다.
 
 독립 읽기 검토와 Python 구문·명세·변경 경로·문서 링크·diff 정적 검사를 수행했다. TODO의 기존 선택 7개·미완료 39개를 보존하고 사용자 확인 1개를 추가했다. 근거는 `Saved/Automation/BattleFloor_20261009/StaticChecks.json`·`DocumentationValidation.json`이다. 게임·PIE·Unreal 자동화 테스트·cook·패키지·신규 화면 캡처는 실행하지 않았고 Editor 창·IDE도 열지 않았다. 실제 바닥의 반복·이음새·접지, 타일 상태의 구분·입력·Continue·2인 표시와 성능은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남긴다. 과거 캡처는 문제 진단에만 사용하며 최신 결과의 검수 근거로 대체하지 않는다.
+
+### 9-41 2026-10-09 라이브러리 활 공격 애니메이션
+
+활 공격 애니메이션 적용 요청을 반영했다. 시작 기준은 `f6ab4335`이며 기존 미커밋 변경은 없었다. 원본 `ParagonAnimationsRetargetedToManny/SparrowManny/Attack/Primary_Fire_Slow.FBX` 1,608,928바이트를 선택했다. 161개 본 이름과 Manny 구조를 대조하고 FBX 곡선을 정적으로 분석했다. 원본 0.50~1.00초의 재당김을 0.30초에 재생하고 0.00~0.40초의 발사·회복을 이어 총 0.70초로 구성했다. 원본 1.0→0.0초 접합에서 분석한 머리·손 위치 차이는 최대 약 0.12cm이며 실제 재생 평가와 구분한다. 조사 근거는 `Saved/Automation/BowAnimation_20261009/Recommendations.json`·`FbxStaticCurves.json`·`HandPoseSamples.json`이다.
+
+공통 Manny 시퀀스·몽타주와 구형 SkeletonGuard 시퀀스·몽타주 4개(546,176바이트)를 원본 팩 하위 구조의 프로젝트 경로에 작성했다. 현재 남녀 몸체는 기존 Manny 호환을 사용하며 구형 Snapshot만 기존 `RTG_SwordEnemy`로 시퀀스 1개를 리타깃한다. 새 Rig·몸체·스켈레톤 복제는 없다. 기존 `BP_SnapshotOpponent`에는 몽타주 override 한 쌍만 추가하고 기존 외형·스킬·override를 보존했다. 현재 네 직업과 해당 Snapshot은 같은 스킬 참조를 사용한다. 이전 클래스·Rig의 정적 참조 근거는 `LegacySkeletonGuardStatic.json`이다.
+
+정밀 화살·화염 화살비 DA는 `CastMontage`만 변경했다. 태그·위력·AP/SAP·0.3초 선딜·화염 화살비의 발동 후 0.4초 판정 지연·GAS·서버 발사·저장 형식은 유지한다. `DrGameSkillSpecs.json`과 생성 도구는 몽타주 참조를 재현하며 석궁 작성 도구는 활 당기기 참조를 제거한다. runtime/RPC 변경은 없다. 선딜 변경 시 몽타주 명세의 준비 시간도 검토하며 자동 속도 조절은 구현하지 않았다. [현행 구조](PROJECT_PLAN.md#4-12-타겟행동-세부-규칙)
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`는 21.04초에 컴파일·링크 성공했다. 이후 [에셋 도구 32번](../Source/ProjectAEditor/Scripts/README.md)의 `UnrealEditor-Cmd -run=pythonscript -script=ConfigureBowAnimation.py -NullRHI` 작성은 11.07초·종료 0·오류 0으로 완료했다. 리타깃 중 import-data 의존 로드와 별도 애니메이션 커브 없음 경고 2개가 있었으며 후속 압축 데이터 저장은 완료됐다. 본 트랙은 161개다. 로그는 `Saved/Automation/BowAnimation_20261009/EditorBuild.log`·`Author.log`·`Author.Console.log`다.
+
+작성 과정에서 두 몽타주의 0.70초 구간·비반복·DefaultSlot·블렌드, 공통 AnimBP 슬롯, 남녀 몸체 8포즈 표본·7본의 유효 좌표/배율, 스킬의 나머지 필드와 기존 Snapshot 구성을 검사했다. 원본·비대상 프로젝트 에셋·CSV 보호 파일 1,213개의 SHA가 동일하고 출력은 지정된 기존 3개·신규 4개뿐이다. 근거는 `Author.json`이며 기존 출력 사본은 `BeforeAssets`에 보존했다. 별도 프로세스 재로드·GPU 렌더·실제 게임·PIE·자동화 테스트는 실행하지 않았고 Editor 창·IDE도 열지 않았다.
+
+독립 코드 검토·Python 구문·JSON·참조·diff·문서 링크 정적 검사를 수행했다. TODO의 기존 선택 7개·미완료 40개를 보존하고 사용자 확인 1개를 추가했으며 근거는 같은 폴더의 `StaticChecks.json`·`DocumentationValidation.json`이다. 실제 손잡이·시위·발사 방향·블렌딩·중단/사망·Continue·2인 원격과 구형 Snapshot 재생은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남긴다. 정적 포즈 검사와 과거 전투 성공을 최신 동작 검수로 대체하지 않는다.

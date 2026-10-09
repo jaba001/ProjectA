@@ -465,7 +465,8 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 - 시전 표현은 명시 프로필의 `RoundDefinition.CastMontage`를 우선하며 비어 있으면 `AbilityClass`의 기존 `AttackMontage`를 사용한다. 소모품은 명시 몽타주만 사용해 공격 몽타주 fallback을 적용하지 않는다. 서버가 시전 진입 시 한 번 재생을 전달한다. 몽타주 재생 인스턴스의 루트 모션과 유닛의 기존 `AN_SkillRelease` 효과 발동은 차단하며, `WindupSeconds`·충돌·AP 계산과 발동 1회는 유지한다. 발동 후 `Recovery`에서 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝날 때까지 기다린 뒤 복귀한다. 서버의 재생 인스턴스를 사용할 수 없으면 에셋 길이/RateScale·블렌드 아웃·여유 시간 0.25초를 사용하며 시전 시작 기준 최대 60초로 제한한다. 반복·자동 종료 누락·잘못된 길이/속도로 무한 대기하지 않으며 시간 초과 시 남은 표현을 즉시 정리한다. 사망·중단·발동 전 취소·다음 행동 시작도 해당 인스턴스를 정리한다. [이전 검증](HISTORY.md#9-5-da-시전-몽타주-연결)
 - 몽타주 대기 시간은 서버가 받은 `DeltaSeconds`를 프레임당 한 번 누적하며 고정 간격 시뮬레이션의 미처리 시간과 분리한다. 프레임 지연 뒤 누적 시뮬레이션을 처리할 때 시전 대기까지 중복 차감하여 조기에 복귀하지 않도록 한다.
 - 이전 GAS 효과·모든 타일 범위·상태효과를 새 행동으로 완전 변환한 것은 아니다. 회복 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 명시 프로필과 재고만 지원한다. 새 Run의 아군은 비무장 공격 1개로 시작하고 상점에서 근접 공격·신규 VFX 60종을 습득할 수 있다. 기존 Blueprint·Snapshot·저장에서는 삭제 VFX 스킬만 제외하고 두 기본 공격·몬스터 전용 공격을 유지한다. 기존 `BP_EnemyUnit`의 근접 공격과 신규 몬스터의 기존 전용 공격을 유지한다. [몬스터 구성](#4-5-몬스터-콘텐츠) · [지원 변환](GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)
-- `RoundMontageOverrides`는 공통 DA를 변경하지 않고 유닛의 Skeleton에 맞는 몽타주로 바꾼다. 전사의 검·비무장과 적의 검 표현에 적용하며 Root Motion·서버 발동 권위·몽타주 종료 후 복귀 규칙을 유지한다. 검은 `hand_r`에 하나만 부착한다.
+- `RoundMontageOverrides`는 공통 DA를 변경하지 않고 유닛의 Skeleton에 맞는 몽타주로 바꾼다. 전사의 검·비무장과 적의 검, 구형 SkeletonGuard Snapshot의 활 표현에 적용하며 Root Motion·서버 발동 권위·몽타주 종료 후 복귀 규칙을 유지한다. 검은 `hand_r`에 하나만 부착한다.
+- 정밀 화살·화염 화살비는 원본 `SparrowManny/Attack/Primary_Fire_Slow.FBX`에서 임포트한 시퀀스를 사용한다. 원본 0.50~1.00초를 5/3배속으로 0.30초에 재생한 뒤 0.00~0.40초를 원속도로 이어 총 0.70초이며 DefaultSlot·비반복·블렌드 0.06/0.12초를 사용한다. 공통 남녀 몸체는 Manny 호환을 활용하고 구형 Snapshot에는 기존 Rig로 만든 같은 길이의 리타깃을 재매핑한다. 두 DA는 `CastMontage`만 바꾸며 화염 화살비의 발동 후 0.4초 판정 지연·태그·CSV·서버 발사 시점은 유지한다. 선딜을 변경할 때는 [활 작성 명세](../Source/ProjectAEditor/Scripts/BowAnimationSpecs.json)의 준비 시간도 검토해야 하며 런타임 자동 속도 보정은 없다. 석궁 작성 도구는 활 몽타주를 제거한 투사체 프로필을 사용한다. [구현·검증 범위](HISTORY.md#9-41-2026-10-09-라이브러리-활-공격-애니메이션)
 - 검만 `bUseWeaponTrace=true`를 사용한다. 서버가 최종 몽타주의 에셋 포즈·메시·무기 부착·소켓을 `GetAnimationPose`로 계산하고 0.23~0.43초를 0.005초 간격·반경 4cm로 검사한다. 렌더 메시 갱신·인스턴스 종료와 독립적으로 누적 구간을 처리하며 행동 취소·사망·대상 상실은 서버 단계에서 처리한다. 최초 적 한 명에게 기존 GAS `Data.Damage`로 1회 피해를 적용한다. `SM_Sword`의 `BladeBase=(0,0,-22)`·`BladeTip=(0,0.191992,-118.28656)`, Pitch/Yaw 0도·Roll 180도, 전사 부착 `(-11.095651,5.605028,-10)`·적 `(-8.5,5,-10)`을 사용한다. 단위는 cm이며 손잡이 위치와 궤적을 함께 관리한다.
 - 리타깃 도구 4개의 중복 연산을 각 6개로 정리하고 보행·공격 시퀀스 48개를 기존 경로에 다시 작성했다. 원본 Root Motion 설정·참조를 보존하며 별도 재로드에서 길이·유효한 포즈·유한 좌표·골반 이동 범위를 검사한다. 전사 전방 보행의 골반 이동은 약 454cm에서 8cm로 줄었으며 정적 재로드 결과만으로 실제 보행 품질을 판단하지 않는다.
 - 서버의 실제 공격 충돌로 피격을 검사하며 별도 명중 확률·성공 슬롯·유닛 간 이동 충돌은 사용하지 않는다. 기본 공격 후 복귀하며 잔류 이동은 자기 진영으로 제한한다.
@@ -605,10 +606,11 @@ GKnight·Assassin·Stylized Dark Witch의 원본·임포트 자료와 제작용 
 | `Blueprint/Unit/Animation/Montage` | 현재 공격·검증·저장 호환에 필요한 프로젝트 몽타주. 미사용 외형별 결과와 공격 02 몽타주는 삭제 |
 | `BossyEnemy/Animations/InPlace/Attacks` | 이전 `Boss_Attack_Swing_InP` 리타깃 시퀀스와 검 몽타주 보존 |
 | `ParagonAnimationsRetargetedToManny/KwangManny/Attack` | 원본 임포트 공격·복귀 2개와 GKnight·Manny·기본 적에 필요한 파생 결과 7개의 검 공격 9개 보존 |
+| `ParagonAnimationsRetargetedToManny/SparrowManny/Attack` | 활 원본 임포트 시퀀스·0.7초 몽타주와 구형 SkeletonGuard용 시퀀스·몽타주 4개. 원본 FBX·몸체·Rig 직접 참조 |
 | `GKnight/Rigs`, `Skeleton_Guard/Rigs` | 기존 전사·적 IK Rig·Retargeter 유지. 사용자가 삭제한 `Paragon*/Characters/Heroes/*/Rigs`의 미사용 IK Rig·Retargeter 12개는 참조 없음 확인 후 삭제 상태 보존 |
 | `Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Sword` | 원본 구조를 유지한 검 사본. 전사·기본 적의 `hand_r` 부착 |
 | `Characters/Mannequins/Meshes/SK_Mannequin`, `Characters/Mannequins/Meshes/SKM_Manny_Simple` | 원본 `/Game/Characters/Mannequins/Meshes`로 연결하는 작은 Redirector. AnimSequence는 원본 뼈대·프리뷰 직접 참조 |
-| `ParagonAnimationsRetargetedToManny` | 전체 AnimSequence 5,385개 임포트는 당시 이력. 현재 Kwang 공격 9개 이외 미사용 결과 5,401개는 삭제했으며 FBX 원본은 보존 |
+| `ParagonAnimationsRetargetedToManny` | 전체 AnimSequence 5,385개 임포트·미사용 결과 5,401개 삭제는 당시 이력. 현재 Kwang 공격 9개와 이후 채택한 Sparrow 활 4개 및 FBX 원본 보존 |
 | `Blueprint/DataAsset/SkillPools/DA_EncounterSkillPool` | `USkillPoolDataAsset`, 빈 범용 풀 보존. 자동 추첨은 사용하지 않음 |
 | `Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog` | `UOpponentSnapshotCatalogDataAsset`, 네 직업 모두 기존 `BP_SnapshotOpponent` 연결. 기존 스킬 별칭·`SwordAttack`·콘텐츠 버전 보존 |
 | `UI/Gameplay/WBP_GameplayRootWidget` | `UGameplayRootWidget`, 기존 RunMap/Result와 native RoundPlanning 화면 연결 |

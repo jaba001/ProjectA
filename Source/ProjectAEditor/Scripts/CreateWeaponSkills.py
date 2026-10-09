@@ -43,6 +43,10 @@ def main():
         require(tags.import_text("(GameplayTags=(" + ",".join('(TagName="' + name + '")' for name in sorted(names)) + "))"), "Tag import failed")
         require(set(re.findall(r'TagName="?([A-Za-z0-9_.]+)"?', tags.export_text())) == names, "Unregistered native tags")
         profile.set_editor_property("effect_tags", tags)
+        if spec["name"] == "DA_CrossbowAttack":
+            # The projectile profile is shared, but the bow draw animation does not belong to a crossbow.
+            # 투사체 프로필을 공유하더라도 활 당기기 애니메이션은 석궁에 적용하지 않습니다.
+            profile.set_editor_property("cast_montage", None)
         if spec["name"] == "DA_MeleeAttack":
             # Use the shared melee collision path for all close weapons rather than the fixed sword trace proxy.
             # 모든 근접 무기의 공통 근접 충돌 경로를 사용하며 고정된 검 판정 프록시는 사용하지 않습니다.
