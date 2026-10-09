@@ -11,6 +11,7 @@ class USizeBox;
 class UTextBlock;
 class UVerticalBox;
 class UGameplayActionButton;
+class UShopItemTooltipWidget;
 struct FGameplayViewState;
 
 // Reward content can be added here without changing encounter cleanup or map progression.
@@ -71,6 +72,12 @@ private:
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UGameplayActionButton>> RewardButtons;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<USizeBox>> RewardCardSizes;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UShopItemTooltipWidget>> RewardTooltips;
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UTextBlock>> RewardAmounts;

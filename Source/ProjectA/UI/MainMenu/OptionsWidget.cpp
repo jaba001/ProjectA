@@ -11,6 +11,7 @@
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/ScaleBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -63,6 +64,7 @@ UTextBlock* UOptionsWidget::AddText(UVerticalBox* Parent, const FText& Text, int
     UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
     Label->SetText(Text);
     Label->SetAutoWrapText(true);
+    Label->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
     FSlateFontInfo Font = Label->GetFont();
     Font.Size = FontSize;
     Label->SetFont(Font);
@@ -77,6 +79,8 @@ UButton* UOptionsWidget::CreateButton(const FName Name, const FText& Text)
     UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
     Label->SetText(Text);
     Label->SetJustification(ETextJustify::Center);
+    Label->SetAutoWrapText(true);
+    Label->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
     FSlateFontInfo Font = Label->GetFont();
     Font.Size = 18;
     Label->SetFont(Font);
@@ -116,9 +120,13 @@ void UOptionsWidget::NativeOnInitialized()
     BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
     USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
     Size->SetWidthOverride(760.0f);
-    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Size);
-    ContentSlot->SetHorizontalAlignment(HAlign_Center);
-    ContentSlot->SetVerticalAlignment(VAlign_Center);
+    UScaleBox* Fit = WidgetTree->ConstructWidget<UScaleBox>();
+    Fit->SetStretch(EStretch::ScaleToFit);
+    Fit->SetStretchDirection(EStretchDirection::DownOnly);
+    Fit->SetContent(Size);
+    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Fit);
+    ContentSlot->SetHorizontalAlignment(HAlign_Fill);
+    ContentSlot->SetVerticalAlignment(VAlign_Fill);
     ContentSlot->SetPadding(FMargin(24.0f));
     SettingsPanel = WidgetTree->ConstructWidget<UBorder>();
     UDemonicUITheme::Get().StylePanel(SettingsPanel);
@@ -149,6 +157,7 @@ void UOptionsWidget::NativeOnInitialized()
     UTextBlock* VSyncLabel = WidgetTree->ConstructWidget<UTextBlock>();
     VSyncLabel->SetText(NSLOCTEXT("Options", "VSync", "수직 동기화"));
     VSync->AddChild(VSyncLabel);
+    VSync->SetToolTipText(NSLOCTEXT("Options", "VSyncHint", "화면 찢어짐을 줄이도록 화면 갱신에 맞춥니다. 환경에 따라 입력 반응이 느려질 수 있습니다."));
     Content->AddChildToVerticalBox(VSync)->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 16.0f));
     Status = AddText(Content, FText::GetEmpty(), 16, 16.0f);
     UHorizontalBox* Actions = WidgetTree->ConstructWidget<UHorizontalBox>();
@@ -172,7 +181,13 @@ void UOptionsWidget::NativeOnInitialized()
     ConfirmationPanel->SetVerticalAlignment(VAlign_Center);
     USizeBox* ConfirmationSize = WidgetTree->ConstructWidget<USizeBox>();
     ConfirmationSize->SetWidthOverride(620.0f);
-    ConfirmationPanel->SetContent(ConfirmationSize);
+    UScaleBox* ConfirmationFit = WidgetTree->ConstructWidget<UScaleBox>();
+    ConfirmationFit->SetStretch(EStretch::ScaleToFit);
+    ConfirmationFit->SetStretchDirection(EStretchDirection::DownOnly);
+    ConfirmationFit->SetContent(ConfirmationSize);
+    ConfirmationPanel->SetHorizontalAlignment(HAlign_Fill);
+    ConfirmationPanel->SetVerticalAlignment(VAlign_Fill);
+    ConfirmationPanel->SetContent(ConfirmationFit);
     UVerticalBox* ConfirmationContent = WidgetTree->ConstructWidget<UVerticalBox>();
     UBorder* ConfirmationFrame = WidgetTree->ConstructWidget<UBorder>();
     UDemonicUITheme::Get().StylePanel(ConfirmationFrame);

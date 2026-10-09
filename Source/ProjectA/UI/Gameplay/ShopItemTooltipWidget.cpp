@@ -99,7 +99,7 @@ void UShopItemTooltipWidget::NativeOnInitialized()
     EmptySkills = AddText(SkillList, 16, ContentWidth);
     EmptySkills->SetText(NSLOCTEXT("ShopItemTooltip", "NoSkills", "부여된 스킬 없음"));
     Theme.AddDivider(WidgetTree, Content);
-    AddText(Content, 16, ContentWidth)->SetText(NSLOCTEXT("ShopItemTooltip", "EquipHint", "구매한 아이템은 인벤토리에 보관됩니다. 인벤토리에서 캐릭터에게 장착하면 부여 스킬을 사용할 수 있습니다."));
+    FooterHint = AddText(Content, 16, ContentWidth);
 }
 
 void UShopItemTooltipWidget::AddSkillRow()
@@ -114,6 +114,22 @@ void UShopItemTooltipWidget::AddSkillRow()
 
 void UShopItemTooltipWidget::ConfigureItem(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities, const FText& Status)
 {
+    const FText Summary = Status.IsEmpty() ? FText::Format(NSLOCTEXT("ShopItemTooltip", "Price", "가격 {0}G"), FText::AsNumber(Item.Price)) : FText::Format(NSLOCTEXT("ShopItemTooltip", "PriceStatus", "가격 {0}G · {1}"), FText::AsNumber(Item.Price), Status);
+    ConfigureDetails(Item, Rarities, Summary, NSLOCTEXT("ShopItemTooltip", "EquipHint", "구매한 아이템은 인벤토리에 보관됩니다. 상점에서 캐릭터에게 장착하면 부여 스킬을 사용할 수 있습니다."));
+}
+
+void UShopItemTooltipWidget::ConfigureInventory(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities, const FText& State)
+{
+    ConfigureDetails(Item, Rarities, State, NSLOCTEXT("ItemTooltip", "InventoryHint", "장비 변경은 상점에서 가능합니다. 장비 슬롯으로 끌어 장착하고, 가방으로 끌어 해제합니다."));
+}
+
+void UShopItemTooltipWidget::ConfigureReward(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities, const FText& State)
+{
+    ConfigureDetails(Item, Rarities, State, NSLOCTEXT("ItemTooltip", "RewardHint", "선택한 아이템은 인벤토리로 지급됩니다. 상점에서 장착할 수 있습니다."));
+}
+
+void UShopItemTooltipWidget::ConfigureDetails(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities, const FText& Summary, const FText& Hint)
+{
     if (!ItemName || !SkillList) return;
     UpdateMaximumHeight();
     const UDemonicUITheme& Theme = UDemonicUITheme::Get();
@@ -121,7 +137,9 @@ void UShopItemTooltipWidget::ConfigureItem(const FRunItemDefinition& Item, const
     Theme.StyleText(ItemName, true, 18);
     ItemName->SetText(RunItemPresentation::Name(Item, Rarities));
     if (const FRunWeaponRarityRule* Rarity = RunItemPresentation::FindRarity(Item, Rarities)) ItemName->SetColorAndOpacity(Rarity->Color);
-    PriceStatus->SetText(Status.IsEmpty() ? FText::Format(NSLOCTEXT("ShopItemTooltip", "Price", "가격 {0}G"), FText::AsNumber(Item.Price)) : FText::Format(NSLOCTEXT("ShopItemTooltip", "PriceStatus", "가격 {0}G · {1}"), FText::AsNumber(Item.Price), Status));
+    PriceStatus->SetText(Summary);
+    PriceStatus->SetVisibility(Summary.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+    FooterHint->SetText(Hint);
     const FText Equipment = RunItemPresentation::EquipmentDescription(Item);
     EquipmentText->SetText(Equipment);
     EquipmentText->SetVisibility(Equipment.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);

@@ -7,6 +7,7 @@
 #include "Components/ButtonSlot.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/ScaleBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -35,6 +36,8 @@ UButton* UGameModeSelectionWidget::AddButton(UVerticalBox* Parent, FName Name, c
     UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
     Label->SetText(Text);
     Label->SetJustification(ETextJustify::Center);
+    Label->SetAutoWrapText(true);
+    Label->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
     CastChecked<UButtonSlot>(Button->AddChild(Label))->SetPadding(FMargin(24.0f, 16.0f));
     Parent->AddChildToVerticalBox(Button)->SetPadding(FMargin(0.0f, 6.0f));
     return Button;
@@ -54,9 +57,13 @@ void UGameModeSelectionWidget::NativeOnInitialized()
 
     USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
     Size->SetWidthOverride(620.0f);
-    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Size);
-    ContentSlot->SetHorizontalAlignment(HAlign_Center);
-    ContentSlot->SetVerticalAlignment(VAlign_Center);
+    UScaleBox* Fit = WidgetTree->ConstructWidget<UScaleBox>();
+    Fit->SetStretch(EStretch::ScaleToFit);
+    Fit->SetStretchDirection(EStretchDirection::DownOnly);
+    Fit->SetContent(Size);
+    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Fit);
+    ContentSlot->SetHorizontalAlignment(HAlign_Fill);
+    ContentSlot->SetVerticalAlignment(VAlign_Fill);
     ContentSlot->SetPadding(FMargin(24.0f));
     UBorder* Panel = WidgetTree->ConstructWidget<UBorder>();
     Theme.StylePanel(Panel);
@@ -72,7 +79,7 @@ void UGameModeSelectionWidget::NativeOnInitialized()
     SinglePlayerButton = AddButton(Content, TEXT("Button_SinglePlayer"), NSLOCTEXT("GameModeSelection", "SinglePlayer", "싱글플레이"));
     SinglePlayerButton->OnClicked.AddUniqueDynamic(this, &UGameModeSelectionWidget::HandleSinglePlayer);
     UTextBlock* SinglePlayerNotice = WidgetTree->ConstructWidget<UTextBlock>();
-    SinglePlayerNotice->SetText(NSLOCTEXT("GameModeSelection", "SinglePlayerNotice", "파티를 만들고 혼자 여정을 시작합니다."));
+    SinglePlayerNotice->SetText(NSLOCTEXT("GameModeSelection", "SinglePlayerControlNotice", "직접 조작할 캐릭터 1명을 선택합니다.\n함께 만든 나머지 동료는 AI가 조작합니다."));
     SinglePlayerNotice->SetAutoWrapText(true);
     SinglePlayerNotice->SetJustification(ETextJustify::Center);
     Content->AddChildToVerticalBox(SinglePlayerNotice)->SetPadding(FMargin(0.0f, 2.0f, 0.0f, 16.0f));

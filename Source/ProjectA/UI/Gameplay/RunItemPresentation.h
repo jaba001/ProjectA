@@ -16,7 +16,7 @@ namespace RunItemPresentation
 
     const FRunWeaponRarityRule* FindRarity(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities);
     FText Name(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities);
-    FText GrantedSkills(const FRunItemDefinition& Item);
+    FText GrantedSkills(const FRunItemDefinition& Item, bool bIncludeStats = true);
     FText Tooltip(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities);
     FText EquipmentDescription(const FRunItemDefinition& Item);
     // Build display values during a view refresh, never from a hover tick or a new random selection.

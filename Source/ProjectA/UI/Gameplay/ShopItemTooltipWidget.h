@@ -18,11 +18,14 @@ class PROJECTA_API UShopItemTooltipWidget : public UUserWidget
 
 public:
     void ConfigureItem(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities, const FText& Status);
+    void ConfigureInventory(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities, const FText& State);
+    void ConfigureReward(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities, const FText& State);
 
 protected:
     virtual void NativeOnInitialized() override;
 
 private:
+    void ConfigureDetails(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities, const FText& Summary, const FText& Hint);
     UTextBlock* AddText(UVerticalBox* Parent, int32 FontSize, float WrapWidth, bool bHeading = false);
     void AddSkillRow();
     void UpdateMaximumHeight();
@@ -38,6 +41,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> PriceStatus;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> FooterHint;
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> EquipmentText;

@@ -74,7 +74,7 @@ FText RunItemPresentation::Name(const FRunItemDefinition& Item, const TArray<FRu
     return Rarity ? FText::Format(NSLOCTEXT("RunItem", "RarityName", "[{0}] {1}"), Rarity->DisplayName, Name) : Name;
 }
 
-FText RunItemPresentation::GrantedSkills(const FRunItemDefinition& Item)
+FText RunItemPresentation::GrantedSkills(const FRunItemDefinition& Item, bool bIncludeStats)
 {
     if (Item.GenerationVersion == 0 || Item.GrantedSkills.IsEmpty()) return FText::GetEmpty();
     TArray<FText> Names;
@@ -86,7 +86,7 @@ FText RunItemPresentation::GrantedSkills(const FRunItemDefinition& Item)
         if (Item.SkillBalanceVersion == 1 && Item.GrantedSkillBalances.IsValidIndex(Index))
         {
             const FRunSkillBalance& Balance = Item.GrantedSkillBalances[Index];
-            Name = FText::Format(NSLOCTEXT("RunItem", "BalancedSkill", "[{0}] {1} · 위력 {2} · AP {3} / SAP {4}"), RunSkillBalance::RarityName(Balance.RarityTag), Name, FText::AsNumber(Balance.Power), FText::AsNumber(Balance.ActionPointCost), FText::AsNumber(Balance.SubActionPointCost));
+            Name = bIncludeStats ? FText::Format(NSLOCTEXT("RunItem", "BalancedSkill", "[{0}] {1} · 위력 {2} · AP {3} / SAP {4}"), RunSkillBalance::RarityName(Balance.RarityTag), Name, FText::AsNumber(Balance.Power), FText::AsNumber(Balance.ActionPointCost), FText::AsNumber(Balance.SubActionPointCost)) : FText::Format(NSLOCTEXT("RunItem", "DetailedSkillName", "[{0}] {1}"), RunSkillBalance::RarityName(Balance.RarityTag), Name);
         }
         Names.Add(Name);
     }

@@ -162,9 +162,9 @@ void UCharacterInventoryPanel::NativeOnInitialized()
     DetailsPanel->SetPadding(FMargin(10.0f));
     Content->AddChildToVerticalBox(DetailsPanel)->SetPadding(FMargin(0.0f, 10.0f, 0.0f, 0.0f));
     USizeBox* DetailsSize = WidgetTree->ConstructWidget<USizeBox>();
-    DetailsSize->SetHeightOverride(164.0f);
+    DetailsSize->SetHeightOverride(220.0f);
     DetailsPanel->SetContent(DetailsSize);
-    UScrollBox* DetailsScroll = WidgetTree->ConstructWidget<UScrollBox>();
+    DetailsScroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("InventoryDetailsScroll"));
     DetailsScroll->SetConsumeMouseWheel(EConsumeMouseWheel::WhenScrollingPossible);
     DetailsSize->SetContent(DetailsScroll);
     UVerticalBox* DetailsContent = WidgetTree->ConstructWidget<UVerticalBox>();
@@ -183,6 +183,8 @@ void UCharacterInventoryPanel::NativeOnInitialized()
     DetailsName = AddText(Description, FText::GetEmpty(), 20, 6.0f);
     DetailsSummary = AddText(Description, FText::GetEmpty(), 14, 6.0f);
     DetailsHint = AddText(DetailsContent, FText::GetEmpty(), 14, 0.0f);
+    DetailsSkills = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventoryItemSkillDetails"));
+    DetailsContent->AddChildToVerticalBox(DetailsSkills)->SetPadding(FMargin(0.0f, 10.0f, 0.0f, 0.0f));
     Theme.ApplyControls(WidgetTree);
 }
 
@@ -233,21 +235,22 @@ void UCharacterInventoryPanel::AddSkill(const USkillDefinitionDataAsset* Skill)
     UHorizontalBoxSlot* NameSlot = Row->AddChildToHorizontalBox(Label);
     NameSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     NameSlot->SetVerticalAlignment(VAlign_Center);
-    UTextBlock* Cost = WidgetTree->ConstructWidget<UTextBlock>();
-    Cost->SetText(Skill->GetActionPointCostText());
-    Theme.StyleText(Cost, false, 13);
-    Row->AddChildToHorizontalBox(Cost)->SetPadding(FMargin(8.0f, 0.0f, 0.0f, 0.0f));
     TArray<FText> Sources;
     TSet<int32> SourceItems;
     FCombatRoundSkill DisplayedSkill;
     FText Error;
     const bool bResolvedSkill = Skill->ResolveRoundSkill(DisplayedSkill, Error);
+    RunItemPresentation::FItemSkillDetails Detail;
+    Detail.Name = Name;
+    Detail.Description = Skill->SkillDescription;
+    Detail.Stats = bResolvedSkill ? FText::Format(NSLOCTEXT("Inventory", "LegacySkillStats", "위력 {0} · AP {1} / SAP {2} · 선딜 {3}초"), FText::AsNumber(DisplayedSkill.Power), FText::AsNumber(DisplayedSkill.ActionPointCost), FText::AsNumber(DisplayedSkill.SubActionPointCost), FText::AsNumber(DisplayedSkill.WindupSeconds)) : NSLOCTEXT("Inventory", "MissingSkillStats", "스킬 수치 정보를 확인할 수 없습니다.");
+    bool bHasSourceDetails = false;
     for (const FRunEquipmentSlot& EquipmentSlot : DisplayedMember.Equipment.Slots)
     {
         if (!DisplayedMember.Items.IsValidIndex(EquipmentSlot.ItemIndex) || SourceItems.Contains(EquipmentSlot.ItemIndex)) continue;
         const FRunItemDefinition& Item = DisplayedMember.Items[EquipmentSlot.ItemIndex];
         if (Item.GenerationVersion == 0) continue;
-        const bool bGrantsSkill = Item.GrantedSkills.ContainsByPredicate([Skill, bResolvedSkill, &DisplayedSkill](const FSoftObjectPath& Path)
+        const int32 GrantedSkillIndex = Item.GrantedSkills.IndexOfByPredicate([Skill, bResolvedSkill, &DisplayedSkill](const FSoftObjectPath& Path)
         {
             const USkillDefinitionDataAsset* GrantedSkill = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
             if (GrantedSkill == Skill) return true;
@@ -255,13 +258,30 @@ void UCharacterInventoryPanel::AddSkill(const USkillDefinitionDataAsset* Skill)
             FText GrantedError;
             return bResolvedSkill && GrantedSkill && GrantedSkill->ResolveRoundSkill(Granted, GrantedError) && Granted.SkillId == DisplayedSkill.SkillId;
         });
-        if (!bGrantsSkill) continue;
+        if (GrantedSkillIndex == INDEX_NONE) continue;
+        if (!bHasSourceDetails)
+        {
+            // Equipped copies carry the same frozen tuning used by combat; never replace it with asset description numbers.
+            // 장착 사본은 전투와 같은 고정 수치를 보유하므로 원본 설명의 숫자로 대체하지 않습니다.
+            const TArray<RunItemPresentation::FItemSkillDetails> ItemDetails = RunItemPresentation::SkillDetails(Item);
+            if (ItemDetails.IsValidIndex(GrantedSkillIndex)) Detail = ItemDetails[GrantedSkillIndex];
+            else
+            {
+                Detail.Description = NSLOCTEXT("Inventory", "MissingSavedSkillDetails", "저장된 스킬 설명을 확인할 수 없습니다.");
+                Detail.Stats = NSLOCTEXT("Inventory", "MissingSavedSkillStats", "저장된 스킬 등급·수치 정보를 확인할 수 없습니다.");
+            }
+            bHasSourceDetails = true;
+        }
         SourceItems.Add(EquipmentSlot.ItemIndex);
         Sources.Add(FText::Format(NSLOCTEXT("Inventory", "EquippedSkillSource", "{0} ({1})"), RunItemPresentation::Name(Item, DisplayedRarities), SlotName(EquipmentSlot.SlotTag)));
     }
+    Label->SetText(Detail.Name);
+    Label->SetColorAndOpacity(Detail.Color);
+    AddText(Content, Detail.Stats, 14, 4.0f)->SetVisibility(ESlateVisibility::HitTestInvisible);
+    if (!Detail.Description.IsEmpty()) AddText(Content, Detail.Description, 14, 4.0f)->SetVisibility(ESlateVisibility::HitTestInvisible);
     const FText SourceText = Sources.IsEmpty() ? FText::GetEmpty() : FText::Format(NSLOCTEXT("Inventory", "EquippedSkillSources", "장착 무기: {0}"), FText::Join(FText::FromString(TEXT(" · ")), Sources));
     if (!SourceText.IsEmpty()) AddText(Content, SourceText, 13, 0.0f)->SetVisibility(ESlateVisibility::HitTestInvisible);
-    const FText Tooltip = FText::Format(NSLOCTEXT("Inventory", "SkillTooltip", "{0}\n{1}\n{2}"), Name, Skill->GetActionPointCostText(), Skill->SkillDescription);
+    const FText Tooltip = FText::Format(NSLOCTEXT("Inventory", "ResolvedSkillTooltip", "{0}\n{1}\n{2}"), Detail.Name, Detail.Stats, Detail.Description);
     Card->SetToolTipText(SourceText.IsEmpty() ? Tooltip : FText::Format(NSLOCTEXT("Inventory", "SkillSourceTooltip", "{0}\n{1}"), Tooltip, SourceText));
 }
 
@@ -300,7 +320,11 @@ void UCharacterInventoryPanel::RefreshInventory(const FGameplayViewState& View, 
     // Preserve a selection only when the same character still owns the same indexed copy and definition.
     // 같은 캐릭터가 동일 인덱스의 사본과 정의를 계속 보유할 때만 선택을 유지합니다.
     const FRunItemDefinition* Candidate = Member && Member->Items.IsValidIndex(SelectedItemIndex) ? &Member->Items[SelectedItemIndex] : nullptr;
-    if (!Candidate || Member->CharacterId != DisplayedMember.CharacterId || Candidate->Asset != SelectedItem.Asset || !Candidate->DisplayName.EqualTo(SelectedItem.DisplayName) || Candidate->Tags != SelectedItem.Tags || Candidate->Price != SelectedItem.Price || Candidate->ItemInstanceId != SelectedItem.ItemInstanceId) SelectedItemIndex = INDEX_NONE;
+    if (!Candidate || Member->CharacterId != DisplayedMember.CharacterId || Candidate->Asset != SelectedItem.Asset || !Candidate->DisplayName.EqualTo(SelectedItem.DisplayName) || Candidate->Tags != SelectedItem.Tags || Candidate->Price != SelectedItem.Price || Candidate->ItemInstanceId != SelectedItem.ItemInstanceId)
+    {
+        SelectedItemIndex = INDEX_NONE;
+        DetailsScroll->ScrollToStart();
+    }
     const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
     DisplayedMember = Member ? *Member : FRunPartyMember();
     DisplayedRarities = View.ItemRarities;
@@ -321,6 +345,7 @@ void UCharacterInventoryPanel::SelectCategory(int32 CategoryIndex)
     if (!Categories.IsValidIndex(CategoryIndex) || SelectedCategoryIndex == CategoryIndex) return;
     SelectedCategoryIndex = CategoryIndex;
     ListScroll->ScrollToStart();
+    DetailsScroll->ScrollToStart();
     RebuildList();
 }
 
@@ -374,6 +399,7 @@ void UCharacterInventoryPanel::SelectItem(int32 ItemIndex)
 {
     if (!VisibleItemIndices.Contains(ItemIndex) || !DisplayedMember.Items.IsValidIndex(ItemIndex)) return;
     SelectedItemIndex = ItemIndex;
+    DetailsScroll->ScrollToStart();
     // Change only highlights and details so mouse selection does not replace a pending drag source.
     // 마우스 선택이 대기 중인 드래그 원본을 교체하지 않도록 강조와 상세만 변경합니다.
     RefreshSelectedItem();
@@ -385,6 +411,7 @@ void UCharacterInventoryPanel::RefreshSelectedItem()
     const bool bHasItem = DisplayedMember.Items.IsValidIndex(SelectedItemIndex) && VisibleItemIndices.Contains(SelectedItemIndex);
     DetailsPanel->SetVisibility(bHasItem ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     SelectedItem = bHasItem ? DisplayedMember.Items[SelectedItemIndex] : FRunItemDefinition();
+    DetailsSkills->ClearChildren();
     if (!bHasItem) return;
     UDemonicUITheme::Get().SetItemIcon(DetailsIcon, SelectedItem.Tags);
     DetailsName->SetText(RunItemPresentation::Name(SelectedItem, DisplayedRarities));
@@ -400,22 +427,26 @@ void UCharacterInventoryPanel::RefreshSelectedItem()
         }
     }
     DetailsSummary->SetText(FText::Format(NSLOCTEXT("Inventory", "ItemDetails", "{0} · 보관 1개\n카탈로그 기준 가격 {1}G"), CategoryLabel, FText::AsNumber(SelectedItem.Price)));
-    const FText GrantedSkills = RunItemPresentation::GrantedSkills(SelectedItem);
-    if (!GrantedSkills.IsEmpty()) DetailsSummary->SetText(FText::Format(NSLOCTEXT("Inventory", "ItemSkillDetails", "{0}\n{1}"), DetailsSummary->GetText(), GrantedSkills));
+    const TArray<RunItemPresentation::FItemSkillDetails> SkillDetails = RunItemPresentation::SkillDetails(SelectedItem);
+    if (!SkillDetails.IsEmpty())
+    {
+        AddText(DetailsSkills, NSLOCTEXT("Inventory", "GrantedSkillDetailsTitle", "장착 시 사용할 스킬"), 16, 6.0f);
+        for (const RunItemPresentation::FItemSkillDetails& Detail : SkillDetails)
+        {
+            AddText(DetailsSkills, Detail.Name, 16, 4.0f)->SetColorAndOpacity(Detail.Color);
+            AddText(DetailsSkills, Detail.Stats, 14, 4.0f);
+            AddText(DetailsSkills, Detail.Description, 14, 10.0f);
+        }
+    }
+    else AddText(DetailsSkills, NSLOCTEXT("Inventory", "NoGrantedSkills", "이 아이템에 저장된 부여 스킬이 없습니다."), 14, 0.0f);
     const FRunEquipmentProfile* Profile = URunEquipmentCatalog::Get().ResolveProfile(SelectedItem);
     if (!Profile)
     {
-        DetailsHint->SetText(NSLOCTEXT("Inventory", "UnsupportedDetails", "현재 장착을 지원하지 않는 아이템입니다."));
+        DetailsHint->SetText(RunItemPresentation::EquipmentDescription(SelectedItem));
         return;
     }
-    TArray<FText> SlotLabels;
-    for (FGameplayTag SlotTag : URunEquipmentCatalog::GetSlotTags())
-    {
-        if (URunEquipmentCatalog::ResolveSlot(*Profile, SlotTag).IsValid()) SlotLabels.Add(SlotName(SlotTag));
-    }
-    const bool bTwoHanded = Profile->OccupiedSlots.HasTagExact(URunEquipmentCatalog::GetWeaponSlot(0)) && Profile->OccupiedSlots.HasTagExact(URunEquipmentCatalog::GetWeaponSlot(1));
-    const FText Hint = bCanChangeEquipment ? NSLOCTEXT("Inventory", "DetailsDragHint", "목록에서 장비 슬롯으로 끌어 장착하세요.") : NSLOCTEXT("Inventory", "DetailsReadOnlyHint", "상점에서 장비를 변경할 수 있습니다.");
-    DetailsHint->SetText(FText::Format(NSLOCTEXT("Inventory", "SupportedDetails", "장착 위치: {0}{1}\n{2}"), FText::Join(FText::FromString(TEXT(" · ")), SlotLabels), bTwoHanded ? NSLOCTEXT("Inventory", "TwoHandedDetails", " (양손)") : FText::GetEmpty(), Hint));
+    const FText Hint = DisplayedMember.CurrentHP == 0.0f ? NSLOCTEXT("Equipment", "DeadChangeHint", "사망한 캐릭터는 장비를 변경할 수 없습니다.") : bCanChangeEquipment ? NSLOCTEXT("Inventory", "DetailsDragHint", "목록에서 장비 슬롯으로 끌어 장착하세요.") : NSLOCTEXT("Inventory", "DetailsReadOnlyHint", "상점에서 장비를 변경할 수 있습니다.");
+    DetailsHint->SetText(FText::Format(NSLOCTEXT("Inventory", "ResolvedEquipmentDetails", "{0}\n{1}"), RunItemPresentation::EquipmentDescription(SelectedItem), Hint));
 }
 
 bool UCharacterInventoryPanel::CanAcceptDrop(const UEquipmentDragDropOperation* Operation, FGameplayTag TargetSlot) const

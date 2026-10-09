@@ -10,6 +10,7 @@ class UBorder;
 class UEquipmentDragDropOperation;
 class UImage;
 class USizeBox;
+class UShopItemTooltipWidget;
 class UTextBlock;
 
 DECLARE_DELEGATE_RetVal_TwoParams(bool, FEquipmentSlotDropDelegate, const UEquipmentDragDropOperation*, FGameplayTag);
@@ -63,6 +64,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> StateText;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UShopItemTooltipWidget> ItemTooltip;
 
     UPROPERTY(Transient)
     FRunItemDefinition DisplayedItem;

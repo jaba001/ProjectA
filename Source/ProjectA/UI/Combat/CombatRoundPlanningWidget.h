@@ -121,6 +121,9 @@ private:
     TObjectPtr<UTextBlock> MovePlanDetails;
 
     UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> ReadyPlanDetails;
+
+    UPROPERTY(Transient)
     TObjectPtr<UTextBlock> TargetDetails;
 
     UPROPERTY(Transient)

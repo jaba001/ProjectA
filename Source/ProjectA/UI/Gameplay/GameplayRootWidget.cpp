@@ -9,6 +9,7 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
 #include "Controller/GameplayPlayerController.h"
 #include "Game/GameState/GameplayViewTypes.h"
 #include "Game/Run/RunStateSubsystem.h"
@@ -201,7 +202,13 @@ void UGameplayRootWidget::NativeOnInitialized()
     GoldText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_PersonalGold"));
     UDemonicUITheme::Get().StyleText(GoldText, true, 20);
     GoldText->SetColorAndOpacity(FLinearColor(0.95f, 0.76f, 0.34f));
-    GoldPanel->SetContent(GoldText);
+    UVerticalBox* GoldContent = WidgetTree->ConstructWidget<UVerticalBox>();
+    GoldPanel->SetContent(GoldContent);
+    GoldContent->AddChildToVerticalBox(GoldText);
+    UTextBlock* Shortcuts = WidgetTree->ConstructWidget<UTextBlock>();
+    Shortcuts->SetText(NSLOCTEXT("GameplayHUD", "ShortcutHint", "I  인벤토리    Esc / O  설정"));
+    UDemonicUITheme::Get().StyleText(Shortcuts, false, 13);
+    GoldContent->AddChildToVerticalBox(Shortcuts)->SetPadding(FMargin(0.f, 4.f, 0.f, 0.f));
     CheckpointNotice = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("CheckpointNotice"));
     UOverlaySlot* NoticeSlot = NoticeRoot->AddChildToOverlay(CheckpointNotice);
     NoticeSlot->SetHorizontalAlignment(HAlign_Center);

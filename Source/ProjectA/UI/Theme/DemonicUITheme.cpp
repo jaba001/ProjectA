@@ -236,6 +236,10 @@ void UDemonicUITheme::ApplyControls(UWidgetTree* Tree) const
         else if (UScrollBox* Scroll = Cast<UScrollBox>(Widget))
         {
             Scroll->SetWidgetBarStyle(ThemeScrollBar(Scroll->GetWidgetBarStyle()));
+            Scroll->SetScrollbarThickness(FVector2D(10.f, 10.f));
+            Scroll->SetAllowOverscroll(false);
+            Scroll->SetAnimateWheelScrolling(true);
+            if (Scroll->GetScrollWhenFocusChanges() == EScrollWhenFocusChanges::NoScroll) Scroll->SetScrollWhenFocusChanges(EScrollWhenFocusChanges::AnimatedScroll);
         }
         else if (UTextBlock* Text = Cast<UTextBlock>(Widget); Text && UsesDefaultTextColor(Text))
         {

@@ -19,6 +19,7 @@
 #include "Game/GameState/GameplayViewTypes.h"
 #include "UI/Gameplay/GameplayActionButton.h"
 #include "UI/Gameplay/RunItemPresentation.h"
+#include "UI/Gameplay/ShopItemTooltipWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
 
 TOptional<FUIInputConfig> UEncounterResultWidget::GetDesiredInputConfig() const
@@ -133,13 +134,15 @@ void UEncounterResultWidget::NativeOnInitialized()
         USizeBox* CardSize = WidgetTree->ConstructWidget<USizeBox>();
         CardSize->SetMinDesiredWidth(160.f);
         CardSize->SetMinDesiredHeight(160.f);
+        CardSize->SetVisibility(ESlateVisibility::Visible);
+        RewardCardSizes.Add(CardSize);
+        RewardTooltips.Add(CreateWidget<UShopItemTooltipWidget>(GetOwningPlayer()));
         UHorizontalBoxSlot* CardSlot = RewardCards->AddChildToHorizontalBox(CardSize);
         CardSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
         CardSlot->SetPadding(FMargin(Index == 0 ? 0.f : 6.f, 0.f, Index == 2 ? 0.f : 6.f, 0.f));
         UGameplayActionButton* Button = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), ChoiceId);
         Button->Configure(ChoiceId, FText::GetEmpty());
         Button->OnActionRequested.AddUObject(this, &UEncounterResultWidget::HandleRewardSelection);
-        Button->SetToolTipText(NSLOCTEXT("CombatGoldReward", "ClaimOnSelection", "선택하면 표시된 골드가 본인 캐릭터에게 지급됩니다. 한 번만 선택할 수 있습니다."));
         CardSize->SetContent(Button);
         UVerticalBox* CardContent = WidgetTree->ConstructWidget<UVerticalBox>();
         Button->SetContent(CardContent);
@@ -176,6 +179,8 @@ void UEncounterResultWidget::NativeOnInitialized()
         CardContent->AddChildToVerticalBox(Details)->SetPadding(FMargin(0.f, 0.f, 0.f, 12.f));
         UTextBlock* Status = WidgetTree->ConstructWidget<UTextBlock>();
         Status->SetJustification(ETextJustify::Center);
+        Status->SetAutoWrapText(true);
+        Status->SetWrapTextAt(220.f);
         CardContent->AddChildToVerticalBox(Status);
         RewardButtons.Add(Button);
         RewardAmounts.Add(Amount);
@@ -256,9 +261,7 @@ void UEncounterResultWidget::RefreshResult(const FGameplayViewState& View)
         ResultContentSize->SetMinDesiredWidth(840.f);
         ResultContentSize->SetMaxDesiredWidth(900.f);
     }
-    RewardInstruction->SetText(bItemRewards ? NSLOCTEXT("CombatItemReward", "ChooseOne", "전투 보상 · 아이템 3개 중 1개 선택") : NSLOCTEXT("CombatGoldReward", "ChooseOne", "전투 보상 · 3개 중 1개 선택"));
     RewardBonusGold->SetVisibility(bItemRewards ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-    RewardBonusGold->SetText(bItemRewards ? FText::Format(NSLOCTEXT("CombatItemReward", "BonusGold", "추가 골드 +{0}G · 아이템 선택 시 함께 지급"), FText::AsNumber(Rewards.BonusGold)) : FText::GetEmpty());
     const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
     const FGuid CharacterId = Controller ? Controller->GetRewardCharacterId(View) : FGuid();
     const bool bPending = Controller && Controller->IsRewardSelectionPending();
@@ -269,10 +272,15 @@ void UEncounterResultWidget::RefreshResult(const FGameplayViewState& View)
     const FRunGoldRewardClaim* Claim = Rewards.Claims.FindByPredicate([this](const FRunGoldRewardClaim& Candidate) { return Candidate.CharacterId == RewardCharacterId; });
     const int32 ChoiceCount = bItemRewards ? Rewards.ItemChoices.Num() : Rewards.GoldChoices.Num();
     bRewardSelectionAllowed = Controller && Member && RewardCharacterId.IsValid() && View.GoldRewardRecipientIds.Contains(RewardCharacterId) && !Claim && !bPending && !RewardNodeId.IsNone() && ChoiceCount == 3;
+    RewardInstruction->SetText(Claim ? NSLOCTEXT("CombatReward", "ReceiptComplete", "전투 보상 · 수령 완료") : bPending ? NSLOCTEXT("CombatReward", "ProcessingReceipt", "전투 보상 · 지급 처리 중") : !Member ? NSLOCTEXT("CombatReward", "WaitingRecipients", "전투 보상 · 참가자 선택 대기") : bItemRewards ? NSLOCTEXT("CombatItemReward", "ChooseOne", "전투 보상 · 아이템 3개 중 1개 선택") : NSLOCTEXT("CombatGoldReward", "ChooseOne", "전투 보상 · 3개 중 1개 선택"));
+    RewardBonusGold->SetText(bItemRewards ? FText::Format(Claim ? NSLOCTEXT("CombatItemReward", "BonusGoldReceived", "추가 골드 +{0}G · 지급 완료") : NSLOCTEXT("CombatItemReward", "BonusGold", "추가 골드 +{0}G · 아이템 선택 시 함께 지급"), FText::AsNumber(Rewards.BonusGold)) : FText::GetEmpty());
     for (int32 Index = 0; Index < RewardButtons.Num(); ++Index)
     {
         const bool bValid = bItemRewards ? Rewards.ItemChoices.IsValidIndex(Index) : Rewards.GoldChoices.IsValidIndex(Index);
         const bool bSelected = Claim && Claim->ChoiceIndex == Index;
+        FText Status = bRewardSelectionAllowed && bValid ? NSLOCTEXT("CombatReward", "ChooseReward", "이 보상 선택") : NSLOCTEXT("CombatReward", "ChoiceWaiting", "선택 대기");
+        if (Claim) Status = bSelected ? NSLOCTEXT("CombatGoldReward", "Claimed", "획득 완료") : NSLOCTEXT("CombatGoldReward", "NotSelected", "미선택");
+        else if (bPending) Status = PendingChoiceIndex == Index ? NSLOCTEXT("CombatReward", "ChoiceProcessing", "지급 처리 중") : NSLOCTEXT("CombatReward", "OtherChoiceProcessing", "선택 처리 대기");
         RewardButtons[Index]->SetIsEnabled(bRewardSelectionAllowed && bValid);
         RewardIconSizes[Index]->SetVisibility(bItemRewards && bValid ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
         RewardItemDetails[Index]->SetVisibility(ESlateVisibility::Collapsed);
@@ -287,18 +295,35 @@ void UEncounterResultWidget::RefreshResult(const FGameplayViewState& View)
             RewardAmounts[Index]->SetText(RunItemPresentation::Name(Item, View.ItemRarities));
             if (const FRunWeaponRarityRule* Rarity = RunItemPresentation::FindRarity(Item, View.ItemRarities)) RewardAmounts[Index]->SetColorAndOpacity(Rarity->Color);
             Theme.SetItemIcon(RewardIcons[Index], Item.Tags);
-            const FText Skills = RunItemPresentation::GrantedSkills(Item);
+            const FText Skills = RunItemPresentation::GrantedSkills(Item, false);
             RewardItemDetails[Index]->SetText(Skills);
             RewardItemDetails[Index]->SetVisibility(Skills.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
-            RewardButtons[Index]->SetToolTipText(RunItemPresentation::Tooltip(Item, View.ItemRarities));
+            // Keep reward details readable after claiming; the enabled wrapper owns the tooltip, not the disabled action.
+            // 수령 후에도 상세를 읽을 수 있도록 비활성 선택 버튼 대신 활성 카드에서 툴팁을 보유합니다.
+            if (RewardTooltips[Index])
+            {
+                RewardTooltips[Index]->ConfigureReward(Item, View.ItemRarities, Status);
+                if (RewardCardSizes[Index]->GetToolTip() != RewardTooltips[Index])
+                {
+                    RewardCardSizes[Index]->SetToolTipText(FText::GetEmpty());
+                    RewardCardSizes[Index]->SetToolTip(RewardTooltips[Index]);
+                }
+            }
+            else RewardCardSizes[Index]->SetToolTipText(RunItemPresentation::Tooltip(Item, View.ItemRarities));
         }
         else if (bValid)
         {
             RewardAmounts[Index]->SetText(FText::Format(NSLOCTEXT("CombatGoldReward", "GoldAmount", "+{0}G"), FText::AsNumber(Rewards.GoldChoices[Index])));
             RewardAmounts[Index]->SetColorAndOpacity(FLinearColor(0.95f, 0.76f, 0.34f));
-            RewardButtons[Index]->SetToolTipText(NSLOCTEXT("CombatGoldReward", "ClaimOnSelection", "선택하면 표시된 골드가 본인 캐릭터에게 지급됩니다. 한 번만 선택할 수 있습니다."));
+            RewardCardSizes[Index]->SetToolTip(nullptr);
+            RewardCardSizes[Index]->SetToolTipText(NSLOCTEXT("CombatGoldReward", "ClaimOnSelection", "선택하면 표시된 골드가 본인 캐릭터에게 지급됩니다. 한 번만 선택할 수 있습니다."));
         }
-        RewardStatuses[Index]->SetText(bSelected ? NSLOCTEXT("CombatGoldReward", "Claimed", "획득 완료") : Claim ? NSLOCTEXT("CombatGoldReward", "NotSelected", "미선택") : NSLOCTEXT("CombatGoldReward", "Select", "선택"));
+        else
+        {
+            RewardCardSizes[Index]->SetToolTip(nullptr);
+            RewardCardSizes[Index]->SetToolTipText(FText::GetEmpty());
+        }
+        RewardStatuses[Index]->SetText(Status);
         Theme.StyleButton(RewardButtons[Index], bSelected);
     }
     RewardBalance->SetText(Member ? FText::Format(NSLOCTEXT("CombatGoldReward", "PersonalBalance", "{0} · 보유 골드 {1}G"), Member->CharacterName, FText::AsNumber(Member->Gold)) : FText::GetEmpty());
@@ -326,11 +351,13 @@ void UEncounterResultWidget::RefreshResult(const FGameplayViewState& View)
     }
     else
     {
-        Message = bItemRewards ? NSLOCTEXT("CombatItemReward", "SelectionHint", "아이템을 선택하면 본인 인벤토리에 보관되며 추가 골드도 함께 지급됩니다.") : NSLOCTEXT("CombatGoldReward", "SelectionHint", "원하는 골드를 선택하면 본인 캐릭터에게 즉시 지급됩니다.");
+        Message = bItemRewards ? NSLOCTEXT("CombatItemReward", "DetailsSelectionHint", "마우스를 올려 장비와 스킬 상세를 확인하세요. 선택한 아이템은 인벤토리로 지급되며 상점에서 장착할 수 있습니다.") : NSLOCTEXT("CombatGoldReward", "SelectionHint", "원하는 골드를 선택하면 본인 캐릭터에게 즉시 지급됩니다.");
     }
     if (Claim || !Member)
     {
-        const FText ContinueHint = !bRewardsComplete ? NSLOCTEXT("CombatGoldReward", "WaitForOthers", "다른 참가자의 보상 선택을 기다리고 있습니다.") : !bContinueAllowed ? NSLOCTEXT("CombatGoldReward", "WaitForHost", "Host가 계속하기를 선택하면 다음으로 진행합니다.") : NSLOCTEXT("CombatGoldReward", "ContinueHint", "계속하기를 눌러 다음으로 진행하세요.");
+        int32 ReceivedCount = 0;
+        for (const FGuid& Recipient : View.GoldRewardRecipientIds) if (Rewards.Claims.ContainsByPredicate([Recipient](const FRunGoldRewardClaim& Receipt) { return Receipt.CharacterId == Recipient; })) ++ReceivedCount;
+        const FText ContinueHint = !bRewardsComplete ? FText::Format(NSLOCTEXT("CombatReward", "WaitingReceiptCount", "보상 수령 {0}/{1} · 남은 캐릭터의 선택을 기다리고 있습니다."), FText::AsNumber(ReceivedCount), FText::AsNumber(View.GoldRewardRecipientIds.Num())) : !bContinueAllowed ? NSLOCTEXT("CombatGoldReward", "WaitForHost", "Host가 계속하기를 선택하면 다음으로 진행합니다.") : NSLOCTEXT("CombatGoldReward", "ContinueHint", "계속하기를 눌러 다음으로 진행하세요.");
         Message = FText::Format(NSLOCTEXT("CombatGoldReward", "MessageWithContinue", "{0}\n{1}"), Message, ContinueHint);
     }
     RewardMessage->SetText(Message);

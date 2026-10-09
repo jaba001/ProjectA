@@ -167,7 +167,7 @@ void URunMapWidget::NativeOnInitialized()
             PveDifficultyButtons.Add(Button);
         }
         UTextBlock* RewardHint = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_PveRewardHint"));
-        RewardHint->SetText(FText::FromString(TEXT("승리 보상: 아이템 3개 중 1개 + 랜덤 골드\n아이템 등급·스킬 확률은 모든 난이도에서 동일합니다. 선택하면 전투를 시작합니다.")));
+        RewardHint->SetText(NSLOCTEXT("RunMap", "DifficultyLegend", "100% = 해당 구간 기본값 · 적 구성·공격 피해·AP는 동일\n승리 보상: 아이템 3개 중 1개 + 랜덤 골드 · 아이템 등급·스킬 확률은 동일합니다."));
         RewardHint->SetJustification(ETextJustify::Center);
         RewardHint->SetAutoWrapText(true);
         DifficultyContent->AddChildToVerticalBox(RewardHint)->SetPadding(FMargin(0.f, 8.f, 0.f, 0.f));
@@ -218,9 +218,9 @@ void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllo
         const FRunPveDifficultyOffer& Offer = View.PveDifficultyOffers[Index];
         PveDifficultyTags.Add(Offer.DifficultyTag);
         const FString Heading = bWorldPresentation ? FString::Printf(TEXT("%s · %s"), *EncounterDungeonLayout::GetDirectionLabel(Index).ToString(), *Offer.DisplayName.ToString()) : Offer.DisplayName.ToString();
-        const FString Label = FString::Printf(TEXT("%s\n적 %d명 · 총 HP %.0f\nHP %d%% · 속도 %d%%\n골드 %d~%d G (%d%%)"), *Heading, Offer.EnemyCount, Offer.TotalEnemyHP, FMath::RoundToInt(Offer.HPScale * 100.f), FMath::RoundToInt(Offer.SpeedScale * 100.f), Offer.GoldMin, Offer.GoldMax, FMath::RoundToInt(Offer.GoldScale * 100.f));
+        const FString Label = FString::Printf(TEXT("%s\n적 %d명 · 총 HP %.0f\n적 HP %d%% · 적 속도 %d%%\n승리 골드 %d~%dG (%d%%)"), *Heading, Offer.EnemyCount, Offer.TotalEnemyHP, FMath::RoundToInt(Offer.HPScale * 100.f), FMath::RoundToInt(Offer.SpeedScale * 100.f), Offer.GoldMin, Offer.GoldMax, FMath::RoundToInt(Offer.GoldScale * 100.f));
         Button->Configure(Offer.DifficultyTag.GetTagName(), FText::FromString(Label));
-        Button->SetToolTipText(FText::FromString(Label + TEXT("\n이 난이도로 전투를 시작합니다.")));
+        Button->SetToolTipText(FText::FromString(Label + TEXT("\n배율은 해당 구간 기본값을 기준으로 합니다. 골드는 표시된 범위에서 정해집니다.\n이 난이도를 선택하면 전투를 시작합니다.")));
         if (UTextBlock* LabelText = Cast<UTextBlock>(Button->GetContent()))
         {
             const FLinearColor Colors[] = {FLinearColor(0.6f, 0.95f, 0.65f), FLinearColor(1.f, 0.9f, 0.65f), FLinearColor(1.f, 0.6f, 0.55f)};
@@ -230,8 +230,8 @@ void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllo
     }
     if (bPveChoice)
     {
-        PveDifficultyTitle->SetText(FText::FromString(FString::Printf(TEXT("%s · PvE 난이도 선택  %d / 80"), *View.Nodes[NextNodeIndex].DisplayName.ToString(), View.TargetCompletedSteps)));
-        const FText HostMessage = bRunCommandsAllowed ? FText::GetEmpty() : FText::FromString(TEXT("Host가 전투 난이도를 선택하고 있습니다."));
+        PveDifficultyTitle->SetText(FText::FromString(FString::Printf(TEXT("%s · PvE 난이도 선택 · 진행 %d / 80 완료"), *View.Nodes[NextNodeIndex].DisplayName.ToString(), View.TargetCompletedSteps)));
+        const FText HostMessage = bRunCommandsAllowed ? NSLOCTEXT("RunMap", "SelectDifficultyToStart", "하·중·상 중 하나를 선택하면 전투를 시작합니다.") : NSLOCTEXT("RunMap", "WaitingHostDifficulty", "선택 대기 · Host가 전투 난이도를 선택합니다.");
         PveDifficultyMessage->SetText(HostMessage.IsEmpty() ? View.FlowMessage : View.FlowMessage.IsEmpty() ? HostMessage : FText::Format(FText::FromString(TEXT("{0}\n{1}")), HostMessage, View.FlowMessage));
     }
     if (!NodeList)

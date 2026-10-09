@@ -7,6 +7,7 @@
 #include "Components/ButtonSlot.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/ScaleBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -31,6 +32,8 @@ UButton* URunSurrenderWidget::AddButton(UVerticalBox* Parent, FName Name, const 
     UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
     Label->SetText(Text);
     Label->SetJustification(ETextJustify::Center);
+    Label->SetAutoWrapText(true);
+    Label->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
     CastChecked<UButtonSlot>(Button->AddChild(Label))->SetPadding(FMargin(24.0f, 14.0f));
     Parent->AddChildToVerticalBox(Button)->SetPadding(FMargin(0.0f, 6.0f));
     return Button;
@@ -54,9 +57,13 @@ void URunSurrenderWidget::NativeOnInitialized()
 
     USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
     Size->SetWidthOverride(620.0f);
-    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Size);
-    ContentSlot->SetHorizontalAlignment(HAlign_Center);
-    ContentSlot->SetVerticalAlignment(VAlign_Center);
+    UScaleBox* Fit = WidgetTree->ConstructWidget<UScaleBox>();
+    Fit->SetStretch(EStretch::ScaleToFit);
+    Fit->SetStretchDirection(EStretchDirection::DownOnly);
+    Fit->SetContent(Size);
+    UOverlaySlot* ContentSlot = Root->AddChildToOverlay(Fit);
+    ContentSlot->SetHorizontalAlignment(HAlign_Fill);
+    ContentSlot->SetVerticalAlignment(VAlign_Fill);
     ContentSlot->SetPadding(FMargin(24.0f));
     UBorder* Panel = WidgetTree->ConstructWidget<UBorder>();
     Theme.StylePanel(Panel);

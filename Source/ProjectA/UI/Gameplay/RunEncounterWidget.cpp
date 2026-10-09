@@ -267,7 +267,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             FText Hint = SelectedOffer ? EncounterShopDescription(*SelectedOffer) : FText::GetEmpty();
             int32 Remaining = 0;
             for (const int32 Index : VisibleItemOfferIndices) if (!View.ItemShopState.Offers[Index].bSold) ++Remaining;
-            Hint = FText::Format(NSLOCTEXT("RunItemShop", "StockSummary", "{0}\n진열 {1}개 · 미판매 {2}개 · 구매한 아이템은 인벤토리에 보관되며 자동 장착되지 않습니다."), Hint, FText::AsNumber(VisibleItemOfferIndices.Num()), FText::AsNumber(Remaining));
+            Hint = FText::Format(NSLOCTEXT("RunItemShop", "StockSummaryWithDetails", "{0}\n진열 {1}개 · 미판매 {2}개 · 상품 위에 마우스를 올려 상세 확인\n구매한 아이템은 인벤토리에 보관되며 자동 장착되지 않습니다."), Hint, FText::AsNumber(VisibleItemOfferIndices.Num()), FText::AsNumber(Remaining));
             if (VisibleItemOfferIndices.IsEmpty()) Hint = FText::Format(NSLOCTEXT("RunItemShop", "EmptyStockHint", "{0}\n{1}"), Hint, View.bCanRerollItemShop ? NSLOCTEXT("RunItemShop", "EmptyStockReroll", "현재 진열에 장착 가능한 상품이 없습니다. 리롤하여 새 상품을 확인하거나 나갈 수 있습니다.") : NSLOCTEXT("RunItemShop", "EmptyStockLeave", "이 상점 조건에 맞는 장착 가능 상품이 부족하여 리롤할 수 없습니다. 나가기를 선택해 진행할 수 있습니다."));
             else if (Remaining == 0) Hint = FText::Format(NSLOCTEXT("RunItemShop", "SoldStockHint", "{0}\n{1}"), Hint, View.bCanRerollItemShop ? NSLOCTEXT("RunItemShop", "SoldStockReroll", "현재 상품은 모두 판매되었습니다. 리롤하여 새 상품을 확인하거나 나갈 수 있습니다.") : NSLOCTEXT("RunItemShop", "SoldStockLeave", "현재 상품은 모두 판매되었으며 리롤할 수 없습니다. 나가기를 선택해 진행할 수 있습니다."));
             ShopHint->SetText(View.ItemShopState.SchemaVersion == 0 ? NSLOCTEXT("RunItemShop", "LegacyRun", "이전 저장에는 아이템 상점이 적용되지 않습니다. 새 Run에서 이용할 수 있습니다.") : Hint);
@@ -343,7 +343,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
                 ShopNames[Index]->SetText(RunItemPresentation::Name(Offer.Item, View.ItemRarities));
                 if (const FRunWeaponRarityRule* Rarity = RunItemPresentation::FindRarity(Offer.Item, View.ItemRarities)) ShopNames[Index]->SetColorAndOpacity(Rarity->Color);
                 ShopPrices[Index]->SetText(FText::Format(NSLOCTEXT("RunItemShop", "Price", "{0}G"), FText::AsNumber(Offer.Item.Price)));
-                const FText GrantedSkills = RunItemPresentation::GrantedSkills(Offer.Item);
+                const FText GrantedSkills = RunItemPresentation::GrantedSkills(Offer.Item, false);
                 if (!GrantedSkills.IsEmpty()) ShopPrices[Index]->SetText(FText::Format(NSLOCTEXT("RunItemShop", "PriceAndSkills", "{0}\n{1}"), ShopPrices[Index]->GetText(), GrantedSkills));
                 ShopPrices[Index]->SetAutoWrapText(true);
                 ShopPrices[Index]->SetWrapTextAt(320.0f);

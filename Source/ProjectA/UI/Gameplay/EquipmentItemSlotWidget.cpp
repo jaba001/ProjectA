@@ -16,6 +16,7 @@
 #include "InputCoreTypes.h"
 #include "UI/Gameplay/EquipmentDragDropOperation.h"
 #include "UI/Gameplay/RunItemPresentation.h"
+#include "UI/Gameplay/ShopItemTooltipWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
 
 void UEquipmentItemSlotWidget::NativeOnInitialized()
@@ -66,6 +67,7 @@ void UEquipmentItemSlotWidget::UseListPresentation()
     Icon->RemoveFromParent();
     IconSize->RemoveFromParent();
     ItemText->RemoveFromParent();
+    StateText->RemoveFromParent();
     IconSize->SetContent(Icon);
     IconSize->SetWidthOverride(24.0f);
     IconSize->SetHeightOverride(24.0f);
@@ -91,6 +93,11 @@ void UEquipmentItemSlotWidget::UseListPresentation()
     UHorizontalBoxSlot* NameSlot = Row->AddChildToHorizontalBox(ItemText);
     NameSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     NameSlot->SetVerticalAlignment(VAlign_Center);
+    UHorizontalBoxSlot* StateSlot = Row->AddChildToHorizontalBox(StateText);
+    StateSlot->SetPadding(FMargin(8.0f, 0.0f, 0.0f, 0.0f));
+    StateSlot->SetVerticalAlignment(VAlign_Center);
+    StateText->SetAutoWrapText(false);
+    StateText->SetWrapTextAt(0.0f);
     UpdateListHighlight();
 }
 
@@ -117,7 +124,7 @@ void UEquipmentItemSlotWidget::RefreshSlot(FGuid InCharacterId, int32 InRevision
     IconSize->SetWidthOverride(bListPresentation ? 24.0f : bEquipmentSlot ? 60.0f : 54.0f);
     IconSize->SetHeightOverride(bListPresentation ? 24.0f : bEquipmentSlot ? 60.0f : 54.0f);
     ItemText->SetWrapTextAt(bListPresentation ? 0.0f : bEquipmentSlot ? 68.0f : 148.0f);
-    StateText->SetWrapTextAt(bEquipmentSlot ? 68.0f : 148.0f);
+    StateText->SetWrapTextAt(bListPresentation ? 0.0f : bEquipmentSlot ? 68.0f : 148.0f);
     Theme.StyleSlot(Frame, Item != nullptr);
     if (Item) Theme.SetItemIcon(Icon, Item->Tags);
     else Theme.SetEquipmentIcon(Icon, EmptyIcon);
@@ -129,9 +136,25 @@ void UEquipmentItemSlotWidget::RefreshSlot(FGuid InCharacterId, int32 InRevision
     ItemText->SetText(bListPresentation && Item ? FText::Format(NSLOCTEXT("Equipment", "ListItem", "{0} (1)"), ItemName) : ItemName);
     StateText->SetText(!Item ? FText::GetEmpty() : bEquipmentSlot ? NSLOCTEXT("Equipment", "Equipped", "장착 중") : bSupported ? NSLOCTEXT("Equipment", "Stored", "보관 중") : NSLOCTEXT("Equipment", "Unsupported", "장착 미지원"));
     StateText->SetVisibility(Item && !bListPresentation ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-    if (Item && Item->GenerationVersion > 0) SetToolTipText(FText::Format(NSLOCTEXT("Equipment", "GeneratedItemTooltip", "{0}\n{1}"), RunItemPresentation::Tooltip(*Item, DisplayedRarities), StateText->GetText()));
-    else if (bListPresentation) SetToolTipText(Item ? FText::Format(NSLOCTEXT("Equipment", "ListItemTooltip", "{0}\n{1}"), ItemName, StateText->GetText()) : SlotLabel);
-    else SetToolTipText(Item ? FText::Format(NSLOCTEXT("Equipment", "ItemTooltip", "{0}\n{1}\n{2}"), ItemName, StateText->GetText(), FText::FromString(Item->Asset.ToString())) : SlotLabel);
+    if (Item)
+    {
+        // Cache the shared item details on refresh; hovering never changes equipment or loads a new random copy.
+        // 갱신 시 공통 아이템 상세를 보관하며 hover로 장비를 바꾸거나 새 사본을 추첨하지 않습니다.
+        if (!ItemTooltip) ItemTooltip = CreateWidget<UShopItemTooltipWidget>(GetOwningPlayer());
+        const FText Hint = bCanDrag ? bEquipmentSlot ? NSLOCTEXT("Equipment", "TooltipUnequipHint", "가방으로 끌어 해제할 수 있습니다.") : NSLOCTEXT("Equipment", "TooltipEquipHint", "장비 슬롯으로 끌어 장착할 수 있습니다.") : FText::GetEmpty();
+        const FText Status = Hint.IsEmpty() ? StateText->GetText() : FText::Format(NSLOCTEXT("Equipment", "TooltipItemState", "{0}\n{1}"), StateText->GetText(), Hint);
+        ItemTooltip->ConfigureInventory(*Item, DisplayedRarities, Status);
+        if (GetToolTip() != ItemTooltip)
+        {
+            SetToolTipText(FText::GetEmpty());
+            SetToolTip(ItemTooltip);
+        }
+    }
+    else
+    {
+        SetToolTip(nullptr);
+        SetToolTipText(FText::Format(NSLOCTEXT("Equipment", "EmptySlotTooltip", "{0} · 미장착\n지원하는 아이템을 상점에서 이 슬롯으로 끌어 장착하세요."), SlotLabel));
+    }
     ResetDropHighlight();
 }
 
@@ -226,6 +249,9 @@ void UEquipmentItemSlotWidget::ResetDropHighlight()
 void UEquipmentItemSlotWidget::UpdateListHighlight()
 {
     if (!bListPresentation || !Card) return;
+    const bool bUnsupported = ItemIndex != INDEX_NONE && !URunEquipmentCatalog::Get().ResolveProfile(DisplayedItem);
+    StateText->SetText(bSelected ? NSLOCTEXT("Equipment", "SelectedItem", "선택") : bUnsupported ? NSLOCTEXT("Equipment", "Unsupported", "장착 미지원") : FText::GetEmpty());
+    StateText->SetVisibility(bSelected || bUnsupported ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
     FLinearColor Background(0.028f, 0.024f, 0.02f, 0.68f);
     if (bDropHighlighted) Background = bDropAccepted ? FLinearColor(0.1f, 0.24f, 0.1f, 0.92f) : FLinearColor(0.3f, 0.09f, 0.06f, 0.92f);
     else if (bSelected) Background = FLinearColor(0.34f, 0.28f, 0.2f, 0.94f);

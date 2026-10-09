@@ -9,6 +9,7 @@
 #include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/ScaleBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -42,6 +43,7 @@ void UMainMenuScreenWidget::NativeOnInitialized()
     {
         if (UTextBlock* Label = Cast<UTextBlock>(Button_NewGame->GetContent())) Label->SetText(NSLOCTEXT("MainMenu", "StartGame", "게임 시작"));
         Button_NewGame->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleNewGameClicked);
+        Button_NewGame->SetToolTipText(NSLOCTEXT("MainMenu", "NewGameHint", "새 파티와 여정을 만듭니다. 새 싱글플레이 여정을 시작하면 기존 저장을 교체합니다."));
     }
 
     if (Button_Continue)
@@ -55,11 +57,14 @@ void UMainMenuScreenWidget::NativeOnInitialized()
 
     if (Button_Options)
     {
+        if (UTextBlock* Label = Cast<UTextBlock>(Button_Options->GetContent())) Label->SetText(NSLOCTEXT("MainMenu", "Options", "설정"));
+        Button_Options->SetToolTipText(NSLOCTEXT("MainMenu", "OptionsHint", "화면 모드·해상도·그래픽 품질을 조정합니다."));
         Button_Options->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleOptionsClicked);
     }
 
     if (Button_Quit)
     {
+        if (UTextBlock* Label = Cast<UTextBlock>(Button_Quit->GetContent())) Label->SetText(NSLOCTEXT("MainMenu", "Quit", "게임 종료"));
         Button_Quit->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleQuitClicked);
     }
     if (WidgetTree && WidgetTree->RootWidget)
@@ -72,7 +77,12 @@ void UMainMenuScreenWidget::NativeOnInitialized()
         PreviousSlot->SetVerticalAlignment(VAlign_Fill);
         SaveStatus = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("SaveStatus"));
         SaveStatus->SetAutoWrapText(true);
+        SaveStatus->SetWrapTextAt(760.f);
+        SaveStatus->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
+        SaveStatus->SetJustification(ETextJustify::Center);
+        SaveStatus->SetVisibility(ESlateVisibility::HitTestInvisible);
         UOverlaySlot* StatusSlot = Root->AddChildToOverlay(SaveStatus);
+        StatusSlot->SetHorizontalAlignment(HAlign_Center);
         StatusSlot->SetVerticalAlignment(VAlign_Bottom);
         StatusSlot->SetPadding(FMargin(24.0f));
         // Extend the existing Designer menu only when an explicitly selected cooperative record is available.
@@ -130,9 +140,13 @@ void UMainMenuScreenWidget::ApplyDemonicStyle()
     // 바인딩된 버튼과 Blueprint 콜백을 교체하지 않고 메뉴에 프레임을 추가합니다.
     MenuBox->RemoveFromParent();
     UHorizontalBox* Panels = WidgetTree->ConstructWidget<UHorizontalBox>();
-    UOverlaySlot* FrameSlot = MenuOverlay->AddChildToOverlay(Panels);
-    FrameSlot->SetHorizontalAlignment(HAlign_Center);
-    FrameSlot->SetVerticalAlignment(VAlign_Center);
+    UScaleBox* Fit = WidgetTree->ConstructWidget<UScaleBox>();
+    Fit->SetStretch(EStretch::ScaleToFit);
+    Fit->SetStretchDirection(EStretchDirection::DownOnly);
+    Fit->SetContent(Panels);
+    UOverlaySlot* FrameSlot = MenuOverlay->AddChildToOverlay(Fit);
+    FrameSlot->SetHorizontalAlignment(HAlign_Fill);
+    FrameSlot->SetVerticalAlignment(VAlign_Fill);
     FrameSlot->SetPadding(FMargin(40.0f, 64.0f));
     USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
     Size->SetWidthOverride(460.0f);
@@ -170,6 +184,7 @@ void UMainMenuScreenWidget::RefreshSavedActions()
     if (Button_Continue)
     {
         Button_Continue->SetIsEnabled(bCanContinue);
+        Button_Continue->SetToolTipText(bCanContinue ? NSLOCTEXT("MainMenu", "ContinueHint", "마지막으로 저장된 체크포인트에서 여정을 이어갑니다.") : Error);
     }
     if (Button_Surrender)
     {
@@ -296,8 +311,8 @@ void UMainMenuScreenWidget::EnsureCodeGeneratedLayout()
 
     Button_NewGame = CreateMenuButton(MenuBox, NSLOCTEXT("MainMenu", "StartGame", "게임 시작"));
     Button_Continue = CreateMenuButton(MenuBox, NSLOCTEXT("MainMenu", "Continue", "이어하기"));
-    Button_Options = CreateMenuButton(MenuBox, FText::FromString(TEXT("Options")));
-    Button_Quit = CreateMenuButton(MenuBox, FText::FromString(TEXT("Quit")));
+    Button_Options = CreateMenuButton(MenuBox, NSLOCTEXT("MainMenu", "Options", "설정"));
+    Button_Quit = CreateMenuButton(MenuBox, NSLOCTEXT("MainMenu", "Quit", "게임 종료"));
 }
 
 void UMainMenuScreenWidget::EnsureContinueRow()

@@ -138,4 +138,10 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> DetailsHint;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UScrollBox> DetailsScroll;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UVerticalBox> DetailsSkills;
 };

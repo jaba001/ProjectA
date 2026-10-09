@@ -967,3 +967,13 @@ PNG에서 검·방패의 한손 자세, 남녀 몸체의 시전과 복귀, 지�
 새 수치는 상품의 `GrantedSkillBalances`, 아이템 등급은 복제된 `ItemRarities`를 사용한다. 기존 원본 설명의 기본 위력은 표시하지 않으며 저장값 누락을 현재 CSV·에셋 값으로 대체하지 않는다. 구버전만 기존 실행 정의의 수치를 사용한다. 패널 너비는 440 논리 단위이고 긴 내용은 최대 600 높이 안에서 전체 비율을 축소한다. 높이는 구성 시점 포인터 모니터의 작업 영역과 데스크톱 DPI를 반영하며 화면 이동 후 다음 갱신 전의 재계산은 구현하지 않았다. 기본 스킬 1개 외 사용자 지정 다수 스킬도 생략하지 않지만 긴 목록은 글자가 작아질 수 있다.
 
 `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64` 컴파일·링크는 최종 5.58초·오류/경고 0으로 성공했다. 최초 컴파일에서 발견한 `UWidget::Cursor` 이름 가림은 지역변수 이름 변경으로 수정했다. 근거는 `Saved/Automation/ShopItemTooltip_20261009/EditorBuild.log`·`EditorBuild.Final.log`다. 독립 소스 검토·기존 표시 함수/TODO 보존·문서 링크·diff 정적 검사를 수행했으며 같은 폴더의 `StaticReview.json`·`DocumentationValidation.json`에 기록한다. 기존 미완료 43개·선택 7개를 보존하고 사용자 확인 1개를 추가했다. 게임·PIE·자동화 테스트·화면 캡처는 실행하지 않았고 Editor·IDE도 열지 않았다. 실제 hover·가독성·리롤/퇴장·2인 클라이언트 확인은 [TODO 29](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)에 남긴다.
+
+### 9-44 2026-10-09 전체 UI 가독성과 조작 피드백 폴리싱
+
+전체 게임 폴리싱 요청에 따라 메뉴·설정·전투 계획·지도·상점·인벤토리·보상 화면을 보완했다. 시작 기준은 `5a81b773`이며 기존 미커밋 변경은 없었다. 메뉴와 확인 패널은 공간이 부족할 때만 비율을 축소하고 한국어 문구·이어하기 불가 사유·Gameplay 단축키를 표시한다. 공통 목록은 스크롤바 두께·휠 이동·포커스 스크롤을 통일하며 기존 즉시 포커스 이동과 휠 입력 소비를 유지한다. 구성은 네이티브 UI이며 에셋·맵·CSV·저장 형식·GAS·서버 권위는 변경하지 않았다.
+
+공통 아이템 툴팁을 장비·가방·보상에도 연결하고 화면별 상태와 장착 안내를 구분했다. 상점·보상 카드에는 스킬 이름/등급을 간결하게 표시한다. 인벤토리 스킬 탭·선택 상세는 장착 사본의 확정 수치와 효과를 조회하며 버전 1 저장값 누락을 원본 기본값으로 대체하지 않는다. 선택 상태·장착 미지원·빈 슬롯·사망 안내와 상세 스크롤을 보완했다. 전투 UI는 현재 지정 대상과 예약 명령, AP/SAP·이동 합계·무행동/이동만 준비·서버 대기를 구분하며 준비 버튼을 스크롤 밖 하단에 고정했다. 보상 UI는 지급 처리/수령 완료와 참가자 수령 진행을 표시하고 난이도 배율의 기준을 명시한다. 상세는 [UI 구조](UI_README.md#7-기본-라운드-전투-ui)·[인벤토리](UI_README.md#8-2-gameplay-인벤토리와-설정-단축키)에 기록한다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64` 컴파일·링크는 37.24초, 고정 준비 버튼·툴팁 재사용·기존 포커스 정책 보완 후 7.48초에 성공했다. 최종 오류·경고는 0이며 근거는 `Saved/Automation/GamePolish_20261009/EditorBuild.log`·`EditorBuild.Final.log`다. 독립 소스 검토와 처리 함수·문서 링크·TODO 보존·diff 정적 검사를 수행했다. 같은 폴더의 `CommandPreservationReview.json`·`DocumentationValidation.json`·`StaticReview.json`에 근거를 기록한다. 기존 미완료 44개·선택 7개를 보존하고 사용자 확인 2개를 추가했다.
+
+게임·PIE·Unreal 자동화 테스트·화면 캡처는 실행하지 않았으며 Editor·IDE도 열지 않았다. 실제 화면비별 가림·입력·보상 재시도·2인 표시·Continue는 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)·[29](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)에 남긴다. 기존 투사체 발사 FX는 원본 emitter의 공간 설정과 실제 장비 소켓 화면 확인이 필요하므로 이번 변경에 포함하지 않고 기존 TODO를 유지한다. 이전 실행 성공을 최신 UI의 작동 검증으로 대체하지 않는다.
