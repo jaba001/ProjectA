@@ -8,6 +8,8 @@
 class UAnimSequence;
 class USkeletalMesh;
 class UStaticMesh;
+class UMaterialInterface;
+struct FRunEncounterOffer;
 
 USTRUCT(BlueprintType)
 struct PROJECTA_API FEncounterStageProp
@@ -24,6 +26,12 @@ struct PROJECTA_API FEncounterStageProp
     // 원본 메시의 바닥 중심을 기준으로 이 상자 안에 균일 배율로 맞춥니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FVector MaxSize = FVector(100.f);
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FName AttachBone = NAME_None;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    bool bCenterAnchor = false;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TSoftObjectPtr<UMaterialInterface> MaterialOverride;
 };
 
 USTRUCT(BlueprintType)
@@ -37,6 +45,16 @@ struct PROJECTA_API FEncounterStageVisualProfile
     FGameplayTagQuery StageQuery;
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     int32 Priority = 0;
+    // Each sample describes one merchandise type and rarity; evaluate the complete offer query, including exclusions.
+    // 샘플마다 한 상품 종류와 등급을 표현하며 제외 조건을 포함한 실제 판매 쿼리 전체를 평가합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TArray<FGameplayTagContainer> MerchandiseSamples;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    bool bEnvironmentOnly = false;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FVector PresentationFocus = FVector(35.f, -130.f, 145.f);
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    float PresentationFocusRadius = 24.f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TSoftObjectPtr<USkeletalMesh> CharacterMesh;
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -75,5 +93,9 @@ public:
     TArray<FEncounterStageVisualProfile> Profiles;
 
     const FEncounterStageVisualProfile* Resolve(const FGameplayTagContainer& StageTags) const;
+    const FEncounterStageVisualProfile* Resolve(const FRunEncounterOffer& Offer) const;
     void GetReferencedAssets(TArray<FSoftObjectPath>& OutAssets) const;
+
+private:
+    const FEncounterStageVisualProfile* Resolve(const FGameplayTagContainer& StageTags, const FGameplayTagQuery& MerchandiseQuery) const;
 };

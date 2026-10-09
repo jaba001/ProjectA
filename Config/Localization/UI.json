@@ -653,8 +653,8 @@
     {
       "namespace": "RunShop",
       "key": "RecoveryChoice",
-      "source": "생존한 본인 캐릭터의 HP를 회복합니다. 최대 HP이면 구매할 수 없습니다.",
-      "translation": "Restore your living character's HP. Unavailable at full HP."
+      "source": "샘물을 마셔 생존한 본인 캐릭터의 HP를 회복합니다. 최대 HP이면 이용할 수 없습니다.",
+      "translation": "Drink from the spring to restore your living character's HP. Unavailable at full HP."
     },
     {
       "namespace": "RunShop",
@@ -881,8 +881,8 @@
     {
       "namespace": "RunRecovery",
       "key": "RecoveryHP",
-      "source": "HP {0} 회복",
-      "translation": "Recover {0} HP"
+      "source": "샘물 마시기 · HP {0} 회복",
+      "translation": "Drink from spring · Restore {0} HP"
     },
     {
       "namespace": "RunRecovery",
@@ -923,8 +923,14 @@
     {
       "namespace": "RunRecovery",
       "key": "RecoveryHint",
-      "source": "본인 생존 캐릭터의 HP를 회복합니다. 이미 최대 HP이면 구매할 수 없습니다.",
-      "translation": "Restore your living character's HP. Unavailable at full HP."
+      "source": "샘물을 마셔 생존한 본인 캐릭터의 HP를 회복합니다. 이미 최대 HP이면 이용할 수 없습니다.",
+      "translation": "Drink from the spring to restore your living character's HP. Unavailable at full HP."
+    },
+    {
+      "namespace": "RunEncounter",
+      "key": "HealingSpring",
+      "source": "회복의 샘물",
+      "translation": "Healing Spring"
     },
     {
       "namespace": "RunEncounter",

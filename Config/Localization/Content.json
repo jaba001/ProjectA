@@ -657,8 +657,8 @@
     {
       "namespace": "ProjectA.Content",
       "key": "Encounter.TargetOffer_03.Name",
-      "source": "회복소",
-      "translation": "Recovery Camp"
+      "source": "회복의 샘물",
+      "translation": "Healing Spring"
     },
     {
       "namespace": "ProjectA.Content",

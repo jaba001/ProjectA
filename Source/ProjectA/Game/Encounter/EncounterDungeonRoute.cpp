@@ -200,7 +200,7 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
     bGeometryPrepared = true;
 }
 
-AEncounterPrototypeStage* AEncounterDungeonRoute::ConfigureStage(const AEncounterPrototypeStage* Template, int32 Direction)
+AEncounterPrototypeStage* AEncounterDungeonRoute::ConfigureStage(const AEncounterPrototypeStage* Template, int32 Direction, const FRunEncounterOffer& Offer)
 {
     if (!IsValid(Template) || Template == PresentedStage || !GetWorld() || GetNetMode() == NM_DedicatedServer || Direction < 0 || Direction > 2) return nullptr;
     PrepareGeometry(Template->PrototypeMaterial);
@@ -210,7 +210,6 @@ AEncounterPrototypeStage* AEncounterDungeonRoute::ConfigureStage(const AEncounte
     Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     AEncounterPrototypeStage* Stage = GetWorld()->SpawnActor<AEncounterPrototypeStage>(AEncounterPrototypeStage::StaticClass(), EncounterDungeonLayout::GetStageTransform(Direction, LayoutVariant) * GetActorTransform(), Parameters);
     if (!Stage) return nullptr;
-    Stage->SetPresentationVisible(bPresentationVisible);
     Stage->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
     Stage->StageId = Template->StageId;
     Stage->StageTitle = Template->StageTitle;
@@ -222,12 +221,16 @@ AEncounterPrototypeStage* AEncounterDungeonRoute::ConfigureStage(const AEncounte
     Stage->VisualStyle = Template->VisualStyle;
     Stage->VisualCatalog = Template->VisualCatalog;
     Stage->bUseLibraryVisuals = Template->bUseLibraryVisuals;
-    Stage->RefreshPrototype();
+    Stage->SetEncounterOffer(Offer);
     Stage->Camera->SetRelativeLocation(FVector(-800.f, 0.f, EncounterDungeonLayout::EyeHeight));
     // Preserve the corridor arrival position while aiming through the central shop UI gap.
     // 통로 도착 위치는 유지하고 상점 UI의 중앙 빈 공간을 향해 시선을 맞춥니다.
-    Stage->Camera->SetRelativeRotation((FVector(35.f, -170.f, 145.f) - Stage->Camera->GetRelativeLocation()).Rotation());
+    FVector Focus;
+    float FocusRadius = 0.f;
+    const FVector Aim = Stage->GetPresentationFocus(Focus, FocusRadius) ? Stage->GetActorTransform().InverseTransformPosition(Focus) + FVector(0.f, -40.f, 0.f) : FVector(35.f, -170.f, 145.f);
+    Stage->Camera->SetRelativeRotation((Aim - Stage->Camera->GetRelativeLocation()).Rotation());
     Stage->Camera->SetFieldOfView(80.f);
+    Stage->SetPresentationVisible(bPresentationVisible);
     Stage->StopPresentation();
     StopTravel();
     DestroyPresentedStage();

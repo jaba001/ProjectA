@@ -31,6 +31,7 @@
 #include "HAL/FileManager.h"
 #include "ImageUtils.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInterface.h"
 #include "Misc/App.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
@@ -221,7 +222,7 @@ namespace EncounterPresentationPIE
                 const int32 Visit = RunDungeonPlan::FindVisit(Plan, Run->GetEncounterProgress());
                 const int32 NextVisit = Plan.Visits.IsValidIndex(Visit + 1) ? Visit + 1 : INDEX_NONE;
                 if (!Check(Plan.Visits.IsValidIndex(Visit) && ArrivedRoute->GetLayoutVariant() == Plan.Visits[Visit].LayoutVariant && Controller->GetResidentDungeonRouteCount() >= 1 && Controller->GetResidentDungeonRouteCount() <= 2 && Controller->GetPreparedDungeonVisitIndex() == NextVisit, TEXT("The arrived room uses its frozen variant and keeps only the current and next logical visit resident."))) return End();
-                if (!CheckLibraryVisuals() || !Capture(World, TEXT("Shop")) || !CheckFraming(World, Screen)) return End();
+                if (!CheckLibraryVisuals(*Offer) || !Capture(World, TEXT("Shop")) || !CheckFraming(World, Screen)) return End();
                 BeforeInventory = Run->GetItemShopState();
                 if (!Click(Screen, TEXT("Button_ShopInventory"))) return End();
                 Advance(8);
@@ -377,13 +378,14 @@ namespace EncounterPresentationPIE
             return true;
         }
 
-        bool CheckLibraryVisuals()
+        bool CheckLibraryVisuals(const FRunEncounterOffer& Offer)
         {
             if (!Check(Presented.IsValid() && Presented->IsUsingLibraryVisuals() && !Presented->IsHidden() && !Presented->GetIsReplicated(), TEXT("The arrived stage uses visible library scenery without replicated gameplay authority."))) return false;
             const UEncounterStageVisualCatalog* Catalog = Presented->VisualCatalog ? Presented->VisualCatalog.Get() : GetDefault<UEncounterStageVisualCatalog>();
-            const FEncounterStageVisualProfile* Profile = Catalog->Resolve(Presented->RequiredTags);
+            const FEncounterStageVisualProfile* Profile = Catalog->Resolve(Offer);
             if (!Check(Profile && Presented->GetLibraryProfileId() == Profile->ProfileId && Presented->GetLibraryPropCount() == Profile->Props.Num(), TEXT("The copied stage preserves the tag-selected library profile and full prop count."))) return false;
-            TArray<FSoftObjectPath> ExpectedCharacters = {Profile->CharacterMesh.ToSoftObjectPath()};
+            TArray<FSoftObjectPath> ExpectedCharacters;
+            if (!Profile->bEnvironmentOnly) ExpectedCharacters.Add(Profile->CharacterMesh.ToSoftObjectPath());
             for (const auto& Part : Profile->CharacterParts) ExpectedCharacters.Add(Part.ToSoftObjectPath());
             USkeletalMeshComponent* Body = nullptr;
             TInlineComponentArray<USkeletalMeshComponent*> Characters(Presented.Get());
@@ -396,28 +398,39 @@ namespace EncounterPresentationPIE
                 ExpectedCharacters.RemoveAt(ExpectedIndex);
                 if (Asset == Profile->CharacterMesh.ToSoftObjectPath()) Body = Character;
             }
-            if (!Check(ExpectedCharacters.IsEmpty() && Body && Body->IsComponentTickEnabled(), TEXT("All selected character parts exist and the actual body animation is ticking."))) return false;
-            const UAnimSingleNodeInstance* Animation = Body->GetSingleNodeInstance();
-            if (!Check(Animation && Animation->IsPlaying() && Animation->IsLooping() && FSoftObjectPath(Animation->GetAnimationAsset()) == Profile->IdleAnimation.ToSoftObjectPath() && Animation->GetAnimationAsset()->GetSkeleton() && Animation->GetAnimationAsset()->GetSkeleton()->IsCompatibleMesh(Body->GetSkeletalMeshAsset()), TEXT("The actual NPC plays its selected compatible source idle in a loop."))) return false;
-            for (USkeletalMeshComponent* Character : Characters)
+            if (Profile->bEnvironmentOnly)
             {
-                if (Character != Body && Character->GetSkeletalMeshAsset() && !Check(Character->LeaderPoseComponent.Get() == Body, TEXT("Every modular outfit part follows the actual animated body pose."))) return false;
+                if (!Check(ExpectedCharacters.IsEmpty() && !Body, TEXT("The healing spring displays environmental props without retaining an NPC body."))) return false;
             }
-            TArray<FSoftObjectPath> ExpectedProps;
-            for (const FEncounterStageProp& Prop : Profile->Props) ExpectedProps.Add(Prop.Mesh.ToSoftObjectPath());
+            else
+            {
+                if (!Check(ExpectedCharacters.IsEmpty() && Body && Body->IsComponentTickEnabled(), TEXT("All selected character parts exist and the actual body animation is ticking."))) return false;
+                const UAnimSingleNodeInstance* Animation = Body->GetSingleNodeInstance();
+                if (!Check(Animation && Animation->IsPlaying() && Animation->IsLooping() && FSoftObjectPath(Animation->GetAnimationAsset()) == Profile->IdleAnimation.ToSoftObjectPath() && Animation->GetAnimationAsset()->GetSkeleton() && Animation->GetAnimationAsset()->GetSkeleton()->IsCompatibleMesh(Body->GetSkeletalMeshAsset()), TEXT("The actual NPC plays its selected compatible source idle in a loop."))) return false;
+                for (USkeletalMeshComponent* Character : Characters)
+                {
+                    if (Character != Body && Character->GetSkeletalMeshAsset() && !Check(Character->LeaderPoseComponent.Get() == Body, TEXT("Every modular outfit part follows the actual animated body pose."))) return false;
+                }
+            }
+            TArray<FEncounterStageProp> ExpectedProps = Profile->Props;
             TInlineComponentArray<UStaticMeshComponent*> Shapes(Presented.Get());
             for (UStaticMeshComponent* Shape : Shapes)
             {
                 if (!Shape->GetStaticMesh()) continue;
                 const FSoftObjectPath Asset(Shape->GetStaticMesh());
                 if (!Asset.GetLongPackageName().StartsWith(TEXT("/Game/"))) continue;
-                const int32 ExpectedIndex = ExpectedProps.IndexOfByKey(Asset);
+                const int32 ExpectedIndex = ExpectedProps.IndexOfByPredicate([&Asset, Shape](const FEncounterStageProp& Prop) { return Prop.Mesh.ToSoftObjectPath() == Asset && Prop.AttachBone == Shape->GetAttachSocketName(); });
                 if (!Check(ExpectedIndex != INDEX_NONE && Shape->IsVisible() && Shape->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Shape->CanEverAffectNavigation(), TEXT("Every library prop uses its selected source mesh without collision or navigation."))) return false;
+                const FEncounterStageProp& ExpectedProp = ExpectedProps[ExpectedIndex];
+                if (!Check(Shape->GetComponentScale().GetMin() > 0.f && !Shape->GetComponentScale().ContainsNaN(), TEXT("Every library prop including a flat water plane has finite positive scale."))) return false;
+                if (!ExpectedProp.AttachBone.IsNone() && !Check(Body && Shape->GetAttachParent() == Body, TEXT("Held merchandise attaches to the selected NPC skeleton."))) return false;
+                if (!ExpectedProp.MaterialOverride.IsNull() && !Check(Shape->GetMaterial(0) && FSoftObjectPath(Shape->GetMaterial(0)) == ExpectedProp.MaterialOverride.ToSoftObjectPath(), TEXT("The prop uses its authored material override without altering the source asset."))) return false;
                 ExpectedProps.RemoveAt(ExpectedIndex);
             }
             if (!Check(ExpectedProps.IsEmpty(), TEXT("All selected library props are present in the arrived stage."))) return false;
             const TSharedPtr<FJsonObject> Record = Records.Last()->AsObject();
             Record->SetStringField(TEXT("library_profile"), Profile->ProfileId.ToString());
+            Record->SetBoolField(TEXT("environment_only"), Profile->bEnvironmentOnly);
             Record->SetStringField(TEXT("npc_source_mesh"), Profile->CharacterMesh.ToString());
             Record->SetStringField(TEXT("npc_idle"), Profile->IdleAnimation.ToString());
             Record->SetNumberField(TEXT("library_prop_count"), Presented->GetLibraryPropCount());
@@ -433,7 +446,7 @@ namespace EncounterPresentationPIE
             UBorder* Panel = Cast<UBorder>(Screen->GetWidgetFromName(TEXT("EncounterPanel")));
             FVector Focus = FVector::ZeroVector;
             float FocusRadius = 0.f;
-            if (!Check(Widget.IsValid() && Viewport && Viewport->Viewport && Panel && Presented->Camera && Presented->GetPresentationFocus(Focus, FocusRadius) && !Focus.ContainsNaN() && FMath::IsFinite(FocusRadius) && FocusRadius > 0.f, TEXT("Actual viewport, merchant panel and active NPC face focus are available for projection."))) return false;
+            if (!Check(Widget.IsValid() && Viewport && Viewport->Viewport && Panel && Presented->Camera && Presented->GetPresentationFocus(Focus, FocusRadius) && !Focus.ContainsNaN() && FMath::IsFinite(FocusRadius) && FocusRadius > 0.f, TEXT("Actual viewport, service panel and NPC or environmental focus are available for projection."))) return false;
             const FIntPoint Size = Viewport->Viewport->GetSizeXY();
             const FGeometry& ViewGeometry = Widget->GetCachedGeometry();
             const FGeometry& PanelGeometry = Panel->GetCachedGeometry();
@@ -515,7 +528,7 @@ namespace EncounterPresentationPIE
             const FString VisualReviewRequirement = TEXT("Directly inspect the saved Shop PNGs for all 6 encounter groups at all 3 ratios. Automatic projection/panel checks do not detect opaque stage decorations covering the NPC face. A passing fixture alone is not a completed visual review.");
             Report->SetStringField(TEXT("required_visual_review"), VisualReviewRequirement);
             Test->AddInfo(VisualReviewRequirement);
-            Report->SetStringField(TEXT("scope"), TEXT("18 isolated UI fixtures: menu-created new Target, 6 authored encounter groups (basic, rarity, tag, recovery, consumable, revival) sharing 5 NPC stages x 3 actual viewport ratios, with 36 expected screenshots. Only each disposable initial save's EncounterSeed, seed-derived Offers and matching frozen dungeon plan are changed; pool, weights, party, gold, items and balance remain authored. Public save/load validates each fixture. Actual card/inventory/leave delegates, dungeon/NPC camera, selected source character/idle/props, skeletal cleanup, face/panel geometry and screenshots are observed. No combat, purchase, input-device navigation, random-frequency, multiplayer or normal-run completion claim."));
+            Report->SetStringField(TEXT("scope"), TEXT("18 isolated UI fixtures: menu-created new Target, 6 authored encounter groups (basic, rarity, tag, recovery, consumable, revival) x 3 actual viewport ratios, with 36 expected screenshots. Each selected offer resolves its merchandise role or environmental healing spring; these samples do not cover every specialized profile. Only each disposable initial save's EncounterSeed, seed-derived Offers and matching frozen dungeon plan are changed; pool, weights, party, gold, items and balance remain authored. Public save/load validates each fixture. Actual card/inventory/leave delegates, dungeon camera, selected source character/idle/props, held-item attachment, environmental cleanup, subject/panel geometry and screenshots are observed. No combat, purchase, input-device navigation, random-frequency, multiplayer or normal-run completion claim."));
             Report->SetNumberField(TEXT("expected_cases"), ExpectedCases);
             Report->SetNumberField(TEXT("expected_captures"), ExpectedCases * 2);
             Report->SetNumberField(TEXT("completed_cases"), CompletedCases);

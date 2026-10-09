@@ -666,12 +666,12 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
                 if (!SelectedStage || Candidate->Priority > SelectedStage->Priority || (Candidate->Priority == SelectedStage->Priority && Candidate->GetPathName() < SelectedStage->GetPathName())) SelectedStage = Candidate;
             }
         }
-        if (SelectedStage)
+        if (SelectedStage && Offer)
         {
             const int32 Direction = Progress.Offers.IndexOfByPredicate([&Progress](const FRunEncounterOffer& Entry) { return Entry.EncounterId == Progress.SelectedEncounterId; });
             if (bDungeonReady && Direction >= 0 && Direction < 3)
             {
-                if (AEncounterPrototypeStage* DungeonStage = DungeonRoute->ConfigureStage(SelectedStage, Direction))
+                if (AEncounterPrototypeStage* DungeonStage = DungeonRoute->ConfigureStage(SelectedStage, Direction, *Offer))
                 {
                     PresentedStage = DungeonStage;
                     PresentationViewTarget = DungeonStage;
@@ -694,6 +694,7 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
                     return;
                 }
             }
+            SelectedStage->SetEncounterOffer(*Offer);
             PresentedStage = SelectedStage;
             ViewTarget = SelectedStage;
         }

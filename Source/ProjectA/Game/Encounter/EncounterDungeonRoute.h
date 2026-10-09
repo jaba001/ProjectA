@@ -11,6 +11,7 @@ class UMaterialInterface;
 class UPointLightComponent;
 class USceneComponent;
 class UStaticMesh;
+struct FRunEncounterOffer;
 
 struct FEncounterDungeonTravelSegment
 {
@@ -40,7 +41,7 @@ public:
     bool ConfigureLayout(int32 InLayoutVariant);
     int32 GetLayoutVariant() const { return LayoutVariant; }
     void SetPresentationVisible(bool bVisible);
-    AEncounterPrototypeStage* ConfigureStage(const AEncounterPrototypeStage* Template, int32 Direction);
+    AEncounterPrototypeStage* ConfigureStage(const AEncounterPrototypeStage* Template, int32 Direction, const FRunEncounterOffer& Offer);
     void ResetAtJunction();
     bool StartTravel(int32 Direction);
     bool IsTraveling() const;

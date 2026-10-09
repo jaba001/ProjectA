@@ -19,7 +19,7 @@ UTargetRunDefinitionDataAsset::UTargetRunDefinitionDataAsset()
     OpponentCatalog = FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog.DA_OpponentSnapshotCatalog"));
     EncounterQuery = FGameplayTagQuery::MakeQuery_MatchTag(TAG_TargetRunEncounter);
     const FGameplayTag Tags[] = {FRunEncounterOffer::GetSkillShopTag(), FRunEncounterOffer::GetItemShopTag(), FRunEncounterOffer::GetRecoveryTag(), FRunEncounterOffer::GetConsumableShopTag(), FRunEncounterOffer::GetRevivalTag()};
-    const TCHAR* Names[] = {TEXT("스킬상점"), TEXT("아이템상점"), TEXT("회복소"), TEXT("소모품상점"), TEXT("부활소")};
+    const TCHAR* Names[] = {TEXT("스킬상점"), TEXT("아이템상점"), TEXT("회복의 샘물"), TEXT("소모품상점"), TEXT("부활소")};
     for (int32 Index = 0; Index < UE_ARRAY_COUNT(Tags); ++Index)
     {
         FRunEncounterOffer& Offer = EncounterPool.AddDefaulted_GetRef();

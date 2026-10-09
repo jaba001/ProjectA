@@ -65,6 +65,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Encounter Stage")
     void RefreshPrototype();
     UFUNCTION(BlueprintCallable, Category = "Encounter Stage")
+    void SetEncounterOffer(const FRunEncounterOffer& Offer);
+    UFUNCTION(BlueprintCallable, Category = "Encounter Stage")
     void StartPresentation();
     UFUNCTION(BlueprintCallable, Category = "Encounter Stage")
     void StopPresentation();
@@ -98,6 +100,12 @@ private:
     FName LibraryProfileId;
     UPROPERTY(Transient)
     FName LibraryFaceBone;
+    UPROPERTY(Transient)
+    FRunEncounterOffer EncounterOffer;
+    bool bHasEncounterOffer = false;
+    bool bEnvironmentOnly = false;
+    FVector LibraryPresentationFocus = FVector::ZeroVector;
+    float LibraryPresentationFocusRadius = 0.f;
     bool bUsingLibraryVisuals = false;
     bool bRefreshingLibrary = false;
     bool bPresentationVisible = true;

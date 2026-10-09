@@ -46,7 +46,7 @@ namespace
         if (Tag.MatchesTag(FRunEncounterOffer::GetRarityItemShopTag())) return NSLOCTEXT("RunShop", "RarityStock", "선택한 등급의 상품을 최대 5개 진열합니다. 해당 등급의 가용 상품이 적으면 진열 수도 줄어듭니다.");
         if (Tag.MatchesTag(FRunEncounterOffer::GetTagItemShopTag())) return NSLOCTEXT("RunShop", "TagStock", "선택한 종류의 상품을 최대 5개 진열합니다. 해당 종류의 가용 상품이 적으면 진열 수도 줄어듭니다.");
         if (Tag.MatchesTag(FRunEncounterOffer::GetItemShopTag())) return NSLOCTEXT("RunShop", "BasicStock", "이 Run의 아이템 후보에서 서로 다른 상품 5개를 진열합니다.");
-        if (Tag.MatchesTag(FRunEncounterOffer::GetRecoveryTag())) return NSLOCTEXT("RunShop", "RecoveryChoice", "생존한 본인 캐릭터의 HP를 회복합니다. 최대 HP이면 구매할 수 없습니다.");
+        if (Tag.MatchesTag(FRunEncounterOffer::GetRecoveryTag())) return NSLOCTEXT("RunShop", "RecoveryChoice", "샘물을 마셔 생존한 본인 캐릭터의 HP를 회복합니다. 최대 HP이면 이용할 수 없습니다.");
         if (Tag.MatchesTag(FRunEncounterOffer::GetRevivalTag())) return NSLOCTEXT("RunShop", "RevivalChoice", "사망한 본인 직접 조작 캐릭터를 부활시킵니다. AI 동료는 대상이 아닙니다.");
         if (Tag.MatchesTag(FRunEncounterOffer::GetConsumableShopTag())) return NSLOCTEXT("RunShop", "ConsumableChoice", "전투에서 사용할 회복 소모품을 구매합니다. 본인 생존 캐릭터만 구매할 수 있습니다.");
         return NSLOCTEXT("RunShop", "SkillChoice", "이 Run에 저장된 스킬 상품과 HP 회복 서비스를 이용합니다.");
@@ -427,12 +427,12 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             const int32 Price = bConsumable ? Rules.ConsumablePrice : bRevival ? Rules.RevivalPrice : Rules.RecoveryPrice;
             const FRunConsumableStack* Stack = Buyer ? Buyer->Consumables.FindByPredicate([&Rules](const FRunConsumableStack& Candidate) { return Candidate.ItemTag == Rules.ConsumableTag && Candidate.Skill == Rules.HealingSkill; }) : nullptr;
             const bool bEligible = Buyer && BuyerView && (bRevival ? Buyer->CurrentHP == 0.f : Buyer->CurrentHP > 0.f) && (bConsumable ? Stack && Stack->Quantity < RunRecoveryRules::MaximumQuantity : bRevival || Buyer->CurrentHP < BuyerView->MaxHP);
-            const FText Product = bConsumable ? FText::Format(NSLOCTEXT("RunRecovery", "ConsumableQuantity", "회복 소모품 1개 · 보유 {0}개"), Stack ? Stack->Quantity : 0) : bRevival ? FText::Format(NSLOCTEXT("RunRecovery", "RevivalHP", "최대 HP {0}%로 부활"), FMath::RoundToInt(Rules.RevivalFraction * 100.f)) : FText::Format(NSLOCTEXT("RunRecovery", "RecoveryHP", "HP {0} 회복"), FMath::RoundToInt(Rules.RecoveryHP));
+            const FText Product = bConsumable ? FText::Format(NSLOCTEXT("RunRecovery", "ConsumableQuantity", "회복 소모품 1개 · 보유 {0}개"), Stack ? Stack->Quantity : 0) : bRevival ? FText::Format(NSLOCTEXT("RunRecovery", "RevivalHP", "최대 HP {0}%로 부활"), FMath::RoundToInt(Rules.RevivalFraction * 100.f)) : FText::Format(NSLOCTEXT("RunRecovery", "RecoveryHP", "샘물 마시기 · HP {0} 회복"), FMath::RoundToInt(Rules.RecoveryHP));
             const FText Ineligible = bConsumable ? NSLOCTEXT("RunRecovery", "QuantityLimit", "보유 한도") : bRevival ? NSLOCTEXT("RunRecovery", "LivingCharacter", "사망자만") : NSLOCTEXT("RunRecovery", "FullHP", "HP 가득 참");
             const bool bServiceAvailable = Rules.SchemaVersion == 1 && Rules.Revision > 0;
             const FText Status = ShopActionStatus(bServiceAvailable && (!Buyer || !BuyerView || bEligible), Buyer && BuyerView, Buyer && Buyer->Gold >= Price, Controller && Controller->IsShopPurchasePending(), bServiceAvailable ? Ineligible : NSLOCTEXT("RunShop", "Unavailable", "이용 불가"));
             RecoveryButton->Configure(Service.GetTagName(), FText::Format(NSLOCTEXT("RunRecovery", "ProductStatus", "{0} · {1}G · {2}"), Product, FText::AsNumber(Price), Status));
-            const FText Hint = bConsumable ? NSLOCTEXT("RunRecovery", "ConsumableHint", "본인 생존 캐릭터가 구매합니다. 전투에서 본인에게 AP 1로 사용하며 실제 회복이 발동한 경우에만 1개를 소모합니다.") : bRevival ? NSLOCTEXT("RunRecovery", "RevivalHint", "본인이 직접 조작하는 사망 캐릭터를 부활시킵니다. AI 동료와 다른 참가자의 캐릭터는 구매할 수 없습니다.") : NSLOCTEXT("RunRecovery", "RecoveryHint", "본인 생존 캐릭터의 HP를 회복합니다. 이미 최대 HP이면 구매할 수 없습니다.");
+            const FText Hint = bConsumable ? NSLOCTEXT("RunRecovery", "ConsumableHint", "본인 생존 캐릭터가 구매합니다. 전투에서 본인에게 AP 1로 사용하며 실제 회복이 발동한 경우에만 1개를 소모합니다.") : bRevival ? NSLOCTEXT("RunRecovery", "RevivalHint", "본인이 직접 조작하는 사망 캐릭터를 부활시킵니다. AI 동료와 다른 참가자의 캐릭터는 구매할 수 없습니다.") : NSLOCTEXT("RunRecovery", "RecoveryHint", "샘물을 마셔 생존한 본인 캐릭터의 HP를 회복합니다. 이미 최대 HP이면 이용할 수 없습니다.");
             RecoveryButton->SetToolTipText(Hint);
             ShopHint->SetText(Hint);
             RecoveryButton->SetIsEnabled(Rules.SchemaVersion == 1 && Rules.Revision > 0 && bEligible && Buyer->Gold >= Price && Controller && !Controller->IsShopPurchasePending());

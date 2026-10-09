@@ -23,7 +23,7 @@
   "stages": [
     {"id": "Market", "title": "MARKET", "position": [-3800, -1000, 20], "required": ["Encounter.Shop"], "excluded": ["Encounter.Shop.Item.Tag", "Encounter.Shop.Consumable"], "priority": 0, "style": 0, "tint": [0.72, 0.43, 0.16, 1]},
     {"id": "Forge", "title": "FORGE", "position": [3400, -1600, 20], "required": ["Encounter.Shop.Item.Tag"], "excluded": [], "priority": 10, "style": 1, "tint": [0.28, 0.36, 0.48, 1]},
-    {"id": "Camp", "title": "REST CAMP", "position": [-3000, 2800, 20], "required": ["Encounter.Service.Recovery"], "excluded": [], "priority": 10, "style": 2, "tint": [0.23, 0.55, 0.28, 1]},
+    {"id": "Camp", "title": "HEALING SPRING", "position": [-3000, 2800, 20], "required": ["Encounter.Service.Recovery"], "excluded": [], "priority": 10, "style": 2, "tint": [0.23, 0.55, 0.28, 1]},
     {"id": "Alchemy", "title": "ALCHEMY", "position": [3000, 2800, 20], "required": ["Encounter.Shop.Consumable"], "excluded": [], "priority": 10, "style": 3, "tint": [0.45, 0.22, 0.62, 1]},
     {"id": "Shrine", "title": "REVIVAL SHRINE", "position": [0, 4200, 20], "required": ["Encounter.Service.Revival"], "excluded": [], "priority": 10, "style": 4, "tint": [0.75, 0.66, 0.35, 1]}
   ],

@@ -68,6 +68,7 @@ FText FRunEncounterOffer::GetDisplayName() const
     // 과거 기본 표시명만 바꾸고 사용자가 작성한 이름과 저장 식별자는 보존합니다.
     if (EncounterId == TEXT("Shop_01") && DisplayName.ToString() == TEXT("상점1")) return NSLOCTEXT("RunEncounter", "SkillShop", "스킬상점");
     if (EncounterId == TEXT("Shop_02") && DisplayName.ToString() == TEXT("상점2")) return NSLOCTEXT("RunEncounter", "ItemShop", "아이템상점");
+    if (GetResolvedTag().MatchesTag(GetRecoveryTag()) && DisplayName.BuildSourceString() == TEXT("회복소")) return NSLOCTEXT("RunEncounter", "HealingSpring", "회복의 샘물");
     return DisplayName;
 }
 
