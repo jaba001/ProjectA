@@ -2,6 +2,7 @@
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunItemRarityProbabilities.h"
 #include "Game/Run/RunWeaponSkillRules.h"
+#include "Game/Run/RunSkillBalance.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
@@ -184,9 +185,11 @@ bool RunItemShopCatalog::ValidateItem(const FRunItemDefinition& Item)
 {
     const FString AssetPath = Item.Asset.ToString();
     if (!Item.Asset.IsValid() || !Item.Asset.GetSubPathUtf8String().IsEmpty() || !AssetPath.StartsWith(TEXT("/Game/")) || !FPackageName::IsValidObjectPath(AssetPath) || !IsValidDisplayName(Item.DisplayName.ToString()) || !Item.Tags.HasTag(TAG_ItemWeapon) || Item.Price <= 0) return false;
-    if (Item.GenerationVersion == 0) return !Item.ItemInstanceId.IsValid() && !Item.RarityTag.IsValid() && Item.GrantedSkills.IsEmpty();
+    if (Item.GenerationVersion == 0) return !Item.ItemInstanceId.IsValid() && !Item.RarityTag.IsValid() && Item.GrantedSkills.IsEmpty() && Item.SkillBalanceVersion == 0 && Item.GrantedSkillBalances.IsEmpty();
     if (Item.GenerationVersion != 1 || !Item.ItemInstanceId.IsValid() || !Item.RarityTag.IsValid()) return false;
     if (Item.CatalogRarityTag.IsValid() && Item.CatalogRarityTag != Item.RarityTag) return false;
+    if (Item.SkillBalanceVersion == 0 ? !Item.GrantedSkillBalances.IsEmpty() : Item.SkillBalanceVersion != 1 || Item.GrantedSkillBalances.Num() != Item.GrantedSkills.Num()) return false;
+    for (const FRunSkillBalance& Balance : Item.GrantedSkillBalances) if (!RunSkillBalance::IsValid(Balance)) return false;
     TSet<FSoftObjectPath> Skills;
     for (const FSoftObjectPath& Skill : Item.GrantedSkills)
     {
@@ -218,6 +221,8 @@ bool RunItemShopCatalog::IsSameBaseDefinition(const FRunItemDefinition& Left, co
         Item->ItemInstanceId.Invalidate();
         Item->RarityTag = FGameplayTag();
         Item->GrantedSkills.Reset();
+        Item->SkillBalanceVersion = 0;
+        Item->GrantedSkillBalances.Reset();
     }
     return IsSameDefinition(LeftBase, RightBase);
 }

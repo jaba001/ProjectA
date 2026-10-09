@@ -4,9 +4,11 @@
 #include "Game/Run/RunWeaponSkillTypes.h"
 
 struct FRunItemDefinition;
+struct FCombatRoundSkill;
 
 namespace RunWeaponSkillRules
 {
+    PROJECTA_API bool ResolveSkill(const FSoftObjectPath& Path, const FRunWeaponSkillRulesState& State, FCombatRoundSkill& OutSkill, FText& OutError);
     PROJECTA_API bool Validate(const FRunWeaponSkillRulesState& State, FText& OutError);
     // Query eligibility only after validating the owning frozen rule state.
     // 소유하는 고정 규칙 상태를 검증한 뒤 후보 적합성을 조회합니다.

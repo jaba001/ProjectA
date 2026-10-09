@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "Game/Run/RunSkillBalanceTypes.h"
 #include "RunItemShopTypes.generated.h"
 
 // Keep catalog entries and purchases serializable without loading their source assets.
@@ -41,6 +42,14 @@ struct PROJECTA_API FRunItemDefinition
 
     UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Item|Generation")
     TArray<FSoftObjectPath> GrantedSkills;
+
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Item|Generation")
+    int32 SkillBalanceVersion = 0;
+
+    // Parallel to GrantedSkills for compact authoritative shop and inventory presentation.
+    // 상점·인벤토리의 간결한 권위 표시를 위해 GrantedSkills와 같은 순서로 보관합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Item|Generation")
+    TArray<FRunSkillBalance> GrantedSkillBalances;
 };
 
 USTRUCT(BlueprintType)

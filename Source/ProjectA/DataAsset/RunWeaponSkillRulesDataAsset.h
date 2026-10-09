@@ -18,6 +18,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Skills")
     FRunWeaponSkillRulesState Rules;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Skills")
+    bool bUseCsvBalance = true;
+
     // Resolve execution tags and freeze the complete authored rule set in each new Run.
     // 실행 태그를 해석하고 작성된 전체 규칙을 새 Run마다 고정합니다.
     UFUNCTION(BlueprintCallable, Category = "Run|WeaponSkills")

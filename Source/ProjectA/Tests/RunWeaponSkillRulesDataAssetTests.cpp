@@ -15,7 +15,8 @@ bool FRunWeaponDefaultRuleDataTest::RunTest(const FString& Parameters)
     FRunWeaponSkillRulesState State;
     FText Error;
     if (!TestTrue(TEXT("The development rule asset freezes valid source skill data"), Asset->BuildState(State, Error))) return false;
-    TestEqual(TEXT("Every generated weapon receives one trial skill"), State.SkillCount, 1);
+    TestEqual(TEXT("Every generated weapon receives one frozen skill"), State.SkillCount, 1);
+    TestTrue(TEXT("New Runs freeze the CSV tuning and all twenty-five rarity weights"), State.BalanceVersion == 1 && State.SkillRarityWeights.Num() == 25 && State.Candidates.Num() == 62);
     TestEqual(TEXT("The development data exposes all five grades"), State.Rarities.Num(), 5);
     TArray<FRunItemDefinition> Catalog;
     if (!TestTrue(TEXT("The source item catalog supplies authored grades"), RunItemShopCatalog::Load(Catalog, Error))) return false;
@@ -61,19 +62,13 @@ bool FRunWeaponDefaultRuleDataTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Bow and crossbow basics have separate authored candidates"), Arrow && Crossbow)) return false;
     TestTrue(TEXT("Bow eligibility uses its item query rather than generic ranged attack tags"), Arrow->AllowedItemQuery.Matches(FGameplayTagContainer(BowTag)) && !Arrow->AllowedItemQuery.Matches(FGameplayTagContainer(CrossbowTag)));
     TestTrue(TEXT("Crossbow eligibility uses its own item query"), Crossbow->AllowedItemQuery.Matches(FGameplayTagContainer(CrossbowTag)) && !Crossbow->AllowedItemQuery.Matches(FGameplayTagContainer(BowTag)));
-    const FGameplayTagContainer StaffTags(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.StaffWand")));
-    TArray<TSet<FSoftObjectPath>> GradePools;
-    for (const FRunWeaponRarityRule& Rarity : State.Rarities)
+    TSet<FGameplayTag> SkillGrades;
+    for (const FRunWeaponSkillCandidate& Candidate : State.Candidates)
     {
-        TSet<FSoftObjectPath>& Pool = GradePools.AddDefaulted_GetRef();
-        for (const FRunWeaponSkillCandidate& Candidate : State.Candidates)
-        {
-            FGameplayTagContainer Tags = Candidate.Tags;
-            Tags.AppendTags(Candidate.SelectionTags);
-            if (Candidate.AllowedItemQuery.Matches(StaffTags) && Rarity.SkillQuery.Matches(Tags)) Pool.Add(Candidate.Skill);
-        }
+        SkillGrades.Add(Candidate.Balance.RarityTag);
+        TestTrue(TEXT("Every candidate has one explicit grade and numeric tuning independent of equipment grade"), Candidate.Balance.RarityTag.IsValid() && Candidate.SelectionTags.HasTagExact(Candidate.Balance.RarityTag) && Candidate.Balance.Power > 0.f);
     }
-    for (int32 Grade = 1; Grade < GradePools.Num(); ++Grade) TestTrue(TEXT("The magic weapon's colored pools add distinct content beyond the basic white pool"), GradePools[Grade].Num() > GradePools[0].Num());
+    TestEqual(TEXT("The active authored skill catalog covers five independent skill grades"), SkillGrades.Num(), 5);
     return true;
 }
 

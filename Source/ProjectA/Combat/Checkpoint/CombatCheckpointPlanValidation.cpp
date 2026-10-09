@@ -1,8 +1,9 @@
 #include "Combat/Round/CombatPlanValidator.h"
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Game/Run/RunWeaponSkillRules.h"
 
-bool CombatPlanValidation::ValidateCheckpointPlans(const FCombatCheckpointData& Checkpoint, FText& OutError)
+bool CombatPlanValidation::ValidateCheckpointPlans(const FCombatCheckpointData& Checkpoint, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
 {
     OutError = NSLOCTEXT("CombatCheckpoint", "RoundPlans", "저장된 준비 계획·대상·이동 예약·비용이 현재 전투 상태와 일치하지 않습니다.");
     FState State;
@@ -34,7 +35,7 @@ bool CombatPlanValidation::ValidateCheckpointPlans(const FCombatCheckpointData& 
         {
             const USkillDefinitionDataAsset* Definition = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
             FCombatRoundSkill Skill;
-            if (!Definition || !Definition->ResolveRoundSkill(Skill, OutError)) return false;
+            if (!Definition || !(WeaponSkillRules ? RunWeaponSkillRules::ResolveSkill(Path, *WeaponSkillRules, Skill, OutError) : Definition->ResolveRoundSkill(Skill, OutError))) return false;
             Unit.SkillIds.Add(Skill.SkillId);
             if (!FindSkill(State, Skill.SkillId)) State.Skills.Add(MoveTemp(Skill));
         }

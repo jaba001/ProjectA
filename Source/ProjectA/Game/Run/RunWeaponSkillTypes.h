@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "Game/Run/RunSkillBalanceTypes.h"
 #include "RunWeaponSkillTypes.generated.h"
 
 // Freeze skill eligibility and weight data alongside the original GAS content tags.
@@ -27,6 +28,9 @@ struct PROJECTA_API FRunWeaponSkillCandidate
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, Category = "Weapon Skills", meta = (ClampMin = "0"))
     float BaseWeight = 0.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, Category = "Weapon Skills")
+    FRunSkillBalance Balance;
 };
 
 USTRUCT(BlueprintType)
@@ -59,6 +63,14 @@ struct PROJECTA_API FRunWeaponSkillRulesState
 
     UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Weapon Skills")
     int32 SchemaVersion = 0;
+
+    // Version zero keeps the original skill pools and asset values in existing saves.
+    // 버전 0은 기존 저장의 스킬 풀과 에셋 수치를 유지합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, Category = "Weapon Skills")
+    int32 BalanceVersion = 0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, Category = "Weapon Skills")
+    TArray<FRunSkillRarityWeight> SkillRarityWeights;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, Category = "Weapon Skills")
     int32 SkillCount = 0;

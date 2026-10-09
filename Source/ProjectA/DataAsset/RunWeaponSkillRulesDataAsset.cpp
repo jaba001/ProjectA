@@ -2,6 +2,7 @@
 
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Run/RunWeaponSkillRules.h"
+#include "Game/Run/RunSkillBalance.h"
 #include "Misc/PackageName.h"
 #include "NativeGameplayTags.h"
 #include <initializer_list>
@@ -72,10 +73,8 @@ URunWeaponSkillRulesDataAsset::URunWeaponSkillRulesDataAsset()
     const FGameplayTag PoolTags[] = {TAG_WeaponPoolWhite, TAG_WeaponPoolGreen, TAG_WeaponPoolBlue, TAG_WeaponPoolPurple, TAG_WeaponPoolOrange};
     for (FGameplayTag Tag : PoolTags) AllPools.AddTag(Tag);
 
-    // Basic candidates support every development color; higher pools add compatible authored presentations.
-    // 기본 후보는 모든 개발용 색상을 지원하며 다른 등급 풀에는 적합한 기존 표현을 추가합니다.
-    // Equal grade weights and one skill per copy are trial data, not final balance or guaranteed upgrade power.
-    // 동일 등급 가중치와 사본당 스킬 한 개는 시험 데이터이며 최종 밸런스나 등급별 위력 상승을 뜻하지 않습니다.
+    // Keep legacy pool metadata; BuildState adds the CSV rarity policy only to newly created Runs.
+    // 기존 풀 메타데이터를 유지하며 BuildState는 새 Run에만 CSV 등급 정책을 추가합니다.
     AddCandidate(Rules, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_MeleeAttack"), CloseWeaponQuery, AllPools);
     AddCandidate(Rules, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_CrossbowAttack"), CrossbowQuery, AllPools);
     AddCandidate(Rules, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_Arrow"), BowQuery, AllPools);
@@ -114,6 +113,7 @@ bool URunWeaponSkillRulesDataAsset::BuildState(FRunWeaponSkillRulesState& OutSta
         if (!Skill->ResolveRoundSkill(Definition, OutError)) return false;
         Candidate.Tags = Definition.EffectTags;
     }
+    if (bUseCsvBalance && !RunSkillBalance::Load(State, OutError)) return false;
     if (!RunWeaponSkillRules::Validate(State, OutError)) return false;
     OutState = MoveTemp(State);
     OutError = FText::GetEmpty();

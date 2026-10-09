@@ -269,7 +269,7 @@ bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FTe
     OutError = FText::FromString(TEXT("유효한 준비 완료 저장과 원래 참가자의 연결이 있어야 전투를 복구할 수 있습니다."));
     if (!HasAuthority() || bShuttingDown || bPreparing || !SpawnedUnits.IsEmpty() || !RunState || RunState->GetPhase() != ERunPhase::Combat || !Arena || !CombatManager || !RunState->ValidateCheckpointHost(HostAccount, OutError) || !ValidateManagedExecution(OutError, true)) return false;
     const FCombatCheckpointData& Checkpoint = RunState->GetCombatCheckpoint();
-    if (Checkpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion || !UCombatCheckpointLibrary::Validate(Checkpoint, RunState->GetPartyMembers(), OutError)) return false;
+    if (Checkpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion || !UCombatCheckpointLibrary::Validate(Checkpoint, RunState->GetPartyMembers(), OutError, &RunState->GetWeaponSkillRules())) return false;
     TGuardValue<bool> PreparationGuard(bPreparing, true);
     SetPlayerCombatInput(false);
     const auto FailRestore = [this, &OutError]()

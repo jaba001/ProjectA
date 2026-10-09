@@ -77,7 +77,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 ## 3 파티와 전투 규약
 
-2026-10-06 새 일반 Target Run은 `WeaponSkillAcquisitionVersion=1`로 스킬상점을 제외하고 장착 무기 스킬을 사용한다. 제안 15~19 선택 1과 추가 결정 위임에 따라 비무장 기본 공격·시작 무기 생성 시 부여·무기당 1스킬·1G를 시험값으로 적용했다. 현재 새 카탈로그의 5등급은 에셋별 CSV 값으로 고정하고 해당 등급·무기 태그의 스킬만 추첨하며 전투 수치는 유지한다. 새 일반 Run의 아이템상점은 별도로 저장한 [등급별 확률](GAME_DESIGN.md#2-4-5-아이템-등급별-등장-확률)을 사용한다. 무기 스킬 도입 전 Run과 명시적 prototype·개발 협동은 버전 0의 기존 상점/습득 경로를 유지한다. 최신 상점 구현·검증 상태는 [HISTORY 9-28](HISTORY.md#9-28-2026-10-08-상점-분류와-인카운터-가중치), 작동 확인은 [TODO 29절](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)을 따른다.
+2026-10-06 새 일반 Target Run은 `WeaponSkillAcquisitionVersion=1`로 스킬상점을 제외하고 장착 무기 스킬을 사용한다. 제안 15~19 선택 1과 추가 결정 위임에 따라 비무장 기본 공격·시작 무기 생성 시 부여·무기당 1스킬·1G를 시험값으로 적용했다. 현재 새 카탈로그의 장비 5등급은 에셋별 CSV 값으로 고정하고 무기 태그에 맞는 스킬을 장비별 스킬 등급 가중치로 추첨한다. 새 Run의 스킬 수치는 별도 밸런스 CSV를 고정해 사용한다. 새 일반 Run의 아이템상점은 별도로 저장한 [등급별 확률](GAME_DESIGN.md#2-4-5-아이템-등급별-등장-확률)을 사용한다. 무기 스킬 도입 전 Run과 명시적 prototype·개발 협동은 버전 0의 기존 상점/습득 경로를 유지한다. 최신 상점 구현·검증 상태는 [HISTORY 9-28](HISTORY.md#9-28-2026-10-08-상점-분류와-인카운터-가중치), 작동 확인은 [TODO 29절](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)을 따른다.
 
 ### 3-1 시작 장비와 장착
 
@@ -89,9 +89,13 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 이전 저장의 누락된 장비 상태는 과거 스킬 외형을 유지하며 첫 명시 장착부터 새 상태를 적용한다. 시작 아이템을 재지급하거나 저장 카탈로그를 바꾸지 않는다. 미지원 240개는 2026-10-09 사용자 요청으로 판매 목록에서 제거하며 원본 에셋과 기존 보유 사본은 유지한다. 비무기 슬롯 콘텐츠·속도 보정·Snapshot `EquipmentIds` 연결은 후속 기획 대상이다. 새 일반 Run의 무기 부여 스킬은 다음 저장 규칙을 사용한다. 아이템·장비 조작과 새 에셋 부착 재생을 제외했던 당시 실행 범위는 과거 이력으로 구분한다. [구현·검증 이력](HISTORY.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
-새 일반 Run은 `RunWeaponSkillRulesDataAsset`의 62후보·무기 종류 Query·등급 Query를 공통 태그 추첨에 전달한다. 근거리 무기·활·석궁·마법 무기를 구분하고 방패·탄약·기타는 등급만 부여한다. `Item.Rarity.*`의 색 5단계와 후보별 `Selection.WeaponSkill.Test.*` 선택 태그는 기존 GAS 실행 태그와 구분한다. 조건이 없는 후보나 부족한 후보를 임의 스킬로 채우지 않는다.
+새 일반 Run은 `RunWeaponSkillRulesDataAsset`의 62후보·무기 종류 Query·등급 Query를 공통 태그 추첨에 전달한다. 근거리 무기·활·석궁·마법 무기를 구분하고 방패·탄약·기타는 등급만 부여한다. 장비 `Item.Rarity.*`와 스킬 `Selection.WeaponSkill.Rarity.*`를 분리하며 이전 `Selection.WeaponSkill.Test.*` 메타데이터와 GAS 실행 태그를 보존한다. 양수 가중치의 적격 스킬이 있는 등급을 먼저 선택하고 등급 안에서 `BaseWeight`로 중복 없이 추첨한다. 조건이 없는 후보나 부족한 후보를 임의 스킬로 채우지 않는다.
 
-`FRunItemDefinition`은 카탈로그 기준 등급 `CatalogRarityTag`, GUID `ItemInstanceId`, `GenerationVersion`, `RarityTag`, `GrantedSkills`를 저장한다. 추가 전용 `Items`와 장착 `ItemIndex`는 유지한다. 시작 사본·진열 사본의 생성 결과와 당시 `WeaponSkillRules`를 Run에 저장하고 구매는 같은 사본을 인계한다. `InnateSkills`와 장착 스킬을 합칠 때 동일 Skill ID는 한 번만 추가하며 양손 사본/여러 출처를 구분한다. 저장은 사본 적합성·ID 중복·최종 스킬 목록을 검사하고 실패 시 기존 상태를 유지한다. 기존 버전 0에는 생성 결과를 소급하지 않는다. 기존 저장의 기준 등급 누락은 당시 무작위 등급 규칙을 유지하고 현재 CSV로 저장 카탈로그·보유품·진열 사본을 변경하지 않는다. 장착 목록은 전투·체크포인트로 전달하며 새 무기 스킬의 Snapshot 상대 카탈로그 등록·사본 공개/내보내기는 후속 작업이다. 새 Target Run은 기존 고정 Snapshot 상대를 유지한다.
+새 Run 생성 시 `RunSkillBalance::Load`가 [SKILL_BALANCE.csv](../DataCatalogs/SKILL_BALANCE.csv) 62행·11열과 [SKILL_RARITY_PROBABILITIES.csv](../DataCatalogs/SKILL_RARITY_PROBABILITIES.csv) 25행·6열을 읽는다. 규칙 `SchemaVersion=1`을 유지하고 `BalanceVersion=1`에 후보별 등급·위력·AP/SAP·선딜과 장비별 가중치를 저장한다. ID·경로·등급 태그·행 누락/중복·유효 수치·장비별 합계 100을 검사하며 오류 시 기존 상태를 보존하고 생성에 실패한다. 누락된 밸런스 버전 0은 기존 풀·원본 수치를 사용한다. 62종의 분포·수치·확률표는 [GAME_DESIGN 2-4-6](GAME_DESIGN.md#2-4-6-스킬-등급과-장비별-추첨-확률)을 따른다.
+
+`FRunItemDefinition`은 카탈로그 기준 등급 `CatalogRarityTag`, GUID `ItemInstanceId`, `GenerationVersion`, `RarityTag`, `GrantedSkills`와 `SkillBalanceVersion/GrantedSkillBalances`의 확정 스킬 수치를 저장한다. 추가 전용 `Items`와 장착 `ItemIndex`는 유지한다. 시작 사본·진열 사본의 생성 결과와 당시 `WeaponSkillRules`를 Run에 저장하고 구매는 같은 사본을 인계한다. `InnateSkills`와 장착 스킬을 합칠 때 동일 Skill ID는 한 번만 추가하며 양손 사본/여러 출처를 구분한다. 저장은 사본 적합성·ID 중복·최종 스킬 목록을 검사하고 실패 시 기존 상태를 유지한다. 기존 버전 0에는 생성 결과를 소급하지 않는다. 기존 저장의 기준 등급 누락은 당시 무작위 등급 규칙을 유지하고 현재 CSV로 저장 카탈로그·보유품·진열 사본을 변경하지 않는다. 장착 목록은 전투·체크포인트로 전달하며 새 무기 스킬의 Snapshot 상대 카탈로그 등록·사본 공개/내보내기는 후속 작업이다. 새 Target Run은 기존 고정 Snapshot 상대를 유지한다.
+
+전투의 `RunWeaponSkillRules::ResolveSkill`은 원본 실행 정의에 현재 Run의 저장된 위력·AP/SAP·선딜만 적용한다. 양 팀의 같은 SkillId는 같은 수치를 사용하고 체크포인트 계획 검증·복구에도 같은 규칙을 전달한다. Snapshot 자체의 스킬 목록·캐릭터 수치를 수정하거나 상대 Run 당시 수치의 경쟁 재현을 보장하지 않는다. 원본 DA·GAS 실행 태그·충돌·범위·체인·몽타주는 유지하며 목록 밖 기본 공격·몬스터·소모품 15종은 조정하지 않는다. [최신 구현·검증 상태](HISTORY.md#9-37-2026-10-09-스킬-수치등급과-장비별-추첨)
 
 프로젝트 전용 `Skills/Weapons/DA_MeleeAttack`, `Skills/Weapons/DA_CrossbowAttack`, `Weapons/DA_WeaponSkillRules`를 `CreateWeaponSkills.py`로 작성하고 `DA_VerticalSliceParty.WeaponSkillRules`를 연결했다. 기존 근접 공격·화살 표현을 참조하며 원본 FX·메시를 복제하지 않고 기존 공격 에셋의 저장값을 변경하지 않는다. 새 근접 DA는 고정 검 trace 대신 공통 근접 충돌을 사용하며 기존 몽타주/직업 재매핑을 재사용한다. 실제 작성·컴파일 근거는 [HISTORY 9-24](HISTORY.md#9-24-2026-10-06-무기-스킬과-새-run-전환)를 따른다.
 
@@ -131,7 +135,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 새 일반 Target Run을 구성하는 `ConfigureTargetRun`은 [ITEM_RARITY_PROBABILITIES.csv](../DataCatalogs/ITEM_RARITY_PROBABILITIES.csv)를 읽어 `FRunItemShopState.RarityProbabilities`에 확률 스키마 1을 저장한다. 각 항목에는 `RarityTag`와 정수 0~10000의 `ProbabilityBasisPoints`를 보관하며 확률의 전체 합은 10000이다. 최초 진열·재입장·리롤마다 적격 후보의 등급을 먼저 추첨하고 같은 등급 안에서 에셋을 균등 추첨한다. 동일 진열의 에셋 중복은 금지하고 등급 반복은 허용한다. 빈 등급·소진·0%는 제외하여 다시 정규화하고 기본상점은 양수 확률의 적격 에셋이 5개 미만이면 기존 상태를 보존하며 실패한다. 전문 상점은 저장된 Query 안에서 장착 가능한 적격 에셋 수와 5 중 작은 수를 진열한다. 기존 전문 상점에 적격 후보가 없으면 빈 진열과 퇴장을 허용하고 유료 리롤은 차단한다. 전투 보상도 같은 저장 카탈로그·확률에서 장착 지원품만 공통 선택하되 직전 상점 Query 없이 중복 없는 에셋 3개를 추첨한다. CSV 변경은 이후 새 일반 Run에만 반영한다. 확률 스키마 0·빈 목록의 이전 저장은 장착 가능한 적격 후보 안에서 기존 아이템 균등 추첨을 유지하며 prototype·개발 협동·지정된 직업별 시작 장비의 선택은 변경하지 않는다. 현재 49개는 흰색 9·초록색 17·파란색 19·보라색 4·주황색 0이다. 5색 확률 CSV는 유지하고 현재 기본 후보는 50:30:15:4를 재정규화한다. [확률표와 적용 범위](GAME_DESIGN.md#2-4-5-아이템-등급별-등장-확률)
 
-프로젝트 루트 `DataCatalogs/`에 무기·아이템 등급 확률·스킬 이펙트·스킬 생성 현황·SFX·인카운터 풀·몬스터 CSV를 함께 보관한다. 런타임은 `WEAPON_ASSETS.csv`·`ITEM_RARITY_PROBABILITIES.csv`·`ENCOUNTER_POOL.csv`와 새 기본 난이도의 `MONSTER_STATS.csv`·`MONSTER_SPAWN_PROBABILITIES.csv`·`MONSTER_ENCOUNTERS.csv`를 읽고 같은 여섯 경로를 빌드의 UFS RuntimeDependency에 지정한다. VFX·SFX·`MONSTER_ASSETS.csv`는 원본·제작 상태를 기록하는 자료 목록이다. 기존 카탈로그 생성 도구는 폐기 상태를 유지하고 새 생성 입력은 `DrGameSkillSpecs.json`을 사용한다.
+프로젝트 루트 `DataCatalogs/`에 무기·아이템 등급 확률·스킬 밸런스/등급 가중치·스킬 이펙트·생성 현황·SFX·인카운터 풀·몬스터 CSV를 함께 보관한다. 런타임은 `WEAPON_ASSETS.csv`·`ITEM_RARITY_PROBABILITIES.csv`·`SKILL_BALANCE.csv`·`SKILL_RARITY_PROBABILITIES.csv`·`ENCOUNTER_POOL.csv`와 새 기본 난이도의 `MONSTER_STATS.csv`·`MONSTER_SPAWN_PROBABILITIES.csv`·`MONSTER_ENCOUNTERS.csv`를 읽고 같은 여덟 경로를 빌드의 UFS RuntimeDependency에 지정한다. VFX·SFX·`MONSTER_ASSETS.csv`는 원본·제작 상태를 기록하는 자료 목록이다. 기존 카탈로그 생성 도구는 폐기 상태를 유지하고 새 생성 입력은 `DrGameSkillSpecs.json`을 사용한다.
 
 CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한다. 앞뒤 공백·선행 `+`·선행 0은 허용하며 소수·접미 문자·쉼표·지수 표기·범위 초과는 카탈로그 전체를 거절하고 기존 출력을 보존한다. 기존 4/5열 CSV와 저장된 카탈로그의 해석을 유지하며 같은 가격 검증을 6/7열에도 적용한다.
 

@@ -1,4 +1,5 @@
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
+#include "Game/Run/RunWeaponSkillRules.h"
 #include "Combat/Round/CombatPlanValidator.h"
 #include "Unit/UnitDataRules.h"
 #include "Combat/Library/CombatTargetingLibrary.h"
@@ -47,7 +48,7 @@ FName UCombatCheckpointLibrary::ResolveSavedSkillId(FName SkillId)
     return Redirected.IsValid() ? FName(*Redirected.ToString()) : SkillId;
 }
 
-bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint, const TArray<FRunPartyMember>& Party, FText& OutError)
+bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint, const TArray<FRunPartyMember>& Party, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules)
 {
     OutError = NSLOCTEXT("CombatCheckpoint", "Invalid", "전투 체크포인트가 손상되었거나 현재 콘텐츠와 호환되지 않습니다.");
     const bool bRound = Checkpoint.SchemaVersion == CurrentSchemaVersion;
@@ -163,7 +164,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
             {
                 FCombatRoundSkill RoundSkill;
                 FText SkillError;
-                if (!Skill || !Skill->ResolveRoundSkill(RoundSkill, SkillError) || SkillIds.Contains(Skill->GetPrimaryAssetId())) return false;
+                if (!Skill || !(WeaponSkillRules ? RunWeaponSkillRules::ResolveSkill(Path, *WeaponSkillRules, RoundSkill, SkillError) : Skill->ResolveRoundSkill(RoundSkill, SkillError)) || SkillIds.Contains(Skill->GetPrimaryAssetId())) return false;
                 if (RunRecoveryRules::IsConsumable(RoundSkill)) return false;
                 SkillPaths.Add(Path);
                 SkillIds.Add(Skill->GetPrimaryAssetId());
@@ -204,7 +205,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
     {
         return false;
     }
-    if (bRound && !CombatPlanValidation::ValidateCheckpointPlans(Checkpoint, OutError)) return false;
+    if (bRound && !CombatPlanValidation::ValidateCheckpointPlans(Checkpoint, OutError, WeaponSkillRules)) return false;
     if (Checkpoint.bHasOpponentSnapshot)
     {
         if (!IsAssetPath(Checkpoint.OpponentCatalog))

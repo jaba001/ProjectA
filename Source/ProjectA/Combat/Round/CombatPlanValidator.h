@@ -4,6 +4,7 @@
 #include "Combat/Round/CombatRoundTypes.h"
 
 struct FCombatCheckpointData;
+struct FRunWeaponSkillRulesState;
 
 // Actor-free planning inputs are shared by live commands and serialized checkpoints.
 // 액터 없는 계획 입력을 실시간 명령과 직렬화된 체크포인트에서 공유합니다.
@@ -37,5 +38,5 @@ namespace CombatPlanValidation
     PROJECTA_API bool ValidateCommand(const FState& State, const FCombatRoundCommand& Command, FText& OutError);
     PROJECTA_API bool ValidateMoveDestination(const FState& State, const FUnit& Unit, FIntPoint Destination, FText& OutError);
     PROJECTA_API bool ValidateDestinations(const FState& State, FText& OutError);
-    PROJECTA_API bool ValidateCheckpointPlans(const FCombatCheckpointData& Checkpoint, FText& OutError);
+    PROJECTA_API bool ValidateCheckpointPlans(const FCombatCheckpointData& Checkpoint, FText& OutError, const FRunWeaponSkillRulesState* WeaponSkillRules = nullptr);
 }

@@ -97,7 +97,7 @@ bool ACombatRoundCoordinator::CapturePlanningCheckpoint(FCombatCheckpointData& O
         Plan.MoveDestinationCoord = Plan.bHasMovePlan ? Entry.MoveDestinationCoord : Entry.HomeCoord;
         Plan.bReady = Saved.bDead || Entry.bReady;
     }
-    if (!UCombatCheckpointLibrary::Validate(Candidate, Run->GetPartyMembers(), OutError)) return false;
+    if (!UCombatCheckpointLibrary::Validate(Candidate, Run->GetPartyMembers(), OutError, &Run->GetWeaponSkillRules())) return false;
     OutCheckpoint = MoveTemp(Candidate);
     OutError = FText::GetEmpty();
     return true;
@@ -111,7 +111,7 @@ bool ACombatRoundCoordinator::RestorePlanningCheckpoint(const FCombatCheckpointD
     if (!HasAuthority() || !Run || Run->GetPhase() != ERunPhase::Combat || !Authority || Checkpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion || View.Units.Num() != Checkpoint.Units.Num() || !IsValid(Arena) || !IsValid(Arena->Grid) || !Projectiles.IsEmpty() || !FRunIdentityData::StaticStruct()->CompareScriptStruct(&Run->GetRunIdentity(), &Checkpoint.Identity, 0)) return false;
     if (Checkpoint.Identity.Origin == ERunIdentityOrigin::LegacyOffline && GetNetMode() != NM_Standalone) return false;
     if (!ActiveEffects.IsEmpty()) return false;
-    if (!UCombatCheckpointLibrary::Validate(Checkpoint, Run->GetPartyMembers(), OutError)) return false;
+    if (!UCombatCheckpointLibrary::Validate(Checkpoint, Run->GetPartyMembers(), OutError, &Run->GetWeaponSkillRules())) return false;
     OutError = FText::FromString(TEXT("저장된 유닛의 소유권·체력·행동력·배치를 복원하지 못했습니다."));
     FCombatRoundView Restored = View;
     Restored.RoundNumber = Checkpoint.RoundNumber;

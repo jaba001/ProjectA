@@ -864,3 +864,21 @@ TODO 29의 `SM_Sword` 외형·등급 추가 확인은 해당 미지원 행이 �
 Native 회귀 3개(`ProjectA.Run.Dungeon.FrozenBoundariesAndRandomIsolation`, `LegacyCorruptionAndAtomicFailures`, `FrozenPlanSerialization`)를 작성하고 기존 배치 회귀 2개를 8개 변형으로 확장해 컴파일했다. 저장 손상·시드 분리·60/9방문·방향별 후보 순서·SaveGame 왕복과 실제 Continue/표시 뷰의 계획 보존을 검사하도록 구성했다. 기존 PIE 검수에는 저장 변형과 이동 경로 일치·구간 캐시 2개 상한을 추가했다. 독립 코드 검토와 문서 11개·로컬 링크 767개·diff 정적 검사를 통과했으며 TODO의 선택 7개와 미완료 항목을 보존했다. 근거는 `Saved/Automation/SeededDungeon_20261009/DocumentationValidation.json`·`StaticChecks.json`이다.
 
 게임·PIE·자동화 테스트·패키지는 실행하지 않았으며 에디터·IDE도 열지 않았다. 이전 9-35의 컴파일과 과거 화면 성공을 이번 변경의 실행 근거로 사용하지 않는다. 동일 시드/재개·구간 수·숨김·2인 경로 일치의 실제 확인은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 유지한다.
+
+### 9-37 2026-10-09 스킬 수치·등급과 장비별 추첨
+
+2026-10-09 사용자 수치 설계 위임에 따라 기존 무기 후보 62종의 고유 스킬 등급·기본 가중치·위력·AP/SAP·선딜을 `SKILL_BALANCE.csv` 11열에 정리하고 장비 5등급×스킬 5등급의 가중치를 `SKILL_RARITY_PROBABILITIES.csv` 25행·6열로 분리했다. 기준 커밋은 `00773132`이며 작업 시작의 Git 상태는 깨끗했다. 등급 분포는 흰색 7·초록색 15·파란색 17·보라색 15·주황색 8이다. 기본 가중치 1·AP 1·SAP 0과 기존 선딜을 유지하고 범위/연쇄의 대상 수를 고려해 위력을 배정했다. 별도 기본 공격 2·몬스터 12·회복 소모품 1종은 유지한다. 수치와 확률표는 [GAME_DESIGN 2-4-6](GAME_DESIGN.md#2-4-6-스킬-등급과-장비별-추첨-확률)을 따른다.
+
+추첨은 기존 무기 GameplayTagQuery를 만족하는 양수 후보의 스킬 등급만 재정규화하고 등급 안에서 기본 가중치로 중복 없이 선택한다. 후보 개수로 등급 확률이 달라지지 않으며 사본당 1스킬을 유지한다. 활의 흰색/파란색 두 후보와 석궁의 흰색 한 후보도 같은 규칙을 사용한다. 장비 등급별 최종 가중치는 흰색 `80/18/2/0/0`, 초록색 `45/40/13/2/0`, 파란색 `18/32/38/11/1`, 보라색 `5/15/35/38/7`, 주황색 `1/4/20/45/30`이다.
+
+새 Run은 규칙 `SchemaVersion=1` 안에 `BalanceVersion=1`·후보 수치·가중치를 저장하고 사본의 `SkillBalanceVersion/GrantedSkillBalances`에 표시·검증용 결과를 보존한다. 이전 버전 0의 풀·원본 수치·사본은 유지하고 CSV를 재개 때 소급 적용하지 않는다. 파서는 누락·중복·잘못된 ID/경로/태그·수치·가중치 합계를 거절하고 실패 시 기존 상태를 보존한다. 두 CSV를 UFS RuntimeDependency에 포함한다. UI는 서버가 확정한 스킬 등급·위력·비용을 사본에서 표시한다.
+
+전투와 체크포인트 검증·복구는 현재 Run의 고정 수치를 양 팀의 같은 SkillId에 동일 적용한다. Snapshot 자체의 스킬 목록·캐릭터 수치는 변경하지 않으며 상대 Run의 과거 수치별 경쟁 재현이나 온라인 검증을 추가하지 않는다. GAS 태그·효과·충돌·범위·체인·몽타주 시점과 원본 에셋은 유지한다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64` 컴파일·링크는 최초 44.51초, 독립 검토 보완 후 최종 17.71초에 성공했다. 로그는 `Saved/Automation/SkillBalance_20261009/EditorBuild.log`·`EditorBuild.Final.log`다. 기본 시험 Query만 전환해 별도 GAS 조건을 보존하고, 후보의 다중 등급 태그를 거절하며 실제 선택 등급과 후보 등급도 대조한다.
+
+Native 회귀 5개(`ProjectA.Run.SkillBalance.CsvAtomicityAndFrozenSave`, `EquipmentWeightsAndFrozenCopies`, `ProjectA.Combat.SkillBalance.FrozenProfileContract`, `ProjectA.Checkpoint.SkillBalance.SharedCostsAndLegacy`, `SerializedFrozenSnapshot`)와 기존 무기 규칙 검수 보완을 작성·컴파일했다. CSV 실패 원자성·등급별 추첨·사본 수치 변조·기존 버전·SaveGame 왕복·양 팀 AP/SAP·Snapshot 계획을 다룬다. 정상 Run PIE 검수의 장비·보상 평가도 저장된 수치를 사용하도록 갱신했지만 실행하지 않았다.
+
+CSV 작성 도구의 숫자형·재읽기·미리보기와 별도 CSV 정적 검증에서 62개 ID/원본 경로·등급 분포·25개 가중치·행 합계 100을 확인했다. 문서 11개·로컬 링크 784개·전체 diff 정적 검사를 통과했으며 TODO의 선택 7개와 미완료 37개를 보존했다. 근거는 `Saved/Automation/SkillBalance_20261009/Validation.json`·`IndependentValidation.json`·`DocumentationValidation.json`·`StaticChecks.json`이다. 원본 에셋 변경·기존 미커밋 변경은 없다.
+
+게임·PIE·자동화 테스트·패키지는 실행하지 않았으며 에디터·IDE도 열지 않았다. 이전 이력의 성공을 이번 변경의 동작 근거로 사용하지 않는다. 실제 화면·등급 추첨·CSV 변경 후 재개·전투 수치와 체크포인트 복원은 [TODO 29](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)에 유지한다.

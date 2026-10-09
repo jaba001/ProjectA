@@ -26,6 +26,7 @@
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/Run/RunWeaponSkillRules.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
 #include "GAS/Attribute/AS_Unit.h"
@@ -530,7 +531,7 @@ namespace NormalTargetRunReview
                 if (Reward.SchemaVersion == 2)
                 {
                     if (!Check(Reward.ItemChoices.Num() == 3 && Reward.GoldChoices.IsEmpty() && Reward.BonusGold > 0, TEXT("A normal weapon Run offers three actual items and one shared gold amount."))) return End();
-                    for (int32 Index = 1; Index < Reward.ItemChoices.Num(); ++Index) if (SkillUtility(Reward.ItemChoices[Index].GrantedSkills) > SkillUtility(Reward.ItemChoices[Choice].GrantedSkills)) Choice = Index;
+                    for (int32 Index = 1; Index < Reward.ItemChoices.Num(); ++Index) if (SkillUtility(Reward.ItemChoices[Index].GrantedSkills, Run->GetWeaponSkillRules()) > SkillUtility(Reward.ItemChoices[Choice].GrantedSkills, Run->GetWeaponSkillRules())) Choice = Index;
                     Event(Run, TEXT("request_offered_item_reward"), Reward.ItemChoices[Choice].DisplayName.ToString());
                 }
                 else
@@ -549,19 +550,18 @@ namespace NormalTargetRunReview
             return false;
         }
 
-        // Evaluate visible loadouts on copies; the production requests still validate and save every change.
-        // 표시된 장비를 사본에서 평가하며 실제 변경은 기존 요청의 검증과 저장을 거칩니다.
-        static float SkillUtility(const TArray<FSoftObjectPath>& Paths)
+        // Evaluate copies with the frozen combat rules; production requests validate and save every change.
+        // 고정 전투 규칙으로 사본을 평가하며 실제 변경은 기존 요청의 검증과 저장을 거칩니다.
+        static float SkillUtility(const TArray<FSoftObjectPath>& Paths, const FRunWeaponSkillRulesState& Rules)
         {
             float Damage = 0.f;
             float Healing = 0.f;
             float Shield = 0.f;
             for (const FSoftObjectPath& Path : Paths)
             {
-                const USkillDefinitionDataAsset* Asset = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
                 FCombatRoundSkill Skill;
                 FText Error;
-                if (!Asset || !Asset->ResolveRoundSkill(Skill, Error)) continue;
+                if (!RunWeaponSkillRules::ResolveSkill(Path, Rules, Skill, Error)) continue;
                 const FGameplayTagContainer Tags = EffectiveTags(Skill);
                 float Power = Skill.Power / FMath::Max(1, Skill.ActionPointCost);
                 if (CombatRoundRules::UsesChain(Skill)) for (int32 Jump = 1; Jump < Skill.Chain.MaxTargets; ++Jump) Power += Skill.Power * FMath::Pow(Skill.Chain.DamageMultiplierPerJump, static_cast<float>(Jump)) / FMath::Max(1, Skill.ActionPointCost);
@@ -574,7 +574,7 @@ namespace NormalTargetRunReview
 
         bool ImproveEquipment(URunStateSubsystem* Run, const FRunPartyMember& Member, const FString& VisitKey)
         {
-            const float CurrentUtility = SkillUtility(Member.Skills);
+            const float CurrentUtility = SkillUtility(Member.Skills, Run->GetWeaponSkillRules());
             float BestUtility = CurrentUtility;
             FRunEquipmentCommand Best;
             Best.CharacterId = Member.CharacterId;
@@ -589,7 +589,7 @@ namespace NormalTargetRunReview
                     FRunPartyMember Candidate = Member;
                     FText Error;
                     if (!RunEquipmentRules::Apply(Candidate, Command, Error)) continue;
-                    const float Utility = SkillUtility(Candidate.Skills);
+                    const float Utility = SkillUtility(Candidate.Skills, Run->GetWeaponSkillRules());
                     if (Utility <= BestUtility + KINDA_SMALL_NUMBER) continue;
                     BestUtility = Utility;
                     Best = Command;
@@ -617,7 +617,7 @@ namespace NormalTargetRunReview
                     Command.TargetSlot = URunEquipmentCatalog::GetWeaponSlot(SlotIndex);
                     FText Error;
                     if (!RunEquipmentRules::Apply(Candidate, Command, Error)) continue;
-                    const float Utility = SkillUtility(Candidate.Skills);
+                    const float Utility = SkillUtility(Candidate.Skills, Run->GetWeaponSkillRules());
                     if (Utility <= BestUtility + KINDA_SMALL_NUMBER) continue;
                     BestUtility = Utility;
                     Purchase = &Offer;

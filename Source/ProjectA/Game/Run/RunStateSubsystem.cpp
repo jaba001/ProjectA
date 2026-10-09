@@ -451,7 +451,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
             return false;
         }
         FText CheckpointError;
-        if (!UCombatCheckpointLibrary::Validate(Checkpoint, Save->Party, CheckpointError))
+        if (!UCombatCheckpointLibrary::Validate(Checkpoint, Save->Party, CheckpointError, &Save->WeaponSkillRules))
         {
             if (!CheckpointError.IsEmpty()) OutError = CheckpointError;
             return false;
