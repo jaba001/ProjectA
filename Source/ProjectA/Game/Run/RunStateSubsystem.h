@@ -48,6 +48,7 @@ public:
     bool InitializeTargetRun(const TArray<FRunPartyMember>& Members, FText& OutError);
     bool IsTargetRun() const { return TargetRun.SchemaVersion == 1; }
     const FRunTargetState& GetTargetRunState() const { return TargetRun; }
+    bool GetCurrentCombatArenaId(FName& OutArenaId, FText& OutError) const;
     bool ResolveMemberProfession(const FRunPartyMember& Member, FProfessionDefinition& OutProfession, FText& OutError) const;
     const FRunRecoveryState& GetRecoveryState() const { return TargetRun.Recovery; }
     bool PurchaseRecoveryOffer(const FRunAccountId& AccountId, FGuid CharacterId, FName OfferId, FText& OutError, int32 ExpectedRevision);

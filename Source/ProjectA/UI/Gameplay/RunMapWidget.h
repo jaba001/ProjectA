@@ -13,6 +13,26 @@ class UGameplayActionButton;
 class USizeBox;
 struct FGameplayViewState;
 
+USTRUCT()
+struct FRunPveDifficultyCardWidgets
+{
+    GENERATED_BODY()
+
+    UPROPERTY(Transient)
+    TObjectPtr<UVerticalBox> Content;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> Heading;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> Arena;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> ArenaDescription;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> Monsters;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> Stats;
+    FGameplayTag ConfiguredTag;
+};
+
 UCLASS()
 class PROJECTA_API URunMapWidget : public UCommonActivatableWidget
 {
@@ -59,6 +79,9 @@ private:
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UGameplayActionButton>> PveDifficultyButtons;
+
+    UPROPERTY(Transient)
+    TArray<FRunPveDifficultyCardWidgets> PveDifficultyCards;
 
     FName PveNodeId;
     TArray<FGameplayTag> PveDifficultyTags;

@@ -1,5 +1,6 @@
 #include "Game/Run/RunPveDifficulty.h"
 
+#include "Game/Encounter/CombatArenaEnvironment.h"
 #include "Game/Run/RunProgressRules.h"
 #include "Game/Run/TargetRunTypes.h"
 #include "Misc/FileHelper.h"
@@ -48,17 +49,27 @@ namespace RunPveDifficultyInternal
 
     bool Empty(const FRunPveDifficultyState& State)
     {
-        return State.SchemaVersion == 0 && State.Rules.IsEmpty() && State.SelectedTags.IsEmpty();
+        return State.SchemaVersion == 0 && State.PresentationVersion == 0 && State.Rules.IsEmpty() && State.SelectedTags.IsEmpty();
     }
 
     bool ValidRules(const FRunPveDifficultyState& State)
     {
-        if (State.SchemaVersion != 1 || State.Rules.Num() != DifficultyCount || State.SelectedTags.Num() > GroupCount) return false;
+        if (State.SchemaVersion != 1 || State.PresentationVersion < 0 || State.PresentationVersion > 1 || State.Rules.Num() != DifficultyCount || State.SelectedTags.Num() > GroupCount) return false;
         const TArray<FGameplayTag> ExpectedTags = Tags();
+        TSet<FName> ArenaIds;
         for (int32 Index = 0; Index < DifficultyCount; ++Index)
         {
             const FRunPveDifficultyRule& Rule = State.Rules[Index];
             if (Rule.DifficultyTag != ExpectedTags[Index] || !ValidText(Rule.DisplayName.ToString(), 64) || !FMath::IsFinite(Rule.HPScale) || Rule.HPScale <= 0.f || !FMath::IsFinite(Rule.SpeedScale) || Rule.SpeedScale <= 0.f || !FMath::IsFinite(Rule.GoldScale) || Rule.GoldScale <= 0.f) return false;
+            if (State.PresentationVersion == 0)
+            {
+                if (!Rule.ArenaId.IsNone()) return false;
+            }
+            else
+            {
+                if (!CombatArenaEnvironment::Find(Rule.ArenaId) || ArenaIds.Contains(Rule.ArenaId)) return false;
+                ArenaIds.Add(Rule.ArenaId);
+            }
         }
         for (FGameplayTag Tag : State.SelectedTags) if (!ExpectedTags.Contains(Tag)) return false;
         return true;
@@ -152,6 +163,7 @@ bool RunPveDifficulty::LoadFromString(FString Csv, FRunPveDifficultyState& State
     for (int32 Index = 0; Index < UE_ARRAY_COUNT(Headers); ++Index) if (FCString::Strcmp(Rows[0][Index], Headers[Index]) != 0) return false;
     FRunPveDifficultyState Candidate;
     Candidate.SchemaVersion = 1;
+    Candidate.PresentationVersion = 1;
     const TArray<FGameplayTag> Tags = RunPveDifficultyInternal::Tags();
     for (int32 Index = 0; Index < RunPveDifficultyInternal::DifficultyCount; ++Index)
     {
@@ -161,6 +173,16 @@ bool RunPveDifficulty::LoadFromString(FString Csv, FRunPveDifficultyState& State
         Rule.DifficultyTag = Tags[Index];
         Rule.DisplayName = FText::FromString(Row[0]);
         if (!RunPveDifficultyInternal::ParseScale(Row[2], Rule.HPScale) || !RunPveDifficultyInternal::ParseScale(Row[3], Rule.SpeedScale) || !RunPveDifficultyInternal::ParseScale(Row[4], Rule.GoldScale)) return false;
+        // Resolve tag queries only when creating a Run; saved mappings never follow later catalog reordering.
+        // 태그 쿼리는 Run 생성 시에만 해석하며 저장된 연결은 이후 카탈로그 순서 변경을 따르지 않습니다.
+        FGameplayTagContainer DifficultyTags;
+        DifficultyTags.AddTag(Rule.DifficultyTag);
+        for (const FCombatArenaEnvironmentProfile& Profile : CombatArenaEnvironment::GetProfiles())
+        {
+            if (Profile.DifficultyQuery.IsEmpty() || !Profile.DifficultyQuery.Matches(DifficultyTags)) continue;
+            if (!Rule.ArenaId.IsNone()) return false;
+            Rule.ArenaId = Profile.ArenaId;
+        }
         Candidate.Rules.Add(MoveTemp(Rule));
     }
     if (!RunPveDifficultyInternal::ValidRules(Candidate)) return false;
@@ -213,6 +235,33 @@ bool RunPveDifficulty::Resolve(const FRunTargetState& State, int32 CombatIndex, 
     return true;
 }
 
+bool RunPveDifficulty::ResolveArena(const FRunTargetState& State, int32 CombatIndex, FName& OutArenaId, FText& OutError)
+{
+    OutError = NSLOCTEXT("RunPveDifficulty", "InvalidArena", "저장된 PvE 전투 무대 또는 확정된 난이도를 해석할 수 없습니다.");
+    if (State.SchemaVersion != 1 || State.Groups.Num() != RunPveDifficultyInternal::GroupCount || CombatIndex < 0 || CombatIndex >= RunPveDifficultyInternal::GroupCount * 2) return false;
+    if (State.PveDifficulty.SchemaVersion == 0)
+    {
+        if (!RunPveDifficultyInternal::Empty(State.PveDifficulty)) return false;
+    }
+    else
+    {
+        if (!RunPveDifficultyInternal::ValidPolicy(State)) return false;
+        if (CombatIndex % 2 == 0)
+        {
+            if (!State.PveDifficulty.SelectedTags.IsValidIndex(CombatIndex / 2)) return false;
+            const FGameplayTag Selected = State.PveDifficulty.SelectedTags[CombatIndex / 2];
+            const FRunPveDifficultyRule* Rule = State.PveDifficulty.Rules.FindByPredicate([Selected](const FRunPveDifficultyRule& Entry) { return Entry.DifficultyTag == Selected; });
+            if (!Rule) return false;
+            OutArenaId = Rule->ArenaId;
+            OutError = FText::GetEmpty();
+            return true;
+        }
+    }
+    OutArenaId = NAME_None;
+    OutError = FText::GetEmpty();
+    return true;
+}
+
 bool RunPveDifficulty::BuildOffers(const FRunTargetState& State, int32 CombatIndex, TArray<FRunPveDifficultyOffer>& OutOffers, FText& OutError)
 {
     OutError = NSLOCTEXT("RunPveDifficulty", "InvalidOffers", "PvE 난이도 선택지를 구성할 수 없습니다.");
@@ -226,6 +275,7 @@ bool RunPveDifficulty::BuildOffers(const FRunTargetState& State, int32 CombatInd
         FRunPveDifficultyOffer Offer;
         Offer.DifficultyTag = Rule.DifficultyTag;
         Offer.DisplayName = Rule.DisplayName;
+        Offer.ArenaId = Rule.ArenaId;
         Offer.HPScale = Rule.HPScale;
         Offer.SpeedScale = Rule.SpeedScale;
         Offer.GoldScale = Rule.GoldScale;
@@ -238,6 +288,7 @@ bool RunPveDifficulty::BuildOffers(const FRunTargetState& State, int32 CombatInd
             Offer.GoldMax = FMath::Max(Offer.GoldMax, Value);
         }
         for (const FRunMonsterDefinition& Monster : Roster) Offer.TotalEnemyHP += Monster.MaxHP;
+        Offer.EnemyRoster = MoveTemp(Roster);
         Offers.Add(MoveTemp(Offer));
     }
     OutOffers = MoveTemp(Offers);

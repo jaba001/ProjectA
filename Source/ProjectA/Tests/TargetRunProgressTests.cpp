@@ -469,13 +469,18 @@ bool FTargetRunPveDifficultyTransactionTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("A registered non-difficulty content tag cannot start PvE"), Fixture.Run->BeginEncounter(Node, FRunEncounterOffer::GetRecoveryTag()));
         TestTrue(TEXT("Rejected choices preserve phase history rewards party bytes and publication count"), SameTargetTransactionState(*BeforeMap.Get(), *Fixture.Run.Get()) && BeforeMapBytes == Fixture.ReadBytes() && Publications == 0);
         if (!TestTrue(TEXT("An explicit high choice atomically enters preparation"), Fixture.Run->BeginEncounter(Node, RunPveDifficulty::GetHighTag()) && Fixture.Run->GetPhase() == ERunPhase::Preparing && Fixture.Run->GetTargetRunState().PveDifficulty.SelectedTags == TArray<FGameplayTag>{RunPveDifficulty::GetHighTag()})) return false;
+        FName PreparedArena;
+        if (!TestTrue(TEXT("Preparation resolves the high card's frozen environment before spawning"), Fixture.Run->GetCurrentCombatArenaId(PreparedArena, Fixture.Error) && PreparedArena == Fixture.Run->GetTargetRunState().PveDifficulty.Rules[2].ArenaId && !PreparedArena.IsNone())) return false;
         TestTrue(TEXT("Preparation retains the previous durable Map until a supported checkpoint"), BeforeMapBytes == Fixture.ReadBytes());
         const FRunTargetState BeforeAbort = Fixture.Run->GetTargetRunState();
         Publications = 0;
         FRunCheckpointStorage::FailNextWriteForTesting();
         TestFalse(TEXT("Failed cancellation cannot discard the selected difficulty from memory"), Fixture.Run->AbortEncounter());
         TestTrue(TEXT("Rejected Abort retains the selected high policy phase and original file"), Fixture.Run->GetPhase() == ERunPhase::Preparing && FRunTargetState::StaticStruct()->CompareScriptStruct(&BeforeAbort, &Fixture.Run->GetTargetRunState(), 0) && BeforeMapBytes == Fixture.ReadBytes() && Publications == 0);
+        FName RetainedArena;
+        TestTrue(TEXT("Failed preparation cancellation retains the same frozen environment for retry"), Fixture.Run->GetCurrentCombatArenaId(RetainedArena, Fixture.Error) && RetainedArena == PreparedArena);
         if (!TestTrue(TEXT("Abort retry commits one Map transition and removes only the unfinished choice"), Fixture.Run->AbortEncounter() && Fixture.Run->GetPhase() == ERunPhase::Map && Fixture.Run->GetTargetRunState().PveDifficulty.SelectedTags.IsEmpty() && Publications == 1)) return false;
+        TestFalse(TEXT("A successfully cancelled battle cannot resolve a stale active arena on Map"), Fixture.Run->GetCurrentCombatArenaId(RetainedArena, Fixture.Error));
         Fixture.Run->OnRunStateChanged.Clear();
         if (!TestTrue(TEXT("The same node accepts a new explicit choice after a successful Abort"), Fixture.Run->BeginEncounter(Node, SelectedTag) && Fixture.Run->MarkCombatStarted())) return false;
         const FRunTargetState& Target = Fixture.Run->GetTargetRunState();
@@ -483,6 +488,8 @@ bool FTargetRunPveDifficultyTransactionTest::RunTest(const FString& Parameters)
         TArray<FRunMonsterDefinition> Roster;
         TArray<int32> GoldChoices;
         if (!TestTrue(TEXT("The chosen tag resolves its frozen combat roster and reward range"), Rule && RunPveDifficulty::Resolve(Target, 0, Roster, GoldChoices, Fixture.Error) && Roster.Num() == Target.Groups[0].EnemyRoster.Num() && GoldChoices.Num() == 3)) return false;
+        const FName SelectedArena = Rule->ArenaId;
+        TestTrue(TEXT("Reselection resolves only the newly selected card's saved arena"), Fixture.Run->GetCurrentCombatArenaId(RetainedArena, Fixture.Error) && RetainedArena == SelectedArena);
         for (int32 Index = 0; Index < Roster.Num(); ++Index)
         {
             const FRunMonsterDefinition& Base = Target.Groups[0].EnemyRoster[Index];
@@ -503,6 +510,7 @@ bool FTargetRunPveDifficultyTransactionTest::RunTest(const FString& Parameters)
         // 합성 승리는 거래와 보상 정책만 검사하며 생성된 전투나 플레이 품질을 검증했다고 취급하지 않습니다.
         if (!TestTrue(TEXT("The public result path persists the chosen difficulty and bounded common gold"), Fixture.Run->CompleteEncounter(ECombatResult::Victory) && Fixture.Run->GetGoldRewardState().BonusGold >= MinimumGold && Fixture.Run->GetGoldRewardState().BonusGold <= MaximumGold && Fixture.ReloadBoundary(*this))) return false;
         TestTrue(TEXT("Continue data retains exactly the chosen PvE difficulty"), Fixture.Run->GetTargetRunState().PveDifficulty.SelectedTags == TArray<FGameplayTag>{SelectedTag});
+        TestTrue(TEXT("A saved result retains the chosen arena without consulting new creation defaults"), RunPveDifficulty::ResolveArena(Fixture.Run->GetTargetRunState(), 0, RetainedArena, Fixture.Error) && RetainedArena == SelectedArena);
         TStrongObjectPtr<URunSaveGame> Valid(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
         TStrongObjectPtr<URunSaveGame> Forged(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
         if (!Valid || !Forged) return false;
@@ -511,6 +519,12 @@ bool FTargetRunPveDifficultyTransactionTest::RunTest(const FString& Parameters)
         const TArray<uint8> ForgedBytes = Fixture.ReadBytes();
         TestFalse(TEXT("A future selected difficulty cannot be accepted by saved progression validation"), Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error));
         TestTrue(TEXT("Rejected continuation preserves the active valid Run and never rewrites the malformed file"), !Fixture.Error.IsEmpty() && SameTargetTransactionState(*Valid.Get(), *Fixture.Run.Get()) && ForgedBytes == Fixture.ReadBytes());
+        Forged->TargetRun = Valid->TargetRun;
+        Forged->TargetRun.PveDifficulty.Rules[0].ArenaId = TEXT("UntrustedMap");
+        if (!TestTrue(TEXT("Only the disposable save receives an unsupported arena ID"), UGameplayStatics::SaveGameToSlot(Forged.Get(), Fixture.Slot, 0))) return false;
+        const TArray<uint8> ForgedArenaBytes = Fixture.ReadBytes();
+        TestFalse(TEXT("Continue rejects a forged map reference before preparing an environment"), Fixture.Run->LoadStandaloneCheckpoint(Fixture.Error));
+        TestTrue(TEXT("Unsupported saved map rejection preserves active state and the supplied file"), !Fixture.Error.IsEmpty() && SameTargetTransactionState(*Valid.Get(), *Fixture.Run.Get()) && ForgedArenaBytes == Fixture.ReadBytes());
     }
     return true;
 }

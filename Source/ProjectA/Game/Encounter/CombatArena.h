@@ -13,6 +13,7 @@ class PROJECTA_API ACombatArena : public AActor
 
 public:
     ACombatArena();
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Arena")
     TObjectPtr<ACombatGridManager> Grid;
@@ -40,7 +41,32 @@ public:
     virtual void ActivateArena(APlayerController* Controller);
     virtual void CleanupArena();
 
+    // The authority freezes the selected environment; clients reconstruct only its local decoration.
+    // 권위 측이 선택 환경을 고정하고 클라이언트는 로컬 장식만 재구성합니다.
+    bool ApplyEnvironment(FName ArenaId, FText& OutError);
+    void ResetEnvironment();
+
+    UPROPERTY(ReplicatedUsing = OnRep_EnvironmentId, BlueprintReadOnly, Category = "Arena|Presentation")
+    FName EnvironmentId;
+
+protected:
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 private:
     UPROPERTY(Transient)
     TObjectPtr<AActor> RuntimeCamera;
+
+    UPROPERTY(Transient)
+    TObjectPtr<AActor> EnvironmentVisual;
+
+    // Keep original visibility so retries, switching and teardown restore only our own changes.
+    // 재시도·교체·종료 시 이 기능의 변경만 복원하도록 원래 표시 상태를 보관합니다.
+    TMap<TWeakObjectPtr<AActor>, bool> OriginalEnvironmentVisibility;
+    FName AppliedEnvironmentId;
+
+    UFUNCTION()
+    void OnRep_EnvironmentId();
+    bool ApplyEnvironmentVisuals(FName ArenaId, FText& OutError);
+    void ResetEnvironmentVisuals();
 };

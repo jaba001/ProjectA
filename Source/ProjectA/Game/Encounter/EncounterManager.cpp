@@ -104,7 +104,10 @@ bool AEncounterManager::RequestStartNode(FName NodeId, FGameplayTag DifficultyTa
         return FailPreparation(FText::FromString(TEXT("Gameplay setup is incomplete. Check Arena and PartyDefinition. / Gameplay 설정을 확인하세요.")));
     }
     FText ArenaError;
-    if (!Arena->PrepareArena(ArenaError))
+    FName ArenaId;
+    // Resolve the saved choice before preparing scenery; collision and checkpoint coordinates stay fixed.
+    // 저장된 선택의 무대를 먼저 준비하며 충돌과 체크포인트 좌표는 고정합니다.
+    if (!RunState->GetCurrentCombatArenaId(ArenaId, ArenaError) || !Arena->ApplyEnvironment(ArenaId, ArenaError) || !Arena->PrepareArena(ArenaError))
     {
         return FailPreparation(ArenaError);
     }
@@ -284,7 +287,8 @@ bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FTe
         OnFlowChanged.Broadcast();
         return false;
     };
-    if (!Arena->PrepareArena(OutError)) return FailRestore();
+    FName ArenaId;
+    if (!RunState->GetCurrentCombatArenaId(ArenaId, OutError) || !Arena->ApplyEnvironment(ArenaId, OutError) || !Arena->PrepareArena(OutError)) return FailRestore();
     FActorSpawnParameters Params;
     Params.Owner = this;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;

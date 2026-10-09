@@ -13,6 +13,16 @@
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Unit/UnitDataRules.h"
 
+bool URunStateSubsystem::GetCurrentCombatArenaId(FName& OutArenaId, FText& OutError) const
+{
+    OutError = NSLOCTEXT("RunPveDifficulty", "InactiveArena", "전투 준비 또는 진행 중에만 현재 전투 무대를 해석할 수 있습니다.");
+    if (Phase != ERunPhase::Preparing && Phase != ERunPhase::Combat) return false;
+    if (IsTargetRun()) return RunPveDifficulty::ResolveArena(TargetRun, CompletedNodes.Num(), OutArenaId, OutError);
+    OutArenaId = NAME_None;
+    OutError = FText::GetEmpty();
+    return true;
+}
+
 bool URunStateSubsystem::ConfigureTargetRun(URunSaveGame* Save, FText& OutError) const
 {
     const UTargetRunDefinitionDataAsset* Definition = PartyDefinition && PartyDefinition->TargetRunDefinition ? PartyDefinition->TargetRunDefinition.Get() : GetDefault<UTargetRunDefinitionDataAsset>();

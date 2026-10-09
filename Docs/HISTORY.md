@@ -1021,3 +1021,15 @@ Startup/Default MoviePlayer 화면에 기존 DemonicUI 성 배경·하단 밴드
 `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`와 같은 옵션의 `ProjectA Win64 Development` 컴파일·링크가 각각 27.25초·26.86초에 성공했다. 로그는 `Saved/Automation/MeleeVfx_20261010/EditorBuild.log`·`GameBuild.log`다. `ProjectA.Combat.MeleeVfx`의 원본 적용 범위·유닛 몽타주/사본 격리·사용자 설정 보존·기존 시각 데이터 직렬화 회귀 4개를 작성하고 컴파일했으며 실행하지 않았다. 독립 소스 검토에서 서버 권위·태그 조건·판정/저장 경로 보존과 추가 동기 로드가 없음을 확인했다.
 
 문서 링크·TODO 보존·전체 diff 정적 근거는 `Saved/Automation/MeleeVfx_20261010/DocumentationValidation.json`·`StaticReview.json`에 기록한다. 기존 미완료 50개·제안 선택 7개를 보존하고 참격 화면 확인 1개를 추가했다. 게임·PIE·Unreal 자동화 테스트·패키지·화면 캡처와 IDE 실행은 수행하지 않았다. 남녀·반대 방향의 적·Continue·2인 원격에서 최초 발광과 베기 궤적이 일치하는지는 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)의 사용자 확인 전이다.
+
+### 9-49 2026-10-10 PvE 난이도별 전투장과 몬스터 안내
+
+PvE 하·중·상에 서로 다른 맵과 등장 몬스터 설명을 제공하도록 변경했다. 시작 기준은 `16f5b13f`이며 기존 미커밋 변경은 없었다. 새 기본 Run의 표시 버전 1에 하 `MeadowBloom`·중 `DungeonStone`·상 `IceCitadel`을 태그 Query로 연결하여 고정한다. 선택 카드와 전투 시작·체크포인트 복구가 동일한 저장 ID를 해석하며 잘못된 ID·중복·미지원 버전을 거절한다. 기존 표시 버전 0은 원래 배경을 유지하고 추가 추첨·시드 소비·CSV 수치 변경은 없다. [저장·편성 계약](PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터)
+
+통합 Gameplay에 이미 배치된 세 지역의 메시·재질을 직접 참조해 비충돌 임시 장식을 중앙 전투 위치에 표시한다. 일반 메시·ISM 종류와 주요 렌더 설정을 유지하며 전투 구역/카메라 시선을 가리는 장식을 제외한다. 모든 후보 컴포넌트 작성 후에만 배경을 교체하고 실패·퇴장·종료에는 원래 표시 상태를 복원한다. 서버가 확정한 ID의 RepNotify와 BeginPlay가 원격 표시를 연결한다. 실제 그리드·물리 바닥·Nav·카메라·유닛/체크포인트 좌표와 맵/원본 에셋은 변경하지 않았다. 기존 지면 기록과 명세 대조는 `Saved/Automation/PveArenaChoices_20261010/EnvironmentSourceReview.json`이며 과거 기록을 이번 렌더 검수로 취급하지 않는다.
+
+카드는 난이도·전투장 이름/소개·몬스터별 역할/HP/속도/이동거리·합계/보상을 분리한다. 실제 ScaleGroup 결과를 View의 EnemyRoster로 전달하고 UI에서 에셋을 로드하거나 적을 다시 선정하지 않는다. 몬스터 이름은 기존 번역을, 역할은 기존 GameplayTag를 사용한다. 카드 전체 클릭·Host 권한·좌/직/우 순서를 유지하고 패널 높이 상한 520과 양축 스크롤을 적용했다. 한영 리소스에 22키를 추가하여 전체 1,091개의 원문·인자·생성물을 대조했다. [UI 구조](UI_README.md#2-실행과-옵션)
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`는 43.20초에 성공했다. 지면 허용 오차·렌더 설정 보존·환경 회귀 추가를 포함한 최종 증분 빌드도 6.37초에 성공했다. 같은 옵션의 `ProjectA Win64 Development` 컴파일·링크는 31.26초에 성공했으며 오류·경고는 0이다. 로그는 `Saved/Automation/PveArenaChoices_20261010/EditorBuild.log`·`EditorBuild.Final.log`·`GameBuild.log`다. 새 회귀 3개와 기존 선택 취소/저장 실패/재선택/Continue 회귀 보완은 작성·컴파일만 수행했다. `ProjectA.Run.PveDifficulty` 및 `ProjectA.Run.Target.PveDifficulty.ChoiceAbortAndFrozenSave`의 실제 실행은 별도다.
+
+`python Source/ProjectAEditor/Scripts/BuildLocalization.py --check`와 같은 검수 폴더의 `ValidateResources.py`로 한영 바이너리 재해석·원문 CRC·UFS 스테이징 참조를 확인했다. `DocumentationValidation.json`·`StaticReview.json`에 문서 링크·기존 미완료 51개/선택 7개 보존과 확인 1개 추가·전체 diff 정적 근거를 기록한다. 게임·PIE·Unreal 자동화 테스트·패키지·화면 캡처 및 IDE는 실행하지 않았다. 세 배경의 실제 가림/접지·한영 카드 가독성·Continue·늦은 원격 접속·기존 저장 호환은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)의 사용자 확인 전이다. Target의 기존 싱글 경로에 복제 표현을 연결한 것이며 일반 협동 지원 완료를 뜻하지 않는다.

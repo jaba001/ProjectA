@@ -1007,8 +1007,8 @@
     {
       "namespace": "RunMap",
       "key": "DifficultyLegend",
-      "source": "100% = 해당 구간 기본값 · 적 구성·공격 피해·AP는 동일\n승리 보상: 아이템 3개 중 1개 + 랜덤 골드 · 아이템 등급·스킬 확률은 동일합니다.",
-      "translation": "100% = base value for this stage · Enemy roster, attack damage and AP are unchanged\nVictory: choose 1 of 3 items + random gold · Item rarity and skill probabilities are unchanged."
+      "source": "100% = 해당 구간 기본값 · 세 선택의 몬스터 종류·공격 피해·AP는 같습니다.\n승리 보상: 아이템 3개 중 1개 + 랜덤 골드 · 아이템 등급·스킬 확률은 같습니다.",
+      "translation": "100% = this stage's base value · All three choices have the same monster types, attack damage and AP.\nVictory: choose 1 of 3 items + random gold · Item rarity and skill probabilities are the same."
     },
     {
       "namespace": "RunMap",
@@ -1019,14 +1019,14 @@
     {
       "namespace": "RunMap",
       "key": "DifficultyStats",
-      "source": "{0}\n적 {1}명 · 총 HP {2}\n적 HP {3}% · 적 속도 {4}%\n승리 골드 {5}~{6}G ({7}%)",
-      "translation": "{0}\nEnemies {1} · Total HP {2}\nEnemy HP {3}% · Speed {4}%\nVictory gold {5}–{6}G ({7}%)"
+      "source": "적 {0}명 · 총 HP {1}\n적 HP {2}% · 적 속도 {3}%\n승리 골드 {4}~{5}G ({6}%)",
+      "translation": "Enemies {0} · Total HP {1}\nEnemy HP {2}% · Speed {3}%\nVictory gold {4}–{5}G ({6}%)"
     },
     {
       "namespace": "RunMap",
       "key": "DifficultyTooltip",
-      "source": "{0}\n배율은 해당 구간 기본값을 기준으로 합니다. 골드는 표시된 범위에서 정해집니다.\n이 난이도를 선택하면 전투를 시작합니다.",
-      "translation": "{0}\nMultipliers use this stage's base values. Gold is rolled within the displayed range.\nSelect this difficulty to begin combat."
+      "source": "{0} · {1}\n{2}\n\n{3}\n\n{4}\n배율은 해당 구간 기본값을 기준으로 합니다. 골드는 표시된 범위에서 정해집니다.\n이 카드를 선택하면 전투를 시작합니다.",
+      "translation": "{0} · {1}\n{2}\n\n{3}\n\n{4}\nMultipliers use this stage's base values. Gold is rolled within the displayed range.\nSelect this card to begin combat."
     },
     {
       "namespace": "RunMap",
@@ -1038,7 +1038,7 @@
       "namespace": "RunMap",
       "key": "SelectDifficultyToStart",
       "source": "하·중·상 중 하나를 선택하면 전투를 시작합니다.",
-      "translation": "Choose Easy, Normal or Hard to begin combat."
+      "translation": "Choose Low, Medium or High to begin combat."
     },
     {
       "namespace": "RunMap",
@@ -1537,6 +1537,138 @@
       "key": "Cancel",
       "source": "취소",
       "translation": "Cancel"
+    },
+    {
+      "namespace": "CombatArenaEnvironment",
+      "key": "InvalidEnvironment",
+      "source": "선택한 전투 환경을 적용할 수 없습니다. 기존 전장은 유지됩니다.",
+      "translation": "The selected battle environment cannot be applied. The existing battlefield is preserved."
+    },
+    {
+      "namespace": "CombatArenaEnvironment",
+      "key": "MissingRegion",
+      "source": "통합 Gameplay에서 선택한 지역 장식과 중앙 전장을 찾을 수 없습니다.",
+      "translation": "The selected region decorations and central battlefield could not be found in the unified Gameplay world."
+    },
+    {
+      "namespace": "CombatArenaEnvironment",
+      "key": "CreateVisual",
+      "source": "선택한 전투 환경의 표시를 준비하지 못했습니다. 기존 전장은 유지됩니다.",
+      "translation": "The selected battle environment could not be prepared. The existing battlefield is preserved."
+    },
+    {
+      "namespace": "CombatArenaEnvironment",
+      "key": "MeadowName",
+      "source": "꽃 초원",
+      "translation": "Flowering Meadow"
+    },
+    {
+      "namespace": "CombatArenaEnvironment",
+      "key": "MeadowDescription",
+      "source": "풀과 꽃이 둘러싼 탁 트인 전장",
+      "translation": "An open battlefield surrounded by grass and flowers"
+    },
+    {
+      "namespace": "CombatArenaEnvironment",
+      "key": "DungeonName",
+      "source": "석조 던전",
+      "translation": "Stone Dungeon"
+    },
+    {
+      "namespace": "CombatArenaEnvironment",
+      "key": "DungeonDescription",
+      "source": "석재 바닥과 오래된 벽으로 둘러싸인 전장",
+      "translation": "A battlefield enclosed by stone floors and ancient walls"
+    },
+    {
+      "namespace": "CombatArenaEnvironment",
+      "key": "IceName",
+      "source": "얼음 성채",
+      "translation": "Ice Citadel"
+    },
+    {
+      "namespace": "CombatArenaEnvironment",
+      "key": "IceDescription",
+      "source": "눈과 얼음 요새의 잔해가 펼쳐진 전장",
+      "translation": "A battlefield among snow and the ruins of an ice fortress"
+    },
+    {
+      "namespace": "RunPveDifficulty",
+      "key": "InvalidArena",
+      "source": "저장된 PvE 전투 무대 또는 확정된 난이도를 해석할 수 없습니다.",
+      "translation": "The saved PvE arena or confirmed difficulty could not be resolved."
+    },
+    {
+      "namespace": "RunPveDifficulty",
+      "key": "InactiveArena",
+      "source": "전투 준비 또는 진행 중에만 현재 전투 무대를 해석할 수 있습니다.",
+      "translation": "The current arena is only available while preparing or playing a battle."
+    },
+    {
+      "namespace": "RunMap",
+      "key": "MonsterBoss",
+      "source": "우두머리",
+      "translation": "Boss"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "MonsterBrute",
+      "source": "중장형",
+      "translation": "Brute"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "MonsterSkirmisher",
+      "source": "기동형",
+      "translation": "Skirmisher"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "MonsterCommon",
+      "source": "일반형",
+      "translation": "Common"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "MonsterUnclassified",
+      "source": "분류 정보 없음",
+      "translation": "Role unavailable"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "MonsterDetailsUnavailable",
+      "source": "등장 몬스터 상세 정보가 없습니다.",
+      "translation": "Enemy details are unavailable."
+    },
+    {
+      "namespace": "RunMap",
+      "key": "MonsterPreview",
+      "source": "{0} · {1}\nHP {2} · 속도 {3} · 이동 {4}칸",
+      "translation": "{0} · {1}\nHP {2} · Speed {3} · Move {4} tiles"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "LegacyArenaName",
+      "source": "기존 전투장",
+      "translation": "Original Battlefield"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "UnknownArenaName",
+      "source": "전투장 정보 없음",
+      "translation": "Arena unavailable"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "LegacyArenaDescription",
+      "source": "이 Run의 기존 전투 환경을 유지합니다.",
+      "translation": "This Run keeps its original battle environment."
+    },
+    {
+      "namespace": "RunMap",
+      "key": "UnknownArenaDescription",
+      "source": "저장된 전투 환경의 설명을 찾을 수 없습니다.",
+      "translation": "The saved battle environment has no available description."
     }
   ]
 }

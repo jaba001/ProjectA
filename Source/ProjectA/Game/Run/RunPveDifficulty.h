@@ -16,5 +16,6 @@ namespace RunPveDifficulty
     PROJECTA_API bool LoadFromString(FString Csv, FRunPveDifficultyState& State, FText& OutError);
     PROJECTA_API bool Validate(const FRunTargetState& State, const FRunProgressView& Progress, FText& OutError);
     PROJECTA_API bool Resolve(const FRunTargetState& State, int32 CombatIndex, TArray<FRunMonsterDefinition>& OutRoster, TArray<int32>& OutGoldChoices, FText& OutError);
+    PROJECTA_API bool ResolveArena(const FRunTargetState& State, int32 CombatIndex, FName& OutArenaId, FText& OutError);
     PROJECTA_API bool BuildOffers(const FRunTargetState& State, int32 CombatIndex, TArray<FRunPveDifficultyOffer>& OutOffers, FText& OutError);
 }

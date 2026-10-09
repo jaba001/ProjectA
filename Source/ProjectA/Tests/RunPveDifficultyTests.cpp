@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Game/Encounter/CombatArenaEnvironment.h"
 #include "Game/Run/RunProgressRules.h"
 #include "Game/Run/RunPveDifficulty.h"
 #include "Game/Run/RunSaveGame.h"
@@ -60,12 +61,12 @@ namespace RunPveDifficultyTests
 
     bool SamePolicy(const FRunPveDifficultyState& Left, const FRunPveDifficultyState& Right)
     {
-        if (Left.SchemaVersion != Right.SchemaVersion || Left.SelectedTags != Right.SelectedTags || Left.Rules.Num() != Right.Rules.Num()) return false;
+        if (Left.SchemaVersion != Right.SchemaVersion || Left.PresentationVersion != Right.PresentationVersion || Left.SelectedTags != Right.SelectedTags || Left.Rules.Num() != Right.Rules.Num()) return false;
         for (int32 Index = 0; Index < Left.Rules.Num(); ++Index)
         {
             const FRunPveDifficultyRule& A = Left.Rules[Index];
             const FRunPveDifficultyRule& B = Right.Rules[Index];
-            if (A.DifficultyTag != B.DifficultyTag || A.DisplayName.ToString() != B.DisplayName.ToString() || A.HPScale != B.HPScale || A.SpeedScale != B.SpeedScale || A.GoldScale != B.GoldScale) return false;
+            if (A.DifficultyTag != B.DifficultyTag || A.DisplayName.ToString() != B.DisplayName.ToString() || A.ArenaId != B.ArenaId || A.HPScale != B.HPScale || A.SpeedScale != B.SpeedScale || A.GoldScale != B.GoldScale) return false;
         }
         return true;
     }
@@ -93,7 +94,7 @@ bool FRunPveDifficultyCsvTest::RunTest(const FString& Parameters)
     {
         FRunPveDifficultyState Candidate;
         TestFalse(TEXT("Malformed columns, order, tags and numeric syntax are rejected."), RunPveDifficulty::LoadFromString(Csv, Candidate, Error));
-        TestTrue(TEXT("A failed initial load leaves schema zero entirely empty."), !Error.IsEmpty() && Candidate.SchemaVersion == 0 && Candidate.Rules.IsEmpty() && Candidate.SelectedTags.IsEmpty());
+        TestTrue(TEXT("A failed initial load leaves schema zero entirely empty."), !Error.IsEmpty() && Candidate.SchemaVersion == 0 && Candidate.PresentationVersion == 0 && Candidate.Rules.IsEmpty() && Candidate.SelectedTags.IsEmpty());
     }
     FRunPveDifficultyState Disk;
     TestTrue(TEXT("The packaged source CSV uses the same strict three-row contract."), RunPveDifficulty::Load(Disk, Error) && RunPveDifficultyTests::SamePolicy(Disk, Before));
@@ -188,6 +189,78 @@ bool FRunPveDifficultyProgressTest::RunTest(const FString& Parameters)
     TArray<FRunMonsterDefinition> Roster;
     TArray<int32> Gold;
     TestTrue(TEXT("Resolution uses the saved multiplier rather than reloading today's Medium row."), RunPveDifficulty::Resolve(Restored->TargetRun, 0, Roster, Gold, Error) && Roster[0].MaxHP == 125.f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRunPveDifficultyArenaTest, "ProjectA.Run.PveDifficulty.FrozenArenaAndExactRosterPreview", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRunPveDifficultyArenaTest::RunTest(const FString& Parameters)
+{
+    RunPveDifficultyTests::FFixture Fixture;
+    FText Error;
+    if (!TestTrue(TEXT("The unchanged six-column CSV freezes a new presentation policy."), Fixture.Initialize(Error) && Fixture.State.PveDifficulty.PresentationVersion == 1)) return false;
+    const FRunTargetState Before = Fixture.State;
+    const FName ExpectedIds[] = {TEXT("MeadowBloom"), TEXT("DungeonStone"), TEXT("IceCitadel")};
+    TArray<FRunPveDifficultyOffer> Offers;
+    if (!TestTrue(TEXT("Three scenery choices retain the exact scaled monster roster."), RunPveDifficulty::BuildOffers(Fixture.State, 0, Offers, Error) && Offers.Num() == 3)) return false;
+    FName ArenaId = TEXT("CallerRetainedArena");
+    TestFalse(TEXT("An unselected PvE cannot infer its environment from the card order."), RunPveDifficulty::ResolveArena(Fixture.State, 0, ArenaId, Error));
+    TestTrue(TEXT("Failed environment resolution preserves the caller's previous ID."), ArenaId == FName(TEXT("CallerRetainedArena")) && !Error.IsEmpty());
+    for (int32 Index = 0; Index < Offers.Num(); ++Index)
+    {
+        const FRunPveDifficultyOffer& Offer = Offers[Index];
+        const FCombatArenaEnvironmentProfile* Profile = CombatArenaEnvironment::Find(Offer.ArenaId);
+        FGameplayTagContainer Tags;
+        Tags.AddTag(Offer.DifficultyTag);
+        TestTrue(TEXT("Each new choice freezes its unique tag-matched native environment."), Offer.ArenaId == ExpectedIds[Index] && Profile && Profile->DifficultyQuery.Matches(Tags) && Offer.ArenaId == Fixture.State.PveDifficulty.Rules[Index].ArenaId);
+        FRunTargetState Selected = Fixture.State;
+        Selected.PveDifficulty.SelectedTags.Add(Offer.DifficultyTag);
+        TArray<FRunMonsterDefinition> ActualRoster;
+        TArray<int32> ActualGold;
+        if (!TestTrue(TEXT("The selected runtime battle resolves the same arena and monster count as its card."), RunPveDifficulty::ResolveArena(Selected, 0, ArenaId, Error) && ArenaId == Offer.ArenaId && RunPveDifficulty::Resolve(Selected, 0, ActualRoster, ActualGold, Error) && ActualRoster.Num() == Offer.EnemyRoster.Num() && Offer.EnemyCount == ActualRoster.Num())) return false;
+        for (int32 MonsterIndex = 0; MonsterIndex < ActualRoster.Num(); ++MonsterIndex) TestTrue(TEXT("Every previewed name class tag skill HP speed AP SAP and movement value equals the actual spawn definition."), FRunMonsterDefinition::StaticStruct()->CompareScriptStruct(&Offer.EnemyRoster[MonsterIndex], &ActualRoster[MonsterIndex], 0));
+        TestTrue(TEXT("Snapshot encounters explicitly restore the original environment instead of reusing the previous PvE."), RunPveDifficulty::ResolveArena(Selected, 1, ArenaId, Error) && ArenaId.IsNone());
+    }
+    TestTrue(TEXT("Building and resolving cards never rewrites the seed, groups or saved choice policy."), FRunTargetState::StaticStruct()->CompareScriptStruct(&Fixture.State, &Before, 0));
+    for (FName InvalidId : {FName(), FName(TEXT("UntrustedMap")), ExpectedIds[1]})
+    {
+        FRunTargetState Invalid = Fixture.State;
+        Invalid.PveDifficulty.Rules[0].ArenaId = InvalidId;
+        TestFalse(TEXT("Missing, unknown and duplicate saved arena IDs are rejected."), RunPveDifficulty::Validate(Invalid, Fixture.Progress(ERunPhase::Map), Error));
+        TestFalse(TEXT("Invalid saved environments cannot produce selectable cards."), RunPveDifficulty::BuildOffers(Invalid, 0, Offers, Error));
+        TestTrue(TEXT("A rejected preview preserves the previous full card payload."), Offers.Num() == 3 && Offers[0].ArenaId == ExpectedIds[0] && Offers[0].EnemyRoster.Num() == 1 && Offers[0].EnemyRoster[0].MaxHP == 80.f);
+        Invalid.PveDifficulty.SelectedTags.Add(RunPveDifficulty::GetLowTag());
+        ArenaId = TEXT("CallerRetainedArena");
+        TestFalse(TEXT("A forged selected environment fails before spawning."), RunPveDifficulty::ResolveArena(Invalid, 0, ArenaId, Error));
+        TestTrue(TEXT("A failed selected environment does not replace the current presentation ID."), ArenaId == FName(TEXT("CallerRetainedArena")) && !Error.IsEmpty());
+    }
+    for (int32 InvalidVersion : {-1, 2})
+    {
+        FRunTargetState Invalid = Fixture.State;
+        Invalid.PveDifficulty.PresentationVersion = InvalidVersion;
+        TestFalse(TEXT("Unknown environment subversions fail closed."), RunPveDifficulty::Validate(Invalid, Fixture.Progress(ERunPhase::Map), Error));
+    }
+    FRunTargetState Legacy = Fixture.State;
+    Legacy.PveDifficulty.PresentationVersion = 0;
+    TestFalse(TEXT("A legacy presentation version cannot conceal new arena payloads."), RunPveDifficulty::Validate(Legacy, Fixture.Progress(ERunPhase::Map), Error));
+    for (FRunPveDifficultyRule& Rule : Legacy.PveDifficulty.Rules) Rule.ArenaId = NAME_None;
+    TestTrue(TEXT("Existing difficulty saves still validate without adopting new environments."), RunPveDifficulty::Validate(Legacy, Fixture.Progress(ERunPhase::Map), Error));
+    TestTrue(TEXT("Existing difficulty cards gain exact monster details while retaining their original arena."), RunPveDifficulty::BuildOffers(Legacy, 0, Offers, Error) && Offers.Num() == 3 && Offers[0].ArenaId.IsNone() && Offers[0].EnemyRoster[0].MaxHP == 80.f);
+    Legacy.PveDifficulty.SelectedTags.Add(RunPveDifficulty::GetHighTag());
+    TestTrue(TEXT("An old high-difficulty selection resolves the original environment."), RunPveDifficulty::ResolveArena(Legacy, 0, ArenaId, Error) && ArenaId.IsNone());
+    Legacy.PveDifficulty = FRunPveDifficultyState();
+    TestTrue(TEXT("Pre-difficulty custom and saved targets retain their original environment."), RunPveDifficulty::ResolveArena(Legacy, 0, ArenaId, Error) && ArenaId.IsNone());
+    TStrongObjectPtr<URunSaveGame> Save(NewObject<URunSaveGame>());
+    Save->TargetRun = Fixture.State;
+    // A serialized mapping is authoritative even if future creation queries choose a different permutation.
+    // 이후 생성 쿼리가 다른 조합을 선택해도 직렬화된 무대 연결을 권위 값으로 유지합니다.
+    Swap(Save->TargetRun.PveDifficulty.Rules[0].ArenaId, Save->TargetRun.PveDifficulty.Rules[2].ArenaId);
+    Save->TargetRun.PveDifficulty.SelectedTags.Add(RunPveDifficulty::GetLowTag());
+    TArray<uint8> Bytes;
+    if (!TestTrue(TEXT("The presentation subversion and per-rule IDs serialize using existing SaveGame storage."), UGameplayStatics::SaveGameToMemory(Save.Get(), Bytes))) return false;
+    TStrongObjectPtr<URunSaveGame> Restored(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+    if (!TestNotNull(TEXT("The frozen presentation payload restores."), Restored.Get())) return false;
+    TestTrue(TEXT("Continue validates and resolves the saved mapping without reading CSV or reapplying creation queries."), RunPveDifficultyTests::SamePolicy(Restored->TargetRun.PveDifficulty, Save->TargetRun.PveDifficulty) && RunPveDifficulty::Validate(Restored->TargetRun, Fixture.Progress(ERunPhase::Combat, 0), Error) && RunPveDifficulty::ResolveArena(Restored->TargetRun, 0, ArenaId, Error) && ArenaId == ExpectedIds[2]);
     return true;
 }
 
