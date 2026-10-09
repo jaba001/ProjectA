@@ -435,6 +435,7 @@ bool FCombatCheckpointCorruptLoadTest::RunTest(const FString& Parameters)
     // 기존 저장은 명시적인 오프라인 상태를 유지하며 v1에 v3 데이터를 숨길 수 없습니다.
     Disk->Version = 1;
     Disk->EncounterProgress = FRunEncounterProgress();
+    Disk->DungeonState = FRunDungeonState();
     Disk->ItemShopState = FRunItemShopState();
     for (FRunPartyMember& Member : Disk->Party)
     {
@@ -663,6 +664,7 @@ bool FCombatLegacyRoundCheckpointTest::RunTest(const FString& Parameters)
     Legacy->Version = 1;
     Legacy->Identity = FRunIdentityData();
     Legacy->EncounterProgress = FRunEncounterProgress();
+    Legacy->DungeonState = FRunDungeonState();
     Legacy->ItemShopState = FRunItemShopState();
     for (FRunPartyMember& Member : Legacy->Party)
     {

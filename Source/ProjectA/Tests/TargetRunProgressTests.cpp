@@ -6,6 +6,7 @@
 #include "DataAsset/RunEncounterPoolDataAsset.h"
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunDungeonPlan.h"
 #include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunItemShopCatalog.h"
 #include "Game/Run/RunProgressRules.h"
@@ -149,6 +150,7 @@ namespace
 
     bool SameTargetTransactionState(const URunSaveGame& Saved, const URunStateSubsystem& Run)
     {
+        if (!FRunDungeonState::StaticStruct()->CompareScriptStruct(&Saved.DungeonState, &Run.GetDungeonState(), 0)) return false;
         return Saved.Phase == Run.GetPhase() && Saved.Result == Run.GetLastResult() && Saved.CurrentNode == Run.GetCurrentNodeId() && Saved.CurrentEncounter == Run.GetCurrentEncounterId() && Saved.CompletedNodes == Run.GetCompletedNodes() && Saved.WeaponSkillAcquisitionVersion == (Run.UsesWeaponSkills() ? 1 : 0) && FRunWeaponSkillRulesState::StaticStruct()->CompareScriptStruct(&Saved.WeaponSkillRules, &Run.GetWeaponSkillRules(), 0) && SameTargetTransactionParty(Saved.Party, Run.GetPartyMembers()) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Saved.Identity, &Run.GetRunIdentity(), 0) && FRunTargetState::StaticStruct()->CompareScriptStruct(&Saved.TargetRun, &Run.GetTargetRunState(), 0) && FRunEncounterProgress::StaticStruct()->CompareScriptStruct(&Saved.EncounterProgress, &Run.GetEncounterProgress(), 0) && SameTargetRewards(Saved.GoldRewardState, Run.GetGoldRewardState()) && FRunSkillShopState::StaticStruct()->CompareScriptStruct(&Saved.SkillShopState, &Run.GetSkillShopState(), 0) && FRunItemShopState::StaticStruct()->CompareScriptStruct(&Saved.ItemShopState, &Run.GetItemShopState(), 0);
     }
 
@@ -216,6 +218,7 @@ namespace
                 Saved->TargetRun.EncounterSeed = Seed;
                 if (!UTargetRunDefinitionDataAsset::BuildOffers(Saved->TargetRun, 0, 0, Saved->EncounterProgress.Offers)) return false;
                 if (!Saved->EncounterProgress.Offers.ContainsByPredicate([](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag() == FRunEncounterOffer::GetBasicItemShopTag(); })) continue;
+                if (!RunDungeonPlan::Build(*Saved.Get(), Saved->DungeonState, Error)) return false;
                 return FRunCheckpointStorage::Save(Saved.Get(), Slot, Error) && Run->LoadStandaloneCheckpoint(Error);
             }
             return false;
@@ -258,6 +261,11 @@ bool FTargetRunDurableSyntheticResultsTest::RunTest(const FString& Parameters)
     }
     if (!TestTrue(TEXT("Public initialization commits a fresh target Run and its real consumable asset"), Fixture.Run->InitializeTargetRun(Party, Fixture.Error) && Fixture.ReloadBoundary(*this))) return false;
     const FRunIdentityData OriginalIdentity = Fixture.Run->GetRunIdentity();
+    const FRunDungeonState FrozenDungeon = Fixture.Run->GetDungeonState();
+    FGameplayViewState DungeonView = FGameplayViewState::FromRun(Fixture.Run.Get(), FText::GetEmpty());
+    TestTrue(TEXT("Fresh Run initialization and the replicated presentation freeze the complete sixty-visit dungeon."), FrozenDungeon.SchemaVersion == 1 && FrozenDungeon.Visits.Num() == 60 && FRunDungeonState::StaticStruct()->CompareScriptStruct(&FrozenDungeon, &DungeonView.DungeonState, 0));
+    DungeonView.DungeonState.Visits.Reset();
+    TestTrue(TEXT("Changing a local presentation copy cannot mutate the authoritative frozen dungeon."), FRunDungeonState::StaticStruct()->CompareScriptStruct(&FrozenDungeon, &Fixture.Run->GetDungeonState(), 0));
     const FRunTargetState FrozenTarget = Fixture.Run->GetTargetRunState();
     const FRunWeaponSkillRulesState FrozenWeaponRules = Fixture.Run->GetWeaponSkillRules();
     TestTrue(TEXT("New target Runs freeze weapon acquisition and exclude every skill-shop candidate"), Fixture.Run->UsesWeaponSkills() && Fixture.Run->GetSkillShopState().SchemaVersion == 0 && !FrozenTarget.EncounterPool.ContainsByPredicate([](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag().MatchesTag(FRunEncounterOffer::GetSkillShopTag()); }));
@@ -636,6 +644,7 @@ bool FTargetRunLegacyAcquisitionTest::RunTest(const FString& Parameters)
     Save->WeaponSkillRules = FRunWeaponSkillRulesState();
     Save->TargetRun.EncounterSelectionVersion = 0;
     Save->TargetRun.EncounterSeed = 0;
+    Save->DungeonState = FRunDungeonState();
     Save->ItemShopState.SelectionVersion = 0;
     const URunEncounterPoolDataAsset* Pool = Fixture.Run->PartyDefinition->RunEncounterPool ? Fixture.Run->PartyDefinition->RunEncounterPool.Get() : GetDefault<URunEncounterPoolDataAsset>();
     if (!Pool->BuildSkillShop(Save->SkillShopState, Fixture.Error) || Save->SkillShopState.Catalog.Num() < 5) return false;

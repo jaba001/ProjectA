@@ -1,5 +1,6 @@
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunSaveGame.h"
+#include "Game/Run/RunDungeonPlan.h"
 #include "Game/Run/RunIdentityLibrary.h"
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Run/RunContentMigration.h"
@@ -37,6 +38,7 @@ void URunStateSubsystem::ResetDevelopmentRun()
     RunIdentity = FRunIdentityData();
     Participation = FRunParticipationData();
     EncounterProgress = FRunEncounterProgress();
+    DungeonState = FRunDungeonState();
     TargetRun = FRunTargetState();
     SkillShopState = FRunSkillShopState();
     ItemShopState = FRunItemShopState();
@@ -232,6 +234,7 @@ bool URunStateSubsystem::ValidateSave(const URunSaveGame* Save, FText& OutError)
     const FRunProgressView Progress{Save->Nodes, Save->CompletedNodes, Save->CurrentNode, Save->CurrentEncounter, Save->Phase, Save->Result};
     if (!RunProgressRules::ValidateNodes(Route, Progress) || !RunProgressRules::ValidateEncounterProgress(Route, Progress, Save->EncounterProgress)) return false;
     if (!UTargetRunDefinitionDataAsset::Validate(Save->TargetRun, Progress, Save->EncounterProgress, OutError)) return false;
+    if (!RunDungeonPlan::Validate(*Save, OutError)) return false;
     if (Save->WeaponSkillAcquisitionVersion < 0 || Save->WeaponSkillAcquisitionVersion > 1 || (Save->WeaponSkillAcquisitionVersion == 1 && Save->TargetRun.SchemaVersion != 1)) return false;
     if (!RunWeaponSkillRules::Validate(Save->WeaponSkillRules, OutError) || Save->WeaponSkillRules.SchemaVersion != Save->WeaponSkillAcquisitionVersion) return false;
     if (Save->WeaponSkillAcquisitionVersion == 1 && (Save->SkillShopState.SchemaVersion != 0 || Save->TargetRun.EncounterPool.ContainsByPredicate([](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag().MatchesTag(FRunEncounterOffer::GetSkillShopTag()); }))) return false;
@@ -494,6 +497,7 @@ URunSaveGame* URunStateSubsystem::CreateSaveData() const
     Save->Identity = RunIdentity;
     Save->Participation = Participation;
     Save->EncounterProgress = EncounterProgress;
+    Save->DungeonState = DungeonState;
     Save->TargetRun = TargetRun;
     Save->SkillShopState = SkillShopState;
     Save->ItemShopState = ItemShopState;
@@ -561,6 +565,13 @@ bool URunStateSubsystem::CommitSaveCandidate(URunSaveGame* Save, FText& OutError
     // 단계 변경은 검증 전에 저장 형식을 선택하며 비전투 경계에 전투 본문을 남기지 않습니다.
     Save->Version = FRunSaveFormat::Select(bManagedRun, Save->Identity.Origin, Save->Phase);
     if (Save->Phase != ERunPhase::Combat) Save->CombatCheckpoint = FCombatCheckpointData();
+    // Memory-only development Runs must also preserve the frozen encounter-to-layout mapping.
+    // 메모리 전용 개발 Run도 고정한 인카운터와 배치 연결을 유지해야 합니다.
+    if (!bCheckpointSaving && !bRequirePersistence && !RunDungeonPlan::Validate(*Save, OutError))
+    {
+        SaveError = OutError;
+        return false;
+    }
     // Preserve memory-only runs while publishing persistent mutations only after validation and writing succeed.
     // 메모리 전용 Run의 동작을 유지하며 영속 변경은 검증과 저장이 성공한 뒤에만 공개합니다.
     if ((bCheckpointSaving || bRequirePersistence) && !WriteSaveData(Save, OutError))
@@ -720,6 +731,7 @@ bool URunStateSubsystem::SurrenderStandaloneSavedRun(const FString& ExpectedToke
     RunIdentity = FRunIdentityData();
     Participation = FRunParticipationData();
     EncounterProgress = FRunEncounterProgress();
+    DungeonState = FRunDungeonState();
     SkillShopState = FRunSkillShopState();
     ItemShopState = FRunItemShopState();
     TargetRun = FRunTargetState();
@@ -765,6 +777,7 @@ void URunStateSubsystem::ApplySaveData(const URunSaveGame* Save, bool bResetPend
     RunIdentity = Save->Identity;
     Participation = Save->Participation;
     EncounterProgress = Save->EncounterProgress;
+    DungeonState = Save->DungeonState;
     TargetRun = Save->TargetRun;
     SkillShopState = Save->SkillShopState;
     ItemShopState = Save->ItemShopState;
@@ -864,6 +877,7 @@ URunSaveGame* URunStateSubsystem::CreateInitialSaveData(const TArray<FRunPartyMe
     Save->Nodes = RunProgressRules::GetPrototypeRoute().Nodes;
     Save->Phase = ERunPhase::Map;
     Save->Catalog = FSoftObjectPath(PartyDefinition);
+    if (!RunDungeonPlan::Build(*Save, Save->DungeonState, OutError)) return nullptr;
     return Save;
 }
 
@@ -1076,6 +1090,7 @@ void URunStateSubsystem::CloseManagedRun()
     RunIdentity = FRunIdentityData();
     Participation = FRunParticipationData();
     EncounterProgress = FRunEncounterProgress();
+    DungeonState = FRunDungeonState();
     TargetRun = FRunTargetState();
     SkillShopState = FRunSkillShopState();
     ItemShopState = FRunItemShopState();
@@ -1441,7 +1456,7 @@ bool URunStateSubsystem::ContinueRun()
         Save->EncounterProgress.bCompleted = false;
         Save->EncounterProgress.AfterCompletedNodeCount = Save->CompletedNodes.Num();
         Save->EncounterProgress.VisitIndex = 0;
-        if (!UTargetRunDefinitionDataAsset::BuildOffers(Save->TargetRun, Save->CompletedNodes.Num(), 0, Save->EncounterProgress.Offers)) return false;
+        if (!RunDungeonPlan::ResolveOffers(*Save, Save->CompletedNodes.Num(), 0, Save->EncounterProgress.Offers, SaveError)) return false;
     }
     if (Route->bRepeatEncounters && Save->EncounterProgress.SchemaVersion == 1 && Save->CompletedNodes.Num() >= Route->EncounterAfterCompletedNodes && Save->CompletedNodes.Num() < Route->Nodes.Num())
     {
@@ -1634,7 +1649,7 @@ bool URunStateSubsystem::LeaveRunEncounter()
             Save->EncounterProgress.SelectedEncounterId = NAME_None;
             Save->EncounterProgress.bCompleted = false;
             Save->Phase = ERunPhase::EncounterChoice;
-            if (!UTargetRunDefinitionDataAsset::BuildOffers(Save->TargetRun, Save->CompletedNodes.Num(), Save->EncounterProgress.VisitIndex, Save->EncounterProgress.Offers)) return false;
+            if (!RunDungeonPlan::ResolveOffers(*Save, Save->CompletedNodes.Num(), Save->EncounterProgress.VisitIndex, Save->EncounterProgress.Offers, SaveError)) return false;
         }
     }
     return CommitSaveCandidate(Save.Get(), SaveError);

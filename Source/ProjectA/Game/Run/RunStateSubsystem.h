@@ -4,6 +4,7 @@
 #include "Engine/EngineBaseTypes.h"
 #include "Game/Run/RunTypes.h"
 #include "Game/Run/RunEncounterTypes.h"
+#include "Game/Run/RunDungeonTypes.h"
 #include "Game/Run/RunSkillShopTypes.h"
 #include "Game/Run/RunWeaponSkillTypes.h"
 #include "Game/Run/RunGoldRewardTypes.h"
@@ -126,6 +127,7 @@ public:
     const FRunWeaponSkillRulesState& GetWeaponSkillRules() const { return WeaponSkillRules; }
     bool UsesWeaponSkills() const { return WeaponSkillAcquisitionVersion == 1; }
     const FRunEncounterProgress& GetEncounterProgress() const { return EncounterProgress; }
+    const FRunDungeonState& GetDungeonState() const { return DungeonState; }
     void UpdatePartyMemberHP(int32 SlotIndex, float CurrentHP);
 
     FOnRunStateChanged OnRunStateChanged;
@@ -197,6 +199,9 @@ private:
 
     UPROPERTY(Transient)
     FRunEncounterProgress EncounterProgress;
+
+    UPROPERTY(Transient)
+    FRunDungeonState DungeonState;
 
     UPROPERTY(Transient)
     FRunTargetState TargetRun;

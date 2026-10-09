@@ -4,6 +4,7 @@
 #include "GameFramework/SaveGame.h"
 #include "Game/Run/RunTypes.h"
 #include "Game/Run/RunEncounterTypes.h"
+#include "Game/Run/RunDungeonTypes.h"
 #include "Game/Run/RunSkillShopTypes.h"
 #include "Game/Run/RunWeaponSkillTypes.h"
 #include "Game/Run/RunGoldRewardTypes.h"
@@ -45,6 +46,10 @@ public:
     FCombatCheckpointData CombatCheckpoint;
     UPROPERTY()
     FRunEncounterProgress EncounterProgress;
+    // Missing dungeon data preserves the fixed layout of existing saves.
+    // 던전 데이터가 없는 기존 저장은 고정 배치를 유지합니다.
+    UPROPERTY()
+    FRunDungeonState DungeonState;
     UPROPERTY()
     FRunSkillShopState SkillShopState;
     UPROPERTY()

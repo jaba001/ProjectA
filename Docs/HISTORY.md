@@ -850,3 +850,17 @@ TODO 29의 `SM_Sword` 외형·등급 추가 확인은 해당 미지원 행이 �
 경로 축 정렬·통과 셀 바닥·도착점과 NPC 카메라 위치·방향 순서·잘못된 방향을 검사하는 Native 테스트 2개(`ProjectA.Run.EncounterPresentation.DungeonLayoutGeometry`, `DungeonDirectionContract`)를 작성하고 컴파일했다. 기존 PIE·패키지 검수는 표시된 방향 버튼·이동 완료·원래 선택 ID·퇴장 정리를 확인하도록 수정했다. 독립 코드 검토와 문서 11개·로컬 링크 764개·diff 정적 검사를 통과했으며 TODO의 기존 선택 7개와 미완료 항목을 보존했다. 근거는 `Saved/Automation/DungeonEncounter_20261009/DocumentationValidation.json`·`StaticChecks.json`이다.
 
 현재 규칙에 따라 게임·PIE·자동화 테스트·패키지를 실행하지 않았으며 에디터·IDE도 열지 않았다. 과거 9-32·9-33의 공중 전경/NPC 화면 성공은 당시 코드의 이력으로 보존하며 새 미로의 가림·이동·Continue·협동 검증으로 대체하지 않는다. 남은 확인은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완), 현행 구성은 [PROJECT_PLAN 4-13](PROJECT_PLAN.md#4-13-통합-gameplay와-npc-상점)과 [UI_README](UI_README.md)에 기록한다.
+
+### 9-36 2026-10-09 시드별 미로 계획과 구간 재사용
+
+2026-10-09 사용자 요청에 따라 새 Run의 전체 논리 미로를 생성 시 고정하도록 확장했다. `DungeonState` 버전 1은 RunId에서 만든 별도 지형 시드, 일반 Target 60방문·명시적 프로토타입/개발 협동 9방문의 통로 변형과 순서 있는 후보 ID 3개를 저장한다. 8개 통로 변형은 기존 좌회전·직진·우회전 방향을 유지하며 변형 0은 이전 고정 좌표와 같다. 기존 태그·가중치 추첨으로 후보를 고정하고 이후 실제 후보는 저장된 ID를 당시 Run의 풀에서 해석한다. 상품·전투·보상 난수는 소비하지 않는다.
+
+새 필드는 기존 SaveGame 안에 추가하고 바깥 저장 파일 버전은 유지한다. 누락된 계획은 버전 0·빈 값으로 읽어 이전 저장의 고정 배치와 선택 흐름을 소급 변경하지 않는다. 서버가 확정한 계획을 읽기 전용 GameState 뷰로 복제하고 Continue에서도 복원한다. 진행·구매·소유권·Host 선택 권한과 원본 Gameplay·Engine 기본 도형·기존 NPC 설정을 유지하며 신규 에셋은 추가하지 않는다.
+
+로컬 컨트롤러는 서로 떨어진 현재·다음 구간 Actor를 최대 2개 보관하고 방문 이동 때 교환·재사용한다. 같은 변형은 기존 지형을 유지하고 다른 변형만 소유 NPC·ISM 인스턴스·조명을 정리해 재구성한다. 준비 구간은 메시·조명·NPC까지 숨기며 새로 생성한 구성요소에도 표시 상태를 상속한다. 전투 등 비인카운터 단계에는 두 구간 모두 숨긴다. 실제 선택 저장 후 2.8초 이동, 상점 재개의 도착점 복원, 다음 갈림길의 짧은 페이드와 하단 3열/오른쪽 거래 UI는 유지한다.
+
+기준 커밋은 `a05c527f`이며 작업 시작에 기존 미커밋 변경은 없었다. `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64` 컴파일·링크는 최초 45.17초, 검수 소스 보완 후 최종 40.41초에 성공했다. 로그는 `Saved/Automation/SeededDungeon_20261009/EditorBuild.log`·`EditorBuild.Final.log`다.
+
+Native 회귀 3개(`ProjectA.Run.Dungeon.FrozenBoundariesAndRandomIsolation`, `LegacyCorruptionAndAtomicFailures`, `FrozenPlanSerialization`)를 작성하고 기존 배치 회귀 2개를 8개 변형으로 확장해 컴파일했다. 저장 손상·시드 분리·60/9방문·방향별 후보 순서·SaveGame 왕복과 실제 Continue/표시 뷰의 계획 보존을 검사하도록 구성했다. 기존 PIE 검수에는 저장 변형과 이동 경로 일치·구간 캐시 2개 상한을 추가했다. 독립 코드 검토와 문서 11개·로컬 링크 767개·diff 정적 검사를 통과했으며 TODO의 선택 7개와 미완료 항목을 보존했다. 근거는 `Saved/Automation/SeededDungeon_20261009/DocumentationValidation.json`·`StaticChecks.json`이다.
+
+게임·PIE·자동화 테스트·패키지는 실행하지 않았으며 에디터·IDE도 열지 않았다. 이전 9-35의 컴파일과 과거 화면 성공을 이번 변경의 실행 근거로 사용하지 않는다. 동일 시드/재개·구간 수·숨김·2인 경로 일치의 실제 확인은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 유지한다.

@@ -18,6 +18,7 @@
 #include "Game/Encounter/EncounterPrototypeStage.h"
 #include "Game/Encounter/EncounterDungeonLayout.h"
 #include "Game/Run/RunEncounterPool.h"
+#include "Game/Run/RunDungeonPlan.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "HAL/FileManager.h"
@@ -207,8 +208,12 @@ namespace EncounterPresentationPIE
                 if (!Check(Presented.IsValid() && Offer && Presented->MatchesOffer(*Offer) && Screen->GetIsEnabled(), TEXT("The committed shop finishes blending to its matching native NPC stage before enabling its panel."))) return End();
                 const AEncounterDungeonRoute* ArrivedRoute = Cast<AEncounterDungeonRoute>(Presented->GetOwner());
                 const int32 Direction = Run->GetEncounterProgress().Offers.IndexOfByPredicate([Offer](const FRunEncounterOffer& Entry) { return Entry.EncounterId == Offer->EncounterId; });
-                const TArray<FVector> ArrivalPath = EncounterDungeonLayout::GetPath(Direction);
+                const TArray<FVector> ArrivalPath = EncounterDungeonLayout::GetPath(Direction, ArrivedRoute ? ArrivedRoute->GetLayoutVariant() : INDEX_NONE);
                 if (!Check(ArrivedRoute && !ArrivedRoute->IsTraveling() && ArrivedRoute->GetPresentedStage() == Presented.Get() && Presented->Camera && !ArrivalPath.IsEmpty() && Presented->Camera->GetComponentLocation().Equals(ArrivedRoute->GetActorTransform().TransformPosition(ArrivalPath.Last()), 1.f), TEXT("The displayed NPC and final camera belong to the selected direction's exact route endpoint."))) return End();
+                const FRunDungeonState& Plan = Run->GetDungeonState();
+                const int32 Visit = RunDungeonPlan::FindVisit(Plan, Run->GetEncounterProgress());
+                const int32 NextVisit = Plan.Visits.IsValidIndex(Visit + 1) ? Visit + 1 : INDEX_NONE;
+                if (!Check(Plan.Visits.IsValidIndex(Visit) && ArrivedRoute->GetLayoutVariant() == Plan.Visits[Visit].LayoutVariant && Controller->GetResidentDungeonRouteCount() >= 1 && Controller->GetResidentDungeonRouteCount() <= 2 && Controller->GetPreparedDungeonVisitIndex() == NextVisit, TEXT("The arrived room uses its frozen variant and keeps only the current and next logical visit resident."))) return End();
                 if (!Capture(World, TEXT("Shop")) || !CheckFraming(World, Screen)) return End();
                 BeforeInventory = Run->GetItemShopState();
                 if (!Click(Screen, TEXT("Button_ShopInventory"))) return End();
@@ -346,6 +351,7 @@ namespace EncounterPresentationPIE
                 break;
             }
             if (!Check(bFound, TEXT("A bounded deterministic seed search exposes the requested authored encounter group."))) return false;
+            if (!Check(RunDungeonPlan::Build(*Fixture.Get(), Fixture->DungeonState, Error), TEXT("The disposable seed-selected fixture freezes a matching complete dungeon plan: ") + Error.ToString())) return false;
             if (!Check(UGameplayStatics::SaveGameToSlot(Fixture.Get(), Slot, 0) && Run->LoadCheckpoint(Error), TEXT("Public save/load validation accepts only the owned seed-selected fixture: ") + Error.ToString())) return false;
             TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
             Record->SetStringField(TEXT("group"), Groups[GroupIndex].ToString());

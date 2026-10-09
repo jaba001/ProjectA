@@ -72,9 +72,55 @@ void AEncounterDungeonRoute::AddLight(const FVector& Position)
     Light->SetAttenuationRadius(1150.f);
     Light->SetLightColor(FLinearColor(1.f, 0.65f, 0.34f));
     Light->SetCastShadows(false);
+    Light->SetVisibility(bPresentationVisible);
     AddInstanceComponent(Light);
     Light->RegisterComponent();
     Lights.Add(Light);
+}
+
+bool AEncounterDungeonRoute::ConfigureLayout(int32 InLayoutVariant)
+{
+    if (InLayoutVariant < 0 || InLayoutVariant >= EncounterDungeonLayout::VariantCount || !GetWorld() || GetNetMode() == NM_DedicatedServer) return false;
+    if (LayoutVariant == InLayoutVariant)
+    {
+        PrepareGeometry(RouteMaterial);
+        return bGeometryPrepared;
+    }
+    // Replace only scenery owned by this cached route; never alter the authored NPC templates.
+    // 캐시된 통로가 소유한 장식만 교체하며 작성된 NPC 원본은 변경하지 않습니다.
+    StopTravel();
+    DestroyPresentedStage();
+    ClearGeometry();
+    LayoutVariant = InLayoutVariant;
+    ResetAtJunction();
+    return bGeometryPrepared;
+}
+
+void AEncounterDungeonRoute::SetPresentationVisible(bool bVisible)
+{
+    // Hide prewarmed lights explicitly, including components created after this call.
+    // 이후 생성하는 컴포넌트를 포함해 미리 준비한 구간의 조명까지 명시적으로 숨깁니다.
+    bPresentationVisible = bVisible;
+    SetActorHiddenInGame(!bVisible);
+    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars};
+    for (UInstancedStaticMeshComponent* Shape : Shapes) Shape->SetVisibility(bVisible);
+    for (UPointLightComponent* Light : Lights)
+    {
+        if (IsValid(Light) && Light->GetOwner() == this) Light->SetVisibility(bVisible);
+    }
+    if (IsValid(PresentedStage) && PresentedStage->GetOwner() == this) PresentedStage->SetActorHiddenInGame(!bVisible);
+}
+
+void AEncounterDungeonRoute::ClearGeometry()
+{
+    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars};
+    for (UInstancedStaticMeshComponent* Shape : Shapes) Shape->ClearInstances();
+    for (UPointLightComponent* Light : Lights)
+    {
+        if (IsValid(Light) && Light->GetOwner() == this) Light->DestroyComponent();
+    }
+    Lights.Reset();
+    bGeometryPrepared = false;
 }
 
 void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
@@ -102,7 +148,7 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
     }
     if (bGeometryPrepared) return;
 
-    const TSet<FIntPoint> Cells = EncounterDungeonLayout::GetFloorCells();
+    const TSet<FIntPoint> Cells = EncounterDungeonLayout::GetFloorCells(LayoutVariant);
     const float CellSize = EncounterDungeonLayout::CellSize;
     const float WallHeight = EncounterDungeonLayout::WallHeight;
     const FIntPoint Neighbors[] = {FIntPoint(1, 0), FIntPoint(-1, 0), FIntPoint(0, 1), FIntPoint(0, -1)};
@@ -162,8 +208,9 @@ AEncounterPrototypeStage* AEncounterDungeonRoute::ConfigureStage(const AEncounte
     Parameters.Owner = this;
     Parameters.ObjectFlags |= RF_Transient;
     Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    AEncounterPrototypeStage* Stage = GetWorld()->SpawnActor<AEncounterPrototypeStage>(AEncounterPrototypeStage::StaticClass(), EncounterDungeonLayout::GetStageTransform(Direction) * GetActorTransform(), Parameters);
+    AEncounterPrototypeStage* Stage = GetWorld()->SpawnActor<AEncounterPrototypeStage>(AEncounterPrototypeStage::StaticClass(), EncounterDungeonLayout::GetStageTransform(Direction, LayoutVariant) * GetActorTransform(), Parameters);
     if (!Stage) return nullptr;
+    Stage->SetActorHiddenInGame(!bPresentationVisible);
     Stage->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
     Stage->StageId = Template->StageId;
     Stage->StageTitle = Template->StageTitle;
@@ -191,7 +238,7 @@ void AEncounterDungeonRoute::ResetAtJunction()
     DestroyPresentedStage();
     if (!GetWorld() || GetNetMode() == NM_DedicatedServer) return;
     PrepareGeometry(RouteMaterial);
-    const TArray<FVector> Path = EncounterDungeonLayout::GetPath(0);
+    const TArray<FVector> Path = EncounterDungeonLayout::GetPath(0, LayoutVariant);
     if (Path.IsEmpty()) return;
     Camera->SetRelativeLocation(Path[0]);
     Camera->SetRelativeRotation(FRotator::ZeroRotator);
@@ -201,7 +248,7 @@ void AEncounterDungeonRoute::ResetAtJunction()
 bool AEncounterDungeonRoute::StartTravel(int32 Direction)
 {
     if (bTraveling || GetNetMode() == NM_DedicatedServer || Direction != StageDirection || !IsValid(PresentedStage) || !PresentedStage->Camera) return false;
-    const TArray<FVector> Path = EncounterDungeonLayout::GetPath(Direction);
+    const TArray<FVector> Path = EncounterDungeonLayout::GetPath(Direction, LayoutVariant);
     if (Path.Num() < 2) return false;
     const FVector Arrival = GetActorTransform().InverseTransformPosition(PresentedStage->Camera->GetComponentLocation());
     if (!Arrival.Equals(Path.Last(), 1.f)) return false;

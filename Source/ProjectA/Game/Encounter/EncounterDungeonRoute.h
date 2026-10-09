@@ -35,6 +35,11 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Encounter Dungeon")
     TObjectPtr<UCameraComponent> Camera;
 
+    // Reject invalid layouts without mutation and rebuild only when the cached variant changes.
+    // 잘못된 배치는 상태 변경 없이 거절하며 캐시 변형이 바뀔 때만 재구성합니다.
+    bool ConfigureLayout(int32 InLayoutVariant);
+    int32 GetLayoutVariant() const { return LayoutVariant; }
+    void SetPresentationVisible(bool bVisible);
     AEncounterPrototypeStage* ConfigureStage(const AEncounterPrototypeStage* Template, int32 Direction);
     void ResetAtJunction();
     bool StartTravel(int32 Direction);
@@ -49,6 +54,7 @@ protected:
 
 private:
     void PrepareGeometry(UMaterialInterface* Material);
+    void ClearGeometry();
     void ApplyMaterial(UInstancedStaticMeshComponent* Component, const FLinearColor& Color);
     void AddBlock(UInstancedStaticMeshComponent* Component, const FVector& Center, const FVector& Size);
     void AddLight(const FVector& Position);
@@ -77,9 +83,11 @@ private:
     TObjectPtr<AEncounterPrototypeStage> PresentedStage;
 
     TArray<FEncounterDungeonTravelSegment> TravelSegments;
+    int32 LayoutVariant = 0;
     int32 TravelSegmentIndex = 0;
     int32 StageDirection = INDEX_NONE;
     float SegmentSeconds = 0.0f;
     bool bGeometryPrepared = false;
     bool bTraveling = false;
+    bool bPresentationVisible = true;
 };

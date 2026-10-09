@@ -159,6 +159,7 @@ namespace
             if (Stage == 1)
             {
                 if (Run->GetPhase() != ERunPhase::EncounterChoice || State->GetViewState().Phase != ERunPhase::EncounterChoice) return false;
+                if (!Test->TestTrue(TEXT("Cooked Continue retains the complete frozen dungeon in both authority and presentation."), FRunDungeonState::StaticStruct()->CompareScriptStruct(&Saved->DungeonState, &Run->GetDungeonState(), 0) && FRunDungeonState::StaticStruct()->CompareScriptStruct(&Saved->DungeonState, &State->GetViewState().DungeonState, 0))) return true;
                 TArray<uint8> AfterContinue;
                 if (!Test->TestTrue(TEXT("Actual menu Continue restores frozen target/identity/encounter values without rewriting the writer's file."), FRunTargetState::StaticStruct()->CompareScriptStruct(&Saved->TargetRun, &Run->GetTargetRunState(), 0) && FRunIdentityData::StaticStruct()->CompareScriptStruct(&Saved->Identity, &Run->GetRunIdentity(), 0) && FRunEncounterProgress::StaticStruct()->CompareScriptStruct(&Saved->EncounterProgress, &Run->GetEncounterProgress(), 0) && Saved->Party.Num() == Run->GetPartyMembers().Num() && UGameplayStatics::LoadDataFromSlot(AfterContinue, Slot, 0) && WriterBytes == AfterContinue)) return true;
                 for (int32 Index = 0; Index < Saved->Party.Num(); ++Index)

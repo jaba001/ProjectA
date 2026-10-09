@@ -184,6 +184,7 @@ namespace
     {
         Save->Version = 1;
         Save->EncounterProgress = FRunEncounterProgress();
+        Save->DungeonState = FRunDungeonState();
         Save->ItemShopState = FRunItemShopState();
         for (FRunPartyMember& Member : Save->Party)
         {

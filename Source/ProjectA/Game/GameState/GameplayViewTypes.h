@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Game/Run/RunTypes.h"
 #include "Game/Run/RunEncounterTypes.h"
+#include "Game/Run/RunDungeonTypes.h"
 #include "Game/Run/RunSkillShopTypes.h"
 #include "Game/Run/RunWeaponSkillTypes.h"
 #include "Game/Run/RunGoldRewardTypes.h"
@@ -56,6 +57,11 @@ struct PROJECTA_API FGameplayViewState
 
     UPROPERTY()
     FRunEncounterProgress EncounterProgress;
+
+    // Replicate the frozen presentation plan without granting clients progression authority.
+    // 진행 권한을 클라이언트에 부여하지 않고 고정된 표시 계획을 복제합니다.
+    UPROPERTY()
+    FRunDungeonState DungeonState;
 
     UPROPERTY()
     FRunSkillShopState SkillShopState;

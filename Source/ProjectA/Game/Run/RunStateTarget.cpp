@@ -1,6 +1,7 @@
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunProgressRules.h"
 #include "Game/Run/RunSaveGame.h"
+#include "Game/Run/RunDungeonPlan.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/TargetRunDefinitionDataAsset.h"
 #include "DataAsset/RunWeaponSkillRulesDataAsset.h"
@@ -65,7 +66,8 @@ bool URunStateSubsystem::ConfigureTargetRun(URunSaveGame* Save, FText& OutError)
         }
         if (!RunEquipmentRules::BuildEquippedSkills(Member, Member.Skills, OutError)) return false;
     }
-    return ConfigureRecoveryRun(Save, OutError);
+    if (!ConfigureRecoveryRun(Save, OutError)) return false;
+    return RunDungeonPlan::Build(*Save, Save->DungeonState, OutError);
 }
 
 bool URunStateSubsystem::ResolveMemberProfession(const FRunPartyMember& Member, FProfessionDefinition& OutProfession, FText& OutError) const

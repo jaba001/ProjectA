@@ -9,6 +9,7 @@
 #include "Engine/GameInstance.h"
 #include "Game/GameState/GameplayViewTypes.h"
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Game/Run/RunDungeonPlan.h"
 #include "Game/Run/RunEquipmentRules.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
@@ -74,6 +75,7 @@ namespace
                 Save->TargetRun.EncounterSeed = Seed;
                 if (!UTargetRunDefinitionDataAsset::BuildOffers(Save->TargetRun, 0, 0, Save->EncounterProgress.Offers)) return false;
                 if (!Save->EncounterProgress.Offers.ContainsByPredicate([Tag](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag() == Tag; })) continue;
+                if (!RunDungeonPlan::Build(*Save.Get(), Save->DungeonState, Error)) return false;
                 return FRunCheckpointStorage::Save(Save.Get(), Slot, Error) && Run->LoadStandaloneCheckpoint(Error);
             }
             return false;

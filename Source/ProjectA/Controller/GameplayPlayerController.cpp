@@ -15,6 +15,7 @@
 #include "Game/GameModes/GameplayGameModeBase.h"
 #include "Game/GameState/GameplayGameState.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/Run/RunDungeonPlan.h"
 #include "UI/Gameplay/GameplayRootWidget.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -116,7 +117,9 @@ void AGameplayPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason
     bPresentationEnding = true;
     ResetEncounterPresentation();
     if (DungeonRoute.IsValid()) DungeonRoute->Destroy();
+    if (PreparedDungeonRoute.IsValid()) PreparedDungeonRoute->Destroy();
     DungeonRoute.Reset();
+    PreparedDungeonRoute.Reset();
     GetWorldTimerManager().ClearTimer(BindStateTimer);
     if (GameplayState)
     {
@@ -490,14 +493,70 @@ void AGameplayPlayerController::ResetEncounterPresentation()
     bEncounterPresentationTransition = false;
 }
 
+bool AGameplayPlayerController::PrepareDungeonRoutes(const FGameplayViewState& View)
+{
+    const FRunDungeonState& Plan = View.DungeonState;
+    const int32 Index = RunDungeonPlan::FindVisit(Plan, View.EncounterProgress);
+    if (Plan.SchemaVersion != 0 && (Plan.SchemaVersion != 1 || !Plan.Visits.IsValidIndex(Index))) return false;
+    if (CachedDungeonSeed != Plan.Seed || CachedDungeonVersion != Plan.SchemaVersion)
+    {
+        PreparedDungeonVisitIndex = INDEX_NONE;
+        CachedDungeonSeed = Plan.Seed;
+        CachedDungeonVersion = Plan.SchemaVersion;
+    }
+
+    // Keep only the current and next physical sections; the complete route remains serialized values.
+    // 전체 경로는 직렬화된 값으로 유지하고 현재 구간과 다음 구간만 실제 공간으로 보관합니다.
+    if (Index != INDEX_NONE && PreparedDungeonVisitIndex == Index && PreparedDungeonRoute.IsValid())
+    {
+        Swap(DungeonRoute, PreparedDungeonRoute);
+        PreparedDungeonVisitIndex = INDEX_NONE;
+    }
+    const auto SpawnRoute = [this](float X)
+    {
+        FActorSpawnParameters Parameters;
+        Parameters.Owner = this;
+        Parameters.ObjectFlags |= RF_Transient;
+        AEncounterDungeonRoute* Route = GetWorld()->SpawnActor<AEncounterDungeonRoute>(AEncounterDungeonRoute::StaticClass(), FVector(X, 0.f, -6000.f), FRotator::ZeroRotator, Parameters);
+        if (Route) Route->SetPresentationVisible(false);
+        return Route;
+    };
+    if (!DungeonRoute.IsValid()) DungeonRoute = SpawnRoute(PreparedDungeonRoute.IsValid() && FMath::IsNearlyZero(PreparedDungeonRoute->GetActorLocation().X) ? 16000.f : 0.f);
+    const int32 Variant = Plan.Visits.IsValidIndex(Index) ? Plan.Visits[Index].LayoutVariant : 0;
+    if (!DungeonRoute.IsValid() || !DungeonRoute->ConfigureLayout(Variant)) return false;
+    DungeonRoute->SetPresentationVisible(true);
+
+    const int32 NextIndex = Index == INDEX_NONE ? INDEX_NONE : Index + 1;
+    if (Plan.Visits.IsValidIndex(NextIndex))
+    {
+        if (!PreparedDungeonRoute.IsValid()) PreparedDungeonRoute = SpawnRoute(FMath::IsNearlyZero(DungeonRoute->GetActorLocation().X) ? 16000.f : 0.f);
+        if (PreparedDungeonRoute.IsValid())
+        {
+            PreparedDungeonRoute->SetPresentationVisible(false);
+            if (PreparedDungeonVisitIndex != NextIndex)
+            {
+                PreparedDungeonRoute->ResetAtJunction();
+                PreparedDungeonVisitIndex = PreparedDungeonRoute->ConfigureLayout(Plan.Visits[NextIndex].LayoutVariant) ? NextIndex : INDEX_NONE;
+            }
+        }
+    }
+    else
+    {
+        if (PreparedDungeonRoute.IsValid()) PreparedDungeonRoute->Destroy();
+        PreparedDungeonRoute.Reset();
+        PreparedDungeonVisitIndex = INDEX_NONE;
+    }
+    return true;
+}
+
 void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayViewState& View)
 {
     if (!IsLocalController() || bPresentationEnding) return;
     const FRunEncounterProgress& Progress = View.EncounterProgress;
     TArray<FName> OfferIds;
     for (const FRunEncounterOffer& Offer : Progress.Offers) OfferIds.Add(Offer.EncounterId);
-    const bool bWalkFromJunction = View.Phase == ERunPhase::Shop && PresentationPhase == ERunPhase::EncounterChoice && PresentationViewTarget == DungeonRoute && DungeonRoute.IsValid() && PresentedCompletedCount == Progress.AfterCompletedNodeCount && PresentedVisitIndex == Progress.VisitIndex && PresentedOfferIds == OfferIds;
-    const bool bSameVisit = PresentationPhase == View.Phase && PresentedEncounterId == Progress.SelectedEncounterId && PresentedCompletedCount == Progress.AfterCompletedNodeCount && PresentedVisitIndex == Progress.VisitIndex && PresentedOfferIds == OfferIds;
+    const bool bWalkFromJunction = View.Phase == ERunPhase::Shop && PresentationPhase == ERunPhase::EncounterChoice && PresentationViewTarget == DungeonRoute && DungeonRoute.IsValid() && PresentedCompletedCount == Progress.AfterCompletedNodeCount && PresentedVisitIndex == Progress.VisitIndex && PresentedOfferIds == OfferIds && PresentedDungeonSeed == View.DungeonState.Seed && PresentedDungeonVersion == View.DungeonState.SchemaVersion;
+    const bool bSameVisit = PresentationPhase == View.Phase && PresentedEncounterId == Progress.SelectedEncounterId && PresentedCompletedCount == Progress.AfterCompletedNodeCount && PresentedVisitIndex == Progress.VisitIndex && PresentedOfferIds == OfferIds && PresentedDungeonSeed == View.DungeonState.Seed && PresentedDungeonVersion == View.DungeonState.SchemaVersion;
     if (!bSameVisit)
     {
         ResetEncounterPresentation();
@@ -506,8 +565,15 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
         PresentedCompletedCount = Progress.AfterCompletedNodeCount;
         PresentedVisitIndex = Progress.VisitIndex;
         PresentedOfferIds = MoveTemp(OfferIds);
+        PresentedDungeonSeed = View.DungeonState.Seed;
+        PresentedDungeonVersion = View.DungeonState.SchemaVersion;
     }
-    if (View.Phase != ERunPhase::Shop && View.Phase != ERunPhase::Map && View.Phase != ERunPhase::EncounterChoice) return;
+    if (View.Phase != ERunPhase::Shop && View.Phase != ERunPhase::Map && View.Phase != ERunPhase::EncounterChoice)
+    {
+        if (DungeonRoute.IsValid()) DungeonRoute->SetPresentationVisible(false);
+        if (PreparedDungeonRoute.IsValid()) PreparedDungeonRoute->SetPresentationVisible(false);
+        return;
+    }
     if (PresentationViewTarget.IsValid()) return;
     if (bWorldEncounterPresentation) ResetEncounterPresentation();
     // The authored marker identifies the unified map; its aerial camera is replaced locally.
@@ -517,14 +583,7 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
     {
         if (It->ActorHasTag(TEXT("GameplayEncounterOverview")) && (!OverviewMarker || It->GetPathName() < OverviewMarker->GetPathName())) OverviewMarker = *It;
     }
-    if (OverviewMarker && !DungeonRoute.IsValid())
-    {
-        FActorSpawnParameters SpawnParameters;
-        SpawnParameters.Owner = this;
-        SpawnParameters.ObjectFlags |= RF_Transient;
-        DungeonRoute = GetWorld()->SpawnActor<AEncounterDungeonRoute>(AEncounterDungeonRoute::StaticClass(), FVector(0.f, 0.f, -6000.f), FRotator::ZeroRotator, SpawnParameters);
-        if (DungeonRoute.IsValid()) DungeonRoute->ResetAtJunction();
-    }
+    const bool bDungeonReady = OverviewMarker && PrepareDungeonRoutes(View);
     AActor* ViewTarget = nullptr;
     if (View.Phase == ERunPhase::Shop)
     {
@@ -543,7 +602,7 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
         if (SelectedStage)
         {
             const int32 Direction = Progress.Offers.IndexOfByPredicate([&Progress](const FRunEncounterOffer& Entry) { return Entry.EncounterId == Progress.SelectedEncounterId; });
-            if (DungeonRoute.IsValid() && Direction >= 0 && Direction < 3)
+            if (bDungeonReady && Direction >= 0 && Direction < 3)
             {
                 if (AEncounterPrototypeStage* DungeonStage = DungeonRoute->ConfigureStage(SelectedStage, Direction))
                 {
@@ -574,7 +633,7 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
     }
     else
     {
-        if (DungeonRoute.IsValid())
+        if (bDungeonReady)
         {
             DungeonRoute->ResetAtJunction();
             PresentationViewTarget = DungeonRoute.Get();

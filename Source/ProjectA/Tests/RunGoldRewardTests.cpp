@@ -215,6 +215,7 @@ bool FRunGoldRewardLegacyTest::RunTest(const FString& Parameters)
         TStrongObjectPtr<URunSaveGame> Legacy(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Fixture.Slot, Fixture.Error)));
         if (!Legacy) return false;
         Legacy->Nodes = RunProgressRules::GetLegacyPrototypeRoute().Nodes;
+        Legacy->DungeonState = FRunDungeonState();
         Legacy->GoldRewardState = FRunGoldRewardState();
         Legacy->ItemShopState = FRunItemShopState();
         for (FRunPartyMember& Member : Legacy->Party)

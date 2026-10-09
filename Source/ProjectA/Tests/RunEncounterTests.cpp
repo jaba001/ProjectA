@@ -150,6 +150,7 @@ bool FRunEncounterPersistenceTest::RunTest(const FString& Parameters)
     FRunCheckpointStorage::Save(Invalid.Get(), Slot.Name, Error);
     TestFalse(TEXT("A map save cannot bypass an unfinished shop"), Run->LoadCheckpoint(Error));
     Legacy->EncounterProgress = FRunEncounterProgress();
+    Legacy->DungeonState = FRunDungeonState();
     Legacy->Nodes = RunProgressRules::GetLegacyPrototypeRoute().Nodes;
     Legacy->ItemShopState = FRunItemShopState();
     for (FRunPartyMember& Member : Legacy->Party)

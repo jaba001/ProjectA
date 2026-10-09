@@ -26,6 +26,8 @@ public:
     void InitializeGameplay(AEncounterManager* InEncounterManager);
     bool CanIssueRunCommands() const;
     bool IsEncounterPresentationTransitioning() const { return bEncounterPresentationTransition; }
+    int32 GetResidentDungeonRouteCount() const { return (DungeonRoute.IsValid() ? 1 : 0) + (PreparedDungeonRoute.IsValid() ? 1 : 0); }
+    int32 GetPreparedDungeonVisitIndex() const { return PreparedDungeonVisitIndex; }
     void RefreshRunFlowPermissions();
     virtual bool IsRoundInputEnabled() const override;
     FGuid GetInventoryCharacterId(const FGameplayViewState& View) const;
@@ -75,6 +77,7 @@ private:
     void RefreshEncounterPresentation(const FGameplayViewState& View);
     void ResetEncounterPresentation();
     void FinishEncounterPresentation(uint32 Generation);
+    bool PrepareDungeonRoutes(const FGameplayViewState& View);
     void ExecuteShopPurchase(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision);
     void ExecuteEquipmentChange(const FRunEquipmentCommand& Command);
     void ExecuteGoldRewardSelection(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex);
@@ -125,6 +128,12 @@ private:
     FTimerHandle EncounterPresentationTimer;
     TWeakObjectPtr<AEncounterPrototypeStage> PresentedStage;
     TWeakObjectPtr<AEncounterDungeonRoute> DungeonRoute;
+    TWeakObjectPtr<AEncounterDungeonRoute> PreparedDungeonRoute;
+    int32 PreparedDungeonVisitIndex = INDEX_NONE;
+    int32 CachedDungeonSeed = 0;
+    int32 CachedDungeonVersion = 0;
+    int32 PresentedDungeonSeed = 0;
+    int32 PresentedDungeonVersion = 0;
     TWeakObjectPtr<AActor> PresentationViewTarget;
     TArray<FName> PresentedOfferIds;
     ERunPhase PresentationPhase = ERunPhase::None;
