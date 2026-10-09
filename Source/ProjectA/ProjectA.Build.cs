@@ -19,6 +19,9 @@ public class ProjectA : ModuleRules
         RuntimeDependencies.Add("$(ProjectDir)/DataCatalogs/MONSTER_SPAWN_PROBABILITIES.csv", StagedFileType.UFS);
         RuntimeDependencies.Add("$(ProjectDir)/DataCatalogs/MONSTER_ENCOUNTERS.csv", StagedFileType.UFS);
         RuntimeDependencies.Add("$(ProjectDir)/DataCatalogs/PVE_DIFFICULTIES.csv", StagedFileType.UFS);
+        // Ship the upstream license with the loading screen plugin in packaged games.
+        // 패키지 게임에도 로딩 화면 플러그인의 원본 라이선스를 동봉합니다.
+        RuntimeDependencies.Add("$(ProjectDir)/Plugins/AsyncLoadingScreen/LICENSE", StagedFileType.NonUFS);
 
 		PublicDependencyModuleNames.AddRange(new string[] {
 			"Core",
@@ -43,6 +46,9 @@ public class ProjectA : ModuleRules
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "AssetRegistry", "ApplicationCore" });
+        // Read the loading screen settings only when collecting editor cook dependencies.
+        // 에디터의 쿠킹 의존성 수집에서만 로딩 화면 설정을 참조합니다.
+        if (Target.bBuildEditor) PrivateDependencyModuleNames.Add("AsyncLoadingScreen");
         PublicDependencyModuleNames.Add("OnlineSubsystem");
         bool bSteamDevelopment = Target.Platform == UnrealTargetPlatform.Win64 && Target.Configuration != UnrealTargetConfiguration.Shipping && Target.Configuration != UnrealTargetConfiguration.Test;
         PublicDefinitions.Add("PROJECTA_WITH_STEAM_DEV=" + (bSteamDevelopment ? "1" : "0"));

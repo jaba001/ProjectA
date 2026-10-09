@@ -977,3 +977,13 @@ PNG에서 검·방패의 한손 자세, 남녀 몸체의 시전과 복귀, 지�
 `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64` 컴파일·링크는 37.24초, 고정 준비 버튼·툴팁 재사용·기존 포커스 정책 보완 후 7.48초에 성공했다. 최종 오류·경고는 0이며 근거는 `Saved/Automation/GamePolish_20261009/EditorBuild.log`·`EditorBuild.Final.log`다. 독립 소스 검토와 처리 함수·문서 링크·TODO 보존·diff 정적 검사를 수행했다. 같은 폴더의 `CommandPreservationReview.json`·`DocumentationValidation.json`·`StaticReview.json`에 근거를 기록한다. 기존 미완료 44개·선택 7개를 보존하고 사용자 확인 2개를 추가했다.
 
 게임·PIE·Unreal 자동화 테스트·화면 캡처는 실행하지 않았으며 Editor·IDE도 열지 않았다. 실제 화면비별 가림·입력·보상 재시도·2인 표시·Continue는 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)·[29](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)에 남긴다. 기존 투사체 발사 FX는 원본 emitter의 공간 설정과 실제 장비 소켓 화면 확인이 필요하므로 이번 변경에 포함하지 않고 기존 TODO를 유지한다. 이전 실행 성공을 최신 UI의 작동 검증으로 대체하지 않는다.
+
+### 9-45 2026-10-09 라이브러리 로딩 화면 플러그인
+
+라이브러리 플러그인 기반 로딩 화면 요청을 반영했다. 시작 기준은 `3f3dfee3`이며 기존 미커밋 변경은 없었다. 로컬 Epic Launcher `WindowsEditor/GameUserSettings.ini`의 AsyncLoadingScreen 5.3 기록을 확인했고 현재 UE 5.8 설치본이 없어 제작자의 MIT 공개 소스 1.7.0·UE 5.8용 `77f3cdcfc32afa2422d1208e04b61df3bd9a52dc`를 프로젝트 플러그인으로 추가했다. 소스 줄 끝 공백·말미 빈 줄 정리 외 기능 변경은 없으며 데모 Content·영상은 제외했다. 출처·설치 범위·라이선스 배포는 [PROJECT_PLAN 1-1절](PROJECT_PLAN.md#1-1-로딩-화면-플러그인)에 기록한다.
+
+Startup/Default MoviePlayer 화면에 기존 DemonicUI 성 배경·하단 밴드·청동색 원형 표시·한국어 팁 6개를 설정했다. 맵 전체 진행률을 가정하지 않고 자동 종료·최소 대기 없음·수동 종료/추가 엔진 tick/PSO 대기 비활성을 명시했다. 배경은 원본 경로를 참조하고 설정된 배경만 `ModifyCook`에 추가한다. MIT LICENSE는 게임 패키지 NonUFS 의존성으로 등록했다. 개별 travel·서버 권위·저장·GAS 코드는 변경하지 않았다. 플러그인의 표시용 팁 선택은 원본의 전역 RNG를 사용하며 저장된 Run 추첨 데이터의 변경과 구분한다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`와 같은 옵션의 `ProjectA Win64 Development` 컴파일·링크가 각각 31.58초·32.36초에 성공했다. 라이선스 스테이징 추가 후 빌드는 5.72초·3.21초, 원본 말미 빈 줄 정리 후 최종 빌드는 4.13초·10.45초이며 오류·경고 0이다. 로그는 `Saved/Automation/LoadingScreen_20261009/EditorBuild.log`·`GameBuild.log`·`EditorBuild.Final.log`·`GameBuild.Final.log`·`EditorBuild.Whitespace.log`·`GameBuild.Whitespace.log`다. 플러그인 출처/소스 대조·INI 구조/필드·배경 경로·빌드 receipt·문서 링크·TODO 보존·전체 diff 정적 검사를 수행하며 근거는 같은 폴더의 `StaticReview.json`·`PluginReview.json`·`DocumentationValidation.json`에 기록한다. 기존 미완료 46개·선택 7개를 보존하고 사용자 확인 1개를 추가했다.
+
+독립 소스 검토에서 일반 PIE 제외와 Gameplay 다음 tick 준비의 수동 종료 교착 가능성을 확인해 엔진의 자동 종료 경로를 유지했다. Editor·게임·PIE·자동화 테스트·cook·패키지·화면 캡처는 실행하지 않았으며 IDE도 열지 않았다. 초기 준비/한글/화면비·재진입·접속 실패·2인 전환·패키지 포함과 원본 배경의 최초 로드/메모리 확인은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남긴다. 같은 월드의 인카운터 이동과 OpenLevel 이전 동기 작업은 [표시 범위](UI_README.md#14-로딩-화면)에서 구분한다.

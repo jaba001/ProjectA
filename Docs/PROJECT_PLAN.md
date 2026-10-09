@@ -51,6 +51,14 @@ flowchart LR
 
 Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_01`~`TargetCombat_20`은 저장된 목표 정의의 PvE 편성과 로컬 Snapshot을 번갈아 사용한다. 기존 `Combat_01`~`Combat_02/10` 저장과 개발 협동·명시적 `-ProjectAPrototypeRun`의 10전투 경로는 보존한다. 원본 몬스터 구성은 [4-5절](#4-5-몬스터-콘텐츠), 목표 편성은 [5-1절](#5-1-목표-run과-회복-시험-데이터)을 따른다. CommonUI 지도는 완료 수/전체 노드 수를 표시하고 알려진 `ContentBox` 직계 `NodeList`를 최대 높이 300의 스크롤 목록으로 감싼다. 기존 바인딩·슬롯 배치·완료/잠금 표시와 별도 사용자 계층은 보존한다. 물리적인 WorldMap 탐험과 전투별 CombatMap 전환은 현재 흐름에 없다.
 
+### 1-1 로딩 화면 플러그인
+
+`ProjectA.uproject`에서 프로젝트 플러그인 `AsyncLoadingScreen`을 활성화한다. Epic Launcher의 과거 라이브러리 기록에서 확인한 플러그인이며, 현재 설치본이 없어 제작자의 MIT 공개 소스 1.7.0·UE 5.8용 [커밋 77f3cdcf](https://github.com/truong-bui/AsyncLoadingScreen/tree/77f3cdcfc32afa2422d1208e04b61df3bd9a52dc)를 `Plugins/AsyncLoadingScreen`에 포함했다. 소스의 줄 끝 공백·말미 빈 줄만 정리하고 기능은 변경하지 않았다. 원본 데모 Content·동영상은 포함하지 않으며 `LICENSE`는 게임 패키지의 NonUFS 런타임 의존성과 플러그인 배포 필터에 등록한다. 생성된 Binaries·Intermediate는 Git에서 제외한다.
+
+플러그인은 `PreLoadingScreen` 단계에 등록되어 엔진 MoviePlayer의 시작 화면과 실제 맵 로딩 준비 이벤트를 처리한다. 전용 서버 모듈에서 제외하고 새 GameInstance·개별 OpenLevel 후킹을 추가하지 않는다. `DefaultGame.ini`의 `/Script/AsyncLoadingScreen.LoadingScreenSettings`에서 startup/default 화면을 설정한다. 맵 로드가 끝나면 자동 종료하며 최소 표시 시간·수동 종료·엔진 tick·PSO 추가 대기·완료 키 입력을 사용하지 않는다. 맵 준비 완료와 다음 tick의 Gameplay 초기화·복제 준비는 구분한다.
+
+배경은 기존 `/Game/DemonicUI/Backgrounds/Background.Background`를 직접 참조한다. `UProjectAAssetManager::ModifyCook`은 두 화면에 지정한 배경의 패키지만 중복 없이 추가하며 원본 팩 전체를 포함하지 않는다. 해당 설정 조회 의존성은 Editor 빌드에만 추가한다. 현재 회전 표시는 Slate 색상 브러시, 글자는 엔진 Roboto와 기존 한국어 fallback을 사용한다. 원본 배경은 8000×4501·NeverStream이며 최초 로드/메모리 영향은 실제 확인이 남아 있다. [표시와 검수 범위](UI_README.md#14-로딩-화면)
+
 ## 2 모듈과 책임
 
 런타임은 `Source/ProjectA`, 에셋 생성·에디터 도구·PIE 테스트는 `Source/ProjectAEditor`에 둔다. Editor 의존성을 런타임 모듈로 옮기지 않는다.

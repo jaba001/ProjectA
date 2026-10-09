@@ -24,6 +24,10 @@
 	],
 	"Plugins": [
 		{
+			"Name": "AsyncLoadingScreen",
+			"Enabled": true
+		},
+		{
 			"Name": "OnlineSubsystemSteam",
 			"Enabled": true,
 			"PlatformAllowList": ["Win64"],

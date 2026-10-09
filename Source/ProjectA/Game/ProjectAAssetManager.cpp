@@ -6,6 +6,8 @@
 #include "DataAsset/TargetRunDefinitionDataAsset.h"
 #include "Game/Run/RunLevelDesign.h"
 #include "Game/Run/RunRecoveryTypes.h"
+#include "Engine/Texture2D.h"
+#include "LoadingScreenSettings.h"
 #include "Misc/PackageName.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogProjectAAssetManager, Log, All);
@@ -13,6 +15,23 @@ DEFINE_LOG_CATEGORY_STATIC(LogProjectAAssetManager, Log, All);
 void UProjectAAssetManager::ModifyCook(TConstArrayView<const ITargetPlatform*> TargetPlatforms, TArray<FName>& PackagesToCook, TArray<FName>& PackagesToNeverCook)
 {
     Super::ModifyCook(TargetPlatforms, PackagesToCook, PackagesToNeverCook);
+    // Cook the configured loading backgrounds explicitly, without including the entire source pack.
+    // 원본 팩 전체를 포함하지 않고 설정된 로딩 배경만 명시적으로 쿠킹합니다.
+    const ULoadingScreenSettings* LoadingSettings = GetDefault<ULoadingScreenSettings>();
+    for (const FALoadingScreenSettings* Screen : {&LoadingSettings->StartupLoadingScreen, &LoadingSettings->DefaultLoadingScreen})
+    {
+        for (const UTexture2D* Background : Screen->Background.Images)
+        {
+            if (!Background) continue;
+            const FName Package = Background->GetOutermost()->GetFName();
+            if (PackagesToNeverCook.Contains(Package))
+            {
+                UE_LOG(LogProjectAAssetManager, Error, TEXT("Loading background is excluded from cooking: %s"), *Package.ToString());
+                continue;
+            }
+            PackagesToCook.AddUnique(Package);
+        }
+    }
     // The consumable uses a runtime path; cook only its authored package and normal dependencies.
     // 소모품은 런타임 경로를 사용하므로 작성된 패키지 하나와 일반 의존성만 쿠킹에 포함합니다.
     const FName RecoveryPackage = RunRecoveryRules::GetHealingSkillPath().GetLongPackageFName();
