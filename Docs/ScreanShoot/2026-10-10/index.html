@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ProjectA 맵별 스크린샷 · 2026-10-10</title>
+<style>
+:root { color-scheme: dark; font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: #0d1118; color: #eef2f8; }
+* { box-sizing: border-box; }
+body { margin: 0; line-height: 1.65; }
+main { max-width: 1680px; margin: 0 auto; padding: 42px 28px 70px; }
+h1 { font-size: clamp(28px, 3vw, 44px); line-height: 1.2; margin: 6px 0 18px; letter-spacing: -1.4px; }
+h2 { font-size: 25px; margin: 0 0 8px; letter-spacing: -.6px; }
+h3 { font-size: 18px; margin: 0; }
+p { margin: 8px 0; }
+a { color: #9bbcff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+a:focus-visible { outline: 3px solid #acd0ff; outline-offset: 4px; }
+.eyebrow { color: #93a4bd; letter-spacing: .14em; font-size: 12px; font-weight: 700; }
+.lead { max-width: 1020px; color: #bdc8d8; }
+.facts, nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0; }
+.facts span, nav a { border: 1px solid #2c384a; border-radius: 6px; padding: 7px 12px; font-size: 13px; }
+nav a { background: #172133; }
+.notice { border-left: 3px solid #debd7b; padding: 12px 18px; background: #262318; color: #e0d2b2; margin: 24px 0; }
+.muted { color: #9aabc2; }
+section { margin-top: 46px; scroll-margin-top: 20px; }
+.section-intro { max-width: 1080px; color: #9aabc2; margin-bottom: 22px; }
+.difficulty { margin: 25px 0 32px; }
+.difficulty-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin: 0 0 12px; }
+.tag { font-size: 12px; color: #a5c5ff; border: 1px solid #3c5373; padding: 1px 7px; border-radius: 4px; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.environment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+figure { margin: 0; background: #141c29; border: 1px solid #2a374c; border-radius: 9px; overflow: hidden; }
+figure > a { display: block; background: #080b10; line-height: 0; }
+figure img { width: 100%; height: auto; aspect-ratio: 16/9; display: block; }
+figcaption { padding: 14px 16px 16px; }
+.filename { color: #8394ac; font: 11px/1.5 ui-monospace, Consolas, monospace; margin-top: 8px; overflow-wrap: anywhere; }
+.caption-note { font-size: 12px; color: #aab8ca; margin-top: 5px; }
+.camera-warning { color: #e0bd7b; }
+details { background: #141c29; border: 1px solid #2a374c; border-radius: 8px; padding: 14px 18px; margin-top: 28px; }
+summary { cursor: pointer; font-weight: 700; }
+details ul { color: #aab8ca; padding-left: 20px; }
+footer { border-top: 1px solid #293449; color: #8192ab; font-size: 12px; padding-top: 20px; margin-top: 40px; }
+@media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } .environment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { main { padding: 26px 16px 50px; } .environment-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">PROJECT A · MAP CAPTURE ARCHIVE</div>
+<h1>맵별 스크린샷</h1>
+<p class="lead">현재 맵의 구도, 바닥, 배경과 전투 화면을 나중에 비교·판단하기 위한 기록입니다. 이미지를 누르면 촬영한 원본 PNG를 전체 크기로 볼 수 있습니다.</p>
+<div class="facts"><span>2026-10-10 · KST</span><span>프로젝트 맵 17개</span><span>원본 PNG 25장</span><span>1280 × 720</span><span>Unreal Engine 5.8.3</span></div>
+<nav aria-label="갤러리 구역"><a href="#pve">실제 PvE · 하 / 중 / 상</a><a href="#environments">독립 환경맵 14종</a><a href="#other">시작 메뉴 · 개발맵</a><a href="manifest.json">촬영 메타데이터</a></nav>
+<aside class="notice">이번 촬영의 숄더 화면에는 캐릭터가 보이지 않고 카메라 위치가 (0, 0, 0)으로 기록된 사례가 있습니다. 실제 중 난이도의 전술 화면에는 회색 체크무늬 바닥이 보입니다. 독립 석조 던전 화면과 함께 비교할 수 있습니다. 화면 보정이나 에셋 수정 없이 현재 출력을 그대로 보존했습니다. ‘행동 후 화면’은 전술 카메라 복귀 성공을 뜻하지 않습니다. 이 기록만으로 시각 품질이나 전체 게임 동작 검증을 완료하지 않습니다.</aside>
+<section id="pve"><h2>1. 실제 PvE 전투</h2><p class="section-intro">새 게임에서 기본 캐릭터 4명과 직접 조작 캐릭터 1명을 구성하고, 실제 인카운터의 난이도를 선택해 촬영했습니다. 세 난이도 모두 통합 Gameplay 맵에서 실행되며 적용된 배경이 다릅니다.</p><div class="difficulty"><div class="difficulty-heading"><h3>난이도 하 · 꽃 초원</h3><span class="tag">MeadowBloom</span></div><div class="grid"><figure><a href="Pve_Low_MeadowBloom_Tactical.png" target="_blank" rel="noopener" aria-label="전술 화면 원본 PNG 열기"><img src="Pve_Low_MeadowBloom_Tactical.png" width="1280" height="720" loading="lazy" alt="전술 화면 — 실제 촬영 화면"></a><figcaption><h3>전술 화면</h3><div class="filename">Pve_Low_MeadowBloom_Tactical.png</div></figcaption></figure>
+<figure><a href="Pve_Low_MeadowBloom_Shoulder.png" target="_blank" rel="noopener" aria-label="준비 완료 후 숄더 화면 원본 PNG 열기"><img src="Pve_Low_MeadowBloom_Shoulder.png" width="1280" height="720" loading="lazy" alt="준비 완료 후 숄더 화면 — 실제 촬영 화면"></a><figcaption><h3>준비 완료 후 숄더 화면</h3><p class="caption-note camera-warning">촬영 기록의 카메라 위치: (0, 0, 0). 현재 출력 그대로 보존.</p><div class="filename">Pve_Low_MeadowBloom_Shoulder.png</div></figcaption></figure>
+<figure><a href="Pve_Low_MeadowBloom_AfterAction.png" target="_blank" rel="noopener" aria-label="행동 후 화면 원본 PNG 열기"><img src="Pve_Low_MeadowBloom_AfterAction.png" width="1280" height="720" loading="lazy" alt="행동 후 화면 — 실제 촬영 화면"></a><figcaption><h3>행동 후 화면</h3><p class="caption-note">복귀 성공 여부와 별개로 기록한 행동 후 실제 화면</p><div class="filename">Pve_Low_MeadowBloom_AfterAction.png</div></figcaption></figure></div></div><div class="difficulty"><div class="difficulty-heading"><h3>난이도 중 · 석조 던전</h3><span class="tag">DungeonStone</span></div><div class="grid"><figure><a href="Pve_Medium_DungeonStone_Tactical.png" target="_blank" rel="noopener" aria-label="전술 화면 원본 PNG 열기"><img src="Pve_Medium_DungeonStone_Tactical.png" width="1280" height="720" loading="lazy" alt="전술 화면 — 실제 촬영 화면"></a><figcaption><h3>전술 화면</h3><div class="filename">Pve_Medium_DungeonStone_Tactical.png</div></figcaption></figure>
+<figure><a href="Pve_Medium_DungeonStone_Shoulder.png" target="_blank" rel="noopener" aria-label="준비 완료 후 숄더 화면 원본 PNG 열기"><img src="Pve_Medium_DungeonStone_Shoulder.png" width="1280" height="720" loading="lazy" alt="준비 완료 후 숄더 화면 — 실제 촬영 화면"></a><figcaption><h3>준비 완료 후 숄더 화면</h3><p class="caption-note camera-warning">촬영 기록의 카메라 위치: (0, 0, 0). 현재 출력 그대로 보존.</p><div class="filename">Pve_Medium_DungeonStone_Shoulder.png</div></figcaption></figure>
+<figure><a href="Pve_Medium_DungeonStone_AfterAction.png" target="_blank" rel="noopener" aria-label="행동 후 화면 원본 PNG 열기"><img src="Pve_Medium_DungeonStone_AfterAction.png" width="1280" height="720" loading="lazy" alt="행동 후 화면 — 실제 촬영 화면"></a><figcaption><h3>행동 후 화면</h3><p class="caption-note">복귀 성공 여부와 별개로 기록한 행동 후 실제 화면</p><div class="filename">Pve_Medium_DungeonStone_AfterAction.png</div></figcaption></figure></div></div><div class="difficulty"><div class="difficulty-heading"><h3>난이도 상 · 얼음 성채</h3><span class="tag">IceCitadel</span></div><div class="grid"><figure><a href="Pve_High_IceCitadel_Tactical.png" target="_blank" rel="noopener" aria-label="전술 화면 원본 PNG 열기"><img src="Pve_High_IceCitadel_Tactical.png" width="1280" height="720" loading="lazy" alt="전술 화면 — 실제 촬영 화면"></a><figcaption><h3>전술 화면</h3><div class="filename">Pve_High_IceCitadel_Tactical.png</div></figcaption></figure>
+<figure><a href="Pve_High_IceCitadel_Shoulder.png" target="_blank" rel="noopener" aria-label="준비 완료 후 숄더 화면 원본 PNG 열기"><img src="Pve_High_IceCitadel_Shoulder.png" width="1280" height="720" loading="lazy" alt="준비 완료 후 숄더 화면 — 실제 촬영 화면"></a><figcaption><h3>준비 완료 후 숄더 화면</h3><p class="caption-note camera-warning">촬영 기록의 카메라 위치: (0, 0, 0). 현재 출력 그대로 보존.</p><div class="filename">Pve_High_IceCitadel_Shoulder.png</div></figcaption></figure>
+<figure><a href="Pve_High_IceCitadel_AfterAction.png" target="_blank" rel="noopener" aria-label="행동 후 화면 원본 PNG 열기"><img src="Pve_High_IceCitadel_AfterAction.png" width="1280" height="720" loading="lazy" alt="행동 후 화면 — 실제 촬영 화면"></a><figcaption><h3>행동 후 화면</h3><p class="caption-note">복귀 성공 여부와 별개로 기록한 행동 후 실제 화면</p><div class="filename">Pve_High_IceCitadel_AfterAction.png</div></figcaption></figure></div></div></section>
+<section id="environments"><h2>2. 독립 환경맵 14종</h2><p class="section-intro">원본 환경맵의 비교용 전경입니다. 기존 디버그 구성인 아군 1명·적 1명, 각각 HP 10,000을 사용했습니다. 실제 PvE 몬스터 구성이나 난이도 수치와 구분해 보십시오.</p><div class="grid environment-grid"><figure><a href="Environment_MeadowBloom.png" target="_blank" rel="noopener" aria-label="꽃 초원 · MeadowBloom 원본 PNG 열기"><img src="Environment_MeadowBloom.png" width="1280" height="720" loading="lazy" alt="꽃 초원 · MeadowBloom — 실제 촬영 화면"></a><figcaption><h3>꽃 초원 · MeadowBloom</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_MeadowBloom.png</div></figcaption></figure>
+<figure><a href="Environment_SavannahGrove.png" target="_blank" rel="noopener" aria-label="사바나 숲 · SavannahGrove 원본 PNG 열기"><img src="Environment_SavannahGrove.png" width="1280" height="720" loading="lazy" alt="사바나 숲 · SavannahGrove — 실제 촬영 화면"></a><figcaption><h3>사바나 숲 · SavannahGrove</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_SavannahGrove.png</div></figcaption></figure>
+<figure><a href="Environment_PineRidge.png" target="_blank" rel="noopener" aria-label="소나무 능선 · PineRidge 원본 PNG 열기"><img src="Environment_PineRidge.png" width="1280" height="720" loading="lazy" alt="소나무 능선 · PineRidge — 실제 촬영 화면"></a><figcaption><h3>소나무 능선 · PineRidge</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_PineRidge.png</div></figcaption></figure>
+<figure><a href="Environment_BambooGarden.png" target="_blank" rel="noopener" aria-label="대나무 정원 · BambooGarden 원본 PNG 열기"><img src="Environment_BambooGarden.png" width="1280" height="720" loading="lazy" alt="대나무 정원 · BambooGarden — 실제 촬영 화면"></a><figcaption><h3>대나무 정원 · BambooGarden</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_BambooGarden.png</div></figcaption></figure>
+<figure><a href="Environment_CrimsonForest.png" target="_blank" rel="noopener" aria-label="붉은 숲 · CrimsonForest 원본 PNG 열기"><img src="Environment_CrimsonForest.png" width="1280" height="720" loading="lazy" alt="붉은 숲 · CrimsonForest — 실제 촬영 화면"></a><figcaption><h3>붉은 숲 · CrimsonForest</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_CrimsonForest.png</div></figcaption></figure>
+<figure><a href="Environment_DarkMarsh.png" target="_blank" rel="noopener" aria-label="어두운 습지 · DarkMarsh 원본 PNG 열기"><img src="Environment_DarkMarsh.png" width="1280" height="720" loading="lazy" alt="어두운 습지 · DarkMarsh — 실제 촬영 화면"></a><figcaption><h3>어두운 습지 · DarkMarsh</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_DarkMarsh.png</div></figcaption></figure>
+<figure><a href="Environment_DesertCanyon.png" target="_blank" rel="noopener" aria-label="사막 협곡 · DesertCanyon 원본 PNG 열기"><img src="Environment_DesertCanyon.png" width="1280" height="720" loading="lazy" alt="사막 협곡 · DesertCanyon — 실제 촬영 화면"></a><figcaption><h3>사막 협곡 · DesertCanyon</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_DesertCanyon.png</div></figcaption></figure>
+<figure><a href="Environment_DesertOasis.png" target="_blank" rel="noopener" aria-label="여름 오아시스 · DesertOasis 원본 PNG 열기"><img src="Environment_DesertOasis.png" width="1280" height="720" loading="lazy" alt="여름 오아시스 · DesertOasis — 실제 촬영 화면"></a><figcaption><h3>여름 오아시스 · DesertOasis</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_DesertOasis.png</div></figcaption></figure>
+<figure><a href="Environment_FrozenPass.png" target="_blank" rel="noopener" aria-label="얼어붙은 고개 · FrozenPass 원본 PNG 열기"><img src="Environment_FrozenPass.png" width="1280" height="720" loading="lazy" alt="얼어붙은 고개 · FrozenPass — 실제 촬영 화면"></a><figcaption><h3>얼어붙은 고개 · FrozenPass</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_FrozenPass.png</div></figcaption></figure>
+<figure><a href="Environment_IceCitadel.png" target="_blank" rel="noopener" aria-label="얼음 성채 · IceCitadel 원본 PNG 열기"><img src="Environment_IceCitadel.png" width="1280" height="720" loading="lazy" alt="얼음 성채 · IceCitadel — 실제 촬영 화면"></a><figcaption><h3>얼음 성채 · IceCitadel</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_IceCitadel.png</div></figcaption></figure>
+<figure><a href="Environment_PalmCoast.png" target="_blank" rel="noopener" aria-label="한낮의 야자 해안 · PalmCoast 원본 PNG 열기"><img src="Environment_PalmCoast.png" width="1280" height="720" loading="lazy" alt="한낮의 야자 해안 · PalmCoast — 실제 촬영 화면"></a><figcaption><h3>한낮의 야자 해안 · PalmCoast</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_PalmCoast.png</div></figcaption></figure>
+<figure><a href="Environment_SunsetLagoon.png" target="_blank" rel="noopener" aria-label="노을빛 수정 석호 · SunsetLagoon 원본 PNG 열기"><img src="Environment_SunsetLagoon.png" width="1280" height="720" loading="lazy" alt="노을빛 수정 석호 · SunsetLagoon — 실제 촬영 화면"></a><figcaption><h3>노을빛 수정 석호 · SunsetLagoon</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_SunsetLagoon.png</div></figcaption></figure>
+<figure><a href="Environment_DungeonStone.png" target="_blank" rel="noopener" aria-label="석조 던전 · DungeonStone 원본 PNG 열기"><img src="Environment_DungeonStone.png" width="1280" height="720" loading="lazy" alt="석조 던전 · DungeonStone — 실제 촬영 화면"></a><figcaption><h3>석조 던전 · DungeonStone</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_DungeonStone.png</div></figcaption></figure>
+<figure><a href="Environment_DungeonFantasy.png" target="_blank" rel="noopener" aria-label="판타지 던전 · DungeonFantasy 원본 PNG 열기"><img src="Environment_DungeonFantasy.png" width="1280" height="720" loading="lazy" alt="판타지 던전 · DungeonFantasy — 실제 촬영 화면"></a><figcaption><h3>판타지 던전 · DungeonFantasy</h3><p class="caption-note">독립 환경맵 · 전술 카메라 · 비교용 디버그 전투 구성</p><div class="filename">Environment_DungeonFantasy.png</div></figcaption></figure></div></section>
+<section id="other"><h2>3. 시작 메뉴와 개발용 전투맵</h2><p class="section-intro">Core/MainMenu와 Development/DebugCombat의 현재 화면입니다.</p><div class="grid environment-grid"><figure><a href="Core_MainMenu.png" target="_blank" rel="noopener" aria-label="시작 메뉴 · MainMenu 원본 PNG 열기"><img src="Core_MainMenu.png" width="1280" height="720" loading="lazy" alt="시작 메뉴 · MainMenu — 실제 촬영 화면"></a><figcaption><h3>시작 메뉴 · MainMenu</h3><p class="caption-note">실제 새 게임 시작 메뉴</p><div class="filename">Core_MainMenu.png</div></figcaption></figure>
+<figure><a href="Development_DebugCombat.png" target="_blank" rel="noopener" aria-label="디버그 전투맵 · DebugCombat 원본 PNG 열기"><img src="Development_DebugCombat.png" width="1280" height="720" loading="lazy" alt="디버그 전투맵 · DebugCombat — 실제 촬영 화면"></a><figcaption><h3>디버그 전투맵 · DebugCombat</h3><p class="caption-note">개발용 전투맵 · 비교용 디버그 전투 구성</p><div class="filename">Development_DebugCombat.png</div></figcaption></figure></div></section>
+<details><summary>촬영 범위와 원본 확인</summary><ul><li>실제 엔진 화면을 새로 촬영했으며, 이 갤러리는 PNG를 재인코딩·크롭·리터칭하지 않습니다. 화면상의 미리보기 크기만 CSS로 조절합니다.</li><li>PNG 헤더, 1280 × 720 해상도, Pillow 파일 검증, 원본/복사본 SHA-256 일치를 확인합니다. 각 파일의 해시와 출처는 <a href="manifest.json">manifest.json</a>에 있습니다.</li><li>프로젝트 전용 LEVEL 폴더의 .umap 17개를 모두 포함합니다. 외부 라이브러리 데모맵 전체를 뜻하지 않습니다.</li><li>PvE 진행은 UI 버튼 델리게이트와 공개 컨트롤러 요청을 통한 자동화입니다. 사람이 마우스로 플레이한 검수와 구분합니다.</li><li>소스 콘텐츠를 변경하지 않는 촬영이며, 촬영용 저장 경로를 분리합니다. 기본 코드 기준은 242a12cb입니다.</li><li>이 스크린샷은 시각적 판단 자료입니다. 밸런스, 협동, Continue, 모든 카메라 예외 상황의 성공 근거로 확대하지 않습니다.</li></ul></details>
+<footer><a href="../index.html">촬영일 목록</a> · 2026-10-10 · ProjectA / Docs / ScreanShoot · 원본 이미지 25장</footer>
+</main>
+</body>
+</html>

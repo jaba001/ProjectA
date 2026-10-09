@@ -1,0 +1,1787 @@
+{
+  "schema_version": 1,
+  "capture_date_kst": "2026-10-10",
+  "generated_utc": "2026-10-09T17:43:12.577777+00:00",
+  "engine_version": "5.8.3",
+  "base_git_commit": "242a12cb",
+  "image_count": 25,
+  "project_map_count": 17,
+  "dimensions": [
+    1280,
+    720
+  ],
+  "source_png_bytes_preserved": true,
+  "source_content_mutation": false,
+  "scope": "Fresh engine screenshots for later visual judgement. Actual PvE uses normal menu creation, UI button delegates and public controller requests, not physical mouse input. Environment views use existing debug fixtures with one ally and one enemy, each at 10000 HP. AfterAction records the actual post-action frame and does not assert tactical camera restoration. No visual correction, crop or re-encoding. This capture does not approve visual quality, balance, multiplayer, Continue or all camera edge cases.",
+  "known_observations": [
+    "Shoulder frames whose camera_at_origin field is true have a recorded camera POV at (0,0,0). The current problematic framing is preserved for user judgement."
+  ],
+  "source_runs": {
+    "environment": {
+      "directory": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4",
+      "invocation": {
+        "group": "Environment",
+        "id": "e3f8c8a8a245462ca6bff4513b250cf4",
+        "slot": "ProjectA_Automation_TodoReview_e3f8c8a8a245462ca6bff4513b250cf4",
+        "root": "C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\Saved\\Automation\\MapScreenshots_20261010\\Environment.e3f8c8a8a245462ca6bff4513b250cf4",
+        "output": "C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\Saved\\Automation\\MapScreenshots_20261010\\Environment.e3f8c8a8a245462ca6bff4513b250cf4\\User\\Saved\\Automation\\EnvironmentScreens",
+        "arguments": [
+          "C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\ProjectA.uproject",
+          "-unattended",
+          "-nowrite",
+          "-nop4",
+          "-nosplash",
+          "-NoTraceServer",
+          "-nosound",
+          "-windowed",
+          "-ResX=1280",
+          "-ResY=720",
+          "-ProjectAReviewLeftMonitor",
+          "-ProjectAMapScreenshotReview",
+          "-UserDir=C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\Saved\\Automation\\MapScreenshots_20261010\\Environment.e3f8c8a8a245462ca6bff4513b250cf4\\User",
+          "-ProjectAReviewOutputRoot=C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\Saved\\Automation\\MapScreenshots_20261010\\Environment.e3f8c8a8a245462ca6bff4513b250cf4\\User\\Saved\\Automation\\EnvironmentScreens",
+          "-ProjectASaveSlot=ProjectA_Automation_TodoReview_e3f8c8a8a245462ca6bff4513b250cf4",
+          "-ExecCmds=Automation RunTests ProjectA.TodoReview.Environment",
+          "-TestExit=Automation Test Queue Empty",
+          "-ReportExportPath=C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\Saved\\Automation\\MapScreenshots_20261010\\Environment.e3f8c8a8a245462ca6bff4513b250cf4\\Report",
+          "-abslog=C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\Saved\\Automation\\MapScreenshots_20261010\\Environment.e3f8c8a8a245462ca6bff4513b250cf4\\Engine.log",
+          "-stdout",
+          "-FullStdOutLogOutput"
+        ],
+        "started": "2026-10-09T17:30:33.6455843Z",
+        "exit_code": 0,
+        "finished": "2026-10-09T17:32:13.0792010Z"
+      }
+    },
+    "pve": {
+      "directory": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509",
+      "invocation": {
+        "group": "Pve",
+        "id": "d1ac6d5450c84a5b9244bd6467d14509",
+        "slot": "ProjectA_Automation_MapScreens_d1ac6d5450c84a5b9244bd6467d14509",
+        "root": "C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\Saved\\Automation\\MapScreenshots_20261010\\Pve.d1ac6d5450c84a5b9244bd6467d14509",
+        "output": "C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\Saved\\Automation\\MapScreenshots_20261010\\Pve.d1ac6d5450c84a5b9244bd6467d14509\\User\\Saved\\Automation\\PveScreens",
+        "arguments": [
+          "C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\ProjectA.uproject",
+          "-unattended",
+          "-nowrite",
+          "-nop4",
+          "-nosplash",
+          "-NoTraceServer",
+          "-nosound",
+          "-windowed",
+          "-ResX=1280",
+          "-ResY=720",
+          "-ProjectAReviewLeftMonitor",
+          "-ProjectAMapScreenshotReview",
+          "-UserDir=C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\Saved\\Automation\\MapScreenshots_20261010\\Pve.d1ac6d5450c84a5b9244bd6467d14509\\User",
+          "-ProjectAReviewOutputRoot=C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\Saved\\Automation\\MapScreenshots_20261010\\Pve.d1ac6d5450c84a5b9244bd6467d14509\\User\\Saved\\Automation\\PveScreens",
+          "-ProjectASaveSlot=ProjectA_Automation_MapScreens_d1ac6d5450c84a5b9244bd6467d14509",
+          "-ExecCmds=Automation RunTests ProjectA.TodoReview.PveMapScreenshots",
+          "-TestExit=Automation Test Queue Empty",
+          "-ReportExportPath=C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\Saved\\Automation\\MapScreenshots_20261010\\Pve.d1ac6d5450c84a5b9244bd6467d14509\\Report",
+          "-abslog=C:\\Users\\jaba0\\Desktop\\MyProjects\\ProjectA\\Saved\\Automation\\MapScreenshots_20261010\\Pve.d1ac6d5450c84a5b9244bd6467d14509\\Engine.log",
+          "-stdout",
+          "-FullStdOutLogOutput"
+        ],
+        "started": "2026-10-09T17:39:37.2255211Z",
+        "exit_code": 0,
+        "finished": "2026-10-09T17:41:14.4195426Z"
+      }
+    }
+  },
+  "map_coverage": [
+    {
+      "map_name": "BambooGarden",
+      "label_ko": "대나무 정원",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Forest/BambooGarden.umap",
+      "umap_sha256": "e2a0b96b980e79dd143cc1bca7c07f05aae3b099da769789aa0ba35d2a5b4a79",
+      "screenshots": [
+        "Environment_BambooGarden.png"
+      ]
+    },
+    {
+      "map_name": "CrimsonForest",
+      "label_ko": "붉은 숲",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Forest/CrimsonForest.umap",
+      "umap_sha256": "973490c155e9243cbd881e7c8fab1ca25503b16951dc6a7bd7168f904b669053",
+      "screenshots": [
+        "Environment_CrimsonForest.png"
+      ]
+    },
+    {
+      "map_name": "DarkMarsh",
+      "label_ko": "어두운 습지",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Forest/DarkMarsh.umap",
+      "umap_sha256": "3cf2f9b6e660fe2c384a4f769bc4b5a2d90454f1975214fb5acce8f8af59e963",
+      "screenshots": [
+        "Environment_DarkMarsh.png"
+      ]
+    },
+    {
+      "map_name": "DebugCombat",
+      "label_ko": "디버그 전투맵",
+      "umap": "Content/User_JeHoon/LEVEL/Development/DebugCombat.umap",
+      "umap_sha256": "0df2b60886246219ee76758797aada32e09bafa966bfcf9c7f1eb95d403edad6",
+      "screenshots": [
+        "Development_DebugCombat.png"
+      ]
+    },
+    {
+      "map_name": "DesertCanyon",
+      "label_ko": "사막 협곡",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Desert/DesertCanyon.umap",
+      "umap_sha256": "3f2bdca9577ba5e155fdb7b958bc4f35f8cbb1934e6aadb8d9ad0393e01a7efc",
+      "screenshots": [
+        "Environment_DesertCanyon.png"
+      ]
+    },
+    {
+      "map_name": "DesertOasis",
+      "label_ko": "여름 오아시스",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Desert/DesertOasis.umap",
+      "umap_sha256": "530fb4fda3289a01e1db2f04eae66bb1f70cfc4d22457251c7370c570eec0801",
+      "screenshots": [
+        "Environment_DesertOasis.png"
+      ]
+    },
+    {
+      "map_name": "DungeonFantasy",
+      "label_ko": "판타지 던전",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Dungeon/DungeonFantasy.umap",
+      "umap_sha256": "66c0c98d9693da2b88e1609c87169a1f06f48c26459697d11c81b42e3c7d540b",
+      "screenshots": [
+        "Environment_DungeonFantasy.png"
+      ]
+    },
+    {
+      "map_name": "DungeonStone",
+      "label_ko": "석조 던전",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Dungeon/DungeonStone.umap",
+      "umap_sha256": "b6ce7a0d57ce3468eacc77102f18b86f1c672194bbf82fbf42a19c79316dc3e5",
+      "screenshots": [
+        "Environment_DungeonStone.png"
+      ]
+    },
+    {
+      "map_name": "FrozenPass",
+      "label_ko": "얼어붙은 고개",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Ice/FrozenPass.umap",
+      "umap_sha256": "40f368f79fb7056b93f55f20f82c59faa52d91e4fc0e90742943664a23c3a434",
+      "screenshots": [
+        "Environment_FrozenPass.png"
+      ]
+    },
+    {
+      "map_name": "Gameplay",
+      "label_ko": "통합 게임플레이",
+      "umap": "Content/User_JeHoon/LEVEL/Core/Gameplay.umap",
+      "umap_sha256": "855dd7647686bdbbc074d76ef0b18457eb978edf41607be58d226b6af46e945a",
+      "screenshots": [
+        "Pve_High_IceCitadel_AfterAction.png",
+        "Pve_High_IceCitadel_Shoulder.png",
+        "Pve_High_IceCitadel_Tactical.png",
+        "Pve_Low_MeadowBloom_AfterAction.png",
+        "Pve_Low_MeadowBloom_Shoulder.png",
+        "Pve_Low_MeadowBloom_Tactical.png",
+        "Pve_Medium_DungeonStone_AfterAction.png",
+        "Pve_Medium_DungeonStone_Shoulder.png",
+        "Pve_Medium_DungeonStone_Tactical.png"
+      ]
+    },
+    {
+      "map_name": "IceCitadel",
+      "label_ko": "얼음 성채",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Ice/IceCitadel.umap",
+      "umap_sha256": "12eeeb2e2da4de1a34773a4faf0925952d7a912dd02b7a8cc0f05c1025e3aaaa",
+      "screenshots": [
+        "Environment_IceCitadel.png"
+      ]
+    },
+    {
+      "map_name": "MainMenu",
+      "label_ko": "시작 메뉴",
+      "umap": "Content/User_JeHoon/LEVEL/Core/MainMenu.umap",
+      "umap_sha256": "47826cf5ea3bca7919570b032ac380b2df185e88ccf2a4104ac59227e53ff553",
+      "screenshots": [
+        "Core_MainMenu.png"
+      ]
+    },
+    {
+      "map_name": "MeadowBloom",
+      "label_ko": "꽃 초원",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Grassland/MeadowBloom.umap",
+      "umap_sha256": "a4be7219a9a1f876f1fb5d6b20671eb8ff913a0cc24d839cf435933e9e76ce5d",
+      "screenshots": [
+        "Environment_MeadowBloom.png"
+      ]
+    },
+    {
+      "map_name": "PalmCoast",
+      "label_ko": "한낮의 야자 해안",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Summer/PalmCoast.umap",
+      "umap_sha256": "fa847a9e9d3aacfd5052afb324a21a011ff2a352813bb249469d3920ff8ec374",
+      "screenshots": [
+        "Environment_PalmCoast.png"
+      ]
+    },
+    {
+      "map_name": "PineRidge",
+      "label_ko": "소나무 능선",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Forest/PineRidge.umap",
+      "umap_sha256": "a2ebc5734fea25e3c98e681e7f2a91f3ea9adba4e81fa08a2817c2eed0502cb3",
+      "screenshots": [
+        "Environment_PineRidge.png"
+      ]
+    },
+    {
+      "map_name": "SavannahGrove",
+      "label_ko": "사바나 숲",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Grassland/SavannahGrove.umap",
+      "umap_sha256": "49a6e3f1d0636b565af6a3befceff03d070d3f8f77bfed5ded2f968de16108f3",
+      "screenshots": [
+        "Environment_SavannahGrove.png"
+      ]
+    },
+    {
+      "map_name": "SunsetLagoon",
+      "label_ko": "노을빛 수정 석호",
+      "umap": "Content/User_JeHoon/LEVEL/Environment/Summer/SunsetLagoon.umap",
+      "umap_sha256": "86eb8fc5d68178c817f5c7b008563bc3eeefade21b4bd47b57516583f6ec87c9",
+      "screenshots": [
+        "Environment_SunsetLagoon.png"
+      ]
+    }
+  ],
+  "captures": [
+    {
+      "filename": "Core_MainMenu.png",
+      "group": "menu",
+      "map_name": "MainMenu",
+      "map_label_ko": "시작 메뉴",
+      "map_package": "/Game/User_JeHoon/LEVEL/Core/MainMenu",
+      "source": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/MainMenu.png",
+      "capture": "MainMenu",
+      "difficulty": "Low",
+      "difficulty_label_ko": "하",
+      "arena_id": "MeadowBloom",
+      "arena_label_ko": "꽃 초원",
+      "camera_at_origin": false,
+      "runtime_record": {
+        "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/MainMenu.png",
+        "capture": "MainMenu",
+        "map": "/Game/User_JeHoon/LEVEL/Core/MainMenu",
+        "difficulty": "Low",
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_MainMenu.MainMenu:PersistentLevel.MainMenuPreviewStage_0",
+        "view_target_class": "/Script/ProjectA.MainMenuPreviewStage",
+        "camera_location": "X=-450.000 Y=0.000 Z=140.000",
+        "camera_rotation": "P=-5.000000 Y=0.000000 R=-0.000000",
+        "world_seconds": 1.354199893772602,
+        "width": 1280,
+        "height": 720,
+        "selected_arena_id": "None",
+        "original_tactical_view_target": "None",
+        "matches_original_tactical_target": false,
+        "actual_tactical_pov_restored": false,
+        "camera_blend_pending": false,
+        "round_available": false,
+        "observed_action_terminal": false,
+        "observed_next_round": false,
+        "observed_combat_result": false,
+        "after_action_observation_timeout": false,
+        "run_phase": 0
+      },
+      "width": 1280,
+      "height": 720,
+      "bytes": 1106739,
+      "sha256": "d80c231d48c05017c39788d60c1211c0957002fe56a49abd22fc5c3288534887"
+    },
+    {
+      "filename": "Development_DebugCombat.png",
+      "group": "debug",
+      "map_name": "DebugCombat",
+      "map_label_ko": "디버그 전투맵",
+      "map_package": "/Game/User_JeHoon/LEVEL/Development/DebugCombat",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/F2B0B84548736C24D9EE66925D3FB123/DebugCombat_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 626355,
+      "sha256": "dcb529c990d59a59557860b75d8e03146b0393d5afa4a55c48ba4255b9e2481a"
+    },
+    {
+      "filename": "Environment_BambooGarden.png",
+      "group": "authored_environment",
+      "map_name": "BambooGarden",
+      "map_label_ko": "대나무 정원",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Forest/BambooGarden",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/D20DD8994F7C9CEB660069B7C568043E/BambooGarden_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1244821,
+      "sha256": "4c69bc07e0a4347d267c02e89382fd4563573275b3d5104e2cccb673a7f3dee5"
+    },
+    {
+      "filename": "Environment_CrimsonForest.png",
+      "group": "authored_environment",
+      "map_name": "CrimsonForest",
+      "map_label_ko": "붉은 숲",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Forest/CrimsonForest",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/E6A745DC4AFD914A66E3D792E52A851E/CrimsonForest_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1148223,
+      "sha256": "8b6d82fa0e9bf6d1549e9eeb53c299cdfa77cf2a88bbcfd0ddaa16f4525cfb48"
+    },
+    {
+      "filename": "Environment_DarkMarsh.png",
+      "group": "authored_environment",
+      "map_name": "DarkMarsh",
+      "map_label_ko": "어두운 습지",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Forest/DarkMarsh",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/A7DE637B448AB0E530730F868A0DA907/DarkMarsh_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1100987,
+      "sha256": "3744b436ee811ddb5f8fcab70b5e80719cd621f0bc07278fa21ef32b537f9c7d"
+    },
+    {
+      "filename": "Environment_DesertCanyon.png",
+      "group": "authored_environment",
+      "map_name": "DesertCanyon",
+      "map_label_ko": "사막 협곡",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Desert/DesertCanyon",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/6FBB27BD4C9DFA7978E4C0A4DEB99549/DesertCanyon_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1407435,
+      "sha256": "42458f2e77edeb710c72ce2a2dd2c00ac83144e30adb73cac3eb7ba2a1e11e2e"
+    },
+    {
+      "filename": "Environment_DesertOasis.png",
+      "group": "authored_environment",
+      "map_name": "DesertOasis",
+      "map_label_ko": "여름 오아시스",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Desert/DesertOasis",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/CE5227DC434A1DD4A545CBAB9BA51FF7/DesertOasis_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1473381,
+      "sha256": "37cb8d5e0b478a33767c56c57d60a8800fec15a5eb05960d349a3e89ade4d4d5"
+    },
+    {
+      "filename": "Environment_DungeonFantasy.png",
+      "group": "authored_environment",
+      "map_name": "DungeonFantasy",
+      "map_label_ko": "판타지 던전",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Dungeon/DungeonFantasy",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/885D6B2545B827F5B4E7CCB8CBC9CE4C/DungeonFantasy_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1640652,
+      "sha256": "fea6b83bf6e5c07f13f0f8ad40f92778c57061e94840111b20d1084932c85270"
+    },
+    {
+      "filename": "Environment_DungeonStone.png",
+      "group": "authored_environment",
+      "map_name": "DungeonStone",
+      "map_label_ko": "석조 던전",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Dungeon/DungeonStone",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/5421C1AC44892E78B8DD34B8D1A79261/DungeonStone_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1807749,
+      "sha256": "7ee13ba3075dff74bb51743f2f98b4f940681b615a2be3145b766820637b0010"
+    },
+    {
+      "filename": "Environment_FrozenPass.png",
+      "group": "authored_environment",
+      "map_name": "FrozenPass",
+      "map_label_ko": "얼어붙은 고개",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Ice/FrozenPass",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/3D783C66420F596DD4E04FB3156026B5/FrozenPass_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1419447,
+      "sha256": "838ae3bb6be3a4fe4c3ac3f98cfbba2f190de24a4e5d484f425d31d40cbb6ee5"
+    },
+    {
+      "filename": "Environment_IceCitadel.png",
+      "group": "authored_environment",
+      "map_name": "IceCitadel",
+      "map_label_ko": "얼음 성채",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Ice/IceCitadel",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/876AB7B54AC4A4C41C11D685DEDD1B60/IceCitadel_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1463603,
+      "sha256": "eab87fff1a435bf4bbb28fd3c9e42855e601d81987d8809b24f6b155c6f8c3cc"
+    },
+    {
+      "filename": "Environment_MeadowBloom.png",
+      "group": "authored_environment",
+      "map_name": "MeadowBloom",
+      "map_label_ko": "꽃 초원",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Grassland/MeadowBloom",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/9E52BE36473F1E03BF9B678768336DFC/MeadowBloom_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1266421,
+      "sha256": "293ff2cb8c1401ce6ffc1119bf39bc957e1b7435ed5d0dd21c763335d6fb4885"
+    },
+    {
+      "filename": "Environment_PalmCoast.png",
+      "group": "authored_environment",
+      "map_name": "PalmCoast",
+      "map_label_ko": "한낮의 야자 해안",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Summer/PalmCoast",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/EBB5712742411305E105DC8E3A0FEEB8/PalmCoast_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1594550,
+      "sha256": "4d9a5a39ae27757cd1c8b5c223fc6301b17987f33c29b132f1fc21bb7a7096ee"
+    },
+    {
+      "filename": "Environment_PineRidge.png",
+      "group": "authored_environment",
+      "map_name": "PineRidge",
+      "map_label_ko": "소나무 능선",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Forest/PineRidge",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/E894ABFD409BCCA6ED344BAF470B4D49/PineRidge_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1035969,
+      "sha256": "fdebee74fda9128f78a6275febfcf60bec26d26208f53ec83ed6333d07a01949"
+    },
+    {
+      "filename": "Environment_SavannahGrove.png",
+      "group": "authored_environment",
+      "map_name": "SavannahGrove",
+      "map_label_ko": "사바나 숲",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Grassland/SavannahGrove",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/4DCC5A5E4C5C004B55FE709D7642EAC8/SavannahGrove_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1179864,
+      "sha256": "b7ba6c1ee092f8c6d20b541a775d679fb9b35e3781265b8ba8f8ebe26652713c"
+    },
+    {
+      "filename": "Environment_SunsetLagoon.png",
+      "group": "authored_environment",
+      "map_name": "SunsetLagoon",
+      "map_label_ko": "노을빛 수정 석호",
+      "map_package": "/Game/User_JeHoon/LEVEL/Environment/Summer/SunsetLagoon",
+      "source": "Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/User/Saved/Automation/EnvironmentScreens/Render/816249A042EB7BD0D81C22AFA8482208/SunsetLagoon_gameplay_ui_16x9.png",
+      "capture": "Tactical",
+      "scope": "Authored map comparison using the existing one-ally/one-enemy debug fixture; both have 10000 HP. This is not the actual PvE roster.",
+      "width": 1280,
+      "height": 720,
+      "bytes": 1547088,
+      "sha256": "6048e7757e6e63fe31271d3cb6e37d14fdc3ab6f03f085aaccd6c1b3aa286bc3"
+    },
+    {
+      "filename": "Pve_High_IceCitadel_AfterAction.png",
+      "group": "actual_pve",
+      "map_name": "Gameplay",
+      "map_label_ko": "통합 게임플레이",
+      "map_package": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+      "source": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/13A8D04B410F5C3F7F34C2867B307BDE/High/AfterAction.png",
+      "capture": "AfterAction",
+      "difficulty": "High",
+      "difficulty_label_ko": "상",
+      "arena_id": "IceCitadel",
+      "arena_label_ko": "얼음 성채",
+      "camera_at_origin": false,
+      "runtime_record": {
+        "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/13A8D04B410F5C3F7F34C2867B307BDE/High/AfterAction.png",
+        "capture": "AfterAction",
+        "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+        "difficulty": "High",
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "view_target_class": "/Script/Engine.CameraActor",
+        "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+        "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+        "world_seconds": 15.555783212184906,
+        "width": 1280,
+        "height": 720,
+        "selected_arena_id": "IceCitadel",
+        "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "matches_original_tactical_target": true,
+        "actual_tactical_pov_restored": true,
+        "camera_blend_pending": false,
+        "round_available": false,
+        "observed_action_terminal": false,
+        "observed_next_round": false,
+        "observed_combat_result": true,
+        "after_action_observation_timeout": false,
+        "run_phase": 4
+      },
+      "width": 1280,
+      "height": 720,
+      "bytes": 913467,
+      "sha256": "096be96d864930b9036d1224120be989ad7877e42f444fdf9888c5dc08b8e231"
+    },
+    {
+      "filename": "Pve_High_IceCitadel_Shoulder.png",
+      "group": "actual_pve",
+      "map_name": "Gameplay",
+      "map_label_ko": "통합 게임플레이",
+      "map_package": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+      "source": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/13A8D04B410F5C3F7F34C2867B307BDE/High/Shoulder.png",
+      "capture": "Shoulder",
+      "difficulty": "High",
+      "difficulty_label_ko": "상",
+      "arena_id": "IceCitadel",
+      "arena_label_ko": "얼음 성채",
+      "camera_at_origin": true,
+      "runtime_record": {
+        "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/13A8D04B410F5C3F7F34C2867B307BDE/High/Shoulder.png",
+        "capture": "Shoulder",
+        "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+        "difficulty": "High",
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CombatShoulderCamera_0",
+        "view_target_class": "/Script/ProjectA.CombatShoulderCamera",
+        "camera_location": "X=0.000 Y=0.000 Z=0.000",
+        "camera_rotation": "P=0.000000 Y=0.000000 R=0.000000",
+        "world_seconds": 12.563190709799528,
+        "width": 1280,
+        "height": 720,
+        "selected_arena_id": "IceCitadel",
+        "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "matches_original_tactical_target": false,
+        "actual_tactical_pov_restored": false,
+        "camera_blend_pending": false,
+        "round_available": true,
+        "observed_action_terminal": false,
+        "observed_next_round": false,
+        "observed_combat_result": false,
+        "after_action_observation_timeout": false,
+        "run_phase": 3,
+        "arena_id": "IceCitadel",
+        "round_number": 1,
+        "round_phase": 2,
+        "direct_unit_id": 1,
+        "direct_action_phase": 2,
+        "direct_ready": true,
+        "direct_command_skill": "SkillDefinitionDataAsset:BPDA_DefaulatAttack"
+      },
+      "width": 1280,
+      "height": 720,
+      "bytes": 803875,
+      "sha256": "b2ad03496869452154f8738e43d03eb1d2646f844577cfdb0a33cc2c424cedd8"
+    },
+    {
+      "filename": "Pve_High_IceCitadel_Tactical.png",
+      "group": "actual_pve",
+      "map_name": "Gameplay",
+      "map_label_ko": "통합 게임플레이",
+      "map_package": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+      "source": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/13A8D04B410F5C3F7F34C2867B307BDE/High/Tactical.png",
+      "capture": "Tactical",
+      "difficulty": "High",
+      "difficulty_label_ko": "상",
+      "arena_id": "IceCitadel",
+      "arena_label_ko": "얼음 성채",
+      "camera_at_origin": false,
+      "runtime_record": {
+        "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/13A8D04B410F5C3F7F34C2867B307BDE/High/Tactical.png",
+        "capture": "Tactical",
+        "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+        "difficulty": "High",
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "view_target_class": "/Script/Engine.CameraActor",
+        "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+        "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+        "world_seconds": 12.075876507908106,
+        "width": 1280,
+        "height": 720,
+        "selected_arena_id": "IceCitadel",
+        "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "matches_original_tactical_target": true,
+        "actual_tactical_pov_restored": true,
+        "camera_blend_pending": false,
+        "round_available": true,
+        "observed_action_terminal": false,
+        "observed_next_round": false,
+        "observed_combat_result": false,
+        "after_action_observation_timeout": false,
+        "run_phase": 3,
+        "arena_id": "IceCitadel",
+        "round_number": 1,
+        "round_phase": 1
+      },
+      "width": 1280,
+      "height": 720,
+      "bytes": 1358539,
+      "sha256": "6f92f1640ea5822f623def1d338c6acf661c2f7372468a604acb335870eb87c3"
+    },
+    {
+      "filename": "Pve_Low_MeadowBloom_AfterAction.png",
+      "group": "actual_pve",
+      "map_name": "Gameplay",
+      "map_label_ko": "통합 게임플레이",
+      "map_package": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+      "source": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/AfterAction.png",
+      "capture": "AfterAction",
+      "difficulty": "Low",
+      "difficulty_label_ko": "하",
+      "arena_id": "MeadowBloom",
+      "arena_label_ko": "꽃 초원",
+      "camera_at_origin": false,
+      "runtime_record": {
+        "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/AfterAction.png",
+        "capture": "AfterAction",
+        "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+        "difficulty": "Low",
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "view_target_class": "/Script/Engine.CameraActor",
+        "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+        "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+        "world_seconds": 15.52080361917615,
+        "width": 1280,
+        "height": 720,
+        "selected_arena_id": "MeadowBloom",
+        "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "matches_original_tactical_target": true,
+        "actual_tactical_pov_restored": true,
+        "camera_blend_pending": false,
+        "round_available": false,
+        "observed_action_terminal": false,
+        "observed_next_round": false,
+        "observed_combat_result": true,
+        "after_action_observation_timeout": false,
+        "run_phase": 4
+      },
+      "width": 1280,
+      "height": 720,
+      "bytes": 909661,
+      "sha256": "589f642d6fa670a1f446e17b1fb1bed56114899130607affaf9f608f88e8fb17"
+    },
+    {
+      "filename": "Pve_Low_MeadowBloom_Shoulder.png",
+      "group": "actual_pve",
+      "map_name": "Gameplay",
+      "map_label_ko": "통합 게임플레이",
+      "map_package": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+      "source": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/Shoulder.png",
+      "capture": "Shoulder",
+      "difficulty": "Low",
+      "difficulty_label_ko": "하",
+      "arena_id": "MeadowBloom",
+      "arena_label_ko": "꽃 초원",
+      "camera_at_origin": true,
+      "runtime_record": {
+        "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/Shoulder.png",
+        "capture": "Shoulder",
+        "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+        "difficulty": "Low",
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CombatShoulderCamera_0",
+        "view_target_class": "/Script/ProjectA.CombatShoulderCamera",
+        "camera_location": "X=0.000 Y=0.000 Z=0.000",
+        "camera_rotation": "P=0.000000 Y=0.000000 R=0.000000",
+        "world_seconds": 12.214475721120834,
+        "width": 1280,
+        "height": 720,
+        "selected_arena_id": "MeadowBloom",
+        "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "matches_original_tactical_target": false,
+        "actual_tactical_pov_restored": false,
+        "camera_blend_pending": false,
+        "round_available": true,
+        "observed_action_terminal": false,
+        "observed_next_round": false,
+        "observed_combat_result": false,
+        "after_action_observation_timeout": false,
+        "run_phase": 3,
+        "arena_id": "MeadowBloom",
+        "round_number": 1,
+        "round_phase": 2,
+        "direct_unit_id": 1,
+        "direct_action_phase": 2,
+        "direct_ready": true,
+        "direct_command_skill": "SkillDefinitionDataAsset:BPDA_DefaulatAttack"
+      },
+      "width": 1280,
+      "height": 720,
+      "bytes": 767584,
+      "sha256": "788d4b4040a239221446c2e3689458c03dbce126e4b7f439fa67a672428e3341"
+    },
+    {
+      "filename": "Pve_Low_MeadowBloom_Tactical.png",
+      "group": "actual_pve",
+      "map_name": "Gameplay",
+      "map_label_ko": "통합 게임플레이",
+      "map_package": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+      "source": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/Tactical.png",
+      "capture": "Tactical",
+      "difficulty": "Low",
+      "difficulty_label_ko": "하",
+      "arena_id": "MeadowBloom",
+      "arena_label_ko": "꽃 초원",
+      "camera_at_origin": false,
+      "runtime_record": {
+        "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/Tactical.png",
+        "capture": "Tactical",
+        "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+        "difficulty": "Low",
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "view_target_class": "/Script/Engine.CameraActor",
+        "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+        "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+        "world_seconds": 11.723378416150808,
+        "width": 1280,
+        "height": 720,
+        "selected_arena_id": "MeadowBloom",
+        "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "matches_original_tactical_target": true,
+        "actual_tactical_pov_restored": true,
+        "camera_blend_pending": false,
+        "round_available": true,
+        "observed_action_terminal": false,
+        "observed_next_round": false,
+        "observed_combat_result": false,
+        "after_action_observation_timeout": false,
+        "run_phase": 3,
+        "arena_id": "MeadowBloom",
+        "round_number": 1,
+        "round_phase": 1
+      },
+      "width": 1280,
+      "height": 720,
+      "bytes": 1399852,
+      "sha256": "cdba3262dffdb3a4500f0bd400bc0aa8c75fef48516e21687c560ca085f989c9"
+    },
+    {
+      "filename": "Pve_Medium_DungeonStone_AfterAction.png",
+      "group": "actual_pve",
+      "map_name": "Gameplay",
+      "map_label_ko": "통합 게임플레이",
+      "map_package": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+      "source": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/F678B2D149D283981DDFD1A3CA7C7D13/Medium/AfterAction.png",
+      "capture": "AfterAction",
+      "difficulty": "Medium",
+      "difficulty_label_ko": "중",
+      "arena_id": "DungeonStone",
+      "arena_label_ko": "석조 던전",
+      "camera_at_origin": false,
+      "runtime_record": {
+        "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/F678B2D149D283981DDFD1A3CA7C7D13/Medium/AfterAction.png",
+        "capture": "AfterAction",
+        "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+        "difficulty": "Medium",
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "view_target_class": "/Script/Engine.CameraActor",
+        "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+        "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+        "world_seconds": 15.439255610108376,
+        "width": 1280,
+        "height": 720,
+        "selected_arena_id": "DungeonStone",
+        "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "matches_original_tactical_target": true,
+        "actual_tactical_pov_restored": true,
+        "camera_blend_pending": false,
+        "round_available": false,
+        "observed_action_terminal": false,
+        "observed_next_round": false,
+        "observed_combat_result": true,
+        "after_action_observation_timeout": false,
+        "run_phase": 4
+      },
+      "width": 1280,
+      "height": 720,
+      "bytes": 913813,
+      "sha256": "e44224e825888a78595ea4315adb25254c26346c685dbbecd97c3fb01e729bb1"
+    },
+    {
+      "filename": "Pve_Medium_DungeonStone_Shoulder.png",
+      "group": "actual_pve",
+      "map_name": "Gameplay",
+      "map_label_ko": "통합 게임플레이",
+      "map_package": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+      "source": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/F678B2D149D283981DDFD1A3CA7C7D13/Medium/Shoulder.png",
+      "capture": "Shoulder",
+      "difficulty": "Medium",
+      "difficulty_label_ko": "중",
+      "arena_id": "DungeonStone",
+      "arena_label_ko": "석조 던전",
+      "camera_at_origin": true,
+      "runtime_record": {
+        "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/F678B2D149D283981DDFD1A3CA7C7D13/Medium/Shoulder.png",
+        "capture": "Shoulder",
+        "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+        "difficulty": "Medium",
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CombatShoulderCamera_0",
+        "view_target_class": "/Script/ProjectA.CombatShoulderCamera",
+        "camera_location": "X=0.000 Y=0.000 Z=0.000",
+        "camera_rotation": "P=0.000000 Y=0.000000 R=0.000000",
+        "world_seconds": 12.187545605003834,
+        "width": 1280,
+        "height": 720,
+        "selected_arena_id": "DungeonStone",
+        "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "matches_original_tactical_target": false,
+        "actual_tactical_pov_restored": false,
+        "camera_blend_pending": false,
+        "round_available": true,
+        "observed_action_terminal": false,
+        "observed_next_round": false,
+        "observed_combat_result": false,
+        "after_action_observation_timeout": false,
+        "run_phase": 3,
+        "arena_id": "DungeonStone",
+        "round_number": 1,
+        "round_phase": 2,
+        "direct_unit_id": 1,
+        "direct_action_phase": 2,
+        "direct_ready": true,
+        "direct_command_skill": "SkillDefinitionDataAsset:BPDA_DefaulatAttack"
+      },
+      "width": 1280,
+      "height": 720,
+      "bytes": 1341721,
+      "sha256": "8c56b4bff6c02740e10a58e9d085b19b69e7b696a57e4828de082558a85a9d83"
+    },
+    {
+      "filename": "Pve_Medium_DungeonStone_Tactical.png",
+      "group": "actual_pve",
+      "map_name": "Gameplay",
+      "map_label_ko": "통합 게임플레이",
+      "map_package": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+      "source": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/F678B2D149D283981DDFD1A3CA7C7D13/Medium/Tactical.png",
+      "capture": "Tactical",
+      "difficulty": "Medium",
+      "difficulty_label_ko": "중",
+      "arena_id": "DungeonStone",
+      "arena_label_ko": "석조 던전",
+      "camera_at_origin": false,
+      "runtime_record": {
+        "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/F678B2D149D283981DDFD1A3CA7C7D13/Medium/Tactical.png",
+        "capture": "Tactical",
+        "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+        "difficulty": "Medium",
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "view_target_class": "/Script/Engine.CameraActor",
+        "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+        "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+        "world_seconds": 11.725426007062197,
+        "width": 1280,
+        "height": 720,
+        "selected_arena_id": "DungeonStone",
+        "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "matches_original_tactical_target": true,
+        "actual_tactical_pov_restored": true,
+        "camera_blend_pending": false,
+        "round_available": true,
+        "observed_action_terminal": false,
+        "observed_next_round": false,
+        "observed_combat_result": false,
+        "after_action_observation_timeout": false,
+        "run_phase": 3,
+        "arena_id": "DungeonStone",
+        "round_number": 1,
+        "round_phase": 1
+      },
+      "width": 1280,
+      "height": 720,
+      "bytes": 821544,
+      "sha256": "156926af202cb10bdef3e6db9e2cf178016d8031fccefa68579dbcb58f66d455"
+    }
+  ],
+  "pve_capture_reports": {
+    "Low": {
+      "source_manifest": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/Manifest.json",
+      "passed_capture_contract": true,
+      "after_action_tactical_pov_restored": true,
+      "after_action_observation_timeout": false,
+      "difficulty": "Low",
+      "arena_id": "MeadowBloom",
+      "isolated_save_slot": "ProjectA_Automation_MapScreens_d1ac6d5450c84a5b9244bd6467d14509",
+      "scope": "Actual normal menu creation, four default characters with one direct player, public encounter/difficulty/skill/Ready requests, original unified Gameplay map and production cameras. Natural tactical, Ready shoulder and observed post-action frames; successful capture does not imply correct shoulder framing or tactical restoration. AfterAction records the state after a terminal action, new round, combat result or settled non-shoulder target followed by thirty natural frames and one world second; a thirty-second missing boundary produces a labelled AfterActionTimeout diagnostic. No GameMode, health, damage, skill timing, actor transform, asset, camera or simulation overrides. UI button delegates and public controller requests are automation, not physical mouse input. Screenshots support later visual judgement and do not establish balance, multiplayer, Continue or all camera edge cases.",
+      "tactical_render_readiness": {
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "authored_camera_anchor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "actual_camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+        "actual_camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+        "target_camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+        "target_camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+        "camera_pov_matches_authored_arena": true,
+        "first_observation": {
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+          "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+          "camera_pov_matches_authored_arena": true,
+          "recently_rendered_living_units": 0,
+          "recently_rendered_grid_tiles": 0
+        },
+        "living_unit_presentation": [
+          {
+            "id": 1,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_WarriorUnit_C_0",
+            "location": "X=0.000 Y=200.000 Z=105.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.72337818145752,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "CameraProxyMeshComponent_0",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Sword",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "StaticMeshComponent_0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.72337818145752,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "StaticMeshComponent_1",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.72337818145752,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          },
+          {
+            "id": 2,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_MageUnit_C_0",
+            "location": "X=-200.000 Y=200.000 Z=105.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.72337818145752,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "CameraProxyMeshComponent_0",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Sword",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Staff",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "StaticMeshComponent_0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.72337818145752,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          },
+          {
+            "id": 3,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_PlayerUnit_C_0",
+            "location": "X=-400.000 Y=200.000 Z=105.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.72337818145752,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "CameraProxyMeshComponent_0",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Sword",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "StaticMeshComponent_0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.72337818145752,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          },
+          {
+            "id": 4,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_RogueUnit_C_0",
+            "location": "X=-600.000 Y=200.000 Z=105.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.72337818145752,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "CameraProxyMeshComponent_0",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Sword",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "StaticMeshComponent_0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.72337818145752,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          },
+          {
+            "id": 5,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_Monster_Wolf_C_0",
+            "location": "X=-200.000 Y=600.000 Z=75.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.72337818145752,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          }
+        ],
+        "living_units": 5,
+        "recently_rendered_living_units": 5,
+        "recently_rendered_grid_tiles": 16,
+        "observed_distinct_engine_frames": 88,
+        "consecutive_ready_engine_frames": 86,
+        "observed_world_seconds": 1.004593849182129,
+        "world_seconds": 11.72337818145752,
+        "ready_for_evidence_capture": true,
+        "scope": "Natural engine frames only; expected arena view target and camera POV, every living unit has a visible registered mesh reported on-screen within 0.25 world seconds, and at least one grid tile is similarly rendered. Thirty consecutive ready engine frames and at least one elapsed world second precede evidence capture. No Tick, camera, visibility, transform, health or simulation mutations. Final PNG still requires visual inspection."
+      },
+      "captures": [
+        {
+          "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/MainMenu.png",
+          "capture": "MainMenu",
+          "map": "/Game/User_JeHoon/LEVEL/Core/MainMenu",
+          "difficulty": "Low",
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_MainMenu.MainMenu:PersistentLevel.MainMenuPreviewStage_0",
+          "view_target_class": "/Script/ProjectA.MainMenuPreviewStage",
+          "camera_location": "X=-450.000 Y=0.000 Z=140.000",
+          "camera_rotation": "P=-5.000000 Y=0.000000 R=-0.000000",
+          "world_seconds": 1.354199893772602,
+          "width": 1280,
+          "height": 720,
+          "selected_arena_id": "None",
+          "original_tactical_view_target": "None",
+          "matches_original_tactical_target": false,
+          "actual_tactical_pov_restored": false,
+          "camera_blend_pending": false,
+          "round_available": false,
+          "observed_action_terminal": false,
+          "observed_next_round": false,
+          "observed_combat_result": false,
+          "after_action_observation_timeout": false,
+          "run_phase": 0
+        },
+        {
+          "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/Tactical.png",
+          "capture": "Tactical",
+          "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+          "difficulty": "Low",
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "view_target_class": "/Script/Engine.CameraActor",
+          "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+          "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+          "world_seconds": 11.723378416150808,
+          "width": 1280,
+          "height": 720,
+          "selected_arena_id": "MeadowBloom",
+          "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "matches_original_tactical_target": true,
+          "actual_tactical_pov_restored": true,
+          "camera_blend_pending": false,
+          "round_available": true,
+          "observed_action_terminal": false,
+          "observed_next_round": false,
+          "observed_combat_result": false,
+          "after_action_observation_timeout": false,
+          "run_phase": 3,
+          "arena_id": "MeadowBloom",
+          "round_number": 1,
+          "round_phase": 1
+        },
+        {
+          "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/Shoulder.png",
+          "capture": "Shoulder",
+          "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+          "difficulty": "Low",
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CombatShoulderCamera_0",
+          "view_target_class": "/Script/ProjectA.CombatShoulderCamera",
+          "camera_location": "X=0.000 Y=0.000 Z=0.000",
+          "camera_rotation": "P=0.000000 Y=0.000000 R=0.000000",
+          "world_seconds": 12.214475721120834,
+          "width": 1280,
+          "height": 720,
+          "selected_arena_id": "MeadowBloom",
+          "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "matches_original_tactical_target": false,
+          "actual_tactical_pov_restored": false,
+          "camera_blend_pending": false,
+          "round_available": true,
+          "observed_action_terminal": false,
+          "observed_next_round": false,
+          "observed_combat_result": false,
+          "after_action_observation_timeout": false,
+          "run_phase": 3,
+          "arena_id": "MeadowBloom",
+          "round_number": 1,
+          "round_phase": 2,
+          "direct_unit_id": 1,
+          "direct_action_phase": 2,
+          "direct_ready": true,
+          "direct_command_skill": "SkillDefinitionDataAsset:BPDA_DefaulatAttack"
+        },
+        {
+          "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/0A93CD104EAF9609F222D1929849A37C/Low/AfterAction.png",
+          "capture": "AfterAction",
+          "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+          "difficulty": "Low",
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "view_target_class": "/Script/Engine.CameraActor",
+          "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+          "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+          "world_seconds": 15.52080361917615,
+          "width": 1280,
+          "height": 720,
+          "selected_arena_id": "MeadowBloom",
+          "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "matches_original_tactical_target": true,
+          "actual_tactical_pov_restored": true,
+          "camera_blend_pending": false,
+          "round_available": false,
+          "observed_action_terminal": false,
+          "observed_next_round": false,
+          "observed_combat_result": true,
+          "after_action_observation_timeout": false,
+          "run_phase": 4
+        }
+      ]
+    },
+    "High": {
+      "source_manifest": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/13A8D04B410F5C3F7F34C2867B307BDE/High/Manifest.json",
+      "passed_capture_contract": true,
+      "after_action_tactical_pov_restored": true,
+      "after_action_observation_timeout": false,
+      "difficulty": "High",
+      "arena_id": "IceCitadel",
+      "isolated_save_slot": "ProjectA_Automation_MapScreens_d1ac6d5450c84a5b9244bd6467d14509",
+      "scope": "Actual normal menu creation, four default characters with one direct player, public encounter/difficulty/skill/Ready requests, original unified Gameplay map and production cameras. Natural tactical, Ready shoulder and observed post-action frames; successful capture does not imply correct shoulder framing or tactical restoration. AfterAction records the state after a terminal action, new round, combat result or settled non-shoulder target followed by thirty natural frames and one world second; a thirty-second missing boundary produces a labelled AfterActionTimeout diagnostic. No GameMode, health, damage, skill timing, actor transform, asset, camera or simulation overrides. UI button delegates and public controller requests are automation, not physical mouse input. Screenshots support later visual judgement and do not establish balance, multiplayer, Continue or all camera edge cases.",
+      "tactical_render_readiness": {
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "authored_camera_anchor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "actual_camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+        "actual_camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+        "target_camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+        "target_camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+        "camera_pov_matches_authored_arena": true,
+        "first_observation": {
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+          "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+          "camera_pov_matches_authored_arena": true,
+          "recently_rendered_living_units": 0,
+          "recently_rendered_grid_tiles": 0
+        },
+        "living_unit_presentation": [
+          {
+            "id": 1,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_WarriorUnit_C_0",
+            "location": "X=0.000 Y=200.000 Z=105.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 12.075876235961914,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "CameraProxyMeshComponent_0",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Sword",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "StaticMeshComponent_0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 12.075876235961914,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "StaticMeshComponent_1",
+                "visible_registered": true,
+                "last_render_time_on_screen": 12.075876235961914,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          },
+          {
+            "id": 2,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_MageUnit_C_0",
+            "location": "X=-200.000 Y=200.000 Z=105.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 12.075876235961914,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "CameraProxyMeshComponent_0",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Sword",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Staff",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "StaticMeshComponent_0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 12.075876235961914,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          },
+          {
+            "id": 3,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_PlayerUnit_C_0",
+            "location": "X=-400.000 Y=200.000 Z=105.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 12.075876235961914,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "CameraProxyMeshComponent_0",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Sword",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "StaticMeshComponent_0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 12.075876235961914,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          },
+          {
+            "id": 4,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_RogueUnit_C_0",
+            "location": "X=-600.000 Y=200.000 Z=105.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 12.075876235961914,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "CameraProxyMeshComponent_0",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Sword",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "StaticMeshComponent_0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 12.075876235961914,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          },
+          {
+            "id": 5,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_Monster_Spider_C_0",
+            "location": "X=-200.000 Y=600.000 Z=75.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 12.075876235961914,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          }
+        ],
+        "living_units": 5,
+        "recently_rendered_living_units": 5,
+        "recently_rendered_grid_tiles": 16,
+        "observed_distinct_engine_frames": 87,
+        "consecutive_ready_engine_frames": 85,
+        "observed_world_seconds": 1.0096092224121094,
+        "world_seconds": 12.075876235961914,
+        "ready_for_evidence_capture": true,
+        "scope": "Natural engine frames only; expected arena view target and camera POV, every living unit has a visible registered mesh reported on-screen within 0.25 world seconds, and at least one grid tile is similarly rendered. Thirty consecutive ready engine frames and at least one elapsed world second precede evidence capture. No Tick, camera, visibility, transform, health or simulation mutations. Final PNG still requires visual inspection."
+      },
+      "captures": [
+        {
+          "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/13A8D04B410F5C3F7F34C2867B307BDE/High/Tactical.png",
+          "capture": "Tactical",
+          "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+          "difficulty": "High",
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "view_target_class": "/Script/Engine.CameraActor",
+          "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+          "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+          "world_seconds": 12.075876507908106,
+          "width": 1280,
+          "height": 720,
+          "selected_arena_id": "IceCitadel",
+          "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "matches_original_tactical_target": true,
+          "actual_tactical_pov_restored": true,
+          "camera_blend_pending": false,
+          "round_available": true,
+          "observed_action_terminal": false,
+          "observed_next_round": false,
+          "observed_combat_result": false,
+          "after_action_observation_timeout": false,
+          "run_phase": 3,
+          "arena_id": "IceCitadel",
+          "round_number": 1,
+          "round_phase": 1
+        },
+        {
+          "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/13A8D04B410F5C3F7F34C2867B307BDE/High/Shoulder.png",
+          "capture": "Shoulder",
+          "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+          "difficulty": "High",
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CombatShoulderCamera_0",
+          "view_target_class": "/Script/ProjectA.CombatShoulderCamera",
+          "camera_location": "X=0.000 Y=0.000 Z=0.000",
+          "camera_rotation": "P=0.000000 Y=0.000000 R=0.000000",
+          "world_seconds": 12.563190709799528,
+          "width": 1280,
+          "height": 720,
+          "selected_arena_id": "IceCitadel",
+          "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "matches_original_tactical_target": false,
+          "actual_tactical_pov_restored": false,
+          "camera_blend_pending": false,
+          "round_available": true,
+          "observed_action_terminal": false,
+          "observed_next_round": false,
+          "observed_combat_result": false,
+          "after_action_observation_timeout": false,
+          "run_phase": 3,
+          "arena_id": "IceCitadel",
+          "round_number": 1,
+          "round_phase": 2,
+          "direct_unit_id": 1,
+          "direct_action_phase": 2,
+          "direct_ready": true,
+          "direct_command_skill": "SkillDefinitionDataAsset:BPDA_DefaulatAttack"
+        },
+        {
+          "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/13A8D04B410F5C3F7F34C2867B307BDE/High/AfterAction.png",
+          "capture": "AfterAction",
+          "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+          "difficulty": "High",
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "view_target_class": "/Script/Engine.CameraActor",
+          "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+          "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+          "world_seconds": 15.555783212184906,
+          "width": 1280,
+          "height": 720,
+          "selected_arena_id": "IceCitadel",
+          "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "matches_original_tactical_target": true,
+          "actual_tactical_pov_restored": true,
+          "camera_blend_pending": false,
+          "round_available": false,
+          "observed_action_terminal": false,
+          "observed_next_round": false,
+          "observed_combat_result": true,
+          "after_action_observation_timeout": false,
+          "run_phase": 4
+        }
+      ]
+    },
+    "Medium": {
+      "source_manifest": "Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/F678B2D149D283981DDFD1A3CA7C7D13/Medium/Manifest.json",
+      "passed_capture_contract": true,
+      "after_action_tactical_pov_restored": true,
+      "after_action_observation_timeout": false,
+      "difficulty": "Medium",
+      "arena_id": "DungeonStone",
+      "isolated_save_slot": "ProjectA_Automation_MapScreens_d1ac6d5450c84a5b9244bd6467d14509",
+      "scope": "Actual normal menu creation, four default characters with one direct player, public encounter/difficulty/skill/Ready requests, original unified Gameplay map and production cameras. Natural tactical, Ready shoulder and observed post-action frames; successful capture does not imply correct shoulder framing or tactical restoration. AfterAction records the state after a terminal action, new round, combat result or settled non-shoulder target followed by thirty natural frames and one world second; a thirty-second missing boundary produces a labelled AfterActionTimeout diagnostic. No GameMode, health, damage, skill timing, actor transform, asset, camera or simulation overrides. UI button delegates and public controller requests are automation, not physical mouse input. Screenshots support later visual judgement and do not establish balance, multiplayer, Continue or all camera edge cases.",
+      "tactical_render_readiness": {
+        "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "authored_camera_anchor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+        "actual_camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+        "actual_camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+        "target_camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+        "target_camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+        "camera_pov_matches_authored_arena": true,
+        "first_observation": {
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+          "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+          "camera_pov_matches_authored_arena": true,
+          "recently_rendered_living_units": 0,
+          "recently_rendered_grid_tiles": 0
+        },
+        "living_unit_presentation": [
+          {
+            "id": 1,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_WarriorUnit_C_0",
+            "location": "X=0.000 Y=200.000 Z=105.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.725425720214844,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "CameraProxyMeshComponent_0",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Sword",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "StaticMeshComponent_0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.725425720214844,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "StaticMeshComponent_1",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.725425720214844,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          },
+          {
+            "id": 2,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_MageUnit_C_0",
+            "location": "X=-200.000 Y=200.000 Z=105.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.725425720214844,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "CameraProxyMeshComponent_0",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Sword",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Staff",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "StaticMeshComponent_0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.725425720214844,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          },
+          {
+            "id": 3,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_PlayerUnit_C_0",
+            "location": "X=-400.000 Y=200.000 Z=105.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.725425720214844,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "CameraProxyMeshComponent_0",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Sword",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "StaticMeshComponent_0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.725425720214844,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          },
+          {
+            "id": 4,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_RogueUnit_C_0",
+            "location": "X=-600.000 Y=200.000 Z=105.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.725425720214844,
+                "recently_drawn_on_screen": true
+              },
+              {
+                "component": "CameraProxyMeshComponent_0",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "Sword",
+                "visible_registered": false,
+                "last_render_time_on_screen": -1000,
+                "recently_drawn_on_screen": false
+              },
+              {
+                "component": "StaticMeshComponent_0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.725425720214844,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          },
+          {
+            "id": 5,
+            "actor": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.BP_Monster_Wolf_C_0",
+            "location": "X=-200.000 Y=600.000 Z=75.000",
+            "actor_hidden": false,
+            "meshes": [
+              {
+                "component": "CharacterMesh0",
+                "visible_registered": true,
+                "last_render_time_on_screen": 11.725425720214844,
+                "recently_drawn_on_screen": true
+              }
+            ],
+            "has_recent_visible_mesh": true
+          }
+        ],
+        "living_units": 5,
+        "recently_rendered_living_units": 5,
+        "recently_rendered_grid_tiles": 16,
+        "observed_distinct_engine_frames": 86,
+        "consecutive_ready_engine_frames": 84,
+        "observed_world_seconds": 1.0021705627441406,
+        "world_seconds": 11.725425720214844,
+        "ready_for_evidence_capture": true,
+        "scope": "Natural engine frames only; expected arena view target and camera POV, every living unit has a visible registered mesh reported on-screen within 0.25 world seconds, and at least one grid tile is similarly rendered. Thirty consecutive ready engine frames and at least one elapsed world second precede evidence capture. No Tick, camera, visibility, transform, health or simulation mutations. Final PNG still requires visual inspection."
+      },
+      "captures": [
+        {
+          "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/F678B2D149D283981DDFD1A3CA7C7D13/Medium/Tactical.png",
+          "capture": "Tactical",
+          "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+          "difficulty": "Medium",
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "view_target_class": "/Script/Engine.CameraActor",
+          "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+          "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+          "world_seconds": 11.725426007062197,
+          "width": 1280,
+          "height": 720,
+          "selected_arena_id": "DungeonStone",
+          "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "matches_original_tactical_target": true,
+          "actual_tactical_pov_restored": true,
+          "camera_blend_pending": false,
+          "round_available": true,
+          "observed_action_terminal": false,
+          "observed_next_round": false,
+          "observed_combat_result": false,
+          "after_action_observation_timeout": false,
+          "run_phase": 3,
+          "arena_id": "DungeonStone",
+          "round_number": 1,
+          "round_phase": 1
+        },
+        {
+          "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/F678B2D149D283981DDFD1A3CA7C7D13/Medium/Shoulder.png",
+          "capture": "Shoulder",
+          "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+          "difficulty": "Medium",
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CombatShoulderCamera_0",
+          "view_target_class": "/Script/ProjectA.CombatShoulderCamera",
+          "camera_location": "X=0.000 Y=0.000 Z=0.000",
+          "camera_rotation": "P=0.000000 Y=0.000000 R=0.000000",
+          "world_seconds": 12.187545605003834,
+          "width": 1280,
+          "height": 720,
+          "selected_arena_id": "DungeonStone",
+          "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "matches_original_tactical_target": false,
+          "actual_tactical_pov_restored": false,
+          "camera_blend_pending": false,
+          "round_available": true,
+          "observed_action_terminal": false,
+          "observed_next_round": false,
+          "observed_combat_result": false,
+          "after_action_observation_timeout": false,
+          "run_phase": 3,
+          "arena_id": "DungeonStone",
+          "round_number": 1,
+          "round_phase": 2,
+          "direct_unit_id": 1,
+          "direct_action_phase": 2,
+          "direct_ready": true,
+          "direct_command_skill": "SkillDefinitionDataAsset:BPDA_DefaulatAttack"
+        },
+        {
+          "filename": "C:/Users/jaba0/Desktop/MyProjects/ProjectA/Saved/Automation/MapScreenshots_20261010/Pve.d1ac6d5450c84a5b9244bd6467d14509/User/Saved/Automation/PveScreens/Pve/Render/F678B2D149D283981DDFD1A3CA7C7D13/Medium/AfterAction.png",
+          "capture": "AfterAction",
+          "map": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
+          "difficulty": "Medium",
+          "view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "view_target_class": "/Script/Engine.CameraActor",
+          "camera_location": "X=-300.000 Y=-1000.000 Z=1500.000",
+          "camera_rotation": "P=-46.970001 Y=90.000000 R=-0.000000",
+          "world_seconds": 15.439255610108376,
+          "width": 1280,
+          "height": 720,
+          "selected_arena_id": "DungeonStone",
+          "original_tactical_view_target": "/Game/User_JeHoon/LEVEL/Core/UEDPIE_0_Gameplay.Gameplay:PersistentLevel.CameraActor_0",
+          "matches_original_tactical_target": true,
+          "actual_tactical_pov_restored": true,
+          "camera_blend_pending": false,
+          "round_available": false,
+          "observed_action_terminal": false,
+          "observed_next_round": false,
+          "observed_combat_result": true,
+          "after_action_observation_timeout": false,
+          "run_phase": 4
+        }
+      ]
+    }
+  }
+}

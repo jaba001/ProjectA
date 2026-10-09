@@ -276,6 +276,9 @@ public:
             {
                 const FString Suffix = ScreenIndex == 0 ? TEXT("gameplay_ui_16x9") : ScreenIndex == 1 ? TEXT("gameplay_ui_21x9") : TEXT("gameplay_ui_4x3");
                 if (!Capture(Suffix)) return End();
+                // Explicit screenshot collection stops before unrelated input and performance scenarios.
+                // 명시적인 스크린샷 수집은 별도 입력·성능 시나리오 전에 종료합니다.
+                if (FParse::Param(FCommandLine::Get(), TEXT("ProjectAMapScreenshotReview"))) return End();
                 if (ScreenIndex < 2)
                 {
                     ++ScreenIndex;
@@ -1054,7 +1057,8 @@ private:
         RestorePerformanceCamera();
         Probe.Reset();
         GEditor->RequestEndPlayMap();
-        Test->AddInfo(TEXT("Render review checks authored camera/grid/roster, real HP draw output and actual Slate tile input. Current capture-free frame intervals are recorded for environment comparison; physical display present, before/after FPS baselines, sound and network support are separate."));
+        if (FParse::Param(FCommandLine::Get(), TEXT("ProjectAMapScreenshotReview"))) Test->AddInfo(TEXT("Screenshot collection captured the authored 1280x720 gameplay view only; input, performance, other aspect ratios and network scenarios were not executed."));
+        else Test->AddInfo(TEXT("Render review checks authored camera/grid/roster, real HP draw output and actual Slate tile input. Current capture-free frame intervals are recorded for environment comparison; physical display present, before/after FPS baselines, sound and network support are separate."));
         Advance(99);
         return false;
     }
@@ -1165,6 +1169,11 @@ IMPLEMENT_COMPLEX_AUTOMATION_TEST(FTodoEnvironmentRenderReview, "ProjectA.TodoRe
 
 void FTodoEnvironmentRenderReview::GetTests(TArray<FString>& OutBeautifiedNames, TArray<FString>& OutTestCommands) const
 {
+    if (FParse::Param(FCommandLine::Get(), TEXT("ProjectAMapScreenshotReview")))
+    {
+        OutBeautifiedNames.Add(TEXT("DebugCombat"));
+        OutTestCommands.Add(TEXT("DebugCombat"));
+    }
     for (const TPair<FString, FString>& Map : TodoRenderReview::EnvironmentMaps)
     {
         OutBeautifiedNames.Add(Map.Key);
@@ -1175,8 +1184,9 @@ void FTodoEnvironmentRenderReview::GetTests(TArray<FString>& OutBeautifiedNames,
 bool FTodoEnvironmentRenderReview::RunTest(const FString& Parameters)
 {
     const FString* RelativePath = TodoRenderReview::EnvironmentMaps.Find(Parameters);
-    if (!RelativePath) return false;
-    const FString MapPath = TEXT("/Game/User_JeHoon/LEVEL/Environment/") + *RelativePath;
+    const bool bDebugScreenshot = Parameters == TEXT("DebugCombat") && FParse::Param(FCommandLine::Get(), TEXT("ProjectAMapScreenshotReview"));
+    if (!RelativePath && !bDebugScreenshot) return false;
+    const FString MapPath = bDebugScreenshot ? TEXT("/Game/User_JeHoon/LEVEL/Development/DebugCombat") : TEXT("/Game/User_JeHoon/LEVEL/Environment/") + *RelativePath;
     FString Slot;
     if (!TodoRenderReview::Prepare(this, MapPath, Slot)) return false;
     ADD_LATENT_AUTOMATION_COMMAND(TodoRenderReview::FReview(this, MapPath, Parameters, Slot, false));

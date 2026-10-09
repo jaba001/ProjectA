@@ -1043,3 +1043,17 @@ PvE 하·중·상에 서로 다른 맵과 등장 몬스터 설명을 제공하�
 `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`는 41.09초, 기하 회귀·GC 참조·시점 식별자 보완을 포함한 최종 빌드는 40.17초에 성공했다. 같은 옵션의 `ProjectA Win64 Development`는 32.73초에 성공했으며 컴파일 오류·경고는 0이다. `ProjectA.Combat.ShoulderCamera`의 소유권/준비/행동/경계 6개와 회전/장식 가림 2개 회귀를 작성·컴파일했으며 실행하지 않았다. 로그는 `Saved/Automation/ShoulderCamera_20261010/{EditorBuild,EditorBuild.Final,GameBuild}.log`다.
 
 독립 코드 검토와 `python Saved/Automation/ShoulderCamera_20261010/ValidateDocumentation.py`·`ValidateStatic.py`로 문서 링크·기존 미완료 52개/제안 선택 7개 보존·확인 1개 추가·전체 diff를 점검했다. 근거는 같은 폴더의 `DocumentationValidation.json`·`StaticReview.json`이다. 게임·PIE·Unreal 자동화 테스트·패키지·화면 캡처·IDE를 실행하지 않았다. 화면비별 근접/활/마법 구도·가림·준비 취소/복귀·Continue·2인 각자 시점의 수용 확인은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남긴다.
+
+### 9-51 2026-10-10 맵별 스크린샷 수집
+
+사용자의 명시적인 촬영 요청에 따라 현재 프로젝트 맵 17개의 화면 25장을 [스크린샷 갤러리](ScreanShoot/index.html)에 보존했다. 기준 커밋은 `242a12cb`이며 시작 시 미커밋 변경은 없었다. 환경 비교 14맵·DebugCombat 각 1장, MainMenu 1장, 통합 Gameplay의 실제 PvE 하·중·상 각각 전술뷰·준비 후 숄더뷰·행동 후 화면 3장이다. 외부 팩의 데모맵은 대상이 아니다. 모두 1280×720이며 [manifest.json](ScreanShoot/2026-10-10/manifest.json)에 맵 경로·촬영 단계·실제 카메라·원본 위치·SHA-256을 기록했다. PNG를 자르거나 보정하지 않았다.
+
+환경 촬영은 기존 아군/적 각 1명·HP 10000의 비교용 구성을 사용한다. 실제 PvE는 정상 새 게임에서 기본 캐릭터 4명과 직접 조작 1명을 생성하고 공개 인카운터·난이도·스킬·준비 요청으로 진행한다. 메뉴 버튼 delegate 자동화이며 물리 마우스 입력 검수가 아니다. 맵·게임 수치·카메라·행동 시간·시뮬레이션을 촬영용으로 변경하지 않았다. `TodoRenderReviewTests`에 16:9 촬영 후 종료하는 선택 옵션을 추가하고 `PveMapScreenshotTests`에 실제 진행의 촬영과 상태 기록을 구현했다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`의 최초·PvE 추가·최종 빌드는 각각 20.40초·8.57초·7.49초에 성공했다. 로그는 `Saved/Automation/MapScreenshots_20261010/{EditorBuild,EditorBuild.Pve,EditorBuild.Final}.log`다. 실행은 같은 폴더의 `RunCapture.ps1 -Group Environment`와 `-Group Pve`이며, `UnrealEditor-Cmd`의 `-ProjectAMapScreenshotReview -ProjectAReviewLeftMonitor -UserDir=<고유 경로> -ProjectASaveSlot=<고유 슬롯> -ProjectAReviewOutputRoot=<분리 Saved/Automation 경로> -nowrite -ExecCmds="Automation RunTests <필터>" -TestExit="Automation Test Queue Empty"`를 사용한다. 필터는 `ProjectA.TodoReview.Environment`와 `ProjectA.TodoReview.PveMapScreenshots`다.
+
+최종 촬영 보고서는 `Saved/Automation/MapScreenshots_20261010/Environment.e3f8c8a8a245462ca6bff4513b250cf4/Report/index.json`의 15건, `Pve.d1ac6d5450c84a5b9244bd6467d14509/Report/index.json`의 3건 모두 경고 포함 통과이며 실패/미실행은 0이다. 최초 `Pve.51fe8bfd252340ebbfb9cb92a203c090`는 승리 후 Round 정리를 관찰하지 못해 3건 시간 초과했다. 촬영 관찰기를 보완해 결과 상태도 기록하도록 수정한 뒤 재촬영했으며 최초 실패를 게임의 복귀 실패로 해석하지 않는다. 최종 세 사례의 행동 후 실제 카메라 POV는 원래 전술 카메라와 일치했고 이미지는 승리·보상 UI다. 일반적인 전투 중 행동 종료의 체감 확인을 대신하지 않는다.
+
+화면에서 실제 중 난이도의 회색 체크무늬 바닥과 세 숄더뷰의 캐릭터 미노출·원점 POV를 관찰했다. 정적 대조에서 UE 5.8 `PlayerCameraManager.cpp`의 `ACameraActor` 전용 경로가 `GetCameraComponent()->GetCameraView()`를 사용하고 프로젝트의 `CalcCamera()` 추적 계산을 우회함을 확인했다. 호출 횟수를 실행 계측하지는 않았다. 이번 작업은 촬영본을 보존하며 해당 문제의 수정·재검증과 최종 시각 판단을 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 유지한다.
+
+실제 PIE 창은 왼쪽 모니터의 `(-1904, 8)`에 배치했고 촬영용 Editor는 종료했다. `ProtectUserState.py --verify`로 기존 저장·사용자/프로젝트 설정·17개 맵 총 69개 파일의 해시와 파일 목록이 그대로임을 확인했다. `ValidateArchive.py`는 25개 PNG 디코딩·해상도·원본 해시·갤러리 링크·17맵 수록과 기존 TODO 미완료 53개/제안 선택 7개 보존을 확인한다. `ValidateDocumentation.py`의 문서 링크 및 전체 diff 정적 결과는 같은 폴더의 `ArchiveValidation.json`·`DocumentationValidation.json`에 기록한다. 카메라/맵 품질 승인, 화면비별 입력, 밸런스, Continue, 멀티플레이 검수 완료로 확대하지 않는다.
