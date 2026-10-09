@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Controller/PartyPlayerController.h"
 #include "Game/Run/RunEquipmentTypes.h"
+#include "Game/Run/RunItemSaleTypes.h"
 #include "Game/Run/RunTypes.h"
 #include "GameplayTagContainer.h"
 #include "GameplayPlayerController.generated.h"
@@ -44,7 +45,11 @@ public:
     void RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision = INDEX_NONE);
     FGuid GetShopBuyerCharacterId(const FGameplayViewState& View) const;
     const FText& GetShopPurchaseMessage() const { return ShopPurchaseMessage; }
-    bool IsShopPurchasePending() const { return bShopPurchasePending; }
+    bool IsShopPurchasePending() const { return bShopPurchasePending || bItemSalePending || bEquipmentChangePending; }
+    void RequestSellInventoryItem(const FRunItemSaleCommand& Command);
+    bool CanSellInventoryItems(const FGameplayViewState& View, FGuid CharacterId) const;
+    bool IsItemSalePending() const { return bItemSalePending; }
+    const FText& GetItemSaleMessage() const { return ItemSaleMessage; }
     void RequestChangeEquipment(const FRunEquipmentCommand& Command);
     bool CanChangeEquipment(const FGameplayViewState& View, FGuid CharacterId) const;
     bool IsEquipmentChangePending() const { return bEquipmentChangePending; }
@@ -80,6 +85,7 @@ private:
     void FinishEncounterPresentation(uint32 Generation);
     bool PrepareDungeonRoutes(const FGameplayViewState& View);
     void ExecuteShopPurchase(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision);
+    void ExecuteItemSale(FGuid RequestId, const FRunItemSaleCommand& Command);
     void ExecuteEquipmentChange(const FRunEquipmentCommand& Command);
     void ExecuteGoldRewardSelection(FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex);
 
@@ -94,6 +100,12 @@ private:
 
     UFUNCTION(Client, Reliable)
     void ClientReceiveShopPurchaseResult(bool bSucceeded, const FText& Message, int32 ConfirmedShopRevision);
+
+    UFUNCTION(Server, Reliable)
+    void ServerSellInventoryItem(FGuid RequestId, const FRunItemSaleCommand& Command);
+
+    UFUNCTION(Client, Reliable)
+    void ClientReceiveItemSaleResult(FGuid RequestId, bool bSucceeded, const FText& Message, int32 ConfirmedEquipmentRevision, int32 ConfirmedShopRevision);
 
     UFUNCTION(Server, Reliable)
     void ServerChangeEquipment(const FRunEquipmentCommand& Command);
@@ -114,6 +126,13 @@ private:
     bool bPendingItemShop = false;
     bool bPendingService = false;
     int32 PendingShopRevision = INDEX_NONE;
+    FText ItemSaleMessage;
+    bool bItemSalePending = false;
+    FGuid PendingItemSaleRequestId;
+    FGuid PendingItemSaleCharacterId;
+    FName PendingItemSaleEncounterId;
+    int32 PendingItemSaleEquipmentRevision = INDEX_NONE;
+    int32 PendingItemSaleShopRevision = INDEX_NONE;
     FText EquipmentMessage;
     bool bEquipmentChangePending = false;
     FGuid PendingEquipmentCharacterId;

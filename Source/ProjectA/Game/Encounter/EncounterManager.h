@@ -14,6 +14,7 @@ class UPartyDefinitionDataAsset;
 class UEncounterDefinitionDataAsset;
 class URunStateSubsystem;
 struct FRunEquipmentCommand;
+struct FRunItemSaleCommand;
 
 DECLARE_MULTICAST_DELEGATE(FOnEncounterFlowChanged);
 
@@ -35,6 +36,7 @@ public:
     bool LeaveRunEncounter();
     bool PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError, int32 ExpectedShopRevision = INDEX_NONE);
     bool ChangeEquipment(const FRunAccountId& AccountId, const FRunEquipmentCommand& Command, FText& OutError);
+    bool SellItem(const FRunAccountId& AccountId, const FRunItemSaleCommand& Command, FText& OutError);
     bool SelectGoldReward(const FRunAccountId& AccountId, FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex, FText& OutError);
 
     // Rebuild units and ownership from a durable round planning boundary.

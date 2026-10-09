@@ -204,7 +204,7 @@ void AGameplayPlayerController::RequestSelectRunEncounter(FName EncounterId)
 
 void AGameplayPlayerController::RequestLeaveRunEncounter()
 {
-    if (CanIssueRunCommands() && EncounterManager) EncounterManager->LeaveRunEncounter();
+    if (!IsShopPurchasePending() && CanIssueRunCommands() && EncounterManager) EncounterManager->LeaveRunEncounter();
 }
 
 void AGameplayPlayerController::RequestToggleInventory()
@@ -278,8 +278,9 @@ bool AGameplayPlayerController::IsRoundInputEnabled() const
 
 void AGameplayPlayerController::RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision)
 {
-    if (!IsLocalController() || bShopPurchasePending || !CharacterId.IsValid() || OfferId.IsNone()) return;
+    if (!IsLocalController() || IsShopPurchasePending() || bEncounterPresentationTransition || !CharacterId.IsValid() || OfferId.IsNone()) return;
     ShopPurchaseMessage = FText::GetEmpty();
+    ItemSaleMessage = FText::GetEmpty();
     bShopPurchasePending = true;
     bPendingItemShop = HasAuthority() && RunState ? RunState->GetEncounterProgress().IsItemShop() : GameplayState && GameplayState->GetViewState().EncounterProgress.IsItemShop();
     const FRunEncounterOffer* Selected = HasAuthority() && RunState ? RunState->GetEncounterProgress().FindSelectedOffer() : GameplayState ? GameplayState->GetViewState().EncounterProgress.FindSelectedOffer() : nullptr;
@@ -325,7 +326,7 @@ void AGameplayPlayerController::ExecuteShopPurchase(FGuid CharacterId, FName Off
         {
             Error = ServiceTag.MatchesTag(FRunEncounterOffer::GetConsumableShopTag()) ? NSLOCTEXT("RunRecovery", "ConsumablePurchased", "회복 소모품 1개를 구매하고 진행을 저장했습니다.") : ServiceTag.MatchesTag(FRunEncounterOffer::GetRevivalTag()) ? NSLOCTEXT("RunRecovery", "RevivalPurchased", "캐릭터를 부활시키고 진행을 저장했습니다.") : NSLOCTEXT("RunRecovery", "Purchased", "회복 서비스를 구매하고 진행을 저장했습니다.");
         }
-        else if (bItemShop) Error = OfferId == FRunItemShopState::GetRerollOfferId() ? NSLOCTEXT("RunItemShop", "Rerolled", "아이템 상점의 상품을 다시 추첨했습니다.") : NSLOCTEXT("RunItemShop", "PurchasedInventory", "아이템을 구매해 인벤토리에 보관했습니다. 인벤토리(I)를 열어 장비 슬롯으로 드래그하여 장착하세요.");
+        else if (bItemShop) Error = OfferId == FRunItemShopState::GetRerollOfferId() ? NSLOCTEXT("RunItemShop", "Rerolled", "아이템 상점의 상품을 다시 추첨했습니다.") : NSLOCTEXT("RunItemShop", "PurchasedInlineInventory", "아이템을 가방에 보관했습니다. 왼쪽 장비 슬롯으로 드래그하여 장착하세요.");
         else if (OfferId == FRunSkillShopState::GetRerollOfferId()) Error = FText::Format(NSLOCTEXT("RunSkillShop", "RerolledCount", "스킬 상품 {0}개를 다시 추첨했습니다. 다음 리롤 비용이 1G 증가했습니다."), FText::AsNumber(CurrentRun->GetSkillShopState().Offers.Num()));
         else Error = OfferId == FRunSkillShopState::GetRecoveryOfferId() ? NSLOCTEXT("RunSkillShop", "Recovered", "HP를 회복했습니다.") : NSLOCTEXT("RunSkillShop", "Purchased", "스킬을 구매했습니다. 다음 전투부터 사용할 수 있습니다.");
     }
@@ -344,14 +345,15 @@ void AGameplayPlayerController::ClientReceiveShopPurchaseResult_Implementation(b
 
 bool AGameplayPlayerController::CanChangeEquipment(const FGameplayViewState& View, FGuid CharacterId) const
 {
-    if (!IsLocalController() || View.Phase != ERunPhase::Shop || RunParticipantAccount.IsEmpty() || bEquipmentChangePending || !View.EquipmentEditableCharacterIds.Contains(CharacterId)) return false;
+    if (!IsLocalController() || View.Phase != ERunPhase::Shop || RunParticipantAccount.IsEmpty() || IsShopPurchasePending() || bEncounterPresentationTransition || !View.EquipmentEditableCharacterIds.Contains(CharacterId)) return false;
     return View.PartyMembers.ContainsByPredicate([this, CharacterId](const FRunPartyMember& Member) { return Member.bCreated && Member.CharacterId == CharacterId && Member.OwnerAccountId == RunParticipantAccount; });
 }
 
 void AGameplayPlayerController::RequestChangeEquipment(const FRunEquipmentCommand& Command)
 {
-    if (!IsLocalController() || bEquipmentChangePending || !Command.CharacterId.IsValid() || Command.ItemIndex < 0) return;
+    if (!IsLocalController() || IsShopPurchasePending() || bEncounterPresentationTransition || !Command.CharacterId.IsValid() || Command.ItemIndex < 0) return;
     EquipmentMessage = FText::GetEmpty();
+    ItemSaleMessage = FText::GetEmpty();
     PendingEquipmentCharacterId = Command.CharacterId;
     PendingEquipmentRevision = INDEX_NONE;
     bEquipmentChangePending = true;
@@ -395,6 +397,71 @@ void AGameplayPlayerController::ClientReceiveEquipmentResult_Implementation(FGui
     PendingEquipmentRevision = bSucceeded ? ConfirmedRevision : INDEX_NONE;
     bEquipmentChangePending = PendingEquipmentRevision != INDEX_NONE;
     EquipmentMessage = Message;
+    RefreshGameplayFlow();
+}
+
+bool AGameplayPlayerController::CanSellInventoryItems(const FGameplayViewState& View, FGuid CharacterId) const
+{
+    return View.EncounterProgress.IsItemShop() && View.ShopBuyerCharacterIds.Contains(CharacterId) && CanChangeEquipment(View, CharacterId);
+}
+
+void AGameplayPlayerController::RequestSellInventoryItem(const FRunItemSaleCommand& Command)
+{
+    const FGameplayViewState View = HasAuthority() && RunState ? FGameplayViewState::FromRun(RunState, FText::GetEmpty()) : GameplayState ? GameplayState->GetViewState() : FGameplayViewState();
+    if (!CanSellInventoryItems(View, Command.CharacterId) || Command.ItemIndex < 0) return;
+    ItemSaleMessage = FText::GetEmpty();
+    PendingItemSaleRequestId = FGuid::NewGuid();
+    EquipmentMessage = FText::GetEmpty();
+    ShopPurchaseMessage = FText::GetEmpty();
+    PendingItemSaleCharacterId = Command.CharacterId;
+    PendingItemSaleEncounterId = Command.EncounterId;
+    PendingItemSaleEquipmentRevision = INDEX_NONE;
+    PendingItemSaleShopRevision = INDEX_NONE;
+    bItemSalePending = true;
+    const FGuid RequestId = PendingItemSaleRequestId;
+    RefreshGameplayFlow();
+    if (HasAuthority()) ExecuteItemSale(RequestId, Command);
+    else ServerSellInventoryItem(RequestId, Command);
+}
+
+void AGameplayPlayerController::ServerSellInventoryItem_Implementation(FGuid RequestId, const FRunItemSaleCommand& Command)
+{
+    ExecuteItemSale(RequestId, Command);
+}
+
+void AGameplayPlayerController::ExecuteItemSale(FGuid RequestId, const FRunItemSaleCommand& Command)
+{
+    if (!HasAuthority()) return;
+    const AGameplayGameState* State = GetWorld() ? GetWorld()->GetGameState<AGameplayGameState>() : nullptr;
+    const ADevelopmentCoopLobby* Lobby = State ? State->GetDevelopmentLobby() : nullptr;
+    if (Lobby && (!Lobby->HasStarted() || Lobby->GetMembers().ContainsByPredicate([](const FDevelopmentCoopMember& Member) { return !Member.bConnected; })))
+    {
+        ClientReceiveItemSaleResult(RequestId, false, NSLOCTEXT("RunItemSale", "Disconnected", "협동 참가자의 연결 상태를 확인해 주세요."), INDEX_NONE, INDEX_NONE);
+        return;
+    }
+    FText Error = NSLOCTEXT("RunItemSale", "UnboundOwner", "현재 연결에 배정된 본인 캐릭터의 아이템만 판매할 수 있습니다.");
+    const AGameplayGameModeBase* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGameplayGameModeBase>() : nullptr;
+    const URunStateSubsystem* CurrentRun = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    const FRunPartyMember* BeforeMember = CurrentRun ? CurrentRun->GetPartyMembers().FindByPredicate([&Command](const FRunPartyMember& Entry) { return Entry.CharacterId == Command.CharacterId; }) : nullptr;
+    const int32 PreviousGold = BeforeMember ? BeforeMember->Gold : 0;
+    FRunAccountId AccountId;
+    bool bSucceeded = false;
+    if (RequestId.IsValid() && Mode && Mode->ResolveRunParticipant(this, AccountId))
+    {
+        if (AEncounterManager* Manager = Mode->GetEncounterManager()) bSucceeded = Manager->SellItem(AccountId, Command, Error);
+    }
+    const FRunPartyMember* Member = CurrentRun ? CurrentRun->GetPartyMembers().FindByPredicate([&Command](const FRunPartyMember& Entry) { return Entry.CharacterId == Command.CharacterId; }) : nullptr;
+    if (bSucceeded && Member) Error = FText::Format(NSLOCTEXT("RunItemSale", "Sold", "아이템을 판매하여 {0}G를 받았습니다."), FText::AsNumber(Member->Gold - PreviousGold));
+    ClientReceiveItemSaleResult(RequestId, bSucceeded, Error, bSucceeded && Member ? Member->Equipment.Revision : INDEX_NONE, bSucceeded && CurrentRun ? CurrentRun->GetItemShopState().Revision : INDEX_NONE);
+}
+
+void AGameplayPlayerController::ClientReceiveItemSaleResult_Implementation(FGuid RequestId, bool bSucceeded, const FText& Message, int32 ConfirmedEquipmentRevision, int32 ConfirmedShopRevision)
+{
+    if (!bItemSalePending || PendingItemSaleRequestId != RequestId) return;
+    PendingItemSaleEquipmentRevision = bSucceeded ? ConfirmedEquipmentRevision : INDEX_NONE;
+    PendingItemSaleShopRevision = bSucceeded ? ConfirmedShopRevision : INDEX_NONE;
+    bItemSalePending = bSucceeded && ConfirmedEquipmentRevision != INDEX_NONE && ConfirmedShopRevision != INDEX_NONE;
+    ItemSaleMessage = Message;
     RefreshGameplayFlow();
 }
 
@@ -682,6 +749,31 @@ void AGameplayPlayerController::RefreshGameplayFlow()
 {
     if (bPresentationEnding) return;
     const ERunPhase CurrentPhase = HasAuthority() && RunState ? RunState->GetPhase() : GameplayState ? GameplayState->GetViewState().Phase : ERunPhase::None;
+    const FRunEncounterProgress* SaleProgress = HasAuthority() && RunState ? &RunState->GetEncounterProgress() : GameplayState ? &GameplayState->GetViewState().EncounterProgress : nullptr;
+    if (CurrentPhase != ERunPhase::Shop || !SaleProgress || (!PendingItemSaleEncounterId.IsNone() && SaleProgress->SelectedEncounterId != PendingItemSaleEncounterId))
+    {
+        ItemSaleMessage = FText::GetEmpty();
+        bItemSalePending = false;
+        PendingItemSaleRequestId.Invalidate();
+        PendingItemSaleCharacterId.Invalidate();
+        PendingItemSaleEncounterId = NAME_None;
+        PendingItemSaleEquipmentRevision = INDEX_NONE;
+        PendingItemSaleShopRevision = INDEX_NONE;
+    }
+    else if (bItemSalePending && PendingItemSaleEquipmentRevision != INDEX_NONE && PendingItemSaleShopRevision != INDEX_NONE)
+    {
+        // Unlock only after both the compacted inventory and confirmed gold/shop projection arrive.
+        // 축소된 인벤토리와 확정 골드·상점 표시 뷰가 모두 도착한 뒤 다음 거래를 허용합니다.
+        const TArray<FRunPartyMember>* Members = HasAuthority() && RunState ? &RunState->GetPartyMembers() : GameplayState ? &GameplayState->GetViewState().PartyMembers : nullptr;
+        const FRunPartyMember* Member = Members ? Members->FindByPredicate([this](const FRunPartyMember& Entry) { return Entry.CharacterId == PendingItemSaleCharacterId; }) : nullptr;
+        const int32 ShopRevision = HasAuthority() && RunState ? RunState->GetItemShopState().Revision : GameplayState ? GameplayState->GetViewState().ItemShopState.Revision : INDEX_NONE;
+        if (Member && Member->Equipment.Revision >= PendingItemSaleEquipmentRevision && ShopRevision >= PendingItemSaleShopRevision)
+        {
+            bItemSalePending = false;
+            PendingItemSaleEquipmentRevision = INDEX_NONE;
+            PendingItemSaleShopRevision = INDEX_NONE;
+        }
+    }
     if (CurrentPhase != ERunPhase::Shop)
     {
         EquipmentMessage = FText::GetEmpty();

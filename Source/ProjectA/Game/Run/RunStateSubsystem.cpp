@@ -12,6 +12,7 @@
 #include "Game/Run/RunCombatRewards.h"
 #include "Game/Run/RunPveDifficulty.h"
 #include "Game/Run/RunEquipmentRules.h"
+#include "Game/Run/RunItemSaleRules.h"
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
@@ -183,12 +184,13 @@ bool URunStateSubsystem::ValidateGoldRewardState(const URunSaveGame* Save) const
     {
         const FRunPartyMember* Member = Save->Party.FindByPredicate([&Claim](const FRunPartyMember& Candidate) { return Candidate.bCreated && Candidate.CharacterId == Claim.CharacterId; });
         if (!Member || !Member->bHasSkillLoadout || !Claim.CharacterId.IsValid() || Member->OwnerAccountId.IsEmpty() || (bSinglePlayer && !Member->bPlayerControlled) || Claimed.Contains(Claim.CharacterId) || Claim.ChoiceIndex < 0 || Claim.ChoiceIndex >= ChoiceCount) return false;
+        if (Claim.bItemSold && (!bItemReward || Save->Phase == ERunPhase::Result)) return false;
         Claimed.Add(Claim.CharacterId);
     }
     if (bItemReward)
     {
-        // A claimed generated copy belongs to its recipient exactly once; unselected copies never enter inventory.
-        // 수령한 생성 사본은 해당 수령인의 인벤토리에 한 번만 존재하며 미선택 사본은 지급되지 않습니다.
+        // Unsold claims require exactly one owned copy; sold and unselected copies cannot remain in inventory.
+        // 미판매 수령 사본은 정확히 하나만 보유하며 판매되거나 미선택인 사본은 인벤토리에 남을 수 없습니다.
         for (int32 Index = 0; Index < Reward.ItemChoices.Num(); ++Index)
         {
             const FRunItemDefinition& Choice = Reward.ItemChoices[Index];
@@ -199,11 +201,11 @@ bool URunStateSubsystem::ValidateGoldRewardState(const URunSaveGame* Save) const
                 for (const FRunItemDefinition& Item : Member.Items)
                 {
                     if (Item.ItemInstanceId != Choice.ItemInstanceId) continue;
-                    if (!Claim || Claim->CharacterId != Member.CharacterId || !RunItemShopCatalog::IsSameDefinition(Choice, Item)) return false;
+                    if (!Claim || Claim->bItemSold || Claim->CharacterId != Member.CharacterId || !RunItemShopCatalog::IsSameDefinition(Choice, Item)) return false;
                     ++OwnedCount;
                 }
             }
-            if (OwnedCount != (Claim ? 1 : 0)) return false;
+            if (OwnedCount != (Claim && !Claim->bItemSold ? 1 : 0)) return false;
         }
     }
     if (Save->Phase != ERunPhase::Result)
@@ -1660,6 +1662,41 @@ bool URunStateSubsystem::ChangeEquipment(const FRunAccountId& AccountId, const F
     if (!RunEquipmentRules::BuildVisuals(*Member, Visuals, OutError)) return false;
     // Commit the complete loadout before publishing the new equipment to UI or future combat actors.
     // UI 또는 다음 전투 액터에 공개하기 전에 전체 장착 구성을 먼저 저장합니다.
+    return CommitSaveCandidate(Save.Get(), OutError);
+}
+
+bool URunStateSubsystem::CanSellItem(const FRunAccountId& AccountId, const FRunItemSaleCommand& Command, FText& OutError) const
+{
+    OutError = NSLOCTEXT("RunItemSale", "Unavailable", "현재 아이템을 판매할 수 없습니다.");
+    if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || bManagedResumePending || Phase != ERunPhase::Shop) return false;
+    const FRunPartyMember* Member = PartyMembers.FindByPredicate([&Command](const FRunPartyMember& Entry) { return Entry.bCreated && Entry.CharacterId == Command.CharacterId; });
+    OutError = NSLOCTEXT("RunItemSale", "LivingOwnerOnly", "본인이 직접 조작하는 생존 캐릭터의 보유품만 판매할 수 있습니다.");
+    if (!Member || !URunIdentityLibrary::IsCharacterOwner(RunIdentity, PartyMembers, Command.CharacterId, AccountId)) return false;
+    if (bManagedRun)
+    {
+        EPartyControlMode Mode = EPartyControlMode::ServerAI;
+        FText ControlError;
+        if (!URunParticipationLibrary::ResolveControlMode(Participation, RunIdentity, PartyMembers, Command.CharacterId, Mode, ControlError) || Mode != EPartyControlMode::Human) return false;
+    }
+    else if (RunIdentity.Origin == ERunIdentityOrigin::LocalDevelopment && RunIdentity.OriginalParticipants.Num() == 1 && !Member->bPlayerControlled) return false;
+    return RunItemSaleRules::Validate(*Member, ItemShopState, EncounterProgress, Command, OutError);
+}
+
+bool URunStateSubsystem::SellItem(const FRunAccountId& AccountId, const FRunItemSaleCommand& Command, FText& OutError)
+{
+    if (!CanSellItem(AccountId, Command, OutError)) return false;
+    TStrongObjectPtr<URunSaveGame> Save(CreateSaveData());
+    FRunPartyMember* Member = Save->Party.FindByPredicate([&Command](const FRunPartyMember& Entry) { return Entry.CharacterId == Command.CharacterId; });
+    if (!Member || !RunItemSaleRules::Apply(*Member, Save->ItemShopState, Save->EncounterProgress, Command, OutError)) return false;
+    if (Save->GoldRewardState.SchemaVersion == 2)
+    {
+        for (FRunGoldRewardClaim& Claim : Save->GoldRewardState.Claims)
+        {
+            if (Claim.CharacterId == Command.CharacterId && Save->GoldRewardState.ItemChoices.IsValidIndex(Claim.ChoiceIndex) && Save->GoldRewardState.ItemChoices[Claim.ChoiceIndex].ItemInstanceId == Command.ItemInstanceId) Claim.bItemSold = true;
+        }
+    }
+    // Publish inventory, shifted equipment indices and gold only after their single durable write succeeds.
+    // 인벤토리·이동한 장비 인덱스·골드를 한 번에 저장한 뒤 성공한 경우에만 공개합니다.
     return CommitSaveCandidate(Save.Get(), OutError);
 }
 

@@ -210,8 +210,10 @@ void AEncounterPrototypeStage::RefreshPrototype()
     SignText->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     SignText->SetCanEverAffectNavigation(false);
     Camera->SetRelativeLocation(FVector(-850.f, 160.f, 380.f));
-    Camera->SetRelativeRotation((FVector(0.f, 0.f, 125.f) - Camera->GetRelativeLocation()).Rotation());
-    Camera->SetFieldOfView(48.f);
+    // Keep the merchant centered in the space between the always-visible inventory and shop panels.
+    // 항상 표시되는 가방과 상품 패널 사이 공간의 중앙에 상인이 오도록 맞춥니다.
+    Camera->SetRelativeRotation((FVector(35.f, -170.f, 145.f) - Camera->GetRelativeLocation()).Rotation());
+    Camera->SetFieldOfView(80.f);
     Camera->SetConstraintAspectRatio(false);
     Camera->bOverrideAspectRatioAxisConstraint = true;
     Camera->SetAspectRatioAxisConstraint(AspectRatio_MaintainYFOV);

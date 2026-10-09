@@ -1801,6 +1801,78 @@
       "key": "DuplicateSkill",
       "source": "Skill asset ID is duplicated: {0}. / 스킬 에셋 ID가 중복됩니다: {0}.",
       "translation": "Skill asset ID is duplicated: {0}."
+    },
+    {
+      "namespace": "RunItemSale",
+      "key": "ChangedInventory",
+      "source": "보유품이나 장비가 변경되었습니다. 최신 목록에서 다시 선택하세요.",
+      "translation": "Your inventory or equipment has changed. Select the item again from the current list."
+    },
+    {
+      "namespace": "RunItemSale",
+      "key": "ChangedVisit",
+      "source": "상점이 변경되었습니다. 현재 상점에서 다시 선택하세요.",
+      "translation": "The shop has changed. Select the item again at the current shop."
+    },
+    {
+      "namespace": "RunItemSale",
+      "key": "GoldOverflow",
+      "source": "보유 골드 한도를 초과하여 판매할 수 없습니다.",
+      "translation": "This sale would exceed the gold limit."
+    },
+    {
+      "namespace": "RunItemSale",
+      "key": "InvalidPrice",
+      "source": "이 아이템의 판매 금액을 계산할 수 없습니다.",
+      "translation": "The sale price of this item could not be calculated."
+    },
+    {
+      "namespace": "RunItemSale",
+      "key": "ItemShopOnly",
+      "source": "아이템 판매는 아이템 상점에서만 가능합니다.",
+      "translation": "Items can only be sold at item shops."
+    },
+    {
+      "namespace": "RunItemSale",
+      "key": "LivingOwnerOnly",
+      "source": "본인이 직접 조작하는 생존 캐릭터의 보유품만 판매할 수 있습니다.",
+      "translation": "You can only sell items owned by a living character you directly control."
+    },
+    {
+      "namespace": "RunItemSale",
+      "key": "Unavailable",
+      "source": "현재 아이템을 판매할 수 없습니다.",
+      "translation": "Items cannot be sold right now."
+    },
+    {
+      "namespace": "RunItemSale",
+      "key": "UnequipFirst",
+      "source": "장착 중인 아이템은 먼저 해제한 뒤 판매하세요.",
+      "translation": "Unequip this item before selling it."
+    },
+    {
+      "namespace": "RunItemSale",
+      "key": "Disconnected",
+      "source": "협동 참가자의 연결 상태를 확인해 주세요.",
+      "translation": "Check the connection status of all co-op participants."
+    },
+    {
+      "namespace": "RunItemSale",
+      "key": "UnboundOwner",
+      "source": "현재 연결에 배정된 본인 캐릭터의 아이템만 판매할 수 있습니다.",
+      "translation": "You can only sell items belonging to your character assigned to this connection."
+    },
+    {
+      "namespace": "RunItemSale",
+      "key": "Sold",
+      "source": "아이템을 판매하여 {0}G를 받았습니다.",
+      "translation": "Item sold for {0}G."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "PurchasedInlineInventory",
+      "source": "아이템을 가방에 보관했습니다. 왼쪽 장비 슬롯으로 드래그하여 장착하세요.",
+      "translation": "Item added to your bag. Drag it to an equipment slot on the left to equip it."
     }
   ]
 }

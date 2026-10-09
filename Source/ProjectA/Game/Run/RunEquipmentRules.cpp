@@ -17,7 +17,9 @@ bool RunEquipmentRules::Validate(const FRunPartyMember& Member, FText& OutError)
     if (State.Revision < 0 || State.Slots.Num() > 9) return false;
     if (!State.bHasLoadout)
     {
-        if (State.Revision != 0 || !State.Slots.IsEmpty()) return false;
+        // Legacy inventory sales advance the revision without enabling equipment-driven visuals or skills.
+        // 이전 인벤토리의 판매는 장비 기반 외형이나 스킬을 활성화하지 않고 버전만 증가시킵니다.
+        if (!State.Slots.IsEmpty() || (State.Revision > 0 && (!Member.bCreated || !Member.bHasSkillLoadout))) return false;
         OutError = FText::GetEmpty();
         return true;
     }

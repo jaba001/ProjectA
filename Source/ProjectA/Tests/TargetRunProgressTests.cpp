@@ -134,7 +134,7 @@ namespace
         }
         for (int32 Index = 0; Index < Left.Claims.Num(); ++Index)
         {
-            if (Left.Claims[Index].CharacterId != Right.Claims[Index].CharacterId || Left.Claims[Index].ChoiceIndex != Right.Claims[Index].ChoiceIndex) return false;
+            if (Left.Claims[Index].CharacterId != Right.Claims[Index].CharacterId || Left.Claims[Index].ChoiceIndex != Right.Claims[Index].ChoiceIndex || Left.Claims[Index].bItemSold != Right.Claims[Index].bItemSold) return false;
         }
         return true;
     }

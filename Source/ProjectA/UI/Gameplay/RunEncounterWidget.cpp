@@ -9,8 +9,10 @@
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/ScaleBox.h"
+#include "Components/ScaleBoxSlot.h"
 #include "Components/ScrollBox.h"
 #include "Components/SizeBox.h"
+#include "Components/Spacer.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
@@ -77,16 +79,39 @@ void URunEncounterWidget::NativeOnInitialized()
     ContentSlot->SetVerticalAlignment(VAlign_Fill);
     ContentSlot->SetPadding(FMargin(32.0f, 64.0f, 32.0f, 32.0f));
     UHorizontalBox* Columns = WidgetTree->ConstructWidget<UHorizontalBox>();
+    Columns->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     ContentFit->SetContent(Columns);
+    if (UScaleBoxSlot* FitSlot = Cast<UScaleBoxSlot>(Columns->Slot))
+    {
+        FitSlot->SetHorizontalAlignment(HAlign_Center);
+        FitSlot->SetVerticalAlignment(VAlign_Center);
+    }
     EquipmentSize = WidgetTree->ConstructWidget<USizeBox>();
     EquipmentSize->SetWidthOverride(300.0f);
     EquipmentSize->SetHeightOverride(840.0f);
+    EquipmentSize->SetClipping(EWidgetClipping::ClipToBounds);
     EquipmentPanel = CreateWidget<UCharacterEquipmentPanel>(GetOwningPlayer());
     EquipmentSize->SetContent(EquipmentPanel);
     Columns->AddChildToHorizontalBox(EquipmentSize)->SetPadding(FMargin(0.0f, 0.0f, 16.0f, 0.0f));
+    InventorySize = WidgetTree->ConstructWidget<USizeBox>();
+    InventorySize->SetWidthOverride(430.0f);
+    InventorySize->SetHeightOverride(840.0f);
+    InventorySize->SetClipping(EWidgetClipping::ClipToBounds);
+    InventoryPanel = CreateWidget<UCharacterInventoryPanel>(GetOwningPlayer());
+    InventorySize->SetContent(InventoryPanel);
+    Columns->AddChildToHorizontalBox(InventorySize);
+    // Reserve actual layout space for the NPC instead of overlaying either inventory or merchandise on the face.
+    // 가방이나 상품이 얼굴 위에 겹치지 않도록 NPC를 위한 실제 배치 공간을 확보합니다.
+    NpcFocusGap = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("ShopNpcFocusGap"));
+    NpcFocusGap->SetWidthOverride(480.0f);
+    NpcFocusGap->SetHeightOverride(840.0f);
+    NpcFocusGap->SetVisibility(ESlateVisibility::HitTestInvisible);
+    NpcFocusGap->SetContent(WidgetTree->ConstructWidget<USpacer>());
+    Columns->AddChildToHorizontalBox(NpcFocusGap);
     MerchantSize = WidgetTree->ConstructWidget<USizeBox>();
     MerchantSize->SetWidthOverride(620.0f);
     MerchantSize->SetHeightOverride(840.0f);
+    MerchantSize->SetClipping(EWidgetClipping::ClipToBounds);
     Columns->AddChildToHorizontalBox(MerchantSize);
     UBorder* Panel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("EncounterPanel"));
     Theme.StylePanel(Panel);
@@ -146,12 +171,6 @@ void URunEncounterWidget::NativeOnInitialized()
     Message->SetAutoWrapText(true);
     Message->SetWrapTextAt(540.0f);
     Content->AddChildToVerticalBox(Message)->SetPadding(FMargin(0.0f, 8.0f, 0.0f, 0.0f));
-    InventorySize = WidgetTree->ConstructWidget<USizeBox>();
-    InventorySize->SetWidthOverride(430.0f);
-    InventorySize->SetHeightOverride(840.0f);
-    InventoryPanel = CreateWidget<UCharacterInventoryPanel>(GetOwningPlayer());
-    InventorySize->SetContent(InventoryPanel);
-    Columns->AddChildToHorizontalBox(InventorySize)->SetPadding(FMargin(16.0f, 0.0f, 0.0f, 0.0f));
     DungeonChoiceFit = WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass(), TEXT("DungeonChoiceBar"));
     DungeonChoiceFit->SetStretch(EStretch::ScaleToFit);
     DungeonChoiceFit->SetStretchDirection(EStretchDirection::DownOnly);
@@ -230,13 +249,15 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     Backdrop->SetVisibility(bWorldPresentation ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
     ContentFit->SetVisibility(bDungeonChoice ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
     DungeonChoiceFit->SetVisibility(bDungeonChoice ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-    if (UOverlaySlot* ContentSlot = Cast<UOverlaySlot>(ContentFit->Slot)) ContentSlot->SetHorizontalAlignment(bWorldPresentation ? HAlign_Right : HAlign_Fill);
-    MerchantSize->SetWidthOverride(bWorldPresentation ? 780.f : 620.f);
-    EquipmentSize->SetVisibility(bInShop && !bWorldPresentation ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-    InventorySize->SetVisibility(bInShop && !bWorldPresentation ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-    InventoryButton->SetVisibility(bInShop && bWorldPresentation ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    if (UOverlaySlot* ContentSlot = Cast<UOverlaySlot>(ContentFit->Slot)) ContentSlot->SetHorizontalAlignment(HAlign_Fill);
+    MerchantSize->SetWidthOverride(620.0f);
+    EquipmentSize->SetVisibility(bInShop ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+    InventorySize->SetVisibility(bInShop ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+    NpcFocusGap->SetWidthOverride(bWorldPresentation ? 480.0f : 16.0f);
+    NpcFocusGap->SetVisibility(bInShop ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+    InventoryButton->SetVisibility(ESlateVisibility::Collapsed);
     MerchantSize->SetHeightOverride(bInShop ? 840.0f : 440.0f);
-    if (bInShop && !bWorldPresentation)
+    if (bInShop)
     {
         // Reading owned inventory remains available when the character cannot buy, including after death.
         // 사망 등으로 구매할 수 없어도 본인 캐릭터의 보유 현황은 계속 열람합니다.
@@ -477,6 +498,14 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     }
     if (View.bTargetRun && (View.Phase == ERunPhase::EncounterChoice || bInShop)) Title->SetText(FText::Format(NSLOCTEXT("RunEncounter", "TargetProgressTitle", "{0} · {1}/80 완료"), Title->GetText(), FText::AsNumber(View.TargetCompletedSteps)));
     DungeonChoiceTitle->SetText(Title->GetText());
+}
+
+void URunEncounterWidget::FocusInventory()
+{
+    // Focus the visible bag without opening an overlay or issuing a gameplay request.
+    // 오버레이를 열거나 게임 요청을 보내지 않고 표시 중인 가방으로 포커스만 옮깁니다.
+    if (!IsActivated() || !GetIsEnabled() || !InventoryPanel || !InventorySize || !InventorySize->IsVisible()) return;
+    InventoryPanel->FocusInventory();
 }
 
 void URunEncounterWidget::HandleSelection(FName EncounterId)

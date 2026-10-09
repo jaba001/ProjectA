@@ -997,3 +997,15 @@ Startup/Default MoviePlayer 화면에 기존 DemonicUI 성 배경·하단 밴드
 `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64` 및 같은 옵션의 `ProjectA Win64 Development` 컴파일·링크가 각각 45.66초·33.93초에 성공했다. 인벤토리/구형 스킬상점 표시 연결 보완을 포함한 최종 증분 빌드도 11.43초·15.95초에 성공했고 오류·경고는 0이다. 근거는 `Saved/Automation/Localization_20261009/EditorBuild.Final.log`·`GameBuild.Final.log`다. 명령줄 컴파일이며 게임·PIE·Unreal 자동화 테스트·패키지 실행·화면 캡처는 수행하지 않았다.
 
 `python Source/ProjectAEditor/Scripts/BuildLocalization.py --check`는 전체 키·원문·서식 인자·한영 생성물 일치를 확인한다. `ResourceValidation.json`은 독립 바이너리 해석으로 양쪽 리소스 전체와 game receipt의 3개 UFS 의존성을 대조하고, 엔진 기본 영문 locres 66,406개 중 원문과 동일한 66,393개에서 source CRC 일치를 확인한다. `ValidateContentTranslations.json`·`CombatStaticReview.json`·`DocumentationValidation.json`은 콘텐츠 원문·명령 보존·문서 링크 검사의 근거다. 기존 TODO 미완료 47개·제안 선택 7개를 보존하고 언어 실행 확인 1개를 추가했다. 재실행 저장·즉시 갱신·영문 줄바꿈·두 독립 클라이언트의 혼합 언어 동작은 사용자 확인 전이며 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남긴다.
+
+### 9-47 2026-10-10 상점 동시 배치와 아이템 판매
+
+상점에서 인벤토리·상품·NPC 동시 표시와 보유품 판매 요청을 반영했다. 시작 기준은 `422d22ad`이며 기존 `ProjectA.uproject`의 AsyncLoadingScreen MarketplaceURL 추가·Steam 배열 서식을 보존해 함께 포함했다. 새 에셋·맵 수정·원본 복제는 없다. 왼쪽 장비 300·가방 430, 중앙 NPC 공간 480, 오른쪽 상품 620 UI 단위와 간격 16으로 구성하고 상점의 I는 가방으로 포커스를 이동한다. 카메라는 기존 도착 위치를 유지하며 NPC 방향과 FOV를 조정한다. 구매·판매·리롤로 입장 연출을 반복하지 않는다. [화면 구조](UI_README.md#8-2-gameplay-인벤토리와-설정-단축키)
+
+가방의 미장착 사본을 선택하여 판매가 확인 후 확정·취소한다. 기본·등급·태그 아이템 상점은 저장 가격의 절반 내림·최소 1G를 지급하며 현재 1G 품목은 1G다. 전문 상점의 매입은 진열 필터와 독립적이며 유효한 구형 장착 미지원 사본도 받는다. 장착품은 해제 후 판매하고 되사기는 제공하지 않는다. 서버는 신뢰 소유자·생존 Human·방문·사본·장비/상점 Revision을 검증하고 삭제·골드·후속 장비 인덱스·직전 보상 판매 표식을 원자 저장한다. 클라이언트는 요청 GUID와 두 Revision 도착을 확인하며 요청 전에 선택을 비워 다른 사본의 연속 판매를 막는다. [권한·가격·저장 계약](PROJECT_PLAN.md#3-2-상점-인카운터)
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`는 49.95초에 성공했고 구형 무장착 Revision 경계 보완 후 최종 증분 빌드도 6.98초에 성공했다. 같은 옵션의 `ProjectA Win64 Development` 컴파일·링크는 36.44초에 성공했다. 로그는 `Saved/Automation/ShopSales_20261010/EditorBuild.log`·`EditorBuild.Final.log`·`GameBuild.log`이며 오류·경고 0이다. `ProjectA.Run.ItemSale` 회귀 4개에 가격·태그/소유권·사본/Revision·인덱스 이동·저장 실패/재시도·Continue·직전 보상·구형 호환 검사를 작성하고 컴파일했으며 실행하지 않았다.
+
+`python Source/ProjectAEditor/Scripts/BuildLocalization.py --check`와 `ValidateResources.py`는 23개 추가 문구를 포함한 기존 6개 JSON의 1,069개 한영 번역·서식 인자·생성물·바이너리 재해석·UFS 의존성을 대조했다. `LayoutStaticReview.json`은 5개 viewport의 배치와 NPC 계획 경계에 대한 정적 계산 45개, `BackendStaticReview.json`은 권한/저장/직전 보상 경로의 소스 검토 근거다. `DocumentationValidation.json`·`StaticReview.json`에 링크·기존 TODO 미완료 48개/선택 7개 보존과 확인 2개 추가·프로젝트 설정·전체 diff 검사를 기록한다.
+
+게임·PIE·Unreal 자동화 테스트·패키지·화면 캡처와 IDE 실행은 수행하지 않았다. 원근 계산은 실제 의상·idle·소품 가림의 렌더 확인을 대신하지 않는다. 세 화면비·한영 판매 UI, 저장 실패/Continue, 협동 지연·동시 거래는 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)의 사용자 확인으로 남긴다. 이전 실행 이력으로 이번 변경의 작동 성공을 표시하지 않는다.

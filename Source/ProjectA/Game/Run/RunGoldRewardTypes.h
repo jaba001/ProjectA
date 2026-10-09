@@ -14,6 +14,11 @@ struct PROJECTA_API FRunGoldRewardClaim
 
     UPROPERTY(BlueprintReadOnly, Category = "Reward")
     int32 ChoiceIndex = INDEX_NONE;
+
+    // Keep the claim after selling its awarded copy; absent data preserves older unsold receipts.
+    // 지급 사본을 판매한 뒤에도 수령 기록을 유지하며 누락된 값은 이전 미판매 기록을 보존합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Reward")
+    bool bItemSold = false;
 };
 
 // Store generated offers and individual claims together so loading never rerolls or pays twice.

@@ -25,19 +25,30 @@
 	"Plugins": [
 		{
 			"Name": "AsyncLoadingScreen",
-			"Enabled": true
+			"Enabled": true,
+			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/01f39767dc6b4290877f38365787cbf8"
 		},
 		{
 			"Name": "OnlineSubsystemSteam",
 			"Enabled": true,
-			"PlatformAllowList": ["Win64"],
-			"TargetConfigurationDenyList": ["Shipping", "Test"]
+			"PlatformAllowList": [
+				"Win64"
+			],
+			"TargetConfigurationDenyList": [
+				"Shipping",
+				"Test"
+			]
 		},
 		{
 			"Name": "SteamSockets",
 			"Enabled": true,
-			"PlatformAllowList": ["Win64"],
-			"TargetConfigurationDenyList": ["Shipping", "Test"]
+			"PlatformAllowList": [
+				"Win64"
+			],
+			"TargetConfigurationDenyList": [
+				"Shipping",
+				"Test"
+			]
 		},
 		{
 			"Name": "ModelingToolsEditorMode",

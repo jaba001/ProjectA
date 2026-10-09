@@ -725,6 +725,16 @@ bool AEncounterManager::ChangeEquipment(const FRunAccountId& AccountId, const FR
     return bSucceeded;
 }
 
+bool AEncounterManager::SellItem(const FRunAccountId& AccountId, const FRunItemSaleCommand& Command, FText& OutError)
+{
+    OutError = NSLOCTEXT("RunItemSale", "Unavailable", "현재 아이템을 판매할 수 없습니다.");
+    if (!HasAuthority() || bShuttingDown || bPreparing || bPreparationAbortPending || PendingResult != ECombatResult::None || !RunState || RunState->GetPhase() != ERunPhase::Shop) return false;
+    if (!ValidateManagedExecution(OutError)) return false;
+    const bool bSucceeded = RunState->SellItem(AccountId, Command, OutError);
+    OnFlowChanged.Broadcast();
+    return bSucceeded;
+}
+
 bool AEncounterManager::SelectGoldReward(const FRunAccountId& AccountId, FGuid CharacterId, FName ExpectedNodeId, int32 ChoiceIndex, FText& OutError)
 {
     OutError = NSLOCTEXT("RunGoldReward", "Unavailable", "현재 전투 보상을 선택할 수 없습니다.");

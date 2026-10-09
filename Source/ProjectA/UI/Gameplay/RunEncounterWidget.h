@@ -24,6 +24,7 @@ class PROJECTA_API URunEncounterWidget : public UCommonActivatableWidget
 public:
     virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
     void RefreshEncounter(const FGameplayViewState& View, bool bAllowRunCommands, bool bWorldPresentation = false);
+    void FocusInventory();
 
 protected:
     virtual void NativeOnInitialized() override;
@@ -72,6 +73,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<USizeBox> InventorySize;
+
+    UPROPERTY(Transient)
+    TObjectPtr<USizeBox> NpcFocusGap;
 
     UPROPERTY(Transient)
     TObjectPtr<USizeBox> MerchantSize;

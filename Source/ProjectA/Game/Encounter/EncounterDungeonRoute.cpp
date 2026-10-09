@@ -224,7 +224,9 @@ AEncounterPrototypeStage* AEncounterDungeonRoute::ConfigureStage(const AEncounte
     Stage->bUseLibraryVisuals = Template->bUseLibraryVisuals;
     Stage->RefreshPrototype();
     Stage->Camera->SetRelativeLocation(FVector(-800.f, 0.f, EncounterDungeonLayout::EyeHeight));
-    Stage->Camera->SetRelativeRotation(FRotator(-2.f, 20.f, 0.f));
+    // Preserve the corridor arrival position while aiming through the central shop UI gap.
+    // 통로 도착 위치는 유지하고 상점 UI의 중앙 빈 공간을 향해 시선을 맞춥니다.
+    Stage->Camera->SetRelativeRotation((FVector(35.f, -170.f, 145.f) - Stage->Camera->GetRelativeLocation()).Rotation());
     Stage->Camera->SetFieldOfView(80.f);
     Stage->StopPresentation();
     StopTravel();

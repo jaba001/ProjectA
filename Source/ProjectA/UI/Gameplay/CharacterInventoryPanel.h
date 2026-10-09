@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "CommonUserWidget.h"
 #include "Components/Button.h"
+#include "Game/Run/RunItemSaleTypes.h"
 #include "Game/Run/RunTypes.h"
 #include "Game/Run/RunWeaponSkillTypes.h"
 #include "CharacterInventoryPanel.generated.h"
@@ -12,6 +13,7 @@ class UEquipmentDragDropOperation;
 class UEquipmentItemSlotWidget;
 class UBorder;
 class UImage;
+class UGameplayActionButton;
 class UScrollBox;
 class UTextBlock;
 class UVerticalBox;
@@ -53,6 +55,7 @@ class PROJECTA_API UCharacterInventoryPanel : public UCommonUserWidget
 
 public:
     void RefreshInventory(const FGameplayViewState& View, FGuid CharacterId);
+    void FocusInventory();
 
 protected:
     virtual void NativeOnInitialized() override;
@@ -67,6 +70,8 @@ private:
     void SelectItem(int32 ItemIndex);
     void RebuildList();
     void RefreshSelectedItem();
+    void RefreshSaleControls();
+    void HandleSaleAction(FName ActionId);
     void ResolveDisplayedSkills();
     bool CanAcceptDrop(const UEquipmentDragDropOperation* Operation, FGameplayTag TargetSlot) const;
     bool HandleDrop(const UEquipmentDragDropOperation* Operation, FGameplayTag TargetSlot);
@@ -78,6 +83,9 @@ private:
     TArray<FRunWeaponRarityRule> DisplayedRarities;
 
     bool bCanChangeEquipment = false;
+    bool bCanSellItems = false;
+    bool bConfirmingSale = false;
+    bool bSuppressAutomaticSelection = false;
     bool bSkillsUnavailable = false;
     int32 SelectedCategoryIndex = 0;
     int32 SelectedItemIndex = INDEX_NONE;
@@ -85,6 +93,12 @@ private:
 
     UPROPERTY(Transient)
     FRunItemDefinition SelectedItem;
+
+    UPROPERTY(Transient)
+    FRunItemSaleCommand SaleCommand;
+
+    FName DisplayedEncounterId;
+    int32 DisplayedShopRevision = INDEX_NONE;
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UInventoryCategoryButton>> CategoryButtons;
@@ -144,4 +158,19 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UVerticalBox> DetailsSkills;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UVerticalBox> SaleControls;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> SaleSummary;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> SaleHint;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UGameplayActionButton> SellButton;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UGameplayActionButton> CancelSaleButton;
 };

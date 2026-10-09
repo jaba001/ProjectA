@@ -18,10 +18,12 @@
 #include "Game/GameState/GameplayViewTypes.h"
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunEquipmentRules.h"
+#include "Game/Run/RunItemSaleRules.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "GameFramework/PlayerController.h"
 #include "UI/Gameplay/EquipmentDragDropOperation.h"
 #include "UI/Gameplay/EquipmentItemSlotWidget.h"
+#include "UI/Gameplay/GameplayActionButton.h"
 #include "UI/Gameplay/RunItemPresentation.h"
 #include "UI/Theme/DemonicUITheme.h"
 
@@ -164,9 +166,11 @@ void UCharacterInventoryPanel::NativeOnInitialized()
     USizeBox* DetailsSize = WidgetTree->ConstructWidget<USizeBox>();
     DetailsSize->SetHeightOverride(220.0f);
     DetailsPanel->SetContent(DetailsSize);
+    UVerticalBox* DetailsLayout = WidgetTree->ConstructWidget<UVerticalBox>();
+    DetailsSize->SetContent(DetailsLayout);
     DetailsScroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("InventoryDetailsScroll"));
     DetailsScroll->SetConsumeMouseWheel(EConsumeMouseWheel::WhenScrollingPossible);
-    DetailsSize->SetContent(DetailsScroll);
+    DetailsLayout->AddChildToVerticalBox(DetailsScroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     UVerticalBox* DetailsContent = WidgetTree->ConstructWidget<UVerticalBox>();
     DetailsScroll->AddChild(DetailsContent);
     UHorizontalBox* DetailRow = WidgetTree->ConstructWidget<UHorizontalBox>();
@@ -185,6 +189,25 @@ void UCharacterInventoryPanel::NativeOnInitialized()
     DetailsHint = AddText(DetailsContent, FText::GetEmpty(), 14, 0.0f);
     DetailsSkills = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventoryItemSkillDetails"));
     DetailsContent->AddChildToVerticalBox(DetailsSkills)->SetPadding(FMargin(0.0f, 10.0f, 0.0f, 0.0f));
+    // Keep confirmation controls visible while long skill descriptions scroll above them.
+    // 긴 스킬 설명만 스크롤하고 판매 확인 버튼은 아래에 고정합니다.
+    SaleControls = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventorySaleControls"));
+    DetailsLayout->AddChildToVerticalBox(SaleControls)->SetPadding(FMargin(0.0f, 8.0f, 0.0f, 0.0f));
+    SaleSummary = AddText(SaleControls, FText::GetEmpty(), 15, 3.0f);
+    SaleSummary->SetAutoWrapText(false);
+    SaleSummary->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);
+    SaleHint = AddText(SaleControls, FText::GetEmpty(), 13, 5.0f);
+    UHorizontalBox* SaleActions = WidgetTree->ConstructWidget<UHorizontalBox>();
+    SaleControls->AddChildToVerticalBox(SaleActions);
+    SellButton = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), TEXT("Button_SellInventoryItem"));
+    SellButton->OnActionRequested.AddUObject(this, &UCharacterInventoryPanel::HandleSaleAction);
+    SaleActions->AddChildToHorizontalBox(SellButton)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    CancelSaleButton = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), TEXT("Button_CancelInventorySale"));
+    CancelSaleButton->OnActionRequested.AddUObject(this, &UCharacterInventoryPanel::HandleSaleAction);
+    UHorizontalBoxSlot* CancelSlot = SaleActions->AddChildToHorizontalBox(CancelSaleButton);
+    CancelSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    CancelSlot->SetPadding(FMargin(8.0f, 0.0f, 0.0f, 0.0f));
+    RefreshSaleControls();
     Theme.ApplyControls(WidgetTree);
 }
 
@@ -316,33 +339,55 @@ void UCharacterInventoryPanel::ResolveDisplayedSkills()
 void UCharacterInventoryPanel::RefreshInventory(const FGameplayViewState& View, FGuid CharacterId)
 {
     if (!ItemList || !SkillList) return;
+    // A refreshed view invalidates local confirmation, even when its item index happens to stay the same.
+    // 표시 상태가 갱신되면 아이템 인덱스가 같아도 로컬 판매 확인을 취소합니다.
+    bConfirmingSale = false;
+    SaleCommand = FRunItemSaleCommand();
     const FRunPartyMember* Member = CharacterId.IsValid() ? View.PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.CharacterId == CharacterId && Candidate.bCreated; }) : nullptr;
     // Preserve a selection only when the same character still owns the same indexed copy and definition.
     // 같은 캐릭터가 동일 인덱스의 사본과 정의를 계속 보유할 때만 선택을 유지합니다.
     const FRunItemDefinition* Candidate = Member && Member->Items.IsValidIndex(SelectedItemIndex) ? &Member->Items[SelectedItemIndex] : nullptr;
     if (!Candidate || Member->CharacterId != DisplayedMember.CharacterId || Candidate->Asset != SelectedItem.Asset || !Candidate->DisplayName.EqualTo(SelectedItem.DisplayName) || Candidate->Tags != SelectedItem.Tags || Candidate->Price != SelectedItem.Price || Candidate->ItemInstanceId != SelectedItem.ItemInstanceId)
     {
+        if (SelectedItemIndex != INDEX_NONE) bSuppressAutomaticSelection = true;
         SelectedItemIndex = INDEX_NONE;
         DetailsScroll->ScrollToStart();
     }
     const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
     DisplayedMember = Member ? *Member : FRunPartyMember();
     DisplayedRarities = View.ItemRarities;
+    DisplayedEncounterId = View.EncounterProgress.SelectedEncounterId;
+    DisplayedShopRevision = View.ItemShopState.Revision;
     bCanChangeEquipment = Member && Controller && Controller->CanChangeEquipment(View, CharacterId);
+    bCanSellItems = Member && Controller && Controller->CanSellInventoryItems(View, CharacterId);
     GoldText->SetVisibility(Member ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     ItemCountText->SetVisibility(Member ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     StatusText->SetVisibility(ESlateVisibility::Visible);
     GoldText->SetText(Member ? FText::Format(NSLOCTEXT("Inventory", "Gold", "보유 골드 {0}G"), FText::AsNumber(Member->Gold)) : FText::GetEmpty());
     StatusText->SetText(!Member ? NSLOCTEXT("Inventory", "NoInventory", "직접 조작 캐릭터가 없어 표시할 인벤토리가 없습니다.") : Member->CurrentHP == 0.0f ? NSLOCTEXT("Inventory", "DeadInventory", "사망 · 보유 아이템과 스킬 보기") : bCanChangeEquipment ? NSLOCTEXT("Inventory", "ListDragHint", "선택하여 상세 보기 · 슬롯으로 끌어 장착") : NSLOCTEXT("Inventory", "ListReadOnlyHint", "선택하여 상세 보기 · 장비 변경은 상점에서"));
-    if (Member && Controller && Controller->IsEquipmentChangePending()) StatusText->SetText(NSLOCTEXT("Equipment", "Pending", "장비 변경을 저장하고 있습니다."));
+    if (Member && Controller && Controller->IsItemSalePending()) StatusText->SetText(NSLOCTEXT("InventorySale", "Pending", "아이템 판매를 저장하고 있습니다."));
+    else if (Member && Controller && Controller->IsEquipmentChangePending()) StatusText->SetText(NSLOCTEXT("Equipment", "Pending", "장비 변경을 저장하고 있습니다."));
+    else if (Member && Controller && !Controller->GetItemSaleMessage().IsEmpty()) StatusText->SetText(Controller->GetItemSaleMessage());
     else if (Member && Controller && !Controller->GetEquipmentMessage().IsEmpty()) StatusText->SetText(Controller->GetEquipmentMessage());
     ResolveDisplayedSkills();
     RebuildList();
 }
 
+void UCharacterInventoryPanel::FocusInventory()
+{
+    // Move keyboard focus without selecting a different copy or confirming a sale.
+    // 다른 사본을 선택하거나 판매를 확정하지 않고 키보드 포커스만 이동합니다.
+    const int32 SelectedRow = VisibleItemIndices.IndexOfByKey(SelectedItemIndex);
+    const int32 FocusRow = ItemRows.IsValidIndex(SelectedRow) ? SelectedRow : 0;
+    if (ItemRows.IsValidIndex(FocusRow)) ItemRows[FocusRow]->SetFocus();
+    else if (CategoryButtons.IsValidIndex(SelectedCategoryIndex)) CategoryButtons[SelectedCategoryIndex]->SetFocus();
+}
+
 void UCharacterInventoryPanel::SelectCategory(int32 CategoryIndex)
 {
     if (!Categories.IsValidIndex(CategoryIndex) || SelectedCategoryIndex == CategoryIndex) return;
+    bConfirmingSale = false;
+    SaleCommand = FRunItemSaleCommand();
     SelectedCategoryIndex = CategoryIndex;
     ListScroll->ScrollToStart();
     DetailsScroll->ScrollToStart();
@@ -391,13 +436,18 @@ void UCharacterInventoryPanel::RebuildList()
     const FText EmptyBag = bCanChangeEquipment ? NSLOCTEXT("Inventory", "EmptyBag", "가방이 비어 있습니다.\n장착 아이템을 이곳으로 끌어 해제할 수 있습니다.") : NSLOCTEXT("Inventory", "EmptyReadOnlyBag", "가방이 비어 있습니다.\n장착 중인 아이템은 현재 장비에서 확인하세요.");
     EmptyItemsText->SetText(BagCount == 0 ? EmptyBag : FText::Format(NSLOCTEXT("Inventory", "EmptyCategory", "{0} 분류에 보관된 아이템이 없습니다.\n전체 탭에서 다른 아이템을 확인하세요."), Categories[SelectedCategoryIndex].Label));
     EmptyItemsText->SetVisibility(bEmptyItems ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    if (!VisibleItemIndices.Contains(SelectedItemIndex)) SelectedItemIndex = VisibleItemIndices.IsEmpty() ? INDEX_NONE : VisibleItemIndices[0];
+    if (!VisibleItemIndices.Contains(SelectedItemIndex)) SelectedItemIndex = bSuppressAutomaticSelection || VisibleItemIndices.IsEmpty() ? INDEX_NONE : VisibleItemIndices[0];
     RefreshSelectedItem();
 }
 
 void UCharacterInventoryPanel::SelectItem(int32 ItemIndex)
 {
     if (!VisibleItemIndices.Contains(ItemIndex) || !DisplayedMember.Items.IsValidIndex(ItemIndex)) return;
+    const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
+    if (Controller && Controller->IsShopPurchasePending()) return;
+    bConfirmingSale = false;
+    SaleCommand = FRunItemSaleCommand();
+    bSuppressAutomaticSelection = false;
     SelectedItemIndex = ItemIndex;
     DetailsScroll->ScrollToStart();
     // Change only highlights and details so mouse selection does not replace a pending drag source.
@@ -412,6 +462,7 @@ void UCharacterInventoryPanel::RefreshSelectedItem()
     DetailsPanel->SetVisibility(bHasItem ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     SelectedItem = bHasItem ? DisplayedMember.Items[SelectedItemIndex] : FRunItemDefinition();
     DetailsSkills->ClearChildren();
+    RefreshSaleControls();
     if (!bHasItem) return;
     UDemonicUITheme::Get().SetItemIcon(DetailsIcon, SelectedItem.Tags);
     DetailsName->SetText(RunItemPresentation::Name(SelectedItem, DisplayedRarities));
@@ -449,16 +500,74 @@ void UCharacterInventoryPanel::RefreshSelectedItem()
     DetailsHint->SetText(FText::Format(NSLOCTEXT("Inventory", "ResolvedEquipmentDetails", "{0}\n{1}"), RunItemPresentation::EquipmentDescription(SelectedItem), Hint));
 }
 
+void UCharacterInventoryPanel::RefreshSaleControls()
+{
+    if (!SaleControls) return;
+    const bool bHasItem = DisplayedMember.Items.IsValidIndex(SelectedItemIndex) && VisibleItemIndices.Contains(SelectedItemIndex);
+    SaleControls->SetVisibility(bHasItem ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+    const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
+    const bool bPending = Controller && Controller->IsShopPurchasePending();
+    const int32 Price = bHasItem ? RunItemSaleRules::GetPrice(SelectedItem) : 0;
+    const bool bCanSell = bHasItem && bCanSellItems && !bPending && Price > 0 && !RunEquipmentRules::IsItemEquipped(DisplayedMember, SelectedItemIndex);
+    const FText Name = bHasItem ? RunItemPresentation::Name(SelectedItem, DisplayedRarities) : FText::GetEmpty();
+    SaleSummary->SetText(bConfirmingSale ? FText::Format(NSLOCTEXT("InventorySale", "ConfirmSummary", "{0} · 판매가 {1}G"), Name, FText::AsNumber(Price)) : FText::Format(NSLOCTEXT("InventorySale", "Price", "판매가격 {0}G"), FText::AsNumber(Price)));
+    SaleSummary->SetToolTipText(SaleSummary->GetText());
+    const FText Hint = bPending ? NSLOCTEXT("InventorySale", "TransactionPending", "처리 중인 거래가 끝날 때까지 기다려 주세요.") : bConfirmingSale ? NSLOCTEXT("InventorySale", "ConfirmWarning", "판매하면 되돌릴 수 없습니다.") : Price <= 0 ? NSLOCTEXT("InventorySale", "NoPrice", "가격이 없는 아이템은 판매할 수 없습니다.") : bCanSell ? NSLOCTEXT("InventorySale", "UnequipFirst", "장착한 아이템은 먼저 해제하세요.") : NSLOCTEXT("InventorySale", "Unavailable", "본인 생존 캐릭터만 아이템 상점에서 판매할 수 있습니다.");
+    SaleHint->SetText(Hint);
+    SellButton->Configure(TEXT("Sell"), bConfirmingSale ? NSLOCTEXT("InventorySale", "Confirm", "판매 확정") : NSLOCTEXT("InventorySale", "Sell", "판매"));
+    SellButton->SetIsEnabled(bCanSell);
+    CancelSaleButton->Configure(TEXT("Cancel"), NSLOCTEXT("InventorySale", "Cancel", "취소"));
+    CancelSaleButton->SetVisibility(bConfirmingSale ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    CancelSaleButton->SetIsEnabled(!bPending);
+}
+
+void UCharacterInventoryPanel::HandleSaleAction(FName ActionId)
+{
+    if (ActionId == TEXT("Cancel"))
+    {
+        bConfirmingSale = false;
+        SaleCommand = FRunItemSaleCommand();
+        RefreshSaleControls();
+        return;
+    }
+    AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
+    if (ActionId != TEXT("Sell") || !Controller || !bCanSellItems || Controller->IsShopPurchasePending() || !VisibleItemIndices.Contains(SelectedItemIndex) || !DisplayedMember.Items.IsValidIndex(SelectedItemIndex) || RunItemSaleRules::GetPrice(SelectedItem) <= 0 || RunEquipmentRules::IsItemEquipped(DisplayedMember, SelectedItemIndex)) return;
+    if (!bConfirmingSale)
+    {
+        SaleCommand.CharacterId = DisplayedMember.CharacterId;
+        SaleCommand.ItemIndex = SelectedItemIndex;
+        SaleCommand.Asset = SelectedItem.Asset;
+        SaleCommand.ItemInstanceId = SelectedItem.ItemInstanceId;
+        SaleCommand.ExpectedEquipmentRevision = DisplayedMember.Equipment.Revision;
+        SaleCommand.ExpectedShopRevision = DisplayedShopRevision;
+        SaleCommand.EncounterId = DisplayedEncounterId;
+        bConfirmingSale = true;
+        RefreshSaleControls();
+        return;
+    }
+    const FRunItemSaleCommand Command = SaleCommand;
+    // Clear the selected copy before a synchronous result or replicated list can reuse its former index.
+    // 동기 결과나 복제 목록이 이전 인덱스를 재사용하기 전에 선택한 사본을 비웁니다.
+    bConfirmingSale = false;
+    SaleCommand = FRunItemSaleCommand();
+    bSuppressAutomaticSelection = true;
+    SelectedItemIndex = INDEX_NONE;
+    RefreshSelectedItem();
+    Controller->RequestSellInventoryItem(Command);
+}
+
 bool UCharacterInventoryPanel::CanAcceptDrop(const UEquipmentDragDropOperation* Operation, FGameplayTag TargetSlot) const
 {
     FText Error;
-    return FEquipmentDropRequest::CanDrop(GetOwningPlayer<AGameplayPlayerController>(), DisplayedMember, bCanChangeEquipment, Operation, FGameplayTag(), Error);
+    const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
+    return FEquipmentDropRequest::CanDrop(Controller, DisplayedMember, bCanChangeEquipment && Controller && !Controller->IsShopPurchasePending(), Operation, FGameplayTag(), Error);
 }
 
 bool UCharacterInventoryPanel::HandleDrop(const UEquipmentDragDropOperation* Operation, FGameplayTag TargetSlot)
 {
     FText Error;
-    if (!FEquipmentDropRequest::Submit(GetOwningPlayer<AGameplayPlayerController>(), DisplayedMember, bCanChangeEquipment, Operation, FGameplayTag(), Error)) StatusText->SetText(Error);
+    AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
+    if (!FEquipmentDropRequest::Submit(Controller, DisplayedMember, bCanChangeEquipment && Controller && !Controller->IsShopPurchasePending(), Operation, FGameplayTag(), Error)) StatusText->SetText(Error);
     return Operation != nullptr;
 }
 

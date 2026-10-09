@@ -191,7 +191,7 @@ FReply UEquipmentItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& Geomet
         SetKeyboardFocus();
     }
     const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
-    if (bCanDrag && Controller && !Controller->IsEquipmentChangePending()) return UWidgetBlueprintLibrary::DetectDragIfPressed(MouseEvent, this, EKeys::LeftMouseButton).NativeReply;
+    if (bCanDrag && Controller && !Controller->IsShopPurchasePending()) return UWidgetBlueprintLibrary::DetectDragIfPressed(MouseEvent, this, EKeys::LeftMouseButton).NativeReply;
     if (bSelectItem) return FReply::Handled();
     return Super::NativeOnMouseButtonDown(Geometry, MouseEvent);
 }
@@ -199,7 +199,7 @@ FReply UEquipmentItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& Geomet
 void UEquipmentItemSlotWidget::NativeOnDragDetected(const FGeometry& Geometry, const FPointerEvent& MouseEvent, UDragDropOperation*& OutOperation)
 {
     const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
-    if (!bCanDrag || !Controller || Controller->IsEquipmentChangePending() || ItemIndex == INDEX_NONE) return;
+    if (!bCanDrag || !Controller || Controller->IsShopPurchasePending() || ItemIndex == INDEX_NONE) return;
     UEquipmentDragDropOperation* Drag = NewObject<UEquipmentDragDropOperation>(this);
     Drag->CharacterId = CharacterId;
     Drag->ItemIndex = ItemIndex;

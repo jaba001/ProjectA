@@ -1471,6 +1471,72 @@
       "key": "Travel",
       "source": "불러오는 중",
       "translation": "Loading"
+    },
+    {
+      "namespace": "InventorySale",
+      "key": "Pending",
+      "source": "아이템 판매를 저장하고 있습니다.",
+      "translation": "Saving the item sale."
+    },
+    {
+      "namespace": "InventorySale",
+      "key": "ConfirmSummary",
+      "source": "{0} · 판매가 {1}G",
+      "translation": "{0} · Sell for {1}G"
+    },
+    {
+      "namespace": "InventorySale",
+      "key": "Price",
+      "source": "판매가격 {0}G",
+      "translation": "Sale price: {0}G"
+    },
+    {
+      "namespace": "InventorySale",
+      "key": "TransactionPending",
+      "source": "처리 중인 거래가 끝날 때까지 기다려 주세요.",
+      "translation": "Wait for the current transaction to finish."
+    },
+    {
+      "namespace": "InventorySale",
+      "key": "ConfirmWarning",
+      "source": "판매하면 되돌릴 수 없습니다.",
+      "translation": "Selling cannot be undone."
+    },
+    {
+      "namespace": "InventorySale",
+      "key": "NoPrice",
+      "source": "가격이 없는 아이템은 판매할 수 없습니다.",
+      "translation": "Items without a price cannot be sold."
+    },
+    {
+      "namespace": "InventorySale",
+      "key": "UnequipFirst",
+      "source": "장착한 아이템은 먼저 해제하세요.",
+      "translation": "Unequip equipped items before selling."
+    },
+    {
+      "namespace": "InventorySale",
+      "key": "Unavailable",
+      "source": "본인 생존 캐릭터만 아이템 상점에서 판매할 수 있습니다.",
+      "translation": "Only a living character you own can sell at an item shop."
+    },
+    {
+      "namespace": "InventorySale",
+      "key": "Confirm",
+      "source": "판매 확정",
+      "translation": "Confirm Sale"
+    },
+    {
+      "namespace": "InventorySale",
+      "key": "Sell",
+      "source": "판매",
+      "translation": "Sell"
+    },
+    {
+      "namespace": "InventorySale",
+      "key": "Cancel",
+      "source": "취소",
+      "translation": "Cancel"
     }
   ]
 }

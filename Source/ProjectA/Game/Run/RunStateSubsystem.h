@@ -8,6 +8,7 @@
 #include "Game/Run/RunSkillShopTypes.h"
 #include "Game/Run/RunWeaponSkillTypes.h"
 #include "Game/Run/RunGoldRewardTypes.h"
+#include "Game/Run/RunItemSaleTypes.h"
 #include "Game/Run/TargetRunTypes.h"
 #include "Game/Run/ManagedRunTypes.h"
 #include "Game/Run/Authority/LocalRunAuthorityStore.h"
@@ -122,6 +123,8 @@ public:
     bool PurchaseShopOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError, int32 ExpectedShopRevision = INDEX_NONE);
     bool CanChangeEquipment(const FRunAccountId& AccountId, FGuid CharacterId, FText& OutError) const;
     bool ChangeEquipment(const FRunAccountId& AccountId, const FRunEquipmentCommand& Command, FText& OutError);
+    bool CanSellItem(const FRunAccountId& AccountId, const FRunItemSaleCommand& Command, FText& OutError) const;
+    bool SellItem(const FRunAccountId& AccountId, const FRunItemSaleCommand& Command, FText& OutError);
     const FRunSkillShopState& GetSkillShopState() const { return SkillShopState; }
     const FRunItemShopState& GetItemShopState() const { return ItemShopState; }
     const FRunWeaponSkillRulesState& GetWeaponSkillRules() const { return WeaponSkillRules; }

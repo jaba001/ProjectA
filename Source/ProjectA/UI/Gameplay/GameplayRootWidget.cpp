@@ -106,6 +106,12 @@ void UGameplayRootWidget::ToggleInventory()
     if (!UtilityLayer || !bHasDisplayedPhase || DisplayedPhase == ERunPhase::None || (DevelopmentWidget && DevelopmentWidget->IsActivated())) return;
     UCommonActivatableWidget* Active = UtilityLayer->GetActiveWidget();
     if (Cast<UOptionsWidget>(Active)) return;
+    if (DisplayedPhase == ERunPhase::Shop && RunEncounterWidget)
+    {
+        if (UInventoryWidget* Inventory = Cast<UInventoryWidget>(Active)) Inventory->DeactivateWidget();
+        RunEncounterWidget->FocusInventory();
+        return;
+    }
     if (UInventoryWidget* Inventory = Cast<UInventoryWidget>(Active))
     {
         Inventory->DeactivateWidget();
@@ -290,6 +296,10 @@ void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool b
 {
     CurrentView = View;
     const ERunPhase Phase = View.Phase;
+    if (Phase == ERunPhase::Shop && UtilityLayer)
+    {
+        if (UInventoryWidget* Inventory = Cast<UInventoryWidget>(UtilityLayer->GetActiveWidget())) Inventory->DeactivateWidget();
+    }
     CheckpointNotice->SetVisibility((Phase == ERunPhase::Combat && !View.FlowMessage.IsEmpty()) || bCanRetryCheckpoint ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     CheckpointMessage->SetText(View.FlowMessage);
     RetryCheckpointButton->SetVisibility(bCanRetryCheckpoint ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);

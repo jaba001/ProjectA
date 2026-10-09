@@ -4,8 +4,8 @@
 #include "GameplayTagContainer.h"
 #include "RunEquipmentTypes.generated.h"
 
-// Inventory indices identify individual copies in the append-only Run item array.
-// Run의 추가 전용 아이템 배열에서 인덱스로 각각의 보유 사본을 식별합니다.
+// Inventory indices identify owned copies; selling a copy shifts later indices in the same transaction.
+// 인덱스로 보유 사본을 식별하며 판매 시 같은 트랜잭션에서 뒤의 인덱스를 이동합니다.
 USTRUCT(BlueprintType)
 struct PROJECTA_API FRunEquipmentSlot
 {
@@ -28,6 +28,8 @@ struct PROJECTA_API FRunEquipmentState
     UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Equipment")
     bool bHasLoadout = false;
 
+    // Equipment changes and item removal invalidate pending drags and sale requests together.
+    // 장비 변경과 아이템 삭제는 대기 중인 드래그와 판매 요청을 함께 무효화합니다.
     UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Equipment")
     int32 Revision = 0;
 
