@@ -3,6 +3,7 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Game/Run/RunSkillBalance.h"
+#include "GAS/CombatGameplayTags.h"
 #include "Misc/PackageName.h"
 #include "NativeGameplayTags.h"
 #include <initializer_list>
@@ -64,11 +65,14 @@ URunWeaponSkillRulesDataAsset::URunWeaponSkillRulesDataAsset()
 {
     Rules.SchemaVersion = 1;
     Rules.SkillCount = 1;
-    Rules.WeaponQuery = MakeItemQuery({TEXT("Item.Weapon.Sword"), TEXT("Item.Weapon.Dagger"), TEXT("Item.Weapon.Axe"), TEXT("Item.Weapon.Hammer"), TEXT("Item.Weapon.MaceClub"), TEXT("Item.Weapon.Spear"), TEXT("Item.Weapon.Scythe"), TEXT("Item.Weapon.Gauntlet"), TEXT("Item.Weapon.Bow"), TEXT("Item.Weapon.Crossbow"), TEXT("Item.Weapon.StaffWand"), TEXT("Item.Weapon.Spellbook")});
+    Rules.WeaponQuery = MakeItemQuery({TEXT("Item.Weapon.Sword"), TEXT("Item.Weapon.Dagger"), TEXT("Item.Weapon.Axe"), TEXT("Item.Weapon.Hammer"), TEXT("Item.Weapon.MaceClub"), TEXT("Item.Weapon.Spear"), TEXT("Item.Weapon.Scythe"), TEXT("Item.Weapon.Gauntlet"), TEXT("Item.Weapon.Bow"), TEXT("Item.Weapon.Crossbow"), TEXT("Item.Weapon.StaffWand"), TEXT("Item.Weapon.Spellbook"), TEXT("Item.Weapon.Shield")});
     const FGameplayTagQuery CloseWeaponQuery = MakeItemQuery({TEXT("Item.Weapon.Sword"), TEXT("Item.Weapon.Dagger"), TEXT("Item.Weapon.Axe"), TEXT("Item.Weapon.Hammer"), TEXT("Item.Weapon.MaceClub"), TEXT("Item.Weapon.Spear"), TEXT("Item.Weapon.Scythe"), TEXT("Item.Weapon.Gauntlet")});
     const FGameplayTagQuery BowQuery = MakeItemQuery({TEXT("Item.Weapon.Bow")});
     const FGameplayTagQuery CrossbowQuery = MakeItemQuery({TEXT("Item.Weapon.Crossbow")});
     const FGameplayTagQuery MagicWeaponQuery = MakeItemQuery({TEXT("Item.Weapon.StaffWand"), TEXT("Item.Weapon.Spellbook")});
+    FRunWeaponSkillItemQueryOverride& ShieldOverride = ItemQueryOverrides.AddDefaulted_GetRef();
+    ShieldOverride.SkillQuery = FGameplayTagQuery::MakeQuery_MatchTag(ProjectACombatTags::Skill_Effect_Shield);
+    ShieldOverride.AllowedItemQuery = MakeItemQuery({TEXT("Item.Weapon.Shield")});
     FGameplayTagContainer AllPools;
     const FGameplayTag PoolTags[] = {TAG_WeaponPoolWhite, TAG_WeaponPoolGreen, TAG_WeaponPoolBlue, TAG_WeaponPoolPurple, TAG_WeaponPoolOrange};
     for (FGameplayTag Tag : PoolTags) AllPools.AddTag(Tag);
@@ -100,7 +104,18 @@ URunWeaponSkillRulesDataAsset::URunWeaponSkillRulesDataAsset()
 
 bool URunWeaponSkillRulesDataAsset::BuildState(FRunWeaponSkillRulesState& OutState, FText& OutError) const
 {
+    OutError = NSLOCTEXT("RunWeaponSkills", "InvalidRules", "무기 스킬 생성 규칙의 버전·개수·태그·후보·등급이 올바르지 않습니다.");
+    if (Rules.WeaponQuery.IsEmpty()) return false;
+    for (const FRunWeaponSkillItemQueryOverride& Override : ItemQueryOverrides)
+    {
+        if (Override.SkillQuery.IsEmpty() || Override.AllowedItemQuery.IsEmpty()) return false;
+    }
     FRunWeaponSkillRulesState State = Rules;
+    FGameplayTagQueryExpression ExistingWeaponExpression;
+    State.WeaponQuery.GetQueryExpr(ExistingWeaponExpression);
+    FGameplayTagQueryExpression WeaponExpression;
+    WeaponExpression.AnyExprMatch().AddExpr(ExistingWeaponExpression);
+    TSet<int32> AppliedOverrides;
     for (FRunWeaponSkillCandidate& Candidate : State.Candidates)
     {
         const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Candidate.Skill.TryLoad());
@@ -112,7 +127,26 @@ bool URunWeaponSkillRulesDataAsset::BuildState(FRunWeaponSkillRulesState& OutSta
         FCombatRoundSkill Definition;
         if (!Skill->ResolveRoundSkill(Definition, OutError)) return false;
         Candidate.Tags = Definition.EffectTags;
+        // The first matching authored override freezes item eligibility with the resolved execution tags.
+        // 처음 일치한 작성 규칙으로 해석된 실행 태그에 맞는 아이템 적합성을 고정합니다.
+        for (int32 OverrideIndex = 0; OverrideIndex < ItemQueryOverrides.Num(); ++OverrideIndex)
+        {
+            const FRunWeaponSkillItemQueryOverride& Override = ItemQueryOverrides[OverrideIndex];
+            if (!Override.SkillQuery.Matches(Candidate.Tags)) continue;
+            Candidate.AllowedItemQuery = Override.AllowedItemQuery;
+            if (!AppliedOverrides.Contains(OverrideIndex))
+            {
+                // Preserve serialized item eligibility while including each applied override once.
+                // 직렬화된 아이템 적합성을 유지하면서 실제 적용한 규칙을 한 번씩 포함합니다.
+                FGameplayTagQueryExpression OverrideExpression;
+                Override.AllowedItemQuery.GetQueryExpr(OverrideExpression);
+                WeaponExpression.AddExpr(OverrideExpression);
+                AppliedOverrides.Add(OverrideIndex);
+            }
+            break;
+        }
     }
+    if (!AppliedOverrides.IsEmpty()) State.WeaponQuery = FGameplayTagQuery::BuildQuery(WeaponExpression);
     if (bUseCsvBalance && !RunSkillBalance::Load(State, OutError)) return false;
     if (!RunWeaponSkillRules::Validate(State, OutError)) return false;
     OutState = MoveTemp(State);
