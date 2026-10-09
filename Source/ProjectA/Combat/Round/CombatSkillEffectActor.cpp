@@ -5,6 +5,7 @@
 #include "CollisionShape.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
+#include "DataAsset/CombatMeleeVfxCatalog.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 #include "Particles/ParticleSystemComponent.h"
@@ -91,7 +92,9 @@ void ACombatSkillEffectActor::InitializeEffect(AUnitBase* Source, AUnitBase* Tar
     {
         if (IsValid(Entry.Unit) && Entry.Unit->GetWorld() == GetWorld()) AllowedTargets.AddUnique(Entry.Unit);
     }
-    Visual = Skill.Vfx;
+    // Resolve the unit's actual montage before applying presentation-only corrections to the replicated visual copy.
+    // 유닛의 실제 몽타주를 해석한 뒤 복제할 시각 사본에만 표현 보정을 적용합니다.
+    Visual = GetDefault<UCombatMeleeVfxCatalog>()->Resolve(Skill, Source->ResolveRoundCastMontage(Skill.CastMontage));
     VisualSourcePosition = SourceLocation;
     VisualTargetPosition = AimPoint;
     bPresentationReady = true;

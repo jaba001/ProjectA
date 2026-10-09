@@ -1009,3 +1009,15 @@ Startup/Default MoviePlayer 화면에 기존 DemonicUI 성 배경·하단 밴드
 `python Source/ProjectAEditor/Scripts/BuildLocalization.py --check`와 `ValidateResources.py`는 23개 추가 문구를 포함한 기존 6개 JSON의 1,069개 한영 번역·서식 인자·생성물·바이너리 재해석·UFS 의존성을 대조했다. `LayoutStaticReview.json`은 5개 viewport의 배치와 NPC 계획 경계에 대한 정적 계산 45개, `BackendStaticReview.json`은 권한/저장/직전 보상 경로의 소스 검토 근거다. `DocumentationValidation.json`·`StaticReview.json`에 링크·기존 TODO 미완료 48개/선택 7개 보존과 확인 2개 추가·프로젝트 설정·전체 diff 검사를 기록한다.
 
 게임·PIE·Unreal 자동화 테스트·패키지·화면 캡처와 IDE 실행은 수행하지 않았다. 원근 계산은 실제 의상·idle·소품 가림의 렌더 확인을 대신하지 않는다. 세 화면비·한영 판매 UI, 저장 실패/Continue, 협동 지연·동시 거래는 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)의 사용자 확인으로 남긴다. 이전 실행 이력으로 이번 변경의 작동 성공을 표시하지 않는다.
+
+### 9-48 2026-10-10 오른손 참격 VFX 회전 방향
+
+근접 VFX와 오른손 무기 애니메이션의 시작·진행 방향 비교 요청을 반영했다. 시작 기준은 `48461306`이며 기존 미커밋 변경은 없었다. 현재 참격 4종의 원본 패키지 SHA256은 기존 감사와 일치한다. Niagara 패키지의 컴파일된 HLSL·Curve LUT를 읽어 도끼·곡검·낫의 양수 `User.RotateSpeed`가 +Z 회전에 사용됨을 확인했다. 2026-10-09 Greystone `Attack_A_Med` 포즈 기록과 동일한 원본 FBX 해시를 대조했으며 오른손은 로컬 +Y→+X→-Y로 이동한다. 이 과거 포즈는 애니메이션 궤적의 근거이며 이번 수정 후 화면 검수의 근거로 사용하지 않는다.
+
+원본을 직접 참조하는 [CombatMeleeVfxCatalog](../Source/ProjectA/DataAsset/CombatMeleeVfxCatalog.cpp)의 태그 Query·원본 경로·실제 유닛 몽타주 조건으로 도끼 `-1`·곡검 `-1.5`·낫 `-2`의 회전 속도를 적용했다. 서버는 발동 시 `Visual` 사본만 수정하고 기존 NetSerialize로 전달한다. 기존 사용자 회전·동일 키 재정의·모호한 규칙은 보존한다. 원본 에셋·스킬 정의·저장 형식·피해·충돌·피격 VFX·소리·발동 시점·초기 회전 오프셋은 변경하지 않았다. README의 상점 설명에 남아 있던 이전 인벤토리 열기 문구도 9-47의 동시 배치 구현과 일치시켰다.
+
+발도 참격은 회전형 업데이트 대신 `VectorToRadialValue`와 감소하는 Erode 곡선으로 재질을 펼친다. 원본 재질 그래프·엔진 함수·스프라이트 축을 대조한 펼침 경계의 -Z 진행은 오른손 궤적과 같은 회전 부호이므로 보정에서 제외했다. 4종의 기존 초기·중간 이미지에는 점·완성된 링·겹친 피격 효과가 있어 실제 첫 발광 날의 시작각을 확정할 수 없다. 초기 UV 위상·텍스처 마스크·반투명 가림까지 맞는다는 결론은 내리지 않았다. 재현 명령은 `python Saved/Automation/MeleeVfx_20261010/ReadDirectionAudit.py`, 근거는 같은 폴더의 `DirectionAudit.json`이다. 파일·패키지 읽기만 수행하며 Unreal을 실행하지 않는다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`와 같은 옵션의 `ProjectA Win64 Development` 컴파일·링크가 각각 27.25초·26.86초에 성공했다. 로그는 `Saved/Automation/MeleeVfx_20261010/EditorBuild.log`·`GameBuild.log`다. `ProjectA.Combat.MeleeVfx`의 원본 적용 범위·유닛 몽타주/사본 격리·사용자 설정 보존·기존 시각 데이터 직렬화 회귀 4개를 작성하고 컴파일했으며 실행하지 않았다. 독립 소스 검토에서 서버 권위·태그 조건·판정/저장 경로 보존과 추가 동기 로드가 없음을 확인했다.
+
+문서 링크·TODO 보존·전체 diff 정적 근거는 `Saved/Automation/MeleeVfx_20261010/DocumentationValidation.json`·`StaticReview.json`에 기록한다. 기존 미완료 50개·제안 선택 7개를 보존하고 참격 화면 확인 1개를 추가했다. 게임·PIE·Unreal 자동화 테스트·패키지·화면 캡처와 IDE 실행은 수행하지 않았다. 남녀·반대 방향의 적·Continue·2인 원격에서 최초 발광과 베기 궤적이 일치하는지는 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)의 사용자 확인 전이다.
