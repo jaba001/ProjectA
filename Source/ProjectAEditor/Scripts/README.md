@@ -321,3 +321,14 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 ```
 
 `WarriorAssetLibrary.ConfigureTimedAttackMontage`를 먼저 Development Editor / Win64로 컴파일한다. 작성 과정에서 스켈레톤·DefaultSlot·구간·비반복·블렌드·남녀 포즈 표본과 변경 필드를 검사하며 전체 출력의 원자적 rollback은 제공하지 않는다. 작성 전 기존 출력은 `Saved/Automation/BowAnimation_20261009/BeforeAssets`에 보존하고 결과는 같은 폴더의 `Author.json`·로그에 기록한다. 선딜 명세·스킬 DA·현재 CSV가 준비 시간과 다르면 중단한다. `CreateDrGameSkills.py`는 선언된 몽타주 참조를 재현하고 `CreateWeaponSkills.py`는 석궁에 활 당기기를 상속하지 않는다. 2026-10-09 작성·컴파일은 통과했으며 실제 재생·별도 프로세스 재로드는 실행하지 않았다. [근거·제한](../../../Docs/HISTORY.md#9-41-2026-10-09-라이브러리-활-공격-애니메이션)
+
+33. `ConfigureCombatAnimations.py`: [CombatAnimationSpecs.json](CombatAnimationSpecs.json)에 따라 일반 근접 1개·참격 4개·전방 마법 27개·광역/지원 마법 27개의 `CastMontage`만 연결한다. Greystone 공격/복귀 FBX 2개와 Gideon/Muriel FBX 각 1개를 선택 임포트하고 기존 Rig로 필요한 SkeletonGuard 결과를 작성한다. 신규 결과는 검 8개·마법 8개다. 일반 근접의 시각적 준비 7/30초·총 1.6초, 참격 준비 0.3초·총 1.6667초, 마법 준비 0.3초를 사용한다. 일반 근접 게임 발동 0.23초, 구형 칼날 판정·Kwang 9개·활·석궁·수치·태그는 보존한다. 검수 중 미채택한 프로젝트 소유 Kwang 참격 몽타주 2개는 참조 확인 후 엔진 API로 정리한다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureCombatAnimations.py") -CombatAnimationsAuthor -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false -nowrite
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureCombatAnimations.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false -nowrite
+```
+
+`CombatAnimationGrip.py`는 명세에 `grip_reference`가 있는 프로젝트 마법 시퀀스 2개에만 선택 임포트한 Greystone `Attack_A_Med` 첫 자세의 오른손 손가락 19개 회전을 적용한다. 시점·손목·팔·기타 트랙·위치·배율의 보존과 손가락 키를 검사하고 metadata SHA로 재로드를 확인한다. 초기 `MM_Idle` 보정본에서의 교체는 이전 metadata 검증 후 정확한 두 참조에만 허용한다. 참조 시퀀스는 수정하지 않으며 기존 소유 SkeletonGuard 시퀀스 2개만 엔진의 덮어쓰기 기능으로 다시 리타깃한다.
+
+Development Editor / Win64 컴파일 후 작성·별도 프로세스 재로드 순으로 실행한다. 기본 모드는 읽기 전용 검사이며 작성에는 `-CombatAnimationsAuthor`가 필요하다. 소유 정보·스켈레톤·구간·DefaultSlot·비반복·블렌드·남녀 포즈·선딜과 CSV 일치를 검사한다. 대상 외 에셋·원본·CSV·설정·저장 파일의 해시를 보존하며 원자적 rollback은 제공하지 않는다. 기존 대상의 바이트 백업은 `Saved/Automation/CombatAnimations_20261009/BeforeAssets`, 결과는 `Author.json`·`Reload.json`이다. 실제 화면 검수는 별도의 명시적 실행 요청에서 렌더링 Editor에 `-ExecCmds="Automation RunTests ProjectA.TodoReview.CastAnimations" -TestExit="Automation Test Queue Empty" -ProjectAReviewLeftMonitor -ProjectASaveSlot=ProjectA_Automation_TodoReview_<새로운식별자> -nowrite`를 전달한다.

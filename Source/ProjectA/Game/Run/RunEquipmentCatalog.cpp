@@ -58,6 +58,9 @@ URunEquipmentCatalog::URunEquipmentCatalog()
     StartingStaff.ItemAssets.Add(FSoftObjectPath(TEXT("/Game/MageStaff_FreeWeapons/SM_Staff_01.SM_Staff_01")));
     StartingStaff.OccupiedSlots = StartingStaff.AllowedSlots;
     StartingStaff.PreferredSlot = TAG_EquipmentMainHand;
+    // Align the original staff shaft with the closed right palm used by the authored casting animations.
+    // 작성한 시전 애니메이션의 쥔 오른손 손바닥에 원본 지팡이 축을 맞춥니다.
+    StartingStaff.Attachments[0].RelativeTransform = FTransform(FQuat(0.289771769, -0.026343001, 0.954720189, -0.062026727).GetNormalized(), FVector(-8.471887, 2.925897, 1.059226), FVector::OneVector);
     Profiles.Add(MoveTemp(StartingStaff));
 }
 

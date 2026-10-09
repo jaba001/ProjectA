@@ -1,6 +1,7 @@
 #include "WarriorAssetLibrary.h"
 #include "Animation/AnimBlueprint.h"
 #include "Animation/AnimData/IAnimationDataController.h"
+#include "Animation/AnimData/IAnimationDataModel.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/Skeleton.h"
@@ -97,6 +98,44 @@ namespace
         const double QuantizedLength = Candidate.FrameRate.AsSeconds(Candidate.FrameRate.AsFrameTime(Candidate.Length).RoundToFrame());
         if (!FMath::IsNearlyEqual(static_cast<double>(Candidate.Length), QuantizedLength, 0.0001)) return Fail(TEXT("Timed attack total length must align with its common frame rate / 시간 조절 공격 전체 길이는 공통 프레임 레이트의 경계와 일치해야 합니다"));
         OutPlan = Candidate;
+        return true;
+    }
+
+    struct FWarriorTimedSwordMontagePlan
+    {
+        FWarriorTimedAttackMontagePlan Timing;
+        TArray<FAnimSegment> Segments;
+    };
+
+    bool BuildTimedSwordMontagePlan(const UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float ReleaseTime, float Windup, float RecoveryStart, FWarriorTimedSwordMontagePlan& OutPlan)
+    {
+        if (!IsValid(Attack) || !IsValid(Recovery)) return Fail(TEXT("Timed sword requires valid attack and recovery sequences / 시간 조절 검 공격에는 유효한 공격·복귀 시퀀스가 필요합니다"));
+        FWarriorTimedAttackMontagePlan AttackPlan;
+        if (!BuildTimedAttackMontagePlan(Montage, Attack, Attack, 0.f, ReleaseTime, ReleaseTime, Attack->GetPlayLength(), Windup, AttackPlan)) return false;
+        FWarriorTimedSwordMontagePlan Candidate;
+        // Reuse the common guards for both source ranges and the final three-segment frame-quantized duration before mutation.
+        // 변경 전에 공통 검증으로 두 원본 범위와 세 구간을 합친 프레임 단위 전체 길이를 확인합니다.
+        if (!BuildTimedAttackMontagePlan(Montage, Attack, Recovery, 0.f, Attack->GetPlayLength(), RecoveryStart, Recovery->GetPlayLength(), AttackPlan.Length, Candidate.Timing)) return false;
+        FAnimSegment Preparation;
+        Preparation.SetAnimReference(Attack, true);
+        Preparation.AnimStartTime = 0.f;
+        Preparation.AnimEndTime = ReleaseTime;
+        Preparation.AnimPlayRate = AttackPlan.DrawPlayRate;
+        FAnimSegment FollowThrough;
+        FollowThrough.SetAnimReference(Attack, true);
+        FollowThrough.StartPos = Preparation.GetEndPos();
+        FollowThrough.AnimStartTime = ReleaseTime;
+        FollowThrough.AnimEndTime = Attack->GetPlayLength();
+        FAnimSegment RecoverySegment;
+        RecoverySegment.SetAnimReference(Recovery, true);
+        // Match Unreal's saved segment normalization to avoid a floating-point gap after reload.
+        // 재로드 후 부동소수점 간격이 생기지 않도록 엔진의 저장 구간 정규화와 맞춥니다.
+        RecoverySegment.StartPos = FollowThrough.GetEndPos();
+        RecoverySegment.AnimStartTime = RecoveryStart;
+        RecoverySegment.AnimEndTime = Recovery->GetPlayLength();
+        if (!FMath::IsNearlyEqual(Preparation.GetEndPos(), FollowThrough.StartPos, 0.0001f) || !FMath::IsNearlyEqual(FollowThrough.GetEndPos(), RecoverySegment.StartPos, 0.0001f) || !FMath::IsNearlyEqual(RecoverySegment.GetEndPos(), Candidate.Timing.Length, 0.0001f)) return Fail(TEXT("Timed sword segments cannot represent the requested continuous timing / 시간 조절 검 구간으로 요청한 연속 시간을 표현할 수 없습니다"));
+        Candidate.Segments = {Preparation, FollowThrough, RecoverySegment};
+        OutPlan = MoveTemp(Candidate);
         return true;
     }
 
@@ -558,6 +597,16 @@ TArray<UAnimSequenceBase*> UWarriorAssetLibrary::GetMontageAnimations(UAnimMonta
     return Animations;
 }
 
+TArray<FTransform> UWarriorAssetLibrary::GetAnimationBoneTrackTransforms(UAnimSequence* Sequence, FName BoneName)
+{
+    if (!IsValid(Sequence) || BoneName.IsNone()) return {};
+    const IAnimationDataModel* Model = Sequence->GetDataModel();
+    if (!Model || !Model->IsValidBoneTrackName(BoneName)) return {};
+    TArray<FTransform> Transforms;
+    Model->GetBoneTrackTransforms(BoneName, Transforms);
+    return Transforms;
+}
+
 bool UWarriorAssetLibrary::ConfigureSwordMontage(UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float RecoveryStartTime)
 {
     if (!IsProjectCopy(Montage) || !IsValid(Attack) || !IsValid(Recovery) || !IsValid(Montage->GetSkeleton())) return Fail(TEXT("Sword montage authoring requires a project-owned montage and valid source animations and skeleton / 검 몽타주 작성에는 작업 사본 몽타주와 유효한 원본 애니메이션 및 스켈레톤이 필요합니다"));
@@ -659,6 +708,48 @@ bool UWarriorAssetLibrary::ValidateTimedAttackMontage(UAnimMontage* Montage, UAn
     if (!FMath::IsNearlyEqual(Segments[0].GetLength(), DrawDuration, 0.0001f) || !FMath::IsNearlyEqual(Segments[0].GetEndPos(), Segments[1].StartPos, 0.0001f) || !FMath::IsNearlyEqual(Segments[1].GetEndPos(), Plan.Length, 0.0001f)) return Fail(TEXT("Timed attack segment timing has a gap or unexpected length / 시간 조절 공격 구간 사이에 틈이 있거나 길이가 다릅니다"));
     if (Montage->RateScale != 1.f || Montage->BlendModeIn != EMontageBlendMode::Standard || Montage->BlendModeOut != EMontageBlendMode::Standard || !FMath::IsNearlyEqual(Montage->BlendIn.GetBlendTime(), 0.06f, 0.0001f) || !FMath::IsNearlyEqual(Montage->BlendOut.GetBlendTime(), 0.12f, 0.0001f) || Montage->BlendOutTriggerTime != -1.f || !Montage->bEnableAutoBlendOut) return Fail(TEXT("Timed attack montage blending or playback settings differ / 시간 조절 공격 몽타주의 블렌딩 또는 재생 설정이 다릅니다"));
     if (Montage->GetCommonTargetFrameRate() != Plan.FrameRate || Montage->GetSamplingFrameRate() != Plan.FrameRate || !FMath::IsNearlyEqual(Montage->GetPlayLength(), Plan.Length, 0.0001f) || !FMath::IsNearlyEqual(Montage->CalculateSequenceLength(), Plan.Length, 0.0001f)) return Fail(TEXT("Timed attack montage frame rate or stored length differs / 시간 조절 공격 몽타주의 프레임 레이트 또는 저장 길이가 다릅니다"));
+    return true;
+}
+
+bool UWarriorAssetLibrary::ConfigureTimedSwordMontage(UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float ReleaseTime, float Windup, float RecoveryStart)
+{
+    FWarriorTimedSwordMontagePlan Plan;
+    if (!BuildTimedSwordMontagePlan(Montage, Attack, Recovery, ReleaseTime, Windup, RecoveryStart, Plan)) return false;
+    Montage->Modify();
+    Montage->SlotAnimTracks[0].AnimTrack.AnimSegments = Plan.Segments;
+    Montage->RateScale = 1.f;
+    Montage->BlendModeIn = EMontageBlendMode::Standard;
+    Montage->BlendModeOut = EMontageBlendMode::Standard;
+    Montage->BlendIn.SetBlendTime(0.06f);
+    Montage->BlendOut.SetBlendTime(0.12f);
+    Montage->BlendOutTriggerTime = -1.f;
+    Montage->bEnableAutoBlendOut = true;
+    static_cast<UAnimCompositeBase*>(Montage)->UpdateCommonTargetFrameRate();
+    Montage->GetController().SetFrameRate(Plan.Timing.FrameRate);
+    Montage->SetCompositeLength(Plan.Timing.Length);
+    Montage->PostEditChange();
+    Montage->MarkPackageDirty();
+    return ValidateTimedSwordMontage(Montage, Attack, Recovery, ReleaseTime, Windup, RecoveryStart);
+}
+
+bool UWarriorAssetLibrary::ValidateTimedSwordMontage(UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float ReleaseTime, float Windup, float RecoveryStart)
+{
+    FWarriorTimedSwordMontagePlan Plan;
+    if (!BuildTimedSwordMontagePlan(Montage, Attack, Recovery, ReleaseTime, Windup, RecoveryStart, Plan)) return false;
+    const TArray<FAnimSegment>& Segments = Montage->SlotAnimTracks[0].AnimTrack.AnimSegments;
+    if (Segments.Num() != Plan.Segments.Num()) return Fail(TEXT("Timed sword montage must contain exactly three segments / 시간 조절 검 몽타주는 정확히 세 구간을 포함해야 합니다"));
+    for (int32 Index = 0; Index < Segments.Num(); ++Index)
+    {
+        const FAnimSegment& Actual = Segments[Index];
+        const FAnimSegment& Expected = Plan.Segments[Index];
+        if (Actual.GetAnimReference() != Expected.GetAnimReference() || Actual.StartPos != Expected.StartPos || Actual.AnimStartTime != Expected.AnimStartTime || Actual.AnimEndTime != Expected.AnimEndTime || Actual.AnimPlayRate != Expected.AnimPlayRate || Actual.LoopingCount != 1 || !FMath::IsNearlyEqual(Actual.GetEndPos(), Expected.GetEndPos(), 0.0001f))
+        {
+            UE_LOG(LogWarriorAssetLibrary, Error, TEXT("Timed sword segment mismatch / 시간 조절 검 구간 불일치: Montage=%s Index=%d Actual{Source=%s Start=%.9g TrimStart=%.9g TrimEnd=%.9g Rate=%.9g Loops=%d End=%.9g} Expected{Source=%s Start=%.9g TrimStart=%.9g TrimEnd=%.9g Rate=%.9g Loops=%d End=%.9g}"), *GetPathNameSafe(Montage), Index, *GetPathNameSafe(Actual.GetAnimReference()), Actual.StartPos, Actual.AnimStartTime, Actual.AnimEndTime, Actual.AnimPlayRate, Actual.LoopingCount, Actual.GetEndPos(), *GetPathNameSafe(Expected.GetAnimReference()), Expected.StartPos, Expected.AnimStartTime, Expected.AnimEndTime, Expected.AnimPlayRate, Expected.LoopingCount, Expected.GetEndPos());
+            return Fail(TEXT("Timed sword references, trims, rates or continuity differ / 시간 조절 검의 원본 참조·구간·배율·연속성이 다릅니다"));
+        }
+    }
+    if (Montage->RateScale != 1.f || Montage->BlendModeIn != EMontageBlendMode::Standard || Montage->BlendModeOut != EMontageBlendMode::Standard || !FMath::IsNearlyEqual(Montage->BlendIn.GetBlendTime(), 0.06f, 0.0001f) || !FMath::IsNearlyEqual(Montage->BlendOut.GetBlendTime(), 0.12f, 0.0001f) || Montage->BlendOutTriggerTime != -1.f || !Montage->bEnableAutoBlendOut) return Fail(TEXT("Timed sword montage blending or playback settings differ / 시간 조절 검 몽타주의 블렌딩 또는 재생 설정이 다릅니다"));
+    if (Montage->GetCommonTargetFrameRate() != Plan.Timing.FrameRate || Montage->GetSamplingFrameRate() != Plan.Timing.FrameRate || !FMath::IsNearlyEqual(Montage->GetPlayLength(), Plan.Timing.Length, 0.0001f) || !FMath::IsNearlyEqual(Montage->CalculateSequenceLength(), Plan.Timing.Length, 0.0001f)) return Fail(TEXT("Timed sword montage frame rate or stored length differs / 시간 조절 검 몽타주의 프레임 레이트 또는 저장 길이가 다릅니다"));
     return true;
 }
 

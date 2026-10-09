@@ -21,6 +21,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Controller/CombatDebugPlayerController.h"
 #include "DataAsset/EncounterDefinitionDataAsset.h"
+#include "DataAsset/CharacterAppearanceCatalog.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Dom/JsonObject.h"
 #include "Editor.h"
@@ -38,6 +39,8 @@
 #include "Game/GameModes/CombatDebugGameMode.h"
 #include "Game/Development/CombatDebugLoadout.h"
 #include "Game/Run/RunStateSubsystem.h"
+#include "Game/Run/RunEquipmentCatalog.h"
+#include "Game/Run/RunItemShopCatalog.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GAS/Attribute/AS_Unit.h"
 #include "GAS/CombatGameplayTags.h"
@@ -69,6 +72,7 @@
 #include "PlayInEditorDataTypes.h"
 #include "PhysicsEngine/PhysicsAsset.h"
 #include "PhysicsEngine/SkeletalBodySetup.h"
+#include "Profession/ProfessionBase.h"
 #include "RenderingThread.h"
 #include "Serialization/JsonSerializer.h"
 #include "Settings/LevelEditorPlaySettings.h"
@@ -77,6 +81,8 @@
 #include "TodoReviewWindowPlacement.h"
 #include "Unit/EnemyUnit.h"
 #include "Unit/UnitBase.h"
+#include "Unit/CharacterAppearanceComponent.h"
+#include "Unit/CharacterEquipmentComponent.h"
 #include "UnrealClient.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/Package.h"
@@ -120,6 +126,8 @@ struct FCase
     bool bNinjaShortPhases = false;
     bool bFocusedFinalBurstPhase = false;
     ENinjaVisibilityCondition NinjaVisibilityCondition = ENinjaVisibilityCondition::Baseline;
+    FName AppearanceBody;
+    FName EquipmentProfession;
 };
 
 TArray<FCase> MakeCases()
@@ -145,6 +153,35 @@ TArray<FCase> MakeCases()
     Cases.Add({TEXT("shield_Ground"), Root + TEXT("_LevelUpSpawn/DA_DrGame_LevelUpSpawn_Spawn_Ground_Root")});
     Cases.Add({TEXT("basic_Unarmed"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_DefaulatAttack"), FVector::ForwardVector, 0, false, false, false, false, true});
     Cases.Add({TEXT("basic_Melee"), TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack"), FVector::ForwardVector, 0, false, false, false, false, true});
+    return Cases;
+}
+
+TArray<FCase> MakeCastAnimationCases()
+{
+    TArray<FCase> Cases;
+    const FString Root = TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/");
+    auto Add = [&Cases](const FString& Label, const FString& Asset, FName Profession, bool bBasic, FName Body = TEXT("Male"))
+    {
+        FCase& Current = Cases.AddDefaulted_GetRef();
+        Current.Label = Label;
+        Current.Asset = Asset;
+        Current.bBasicAttack = bBasic;
+        Current.AppearanceBody = Body;
+        Current.EquipmentProfession = Profession;
+    };
+    const FString Sword = TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_MeleeAttack");
+    const FString Projectile = Root + TEXT("ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_FireBall");
+    const FString Support = Root + TEXT("_LevelUpSpawn/DA_DrGame_LevelUpSpawn_LevelUp_Ascend_Root");
+    Add(TEXT("sword_Male"), Sword, TEXT("Warrior"), true);
+    Add(TEXT("slash_Male"), Root + TEXT("SlashHitVFX/DA_DrGame_SlashHitVFX_Slash_Katana"), TEXT("Warrior"), false);
+    Add(TEXT("projectile_Male"), Projectile, TEXT("Mage"), false);
+    Add(TEXT("area_Male"), Root + TEXT("__AoeVFX/DA_DrGame_AoeVFX_AOE_BlazeBlast"), TEXT("Mage"), false);
+    Add(TEXT("heal_Male"), Support, TEXT("Mage"), false);
+    Add(TEXT("shield_Male"), Root + TEXT("_LevelUpSpawn/DA_DrGame_LevelUpSpawn_Spawn_Ground_Root"), TEXT("Mage"), false);
+    Add(TEXT("bow_Male"), Root + TEXT("ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_Arrow"), TEXT("Archer"), false);
+    Add(TEXT("sword_Female"), Sword, TEXT("Warrior"), true, TEXT("Female"));
+    Add(TEXT("projectile_Female"), Projectile, TEXT("Mage"), false, TEXT("Female"));
+    Add(TEXT("heal_Female"), Support, TEXT("Mage"), false, TEXT("Female"));
     return Cases;
 }
 
@@ -291,16 +328,16 @@ private:
 class FDirectionReview : public IAutomationLatentCommand
 {
 public:
-    FDirectionReview(FAutomationTestBase* InTest, const FString& InSlot, bool bInMonsters = false) : Test(InTest), SaveSlot(InSlot), Cases(bInMonsters ? TArray<FCase>() : MakeCases()), bMonsterReview(bInMonsters)
+    FDirectionReview(FAutomationTestBase* InTest, const FString& InSlot, bool bInMonsters = false, bool bInCastAnimations = false) : Test(InTest), SaveSlot(InSlot), Cases(bInCastAnimations ? MakeCastAnimationCases() : bInMonsters ? TArray<FCase>() : MakeCases()), bMonsterReview(bInMonsters), bCastAnimationReview(bInCastAnimations)
     {
-        bNinjaVisibilityReview = !bMonsterReview && FParse::Param(FCommandLine::Get(), TEXT("ProjectANinjaVisibilityReview"));
-        bFocusedReview = !bMonsterReview && (bNinjaVisibilityReview || FParse::Param(FCommandLine::Get(), TEXT("ProjectAVfxFocusedReview")));
-        bAuthoredChainReview = !bMonsterReview && !bFocusedReview && FParse::Param(FCommandLine::Get(), TEXT("ProjectAAuthoredChainReview"));
+        bNinjaVisibilityReview = !bMonsterReview && !bCastAnimationReview && FParse::Param(FCommandLine::Get(), TEXT("ProjectANinjaVisibilityReview"));
+        bFocusedReview = !bMonsterReview && !bCastAnimationReview && (bNinjaVisibilityReview || FParse::Param(FCommandLine::Get(), TEXT("ProjectAVfxFocusedReview")));
+        bAuthoredChainReview = !bMonsterReview && !bCastAnimationReview && !bFocusedReview && FParse::Param(FCommandLine::Get(), TEXT("ProjectAAuthoredChainReview"));
         bFinalSettlingReview = bMonsterReview && FParse::Param(FCommandLine::Get(), TEXT("ProjectARagdollFinalSettlingReview"));
         bSettlingReview = bMonsterReview && (bFinalSettlingReview || FParse::Param(FCommandLine::Get(), TEXT("ProjectARagdollSettlingReview")));
         if (bFocusedReview) Cases = bNinjaVisibilityReview ? MakeNinjaVisibilityCases() : MakeFocusedCases();
         if (bAuthoredChainReview) Cases.RemoveAll([](const FCase& Case) { return !Case.bChain; });
-        const FString ReviewFolder = bAuthoredChainReview ? TEXT("AuthoredChain") : bNinjaVisibilityReview ? TEXT("VfxNinjaVisibility") : bFocusedReview ? TEXT("VfxFocused") : bSettlingReview ? TEXT("MonsterSettling") : bMonsterReview ? TEXT("MonsterAttacks") : TEXT("VfxDirections");
+        const FString ReviewFolder = bCastAnimationReview ? TEXT("CastAnimations") : bAuthoredChainReview ? TEXT("AuthoredChain") : bNinjaVisibilityReview ? TEXT("VfxNinjaVisibility") : bFocusedReview ? TEXT("VfxFocused") : bSettlingReview ? TEXT("MonsterSettling") : bMonsterReview ? TEXT("MonsterAttacks") : TEXT("VfxDirections");
         FString ReviewRoot;
         if (!TodoReviewWindowPlacement::OutputRoot(Test, ReviewRoot))
         {
@@ -526,7 +563,7 @@ public:
 
 private:
     bool NeedsLateCaptures(const FCase& Current, const FCombatRoundSkill& Skill) const { return !Current.bChain && !Current.bBasicAttack && (Current.bFocusedExtraPhases || Current.bFalling || Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Shape_Area) || Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Heal) || Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Shield)); }
-    int32 CapturePlanCount(const FCase& Current, const FCombatRoundSkill& Skill) const { return Current.bChain ? (bAuthoredChainReview ? Skill.Chain.MaxTargets : 3) : Current.bMonster ? 3 : 2 + (NeedsLateCaptures(Current, Skill) ? 2 : 0) + (Current.bNinjaShortPhases ? 2 : 0) + (Current.bFocusedFinalBurstPhase ? 1 : 0) + (!Current.bBasicAttack && !Skill.ImpactVfx.Niagara.IsNull() ? 1 : 0); }
+    int32 CapturePlanCount(const FCase& Current, const FCombatRoundSkill& Skill) const { return bCastAnimationReview ? (Current.Label == TEXT("sword_Male") ? 4 : 3) : Current.bChain ? (bAuthoredChainReview ? Skill.Chain.MaxTargets : 3) : Current.bMonster ? 3 : 2 + (NeedsLateCaptures(Current, Skill) ? 2 : 0) + (Current.bNinjaShortPhases ? 2 : 0) + (Current.bFocusedFinalBurstPhase ? 1 : 0) + (!Current.bBasicAttack && !Skill.ImpactVfx.Niagara.IsNull() ? 1 : 0); }
     int32 AttackCaptureCount(const FCase& Current) const { return CapturePlanCount(Current, Definition); }
 
     bool PrepareFocusedView(AActor* Camera, const FVector& Focus)
@@ -978,7 +1015,12 @@ private:
 
     bool ExpandCatalog()
     {
-        if (bMonsterReview)
+        if (bCastAnimationReview)
+        {
+            FText Error;
+            if (!Check(Cases.Num() == 10 && RunItemShopCatalog::Load(CastEquipmentCatalog, Error), TEXT("Ten isolated animation cases use the current equipment catalog: ") + Error.ToString())) return false;
+        }
+        else if (bMonsterReview)
         {
             TArray<FName> Ids;
             TArray<FText> Names;
@@ -1051,9 +1093,10 @@ private:
                 FCombatRoundSkill Profile;
                 FText Error;
                 if (!Check(Data && Data->ResolveRoundSkill(Profile, Error), TEXT("Resolve the original per-case capture plan: ") + Current.Asset + TEXT("; ") + Error.ToString())) return false;
+                if (bCastAnimationReview && !Check(IsValid(Profile.CastMontage) && Profile.WindupSeconds > 0.f, TEXT("Each selected animation case has its authored cast montage and positive unchanged windup."))) return false;
                 PlannedCaptures += CapturePlanCount(Current, Profile);
             }
-            Test->AddInfo(FString::Printf(TEXT("Rendered capture plan: %d casts, %d PNG; preserve early observations, add active main phases at age 0.3/0.6 for target-centered effects and a real impact frame where authored."), Cases.Num(), PlannedCaptures));
+            Test->AddInfo(FString::Printf(TEXT("Rendered capture plan: %d casts, %d PNG; animation mode=%d. Animation captures observe casting, released recovery and restored home pose; other modes retain their authored particle-phase plan."), Cases.Num(), PlannedCaptures, bCastAnimationReview));
         }
         bCatalogExpanded = true;
         return true;
@@ -1078,6 +1121,42 @@ private:
     {
         const UAS_Unit* Attributes = Unit ? Unit->GetAttributeSet() : nullptr;
         return Attributes && Unit->ConfigureProfession(FMath::Max(Attributes->GetMaxHP(), ObservationMaxHP), Unit->GetMaxActionPoint(), Unit->GetMaxSubActionPoint(), Skills, Attributes->GetSpeed());
+    }
+
+    bool ConfigureCastPresentation()
+    {
+        if (!bCastAnimationReview) return true;
+        const FCase& Current = Cases[CaseIndex];
+        UCharacterAppearanceComponent* Appearance = Source->FindComponentByClass<UCharacterAppearanceComponent>();
+        UCharacterEquipmentComponent* Equipment = Source->FindComponentByClass<UCharacterEquipmentComponent>();
+        const UProfessionBase* Profession = UProfessionBase::FindProfession(Current.EquipmentProfession);
+        FCharacterAppearanceSelection Selection;
+        Selection.BodyId = Current.AppearanceBody;
+        const FCharacterAppearanceBodyVariant* Body = Appearance && Appearance->AppearanceCatalog ? Appearance->AppearanceCatalog->FindBodyVariant(Selection.BodyId) : nullptr;
+        if (!Check(Body && Equipment && Profession && Appearance->SetAppearance(Appearance->AppearanceCatalog, Selection) && Source->GetMesh()->GetSkeletalMeshAsset() == Body->Mesh.Get(), TEXT("The unsaved caster uses the selected original body through the production appearance API."))) return false;
+        // Initialize this new combat's empty debug inventory before granting its review equipment through the public API.
+        // 새 전투의 빈 디버그 인벤토리를 먼저 초기화한 뒤 공개 API로 검수 장비를 부여합니다.
+        UCombatDebugLoadout* Loadout = Controller->GetDebugLoadout();
+        const FCombatRoundUnitView* UnitView = Controller->GetRoundCoordinator()->GetView().Units.FindByPredicate([this](const FCombatRoundUnitView& Entry) { return Entry.Unit == Source; });
+        if (!Check(Loadout && UnitView && Loadout->GetEquipmentMember(UnitView->UnitId), TEXT("The current combat owns its initialized transient equipment inventory before visual setup."))) return false;
+        const int32 SourceId = UnitView->UnitId;
+        CastEquipmentVisuals.Reset();
+        for (const FRunStartingEquipment& Starting : Profession->StartingEquipment)
+        {
+            const FRunItemDefinition* Item = CastEquipmentCatalog.FindByPredicate([&Starting](const FRunItemDefinition& Candidate) { return Candidate.Asset == Starting.Asset; });
+            const FRunEquipmentProfile* Profile = Item ? URunEquipmentCatalog::Get().ResolveProfile(*Item) : nullptr;
+            FRunEquipmentVisual Visual;
+            Visual.Asset = Starting.Asset;
+            const FGameplayTag Slot = Profile ? URunEquipmentCatalog::ResolveSlot(*Profile, Starting.SlotTag) : FGameplayTag();
+            if (!Check(Profile && URunEquipmentCatalog::GetAttachment(*Profile, Slot, Visual.SocketName, Visual.RelativeTransform), TEXT("The unchanged profession's original starting mesh resolves its actual supported equipment attachment."))) return false;
+            FText Error;
+            if (!Check(Loadout->GrantEquipment(Controller, SourceId, Starting.Asset, Starting.SlotTag, Error), TEXT("The official debug equipment command grants the original starting item: ") + Error.ToString())) return false;
+            CastEquipmentVisuals.Add(Visual);
+        }
+        TArray<TSharedPtr<FJsonValue>> ActualEquipment;
+        if (!Check(!CastEquipmentVisuals.IsEmpty(), TEXT("The animation fixture requests at least one real item.")) || !ReadCastEquipment(ActualEquipment, false)) return false;
+        ExpectedCastMontage = Source->ResolveRoundCastMontage(Definition.CastMontage);
+        return Check(ExpectedCastMontage.IsValid() && Source->GetMesh()->GetAnimInstance() && Source->GetMesh()->DoesSocketExist(TEXT("hand_l")) && Source->GetMesh()->DoesSocketExist(TEXT("hand_r")), TEXT("The selected body resolves a live animation instance, authored montage and both actual hand sockets."));
     }
 
     void MoveFixtureActor(AActor* Actor, const FTransform& Transform)
@@ -1308,6 +1387,7 @@ private:
         Manager->StartCombat_Internal();
         Controller->SetCombatContext(Manager, true);
         if (!Check(Manager->IsCombatActive() && Controller->GetRoundCoordinator() && Controller->GetRoundCoordinator()->GetView().Phase == ECombatRoundPhase::Planning, TEXT("The official manager initializes an owned planning round for the geometry fixture."))) return false;
+        if (!ConfigureCastPresentation()) return false;
         if (Current.bLargeWorld)
         {
             for (AUnitBase* Unit : Units)
@@ -1319,8 +1399,9 @@ private:
         AActor* Camera = Controller->GetViewTarget();
         if (!Check(IsValid(Camera), TEXT("The actual gameplay camera remains the rendering view target."))) return false;
         const FVector Focus = Current.bCardinal ? (Source->GetActorLocation() + Enemies[bAuthoredChainReview ? 3 : 2]->GetActorLocation()) * 0.5 : (Source->GetActorLocation() + Enemies[Current.TargetIndex]->GetActorLocation()) * 0.5;
-        const FVector CameraPosition = Focus + FVector(-1000, -1200, 1200);
-        MoveFixtureActor(Camera, FTransform((Focus - CameraPosition).Rotation(), CameraPosition, Camera->GetActorScale3D()));
+        CastCameraFocus = Focus + (bCastAnimationReview ? FVector(0, 0, 30) : FVector::ZeroVector);
+        const FVector CameraPosition = CastCameraFocus + (bCastAnimationReview ? FVector(-450, -600, 400) : FVector(-1000, -1200, 1200));
+        MoveFixtureActor(Camera, FTransform((CastCameraFocus - CameraPosition).Rotation(), CameraPosition, Camera->GetActorScale3D()));
         UGameViewportClient* Viewport = Controller->GetWorld()->GetGameViewport();
         const TSharedPtr<SViewport> Widget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
         const TSharedPtr<SWindow> Window = Widget.IsValid() ? FSlateApplication::Get().FindWidgetWindow(Widget.ToSharedRef()) : nullptr;
@@ -1339,6 +1420,7 @@ private:
         InitialAP = Source->GetCurrentActionPoint();
         InitialRound = Controller->GetRoundCoordinator()->GetView().RoundNumber;
         ResetLiveObservations();
+        CastHomeTransform = Source->GetActorTransform();
         if (!PrepareFocusedView(Camera, Focus)) return false;
         if (!Definition.Vfx.Niagara.IsNull()) Definition.Vfx.Niagara.LoadSynchronous();
         if (!Definition.ImpactVfx.Niagara.IsNull()) Definition.ImpactVfx.Niagara.LoadSynchronous();
@@ -1363,6 +1445,12 @@ private:
         FocusedMaxLODDistance = 0.f;
         bImpactCaptureQueued = false;
         CaseCaptureRecords.Reset();
+        CastPoseSamples.Reset();
+        CastCapturesQueued = 0;
+        CastOverviewStartedAt = LastCastObservedWorldTime = -1.0;
+        MaxCastHandDisplacement = 0.0;
+        LastCastMontagePosition = -1.f;
+        bSawExpectedCastMontage = bSawCastRecovery = false;
         NinjaVisibilityDiagnostics.Reset();
         LastNinjaDiagnosticAge = -1.f;
         MaxAge = FirstParticleAge = 0.f;
@@ -1399,6 +1487,12 @@ private:
 
     bool ExecuteCase()
     {
+        if (bCastAnimationReview)
+        {
+            const USkeletalMeshComponent* Mesh = Source->GetMesh();
+            CastInitialLeftHand = Mesh->GetSocketTransform(TEXT("hand_l"), RTS_Component).GetLocation();
+            CastInitialRightHand = Mesh->GetSocketTransform(TEXT("hand_r"), RTS_Component).GetLocation();
+        }
         for (TObjectIterator<UNiagaraComponent> It; It; ++It)
         {
             if (It->GetWorld() == Controller->GetWorld() && It->GetAsset() == Definition.ImpactVfx.Niagara.Get()) PriorImpactComponents.Add(*It);
@@ -1577,7 +1671,7 @@ private:
                 Test->AddInfo(FString::Printf(TEXT("%s impact%d: system=%s; position=%s; age=%.3f; particles=%d."), *Cases[CaseIndex].Label, ImpactInstances.Num(), *Component->GetAsset()->GetPathName(), *Component->GetComponentLocation().ToString(), Instance->GetAge(), Particles));
             }
             MaxImpactParticles = FMath::Max(MaxImpactParticles, Particles);
-            if (!Cases[CaseIndex].bChain && !Cases[CaseIndex].bBasicAttack && !bImpactCaptureQueued && Instance->GetAge() >= 0.05f && PendingScreenshot.IsEmpty()) bImpactCaptureQueued = QueueCapture(TEXT("actual_impact"), Instance->GetAge());
+            if (!bCastAnimationReview && !Cases[CaseIndex].bChain && !Cases[CaseIndex].bBasicAttack && !bImpactCaptureQueued && Instance->GetAge() >= 0.05f && PendingScreenshot.IsEmpty()) bImpactCaptureQueued = QueueCapture(TEXT("actual_impact"), Instance->GetAge());
         }
         return true;
     }
@@ -1720,6 +1814,131 @@ private:
         return true;
     }
 
+    bool ReadCastEquipment(TArray<TSharedPtr<FJsonValue>>& OutEquipment, bool bRequireRendered)
+    {
+        TInlineComponentArray<UMeshComponent*> Meshes(Source);
+        for (const FRunEquipmentVisual& Visual : CastEquipmentVisuals)
+        {
+            UMeshComponent* Found = nullptr;
+            int32 Matches = 0;
+            for (UMeshComponent* Component : Meshes)
+            {
+                if (!IsValid(Component) || !Source->GetInstanceComponents().Contains(Component)) continue;
+                const UStaticMeshComponent* Static = Cast<UStaticMeshComponent>(Component);
+                const USkeletalMeshComponent* Skeletal = Cast<USkeletalMeshComponent>(Component);
+                const UObject* Asset = Static ? static_cast<const UObject*>(Static->GetStaticMesh()) : Skeletal ? static_cast<const UObject*>(Skeletal->GetSkeletalMeshAsset()) : nullptr;
+                if (!Asset || FSoftObjectPath(Asset) != Visual.Asset) continue;
+                Found = Component;
+                ++Matches;
+            }
+            if (!Check(Matches == 1 && Found && Found->IsRegistered() && Found->IsVisible() && !Found->bHiddenInGame && !Source->IsHidden() && Found->GetAttachParent() == Source->GetMesh() && Found->GetAttachSocketName() == Visual.SocketName && Found->GetRelativeTransform().Equals(Visual.RelativeTransform, 0.001), TEXT("Exactly one registered, visible original equipment component retains its real body socket and catalog transform: ") + Visual.Asset.ToString())) return false;
+            const FTransform ExpectedWorld = Visual.RelativeTransform * Source->GetMesh()->GetSocketTransform(Visual.SocketName);
+            if (!Check(!Found->GetComponentTransform().ContainsNaN() && Found->GetComponentTransform().Equals(ExpectedWorld, 0.1) && FMath::IsFinite(Found->Bounds.SphereRadius) && Found->Bounds.SphereRadius > 0.f && (!bRequireRendered || Found->WasRecentlyRendered(0.25f)), TEXT("The actual equipment follows the current hand pose with finite geometry and is recently rendered for requested PNGs."))) return false;
+            TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
+            Entry->SetStringField(TEXT("component"), Found->GetPathName());
+            Entry->SetStringField(TEXT("original_mesh"), Visual.Asset.ToString());
+            Entry->SetStringField(TEXT("socket"), Found->GetAttachSocketName().ToString());
+            Entry->SetStringField(TEXT("actual_world_transform"), Found->GetComponentTransform().ToString());
+            Entry->SetStringField(TEXT("actual_bounds_origin"), Found->Bounds.Origin.ToString());
+            Entry->SetStringField(TEXT("actual_bounds_extent"), Found->Bounds.BoxExtent.ToString());
+            Entry->SetBoolField(TEXT("registered_visible_attached"), true);
+            Entry->SetBoolField(TEXT("recently_rendered"), Found->WasRecentlyRendered(0.25f));
+            OutEquipment.Add(MakeShared<FJsonValueObject>(Entry));
+        }
+        return true;
+    }
+
+    TSharedPtr<FJsonObject> ReadCastPose(bool bRequireFraming)
+    {
+        USkeletalMeshComponent* Mesh = Source->GetMesh();
+        UAnimInstance* Animation = Mesh ? Mesh->GetAnimInstance() : nullptr;
+        const FCombatRoundView& View = Controller->GetRoundCoordinator()->GetView();
+        const FCombatRoundUnitView* Body = View.Units.FindByPredicate([this](const FCombatRoundUnitView& Unit) { return Unit.Unit == Source; });
+        if (!Check(Mesh && Animation && Body && ExpectedCastMontage.IsValid(), TEXT("Animation observation retains the actual caster, montage and public round view."))) return nullptr;
+        const bool bActive = Animation->Montage_IsActive(ExpectedCastMontage.Get());
+        TSharedRef<FJsonObject> Sample = MakeShared<FJsonObject>();
+        Sample->SetNumberField(TEXT("world_seconds"), Controller->GetWorld()->GetTimeSeconds());
+        Sample->SetNumberField(TEXT("engine_frame"), static_cast<double>(GFrameCounter));
+        Sample->SetNumberField(TEXT("round"), View.RoundNumber);
+        Sample->SetNumberField(TEXT("action_phase"), static_cast<int32>(Body->ActionPhase));
+        Sample->SetBoolField(TEXT("expected_montage_active"), bActive);
+        Sample->SetNumberField(TEXT("montage_position_seconds"), bActive ? Animation->Montage_GetPosition(ExpectedCastMontage.Get()) : -1.f);
+        Sample->SetStringField(TEXT("body_mesh"), Mesh->GetSkeletalMeshAsset()->GetPathName());
+        Sample->SetStringField(TEXT("body_location"), Source->GetActorLocation().ToString());
+        Sample->SetStringField(TEXT("body_rotation"), Source->GetActorRotation().ToString());
+        Sample->SetNumberField(TEXT("gas_effects_observed"), AppliedEffects);
+        TArray<TSharedPtr<FJsonValue>> Equipment;
+        if (!ReadCastEquipment(Equipment, bRequireFraming)) return nullptr;
+        Sample->SetArrayField(TEXT("actual_equipment_components"), Equipment);
+        for (const FName Socket : {FName(TEXT("hand_l")), FName(TEXT("hand_r")), FName(TEXT("head"))})
+        {
+            const FTransform Transform = Mesh->GetSocketTransform(Socket);
+            FVector2D Screen;
+            const bool bProjected = Controller->ProjectWorldLocationToScreen(Transform.GetLocation(), Screen, true);
+            const bool bInFrame = bProjected && Screen.X >= 16.0 && Screen.X <= 1264.0 && Screen.Y >= 16.0 && Screen.Y <= 704.0;
+            if (!Check(Mesh->DoesSocketExist(Socket) && !Transform.ContainsNaN() && (!bRequireFraming || bInFrame), TEXT("The actual hand/head pose is finite and requested captures keep its projection inside the viewport: ") + Socket.ToString())) return nullptr;
+            Sample->SetStringField(Socket.ToString() + TEXT("_world_transform"), Transform.ToString());
+            Sample->SetStringField(Socket.ToString() + TEXT("_screen"), bProjected ? Screen.ToString() : TEXT("not projected"));
+        }
+        return Sample;
+    }
+
+    bool ObserveCastAnimation()
+    {
+        UAnimInstance* Animation = Source->GetMesh()->GetAnimInstance();
+        const FCombatRoundView& View = Controller->GetRoundCoordinator()->GetView();
+        const FCombatRoundUnitView* Body = View.Units.FindByPredicate([this](const FCombatRoundUnitView& Unit) { return Unit.Unit == Source; });
+        if (!Check(Animation && Body && ExpectedCastMontage.IsValid(), TEXT("Natural animation observation retains its live instance and source unit."))) return false;
+        const bool bActive = Animation->Montage_IsActive(ExpectedCastMontage.Get());
+        const float Position = bActive ? Animation->Montage_GetPosition(ExpectedCastMontage.Get()) : -1.f;
+        const double WorldTime = Controller->GetWorld()->GetTimeSeconds();
+        if (bActive)
+        {
+            if (!Check(Position + 0.001f >= LastCastMontagePosition, TEXT("The expected montage advances naturally without seeking or restarting."))) return false;
+            LastCastMontagePosition = Position;
+            bSawExpectedCastMontage = true;
+            bSawCastRecovery |= Body->ActionPhase == ECombatRoundActionPhase::Recovery;
+            const USkeletalMeshComponent* Mesh = Source->GetMesh();
+            MaxCastHandDisplacement = FMath::Max(MaxCastHandDisplacement, FMath::Max(FVector::Distance(CastInitialLeftHand, Mesh->GetSocketTransform(TEXT("hand_l"), RTS_Component).GetLocation()), FVector::Distance(CastInitialRightHand, Mesh->GetSocketTransform(TEXT("hand_r"), RTS_Component).GetLocation())));
+        }
+        if (WorldTime > LastCastObservedWorldTime && CastPoseSamples.Num() < 256)
+        {
+            const TSharedPtr<FJsonObject> Sample = ReadCastPose(false);
+            if (!Sample.IsValid()) return false;
+            CastPoseSamples.Add(MakeShared<FJsonValueObject>(Sample));
+            LastCastObservedWorldTime = WorldTime;
+        }
+        if (!PendingScreenshot.IsEmpty()) return true;
+        const bool bReturnedHome = View.RoundNumber > InitialRound && !bActive && Source->GetActorLocation().Equals(CastHomeTransform.GetLocation(), 2.0) && Source->GetActorQuat().Equals(CastHomeTransform.GetRotation(), 0.01);
+        // Capture only naturally reached phases; missed short phases fail instead of seeking or slowing the montage.
+        // 자연 재생으로 도달한 단계만 캡처하며 짧은 구간을 놓치면 몽타주 탐색·감속 대신 실패로 기록합니다.
+        if (CastCapturesQueued == 0 && bActive && Body->ActionPhase == ECombatRoundActionPhase::Casting && Position >= FMath::Min(0.1f, Definition.WindupSeconds * 0.4f))
+        {
+            if (QueueCapture(TEXT("casting"), Position)) ++CastCapturesQueued;
+        }
+        else if (CastCapturesQueued == 1 && bActive && Body->ActionPhase == ECombatRoundActionPhase::Recovery)
+        {
+            if (QueueCapture(TEXT("released_recovery"), Position)) ++CastCapturesQueued;
+        }
+        else if (CastCapturesQueued == 2 && bReturnedHome)
+        {
+            if (QueueCapture(TEXT("returned_home"), Position)) ++CastCapturesQueued;
+        }
+        else if (CastCapturesQueued == 3 && CaseIndex == 0 && bReturnedHome)
+        {
+            if (CastOverviewStartedAt < 0.0)
+            {
+                AActor* Camera = Controller->GetViewTarget();
+                if (!Check(IsValid(Camera), TEXT("The overview retains the real debug combat camera."))) return false;
+                const FVector PositionWide = CastCameraFocus + FVector(-1000, -1200, 1200);
+                MoveFixtureActor(Camera, FTransform((CastCameraFocus - PositionWide).Rotation(), PositionWide, Camera->GetActorScale3D()));
+                CastOverviewStartedAt = WorldTime;
+            }
+            else if (WorldTime - CastOverviewStartedAt >= 0.2 && QueueCapture(TEXT("debug_combat_overview"), Position)) ++CastCapturesQueued;
+        }
+        return !bCaptureFailed;
+    }
+
     bool ObserveLiveEffect()
     {
         if (Cases[CaseIndex].bMonster) return ObserveMonsterAttack() && ObserveImpacts();
@@ -1790,6 +2009,7 @@ private:
         if (!ObserveImpacts()) return false;
         MaxParticles = FMath::Max(MaxParticles, Particles);
         MaxAge = FMath::Max(MaxAge, Age);
+        if (bCastAnimationReview) return ObserveCastAnimation();
         if (Cases[CaseIndex].bChain || !PendingScreenshot.IsEmpty()) return true;
         const bool bRenderable = Cases[CaseIndex].bBasicAttack ? bMontagePlaying : Particles > 0;
         const float ObservationAge = Cases[CaseIndex].bBasicAttack ? static_cast<float>(FPlatformTime::Seconds() - StageStarted) : Age;
@@ -1848,6 +2068,11 @@ private:
         bool bValid = Check(CapturedThisCase + DeferredPhases.Num() == AttackCaptureCount(Current), bFocusedReview ? TEXT("Every focused PNG request is captured during natural playback or explicitly deferred without claiming visual completion.") : TEXT("The case has every requested completed PNG from the live game viewport."));
         bValid &= Check(bOriginalGasContext && AppliedEffects > 0, TEXT("Every applied GAS spec retains the original caster as instigator and source object."));
         bValid &= Check(FCombatRoundSkill::StaticStruct()->CompareScriptStruct(&AuthoredSkill->RoundDefinition, &OriginalAuthoredDefinition, 0), TEXT("The authored DataAsset remains identical after the transient test."));
+        if (bCastAnimationReview)
+        {
+            bValid &= Check(bSawExpectedCastMontage && bSawCastRecovery && MaxCastHandDisplacement > 1.0 && CastCapturesQueued == AttackCaptureCount(Current), TEXT("The authored montage moves actual hand bones, reaches released recovery and completes every natural-phase capture."));
+            bValid &= Check(Source->GetActorLocation().Equals(CastHomeTransform.GetLocation(), 2.0) && Source->GetActorQuat().Equals(CastHomeTransform.GetRotation(), 0.01) && Source->GetCurrentTile() && Source->GetCurrentTile()->GetOccupyingUnit() == Source && !Source->GetMesh()->GetAnimInstance()->Montage_IsActive(ExpectedCastMontage.Get()), TEXT("The animation finishes with original home location, facing, tile occupancy and no retained cast montage."));
+        }
         if (Current.bBasicAttack) bValid &= Check(bSawMontage && bOrientationVerified, TEXT("The retained basic or original monster attack plays its authored character montage toward the actual target."));
         else bValid &= Check(bSawActive && bSawReady && MaxParticles > 0 && MaxAge > 0.f, TEXT("The original main VFX has active, ready, advancing real-frame particle simulation."));
         if (bFocusedReview)
@@ -1892,6 +2117,26 @@ private:
         Record->SetStringField(TEXT("impact_niagara"), Definition.ImpactVfx.Niagara.ToSoftObjectPath().ToString());
         Record->SetNumberField(TEXT("paid_ap_cost"), Definition.ActionPointCost);
         Record->SetBoolField(TEXT("original_gas_caster"), bOriginalGasContext);
+        if (bCastAnimationReview)
+        {
+            Record->SetStringField(TEXT("selected_body"), Current.AppearanceBody.ToString());
+            Record->SetStringField(TEXT("equipment_profession"), Current.EquipmentProfession.ToString());
+            Record->SetStringField(TEXT("resolved_cast_montage"), ExpectedCastMontage->GetPathName());
+            Record->SetNumberField(TEXT("authored_windup_seconds"), Definition.WindupSeconds);
+            Record->SetNumberField(TEXT("montage_play_length_seconds"), ExpectedCastMontage->GetPlayLength());
+            Record->SetNumberField(TEXT("max_hand_displacement_in_mesh_space_cm"), MaxCastHandDisplacement);
+            Record->SetArrayField(TEXT("natural_pose_samples"), CastPoseSamples);
+            TArray<TSharedPtr<FJsonValue>> EquipmentRecords;
+            for (const FRunEquipmentVisual& Visual : CastEquipmentVisuals)
+            {
+                TSharedRef<FJsonObject> EquipmentRecord = MakeShared<FJsonObject>();
+                EquipmentRecord->SetStringField(TEXT("original_mesh"), Visual.Asset.ToString());
+                EquipmentRecord->SetStringField(TEXT("socket"), Visual.SocketName.ToString());
+                EquipmentRecord->SetStringField(TEXT("relative_transform"), Visual.RelativeTransform.ToString());
+                EquipmentRecords.Add(MakeShared<FJsonValueObject>(EquipmentRecord));
+            }
+            Record->SetArrayField(TEXT("production_equipment_attachments"), EquipmentRecords);
+        }
         if (Current.bMonster)
         {
             Record->SetStringField(TEXT("monster_class"), Current.MonsterClass);
@@ -2014,6 +2259,19 @@ private:
                 TSharedRef<FJsonObject> CaptureRecord = MakeShared<FJsonObject>();
                 CaptureRecord->SetStringField(TEXT("file"), PendingScreenshot);
                 CaptureRecord->SetNumberField(TEXT("observed_age"), PendingAge);
+                if (bCastAnimationReview)
+                {
+                    const TSharedPtr<FJsonObject> Pose = ReadCastPose(true);
+                    if (!Pose.IsValid()) bCaptureFailed = true;
+                    else
+                    {
+                        CaptureRecord->SetObjectField(TEXT("render_frame_pose"), Pose);
+                        const bool bActive = Pose->GetBoolField(TEXT("expected_montage_active"));
+                        const int32 Phase = static_cast<int32>(Pose->GetNumberField(TEXT("action_phase")));
+                        const bool bExpectedPhase = PendingScreenshot.EndsWith(TEXT("_casting.png")) ? bActive && Phase == static_cast<int32>(ECombatRoundActionPhase::Casting) : PendingScreenshot.EndsWith(TEXT("_released_recovery.png")) ? bActive && Phase == static_cast<int32>(ECombatRoundActionPhase::Recovery) : !bActive && Pose->GetNumberField(TEXT("round")) > InitialRound;
+                        if (!Check(bExpectedPhase, TEXT("The rendered frame still observes the requested natural animation phase; a missed phase is not counted as visual proof."))) bCaptureFailed = true;
+                    }
+                }
                 CaseCaptureRecords.Add(MakeShared<FJsonValueObject>(CaptureRecord));
                 Test->AddInfo(FString::Printf(TEXT("Rendered VFX PNG: %s; particle observation age=%.3f."), *PendingScreenshot, PendingAge));
             }
@@ -2065,6 +2323,12 @@ private:
         Summary->SetNumberField(TEXT("planned_captures"), PlannedCaptures);
         Summary->SetNumberField(TEXT("completed_captures"), CompletedCaptures);
         Summary->SetBoolField(TEXT("focusScope"), bFocusedReview);
+        Summary->SetBoolField(TEXT("cast_animation_review"), bCastAnimationReview);
+        if (bCastAnimationReview)
+        {
+            Summary->SetArrayField(TEXT("current_cast_capture_phases"), CaseCaptureRecords);
+            Summary->SetArrayField(TEXT("current_cast_pose_samples"), CastPoseSamples);
+        }
         Summary->SetBoolField(TEXT("ninja_visibility_review"), bNinjaVisibilityReview);
         if (bNinjaVisibilityReview) Summary->SetArrayField(TEXT("current_ninja_visibility_diagnostics"), NinjaVisibilityDiagnostics);
         if (bFocusedReview)
@@ -2078,6 +2342,7 @@ private:
         Summary->SetStringField(TEXT("optional_audio_environment"), TEXT("Recording only: temporarily set official au.DisableAppVolume and au.NeverDisableSubmixes with console value/priority restoration; wait for the audio-thread start fence, actual master-submix sample callbacks and one real second before casting. Source audio, saved editor settings and FApp unfocused-volume configuration remain unchanged. Live device/listener/sound diagnostics and PCM signal analysis are separate from listening quality."));
         Summary->SetStringField(TEXT("scope"), bMonsterReview ? TEXT("Original 12 monster classes plus the retained skeleton; real enemy AI, authored montage, approach, recovery, GAS and AP; subsequent lethal GAS ragdoll, tile release and Restart restores the original single-enemy roster with 10,000 current/maximum HP on both units. Preserve four early PNG and add a fifth at 2.5 actual world seconds with finite physical body velocities and awake state. A late sample does not establish final settling or floor penetration. Transient actors and human observation HP only; original physics, assets and saves stay unchanged. PNG review remains required for body pose and floor contact; audio listening, FPS and multiplayer are not measured.") : TEXT("Rendered local standalone PIE; preserve the 39 casts and append 48 distinct official DrGame assets. All 60 DrGame plus two retained human attacks. Original early observations plus required active main ages 0.3/0.6 for falling/area/healing/shield and actual impact PNG where authored; per-case phase ages are recorded. Chain capture starts at live age 0.15. Transient chain prototype=3/400cm/0.4s/1. PNG review remains required for visible direction and floor height; audio listening, FPS baseline and multiplayer are not measured."));
         if (bFocusedReview) Summary->SetStringField(TEXT("scope"), Summary->GetStringField(TEXT("focused_scope")));
+        if (bCastAnimationReview) Summary->SetStringField(TEXT("scope"), TEXT("Ten current weapon-skill sword (Weapons/DA_MeleeAttack), slash, projectile/area magic, healing, shield and bow casts; seven Male and three Female original body selections. The retained legacy BPDA_swoard_attack trace is outside this animation mode. Real profession starting equipment and catalog attachments; natural SubmitPlan/Ready/GAS and animation ticks. Casting, released recovery and returned-home PNGs plus one existing-distance DebugCombat overview. Actual montage, head/hand transforms and projections are recorded at rendered-frame capture; missed phases fail without seeking or timing overrides. Close-up camera and passive 10,000-HP debug opponents are transient. No Run/user-save changes. DebugCombat UI is not normal Run HUD; screenshot inspection is required for grip, silhouette, clipping and aesthetic quality. Network, all item meshes and legacy SkeletonGuard are outside this rendered scope."));
         if (bAuthoredChainReview) Summary->SetStringField(TEXT("scope"), TEXT("All five authored chain DataAssets, four directions and LWC, four real targets each: 25 casts and 100 rendered captures, with every early segment sampled from age 0.08 before its hit removes or replaces the main beam. Original saved 4/600cm/0.4s/0.8 settings execute without a profile override; nearest unhit order, original-caster GAS attenuation, one AP payment, endpoint tracking, immediate previous-main-VFX removal, all main VFX absent after completion and main audio first-segment-only flags are checked. Optional actual submix recording is separate from individual listening quality. Original assets and saves remain unchanged."));
         if (bSettlingReview)
         {
@@ -2179,6 +2444,21 @@ private:
     TWeakObjectPtr<ACombatGridTile> DeathHomeTile;
     TArray<FString> DefaultEnemyClasses;
     TWeakObjectPtr<UAnimMontage> ExpectedMonsterMontage;
+    TWeakObjectPtr<UAnimMontage> ExpectedCastMontage;
+    TArray<FRunItemDefinition> CastEquipmentCatalog;
+    TArray<FRunEquipmentVisual> CastEquipmentVisuals;
+    TArray<TSharedPtr<FJsonValue>> CastPoseSamples;
+    FTransform CastHomeTransform = FTransform::Identity;
+    FVector CastCameraFocus = FVector::ZeroVector;
+    FVector CastInitialLeftHand = FVector::ZeroVector;
+    FVector CastInitialRightHand = FVector::ZeroVector;
+    double LastCastObservedWorldTime = -1.0;
+    double CastOverviewStartedAt = -1.0;
+    double MaxCastHandDisplacement = 0.0;
+    float LastCastMontagePosition = -1.f;
+    int32 CastCapturesQueued = 0;
+    bool bSawExpectedCastMontage = false;
+    bool bSawCastRecovery = false;
     FVector OriginalMonsterPosition = FVector::ZeroVector;
     FQuat OriginalMonsterRotation = FQuat::Identity;
     TArray<int32> ChainHitIds;
@@ -2275,6 +2555,7 @@ private:
     bool bFinalSettled = false;
     bool bCatalogExpanded = false;
     bool bMonsterReview = false;
+    bool bCastAnimationReview = false;
     bool bFocusedReview = false;
     bool bAuthoredChainReview = false;
     bool bNinjaVisibilityReview = false;
@@ -2327,6 +2608,40 @@ bool FTodoVfxDirectionsPIETest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The approved render scope contains exactly 39 casts."), TodoVfxDirections::MakeCases().Num(), 39);
     ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Development/DebugCombat")));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<TodoVfxDirections::FDirectionReview>(this, Slot));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTodoCastAnimationsPIETest, "ProjectA.TodoReview.CastAnimations", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTodoCastAnimationsPIETest::RunTest(const FString& Parameters)
+{
+    if (!GEditor || !GEngine || !FApp::CanEverRender() || !FSlateApplication::IsInitialized() || FParse::Param(FCommandLine::Get(), TEXT("nullrhi")))
+    {
+        AddError(TEXT("Cast animation review requires a real rendering editor viewport."));
+        return false;
+    }
+    for (const FWorldContext& Context : GEngine->GetWorldContexts())
+    {
+        if (Context.WorldType == EWorldType::PIE)
+        {
+            AddError(TEXT("Close existing PIE before the isolated animation review."));
+            return false;
+        }
+    }
+    const FString Slot = URunStateSubsystem::ResolveCheckpointSlot(FCommandLine::Get());
+    const FString Prefix = TEXT("ProjectA_Automation_TodoReview_");
+    bool bSuffixValid = Slot.Len() > Prefix.Len();
+    for (TCHAR Character : Slot.Mid(Prefix.Len()))
+    {
+        if (!FChar::IsAlnum(Character) && Character != TEXT('_')) bSuffixValid = false;
+    }
+    if (!Slot.StartsWith(Prefix) || !bSuffixValid || UGameplayStatics::DoesSaveGameExist(Slot, 0))
+    {
+        AddError(TEXT("Supply a fresh -ProjectASaveSlot=ProjectA_Automation_TodoReview_<suffix>; existing user saves are preserved."));
+        return false;
+    }
+    ADD_LATENT_AUTOMATION_COMMAND(FEditorLoadMap(TEXT("/Game/User_JeHoon/LEVEL/Development/DebugCombat")));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<TodoVfxDirections::FDirectionReview>(this, Slot, false, true));
     return true;
 }
 

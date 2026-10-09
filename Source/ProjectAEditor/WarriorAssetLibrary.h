@@ -69,6 +69,11 @@ public:
     UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
     static TArray<UAnimSequenceBase*> GetMontageAnimations(UAnimMontage* Montage);
 
+    // Expose current animation-model local keys to Python without relying on removed raw-track storage.
+    // 제거된 원시 트랙 저장 방식에 의존하지 않고 현재 애니메이션 모델의 로컬 키를 Python에 제공합니다.
+    UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
+    static TArray<FTransform> GetAnimationBoneTrackTransforms(UAnimSequence* Sequence, FName BoneName);
+
     // Author only the destination montage, preserving native source sequences and their skeleton.
     // 대상 몽타주만 작성하며 원본 시퀀스와 해당 스켈레톤을 보존합니다.
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
@@ -84,6 +89,14 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
     static bool ValidateTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime, float ReleaseStartTime, float ReleaseEndTime, float DrawDuration);
+
+    // Align the sword release with its windup while preserving the remaining attack and separate recovery at their original rates.
+    // 검의 발동을 선딜에 맞추고 남은 공격과 별도 복귀 동작은 원래 속도로 보존합니다.
+    UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
+    static bool ConfigureTimedSwordMontage(UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float ReleaseTime, float Windup, float RecoveryStart);
+
+    UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
+    static bool ValidateTimedSwordMontage(UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float ReleaseTime, float Windup, float RecoveryStart);
 
     UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
     static bool IsOutputSlotConnected(UAnimBlueprint* Blueprint, FName SlotName);

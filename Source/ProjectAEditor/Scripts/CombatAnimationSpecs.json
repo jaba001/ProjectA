@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "skill_count": 59,
+  "groups": [
+    {
+      "source": "GreystoneManny/Attack/Attack_A_Med",
+      "montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_SwordSkillCast",
+      "profiles": [
+        "slash"
+      ],
+      "prepare_start": 0.0,
+      "release_at": 0.26666666666666666,
+      "end": 0.8,
+      "windup": 0.3,
+      "recovery": "GreystoneManny/Attack/Attack_A_Slow_Recovery",
+      "recovery_start": 0.0,
+      "previous_montages": [
+        "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/KwangManny/Attack/AM_SwordSkillCast"
+      ]
+    },
+    {
+      "source": "GreystoneManny/Attack/Attack_A_Med",
+      "montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_MeleeAttack",
+      "profiles": [
+        "weapon_melee"
+      ],
+      "prepare_start": 0.0,
+      "release_at": 0.26666666666666666,
+      "end": 0.8,
+      "windup": 0.23,
+      "recovery": "GreystoneManny/Attack/Attack_A_Slow_Recovery",
+      "recovery_start": 0.0,
+      "previous_montages": [
+        "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/KwangManny/Attack/AM_SwordAttack"
+      ],
+      "prepare_duration": 0.23333333333333334
+    },
+    {
+      "source": "GideonManny/Attack/Primary_Attack_A_Medium",
+      "montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
+      "profiles": [
+        "projectile",
+        "line",
+        "link"
+      ],
+      "grip_reference": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/Attack_A_Med",
+      "prepare_start": 0.0,
+      "release_at": 0.2333333333333333,
+      "end": 1.2333333333333334,
+      "windup": 0.3
+    },
+    {
+      "source": "MurielManny/ConsecratedGround_Cast",
+      "montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
+      "profiles": [
+        "area",
+        "heal",
+        "shield"
+      ],
+      "grip_reference": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/Attack_A_Med",
+      "prepare_start": 0.0,
+      "release_at": 0.2666666666666667,
+      "end": 1.6,
+      "windup": 0.3
+    }
+  ],
+  "legacy": {
+    "blueprint": "/Game/User_JeHoon/Blueprint/Unit/BP_SnapshotOpponent",
+    "mesh": "/Game/Skeleton_Guard/Mesh_UE4/Full/SKM_Skeleton_Guard_Body",
+    "retargeter": "/Game/User_JeHoon/Skeleton_Guard/Rigs/RTG_SwordEnemy",
+    "suffix": "_SkeletonGuard"
+  },
+  "extra_skills": [
+    {
+      "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_MeleeAttack",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_MeleeAttack",
+      "profile": "weapon_melee",
+      "owner_key": "ProjectA.WeaponSkills",
+      "owner": "WeaponSkills.v1"
+    }
+  ],
+  "retired_montages": [
+    "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/KwangManny/Attack/AM_SwordSkillCast",
+    "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/KwangManny/Attack/AM_SwordSkillCast_SkeletonGuard"
+  ]
+}

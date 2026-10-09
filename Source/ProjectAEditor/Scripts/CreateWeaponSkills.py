@@ -11,7 +11,7 @@ ASSETS = unreal.EditorAssetLibrary
 OWNER_KEY = "ProjectA.WeaponSkills"
 OWNER = "WeaponSkills.v1"
 SPECS = [
-    {"name": "DA_MeleeAttack", "id": "WeaponMeleeAttack", "label": "근접 공격", "source": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack", "tags": ["Attack.Close", "Skill.Element.Physical", "Skill.Effect.Damage"]},
+    {"name": "DA_MeleeAttack", "id": "WeaponMeleeAttack", "label": "근접 공격", "source": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack", "tags": ["Attack.Close", "Skill.Element.Physical", "Skill.Effect.Damage"], "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_MeleeAttack"},
     {"name": "DA_CrossbowAttack", "id": "WeaponCrossbowAttack", "label": "석궁 공격", "source": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_Arrow", "tags": ["Attack.Ranged", "Skill.Element.Physical", "Skill.Effect.Damage", "Skill.Shape.Projectile"]},
 ]
 
@@ -43,6 +43,12 @@ def main():
         require(tags.import_text("(GameplayTags=(" + ",".join('(TagName="' + name + '")' for name in sorted(names)) + "))"), "Tag import failed")
         require(set(re.findall(r'TagName="?([A-Za-z0-9_.]+)"?', tags.export_text())) == names, "Unregistered native tags")
         profile.set_editor_property("effect_tags", tags)
+        if spec.get("cast_montage"):
+            # Apply the declared presentation without changing the source skill or its combat profile values.
+            # 원본 스킬과 전투 프로필 수치는 유지하고 명세에 선언한 시전 표현만 적용합니다.
+            montage = unreal.load_asset(spec["cast_montage"])
+            require(isinstance(montage, unreal.AnimMontage), "Missing declared cast montage: " + spec["cast_montage"])
+            profile.set_editor_property("cast_montage", montage)
         if spec["name"] == "DA_CrossbowAttack":
             # The projectile profile is shared, but the bow draw animation does not belong to a crossbow.
             # 투사체 프로필을 공유하더라도 활 당기기 애니메이션은 석궁에 적용하지 않습니다.

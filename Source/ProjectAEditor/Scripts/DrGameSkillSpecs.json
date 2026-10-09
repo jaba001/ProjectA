@@ -257,6 +257,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_BlazeBlast",
       "skill_id": "DrGame_AoeVFX_AOE_BlazeBlast",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Fire",
       "element_tags": [
         "Skill.Element.Fire"
@@ -298,6 +299,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_Blizzard",
       "skill_id": "DrGame_AoeVFX_AOE_Blizzard",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Cold",
       "element_tags": [
         "Skill.Element.Cold"
@@ -336,6 +338,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_CrystalFlower",
       "skill_id": "DrGame_AoeVFX_AOE_CrystalFlower",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Cold",
       "element_tags": [
         "Skill.Element.Cold"
@@ -425,6 +428,7 @@
       "profile": "shield",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_Guardian",
       "skill_id": "DrGame_AoeVFX_AOE_Guardian",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -465,6 +469,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_Hail",
       "skill_id": "DrGame_AoeVFX_AOE_Hail",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Cold",
       "element_tags": [
         "Skill.Element.Cold"
@@ -512,6 +517,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_IceSpiral",
       "skill_id": "DrGame_AoeVFX_AOE_IceSpiral",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Cold",
       "element_tags": [
         "Skill.Element.Cold"
@@ -552,6 +558,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_LavaLotus",
       "skill_id": "DrGame_AoeVFX_AOE_LavaLotus",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Fire",
       "element_tags": [
         "Skill.Element.Fire"
@@ -590,6 +597,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_LightningHoop",
       "skill_id": "DrGame_AoeVFX_AOE_LightningHoop",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Lightning",
       "element_tags": [
         "Skill.Element.Lightning"
@@ -641,6 +649,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_Meteoroid_lite",
       "skill_id": "DrGame_AoeVFX_AOE_Meteoroid_lite",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Fire",
       "element_tags": [
         "Skill.Element.Fire"
@@ -682,6 +691,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_PoisonCarousel",
       "skill_id": "DrGame_AoeVFX_AOE_PoisonCarousel",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Chaos",
       "element_tags": [
         "Skill.Element.Chaos"
@@ -721,6 +731,7 @@
       "profile": "heal",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__AoeVFX/DA_DrGame_AoeVFX_AOE_TimeSpell",
       "skill_id": "DrGame_AoeVFX_AOE_TimeSpell",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -889,6 +900,7 @@
       "profile": "line",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_AberrateObelisk",
       "skill_id": "DrGame_GroundAttackVFX_AberrateObelisk",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -922,6 +934,7 @@
       "profile": "line",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_BrambleTusk",
       "skill_id": "DrGame_GroundAttackVFX_BrambleTusk",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Chaos",
       "element_tags": [
         "Skill.Element.Chaos"
@@ -968,6 +981,7 @@
       "profile": "line",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_DashMagma",
       "skill_id": "DrGame_GroundAttackVFX_DashMagma",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Fire",
       "element_tags": [
         "Skill.Element.Fire"
@@ -1000,6 +1014,7 @@
       "profile": "line",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_FeudFang",
       "skill_id": "DrGame_GroundAttackVFX_FeudFang",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -1034,6 +1049,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_FreezeCrystal_Ice",
       "skill_id": "DrGame_GroundAttackVFX_FreezeCrystal_Ice",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Cold",
       "element_tags": [
         "Skill.Element.Cold"
@@ -1067,6 +1083,7 @@
       "profile": "line",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_HuntingSharkFin",
       "skill_id": "DrGame_GroundAttackVFX_HuntingSharkFin",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -1101,6 +1118,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_IceSpell",
       "skill_id": "DrGame_GroundAttackVFX_IceSpell",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Cold",
       "element_tags": [
         "Skill.Element.Cold"
@@ -1136,6 +1154,7 @@
       "profile": "line",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_IceSpike",
       "skill_id": "DrGame_GroundAttackVFX_IceSpike",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Cold",
       "element_tags": [
         "Skill.Element.Cold"
@@ -1171,6 +1190,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_IceSprout",
       "skill_id": "DrGame_GroundAttackVFX_IceSprout",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Cold",
       "element_tags": [
         "Skill.Element.Cold"
@@ -1204,6 +1224,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_LavaBurst",
       "skill_id": "DrGame_GroundAttackVFX_LavaBurst",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Fire",
       "element_tags": [
         "Skill.Element.Fire"
@@ -1238,6 +1259,7 @@
       "profile": "line",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_Lazurite",
       "skill_id": "DrGame_GroundAttackVFX_Lazurite",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -1271,6 +1293,7 @@
       "profile": "line",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_Line_Lava",
       "skill_id": "DrGame_GroundAttackVFX_Line_Lava",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Fire",
       "element_tags": [
         "Skill.Element.Fire"
@@ -1305,6 +1328,7 @@
       "profile": "area",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_PoisonCannibalPlant",
       "skill_id": "DrGame_GroundAttackVFX_PoisonCannibalPlant",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Chaos",
       "element_tags": [
         "Skill.Element.Chaos"
@@ -1337,6 +1361,7 @@
       "profile": "line",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/__GroundAttackVFX/DA_DrGame_GroundAttackVFX_StoneRush",
       "skill_id": "DrGame_GroundAttackVFX_StoneRush",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -1480,6 +1505,7 @@
       "profile": "link",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/___LinkChainVFX/DA_DrGame_LinkChainVFX_Link_Bramble",
       "skill_id": "DrGame_LinkChainVFX_Link_Bramble",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Chaos",
       "element_tags": [
         "Skill.Element.Chaos"
@@ -1536,6 +1562,7 @@
       "profile": "link",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/___LinkChainVFX/DA_DrGame_LinkChainVFX_Link_Electric",
       "skill_id": "DrGame_LinkChainVFX_Link_Electric",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Lightning",
       "element_tags": [
         "Skill.Element.Lightning"
@@ -1594,6 +1621,7 @@
       "profile": "link",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/___LinkChainVFX/DA_DrGame_LinkChainVFX_Link_Energy",
       "skill_id": "DrGame_LinkChainVFX_Link_Energy",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Lightning",
       "element_tags": [
         "Skill.Element.Lightning"
@@ -1652,6 +1680,7 @@
       "profile": "link",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/___LinkChainVFX/DA_DrGame_LinkChainVFX_Link_Fire",
       "skill_id": "DrGame_LinkChainVFX_Link_Fire",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Fire",
       "element_tags": [
         "Skill.Element.Fire"
@@ -1709,6 +1738,7 @@
       "profile": "link",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/___LinkChainVFX/DA_DrGame_LinkChainVFX_Link_Magic",
       "skill_id": "DrGame_LinkChainVFX_Link_Magic",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Chaos",
       "element_tags": [
         "Skill.Element.Chaos"
@@ -1770,6 +1800,7 @@
       "profile": "heal",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_LevelUp_Ascend_Root",
       "skill_id": "DrGame_LevelUpSpawn_LevelUp_Ascend_Root",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -1806,6 +1837,7 @@
       "profile": "heal",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_LevelUp_Burst_Pivot",
       "skill_id": "DrGame_LevelUpSpawn_LevelUp_Burst_Pivot",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -1841,6 +1873,7 @@
       "profile": "heal",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_LevelUp_Descend_Root",
       "skill_id": "DrGame_LevelUpSpawn_LevelUp_Descend_Root",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -1876,6 +1909,7 @@
       "profile": "heal",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_LevelUp_Lift_root",
       "skill_id": "DrGame_LevelUpSpawn_LevelUp_Lift_root",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -1912,6 +1946,7 @@
       "profile": "heal",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_LevelUp_Twist_Root",
       "skill_id": "DrGame_LevelUpSpawn_LevelUp_Twist_Root",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -1949,6 +1984,7 @@
       "profile": "shield",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_Spawn_Down_Root",
       "skill_id": "DrGame_LevelUpSpawn_Spawn_Down_Root",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -1982,6 +2018,7 @@
       "profile": "shield",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_Spawn_Ground_Root",
       "skill_id": "DrGame_LevelUpSpawn_Spawn_Ground_Root",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -2017,6 +2054,7 @@
       "profile": "shield",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_Spawn_Magic_Root",
       "skill_id": "DrGame_LevelUpSpawn_Spawn_Magic_Root",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Chaos",
       "element_tags": [
         "Skill.Element.Chaos"
@@ -2052,6 +2090,7 @@
       "profile": "shield",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_Spawn_Ninja_Root",
       "skill_id": "DrGame_LevelUpSpawn_Spawn_Ninja_Root",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -2087,6 +2126,7 @@
       "profile": "shield",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_Spawn_Teleport_Root",
       "skill_id": "DrGame_LevelUpSpawn_Spawn_Teleport_Root",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Chaos",
       "element_tags": [
         "Skill.Element.Chaos"
@@ -2121,6 +2161,7 @@
       "profile": "shield",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/_LevelUpSpawn/DA_DrGame_LevelUpSpawn_Spawn_Up_Root",
       "skill_id": "DrGame_LevelUpSpawn_Spawn_Up_Root",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/AM_MagicAreaCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -2155,6 +2196,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_AerolithCurved",
       "skill_id": "DrGame_ProjectileHitVFX_AerolithCurved",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Fire",
       "element_tags": [
         "Skill.Element.Fire"
@@ -2259,6 +2301,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_Comet",
       "skill_id": "DrGame_ProjectileHitVFX_Comet",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Chaos",
       "element_tags": [
         "Skill.Element.Chaos"
@@ -2311,6 +2354,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_FireBall",
       "skill_id": "DrGame_ProjectileHitVFX_FireBall",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Fire",
       "element_tags": [
         "Skill.Element.Fire"
@@ -2506,6 +2550,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_HolyEnergy",
       "skill_id": "DrGame_ProjectileHitVFX_HolyEnergy",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -2557,6 +2602,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_IceCrystal",
       "skill_id": "DrGame_ProjectileHitVFX_IceCrystal",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Cold",
       "element_tags": [
         "Skill.Element.Cold"
@@ -2610,6 +2656,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_Iceicle3D",
       "skill_id": "DrGame_ProjectileHitVFX_Iceicle3D",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Cold",
       "element_tags": [
         "Skill.Element.Cold"
@@ -2662,6 +2709,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_MagicLanceShuriken",
       "skill_id": "DrGame_ProjectileHitVFX_MagicLanceShuriken",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Chaos",
       "element_tags": [
         "Skill.Element.Chaos"
@@ -2713,6 +2761,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_MeteoriteStraight",
       "skill_id": "DrGame_ProjectileHitVFX_MeteoriteStraight",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Fire",
       "element_tags": [
         "Skill.Element.Fire"
@@ -2764,6 +2813,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_PoisonSkullFish",
       "skill_id": "DrGame_ProjectileHitVFX_PoisonSkullFish",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Chaos",
       "element_tags": [
         "Skill.Element.Chaos"
@@ -2816,6 +2866,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_RockSling",
       "skill_id": "DrGame_ProjectileHitVFX_RockSling",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -2868,6 +2919,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_SonicBlade",
       "skill_id": "DrGame_ProjectileHitVFX_SonicBlade",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -2920,6 +2972,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_ThunderBolt",
       "skill_id": "DrGame_ProjectileHitVFX_ThunderBolt",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Lightning",
       "element_tags": [
         "Skill.Element.Lightning"
@@ -2972,6 +3025,7 @@
       "profile": "projectile",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_VenomDart",
       "skill_id": "DrGame_ProjectileHitVFX_VenomDart",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/AM_MagicProjectileCast",
       "theme": "Chaos",
       "element_tags": [
         "Skill.Element.Chaos"
@@ -3177,6 +3231,7 @@
       "profile": "slash",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/SlashHitVFX/DA_DrGame_SlashHitVFX_Slash_Axe",
       "skill_id": "DrGame_SlashHitVFX_Slash_Axe",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_SwordSkillCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -3226,6 +3281,7 @@
       "profile": "slash",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/SlashHitVFX/DA_DrGame_SlashHitVFX_Slash_CurvedSword",
       "skill_id": "DrGame_SlashHitVFX_Slash_CurvedSword",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_SwordSkillCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -3275,6 +3331,7 @@
       "profile": "slash",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/SlashHitVFX/DA_DrGame_SlashHitVFX_Slash_Katana",
       "skill_id": "DrGame_SlashHitVFX_Slash_Katana",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_SwordSkillCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
@@ -3324,6 +3381,7 @@
       "profile": "slash",
       "destination": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/SlashHitVFX/DA_DrGame_SlashHitVFX_Slash_Reaper",
       "skill_id": "DrGame_SlashHitVFX_Slash_Reaper",
+      "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_SwordSkillCast",
       "theme": "Physical",
       "element_tags": [
         "Skill.Element.Physical"
