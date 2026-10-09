@@ -959,3 +959,11 @@ Greystone `Attack_A_Med`의 준비 0~8/30초와 나머지 베기, `Attack_A_Slow
 최종 화면 검수 명령은 `powershell -ExecutionPolicy Bypass -File Saved/Automation/CombatAnimations_20261009/RunReview.ps1 -Label VisualStaff`이다. 새 검수 저장 슬롯·`-nowrite`·`-ProjectAReviewLeftMonitor`로 왼쪽 모니터에 배치한 D3D12/SM6 DebugCombat PIE에서 `ProjectA.TodoReview.CastAnimations`를 실행했다. 남성 검/참격/전방/광역/회복/보호막/활과 여성 검/전방/회복의 10회, 실제 뷰포트 PNG 31장, 자연 재생·발동·AP/GAS·몽타주 종료·원위치 복귀·실제 장비 메시/소켓/렌더 검사가 51.17초에 통과했다. 자동화 결과는 실패 0·RecastNavMesh 없음 경고 1개다. `VisualStaff/Report/index.json`, `VisualStaff/CastAnimations/8212A71944134240A21041B0D4A3DDF6/summary.json`·PNG에 근거를 보존한다. 실행 종료 후 Editor를 닫았으며 IDE는 열지 않았다.
 
 PNG에서 검·방패의 한손 자세, 남녀 몸체의 시전과 복귀, 지팡이 손 모양을 확인했다. 59개 스킬 전체·모든 장비 조합·구형 SkeletonGuard 화면·Continue·사망/중단·2인 원격 검증으로 확대하지 않는다. 근접 검수 카메라의 광역 FX 가림과 기존 골반 높이 투사체 발사 FX는 별도 표현 범위이며, 발사 소켓 개선과 나머지 검수는 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 남긴다. 기존 선택 7개·미완료 41개를 보존하고 확인/후속 2개를 추가했으며 문서 링크 근거는 `DocumentationValidation.json`이다.
+
+### 9-43 2026-10-09 상점 아이템 설명 UI
+
+아이템상점의 마우스 설명을 네이티브 `UShopItemTooltipWidget`으로 구현했다. 시작 기준은 `37296652`이며 기존 미커밋 변경은 없었다. 아이콘·등급 이름/색·가격/구매 상태·장착 위치/양손 여부·부여 스킬의 효과와 확정 위력/AP/SAP/선딜·구매 후 장착 안내를 표시한다. 상품 카드에 표준 UMG 툴팁을 연결하고 구매 버튼의 텍스트 툴팁을 비워 비활성 버튼도 같은 설명을 사용한다. 카드별 위젯과 스킬 행을 재사용하며 구매·리롤에는 현재 상품 표시값으로 갱신하고 숨김·서비스 전환에는 연결을 해제한다. GameplayTag와 장착 프로필·실행 정의를 사용하며 저장·구매·복제·추첨 경로와 콘텐츠 에셋은 변경하지 않았다.
+
+새 수치는 상품의 `GrantedSkillBalances`, 아이템 등급은 복제된 `ItemRarities`를 사용한다. 기존 원본 설명의 기본 위력은 표시하지 않으며 저장값 누락을 현재 CSV·에셋 값으로 대체하지 않는다. 구버전만 기존 실행 정의의 수치를 사용한다. 패널 너비는 440 논리 단위이고 긴 내용은 최대 600 높이 안에서 전체 비율을 축소한다. 높이는 구성 시점 포인터 모니터의 작업 영역과 데스크톱 DPI를 반영하며 화면 이동 후 다음 갱신 전의 재계산은 구현하지 않았다. 기본 스킬 1개 외 사용자 지정 다수 스킬도 생략하지 않지만 긴 목록은 글자가 작아질 수 있다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64` 컴파일·링크는 최종 5.58초·오류/경고 0으로 성공했다. 최초 컴파일에서 발견한 `UWidget::Cursor` 이름 가림은 지역변수 이름 변경으로 수정했다. 근거는 `Saved/Automation/ShopItemTooltip_20261009/EditorBuild.log`·`EditorBuild.Final.log`다. 독립 소스 검토·기존 표시 함수/TODO 보존·문서 링크·diff 정적 검사를 수행했으며 같은 폴더의 `StaticReview.json`·`DocumentationValidation.json`에 기록한다. 기존 미완료 43개·선택 7개를 보존하고 사용자 확인 1개를 추가했다. 게임·PIE·자동화 테스트·화면 캡처는 실행하지 않았고 Editor·IDE도 열지 않았다. 실제 hover·가독성·리롤/퇴장·2인 클라이언트 확인은 [TODO 29](TODO.md#29-무기-랜덤-스킬과-아이템-등급-기획)에 남긴다.

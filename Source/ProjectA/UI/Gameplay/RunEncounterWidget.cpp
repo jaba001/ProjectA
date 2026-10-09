@@ -23,6 +23,7 @@
 #include "UI/Gameplay/CharacterEquipmentPanel.h"
 #include "UI/Gameplay/CharacterInventoryPanel.h"
 #include "UI/Gameplay/RunItemPresentation.h"
+#include "UI/Gameplay/ShopItemTooltipWidget.h"
 #include "UI/Theme/DemonicUITheme.h"
 
 namespace
@@ -246,6 +247,15 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     ShopBalance->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     ShopHint->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     ShopActions->SetVisibility(bInShop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    if (!bInShop)
+    {
+        for (int32 Index = 0; Index < ShopCards.Num(); ++Index)
+        {
+            ShopCards[Index]->SetToolTipText(FText::GetEmpty());
+            ShopCards[Index]->SetToolTip(nullptr);
+            ShopButtons[Index]->SetToolTipText(FText::GetEmpty());
+        }
+    }
     RecoveryButton->SetVisibility(bService || (bInShop && !bItemShop && View.SkillShopState.SchemaVersion == 1) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     RerollButton->SetVisibility(bInShop && !bService && (bItemShop ? View.ItemShopState.SchemaVersion == 1 : View.SkillShopState.SchemaVersion == 1) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     if (bInShop)
@@ -274,6 +284,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             Card->SetPadding(FMargin(12.0f));
             ShopActions->AddChildToVerticalBox(Card)->SetPadding(FMargin(0.0f, 4.0f));
             ShopCards.Add(Card);
+            ShopTooltips.Add(CreateWidget<UShopItemTooltipWidget>(GetOwningPlayer()));
             UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
             Card->SetContent(Row);
             USizeBox* IconSize = WidgetTree->ConstructWidget<USizeBox>();
@@ -316,6 +327,9 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             ShopCards[Index]->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
             if (!bVisible)
             {
+                ShopCards[Index]->SetToolTipText(FText::GetEmpty());
+                ShopCards[Index]->SetToolTip(nullptr);
+                Button->SetToolTipText(FText::GetEmpty());
                 Button->SetIsEnabled(false);
                 continue;
             }
@@ -336,9 +350,15 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
                 Theme.SetItemIcon(ShopIcons[Index], Offer.Item.Tags);
                 ShopIcons[Index]->SetVisibility(ESlateVisibility::HitTestInvisible);
                 ShopCards[Index]->SetRenderOpacity(Offer.bSold ? 0.55f : 1.0f);
-                const FText Tooltip = RunItemPresentation::Tooltip(Offer.Item, View.ItemRarities);
-                ShopCards[Index]->SetToolTipText(Tooltip);
-                Button->SetToolTipText(FText::Format(NSLOCTEXT("RunShop", "ProductActionTooltip", "{0}\n{1}"), Status, Tooltip));
+                ShopTooltips[Index]->ConfigureItem(Offer.Item, View.ItemRarities, Status);
+                // Let the entire card expose the same details, including disabled purchase buttons.
+                // 비활성 구매 버튼을 포함한 카드 전체에서 같은 상세 설명을 표시합니다.
+                Button->SetToolTipText(FText::GetEmpty());
+                if (ShopCards[Index]->GetToolTip() != ShopTooltips[Index])
+                {
+                    ShopCards[Index]->SetToolTipText(FText::GetEmpty());
+                    ShopCards[Index]->SetToolTip(ShopTooltips[Index]);
+                }
                 Button->SetIsEnabled(View.ItemShopState.SchemaVersion == 1 && !Offer.bSold && bAffordable && Controller && !Controller->IsShopPurchasePending());
                 continue;
             }
@@ -355,6 +375,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             ShopIcons[Index]->SetVisibility(Skill && Skill->SkillIcon ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
             if (Skill && Skill->SkillIcon) ShopIcons[Index]->SetBrushFromTexture(Skill->SkillIcon);
             ShopCards[Index]->SetRenderOpacity(bOwned ? 0.55f : 1.0f);
+            ShopCards[Index]->SetToolTip(nullptr);
             ShopCards[Index]->SetToolTipText(Offer.Description);
             Button->SetToolTipText(FText::Format(NSLOCTEXT("RunShop", "ProductActionTooltip", "{0}\n{1}"), Status, Offer.Description));
             Button->SetIsEnabled(!bOwned && bAffordable && Controller && !Controller->IsShopPurchasePending());

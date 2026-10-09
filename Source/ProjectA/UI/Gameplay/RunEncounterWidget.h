@@ -12,6 +12,7 @@ class UImage;
 class USizeBox;
 class UCharacterEquipmentPanel;
 class UCharacterInventoryPanel;
+class UShopItemTooltipWidget;
 class UScaleBox;
 struct FGameplayViewState;
 
@@ -89,6 +90,9 @@ private:
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UBorder>> ShopCards;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UShopItemTooltipWidget>> ShopTooltips;
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UImage>> ShopIcons;
