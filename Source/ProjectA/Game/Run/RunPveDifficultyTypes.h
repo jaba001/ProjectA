@@ -5,8 +5,8 @@
 #include "Game/Run/RunLevelDesignTypes.h"
 #include "RunPveDifficultyTypes.generated.h"
 
-// Freeze player-selected multipliers without changing the underlying monster roster or skill rules.
-// 원본 몬스터 편성과 스킬 규칙을 바꾸지 않고 플레이어가 고르는 배율을 고정합니다.
+// Freeze player-selected stat rules without changing the underlying monster roster or skill rules.
+// 원본 몬스터 편성과 스킬 규칙을 바꾸지 않고 플레이어가 고르는 스탯 규칙을 고정합니다.
 USTRUCT(BlueprintType)
 struct PROJECTA_API FRunPveDifficultyRule
 {
@@ -20,6 +20,10 @@ struct PROJECTA_API FRunPveDifficultyRule
     FName ArenaId;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
     float HPScale = 1.f;
+    // Version one fixes the toughest roster member's HP per group and preserves the remaining HP ratios.
+    // 버전 1은 묶음별 최고 체력 몬스터의 HP를 고정하고 나머지 몬스터의 HP 비율을 유지합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
+    TArray<float> ReferenceHPByGroup;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
     float SpeedScale = 1.f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame)
@@ -37,6 +41,10 @@ struct PROJECTA_API FRunPveDifficultyState
     // 이전 저장은 원래 무대를 유지하며 새 Run은 밸런스와 별도로 연출 프로필을 고정합니다.
     UPROPERTY(BlueprintReadOnly, SaveGame)
     int32 PresentationVersion = 0;
+    // Missing fields in older saves retain legacy HP multipliers without reloading current CSV values.
+    // 이전 저장에서 필드가 없으면 최신 CSV를 다시 읽지 않고 기존 HP 배율을 유지합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame)
+    int32 HealthCurveVersion = 0;
     UPROPERTY(BlueprintReadOnly, SaveGame)
     TArray<FRunPveDifficultyRule> Rules;
     // One entry per started PvE, including the current unfinished combat.

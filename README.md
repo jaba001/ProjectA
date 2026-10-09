@@ -20,7 +20,7 @@ Unreal Engine 5.8 기반의 파티·Grid 턴제 전투 프로젝트. UI 중심�
 
 저항 시스템 기획은 2026-10-06 사용자 결정으로 폐기했다. 기존 스킬 속성 태그·피해·보호막과 후순위 상태이상 기획은 유지한다. [전투 기획 기준](Docs/GAME_DESIGN.md#8-7-기본-전투-전환과-스킬-데이터)
 
-무기 스킬 획득 버전 1의 일반 Target Run은 **PvE 승리에서 아이템 3개 중 1개와 공통 골드**를 함께 받는다. 선택한 아이템은 자동 장착 없이 가방에 추가하며 해당 Run의 카탈로그·등급 확률·스킬 규칙을 사용한다. 새 기본 Run의 중 난이도 골드는 첫 묶음 3~5G에서 마지막 8~15G이며 하·중·상의 적 HP/속도/골드 배율은 각각 80/90/75%·100/100/100%·130/110/150%다. [PvE 난이도 CSV](DataCatalogs/PVE_DIFFICULTIES.csv)에 수치를 관리하고 선택 시 실제 적 수·HP·골드 범위를 표시한다. 아이템 등급 확률은 동일하다. PvE 승리마다 생존 파티에 휴식 HP 20~40을 성장 후 최대 HP까지 회복한다. 사망자는 부활하지 않으며 Snapshot·패배에는 성장·보상·휴식이 없다. 기존 Run의 저장된 보상·골드 범위·회복 정책은 유지한다. [난이도·경제 기준](Docs/PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터) · [사용자 확인](Docs/TODO.md#26-재개-후-로컬-검수와-저장-보완)
+무기 스킬 획득 버전 1의 일반 Target Run은 **PvE 승리에서 아이템 3개 중 1개와 공통 골드**를 함께 받는다. 선택한 아이템은 자동 장착 없이 가방에 추가하며 해당 Run의 카탈로그·등급 확률·스킬 규칙을 사용한다. 새 기본 Run의 하·중·상 HP는 **첫 몬스터 50·100·150 → 최종 골렘 1000·1500·3000**으로 증가한다. [체력 곡선 CSV](DataCatalogs/PVE_HEALTH_CURVE.csv)가 10묶음별 최고 체력 몬스터의 기준 HP를 정하고 나머지 적은 기존 편성 HP 비율을 유지한다. [PvE 난이도 CSV](DataCatalogs/PVE_DIFFICULTIES.csv)의 속도 배율 90·100·110%와 골드 배율 75·100·150%는 유지하며 중 난이도 골드는 첫 묶음 3~5G에서 마지막 8~15G다. 선택 시 실제 적 수·HP·골드 범위를 표시하고 아이템 등급 확률은 동일하다. PvE 승리마다 생존 파티에 휴식 HP 20~40을 성장 후 최대 HP까지 회복한다. 사망자는 부활하지 않으며 Snapshot·패배에는 성장·보상·휴식이 없다. 기존 Run의 저장된 HP·보상·회복 정책은 유지한다. [난이도·경제 기준](Docs/PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터) · [사용자 확인](Docs/TODO.md#26-재개-후-로컬-검수와-저장-보완)
 
 새 Run의 PvE 하·중·상은 각각 **초원·석조 던전·얼음 성채**에서 전투한다. 선택 카드에 전투장 설명과 실제 등장 몬스터의 이름·역할·HP·속도를 표시한다. 선택한 전투장은 이어하기에도 유지하며 기존 Run의 배경은 보존한다. [전투장·편성 기준](Docs/PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터)
 
@@ -94,7 +94,7 @@ Windows의 긴 사용자 경로에서도 체크포인트 교체·토큰 확인 �
 
 전투 디버그의 **캐릭터·체력 → 적군 추가**에서 신규 12개와 기존 `BP_EnemyUnit`을 선택한다. `Fantasy_Pack`·`StylizedCreaturesBundle`의 원본 메시·재질·애니메이션을 직접 참조하고 늑대인간·골렘의 Manny 공격 2개만 리타깃한다. 기존 기본 비무장 공격의 피해·AP·GAS 조건과 전체 래그돌을 유지한다. 기존 시험 Run은 기본 편성 4개, 새 목표 Run은 저장된 단계별 편성을 사용하며 13개 카탈로그는 디버그 목록 조회 시 로드한다. [작성 명령](Source/ProjectAEditor/Scripts/README.md)·[구성 명세](Source/ProjectAEditor/Scripts/MonsterContentSpecs.json)
 
-전체 13개 몬스터의 원본 경로는 [몬스터 목록](DataCatalogs/MONSTER_ASSETS.csv)에 보존한다. 새 기본 Run은 [스탯](DataCatalogs/MONSTER_STATS.csv)·[출현 가중치](DataCatalogs/MONSTER_SPAWN_PROBABILITIES.csv)·[10묶음 난이도](DataCatalogs/MONSTER_ENCOUNTERS.csv)를 생성 시 읽고 결과를 저장한다. CSV 수정은 이후 새 Run에만 반영하며 기존 저장·맞춤 정의·원본 Blueprint와 공격 스킬은 변경하지 않는다. [구현과 미완료 검증](Docs/HISTORY.md#9-31-2026-10-08-csv-기반-레벨-난이도)
+전체 13개 몬스터의 원본 경로는 [몬스터 목록](DataCatalogs/MONSTER_ASSETS.csv)에 보존한다. 새 기본 Run은 [스탯](DataCatalogs/MONSTER_STATS.csv)·[출현 가중치](DataCatalogs/MONSTER_SPAWN_PROBABILITIES.csv)·[10묶음 편성](DataCatalogs/MONSTER_ENCOUNTERS.csv)·[난이도](DataCatalogs/PVE_DIFFICULTIES.csv)·[체력 곡선](DataCatalogs/PVE_HEALTH_CURVE.csv)을 생성 시 읽고 결과를 저장한다. CSV 수정은 이후 새 Run에만 반영하며 기존 저장·맞춤 정의·원본 Blueprint와 공격 스킬은 변경하지 않는다. [구현과 미완료 검증](Docs/HISTORY.md#9-52-2026-10-10-pve-시작최종-체력과-성장-곡선)
 
 **환경 비교 레벨**은 `/Game/User_JeHoon/LEVEL/Environment/`의 `Grassland`·`Forest`·`Desert`·`Ice`·`Summer` 하위 폴더에 있는 12맵이다. 초원·숲·대나무·사막·습지·얼음·해변을 원본 메시와 ISM으로 구성하고 표면 Material 9개·자식 MI 44개를 작성했다. 폴더 이동 전 독립 재로드와 실제 Windows 창의 4:3·16:9·21:9 화면·Slate 좌표 클릭·SAP 이동/자원/점유 검수를 통과했다. 두 던전과 합계 14맵·42장 화면을 직접 확인했다. 원본 팩은 Git에 포함하지 않으므로 다른 PC에서도 설치가 필요하다. 동일 품질 180프레임의 wall 간격 표본은 CPU/GPU·화면 제시 시각·변경 전후 FPS 비교를 측정하지 않는다. [맵 목록·구성 기준](Docs/PROJECT_PLAN.md#4-4-환경-비교-레벨)
 
@@ -188,7 +188,7 @@ UI는 1920×1080을 기준으로 뷰포트에 맞춰 같은 비율로 확대·�
 | [MULTIPLAYER](Docs/MULTIPLAYER.md) | 식별·소유권·저장·네트워크 계약 |
 | [HISTORY](Docs/HISTORY.md) | 완료 이력·검증 결과·기준 커밋 |
 
-프로젝트 루트 `DataCatalogs/`는 에셋·SFX 목록·생성 현황·기획 풀·등장 확률 CSV 12개를 함께 보관한다. 새 기본 Run은 무기·아이템 등급 확률·스킬 밸런스·장비별 스킬 등급 가중치·인카운터 풀·몬스터 스탯·몬스터 출현 가중치·몬스터 구간 규칙의 CSV 8개를 읽으며 같은 파일을 UFS 패키징 대상으로 포함한다. `MONSTER_ASSETS.csv`는 원본 경로 자료로 유지한다.
+프로젝트 루트 `DataCatalogs/`는 에셋·SFX 목록·생성 현황·기획 풀·등장 확률 CSV 14개를 함께 보관한다. 새 기본 Run은 무기·아이템 등급 확률·스킬 밸런스·장비별 스킬 등급 가중치·인카운터 풀·몬스터 스탯·몬스터 출현 가중치·몬스터 구간 규칙·PvE 난이도·체력 곡선의 CSV 10개를 읽으며 같은 파일을 UFS 패키징 대상으로 포함한다. `MONSTER_ASSETS.csv`는 원본 경로 자료로 유지한다.
 
 | 데이터 카탈로그 | 내용 |
 |---|---|
@@ -204,6 +204,8 @@ UI는 1920×1080을 기준으로 뷰포트에 맞춰 같은 비율로 확대·�
 | [MONSTER_STATS.csv](DataCatalogs/MONSTER_STATS.csv) | 13종·13열의 클래스·지역/역할 태그·HP/AP/SAP/속도/이동거리·원본 스킬. 공격 피해·선딜은 변경하지 않는 참고값 |
 | [MONSTER_SPAWN_PROBABILITIES.csv](DataCatalogs/MONSTER_SPAWN_PROBABILITIES.csv) | 13종 중 활성 12종의 가중치 합 100. 개발용 검병은 0이며 구간 태그와 남은 후보의 가중치로 재정규화 |
 | [MONSTER_ENCOUNTERS.csv](DataCatalogs/MONSTER_ENCOUNTERS.csv) | 10묶음의 지역·선봉 조건·기준 적 수·HP/속도 배율·골드·성장·휴식·Snapshot 난이도. 시작 파티 인원과 함께 새 기본 Run에 고정 |
+| [PVE_DIFFICULTIES.csv](DataCatalogs/PVE_DIFFICULTIES.csv) | 하·중·상 태그와 속도·골드 배율. HP 배율은 체력 곡선 버전 0의 기존 정책용 |
+| [PVE_HEALTH_CURVE.csv](DataCatalogs/PVE_HEALTH_CURVE.csv) | 10묶음×하·중·상 30행의 최고 체력 몬스터 기준 HP. 새 Run에 저장하며 편성 내 다른 적의 HP 비율 유지 |
 
 무기 목록의 중복 `게임 내 이름`은 기존 행 순서의 `이름 1`, `이름 2` 번호를 유지한다. 이펙트 목록의 퇴역 577행·표시명은 고정하고 신규 설치 목록 안에서 중복 표시명을 구분한다. 원본 에셋 이름·경로는 유지하며 번호는 등급·강화 단계를 의미하지 않는다. [표시명 규칙](Docs/PROJECT_PLAN.md#4-1-스킬-이펙트-에셋-목록)
 

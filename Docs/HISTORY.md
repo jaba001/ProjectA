@@ -1057,3 +1057,13 @@ PvE 하·중·상에 서로 다른 맵과 등장 몬스터 설명을 제공하�
 화면에서 실제 중 난이도의 회색 체크무늬 바닥과 세 숄더뷰의 캐릭터 미노출·원점 POV를 관찰했다. 정적 대조에서 UE 5.8 `PlayerCameraManager.cpp`의 `ACameraActor` 전용 경로가 `GetCameraComponent()->GetCameraView()`를 사용하고 프로젝트의 `CalcCamera()` 추적 계산을 우회함을 확인했다. 호출 횟수를 실행 계측하지는 않았다. 이번 작업은 촬영본을 보존하며 해당 문제의 수정·재검증과 최종 시각 판단을 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 유지한다.
 
 실제 PIE 창은 왼쪽 모니터의 `(-1904, 8)`에 배치했고 촬영용 Editor는 종료했다. `ProtectUserState.py --verify`로 기존 저장·사용자/프로젝트 설정·17개 맵 총 69개 파일의 해시와 파일 목록이 그대로임을 확인했다. `ValidateArchive.py`는 25개 PNG 디코딩·해상도·원본 해시·갤러리 링크·17맵 수록과 기존 TODO 미완료 53개/제안 선택 7개 보존을 확인한다. `ValidateDocumentation.py`의 문서 링크 및 전체 diff 정적 결과는 같은 폴더의 `ArchiveValidation.json`·`DocumentationValidation.json`에 기록한다. 카메라/맵 품질 승인, 화면비별 입력, 밸런스, Continue, 멀티플레이 검수 완료로 확대하지 않는다.
+
+### 9-52 2026-10-10 PvE 시작·최종 체력과 성장 곡선
+
+사용자 지정 첫 몬스터 HP 하·중·상 50·100·150과 최종 골렘 1000·1500·3000을 새 기본 Run에 적용했다. 시작 기준은 `cfab4555`이며 기존 미커밋 변경은 없었다. [PVE_HEALTH_CURVE.csv](../DataCatalogs/PVE_HEALTH_CURVE.csv)의 10묶음×3난이도에 초반 완만·후반 증가폭 확장 곡선을 작성하고 기존 7묶음의 적 수 감소를 유지했다. 전체 수치는 [PROJECT_PLAN 5-1](PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터)에 통합한다. 기준 HP는 총합이 아닌 편성 중 최고 체력 몬스터이며 다른 적은 저장된 기초 HP 비율을 유지해 올림한다. 첫 적 1명과 최종 골렘의 기준은 파티 1~4인에서 동일하며 인원 보정은 적 수에 유지한다. 태그·가중치 편성·시드·Snapshot·공격 피해·AP/SAP·성장·골드·아이템 보상은 변경하지 않았다.
+
+`PveDifficulty.HealthCurveVersion=1`과 난이도별 10개 `ReferenceHPByGroup`을 기존 SaveGame에 고정한다. 선택 카드·실제 스폰·체크포인트 검증은 공통 해석을 사용하며 카드 HP 배율도 실제 비율로 전달한다. 필드가 없는 기존 저장은 버전 0의 이전 곱셈·올림과 편성을 유지한다. 두 CSV의 행·태그·정수 범위·묶음별 증가·난이도 순서를 원자적으로 검사하고 실패 시 기존 상태를 보존한다. `ProjectA.Build.cs`에 새 CSV를 UFS로 등록했으며 신규 오류 문구 3개의 한영 번역·locres를 갱신했다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`는 41.98초, 같은 옵션의 `ProjectA Win64 Development`는 31.02초에 성공했다. 로그는 `Saved/Automation/PveHealthCurve_20261010/{EditorBuild,GameBuild}.log`다. `ProjectA.Run.PveDifficulty.HealthCurve`의 CSV 오류·원자성, 16시드×4인원×10묶음×3난이도, 저장 복원·버전 0 호환·편성 순서/동률 회귀 3개를 추가하고 기존 Target 거래 회귀를 갱신하여 컴파일했다. Unreal 자동화 테스트는 실행하지 않았다.
+
+`python Source/ProjectAEditor/Scripts/BuildLocalization.py --check`는 번역 1,094개와 한영 리소스 일치를 확인했다. 같은 검수 폴더의 `ValidateData.py`는 가능 편성 3,368개×3난이도 10,104건의 체력 산술과 CSV·UFS 참조를 검사했다. `ValidateDocumentation.py`·`ValidateStatic.py`는 문서 링크 911개·기존 TODO 미완료 53개/제안 선택 7개 보존과 전체 diff를 확인했다. 결과는 `StaticDataValidation.json`·`DocumentationValidation.json`·`StaticReview.json`에 기록한다. 이 검사는 게임 실행 결과가 아니다. 게임·PIE·패키지·화면 캡처·IDE는 실행하지 않았으며 첫/최종 HP의 실제 표시·Continue·후반 상 난이도의 처치 시간과 생존률은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)의 사용자 확인 전이다.

@@ -1258,6 +1258,24 @@
     },
     {
       "namespace": "RunPveDifficulty",
+      "key": "MissingHealthCsv",
+      "source": "PvE 체력 곡선 CSV를 읽을 수 없습니다.",
+      "translation": "The PvE health curve CSV could not be read."
+    },
+    {
+      "namespace": "RunPveDifficulty",
+      "key": "InvalidHealthCsv",
+      "source": "PvE 체력 곡선 CSV의 열·묶음·난이도 태그·정수 HP·증가 순서가 올바르지 않습니다.",
+      "translation": "The PvE health curve CSV has invalid columns, groups, difficulty tags, integer HP values, or increasing order."
+    },
+    {
+      "namespace": "RunPveDifficulty",
+      "key": "InvalidInitialState",
+      "source": "PvE 난이도 규칙을 읽기 위한 초기 저장 상태가 올바르지 않습니다.",
+      "translation": "The initial save state for loading PvE difficulty rules is invalid."
+    },
+    {
+      "namespace": "RunPveDifficulty",
       "key": "InvalidState",
       "source": "저장된 PvE 난이도 규칙·선택 기록·전투 배율이 진행 상태와 일치하지 않습니다.",
       "translation": "The saved PvE difficulty rules, selection history, or battle multipliers do not match the current progress."

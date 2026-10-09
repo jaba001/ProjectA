@@ -453,7 +453,7 @@ bool FTargetRunPveDifficultyTransactionTest::RunTest(const FString& Parameters)
     for (FGameplayTag SelectedTag : {RunPveDifficulty::GetLowTag(), RunPveDifficulty::GetHighTag()})
     {
         FTargetRunTransactionFixture Fixture;
-        if (!TestTrue(TEXT("The new default Target freezes a difficulty policy"), Fixture.InitializeEveryProfession() && Fixture.Run->GetTargetRunState().PveDifficulty.SchemaVersion == 1)) return false;
+        if (!TestTrue(TEXT("The new default Target freezes the version-one health curve"), Fixture.InitializeEveryProfession() && Fixture.Run->GetTargetRunState().PveDifficulty.SchemaVersion == 1 && Fixture.Run->GetTargetRunState().PveDifficulty.HealthCurveVersion == 1)) return false;
         for (int32 Visit = 0; Visit < 3; ++Visit)
         {
             const FRunEncounterProgress& Progress = Fixture.Run->GetEncounterProgress();
@@ -490,12 +490,17 @@ bool FTargetRunPveDifficultyTransactionTest::RunTest(const FString& Parameters)
         if (!TestTrue(TEXT("The chosen tag resolves its frozen combat roster and reward range"), Rule && RunPveDifficulty::Resolve(Target, 0, Roster, GoldChoices, Fixture.Error) && Roster.Num() == Target.Groups[0].EnemyRoster.Num() && GoldChoices.Num() == 3)) return false;
         const FName SelectedArena = Rule->ArenaId;
         TestTrue(TEXT("Reselection resolves only the newly selected card's saved arena"), Fixture.Run->GetCurrentCombatArenaId(RetainedArena, Fixture.Error) && RetainedArena == SelectedArena);
+        if (!TestEqual(TEXT("The selected saved curve retains all ten group references"), Rule->ReferenceHPByGroup.Num(), 10)) return false;
+        const float FirstReferenceHP = SelectedTag == RunPveDifficulty::GetLowTag() ? 50.f : 150.f;
+        TestEqual(TEXT("The first battle freezes the requested low or high health endpoint"), Rule->ReferenceHPByGroup[0], FirstReferenceHP);
+        float MaximumBaseHP = 0.f;
+        for (const FRunMonsterDefinition& Monster : Target.Groups[0].EnemyRoster) MaximumBaseHP = FMath::Max(MaximumBaseHP, Monster.MaxHP);
         for (int32 Index = 0; Index < Roster.Num(); ++Index)
         {
             const FRunMonsterDefinition& Base = Target.Groups[0].EnemyRoster[Index];
-            const float ExpectedHP = FMath::CeilToFloat(static_cast<float>(static_cast<double>(Base.MaxHP) * Rule->HPScale));
+            const float ExpectedHP = static_cast<float>(FMath::CeilToFloat(static_cast<double>(FirstReferenceHP) * Base.MaxHP / MaximumBaseHP));
             const float ExpectedSpeed = static_cast<float>(static_cast<double>(Base.Speed) * Rule->SpeedScale);
-            TestTrue(TEXT("Only HP and speed scale while roster identity AP SAP movement and skill remain fixed"), Roster[Index].MaxHP == ExpectedHP && Roster[Index].Speed == ExpectedSpeed && Roster[Index].MonsterId == Base.MonsterId && Roster[Index].UnitClass == Base.UnitClass && Roster[Index].AP == Base.AP && Roster[Index].SAP == Base.SAP && Roster[Index].MoveRange == Base.MoveRange && Roster[Index].Skill == Base.Skill);
+            TestTrue(TEXT("HP follows the saved reference while speed identity AP SAP movement and skill retain their contracts"), Roster[Index].MaxHP == ExpectedHP && Roster[Index].Speed == ExpectedSpeed && Roster[Index].MonsterId == Base.MonsterId && Roster[Index].UnitClass == Base.UnitClass && Roster[Index].AP == Base.AP && Roster[Index].SAP == Base.SAP && Roster[Index].MoveRange == Base.MoveRange && Roster[Index].Skill == Base.Skill);
         }
         int32 MinimumGold = MAX_int32;
         int32 MaximumGold = 0;
