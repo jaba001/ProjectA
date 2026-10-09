@@ -382,11 +382,14 @@ public:
                 for (UUserWidget* Screen : Screens)
                 {
                     URunEncounterWidget* Encounter = Cast<URunEncounterWidget>(Screen);
-                    if (!Encounter->IsActivated()) continue;
+                    AGameplayPlayerController* PresentationController = Cast<AGameplayPlayerController>(Screen->GetOwningPlayer());
+                    if (!Encounter->IsActivated() || !Encounter->GetIsEnabled() || !PresentationController || PresentationController->IsEncounterPresentationTransitioning()) continue;
                     UVerticalBox* Actions = Cast<UVerticalBox>(Screen->GetWidgetFromName(TEXT("EncounterActions")));
-                    UButton* Action = Run->GetPhase() == ERunPhase::EncounterChoice ? (Actions ? Cast<UButton>(Actions->GetChildAt(1)) : nullptr) : Cast<UButton>(Screen->GetWidgetFromName(TEXT("Button_LeaveShop")));
+                    UWidget* DungeonBar = Screen->GetWidgetFromName(TEXT("DungeonChoiceBar"));
+                    UButton* Choice = DungeonBar && DungeonBar->IsVisible() ? Cast<UButton>(Screen->GetWidgetFromName(TEXT("Button_DungeonChoice_1"))) : Actions && Actions->GetChildrenCount() > 1 ? Cast<UButton>(Actions->GetChildAt(1)) : nullptr;
+                    UButton* Action = Run->GetPhase() == ERunPhase::EncounterChoice ? Choice : Cast<UButton>(Screen->GetWidgetFromName(TEXT("Button_LeaveShop")));
                     CaptureState(TEXT("WaitingForShopAction"), World, Run, Screen, Action);
-                    if (Action && Action->GetIsEnabled()) Action->OnClicked.Broadcast();
+                    if (Action && Action->IsVisible() && Action->GetIsEnabled()) Action->OnClicked.Broadcast();
                     break;
                 }
                 if (Run->GetPhase() != ERunPhase::Map) return false;

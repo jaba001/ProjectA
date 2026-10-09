@@ -468,11 +468,13 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 
 2026-10-08 사용자 위임에 따라 `/Game/User_JeHoon/LEVEL/Core/Gameplay`에 기존 환경 12개·던전 2개의 메시 배치를 구역별로 합성한다. 중앙 PineRidge 구역과 12,000cm 간격의 주변 구역을 같은 맵에 저장하며 원본 메시·기존 재질을 직접 참조한다. 구역별 ISM과 거리 컬링을 사용하고 장식의 충돌·navigation 영향을 끈다. 기존 Arena·Grid·카메라·물리 바닥·NavBounds·GameMode·전역 조명은 보존한다. 비교 맵의 중복 전투 코어나 전역 조명·안개·무한 PostProcess는 합치지 않는다. 기존 14개 맵은 제작·이전 경로 호환용으로 보존하며 실제 Run 중 맵 전환은 추가하지 않는다.
 
-중앙 주변의 `AEncounterPrototypeStage` 5개는 상인·대장간·회복소·소모품점·제단을 표현한다. Engine 기본 도형·최소 색상 재질과 절차적 팔 인사·호흡을 사용하며 새 NPC 모델·텍스처·애니메이션을 도입하지 않는다. 각 공간은 필수·제외 GameplayTagContainer와 우선순위로 기존 인카운터 태그를 해석한다. 기본·등급별 상점은 상인, 태그별 상점은 대장간을 공유하고 서비스는 해당 공간을 사용한다. 현재 활성 13개 인카운터와 반복 방문은 다섯 공간을 재사용하며 기존 저장의 이전 상점도 같은 태그 공간을 사용한다.
+맵에 저장된 `AEncounterPrototypeStage` 5개는 상인·대장간·회복소·소모품점·제단의 표시 설정 원본으로 유지한다. Engine 기본 도형·색상 재질·절차적 팔 인사와 호흡을 사용하며 새 NPC 모델·텍스처·애니메이션을 도입하지 않는다. 필수·제외 GameplayTagContainer와 우선순위로 무대를 해석하고, 기본·등급별 상점은 상인, 태그별 상점은 대장간, 서비스는 해당 설정을 사용한다. 현재 활성 13개와 이전 저장의 상점도 같은 태그 조건으로 해석한다.
 
-로컬 컨트롤러는 저장·복제 후 확정된 방문 식별자와 회차가 바뀔 때 카메라를 이동하고 완료 후 오른쪽 상점 패널을 표시한다. 상품 구매·리롤에 따른 뷰 갱신은 같은 입장 연출을 재시작하지 않는다. 인카운터 선택·지도는 전경 카메라를 사용하고 전투에는 기존 Arena 카메라로 복귀한다. 연출이 없는 기존 맵은 원래 UI를 사용한다. NPC·카메라는 표시 전용이며 구매·진행·저장·소유권·Host 권위는 기존 경로가 담당한다. 전투장 원점을 유지하므로 기존 체크포인트의 절대 좌표와 Grid 점유 계약은 변경하지 않는다.
+2026-10-09부터 인카운터 카메라는 공중 전경 대신 로컬 `AEncounterDungeonRoute`의 지하 갈림길을 사용한다. `EncounterDungeonLayout`이 후보 순서 0=좌회전·1=직진·2=우회전의 축 정렬 통로·코너를 정의하고 런타임 native 도형으로 바닥·벽·천장을 구성한다. NPC는 기존 무대의 태그·재질·외형 설정을 참조한 로컬 Actor로 생성하며 맵이나 원본 에셋에 사본을 저장하지 않는다.
 
-작성 입력은 [UnifiedGameplaySpecs.json](../Source/ProjectAEditor/Scripts/UnifiedGameplaySpecs.json), 작성기는 [ConfigureUnifiedGameplay.py](../Source/ProjectAEditor/Scripts/ConfigureUnifiedGameplay.py)다. 작성기는 전용 태그의 결과만 재구성하고 원본 콘텐츠·기존 비교 맵·저장·설정의 보존을 확인한다. 실행 명령은 [에셋 도구](../Source/ProjectAEditor/Scripts/README.md)를 따른다. 실제 카메라·NPC·패널 가독성·Continue와 성능은 사용자 확인 대상으로 유지한다. [구현·검증 근거](HISTORY.md#9-32-2026-10-08-통합-gameplay와-npc-상점-프로토타입)
+로컬 컨트롤러가 실제 선택의 저장·복제를 확인한 경우에만 2.8초 보행·코너 회전을 표시한다. 도착 후 오른쪽 상점 패널을 열고 상품 구매·리롤의 같은 방문 갱신에는 재연출하지 않는다. 상점 Continue·늦은 클라이언트 접속은 도착점으로 바로 복원하며 퇴장 후 다음 갈림길로 전환할 때 짧은 페이드를 사용한다. 선택 화면은 하단 3열 카드, 전투는 기존 Arena 카메라를 사용하고 연출 없는 맵은 기존 세로 선택·상점 UI를 유지한다. 후보 추첨·ID·구매·진행·저장 스키마·소유권·Host 권위와 전투장 원점·체크포인트 좌표·Grid 점유는 변경하지 않는다.
+
+기존 통합 맵의 작성 입력은 [UnifiedGameplaySpecs.json](../Source/ProjectAEditor/Scripts/UnifiedGameplaySpecs.json), 작성기는 [ConfigureUnifiedGameplay.py](../Source/ProjectAEditor/Scripts/ConfigureUnifiedGameplay.py)다. 지하 연출은 런타임에 구성하므로 이 맵을 재작성하지 않는다. 당시 맵 작성·NPC 검수는 [9-32절](HISTORY.md#9-32-2026-10-08-통합-gameplay와-npc-상점-프로토타입), 지하 연출의 현재 구현·검증 대기는 [9-35절](HISTORY.md#9-35-2026-10-09-지하-미로-갈림길-연출)에 구분한다. 실제 코너 이동·카메라·패널 가독성·Continue·성능은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)의 확인 대상이다.
 
 ## 5 저장과 멀티플레이 연결 경계
 

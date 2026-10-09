@@ -47,6 +47,7 @@
 #include "Slate/SObjectWidget.h"
 #include "Slate/UMGDragDropOp.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "RunEncounterPIEHelpers.h"
 #include "UI/Gameplay/CharacterEquipmentPanel.h"
 #include "UI/Gameplay/CharacterInventoryPanel.h"
 #include "UI/Gameplay/EquipmentDragDropOperation.h"
@@ -280,9 +281,8 @@ public:
         if (Stage == 6)
         {
             URunEncounterWidget* Screen = Active<URunEncounterWidget>(World);
-            if (!Screen) return false;
-            UVerticalBox* Choices = Cast<UVerticalBox>(Screen->GetWidgetFromName(TEXT("EncounterActions")));
-            UButton* ItemShop = Choices && Choices->GetChildrenCount() > 1 ? Cast<UButton>(Choices->GetChildAt(1)) : nullptr;
+            if (!RunEncounterPIE::PresentationReady(Controller.Get(), Screen)) return false;
+            UButton* ItemShop = RunEncounterPIE::FindChoiceButton(Screen, 1);
             if (!Check(ItemShop && ItemShop->GetIsEnabled(), TEXT("The actual encounter screen exposes its item shop choice."))) return End();
             ItemShop->OnClicked.Broadcast();
             if (!Check(Run->GetPhase() == ERunPhase::Shop && Run->GetEncounterProgress().SelectedEncounterId == FRunItemShopState::GetEncounterId(), TEXT("The real shop button selects Shop_02 without changing ownership."))) return End();
@@ -292,7 +292,7 @@ public:
         if (Stage == 7)
         {
             URunEncounterWidget* Screen = Active<URunEncounterWidget>(World);
-            if (!Screen || !Warm()) return false;
+            if (!RunEncounterPIE::PresentationReady(Controller.Get(), Screen) || !Warm()) return false;
             if (!Check(Run->GetItemShopState().Catalog.Num() == 49 && Run->GetItemShopState().Offers.Num() == 5, TEXT("The authored item shop loads all 49 supported CSV definitions and five actual offers."))) return End();
             if (!Capture(TEXT("Shop"))) return End();
             if (!Purchase(Screen, Run)) return End();

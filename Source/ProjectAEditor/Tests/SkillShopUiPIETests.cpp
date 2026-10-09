@@ -48,6 +48,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "Settings/LevelEditorPlaySettings.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "RunEncounterPIEHelpers.h"
 #include "UI/Gameplay/CharacterInventoryPanel.h"
 #include "UI/Gameplay/GameplayActionButton.h"
 #include "UI/Gameplay/InventoryWidget.h"
@@ -247,9 +248,8 @@ namespace SkillShopUiReview
             if (Stage == 5)
             {
                 URunEncounterWidget* Screen = Active<URunEncounterWidget>(World);
-                if (!Screen) return false;
-                UVerticalBox* Choices = Cast<UVerticalBox>(Screen->GetWidgetFromName(TEXT("EncounterActions")));
-                UButton* Shop = Choices && Choices->GetChildrenCount() > 0 ? Cast<UButton>(Choices->GetChildAt(0)) : nullptr;
+                if (!RunEncounterPIE::PresentationReady(Controller.Get(), Screen)) return false;
+                UButton* Shop = RunEncounterPIE::FindChoiceButton(Screen, 0);
                 if (!Check(Shop && Shop->GetIsEnabled(), TEXT("The actual encounter screen exposes its original first skill-shop choice."))) return End(false);
                 Shop->OnClicked.Broadcast();
                 if (!Check(Run->GetPhase() == ERunPhase::Shop && Run->GetEncounterProgress().SelectedEncounterId == FName(TEXT("Shop_01")), TEXT("The original shop card opens Shop_01."))) return End(false);
@@ -260,7 +260,7 @@ namespace SkillShopUiReview
             if (Stage == 6)
             {
                 URunEncounterWidget* Screen = Active<URunEncounterWidget>(World);
-                if (!Screen || !Warm()) return false;
+                if (!RunEncounterPIE::PresentationReady(Controller.Get(), Screen) || !Warm()) return false;
                 if (!Purchase(Screen, Run, PurchaseIndex)) return End(false);
                 if (++PurchaseIndex < Paths.Num())
                 {

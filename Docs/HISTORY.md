@@ -6,6 +6,7 @@
 
 | 기준 | 변경·검증 |
 |---|---|
+| 2026-10-09 지하 미로 갈림길 연출 | 후보 순서에 맞춘 좌·직진·우 통로와 코너·벽·천장을 로컬 런타임에 구성하고 선택 하단 3열·NPC 도착 후 오른쪽 거래 패널을 연결했다. Development Editor / Win64 컴파일·정적 검사를 통과했으며 실제 이동·화면·협동 확인은 남아 있다. [범위·상태](#9-35-2026-10-09-지하-미로-갈림길-연출) |
 | 2026-10-09 장착 가능 아이템만 판매 | 장착 지원 49개만 판매·신규 보상 후보로 유지하고 미지원 240행·빈 전문점 15행을 제거했다. 기존 보유품·원본 에셋·저장된 보상은 보존하며 이전 미지원 진열은 숨기고 구매를 거절한다. [범위·근거](#9-34-2026-10-09-장착-가능-아이템만-판매) |
 | 2026-10-08 위임 실행 검수와 협동 보완 | 초기 저장 원자성·새 협동 1인 1캐릭터·Snapshot 소모품 차단·NPC 지붕 가림을 보완했다. 고유 Native 222개, 동일 PC 1/2/4인 30전투·27상점, NPC 18경우, 기존 저장 사본·소모 후 Continue와 새 Win64 패키지를 검수했다. 정상 Run은 9전투·30선택 후 자연 패배이며 80단계 완주·최종 밸런스·Steam/PlayFab은 미완료다. [범위·근거](#9-33-2026-10-08-위임-실행-검수와-협동-보완) |
 | 2026-10-07 TODO 권장안 로컬 구현 | T14 제안 9·10의 Steam 친구별 방 검색·요청 정리·재접속 인증 표시와 제안 12의 태그 기반 Snapshot 후보 선택 API를 보완했다. 프로젝트 파일 재생성 9.67초와 Development Editor / Win64 컴파일·링크 45.82초, 독립 코드·문서 정적 검사를 통과했다. 기존 Run·저장·에셋은 유지하며 게임·PIE·자동화·실제 Steam/PlayFab 연결은 미실행이다. [범위·근거](#9-25-2026-10-07-todo-권장안의-로컬-구현) |
@@ -837,3 +838,15 @@ TODO 29의 `SM_Sword` 외형·등급 추가 확인은 해당 미지원 행이 �
 | 정적·보존 | 독립 코드·문서 검토, 문서 11개·로컬 링크 757개·diff 검사 통과. 원본 Content 19,809개·사용자 저장/설정 52개의 해시 동일, 추가 시험 저장 0개. TODO 선택 7개 보존. `Saved/Automation/EquipableCatalog_20261009/FinalSummary.json`·`ProtectedAfter.json`·`DocumentationValidation.json` |
 
 현재 변경의 실제 상점 화면·물리 입력·다중 PC·패키지 실행은 검수하지 않았다. 이전 실행 이력은 최신 변경의 작동 확인 근거로 대체하지 않는다.
+
+### 9-35 2026-10-09 지하 미로 갈림길 연출
+
+2026-10-09 사용자 요청에 따라 인카운터의 공중 전경·외부 NPC 무대 이동을 지하 미로 갈림길 연출로 변경했다. 후보 순서 0=좌회전·1=직진·2=우회전을 공통 `EncounterDungeonLayout`에서 정의하고 기존 가중치·태그·EncounterId와 Host 선택 권한을 유지한다. `AEncounterDungeonRoute`가 로컬 런타임 native 도형으로 벽·바닥·천장·코너를 구성하며 기존 NPC 무대의 설정·재질을 참조한 표시 Actor를 생성한다. 원본 Content·Gameplay 맵·전투 Arena·Grid·체크포인트 좌표·저장 스키마를 변경하지 않는다.
+
+실제 선택이 저장·복제된 경우에만 2.8초 통로 이동·코너 회전을 표시한다. 상점 Continue와 늦게 접속한 클라이언트는 도착점에 바로 배치하고 같은 방문의 구매·리롤 갱신은 연출을 재시작하지 않는다. 퇴장 뒤 다음 갈림길 전환에는 짧은 페이드를 사용한다. 선택 UI는 전체 배경 없이 하단 3열 카드를 표시하며 원래 후보 ID로 요청한다. 이동 중에는 기존 전환 잠금으로 UI를 숨기고 도착 후 오른쪽 구매 패널을 연다. 연출이 없는 맵의 세로 선택·상점 표시와 전투 카메라 복귀는 유지한다.
+
+기준 커밋은 `8f9802be`이며 작업 시작에 기존 미커밋 변경은 없었다. `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`의 최초 빌드는 새 소스에 따른 Unity 묶음 변경으로 기존 `RunEncounterPool` 내부 이름이 다른 CSV 파일과 충돌했다. 후보 개수·태그 파서의 내부 이름만 구분한 뒤 최종 컴파일·링크가 12.47초에 성공했다. 로그는 `Saved/Automation/DungeonEncounter_20261009/EditorBuild.log`·`EditorBuild.Final.log`다.
+
+경로 축 정렬·통과 셀 바닥·도착점과 NPC 카메라 위치·방향 순서·잘못된 방향을 검사하는 Native 테스트 2개(`ProjectA.Run.EncounterPresentation.DungeonLayoutGeometry`, `DungeonDirectionContract`)를 작성하고 컴파일했다. 기존 PIE·패키지 검수는 표시된 방향 버튼·이동 완료·원래 선택 ID·퇴장 정리를 확인하도록 수정했다. 독립 코드 검토와 문서 11개·로컬 링크 764개·diff 정적 검사를 통과했으며 TODO의 기존 선택 7개와 미완료 항목을 보존했다. 근거는 `Saved/Automation/DungeonEncounter_20261009/DocumentationValidation.json`·`StaticChecks.json`이다.
+
+현재 규칙에 따라 게임·PIE·자동화 테스트·패키지를 실행하지 않았으며 에디터·IDE도 열지 않았다. 과거 9-32·9-33의 공중 전경/NPC 화면 성공은 당시 코드의 이력으로 보존하며 새 미로의 가림·이동·Continue·협동 검증으로 대체하지 않는다. 남은 확인은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완), 현행 구성은 [PROJECT_PLAN 4-13](PROJECT_PLAN.md#4-13-통합-gameplay와-npc-상점)과 [UI_README](UI_README.md)에 기록한다.

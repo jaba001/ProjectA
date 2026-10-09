@@ -2,6 +2,7 @@
 
 #include "Combat/CombatManager.h"
 #include "Camera/CameraActor.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
@@ -10,6 +11,7 @@
 #include "Game/Encounter/EncounterManager.h"
 #include "Game/Encounter/CombatArena.h"
 #include "Game/Encounter/EncounterPrototypeStage.h"
+#include "Game/Encounter/EncounterDungeonRoute.h"
 #include "Game/GameModes/GameplayGameModeBase.h"
 #include "Game/GameState/GameplayGameState.h"
 #include "Game/Run/RunStateSubsystem.h"
@@ -113,6 +115,8 @@ void AGameplayPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason
 {
     bPresentationEnding = true;
     ResetEncounterPresentation();
+    if (DungeonRoute.IsValid()) DungeonRoute->Destroy();
+    DungeonRoute.Reset();
     GetWorldTimerManager().ClearTimer(BindStateTimer);
     if (GameplayState)
     {
@@ -475,6 +479,11 @@ void AGameplayPlayerController::ResetEncounterPresentation()
     GetWorldTimerManager().ClearTimer(EncounterPresentationTimer);
     ++PresentationGeneration;
     if (PresentedStage.IsValid()) PresentedStage->StopPresentation();
+    if (DungeonRoute.IsValid())
+    {
+        DungeonRoute->OnTravelFinished.RemoveAll(this);
+        DungeonRoute->ResetAtJunction();
+    }
     PresentedStage.Reset();
     PresentationViewTarget.Reset();
     bWorldEncounterPresentation = false;
@@ -485,7 +494,10 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
 {
     if (!IsLocalController() || bPresentationEnding) return;
     const FRunEncounterProgress& Progress = View.EncounterProgress;
-    const bool bSameVisit = PresentationPhase == View.Phase && PresentedEncounterId == Progress.SelectedEncounterId && PresentedCompletedCount == Progress.AfterCompletedNodeCount && PresentedVisitIndex == Progress.VisitIndex;
+    TArray<FName> OfferIds;
+    for (const FRunEncounterOffer& Offer : Progress.Offers) OfferIds.Add(Offer.EncounterId);
+    const bool bWalkFromJunction = View.Phase == ERunPhase::Shop && PresentationPhase == ERunPhase::EncounterChoice && PresentationViewTarget == DungeonRoute && DungeonRoute.IsValid() && PresentedCompletedCount == Progress.AfterCompletedNodeCount && PresentedVisitIndex == Progress.VisitIndex && PresentedOfferIds == OfferIds;
+    const bool bSameVisit = PresentationPhase == View.Phase && PresentedEncounterId == Progress.SelectedEncounterId && PresentedCompletedCount == Progress.AfterCompletedNodeCount && PresentedVisitIndex == Progress.VisitIndex && PresentedOfferIds == OfferIds;
     if (!bSameVisit)
     {
         ResetEncounterPresentation();
@@ -493,10 +505,26 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
         PresentedEncounterId = Progress.SelectedEncounterId;
         PresentedCompletedCount = Progress.AfterCompletedNodeCount;
         PresentedVisitIndex = Progress.VisitIndex;
+        PresentedOfferIds = MoveTemp(OfferIds);
     }
     if (View.Phase != ERunPhase::Shop && View.Phase != ERunPhase::Map && View.Phase != ERunPhase::EncounterChoice) return;
     if (PresentationViewTarget.IsValid()) return;
     if (bWorldEncounterPresentation) ResetEncounterPresentation();
+    // The authored marker identifies the unified map; its aerial camera is replaced locally.
+    // 제작된 마커로 통합 맵을 식별하고 공중 카메라를 로컬 던전 연출로 대체합니다.
+    AActor* OverviewMarker = nullptr;
+    for (TActorIterator<ACameraActor> It(GetWorld()); It; ++It)
+    {
+        if (It->ActorHasTag(TEXT("GameplayEncounterOverview")) && (!OverviewMarker || It->GetPathName() < OverviewMarker->GetPathName())) OverviewMarker = *It;
+    }
+    if (OverviewMarker && !DungeonRoute.IsValid())
+    {
+        FActorSpawnParameters SpawnParameters;
+        SpawnParameters.Owner = this;
+        SpawnParameters.ObjectFlags |= RF_Transient;
+        DungeonRoute = GetWorld()->SpawnActor<AEncounterDungeonRoute>(AEncounterDungeonRoute::StaticClass(), FVector(0.f, 0.f, -6000.f), FRotator::ZeroRotator, SpawnParameters);
+        if (DungeonRoute.IsValid()) DungeonRoute->ResetAtJunction();
+    }
     AActor* ViewTarget = nullptr;
     if (View.Phase == ERunPhase::Shop)
     {
@@ -507,22 +535,55 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
             for (TActorIterator<AEncounterPrototypeStage> It(GetWorld()); It; ++It)
             {
                 AEncounterPrototypeStage* Candidate = *It;
+                if (Candidate->GetOwner() && Candidate->GetOwner()->IsA<AEncounterDungeonRoute>()) continue;
                 if (!Candidate->MatchesOffer(*Offer)) continue;
                 if (!SelectedStage || Candidate->Priority > SelectedStage->Priority || (Candidate->Priority == SelectedStage->Priority && Candidate->GetPathName() < SelectedStage->GetPathName())) SelectedStage = Candidate;
             }
         }
         if (SelectedStage)
         {
+            const int32 Direction = Progress.Offers.IndexOfByPredicate([&Progress](const FRunEncounterOffer& Entry) { return Entry.EncounterId == Progress.SelectedEncounterId; });
+            if (DungeonRoute.IsValid() && Direction >= 0 && Direction < 3)
+            {
+                if (AEncounterPrototypeStage* DungeonStage = DungeonRoute->ConfigureStage(SelectedStage, Direction))
+                {
+                    PresentedStage = DungeonStage;
+                    PresentationViewTarget = DungeonStage;
+                    bWorldEncounterPresentation = true;
+                    if (bWalkFromJunction)
+                    {
+                        // Move only after the server commits the selected offer, never on the button request.
+                        // 버튼 요청 시점이 아니라 서버가 후보 선택을 확정한 뒤에만 이동합니다.
+                        bEncounterPresentationTransition = true;
+                        SetViewTargetWithBlend(DungeonRoute.Get(), 0.f);
+                        DungeonRoute->OnTravelFinished.AddUObject(this, &AGameplayPlayerController::FinishEncounterPresentation, PresentationGeneration);
+                        if (DungeonRoute->StartTravel(Direction)) return;
+                        DungeonRoute->OnTravelFinished.RemoveAll(this);
+                    }
+                    // Continue and late replication open directly at the saved encounter's arrival point.
+                    // 이어하기와 늦게 수신한 복제 상태는 저장된 인카운터 도착점에서 시작합니다.
+                    DungeonRoute->FinishAtStage();
+                    FinishEncounterPresentation(PresentationGeneration);
+                    if (PlayerCameraManager) PlayerCameraManager->StartCameraFade(1.f, 0.f, 0.3f, FLinearColor::Black, false, false);
+                    return;
+                }
+            }
             PresentedStage = SelectedStage;
             ViewTarget = SelectedStage;
         }
     }
     else
     {
-        for (TActorIterator<ACameraActor> It(GetWorld()); It; ++It)
+        if (DungeonRoute.IsValid())
         {
-            if (It->ActorHasTag(TEXT("GameplayEncounterOverview")) && (!ViewTarget || It->GetPathName() < ViewTarget->GetPathName())) ViewTarget = *It;
+            DungeonRoute->ResetAtJunction();
+            PresentationViewTarget = DungeonRoute.Get();
+            bWorldEncounterPresentation = true;
+            SetViewTargetWithBlend(DungeonRoute.Get(), 0.f);
+            if (PlayerCameraManager) PlayerCameraManager->StartCameraFade(1.f, 0.f, 0.3f, FLinearColor::Black, false, false);
+            return;
         }
+        ViewTarget = OverviewMarker;
     }
     // Missing stages keep legacy maps and their existing full-screen encounter layout usable.
     // 무대가 없는 기존 맵에서는 원래 전체 화면 인카운터 구성을 그대로 사용합니다.

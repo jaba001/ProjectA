@@ -16,6 +16,7 @@
 #include "Controller/GameplayPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/EngineBaseTypes.h"
+#include "Game/Encounter/EncounterDungeonLayout.h"
 #include "Game/GameState/GameplayViewTypes.h"
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "UI/Gameplay/GameplayActionButton.h"
@@ -149,11 +150,54 @@ void URunEncounterWidget::NativeOnInitialized()
     InventoryPanel = CreateWidget<UCharacterInventoryPanel>(GetOwningPlayer());
     InventorySize->SetContent(InventoryPanel);
     Columns->AddChildToHorizontalBox(InventorySize)->SetPadding(FMargin(16.0f, 0.0f, 0.0f, 0.0f));
+    DungeonChoiceFit = WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass(), TEXT("DungeonChoiceBar"));
+    DungeonChoiceFit->SetStretch(EStretch::ScaleToFit);
+    DungeonChoiceFit->SetStretchDirection(EStretchDirection::DownOnly);
+    DungeonChoiceFit->SetVisibility(ESlateVisibility::Collapsed);
+    UOverlaySlot* DungeonSlot = Root->AddChildToOverlay(DungeonChoiceFit);
+    DungeonSlot->SetHorizontalAlignment(HAlign_Fill);
+    DungeonSlot->SetVerticalAlignment(VAlign_Bottom);
+    DungeonSlot->SetPadding(FMargin(32.0f, 0.0f, 32.0f, 24.0f));
+    USizeBox* DungeonSize = WidgetTree->ConstructWidget<USizeBox>();
+    DungeonSize->SetWidthOverride(1120.0f);
+    DungeonChoiceFit->SetContent(DungeonSize);
+    UBorder* DungeonPanel = WidgetTree->ConstructWidget<UBorder>();
+    Theme.StyleInset(DungeonPanel);
+    DungeonPanel->SetPadding(FMargin(16.0f, 12.0f));
+    DungeonSize->SetContent(DungeonPanel);
+    UVerticalBox* DungeonContent = WidgetTree->ConstructWidget<UVerticalBox>();
+    DungeonPanel->SetContent(DungeonContent);
+    DungeonChoiceTitle = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_DungeonChoiceTitle"));
+    DungeonChoiceTitle->SetJustification(ETextJustify::Center);
+    DungeonContent->AddChildToVerticalBox(DungeonChoiceTitle)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 8.0f));
+    UHorizontalBox* DungeonChoices = WidgetTree->ConstructWidget<UHorizontalBox>();
+    DungeonContent->AddChildToVerticalBox(DungeonChoices);
+    // Keep offer indices zero, one and two aligned with the left, straight and right corridors.
+    // 후보 0·1·2의 순서를 각각 왼쪽·직진·오른쪽 통로에 고정합니다.
+    for (int32 Index = 0; Index < 3; ++Index)
+    {
+        USizeBox* CardSize = WidgetTree->ConstructWidget<USizeBox>();
+        CardSize->SetMinDesiredHeight(104.0f);
+        UHorizontalBoxSlot* CardSlot = DungeonChoices->AddChildToHorizontalBox(CardSize);
+        CardSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+        CardSlot->SetPadding(FMargin(6.0f, 0.0f));
+        UGameplayActionButton* Button = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), FName(*FString::Printf(TEXT("Button_DungeonChoice_%d"), Index)));
+        Button->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandleSelection);
+        CardSize->SetContent(Button);
+        DungeonChoiceButtons.Add(Button);
+    }
+    DungeonChoiceMessage = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_DungeonChoiceMessage"));
+    DungeonChoiceMessage->SetJustification(ETextJustify::Center);
+    DungeonChoiceMessage->SetAutoWrapText(true);
+    DungeonChoiceMessage->SetWrapTextAt(1040.0f);
+    DungeonContent->AddChildToVerticalBox(DungeonChoiceMessage)->SetPadding(FMargin(0.0f, 8.0f, 0.0f, 0.0f));
     Theme.ApplyControls(WidgetTree);
     Theme.StyleText(Title, true, 28);
     Theme.StyleText(ShopBalance, true, 18);
     Theme.StyleText(ShopHint, false, 14);
     Theme.StyleText(Message, false, 14);
+    Theme.StyleText(DungeonChoiceTitle, true, 20);
+    Theme.StyleText(DungeonChoiceMessage, false, 16);
 }
 
 void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool bAllowRunCommands, bool bWorldPresentation)
@@ -165,6 +209,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     const FRunPartyMember* Buyer = BuyerCharacterId.IsValid() ? View.PartyMembers.FindByPredicate([this](const FRunPartyMember& Member) { return Member.CharacterId == BuyerCharacterId; }) : nullptr;
     const FRunShopBuyerView* BuyerView = Buyer ? View.ShopBuyerViews.FindByPredicate([this](const FRunShopBuyerView& Entry) { return Entry.CharacterId == BuyerCharacterId; }) : nullptr;
     const bool bInShop = View.Phase == ERunPhase::Shop;
+    const bool bDungeonChoice = bWorldPresentation && View.Phase == ERunPhase::EncounterChoice;
     const bool bItemShop = bInShop && View.EncounterProgress.IsItemShop();
     TArray<int32> VisibleItemOfferIndices;
     if (bItemShop)
@@ -181,6 +226,8 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     const bool bService = bInShop && SelectedOffer && SelectedOffer->IsService();
     const UDemonicUITheme& Theme = UDemonicUITheme::Get();
     Backdrop->SetVisibility(bWorldPresentation ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+    ContentFit->SetVisibility(bDungeonChoice ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+    DungeonChoiceFit->SetVisibility(bDungeonChoice ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
     if (UOverlaySlot* ContentSlot = Cast<UOverlaySlot>(ContentFit->Slot)) ContentSlot->SetHorizontalAlignment(bWorldPresentation ? HAlign_Right : HAlign_Fill);
     MerchantSize->SetWidthOverride(bWorldPresentation ? 780.f : 620.f);
     EquipmentSize->SetVisibility(bInShop && !bWorldPresentation ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
@@ -350,7 +397,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     for (int32 Index = 0; Index < ChoiceButtons.Num(); ++Index)
     {
         UGameplayActionButton* Button = ChoiceButtons[Index];
-        const bool bVisible = View.Phase == ERunPhase::EncounterChoice && View.EncounterProgress.Offers.IsValidIndex(Index);
+        const bool bVisible = !bDungeonChoice && View.Phase == ERunPhase::EncounterChoice && View.EncounterProgress.Offers.IsValidIndex(Index);
         Button->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
         Button->SetIsEnabled(bVisible && bAllowRunCommands);
         if (bVisible)
@@ -358,6 +405,25 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             const FRunEncounterOffer& Offer = View.EncounterProgress.Offers[Index];
             Button->Configure(Offer.EncounterId, Offer.GetDisplayName());
             Button->SetToolTipText(EncounterShopDescription(Offer));
+        }
+    }
+    for (int32 Index = 0; Index < DungeonChoiceButtons.Num(); ++Index)
+    {
+        UGameplayActionButton* Button = DungeonChoiceButtons[Index];
+        const bool bVisible = bDungeonChoice && View.EncounterProgress.Offers.IsValidIndex(Index);
+        // Hidden slots retain their direction instead of shifting the remaining corridor cards.
+        // 후보가 없는 칸도 공간을 유지하여 남은 통로 카드의 방향이 바뀌지 않게 합니다.
+        Button->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
+        Button->SetIsEnabled(bVisible && bAllowRunCommands);
+        if (!bVisible) continue;
+        const FRunEncounterOffer& Offer = View.EncounterProgress.Offers[Index];
+        const FText Direction = EncounterDungeonLayout::GetDirectionLabel(Index);
+        Button->Configure(Offer.EncounterId, FText::Format(NSLOCTEXT("RunEncounter", "DungeonDirectionOffer", "{0}\n{1}"), Direction, Offer.GetDisplayName()));
+        Button->SetToolTipText(FText::Format(NSLOCTEXT("RunEncounter", "DungeonDirectionDescription", "{0} · {1}\n{2}"), Direction, Offer.GetDisplayName(), EncounterShopDescription(Offer)));
+        if (UTextBlock* Label = Cast<UTextBlock>(Button->GetContent()))
+        {
+            Label->SetWrapTextAt(300.0f);
+            Theme.StyleText(Label, true, 20);
         }
     }
     LeaveButton->SetVisibility(View.Phase == ERunPhase::Shop ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -374,9 +440,11 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
     }
     Message->SetText(DisplayMessage);
     Message->SetVisibility(DisplayMessage.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+    DungeonChoiceMessage->SetText(DisplayMessage);
+    DungeonChoiceMessage->SetVisibility(DisplayMessage.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
     if (View.Phase == ERunPhase::EncounterChoice)
     {
-        Title->SetText(NSLOCTEXT("RunEncounter", "Choose", "인카운터 선택"));
+        Title->SetText(bDungeonChoice ? NSLOCTEXT("RunEncounter", "DungeonChoose", "갈림길 · 이동할 통로 선택") : NSLOCTEXT("RunEncounter", "Choose", "인카운터 선택"));
     }
     else if (View.Phase == ERunPhase::Shop)
     {
@@ -384,6 +452,7 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
         Title->SetText(Selected ? Selected->GetDisplayName() : NSLOCTEXT("RunEncounter", "Shop", "상점"));
     }
     if (View.bTargetRun && (View.Phase == ERunPhase::EncounterChoice || bInShop)) Title->SetText(FText::Format(NSLOCTEXT("RunEncounter", "TargetProgressTitle", "{0} · {1}/80 완료"), Title->GetText(), FText::AsNumber(View.TargetCompletedSteps)));
+    DungeonChoiceTitle->SetText(Title->GetText());
 }
 
 void URunEncounterWidget::HandleSelection(FName EncounterId)

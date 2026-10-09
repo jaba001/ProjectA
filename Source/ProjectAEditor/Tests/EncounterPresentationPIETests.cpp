@@ -16,6 +16,7 @@
 #include "Engine/World.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Game/Encounter/EncounterPrototypeStage.h"
+#include "Game/Encounter/EncounterDungeonLayout.h"
 #include "Game/Run/RunEncounterPool.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunStateSubsystem.h"
@@ -32,6 +33,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "Settings/LevelEditorPlaySettings.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "RunEncounterPIEHelpers.h"
 #include "TodoReviewWindowPlacement.h"
 #include "UI/Gameplay/InventoryWidget.h"
 #include "UI/Gameplay/RunEncounterWidget.h"
@@ -183,23 +185,30 @@ namespace EncounterPresentationPIE
             if (Step == 6)
             {
                 URunEncounterWidget* Screen = Active<URunEncounterWidget>(World);
-                if (!Screen || !Screen->GetIsEnabled() || !Warm()) return false;
-                UVerticalBox* Choices = Cast<UVerticalBox>(Screen->GetWidgetFromName(TEXT("EncounterActions")));
+                if (!RunEncounterPIE::PresentationReady(Controller.Get(), Screen) || !Warm()) return false;
                 const int32 Index = Run->GetEncounterProgress().Offers.IndexOfByPredicate([this](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag() == Groups[GroupIndex]; });
-                UButton* Button = Choices && Index != INDEX_NONE ? Cast<UButton>(Choices->GetChildAt(Index)) : nullptr;
-                if (!Check(Button && Button->GetIsEnabled(), TEXT("The real encounter card is enabled after the overview camera transition."))) return End();
+                UButton* Button = RunEncounterPIE::FindChoiceButton(Screen, Index);
+                if (!Check(Button && Button->GetIsEnabled(), TEXT("The real direction card is enabled at the dungeon junction."))) return End();
+                const FName SelectedId = Run->GetEncounterProgress().Offers[Index].EncounterId;
                 Button->OnClicked.Broadcast();
-                if (!Check(Run->GetPhase() == ERunPhase::Shop, TEXT("The real encounter card commits its valid shop visit."))) return End();
+                if (!Check(Run->GetPhase() == ERunPhase::Shop && Run->GetEncounterProgress().SelectedEncounterId == SelectedId, TEXT("The real direction card commits the original server offer ID at the same index."))) return End();
+                const AEncounterDungeonRoute* TravelingRoute = Cast<AEncounterDungeonRoute>(Controller->GetViewTarget());
+                URunEncounterWidget* ArrivingShop = Active<URunEncounterWidget>(World);
+                if (!Check(TravelingRoute && TravelingRoute->IsTraveling() && Controller->IsEncounterPresentationTransitioning() && ArrivingShop && !ArrivingShop->GetIsEnabled(), TEXT("A committed junction choice starts local corridor travel while shop actions remain disabled."))) return End();
                 Advance(7);
                 return false;
             }
             if (Step == 7)
             {
                 URunEncounterWidget* Screen = Active<URunEncounterWidget>(World);
-                if (!Screen || !Screen->GetIsEnabled() || !Warm()) return false;
+                if (!RunEncounterPIE::PresentationReady(Controller.Get(), Screen) || !Warm()) return false;
                 Presented = Cast<AEncounterPrototypeStage>(Controller->GetViewTarget());
                 const FRunEncounterOffer* Offer = Run->GetEncounterProgress().FindSelectedOffer();
                 if (!Check(Presented.IsValid() && Offer && Presented->MatchesOffer(*Offer) && Screen->GetIsEnabled(), TEXT("The committed shop finishes blending to its matching native NPC stage before enabling its panel."))) return End();
+                const AEncounterDungeonRoute* ArrivedRoute = Cast<AEncounterDungeonRoute>(Presented->GetOwner());
+                const int32 Direction = Run->GetEncounterProgress().Offers.IndexOfByPredicate([Offer](const FRunEncounterOffer& Entry) { return Entry.EncounterId == Offer->EncounterId; });
+                const TArray<FVector> ArrivalPath = EncounterDungeonLayout::GetPath(Direction);
+                if (!Check(ArrivedRoute && !ArrivedRoute->IsTraveling() && ArrivedRoute->GetPresentedStage() == Presented.Get() && Presented->Camera && !ArrivalPath.IsEmpty() && Presented->Camera->GetComponentLocation().Equals(ArrivedRoute->GetActorTransform().TransformPosition(ArrivalPath.Last()), 1.f), TEXT("The displayed NPC and final camera belong to the selected direction's exact route endpoint."))) return End();
                 if (!Capture(World, TEXT("Shop")) || !CheckFraming(World, Screen)) return End();
                 BeforeInventory = Run->GetItemShopState();
                 if (!Click(Screen, TEXT("Button_ShopInventory"))) return End();
@@ -224,8 +233,9 @@ namespace EncounterPresentationPIE
             }
             if (Step == 10)
             {
-                if (!Warm()) return false;
-                if (!Check(Run->GetPhase() == ERunPhase::EncounterChoice && Controller->GetViewTarget() && Controller->GetViewTarget()->ActorHasTag(TEXT("GameplayEncounterOverview")) && Presented.IsValid() && !Presented->IsActorTickEnabled(), TEXT("Leaving returns to the overview camera and stops the old NPC animation."))) return End();
+                if (!RunEncounterPIE::PresentationReady(Controller.Get(), Active<URunEncounterWidget>(World)) || !Warm()) return false;
+                const AEncounterDungeonRoute* Route = Cast<AEncounterDungeonRoute>(Controller->GetViewTarget());
+                if (!Check(Run->GetPhase() == ERunPhase::EncounterChoice && Route && !Route->IsTraveling() && (!Presented.IsValid() || !Presented->IsActorTickEnabled()), TEXT("Leaving returns to the idle dungeon junction and stops or releases the old NPC animation."))) return End();
                 ++CompletedCases;
                 if (++GroupIndex >= Groups.Num()) return End();
                 Advance(5);
@@ -330,7 +340,8 @@ namespace EncounterPresentationPIE
             {
                 Fixture->TargetRun.EncounterSeed = Seed;
                 if (!RunEncounterPool::Select(Fixture->TargetRun, 0, 0, Fixture->EncounterProgress.Offers, Error)) return Check(false, TEXT("The original frozen encounter pool remains valid: ") + Error.ToString());
-                if (!Fixture->EncounterProgress.Offers.ContainsByPredicate([this](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag() == Groups[GroupIndex]; })) continue;
+                const int32 Direction = GroupIndex % 3;
+                if (!Fixture->EncounterProgress.Offers.IsValidIndex(Direction) || Fixture->EncounterProgress.Offers[Direction].GetResolvedTag() != Groups[GroupIndex]) continue;
                 bFound = true;
                 break;
             }

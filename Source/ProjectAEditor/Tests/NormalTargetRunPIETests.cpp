@@ -45,6 +45,7 @@
 #include "RenderingThread.h"
 #include "Serialization/JsonSerializer.h"
 #include "Tests/AutomationEditorCommon.h"
+#include "RunEncounterPIEHelpers.h"
 #include "TodoReviewWindowPlacement.h"
 #include "TodoReviewGameplayPresentation.h"
 #include "UI/Combat/CombatRoundPlanningWidget.h"
@@ -436,7 +437,7 @@ namespace NormalTargetRunReview
                 ServiceUIReadyAt = FPlatformTime::Seconds();
                 return false;
             }
-            if (FPlatformTime::Seconds() - ServiceUIReadyAt < 1.2) return false;
+            if (!RunEncounterPIE::PresentationReady(Controller.Get(), Screen<URunEncounterWidget>(Controller->GetWorld()))) return false;
             AEncounterPrototypeStage* NPC = Cast<AEncounterPrototypeStage>(Controller->GetViewTarget());
             if (!Check(NPC && NPC->MatchesOffer(*Encounter), TEXT("The committed shop reaches its matching authored NPC camera before interaction."))) return End();
             if (!ObservedStages.Contains(NPC->StageId))

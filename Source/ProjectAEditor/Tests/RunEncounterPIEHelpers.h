@@ -10,6 +10,7 @@
 #include "Engine/World.h"
 #include "Game/GameState/GameplayGameState.h"
 #include "Game/Encounter/EncounterPrototypeStage.h"
+#include "Game/Encounter/EncounterDungeonRoute.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Misc/AutomationTest.h"
 #include "UI/Gameplay/RunEncounterWidget.h"
@@ -34,11 +35,27 @@ namespace RunEncounterPIE
         return FindActiveScreen<URunEncounterWidget>(Controller);
     }
 
+    inline bool IsWidgetVisible(const UWidget* Widget)
+    {
+        for (const UWidget* Current = Widget; Current; Current = Current->GetParent()) if (!Current->IsVisible()) return false;
+        return Widget != nullptr;
+    }
+
+    inline UButton* FindChoiceButton(URunEncounterWidget* Screen, int32 Index)
+    {
+        if (!Screen || Index < 0 || Index >= 3) return nullptr;
+        if (IsWidgetVisible(Screen->GetWidgetFromName(TEXT("DungeonChoiceBar")))) return Cast<UButton>(Screen->GetWidgetFromName(FName(*FString::Printf(TEXT("Button_DungeonChoice_%d"), Index))));
+        UVerticalBox* Actions = Cast<UVerticalBox>(Screen->GetWidgetFromName(TEXT("EncounterActions")));
+        UButton* Button = Actions && Actions->GetChildrenCount() > Index ? Cast<UButton>(Actions->GetChildAt(Index)) : nullptr;
+        return IsWidgetVisible(Button) ? Button : nullptr;
+    }
+
     inline bool PresentationReady(AGameplayPlayerController* Controller, UUserWidget* Screen)
     {
-        // Root enabled state follows camera transition only; client choice permissions disable individual buttons.
-        // 루트 활성 상태는 카메라 전환만 따르며 클라이언트 선택 권한은 개별 버튼을 비활성화합니다.
-        return Controller && Controller->IsLocalController() && Screen && Screen->GetIsEnabled() && Controller->PlayerCameraManager && !Controller->PlayerCameraManager->PendingViewTarget.Target;
+        // Route motion can continue on one view target after camera blending has already completed.
+        // 카메라 블렌드가 끝나도 같은 뷰 타깃 안에서 통로 이동이 계속될 수 있습니다.
+        const AEncounterDungeonRoute* Route = Controller ? Cast<AEncounterDungeonRoute>(Controller->GetViewTarget()) : nullptr;
+        return Controller && Controller->IsLocalController() && !Controller->IsEncounterPresentationTransitioning() && Screen && Screen->GetIsEnabled() && IsWidgetVisible(Screen) && Controller->PlayerCameraManager && !Controller->PlayerCameraManager->PendingViewTarget.Target && (!Route || !Route->IsTraveling());
     }
 
     inline bool VerifyShopPresentation(FAutomationTestBase* Test, AGameplayPlayerController* Controller, URunEncounterWidget* Screen, const FRunEncounterProgress& Progress, bool bTargetRun, int32 CompletedSteps)
@@ -72,7 +89,8 @@ namespace RunEncounterPIE
                     if (!State || State->GetViewState().Phase != ERunPhase::Map) return false;
                 }
                 if (!PresentationReady(Controller, FindActiveScreen<URunMapWidget>(Controller))) return false;
-                if (!Test->TestTrue(TEXT("Every local camera returns to the authored overview before the next combat starts."), Controller->GetViewTarget() && Controller->GetViewTarget()->ActorHasTag(TEXT("GameplayEncounterOverview")))) bFailed = true;
+                const AEncounterDungeonRoute* Route = Cast<AEncounterDungeonRoute>(Controller->GetViewTarget());
+                if (!Test->TestTrue(TEXT("Every local camera rests at its dungeon junction before the next combat starts."), Route && !Route->IsTraveling())) bFailed = true;
             }
             return !bFailed;
         }
@@ -97,11 +115,9 @@ namespace RunEncounterPIE
             {
                 if (Received.Offers[Index].EncounterId != Progress.Offers[Index].EncounterId || Received.Offers[Index].DisplayName.ToString() != Progress.Offers[Index].DisplayName.ToString()) return false;
             }
-            UVerticalBox* Actions = Cast<UVerticalBox>(Screen->GetWidgetFromName(TEXT("EncounterActions")));
-            if (!Actions || Actions->GetChildrenCount() < 3) return false;
-            for (int32 Index = 0; Index < 3; ++Index)
+            for (int32 Index = 0; Phase == ERunPhase::EncounterChoice && Index < 3; ++Index)
             {
-                UButton* Choice = Cast<UButton>(Actions->GetChildAt(Index));
+                UButton* Choice = FindChoiceButton(Screen, Index);
                 if (!Test->TestTrue(TEXT("Clients cannot activate encounter choices."), Choice && !Choice->GetIsEnabled())) bFailed = true;
             }
             UButton* Exit = Cast<UButton>(Screen->GetWidgetFromName(TEXT("Button_LeaveShop")));
@@ -111,8 +127,7 @@ namespace RunEncounterPIE
             Client->RequestLeaveRunEncounter();
             if (!Test->TestTrue(TEXT("Client encounter commands preserve the server choice and phase."), Run->GetPhase() == Phase && Run->GetEncounterProgress().SelectedEncounterId == Progress.SelectedEncounterId)) bFailed = true;
         }
-        UVerticalBox* Actions = Cast<UVerticalBox>(HostScreen->GetWidgetFromName(TEXT("EncounterActions")));
-        UButton* Button = Phase == ERunPhase::EncounterChoice ? (Actions ? Cast<UButton>(Actions->GetChildAt(1)) : nullptr) : Cast<UButton>(HostScreen->GetWidgetFromName(TEXT("Button_LeaveShop")));
+        UButton* Button = Phase == ERunPhase::EncounterChoice ? FindChoiceButton(HostScreen, 1) : Cast<UButton>(HostScreen->GetWidgetFromName(TEXT("Button_LeaveShop")));
         if (!Button || !Button->GetIsEnabled()) return false;
         if (Phase == ERunPhase::Shop)
         {

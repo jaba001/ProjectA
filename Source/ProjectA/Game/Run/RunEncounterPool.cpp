@@ -8,7 +8,7 @@
 
 namespace
 {
-    constexpr int32 OfferCount = 3;
+    constexpr int32 EncounterOfferCount = 3;
     constexpr int32 MaximumPoolSize = 32;
 
     bool IsValidText(const FString& Value, int32 MaximumLength, bool bAllowEmpty = false)
@@ -49,7 +49,7 @@ namespace
         return FMath::IsFinite(OutWeight);
     }
 
-    bool ParseTags(const TCHAR* Text, FGameplayTagContainer& OutTags)
+    bool ParseEncounterTags(const TCHAR* Text, FGameplayTagContainer& OutTags)
     {
         const FString Value(Text);
         if (Value.IsEmpty()) return true;
@@ -118,7 +118,7 @@ bool RunEncounterPool::LoadFromString(FString CsvText, int32 Seed, FRunTargetSta
     const FCsvParser Parser(MoveTemp(CsvText));
     const FCsvParser::FRows& Rows = Parser.GetRows();
     const TCHAR* Headers[] = {TEXT("인카운터 ID"), TEXT("게임 내 이름"), TEXT("상점 종류"), TEXT("속성"), TEXT("분류 태그"), TEXT("판매 대상"), TEXT("활성 여부"), TEXT("그룹 태그"), TEXT("그룹 가중치"), TEXT("변형 가중치"), TEXT("상품 필수 태그"), TEXT("상품 제외 태그"), TEXT("진열 정책"), TEXT("구현 상태"), TEXT("확인 사항")};
-    if (Rows.Num() < OfferCount + 1 || Rows.Num() > 1025 || Rows[0].Num() != UE_ARRAY_COUNT(Headers)) return false;
+    if (Rows.Num() < EncounterOfferCount + 1 || Rows.Num() > 1025 || Rows[0].Num() != UE_ARRAY_COUNT(Headers)) return false;
     for (int32 Index = 0; Index < UE_ARRAY_COUNT(Headers); ++Index) if (FCString::Strcmp(Rows[0][Index], Headers[Index]) != 0) return false;
 
     TArray<FRunEncounterOffer> Offers;
@@ -146,7 +146,7 @@ bool RunEncounterPool::LoadFromString(FString CsvText, int32 Seed, FRunTargetSta
         if ((bEnabled || Row[9][0] != TEXT('\0')) && !ParseWeight(Row[9], Offer.VariantWeight)) return false;
         FGameplayTagContainer Required;
         FGameplayTagContainer Excluded;
-        if (!ParseTags(Row[10], Required) || !ParseTags(Row[11], Excluded) || Required.HasAnyExact(Excluded)) return false;
+        if (!ParseEncounterTags(Row[10], Required) || !ParseEncounterTags(Row[11], Excluded) || Required.HasAnyExact(Excluded)) return false;
         const FString StockPolicy(Row[12]);
         if (StockPolicy != TEXT("기본5") && StockPolicy != TEXT("최대5") && StockPolicy != TEXT("해당없음") && StockPolicy != TEXT("보존")) return false;
         if (!bEnabled) continue;
@@ -174,7 +174,7 @@ bool RunEncounterPool::Validate(const FRunTargetState& State, FText& OutError)
     OutError = NSLOCTEXT("RunEncounterPool", "InvalidState", "저장된 인카운터 정책·태그·그룹 가중치·상품 조건 또는 선택 가능한 후보 수가 올바르지 않습니다.");
     if (State.EncounterSelectionVersion < 0 || State.EncounterSelectionVersion > 1 || State.EncounterPool.Num() > MaximumPoolSize) return false;
     const bool bWeighted = State.EncounterSelectionVersion == 1;
-    if (bWeighted ? State.SchemaVersion != 1 || State.EncounterPool.Num() < OfferCount : State.EncounterSeed != 0) return false;
+    if (bWeighted ? State.SchemaVersion != 1 || State.EncounterPool.Num() < EncounterOfferCount : State.EncounterSeed != 0) return false;
     TSet<FName> Ids;
     TMap<FGameplayTag, float> GroupWeights;
     int32 EligibleCount = 0;
@@ -199,7 +199,7 @@ bool RunEncounterPool::Validate(const FRunTargetState& State, FText& OutError)
         else if (!Offer.IsService() || !Offer.ItemQuery.IsEmpty() || Offer.ItemStockPolicyVersion != 0) return false;
         if (Offer.GroupWeight > 0.0f && Offer.VariantWeight > 0.0f && MatchesEncounterQuery(Offer, State.EncounterQuery)) ++EligibleCount;
     }
-    if (bWeighted && EligibleCount < OfferCount) return false;
+    if (bWeighted && EligibleCount < EncounterOfferCount) return false;
     OutError = FText::GetEmpty();
     return true;
 }
@@ -235,7 +235,7 @@ bool RunEncounterPool::Select(const FRunTargetState& State, int32 CombatIndex, i
     VisitSeed ^= VisitSeed >> 13;
     FRandomStream Random(static_cast<int32>(VisitSeed));
     TArray<FRunEncounterOffer> Offers;
-    for (int32 Selection = 0; Selection < OfferCount; ++Selection)
+    for (int32 Selection = 0; Selection < EncounterOfferCount; ++Selection)
     {
         TArray<int32> SelectedGroups;
         if (!GameplayTagCandidateSelection::Select(GroupCandidates, FGameplayTagQuery(), 1, false, Random, SelectedGroups)) return false;

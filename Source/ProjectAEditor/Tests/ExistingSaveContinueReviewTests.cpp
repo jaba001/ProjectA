@@ -21,6 +21,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Encounter/EncounterPrototypeStage.h"
+#include "Game/Encounter/EncounterDungeonRoute.h"
 #include "Game/Run/RunParticipationLibrary.h"
 #include "Game/Run/RunSaveFormat.h"
 #include "Game/Run/RunSaveGame.h"
@@ -349,7 +350,8 @@ namespace ExistingSaveContinueReview
         {
             const ERunPhase Phase = Observation->Expected->Phase;
             UUserWidget* Screen = nullptr;
-            bool bCameraReady = Controller->PlayerCameraManager && !Controller->PlayerCameraManager->PendingViewTarget.Target;
+            const AEncounterDungeonRoute* Route = Cast<AEncounterDungeonRoute>(Controller->GetViewTarget());
+            bool bCameraReady = !Controller->IsEncounterPresentationTransitioning() && Controller->PlayerCameraManager && !Controller->PlayerCameraManager->PendingViewTarget.Target && (!Route || !Route->IsTraveling());
             bool bContentReady = false;
             if (Phase == ERunPhase::Shop || Phase == ERunPhase::EncounterChoice)
             {
@@ -367,12 +369,12 @@ namespace ExistingSaveContinueReview
                     PresentationReport->SetStringField(TEXT("npc_stage"), NPC ? NPC->StageId.ToString() : TEXT("missing"));
                     PresentationReport->SetStringField(TEXT("visible_shop_title"), Title ? Title->GetText().ToString() : TEXT("missing"));
                 }
-                else bContentReady = !Run->GetEncounterProgress().Offers.IsEmpty() && Controller->GetViewTarget() && Controller->GetViewTarget()->ActorHasTag(TEXT("GameplayEncounterOverview"));
+                else bContentReady = !Run->GetEncounterProgress().Offers.IsEmpty() && Route && !Route->IsTraveling();
             }
             else if (Phase == ERunPhase::Map)
             {
                 Screen = ActiveScreen<URunMapWidget>(Controller);
-                bContentReady = Controller->GetViewTarget() && Controller->GetViewTarget()->ActorHasTag(TEXT("GameplayEncounterOverview"));
+                bContentReady = Route && !Route->IsTraveling();
             }
             else if (Phase == ERunPhase::Result)
             {

@@ -8,6 +8,7 @@
 
 class AEncounterManager;
 class AEncounterPrototypeStage;
+class AEncounterDungeonRoute;
 class UGameplayRootWidget;
 class URunStateSubsystem;
 class AGameplayGameState;
@@ -24,6 +25,7 @@ public:
     AGameplayPlayerController();
     void InitializeGameplay(AEncounterManager* InEncounterManager);
     bool CanIssueRunCommands() const;
+    bool IsEncounterPresentationTransitioning() const { return bEncounterPresentationTransition; }
     void RefreshRunFlowPermissions();
     virtual bool IsRoundInputEnabled() const override;
     FGuid GetInventoryCharacterId(const FGameplayViewState& View) const;
@@ -122,7 +124,9 @@ private:
     FTimerHandle BindStateTimer;
     FTimerHandle EncounterPresentationTimer;
     TWeakObjectPtr<AEncounterPrototypeStage> PresentedStage;
+    TWeakObjectPtr<AEncounterDungeonRoute> DungeonRoute;
     TWeakObjectPtr<AActor> PresentationViewTarget;
+    TArray<FName> PresentedOfferIds;
     ERunPhase PresentationPhase = ERunPhase::None;
     FName PresentedEncounterId;
     int32 PresentedCompletedCount = INDEX_NONE;

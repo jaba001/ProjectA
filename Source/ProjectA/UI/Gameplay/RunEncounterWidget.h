@@ -43,6 +43,18 @@ private:
     TObjectPtr<UScaleBox> ContentFit;
 
     UPROPERTY(Transient)
+    TObjectPtr<UScaleBox> DungeonChoiceFit;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> DungeonChoiceTitle;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> DungeonChoiceMessage;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UGameplayActionButton>> DungeonChoiceButtons;
+
+    UPROPERTY(Transient)
     TObjectPtr<UTextBlock> Title;
 
     UPROPERTY(Transient)
