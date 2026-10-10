@@ -1,4 +1,5 @@
 #include "Game/Encounter/CombatArena.h"
+#include "ProjectA.h"
 #include "Game/Encounter/CombatArenaEnvironment.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
@@ -60,7 +61,7 @@ void ACombatArena::OnRep_EnvironmentId()
     // 복제가 BeginPlay보다 빠르면 배치된 장면 초기화 후 BeginPlay에서 다시 적용합니다.
     if (!HasActorBegunPlay() || GetNetMode() == NM_DedicatedServer) return;
     FText Error;
-    if (!ApplyEnvironmentVisuals(EnvironmentId, Error)) UE_LOG(LogTemp, Warning, TEXT("[CombatArena] Environment %s could not be presented: %s"), *EnvironmentId.ToString(), *Error.ToString());
+    if (!ApplyEnvironmentVisuals(EnvironmentId, Error)) UE_LOG(LogProjectA, Warning, TEXT("[CombatArena] Environment %s could not be presented: %s"), *EnvironmentId.ToString(), *Error.ToString());
 }
 
 bool ACombatArena::ApplyEnvironment(FName ArenaId, FText& OutError)
@@ -253,7 +254,7 @@ bool ACombatArena::PrepareArena(FText& OutError)
 {
     if (!IsValid(Grid))
     {
-        OutError = FText::FromString(TEXT("Arena Grid is not configured. / 아레나 Grid를 지정하세요."));
+        OutError = NSLOCTEXT("CombatArenaText", "M_8D9368AD", "Arena Grid is not configured. / 아레나 Grid를 지정하세요.");
         return false;
     }
     if (Grid->TileMap.IsEmpty())
@@ -262,7 +263,7 @@ bool ACombatArena::PrepareArena(FText& OutError)
     }
     if (Grid->TileMap.IsEmpty())
     {
-        OutError = FText::FromString(TEXT("Grid generation failed. Check TileClass. / TileClass를 확인하세요."));
+        OutError = NSLOCTEXT("CombatArenaText", "M_E2B12843", "Grid generation failed. Check TileClass. / TileClass를 확인하세요.");
         return false;
     }
     Grid->ClearOccupancy();

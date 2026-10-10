@@ -1,4 +1,5 @@
 #include "Combat/CombatManager.h"
+#include "ProjectA.h"
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Net/UnrealNetwork.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
@@ -30,11 +31,11 @@ void ACombatManager::BeginPlay()
 
     if (!CombatGridManager)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CombatManager] CombatGridManager not found"));
+        UE_LOG(LogProjectA, Warning, TEXT("[CombatManager] CombatGridManager not found"));
         return;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[CombatManager] CombatGridManager initialized"));
+    UE_LOG(LogProjectA, Log, TEXT("[CombatManager] CombatGridManager initialized"));
 }
 
 void ACombatManager::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -299,7 +300,7 @@ void ACombatManager::StartCombat_Internal()
     FText Error;
     if (!RoundCoordinator->InitializeFromCombat(this, Error))
     {
-        UE_LOG(LogTemp, Error, TEXT("[CombatManager] Timed-round initialization failed: %s"), *Error.ToString());
+        UE_LOG(LogProjectA, Error, TEXT("[CombatManager] Timed-round initialization failed: %s"), *Error.ToString());
         RoundCoordinator->OnCombatFinished.RemoveAll(this);
         RoundCoordinator->OnRoundStateChanged.RemoveAll(this);
         RoundCoordinator->StopRound();

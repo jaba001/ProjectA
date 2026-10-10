@@ -1,4 +1,5 @@
 #include "UI/MainMenu/CharacterCreationWidget.h"
+#include "ProjectA.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
@@ -62,7 +63,7 @@ void UCharacterCreationWidget::NativeOnInitialized()
     }
     else if (!BackgroundBlocker && !FullscreenInputBlocker)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Background blocker is missing and code-generated layout is disabled."));
+        UE_LOG(LogProjectA, Warning, TEXT("[CharacterCreationWidget] Background blocker is missing and code-generated layout is disabled."));
     }
 
     InitializeClassSlotWidgetArrays();
@@ -295,14 +296,14 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
 
     if (BackgroundBlocker)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Using designer BackgroundBlocker."));
+        UE_LOG(LogProjectA, Warning, TEXT("[CharacterCreationWidget] Using designer BackgroundBlocker."));
     }
 
     if (EditableTextBox_Name || Button_Warrior || Button_Archer || Button_Mage || Button_Back || Button_Close || Button_StartGame)
     {
         if (!BackgroundBlocker)
         {
-            UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Background blocker is missing while designer character creation widgets are present."));
+            UE_LOG(LogProjectA, Warning, TEXT("[CharacterCreationWidget] Background blocker is missing while designer character creation widgets are present."));
         }
 
         return;
@@ -310,7 +311,7 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
 
     if (!WidgetTree)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] WidgetTree is not available."));
+        UE_LOG(LogProjectA, Warning, TEXT("[CharacterCreationWidget] WidgetTree is not available."));
         return;
     }
 
@@ -324,7 +325,7 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
 
     if (!RootOverlay || !FullscreenInputBlocker || !BottomPanel || !PartySlotsFixedHeightBox || !BottomHorizontalBox || !Button_StartGame || !Button_Close)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Failed to create character creation party slot fallback layout."));
+        UE_LOG(LogProjectA, Warning, TEXT("[CharacterCreationWidget] Failed to create character creation party slot fallback layout."));
         return;
     }
 
@@ -556,7 +557,7 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
 
         if (!SlotPanel || !SlotContentOverlay || !CreateSlotButton || !SlotEditorBox)
         {
-            UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Failed to create fallback party slot widgets. SlotIndex: %d"), SlotIndex);
+            UE_LOG(LogProjectA, Warning, TEXT("[CharacterCreationWidget] Failed to create fallback party slot widgets. SlotIndex: %d"), SlotIndex);
             continue;
         }
 
@@ -684,7 +685,7 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
         }
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] Character creation party slot fallback layout was created in code."));
+    UE_LOG(LogProjectA, Warning, TEXT("[CharacterCreationWidget] Character creation party slot fallback layout was created in code."));
 }
 
 void UCharacterCreationWidget::ConfigureBackgroundBlocker()
@@ -727,7 +728,7 @@ void UCharacterCreationWidget::ConfigurePartySlotsFixedHeight()
     {
         if (BottomPanel && BottomHorizontalBox)
         {
-            UE_LOG(LogTemp, Warning, TEXT("[CharacterCreationWidget] PartySlotsFixedHeightBox is missing; regenerate WBP_CharacterCreationWidget to lock PartySlots height."));
+            UE_LOG(LogProjectA, Warning, TEXT("[CharacterCreationWidget] PartySlotsFixedHeightBox is missing; regenerate WBP_CharacterCreationWidget to lock PartySlots height."));
         }
 
         return;
@@ -916,7 +917,7 @@ void UCharacterCreationWidget::CreateCharacterInSlot(int32 SlotIndex)
     if (!PartyDraft.Create(SlotIndex)) return;
     SyncDraftProperties();
     SetSlotClass(SlotIndex, SlotClassIds[SlotIndex]);
-    UE_LOG(LogTemp, Log, TEXT("[CharacterCreationWidget] Character created. SlotIndex: %d, ClassId: %s"), SlotIndex, *SlotClassIds[SlotIndex].ToString());
+    UE_LOG(LogProjectA, Log, TEXT("[CharacterCreationWidget] Character created. SlotIndex: %d, ClassId: %s"), SlotIndex, *SlotClassIds[SlotIndex].ToString());
 }
 
 void UCharacterCreationWidget::ClearCharacterSlot(int32 SlotIndex)
@@ -926,7 +927,7 @@ void UCharacterCreationWidget::ClearCharacterSlot(int32 SlotIndex)
     ClearPreviewStageSlot(SlotIndex);
     RefreshSlotVisibility(SlotIndex);
     RefreshPlayerControlSelection();
-    UE_LOG(LogTemp, Log, TEXT("[CharacterCreationWidget] Character creation panel closed. SlotIndex: %d"), SlotIndex);
+    UE_LOG(LogProjectA, Log, TEXT("[CharacterCreationWidget] Character creation panel closed. SlotIndex: %d"), SlotIndex);
 }
 
 void FCharacterCreationSlotWidgets::SetCharacterVisible(bool bCreated) const
@@ -1004,7 +1005,7 @@ void UCharacterCreationWidget::LogSlotAction(int32 SlotIndex, const TCHAR* Actio
         return;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[CharacterCreationWidget] Slot action requested. SlotIndex: %d, ClassId: %s, Action: %s"), SlotIndex, *SlotClassIds[SlotIndex].ToString(), ActionName);
+    UE_LOG(LogProjectA, Log, TEXT("[CharacterCreationWidget] Slot action requested. SlotIndex: %d, ClassId: %s, Action: %s"), SlotIndex, *SlotClassIds[SlotIndex].ToString(), ActionName);
 }
 
 void UCharacterCreationWidget::RefreshPreview()
@@ -1329,7 +1330,7 @@ void UCharacterCreationWidget::RequestStartGame()
 
     if (!MainMenuPlayerController)
     {
-        UE_LOG(LogTemp, Warning, TEXT("RequestStartGame failed because owning player is not AMainMenuPlayerController."));
+        UE_LOG(LogProjectA, Warning, TEXT("RequestStartGame failed because owning player is not AMainMenuPlayerController."));
         return;
     }
 

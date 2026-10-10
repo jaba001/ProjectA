@@ -151,7 +151,7 @@ public:
         }
         const FIntPoint OriginalSecondCoord = Arena->EnemyCoords[1];
         Arena->EnemyCoords[1] = Arena->EnemyCoords[0];
-        const FText FormationError = FText::FromString(TEXT("Opponent Snapshot formation requires distinct empty enemy tiles. / 상대 스냅샷 배치에는 중복되지 않는 빈 적 타일이 필요합니다."));
+        const FText FormationError = NSLOCTEXT("EncounterManagerText", "M_4DB3A522", "Opponent Snapshot formation requires distinct empty enemy tiles. / 상대 스냅샷 배치에는 중복되지 않는 빈 적 타일이 필요합니다.");
         CheckRejected(TEXT("Duplicate physical formation tile"), FormationError, Encounter, Combat, Arena, Run);
         Arena->EnemyCoords[1] = OriginalSecondCoord;
         if (!Test->TestTrue(TEXT("Repairing the formation starts the saved Snapshot encounter."), Encounter->RequestStartNode(Run->GetNodes()[0].NodeId))) return true;

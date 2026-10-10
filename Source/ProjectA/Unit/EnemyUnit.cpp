@@ -1,4 +1,5 @@
 #include "Unit/EnemyUnit.h"
+#include "ProjectA.h"
 
 AEnemyUnit::AEnemyUnit()
 {
@@ -18,5 +19,5 @@ void AEnemyUnit::OnTurnStart()
 
 void AEnemyUnit::SetTurnState(EEnemyTurnState NewState)
 {
-    UE_LOG(LogTemp, Warning, TEXT("[EnemyUnit] Sequential AI state changes are unsupported."));
+    UE_LOG(LogProjectA, Warning, TEXT("[EnemyUnit] Sequential AI state changes are unsupported."));
 }

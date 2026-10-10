@@ -1,4 +1,5 @@
 #include "UI/MainMenu/MainMenuScreenWidget.h"
+#include "ProjectA.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
@@ -261,7 +262,7 @@ void UMainMenuScreenWidget::EnsureCodeGeneratedLayout()
 
     if (!WidgetTree)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuScreenWidget] WidgetTree is not available."));
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuScreenWidget] WidgetTree is not available."));
         return;
     }
 
@@ -271,7 +272,7 @@ void UMainMenuScreenWidget::EnsureCodeGeneratedLayout()
 
     if (!RootOverlay || !Image_Background || !MenuBox)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuScreenWidget] Failed to create menu root layout."));
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuScreenWidget] Failed to create menu root layout."));
         return;
     }
 
@@ -487,7 +488,7 @@ void UMainMenuScreenWidget::RequestNewGame()
 
     if (!MainMenuPlayerController)
     {
-        UE_LOG(LogTemp, Warning, TEXT("RequestNewGame failed because owning player is not AMainMenuPlayerController."));
+        UE_LOG(LogProjectA, Warning, TEXT("RequestNewGame failed because owning player is not AMainMenuPlayerController."));
         return;
     }
 

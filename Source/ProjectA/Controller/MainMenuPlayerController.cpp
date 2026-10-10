@@ -1,4 +1,5 @@
 #include "Controller/MainMenuPlayerController.h"
+#include "ProjectA.h"
 
 #include "Blueprint/UserWidget.h"
 #include "Engine/GameInstance.h"
@@ -39,32 +40,32 @@ void AMainMenuPlayerController::BeginPlay()
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuPlayerController] MainMenuPreviewStage was not found in the level."));
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuPlayerController] MainMenuPreviewStage was not found in the level."));
     }
 
     if (!MainMenuRootWidgetClass)
     {
         MainMenuRootWidgetClass = UMainMenuRootWidget::StaticClass();
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuPlayerController] MainMenuRootWidgetClass is not set. Using native fallback."));
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuPlayerController] MainMenuRootWidgetClass is not set. Using native fallback."));
     }
 
     if (!MainMenuScreenWidgetClass)
     {
         MainMenuScreenWidgetClass = UMainMenuScreenWidget::StaticClass();
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuPlayerController] MainMenuScreenWidgetClass is not set. Using native fallback."));
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuPlayerController] MainMenuScreenWidgetClass is not set. Using native fallback."));
     }
 
     if (!CharacterCreationWidgetClass)
     {
         CharacterCreationWidgetClass = UCharacterCreationWidget::StaticClass();
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuPlayerController] CharacterCreationWidgetClass is not set. Using native fallback."));
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuPlayerController] CharacterCreationWidgetClass is not set. Using native fallback."));
     }
 
     MainMenuRootWidget = CreateWidget<UMainMenuRootWidget>(this, MainMenuRootWidgetClass);
 
     if (!MainMenuRootWidget)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Failed to create MainMenuRootWidget."));
+        UE_LOG(LogProjectA, Warning, TEXT("Failed to create MainMenuRootWidget."));
         return;
     }
 
@@ -86,7 +87,7 @@ void AMainMenuPlayerController::ShowMainMenuScreen()
 {
     if (!MainMenuRootWidget)
     {
-        UE_LOG(LogTemp, Warning, TEXT("MainMenuRootWidget is not available."));
+        UE_LOG(LogProjectA, Warning, TEXT("MainMenuRootWidget is not available."));
         return;
     }
 
@@ -97,7 +98,7 @@ void AMainMenuPlayerController::ShowCharacterCreationScreen()
 {
     if (!MainMenuRootWidget)
     {
-        UE_LOG(LogTemp, Warning, TEXT("MainMenuRootWidget is not available."));
+        UE_LOG(LogProjectA, Warning, TEXT("MainMenuRootWidget is not available."));
         return;
     }
 
@@ -113,15 +114,15 @@ void AMainMenuPlayerController::StartNewGameFromCharacterCreation(const FText& C
         return;
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("[MainMenuPlayerController] Start requires an active character creation screen with party slots."));
+    UE_LOG(LogProjectA, Warning, TEXT("[MainMenuPlayerController] Start requires an active character creation screen with party slots."));
 }
 
 bool AMainMenuPlayerController::StartNewGameFromParty(const TArray<FRunPartyMember>& PartyMembers, FText& OutError)
 {
     if (GameplayLevelName.IsNone() || !FPackageName::DoesPackageExist(GameplayLevelName.ToString()))
     {
-        OutError = FText::FromString(TEXT("Gameplay level is missing. Create the configured Gameplay level first. / Gameplay 레벨을 먼저 생성해 주세요."));
-        UE_LOG(LogTemp, Error, TEXT("[MainMenuPlayerController] GameplayLevelName does not exist: %s"), *GameplayLevelName.ToString());
+        OutError = NSLOCTEXT("MainMenuPlayerControllerText", "M_998333C5", "Gameplay level is missing. Create the configured Gameplay level first. / Gameplay 레벨을 먼저 생성해 주세요.");
+        UE_LOG(LogProjectA, Error, TEXT("[MainMenuPlayerController] GameplayLevelName does not exist: %s"), *GameplayLevelName.ToString());
         return false;
     }
 
@@ -135,7 +136,7 @@ bool AMainMenuPlayerController::StartNewGameFromParty(const TArray<FRunPartyMemb
 
     if (!RunState)
     {
-        OutError = FText::FromString(TEXT("Run state is unavailable. / 진행 상태를 사용할 수 없습니다."));
+        OutError = NSLOCTEXT("MainMenuPlayerControllerText", "M_50FDE898", "Run state is unavailable. / 진행 상태를 사용할 수 없습니다.");
         return false;
     }
 
@@ -145,7 +146,7 @@ bool AMainMenuPlayerController::StartNewGameFromParty(const TArray<FRunPartyMemb
 #endif
     if (!(bPrototype ? RunState->InitializeRun(PartyMembers, OutError) : RunState->InitializeTargetRun(PartyMembers, OutError)))
     {
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuPlayerController] Party validation failed: %s"), *OutError.ToString());
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuPlayerController] Party validation failed: %s"), *OutError.ToString());
         return false;
     }
 
@@ -162,7 +163,7 @@ bool AMainMenuPlayerController::ContinueSavedGame(FText& OutError)
 {
     if (GameplayLevelName.IsNone() || !FPackageName::DoesPackageExist(GameplayLevelName.ToString()))
     {
-        OutError = FText::FromString(TEXT("Gameplay 레벨을 찾을 수 없습니다."));
+        OutError = NSLOCTEXT("MainMenuPlayerControllerText", "M_7DC390AA", "Gameplay 레벨을 찾을 수 없습니다.");
         return false;
     }
     URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();

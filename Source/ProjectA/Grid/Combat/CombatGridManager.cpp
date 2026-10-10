@@ -1,4 +1,5 @@
 #include "Grid/Combat/CombatGridManager.h"
+#include "ProjectA.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
@@ -27,7 +28,7 @@ void ACombatGridManager::BeginPlay()
 
     if (!TileClass)
     {
-        UE_LOG(LogTemp, Error, TEXT("CombatGridManager: TileClass not set."));
+        UE_LOG(LogProjectA, Error, TEXT("CombatGridManager: TileClass not set."));
         return;
     }
 

@@ -1,13 +1,14 @@
 #include "Animation/Notify/AN_SkillRelease.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameplayTagContainer.h"
+#include "GAS/CombatGameplayTags.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Actor.h"
 #include "Unit/UnitBase.h"
 
 UAN_SkillRelease::UAN_SkillRelease()
 {
-    SkillReleaseEventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Release"));
+    SkillReleaseEventTag = ProjectACombatTags::Event_Attack_Release;
 }
 
 void UAN_SkillRelease::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)

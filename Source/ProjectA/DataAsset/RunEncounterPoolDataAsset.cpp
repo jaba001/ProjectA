@@ -1,4 +1,5 @@
 #include "DataAsset/RunEncounterPoolDataAsset.h"
+#include "Types/ProjectARandom.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Run/RunRecoveryTypes.h"
 #include "DataAsset/SkillPoolDataAsset.h"
@@ -129,7 +130,7 @@ bool URunEncounterPoolDataAsset::RollSkillShop(FRunSkillShopState& State, bool b
         Candidate.Tags = Offer.Tags;
         Candidate.BaseWeight = Offer.BaseWeight;
     }
-    FRandomStream Random(FMath::Rand());
+    FRandomStream Random(ProjectARandom::NewSeed());
     TArray<int32> SelectedIndices;
     const int32 OfferCount = GetSkillShopOfferCount(State);
     if (OfferCount <= 0 || !GameplayTagCandidateSelection::Select(Candidates, State.Query, OfferCount, false, Random, SelectedIndices))

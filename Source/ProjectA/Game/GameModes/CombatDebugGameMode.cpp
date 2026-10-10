@@ -206,12 +206,12 @@ bool ACombatDebugGameMode::CanSpawnDebugUnit(APlayerController* Controller, bool
     const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     if (!HasAuthority() || !IsDebugWorld(GetWorld()) || (Run && (Run->IsManagedRun() || Run->HasManagedLease())) || !IsValid(CombatManager) || !IsValid(CombatManager->GetRoundCoordinator()))
     {
-        OutError = FText::FromString(TEXT("준비된 독립 디버그 전투에서만 캐릭터를 추가할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatDebugGameModeText", "M_327FAFF3", "준비된 독립 디버그 전투에서만 캐릭터를 추가할 수 있습니다.");
         return false;
     }
     if ((bEnemy && !IsValid(EnemyDefinition)) || (!bEnemy && !IsValid(PartyDefinition)))
     {
-        OutError = FText::FromString(TEXT("추가할 캐릭터의 데이터 정의가 없습니다."));
+        OutError = NSLOCTEXT("CombatDebugGameModeText", "M_C5000930", "추가할 캐릭터의 데이터 정의가 없습니다.");
         return false;
     }
     return CombatManager->GetRoundCoordinator()->CanAddDebugUnit(Controller, bEnemy, OutError);
@@ -222,7 +222,7 @@ AUnitBase* ACombatDebugGameMode::SpawnConfiguredDebugUnit(bool bEnemy, FName Opt
     OutError = FText::GetEmpty();
     if (!IsValid(Tile) || !IsValid(Arena) || !IsValid(Arena->Grid) || Tile->GetWorld() != GetWorld() || Arena->Grid->GetTileAtCoord(Tile->GridCoord) != Tile || Tile->GetOccupyingUnit() || Tile->GetTerritory() != (bEnemy ? ETileTerritory::Enemy : ETileTerritory::Player))
     {
-        OutError = FText::FromString(TEXT("배치할 진영에 유효한 빈 칸이 없습니다."));
+        OutError = NSLOCTEXT("CombatDebugGameModeText", "M_8B77966B", "배치할 진영에 유효한 빈 칸이 없습니다.");
         return nullptr;
     }
     TSubclassOf<AUnitBase> UnitClass;
@@ -262,7 +262,7 @@ AUnitBase* ACombatDebugGameMode::SpawnConfiguredDebugUnit(bool bEnemy, FName Opt
     }
     if (!UnitClass || UnitClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated))
     {
-        OutError = FText::FromString(TEXT("등록된 목록에서 생성 가능한 캐릭터를 선택하세요."));
+        OutError = NSLOCTEXT("CombatDebugGameModeText", "M_D365615D", "등록된 목록에서 생성 가능한 캐릭터를 선택하세요.");
         return nullptr;
     }
     FActorSpawnParameters Params;
@@ -271,7 +271,7 @@ AUnitBase* ACombatDebugGameMode::SpawnConfiguredDebugUnit(bool bEnemy, FName Opt
     AUnitBase* Unit = GetWorld()->SpawnActor<AUnitBase>(UnitClass, Tile->GetActorLocation() + FVector(0.f, 0.f, 100.f), FRotator(0.f, bEnemy ? -90.f : 90.f, 0.f), Params);
     if (!IsValid(Unit))
     {
-        OutError = FText::FromString(TEXT("캐릭터 액터 생성에 실패했습니다."));
+        OutError = NSLOCTEXT("CombatDebugGameModeText", "M_1AAB9D58", "캐릭터 액터 생성에 실패했습니다.");
         return nullptr;
     }
     // Configure disposable actors before claiming a tile or joining the existing combat roster.
@@ -281,7 +281,7 @@ AUnitBase* ACombatDebugGameMode::SpawnConfiguredDebugUnit(bool bEnemy, FName Opt
         APlayerUnit* Player = Cast<APlayerUnit>(Unit);
         if (!Player || !Player->CharacterAppearance || !Player->CharacterAppearance->SetAppearance(Profession.AppearanceCatalog, FCharacterAppearanceSelection()) || !Player->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, StartingSkills, Profession.Speed) || !Player->CharacterEquipment || !Player->CharacterEquipment->SetEquipment(true, TArray<FRunEquipmentVisual>()))
         {
-            OutError = FText::FromString(TEXT("캐릭터 외형·능력치·시작 스킬 구성에 실패했습니다."));
+            OutError = NSLOCTEXT("CombatDebugGameModeText", "M_2C121C8F", "캐릭터 외형·능력치·시작 스킬 구성에 실패했습니다.");
             Unit->Destroy();
             return nullptr;
         }
@@ -292,7 +292,7 @@ AUnitBase* ACombatDebugGameMode::SpawnConfiguredDebugUnit(bool bEnemy, FName Opt
     UAbilitySystemComponent* AbilitySystem = Unit->GetAbilitySystemComponent();
     if (!AbilitySystem || !Unit->GetAttributeSet())
     {
-        OutError = FText::FromString(TEXT("캐릭터의 디버그 체력 초기화에 필요한 능력치가 없습니다."));
+        OutError = NSLOCTEXT("CombatDebugGameModeText", "M_F9436D07", "캐릭터의 디버그 체력 초기화에 필요한 능력치가 없습니다.");
         Unit->Destroy();
         return nullptr;
     }

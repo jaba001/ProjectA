@@ -1,4 +1,5 @@
 #include "Combat/Round/CombatRoundCoordinator.h"
+#include "ProjectA.h"
 #include "Combat/Round/CombatSkillEffectActor.h"
 #include "Combat/Round/CombatSkillPresentation.h"
 #include "Combat/Library/CombatEffectLibrary.h"
@@ -65,15 +66,11 @@ namespace
         const double Budget = (bValidLength ? Length : 1.0) / (bValidRate ? Rate : 1.0) + (bValidBlend ? BlendOut : 0.0) + 0.25;
         if (!bValidLength || !bValidRate || !bValidBlend || bLooping || !Montage->bEnableAutoBlendOut || Budget > MaximumMontageRecoverySeconds)
         {
-            UE_LOG(LogTemp, Warning, TEXT("[RoundAnimation] Bounded montage recovery Montage=%s Length=%.3f Rate=%.3f Budget=%.3f Loop=%d AutoBlendOut=%d / 몽타주 설정의 무한 대기를 방지하기 위해 최대 60초 안에 정리합니다"), *GetPathNameSafe(Montage), Length, Rate, Budget, bLooping, Montage->bEnableAutoBlendOut);
+            UE_LOG(LogProjectA, Warning, TEXT("[RoundAnimation] Bounded montage recovery Montage=%s Length=%.3f Rate=%.3f Budget=%.3f Loop=%d AutoBlendOut=%d / 몽타주 설정의 무한 대기를 방지하기 위해 최대 60초 안에 정리합니다"), *GetPathNameSafe(Montage), Length, Rate, Budget, bLooping, Montage->bEnableAutoBlendOut);
         }
         return FMath::Clamp(Budget, 0.01, MaximumMontageRecoverySeconds);
     }
 
-    FText RoundText(const TCHAR* Value)
-    {
-        return FText::FromString(Value);
-    }
 
 
 }
@@ -131,7 +128,7 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
 {
     if (!HasAuthority() || !IsValid(InManager) || InManager->GetWorld() != GetWorld() || View.CombatId.IsValid())
     {
-        OutError = RoundText(TEXT("전투 실행 문맥이 올바르지 않습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_AB9B7207", "전투 실행 문맥이 올바르지 않습니다.");
         return false;
     }
     CombatManager = InManager;
@@ -145,7 +142,7 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
     }
     if (!Arena || !CombatManager->GetActionAuthority())
     {
-        OutError = RoundText(TEXT("전투장 또는 참가자 권위가 없습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_667E12CF", "전투장 또는 참가자 권위가 없습니다.");
         return false;
     }
     Skills.Reset();
@@ -169,12 +166,12 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
     {
         if (!IsValid(Unit) || !Unit->GetAttributeSet() || (!Unit->IsUnitAlive() && !bRestoring) || (Unit->IsUnitAlive() && !Unit->GetCurrentTile()))
         {
-            OutError = RoundText(TEXT("유닛의 시작 위치 또는 생존 상태가 올바르지 않습니다."));
+            OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_1E843B9D", "유닛의 시작 위치 또는 생존 상태가 올바르지 않습니다.");
             return false;
         }
         if (Unit->IsUnitAlive() && (Arena->Grid->GetTileAtCoord(Unit->GetCurrentTile()->GridCoord) != Unit->GetCurrentTile() || Unit->GetCurrentTile()->GetOccupyingUnit() != Unit || !CombatRoundRules::IsOwnTerritory(Unit->GetTeam() == ETeam::Enemy, Unit->GetCurrentTile()->GridCoord)))
         {
-            OutError = RoundText(TEXT("유닛의 시작 칸과 전투 Grid·진영·점유가 일치하지 않습니다."));
+            OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_FEFE8265", "유닛의 시작 칸과 전투 Grid·진영·점유가 일치하지 않습니다.");
             return false;
         }
         Unit->OnTurnEnd();
@@ -211,7 +208,7 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
         }
         if (Unit->IsUnitAlive() && !Entry.bEnemy && !InManager->IsPartyAIControlled(Unit) && Entry.OwnerSlot == 0)
         {
-            OutError = RoundText(TEXT("인간 캐릭터의 원래 소유 연결을 확인하지 못했습니다."));
+            OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_9AC72AFB", "인간 캐릭터의 원래 소유 연결을 확인하지 못했습니다.");
             return false;
         }
         if (!RunRecoveryRules::ValidateStacks(Unit->Consumables, OutError) || (Entry.bEnemy && !Unit->Consumables.IsEmpty())) return false;
@@ -226,14 +223,14 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
     }
     if (View.Units.Num() < 2 || View.Units.Num() > 8)
     {
-        OutError = RoundText(TEXT("전투 유닛은 양 진영 합계 2~8명이어야 합니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_0A9B534B", "전투 유닛은 양 진영 합계 2~8명이어야 합니다.");
         return false;
     }
     const bool bHasPlayer = View.Units.ContainsByPredicate([](const FCombatRoundUnitView& Entry) { return !Entry.bEnemy; });
     const bool bHasEnemy = View.Units.ContainsByPredicate([](const FCombatRoundUnitView& Entry) { return Entry.bEnemy; });
     if (!bHasPlayer || !bHasEnemy)
     {
-        OutError = RoundText(TEXT("양 진영에 생존 유닛이 있어야 전투를 시작할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_F0384537", "양 진영에 생존 유닛이 있어야 전투를 시작할 수 있습니다.");
         return false;
     }
     for (const FCombatRoundSkill& Skill : Skills)
@@ -277,7 +274,7 @@ void ACombatRoundCoordinator::SuspendRound()
         }
     }
     View.Phase = ECombatRoundPhase::Suspended;
-    View.Message = RoundText(TEXT("전투가 중단되었습니다. 재개 시 마지막으로 저장한 준비 상태에서 복구합니다."));
+    View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_F7934DA5", "전투가 중단되었습니다. 재개 시 마지막으로 저장한 준비 상태에서 복구합니다.");
     PublishState();
 }
 
@@ -390,13 +387,13 @@ void ACombatRoundCoordinator::BeginPlanning()
         Entry.bHasMovePlan = false;
         Entry.MoveDestinationCoord = Entry.HomeCoord;
         Entry.bReady = false;
-        Entry.Status = RoundText(TEXT("스킬 미선택 · 턴 넘기기"));
+        Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_508EC38A", "스킬 미선택 · 턴 넘기기");
         Entry.ActionPhase = ECombatRoundActionPhase::Planned;
         Actions[Index] = FActionRuntime();
         if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive())
         {
             Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
-            Entry.Status = RoundText(TEXT("사망"));
+            Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_D690C583", "사망");
             Entry.bReady = true;
             continue;
         }
@@ -417,9 +414,9 @@ void ACombatRoundCoordinator::BeginPlanning()
             return ValidateCommand(Command, Error);
         });
         Entry.bReady = true;
-        Entry.Status = RoundText(TEXT("AI 계획 고정"));
+        Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_F4A32AA7", "AI 계획 고정");
     }
-    View.Message = RoundText(TEXT("준비 완료를 누르면 스킬을 선택하지 않은 유닛은 행동을 건너뜁니다. 적 계획은 이미 고정되었습니다."));
+    View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_3290DD4E", "준비 완료를 누르면 스킬을 선택하지 않은 유닛은 행동을 건너뜁니다. 적 계획은 이미 고정되었습니다.");
     FText SaveError;
     if (!PersistPlanningCheckpoint(SaveError)) View.Message = SaveError;
     PublishState();
@@ -464,7 +461,7 @@ bool ACombatRoundCoordinator::ValidateRequest(APlayerController* Controller, FGu
 {
     if (!HasExecutionAuthority() || !IsValid(Controller) || Controller->GetWorld() != GetWorld() || GetParticipantSlot(Controller) == 0)
     {
-        OutError = RoundText(TEXT("현재 전투를 조작할 권한이 없습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_195F30A0", "현재 전투를 조작할 권한이 없습니다.");
         return false;
     }
     bool bOwnsCharacter = false;
@@ -474,17 +471,17 @@ bool ACombatRoundCoordinator::ValidateRequest(APlayerController* Controller, FGu
     }
     if (!bOwnsCharacter)
     {
-        OutError = RoundText(TEXT("이 전투에 조작 가능한 원래 캐릭터가 없습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_B4BAA1A3", "이 전투에 조작 가능한 원래 캐릭터가 없습니다.");
         return false;
     }
     if (View.Phase != ECombatRoundPhase::Planning || CombatId != View.CombatId || RoundNumber != View.RoundNumber || Revision != View.PlanRevision)
     {
-        OutError = RoundText(TEXT("계획이 변경되었거나 이미 잠겼습니다. 최신 상태에서 다시 선택하세요."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_02A3D583", "계획이 변경되었거나 이미 잠겼습니다. 최신 상태에서 다시 선택하세요.");
         return false;
     }
     if (bSAPMovementInProgress)
     {
-        OutError = RoundText(TEXT("이동이 끝난 뒤 계획과 준비를 변경하세요."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_F084CF45", "이동이 끝난 뒤 계획과 준비를 변경하세요.");
         return false;
     }
     return true;
@@ -502,7 +499,7 @@ bool ACombatRoundCoordinator::CanPlanCommand(const FCombatRoundCommand& Command,
     OutError = FText::GetEmpty();
     if (View.Phase != ECombatRoundPhase::Planning || bSAPMovementInProgress)
     {
-        OutError = RoundText(TEXT("계획 단계에서만 행동을 선택할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_A5EFB2B8", "계획 단계에서만 행동을 선택할 수 있습니다.");
         return false;
     }
     if (!ValidateCommand(Command, OutError)) return false;
@@ -518,19 +515,19 @@ bool ACombatRoundCoordinator::CanMoveUnit(int32 UnitId, FIntPoint Destination, F
     const int32 Index = FindUnitIndex(UnitId);
     if (View.Phase != ECombatRoundPhase::Planning || !View.Units.IsValidIndex(Index))
     {
-        OutError = RoundText(TEXT("계획 단계에서만 SAP 이동을 예약할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_BACC52D2", "계획 단계에서만 SAP 이동을 예약할 수 있습니다.");
         return false;
     }
     const FCombatRoundUnitView& Entry = View.Units[Index];
     const FCombatRoundSkill* Skill = FindCommandSkill(Entry.Command);
     if (Entry.bEnemy || Entry.OwnerSlot == 0 || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive())
     {
-        OutError = RoundText(TEXT("살아 있는 인간 조작 캐릭터만 이동을 예약할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_215E6DE6", "살아 있는 인간 조작 캐릭터만 이동을 예약할 수 있습니다.");
         return false;
     }
     if (!Entry.Unit->HasEnoughSubActionPoint(1 + (Skill ? Skill->SubActionPointCost : 0)))
     {
-        OutError = RoundText(TEXT("이동 SAP 1과 선택한 스킬의 SAP 합계가 부족합니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_D7ED9C47", "이동 SAP 1과 선택한 스킬의 SAP 합계가 부족합니다.");
         return false;
     }
     TArray<FIntPoint> Path;
@@ -548,7 +545,7 @@ bool ACombatRoundCoordinator::BuildPlanningMovePath(int32 UnitId, FIntPoint Dest
     const int32 Index = FindUnitIndex(UnitId);
     if (!View.Units.IsValidIndex(Index) || !IsValid(Arena) || !IsValid(Arena->Grid))
     {
-        OutError = RoundText(TEXT("SAP 이동의 유닛 또는 전투장을 확인할 수 없습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_B7335203", "SAP 이동의 유닛 또는 전투장을 확인할 수 없습니다.");
         return false;
     }
     const FCombatRoundUnitView& Entry = View.Units[Index];
@@ -556,7 +553,7 @@ bool ACombatRoundCoordinator::BuildPlanningMovePath(int32 UnitId, FIntPoint Dest
     ACombatGridTile* Origin = Arena->Grid->GetTileAtCoord(Entry.HomeCoord);
     if (!IsValid(Unit) || !Unit->IsUnitAlive() || !IsValid(Origin) || Unit->GetCurrentTile() != Origin || Origin->GetOccupyingUnit() != Unit)
     {
-        OutError = RoundText(TEXT("살아 있는 캐릭터의 현재 칸을 확인할 수 없습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_A1430822", "살아 있는 캐릭터의 현재 칸을 확인할 수 없습니다.");
         return false;
     }
     const CombatPlanValidation::FState State = BuildPlanningState();
@@ -565,7 +562,7 @@ bool ACombatRoundCoordinator::BuildPlanningMovePath(int32 UnitId, FIntPoint Dest
     ACombatGridTile* Target = Arena->Grid->GetTileAtCoord(Destination);
     if (!IsValid(Target) || Target == Origin || Target->GetOccupyingUnit() || !CombatRoundRules::IsOwnTerritory(Entry.bEnemy, Destination) || Target->GetTerritory() != Territory)
     {
-        OutError = RoundText(TEXT("이동할 아군 진영의 예약되지 않은 빈칸을 선택하세요."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_4DD8BFDA", "이동할 아군 진영의 예약되지 않은 빈칸을 선택하세요.");
         return false;
     }
 
@@ -600,7 +597,7 @@ bool ACombatRoundCoordinator::BuildPlanningMovePath(int32 UnitId, FIntPoint Dest
             }
         }
     }
-    OutError = RoundText(TEXT("이동 범위 안에서 빈 아군 칸을 따라 도달할 수 없습니다."));
+    OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_6600F439", "이동 범위 안에서 빈 아군 칸을 따라 도달할 수 없습니다.");
     return false;
 }
 
@@ -610,16 +607,16 @@ bool ACombatRoundCoordinator::SubmitMove(APlayerController* Controller, FGuid Co
     const int32 Index = FindUnitIndex(UnitId);
     if (!View.Units.IsValidIndex(Index) || !CombatManager->GetActionAuthority()->CanControllerControl(Cast<APartyPlayerController>(Controller), View.Units[Index].Unit))
     {
-        OutError = RoundText(TEXT("원래 자신의 캐릭터만 이동을 예약할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_9673FE9F", "원래 자신의 캐릭터만 이동을 예약할 수 있습니다.");
         return false;
     }
     if (!CanMoveUnit(UnitId, Destination, OutError)) return false;
     const FCombatRoundView PreviousView = View;
     View.Units[Index].bHasMovePlan = true;
     View.Units[Index].MoveDestinationCoord = Destination;
-    View.Units[Index].Status = RoundText(TEXT("SAP 이동 예약됨"));
+    View.Units[Index].Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_E6405B83", "SAP 이동 예약됨");
     ClearOwnerReady(GetParticipantSlot(Controller));
-    View.Message = RoundText(TEXT("이동을 예약했습니다. 준비 완료 후 SAP 이동부터 실행합니다."));
+    View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_AFC958E8", "이동을 예약했습니다. 준비 완료 후 SAP 이동부터 실행합니다.");
     ++View.PlanRevision;
     if (!PersistPlanningCheckpoint(OutError))
     {
@@ -637,15 +634,15 @@ bool ACombatRoundCoordinator::CancelMove(APlayerController* Controller, FGuid Co
     const int32 Index = FindUnitIndex(UnitId);
     if (!View.Units.IsValidIndex(Index) || !IsValid(View.Units[Index].Unit) || !View.Units[Index].Unit->IsUnitAlive() || !CombatManager->GetActionAuthority()->CanControllerControl(Cast<APartyPlayerController>(Controller), View.Units[Index].Unit) || !View.Units[Index].bHasMovePlan)
     {
-        OutError = RoundText(TEXT("자신의 살아 있는 캐릭터에게 예약된 이동이 없습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_76797F79", "자신의 살아 있는 캐릭터에게 예약된 이동이 없습니다.");
         return false;
     }
     const FCombatRoundView PreviousView = View;
     View.Units[Index].bHasMovePlan = false;
     View.Units[Index].MoveDestinationCoord = View.Units[Index].HomeCoord;
-    View.Units[Index].Status = RoundText(TEXT("SAP 이동 예약 취소"));
+    View.Units[Index].Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_F6EBE1A0", "SAP 이동 예약 취소");
     ClearOwnerReady(GetParticipantSlot(Controller));
-    View.Message = RoundText(TEXT("이동 예약을 취소했습니다. 행동 계획과 준비를 다시 확인하세요."));
+    View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_55DBDE59", "이동 예약을 취소했습니다. 행동 계획과 준비를 다시 확인하세요.");
     ++View.PlanRevision;
     OutError = FText::GetEmpty();
     if (!PersistPlanningCheckpoint(OutError))
@@ -668,7 +665,7 @@ void ACombatRoundCoordinator::BeginNextMove()
         if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive() || Actions[Index].MovePath.IsEmpty())
         {
             bSAPMovementFailed = true;
-            Entry.Status = RoundText(TEXT("SAP 이동 취소"));
+            Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_D1852D3B", "SAP 이동 취소");
             continue;
         }
         PlanningMoveIndex = Index;
@@ -679,7 +676,7 @@ void ACombatRoundCoordinator::BeginNextMove()
         PlanningMoveRotation = Entry.Unit->GetActorRotation();
         Actions[Index].OriginalLocation = PlanningMoveOrigin;
         Entry.Unit->SetRoundCastMontage(nullptr);
-        Entry.Status = RoundText(TEXT("SAP 이동 중"));
+        Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_6B6BD7FB", "SAP 이동 중");
         return;
     }
     bSAPMovementInProgress = false;
@@ -738,7 +735,7 @@ void ACombatRoundCoordinator::FinishPlanningMove(bool bSucceeded)
             Unit->ForceNetUpdate();
         }
         bSAPMovementFailed |= !bSucceeded;
-        Entry.Status = RoundText(bSucceeded ? TEXT("SAP 이동 완료") : TEXT("SAP 이동 취소"));
+        Entry.Status = (bSucceeded ? NSLOCTEXT("CombatRoundCoordinatorText", "M_A82C6ABA", "SAP 이동 완료") : NSLOCTEXT("CombatRoundCoordinatorText", "M_D1852D3B", "SAP 이동 취소"));
     }
     PlanningMoveIndex = INDEX_NONE;
     PlanningMovePath.Reset();
@@ -799,18 +796,18 @@ bool ACombatRoundCoordinator::ValidateCommand(const FCombatRoundCommand& Command
     const FCombatRoundSkill* Skill = FindCommandSkill(Command);
     if (Skill->Kind != ECombatRoundSkillKind::Wait && (!IsValid(Arena) || !IsValid(Arena->Grid)))
     {
-        OutError = RoundText(TEXT("전투 Grid가 없습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_7390282D", "전투 Grid가 없습니다.");
         return false;
     }
     if (!CombatSkillExecution::CanUseSkill(View.Units[Index].Unit, *Skill))
     {
-        OutError = RoundText(TEXT("스킬 발동 태그 조건을 만족하지 않습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_A6620634", "스킬 발동 태그 조건을 만족하지 않습니다.");
         return false;
     }
     if (!CombatRoundRules::UsesUnitTarget(*Skill)) return true;
     if (!IsValidUnitTarget(Command.UnitId, Command.SkillId, Command.TargetUnitId))
     {
-        OutError = RoundText(TEXT("스킬의 대상 진영 또는 태그 조건이 올바르지 않습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_FC8A76E3", "스킬의 대상 진영 또는 태그 조건이 올바르지 않습니다.");
         return false;
     }
     return true;
@@ -822,16 +819,16 @@ bool ACombatRoundCoordinator::SubmitPlan(APlayerController* Controller, FGuid Co
     const int32 Index = FindUnitIndex(Command.UnitId);
     if (!View.Units.IsValidIndex(Index) || !CombatManager->GetActionAuthority()->CanControllerControl(Cast<APartyPlayerController>(Controller), View.Units[Index].Unit))
     {
-        OutError = RoundText(TEXT("원래 자신의 캐릭터만 계획할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_53F18F01", "원래 자신의 캐릭터만 계획할 수 있습니다.");
         return false;
     }
     if (!CanPlanCommand(Command, OutError)) return false;
     const FCombatRoundView PreviousView = View;
     View.Units[Index].Command = Command;
-    View.Units[Index].Status = RoundText(TEXT("계획 적용됨"));
+    View.Units[Index].Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_76C51C91", "계획 적용됨");
     ClearOwnerReady(GetParticipantSlot(Controller));
     ++View.PlanRevision;
-    View.Message = RoundText(TEXT("계획이 변경되어 자신의 준비만 해제되었습니다."));
+    View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_6C13C7E3", "계획이 변경되어 자신의 준비만 해제되었습니다.");
     FText Conflict;
     if (!ValidateDestinations(Conflict)) View.Message = Conflict;
     if (!PersistPlanningCheckpoint(OutError))
@@ -930,7 +927,7 @@ bool ACombatRoundCoordinator::LockPlans(FText& OutError)
         if (SAPCost > 0) Entry.Unit->ConsumeSubActionPoint(SAPCost);
         bHasMoves |= Entry.bHasMovePlan;
         Entry.ActionPhase = ECombatRoundActionPhase::Waiting;
-        Entry.Status = RoundText(TEXT("AP 실행 대기"));
+        Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_151C2CF9", "AP 실행 대기");
     }
     View.Phase = ECombatRoundPhase::Resolving;
     Accumulator = 0.0;
@@ -941,7 +938,7 @@ bool ACombatRoundCoordinator::LockPlans(FText& OutError)
     NextMoveIndex = 0;
     if (bSAPMovementInProgress)
     {
-        View.Message = RoundText(TEXT("계획 잠금 완료. 모든 예약 SAP 이동을 먼저 실행합니다."));
+        View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_12B4103C", "계획 잠금 완료. 모든 예약 SAP 이동을 먼저 실행합니다.");
         BeginNextMove();
     }
     else BeginActionResolution();
@@ -978,9 +975,9 @@ void ACombatRoundCoordinator::BeginActionResolution()
         Action.Destination = Action.OriginalLocation;
         if (Skill.Approach == ECombatRoundApproach::Tile) Action.Destination = Arena->Grid->GetTileAtCoord(Entry.Command.DestinationCoord)->GetActorLocation() + FVector(0.f, 0.f, 100.f);
         Entry.ActionPhase = ECombatRoundActionPhase::Waiting;
-        Entry.Status = RoundText(TEXT("시작 대기"));
+        Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_5CD5934E", "시작 대기");
     }
-    View.Message = RoundText(bSAPMovementFailed ? TEXT("일부 SAP 이동이 실패했습니다. SAP는 환불되지 않으며 생존 캐릭터의 AP 행동을 계속 실행합니다.") : TEXT("SAP 이동 처리 완료. 속도차에 따라 AP 행동을 실행합니다."));
+    View.Message = (bSAPMovementFailed ? NSLOCTEXT("CombatRoundCoordinatorText", "M_985E02CC", "일부 SAP 이동이 실패했습니다. SAP는 환불되지 않으며 생존 캐릭터의 AP 행동을 계속 실행합니다.") : NSLOCTEXT("CombatRoundCoordinatorText", "M_3FFBB395", "SAP 이동 처리 완료. 속도차에 따라 AP 행동을 실행합니다."));
     Accumulator = 0.0;
     SimulationTime = 0.0;
     MontageClock = 0.0;
@@ -1061,7 +1058,7 @@ void ACombatRoundCoordinator::AdvanceSimulation(float StepSeconds)
         if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive())
         {
             Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
-            Entry.Status = RoundText(TEXT("사망으로 남은 행동 취소"));
+            Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_8F480533", "사망으로 남은 행동 취소");
         }
     }
     FinishRoundIfSettled();
@@ -1095,13 +1092,13 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
     if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive())
     {
         Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
-        Entry.Status = RoundText(TEXT("발동 전 사망으로 취소"));
+        Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_F4142938", "발동 전 사망으로 취소");
         return;
     }
     const FCombatRoundSkill* Skill = FindCommandSkill(Entry.Command);
     if (!Skill)
     {
-        StartReturn(Index, true, RoundText(TEXT("스킬 정의 누락")));
+        StartReturn(Index, true, NSLOCTEXT("CombatRoundCoordinatorText", "M_4321F015", "스킬 정의 누락"));
         return;
     }
     if (Entry.ActionPhase == ECombatRoundActionPhase::Waiting)
@@ -1110,17 +1107,17 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
         Entry.Unit->SetRoundCastMontage(nullptr);
         Action.PhaseStarted = SimulationTime;
         Entry.ActionPhase = ECombatRoundActionPhase::Casting;
-        Entry.Status = RoundText(TEXT("시전 중"));
+        Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_86A82DBF", "시전 중");
         if (Skill->Kind == ECombatRoundSkillKind::Wait)
         {
             Entry.ActionPhase = ECombatRoundActionPhase::Complete;
-            Entry.Status = RoundText(TEXT("대기 완료"));
+            Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_8507A104", "대기 완료");
             return;
         }
         if (Skill->Approach != ECombatRoundApproach::None)
         {
             Entry.ActionPhase = ECombatRoundActionPhase::Approaching;
-            Entry.Status = RoundText(TEXT("접근 중"));
+            Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_F15BD04E", "접근 중");
         }
     }
     if (Entry.ActionPhase == ECombatRoundActionPhase::Approaching || Entry.ActionPhase == ECombatRoundActionPhase::Casting)
@@ -1146,12 +1143,12 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
                     Action.MontageRecoverySeconds = 0.0;
                     Action.WeaponTrace = CombatSkillExecution::FWeaponTraceState();
                     if (Skill->Approach == ECombatRoundApproach::Unit) Entry.ActionPhase = ECombatRoundActionPhase::Approaching;
-                    Entry.Status = RoundText(TEXT("가까운 적으로 대상 변경"));
+                    Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_A14A8022", "가까운 적으로 대상 변경");
                 }
             }
             if (Skill->TargetLoss == ECombatRoundTargetLoss::Cancel || (Skill->TargetLoss == ECombatRoundTargetLoss::NearestEnemy && !View.Units.IsValidIndex(TargetIndex)))
             {
-                StartReturn(Index, true, RoundText(TEXT("목표 사망으로 불발")));
+                StartReturn(Index, true, NSLOCTEXT("CombatRoundCoordinatorText", "M_19005738", "목표 사망으로 불발"));
                 return;
             }
         }
@@ -1168,7 +1165,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
                 ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Entry.Command.DestinationCoord);
                 if (!Tile || (Tile->GetOccupyingUnit() && Tile->GetOccupyingUnit() != Entry.Unit) || IsDestinationReservedByOther(Index, Entry.Command.DestinationCoord))
                 {
-                    StartReturn(Index, true, RoundText(TEXT("접근 칸 점유 또는 예약 충돌로 불발")));
+                    StartReturn(Index, true, NSLOCTEXT("CombatRoundCoordinatorText", "M_7A5A3B1D", "접근 칸 점유 또는 예약 충돌로 불발"));
                     return;
                 }
             }
@@ -1183,13 +1180,13 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
             }
             if (SimulationTime - Action.PhaseStarted > MovementTimeout)
             {
-                StartReturn(Index, true, RoundText(TEXT("접근 시간 초과로 불발")));
+                StartReturn(Index, true, NSLOCTEXT("CombatRoundCoordinatorText", "M_5CC8DA49", "접근 시간 초과로 불발"));
                 return;
             }
             if (!bWithinApproachRange && !MoveUnitToward(Index, Destination, CombatRoundRules::AttackMoveSpeed(*Skill, Entry.Speed), StepSeconds)) return;
             Action.PhaseStarted = SimulationTime;
             Entry.ActionPhase = ECombatRoundActionPhase::Casting;
-            Entry.Status = RoundText(TEXT("시전 중"));
+            Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_86A82DBF", "시전 중");
         }
         if (Entry.ActionPhase == ECombatRoundActionPhase::Casting)
         {
@@ -1226,7 +1223,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
         if (!bFinished && MontageClock + 0.00001 < Action.MontageStartedAt + Action.MontageRecoverySeconds) return;
         if (!bFinished)
         {
-            if (bHasMontageInstance) UE_LOG(LogTemp, Warning, TEXT("[RoundAnimation] Recovery timeout Unit=%d Round=%d / 몽타주 종료 대기 시간 초과로 표현을 정리하고 복귀합니다"), Entry.UnitId, View.RoundNumber);
+            if (bHasMontageInstance) UE_LOG(LogProjectA, Warning, TEXT("[RoundAnimation] Recovery timeout Unit=%d Round=%d / 몽타주 종료 대기 시간 초과로 표현을 정리하고 복귀합니다"), Entry.UnitId, View.RoundNumber);
             // A zero blend stops held or looping poses before return movement begins, including on remote clients.
             // 원격 클라이언트를 포함하여 복귀 이동 전에 유지되거나 반복되는 자세를 0초 블렌드로 정리합니다.
             Entry.Unit->SetRoundCastMontage(nullptr, true);
@@ -1243,8 +1240,8 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
             // 복귀 실패 시 예약한 원위치로 정리하여 생존 유닛을 상대 진영에 남기지 않습니다.
             Entry.Unit->SetActorLocation(Action.OriginalLocation, false);
             Action.bFailed = true;
-            Entry.Status = RoundText(TEXT("복귀 시간 초과: 예약 칸으로 복원"));
-            UE_LOG(LogTemp, Warning, TEXT("[Round] Return timeout Unit=%d Round=%d / 복귀 시간 초과"), Entry.UnitId, View.RoundNumber);
+            Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_25B385B9", "복귀 시간 초과: 예약 칸으로 복원");
+            UE_LOG(LogProjectA, Warning, TEXT("[Round] Return timeout Unit=%d Round=%d / 복귀 시간 초과"), Entry.UnitId, View.RoundNumber);
         }
         else if (!MoveUnitToward(Index, Action.OriginalLocation, CombatRoundRules::AttackMoveSpeed(*Skill, Entry.Speed), StepSeconds))
         {
@@ -1305,7 +1302,7 @@ void ACombatRoundCoordinator::StartReturn(int32 Index, bool bFailed, const FText
         }
         Action.bFailed = true;
         bFailed = true;
-        Entry.Status = RoundText(TEXT("최종 배치 실패: 출발 칸으로 복귀"));
+        Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_19AF2AB8", "최종 배치 실패: 출발 칸으로 복귀");
     }
     if (FVector::DistSquared2D(Entry.Unit->GetActorLocation(), Action.OriginalLocation) <= 4.f)
     {
@@ -1346,7 +1343,7 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
         AUnitBase* Target = View.Units.IsValidIndex(TargetIndex) ? View.Units[TargetIndex].Unit.Get() : nullptr;
         const bool bSucceeded = CombatConsumableRules::Release(Entry.Unit, Target, Skill, Entry.OwnerSlot > 0 && !Entry.bEnemy && !CombatManager->IsPartyAIControlled(Entry.Unit));
         if (bSucceeded) Entry.HP = Entry.Unit->GetAttributeSet()->GetHP();
-        StartRecovery(Index, !bSucceeded, RoundText(bSucceeded ? TEXT("회복 소모품 사용") : TEXT("회복 조건 변경으로 소모품 보존")));
+        StartRecovery(Index, !bSucceeded, (bSucceeded ? NSLOCTEXT("CombatRoundCoordinatorText", "M_2BFA3D10", "회복 소모품 사용") : NSLOCTEXT("CombatRoundCoordinatorText", "M_A64E7284", "회복 조건 변경으로 소모품 보존")));
         return;
     }
     CombatSkillExecution::FReleaseContext Context;
@@ -1396,9 +1393,9 @@ void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, con
     if (!Target->IsUnitAlive())
     {
         Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
-        Entry.Status = RoundText(TEXT("사망으로 남은 행동 취소"));
+        Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_8F480533", "사망으로 남은 행동 취소");
     }
-    UE_LOG(LogTemp, Log, TEXT("[Round] Round=%d Time=%.2f Source=%d Target=%d Damage=%.1f / 서버 피격"), View.RoundNumber, SimulationTime, Source->UnitIndex, Target->UnitIndex, Skill.Power);
+    UE_LOG(LogProjectA, Log, TEXT("[Round] Round=%d Time=%.2f Source=%d Target=%d Damage=%.1f / 서버 피격"), View.RoundNumber, SimulationTime, Source->UnitIndex, Target->UnitIndex, Skill.Power);
 }
 
 void ACombatRoundCoordinator::HandleProjectileResolved(ACombatRoundProjectile* Projectile)
@@ -1447,11 +1444,11 @@ void ACombatRoundCoordinator::FinishRoundIfSettled()
     }
     for (const FCombatRoundUnitView& Entry : View.Units) UCombatEffectLibrary::ClearRoundShield(Entry.Unit);
     View.Phase = ECombatRoundPhase::Finished;
-    View.Message = RoundText(TEXT("패배"));
+    View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_6DC2E7F3", "패배");
     ECombatResult Result = ECombatResult::Defeat;
     if (bPlayersAlive)
     {
-        View.Message = RoundText(TEXT("승리"));
+        View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_C9E21894", "승리");
         Result = ECombatResult::Victory;
     }
     PublishState();

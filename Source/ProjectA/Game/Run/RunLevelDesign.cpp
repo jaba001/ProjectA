@@ -1,4 +1,5 @@
 #include "Game/Run/RunLevelDesign.h"
+#include "Types/ProjectARandom.h"
 
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Run/TargetRunTypes.h"
@@ -332,7 +333,7 @@ bool RunLevelDesign::Load(FRunTargetState& State, int32 PartySize, FText& OutErr
     }
     // Draw the seed only after every input and possible scaled candidate has passed validation.
     // 모든 입력과 선택 가능한 배율 적용 후보를 검증한 뒤에만 최초 시드를 추첨합니다.
-    Candidate.LevelDesign.Seed = FMath::Rand();
+    Candidate.LevelDesign.Seed = ProjectARandom::NewSeed();
     if (!Build(Candidate, OutError)) return false;
     State = MoveTemp(Candidate);
     OutError = FText::GetEmpty();

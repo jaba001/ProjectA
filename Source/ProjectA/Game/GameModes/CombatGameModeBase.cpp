@@ -1,4 +1,5 @@
 #include "Game/GameModes/CombatGameModeBase.h"
+#include "ProjectA.h"
 #include "Combat/CombatManager.h"
 #include "Unit/UnitBase.h"
 #include "Engine/World.h"
@@ -27,7 +28,7 @@ void ACombatGameModeBase::SpawnCombat()
 
     if (!CombatManagerClass)
     {
-        UE_LOG(LogTemp, Error, TEXT("CombatManagerClass is null"));
+        UE_LOG(LogProjectA, Error, TEXT("CombatManagerClass is null"));
         return;
     }
 
@@ -42,7 +43,7 @@ void ACombatGameModeBase::SpawnCombat()
 
     if (!Grid)
     {
-        UE_LOG(LogTemp, Error, TEXT("CombatGridManager not found"));
+        UE_LOG(LogProjectA, Error, TEXT("CombatGridManager not found"));
         return;
     }
 

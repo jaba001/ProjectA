@@ -359,7 +359,7 @@ bool UCombatActionAuthority::HasOriginalOwner(const APlayerUnit* Unit) const
 
 bool UCombatActionAuthority::SetPartyControlMode(APlayerUnit* Unit, EPartyControlMode Mode, FText& OutError)
 {
-    OutError = FText::FromString(TEXT("원래 소유자가 확인된 유휴 아군의 조작 방식은 서버에서 전투 시작 전에만 설정할 수 있습니다."));
+    OutError = NSLOCTEXT("CombatActionAuthorityText", "M_671D4184", "원래 소유자가 확인된 유휴 아군의 조작 방식은 서버에서 전투 시작 전에만 설정할 수 있습니다.");
     ACombatManager* Manager = GetManager();
     if (!IsValid(Manager) || !Manager->HasAuthority() || !HasManagedExecutionAuthority(true) || Manager->IsCombatActive() || Manager->GetCombatViewState().bSuspendedForRecovery || IsValid(Manager->GetRoundCoordinator()) || !bRunConfigured || !IsValid(Unit) || Unit->GetWorld() != Manager->GetWorld() || Unit->GetTeam() != ETeam::Player || !HasOriginalOwner(Unit) || !GetUnitId(Unit).IsValid() || !Manager->GetRegisteredUnits().Contains(Unit) || (Mode != EPartyControlMode::Human && Mode != EPartyControlMode::ServerAI))
     {

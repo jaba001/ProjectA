@@ -1,4 +1,5 @@
 #include "Game/GameModes/GameplayGameModeBase.h"
+#include "ProjectA.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Controller/GameplayPlayerController.h"
@@ -92,7 +93,7 @@ void AGameplayGameModeBase::InitializeGameplay()
     const FName SnapshotSlot = SlotOverride.Len() <= 64 ? FName(*SlotOverride) : NAME_None;
     if (bUseSnapshot && UPartySnapshotLibrary::GetSaveSlotName(SnapshotSlot).IsEmpty())
     {
-        UE_LOG(LogTemp, Error, TEXT("[Gameplay] Invalid ProjectAOpponentSnapshot slot. Use 1-64 ASCII letters, digits or underscores. / 상대 Snapshot 슬롯에는 영문, 숫자, 밑줄로 이루어진 1~64자 식별자가 필요합니다."));
+        UE_LOG(LogProjectA, Error, TEXT("[Gameplay] Invalid ProjectAOpponentSnapshot slot. Use 1-64 ASCII letters, digits or underscores. / 상대 Snapshot 슬롯에는 영문, 숫자, 밑줄로 이루어진 1~64자 식별자가 필요합니다."));
         return;
     }
     ACombatArena* Arena = nullptr;
@@ -115,7 +116,7 @@ void AGameplayGameModeBase::InitializeGameplay()
     EncounterManager = GetWorld()->SpawnActor<AEncounterManager>(EncounterManagerClass, FVector::ZeroVector, FRotator::ZeroRotator, Params);
     if (!EncounterManager)
     {
-        UE_LOG(LogTemp, Error, TEXT("[Gameplay] EncounterManagerClass is missing or could not spawn."));
+        UE_LOG(LogProjectA, Error, TEXT("[Gameplay] EncounterManagerClass is missing or could not spawn."));
         return;
     }
     TMap<FName, TObjectPtr<UEncounterDefinitionDataAsset>> RuntimeDefinitions = EncounterDefinitions;
@@ -159,7 +160,7 @@ void AGameplayGameModeBase::InitializeGameplay()
         FText Error;
         if (!EncounterManager->ResumeManagedGameplay(Error))
         {
-            UE_LOG(LogTemp, Warning, TEXT("[Gameplay] Managed Run is waiting for resume: %s"), *Error.ToString());
+            UE_LOG(LogProjectA, Warning, TEXT("[Gameplay] Managed Run is waiting for resume: %s"), *Error.ToString());
         }
     }
     else if (GetNetMode() == NM_Standalone && Run->HasCombatCheckpoint())
@@ -167,7 +168,7 @@ void AGameplayGameModeBase::InitializeGameplay()
         FText Error;
         if (!EncounterManager->RestoreSavedCombat(Run->GetRunIdentity().HostAccountId, Error))
         {
-            UE_LOG(LogTemp, Error, TEXT("[Gameplay] Combat checkpoint restore failed: %s"), *Error.ToString());
+            UE_LOG(LogProjectA, Error, TEXT("[Gameplay] Combat checkpoint restore failed: %s"), *Error.ToString());
         }
     }
 }
@@ -177,7 +178,7 @@ void AGameplayGameModeBase::PostLogin(APlayerController* NewPlayer)
     Super::PostLogin(NewPlayer);
     if (DevelopmentCoopCapacity > 0 && (!DevelopmentLobby || !DevelopmentLobby->AddParticipant(Cast<AGameplayPlayerController>(NewPlayer))))
     {
-        if (GameSession) GameSession->KickPlayer(NewPlayer, FText::FromString(TEXT("개발용 방이 가득 찼거나 이미 시작되었습니다.")));
+        if (GameSession) GameSession->KickPlayer(NewPlayer, NSLOCTEXT("GameplayGameModeBaseText", "M_DB0C5DE6", "개발용 방이 가득 찼거나 이미 시작되었습니다."));
         return;
     }
     if (EncounterManager)
@@ -336,7 +337,7 @@ bool AGameplayGameModeBase::ApplyCombatParticipantBindings(UCombatActionAuthorit
 bool AGameplayGameModeBase::ValidateManagedRunConnections(FText& OutError) const
 {
     const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
-    OutError = FText::FromString(TEXT("관리 Run을 실행할 현재 Host의 유효한 로컬 권한이 필요합니다."));
+    OutError = NSLOCTEXT("GameplayGameModeBaseText", "M_7BC4E208", "관리 Run을 실행할 현재 Host의 유효한 로컬 권한이 필요합니다.");
     if (!HasAuthority() || !Run || !Run->IsManagedRun() || !Run->HasManagedLease() || Run->GetRunIdentity().Origin != ERunIdentityOrigin::LocalDevelopment || Run->GetLocalCaller() != Run->GetRunIdentity().HostAccountId || (GetNetMode() != NM_Standalone && GetNetMode() != NM_ListenServer))
     {
         return false;
@@ -347,7 +348,7 @@ bool AGameplayGameModeBase::ValidateManagedRunConnections(FText& OutError) const
     }
     if (GetNetMode() == NM_Standalone && (Run->GetParticipation().HumanParticipants.Num() != 1 || Run->GetParticipation().HumanParticipants[0] != Run->GetLocalCaller()))
     {
-        OutError = FText::FromString(TEXT("싱글 재개에는 현재 Host 한 명만 인간 참가자로 남아 있어야 합니다."));
+        OutError = NSLOCTEXT("GameplayGameModeBaseText", "M_79884691", "싱글 재개에는 현재 Host 한 명만 인간 참가자로 남아 있어야 합니다.");
         return false;
     }
     for (const FRunAccountId& Human : Run->GetParticipation().HumanParticipants)
@@ -363,7 +364,7 @@ bool AGameplayGameModeBase::ValidateManagedRunConnections(FText& OutError) const
         }
         if (!Match || Match->GetWorld() != GetWorld() || Match->IsLocalController() != (Human == Run->GetRunIdentity().HostAccountId))
         {
-            OutError = FText::FromString(TEXT("현재 인간 참가자 모두의 서버 연결 배정이 필요합니다. 불참자는 자동으로 AI 전환되지 않습니다."));
+            OutError = NSLOCTEXT("GameplayGameModeBaseText", "M_90647623", "현재 인간 참가자 모두의 서버 연결 배정이 필요합니다. 불참자는 자동으로 AI 전환되지 않습니다.");
             return false;
         }
     }

@@ -1,4 +1,5 @@
 #include "Combat/CombatManager.h"
+#include "ProjectA.h"
 #include "Grid/Combat/CombatGridTile.h"
 
 // Preserve reflected names and inert behavior for existing assets; new combat uses round planning.
@@ -11,19 +12,19 @@ bool ACombatManager::IsAwaitingTurnCheckpoint() const
 
 bool ACombatManager::RetryTurnCheckpoint()
 {
-    UE_LOG(LogTemp, Warning, TEXT("[CombatManager] Sequential turn checkpoint retry is unsupported by timed-round combat."));
+    UE_LOG(LogProjectA, Warning, TEXT("[CombatManager] Sequential turn checkpoint retry is unsupported by timed-round combat."));
     return false;
 }
 
 bool ACombatManager::RestoreCombatFromBoundary(int32 CompletedTurnSerial, int32 NextTurnIndex)
 {
-    UE_LOG(LogTemp, Warning, TEXT("[CombatManager] Sequential turn checkpoint restoration is unsupported by timed-round combat."));
+    UE_LOG(LogProjectA, Warning, TEXT("[CombatManager] Sequential turn checkpoint restoration is unsupported by timed-round combat."));
     return false;
 }
 
 void ACombatManager::RequestEndTurn()
 {
-    UE_LOG(LogTemp, Warning, TEXT("[CombatManager] End-turn input is unsupported; submit timed-round readiness instead."));
+    UE_LOG(LogProjectA, Warning, TEXT("[CombatManager] End-turn input is unsupported; submit timed-round readiness instead."));
 }
 
 bool ACombatManager::RequestEndTurnForUnit(AUnitBase* RequestingUnit)

@@ -111,7 +111,7 @@ namespace ExistingSaveContinueReview
         // These reasons are emitted only after production data validation succeeds; generic corruption is not accepted.
         // 이 사유들은 프로덕션 데이터 검증 성공 후에만 반환되며 일반 손상 오류는 정상 거부로 인정하지 않습니다.
         if (FRunSaveFormat::IsManaged(Save->Version)) return Error.EqualTo(NSLOCTEXT("RunCheckpoint", "ManagedResumeRequired", "관리 Run은 기준 저장소에서 실행 lease를 획득하는 명시적 재개를 사용해야 합니다."));
-        if (Save->Phase == ERunPhase::Defeat || Save->Phase == ERunPhase::Complete) return Error.ToString() == TEXT("종료된 진행입니다. 새 게임을 시작해 주세요.");
+        if (Save->Phase == ERunPhase::Defeat || Save->Phase == ERunPhase::Complete) return Error.EqualTo(NSLOCTEXT("RunStateSubsystemText", "M_F114E5FC", "종료된 진행입니다. 새 게임을 시작해 주세요."));
         if (Save->Identity.Origin != ERunIdentityOrigin::LegacyOffline && (Save->Identity.Origin != ERunIdentityOrigin::LocalDevelopment || Save->Identity.OriginalParticipants.Num() != 1)) return Error.EqualTo(NSLOCTEXT("RunCheckpoint", "SessionRequired", "계정 연결 또는 협동 세션이 필요한 저장입니다. 현재 싱글플레이 이어하기 대신 기존 Host와 원래 참가자가 연결된 세션에서 복원해야 합니다."));
         return false;
     }

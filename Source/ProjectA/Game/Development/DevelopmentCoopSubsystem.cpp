@@ -69,7 +69,7 @@ bool UDevelopmentCoopSubsystem::NormalizeAddress(const FString& Input, FString& 
 
 bool UDevelopmentCoopSubsystem::CanTravel(APlayerController* Controller, FText& Error) const
 {
-    Error = FText::FromString(TEXT("독립 실행된 메인메뉴에서 접속을 시작해 주세요."));
+    Error = NSLOCTEXT("DevelopmentCoopSubsystemText", "M_1111F90B", "독립 실행된 메인메뉴에서 접속을 시작해 주세요.");
     const URunStateSubsystem* Run = GetGameInstance()->GetSubsystem<URunStateSubsystem>();
     return IsAvailable() && FConfigCacheIni::GetCustomConfigString() != TEXT("SteamDev") && Cast<AMainMenuPlayerController>(Controller) && Controller->GetGameInstance() == GetGameInstance() && Controller->IsLocalController() && Controller->GetNetMode() == NM_Standalone && !bPending && !bActive && Run && !Run->IsManagedRun() && !Run->HasManagedLease();
 }
@@ -79,12 +79,12 @@ bool UDevelopmentCoopSubsystem::Host(APlayerController* Controller, int32 Capaci
     if (!CanTravel(Controller, Error)) return false;
     if (Capacity < 2 || Capacity > 4)
     {
-        Error = FText::FromString(TEXT("협동 인원은 2~4명입니다."));
+        Error = NSLOCTEXT("DevelopmentCoopSubsystemText", "M_29D54F50", "협동 인원은 2~4명입니다.");
         return false;
     }
     GetGameInstance()->GetSubsystem<URunStateSubsystem>()->ResetDevelopmentRun();
     bPending = bActive = bResetAtMenu = true;
-    Status = FText::FromString(TEXT("개발용 방을 여는 중입니다."));
+    Status = NSLOCTEXT("DevelopmentCoopSubsystemText", "M_7A579509", "개발용 방을 여는 중입니다.");
     UGameplayStatics::OpenLevel(Controller, TEXT("/Game/User_JeHoon/LEVEL/Core/Gameplay"), true, FString::Printf(TEXT("listen?ProjectADevCoop=%d"), Capacity));
     Error = FText::GetEmpty();
     return true;
@@ -96,11 +96,11 @@ bool UDevelopmentCoopSubsystem::Join(APlayerController* Controller, const FStrin
     FString URL;
     if (!NormalizeAddress(Address, URL))
     {
-        Error = FText::FromString(TEXT("IPv4 주소와 포트를 입력해 주세요. 예: 127.0.0.1:7777"));
+        Error = NSLOCTEXT("DevelopmentCoopSubsystemText", "M_63D1EC9D", "IPv4 주소와 포트를 입력해 주세요. 예: 127.0.0.1:7777");
         return false;
     }
     bPending = bActive = bResetAtMenu = true;
-    Status = FText::FromString(TEXT("Host에 접속 중입니다. 응답이 없으면 취소 후 주소를 확인해 주세요."));
+    Status = NSLOCTEXT("DevelopmentCoopSubsystemText", "M_9C7D7BF3", "Host에 접속 중입니다. 응답이 없으면 취소 후 주소를 확인해 주세요.");
     Controller->ClientTravel(URL + TEXT("?ProjectADevClient=1"), TRAVEL_Absolute);
     Error = FText::GetEmpty();
     return true;
@@ -110,7 +110,7 @@ void UDevelopmentCoopSubsystem::Leave(APlayerController* Controller)
 {
     if (!IsAvailable() || !Controller || !Controller->IsLocalController() || Controller->GetGameInstance() != GetGameInstance()) return;
     bPending = bActive = false;
-    Status = FText::FromString(TEXT("개발용 협동에서 나왔습니다. 새 방으로 다시 시작할 수 있습니다."));
+    Status = NSLOCTEXT("DevelopmentCoopSubsystemText", "M_7946512A", "개발용 협동에서 나왔습니다. 새 방으로 다시 시작할 수 있습니다.");
     UGameplayStatics::OpenLevel(Controller, TEXT("/Game/User_JeHoon/LEVEL/Core/MainMenu"), true);
 }
 

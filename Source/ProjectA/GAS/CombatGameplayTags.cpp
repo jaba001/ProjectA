@@ -5,6 +5,7 @@ namespace ProjectACombatTags
     UE_DEFINE_GAMEPLAY_TAG(Skill_Effect_Damage, "Skill.Effect.Damage");
     UE_DEFINE_GAMEPLAY_TAG(Skill_Effect_Heal, "Skill.Effect.Heal");
     UE_DEFINE_GAMEPLAY_TAG(Skill_Effect_Shield, "Skill.Effect.Shield");
+    UE_DEFINE_GAMEPLAY_TAG(Data_Damage, "Data.Damage");
     UE_DEFINE_GAMEPLAY_TAG(Data_Heal, "Data.Heal");
     UE_DEFINE_GAMEPLAY_TAG(Data_Shield, "Data.Shield");
     UE_DEFINE_GAMEPLAY_TAG(Skill_Element_Physical, "Skill.Element.Physical");
@@ -17,4 +18,5 @@ namespace ProjectACombatTags
     UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Area, "Skill.Shape.Area");
     UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Beam, "Skill.Shape.Beam");
     UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Chain, "Skill.Shape.Chain");
+    UE_DEFINE_GAMEPLAY_TAG(Event_Attack_Release, "Event.Attack.Release");
 }

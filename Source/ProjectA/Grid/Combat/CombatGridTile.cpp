@@ -1,4 +1,5 @@
 #include "CombatGridTile.h"
+#include "ProjectA.h"
 #include "Engine/World.h"
 
 #include "Controller/PartyPlayerController.h"
@@ -228,13 +229,13 @@ void ACombatGridTile::ApplyMovableTileVisual()
 {
     if (!TileSprite)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[GridTile] ApplyMovableTileVisual failed | TileSprite is null"));
+        UE_LOG(LogProjectA, Warning, TEXT("[GridTile] ApplyMovableTileVisual failed | TileSprite is null"));
         return;
     }
 
     if (!MovableSprite)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[GridTile] ApplyMovableTileVisual failed | MovableSprite is null | Coord=(%d,%d)"), GridCoord.X, GridCoord.Y);
+        UE_LOG(LogProjectA, Warning, TEXT("[GridTile] ApplyMovableTileVisual failed | MovableSprite is null | Coord=(%d,%d)"), GridCoord.X, GridCoord.Y);
         return;
     }
 
@@ -276,7 +277,7 @@ void ACombatGridTile::SetProtectedByFront(bool bInProtectedByFront)
 
     bProtectedByFront = bInProtectedByFront;
 
-    //UE_LOG(LogTemp, Log, TEXT("[GridTile] SetProtectedByFront | Coord=(%d,%d) | Protected=%s"), GridCoord.X, GridCoord.Y, bProtectedByFront ? TEXT("true") : TEXT("false"));
+    //UE_LOG(LogProjectA, Log, TEXT("[GridTile] SetProtectedByFront | Coord=(%d,%d) | Protected=%s"), GridCoord.X, GridCoord.Y, bProtectedByFront ? TEXT("true") : TEXT("false"));
 
     UpdateTileVisual();
     ForceNetUpdate();

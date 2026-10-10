@@ -1,4 +1,5 @@
 #include "Game/Run/RunItemShopCatalog.h"
+#include "Types/ProjectARandom.h"
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunItemRarityProbabilities.h"
 #include "Game/Run/RunWeaponSkillRules.h"
@@ -132,7 +133,7 @@ namespace
             OutError = NSLOCTEXT("RunItemShop", "CannotRollShop", "아이템 상점의 상품을 갱신할 수 없습니다.");
             return false;
         }
-        FRandomStream Random(FMath::Rand());
+        FRandomStream Random(ProjectARandom::NewSeed());
         TArray<int32> SelectedIndices;
         if (Count < 0 || (Count == 0 && (State.SelectionVersion != 1 || State.ActiveStockPolicyVersion != 1))) return false;
         if (Count > 0 && !RunItemRarityProbabilities::Select(State.Catalog, State.RarityProbabilities, Query, Count, bAllowDuplicates, Random, SelectedIndices, OutError, WeaponSkillRules, true)) return false;

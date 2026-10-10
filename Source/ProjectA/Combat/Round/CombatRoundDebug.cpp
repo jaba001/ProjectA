@@ -45,22 +45,22 @@ bool ACombatRoundCoordinator::CanModifyDebugRoster(APlayerController* Controller
     const APartyPlayerController* PartyController = Cast<APartyPlayerController>(Controller);
     if (!ACombatDebugGameMode::IsDebugWorld(GetWorld()) || !HasExecutionAuthority() || !IsValid(PartyController) || !PartyController->IsLocalController() || PartyController->GetWorld() != GetWorld() || PartyController->GetCombatManager() != CombatManager || GetParticipantSlot(Controller) <= 0 || !CombatManager->GetActionAuthority()->CanRegisterDebugUnit(PartyController))
     {
-        OutError = FText::FromString(TEXT("참가 중인 독립 로컬 디버그 전투에서만 캐릭터를 추가할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_45F87A9C", "참가 중인 독립 로컬 디버그 전투에서만 캐릭터를 추가할 수 있습니다.");
         return false;
     }
     if ((View.Phase != ECombatRoundPhase::Planning && View.Phase != ECombatRoundPhase::Finished) || bSAPMovementInProgress || PlanningMoveIndex != INDEX_NONE || !Projectiles.IsEmpty() || !ActiveEffects.IsEmpty())
     {
-        OutError = FText::FromString(TEXT("모든 행동이 끝난 계획 단계 또는 전투 종료 후 캐릭터를 추가할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_51D0622F", "모든 행동이 끝난 계획 단계 또는 전투 종료 후 캐릭터를 추가할 수 있습니다.");
         return false;
     }
     if (View.Units.Num() >= 8)
     {
-        OutError = FText::FromString(TEXT("사망한 캐릭터를 포함하여 아군·적군 합계 8명까지 추가할 수 있습니다. 전투 초기화로 새 테스트를 시작하세요."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_ACD72B2D", "사망한 캐릭터를 포함하여 아군·적군 합계 8명까지 추가할 수 있습니다. 전투 초기화로 새 테스트를 시작하세요.");
         return false;
     }
     if (!IsValid(Arena) || !IsValid(Arena->Grid) || Actions.Num() != View.Units.Num() || CombatManager->GetRegisteredUnits().Num() != View.Units.Num())
     {
-        OutError = FText::FromString(TEXT("전투장 또는 현재 캐릭터 등록 상태가 올바르지 않습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_B6D8E5C8", "전투장 또는 현재 캐릭터 등록 상태가 올바르지 않습니다.");
         return false;
     }
     return true;
@@ -87,7 +87,7 @@ bool ACombatRoundCoordinator::CanAddDebugUnit(APlayerController* Controller, boo
     if (!CanModifyDebugRoster(Controller, OutError)) return false;
     if (!FindDebugSpawnTile(bEnemy))
     {
-        OutError = FText::FromString(bEnemy ? TEXT("적군 진영에 점유·이동 예약이 없는 빈 칸이 없습니다.") : TEXT("아군 진영에 점유·이동 예약이 없는 빈 칸이 없습니다."));
+        OutError = (bEnemy ? NSLOCTEXT("CombatRoundDebugText", "M_3A25554F", "적군 진영에 점유·이동 예약이 없는 빈 칸이 없습니다.") : NSLOCTEXT("CombatRoundDebugText", "M_BEF0CE91", "아군 진영에 점유·이동 예약이 없는 빈 칸이 없습니다."));
         return false;
     }
     return true;
@@ -98,26 +98,26 @@ bool ACombatRoundCoordinator::AddDebugUnit(APlayerController* Controller, AUnitB
     if (!CanModifyDebugRoster(Controller, OutError)) return false;
     if (!IsValid(Unit) || Unit->IsActorBeingDestroyed() || Unit->GetWorld() != GetWorld() || !Unit->IsUnitAlive() || !Unit->GetAttributeSet() || !Unit->GetAbilitySystemComponent() || !Unit->GetCharacterMovement() || !Unit->GetCapsuleComponent() || (Unit->GetTeam() != ETeam::Player && Unit->GetTeam() != ETeam::Enemy) || View.Units.ContainsByPredicate([Unit](const FCombatRoundUnitView& Entry) { return Entry.Unit == Unit; }) || CombatManager->GetRegisteredUnits().Contains(Unit))
     {
-        OutError = FText::FromString(TEXT("추가할 캐릭터의 생존·속성·등록 상태가 올바르지 않습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_89F68856", "추가할 캐릭터의 생존·속성·등록 상태가 올바르지 않습니다.");
         return false;
     }
     const bool bEnemy = Unit->GetTeam() == ETeam::Enemy;
     const APlayerUnit* Player = Cast<APlayerUnit>(Unit);
     if (!bEnemy && (!Player || Player->IsServerAIControlled()))
     {
-        OutError = FText::FromString(TEXT("추가할 아군은 로컬 플레이어가 조작하는 캐릭터여야 합니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_39452936", "추가할 아군은 로컬 플레이어가 조작하는 캐릭터여야 합니다.");
         return false;
     }
     ACombatGridTile* Tile = Unit->GetCurrentTile();
     const ETileTerritory Territory = bEnemy ? ETileTerritory::Enemy : ETileTerritory::Player;
     if (!IsValid(Tile) || Tile->GetWorld() != GetWorld() || Arena->Grid->GetTileAtCoord(Tile->GridCoord) != Tile || Tile->GetOccupyingUnit() != Unit || Tile->GetTerritory() != Territory || !CombatRoundRules::IsOwnTerritory(bEnemy, Tile->GridCoord) || CombatPlanValidation::IsReservedByOther(BuildPlanningState(), INDEX_NONE, Tile->GridCoord))
     {
-        OutError = FText::FromString(TEXT("추가할 캐릭터의 배치 칸이 잘못되었거나 기존 이동 예약과 겹칩니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_0CE6D957", "추가할 캐릭터의 배치 칸이 잘못되었거나 기존 이동 예약과 겹칩니다.");
         return false;
     }
     if (!UnitDataRules::IsValidHealth(Unit->GetAttributeSet()->GetMaxHP(), Unit->GetAttributeSet()->GetHP()) || !UnitDataRules::IsValidActionPoints(Unit->GetMaxActionPoint(), Unit->GetMaxSubActionPoint()) || Unit->GetActorLocation().ContainsNaN() || Unit->GetActorRotation().ContainsNaN())
     {
-        OutError = FText::FromString(TEXT("추가할 캐릭터의 체력·행동력 또는 위치 수치가 올바르지 않습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_369E7221", "추가할 캐릭터의 체력·행동력 또는 위치 수치가 올바르지 않습니다.");
         return false;
     }
     TArray<FCombatRoundSkill> NewSkills;
@@ -127,7 +127,7 @@ bool ACombatRoundCoordinator::AddDebugUnit(APlayerController* Controller, AUnitB
     {
         if (!IsValid(Candidate))
         {
-            OutError = FText::FromString(TEXT("기존 전투 캐릭터가 사라져 스킬 목록을 검증할 수 없습니다."));
+            OutError = NSLOCTEXT("CombatRoundDebugText", "M_793D5557", "기존 전투 캐릭터가 사라져 스킬 목록을 검증할 수 없습니다.");
             return false;
         }
         if (!UnitDataRules::ValidateSkills(Candidate->GetEquippedSkillDataAssets(), false, OutError)) return false;
@@ -138,7 +138,7 @@ bool ACombatRoundCoordinator::AddDebugUnit(APlayerController* Controller, AUnitB
             ApplyDebugSkillTimingOverride(Skill);
             if (!CombatRoundRules::IsValidSkill(Skill))
             {
-                OutError = FText::FromString(TEXT("원본 스킬이 변경되어 임시 타이밍을 적용할 수 없습니다. 해당 스킬의 원본값을 복원하거나 전투를 초기화하세요."));
+                OutError = NSLOCTEXT("CombatRoundDebugText", "M_85C541ED", "원본 스킬이 변경되어 임시 타이밍을 적용할 수 없습니다. 해당 스킬의 원본값을 복원하거나 전투를 초기화하세요.");
                 return false;
             }
             if (USkillDefinitionDataAsset* const* Existing = DefinitionsById.Find(Skill.SkillId))
@@ -168,7 +168,7 @@ bool ACombatRoundCoordinator::AddDebugUnit(APlayerController* Controller, AUnitB
             TArray<FIntPoint> Path;
             if (!BuildPlanningMovePath(Existing.UnitId, Existing.MoveDestinationCoord, Path, OutError))
             {
-                OutError = FText::FromString(TEXT("새 캐릭터가 기존 SAP 이동 경로를 막습니다. 해당 이동 계획을 변경하거나 취소한 뒤 추가하세요."));
+                OutError = NSLOCTEXT("CombatRoundDebugText", "M_B6D3EFD1", "새 캐릭터가 기존 SAP 이동 경로를 막습니다. 해당 이동 계획을 변경하거나 취소한 뒤 추가하세요.");
                 return false;
             }
         }
@@ -178,7 +178,7 @@ bool ACombatRoundCoordinator::AddDebugUnit(APlayerController* Controller, AUnitB
     if (!CombatSkillPresentation::Prepare(GetWorld(), NewSkills, PreparedVisualAssets, OutError)) return false;
     if (!CombatManager->RegisterDebugUnit(Unit, Cast<APartyPlayerController>(Controller)))
     {
-        OutError = FText::FromString(TEXT("새 캐릭터의 전투 식별자 또는 조작 권한을 등록하지 못했습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_5188411F", "새 캐릭터의 전투 식별자 또는 조작 권한을 등록하지 못했습니다.");
         return false;
     }
     // All fallible checks precede registration so a failed request leaves the current battle untouched.
@@ -205,7 +205,7 @@ bool ACombatRoundCoordinator::AddDebugUnit(APlayerController* Controller, AUnitB
     Added.Command.TargetCoord = Added.HomeCoord;
     Added.Command.DestinationCoord = Added.HomeCoord;
     Added.MoveDestinationCoord = Added.HomeCoord;
-    Added.Status = FText::FromString(TEXT("스킬 미선택 · 턴 넘기기"));
+    Added.Status = NSLOCTEXT("CombatRoundDebugText", "M_508EC38A", "스킬 미선택 · 턴 넘기기");
     const int32 AddedIndex = View.Units.Add(MoveTemp(Added));
     Actions.AddDefaulted();
     Actions[AddedIndex].OriginalLocation = Unit->GetActorLocation();
@@ -219,7 +219,7 @@ bool ACombatRoundCoordinator::AddDebugUnit(APlayerController* Controller, AUnitB
     {
         CombatManager->ClearDebugCombatResult();
         BeginPlanning();
-        View.Message = FText::FromString(TEXT("캐릭터 추가 완료 · 기존 스킬·장비 유지 · 다음 라운드를 계획하세요."));
+        View.Message = NSLOCTEXT("CombatRoundDebugText", "M_9669BF28", "캐릭터 추가 완료 · 기존 스킬·장비 유지 · 다음 라운드를 계획하세요.");
     }
     else
     {
@@ -256,11 +256,11 @@ bool ACombatRoundCoordinator::AddDebugUnit(APlayerController* Controller, AUnitB
                 return true;
             });
             Entry.bReady = true;
-            Entry.Status = FText::FromString(TEXT("AI 계획 고정"));
+            Entry.Status = NSLOCTEXT("CombatRoundDebugText", "M_F4A32AA7", "AI 계획 고정");
         }
         ++View.PlanRevision;
         bLockRetryBlocked = false;
-        View.Message = FText::FromString(bFinished ? TEXT("캐릭터 추가 완료 · 양 진영에 생존 캐릭터가 있어야 전투가 재개됩니다.") : TEXT("캐릭터 추가 완료 · 기존 계획 유지 · 아군 준비 완료를 다시 눌러주세요."));
+        View.Message = (bFinished ? NSLOCTEXT("CombatRoundDebugText", "M_74382F49", "캐릭터 추가 완료 · 양 진영에 생존 캐릭터가 있어야 전투가 재개됩니다.") : NSLOCTEXT("CombatRoundDebugText", "M_1A8D5A18", "캐릭터 추가 완료 · 기존 계획 유지 · 아군 준비 완료를 다시 눌러주세요."));
     }
     Unit->ForceNetUpdate();
     CombatManager->RefreshTileProtectedByFront();
@@ -309,35 +309,35 @@ bool ACombatRoundCoordinator::CanReviveDebugUnit(APlayerController* Controller, 
     OutError = FText::GetEmpty();
     if (!ACombatDebugGameMode::IsDebugWorld(GetWorld()) || !HasExecutionAuthority() || !IsValid(Controller) || !Controller->IsLocalController() || Controller->GetWorld() != GetWorld())
     {
-        OutError = FText::FromString(TEXT("독립 로컬 디버그 전투에서만 부활할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_33AEB6A0", "독립 로컬 디버그 전투에서만 부활할 수 있습니다.");
         return false;
     }
     if ((View.Phase != ECombatRoundPhase::Planning && View.Phase != ECombatRoundPhase::Finished) || bSAPMovementInProgress || PlanningMoveIndex != INDEX_NONE || !Projectiles.IsEmpty() || !ActiveEffects.IsEmpty())
     {
-        OutError = FText::FromString(TEXT("모든 행동이 끝난 계획 단계 또는 전투 종료 후 부활할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_5465116A", "모든 행동이 끝난 계획 단계 또는 전투 종료 후 부활할 수 있습니다.");
         return false;
     }
     const int32 Index = FindUnitIndex(UnitId);
     const int32 OwnerSlot = GetParticipantSlot(Controller);
     if (!View.Units.IsValidIndex(Index) || !Actions.IsValidIndex(Index) || OwnerSlot <= 0)
     {
-        OutError = FText::FromString(TEXT("부활할 아군을 선택하세요."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_5F82F41C", "부활할 아군을 선택하세요.");
         return false;
     }
     const FCombatRoundUnitView& Entry = View.Units[Index];
     if (!IsValid(Entry.Unit) || Entry.bEnemy || Entry.OwnerSlot != OwnerSlot || !CombatManager->GetActionAuthority()->CanControllerControl(Cast<APartyPlayerController>(Controller), Entry.Unit))
     {
-        OutError = FText::FromString(TEXT("자신이 조작하는 아군만 부활할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_CEA0030F", "자신이 조작하는 아군만 부활할 수 있습니다.");
         return false;
     }
     if (Entry.Unit->IsUnitAlive())
     {
-        OutError = FText::FromString(TEXT("생존 중인 아군입니다. 사망 후 부활할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_1AAA1104", "생존 중인 아군입니다. 사망 후 부활할 수 있습니다.");
         return false;
     }
     if (!FindDebugReviveTile(Index))
     {
-        OutError = FText::FromString(TEXT("아군 진영에 점유·이동 예약·기존 SAP 경로를 피할 수 있는 빈 칸이 없습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_CD9CF76B", "아군 진영에 점유·이동 예약·기존 SAP 경로를 피할 수 있는 빈 칸이 없습니다.");
         return false;
     }
     return true;
@@ -351,7 +351,7 @@ bool ACombatRoundCoordinator::ReviveDebugUnit(APlayerController* Controller, int
     ACombatGridTile* Tile = FindDebugReviveTile(Index);
     if (!Entry.Unit->ReviveForDebug(Tile))
     {
-        OutError = FText::FromString(TEXT("유닛의 부활 상태를 복구하지 못했습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_D6742F4D", "유닛의 부활 상태를 복구하지 못했습니다.");
         return false;
     }
     Entry.HomeCoord = Tile->GridCoord;
@@ -363,7 +363,7 @@ bool ACombatRoundCoordinator::ReviveDebugUnit(APlayerController* Controller, int
     {
         CombatManager->ClearDebugCombatResult();
         BeginPlanning();
-        View.Message = FText::FromString(TEXT("아군 부활 완료 · 스킬·장비 유지 · 다음 라운드를 계획하세요."));
+        View.Message = NSLOCTEXT("CombatRoundDebugText", "M_CDA62919", "아군 부활 완료 · 스킬·장비 유지 · 다음 라운드를 계획하세요.");
     }
     else
     {
@@ -374,7 +374,7 @@ bool ACombatRoundCoordinator::ReviveDebugUnit(APlayerController* Controller, int
             if (IsValid(Unit.Unit) && Unit.Unit->IsUnitAlive()) HighestSpeed = FMath::Max(HighestSpeed, Unit.Speed);
         }
         for (FCombatRoundUnitView& Unit : View.Units) Unit.StartDelay = CombatRoundRules::StartDelay(HighestSpeed, Unit.Speed);
-        ResetDebugUnitPlan(Index, FText::FromString(bFinished ? TEXT("아군 부활 완료 · 생존한 적이 없습니다. 전투 초기화로 새 테스트를 시작하세요.") : TEXT("아군 부활 완료 · HP·AP·SAP 복구 · 스킬·장비를 유지합니다.")));
+        ResetDebugUnitPlan(Index, (bFinished ? NSLOCTEXT("CombatRoundDebugText", "M_A1FD9739", "아군 부활 완료 · 생존한 적이 없습니다. 전투 초기화로 새 테스트를 시작하세요.") : NSLOCTEXT("CombatRoundDebugText", "M_6FC89C1A", "아군 부활 완료 · HP·AP·SAP 복구 · 스킬·장비를 유지합니다.")));
     }
     CombatManager->RefreshTileProtectedByFront();
     PublishState();
@@ -387,35 +387,35 @@ bool ACombatRoundCoordinator::CanSetDebugUnitHealth(APlayerController* Controlle
     const APartyPlayerController* PartyController = Cast<APartyPlayerController>(Controller);
     if (!ACombatDebugGameMode::IsDebugWorld(GetWorld()) || !HasExecutionAuthority() || !IsValid(PartyController) || !PartyController->IsLocalController() || PartyController->GetWorld() != GetWorld() || PartyController->GetCombatManager() != CombatManager || GetParticipantSlot(Controller) <= 0 || !CombatManager->GetActionAuthority()->CanRegisterDebugUnit(PartyController))
     {
-        OutError = FText::FromString(TEXT("참가 중인 독립 로컬 디버그 전투에서만 체력을 설정할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_39396559", "참가 중인 독립 로컬 디버그 전투에서만 체력을 설정할 수 있습니다.");
         return false;
     }
     if (View.Phase != ECombatRoundPhase::Planning || bSAPMovementInProgress || PlanningMoveIndex != INDEX_NONE || !Projectiles.IsEmpty() || !ActiveEffects.IsEmpty())
     {
-        OutError = FText::FromString(TEXT("계획 단계에서 이동과 효과가 모두 끝난 뒤 체력을 설정하세요."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_364F0CAF", "계획 단계에서 이동과 효과가 모두 끝난 뒤 체력을 설정하세요.");
         return false;
     }
     const int32 Index = FindUnitIndex(UnitId);
     if (!View.Units.IsValidIndex(Index) || !Actions.IsValidIndex(Index))
     {
-        OutError = FText::FromString(TEXT("체력을 설정할 아군 또는 적군을 선택하세요."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_9DDB9697", "체력을 설정할 아군 또는 적군을 선택하세요.");
         return false;
     }
     const FCombatRoundUnitView& Entry = View.Units[Index];
     const AUnitBase* Unit = Entry.Unit;
     if (!IsValid(Unit) || Unit->IsActorBeingDestroyed() || Unit->GetWorld() != GetWorld() || !Unit->HasAuthority() || !Unit->IsUnitAlive() || !IsValid(Unit->GetAttributeSet()) || !IsValid(Unit->GetAbilitySystemComponent()) || !CombatManager->GetRegisteredUnits().Contains(Unit) || !CombatManager->GetActionAuthority()->GetUnitId(Unit).IsValid())
     {
-        OutError = FText::FromString(TEXT("등록된 생존 캐릭터만 체력을 설정할 수 있습니다. 사망한 아군은 먼저 부활시키세요."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_4BAFA9B9", "등록된 생존 캐릭터만 체력을 설정할 수 있습니다. 사망한 아군은 먼저 부활시키세요.");
         return false;
     }
     if ((Entry.bEnemy && (Unit->GetTeam() != ETeam::Enemy || Entry.OwnerSlot != 0)) || (!Entry.bEnemy && (Unit->GetTeam() != ETeam::Player || Entry.OwnerSlot != GetParticipantSlot(Controller) || !CombatManager->GetActionAuthority()->CanControllerControl(PartyController, Unit))))
     {
-        OutError = FText::FromString(TEXT("자신이 조작하는 아군 또는 디버그 적군만 체력을 설정할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_B336637A", "자신이 조작하는 아군 또는 디버그 적군만 체력을 설정할 수 있습니다.");
         return false;
     }
     if (!UnitDataRules::IsValidHealth(Unit->GetAttributeSet()->GetMaxHP(), Unit->GetAttributeSet()->GetHP()) || Unit->GetAttributeSet()->GetHP() <= 0.f || !Unit->GetVelocity().IsNearlyZero() || (Unit->GetCharacterMovement() && !Unit->GetCharacterMovement()->Velocity.IsNearlyZero()))
     {
-        OutError = FText::FromString(TEXT("현재 체력과 정지 상태가 유효한 생존 캐릭터만 변경할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_75AE272D", "현재 체력과 정지 상태가 유효한 생존 캐릭터만 변경할 수 있습니다.");
         return false;
     }
     return true;
@@ -426,7 +426,7 @@ bool ACombatRoundCoordinator::SetDebugUnitHealth(APlayerController* Controller, 
     if (!CanSetDebugUnitHealth(Controller, UnitId, OutError)) return false;
     if (!UnitDataRules::IsValidHealth(MaxHP, CurrentHP) || CurrentHP < 1.f)
     {
-        OutError = FText::FromString(TEXT("최대 체력은 1~1,000,000, 현재 체력은 1~최대 체력 범위로 입력하세요."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_4BB33D50", "최대 체력은 1~1,000,000, 현재 체력은 1~최대 체력 범위로 입력하세요.");
         return false;
     }
     AUnitBase* Unit = View.Units[FindUnitIndex(UnitId)].Unit;
@@ -443,7 +443,7 @@ bool ACombatRoundCoordinator::SetDebugUnitHealth(APlayerController* Controller, 
     ClearOwnerReady(GetParticipantSlot(Controller));
     ++View.PlanRevision;
     bLockRetryBlocked = false;
-    View.Message = FText::FromString(TEXT("체력 설정 완료 · 기존 계획 유지 · 아군 준비 완료를 다시 눌러주세요."));
+    View.Message = NSLOCTEXT("CombatRoundDebugText", "M_532024FE", "체력 설정 완료 · 기존 계획 유지 · 아군 준비 완료를 다시 눌러주세요.");
     Unit->ForceNetUpdate();
     PublishState();
     return true;
@@ -454,30 +454,30 @@ bool ACombatRoundCoordinator::CanEditDebugUnit(APlayerController* Controller, in
     OutError = FText::GetEmpty();
     if (!ACombatDebugGameMode::IsDebugWorld(GetWorld()) || !HasExecutionAuthority() || !IsValid(Controller) || !Controller->IsLocalController() || Controller->GetWorld() != GetWorld())
     {
-        OutError = FText::FromString(TEXT("독립 디버그 전투에서만 장착을 변경할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_D1F21563", "독립 디버그 전투에서만 장착을 변경할 수 있습니다.");
         return false;
     }
     if (View.Phase != ECombatRoundPhase::Planning || bSAPMovementInProgress || PlanningMoveIndex != INDEX_NONE || !Projectiles.IsEmpty() || !ActiveEffects.IsEmpty())
     {
-        OutError = FText::FromString(TEXT("계획 단계에서 이동과 효과가 모두 끝난 뒤 변경하세요."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_FA2A9C6F", "계획 단계에서 이동과 효과가 모두 끝난 뒤 변경하세요.");
         return false;
     }
     const int32 Index = FindUnitIndex(UnitId);
     const int32 OwnerSlot = GetParticipantSlot(Controller);
     if (!View.Units.IsValidIndex(Index) || OwnerSlot <= 0)
     {
-        OutError = FText::FromString(TEXT("변경할 소유 유닛을 선택하세요."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_C69A327A", "변경할 소유 유닛을 선택하세요.");
         return false;
     }
     const FCombatRoundUnitView& Entry = View.Units[Index];
     if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive() || Entry.bEnemy || Entry.OwnerSlot != OwnerSlot || !CombatManager->GetActionAuthority()->CanControllerControl(Cast<APartyPlayerController>(Controller), Entry.Unit))
     {
-        OutError = FText::FromString(TEXT("생존한 자신의 아군만 변경할 수 있습니다."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_1866659D", "생존한 자신의 아군만 변경할 수 있습니다.");
         return false;
     }
     if (!Entry.Unit->GetVelocity().IsNearlyZero() || (Entry.Unit->GetCharacterMovement() && !Entry.Unit->GetCharacterMovement()->Velocity.IsNearlyZero()))
     {
-        OutError = FText::FromString(TEXT("유닛이 정지한 뒤 변경하세요."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_07603BE0", "유닛이 정지한 뒤 변경하세요.");
         return false;
     }
     return true;
@@ -499,7 +499,7 @@ bool ACombatRoundCoordinator::SetDebugUnitSkills(APlayerController* Controller, 
         const AUnitBase* Unit = View.Units[Index].Unit;
         if (!IsValid(Unit))
         {
-            OutError = FText::FromString(TEXT("전투 유닛이 사라져 스킬 목록을 갱신할 수 없습니다."));
+            OutError = NSLOCTEXT("CombatRoundDebugText", "M_726FC415", "전투 유닛이 사라져 스킬 목록을 갱신할 수 없습니다.");
             return false;
         }
         const TArray<TObjectPtr<USkillDefinitionDataAsset>>& UnitSkills = Index == ChangedIndex ? Definitions : Unit->GetEquippedSkillDataAssets();
@@ -511,7 +511,7 @@ bool ACombatRoundCoordinator::SetDebugUnitSkills(APlayerController* Controller, 
             ApplyDebugSkillTimingOverride(Skill);
             if (!CombatRoundRules::IsValidSkill(Skill))
             {
-                OutError = FText::FromString(TEXT("원본 스킬이 변경되어 임시 타이밍을 적용할 수 없습니다. 해당 스킬의 원본값을 복원하거나 전투를 초기화하세요."));
+                OutError = NSLOCTEXT("CombatRoundDebugText", "M_85C541ED", "원본 스킬이 변경되어 임시 타이밍을 적용할 수 없습니다. 해당 스킬의 원본값을 복원하거나 전투를 초기화하세요.");
                 return false;
             }
             if (USkillDefinitionDataAsset* const* Existing = DefinitionsById.Find(Skill.SkillId))
@@ -536,7 +536,7 @@ bool ACombatRoundCoordinator::SetDebugUnitSkills(APlayerController* Controller, 
     Skills = MoveTemp(NewSkills);
     PreparedSkillVisualAssets = MoveTemp(PreparedVisualAssets);
     for (int32 Index = 0; Index < View.Units.Num(); ++Index) View.Units[Index].SkillIds = MoveTemp(NewUnitSkillIds[Index]);
-    ResetDebugUnitPlan(ChangedIndex, FText::FromString(TEXT("스킬 장착이 변경되어 해당 유닛의 계획과 자신의 준비가 해제되었습니다.")));
+    ResetDebugUnitPlan(ChangedIndex, NSLOCTEXT("CombatRoundDebugText", "M_3039EF3E", "스킬 장착이 변경되어 해당 유닛의 계획과 자신의 준비가 해제되었습니다."));
     return true;
 }
 
@@ -547,7 +547,7 @@ void ACombatRoundCoordinator::ApplyDebugSkillTimingOverride(FCombatRoundSkill& S
 
 bool ACombatRoundCoordinator::GetDebugSkillTiming(int32 UnitId, FName SkillId, FCombatDebugSkillTiming& OutCurrent, FCombatDebugSkillTiming& OutOriginal, FSoftObjectPath& OutAsset, FText& OutError) const
 {
-    OutError = FText::FromString(TEXT("아군의 보유 스킬을 선택하세요."));
+    OutError = NSLOCTEXT("CombatRoundDebugText", "M_24B0A6F4", "아군의 보유 스킬을 선택하세요.");
     OutAsset.Reset();
     const int32 UnitIndex = FindUnitIndex(UnitId);
     const FCombatRoundSkill* Current = FindSkill(SkillId);
@@ -587,13 +587,13 @@ bool ACombatRoundCoordinator::SetDebugSkillTiming(APlayerController* Controller,
     const bool bValidWeapon = FMath::IsFinite(Timing.WeaponTraceDuration) && Timing.WeaponTraceDuration > 0.f && Timing.WeaponTraceDuration <= 5.f;
     if (!bValidWindup || !bValidEffect || !bValidProjectile || !bValidWeapon || !CombatRoundRules::IsValidSkill(Candidate))
     {
-        OutError = FText::FromString(TEXT("타이밍 범위를 확인하세요: 준비 0~60초, 효과 지연 0~10초, 효과 지속 0초 초과~10초, 투사체 속도 0 초과~100,000cm/s, 무기 판정 0초 초과~5초(준비+무기 판정은 60초 이하)."));
+        OutError = NSLOCTEXT("CombatRoundDebugText", "M_E8CBF571", "타이밍 범위를 확인하세요: 준비 0~60초, 효과 지연 0~10초, 효과 지속 0초 초과~10초, 투사체 속도 0 초과~100,000cm/s, 무기 판정 0초 초과~5초(준비+무기 판정은 60초 이하).");
         return false;
     }
     if (FCombatDebugSkillTiming::StaticStruct()->CompareScriptStruct(&Current, &Timing, 0)) return true;
     DebugSkillTimingOverrides.Add(SkillId, Timing);
     *Skill = MoveTemp(Candidate);
-    const FText Message = FText::FromString(TEXT("동일 스킬 전체에 임시 타이밍 적용 · 해당 스킬을 보유한 아군의 계획과 준비 완료 해제 · 적 계획 유지"));
+    const FText Message = NSLOCTEXT("CombatRoundDebugText", "M_60F58C76", "동일 스킬 전체에 임시 타이밍 적용 · 해당 스킬을 보유한 아군의 계획과 준비 완료 해제 · 적 계획 유지");
     for (int32 Index = 0; Index < View.Units.Num(); ++Index)
     {
         const FCombatRoundUnitView& Entry = View.Units[Index];
@@ -617,7 +617,7 @@ void ACombatRoundCoordinator::NotifyDebugEquipmentChanged(APlayerController* Con
 {
     FText Error;
     if (!CanEditDebugUnit(Controller, UnitId, Error)) return;
-    ResetDebugUnitPlan(FindUnitIndex(UnitId), FText::FromString(TEXT("장비가 변경되어 해당 유닛의 계획과 자신의 준비가 해제되었습니다.")));
+    ResetDebugUnitPlan(FindUnitIndex(UnitId), NSLOCTEXT("CombatRoundDebugText", "M_1209C39D", "장비가 변경되어 해당 유닛의 계획과 자신의 준비가 해제되었습니다."));
 }
 
 void ACombatRoundCoordinator::ResetDebugUnitPlan(int32 UnitIndex, const FText& Message, bool bPublish)
@@ -630,7 +630,7 @@ void ACombatRoundCoordinator::ResetDebugUnitPlan(int32 UnitIndex, const FText& M
     Entry.bHasMovePlan = false;
     Entry.MoveDestinationCoord = Entry.HomeCoord;
     Entry.ActionPhase = ECombatRoundActionPhase::Planned;
-    Entry.Status = FText::FromString(TEXT("스킬 미선택 · 턴 넘기기"));
+    Entry.Status = NSLOCTEXT("CombatRoundDebugText", "M_508EC38A", "스킬 미선택 · 턴 넘기기");
     Actions[UnitIndex] = FActionRuntime();
     Actions[UnitIndex].OriginalLocation = Entry.Unit->GetActorLocation();
     ClearOwnerReady(Entry.OwnerSlot);

@@ -1,4 +1,5 @@
 #include "Combat/SkillActor/AttackSkillActorBase.h"
+#include "ProjectA.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "GameplayEffect.h"
 #include "Grid/Combat/CombatGridTile.h"
@@ -15,7 +16,7 @@ void AAttackSkillActorBase::InitializeAttackSkillActor(const FSkillActorInitData
 
     InitializeSkillActor(InitData);
 
-    UE_LOG(LogTemp, Log, TEXT("[AttackSkillActorBase] InitializeAttackSkillActor | Actor=%s | DamageEffect=%s | DamageAmount=%.2f"), *GetNameSafe(this), *GetNameSafe(DamageEffectClass), DamageAmount);
+    UE_LOG(LogProjectA, Log, TEXT("[AttackSkillActorBase] InitializeAttackSkillActor | Actor=%s | DamageEffect=%s | DamageAmount=%.2f"), *GetNameSafe(this), *GetNameSafe(DamageEffectClass), DamageAmount);
 }
 
 TSubclassOf<UGameplayEffect> AAttackSkillActorBase::GetDamageEffectClass() const

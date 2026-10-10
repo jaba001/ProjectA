@@ -1,0 +1,1344 @@
+{
+  "nativeCulture": "ko",
+  "culture": "en",
+  "entries": [
+    {
+      "namespace": "RunRecoveryTypesText",
+      "key": "M_1D288C28",
+      "source": "소모품 태그, 수량 또는 회복 스킬이 올바르지 않습니다.",
+      "translation": "The consumable tag, quantity or recovery skill is invalid."
+    },
+    {
+      "namespace": "RunStateTargetText",
+      "key": "M_EC2E9CCD",
+      "source": "PvE",
+      "translation": "PvE"
+    },
+    {
+      "namespace": "RunStateTargetText",
+      "key": "M_E8E82B63",
+      "source": "로컬 Snapshot",
+      "translation": "Local Snapshot"
+    },
+    {
+      "namespace": "RunStateRecoveryText",
+      "key": "M_19AFF7F8",
+      "source": "현재 회복 서비스를 구매할 수 없습니다.",
+      "translation": "The recovery service cannot be purchased right now."
+    },
+    {
+      "namespace": "RunStateSubsystemText",
+      "key": "M_F114E5FC",
+      "source": "종료된 진행입니다. 새 게임을 시작해 주세요.",
+      "translation": "This run has ended. Please start a new game."
+    },
+    {
+      "namespace": "RunStateSubsystemText",
+      "key": "M_48662D16",
+      "source": "A party supports up to four slots. / 파티는 최대 4개 슬롯입니다.",
+      "translation": "A party supports up to four slots."
+    },
+    {
+      "namespace": "RunStateSubsystemText",
+      "key": "M_B9B637F2",
+      "source": "Party slot indices must be unique and between 0 and 3. / 파티 슬롯 번호는 0~3이며 중복될 수 없습니다.",
+      "translation": "Party slot indices must be unique and between 0 and 3."
+    },
+    {
+      "namespace": "RunStateSubsystemText",
+      "key": "M_27A9A82A",
+      "source": "Created characters need a name and class. / 생성한 캐릭터의 이름과 직업이 필요합니다.",
+      "translation": "Created characters need a name and class."
+    },
+    {
+      "namespace": "RunStateSubsystemText",
+      "key": "M_1183F616",
+      "source": "Create at least one character to start. / 캐릭터를 1명 이상 생성해 주세요.",
+      "translation": "Create at least one character to start."
+    },
+    {
+      "namespace": "RunStateSubsystemText",
+      "key": "M_72278B32",
+      "source": "새 진행에는 Run·참가자·캐릭터 식별 정보가 필요합니다.",
+      "translation": "A new run requires run, participant and character identity data."
+    },
+    {
+      "namespace": "RunStateSubsystemText",
+      "key": "M_3BB61A0B",
+      "source": "현재 Run의 참가자와 소유권을 새 게임 생성으로 교체할 수 없습니다. 복원은 이어하기를 사용해 주세요.",
+      "translation": "The current run's participants and ownership cannot be replaced by creating a new game. Use Continue to restore it."
+    },
+    {
+      "namespace": "DevelopmentCoopSubsystemText",
+      "key": "M_1111F90B",
+      "source": "독립 실행된 메인메뉴에서 접속을 시작해 주세요.",
+      "translation": "Start the connection from a standalone main menu."
+    },
+    {
+      "namespace": "DevelopmentCoopSubsystemText",
+      "key": "M_29D54F50",
+      "source": "협동 인원은 2~4명입니다.",
+      "translation": "Co-op supports 2 to 4 players."
+    },
+    {
+      "namespace": "DevelopmentCoopSubsystemText",
+      "key": "M_7A579509",
+      "source": "개발용 방을 여는 중입니다.",
+      "translation": "Opening the development room."
+    },
+    {
+      "namespace": "DevelopmentCoopSubsystemText",
+      "key": "M_63D1EC9D",
+      "source": "IPv4 주소와 포트를 입력해 주세요. 예: 127.0.0.1:7777",
+      "translation": "Enter an IPv4 address and port. Example: 127.0.0.1:7777"
+    },
+    {
+      "namespace": "DevelopmentCoopSubsystemText",
+      "key": "M_9C7D7BF3",
+      "source": "Host에 접속 중입니다. 응답이 없으면 취소 후 주소를 확인해 주세요.",
+      "translation": "Connecting to the host. If there is no response, cancel and check the address."
+    },
+    {
+      "namespace": "DevelopmentCoopSubsystemText",
+      "key": "M_7946512A",
+      "source": "개발용 협동에서 나왔습니다. 새 방으로 다시 시작할 수 있습니다.",
+      "translation": "You left the development co-op. You can start again with a new room."
+    },
+    {
+      "namespace": "DevelopmentCoopLobbyText",
+      "key": "M_155696C3",
+      "source": "모든 참가자가 준비하면 Host가 시작합니다. 캐릭터는 각자 궁수 1명입니다.",
+      "translation": "The host starts once every participant is ready. Each player controls one archer."
+    },
+    {
+      "namespace": "DevelopmentCoopLobbyText",
+      "key": "M_6CD158B5",
+      "source": "참가자가 나갔습니다. 자동 Host 승계·AI 전환·대체 참가는 하지 않습니다. 메뉴로 나가 새 방을 만들어 주세요.",
+      "translation": "A participant left. Automatic host migration, AI takeover and substitute joining are not performed. Return to the menu and create a new room."
+    },
+    {
+      "namespace": "DevelopmentCoopLobbyText",
+      "key": "M_6B8877D5",
+      "source": "Gameplay와 궁수 파티 설정을 확인해 주세요.",
+      "translation": "Check the Gameplay and archer party settings."
+    },
+    {
+      "namespace": "DevelopmentCoopLobbyText",
+      "key": "M_E9A0FBDC",
+      "source": "참가자 배정에 실패했습니다. 메뉴로 나가 새 방을 만들어 주세요.",
+      "translation": "Failed to assign participants. Return to the menu and create a new room."
+    },
+    {
+      "namespace": "DevelopmentCoopLobbyText",
+      "key": "M_5964ECFD",
+      "source": "개발용 협동 · 본인 캐릭터만 조작 · 진행 선택은 Host",
+      "translation": "Development co-op · Control only your own character · The host chooses progression"
+    },
+    {
+      "namespace": "GameplayGameModeBaseText",
+      "key": "M_DB0C5DE6",
+      "source": "개발용 방이 가득 찼거나 이미 시작되었습니다.",
+      "translation": "The development room is full or has already started."
+    },
+    {
+      "namespace": "GameplayGameModeBaseText",
+      "key": "M_7BC4E208",
+      "source": "관리 Run을 실행할 현재 Host의 유효한 로컬 권한이 필요합니다.",
+      "translation": "The current host needs valid local authority to run the managed run."
+    },
+    {
+      "namespace": "GameplayGameModeBaseText",
+      "key": "M_79884691",
+      "source": "싱글 재개에는 현재 Host 한 명만 인간 참가자로 남아 있어야 합니다.",
+      "translation": "Single-player resume requires the current host to be the only remaining human participant."
+    },
+    {
+      "namespace": "GameplayGameModeBaseText",
+      "key": "M_90647623",
+      "source": "현재 인간 참가자 모두의 서버 연결 배정이 필요합니다. 불참자는 자동으로 AI 전환되지 않습니다.",
+      "translation": "Every current human participant needs a server connection assignment. Absent players are not switched to AI automatically."
+    },
+    {
+      "namespace": "CombatDebugGameModeText",
+      "key": "M_327FAFF3",
+      "source": "준비된 독립 디버그 전투에서만 캐릭터를 추가할 수 있습니다.",
+      "translation": "Characters can only be added in a prepared standalone debug battle."
+    },
+    {
+      "namespace": "CombatDebugGameModeText",
+      "key": "M_C5000930",
+      "source": "추가할 캐릭터의 데이터 정의가 없습니다.",
+      "translation": "The character to add has no data definition."
+    },
+    {
+      "namespace": "CombatDebugGameModeText",
+      "key": "M_8B77966B",
+      "source": "배치할 진영에 유효한 빈 칸이 없습니다.",
+      "translation": "There is no valid empty tile on the selected side."
+    },
+    {
+      "namespace": "CombatDebugGameModeText",
+      "key": "M_D365615D",
+      "source": "등록된 목록에서 생성 가능한 캐릭터를 선택하세요.",
+      "translation": "Select a character that can be created from the registered list."
+    },
+    {
+      "namespace": "CombatDebugGameModeText",
+      "key": "M_1AAB9D58",
+      "source": "캐릭터 액터 생성에 실패했습니다.",
+      "translation": "Failed to spawn the character actor."
+    },
+    {
+      "namespace": "CombatDebugGameModeText",
+      "key": "M_2C121C8F",
+      "source": "캐릭터 외형·능력치·시작 스킬 구성에 실패했습니다.",
+      "translation": "Failed to configure the character's appearance, stats or starting skills."
+    },
+    {
+      "namespace": "CombatDebugGameModeText",
+      "key": "M_F9436D07",
+      "source": "캐릭터의 디버그 체력 초기화에 필요한 능력치가 없습니다.",
+      "translation": "The character is missing the stats required to initialize debug health."
+    },
+    {
+      "namespace": "CombatArenaText",
+      "key": "M_8D9368AD",
+      "source": "Arena Grid is not configured. / 아레나 Grid를 지정하세요.",
+      "translation": "Arena Grid is not configured."
+    },
+    {
+      "namespace": "CombatArenaText",
+      "key": "M_E2B12843",
+      "source": "Grid generation failed. Check TileClass. / TileClass를 확인하세요.",
+      "translation": "Grid generation failed. Check TileClass."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_A2B4F756",
+      "source": "Gameplay setup is incomplete. Check Arena and PartyDefinition. / Gameplay 설정을 확인하세요.",
+      "translation": "Gameplay setup is incomplete. Check Arena and PartyDefinition."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_1B2B70DA",
+      "source": "Encounter spawn failed. Check unit classes and spawn coordinates. / 유닛 클래스와 스폰 좌표를 확인하세요.",
+      "translation": "Encounter spawn failed. Check unit classes and spawn coordinates."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_A7F11564",
+      "source": "Run 전투 상태를 활성화하지 못했습니다.",
+      "translation": "Failed to activate the run's combat state."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_D98D426B",
+      "source": "Combat could not start. / 전투를 시작할 수 없습니다.",
+      "translation": "Combat could not start."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_620008E5",
+      "source": "현재 인간 참가자의 전투 연결 배정을 완료하지 못했습니다.",
+      "translation": "Failed to assign combat connections for the current human participants."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_B514EEED",
+      "source": "로컬 참가자를 전투에 연결하지 못했습니다.",
+      "translation": "Failed to connect the local participant to combat."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_7E1F8EA7",
+      "source": "원래 참가자 모두의 서버 연결 배정이 필요합니다.",
+      "translation": "Every original participant needs a server connection assignment."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_DB2BC52D",
+      "source": "현재 Host의 관리 Run 실행 권한과 완료된 복원이 필요합니다.",
+      "translation": "The current host's managed run authority and a completed restore are required."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_65A1BEFB",
+      "source": "재개할 관리 Run과 현재 Host의 실행 권한이 필요합니다.",
+      "translation": "A managed run to resume and the current host's authority are required."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_9E202512",
+      "source": "진행 지도·승리 결과·인카운터 선택·상점에서만 전투 없는 관리 재개를 완료할 수 있습니다.",
+      "translation": "A combat-free managed resume can only be completed from the progress map, a victory result, an encounter choice or a shop."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_8C3768DF",
+      "source": "유효한 준비 완료 저장과 원래 참가자의 연결이 있어야 전투를 복구할 수 있습니다.",
+      "translation": "A valid ready-boundary save and the original participants' connections are required to restore combat."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_8D587D3C",
+      "source": "준비 계획 복구를 완료하지 못했습니다. 확정 저장은 유지됩니다.",
+      "translation": "Failed to restore the ready plans. The confirmed save is kept."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_4D07B46C",
+      "source": "재시도할 전투 저장이 없습니다.",
+      "translation": "There is no combat save to retry."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_4E7FFA06",
+      "source": "원래 참가자의 연결이 끊겨 전투를 중단했습니다. 메뉴에서 마지막 확정 준비 계획부터 명시적으로 재개해야 하며 자동 Host 승계나 AI 전환은 수행하지 않습니다.",
+      "translation": "Combat was suspended because an original participant disconnected. Resume explicitly from the menu at the last confirmed ready plan; automatic host migration and AI takeover are not performed."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_8A0D62F2",
+      "source": "Opponent Snapshot catalog is missing. / 상대 스냅샷 카탈로그가 없습니다.",
+      "translation": "Opponent Snapshot catalog is missing."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_453A9B0F",
+      "source": "Opponent Snapshot formation is outside this arena. / 상대 스냅샷 배치가 아레나 범위를 벗어났습니다.",
+      "translation": "Opponent Snapshot formation is outside this arena."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_4DB3A522",
+      "source": "Opponent Snapshot formation requires distinct empty enemy tiles. / 상대 스냅샷 배치에는 중복되지 않는 빈 적 타일이 필요합니다.",
+      "translation": "Opponent Snapshot formation requires distinct empty enemy tiles."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_4BEA5910",
+      "source": "Opponent Snapshot unit configuration failed. / 상대 스냅샷 유닛 설정에 실패했습니다.",
+      "translation": "Opponent Snapshot unit configuration failed."
+    },
+    {
+      "namespace": "EncounterManagerText",
+      "key": "M_A1FB62F9",
+      "source": "전투 준비 취소를 완료하지 못했습니다. 저장 다시 시도를 사용하세요.",
+      "translation": "Failed to cancel combat preparation. Use Retry Save."
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_062F86D8",
+      "source": "공격 충돌 없음 또는 장애물에 차단됨",
+      "translation": "No attack collision, or blocked by an obstacle"
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_9D704113",
+      "source": "스킬 발동 태그 조건 불충족",
+      "translation": "Skill activation tag requirements not met"
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_0D5D69E0",
+      "source": "효과 충돌 수명 관리 연결 누락",
+      "translation": "Effect collision lifetime binding is missing"
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_A30BFD0D",
+      "source": "효과 충돌 액터 생성 실패",
+      "translation": "Failed to spawn the effect collision actor"
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_0B387988",
+      "source": "효과 충돌 발동",
+      "translation": "Effect collision triggered"
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_DD2AE7E8",
+      "source": "투사체 생성 실패",
+      "translation": "Failed to spawn the projectile"
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_A1AC4136",
+      "source": "타격 완료",
+      "translation": "Hit landed"
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_7E79B654",
+      "source": "근접 공격 애니메이션 설정 누락",
+      "translation": "Melee attack animation settings are missing"
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_3C610B82",
+      "source": "검 장착 또는 칼날 소켓 설정 누락",
+      "translation": "Sword equipment or blade socket settings are missing"
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_35D4B0A1",
+      "source": "검 타격 완료",
+      "translation": "Sword hit landed"
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_799CF3EB",
+      "source": "칼날 충돌 없음 또는 장애물에 차단됨",
+      "translation": "No blade collision, or blocked by an obstacle"
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_ADDD92E2",
+      "source": "발사 완료",
+      "translation": "Fired"
+    },
+    {
+      "namespace": "CombatSkillExecutorText",
+      "key": "M_81331848",
+      "source": "발사 대상 또는 투사체 설정이 유효하지 않습니다.",
+      "translation": "The firing target or projectile settings are invalid."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_45F87A9C",
+      "source": "참가 중인 독립 로컬 디버그 전투에서만 캐릭터를 추가할 수 있습니다.",
+      "translation": "Characters can only be added in a joined standalone local debug battle."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_51D0622F",
+      "source": "모든 행동이 끝난 계획 단계 또는 전투 종료 후 캐릭터를 추가할 수 있습니다.",
+      "translation": "Characters can be added in the planning phase after all actions finish, or after combat ends."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_ACD72B2D",
+      "source": "사망한 캐릭터를 포함하여 아군·적군 합계 8명까지 추가할 수 있습니다. 전투 초기화로 새 테스트를 시작하세요.",
+      "translation": "Up to 8 allies and enemies in total can be added, including dead characters. Reset the battle to start a new test."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_B6D8E5C8",
+      "source": "전투장 또는 현재 캐릭터 등록 상태가 올바르지 않습니다.",
+      "translation": "The arena or current character registration is invalid."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_89F68856",
+      "source": "추가할 캐릭터의 생존·속성·등록 상태가 올바르지 않습니다.",
+      "translation": "The character to add has an invalid life, attribute or registration state."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_39452936",
+      "source": "추가할 아군은 로컬 플레이어가 조작하는 캐릭터여야 합니다.",
+      "translation": "An ally to add must be controlled by the local player."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_0CE6D957",
+      "source": "추가할 캐릭터의 배치 칸이 잘못되었거나 기존 이동 예약과 겹칩니다.",
+      "translation": "The character's placement tile is invalid or overlaps an existing move reservation."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_369E7221",
+      "source": "추가할 캐릭터의 체력·행동력 또는 위치 수치가 올바르지 않습니다.",
+      "translation": "The character to add has invalid health, action points or position values."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_793D5557",
+      "source": "기존 전투 캐릭터가 사라져 스킬 목록을 검증할 수 없습니다.",
+      "translation": "An existing combat character is missing, so the skill list cannot be validated."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_85C541ED",
+      "source": "원본 스킬이 변경되어 임시 타이밍을 적용할 수 없습니다. 해당 스킬의 원본값을 복원하거나 전투를 초기화하세요.",
+      "translation": "The source skill changed, so the temporary timing cannot be applied. Restore the skill's original values or reset the battle."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_B6D3EFD1",
+      "source": "새 캐릭터가 기존 SAP 이동 경로를 막습니다. 해당 이동 계획을 변경하거나 취소한 뒤 추가하세요.",
+      "translation": "The new character blocks an existing SAP move path. Change or cancel that move plan before adding."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_5188411F",
+      "source": "새 캐릭터의 전투 식별자 또는 조작 권한을 등록하지 못했습니다.",
+      "translation": "Failed to register the new character's combat identifier or control authority."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_508EC38A",
+      "source": "스킬 미선택 · 턴 넘기기",
+      "translation": "No skill selected · Skip turn"
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_9669BF28",
+      "source": "캐릭터 추가 완료 · 기존 스킬·장비 유지 · 다음 라운드를 계획하세요.",
+      "translation": "Character added · Skills and equipment kept · Plan the next round."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_F4A32AA7",
+      "source": "AI 계획 고정",
+      "translation": "AI plan locked"
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_33AEB6A0",
+      "source": "독립 로컬 디버그 전투에서만 부활할 수 있습니다.",
+      "translation": "Revival is only available in a standalone local debug battle."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_5465116A",
+      "source": "모든 행동이 끝난 계획 단계 또는 전투 종료 후 부활할 수 있습니다.",
+      "translation": "Revival is available in the planning phase after all actions finish, or after combat ends."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_5F82F41C",
+      "source": "부활할 아군을 선택하세요.",
+      "translation": "Select an ally to revive."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_CEA0030F",
+      "source": "자신이 조작하는 아군만 부활할 수 있습니다.",
+      "translation": "You can only revive allies you control."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_1AAA1104",
+      "source": "생존 중인 아군입니다. 사망 후 부활할 수 있습니다.",
+      "translation": "This ally is alive. It can be revived after it dies."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_CD9CF76B",
+      "source": "아군 진영에 점유·이동 예약·기존 SAP 경로를 피할 수 있는 빈 칸이 없습니다.",
+      "translation": "There is no empty ally tile free of occupants, move reservations and existing SAP paths."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_D6742F4D",
+      "source": "유닛의 부활 상태를 복구하지 못했습니다.",
+      "translation": "Failed to restore the unit's revived state."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_CDA62919",
+      "source": "아군 부활 완료 · 스킬·장비 유지 · 다음 라운드를 계획하세요.",
+      "translation": "Ally revived · Skills and equipment kept · Plan the next round."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_39396559",
+      "source": "참가 중인 독립 로컬 디버그 전투에서만 체력을 설정할 수 있습니다.",
+      "translation": "Health can only be set in a joined standalone local debug battle."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_364F0CAF",
+      "source": "계획 단계에서 이동과 효과가 모두 끝난 뒤 체력을 설정하세요.",
+      "translation": "Set health in the planning phase after all movement and effects finish."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_9DDB9697",
+      "source": "체력을 설정할 아군 또는 적군을 선택하세요.",
+      "translation": "Select an ally or enemy to set health for."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_4BAFA9B9",
+      "source": "등록된 생존 캐릭터만 체력을 설정할 수 있습니다. 사망한 아군은 먼저 부활시키세요.",
+      "translation": "Only registered living characters can have their health set. Revive dead allies first."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_B336637A",
+      "source": "자신이 조작하는 아군 또는 디버그 적군만 체력을 설정할 수 있습니다.",
+      "translation": "You can only set health for allies you control or debug enemies."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_75AE272D",
+      "source": "현재 체력과 정지 상태가 유효한 생존 캐릭터만 변경할 수 있습니다.",
+      "translation": "Only living characters with valid current health and a stationary state can be changed."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_4BB33D50",
+      "source": "최대 체력은 1~1,000,000, 현재 체력은 1~최대 체력 범위로 입력하세요.",
+      "translation": "Enter max HP between 1 and 1,000,000 and current HP between 1 and max HP."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_532024FE",
+      "source": "체력 설정 완료 · 기존 계획 유지 · 아군 준비 완료를 다시 눌러주세요.",
+      "translation": "Health set · Existing plans kept · Press Ready again for your allies."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_D1F21563",
+      "source": "독립 디버그 전투에서만 장착을 변경할 수 있습니다.",
+      "translation": "Equipment can only be changed in a standalone debug battle."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_FA2A9C6F",
+      "source": "계획 단계에서 이동과 효과가 모두 끝난 뒤 변경하세요.",
+      "translation": "Change it in the planning phase after all movement and effects finish."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_C69A327A",
+      "source": "변경할 소유 유닛을 선택하세요.",
+      "translation": "Select an owned unit to change."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_1866659D",
+      "source": "생존한 자신의 아군만 변경할 수 있습니다.",
+      "translation": "You can only change your own living allies."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_07603BE0",
+      "source": "유닛이 정지한 뒤 변경하세요.",
+      "translation": "Change it after the unit stops."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_726FC415",
+      "source": "전투 유닛이 사라져 스킬 목록을 갱신할 수 없습니다.",
+      "translation": "The combat unit is missing, so the skill list cannot be updated."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_3039EF3E",
+      "source": "스킬 장착이 변경되어 해당 유닛의 계획과 자신의 준비가 해제되었습니다.",
+      "translation": "Skill equipment changed, so that unit's plan and your Ready state were cleared."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_24B0A6F4",
+      "source": "아군의 보유 스킬을 선택하세요.",
+      "translation": "Select one of the ally's owned skills."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_E8CBF571",
+      "source": "타이밍 범위를 확인하세요: 준비 0~60초, 효과 지연 0~10초, 효과 지속 0초 초과~10초, 투사체 속도 0 초과~100,000cm/s, 무기 판정 0초 초과~5초(준비+무기 판정은 60초 이하).",
+      "translation": "Check the timing ranges: windup 0-60 s, effect delay 0-10 s, effect duration over 0 up to 10 s, projectile speed over 0 up to 100,000 cm/s, weapon trace over 0 up to 5 s (windup + weapon trace at most 60 s)."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_60F58C76",
+      "source": "동일 스킬 전체에 임시 타이밍 적용 · 해당 스킬을 보유한 아군의 계획과 준비 완료 해제 · 적 계획 유지",
+      "translation": "Temporary timing applied to every use of this skill · Plans and Ready cleared for allies with this skill · Enemy plans kept"
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_1209C39D",
+      "source": "장비가 변경되어 해당 유닛의 계획과 자신의 준비가 해제되었습니다.",
+      "translation": "Equipment changed, so that unit's plan and your Ready state were cleared."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_3A25554F",
+      "source": "적군 진영에 점유·이동 예약이 없는 빈 칸이 없습니다.",
+      "translation": "There is no empty enemy-side tile free of occupants and move reservations."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_BEF0CE91",
+      "source": "아군 진영에 점유·이동 예약이 없는 빈 칸이 없습니다.",
+      "translation": "There is no empty ally-side tile free of occupants and move reservations."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_74382F49",
+      "source": "캐릭터 추가 완료 · 양 진영에 생존 캐릭터가 있어야 전투가 재개됩니다.",
+      "translation": "Character added · Combat resumes only when both sides have living characters."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_1A8D5A18",
+      "source": "캐릭터 추가 완료 · 기존 계획 유지 · 아군 준비 완료를 다시 눌러주세요.",
+      "translation": "Character added · Existing plans kept · Press Ready again for your allies."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_A1FD9739",
+      "source": "아군 부활 완료 · 생존한 적이 없습니다. 전투 초기화로 새 테스트를 시작하세요.",
+      "translation": "Ally revived · No enemies are alive. Reset the battle to start a new test."
+    },
+    {
+      "namespace": "CombatRoundDebugText",
+      "key": "M_6FC89C1A",
+      "source": "아군 부활 완료 · HP·AP·SAP 복구 · 스킬·장비를 유지합니다.",
+      "translation": "Ally revived · HP, AP and SAP restored · Skills and equipment kept."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_AB9B7207",
+      "source": "전투 실행 문맥이 올바르지 않습니다.",
+      "translation": "The combat execution context is invalid."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_667E12CF",
+      "source": "전투장 또는 참가자 권위가 없습니다.",
+      "translation": "The arena or participant authority is missing."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_1E843B9D",
+      "source": "유닛의 시작 위치 또는 생존 상태가 올바르지 않습니다.",
+      "translation": "The unit's starting position or life state is invalid."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_FEFE8265",
+      "source": "유닛의 시작 칸과 전투 Grid·진영·점유가 일치하지 않습니다.",
+      "translation": "The unit's starting tile does not match the combat grid, side or occupancy."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_9AC72AFB",
+      "source": "인간 캐릭터의 원래 소유 연결을 확인하지 못했습니다.",
+      "translation": "Failed to verify the original owner connection of a human character."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_0A9B534B",
+      "source": "전투 유닛은 양 진영 합계 2~8명이어야 합니다.",
+      "translation": "Combat requires 2 to 8 units across both sides."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_F0384537",
+      "source": "양 진영에 생존 유닛이 있어야 전투를 시작할 수 있습니다.",
+      "translation": "Both sides need living units to start combat."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_F7934DA5",
+      "source": "전투가 중단되었습니다. 재개 시 마지막으로 저장한 준비 상태에서 복구합니다.",
+      "translation": "Combat was suspended. Resuming restores the last saved ready state."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_508EC38A",
+      "source": "스킬 미선택 · 턴 넘기기",
+      "translation": "No skill selected · Skip turn"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_D690C583",
+      "source": "사망",
+      "translation": "Dead"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_F4A32AA7",
+      "source": "AI 계획 고정",
+      "translation": "AI plan locked"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_3290DD4E",
+      "source": "준비 완료를 누르면 스킬을 선택하지 않은 유닛은 행동을 건너뜁니다. 적 계획은 이미 고정되었습니다.",
+      "translation": "Units without a selected skill skip their action when you press Ready. Enemy plans are already locked."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_195F30A0",
+      "source": "현재 전투를 조작할 권한이 없습니다.",
+      "translation": "You do not have permission to control this combat."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_B4BAA1A3",
+      "source": "이 전투에 조작 가능한 원래 캐릭터가 없습니다.",
+      "translation": "You have no original character you can control in this combat."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_02A3D583",
+      "source": "계획이 변경되었거나 이미 잠겼습니다. 최신 상태에서 다시 선택하세요.",
+      "translation": "The plan changed or is already locked. Select again from the latest state."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_F084CF45",
+      "source": "이동이 끝난 뒤 계획과 준비를 변경하세요.",
+      "translation": "Change plans and Ready after movement finishes."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_A5EFB2B8",
+      "source": "계획 단계에서만 행동을 선택할 수 있습니다.",
+      "translation": "Actions can only be selected in the planning phase."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_BACC52D2",
+      "source": "계획 단계에서만 SAP 이동을 예약할 수 있습니다.",
+      "translation": "SAP moves can only be reserved in the planning phase."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_215E6DE6",
+      "source": "살아 있는 인간 조작 캐릭터만 이동을 예약할 수 있습니다.",
+      "translation": "Only living human-controlled characters can reserve moves."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_D7ED9C47",
+      "source": "이동 SAP 1과 선택한 스킬의 SAP 합계가 부족합니다.",
+      "translation": "Not enough SAP for the move (1 SAP) plus the selected skill's SAP."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_B7335203",
+      "source": "SAP 이동의 유닛 또는 전투장을 확인할 수 없습니다.",
+      "translation": "The unit or arena for the SAP move cannot be found."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_A1430822",
+      "source": "살아 있는 캐릭터의 현재 칸을 확인할 수 없습니다.",
+      "translation": "The living character's current tile cannot be found."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_4DD8BFDA",
+      "source": "이동할 아군 진영의 예약되지 않은 빈칸을 선택하세요.",
+      "translation": "Select an unreserved empty tile on the ally side to move to."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_6600F439",
+      "source": "이동 범위 안에서 빈 아군 칸을 따라 도달할 수 없습니다.",
+      "translation": "The tile cannot be reached through empty ally tiles within move range."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_9673FE9F",
+      "source": "원래 자신의 캐릭터만 이동을 예약할 수 있습니다.",
+      "translation": "You can only reserve moves for your own original characters."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_E6405B83",
+      "source": "SAP 이동 예약됨",
+      "translation": "SAP move reserved"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_AFC958E8",
+      "source": "이동을 예약했습니다. 준비 완료 후 SAP 이동부터 실행합니다.",
+      "translation": "Move reserved. After Ready, SAP moves run first."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_76797F79",
+      "source": "자신의 살아 있는 캐릭터에게 예약된 이동이 없습니다.",
+      "translation": "None of your living characters has a reserved move."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_F6EBE1A0",
+      "source": "SAP 이동 예약 취소",
+      "translation": "SAP move reservation cancelled"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_55DBDE59",
+      "source": "이동 예약을 취소했습니다. 행동 계획과 준비를 다시 확인하세요.",
+      "translation": "Move reservation cancelled. Check your action plans and Ready again."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_D1852D3B",
+      "source": "SAP 이동 취소",
+      "translation": "SAP move cancelled"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_6B6BD7FB",
+      "source": "SAP 이동 중",
+      "translation": "SAP moving"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_7390282D",
+      "source": "전투 Grid가 없습니다.",
+      "translation": "The combat grid is missing."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_A6620634",
+      "source": "스킬 발동 태그 조건을 만족하지 않습니다.",
+      "translation": "The skill's activation tag requirements are not met."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_FC8A76E3",
+      "source": "스킬의 대상 진영 또는 태그 조건이 올바르지 않습니다.",
+      "translation": "The skill's target side or tag requirements are invalid."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_53F18F01",
+      "source": "원래 자신의 캐릭터만 계획할 수 있습니다.",
+      "translation": "You can only plan for your own original characters."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_76C51C91",
+      "source": "계획 적용됨",
+      "translation": "Plan applied"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_6C13C7E3",
+      "source": "계획이 변경되어 자신의 준비만 해제되었습니다.",
+      "translation": "The plan changed, so only your Ready state was cleared."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_151C2CF9",
+      "source": "AP 실행 대기",
+      "translation": "Waiting for AP execution"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_12B4103C",
+      "source": "계획 잠금 완료. 모든 예약 SAP 이동을 먼저 실행합니다.",
+      "translation": "Plans locked. All reserved SAP moves run first."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_5CD5934E",
+      "source": "시작 대기",
+      "translation": "Waiting to start"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_8F480533",
+      "source": "사망으로 남은 행동 취소",
+      "translation": "Remaining action cancelled due to death"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_F4142938",
+      "source": "발동 전 사망으로 취소",
+      "translation": "Cancelled due to death before activation"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_4321F015",
+      "source": "스킬 정의 누락",
+      "translation": "Skill definition missing"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_86A82DBF",
+      "source": "시전 중",
+      "translation": "Casting"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_8507A104",
+      "source": "대기 완료",
+      "translation": "Wait complete"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_F15BD04E",
+      "source": "접근 중",
+      "translation": "Approaching"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_A14A8022",
+      "source": "가까운 적으로 대상 변경",
+      "translation": "Retargeted to the nearest enemy"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_19005738",
+      "source": "목표 사망으로 불발",
+      "translation": "Failed: target died"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_7A5A3B1D",
+      "source": "접근 칸 점유 또는 예약 충돌로 불발",
+      "translation": "Failed: approach tile occupied or reservation conflict"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_5CC8DA49",
+      "source": "접근 시간 초과로 불발",
+      "translation": "Failed: approach timed out"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_25B385B9",
+      "source": "복귀 시간 초과: 예약 칸으로 복원",
+      "translation": "Return timed out: restored to the reserved tile"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_19AF2AB8",
+      "source": "최종 배치 실패: 출발 칸으로 복귀",
+      "translation": "Final placement failed: returned to the starting tile"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_6DC2E7F3",
+      "source": "패배",
+      "translation": "Defeat"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_C9E21894",
+      "source": "승리",
+      "translation": "Victory"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_A82C6ABA",
+      "source": "SAP 이동 완료",
+      "translation": "SAP move complete"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_985E02CC",
+      "source": "일부 SAP 이동이 실패했습니다. SAP는 환불되지 않으며 생존 캐릭터의 AP 행동을 계속 실행합니다.",
+      "translation": "Some SAP moves failed. SAP is not refunded, and living characters continue with their AP actions."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_3FFBB395",
+      "source": "SAP 이동 처리 완료. 속도차에 따라 AP 행동을 실행합니다.",
+      "translation": "SAP moves complete. AP actions run according to speed differences."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_2BFA3D10",
+      "source": "회복 소모품 사용",
+      "translation": "Recovery consumable used"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "M_A64E7284",
+      "source": "회복 조건 변경으로 소모품 보존",
+      "translation": "Consumable kept because recovery conditions changed"
+    },
+    {
+      "namespace": "CombatSkillPresentationText",
+      "key": "M_8A898AB5",
+      "source": "스킬 이펙트를 준비할 월드가 없습니다.",
+      "translation": "There is no world to prepare skill effects in."
+    },
+    {
+      "namespace": "CombatRoundCheckpointText",
+      "key": "M_66809E02",
+      "source": "계획 단계의 전투 상태와 Run 소유권을 저장할 수 없습니다.",
+      "translation": "Cannot save the planning-phase combat state and run ownership."
+    },
+    {
+      "namespace": "CombatRoundCheckpointText",
+      "key": "M_AE610326",
+      "source": "라운드 보호막은 준비 상태 저장 전에 제거되어야 합니다.",
+      "translation": "Round shields must be removed before saving the ready state."
+    },
+    {
+      "namespace": "CombatRoundCheckpointText",
+      "key": "M_6CEC8EAA",
+      "source": "저장된 준비 계획과 복원된 전투 유닛이 일치하지 않습니다.",
+      "translation": "The saved ready plans do not match the restored combat units."
+    },
+    {
+      "namespace": "CombatRoundCheckpointText",
+      "key": "M_E6980444",
+      "source": "저장된 유닛의 소유권·체력·행동력·배치를 복원하지 못했습니다.",
+      "translation": "Failed to restore saved units' ownership, health, action points or placement."
+    },
+    {
+      "namespace": "CombatRoundCheckpointText",
+      "key": "M_651148AA",
+      "source": "마지막으로 저장한 준비 상태를 복구했습니다.",
+      "translation": "Restored the last saved ready state."
+    },
+    {
+      "namespace": "PartyPlayerControllerLegacyText",
+      "key": "M_478C9E4B",
+      "source": "개별 턴 즉시 실행은 종료되었습니다. 라운드 계획을 적용한 뒤 준비 완료를 사용하세요.",
+      "translation": "Immediate per-turn execution has ended. Apply round plans and then use Ready."
+    },
+    {
+      "namespace": "CombatActionAuthorityText",
+      "key": "M_671D4184",
+      "source": "원래 소유자가 확인된 유휴 아군의 조작 방식은 서버에서 전투 시작 전에만 설정할 수 있습니다.",
+      "translation": "The control mode of an idle ally with a verified original owner can only be set on the server before combat starts."
+    },
+    {
+      "namespace": "CombatRoundPlayerControllerText",
+      "key": "M_254F7259",
+      "source": "계획을 서버에서 확인하고 있습니다.",
+      "translation": "Checking the plan with the server."
+    },
+    {
+      "namespace": "CombatRoundPlayerControllerText",
+      "key": "M_E2594D81",
+      "source": "준비 상태를 서버에서 확인하고 있습니다.",
+      "translation": "Checking the Ready state with the server."
+    },
+    {
+      "namespace": "CombatRoundPlayerControllerText",
+      "key": "M_0B941F54",
+      "source": "라운드 세션에 연결되지 않았습니다.",
+      "translation": "Not connected to a round session."
+    },
+    {
+      "namespace": "CombatRoundPlayerControllerText",
+      "key": "M_27EFC966",
+      "source": "계획 적용 완료. 모든 아군 계획을 확인한 뒤 준비 완료를 누르세요.",
+      "translation": "Plan applied. Check every ally's plan, then press Ready."
+    },
+    {
+      "namespace": "CombatRoundPlayerControllerText",
+      "key": "M_9F8EA735",
+      "source": "준비 완료를 반영했습니다.",
+      "translation": "Ready applied."
+    },
+    {
+      "namespace": "CombatRoundPlayerControllerText",
+      "key": "M_13877AFC",
+      "source": "준비 완료를 취소했습니다.",
+      "translation": "Ready cancelled."
+    },
+    {
+      "namespace": "MainMenuPlayerControllerText",
+      "key": "M_998333C5",
+      "source": "Gameplay level is missing. Create the configured Gameplay level first. / Gameplay 레벨을 먼저 생성해 주세요.",
+      "translation": "Gameplay level is missing. Create the configured Gameplay level first."
+    },
+    {
+      "namespace": "MainMenuPlayerControllerText",
+      "key": "M_50FDE898",
+      "source": "Run state is unavailable. / 진행 상태를 사용할 수 없습니다.",
+      "translation": "Run state is unavailable."
+    },
+    {
+      "namespace": "MainMenuPlayerControllerText",
+      "key": "M_7DC390AA",
+      "source": "Gameplay 레벨을 찾을 수 없습니다.",
+      "translation": "Cannot find the Gameplay level."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_B2A0A61F",
+      "source": "속성",
+      "translation": "Element"
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_1BD493C4",
+      "source": "방식",
+      "translation": "Method"
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_CAC98F6D",
+      "source": "이름 / 에셋 이름 검색",
+      "translation": "Search by name / asset name"
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_3888745D",
+      "source": "디버그 전투가 없습니다.",
+      "translation": "There is no debug battle."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_67EBE6A5",
+      "source": "추가·제거 즉시 반영 / 해당 유닛의 계획 해제",
+      "translation": "Adding or removing applies immediately / Clears that unit's plan"
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_25879EDF",
+      "source": "위 목록에서 부활할 아군을 선택하세요.",
+      "translation": "Select an ally to revive from the list above."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_4E034C76",
+      "source": "선택 아군의 스킬·장비를 유지한 채 HP를 전부 회복하고 부활합니다.",
+      "translation": "Fully restores HP and revives the selected ally while keeping its skills and equipment."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_2ADB9CB4",
+      "source": "위 목록에서 아군 또는 적군을 선택하세요.",
+      "translation": "Select an ally or enemy from the list above."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_0C808620",
+      "source": "디버그 전투 준비 후 사용할 수 있습니다.",
+      "translation": "Available after the debug battle is prepared."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_9FF3E890",
+      "source": "계획 단계에서 HP를 적용합니다. 스킬·장비·행동 계획은 유지하고 아군 준비 완료를 해제합니다.",
+      "translation": "Applies HP in the planning phase. Skills, equipment and action plans are kept, and allies' Ready is cleared."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_3E64A7E9",
+      "source": "최대 HP와 현재 HP에 쉼표 없이 올바른 숫자를 입력하세요.",
+      "translation": "Enter valid numbers without commas for max HP and current HP."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_CFBE937C",
+      "source": "위 대상 목록에서 아군을 고르고 보유 스킬을 선택하세요.",
+      "translation": "Choose an ally from the target list above, then select an owned skill."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_24B0A6F4",
+      "source": "아군의 보유 스킬을 선택하세요.",
+      "translation": "Select one of the ally's owned skills."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_B636AC38",
+      "source": "계획 단계에서 적용 · 같은 스킬 보유 아군의 계획/준비 해제 · 적 계획 유지",
+      "translation": "Applies in the planning phase · Clears plans/Ready for allies with the same skill · Enemy plans kept"
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_86314FA8",
+      "source": "사용 중인 항목에 쉼표 없이 올바른 숫자를 입력하세요.",
+      "translation": "Enter valid numbers without commas for the fields in use."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_BDCB0220",
+      "source": "입력값이 항목의 허용 범위를 벗어났습니다. 무기 판정은 준비+지속 60초 이하입니다.",
+      "translation": "A value is outside its allowed range. Windup + weapon trace must be at most 60 s."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_A0042D7E",
+      "source": "입력값을 현재 전투에 임시 적용했습니다.",
+      "translation": "Applied the values temporarily to the current battle."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_E39B7006",
+      "source": "현재 전투의 타이밍을 원본 에셋 값으로 복원했습니다.",
+      "translation": "Restored the current battle's timing to the source asset values."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_038218CD",
+      "source": "에셋 경로와 입력 설정값을 클립보드에 복사했습니다. 원본 에셋은 저장하지 않았습니다.",
+      "translation": "Copied the asset path and input values to the clipboard. The source asset was not saved."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_1AA8CD7B",
+      "source": "추가할 캐릭터가 없습니다.",
+      "translation": "There is no character to add."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_3127192C",
+      "source": "빈 진영 칸에 추가하고 체력 설정 대상으로 선택합니다.",
+      "translation": "Adds to an empty tile on the side and selects it for health editing."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_5BABF047",
+      "source": "추가할 캐릭터를 선택하세요.",
+      "translation": "Select a character to add."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_1F7AC7B4",
+      "source": "적군의 HP는 캐릭터·체력 탭에서 변경할 수 있습니다.",
+      "translation": "Enemy HP can be changed in the Character/Health tab."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_022BDBB8",
+      "source": "스킬 에셋을 불러오지 못했습니다.",
+      "translation": "Failed to load the skill asset."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_48CFBE4A",
+      "source": "목록이 바뀌었습니다. 다시 선택하세요.",
+      "translation": "The list changed. Please select again."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_974DEE99",
+      "source": "반영했습니다. 전투 화면에서 바로 확인할 수 있습니다.",
+      "translation": "Applied. You can check it right away on the combat screen."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_9D189E24",
+      "source": "선택한 아군이 없습니다.",
+      "translation": "No ally is selected."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_038733DC",
+      "source": "선택 캐릭터의 HP를 전부 회복했습니다.",
+      "translation": "Fully restored the selected character's HP."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_762E274B",
+      "source": "최대 HP와 현재 HP를 적용했습니다.",
+      "translation": "Applied max HP and current HP."
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_6FD4B805",
+      "source": "아군 부활 창 접기",
+      "translation": "Collapse ally revival panel"
+    },
+    {
+      "namespace": "CombatDebugWidgetText",
+      "key": "M_EB39839F",
+      "source": "아군 부활 창 열기",
+      "translation": "Expand ally revival panel"
+    }
+  ]
+}

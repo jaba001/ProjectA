@@ -18,7 +18,7 @@ bool RunRecoveryRules::IsConsumable(const FCombatRoundSkill& Skill) { return Ski
 
 bool RunRecoveryRules::ResolveStack(const FRunConsumableStack& Stack, FCombatRoundSkill& OutSkill, FText& OutError)
 {
-    OutError = FText::FromString(TEXT("소모품 태그, 수량 또는 회복 스킬이 올바르지 않습니다."));
+    OutError = NSLOCTEXT("RunRecoveryTypesText", "M_1D288C28", "소모품 태그, 수량 또는 회복 스킬이 올바르지 않습니다.");
     if (!Stack.ItemTag.IsValid() || !Stack.ItemTag.MatchesTag(GetConsumableTag()) || Stack.Quantity < 0 || Stack.Quantity > MaximumQuantity || !Stack.Skill.IsValid() || !Stack.Skill.GetAssetPathString().StartsWith(TEXT("/Game/User_JeHoon/"))) return false;
     const USkillDefinitionDataAsset* Definition = Cast<USkillDefinitionDataAsset>(Stack.Skill.TryLoad());
     if (!Definition || !Definition->ResolveRoundSkill(OutSkill, OutError)) return false;

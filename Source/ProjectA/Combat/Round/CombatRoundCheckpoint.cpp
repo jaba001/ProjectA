@@ -14,7 +14,7 @@
 
 bool ACombatRoundCoordinator::CapturePlanningCheckpoint(FCombatCheckpointData& OutCheckpoint, FText& OutError) const
 {
-    OutError = FText::FromString(TEXT("계획 단계의 전투 상태와 Run 소유권을 저장할 수 없습니다."));
+    OutError = NSLOCTEXT("CombatRoundCheckpointText", "M_66809E02", "계획 단계의 전투 상태와 Run 소유권을 저장할 수 없습니다.");
     const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     const UCombatActionAuthority* Authority = IsValid(CombatManager) ? CombatManager->GetActionAuthority() : nullptr;
     if (!HasAuthority() || View.Phase != ECombatRoundPhase::Planning || bSAPMovementInProgress || !Projectiles.IsEmpty() || !Run || Run->GetPhase() != ERunPhase::Combat || !Authority || !View.CombatId.IsValid() || !FRunIdentityData::StaticStruct()->CompareScriptStruct(&Run->GetRunIdentity(), &Authority->GetRunIdentity(), 0)) return false;
@@ -45,7 +45,7 @@ bool ACombatRoundCoordinator::CapturePlanningCheckpoint(FCombatCheckpointData& O
         const UAS_Unit* Attributes = Unit->GetAttributeSet();
         if (Attributes->GetShield() != 0.f)
         {
-            OutError = FText::FromString(TEXT("라운드 보호막은 준비 상태 저장 전에 제거되어야 합니다."));
+            OutError = NSLOCTEXT("CombatRoundCheckpointText", "M_AE610326", "라운드 보호막은 준비 상태 저장 전에 제거되어야 합니다.");
             return false;
         }
         FCombatCheckpointUnit& Saved = Candidate.Units.AddDefaulted_GetRef();
@@ -105,14 +105,14 @@ bool ACombatRoundCoordinator::CapturePlanningCheckpoint(FCombatCheckpointData& O
 
 bool ACombatRoundCoordinator::RestorePlanningCheckpoint(const FCombatCheckpointData& Checkpoint, FText& OutError)
 {
-    OutError = FText::FromString(TEXT("저장된 준비 계획과 복원된 전투 유닛이 일치하지 않습니다."));
+    OutError = NSLOCTEXT("CombatRoundCheckpointText", "M_6CEC8EAA", "저장된 준비 계획과 복원된 전투 유닛이 일치하지 않습니다.");
     const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     const UCombatActionAuthority* Authority = IsValid(CombatManager) ? CombatManager->GetActionAuthority() : nullptr;
     if (!HasAuthority() || !Run || Run->GetPhase() != ERunPhase::Combat || !Authority || Checkpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion || View.Units.Num() != Checkpoint.Units.Num() || !IsValid(Arena) || !IsValid(Arena->Grid) || !Projectiles.IsEmpty() || !FRunIdentityData::StaticStruct()->CompareScriptStruct(&Run->GetRunIdentity(), &Checkpoint.Identity, 0)) return false;
     if (Checkpoint.Identity.Origin == ERunIdentityOrigin::LegacyOffline && GetNetMode() != NM_Standalone) return false;
     if (!ActiveEffects.IsEmpty()) return false;
     if (!UCombatCheckpointLibrary::Validate(Checkpoint, Run->GetPartyMembers(), OutError, &Run->GetWeaponSkillRules())) return false;
-    OutError = FText::FromString(TEXT("저장된 유닛의 소유권·체력·행동력·배치를 복원하지 못했습니다."));
+    OutError = NSLOCTEXT("CombatRoundCheckpointText", "M_E6980444", "저장된 유닛의 소유권·체력·행동력·배치를 복원하지 못했습니다.");
     FCombatRoundView Restored = View;
     Restored.RoundNumber = Checkpoint.RoundNumber;
     Restored.PlanRevision = Checkpoint.PlanRevision;
@@ -196,7 +196,7 @@ bool ACombatRoundCoordinator::RestorePlanningCheckpoint(const FCombatCheckpointD
     NextMoveIndex = PlanningMoveStep = 0;
     PlanningMoveElapsed = 0.0;
     PlanningMovePath.Reset();
-    View.Message = FText::FromString(TEXT("마지막으로 저장한 준비 상태를 복구했습니다."));
+    View.Message = NSLOCTEXT("CombatRoundCheckpointText", "M_651148AA", "마지막으로 저장한 준비 상태를 복구했습니다.");
     OutError = FText::GetEmpty();
     PublishState();
     return true;

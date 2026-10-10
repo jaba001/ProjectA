@@ -23,7 +23,7 @@ UGE_Damage::UGE_Damage()
     DamageModifier.ModifierOp = EGameplayModOp::Additive;
 
     FSetByCallerFloat SetByCallerDamage;
-    SetByCallerDamage.DataTag = FGameplayTag::RequestGameplayTag(FName("Data.Damage"));
+    SetByCallerDamage.DataTag = ProjectACombatTags::Data_Damage;
 
     DamageModifier.ModifierMagnitude = SetByCallerDamage;
 

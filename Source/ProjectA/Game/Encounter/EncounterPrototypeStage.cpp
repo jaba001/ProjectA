@@ -1,4 +1,5 @@
 #include "Game/Encounter/EncounterPrototypeStage.h"
+#include "ProjectA.h"
 
 #include "Camera/CameraComponent.h"
 #include "Animation/AnimSequence.h"
@@ -277,7 +278,7 @@ void AEncounterPrototypeStage::RebuildLibraryVisuals()
         Idle = Profile->IdleAnimation.LoadSynchronous();
         if (!Character || !Character->GetSkeleton() || !Idle || !Idle->GetSkeleton() || !Idle->GetSkeleton()->IsCompatibleMesh(Character))
         {
-            UE_LOG(LogTemp, Warning, TEXT("Encounter stage %s retained prototype scenery: missing or incompatible character/idle for %s."), *GetName(), *Profile->ProfileId.ToString());
+            UE_LOG(LogProjectA, Warning, TEXT("Encounter stage %s retained prototype scenery: missing or incompatible character/idle for %s."), *GetName(), *Profile->ProfileId.ToString());
             return;
         }
         CharacterBounds = Character->GetBounds().GetBox();

@@ -1,4 +1,5 @@
 #include "Game/Run/RunEncounterPool.h"
+#include "Types/ProjectARandom.h"
 
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -106,7 +107,7 @@ bool RunEncounterPool::Load(FRunTargetState& State, FText& OutError)
     }
     FRunTargetState Candidate = State;
     if (!LoadFromString(MoveTemp(CsvText), 0, Candidate, OutError)) return false;
-    Candidate.EncounterSeed = FMath::Rand();
+    Candidate.EncounterSeed = ProjectARandom::NewSeed();
     State = MoveTemp(Candidate);
     return true;
 }

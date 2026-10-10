@@ -35,7 +35,7 @@ void ADevelopmentCoopLobby::InitializeLobby(int32 Capacity)
     if (!HasAuthority() || !UDevelopmentCoopSubsystem::IsAvailable() || Capacity < 2 || Capacity > 4 || !Members.IsEmpty()) return;
     Members.SetNum(Capacity);
     Connections.SetNum(Capacity);
-    Message = FText::FromString(TEXT("모든 참가자가 준비하면 Host가 시작합니다. 캐릭터는 각자 궁수 1명입니다."));
+    Message = NSLOCTEXT("DevelopmentCoopLobbyText", "M_155696C3", "모든 참가자가 준비하면 Host가 시작합니다. 캐릭터는 각자 궁수 1명입니다.");
     Publish();
 }
 
@@ -72,7 +72,7 @@ void ADevelopmentCoopLobby::RemoveParticipant(AGameplayPlayerController* Control
     Connections[Index].Reset();
     Members[Index].bConnected = Members[Index].bReady = false;
     bClosed = true;
-    Message = FText::FromString(TEXT("참가자가 나갔습니다. 자동 Host 승계·AI 전환·대체 참가는 하지 않습니다. 메뉴로 나가 새 방을 만들어 주세요."));
+    Message = NSLOCTEXT("DevelopmentCoopLobbyText", "M_6CD158B5", "참가자가 나갔습니다. 자동 Host 승계·AI 전환·대체 참가는 하지 않습니다. 메뉴로 나가 새 방을 만들어 주세요.");
     Publish();
 }
 
@@ -98,7 +98,7 @@ bool ADevelopmentCoopLobby::Start(AGameplayPlayerController* Controller)
     FProfessionDefinition Profession;
     if (!Mode || !Mode->GetEncounterManager() || !Mode->PartyDefinition || !Mode->PartyDefinition->ResolveProfession(TEXT("Archer"), Profession) || !Run || Run->IsManagedRun())
     {
-        Message = FText::FromString(TEXT("Gameplay와 궁수 파티 설정을 확인해 주세요."));
+        Message = NSLOCTEXT("DevelopmentCoopLobbyText", "M_6B8877D5", "Gameplay와 궁수 파티 설정을 확인해 주세요.");
         Publish();
         return false;
     }
@@ -138,13 +138,13 @@ bool ADevelopmentCoopLobby::Start(AGameplayPlayerController* Controller)
         if (!Mode->AssignRunParticipant(Connections[Index].Get(), Identity.OriginalParticipants[Index].AccountId))
         {
             bClosed = true;
-            Message = FText::FromString(TEXT("참가자 배정에 실패했습니다. 메뉴로 나가 새 방을 만들어 주세요."));
+            Message = NSLOCTEXT("DevelopmentCoopLobbyText", "M_E9A0FBDC", "참가자 배정에 실패했습니다. 메뉴로 나가 새 방을 만들어 주세요.");
             Publish();
             return false;
         }
     }
     bStarted = true;
-    Message = FText::FromString(TEXT("개발용 협동 · 본인 캐릭터만 조작 · 진행 선택은 Host"));
+    Message = NSLOCTEXT("DevelopmentCoopLobbyText", "M_5964ECFD", "개발용 협동 · 본인 캐릭터만 조작 · 진행 선택은 Host");
     Publish();
     return true;
 }

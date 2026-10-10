@@ -199,10 +199,10 @@ bool CombatSkillExecution::ApplyEffect(AUnitBase* Source, AUnitBase* Target, con
 CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleaseContext& Context, const TArray<FCombatRoundUnitView>& Units, const FCombatRoundSkill& Skill, TFunctionRef<void(AUnitBase*)> OnHit, TFunctionRef<void(ACombatRoundProjectile*)> RegisterProjectile, TFunction<void(ACombatSkillEffectActor*)> RegisterEffect)
 {
     FReleaseResult Result;
-    Result.Status = FText::FromString(TEXT("공격 충돌 없음 또는 장애물에 차단됨"));
+    Result.Status = NSLOCTEXT("CombatSkillExecutorText", "M_062F86D8", "공격 충돌 없음 또는 장애물에 차단됨");
     if (!IsValid(Context.Owner) || !Context.Owner->HasAuthority() || !CanUseSkill(Context.Source, Skill))
     {
-        Result.Status = FText::FromString(TEXT("스킬 발동 태그 조건 불충족"));
+        Result.Status = NSLOCTEXT("CombatSkillExecutorText", "M_9D704113", "스킬 발동 태그 조건 불충족");
         return Result;
     }
     UWorld* World = Context.Owner->GetWorld();
@@ -211,7 +211,7 @@ CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleas
     {
         if (!RegisterEffect)
         {
-            Result.Status = FText::FromString(TEXT("효과 충돌 수명 관리 연결 누락"));
+            Result.Status = NSLOCTEXT("CombatSkillExecutorText", "M_0D5D69E0", "효과 충돌 수명 관리 연결 누락");
             return Result;
         }
         FActorSpawnParameters Params;
@@ -223,13 +223,13 @@ CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleas
         ACombatSkillEffectActor* Effect = bChain ? World->SpawnActor<ACombatChainEffectActor>(Context.Source->GetActorLocation(), FRotator::ZeroRotator, Params) : World->SpawnActor<ACombatSkillEffectActor>(Context.Source->GetActorLocation(), FRotator::ZeroRotator, Params);
         if (!Effect)
         {
-            Result.Status = FText::FromString(TEXT("효과 충돌 액터 생성 실패"));
+            Result.Status = NSLOCTEXT("CombatSkillExecutorText", "M_A30BFD0D", "효과 충돌 액터 생성 실패");
             return Result;
         }
         RegisterEffect(Effect);
         Effect->InitializeEffect(Context.Source, Context.Target, Context.AimLocation, Skill, Units, Context.PresentationTime);
         Result.bSucceeded = true;
-        Result.Status = FText::FromString(TEXT("효과 충돌 발동"));
+        Result.Status = NSLOCTEXT("CombatSkillExecutorText", "M_0B387988", "효과 충돌 발동");
         return Result;
     }
     if (Skill.Kind == ECombatRoundSkillKind::Projectile)
@@ -240,7 +240,7 @@ CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleas
         ACombatRoundProjectile* Projectile = World->SpawnActor<ACombatRoundProjectile>(Context.Source->GetActorLocation(), FRotator::ZeroRotator, Params);
         if (!Projectile)
         {
-            Result.Status = FText::FromString(TEXT("투사체 생성 실패"));
+            Result.Status = NSLOCTEXT("CombatSkillExecutorText", "M_DD2AE7E8", "투사체 생성 실패");
             return Result;
         }
         RegisterProjectile(Projectile);
@@ -253,7 +253,7 @@ CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleas
         const float SpeedScale = FMath::IsFinite(RequestedScale) ? FMath::Clamp(RequestedScale, 0.1f, 2.f) : 0.5f;
         Projectile->InitializeProjectile(Context.Source, Context.Target, Context.AimLocation, Skill.ProjectileSpeed * SpeedScale, Skill.Power, Skill.ProjectileRadius, Skill.ProjectileLifetime / SpeedScale, Skill.bHoming, Skill.bTargetOnly, Context.PresentationTime);
         Result.bSucceeded = !Projectile->HasResolved();
-        Result.Status = FText::FromString(Result.bSucceeded ? TEXT("발사 완료") : TEXT("발사 대상 또는 투사체 설정이 유효하지 않습니다."));
+        Result.Status = (Result.bSucceeded ? NSLOCTEXT("CombatSkillExecutorText", "M_ADDD92E2", "발사 완료") : NSLOCTEXT("CombatSkillExecutorText", "M_81331848", "발사 대상 또는 투사체 설정이 유효하지 않습니다."));
         return Result;
     }
     TArray<FCombatRoundUnitView> EligibleUnits;
@@ -278,7 +278,7 @@ CombatSkillExecution::FReleaseResult CombatSkillExecution::Release(const FReleas
         OnHit(Hit);
         Result.bSucceeded = true;
     }
-    if (Result.bSucceeded) Result.Status = FText::FromString(TEXT("타격 완료"));
+    if (Result.bSucceeded) Result.Status = NSLOCTEXT("CombatSkillExecutorText", "M_A1AC4136", "타격 완료");
     return Result;
 }
 
@@ -287,13 +287,13 @@ CombatSkillExecution::ETraceResult CombatSkillExecution::AdvanceWeaponTrace(AUni
     OutHit = nullptr;
     if (!IsValid(Source) || !Source->HasAuthority() || !CanUseSkill(Source, Skill))
     {
-        OutStatus = FText::FromString(TEXT("스킬 발동 태그 조건 불충족"));
+        OutStatus = NSLOCTEXT("CombatSkillExecutorText", "M_9D704113", "스킬 발동 태그 조건 불충족");
         return ETraceResult::Invalid;
     }
     UAnimMontage* Montage = Source->ResolveRoundCastMontage(Skill.CastMontage);
     if (!IsValid(Montage) || !FMath::IsFinite(Montage->RateScale) || Montage->RateScale <= 0.f)
     {
-        OutStatus = FText::FromString(TEXT("근접 공격 애니메이션 설정 누락"));
+        OutStatus = NSLOCTEXT("CombatSkillExecutorText", "M_7E79B654", "근접 공격 애니메이션 설정 누락");
         return ETraceResult::Invalid;
     }
     const double WindowEnd = Skill.WindupSeconds + Skill.WeaponTraceDuration;
@@ -312,7 +312,7 @@ CombatSkillExecution::ETraceResult CombatSkillExecution::AdvanceWeaponTrace(AUni
         CombatWeaponTrace::FBladePose Current;
         if (!CombatWeaponTrace::SampleBlade(Source, Skill, Montage, SampleTime * Montage->RateScale, Current))
         {
-            OutStatus = FText::FromString(TEXT("검 장착 또는 칼날 소켓 설정 누락"));
+            OutStatus = NSLOCTEXT("CombatSkillExecutorText", "M_3C610B82", "검 장착 또는 칼날 소켓 설정 누락");
             return ETraceResult::Invalid;
         }
         const CombatWeaponTrace::FBladePose Previous = State.SampleTime < 0.0 ? Current : CombatWeaponTrace::FBladePose{State.PreviousBase, State.PreviousTip};
@@ -322,13 +322,13 @@ CombatSkillExecution::ETraceResult CombatSkillExecution::AdvanceWeaponTrace(AUni
         OutHit = CombatWeaponTrace::FindFirstHit(Source->GetWorld(), Source, EligibleUnits, Previous, Current, Skill.WeaponTraceRadius);
         if (OutHit)
         {
-            OutStatus = FText::FromString(TEXT("검 타격 완료"));
+            OutStatus = NSLOCTEXT("CombatSkillExecutorText", "M_35D4B0A1", "검 타격 완료");
             return ETraceResult::Hit;
         }
         if (SampleTime + UE_DOUBLE_SMALL_NUMBER >= SampleUntil) break;
         SampleTime = FMath::Min(SampleTime + 0.005, SampleUntil);
     }
     if (Elapsed + UE_DOUBLE_SMALL_NUMBER < WindowEnd) return ETraceResult::Pending;
-    OutStatus = FText::FromString(TEXT("칼날 충돌 없음 또는 장애물에 차단됨"));
+    OutStatus = NSLOCTEXT("CombatSkillExecutorText", "M_799CF3EB", "칼날 충돌 없음 또는 장애물에 차단됨");
     return ETraceResult::Miss;
 }

@@ -242,7 +242,7 @@ void ACombatRoundPlayerController::SubmitRoundPlan(const FCombatRoundCommand& Co
     RequestedRevision = View.PlanRevision;
     bRequestPending = true;
     bAwaitingReplicatedResult = false;
-    RequestStatus = FText::FromString(TEXT("계획을 서버에서 확인하고 있습니다."));
+    RequestStatus = NSLOCTEXT("CombatRoundPlayerControllerText", "M_254F7259", "계획을 서버에서 확인하고 있습니다.");
     ServerSubmitRoundPlan(View.CombatId, View.RoundNumber, View.PlanRevision, Command);
 }
 
@@ -285,16 +285,16 @@ void ACombatRoundPlayerController::SetRoundReady(bool bReady)
     RequestedRevision = View.PlanRevision;
     bRequestPending = true;
     bAwaitingReplicatedResult = false;
-    RequestStatus = FText::FromString(TEXT("준비 상태를 서버에서 확인하고 있습니다."));
+    RequestStatus = NSLOCTEXT("CombatRoundPlayerControllerText", "M_E2594D81", "준비 상태를 서버에서 확인하고 있습니다.");
     ServerSetRoundReady(View.CombatId, View.RoundNumber, View.PlanRevision, bReady);
     UpdateRoundCamera();
 }
 
 void ACombatRoundPlayerController::ServerSubmitRoundPlan_Implementation(FGuid CombatId, int32 RoundNumber, int32 Revision, FCombatRoundCommand Command)
 {
-    FText Error = FText::FromString(TEXT("라운드 세션에 연결되지 않았습니다."));
+    FText Error = NSLOCTEXT("CombatRoundPlayerControllerText", "M_0B941F54", "라운드 세션에 연결되지 않았습니다.");
     const bool bAccepted = IsRoundInputEnabled() && IsValid(Coordinator) && Coordinator->SubmitPlan(this, CombatId, RoundNumber, Revision, Command, Error);
-    ClientReceiveRoundResponse(bAccepted, bAccepted ? FText::FromString(TEXT("계획 적용 완료. 모든 아군 계획을 확인한 뒤 준비 완료를 누르세요.")) : Error);
+    ClientReceiveRoundResponse(bAccepted, bAccepted ? NSLOCTEXT("CombatRoundPlayerControllerText", "M_27EFC966", "계획 적용 완료. 모든 아군 계획을 확인한 뒤 준비 완료를 누르세요.") : Error);
 }
 
 void ACombatRoundPlayerController::ServerSubmitRoundMove_Implementation(FGuid CombatId, int32 RoundNumber, int32 Revision, int32 UnitId, FIntPoint Destination)
@@ -313,9 +313,9 @@ void ACombatRoundPlayerController::ServerCancelRoundMove_Implementation(FGuid Co
 
 void ACombatRoundPlayerController::ServerSetRoundReady_Implementation(FGuid CombatId, int32 RoundNumber, int32 Revision, bool bReady)
 {
-    FText Error = FText::FromString(TEXT("라운드 세션에 연결되지 않았습니다."));
+    FText Error = NSLOCTEXT("CombatRoundPlayerControllerText", "M_0B941F54", "라운드 세션에 연결되지 않았습니다.");
     const bool bAccepted = IsRoundInputEnabled() && IsValid(Coordinator) && Coordinator->SetParticipantReady(this, CombatId, RoundNumber, Revision, bReady, Error);
-    ClientReceiveRoundResponse(bAccepted, bAccepted ? FText::FromString(bReady ? TEXT("준비 완료를 반영했습니다.") : TEXT("준비 완료를 취소했습니다.")) : Error);
+    ClientReceiveRoundResponse(bAccepted, bAccepted ? (bReady ? NSLOCTEXT("CombatRoundPlayerControllerText", "M_9F8EA735", "준비 완료를 반영했습니다.") : NSLOCTEXT("CombatRoundPlayerControllerText", "M_13877AFC", "준비 완료를 취소했습니다.")) : Error);
 }
 
 void ACombatRoundPlayerController::ClientReceiveRoundResponse_Implementation(bool bAccepted, const FText& Message)

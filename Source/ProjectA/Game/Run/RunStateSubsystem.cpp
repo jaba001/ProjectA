@@ -1,4 +1,5 @@
 #include "Game/Run/RunStateSubsystem.h"
+#include "Types/ProjectARandom.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunDungeonPlan.h"
 #include "Game/Run/RunIdentityLibrary.h"
@@ -683,7 +684,7 @@ bool URunStateSubsystem::ValidateContinuableSave(const URunSaveGame* Save, bool 
     }
     if (Save->Phase == ERunPhase::Defeat || Save->Phase == ERunPhase::Complete)
     {
-        OutError = FText::FromString(TEXT("종료된 진행입니다. 새 게임을 시작해 주세요."));
+        OutError = NSLOCTEXT("RunStateSubsystemText", "M_F114E5FC", "종료된 진행입니다. 새 게임을 시작해 주세요.");
         return false;
     }
     if (bStandaloneOnly && Save->Identity.Origin != ERunIdentityOrigin::LegacyOffline && (Save->Identity.Origin != ERunIdentityOrigin::LocalDevelopment || Save->Identity.OriginalParticipants.Num() != 1))
@@ -1178,7 +1179,7 @@ bool URunStateSubsystem::InitializeIdentifiedRun(const TArray<FRunPartyMember>& 
 
     if (Members.Num() > 4)
     {
-        OutError = FText::FromString(TEXT("A party supports up to four slots. / 파티는 최대 4개 슬롯입니다."));
+        OutError = NSLOCTEXT("RunStateSubsystemText", "M_48662D16", "A party supports up to four slots. / 파티는 최대 4개 슬롯입니다.");
         return false;
     }
 
@@ -1186,7 +1187,7 @@ bool URunStateSubsystem::InitializeIdentifiedRun(const TArray<FRunPartyMember>& 
     {
         if (Member.SlotIndex < 0 || Member.SlotIndex >= 4 || UsedSlots.Contains(Member.SlotIndex))
         {
-            OutError = FText::FromString(TEXT("Party slot indices must be unique and between 0 and 3. / 파티 슬롯 번호는 0~3이며 중복될 수 없습니다."));
+            OutError = NSLOCTEXT("RunStateSubsystemText", "M_B9B637F2", "Party slot indices must be unique and between 0 and 3. / 파티 슬롯 번호는 0~3이며 중복될 수 없습니다.");
             return false;
         }
 
@@ -1196,7 +1197,7 @@ bool URunStateSubsystem::InitializeIdentifiedRun(const TArray<FRunPartyMember>& 
         {
             if (Member.ClassId.IsNone() || Member.CharacterName.ToString().TrimStartAndEnd().IsEmpty())
             {
-                OutError = FText::FromString(TEXT("Created characters need a name and class. / 생성한 캐릭터의 이름과 직업이 필요합니다."));
+                OutError = NSLOCTEXT("RunStateSubsystemText", "M_27A9A82A", "Created characters need a name and class. / 생성한 캐릭터의 이름과 직업이 필요합니다.");
                 return false;
             }
 
@@ -1206,13 +1207,13 @@ bool URunStateSubsystem::InitializeIdentifiedRun(const TArray<FRunPartyMember>& 
 
     if (CreatedCount == 0)
     {
-        OutError = FText::FromString(TEXT("Create at least one character to start. / 캐릭터를 1명 이상 생성해 주세요."));
+        OutError = NSLOCTEXT("RunStateSubsystemText", "M_1183F616", "Create at least one character to start. / 캐릭터를 1명 이상 생성해 주세요.");
         return false;
     }
 
     if (Identity.Origin == ERunIdentityOrigin::LegacyOffline)
     {
-        OutError = FText::FromString(TEXT("새 진행에는 Run·참가자·캐릭터 식별 정보가 필요합니다."));
+        OutError = NSLOCTEXT("RunStateSubsystemText", "M_72278B32", "새 진행에는 Run·참가자·캐릭터 식별 정보가 필요합니다.");
         return false;
     }
     if (!URunParticipationLibrary::ValidateNewRunRoster(Identity, Members, OutError))
@@ -1221,7 +1222,7 @@ bool URunStateSubsystem::InitializeIdentifiedRun(const TArray<FRunPartyMember>& 
     }
     if (RunIdentity.RunId.IsValid() && RunIdentity.RunId == Identity.RunId)
     {
-        OutError = FText::FromString(TEXT("현재 Run의 참가자와 소유권을 새 게임 생성으로 교체할 수 없습니다. 복원은 이어하기를 사용해 주세요."));
+        OutError = NSLOCTEXT("RunStateSubsystemText", "M_3BB61A0B", "현재 Run의 참가자와 소유권을 새 게임 생성으로 교체할 수 없습니다. 복원은 이어하기를 사용해 주세요.");
         return false;
     }
 
@@ -1367,7 +1368,7 @@ bool URunStateSubsystem::CompleteEncounter(ECombatResult Result, const TMap<int3
             {
                 if (PendingGoldRewardState.NodeId != CurrentNodeId || PendingGoldRewardState.SchemaVersion != 2)
                 {
-                    FRandomStream RewardRandom(FMath::Rand());
+                    FRandomStream RewardRandom(ProjectARandom::NewSeed());
                     if (!RunCombatRewards::Build(CurrentNodeId, ItemShopState, WeaponSkillRules, GoldChoices, RewardRandom, PendingGoldRewardState, SaveError)) return false;
                 }
                 Save->GoldRewardState = PendingGoldRewardState;

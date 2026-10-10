@@ -52,7 +52,7 @@ bool URunStateSubsystem::ValidateRecoverySave(const URunSaveGame* Save, FText& O
 
 bool URunStateSubsystem::PurchaseRecoveryOffer(const FRunAccountId& BuyerAccountId, FGuid CharacterId, FName OfferId, FText& OutError, int32 ExpectedRevision)
 {
-    OutError = FText::FromString(TEXT("현재 회복 서비스를 구매할 수 없습니다."));
+    OutError = NSLOCTEXT("RunStateRecoveryText", "M_19AFF7F8", "현재 회복 서비스를 구매할 수 없습니다.");
     if ((GetWorld() && GetWorld()->GetNetMode() == NM_Client) || !CanMutateManagedRun() || bManagedResumePending || !IsTargetRun() || Phase != ERunPhase::Shop || EncounterProgress.bCompleted) return false;
     const FRunEncounterOffer* Selected = EncounterProgress.FindSelectedOffer();
     const FRunRecoveryState& Rules = TargetRun.Recovery;

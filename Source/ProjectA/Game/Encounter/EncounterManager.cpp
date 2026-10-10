@@ -1,4 +1,5 @@
 #include "Game/Encounter/EncounterManager.h"
+#include "ProjectA.h"
 #include "AbilitySystemComponent.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
@@ -101,7 +102,7 @@ bool AEncounterManager::RequestStartNode(FName NodeId, FGameplayTag DifficultyTa
     OnFlowChanged.Broadcast();
     if (!Arena || !CombatManager || !PartyDefinition)
     {
-        return FailPreparation(FText::FromString(TEXT("Gameplay setup is incomplete. Check Arena and PartyDefinition. / Gameplay 설정을 확인하세요.")));
+        return FailPreparation(NSLOCTEXT("EncounterManagerText", "M_A2B4F756", "Gameplay setup is incomplete. Check Arena and PartyDefinition. / Gameplay 설정을 확인하세요."));
     }
     FText ArenaError;
     FName ArenaId;
@@ -123,7 +124,7 @@ bool AEncounterManager::RequestStartNode(FName NodeId, FGameplayTag DifficultyTa
     }
     if (!IsValid(Definition) || !SpawnEncounter(Definition))
     {
-        return FailPreparation(FlowMessage.IsEmpty() ? FText::FromString(TEXT("Encounter spawn failed. Check unit classes and spawn coordinates. / 유닛 클래스와 스폰 좌표를 확인하세요.")) : FlowMessage);
+        return FailPreparation(FlowMessage.IsEmpty() ? NSLOCTEXT("EncounterManagerText", "M_1B2B70DA", "Encounter spawn failed. Check unit classes and spawn coordinates. / 유닛 클래스와 스폰 좌표를 확인하세요.") : FlowMessage);
     }
     CombatManager->SetCombatGrid(Arena->Grid);
     TArray<AUnitBase*> Units;
@@ -140,7 +141,7 @@ bool AEncounterManager::RequestStartNode(FName NodeId, FGameplayTag DifficultyTa
     Arena->ActivateArena(GetWorld()->GetFirstPlayerController());
     if (!RunState->MarkCombatStarted())
     {
-        return FailPreparation(FText::FromString(TEXT("Run 전투 상태를 활성화하지 못했습니다.")));
+        return FailPreparation(NSLOCTEXT("EncounterManagerText", "M_A7F11564", "Run 전투 상태를 활성화하지 못했습니다."));
     }
     bPreparing = false;
     CombatManager->StartCombat_Internal();
@@ -150,10 +151,10 @@ bool AEncounterManager::RequestStartNode(FName NodeId, FGameplayTag DifficultyTa
         {
             return true;
         }
-        return FailPreparation(FText::FromString(TEXT("Combat could not start. / 전투를 시작할 수 없습니다.")));
+        return FailPreparation(NSLOCTEXT("EncounterManagerText", "M_D98D426B", "Combat could not start. / 전투를 시작할 수 없습니다."));
     }
     SetPlayerCombatInput(CombatManager->IsCombatActive());
-    UE_LOG(LogTemp, Log, TEXT("[Encounter] Started Node=%s Units=%d"), *NodeId.ToString(), SpawnedUnits.Num());
+    UE_LOG(LogProjectA, Log, TEXT("[Encounter] Started Node=%s Units=%d"), *NodeId.ToString(), SpawnedUnits.Num());
     OnFlowChanged.Broadcast();
     return true;
 }
@@ -185,7 +186,7 @@ bool AEncounterManager::ConfigureCombatParticipants(FText& OutError)
         AGameplayGameModeBase* Mode = GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
         if (!Mode || !Mode->ApplyCombatParticipantBindings(Authority))
         {
-            OutError = FText::FromString(TEXT("현재 인간 참가자의 전투 연결 배정을 완료하지 못했습니다."));
+            OutError = NSLOCTEXT("EncounterManagerText", "M_620008E5", "현재 인간 참가자의 전투 연결 배정을 완료하지 못했습니다.");
             return false;
         }
         return true;
@@ -210,7 +211,7 @@ bool AEncounterManager::ConfigureCombatParticipants(FText& OutError)
         }
         if (!Authority->BindParticipant(LocalController, Identity.OriginalParticipants[0].AccountId))
         {
-            OutError = FText::FromString(TEXT("로컬 참가자를 전투에 연결하지 못했습니다."));
+            OutError = NSLOCTEXT("EncounterManagerText", "M_B514EEED", "로컬 참가자를 전투에 연결하지 못했습니다.");
             return false;
         }
     }
@@ -219,7 +220,7 @@ bool AEncounterManager::ConfigureCombatParticipants(FText& OutError)
         AGameplayGameModeBase* Mode = GetWorld()->GetAuthGameMode<AGameplayGameModeBase>();
         if (!Mode || !Mode->ApplyCombatParticipantBindings(Authority))
         {
-            OutError = FText::FromString(TEXT("원래 참가자 모두의 서버 연결 배정이 필요합니다."));
+            OutError = NSLOCTEXT("EncounterManagerText", "M_7E1F8EA7", "원래 참가자 모두의 서버 연결 배정이 필요합니다.");
             return false;
         }
     }
@@ -232,7 +233,7 @@ bool AEncounterManager::ValidateManagedExecution(FText& OutError, bool bAllowRes
     {
         return true;
     }
-    OutError = FText::FromString(TEXT("현재 Host의 관리 Run 실행 권한과 완료된 복원이 필요합니다."));
+    OutError = NSLOCTEXT("EncounterManagerText", "M_DB2BC52D", "현재 Host의 관리 Run 실행 권한과 완료된 복원이 필요합니다.");
     if (!HasAuthority() || bShuttingDown || !RunState->HasManagedLease() || (!bAllowResumePending && RunState->IsManagedResumePending()))
     {
         return false;
@@ -243,7 +244,7 @@ bool AEncounterManager::ValidateManagedExecution(FText& OutError, bool bAllowRes
 
 bool AEncounterManager::ResumeManagedGameplay(FText& OutError)
 {
-    OutError = FText::FromString(TEXT("재개할 관리 Run과 현재 Host의 실행 권한이 필요합니다."));
+    OutError = NSLOCTEXT("EncounterManagerText", "M_65A1BEFB", "재개할 관리 Run과 현재 Host의 실행 권한이 필요합니다.");
     if (!RunState || !RunState->IsManagedRun() || !ValidateManagedExecution(OutError, true))
     {
         FlowMessage = OutError;
@@ -259,7 +260,7 @@ bool AEncounterManager::ResumeManagedGameplay(FText& OutError)
     {
         if (OutError.IsEmpty())
         {
-            OutError = FText::FromString(TEXT("진행 지도·승리 결과·인카운터 선택·상점에서만 전투 없는 관리 재개를 완료할 수 있습니다."));
+            OutError = NSLOCTEXT("EncounterManagerText", "M_9E202512", "진행 지도·승리 결과·인카운터 선택·상점에서만 전투 없는 관리 재개를 완료할 수 있습니다.");
         }
         FlowMessage = OutError;
         OnFlowChanged.Broadcast();
@@ -272,7 +273,7 @@ bool AEncounterManager::ResumeManagedGameplay(FText& OutError)
 
 bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FText& OutError)
 {
-    OutError = FText::FromString(TEXT("유효한 준비 완료 저장과 원래 참가자의 연결이 있어야 전투를 복구할 수 있습니다."));
+    OutError = NSLOCTEXT("EncounterManagerText", "M_8C3768DF", "유효한 준비 완료 저장과 원래 참가자의 연결이 있어야 전투를 복구할 수 있습니다.");
     if (!HasAuthority() || bShuttingDown || bPreparing || !SpawnedUnits.IsEmpty() || !RunState || RunState->GetPhase() != ERunPhase::Combat || !Arena || !CombatManager || !RunState->ValidateCheckpointHost(HostAccount, OutError) || !ValidateManagedExecution(OutError, true)) return false;
     const FCombatCheckpointData& Checkpoint = RunState->GetCombatCheckpoint();
     if (Checkpoint.SchemaVersion != UCombatCheckpointLibrary::CurrentSchemaVersion || !UCombatCheckpointLibrary::Validate(Checkpoint, RunState->GetPartyMembers(), OutError, &RunState->GetWeaponSkillRules())) return false;
@@ -281,7 +282,7 @@ bool AEncounterManager::RestoreSavedCombat(const FRunAccountId& HostAccount, FTe
     const auto FailRestore = [this, &OutError]()
     {
         CleanupEncounter();
-        FlowMessage = OutError.IsEmpty() ? FText::FromString(TEXT("준비 계획 복구를 완료하지 못했습니다. 확정 저장은 유지됩니다.")) : OutError;
+        FlowMessage = OutError.IsEmpty() ? NSLOCTEXT("EncounterManagerText", "M_8D587D3C", "준비 계획 복구를 완료하지 못했습니다. 확정 저장은 유지됩니다.") : OutError;
         OutError = FlowMessage;
         bPreparing = false;
         OnFlowChanged.Broadcast();
@@ -362,7 +363,7 @@ bool AEncounterManager::RetryCombatCheckpoint(FText& OutError)
 {
     if (!CanRetryCombatCheckpoint())
     {
-        OutError = FText::FromString(TEXT("재시도할 전투 저장이 없습니다."));
+        OutError = NSLOCTEXT("EncounterManagerText", "M_4D07B46C", "재시도할 전투 저장이 없습니다.");
         return false;
     }
     if (bPreparationAbortPending)
@@ -409,7 +410,7 @@ void AEncounterManager::SuspendForDisconnectedParticipant()
     }
     SetPlayerCombatInput(false);
     CombatManager->SuspendCombatForRecovery();
-    FlowMessage = FText::FromString(TEXT("원래 참가자의 연결이 끊겨 전투를 중단했습니다. 메뉴에서 마지막 확정 준비 계획부터 명시적으로 재개해야 하며 자동 Host 승계나 AI 전환은 수행하지 않습니다."));
+    FlowMessage = NSLOCTEXT("EncounterManagerText", "M_4E7FFA06", "원래 참가자의 연결이 끊겨 전투를 중단했습니다. 메뉴에서 마지막 확정 준비 계획부터 명시적으로 재개해야 하며 자동 Host 승계나 AI 전환은 수행하지 않습니다.");
     OnFlowChanged.Broadcast();
 }
 
@@ -425,7 +426,7 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         // 인카운터 유닛을 생성하기 전에 저장된 파티 전체를 검증합니다.
         if (!IsValid(Definition->SnapshotCatalog))
         {
-            FlowMessage = FText::FromString(TEXT("Opponent Snapshot catalog is missing. / 상대 스냅샷 카탈로그가 없습니다."));
+            FlowMessage = NSLOCTEXT("EncounterManagerText", "M_8A0D62F2", "Opponent Snapshot catalog is missing. / 상대 스냅샷 카탈로그가 없습니다.");
             return false;
         }
         if (bTargetSnapshot) Snapshot = RunState->GetTargetRunState().Groups[RunState->GetCompletedNodes().Num() / 2].Opponent;
@@ -439,13 +440,13 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         {
             if (!Arena->EnemyCoords.IsValidIndex(Member.FormationSlot))
             {
-                FlowMessage = FText::FromString(TEXT("Opponent Snapshot formation is outside this arena. / 상대 스냅샷 배치가 아레나 범위를 벗어났습니다."));
+                FlowMessage = NSLOCTEXT("EncounterManagerText", "M_453A9B0F", "Opponent Snapshot formation is outside this arena. / 상대 스냅샷 배치가 아레나 범위를 벗어났습니다.");
                 return false;
             }
             ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Arena->EnemyCoords[Member.FormationSlot]);
             if (!Tile || Tile->GetOccupyingUnit() || Tile->GetTerritory() != ETileTerritory::Enemy || FormationTiles.Contains(Tile))
             {
-                FlowMessage = FText::FromString(TEXT("Opponent Snapshot formation requires distinct empty enemy tiles. / 상대 스냅샷 배치에는 중복되지 않는 빈 적 타일이 필요합니다."));
+                FlowMessage = NSLOCTEXT("EncounterManagerText", "M_4DB3A522", "Opponent Snapshot formation requires distinct empty enemy tiles. / 상대 스냅샷 배치에는 중복되지 않는 빈 적 타일이 필요합니다.");
                 return false;
             }
             FormationTiles.Add(Tile);
@@ -561,7 +562,7 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
             }
             if (!Unit->ConfigureProfession(Member->Stats.MaxHP, Member->Stats.MaxActionPoints, Member->Stats.MaxSubActionPoints, SnapshotSkills[Index], Member->Stats.Speed))
             {
-                FlowMessage = FText::FromString(TEXT("Opponent Snapshot unit configuration failed. / 상대 스냅샷 유닛 설정에 실패했습니다."));
+                FlowMessage = NSLOCTEXT("EncounterManagerText", "M_4BEA5910", "Opponent Snapshot unit configuration failed. / 상대 스냅샷 유닛 설정에 실패했습니다.");
                 return false;
             }
             Unit->RuntimeCharacterName = FText::FromString(Member->CharacterName);
@@ -646,7 +647,7 @@ void AEncounterManager::FinishEncounter()
     {
         CleanupEncounter();
     }
-    UE_LOG(LogTemp, Log, TEXT("[Encounter] Finished Result=%d RemainingUnits=%d"), static_cast<int32>(Result), SpawnedUnits.Num());
+    UE_LOG(LogProjectA, Log, TEXT("[Encounter] Finished Result=%d RemainingUnits=%d"), static_cast<int32>(Result), SpawnedUnits.Num());
     OnFlowChanged.Broadcast();
 }
 
@@ -757,7 +758,7 @@ bool AEncounterManager::FailPreparation(const FText& Message)
     CleanupEncounter();
     bPreparing = false;
     TryAbortPreparation();
-    UE_LOG(LogTemp, Error, TEXT("[Encounter] %s"), *Message.ToString());
+    UE_LOG(LogProjectA, Error, TEXT("[Encounter] %s"), *Message.ToString());
     return false;
 }
 
@@ -774,7 +775,7 @@ bool AEncounterManager::TryAbortPreparation()
         bPreparationAbortPending = !bAborted;
         if (!bAborted)
         {
-            const FText Error = RunState->GetSaveError().IsEmpty() ? FText::FromString(TEXT("전투 준비 취소를 완료하지 못했습니다. 저장 다시 시도를 사용하세요.")) : RunState->GetSaveError();
+            const FText Error = RunState->GetSaveError().IsEmpty() ? NSLOCTEXT("EncounterManagerText", "M_A1FB62F9", "전투 준비 취소를 완료하지 못했습니다. 저장 다시 시도를 사용하세요.") : RunState->GetSaveError();
             FlowMessage = FText::Format(FText::FromString(TEXT("{0}\n{1}")), PreparationFailureMessage, Error);
         }
     }

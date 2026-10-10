@@ -208,7 +208,7 @@ bool CombatSkillPresentation::Prepare(UWorld* World, const TArray<FCombatRoundSk
     OutError = FText::GetEmpty();
     if (!IsValid(World))
     {
-        OutError = FText::FromString(TEXT("스킬 이펙트를 준비할 월드가 없습니다."));
+        OutError = NSLOCTEXT("CombatSkillPresentationText", "M_8A898AB5", "스킬 이펙트를 준비할 월드가 없습니다.");
         return false;
     }
     if (!FApp::CanEverRender() || World->GetNetMode() == NM_DedicatedServer)

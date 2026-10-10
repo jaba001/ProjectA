@@ -1,4 +1,5 @@
 #include "UnitBase.h"
+#include "ProjectA.h"
 #include "Unit/UnitCharacterMovementComponent.h"
 #include "Unit/UnitDataRules.h"
 #include "Unit/CharacterAppearanceComponent.h"
@@ -202,13 +203,13 @@ void AUnitBase::MulticastSetRoundCastMontage_Implementation(UAnimMontage* Montag
     if (!Montage || bIsDead || GetNetMode() == NM_DedicatedServer) return;
     if (!FMath::IsFinite(Montage->GetPlayLength()) || Montage->GetPlayLength() <= 0.f || !FMath::IsFinite(Montage->RateScale) || Montage->RateScale <= 0.f)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[RoundAnimation] Invalid montage duration or rate Unit=%s Montage=%s / 몽타주 길이 또는 속도가 유효하지 않아 시간 제한 대기를 사용합니다"), *GetPathName(), *GetPathNameSafe(Montage));
+        UE_LOG(LogProjectA, Warning, TEXT("[RoundAnimation] Invalid montage duration or rate Unit=%s Montage=%s / 몽타주 길이 또는 속도가 유효하지 않아 시간 제한 대기를 사용합니다"), *GetPathName(), *GetPathNameSafe(Montage));
         return;
     }
     UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
     if (!AnimInstance || AnimInstance->Montage_Play(Montage, 1.f, EMontagePlayReturnType::MontageLength, 0.f, false) <= 0.f)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[RoundAnimation] Montage playback failed Unit=%s Montage=%s AnimInstance=%s / 몽타주 재생 실패: AnimBP, Skeleton, Slot 확인"), *GetPathName(), *GetPathNameSafe(Montage), *GetPathNameSafe(AnimInstance));
+        UE_LOG(LogProjectA, Warning, TEXT("[RoundAnimation] Montage playback failed Unit=%s Montage=%s AnimInstance=%s / 몽타주 재생 실패: AnimBP, Skeleton, Slot 확인"), *GetPathName(), *GetPathNameSafe(Montage), *GetPathNameSafe(AnimInstance));
         return;
     }
     if (FAnimMontageInstance* Instance = AnimInstance->GetActiveInstanceForMontage(Montage))
@@ -218,7 +219,7 @@ void AUnitBase::MulticastSetRoundCastMontage_Implementation(UAnimMontage* Montag
         Instance->PushDisableRootMotion();
         RoundMontageAnimInstance = AnimInstance;
         RoundMontageInstanceId = Instance->GetInstanceID();
-        UE_LOG(LogTemp, Log, TEXT("[RoundAnimation] Started Unit=%s Montage=%s / 시전 몽타주 시작"), *GetPathName(), *GetPathNameSafe(Montage));
+        UE_LOG(LogProjectA, Log, TEXT("[RoundAnimation] Started Unit=%s Montage=%s / 시전 몽타주 시작"), *GetPathName(), *GetPathNameSafe(Montage));
     }
 }
 

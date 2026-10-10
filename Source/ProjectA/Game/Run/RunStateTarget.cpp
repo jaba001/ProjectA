@@ -1,4 +1,5 @@
 #include "Game/Run/RunStateSubsystem.h"
+#include "Types/ProjectARandom.h"
 #include "Game/Run/RunProgressRules.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Game/Run/RunDungeonPlan.h"
@@ -52,7 +53,7 @@ bool URunStateSubsystem::ConfigureTargetRun(URunSaveGame* Save, FText& OutError)
         for (int32 Index = 0; Index < Save->Nodes.Num(); ++Index)
         {
             const FRunLevelRule& Rule = Save->TargetRun.LevelDesign.Rules[Index / 2];
-            Save->Nodes[Index].DisplayName = FText::Format(NSLOCTEXT("RunLevelDesign", "NodeName", "{0} · {1}/10 · {2}"), Rule.Name, FText::AsNumber(Index / 2 + 1), FText::FromString(Index % 2 == 0 ? TEXT("PvE") : TEXT("로컬 Snapshot")));
+            Save->Nodes[Index].DisplayName = FText::Format(NSLOCTEXT("RunLevelDesign", "NodeName", "{0} · {1}/10 · {2}"), Rule.Name, FText::AsNumber(Index / 2 + 1), (Index % 2 == 0 ? NSLOCTEXT("RunStateTargetText", "M_EC2E9CCD", "PvE") : NSLOCTEXT("RunStateTargetText", "M_E8E82B63", "로컬 Snapshot")));
         }
     }
     Save->EncounterProgress = FRunEncounterProgress();
@@ -62,7 +63,7 @@ bool URunStateSubsystem::ConfigureTargetRun(URunSaveGame* Save, FText& OutError)
     Save->GoldRewardState = FRunGoldRewardState();
     Save->Phase = ERunPhase::EncounterChoice;
     const UPartyDefinitionDataAsset* Catalog = PartyDefinition ? PartyDefinition.Get() : GetDefault<UPartyDefinitionDataAsset>();
-    FRandomStream ItemRandom(FMath::Rand());
+    FRandomStream ItemRandom(ProjectARandom::NewSeed());
     for (FRunPartyMember& Member : Save->Party)
     {
         if (!Member.bCreated) continue;

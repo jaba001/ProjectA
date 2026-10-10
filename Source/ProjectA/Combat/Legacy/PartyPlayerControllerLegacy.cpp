@@ -11,7 +11,7 @@ namespace
         Response.CombatInstanceId = Request.CombatInstanceId;
         Response.RequestSequence = Request.RequestSequence;
         Response.Result = ECombatRequestResult::InvalidContext;
-        Response.Message = FText::FromString(TEXT("개별 턴 즉시 실행은 종료되었습니다. 라운드 계획을 적용한 뒤 준비 완료를 사용하세요."));
+        Response.Message = NSLOCTEXT("PartyPlayerControllerLegacyText", "M_478C9E4B", "개별 턴 즉시 실행은 종료되었습니다. 라운드 계획을 적용한 뒤 준비 완료를 사용하세요.");
         return Response;
     }
 }

@@ -256,7 +256,7 @@ void UCombatDebugWidget::NativeOnInitialized()
     SkillCategoryTabs->SetInnerSlotPadding(FVector2D(6.f, 4.f));
     LoadoutBody->AddChildToVerticalBox(SkillCategoryTabs)->SetPadding(FMargin(0.f, 4.f, 0.f, 6.f));
     UTextBlock* ElementLabel = WidgetTree->ConstructWidget<UTextBlock>();
-    ElementLabel->SetText(FText::FromString(TEXT("속성")));
+    ElementLabel->SetText(NSLOCTEXT("CombatDebugWidgetText", "M_B2A0A61F", "속성"));
     UDemonicUITheme::Get().StyleText(ElementLabel, false, 14);
     SkillCategoryTabs->AddChildToWrapBox(ElementLabel);
     const TArray<FDebugSkillCategory>& Categories = GetDebugSkillCategories();
@@ -276,7 +276,7 @@ void UCombatDebugWidget::NativeOnInitialized()
     SkillMethodTabs->SetInnerSlotPadding(FVector2D(6.f, 4.f));
     LoadoutBody->AddChildToVerticalBox(SkillMethodTabs)->SetPadding(FMargin(0.f, 0.f, 0.f, 6.f));
     UTextBlock* MethodLabel = WidgetTree->ConstructWidget<UTextBlock>();
-    MethodLabel->SetText(FText::FromString(TEXT("방식")));
+    MethodLabel->SetText(NSLOCTEXT("CombatDebugWidgetText", "M_1BD493C4", "방식"));
     UDemonicUITheme::Get().StyleText(MethodLabel, false, 14);
     SkillMethodTabs->AddChildToWrapBox(MethodLabel);
     const TArray<FDebugSkillMethod>& Methods = GetDebugSkillMethods();
@@ -312,7 +312,7 @@ void UCombatDebugWidget::NativeOnInitialized()
     CatalogSize.Value = 0.62f;
     Lists->AddChildToHorizontalBox(CatalogBody)->SetSize(CatalogSize);
     Search = WidgetTree->ConstructWidget<UEditableTextBox>();
-    Search->SetHintText(FText::FromString(TEXT("이름 / 에셋 이름 검색")));
+    Search->SetHintText(NSLOCTEXT("CombatDebugWidgetText", "M_CAC98F6D", "이름 / 에셋 이름 검색"));
     CatalogBody->AddChildToVerticalBox(Search);
     Search->OnTextChanged.AddDynamic(this, &UCombatDebugWidget::HandleSearch);
     CatalogTitle = AddText(CatalogBody, TEXT("전체 목록"), 18);
@@ -478,7 +478,7 @@ void UCombatDebugWidget::RefreshState()
         OwnedList->SetIsEnabled(false);
         CatalogList->SetIsEnabled(false);
         const ACombatDebugGameMode* Mode = GetWorld()->GetAuthGameMode<ACombatDebugGameMode>();
-        Status->SetText(Mode ? Mode->GetStatusMessage() : FText::FromString(TEXT("디버그 전투가 없습니다.")));
+        Status->SetText(Mode ? Mode->GetStatusMessage() : NSLOCTEXT("CombatDebugWidgetText", "M_3888745D", "디버그 전투가 없습니다."));
         ReviveMessage = FText::GetEmpty();
         AllySpawnMessage = FText::GetEmpty();
         EnemySpawnMessage = FText::GetEmpty();
@@ -519,7 +519,7 @@ void UCombatDebugWidget::RefreshState()
     const bool bCanEdit = Round->CanEditDebugUnit(Controller, SelectedUnitId, Error);
     OwnedList->SetIsEnabled(bCanEdit);
     CatalogList->SetIsEnabled(bCanEdit);
-    Status->SetText(bCanEdit ? (ActionMessage.IsEmpty() ? FText::FromString(TEXT("추가·제거 즉시 반영 / 해당 유닛의 계획 해제")) : ActionMessage) : Error);
+    Status->SetText(bCanEdit ? (ActionMessage.IsEmpty() ? NSLOCTEXT("CombatDebugWidgetText", "M_67EBE6A5", "추가·제거 즉시 반영 / 해당 유닛의 계획 해제") : ActionMessage) : Error);
     RefreshReviveState();
     RefreshSpawnState();
     RefreshHealthState();
@@ -568,9 +568,9 @@ void UCombatDebugWidget::RefreshReviveState()
     const FCombatRoundUnitView* Selected = Round ? Round->GetView().Units.FindByPredicate([this](const FCombatRoundUnitView& Unit) { return Unit.UnitId == SelectedUnitId; }) : nullptr;
     if (!Selected || !IsValid(Selected->Unit))
     {
-        ReviveTarget->SetText(FText::FromString(TEXT("위 목록에서 부활할 아군을 선택하세요.")));
+        ReviveTarget->SetText(NSLOCTEXT("CombatDebugWidgetText", "M_25879EDF", "위 목록에서 부활할 아군을 선택하세요."));
         ReviveButton->SetIsEnabled(false);
-        ReviveStatus->SetText(FText::FromString(Round ? TEXT("선택한 아군이 없습니다.") : TEXT("디버그 전투 준비 후 사용할 수 있습니다.")));
+        ReviveStatus->SetText((Round ? NSLOCTEXT("CombatDebugWidgetText", "M_9D189E24", "선택한 아군이 없습니다.") : NSLOCTEXT("CombatDebugWidgetText", "M_0C808620", "디버그 전투 준비 후 사용할 수 있습니다.")));
         ReviveButton->SetToolTipText(ReviveStatus->GetText());
         return;
     }
@@ -580,7 +580,7 @@ void UCombatDebugWidget::RefreshReviveState()
     FText Error;
     const bool bCanRevive = Round->CanReviveDebugUnit(Controller, SelectedUnitId, Error);
     ReviveButton->SetIsEnabled(bCanRevive);
-    const FText Availability = bCanRevive ? FText::FromString(TEXT("선택 아군의 스킬·장비를 유지한 채 HP를 전부 회복하고 부활합니다.")) : Error;
+    const FText Availability = bCanRevive ? NSLOCTEXT("CombatDebugWidgetText", "M_4E034C76", "선택 아군의 스킬·장비를 유지한 채 HP를 전부 회복하고 부활합니다.") : Error;
     ReviveButton->SetToolTipText(Availability);
     // Preserve revival feedback separately from ordinary loadout-edit errors for dead or finished units.
     // 사망하거나 전투가 끝난 유닛의 일반 장착 편집 오류와 부활 결과를 별도로 유지합니다.
@@ -602,10 +602,10 @@ void UCombatDebugWidget::RefreshHealthState(bool bResetInput)
     if (!Attributes)
     {
         HealthInputUnitId = INDEX_NONE;
-        HealthTarget->SetText(FText::FromString(TEXT("위 목록에서 아군 또는 적군을 선택하세요.")));
+        HealthTarget->SetText(NSLOCTEXT("CombatDebugWidgetText", "M_2ADB9CB4", "위 목록에서 아군 또는 적군을 선택하세요."));
         MaxHealthInput->SetText(FText::GetEmpty());
         CurrentHealthInput->SetText(FText::GetEmpty());
-        HealthStatus->SetText(FText::FromString(TEXT("디버그 전투 준비 후 사용할 수 있습니다.")));
+        HealthStatus->SetText(NSLOCTEXT("CombatDebugWidgetText", "M_0C808620", "디버그 전투 준비 후 사용할 수 있습니다."));
         return;
     }
     HealthTarget->SetText(FText::FromString(FString::Printf(TEXT("[%s] %s · HP %s / %s · %s"), Selected->bEnemy ? TEXT("적군") : TEXT("아군"), *GetDebugUnitDisplayName(Selected->Unit), *FString::SanitizeFloat(Attributes->GetHP()), *FString::SanitizeFloat(Attributes->GetMaxHP()), Selected->Unit->IsUnitAlive() ? TEXT("생존") : TEXT("사망"))));
@@ -617,7 +617,7 @@ void UCombatDebugWidget::RefreshHealthState(bool bResetInput)
         MaxHealthInput->SetText(FText::FromString(FString::SanitizeFloat(Attributes->GetMaxHP())));
         CurrentHealthInput->SetText(FText::FromString(FString::SanitizeFloat(Attributes->GetHP())));
     }
-    const FText Availability = bCanEdit ? FText::FromString(TEXT("계획 단계에서 HP를 적용합니다. 스킬·장비·행동 계획은 유지하고 아군 준비 완료를 해제합니다.")) : Error;
+    const FText Availability = bCanEdit ? NSLOCTEXT("CombatDebugWidgetText", "M_9FF3E890", "계획 단계에서 HP를 적용합니다. 스킬·장비·행동 계획은 유지하고 아군 준비 완료를 해제합니다.") : Error;
     HealthApplyButton->SetToolTipText(Availability);
     HealButton->SetToolTipText(Availability);
     HealthStatus->SetText(HealthMessage.IsEmpty() ? Availability : FText::Format(FText::FromString(TEXT("{0}\n{1}")), HealthMessage, Availability));
@@ -645,12 +645,12 @@ void UCombatDebugWidget::ApplyHealth(bool bFullHeal)
     }
     else if (!FDefaultValueHelper::ParseFloat(MaxHealthInput->GetText().ToString().TrimStartAndEnd(), MaxHP) || !FDefaultValueHelper::ParseFloat(CurrentHealthInput->GetText().ToString().TrimStartAndEnd(), CurrentHP))
     {
-        HealthMessage = FText::FromString(TEXT("최대 HP와 현재 HP에 쉼표 없이 올바른 숫자를 입력하세요."));
+        HealthMessage = NSLOCTEXT("CombatDebugWidgetText", "M_3E64A7E9", "최대 HP와 현재 HP에 쉼표 없이 올바른 숫자를 입력하세요.");
         RefreshHealthState();
         return;
     }
     const bool bSucceeded = Round->SetDebugUnitHealth(Controller, SelectedUnitId, MaxHP, CurrentHP, Error);
-    HealthMessage = bSucceeded ? FText::FromString(bFullHeal ? TEXT("선택 캐릭터의 HP를 전부 회복했습니다.") : TEXT("최대 HP와 현재 HP를 적용했습니다.")) : Error;
+    HealthMessage = bSucceeded ? (bFullHeal ? NSLOCTEXT("CombatDebugWidgetText", "M_038733DC", "선택 캐릭터의 HP를 전부 회복했습니다.") : NSLOCTEXT("CombatDebugWidgetText", "M_762E274B", "최대 HP와 현재 HP를 적용했습니다.")) : Error;
     RefreshHealthState(bSucceeded);
     RefreshState();
 }
@@ -695,7 +695,7 @@ void UCombatDebugWidget::RefreshSkillTiming(bool bResetInput)
     FCombatDebugSkillTiming Current;
     FCombatDebugSkillTiming Original;
     FSoftObjectPath Asset;
-    FText Error = FText::FromString(TEXT("위 대상 목록에서 아군을 고르고 보유 스킬을 선택하세요."));
+    FText Error = NSLOCTEXT("CombatDebugWidgetText", "M_CFBE937C", "위 대상 목록에서 아군을 고르고 보유 스킬을 선택하세요.");
     const bool bHasSkill = Round && !SelectedTimingSkill.IsNone() && Round->GetDebugSkillTiming(SelectedUnitId, SelectedTimingSkill, Current, Original, Asset, Error);
     const FCombatRoundSkill* Skill = bHasSkill ? Round->FindSkill(SelectedTimingSkill) : nullptr;
     const bool bCanEdit = Skill && Round->CanEditDebugUnit(Controller, SelectedUnitId, Error);
@@ -712,7 +712,7 @@ void UCombatDebugWidget::RefreshSkillTiming(bool bResetInput)
         TimingInputUnitId = INDEX_NONE;
         TimingInputSkill = NAME_None;
         TimingMessage = FText::GetEmpty();
-        TimingAssetPath->SetText(FText::FromString(TEXT("아군의 보유 스킬을 선택하세요.")));
+        TimingAssetPath->SetText(NSLOCTEXT("CombatDebugWidgetText", "M_24B0A6F4", "아군의 보유 스킬을 선택하세요."));
         TimingOriginalValues->SetText(FText::GetEmpty());
         for (UEditableTextBox* Input : { WindupInput.Get(), EffectDelayInput.Get(), EffectDurationInput.Get(), ProjectileSpeedInput.Get(), WeaponDurationInput.Get() }) Input->SetText(FText::GetEmpty());
         TimingStatus->SetText(Error);
@@ -741,7 +741,7 @@ void UCombatDebugWidget::RefreshSkillTiming(bool bResetInput)
         ProjectileSpeedInput->SetText(FText::FromString(FString::SanitizeFloat(Current.ProjectileSpeed)));
         WeaponDurationInput->SetText(FText::FromString(FString::SanitizeFloat(Current.WeaponTraceDuration)));
     }
-    const FText Availability = bCanEdit ? FText::FromString(TEXT("계획 단계에서 적용 · 같은 스킬 보유 아군의 계획/준비 해제 · 적 계획 유지")) : Error;
+    const FText Availability = bCanEdit ? NSLOCTEXT("CombatDebugWidgetText", "M_B636AC38", "계획 단계에서 적용 · 같은 스킬 보유 아군의 계획/준비 해제 · 적 계획 유지") : Error;
     TimingStatus->SetText(TimingMessage.IsEmpty() ? Availability : FText::Format(FText::FromString(TEXT("{0}\n{1}")), TimingMessage, Availability));
 }
 
@@ -760,7 +760,7 @@ bool UCombatDebugWidget::ReadSkillTimingInputs(FCombatDebugSkillTiming& OutTimin
     };
     if (!Parse(WindupInput, OutTiming.WindupSeconds) || (Skill->bUseEffectCollision && (!Parse(EffectDelayInput, OutTiming.EffectHitDelaySeconds) || !Parse(EffectDurationInput, OutTiming.EffectDuration))) || (Skill->Kind == ECombatRoundSkillKind::Projectile && !Parse(ProjectileSpeedInput, OutTiming.ProjectileSpeed)) || (Skill->bUseWeaponTrace && !Parse(WeaponDurationInput, OutTiming.WeaponTraceDuration)))
     {
-        OutError = FText::FromString(TEXT("사용 중인 항목에 쉼표 없이 올바른 숫자를 입력하세요."));
+        OutError = NSLOCTEXT("CombatDebugWidgetText", "M_86314FA8", "사용 중인 항목에 쉼표 없이 올바른 숫자를 입력하세요.");
         return false;
     }
     FCombatRoundSkill Candidate = *Skill;
@@ -771,7 +771,7 @@ bool UCombatDebugWidget::ReadSkillTimingInputs(FCombatDebugSkillTiming& OutTimin
     Candidate.WeaponTraceDuration = OutTiming.WeaponTraceDuration;
     if (!CombatRoundRules::IsValidSkill(Candidate))
     {
-        OutError = FText::FromString(TEXT("입력값이 항목의 허용 범위를 벗어났습니다. 무기 판정은 준비+지속 60초 이하입니다."));
+        OutError = NSLOCTEXT("CombatDebugWidgetText", "M_BDCB0220", "입력값이 항목의 허용 범위를 벗어났습니다. 무기 판정은 준비+지속 60초 이하입니다.");
         return false;
     }
     return true;
@@ -801,7 +801,7 @@ void UCombatDebugWidget::ApplySkillTiming()
     FCombatDebugSkillTiming Timing;
     FText Error;
     const bool bSucceeded = Round && ReadSkillTimingInputs(Timing, Error) && Round->SetDebugSkillTiming(Controller, SelectedUnitId, SelectedTimingSkill, Timing, Error);
-    TimingMessage = bSucceeded ? FText::FromString(TEXT("입력값을 현재 전투에 임시 적용했습니다.")) : Error;
+    TimingMessage = bSucceeded ? NSLOCTEXT("CombatDebugWidgetText", "M_A0042D7E", "입력값을 현재 전투에 임시 적용했습니다.") : Error;
     RefreshSkillTiming(bSucceeded);
     RefreshState();
 }
@@ -812,7 +812,7 @@ void UCombatDebugWidget::ResetSkillTiming()
     ACombatRoundCoordinator* Round = Controller ? Controller->GetRoundCoordinator() : nullptr;
     FText Error;
     const bool bSucceeded = Round && Round->ResetDebugSkillTiming(Controller, SelectedUnitId, SelectedTimingSkill, Error);
-    TimingMessage = bSucceeded ? FText::FromString(TEXT("현재 전투의 타이밍을 원본 에셋 값으로 복원했습니다.")) : Error;
+    TimingMessage = bSucceeded ? NSLOCTEXT("CombatDebugWidgetText", "M_E39B7006", "현재 전투의 타이밍을 원본 에셋 값으로 복원했습니다.") : Error;
     RefreshSkillTiming(bSucceeded);
     RefreshState();
 }
@@ -833,7 +833,7 @@ void UCombatDebugWidget::CopySkillTiming()
     }
     const FString Settings = FString::Printf(TEXT("Asset=%s\nSkillId=%s\nWindupSeconds=%.9g\nEffectHitDelaySeconds=%.9g\nEffectDuration=%.9g\nProjectileSpeed=%.9g\nWeaponTraceDuration=%.9g\n"), *Asset.ToString(), *SelectedTimingSkill.ToString(), Timing.WindupSeconds, Timing.EffectHitDelaySeconds, Timing.EffectDuration, Timing.ProjectileSpeed, Timing.WeaponTraceDuration);
     FPlatformApplicationMisc::ClipboardCopy(*Settings);
-    TimingMessage = FText::FromString(TEXT("에셋 경로와 입력 설정값을 클립보드에 복사했습니다. 원본 에셋은 저장하지 않았습니다."));
+    TimingMessage = NSLOCTEXT("CombatDebugWidgetText", "M_038218CD", "에셋 경로와 입력 설정값을 클립보드에 복사했습니다. 원본 에셋은 저장하지 않았습니다.");
     RefreshSkillTiming();
 }
 
@@ -901,15 +901,15 @@ void UCombatDebugWidget::RefreshSpawnState()
         const FText& Message = bEnemy ? EnemySpawnMessage : AllySpawnMessage;
         FText Error;
         bool bCanSpawn = Mode && Mode->CanSpawnDebugUnit(Controller, bEnemy, Error);
-        if (!Mode) Error = FText::FromString(TEXT("디버그 전투 준비 후 사용할 수 있습니다."));
+        if (!Mode) Error = NSLOCTEXT("CombatDebugWidgetText", "M_0C808620", "디버그 전투 준비 후 사용할 수 있습니다.");
         if (bCanSpawn && !Options.Contains(Choice->GetSelectedOption()))
         {
             bCanSpawn = false;
-            Error = FText::FromString(TEXT("추가할 캐릭터가 없습니다."));
+            Error = NSLOCTEXT("CombatDebugWidgetText", "M_1AA8CD7B", "추가할 캐릭터가 없습니다.");
         }
         Button->SetIsEnabled(bCanSpawn);
         Choice->SetIsEnabled(!Options.IsEmpty());
-        const FText Availability = bCanSpawn ? FText::FromString(TEXT("빈 진영 칸에 추가하고 체력 설정 대상으로 선택합니다.")) : Error;
+        const FText Availability = bCanSpawn ? NSLOCTEXT("CombatDebugWidgetText", "M_3127192C", "빈 진영 칸에 추가하고 체력 설정 대상으로 선택합니다.") : Error;
         Button->SetToolTipText(Availability);
         Result->SetText(Message.IsEmpty() || Message.EqualTo(Availability) ? Availability : bCanSpawn ? Message : FText::Format(FText::FromString(TEXT("{0}\n{1}")), Message, Availability));
     }
@@ -927,7 +927,7 @@ void UCombatDebugWidget::SpawnUnit(bool bEnemy)
     FText Error;
     if (!Mode || !OptionId)
     {
-        Message = FText::FromString(TEXT("추가할 캐릭터를 선택하세요."));
+        Message = NSLOCTEXT("CombatDebugWidgetText", "M_5BABF047", "추가할 캐릭터를 선택하세요.");
         RefreshSpawnState();
         return;
     }
@@ -970,7 +970,7 @@ void UCombatDebugWidget::RebuildLists()
     if (Selected->bEnemy)
     {
         AddText(OwnedList, TEXT("스킬·장비를 변경할 아군을 선택하세요."), 18);
-        CatalogTitle->SetText(FText::FromString(TEXT("적군의 HP는 캐릭터·체력 탭에서 변경할 수 있습니다.")));
+        CatalogTitle->SetText(NSLOCTEXT("CombatDebugWidgetText", "M_1F7AC7B4", "적군의 HP는 캐릭터·체력 탭에서 변경할 수 있습니다."));
         return;
     }
     const FString Query = Search->GetText().ToString().TrimStartAndEnd();
@@ -1117,15 +1117,15 @@ void UCombatDebugWidget::HandleAction(UCombatDebugActionButton* Button)
         if (Button->Action == ECombatDebugAction::AddSkill && Loadout->GetSkillAssets().Contains(Button->Asset))
         {
             if (USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Button->Asset.TryLoad())) Skills.AddUnique(Skill);
-            else Error = FText::FromString(TEXT("스킬 에셋을 불러오지 못했습니다."));
+            else Error = NSLOCTEXT("CombatDebugWidgetText", "M_022BDBB8", "스킬 에셋을 불러오지 못했습니다.");
         }
         else if (Skills.IsValidIndex(Button->Index) && FSoftObjectPath(Skills[Button->Index]) == Button->Asset) Skills.RemoveAt(Button->Index);
-        else Error = FText::FromString(TEXT("목록이 바뀌었습니다. 다시 선택하세요."));
+        else Error = NSLOCTEXT("CombatDebugWidgetText", "M_48CFBE4A", "목록이 바뀌었습니다. 다시 선택하세요.");
         if (Error.IsEmpty()) bSucceeded = Round->SetDebugUnitSkills(Controller, SelectedUnitId, Skills, Error);
     }
     else if (Button->Action == ECombatDebugAction::GrantEquipment) bSucceeded = Loadout->GrantEquipment(Controller, SelectedUnitId, Button->Asset, Button->EquipmentSlot, Error);
     else bSucceeded = Loadout->RemoveEquipment(Controller, SelectedUnitId, Button->Index, Error);
-    ActionMessage = bSucceeded ? FText::FromString(TEXT("반영했습니다. 전투 화면에서 바로 확인할 수 있습니다.")) : Error;
+    ActionMessage = bSucceeded ? NSLOCTEXT("CombatDebugWidgetText", "M_974DEE99", "반영했습니다. 전투 화면에서 바로 확인할 수 있습니다.") : Error;
     RebuildLists();
     RefreshState();
 }
@@ -1139,7 +1139,7 @@ void UCombatDebugWidget::ToggleRevivePanel()
 {
     const bool bOpen = RevivePanel->GetVisibility() == ESlateVisibility::Collapsed;
     RevivePanel->SetVisibility(bOpen ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-    if (UTextBlock* Label = Cast<UTextBlock>(ReviveToggleButton->GetContent())) Label->SetText(FText::FromString(bOpen ? TEXT("아군 부활 창 접기") : TEXT("아군 부활 창 열기")));
+    if (UTextBlock* Label = Cast<UTextBlock>(ReviveToggleButton->GetContent())) Label->SetText((bOpen ? NSLOCTEXT("CombatDebugWidgetText", "M_6FD4B805", "아군 부활 창 접기") : NSLOCTEXT("CombatDebugWidgetText", "M_EB39839F", "아군 부활 창 열기")));
     RefreshReviveState();
 }
 

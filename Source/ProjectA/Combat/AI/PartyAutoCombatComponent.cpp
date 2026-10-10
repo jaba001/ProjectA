@@ -1,4 +1,5 @@
 #include "Combat/AI/PartyAutoCombatComponent.h"
+#include "ProjectA.h"
 
 UPartyAutoCombatComponent::UPartyAutoCombatComponent()
 {
@@ -12,7 +13,7 @@ void UPartyAutoCombatComponent::InitializeCombat(ACombatManager* InCombatManager
 
 void UPartyAutoCombatComponent::StartTurn()
 {
-    UE_LOG(LogTemp, Warning, TEXT("[PartyAutoCombat] Sequential AI was removed. The round coordinator selects one locked plan."));
+    UE_LOG(LogProjectA, Warning, TEXT("[PartyAutoCombat] Sequential AI was removed. The round coordinator selects one locked plan."));
 }
 
 void UPartyAutoCombatComponent::Stop()

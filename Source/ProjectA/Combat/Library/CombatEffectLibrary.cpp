@@ -1,4 +1,5 @@
 #include "Combat/Library/CombatEffectLibrary.h"
+#include "ProjectA.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayEffect.h"
 #include "GameplayTagContainer.h"
@@ -15,13 +16,13 @@ bool UCombatEffectLibrary::ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitB
 {
     if (!IsValid(SourceUnit) || !IsValid(TargetUnit) || !SourceUnit->HasAuthority() || !TargetUnit->HasAuthority() || SourceUnit->GetWorld() != TargetUnit->GetWorld() || !FMath::IsFinite(Power) || Power < 0.0f)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Invalid Source or Target"));
+        UE_LOG(LogProjectA, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Invalid Source or Target"));
         return false;
     }
 
     if (!TargetUnit->IsUnitAlive())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Target Dead | Target=%s"), *GetNameSafe(TargetUnit));
+        UE_LOG(LogProjectA, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Target Dead | Target=%s"), *GetNameSafe(TargetUnit));
         return false;
     }
 
@@ -30,13 +31,13 @@ bool UCombatEffectLibrary::ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitB
 
     if (!SourceASC || !TargetASC)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Invalid ASC | Source=%s | Target=%s"), *GetNameSafe(SourceUnit), *GetNameSafe(TargetUnit));
+        UE_LOG(LogProjectA, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Invalid ASC | Source=%s | Target=%s"), *GetNameSafe(SourceUnit), *GetNameSafe(TargetUnit));
         return false;
     }
 
     if (!EffectClass)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | DamageEffectClass is null"));
+        UE_LOG(LogProjectA, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | DamageEffectClass is null"));
         return false;
     }
 
@@ -47,7 +48,7 @@ bool UCombatEffectLibrary::ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitB
 
     if (!SpecHandle.IsValid())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Invalid SpecHandle"));
+        UE_LOG(LogProjectA, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Invalid SpecHandle"));
         return false;
     }
 
@@ -62,7 +63,7 @@ bool UCombatEffectLibrary::ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitB
 
     // Damage retains its negative contract; positive support power follows authored effect tags.
     // 피해의 음수 계약을 유지하고 양수 지원 강도는 제작된 효과 태그를 따릅니다.
-    SpecHandle.Data->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(TEXT("Data.Damage")), -Power);
+    SpecHandle.Data->SetSetByCallerMagnitude(ProjectACombatTags::Data_Damage, -Power);
     SpecHandle.Data->SetSetByCallerMagnitude(ProjectACombatTags::Data_Heal, bHeal ? Power : 0.0f);
     SpecHandle.Data->SetSetByCallerMagnitude(ProjectACombatTags::Data_Shield, bShield ? Power : 0.0f);
 
@@ -72,7 +73,7 @@ bool UCombatEffectLibrary::ApplyTaggedEffectToUnit(AUnitBase* SourceUnit, AUnitB
     // 즉시 효과에는 활성 핸들이 없지만 적용 결과에는 GAS 조건에 의한 거절 여부가 기록됩니다.
     if (!AppliedHandle.WasSuccessfullyApplied())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Apply Result Invalid | Source=%s | Target=%s"), *GetNameSafe(SourceUnit), *GetNameSafe(TargetUnit));
+        UE_LOG(LogProjectA, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnit Failed | Apply Result Invalid | Source=%s | Target=%s"), *GetNameSafe(SourceUnit), *GetNameSafe(TargetUnit));
         return false;
     }
 
@@ -93,19 +94,19 @@ int32 UCombatEffectLibrary::ApplyDamageToUnits(AUnitBase* SourceUnit, const TArr
 {
     if (!SourceUnit)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnits Failed | SourceUnit is null"));
+        UE_LOG(LogProjectA, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnits Failed | SourceUnit is null"));
         return 0;
     }
 
     if (!DamageEffectClass)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnits Failed | DamageEffectClass is null"));
+        UE_LOG(LogProjectA, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnits Failed | DamageEffectClass is null"));
         return 0;
     }
 
     if (TargetUnits.IsEmpty())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnits Skipped | TargetUnits Empty | Source=%s"), *GetNameSafe(SourceUnit));
+        UE_LOG(LogProjectA, Warning, TEXT("[CombatEffectLibrary] ApplyDamageToUnits Skipped | TargetUnits Empty | Source=%s"), *GetNameSafe(SourceUnit));
         return 0;
     }
 

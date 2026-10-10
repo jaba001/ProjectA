@@ -1,4 +1,5 @@
 #include "UI/MainMenu/MainMenuPreviewStage.h"
+#include "ProjectA.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/SceneComponent.h"
@@ -116,7 +117,7 @@ void AMainMenuPreviewStage::SetPreviewActorForSlot(int32 SlotIndex, FName ClassI
     USceneComponent* SlotAnchor = GetSlotAnchor(SlotIndex);
     if (!SlotAnchor)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuPreviewStage] Invalid preview slot index: %d"), SlotIndex);
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuPreviewStage] Invalid preview slot index: %d"), SlotIndex);
         return;
     }
 
@@ -125,14 +126,14 @@ void AMainMenuPreviewStage::SetPreviewActorForSlot(int32 SlotIndex, FName ClassI
     const TSubclassOf<AActor>* PreviewActorClass = PreviewActorClasses.Find(ClassId);
     if (!PreviewActorClass || !PreviewActorClass->Get())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuPreviewStage] Preview actor class is not configured for ClassId: %s"), *ClassId.ToString());
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuPreviewStage] Preview actor class is not configured for ClassId: %s"), *ClassId.ToString());
         return;
     }
 
     UWorld* World = GetWorld();
     if (!World)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuPreviewStage] World is not available."));
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuPreviewStage] World is not available."));
         return;
     }
 
@@ -143,7 +144,7 @@ void AMainMenuPreviewStage::SetPreviewActorForSlot(int32 SlotIndex, FName ClassI
     AActor* PreviewActor = World->SpawnActor<AActor>(PreviewActorClass->Get(), SlotAnchor->GetComponentTransform(), SpawnParameters);
     if (!PreviewActor)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuPreviewStage] Failed to spawn preview actor for slot %d."), SlotIndex);
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuPreviewStage] Failed to spawn preview actor for slot %d."), SlotIndex);
         return;
     }
 
@@ -152,7 +153,7 @@ void AMainMenuPreviewStage::SetPreviewActorForSlot(int32 SlotIndex, FName ClassI
     if (const USceneComponent* PreviewRoot = PreviewActor->GetRootComponent()) PreviewBaseRotations[SlotIndex] = PreviewRoot->GetRelativeTransform().GetRotation();
     InvalidateOverviewCameraFit();
     RefreshPreviewFocus();
-    UE_LOG(LogTemp, Log, TEXT("[MainMenuPreviewStage] Preview actor updated. SlotIndex: %d, ClassId: %s"), SlotIndex, *ClassId.ToString());
+    UE_LOG(LogProjectA, Log, TEXT("[MainMenuPreviewStage] Preview actor updated. SlotIndex: %d, ClassId: %s"), SlotIndex, *ClassId.ToString());
 }
 
 void AMainMenuPreviewStage::ClearPreviewActorForSlot(int32 SlotIndex)

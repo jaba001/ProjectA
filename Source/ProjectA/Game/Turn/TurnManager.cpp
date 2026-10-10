@@ -1,4 +1,5 @@
 #include "Game/Turn/TurnManager.h"
+#include "ProjectA.h"
 
 bool UTurnManager::RetryTurnCheckpoint()
 {
@@ -7,7 +8,7 @@ bool UTurnManager::RetryTurnCheckpoint()
 
 bool UTurnManager::RestoreFromBoundary(const TArray<AUnitBase*>& Units, int32 CompletedTurnSerial, int32 NextTurnIndex)
 {
-    UE_LOG(LogTemp, Warning, TEXT("[TurnManager] Sequential checkpoint restoration is no longer supported."));
+    UE_LOG(LogProjectA, Warning, TEXT("[TurnManager] Sequential checkpoint restoration is no longer supported."));
     return false;
 }
 
@@ -18,7 +19,7 @@ void UTurnManager::InitializeTurnOrder(const TArray<AUnitBase*>& Units)
 
 void UTurnManager::StartTurn()
 {
-    UE_LOG(LogTemp, Warning, TEXT("[TurnManager] Sequential execution was removed. Use timed-round combat."));
+    UE_LOG(LogProjectA, Warning, TEXT("[TurnManager] Sequential execution was removed. Use timed-round combat."));
 }
 
 void UTurnManager::EndTurn()

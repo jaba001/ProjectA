@@ -1,4 +1,5 @@
 #include "UI/MainMenu/MainMenuRootWidget.h"
+#include "ProjectA.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "CommonActivatableWidget.h"
@@ -27,7 +28,7 @@ void UMainMenuRootWidget::EnsureCodeGeneratedRootLayout()
 
     if (!WidgetTree)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuRootWidget] WidgetTree is not available."));
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuRootWidget] WidgetTree is not available."));
         return;
     }
 
@@ -35,7 +36,7 @@ void UMainMenuRootWidget::EnsureCodeGeneratedRootLayout()
 
     if (!RootOverlay)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuRootWidget] Failed to create root overlay."));
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuRootWidget] Failed to create root overlay."));
         return;
     }
 
@@ -45,7 +46,7 @@ void UMainMenuRootWidget::EnsureCodeGeneratedRootLayout()
 
     if (!MainStack || !MenuStack || !ModalStack)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[MainMenuRootWidget] Failed to create CommonUI stacks."));
+        UE_LOG(LogProjectA, Warning, TEXT("[MainMenuRootWidget] Failed to create CommonUI stacks."));
         return;
     }
 
@@ -101,7 +102,7 @@ void UMainMenuRootWidget::ClearMenuStack()
 {
     if (!MenuStack)
     {
-        UE_LOG(LogTemp, Warning, TEXT("ClearMenuStack failed because MenuStack is not bound."));
+        UE_LOG(LogProjectA, Warning, TEXT("ClearMenuStack failed because MenuStack is not bound."));
         return;
     }
 
@@ -113,7 +114,7 @@ void UMainMenuRootWidget::ClearModalStack()
 {
     if (!ModalStack)
     {
-        UE_LOG(LogTemp, Warning, TEXT("ClearModalStack failed because ModalStack is not bound."));
+        UE_LOG(LogProjectA, Warning, TEXT("ClearModalStack failed because ModalStack is not bound."));
         return;
     }
 
@@ -130,13 +131,13 @@ UCommonActivatableWidget* UMainMenuRootWidget::PushScreen(UCommonActivatableWidg
 {
     if (!Stack)
     {
-        UE_LOG(LogTemp, Warning, TEXT("PushScreen failed because %s is not bound."), StackName);
+        UE_LOG(LogProjectA, Warning, TEXT("PushScreen failed because %s is not bound."), StackName);
         return nullptr;
     }
 
     if (!WidgetClass)
     {
-        UE_LOG(LogTemp, Warning, TEXT("PushScreen failed because WidgetClass is not set for %s."), StackName);
+        UE_LOG(LogProjectA, Warning, TEXT("PushScreen failed because WidgetClass is not set for %s."), StackName);
         return nullptr;
     }
 
