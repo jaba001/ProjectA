@@ -400,6 +400,6 @@ Designer와 native 경로 모두 기존 `SlotActionBox` 행을 사용하므로 W
 
 메뉴·캐릭터 생성·설정·전투 계획·인벤토리·장비/스킬 툴팁·인카운터·PvE 난이도·보상·로딩 안내에 Unreal `FText`와 키가 있는 번역 리소스를 사용한다. 아이템 49종·스킬 77종과 현재 인카운터·노드·몬스터·직업/몸체 이름은 고정 ID 또는 원본 에셋 경로로 현지화한다. 저장된 이름·수치·태그·획득 확률·Snapshot·명령 ID를 변경하지 않으며 사용자 캐릭터명은 번역하지 않는다. 기존 개발 진단의 고정 문자열과 미등록/사용자 수정 콘텐츠는 원문을 유지한다. 전체 게임의 모든 로그·예외 문구가 영어라는 의미는 아니다.
 
-`Config/Localization`의 6개 JSON에 namespace·key·한국어 원문·영어 번역을 관리한다. 정적 문자열은 `NSLOCTEXT`, 데이터 표시 문자열은 `ProjectALocalization`의 명시적인 키를 사용한다. 번역이 없거나 원문 해시가 다르면 원문을 표시한다. 원문 변경 시 같은 키의 source/translation을 함께 갱신하며 서식 인자의 이름을 보존한다. `python Source/ProjectAEditor/Scripts/BuildLocalization.py`로 ko/en 리소스를 생성하고 `--check`로 수집 누락·키 충돌·원문/인자·생성물 일치를 검사한다. 생성기는 UE Compact locres 1·locmeta 1을 작성하며 엔진 기본 로더가 읽는다. 번역 배포에는 런타임 JSON 파싱이나 외부 API가 필요 없다.
+`Config/Localization`의 7개 JSON에 namespace·key·한국어 원문·영어 번역을 관리한다. 정적 문자열은 `NSLOCTEXT`, 데이터 표시 문자열은 `ProjectALocalization`의 명시적인 키를 사용한다. 번역이 없거나 원문 해시가 다르면 원문을 표시한다. 원문 변경 시 같은 키의 source/translation을 함께 갱신하며 서식 인자의 이름을 보존한다. `python Source/ProjectAEditor/Scripts/BuildLocalization.py`로 ko/en 리소스를 생성하고 `--check`로 수집 누락·키 충돌·원문/인자·생성물 일치를 검사한다. 생성기는 UE Compact locres 1·locmeta 1을 작성하며 엔진 기본 로더가 읽는다. 번역 배포에는 런타임 JSON 파싱이나 외부 API가 필요 없다.
 
 컴파일과 리소스 정적 검사는 [HISTORY 9-46](HISTORY.md#9-46-2026-10-09-한국어영어-설정과-텍스트-현지화), 화면·저장·혼합 언어 협동 확인은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)을 따른다.

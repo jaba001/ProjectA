@@ -1087,3 +1087,11 @@ PvE 하·중·상에 서로 다른 맵과 등장 몬스터 설명을 제공하�
 `Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`는 최초 38.57초, 소품 높이 보정 후 4.85초에 성공했다. 같은 옵션의 `ProjectA Win64 Development`는 27.97초에 성공했다. 로그는 `Saved/Automation/NpcRoles_20261010/{EditorBuild.Initial,EditorBuild,GameBuild}.log`다. `ProjectA.Run.EncounterPresentation.MerchandiseRolesAndHealingSpring`을 추가하고 기존 태그·cook 참조·PIE 관찰기를 컴파일했다. 활성 CSV 13종·이름 독립성·제외 Query·환경형·부착물 검사용 코드이며 Unreal 자동화 테스트는 실행하지 않았다.
 
 `python Saved/Automation/NpcRoles_20261010/ValidateAssets.py`의 279개 정적 검사로 직접 원본 40개와 클래스·스켈레톤·부착 본 참조, 기존 SHA 38개 보존을 확인했다. 나머지 Skin3·Ulf 2개는 현재 SHA 기준선이며 이전 해시 비교 근거가 아니다. 원본 캐시 thumbnail과 bounds로 설계하고 진열대 배율 회귀·책/상자 부유를 수정했다. `python Source/ProjectAEditor/Scripts/BuildLocalization.py --check`는 번역 1,095개와 한영 리소스 일치를 확인했다. 같은 폴더의 `ValidateDocumentation.py`·`ValidateStatic.py`로 문서 링크·CSV 수치와 ID·TODO 미완료 54개/선택 7개·전체 diff를 검사하고 `AssetValidation.json`·`DocumentationValidation.json`·`StaticReview.json`에 보존했다. 게임·PIE·패키지·화면 캡처·IDE는 실행하지 않았다. 실제 손 그립·수면·얼굴/패널 구도·Continue·2인 동기 외형·서비스 작동은 기존 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)에 갱신한 사용자 확인 전이다.
+
+### 9-55 2026-10-11 Claude 현지화·시드·태그·로그 변경 인계
+
+Claude HANDOFF 2-1~4의 런타임 현지화 232곳·테스트 기대값 2곳·신규 번역 223개, 32비트 시드 호출 6곳, 네이티브 피해/발동 태그, 로그 카테고리 91곳을 검토했다. 기존 저장 시드·전투 조건·태그 의미를 유지하며 관련 54개 파일만 `0ac5e5a3` `[claude] 현지화·시드·네이티브 태그·로그 카테고리 정리`로 커밋하고 `origin/main`에 push했다. 기존 협업 규칙·Claude 문서와 기능에 불필요한 `ProjectAAssetManager.cpp` 헤더 추가는 미커밋으로 보존했다. 인계 문서 4절은 로컬에서 상태만 갱신하고 Codex 검증 기록은 별도 커밋한다.
+
+`Build.bat ProjectAEditor Win64 Development -Project=C:/Users/jaba0/Desktop/MyProjects/ProjectA/ProjectA.uproject -WaitMutex -FromMsBuild -architecture=x64`는 66개 작업·61.05초·종료 0으로 성공했다. `python Source/ProjectAEditor/Scripts/BuildLocalization.py --check`는 Python 3.12.14에서 번역 1,318개·ko/en 리소스·한국어 원문 대체 일치를 확인했다. 전체 staged diff와 `git diff --check`를 검토했으며 소스 보정은 필요하지 않았다. 실행 로그는 `Saved/Automation/ClaudeHandoff/Build.Editor.log`·`Localization.Check.log`, 커밋 파일 목록은 같은 폴더의 `CommitFiles.json`에 보존한다.
+
+Visual Studio·Unreal Editor·게임·PIE·자동화 테스트를 실행하지 않았다. 영어 전투 상태/준비 문구, 새 Run 배치 변화와 기존 저장 배치 보존은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)의 사용자 확인 전이며 컴파일 성공을 작동 검증으로 취급하지 않는다. TODO 기존 미완료·제안 선택은 유지하고 완료 이관은 수행하지 않았다.
