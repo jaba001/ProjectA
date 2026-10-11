@@ -340,10 +340,21 @@ void ACombatRoundCoordinator::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void ACombatRoundCoordinator::PublishState()
 {
-    for (FCombatRoundUnitView& Entry : View.Units)
+    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
     {
+        FCombatRoundUnitView& Entry = View.Units[Index];
         Entry.HP = 0.f;
         if (IsValid(Entry.Unit) && Entry.Unit->GetAttributeSet()) Entry.HP = Entry.Unit->GetAttributeSet()->GetHP();
+        Entry.bSkillImpactSettled = false;
+        Entry.bAwaitingSkillImpact = false;
+        if (Actions.IsValidIndex(Index))
+        {
+            const FActionRuntime& Action = Actions[Index];
+            const FCombatRoundSkill* Skill = FindCommandSkill(Entry.Command);
+            const bool bReturnOnImpact = Skill && (Skill->Kind == ECombatRoundSkillKind::Projectile || Skill->Kind == ECombatRoundSkillKind::GroundAttack);
+            Entry.bSkillImpactSettled = bReturnOnImpact && (Action.bHasSkillImpact || (Action.bReleased && Action.PendingSkillImpacts == 0));
+            Entry.bAwaitingSkillImpact = bReturnOnImpact && Action.PendingSkillImpacts > 0 && !Entry.bSkillImpactSettled;
+        }
     }
     View.ElapsedSeconds = static_cast<float>(SimulationTime);
     View.PendingProjectiles = Projectiles.Num();
@@ -1387,17 +1398,23 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
     const CombatSkillExecution::FReleaseResult Result = CombatSkillExecution::Release(Context, View.Units, Skill, [this, &Entry, &Skill](AUnitBase* Hit)
     {
         ApplyHit(Entry.Unit, Hit, Skill);
-    }, [this, Skill](ACombatRoundProjectile* Projectile)
+    }, [this, Skill, Index](ACombatRoundProjectile* Projectile)
     {
         Projectiles.Add(Projectile);
+        ++Actions[Index].PendingSkillImpacts;
         Projectile->OnImpact.AddWeakLambda(this, [this, Skill](AUnitBase* Source, AUnitBase* Target, float Damage)
         {
             ApplyHit(Source, Target, Skill);
         });
-        Projectile->OnResolved.AddUObject(this, &ACombatRoundCoordinator::HandleProjectileResolved);
-    }, [this, Skill](ACombatSkillEffectActor* Effect)
+        Projectile->OnResolved.AddWeakLambda(this, [this, Index](ACombatRoundProjectile* Resolved)
+        {
+            if (Actions.IsValidIndex(Index)) Actions[Index].PendingSkillImpacts = FMath::Max(0, Actions[Index].PendingSkillImpacts - 1);
+            HandleProjectileResolved(Resolved);
+        });
+    }, [this, Skill, Index](ACombatSkillEffectActor* Effect)
     {
         ActiveEffects.Add(Effect);
+        ++Actions[Index].PendingSkillImpacts;
         Effect->OnImpact.AddWeakLambda(this, [this, Skill](AUnitBase* Source, AUnitBase* Target, float Power)
         {
             if (!FMath::IsFinite(Power) || Power < 0.f || Power > Skill.Power) return;
@@ -1407,7 +1424,11 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
             ImpactSkill.Power = Power;
             ApplyHit(Source, Target, ImpactSkill);
         });
-        Effect->OnResolved.AddUObject(this, &ACombatRoundCoordinator::HandleEffectResolved);
+        Effect->OnResolved.AddWeakLambda(this, [this, Index](ACombatSkillEffectActor* Resolved)
+        {
+            if (Actions.IsValidIndex(Index)) Actions[Index].PendingSkillImpacts = FMath::Max(0, Actions[Index].PendingSkillImpacts - 1);
+            HandleEffectResolved(Resolved);
+        });
     });
     StartRecovery(Index, !Result.bSucceeded, Result.Status);
 }
@@ -1436,6 +1457,8 @@ void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, con
         }
     }
     if (!CombatSkillExecution::ApplyEffect(Source, Target, Skill)) return;
+    const int32 SourceIndex = View.Units.IndexOfByPredicate([Source](const FCombatRoundUnitView& Unit) { return Unit.Unit == Source; });
+    if (Actions.IsValidIndex(SourceIndex)) Actions[SourceIndex].bHasSkillImpact = true;
     Entry.HP = Target->GetAttributeSet() ? Target->GetAttributeSet()->GetHP() : 0.f;
     if (!Target->IsUnitAlive())
     {

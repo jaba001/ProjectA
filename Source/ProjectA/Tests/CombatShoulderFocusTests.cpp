@@ -62,17 +62,89 @@ bool FCombatShoulderFocusActionLifecycleTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Ready establishes one character for this action."), Focus.Update(View, 1, 2), 2);
     View.Phase = ECombatRoundPhase::Resolving;
     View.Units[1].bHasMovePlan = true;
-    const TArray<ECombatRoundActionPhase> ActivePhases = {ECombatRoundActionPhase::Waiting, ECombatRoundActionPhase::Approaching, ECombatRoundActionPhase::Casting, ECombatRoundActionPhase::Recovery, ECombatRoundActionPhase::Returning};
+    const TArray<ECombatRoundActionPhase> ActivePhases = {ECombatRoundActionPhase::Waiting, ECombatRoundActionPhase::Approaching, ECombatRoundActionPhase::Casting, ECombatRoundActionPhase::Recovery};
+    FCombatRoundSkill Melee;
+    Melee.Kind = ECombatRoundSkillKind::Melee;
     for (const ECombatRoundActionPhase Phase : ActivePhases)
     {
         View.Units[1].ActionPhase = Phase;
-        TestEqual(TEXT("SAP waiting, attack, animation recovery and return retain the selected character."), Focus.Update(View, 1, 1), 2);
+        TestEqual(TEXT("SAP waiting, approach, attack and animation recovery retain the selected character."), Focus.Update(View, 1, 1), 2);
+        TestFalse(TEXT("A melee hit cannot end the shot before animation recovery finishes."), Focus.FinishAtReturnPoint(View.Units[1], &Melee));
     }
+    View.Units[1].ActionPhase = ECombatRoundActionPhase::Returning;
+    TestTrue(TEXT("Melee return ends the shot before any travel home."), Focus.FinishAtReturnPoint(View.Units[1], &Melee));
+    TestEqual(TEXT("The selected returning melee unit cannot restart the shot."), Focus.Update(View, 1, 1), INDEX_NONE);
     View.Units[0].ActionPhase = ECombatRoundActionPhase::Casting;
     View.Units[1].ActionPhase = ECombatRoundActionPhase::Complete;
     TestEqual(TEXT("The selected character completing returns before another owned action settles."), Focus.Update(View, 1, 1), INDEX_NONE);
     View.Units[1].ActionPhase = ECombatRoundActionPhase::Waiting;
     TestEqual(TEXT("A finished shot cannot restart or switch characters during the same resolution."), Focus.Update(View, 1, 1), INDEX_NONE);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatShoulderFocusImpactTest, "ProjectA.Combat.ShoulderCamera.RangedAndMagicImpact", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatShoulderFocusImpactTest::RunTest(const FString& Parameters)
+{
+    const TArray<ECombatRoundSkillKind> Kinds = {ECombatRoundSkillKind::Projectile, ECombatRoundSkillKind::GroundAttack};
+    for (const ECombatRoundSkillKind Kind : Kinds)
+    {
+        FCombatRoundView View = CombatShoulderFocusTests::MakeView();
+        FCombatShoulderFocus Focus;
+        FCombatRoundSkill Skill;
+        Skill.Kind = Kind;
+        TestEqual(TEXT("The ranged or magic shot starts with its accepted owner."), Focus.Update(View, 1, 2), 2);
+        View.Phase = ECombatRoundPhase::Resolving;
+        View.Units[1].ActionPhase = ECombatRoundActionPhase::Recovery;
+        View.Units[1].bAwaitingSkillImpact = true;
+        TestFalse(TEXT("Release and recovery do not substitute for an impact."), Focus.FinishAtReturnPoint(View.Units[1], &Skill));
+        View.Units[1].ActionPhase = ECombatRoundActionPhase::Complete;
+        TestEqual(TEXT("A finished cast keeps the shot while its projectile or effect is pending."), Focus.Update(View, 1, 1), 2);
+        View.Units[0].bSkillImpactSettled = true;
+        TestFalse(TEXT("Another owned unit's impact cannot end this shot."), Focus.FinishAtReturnPoint(View.Units[0], &Skill));
+        View.Units[1].bSkillImpactSettled = true;
+        View.Units[1].bAwaitingSkillImpact = false;
+        TestEqual(TEXT("An impact after cast completion returns without waiting for other actions."), Focus.Update(View, 1, 1), INDEX_NONE);
+        View.Units[1].ActionPhase = ECombatRoundActionPhase::Recovery;
+        TestEqual(TEXT("Later chain hits cannot reopen the same shot."), Focus.Update(View, 1, 1), INDEX_NONE);
+
+        Focus.Reset();
+        View.Units[1].bSkillImpactSettled = false;
+        View.Units[1].bAwaitingSkillImpact = true;
+        TestEqual(TEXT("A fresh shot can still observe recovery before impact."), Focus.Update(View, 1, 2), 2);
+        View.Units[1].bSkillImpactSettled = true;
+        View.Units[1].bAwaitingSkillImpact = false;
+        TestTrue(TEXT("The first impact ends the shot even while the cast animation is recovering."), Focus.FinishAtReturnPoint(View.Units[1], &Skill));
+        TestEqual(TEXT("The remaining cast animation cannot restart the camera."), Focus.Update(View, 1, 2), INDEX_NONE);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCombatShoulderFocusMissTest, "ProjectA.Combat.ShoulderCamera.MissCancellationAndLateReturn", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatShoulderFocusMissTest::RunTest(const FString& Parameters)
+{
+    FCombatRoundView View = CombatShoulderFocusTests::MakeView();
+    FCombatShoulderFocus Focus;
+    FCombatRoundSkill Skill;
+    Skill.Kind = ECombatRoundSkillKind::Projectile;
+    TestEqual(TEXT("A pending shot begins with the selected owner."), Focus.Update(View, 1, 2), 2);
+    View.Phase = ECombatRoundPhase::Resolving;
+    View.Units[1].ActionPhase = ECombatRoundActionPhase::Recovery;
+    View.Units[1].bSkillImpactSettled = true;
+    TestTrue(TEXT("A final miss or expired effect ends the shot without an enemy hit."), Focus.FinishAtReturnPoint(View.Units[1], &Skill));
+    TestEqual(TEXT("A missed shot cannot attach to another owned action."), Focus.Update(View, 1, 1), INDEX_NONE);
+    Focus.Reset();
+    View.Units[1].bSkillImpactSettled = false;
+    View.Units[1].bAwaitingSkillImpact = true;
+    View.Units[1].ActionPhase = ECombatRoundActionPhase::Cancelled;
+    TestEqual(TEXT("Cancellation returns even if an effect is still pending."), Focus.Update(View, 1, 2), INDEX_NONE);
+    Focus.Reset();
+    Skill.Kind = ECombatRoundSkillKind::Melee;
+    View.Units[1].ActionPhase = ECombatRoundActionPhase::Returning;
+    TestEqual(TEXT("A late view can select the owner before evaluating its return boundary."), Focus.Update(View, 1, 2), 2);
+    TestTrue(TEXT("A late melee return is rejected before a shoulder camera is spawned."), Focus.FinishAtReturnPoint(View.Units[1], &Skill));
+    TestEqual(TEXT("Late return cannot switch to another participant's action."), Focus.Update(View, 1, 3), INDEX_NONE);
     return true;
 }
 

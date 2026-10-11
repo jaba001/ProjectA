@@ -435,6 +435,14 @@ struct PROJECTA_API FCombatRoundUnitView
     UPROPERTY(BlueprintReadOnly)
     ECombatRoundActionPhase ActionPhase = ECombatRoundActionPhase::Planned;
 
+    // Presentation follows the first applied impact or the final miss, independently of the cast animation.
+    // 시전 애니메이션과 별개로 최초 적용된 피격 또는 마지막 불발 종료를 시점 연출에 전달합니다.
+    UPROPERTY(BlueprintReadOnly)
+    bool bSkillImpactSettled = false;
+
+    UPROPERTY(BlueprintReadOnly)
+    bool bAwaitingSkillImpact = false;
+
     UPROPERTY(BlueprintReadOnly)
     float StartDelay = 0.f;
 

@@ -1,5 +1,5 @@
 #include "Combat/Presentation/CombatShoulderCamera.h"
-#include "Camera/CameraComponent.h"
+#include "Components/SceneComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -30,14 +30,14 @@ float CombatShoulderCameraGeometry::DecorationHitFraction(const FBox& Bounds, co
 
 ACombatShoulderCamera::ACombatShoulderCamera()
 {
+    // Camera actors bypass CalcCamera; a plain view target keeps the custom POV on the engine camera path.
+    // CameraActor는 CalcCamera를 우회하므로 일반 시점 액터로 엔진의 커스텀 POV 호출 경로를 사용합니다.
+    RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("CameraRoot"));
+    bFindCameraComponentWhenViewTarget = false;
     PrimaryActorTick.bCanEverTick = false;
     bReplicates = false;
     SetReplicateMovement(false);
     SetActorEnableCollision(false);
-    GetCameraComponent()->bConstrainAspectRatio = false;
-    GetCameraComponent()->bOverrideAspectRatioAxisConstraint = true;
-    GetCameraComponent()->SetAspectRatioAxisConstraint(AspectRatio_MaintainYFOV);
-    GetCameraComponent()->SetFieldOfView(ShoulderFOV);
 }
 
 void ACombatShoulderCamera::FollowUnit(AUnitBase* InUnit, const FMinimalViewInfo& TacticalPOV)
@@ -54,6 +54,10 @@ void ACombatShoulderCamera::FollowUnit(AUnitBase* InUnit, const FMinimalViewInfo
     ViewTemplate.bConstrainAspectRatio = false;
     LastView = TacticalPOV;
     CacheDecorationBounds();
+    // Initialize the pose before blending so the new view target never starts at its spawn origin.
+    // 블렌드 전에 구도를 초기화하여 새 시점이 스폰 원점에서 시작하지 않도록 합니다.
+    FMinimalViewInfo InitialView;
+    CalcCamera(0.f, InitialView);
 }
 
 void ACombatShoulderCamera::CacheDecorationBounds()

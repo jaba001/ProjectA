@@ -1,5 +1,15 @@
 #include "Combat/Presentation/CombatShoulderFocus.h"
 
+bool FCombatShoulderFocus::FinishAtReturnPoint(const FCombatRoundUnitView& Unit, const FCombatRoundSkill* Skill)
+{
+    if (bFinished || UnitId == INDEX_NONE || Unit.UnitId != UnitId || !Skill) return false;
+    const bool bMeleeReturn = Skill->Kind == ECombatRoundSkillKind::Melee && Unit.ActionPhase == ECombatRoundActionPhase::Returning;
+    const bool bSkillImpact = (Skill->Kind == ECombatRoundSkillKind::Projectile || Skill->Kind == ECombatRoundSkillKind::GroundAttack) && Unit.bSkillImpactSettled;
+    if (!bMeleeReturn && !bSkillImpact) return false;
+    Finish();
+    return true;
+}
+
 int32 FCombatShoulderFocus::Update(const FCombatRoundView& View, int32 ParticipantSlot, int32 PreferredUnitId)
 {
     if (CombatId != View.CombatId || RoundNumber != View.RoundNumber || OwnerSlot != ParticipantSlot)
@@ -33,7 +43,10 @@ int32 FCombatShoulderFocus::Update(const FCombatRoundView& View, int32 Participa
         if (!Focus || (View.Phase == ECombatRoundPhase::Planning && !Focus->bReady)) return INDEX_NONE;
         UnitId = Focus->UnitId;
     }
-    if (!Focus || !IsOwned(*Focus) || Focus->HP <= 0.f || CombatRoundRules::IsTerminal(Focus->ActionPhase))
+    // A completed cast can still have a projectile in flight; cancellation and death never retain the shot.
+    // 시전 완료 뒤에도 투사체는 비행할 수 있지만 취소·사망 시에는 시점을 유지하지 않습니다.
+    const bool bActionEnded = Focus && (Focus->ActionPhase == ECombatRoundActionPhase::Cancelled || (Focus->ActionPhase == ECombatRoundActionPhase::Complete && !Focus->bAwaitingSkillImpact));
+    if (!Focus || !IsOwned(*Focus) || Focus->HP <= 0.f || bActionEnded)
     {
         Finish();
         return INDEX_NONE;

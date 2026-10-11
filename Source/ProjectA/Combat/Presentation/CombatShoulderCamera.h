@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Camera/CameraActor.h"
+#include "GameFramework/Actor.h"
 #include "Camera/CameraTypes.h"
 #include "CombatShoulderCamera.generated.h"
 
@@ -17,7 +17,7 @@ namespace CombatShoulderCameraGeometry
 // A local view target follows one action without possessing or rotating its unit.
 // 유닛을 빙의하거나 회전시키지 않고 하나의 행동을 따라가는 로컬 시점입니다.
 UCLASS(NotPlaceable, Transient)
-class PROJECTA_API ACombatShoulderCamera : public ACameraActor
+class PROJECTA_API ACombatShoulderCamera : public AActor
 {
     GENERATED_BODY()
 
