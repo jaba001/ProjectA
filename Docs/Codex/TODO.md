@@ -130,6 +130,7 @@ P2P 연결과 중앙 저장·계정 인증·MMR 검증은 각각 필요하다. �
 
 - [ ] 야외 음영·PineRidge 바닥 가독성과 하단 HUD의 타일 가장자리 가림을 실제 플레이에서 확인한다. 선호 또는 선택 방해가 있으면 맵·위치를 기록한다.
 - [ ] Shipping 패키지 `Saved/ClaudePackage/Archive/Windows/ProjectA.exe`를 실행한다. 새 Run 시작, 저장 후 종료, 이어하기가 동작하고 로딩 화면이 정상이며 Steam 없이 싱글플레이가 진행되어야 한다. [빌드 근거](History/2026-10-10_11.md#9-58-2026-10-11-win64-shipping-패키지-빌드)
+- [ ] 상태이상: 스킬 DA 하나의 `RoundDefinition → Status Applications`에 상태를 추가한 뒤 DebugCombat에서 8종을 각각 확인한다. 대상 패널에 `상태:` 줄이 보이고, `[RoundStatus]` 로그와 HP 변화가 [STATUS_EFFECTS 9절](STATUS_EFFECTS.md#9-2026-10-11-구현-규칙)과 일치해야 한다. `ProjectA.Combat.StatusRules` 자동화 테스트도 실행한다. [구현 근거](History/2026-10-10_11.md#9-61-2026-10-11-해로운-상태이상-8종-구현)
 
 선호 확인은 [10절](#10-지하-던전-비교-레벨-확인)·[12절](#12-몬스터-콘텐츠-확인)·[19절](#19-구입-vfxsfx-스킬-확인), 핵심 재미와 밸런스는 [31절](#31-핵심-재미와-밸런스), Steam 2PC·PlayFab·온라인 구현은 [4절](#4-온라인-협동과-경쟁)에 둔다.
 
