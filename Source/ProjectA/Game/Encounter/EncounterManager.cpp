@@ -1,4 +1,5 @@
 #include "Game/Encounter/EncounterManager.h"
+#include "Types/ProjectARandom.h"
 #include "ProjectA.h"
 #include "AbilitySystemComponent.h"
 #include "Combat/CombatManager.h"
@@ -165,6 +166,16 @@ bool AEncounterManager::ConfigureCombatParticipants(FText& OutError)
     if (!Authority || !Authority->ConfigureRun(RunState->GetRunIdentity(), RunState->GetPartyMembers(), PartyActors, OutError, RunState->IsManagedRun()))
     {
         return false;
+    }
+    // Use the existing authority transition and companion planner without changing ordinary Run ownership.
+    // 일반 Run 소유권을 바꾸지 않고 기존 권위 전환과 동료 계획기를 사용합니다.
+    if (ProjectARandom::IsBalanceSimulation())
+    {
+        for (const TPair<int32, TObjectPtr<AUnitBase>>& Entry : PartyActors)
+        {
+            if (!Authority->SetPartyControlMode(Cast<APlayerUnit>(Entry.Value), EPartyControlMode::ServerAI, OutError)) return false;
+        }
+        return true;
     }
     if (RunState->IsManagedRun())
     {

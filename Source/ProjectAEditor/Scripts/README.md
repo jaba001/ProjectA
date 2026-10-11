@@ -2,6 +2,8 @@
 
 UI 구조·생성 옵션·JSON 필드는 [UI_README](../../../Docs/Codex/UI_README.md)를 따른다.
 
+밸런스 측정 commandlet은 [34번](#34-밸런스-측정-commandlet)을 따른다. 실제 Run을 실행하므로 사용자가 직접 실행한다.
+
 2026-10-04 사용자가 위임한 UE 5.8.3 엔진 자동화·실제 렌더링·입력 검수의 최신 범위는 [검증 이력](../../../Docs/Codex/History/2026-10-01_06.md#9-17-2026-10-04-ue-58-todo-실행-검수)에 기록한다. 아래 도구별 작성·재로드 이력과 최신 작동 검수는 구분하며 남은 확인은 [TODO](../../../Docs/Codex/TODO.md)를 따른다.
 
 UE 5.8 Development Editor / Win64 빌드를 사용한다. 기존 Gameplay·Run 도구의 실행·재로드 결과는 UE 5.7 이력이며 19~20번 비교 레벨 도구의 작성·검사 결과는 UE 5.8 기준이다. UE 5.8 작동 확인은 [HISTORY 9-17](../../../Docs/Codex/History/2026-10-01_06.md#9-17-2026-10-04-ue-58-todo-실행-검수)을 따른다. Python은 `-EnablePlugins=PythonScriptPlugin`으로 해당 프로세스에서만 활성화한다. 제작 경로는 `/Game/User_JeHoon`이며 사용자 요청에 따른 지팡이 직접 임포트는 `/Game/MageStaff_FreeWeapons`를 사용한다. 최초 생성 도구 `ConfigureGameplayAssets.py`만 기존 TestMap을 요구하며 입력이 없으면 작성 전에 중단한다. `AuditGameplayAssets.py`는 현재 역할 4맵의 새 경로를 검사하므로 TestMap을 요구하지 않는다.
@@ -332,3 +334,19 @@ foreach ($environmentSpec in $environmentSpecs.levels)
 `CombatAnimationGrip.py`는 명세에 `grip_reference`가 있는 프로젝트 마법 시퀀스 2개에만 선택 임포트한 Greystone `Attack_A_Med` 첫 자세의 오른손 손가락 19개 회전을 적용한다. 시점·손목·팔·기타 트랙·위치·배율의 보존과 손가락 키를 검사하고 metadata SHA로 재로드를 확인한다. 초기 `MM_Idle` 보정본에서의 교체는 이전 metadata 검증 후 정확한 두 참조에만 허용한다. 참조 시퀀스는 수정하지 않으며 기존 소유 SkeletonGuard 시퀀스 2개만 엔진의 덮어쓰기 기능으로 다시 리타깃한다.
 
 Development Editor / Win64 컴파일 후 작성·별도 프로세스 재로드 순으로 실행한다. 기본 모드는 읽기 전용 검사이며 작성에는 `-CombatAnimationsAuthor`가 필요하다. 소유 정보·스켈레톤·구간·DefaultSlot·비반복·블렌드·남녀 포즈·선딜과 CSV 일치를 검사한다. 대상 외 에셋·원본·CSV·설정·저장 파일의 해시를 보존하며 원자적 rollback은 제공하지 않는다. 기존 대상의 바이트 백업은 `Saved/Automation/CombatAnimations_20261009/BeforeAssets`, 결과는 `Author.json`·`Reload.json`이다. 실제 화면 검수는 별도의 명시적 실행 요청에서 렌더링 Editor에 `-ExecCmds="Automation RunTests ProjectA.TodoReview.CastAnimations" -TestExit="Automation Test Queue Empty" -ProjectAReviewLeftMonitor -ProjectASaveSlot=ProjectA_Automation_TodoReview_<새로운식별자> -nowrite`를 전달한다.
+
+## 34 밸런스 측정 commandlet
+
+프로젝트 루트의 PowerShell에서 실행한다. Development Editor / Win64 빌드와 기존 Gameplay·파티·Snapshot 콘텐츠가 필요하다.
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "$PWD\ProjectA.uproject" -run=BalanceSim -nullrhi -nosound -unattended -nop4 -NoTraceServer -nowrite -Players=1 -Difficulty=Medium -Repeats=2 -Seed=31001 -TimeScale=20 -MaxSteps=80
+```
+
+`Players=1..4`, `Difficulty=Low|Medium|High|Random`(하·중·상·시드 추첨), `Repeats=1..100000`, `Seed=int32`, `TimeScale=1..1000`, `MaxSteps=1..80`, `MaxSeconds>0`을 지원한다. 기본값은 1인·중·1회·시드 1·20배·80단계·Run당 실제 7200초다. 반복 시 시드는 1씩 증가하며 int32 범위를 순환한다. 시간 배율은 1/60초 월드 tick 사이의 실제 대기만 줄이고 게임 time dilation·스킬 타이밍·판정 간격은 바꾸지 않는다. 처리 성능이 실제 가속 상한이다.
+
+정책 v1: 생성 UI와 같은 직업 순서·기본 장비로 새 기본 Run을 만들고 전원을 기존 서버 동료 AI에 배정한다. 인카운터·무작위 난이도·보상은 시드로 선택한다. 상점은 시드로 섞은 구매 가능 장비를 구매하고, 상점에서 보유 순서대로 빈 합법 슬롯 또는 선호 슬롯에 장착한다. 서비스는 방문당 한 번 구매를 요청한다. 골드·구매·보상·장비 변경 권한은 기존 싱글플레이의 선택 캐릭터 규칙을 유지하며 동료에게 재화를 새로 지급하지 않는다. AI의 기존 소모품·SAP 판단 범위도 유지한다.
+
+결과는 `Saved/BalanceSim/<UTC 타임스탬프_UUID>/runs.csv`·`combats.csv`(UTF-8)에 누적된다. Run 결과 `Complete`·`Defeat`는 완주·자연 패배이며, `StepLimit`·`Timeout`·`Error`는 미완료 측정이다. 하나라도 미완료면 종료 코드 2, 인자 오류는 1, 전체 완주/패배 기록 성공은 0이다. `progress_steps`는 완료 선택+승리 전투 수, `final_gold`는 파티 골드 합이다. 전투 행은 결과 확정·보상 선택 후 기록하며 `gold_earned`는 해당 전투와 보상 선택의 골드 순증, HP·생존 수는 결과 콜백 시점, 최대 HP 합은 전투 시작 시 전체 생성 아군(이미 사망한 캐릭터 포함) 기준이다. Snapshot 난이도는 `N/A`다. 상한·오류로 중단된 미종료 전투는 전투 결과 행을 만들지 않는다.
+
+저장은 기존 체크포인트 검증 후 메모리에만 게시하고 Run 저장 파일의 읽기·쓰기·삭제를 차단한다. CSV·밸런스·콘텐츠 에셋은 변경하지 않는다. `NormalTargetRun`의 Run·Encounter 공개 요청을 재사용하며 메뉴 UI·실제 저장 재개·렌더링 검수는 측정 범위에서 제외한다. 시뮬레이터 실행 및 속도별 결과 동일성 확인은 [TODO 31](../../../Docs/Codex/TODO.md#31-핵심-재미와-밸런스)에 남아 있다.

@@ -528,6 +528,9 @@ URunSaveGame* URunStateSubsystem::CreateSaveData() const
 bool URunStateSubsystem::WriteSaveData(URunSaveGame* Save, FText& OutError)
 {
     if (!ValidateSave(Save, OutError)) return false;
+    // Keep full checkpoint validation while the measurement commandlet publishes only in memory.
+    // 측정 commandlet은 전체 체크포인트 검증을 유지하며 메모리에만 게시합니다.
+    if (ProjectARandom::IsBalanceSimulation()) return !bManagedRun;
     if (!bManagedRun)
     {
         if (FRunSaveFormat::IsManaged(Save->Version)) return false;
@@ -1144,18 +1147,18 @@ bool URunStateSubsystem::InitializeStandaloneRun(const TArray<FRunPartyMember>& 
     FRunIdentityData Identity;
     Identity.SchemaVersion = URunIdentityLibrary::CurrentSchemaVersion;
     Identity.Origin = ERunIdentityOrigin::LocalDevelopment;
-    Identity.RunId = FGuid::NewGuid();
+    Identity.RunId = ProjectARandom::NewRunGuid();
     Identity.HostEpoch = 1;
     FRunParticipantData& Participant = Identity.OriginalParticipants.AddDefaulted_GetRef();
     Participant.JoinOrdinal = 1;
     Participant.AccountId.Provider = TEXT("Development");
-    Participant.AccountId.Subject = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    Participant.AccountId.Subject = ProjectARandom::NewRunGuid().ToString(EGuidFormats::Digits);
     Identity.HostAccountId = Participant.AccountId;
     TArray<FRunPartyMember> OwnedMembers = Members;
     for (FRunPartyMember& Member : OwnedMembers)
     {
         Member.bPlayerControlled = Member.bCreated && Member.SlotIndex == PlayerSlot;
-        Member.CharacterId = Member.bCreated ? FGuid::NewGuid() : FGuid();
+        Member.CharacterId = Member.bCreated ? ProjectARandom::NewRunGuid() : FGuid();
         Member.OwnerAccountId = Member.bCreated ? Participant.AccountId : FRunAccountId();
     }
     return InitializeIdentifiedRun(OwnedMembers, Identity, bTarget, OutError);

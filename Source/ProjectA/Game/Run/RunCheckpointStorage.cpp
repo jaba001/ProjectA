@@ -1,4 +1,5 @@
 #include "Game/Run/RunCheckpointStorage.h"
+#include "Types/ProjectARandom.h"
 #include "Game/Run/RunContentMigration.h"
 #include "Game/Run/RunSaveGame.h"
 #include "GameFramework/SaveGame.h"
@@ -77,6 +78,7 @@ bool FRunCheckpointStorage::IsSafeSlotName(const FString& Slot)
 
 bool FRunCheckpointStorage::Save(USaveGame* SaveGame, const FString& Slot, FText& OutError)
 {
+    if (ProjectARandom::IsBalanceSimulation()) return false;
     OutError = NSLOCTEXT("RunCheckpoint", "Write", "진행을 저장하지 못했습니다. 이전 확정 저장을 유지합니다.");
     if (!IsSafeSlotName(Slot) || !IsValid(SaveGame))
     {
@@ -132,6 +134,7 @@ bool FRunCheckpointStorage::Save(USaveGame* SaveGame, const FString& Slot, FText
 
 USaveGame* FRunCheckpointStorage::Load(const FString& Slot, FText& OutError, FString* OutToken)
 {
+    if (ProjectARandom::IsBalanceSimulation()) return nullptr;
     if (OutToken) OutToken->Reset();
     OutError = NSLOCTEXT("RunCheckpoint", "Read", "이어할 저장이 없거나 파일이 손상되었습니다.");
     if (!IsSafeSlotName(Slot))
@@ -164,6 +167,7 @@ USaveGame* FRunCheckpointStorage::Load(const FString& Slot, FText& OutError, FSt
 
 bool FRunCheckpointStorage::DeleteIfUnchanged(const FString& Slot, const FString& ExpectedToken, FText& OutError)
 {
+    if (ProjectARandom::IsBalanceSimulation()) return false;
     OutError = NSLOCTEXT("RunCheckpoint", "Delete", "진행을 포기하지 못했습니다. 기존 저장을 유지하며 다시 시도할 수 있습니다.");
     if (!IsSafeSlotName(Slot) || ExpectedToken.IsEmpty()) return false;
 #if !PLATFORM_WINDOWS

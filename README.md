@@ -31,6 +31,7 @@ README에는 개요·실행·빌드·문서 안내만 둔다. 기능별 상세 �
 | `/Game/User_JeHoon/LEVEL/Development/DebugCombat` | 전투 디버그. 스킬·장비·캐릭터/체력·스킬 타이밍 탭을 제공한다. [상세](Docs/Codex/PROJECT_PLAN.md#4-2-전투-디버그-레벨) |
 | `/Game/User_JeHoon/LEVEL/Environment/` | 환경 12맵과 지하 던전 2맵의 비교 레벨. [맵 목록](Docs/Codex/PROJECT_PLAN.md#4-4-환경-비교-레벨) |
 | 독립 게임 창 2개 → 멀티플레이 | 개발 협동. 첫 창이 방을 만들고 두 번째 창이 `127.0.0.1:7777`로 참가한다. [실행 명령](Docs/Codex/MULTIPLAYER.md#11-개발-실행-참조) |
+| `UnrealEditor-Cmd -run=BalanceSim -nullrhi` | 밸런스 측정용 자동 Run. [인자·실행 명령](Source/ProjectAEditor/Scripts/README.md#34-밸런스-측정-commandlet). 사용자 실행 확인 대기. |
 | `-CustomConfig=SteamDev -ProjectASteamDev` | Win64 Development 게임 전용의 Steam 480 연결 확인 패널. 기본 설정은 Steam 비활성이다. |
 
 외부 에셋 팩은 Git에 포함되지 않으므로 다른 PC에서는 같은 경로에 따로 설치해야 한다. [에셋 구성](Docs/Codex/PROJECT_PLAN.md#6-gameplay-에셋과-배치)

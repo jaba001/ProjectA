@@ -722,6 +722,18 @@ JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Desig
 
 메뉴 WBP 3종은 `UI/MainMenu`, 검증 사본은 `Validation/T12`에 둔다. `ProjectA.Menu.AssetContracts -T12GeneratedAssets`로 생성본을 검사한다. 지원 위젯·명세·옵션은 [UI 명세](UI_README.md), 실행 명령·제약은 [에셋 도구](../../Source/ProjectAEditor/Scripts/README.md)를 따른다.
 
+### 7-1 밸런스 측정 commandlet
+
+`Source/ProjectAEditor/Commandlets/BalanceSimCommandlet`은 기본 Run·EncounterManager·서버 동료 AI·실제 충돌/GAS/AP/SAP를 재사용한다. Editor commandlet의 범위 안에서만 결정적 시드·전원 AI·메모리 체크포인트 저장을 적용하며 런타임 모듈에 Editor 의존성을 추가하지 않는다. CSV·난이도·밸런스 값은 유지한다.
+
+프로젝트 루트의 PowerShell 실행 한 줄:
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "$PWD\ProjectA.uproject" -run=BalanceSim -nullrhi -nosound -unattended -nop4 -NoTraceServer -nowrite -Players=1 -Difficulty=Medium -Repeats=2 -Seed=31001 -TimeScale=20 -MaxSteps=80
+```
+
+기본 진행은 최대 80단계다. `Difficulty=Low|Medium|High|Random`, `Players=1..4`, 반복·시드·`TimeScale`·`MaxSteps`·Run당 실제 제한 `MaxSeconds`를 지원한다. 시간 배율은 고정 1/60초 월드 tick의 실제 대기만 줄인다. 결과는 `Saved/BalanceSim/<UTC 타임스탬프_UUID>/{runs,combats}.csv`다. 중단 결과는 자연 패배와 구분하며 골드·상점 권한은 기본 싱글플레이 규칙을 유지한다. 정책·열 의미·종료 코드는 [도구 안내](../../Source/ProjectAEditor/Scripts/README.md#34-밸런스-측정-commandlet), 남은 실행 확인은 [TODO 31](TODO.md#31-핵심-재미와-밸런스)을 따른다.
+
 ## 8 현재 한계와 보존 대상
 
 - 새 싱글의 PvE/로컬 Snapshot 20전투·60선택과 시험 편성·성장·보상·회복/부활·전투 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 구현 범위다. 기존 2/10전투 저장과 개발 협동 10전투 경로는 보존한다. 미지원 240종은 판매 목록에서 제거했으며 기존 보유품은 유지한다. 직업별 고유 스킬·최종 밸런스·추가 비무기 콘텐츠·장비 속도 보정·Snapshot 장비 연결은 미구현이며 후속 작업은 [TODO](TODO.md), 실행 검수 결과는 [HISTORY](HISTORY.md)를 따른다.

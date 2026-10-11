@@ -137,5 +137,9 @@ P2P 연결과 중앙 저장·계정 인증·MMR 검증은 각각 필요하다. �
 
 2026-10-11 사용자가 직접 진행하기로 하고 보류했다. 사용자 요청 전에는 밸런스 수치나 난이도 곡선을 임의로 조정하지 않는다.
 
+- [ ] 측정 도구 1인·중·2회: 프로젝트 루트 PowerShell에서 `& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "$PWD\ProjectA.uproject" -run=BalanceSim -nullrhi -nosound -unattended -nop4 -NoTraceServer -nowrite -Players=1 -Difficulty=Medium -Repeats=2 -Seed=31001 -TimeScale=20 -MaxSteps=80` 실행.
+- [ ] 측정 도구 4인·상·1회: `& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "$PWD\ProjectA.uproject" -run=BalanceSim -nullrhi -nosound -unattended -nop4 -NoTraceServer -nowrite -Players=4 -Difficulty=High -Repeats=1 -Seed=31001 -TimeScale=20 -MaxSteps=80` 실행.
+- 기대 결과: 각 출력 폴더에 runs.csv 2행/1행과 실제 종료 전투별 combats.csv가 생성되고 완주·자연 패배가 기록되며 기존 저장은 보존된다. 같은 시드·정책의 TimeScale=1/20 결과(실제 시간 제외) 비교와 짧은 MaxSteps의 StepLimit도 확인한다. [구현·컴파일 이력](History/2026-10-10_11.md#9-60-2026-10-11-밸런스-측정-run-commandlet); 실행·밸런스 검증은 미완료다.
+
 - [ ] 정상 80단계 완주와 최종 밸런스: 정상 메뉴에서 새 Run을 시작해 강제 승리 없이 60선택·20전투를 완료한다. 2026-10-08 최신 관측은 9전투·30선택 뒤 `TargetCombat_10`에서 자연 패배였다. [이전 확인 범위](History/2026-10-07_09.md#9-33-2026-10-08-위임-실행-검수와-협동-보완)
 - [ ] 1~4인 시작 시 후반 상 난이도의 처치 라운드 수·아군 생존률·회복 부담을 기록하고 [난이도 규칙](PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터)을 조정한다.
