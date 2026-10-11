@@ -16,6 +16,7 @@ README에는 개요·실행·빌드·문서 안내만 둔다. 기능별 상세 �
 | 저장 | 전투 밖에서는 일반 저장, 전투 중에는 Ready 경계마다 체크포인트를 쓴다. 저장에 실패하면 준비 완료를 막고 원본을 보존한다. 이전 저장의 카탈로그와 확정 결과도 보존한다. | [저장 경계](Docs/Codex/PROJECT_PLAN.md#5-저장과-멀티플레이-연결-경계) |
 | 멀티플레이 | 같은 PC에서 Listen Server로 2·4인 개발 협동을 할 수 있다. 명시적인 Steam 480 개발 연결 시제품이 있다. PlayFab 연동·중앙 저장·실제 2PC 확인은 준비 대기다. | [멀티플레이 계약](Docs/Codex/MULTIPLAYER.md) |
 | UI·현지화 | DemonicUI 공통 테마, 1920×1080 기준 DPI, 한국어·English 설정, Async Loading Screen을 사용한다. | [UI 구조](Docs/Codex/UI_README.md) |
+| 백과사전 | 메인메뉴에서 장비·스킬·직업·상태이상·전투 공식·모험·몬스터를 탭과 검색으로 조회한다. | [화면·데이터 기준](Docs/Codex/UI_README.md#8-4-시작-메뉴-백과사전) |
 
 남은 작업과 사용자 확인 항목은 [TODO](Docs/Codex/TODO.md)에서 관리한다.
 

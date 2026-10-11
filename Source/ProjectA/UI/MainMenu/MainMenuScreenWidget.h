@@ -75,6 +75,9 @@ protected:
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> Button_Surrender;
 
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> Button_Encyclopedia;
+
     // Options button optionally bound from a designer widget.
     // 디자이너 위젯에서 선택적으로 바인딩되는 옵션 버튼입니다.
     // T12: Verified Button_Options binding in the saved Designer WBP.
@@ -105,6 +108,7 @@ private:
     void EnsureCodeGeneratedLayout();
 
     void EnsureContinueRow();
+    void EnsureEncyclopediaButton();
     void RefreshSavedActions();
     void HandleSurrendered();
 
@@ -141,6 +145,9 @@ private:
 
     UFUNCTION()
     void HandleOptionsClicked();
+
+    UFUNCTION()
+    void HandleEncyclopediaClicked();
 
     UFUNCTION()
     void HandleQuitClicked();

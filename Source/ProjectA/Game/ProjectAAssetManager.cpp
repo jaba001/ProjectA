@@ -9,12 +9,28 @@
 #include "Engine/Texture2D.h"
 #include "LoadingScreenSettings.h"
 #include "Misc/PackageName.h"
+#include "UI/MainMenu/EncyclopediaCatalog.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogProjectAAssetManager, Log, All);
 
 void UProjectAAssetManager::ModifyCook(TConstArrayView<const ITargetPlatform*> TargetPlatforms, TArray<FName>& PackagesToCook, TArray<FName>& PackagesToNeverCook)
 {
     Super::ModifyCook(TargetPlatforms, PackagesToCook, PackagesToNeverCook);
+    // Keep every live encyclopedia definition available in packages without cooking source effect packs.
+    // 원본 효과 팩 전체를 쿠킹하지 않고 백과사전의 유효 정의를 패키지에 포함합니다.
+    TArray<FSoftObjectPath> EncyclopediaAssets;
+    EncyclopediaCatalog::GetSkillPaths(EncyclopediaAssets);
+    EncyclopediaAssets.AddUnique(EncyclopediaCatalog::DefaultPartyPath());
+    for (const FSoftObjectPath& Asset : EncyclopediaAssets)
+    {
+        const FName Package = Asset.GetLongPackageFName();
+        if (PackagesToNeverCook.Contains(Package) || !FPackageName::DoesPackageExist(Package.ToString()))
+        {
+            UE_LOG(LogProjectAAssetManager, Error, TEXT("Encyclopedia definition is missing or excluded from cooking: %s"), *Package.ToString());
+            continue;
+        }
+        PackagesToCook.AddUnique(Package);
+    }
     // Cook the configured loading backgrounds explicitly, without including the entire source pack.
     // 원본 팩 전체를 포함하지 않고 설정된 로딩 배경만 명시적으로 쿠킹합니다.
     const ULoadingScreenSettings* LoadingSettings = GetDefault<ULoadingScreenSettings>();

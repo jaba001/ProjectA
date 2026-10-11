@@ -1,4 +1,5 @@
 #include "UI/MainMenu/MainMenuScreenWidget.h"
+#include "UI/MainMenu/EncyclopediaWidget.h"
 #include "ProjectA.h"
 
 #include "Blueprint/WidgetTree.h"
@@ -54,6 +55,12 @@ void UMainMenuScreenWidget::NativeOnInitialized()
     }
 
     EnsureContinueRow();
+    EnsureEncyclopediaButton();
+    if (Button_Encyclopedia)
+    {
+        Button_Encyclopedia->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleEncyclopediaClicked);
+        if (UTextBlock* Label = Cast<UTextBlock>(Button_Encyclopedia->GetContent())) Label->SetText(NSLOCTEXT("MainMenu", "Encyclopedia", "백과사전"));
+    }
     if (Button_Surrender) Button_Surrender->OnClicked.AddUniqueDynamic(this, &UMainMenuScreenWidget::HandleSurrenderClicked);
 
     if (Button_Options)
@@ -352,6 +359,28 @@ void UMainMenuScreenWidget::ConfigureBackgroundImage()
 
     Image_Background->SetVisibility(ESlateVisibility::Visible);
     UDemonicUITheme::Get().StyleBackgroundImage(Image_Background);
+}
+
+void UMainMenuScreenWidget::EnsureEncyclopediaButton()
+{
+    if (Button_Encyclopedia || !WidgetTree || !Button_NewGame) return;
+    UVerticalBox* Menu = Cast<UVerticalBox>(Button_NewGame->GetParent());
+    if (!Menu) return;
+    const int32 Index = Button_Options && Button_Options->GetParent() == Menu ? Menu->GetChildIndex(Button_Options) : Menu->GetChildrenCount();
+    Button_Encyclopedia = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_Encyclopedia"));
+    CreateButtonText(Button_Encyclopedia, NSLOCTEXT("MainMenu", "Encyclopedia", "백과사전"));
+    UVerticalBoxSlot* EncyclopediaSlot = CastChecked<UVerticalBoxSlot>(Menu->InsertChildAt(Index, Button_Encyclopedia));
+    EncyclopediaSlot->SetHorizontalAlignment(HAlign_Fill);
+    EncyclopediaSlot->SetPadding(FMargin(0.0f, 4.0f));
+}
+
+void UMainMenuScreenWidget::HandleEncyclopediaClicked()
+{
+    if (!IsActivated()) return;
+    if (AMainMenuPlayerController* Controller = Cast<AMainMenuPlayerController>(GetOwningPlayer()))
+    {
+        if (UMainMenuRootWidget* Root = Controller->GetMainMenuRootWidget()) Root->PushMenuScreen(UEncyclopediaWidget::StaticClass());
+    }
 }
 
 UButton* UMainMenuScreenWidget::CreateMenuButton(UVerticalBox* ParentBox, const FText& ButtonText)

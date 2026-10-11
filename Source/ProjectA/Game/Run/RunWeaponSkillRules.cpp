@@ -77,6 +77,11 @@ bool RunWeaponSkillRules::ResolveSkill(const FSoftObjectPath& Path, const FRunWe
     return true;
 }
 
+bool RunWeaponSkillRules::IsEligibleCandidate(const FRunWeaponSkillCandidate& Candidate, const FRunItemDefinition& Item, const FRunWeaponRarityRule& Rarity, const FRunWeaponSkillRulesState& State)
+{
+    return MatchesCandidate(Candidate, Item, Rarity, State);
+}
+
 bool RunWeaponSkillRules::Validate(const FRunWeaponSkillRulesState& State, FText& OutError)
 {
     if (!RunSkillBalance::Validate(State, OutError)) return false;
