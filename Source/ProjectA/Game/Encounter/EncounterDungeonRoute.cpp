@@ -33,6 +33,8 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
     Pillars = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Pillars"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
     CubeMesh = Cube.Object;
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> StoneWall(TEXT("/Game/Dungeon_Modular_V1/Materials/M_Stone_Wall_Master_01.M_Stone_Wall_Master_01"));
+    WallMaterial = StoneWall.Object;
     UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars};
     for (UInstancedStaticMeshComponent* Shape : Shapes)
     {
@@ -143,8 +145,10 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
         ApplyMaterial(Floor, FLinearColor(0.21f, 0.19f, 0.16f));
         ApplyMaterial(Ceiling, FLinearColor(0.14f, 0.13f, 0.12f));
         ApplyMaterial(Mortar, FLinearColor(0.055f, 0.05f, 0.04f));
-        ApplyMaterial(WallBlocks, FLinearColor(0.29f, 0.265f, 0.22f));
-        ApplyMaterial(Pillars, FLinearColor(0.23f, 0.205f, 0.17f));
+        // Keep the original textured stone on walls and pillars when the NPC prototype material changes.
+        // NPC 프로토타입 재질이 바뀌어도 벽과 기둥에는 원본 석재 텍스처를 유지합니다.
+        WallBlocks->SetMaterial(0, WallMaterial);
+        Pillars->SetMaterial(0, WallMaterial);
     }
     if (bGeometryPrepared) return;
 

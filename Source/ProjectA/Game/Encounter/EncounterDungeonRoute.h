@@ -76,6 +76,8 @@ private:
     TObjectPtr<UInstancedStaticMeshComponent> Pillars;
     UPROPERTY()
     TObjectPtr<UStaticMesh> CubeMesh;
+    UPROPERTY()
+    TObjectPtr<UMaterialInterface> WallMaterial;
     UPROPERTY(Transient)
     TObjectPtr<UMaterialInterface> RouteMaterial;
     UPROPERTY(Transient)
