@@ -46,6 +46,7 @@ public:
     void ResetAtJunction();
     bool StartTravel(int32 Direction);
     bool StartExitTravel();
+    bool StartLoopEntrance();
     bool IsTraveling() const;
     AEncounterPrototypeStage* GetPresentedStage() const;
     void FinishAtStage();
@@ -87,6 +88,8 @@ private:
     UPROPERTY()
     TObjectPtr<UInstancedStaticMeshComponent> RightDoors;
     UPROPERTY()
+    TObjectPtr<UInstancedStaticMeshComponent> DoorSeals;
+    UPROPERTY()
     TObjectPtr<UStaticMesh> CubeMesh;
     UPROPERTY()
     TObjectPtr<UMaterialInterface> WallMaterial;
@@ -106,5 +109,6 @@ private:
     bool bGeometryPrepared = false;
     bool bTraveling = false;
     bool bExiting = false;
+    bool bLoopEntering = false;
     bool bPresentationVisible = true;
 };

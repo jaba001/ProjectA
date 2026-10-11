@@ -75,6 +75,7 @@ TSet<FIntPoint> EncounterDungeonLayout::GetFloorCells(int32 LayoutVariant)
             }
         }
         Cells.Add(FIntPoint(Room.X + 4, Room.Y));
+        Cells.Add(FIntPoint(Room.X + 5, Room.Y));
     }
     return Cells;
 }
@@ -100,14 +101,22 @@ FVector EncounterDungeonLayout::GetDoorCenter(int32 Direction, int32 LayoutVaria
     return Path.Last() + FVector((bExit ? 3.5f : -0.5f) * CellSize, 0.f, -EyeHeight);
 }
 
+FVector EncounterDungeonLayout::GetLoopDoorCenter(int32 Direction, int32 LayoutVariant)
+{
+    const TArray<FVector> Path = GetPath(Direction, LayoutVariant);
+    if (Path.IsEmpty()) return FVector::ZeroVector;
+    return Path.Last() + FVector(5.5f * CellSize, 0.f, -EyeHeight);
+}
+
 TArray<FVector> EncounterDungeonLayout::GetExitPath(int32 Direction, int32 LayoutVariant)
 {
     const TArray<FVector> Path = GetPath(Direction, LayoutVariant);
     if (Path.IsEmpty()) return {};
     const FVector Arrival = Path.Last();
-    // Pass beside the NPC and service props before aligning with the rear doorway.
-    // NPC와 서비스 소품 옆으로 지나간 뒤 뒤쪽 문에 정렬합니다.
-    return {Arrival, Arrival + FVector(CellSize, 250.f, 0.f), Arrival + FVector(3.f * CellSize, 250.f, 0.f), Arrival + FVector(3.f * CellSize, 0.f, 0.f), GetDoorCenter(Direction, LayoutVariant, true) + FVector(160.f, 0.f, EyeHeight)};
+    // Walk straight through the rear doorway and conceal the section swap behind the final closed door.
+    // 후문을 지나 직진하고 마지막 닫힌 문으로 구간 교환 지점을 가립니다.
+    const FVector RearDoor = GetDoorCenter(Direction, LayoutVariant, true) + FVector(0.f, 0.f, EyeHeight);
+    return {Arrival, RearDoor - FVector(220.f, 0.f, 0.f), GetLoopDoorCenter(Direction, LayoutVariant) + FVector(-DoorCoverDistance, 0.f, EyeHeight)};
 }
 
 FText EncounterDungeonLayout::GetDirectionLabel(int32 Index)

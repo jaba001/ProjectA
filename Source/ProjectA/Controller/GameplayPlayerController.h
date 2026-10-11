@@ -167,6 +167,7 @@ private:
     bool bWorldEncounterPresentation = false;
     bool bEncounterPresentationTransition = false;
     bool bEncounterExitTransition = false;
+    bool bNeedsLoopEntrance = false;
     bool bPresentationEnding = false;
 
     UPROPERTY(Transient)

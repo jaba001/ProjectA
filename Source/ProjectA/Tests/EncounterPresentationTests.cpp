@@ -231,8 +231,8 @@ bool FEncounterDungeonDoorLifecycleTest::RunTest(const FString& Parameters)
     for (int32 Variant = 0; Variant < EncounterDungeonLayout::VariantCount; ++Variant)
     {
         TestTrue(TEXT("Every supported layout prepares its cached scenery."), Route->ConfigureLayout(Variant));
-        TestEqual(TEXT("Each of three rooms has a front and rear pair of original door leaves."), Route->LeftDoors->GetInstanceCount(), 6);
-        TestEqual(TEXT("The left and right door instances remain paired."), Route->RightDoors->GetInstanceCount(), 6);
+        TestEqual(TEXT("Three doors per room and one matching section entrance have paired original leaves."), Route->LeftDoors->GetInstanceCount(), 10);
+        TestEqual(TEXT("The left and right door instances remain paired."), Route->RightDoors->GetInstanceCount(), 10);
         for (int32 Direction = 0; Direction < 3; ++Direction)
         {
             Route->ResetAtJunction();
@@ -255,6 +255,8 @@ bool FEncounterDungeonDoorLifecycleTest::RunTest(const FString& Parameters)
             if (!TestTrue(TEXT("Departure reuses the current room instead of resetting to the junction."), Route->StartExitTravel())) continue;
             Route->Tick(10.f);
             TestTrue(TEXT("Departure finishes beyond the rear door and preserves the NPC until the cache swap."), !Route->IsTraveling() && Route->GetPresentedStage() == Stage && Route->Camera->GetRelativeLocation().X > EncounterDungeonLayout::GetDoorCenter(Direction, Variant, true).X && Completions == Before + 2);
+            const FVector LoopDoor = EncounterDungeonLayout::GetLoopDoorCenter(Direction, Variant);
+            TestTrue(TEXT("Departure remains on the center line and stops in front of the closed loop door."), Route->Camera->GetRelativeLocation().Y == LoopDoor.Y && FMath::IsNearlyEqual(LoopDoor.X - Route->Camera->GetRelativeLocation().X, EncounterDungeonLayout::DoorCoverDistance));
             Route->Tick(1.f);
             TestEqual(TEXT("An idle frame cannot repeat a completed departure callback."), Completions, Before + 2);
             Route->FinishAtStage();
@@ -268,8 +270,19 @@ bool FEncounterDungeonDoorLifecycleTest::RunTest(const FString& Parameters)
             Controller->FadeEncounterExit(OldGeneration);
             Controller->FinishEncounterExit(OldGeneration);
             TestTrue(TEXT("Cancellation invalidates old exit callbacks and stops the cached route."), Controller->PresentationGeneration != OldGeneration && !Controller->bEncounterExitTransition && !Controller->bEncounterPresentationTransition && !Route->IsTraveling() && !Route->GetPresentedStage());
+            TestTrue(TEXT("The next section opens its matching doorway without an NPC stage."), Route->StartLoopEntrance());
+            const FVector EntranceDoor = Route->DoorCenters[EncounterDungeonLayout::LoopEntranceDoorIndex];
+            TestTrue(TEXT("The incoming door begins at the same distance and facing as the outgoing closed door."), FMath::IsNearlyEqual(EntranceDoor.X - Route->Camera->GetRelativeLocation().X, EncounterDungeonLayout::DoorCoverDistance) && Route->Camera->GetRelativeRotation().IsNearlyZero());
+            Route->Tick(0.3f);
+            TestTrue(TEXT("Door opening finishes before the camera crosses into the new junction."), Route->IsTraveling() && Route->Camera->GetRelativeLocation().X < EntranceDoor.X);
+            Route->Tick(10.f);
+            TestTrue(TEXT("A frame hitch completes the incoming doorway once at the ordinary junction."), !Route->IsTraveling() && Route->Camera->GetRelativeLocation().Equals(FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)) && Completions == Before + 3);
+            TestTrue(TEXT("An incoming doorway can be cancelled and cannot continue from stale travel segments."), Route->StartLoopEntrance());
+            Route->ResetAtJunction();
+            Route->Tick(10.f);
+            TestEqual(TEXT("Cancellation cannot replay an incoming door completion."), Completions, Before + 3);
             Route->SetPresentationVisible(false);
-            TestFalse(TEXT("Prepared or hidden rooms hide their doors too."), Route->LeftDoors->IsVisible() || Route->RightDoors->IsVisible());
+            TestFalse(TEXT("Prepared or hidden rooms hide their doors and seam covers too."), Route->LeftDoors->IsVisible() || Route->RightDoors->IsVisible() || Route->DoorSeals->IsVisible());
             Route->SetPresentationVisible(true);
         }
     }

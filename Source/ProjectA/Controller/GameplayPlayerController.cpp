@@ -561,6 +561,7 @@ void AGameplayPlayerController::ResetEncounterPresentation()
     bWorldEncounterPresentation = false;
     bEncounterPresentationTransition = false;
     bEncounterExitTransition = false;
+    bNeedsLoopEntrance = false;
 }
 
 bool AGameplayPlayerController::PrepareDungeonRoutes(const FGameplayViewState& View)
@@ -725,12 +726,26 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
     }
     else
     {
+        const bool bLoopEntrance = bNeedsLoopEntrance;
+        bNeedsLoopEntrance = false;
         if (bDungeonReady)
         {
             DungeonRoute->ResetAtJunction();
             PresentationViewTarget = DungeonRoute.Get();
             bWorldEncounterPresentation = true;
             SetViewTargetWithBlend(DungeonRoute.Get(), 0.f);
+            if (bLoopEntrance)
+            {
+                bEncounterPresentationTransition = true;
+                DungeonRoute->OnTravelFinished.AddUObject(this, &AGameplayPlayerController::FinishEncounterPresentation, PresentationGeneration);
+                if (DungeonRoute->StartLoopEntrance())
+                {
+                    if (PlayerCameraManager) PlayerCameraManager->StartCameraFade(1.f, 0.f, 0.18f, FLinearColor::Black, false, false);
+                    return;
+                }
+                DungeonRoute->OnTravelFinished.RemoveAll(this);
+                bEncounterPresentationTransition = false;
+            }
             if (PlayerCameraManager) PlayerCameraManager->StartCameraFade(1.f, 0.f, 0.3f, FLinearColor::Black, false, false);
             return;
         }
@@ -764,6 +779,7 @@ void AGameplayPlayerController::FinishEncounterExit(uint32 Generation)
     // Swap cached sections behind the closed fade and resume from the latest authoritative view.
     // 페이드가 닫힌 상태에서 캐시 구간을 교환하고 최신 권위 뷰에서 표시를 재개합니다.
     ResetEncounterPresentation();
+    bNeedsLoopEntrance = true;
     RefreshGameplayFlow();
 }
 

@@ -50,8 +50,11 @@ bool FEncounterDungeonLayoutGeometryTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("The entrance lies before arrival and the rear doorway lies beyond the NPC."), Entrance.X < Path.Last().X && Exit.X > StageLocation.X && Entrance.Y == StageLocation.Y && Exit.Y == StageLocation.Y);
             const TArray<FVector> ExitPath = EncounterDungeonLayout::GetExitPath(Direction, Variant);
             if (!TestTrue(TEXT("Departure starts at the saved arrival pose and crosses the rear doorway at eye height."), ExitPath.Num() >= 2 && ExitPath[0].Equals(Path.Last()) && ExitPath.Last().X > Exit.X && ExitPath.Last().Y == Exit.Y)) return false;
+            const FVector LoopDoor = EncounterDungeonLayout::GetLoopDoorCenter(Direction, Variant);
+            TestTrue(TEXT("Departure finishes close to a closed continuation door before any end wall is visible."), ExitPath.Last().X < LoopDoor.X && FMath::IsNearlyEqual(LoopDoor.X - ExitPath.Last().X, EncounterDungeonLayout::DoorCoverDistance));
             for (int32 Index = 1; Index < ExitPath.Num(); ++Index)
             {
+                TestTrue(TEXT("Every departure segment moves straight forward without a sideways detour."), ExitPath[Index].X > ExitPath[Index - 1].X && ExitPath[Index].Y == ExitPath[0].Y);
                 const int32 Samples = FMath::CeilToInt(FVector::Distance(ExitPath[Index - 1], ExitPath[Index]) / 20.f);
                 for (int32 Sample = 0; Sample <= Samples; ++Sample)
                 {
@@ -62,6 +65,11 @@ bool FEncounterDungeonLayoutGeometryTest::RunTest(const FString& Parameters)
             Destinations.Add(StageCell);
         }
         TestEqual(TEXT("The three directions retain three distinct NPC rooms."), Destinations.Num(), 3);
+    }
+    for (const float AspectRatio : {4.f / 3.f, 16.f / 9.f, 21.f / 9.f})
+    {
+        const float HalfHeight = FMath::Tan(FMath::DegreesToRadians(40.f)) * (EncounterDungeonLayout::DoorCoverDistance + 22.f);
+        TestTrue(TEXT("The closed-door seam cover fills the terminal view for supported aspect ratios."), HalfHeight * AspectRatio < 140.f && HalfHeight < FMath::Min(EncounterDungeonLayout::EyeHeight, 300.f - EncounterDungeonLayout::EyeHeight));
     }
     return true;
 }

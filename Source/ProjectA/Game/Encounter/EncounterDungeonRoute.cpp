@@ -33,13 +33,14 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
     Pillars = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Pillars"));
     LeftDoors = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("LeftDoors"));
     RightDoors = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("RightDoors"));
+    DoorSeals = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("DoorSeals"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
     CubeMesh = Cube.Object;
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> StoneWall(TEXT("/Game/Dungeon_Modular_V1/Materials/M_Stone_Wall_Master_01.M_Stone_Wall_Master_01"));
     WallMaterial = StoneWall.Object;
     static ConstructorHelpers::FObjectFinder<UStaticMesh> LeftDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_L.MOD_Gateway_Door_01_large_door_L"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> RightDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_R.MOD_Gateway_Door_01_large_door_R"));
-    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars};
+    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, DoorSeals};
     for (UInstancedStaticMeshComponent* Shape : Shapes)
     {
         Shape->SetupAttachment(RouteRoot);
@@ -50,6 +51,7 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
         Shape->SetCanEverAffectNavigation(false);
         Shape->SetCastShadow(true);
     }
+    if (LeftDoor.Object) DoorSeals->SetMaterial(0, LeftDoor.Object->GetMaterial(0));
     UInstancedStaticMeshComponent* Doors[] = {LeftDoors, RightDoors};
     for (int32 Index = 0; Index < 2; ++Index)
     {
@@ -93,6 +95,13 @@ void AEncounterDungeonRoute::SetDoorOpen(int32 Index, float Alpha)
         const FVector Offset = FVector(Sign * 68.f, 0.f, 150.f) - Bounds.GetCenter() * Scale;
         const FVector Hinge = DoorCenters[Index] + FVector(0.f, -Sign * 136.f, 0.f);
         Door->UpdateInstanceTransform(Index, FTransform(Rotation, Hinge + Rotation.RotateVector(Offset), Scale), false, true, true);
+    }
+    if (Index == EncounterDungeonLayout::LoopEntranceDoorIndex && DoorSeals->GetInstanceCount() > 3)
+    {
+        // Cover mesh seams at the matching closed-door pose and remove the cover as the next door opens.
+        // 일치하는 닫힌 문 구도에서 메시 틈을 가리고 다음 문이 열리면 가림판을 제거합니다.
+        const FVector Scale = Alpha > 0.f ? FVector::ZeroVector : FVector(0.04f, 2.8f, 3.f);
+        DoorSeals->UpdateInstanceTransform(3, FTransform(FQuat::Identity, DoorCenters[Index] + FVector(20.f, 0.f, 150.f), Scale), false, true, true);
     }
 }
 
@@ -152,7 +161,7 @@ void AEncounterDungeonRoute::SetPresentationVisible(bool bVisible)
     // 이후 생성하는 컴포넌트를 포함해 미리 준비한 구간의 조명까지 명시적으로 숨깁니다.
     bPresentationVisible = bVisible;
     SetActorHiddenInGame(!bVisible);
-    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, LeftDoors, RightDoors};
+    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, LeftDoors, RightDoors, DoorSeals};
     for (UInstancedStaticMeshComponent* Shape : Shapes) Shape->SetVisibility(bVisible);
     for (UPointLightComponent* Light : Lights)
     {
@@ -163,7 +172,7 @@ void AEncounterDungeonRoute::SetPresentationVisible(bool bVisible)
 
 void AEncounterDungeonRoute::ClearGeometry()
 {
-    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, LeftDoors, RightDoors};
+    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, LeftDoors, RightDoors, DoorSeals};
     for (UInstancedStaticMeshComponent* Shape : Shapes) Shape->ClearInstances();
     DoorCenters.Reset();
     for (UPointLightComponent* Light : Lights)
@@ -206,6 +215,12 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
     const float WallHeight = EncounterDungeonLayout::WallHeight;
     const FIntPoint Neighbors[] = {FIntPoint(1, 0), FIntPoint(-1, 0), FIntPoint(0, 1), FIntPoint(0, -1)};
     TSet<FIntPoint> PillarCorners;
+    TSet<FIntPoint> LoopExitCells;
+    for (int32 Direction = 0; Direction < 3; ++Direction)
+    {
+        const FVector DoorCenter = EncounterDungeonLayout::GetLoopDoorCenter(Direction, LayoutVariant);
+        LoopExitCells.Add(FIntPoint(FMath::RoundToInt(DoorCenter.X / CellSize - 0.5f), FMath::RoundToInt(DoorCenter.Y / CellSize)));
+    }
     for (const FIntPoint& Cell : Cells)
     {
         const FVector Center(Cell.X * CellSize, Cell.Y * CellSize, 0.f);
@@ -214,6 +229,7 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
         for (const FIntPoint& Neighbor : Neighbors)
         {
             if (Cells.Contains(Cell + Neighbor)) continue;
+            if (Neighbor == FIntPoint(1, 0) && LoopExitCells.Contains(Cell)) continue;
             const FVector Normal(Neighbor.X, Neighbor.Y, 0.f);
             const FVector Tangent(-Neighbor.Y, Neighbor.X, 0.f);
             const bool bAlongY = Neighbor.X != 0;
@@ -254,7 +270,13 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
     {
         AddDoorway(EncounterDungeonLayout::GetDoorCenter(Direction, LayoutVariant, false));
         AddDoorway(EncounterDungeonLayout::GetDoorCenter(Direction, LayoutVariant, true));
+        const FVector LoopDoor = EncounterDungeonLayout::GetLoopDoorCenter(Direction, LayoutVariant);
+        AddDoorway(LoopDoor);
+        AddBlock(DoorSeals, LoopDoor + FVector(20.f, 0.f, 150.f), FVector(4.f, 280.f, 300.f));
     }
+    const FVector LoopEntrance(-CellSize * 0.5f, 0.f, 0.f);
+    AddDoorway(LoopEntrance);
+    AddBlock(DoorSeals, LoopEntrance + FVector(20.f, 0.f, 150.f), FVector(4.f, 280.f, 300.f));
     bGeometryPrepared = true;
 }
 
@@ -335,7 +357,7 @@ bool AEncounterDungeonRoute::StartTravel(int32 Direction)
             ++TurnCount;
         }
         Segments.Add({Path[Index - 1], Path[Index], Facing, Facing, static_cast<float>(Delta.Size())});
-        if (Path[Index].Equals(DoorApproach)) Segments.Add({DoorApproach, DoorApproach, Facing, Facing, EncounterDungeonLayout::DoorOpenDuration, Direction * 2});
+        if (Path[Index].Equals(DoorApproach)) Segments.Add({DoorApproach, DoorApproach, Facing, Facing, EncounterDungeonLayout::DoorOpenDuration, Direction * EncounterDungeonLayout::DoorsPerRoom});
         TotalDistance += static_cast<float>(Delta.Size());
         CurrentRotation = Facing;
     }
@@ -378,11 +400,28 @@ bool AEncounterDungeonRoute::StartExitTravel()
     {
         const FQuat Facing = (Path[Index] - Path[Index - 1]).Rotation().Quaternion();
         if (!CurrentRotation.Equals(Facing, 0.001f)) TravelSegments.Add({Path[Index - 1], Path[Index - 1], CurrentRotation, Facing, 0.18f});
-        if (Index == Path.Num() - 1) TravelSegments.Add({Path[Index - 1], Path[Index - 1], Facing, Facing, EncounterDungeonLayout::DoorOpenDuration, StageDirection * 2 + 1});
+        if (Index == 2) TravelSegments.Add({Path[Index - 1], Path[Index - 1], Facing, Facing, EncounterDungeonLayout::DoorOpenDuration, StageDirection * EncounterDungeonLayout::DoorsPerRoom + 1});
         TravelSegments.Add({Path[Index - 1], Path[Index], Facing, Facing, static_cast<float>(FVector::Distance(Path[Index - 1], Path[Index])) / 700.f});
         CurrentRotation = Facing;
     }
     bExiting = true;
+    bTraveling = true;
+    SetActorTickEnabled(true);
+    return true;
+}
+
+bool AEncounterDungeonRoute::StartLoopEntrance()
+{
+    if (bTraveling || GetNetMode() == NM_DedicatedServer || !DoorCenters.IsValidIndex(EncounterDungeonLayout::LoopEntranceDoorIndex)) return false;
+    StopTravel();
+    const FVector Start = DoorCenters[EncounterDungeonLayout::LoopEntranceDoorIndex] + FVector(-EncounterDungeonLayout::DoorCoverDistance, 0.f, EncounterDungeonLayout::EyeHeight);
+    const FVector End(0.f, 0.f, EncounterDungeonLayout::EyeHeight);
+    Camera->SetRelativeLocation(Start);
+    Camera->SetRelativeRotation(FRotator::ZeroRotator);
+    Camera->SetFieldOfView(80.f);
+    SetDoorOpen(EncounterDungeonLayout::LoopEntranceDoorIndex, 0.f);
+    TravelSegments = {{Start, Start, FQuat::Identity, FQuat::Identity, EncounterDungeonLayout::DoorOpenDuration, EncounterDungeonLayout::LoopEntranceDoorIndex}, {Start, End, FQuat::Identity, FQuat::Identity, 0.6f}};
+    bLoopEntering = true;
     bTraveling = true;
     SetActorTickEnabled(true);
     return true;
@@ -397,6 +436,7 @@ void AEncounterDungeonRoute::StopTravel()
 {
     bTraveling = false;
     bExiting = false;
+    bLoopEntering = false;
     SetActorTickEnabled(false);
     TravelSegments.Reset();
     TravelSegmentIndex = 0;
@@ -407,8 +447,7 @@ void AEncounterDungeonRoute::FinishAtStage()
 {
     StopTravel();
     if (!IsValid(PresentedStage) || !PresentedStage->Camera) return;
-    SetDoorOpen(StageDirection * 2, 0.f);
-    SetDoorOpen(StageDirection * 2 + 1, 0.f);
+    for (int32 Index = 0; Index < EncounterDungeonLayout::DoorsPerRoom; ++Index) SetDoorOpen(StageDirection * EncounterDungeonLayout::DoorsPerRoom + Index, 0.f);
     Camera->SetWorldLocationAndRotation(PresentedStage->Camera->GetComponentLocation(), PresentedStage->Camera->GetComponentQuat());
     Camera->SetFieldOfView(PresentedStage->Camera->FieldOfView);
 }
@@ -417,7 +456,7 @@ void AEncounterDungeonRoute::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
     if (!bTraveling || !FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.f) return;
-    if (!IsValid(PresentedStage))
+    if (!bLoopEntering && !IsValid(PresentedStage))
     {
         StopTravel();
         OnTravelFinished.Broadcast();
@@ -442,7 +481,12 @@ void AEncounterDungeonRoute::Tick(float DeltaSeconds)
     }
     if (!TravelSegments.IsValidIndex(TravelSegmentIndex))
     {
-        if (bExiting) StopTravel();
+        if (bLoopEntering)
+        {
+            StopTravel();
+            SetDoorOpen(EncounterDungeonLayout::LoopEntranceDoorIndex, 0.f);
+        }
+        else if (bExiting) StopTravel();
         else FinishAtStage();
         OnTravelFinished.Broadcast();
     }
