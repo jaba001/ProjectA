@@ -52,6 +52,7 @@ public class ProjectA : ModuleRules
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "AssetRegistry", "ApplicationCore" });
+        PublicDependencyModuleNames.Add("DeveloperSettings");
         // Read the loading screen settings only when collecting editor cook dependencies.
         // 에디터의 쿠킹 의존성 수집에서만 로딩 화면 설정을 참조합니다.
         if (Target.bBuildEditor) PrivateDependencyModuleNames.Add("AsyncLoadingScreen");

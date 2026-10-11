@@ -23,6 +23,43 @@ int32 CombatAIPlanning::FindNearestEnemy(const FCombatRoundView& View, int32 Sou
     return Best;
 }
 
+namespace
+{
+    bool IsPlannableSkill(const FCombatRoundSkill* Skill)
+    {
+        return Skill && Skill->Kind != ECombatRoundSkillKind::Wait && !Skill->bRemainAtDestination;
+    }
+
+    FCombatRoundCommand BuildCommand(const FCombatRoundView& View, const CombatPlanValidation::FState& State, int32 UnitIndex, FName SkillId, const FCombatRoundSkill& Skill, int32 TargetIndex)
+    {
+        const FCombatRoundUnitView& Entry = View.Units[UnitIndex];
+        FCombatRoundCommand Command = Entry.Command;
+        Command.TargetUnitId = View.Units[TargetIndex].UnitId;
+        Command.TargetCoord = View.Units[TargetIndex].HomeCoord;
+        Command.SkillId = SkillId;
+        Command.DestinationCoord = Entry.HomeCoord;
+        if (Skill.Approach != ECombatRoundApproach::Tile) return Command;
+        int32 BestDistance = MAX_int32;
+        for (int32 X = 0; X < 4; ++X)
+        {
+            for (int32 Y = 0; Y < 4; ++Y)
+            {
+                const FIntPoint Coord(X, Y);
+                const int32* Occupant = State.Tiles.Find(Coord);
+                if (!Occupant || (*Occupant != INDEX_NONE && *Occupant != Entry.UnitId) || CombatPlanValidation::IsReservedByOther(State, Entry.UnitId, Coord)) continue;
+                const FIntPoint Offset = Coord - Command.TargetCoord;
+                const int32 Distance = FMath::Abs(Offset.X) + FMath::Abs(Offset.Y);
+                if (Distance < BestDistance)
+                {
+                    BestDistance = Distance;
+                    Command.DestinationCoord = Coord;
+                }
+            }
+        }
+        return Command;
+    }
+}
+
 FCombatRoundCommand CombatAIPlanning::ChooseCommand(const FCombatRoundView& View, const CombatPlanValidation::FState& State, int32 UnitIndex, TFunctionRef<bool(const FCombatRoundCommand&)> IsAllowed)
 {
     const FCombatRoundUnitView& Entry = View.Units[UnitIndex];
@@ -33,7 +70,7 @@ FCombatRoundCommand CombatAIPlanning::ChooseCommand(const FCombatRoundView& View
     for (FName SkillId : Entry.SkillIds)
     {
         const FCombatRoundSkill* Skill = CombatPlanValidation::FindSkill(State, SkillId);
-        if (!Skill || Skill->Kind == ECombatRoundSkillKind::Wait || Skill->bRemainAtDestination) continue;
+        if (!IsPlannableSkill(Skill)) continue;
         int32 TargetIndex = INDEX_NONE;
         double TargetDistance = TNumericLimits<double>::Max();
         for (int32 CandidateIndex = 0; CandidateIndex < View.Units.Num(); ++CandidateIndex)
@@ -48,33 +85,28 @@ FCombatRoundCommand CombatAIPlanning::ChooseCommand(const FCombatRoundView& View
             }
         }
         if (!View.Units.IsValidIndex(TargetIndex)) continue;
-        Command.TargetUnitId = View.Units[TargetIndex].UnitId;
-        Command.TargetCoord = View.Units[TargetIndex].HomeCoord;
-        Command.SkillId = SkillId;
-        Command.DestinationCoord = Entry.HomeCoord;
-        if (Skill->Approach == ECombatRoundApproach::Tile)
-        {
-            int32 BestDistance = MAX_int32;
-            for (int32 X = 0; X < 4; ++X)
-            {
-                for (int32 Y = 0; Y < 4; ++Y)
-                {
-                    const FIntPoint Coord(X, Y);
-                    const int32* Occupant = State.Tiles.Find(Coord);
-                    if (!Occupant || (*Occupant != INDEX_NONE && *Occupant != Entry.UnitId) || CombatPlanValidation::IsReservedByOther(State, Entry.UnitId, Coord)) continue;
-                    const FIntPoint Offset = Coord - Command.TargetCoord;
-                    const int32 Distance = FMath::Abs(Offset.X) + FMath::Abs(Offset.Y);
-                    if (Distance < BestDistance)
-                    {
-                        BestDistance = Distance;
-                        Command.DestinationCoord = Coord;
-                    }
-                }
-            }
-        }
+        Command = BuildCommand(View, State, UnitIndex, SkillId, *Skill, TargetIndex);
         if (IsAllowed(Command)) return Command;
         Command.SkillId = NAME_None;
         Command.DestinationCoord = Entry.HomeCoord;
     }
     return Command;
+}
+
+TArray<FCombatRoundCommand> CombatAIPlanning::CollectCommands(const FCombatRoundView& View, const CombatPlanValidation::FState& State, int32 UnitIndex, TFunctionRef<bool(const FCombatRoundCommand&)> IsAllowed)
+{
+    TArray<FCombatRoundCommand> Commands;
+    const FCombatRoundUnitView& Entry = View.Units[UnitIndex];
+    for (FName SkillId : Entry.SkillIds)
+    {
+        const FCombatRoundSkill* Skill = CombatPlanValidation::FindSkill(State, SkillId);
+        if (!IsPlannableSkill(Skill)) continue;
+        for (int32 CandidateIndex = 0; CandidateIndex < View.Units.Num(); ++CandidateIndex)
+        {
+            if (!CombatSkillExecution::IsValidEffectTarget(Entry.Unit, View.Units[CandidateIndex].Unit, *Skill)) continue;
+            const FCombatRoundCommand Candidate = BuildCommand(View, State, UnitIndex, SkillId, *Skill, CandidateIndex);
+            if (IsAllowed(Candidate)) Commands.Add(Candidate);
+        }
+    }
+    return Commands;
 }

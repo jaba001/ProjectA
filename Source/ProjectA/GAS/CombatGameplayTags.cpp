@@ -19,4 +19,12 @@ namespace ProjectACombatTags
     UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Beam, "Skill.Shape.Beam");
     UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Chain, "Skill.Shape.Chain");
     UE_DEFINE_GAMEPLAY_TAG(Event_Attack_Release, "Event.Attack.Release");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Burning, "Status.Burning", "Damage equal to the value at round end, then decays");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Poisoned, "Status.Poisoned", "Damage equal to the value at round end, then minus one");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Bleeding, "Status.Bleeding", "Damage equal to the value per tactical tile moved");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Chilled, "Status.Chilled", "Lowers combat speed from the next planning");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Frozen, "Status.Frozen", "Blocks the current waiting action or the next round");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Stunned, "Status.Stunned", "Cannot act");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Confused, "Status.Confused", "Replaces the next round plan with a random legal action");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Shocked, "Status.Shocked", "Discharges to orthogonal allies on the next direct hit");
 }

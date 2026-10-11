@@ -71,6 +71,7 @@ bool ACombatRoundCoordinator::CapturePlanningCheckpoint(FCombatCheckpointData& O
         Saved.GridCoord = Entry.HomeCoord;
         Saved.Transform = Unit->GetActorTransform();
         Saved.DefaultAttackAbility = FSoftObjectPath(Unit->GetDefaultAttackAbilityClass().Get());
+        if (!Saved.bDead) Saved.Statuses = Entry.Statuses;
         if (Saved.bHasTile && (!IsValid(Arena) || !IsValid(Arena->Grid) || Unit->GetCurrentTile()->GridCoord != Entry.HomeCoord || Arena->Grid->GetTileAtCoord(Entry.HomeCoord) != Unit->GetCurrentTile() || Unit->GetCurrentTile()->GetOccupyingUnit() != Unit)) return false;
         for (USkillDefinitionDataAsset* Skill : Unit->GetEquippedSkillDataAssets())
         {
@@ -138,10 +139,20 @@ bool ACombatRoundCoordinator::RestorePlanningCheckpoint(const FCombatCheckpointD
         }
         if (Saved.bHasTile && (Unit->GetCurrentTile() != Arena->Grid->GetTileAtCoord(Saved.GridCoord) || !Unit->GetCurrentTile() || Unit->GetCurrentTile()->GetOccupyingUnit() != Unit)) return false;
         if (!Saved.bHasTile && Unit->GetCurrentTile()) return false;
+        // Statuses already passed this planning boundary when saved, so restore them without advancing again.
+        // 저장 시점에 이미 이번 계획 경계를 지났으므로 상태를 다시 진행하지 않고 복원합니다.
+        TSet<FGameplayTag> SeenStatuses;
+        for (const FCombatStatusEntry& Status : Saved.Statuses)
+        {
+            bool bDuplicate = false;
+            SeenStatuses.Add(Status.Status, &bDuplicate);
+            if (Saved.bDead || bDuplicate || !CombatStatusRules::IsValidEntry(Status)) return false;
+        }
+        Entry.Statuses = Saved.Statuses;
         Entry.UnitId = Saved.RoundUnitId;
         Entry.HomeCoord = Saved.GridCoord;
         Entry.HP = Saved.HP;
-        Entry.Speed = Unit->GetCombatSpeed();
+        Entry.Speed = CombatStatusRules::ChilledSpeed(Unit->GetCombatSpeed(), Entry.Statuses, StatusTuning);
         Entry.Command = Plan->Command;
         Entry.Command.SkillId = UCombatCheckpointLibrary::ResolveSavedSkillId(Entry.Command.SkillId);
         // An explicit conversion to AI cancels the owner's saved consumable request without consuming stock.
@@ -184,6 +195,7 @@ bool ACombatRoundCoordinator::RestorePlanningCheckpoint(const FCombatCheckpointD
     {
         AUnitBase* Unit = View.Units[Index].Unit;
         Unit->UnitIndex = View.Units[Index].UnitId;
+        CombatStatusRules::SyncOwnedTags(Unit, View.Units[Index].Statuses);
         Actions[Index].OriginalLocation = Unit->GetActorLocation();
         Actions[Index].OriginalRotation = Unit->GetActorRotation();
         Unit->ForceNetUpdate();

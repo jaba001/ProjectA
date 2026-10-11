@@ -1,5 +1,6 @@
 #include "UI/Combat/CombatRoundPlanningWidget.h"
 #include "InputCoreTypes.h"
+#include "Combat/Round/CombatStatusRules.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "AbilitySystemComponent.h"
@@ -62,6 +63,14 @@ namespace
         Options.SetMinimumFractionalDigits(0);
         Options.SetMaximumFractionalDigits(0);
         return FText::AsNumber(HP, &Options);
+    }
+
+    // Append harmful statuses on a second line only when the unit has any.
+    // 해로운 상태가 있을 때만 둘째 줄에 덧붙입니다.
+    FText WithStatuses(const FText& Text, const FCombatRoundUnitView& Unit)
+    {
+        const FText Statuses = CombatStatusRules::Summary(Unit.Statuses);
+        return Statuses.IsEmpty() ? Text : FText::Format(NSLOCTEXT("CombatPlanning", "WithStatuses", "{0}\n상태: {1}"), Text, Statuses);
     }
 
     FText SkillName(const FCombatRoundSkill& Skill)
@@ -803,7 +812,7 @@ void UCombatRoundPlanningWidget::RefreshView(bool bForce)
                 FText Enemy = FText::Format(NSLOCTEXT("CombatPlanning", "EnemyDetail", "{0} · HP {1}\n{2}"), UnitLabel(Unit), HealthLabel(Unit.HP), Plan);
                 if (Unit.bReady) Enemy = FText::Format(NSLOCTEXT("CombatPlanning", "EnemyReady", "{0} · 준비 완료"), Enemy);
                 if (Unit.bHasMovePlan) Enemy = FText::Format(NSLOCTEXT("CombatPlanning", "EnemyMove", "{0} · SAP ({1},{2})"), Enemy, FText::AsNumber(Unit.MoveDestinationCoord.X), FText::AsNumber(Unit.MoveDestinationCoord.Y));
-                Enemies.Add(Enemy);
+                Enemies.Add(WithStatuses(Enemy, Unit));
             }
             if (Unit.UnitId == GetSelectedUnitId()) SelectedUnit = &Unit;
             if (Unit.UnitId == SelectedTargetId && Unit.HP > 0.f) Target = &Unit;
@@ -827,6 +836,7 @@ void UCombatRoundPlanningWidget::RefreshView(bool bForce)
                 for (const FRunConsumableStack& Stack : SelectedUnit->Unit->Consumables) Quantity += Stack.Quantity;
                 UnitDetails->SetText(FText::Format(NSLOCTEXT("CombatPlanning", "ConsumableQuantity", "{0} · 소모품 {1}개"), UnitDetails->GetText(), FText::AsNumber(Quantity)));
             }
+            UnitDetails->SetText(WithStatuses(UnitDetails->GetText(), *SelectedUnit));
             bHasMovePlan = SelectedUnit->bHasMovePlan;
             MovePlanDetails->SetText(bHasMovePlan ? FText::Format(NSLOCTEXT("CombatPlanning", "MovePlan", "SAP 이동: ({0},{1}) · 비용 1"), FText::AsNumber(SelectedUnit->MoveDestinationCoord.X), FText::AsNumber(SelectedUnit->MoveDestinationCoord.Y)) : NSLOCTEXT("CombatPlanning", "NoMovePlan", "SAP 이동: 예약 없음"));
             const ACombatArena* Arena = Coordinator->GetArena();
@@ -865,7 +875,7 @@ void UCombatRoundPlanningWidget::RefreshView(bool bForce)
         if (Target)
         {
             SelectedTargetCoord = Target->HomeCoord;
-            TargetDetails->SetText(bChoosingMove ? NSLOCTEXT("CombatPlanning", "ChooseMoveTile", "이동할 아군 빈칸을 클릭하세요.") : FText::Format(NSLOCTEXT("CombatPlanning", "SelectedTarget", "지정 대상: {0} · {1} · HP {2}\n스킬 버튼을 눌러 이 대상에게 행동을 예약합니다."), UnitLabel(*Target), Target->bEnemy ? NSLOCTEXT("CombatPlanning", "Enemy", "적") : NSLOCTEXT("CombatPlanning", "Ally", "아군"), HealthLabel(Target->HP)));
+            TargetDetails->SetText(bChoosingMove ? NSLOCTEXT("CombatPlanning", "ChooseMoveTile", "이동할 아군 빈칸을 클릭하세요.") : WithStatuses(FText::Format(NSLOCTEXT("CombatPlanning", "SelectedTarget", "지정 대상: {0} · {1} · HP {2}\n스킬 버튼을 눌러 이 대상에게 행동을 예약합니다."), UnitLabel(*Target), Target->bEnemy ? NSLOCTEXT("CombatPlanning", "Enemy", "적") : NSLOCTEXT("CombatPlanning", "Ally", "아군"), HealthLabel(Target->HP)), *Target));
         }
         else
         {
