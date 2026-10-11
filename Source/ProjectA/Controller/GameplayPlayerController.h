@@ -77,12 +77,15 @@ protected:
 private:
 #if WITH_DEV_AUTOMATION_TESTS
     friend class FEncounterPreparationRetryTest;
+    friend class FEncounterDungeonDoorLifecycleTest;
 #endif
 
     void RefreshGameplayFlow();
     void RefreshEncounterPresentation(const FGameplayViewState& View);
     void ResetEncounterPresentation();
     void FinishEncounterPresentation(uint32 Generation);
+    void FadeEncounterExit(uint32 Generation);
+    void FinishEncounterExit(uint32 Generation);
     bool PrepareDungeonRoutes(const FGameplayViewState& View);
     void ExecuteShopPurchase(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision);
     void ExecuteItemSale(FGuid RequestId, const FRunItemSaleCommand& Command);
@@ -163,6 +166,7 @@ private:
     uint32 PresentationGeneration = 0;
     bool bWorldEncounterPresentation = false;
     bool bEncounterPresentationTransition = false;
+    bool bEncounterExitTransition = false;
     bool bPresentationEnding = false;
 
     UPROPERTY(Transient)

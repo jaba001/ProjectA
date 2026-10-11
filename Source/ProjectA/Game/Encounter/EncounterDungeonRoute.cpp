@@ -31,10 +31,14 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
     Mortar = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Mortar"));
     WallBlocks = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("WallBlocks"));
     Pillars = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Pillars"));
+    LeftDoors = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("LeftDoors"));
+    RightDoors = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("RightDoors"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
     CubeMesh = Cube.Object;
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> StoneWall(TEXT("/Game/Dungeon_Modular_V1/Materials/M_Stone_Wall_Master_01.M_Stone_Wall_Master_01"));
     WallMaterial = StoneWall.Object;
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> LeftDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_L.MOD_Gateway_Door_01_large_door_L"));
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> RightDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_R.MOD_Gateway_Door_01_large_door_R"));
     UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars};
     for (UInstancedStaticMeshComponent* Shape : Shapes)
     {
@@ -45,6 +49,50 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
         Shape->SetGenerateOverlapEvents(false);
         Shape->SetCanEverAffectNavigation(false);
         Shape->SetCastShadow(true);
+    }
+    UInstancedStaticMeshComponent* Doors[] = {LeftDoors, RightDoors};
+    for (int32 Index = 0; Index < 2; ++Index)
+    {
+        Doors[Index]->SetupAttachment(RouteRoot);
+        Doors[Index]->SetStaticMesh(Index == 0 ? LeftDoor.Object : RightDoor.Object);
+        Doors[Index]->SetMobility(EComponentMobility::Movable);
+        Doors[Index]->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Doors[Index]->SetGenerateOverlapEvents(false);
+        Doors[Index]->SetCanEverAffectNavigation(false);
+        Doors[Index]->SetCastShadow(true);
+    }
+}
+
+void AEncounterDungeonRoute::AddDoorway(const FVector& Center)
+{
+    AddBlock(Pillars, Center + FVector(0.f, -170.f, 150.f), FVector(60.f, 60.f, 300.f));
+    AddBlock(Pillars, Center + FVector(0.f, 170.f, 150.f), FVector(60.f, 60.f, 300.f));
+    AddBlock(Pillars, Center + FVector(0.f, 0.f, 360.f), FVector(60.f, 400.f, 120.f));
+    const int32 Index = DoorCenters.Add(Center);
+    LeftDoors->AddInstance(FTransform::Identity);
+    RightDoors->AddInstance(FTransform::Identity);
+    SetDoorOpen(Index, 0.f);
+}
+
+void AEncounterDungeonRoute::SetDoorOpen(int32 Index, float Alpha)
+{
+    if (!DoorCenters.IsValidIndex(Index)) return;
+    UInstancedStaticMeshComponent* Doors[] = {LeftDoors, RightDoors};
+    for (int32 Side = 0; Side < 2; ++Side)
+    {
+        UInstancedStaticMeshComponent* Door = Doors[Side];
+        if (!Door->GetStaticMesh()) continue;
+        const FBox Bounds = Door->GetStaticMesh()->GetBoundingBox();
+        const FVector Size = Bounds.GetSize();
+        if (!Bounds.IsValid || Size.GetMin() <= UE_SMALL_NUMBER) continue;
+        // Fit the original leaves around their hinges without assuming an imported pivot or modifying assets.
+        // 임포트 피벗을 가정하거나 에셋을 변경하지 않고 원본 문짝을 경첩 기준으로 맞춥니다.
+        const float Sign = Side == 0 ? 1.f : -1.f;
+        const FVector Scale = FVector(136.f, 24.f, 300.f) / Size;
+        const FQuat Rotation = FRotator(0.f, 90.f - Sign * 100.f * FMath::Clamp(Alpha, 0.f, 1.f), 0.f).Quaternion();
+        const FVector Offset = FVector(Sign * 68.f, 0.f, 150.f) - Bounds.GetCenter() * Scale;
+        const FVector Hinge = DoorCenters[Index] + FVector(0.f, -Sign * 136.f, 0.f);
+        Door->UpdateInstanceTransform(Index, FTransform(Rotation, Hinge + Rotation.RotateVector(Offset), Scale), false, true, true);
     }
 }
 
@@ -104,7 +152,7 @@ void AEncounterDungeonRoute::SetPresentationVisible(bool bVisible)
     // 이후 생성하는 컴포넌트를 포함해 미리 준비한 구간의 조명까지 명시적으로 숨깁니다.
     bPresentationVisible = bVisible;
     SetActorHiddenInGame(!bVisible);
-    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars};
+    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, LeftDoors, RightDoors};
     for (UInstancedStaticMeshComponent* Shape : Shapes) Shape->SetVisibility(bVisible);
     for (UPointLightComponent* Light : Lights)
     {
@@ -115,8 +163,9 @@ void AEncounterDungeonRoute::SetPresentationVisible(bool bVisible)
 
 void AEncounterDungeonRoute::ClearGeometry()
 {
-    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars};
+    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, LeftDoors, RightDoors};
     for (UInstancedStaticMeshComponent* Shape : Shapes) Shape->ClearInstances();
+    DoorCenters.Reset();
     for (UPointLightComponent* Light : Lights)
     {
         if (IsValid(Light) && Light->GetOwner() == this) Light->DestroyComponent();
@@ -201,6 +250,11 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
         AddBlock(Pillars, FVector(Center.X, Center.Y, 24.f), FVector(46.f, 46.f, 48.f));
         AddBlock(Pillars, FVector(Center.X, Center.Y, WallHeight - 24.f), FVector(46.f, 46.f, 48.f));
     }
+    for (int32 Direction = 0; Direction < 3; ++Direction)
+    {
+        AddDoorway(EncounterDungeonLayout::GetDoorCenter(Direction, LayoutVariant, false));
+        AddDoorway(EncounterDungeonLayout::GetDoorCenter(Direction, LayoutVariant, true));
+    }
     bGeometryPrepared = true;
 }
 
@@ -249,6 +303,7 @@ void AEncounterDungeonRoute::ResetAtJunction()
     DestroyPresentedStage();
     if (!GetWorld() || GetNetMode() == NM_DedicatedServer) return;
     PrepareGeometry(RouteMaterial);
+    for (int32 Index = 0; Index < DoorCenters.Num(); ++Index) SetDoorOpen(Index, 0.f);
     const TArray<FVector> Path = EncounterDungeonLayout::GetPath(0, LayoutVariant);
     if (Path.IsEmpty()) return;
     Camera->SetRelativeLocation(Path[0]);
@@ -259,10 +314,12 @@ void AEncounterDungeonRoute::ResetAtJunction()
 bool AEncounterDungeonRoute::StartTravel(int32 Direction)
 {
     if (bTraveling || GetNetMode() == NM_DedicatedServer || Direction != StageDirection || !IsValid(PresentedStage) || !PresentedStage->Camera) return false;
-    const TArray<FVector> Path = EncounterDungeonLayout::GetPath(Direction, LayoutVariant);
+    TArray<FVector> Path = EncounterDungeonLayout::GetPath(Direction, LayoutVariant);
     if (Path.Num() < 2) return false;
     const FVector Arrival = GetActorTransform().InverseTransformPosition(PresentedStage->Camera->GetComponentLocation());
     if (!Arrival.Equals(Path.Last(), 1.f)) return false;
+    const FVector DoorApproach = EncounterDungeonLayout::GetDoorCenter(Direction, LayoutVariant, false) + FVector(-220.f, 0.f, EncounterDungeonLayout::EyeHeight);
+    Path.Insert(DoorApproach, Path.Num() - 1);
     TArray<FEncounterDungeonTravelSegment> Segments;
     FQuat CurrentRotation = FQuat::Identity;
     float TotalDistance = 0.f;
@@ -278,6 +335,7 @@ bool AEncounterDungeonRoute::StartTravel(int32 Direction)
             ++TurnCount;
         }
         Segments.Add({Path[Index - 1], Path[Index], Facing, Facing, static_cast<float>(Delta.Size())});
+        if (Path[Index].Equals(DoorApproach)) Segments.Add({DoorApproach, DoorApproach, Facing, Facing, EncounterDungeonLayout::DoorOpenDuration, Direction * 2});
         TotalDistance += static_cast<float>(Delta.Size());
         CurrentRotation = Facing;
     }
@@ -291,7 +349,7 @@ bool AEncounterDungeonRoute::StartTravel(int32 Direction)
     const float MoveDuration = 2.8f - TurnCount * TurnDuration;
     for (FEncounterDungeonTravelSegment& Segment : Segments)
     {
-        Segment.Duration = Segment.Start.Equals(Segment.End) ? TurnDuration : MoveDuration * Segment.Duration / TotalDistance;
+        if (Segment.DoorIndex == INDEX_NONE) Segment.Duration = Segment.Start.Equals(Segment.End) ? TurnDuration : MoveDuration * Segment.Duration / TotalDistance;
     }
     StopTravel();
     TravelSegments = MoveTemp(Segments);
@@ -308,6 +366,28 @@ bool AEncounterDungeonRoute::IsTraveling() const
     return bTraveling;
 }
 
+bool AEncounterDungeonRoute::StartExitTravel()
+{
+    if (bTraveling || GetNetMode() == NM_DedicatedServer || !IsValid(PresentedStage) || !PresentedStage->Camera || StageDirection == INDEX_NONE) return false;
+    const TArray<FVector> Path = EncounterDungeonLayout::GetExitPath(StageDirection, LayoutVariant);
+    if (Path.Num() < 2) return false;
+    StopTravel();
+    Camera->SetWorldLocationAndRotation(PresentedStage->Camera->GetComponentLocation(), PresentedStage->Camera->GetComponentQuat());
+    FQuat CurrentRotation = Camera->GetRelativeRotation().Quaternion();
+    for (int32 Index = 1; Index < Path.Num(); ++Index)
+    {
+        const FQuat Facing = (Path[Index] - Path[Index - 1]).Rotation().Quaternion();
+        if (!CurrentRotation.Equals(Facing, 0.001f)) TravelSegments.Add({Path[Index - 1], Path[Index - 1], CurrentRotation, Facing, 0.18f});
+        if (Index == Path.Num() - 1) TravelSegments.Add({Path[Index - 1], Path[Index - 1], Facing, Facing, EncounterDungeonLayout::DoorOpenDuration, StageDirection * 2 + 1});
+        TravelSegments.Add({Path[Index - 1], Path[Index], Facing, Facing, static_cast<float>(FVector::Distance(Path[Index - 1], Path[Index])) / 700.f});
+        CurrentRotation = Facing;
+    }
+    bExiting = true;
+    bTraveling = true;
+    SetActorTickEnabled(true);
+    return true;
+}
+
 AEncounterPrototypeStage* AEncounterDungeonRoute::GetPresentedStage() const
 {
     return IsValid(PresentedStage) ? PresentedStage.Get() : nullptr;
@@ -316,6 +396,7 @@ AEncounterPrototypeStage* AEncounterDungeonRoute::GetPresentedStage() const
 void AEncounterDungeonRoute::StopTravel()
 {
     bTraveling = false;
+    bExiting = false;
     SetActorTickEnabled(false);
     TravelSegments.Reset();
     TravelSegmentIndex = 0;
@@ -326,6 +407,8 @@ void AEncounterDungeonRoute::FinishAtStage()
 {
     StopTravel();
     if (!IsValid(PresentedStage) || !PresentedStage->Camera) return;
+    SetDoorOpen(StageDirection * 2, 0.f);
+    SetDoorOpen(StageDirection * 2 + 1, 0.f);
     Camera->SetWorldLocationAndRotation(PresentedStage->Camera->GetComponentLocation(), PresentedStage->Camera->GetComponentQuat());
     Camera->SetFieldOfView(PresentedStage->Camera->FieldOfView);
 }
@@ -349,6 +432,7 @@ void AEncounterDungeonRoute::Tick(float DeltaSeconds)
         RemainingSeconds -= Step;
         const float Alpha = FMath::Clamp(SegmentSeconds / Segment.Duration, 0.f, 1.f);
         const float SmoothedAlpha = Alpha * Alpha * (3.f - 2.f * Alpha);
+        if (Segment.DoorIndex != INDEX_NONE) SetDoorOpen(Segment.DoorIndex, SmoothedAlpha);
         Camera->SetRelativeLocation(FMath::Lerp(Segment.Start, Segment.End, SmoothedAlpha));
         Camera->SetRelativeRotation(FQuat::Slerp(Segment.StartRotation, Segment.EndRotation, SmoothedAlpha));
         if (SegmentSeconds < Segment.Duration) break;
@@ -358,7 +442,8 @@ void AEncounterDungeonRoute::Tick(float DeltaSeconds)
     }
     if (!TravelSegments.IsValidIndex(TravelSegmentIndex))
     {
-        FinishAtStage();
+        if (bExiting) StopTravel();
+        else FinishAtStage();
         OnTravelFinished.Broadcast();
     }
 }

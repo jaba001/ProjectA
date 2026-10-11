@@ -2,6 +2,12 @@
 
 #include "Misc/AutomationTest.h"
 #include "DataAsset/EncounterStageVisualCatalog.h"
+#include "Camera/CameraComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Controller/GameplayPlayerController.h"
+#include "Engine/World.h"
+#include "Game/Encounter/EncounterDungeonLayout.h"
+#include "Game/Encounter/EncounterDungeonRoute.h"
 #include "Game/Encounter/EncounterPrototypeStage.h"
 #include "Game/Run/RunEncounterPool.h"
 #include "Misc/PackageName.h"
@@ -201,6 +207,74 @@ bool FEncounterMerchandiseProfilesTest::RunTest(const FString& Parameters)
     Filtered.ItemQuery = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Rarity.Orange")));
     Selected = Catalog->Resolve(Filtered);
     TestTrue(TEXT("The orange rarity appearance is ready without enabling an inactive encounter in the CSV"), Selected && Selected->ProfileId == FName(TEXT("RarityOrange")));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEncounterDungeonDoorLifecycleTest, "ProjectA.Run.EncounterPresentation.DoorArrivalDepartureAndCancellation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEncounterDungeonDoorLifecycleTest::RunTest(const FString& Parameters)
+{
+    const UWorld::InitializationValues Values = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false);
+    TStrongObjectPtr<UWorld> World(UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Values));
+    if (!TestTrue(TEXT("A local presentation fixture has a world."), World.IsValid())) return false;
+    AEncounterDungeonRoute* Route = World->SpawnActor<AEncounterDungeonRoute>();
+    AEncounterPrototypeStage* Template = World->SpawnActor<AEncounterPrototypeStage>();
+    AGameplayPlayerController* Controller = World->SpawnActor<AGameplayPlayerController>();
+    if (!Route || !Template || !Controller)
+    {
+        World->DestroyWorld(false);
+        return false;
+    }
+    Template->bUseLibraryVisuals = false;
+    int32 Completions = 0;
+    Route->OnTravelFinished.AddLambda([&Completions]() { ++Completions; });
+    for (int32 Variant = 0; Variant < EncounterDungeonLayout::VariantCount; ++Variant)
+    {
+        TestTrue(TEXT("Every supported layout prepares its cached scenery."), Route->ConfigureLayout(Variant));
+        TestEqual(TEXT("Each of three rooms has a front and rear pair of original door leaves."), Route->LeftDoors->GetInstanceCount(), 6);
+        TestEqual(TEXT("The left and right door instances remain paired."), Route->RightDoors->GetInstanceCount(), 6);
+        for (int32 Direction = 0; Direction < 3; ++Direction)
+        {
+            Route->ResetAtJunction();
+            AEncounterPrototypeStage* Stage = Route->ConfigureStage(Template, Direction, FRunEncounterOffer());
+            TestNotNull(TEXT("A room owns a local NPC stage."), Stage);
+            if (!Stage) continue;
+            const int32 Before = Completions;
+            if (!TestTrue(TEXT("Confirmed selection begins arrival travel."), Route->StartTravel(Direction))) continue;
+            TestFalse(TEXT("A second travel request cannot replace an active door arrival."), Route->StartTravel(Direction));
+            float ApproachSeconds = 0.f;
+            for (const FEncounterDungeonTravelSegment& Segment : Route->TravelSegments)
+            {
+                if (Segment.DoorIndex != INDEX_NONE) break;
+                ApproachSeconds += Segment.Duration;
+            }
+            Route->Tick(ApproachSeconds + 0.3f);
+            TestTrue(TEXT("The camera waits outside while the entrance opens."), Route->Camera->GetRelativeLocation().X < EncounterDungeonLayout::GetDoorCenter(Direction, Variant, false).X && Route->IsTraveling() && Completions == Before);
+            Route->Tick(10.f);
+            TestTrue(TEXT("A frame hitch completes arrival once at the configured NPC camera."), !Route->IsTraveling() && Route->Camera->GetComponentLocation().Equals(Stage->Camera->GetComponentLocation()) && Completions == Before + 1);
+            if (!TestTrue(TEXT("Departure reuses the current room instead of resetting to the junction."), Route->StartExitTravel())) continue;
+            Route->Tick(10.f);
+            TestTrue(TEXT("Departure finishes beyond the rear door and preserves the NPC until the cache swap."), !Route->IsTraveling() && Route->GetPresentedStage() == Stage && Route->Camera->GetRelativeLocation().X > EncounterDungeonLayout::GetDoorCenter(Direction, Variant, true).X && Completions == Before + 2);
+            Route->Tick(1.f);
+            TestEqual(TEXT("An idle frame cannot repeat a completed departure callback."), Completions, Before + 2);
+            Route->FinishAtStage();
+            TestTrue(TEXT("Continue can restore directly to arrival without replaying entry."), !Route->IsTraveling() && Route->Camera->GetComponentLocation().Equals(Stage->Camera->GetComponentLocation()));
+            TestTrue(TEXT("The restored room can depart through its rear doorway."), Route->StartExitTravel());
+            Controller->DungeonRoute = Route;
+            Controller->bEncounterExitTransition = true;
+            Controller->bEncounterPresentationTransition = true;
+            const uint32 OldGeneration = Controller->PresentationGeneration;
+            Controller->ResetEncounterPresentation();
+            Controller->FadeEncounterExit(OldGeneration);
+            Controller->FinishEncounterExit(OldGeneration);
+            TestTrue(TEXT("Cancellation invalidates old exit callbacks and stops the cached route."), Controller->PresentationGeneration != OldGeneration && !Controller->bEncounterExitTransition && !Controller->bEncounterPresentationTransition && !Route->IsTraveling() && !Route->GetPresentedStage());
+            Route->SetPresentationVisible(false);
+            TestFalse(TEXT("Prepared or hidden rooms hide their doors too."), Route->LeftDoors->IsVisible() || Route->RightDoors->IsVisible());
+            Route->SetPresentationVisible(true);
+        }
+    }
+    Route->OnTravelFinished.Clear();
+    World->DestroyWorld(false);
     return true;
 }
 

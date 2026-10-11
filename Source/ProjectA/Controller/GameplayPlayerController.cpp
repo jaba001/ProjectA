@@ -182,6 +182,7 @@ void AGameplayPlayerController::RequestContinueRun()
 
 bool AGameplayPlayerController::CanIssueRunCommands() const
 {
+    if (bEncounterPresentationTransition) return false;
     if (!HasAuthority() || !IsLocalController())
     {
         return false;
@@ -547,6 +548,7 @@ bool AGameplayPlayerController::CanActivateRoundCamera() const
 void AGameplayPlayerController::ResetEncounterPresentation()
 {
     GetWorldTimerManager().ClearTimer(EncounterPresentationTimer);
+    if (bEncounterExitTransition && PlayerCameraManager) PlayerCameraManager->StopCameraFade();
     ++PresentationGeneration;
     if (PresentedStage.IsValid()) PresentedStage->StopPresentation();
     if (DungeonRoute.IsValid())
@@ -558,6 +560,7 @@ void AGameplayPlayerController::ResetEncounterPresentation()
     PresentationViewTarget.Reset();
     bWorldEncounterPresentation = false;
     bEncounterPresentationTransition = false;
+    bEncounterExitTransition = false;
 }
 
 bool AGameplayPlayerController::PrepareDungeonRoutes(const FGameplayViewState& View)
@@ -624,9 +627,29 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
     for (const FRunEncounterOffer& Offer : Progress.Offers) OfferIds.Add(Offer.EncounterId);
     const bool bWalkFromJunction = View.Phase == ERunPhase::Shop && PresentationPhase == ERunPhase::EncounterChoice && PresentationViewTarget == DungeonRoute && DungeonRoute.IsValid() && PresentedCompletedCount == Progress.AfterCompletedNodeCount && PresentedVisitIndex == Progress.VisitIndex && PresentedOfferIds == OfferIds && PresentedDungeonSeed == View.DungeonState.Seed && PresentedDungeonVersion == View.DungeonState.SchemaVersion;
     const bool bSameVisit = PresentationPhase == View.Phase && PresentedEncounterId == Progress.SelectedEncounterId && PresentedCompletedCount == Progress.AfterCompletedNodeCount && PresentedVisitIndex == Progress.VisitIndex && PresentedOfferIds == OfferIds && PresentedDungeonSeed == View.DungeonState.Seed && PresentedDungeonVersion == View.DungeonState.SchemaVersion;
+    if (bEncounterExitTransition)
+    {
+        if (bSameVisit && DungeonRoute.IsValid() && PresentedStage.IsValid()) return;
+        ResetEncounterPresentation();
+    }
     if (!bSameVisit)
     {
-        ResetEncounterPresentation();
+        // Animate departure only after authoritative state leaves this shop; never delay the durable command.
+        // 권위 상태가 상점을 떠난 뒤에만 퇴장을 연출하며 저장 명령을 지연하지 않습니다.
+        const bool bLeaveRoom = PresentationPhase == ERunPhase::Shop && (View.Phase == ERunPhase::Map || View.Phase == ERunPhase::EncounterChoice) && bWorldEncounterPresentation && PresentedStage.IsValid() && DungeonRoute.IsValid() && DungeonRoute->GetPresentedStage() == PresentedStage.Get() && PresentedDungeonSeed == View.DungeonState.Seed && PresentedDungeonVersion == View.DungeonState.SchemaVersion;
+        if (bLeaveRoom && DungeonRoute->StartExitTravel())
+        {
+            GetWorldTimerManager().ClearTimer(EncounterPresentationTimer);
+            ++PresentationGeneration;
+            DungeonRoute->OnTravelFinished.RemoveAll(this);
+            DungeonRoute->OnTravelFinished.AddUObject(this, &AGameplayPlayerController::FadeEncounterExit, PresentationGeneration);
+            PresentedStage->StopPresentation();
+            PresentationViewTarget = DungeonRoute.Get();
+            bEncounterExitTransition = true;
+            bEncounterPresentationTransition = true;
+            SetViewTargetWithBlend(DungeonRoute.Get(), 0.f);
+        }
+        else ResetEncounterPresentation();
         PresentationPhase = View.Phase;
         PresentedEncounterId = Progress.SelectedEncounterId;
         PresentedCompletedCount = Progress.AfterCompletedNodeCount;
@@ -634,6 +657,7 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
         PresentedOfferIds = MoveTemp(OfferIds);
         PresentedDungeonSeed = View.DungeonState.Seed;
         PresentedDungeonVersion = View.DungeonState.SchemaVersion;
+        if (bEncounterExitTransition) return;
     }
     if (View.Phase != ERunPhase::Shop && View.Phase != ERunPhase::Map && View.Phase != ERunPhase::EncounterChoice)
     {
@@ -725,6 +749,22 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
     }
     SetViewTargetWithBlend(ViewTarget, 0.65f, VTBlend_Cubic);
     GetWorldTimerManager().SetTimer(EncounterPresentationTimer, FTimerDelegate::CreateUObject(this, &AGameplayPlayerController::FinishEncounterPresentation, PresentationGeneration), 0.65f, false);
+}
+
+void AGameplayPlayerController::FadeEncounterExit(uint32 Generation)
+{
+    if (!IsLocalController() || bPresentationEnding || !bEncounterExitTransition || Generation != PresentationGeneration) return;
+    if (PlayerCameraManager) PlayerCameraManager->StartCameraFade(0.f, 1.f, 0.18f, FLinearColor::Black, false, true);
+    GetWorldTimerManager().SetTimer(EncounterPresentationTimer, FTimerDelegate::CreateUObject(this, &AGameplayPlayerController::FinishEncounterExit, Generation), 0.18f, false);
+}
+
+void AGameplayPlayerController::FinishEncounterExit(uint32 Generation)
+{
+    if (!IsLocalController() || bPresentationEnding || !bEncounterExitTransition || Generation != PresentationGeneration) return;
+    // Swap cached sections behind the closed fade and resume from the latest authoritative view.
+    // 페이드가 닫힌 상태에서 캐시 구간을 교환하고 최신 권위 뷰에서 표시를 재개합니다.
+    ResetEncounterPresentation();
+    RefreshGameplayFlow();
 }
 
 void AGameplayPlayerController::FinishEncounterPresentation(uint32 Generation)

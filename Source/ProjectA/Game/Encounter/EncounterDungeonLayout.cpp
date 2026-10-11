@@ -74,6 +74,7 @@ TSet<FIntPoint> EncounterDungeonLayout::GetFloorCells(int32 LayoutVariant)
                 Cells.Add(FIntPoint(X, Y));
             }
         }
+        Cells.Add(FIntPoint(Room.X + 4, Room.Y));
     }
     return Cells;
 }
@@ -90,6 +91,23 @@ FTransform EncounterDungeonLayout::GetStageTransform(int32 Direction, int32 Layo
     // Keep the fixed NPC camera offset aligned with every variant's corridor endpoint.
     // 고정 NPC 카메라 오프셋을 모든 변형의 통로 도착점과 일치시킵니다.
     return FTransform(Path.Last() + FVector(2.f * CellSize, 0.f, -EyeHeight));
+}
+
+FVector EncounterDungeonLayout::GetDoorCenter(int32 Direction, int32 LayoutVariant, bool bExit)
+{
+    const TArray<FVector> Path = GetPath(Direction, LayoutVariant);
+    if (Path.IsEmpty()) return FVector::ZeroVector;
+    return Path.Last() + FVector((bExit ? 3.5f : -0.5f) * CellSize, 0.f, -EyeHeight);
+}
+
+TArray<FVector> EncounterDungeonLayout::GetExitPath(int32 Direction, int32 LayoutVariant)
+{
+    const TArray<FVector> Path = GetPath(Direction, LayoutVariant);
+    if (Path.IsEmpty()) return {};
+    const FVector Arrival = Path.Last();
+    // Pass beside the NPC and service props before aligning with the rear doorway.
+    // NPC와 서비스 소품 옆으로 지나간 뒤 뒤쪽 문에 정렬합니다.
+    return {Arrival, Arrival + FVector(CellSize, 250.f, 0.f), Arrival + FVector(3.f * CellSize, 250.f, 0.f), Arrival + FVector(3.f * CellSize, 0.f, 0.f), GetDoorCenter(Direction, LayoutVariant, true) + FVector(160.f, 0.f, EyeHeight)};
 }
 
 FText EncounterDungeonLayout::GetDirectionLabel(int32 Index)

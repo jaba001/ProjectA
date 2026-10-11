@@ -45,6 +45,20 @@ bool FEncounterDungeonLayoutGeometryTest::RunTest(const FString& Parameters)
             const FVector StageLocation = Stage.GetLocation();
             const FIntPoint StageCell(FMath::RoundToInt(StageLocation.X / EncounterDungeonLayout::CellSize), FMath::RoundToInt(StageLocation.Y / EncounterDungeonLayout::CellSize));
             TestTrue(TEXT("Each NPC destination occupies its own room with a floor cell."), Floor.Contains(StageCell) && !Destinations.Contains(StageCell));
+            const FVector Entrance = EncounterDungeonLayout::GetDoorCenter(Direction, Variant, false);
+            const FVector Exit = EncounterDungeonLayout::GetDoorCenter(Direction, Variant, true);
+            TestTrue(TEXT("The entrance lies before arrival and the rear doorway lies beyond the NPC."), Entrance.X < Path.Last().X && Exit.X > StageLocation.X && Entrance.Y == StageLocation.Y && Exit.Y == StageLocation.Y);
+            const TArray<FVector> ExitPath = EncounterDungeonLayout::GetExitPath(Direction, Variant);
+            if (!TestTrue(TEXT("Departure starts at the saved arrival pose and crosses the rear doorway at eye height."), ExitPath.Num() >= 2 && ExitPath[0].Equals(Path.Last()) && ExitPath.Last().X > Exit.X && ExitPath.Last().Y == Exit.Y)) return false;
+            for (int32 Index = 1; Index < ExitPath.Num(); ++Index)
+            {
+                const int32 Samples = FMath::CeilToInt(FVector::Distance(ExitPath[Index - 1], ExitPath[Index]) / 20.f);
+                for (int32 Sample = 0; Sample <= Samples; ++Sample)
+                {
+                    const FVector Point = FMath::Lerp(ExitPath[Index - 1], ExitPath[Index], static_cast<float>(Sample) / Samples);
+                    TestTrue(TEXT("Every sampled departure point has floor and remains at eye height."), Point.Z == EncounterDungeonLayout::EyeHeight && Floor.Contains(FIntPoint(FMath::FloorToInt((Point.X + 200.f) / 400.f), FMath::FloorToInt((Point.Y + 200.f) / 400.f))));
+                }
+            }
             Destinations.Add(StageCell);
         }
         TestEqual(TEXT("The three directions retain three distinct NPC rooms."), Destinations.Num(), 3);
@@ -72,11 +86,13 @@ bool FEncounterDungeonLayoutDirectionTest::RunTest(const FString& Parameters)
     {
         TestTrue(TEXT("An invalid saved layout cannot create scenery or route points."), EncounterDungeonLayout::GetFloorCells(InvalidVariant).IsEmpty() && EncounterDungeonLayout::GetPath(0, InvalidVariant).IsEmpty());
         TestTrue(TEXT("An invalid saved layout cannot place a stage."), EncounterDungeonLayout::GetStageTransform(0, InvalidVariant).Equals(FTransform::Identity));
+        TestTrue(TEXT("An invalid saved layout cannot create a door departure path."), EncounterDungeonLayout::GetExitPath(0, InvalidVariant).IsEmpty());
     }
     for (const int32 InvalidDirection : {-1, 3, MAX_int32})
     {
         TestTrue(TEXT("An invalid direction cannot create a route or display an offer label."), EncounterDungeonLayout::GetPath(InvalidDirection).IsEmpty() && EncounterDungeonLayout::GetDirectionLabel(InvalidDirection).IsEmpty());
         TestTrue(TEXT("An invalid direction cannot offset an NPC into an unrelated room."), EncounterDungeonLayout::GetStageTransform(InvalidDirection).Equals(FTransform::Identity));
+        TestTrue(TEXT("An invalid direction cannot create a door departure path."), EncounterDungeonLayout::GetExitPath(InvalidDirection, 0).IsEmpty());
     }
     return true;
 }

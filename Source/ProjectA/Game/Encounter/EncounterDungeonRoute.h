@@ -20,6 +20,7 @@ struct FEncounterDungeonTravelSegment
     FQuat StartRotation = FQuat::Identity;
     FQuat EndRotation = FQuat::Identity;
     float Duration = 0.0f;
+    int32 DoorIndex = INDEX_NONE;
 };
 
 // Own only local dungeon scenery, camera travel and a copied presentation stage.
@@ -44,6 +45,7 @@ public:
     AEncounterPrototypeStage* ConfigureStage(const AEncounterPrototypeStage* Template, int32 Direction, const FRunEncounterOffer& Offer);
     void ResetAtJunction();
     bool StartTravel(int32 Direction);
+    bool StartExitTravel();
     bool IsTraveling() const;
     AEncounterPrototypeStage* GetPresentedStage() const;
     void FinishAtStage();
@@ -54,6 +56,10 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+    friend class FEncounterDungeonDoorLifecycleTest;
+#endif
+
     void PrepareGeometry(UMaterialInterface* Material);
     void ClearGeometry();
     void ApplyMaterial(UInstancedStaticMeshComponent* Component, const FLinearColor& Color);
@@ -61,6 +67,8 @@ private:
     void AddLight(const FVector& Position);
     void DestroyPresentedStage();
     void StopTravel();
+    void AddDoorway(const FVector& Center);
+    void SetDoorOpen(int32 Index, float Alpha);
 
     UPROPERTY()
     TObjectPtr<USceneComponent> RouteRoot;
@@ -75,6 +83,10 @@ private:
     UPROPERTY()
     TObjectPtr<UInstancedStaticMeshComponent> Pillars;
     UPROPERTY()
+    TObjectPtr<UInstancedStaticMeshComponent> LeftDoors;
+    UPROPERTY()
+    TObjectPtr<UInstancedStaticMeshComponent> RightDoors;
+    UPROPERTY()
     TObjectPtr<UStaticMesh> CubeMesh;
     UPROPERTY()
     TObjectPtr<UMaterialInterface> WallMaterial;
@@ -86,11 +98,13 @@ private:
     TObjectPtr<AEncounterPrototypeStage> PresentedStage;
 
     TArray<FEncounterDungeonTravelSegment> TravelSegments;
+    TArray<FVector> DoorCenters;
     int32 LayoutVariant = 0;
     int32 TravelSegmentIndex = 0;
     int32 StageDirection = INDEX_NONE;
     float SegmentSeconds = 0.0f;
     bool bGeometryPrepared = false;
     bool bTraveling = false;
+    bool bExiting = false;
     bool bPresentationVisible = true;
 };
