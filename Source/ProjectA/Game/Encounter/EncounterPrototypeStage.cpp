@@ -6,6 +6,7 @@
 #include "Animation/AnimSingleNodeInstance.h"
 #include "Animation/Skeleton.h"
 #include "Components/PointLightComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -405,7 +406,29 @@ void AEncounterPrototypeStage::RebuildLibraryVisuals()
     LibraryLight->SetRelativeLocation(Profile->LightLocation);
     LibraryLight->SetLightColor(Profile->LightColor);
     LibraryLight->SetIntensity(Profile->LightIntensity);
+    if (bDungeonLighting) ApplyDungeonLighting();
     UpdateLibraryPlayback();
+}
+
+void AEncounterPrototypeStage::UseDungeonLighting()
+{
+    bDungeonLighting = true;
+    ApplyDungeonLighting();
+}
+
+void AEncounterPrototypeStage::ApplyDungeonLighting()
+{
+    // Isolate only the route-owned stage from outdoor lights and retain a small warm face fill.
+    // 통로 소유 무대만 야외 조명에서 분리하고 얼굴 식별용 작은 따뜻한 보조광을 유지합니다.
+    TArray<UPrimitiveComponent*> Shapes;
+    GetComponents(Shapes);
+    for (UPrimitiveComponent* Shape : Shapes) Shape->SetLightingChannels(false, true, false);
+    LibraryLight->SetLightingChannels(false, true, false);
+    LibraryLight->SetIntensityUnits(ELightUnits::Lumens);
+    LibraryLight->SetUseInverseSquaredFalloff(true);
+    LibraryLight->SetIntensity(700.f);
+    LibraryLight->SetAttenuationRadius(550.f);
+    LibraryLight->SetLightColor(FLinearColor(1.f, 0.55f, 0.24f));
 }
 
 void AEncounterPrototypeStage::UpdateLibraryPlayback()

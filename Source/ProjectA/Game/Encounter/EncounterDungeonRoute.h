@@ -8,6 +8,8 @@ class AEncounterPrototypeStage;
 class UCameraComponent;
 class UInstancedStaticMeshComponent;
 class UMaterialInterface;
+class UNiagaraComponent;
+class UNiagaraSystem;
 class UPointLightComponent;
 class USceneComponent;
 class UStaticMesh;
@@ -68,6 +70,7 @@ private:
     void AddBlock(UInstancedStaticMeshComponent* Component, const FVector& Center, const FVector& Size);
     void AddMasonryPanel(UInstancedStaticMeshComponent* Component, const FVector& Center, const FVector& Horizontal, const FVector& Vertical, const FVector& Normal, float Width, float Height, float Thickness);
     void AddLight(const FVector& Position);
+    void AddTorch(const FVector& Center, const FVector& Normal);
     void DestroyPresentedStage();
     void StopTravel();
     void AddDoorway(const FVector& Center);
@@ -92,6 +95,8 @@ private:
     UPROPERTY()
     TObjectPtr<UInstancedStaticMeshComponent> DoorSeals;
     UPROPERTY()
+    TObjectPtr<UInstancedStaticMeshComponent> Torches;
+    UPROPERTY()
     TObjectPtr<UStaticMesh> CubeMesh;
     UPROPERTY()
     TSoftObjectPtr<UMaterialInterface> WallMaterial;
@@ -99,6 +104,12 @@ private:
     TSoftObjectPtr<UMaterialInterface> FloorMaterial;
     UPROPERTY()
     TSoftObjectPtr<UMaterialInterface> CeilingMaterial;
+    UPROPERTY()
+    TSoftObjectPtr<UStaticMesh> TorchMesh;
+    UPROPERTY()
+    TSoftObjectPtr<UNiagaraSystem> TorchFlame;
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UNiagaraComponent>> TorchEffects;
     UPROPERTY(Transient)
     TObjectPtr<UMaterialInterface> RouteMaterial;
     UPROPERTY(Transient)

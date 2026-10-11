@@ -71,6 +71,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Encounter Stage")
     void StopPresentation();
     void SetPresentationVisible(bool bVisible);
+    void UseDungeonLighting();
     bool IsUsingLibraryVisuals() const { return bUsingLibraryVisuals; }
     FName GetLibraryProfileId() const { return LibraryProfileId; }
     int32 GetLibraryPropCount() const { return LibraryProps.Num(); }
@@ -85,6 +86,7 @@ private:
     void RebuildLibraryVisuals();
     void ClearLibraryVisuals();
     void UpdateLibraryPlayback();
+    void ApplyDungeonLighting();
 
     UPROPERTY()
     TObjectPtr<USceneComponent> LibraryRoot;
@@ -109,6 +111,7 @@ private:
     bool bUsingLibraryVisuals = false;
     bool bRefreshingLibrary = false;
     bool bPresentationVisible = true;
+    bool bDungeonLighting = false;
 
     UPROPERTY()
     TObjectPtr<USceneComponent> StageRoot;

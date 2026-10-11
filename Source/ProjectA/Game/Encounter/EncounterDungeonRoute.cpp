@@ -10,6 +10,8 @@
 #include "Game/Encounter/EncounterDungeonLayout.h"
 #include "Game/Encounter/EncounterPrototypeStage.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 #include "UObject/ConstructorHelpers.h"
 
 AEncounterDungeonRoute::AEncounterDungeonRoute()
@@ -26,6 +28,21 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
     Camera->SetConstraintAspectRatio(false);
     Camera->bOverrideAspectRatioAxisConstraint = true;
     Camera->SetAspectRatioAxisConstraint(AspectRatio_MaintainYFOV);
+    // Keep darkness stable instead of allowing eye adaptation to brighten the underground corridor.
+    // 자동 노출이 지하 통로를 밝히지 않도록 어두운 노출을 고정합니다.
+    Camera->PostProcessBlendWeight = 1.f;
+    Camera->PostProcessSettings.bOverride_AutoExposureMethod = true;
+    Camera->PostProcessSettings.AutoExposureMethod = AEM_Manual;
+    Camera->PostProcessSettings.bOverride_AutoExposureApplyPhysicalCameraExposure = true;
+    Camera->PostProcessSettings.AutoExposureApplyPhysicalCameraExposure = false;
+    Camera->PostProcessSettings.bOverride_AutoExposureBias = true;
+    Camera->PostProcessSettings.AutoExposureBias = -0.4f;
+    Camera->PostProcessSettings.bOverride_IndirectLightingIntensity = true;
+    Camera->PostProcessSettings.IndirectLightingIntensity = 0.08f;
+    Camera->PostProcessSettings.bOverride_BloomIntensity = true;
+    Camera->PostProcessSettings.BloomIntensity = 0.12f;
+    Camera->PostProcessSettings.bOverride_VignetteIntensity = true;
+    Camera->PostProcessSettings.VignetteIntensity = 0.18f;
     Floor = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Floor"));
     Ceiling = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Ceiling"));
     Mortar = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Mortar"));
@@ -34,6 +51,7 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
     LeftDoors = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("LeftDoors"));
     RightDoors = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("RightDoors"));
     DoorSeals = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("DoorSeals"));
+    Torches = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Torches"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
     CubeMesh = Cube.Object;
     // Preserve cookable asset references without rooting editable material graphs during class initialization.
@@ -41,6 +59,8 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
     WallMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneWall.M_EncounterStoneWall")));
     FloorMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneFloor.M_EncounterStoneFloor")));
     CeilingMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneCeiling.M_EncounterStoneCeiling")));
+    TorchMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/props/light/SM_PROP_torch_wall_dungeon.SM_PROP_torch_wall_dungeon")));
+    TorchFlame = TSoftObjectPtr<UNiagaraSystem>(FSoftObjectPath(TEXT("/Game/Fantastic_Dungeon_Pack/effects/PS_FX_fire_dungeon_01_Niagara.PS_FX_fire_dungeon_01_Niagara")));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> LeftDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_L.MOD_Gateway_Door_01_large_door_L"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> RightDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_R.MOD_Gateway_Door_01_large_door_R"));
     UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, DoorSeals};
@@ -53,7 +73,15 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
         Shape->SetGenerateOverlapEvents(false);
         Shape->SetCanEverAffectNavigation(false);
         Shape->SetCastShadow(true);
+        Shape->SetLightingChannels(false, true, false);
     }
+    Torches->SetupAttachment(RouteRoot);
+    Torches->SetMobility(EComponentMobility::Movable);
+    Torches->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Torches->SetGenerateOverlapEvents(false);
+    Torches->SetCanEverAffectNavigation(false);
+    Torches->SetCastShadow(false);
+    Torches->SetLightingChannels(false, true, false);
     if (LeftDoor.Object) DoorSeals->SetMaterial(0, LeftDoor.Object->GetMaterial(0));
     UInstancedStaticMeshComponent* Doors[] = {LeftDoors, RightDoors};
     for (int32 Index = 0; Index < 2; ++Index)
@@ -65,6 +93,7 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
         Doors[Index]->SetGenerateOverlapEvents(false);
         Doors[Index]->SetCanEverAffectNavigation(false);
         Doors[Index]->SetCastShadow(true);
+        Doors[Index]->SetLightingChannels(false, true, false);
     }
 }
 
@@ -153,14 +182,65 @@ void AEncounterDungeonRoute::AddLight(const FVector& Position)
     Light->SetRelativeLocation(Position);
     Light->SetIntensityUnits(ELightUnits::Lumens);
     Light->SetUseInverseSquaredFalloff(true);
-    Light->SetIntensity(3600.f);
-    Light->SetAttenuationRadius(1150.f);
-    Light->SetLightColor(FLinearColor(1.f, 0.95f, 0.88f));
-    Light->SetCastShadows(false);
+    Light->SetIntensity(1100.f);
+    Light->SetAttenuationRadius(650.f);
+    Light->SetLightColor(FLinearColor(1.f, 0.52f, 0.22f));
+    Light->SetLightingChannels(false, true, false);
+    Light->SetCastShadows(true);
+    Light->SetSourceRadius(8.f);
+    Light->ShadowResolutionScale = 0.35f;
+    Light->MaxDrawDistance = 1400.f;
+    Light->MaxDistanceFadeRange = 300.f;
     Light->SetVisibility(bPresentationVisible);
     AddInstanceComponent(Light);
     Light->RegisterComponent();
     Lights.Add(Light);
+}
+
+void AEncounterDungeonRoute::AddTorch(const FVector& Center, const FVector& Normal)
+{
+    // Reference the original wall sconce and flame directly, with only local presentation components.
+    // 원본 벽 횃불과 불꽃을 직접 참조하고 로컬 연출 컴포넌트만 생성합니다.
+    if (!Torches->GetStaticMesh()) Torches->SetStaticMesh(TorchMesh.LoadSynchronous());
+    const FVector Mount = Center + Normal * (EncounterDungeonLayout::CellSize * 0.5f - 15.f) + FVector(0.f, 0.f, 220.f);
+    const FQuat Rotation = FRotationMatrix::MakeFromYZ(-Normal, FVector::UpVector).ToQuat();
+    if (Torches->GetStaticMesh()) Torches->AddInstance(FTransform(Rotation, Mount));
+    const FVector FlamePosition = Mount - Normal * 22.f + FVector(0.f, 0.f, 30.f);
+    AddLight(FlamePosition);
+    // Approximate a little torch bounce locally because this project does not enable Lumen.
+    // Lumen을 사용하지 않는 프로젝트이므로 횃불의 약한 반사광을 통로 내부에 국소적으로 보완합니다.
+    UPointLightComponent* Bounce = NewObject<UPointLightComponent>(this);
+    Bounce->SetupAttachment(RouteRoot);
+    Bounce->SetRelativeLocation(Center + FVector(0.f, 0.f, 180.f));
+    Bounce->SetIntensityUnits(ELightUnits::Lumens);
+    Bounce->SetUseInverseSquaredFalloff(true);
+    Bounce->SetIntensity(350.f);
+    Bounce->SetAttenuationRadius(950.f);
+    Bounce->SetLightColor(FLinearColor(1.f, 0.66f, 0.38f));
+    Bounce->SetLightingChannels(false, true, false);
+    Bounce->SetCastShadows(false);
+    Bounce->MaxDrawDistance = 1400.f;
+    Bounce->MaxDistanceFadeRange = 300.f;
+    Bounce->SetVisibility(bPresentationVisible);
+    AddInstanceComponent(Bounce);
+    Bounce->RegisterComponent();
+    Lights.Add(Bounce);
+    UNiagaraSystem* System = TorchFlame.LoadSynchronous();
+    if (!System) return;
+    UNiagaraComponent* Effect = NewObject<UNiagaraComponent>(this, NAME_None, RF_Transient);
+    Effect->SetAutoActivate(false);
+    Effect->SetupAttachment(RouteRoot);
+    Effect->SetRelativeLocation(FlamePosition);
+    Effect->SetRelativeScale3D(FVector(0.35f));
+    Effect->SetAsset(System);
+    Effect->SetCastShadow(false);
+    Effect->SetCanEverAffectNavigation(false);
+    Effect->SetVisibility(bPresentationVisible);
+    AddInstanceComponent(Effect);
+    Effect->RegisterComponent();
+    Effect->SetComponentTickEnabled(bPresentationVisible);
+    if (bPresentationVisible) Effect->Activate(true);
+    TorchEffects.Add(Effect);
 }
 
 bool AEncounterDungeonRoute::ConfigureLayout(int32 InLayoutVariant)
@@ -187,18 +267,26 @@ void AEncounterDungeonRoute::SetPresentationVisible(bool bVisible)
     // 이후 생성하는 컴포넌트를 포함해 미리 준비한 구간의 조명까지 명시적으로 숨깁니다.
     bPresentationVisible = bVisible;
     SetActorHiddenInGame(!bVisible);
-    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, LeftDoors, RightDoors, DoorSeals};
+    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, LeftDoors, RightDoors, DoorSeals, Torches};
     for (UInstancedStaticMeshComponent* Shape : Shapes) Shape->SetVisibility(bVisible);
     for (UPointLightComponent* Light : Lights)
     {
         if (IsValid(Light) && Light->GetOwner() == this) Light->SetVisibility(bVisible);
+    }
+    for (UNiagaraComponent* Effect : TorchEffects)
+    {
+        if (!IsValid(Effect) || Effect->GetOwner() != this) continue;
+        Effect->SetVisibility(bVisible);
+        Effect->SetComponentTickEnabled(bVisible);
+        if (bVisible) Effect->Activate(false);
+        else Effect->DeactivateImmediate();
     }
     if (IsValid(PresentedStage) && PresentedStage->GetOwner() == this) PresentedStage->SetPresentationVisible(bVisible);
 }
 
 void AEncounterDungeonRoute::ClearGeometry()
 {
-    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, LeftDoors, RightDoors, DoorSeals};
+    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, LeftDoors, RightDoors, DoorSeals, Torches};
     for (UInstancedStaticMeshComponent* Shape : Shapes) Shape->ClearInstances();
     DoorCenters.Reset();
     for (UPointLightComponent* Light : Lights)
@@ -206,6 +294,11 @@ void AEncounterDungeonRoute::ClearGeometry()
         if (IsValid(Light) && Light->GetOwner() == this) Light->DestroyComponent();
     }
     Lights.Reset();
+    for (UNiagaraComponent* Effect : TorchEffects)
+    {
+        if (IsValid(Effect) && Effect->GetOwner() == this) Effect->DestroyComponent();
+    }
+    TorchEffects.Reset();
     bGeometryPrepared = false;
 }
 
@@ -251,6 +344,7 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
     for (const FIntPoint& Cell : Cells)
     {
         const FVector Center(Cell.X * CellSize, Cell.Y * CellSize, 0.f);
+        bool bTorchPlaced = false;
         // Back the joints with opaque slabs recessed two centimeters from the stone faces.
         // 석재 표면보다 2cm 들어간 불투명 판으로 줄눈을 막습니다.
         AddBlock(Mortar, Center + FVector(0.f, 0.f, -12.f), FVector(CellSize, CellSize, 20.f));
@@ -263,6 +357,11 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
             if (Neighbor == FIntPoint(1, 0) && LoopExitCells.Contains(Cell)) continue;
             const FVector Normal(Neighbor.X, Neighbor.Y, 0.f);
             const FVector Tangent(-Neighbor.Y, Neighbor.X, 0.f);
+            if (!bTorchPlaced && ((Cell.X + Cell.Y) % 2 == 0 || Cell == FIntPoint(1, 0)))
+            {
+                AddTorch(Center, Normal);
+                bTorchPlaced = true;
+            }
             const bool bAlongY = Neighbor.X != 0;
             const FVector WallCenter = Center + Normal * (CellSize * 0.5f + 16.f) + FVector(0.f, 0.f, WallHeight * 0.5f);
             AddBlock(Mortar, WallCenter, bAlongY ? FVector(32.f, CellSize, WallHeight) : FVector(CellSize, 32.f, WallHeight));
@@ -273,7 +372,6 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
             PillarCorners.Add(EdgeCenter + EdgeTangent);
             PillarCorners.Add(EdgeCenter - EdgeTangent);
         }
-        if ((Cell.X + Cell.Y) % 2 == 0) AddLight(Center + FVector(0.f, 0.f, WallHeight * 0.5f));
     }
     for (const FIntPoint& Corner : PillarCorners)
     {
@@ -326,6 +424,9 @@ AEncounterPrototypeStage* AEncounterDungeonRoute::ConfigureStage(const AEncounte
     const FVector Aim = Stage->GetPresentationFocus(Focus, FocusRadius) ? Stage->GetActorTransform().InverseTransformPosition(Focus) + FVector(0.f, -40.f, 0.f) : FVector(35.f, -170.f, 145.f);
     Stage->Camera->SetRelativeRotation((Aim - Stage->Camera->GetRelativeLocation()).Rotation());
     Stage->Camera->SetFieldOfView(80.f);
+    Stage->Camera->PostProcessSettings = Camera->PostProcessSettings;
+    Stage->Camera->PostProcessBlendWeight = Camera->PostProcessBlendWeight;
+    Stage->UseDungeonLighting();
     Stage->SetPresentationVisible(bPresentationVisible);
     Stage->StopPresentation();
     StopTravel();
