@@ -86,6 +86,9 @@ private:
     void FinishEncounterPresentation(uint32 Generation);
     void FadeEncounterExit(uint32 Generation);
     void FinishEncounterExit(uint32 Generation);
+    void FinishCombatTravel(uint32 Generation);
+    void TryRevealCombat(uint32 Generation);
+    void RevealCombat(uint32 Generation);
     bool PrepareDungeonRoutes(const FGameplayViewState& View);
     void ExecuteShopPurchase(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision);
     void ExecuteItemSale(FGuid RequestId, const FRunItemSaleCommand& Command);
@@ -168,6 +171,9 @@ private:
     bool bEncounterPresentationTransition = false;
     bool bEncounterExitTransition = false;
     bool bNeedsLoopEntrance = false;
+    bool bCombatEntryTransition = false;
+    bool bCombatTravelFinished = false;
+    bool bCombatEntryFading = false;
     bool bPresentationEnding = false;
 
     UPROPERTY(Transient)

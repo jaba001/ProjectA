@@ -55,7 +55,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 `ProjectA.uproject`에서 프로젝트 플러그인 `AsyncLoadingScreen`을 활성화한다. Epic Launcher의 과거 라이브러리 기록에서 확인한 플러그인이며, 현재 설치본이 없어 제작자의 MIT 공개 소스 1.7.0·UE 5.8용 [커밋 77f3cdcf](https://github.com/truong-bui/AsyncLoadingScreen/tree/77f3cdcfc32afa2422d1208e04b61df3bd9a52dc)를 `Plugins/AsyncLoadingScreen`에 포함했다. 소스의 줄 끝 공백·말미 빈 줄만 정리하고 기능은 변경하지 않았다. 원본 데모 Content·동영상은 포함하지 않으며 `LICENSE`는 게임 패키지의 NonUFS 런타임 의존성과 플러그인 배포 필터에 등록한다. 생성된 Binaries·Intermediate는 Git에서 제외한다.
 
-플러그인은 `PreLoadingScreen` 단계에 등록되어 엔진 MoviePlayer의 시작 화면과 실제 맵 로딩 준비 이벤트를 처리한다. 전용 서버 모듈에서 제외하고 새 GameInstance·개별 OpenLevel 후킹을 추가하지 않는다. `DefaultGame.ini`의 `/Script/AsyncLoadingScreen.LoadingScreenSettings`에서 startup/default 화면을 설정한다. 맵 로드가 끝나면 자동 종료하며 최소 표시 시간·수동 종료·엔진 tick·PSO 추가 대기·완료 키 입력을 사용하지 않는다. 맵 준비 완료와 다음 tick의 Gameplay 초기화·복제 준비는 구분한다.
+플러그인은 `PreLoadingScreen` 단계에 등록되어 엔진 MoviePlayer의 시작 화면과 실제 맵 로딩 준비 이벤트를 처리한다. 전용 서버 모듈에서 제외하고 새 GameInstance·개별 OpenLevel 후킹을 추가하지 않는다. `DefaultGame.ini`의 `/Script/AsyncLoadingScreen.LoadingScreenSettings`에서 startup/default 화면을 설정한다. 맵 로드가 끝나면 자동 종료하며 최소 표시 시간·수동 종료·엔진 tick·PSO 추가 대기·완료 키 입력을 사용하지 않는다. 맵 준비 완료와 다음 tick의 Gameplay 초기화·복제 준비는 구분한다. 같은 Gameplay 월드의 PvE 준비에는 MoviePlayer 대신 미로 이동과 native 회전 표시를 사용한다.
 
 배경은 기존 `/Game/DemonicUI/Backgrounds/Background.Background`를 직접 참조한다. `UProjectAAssetManager::ModifyCook`은 두 화면에 지정한 배경의 패키지만 중복 없이 추가하며 원본 팩 전체를 포함하지 않는다. 해당 설정 조회 의존성은 Editor 빌드에만 추가한다. 현재 회전 표시는 Slate 색상 브러시, 글자는 엔진 Roboto와 기존 한국어 fallback을 사용한다. 원본 배경은 8000×4501·NeverStream이며 최초 로드/메모리 영향은 실제 확인이 남아 있다. [표시와 검수 범위](UI_README.md#14-로딩-화면)
 
@@ -536,6 +536,10 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 로컬 컨트롤러가 실제 선택의 저장·복제를 확인한 경우에만 2.8초 보행·코너 회전과 입구 문 열기 0.65초를 표시한다. 세 방에는 각각 석재 문틀과 `Fantastic_Dungeon_Pack` 원본 양쪽 문짝의 입구·후문·마지막 연결문이 있고 새 구간 입구에도 같은 문을 둔다. 문짝은 원본 bounds로 배치하고 경첩 기준 100도 회전한다. 입장 완료 후 입구를 닫고 왼쪽 장비·가방과 오른쪽 상품을 함께 표시한다. 구매·판매·리롤은 재연출하지 않으며 Continue·늦은 접속은 문이 닫힌 도착점으로 바로 복원한다.
 
 서버가 상점 퇴장을 확정하면 현재 방의 중앙선으로 직진하여 후문 앞에서 0.65초 개방을 기다린 뒤 마지막 연결문까지 간다. 연결문 32cm 앞에서 문짝·같은 목재 재질의 틈 가림판이 시야를 채운 상태로 0.18초 페이드와 캐시 구간 교환을 수행한다. 새 구간은 같은 문·거리·정면 구도로 복원하고 문 열기 0.65초·갈림길 진입 0.6초 뒤 선택 UI를 표시한다. 마지막 문 뒤의 끝 벽은 생성하지 않는다. 이동·개방 중 UI와 로컬 진행 입력을 막으며 세대 토큰으로 중단·새 상태의 이전 콜백을 무효화한다. 문·문틀·후문 뒤 바닥 두 칸은 로컬 장식이며 충돌·navigation·복제·추가 저장 데이터가 없다. 선택 화면은 하단 3열 카드, 전투는 기존 Arena 카메라를 사용하고 연출 없는 맵은 기존 UI를 유지한다. 구매·진행·소유권·Host 권위·저장된 8개 변형과 전투장 좌표·Grid 점유는 유지한다. [직진·연결문 수정 근거](History/2026-10-10_11.md#9-65-2026-10-11-직진-퇴장과-문-뒤-구간-연결)
+
+PvE 난이도 선택이 권위 측 `Preparing`에 반영되면 복제 뷰의 `CombatEntranceDirection`으로 기존 후보 순서의 통로를 걷는다. NPC를 생성하지 않고 입구·후문을 열어 마지막 닫힌 문까지 진행한다. 보행은 3.6초, 코너 회전은 각각 0.18초, 문 개방은 각각 0.65초다. `GameplayPlayerController`의 시작 요청은 0.05초 뒤 `FStreamableManager`로 선택 편성의 몬스터 클래스·스킬과 생존 파티원의 장비·선택 몸체·의상 에셋을 비동기로 읽는다. 로드 핸들은 기존 환경 적용·스폰·GAS/참가 연결이 끝날 때까지 유지하고 실패는 기존 준비 취소·저장 재시도로 전달한다. 메모리 준비 선택과 확정 Ready 저장 경계는 유지하며 추가 저장이나 후보 재추첨은 없다.
+
+이동 중에는 오른쪽 아래에 `불러오는 중`을 표시하고 전투 계획 UI·카메라·입력을 보류한다. 문 도착과 로컬 전투 뷰·유닛의 BeginPlay가 모두 준비되면 0.18초 페이드 뒤 전장으로 전환하고 0.3초로 밝힌다. 준비가 늦으면 닫힌 문 앞에서 기다린다. 전투 Continue·늦은 접속은 기존 복원 경로를 사용하고 일반 요청·미로 없는 맵도 준비 표시를 사용할 수 있다. 유닛 스폰·환경 컴포넌트 생성·Ready 체크포인트 저장은 게임 스레드 작업이며 완전한 무정지 전환은 검증하지 않았다. 실제 맵 변경과 레벨 스트리밍은 이 변경에 포함되지 않는다. [구현·검증](History/2026-10-10_11.md#9-66-2026-10-11-pve-미로-이동과-비동기-전투-준비)
 
 기존 통합 맵의 작성 입력은 [UnifiedGameplaySpecs.json](../../Source/ProjectAEditor/Scripts/UnifiedGameplaySpecs.json), 작성기는 [ConfigureUnifiedGameplay.py](../../Source/ProjectAEditor/Scripts/ConfigureUnifiedGameplay.py)다. 지하 연출은 런타임에 구성하므로 이 맵을 재작성하지 않는다. 당시 맵 작성·NPC 검수는 [9-32절](History/2026-10-07_09.md#9-32-2026-10-08-통합-gameplay와-npc-상점-프로토타입), 고정 미로 도입은 [9-35절](History/2026-10-07_09.md#9-35-2026-10-09-지하-미로-갈림길-연출), 시드별 계획·구간 재사용의 현재 검증 대기는 [9-36절](History/2026-10-07_09.md#9-36-2026-10-09-시드별-미로-계획과-구간-재사용)에 구분한다. 실제 코너 이동·가독성·동일 시드/Continue 복원·2인 배치 일치·구간 수와 성능은 [TODO 26](TODO.md#26-재개-후-로컬-검수와-저장-보완)의 확인 대상이다.
 

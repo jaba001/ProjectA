@@ -47,6 +47,7 @@ public:
     bool StartTravel(int32 Direction);
     bool StartExitTravel();
     bool StartLoopEntrance();
+    bool StartCombatTravel(int32 Direction);
     bool IsTraveling() const;
     AEncounterPrototypeStage* GetPresentedStage() const;
     void FinishAtStage();
@@ -110,5 +111,6 @@ private:
     bool bTraveling = false;
     bool bExiting = false;
     bool bLoopEntering = false;
+    bool bCombatEntering = false;
     bool bPresentationVisible = true;
 };

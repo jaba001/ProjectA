@@ -1,6 +1,7 @@
 #include "Controller/GameplayPlayerController.h"
 
 #include "Combat/CombatManager.h"
+#include "Combat/Round/CombatRoundCoordinator.h"
 #include "Camera/CameraActor.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Engine/GameInstance.h"
@@ -23,6 +24,7 @@
 #include "Game/Development/DevelopmentCoopLobby.h"
 #include "Game/Development/DevelopmentCoopSubsystem.h"
 #include "Net/UnrealNetwork.h"
+#include "Unit/UnitBase.h"
 
 void AGameplayPlayerController::ServerSetDevelopmentReady_Implementation(bool bReady)
 {
@@ -168,7 +170,7 @@ void AGameplayPlayerController::RequestStartNode(FName NodeId, FGameplayTag Diff
 {
     if (CanIssueRunCommands() && EncounterManager)
     {
-        EncounterManager->RequestStartNode(NodeId, DifficultyTag);
+        EncounterManager->RequestStartNode(NodeId, DifficultyTag, true);
     }
 }
 
@@ -274,7 +276,7 @@ FGuid AGameplayPlayerController::GetRewardCharacterId(const FGameplayViewState& 
 
 bool AGameplayPlayerController::IsRoundInputEnabled() const
 {
-    return Super::IsRoundInputEnabled() && (!GameplayRootWidget || !GameplayRootWidget->IsUtilityMenuOpen());
+    return !bEncounterPresentationTransition && Super::IsRoundInputEnabled() && (!GameplayRootWidget || !GameplayRootWidget->IsUtilityMenuOpen());
 }
 
 void AGameplayPlayerController::RequestPurchaseShopOffer(FGuid CharacterId, FName OfferId, int32 ExpectedShopRevision)
@@ -542,13 +544,13 @@ bool AGameplayPlayerController::CanRetryGameplayRecovery() const
 bool AGameplayPlayerController::CanActivateRoundCamera() const
 {
     const ERunPhase Phase = HasAuthority() && RunState ? RunState->GetPhase() : GameplayState ? GameplayState->GetViewState().Phase : ERunPhase::None;
-    return !bPresentationEnding && Phase == ERunPhase::Combat;
+    return !bPresentationEnding && !bEncounterPresentationTransition && Phase == ERunPhase::Combat;
 }
 
 void AGameplayPlayerController::ResetEncounterPresentation()
 {
     GetWorldTimerManager().ClearTimer(EncounterPresentationTimer);
-    if (bEncounterExitTransition && PlayerCameraManager) PlayerCameraManager->StopCameraFade();
+    if ((bEncounterExitTransition || bCombatEntryTransition) && PlayerCameraManager) PlayerCameraManager->StopCameraFade();
     ++PresentationGeneration;
     if (PresentedStage.IsValid()) PresentedStage->StopPresentation();
     if (DungeonRoute.IsValid())
@@ -562,6 +564,9 @@ void AGameplayPlayerController::ResetEncounterPresentation()
     bEncounterPresentationTransition = false;
     bEncounterExitTransition = false;
     bNeedsLoopEntrance = false;
+    bCombatEntryTransition = false;
+    bCombatTravelFinished = false;
+    bCombatEntryFading = false;
 }
 
 bool AGameplayPlayerController::PrepareDungeonRoutes(const FGameplayViewState& View)
@@ -624,6 +629,33 @@ void AGameplayPlayerController::RefreshEncounterPresentation(const FGameplayView
 {
     if (!IsLocalController() || bPresentationEnding) return;
     const FRunEncounterProgress& Progress = View.EncounterProgress;
+    if (bCombatEntryTransition)
+    {
+        if ((View.Phase == ERunPhase::Preparing || View.Phase == ERunPhase::Combat) && View.FlowMessage.IsEmpty() && DungeonRoute.IsValid() && PresentedCompletedCount == Progress.AfterCompletedNodeCount)
+        {
+            PresentationPhase = View.Phase;
+            if (bCombatTravelFinished) TryRevealCombat(PresentationGeneration);
+            return;
+        }
+        ResetEncounterPresentation();
+    }
+    const bool bWalkToCombat = (View.Phase == ERunPhase::Preparing || View.Phase == ERunPhase::Combat) && PresentationPhase == ERunPhase::Map && View.FlowMessage.IsEmpty() && View.CombatEntranceDirection >= 0 && View.CombatEntranceDirection < 3 && bWorldEncounterPresentation && DungeonRoute.IsValid() && PresentationViewTarget == DungeonRoute && PresentedDungeonSeed == View.DungeonState.Seed && PresentedDungeonVersion == View.DungeonState.SchemaVersion;
+    if (bWalkToCombat)
+    {
+        ResetEncounterPresentation();
+        DungeonRoute->SetPresentationVisible(true);
+        if (DungeonRoute->StartCombatTravel(View.CombatEntranceDirection))
+        {
+            PresentationPhase = View.Phase;
+            bCombatEntryTransition = true;
+            bEncounterPresentationTransition = true;
+            bWorldEncounterPresentation = true;
+            PresentationViewTarget = DungeonRoute.Get();
+            DungeonRoute->OnTravelFinished.AddUObject(this, &AGameplayPlayerController::FinishCombatTravel, PresentationGeneration);
+            SetViewTargetWithBlend(DungeonRoute.Get(), 0.f);
+            return;
+        }
+    }
     TArray<FName> OfferIds;
     for (const FRunEncounterOffer& Offer : Progress.Offers) OfferIds.Add(Offer.EncounterId);
     const bool bWalkFromJunction = View.Phase == ERunPhase::Shop && PresentationPhase == ERunPhase::EncounterChoice && PresentationViewTarget == DungeonRoute && DungeonRoute.IsValid() && PresentedCompletedCount == Progress.AfterCompletedNodeCount && PresentedVisitIndex == Progress.VisitIndex && PresentedOfferIds == OfferIds && PresentedDungeonSeed == View.DungeonState.Seed && PresentedDungeonVersion == View.DungeonState.SchemaVersion;
@@ -802,6 +834,48 @@ void AGameplayPlayerController::FinishEncounterPresentation(uint32 Generation)
     RefreshGameplayFlow();
 }
 
+void AGameplayPlayerController::FinishCombatTravel(uint32 Generation)
+{
+    if (bPresentationEnding || !bCombatEntryTransition || Generation != PresentationGeneration) return;
+    bCombatTravelFinished = true;
+    TryRevealCombat(Generation);
+}
+
+void AGameplayPlayerController::TryRevealCombat(uint32 Generation)
+{
+    if (bPresentationEnding || !bCombatEntryTransition || bCombatEntryFading || !bCombatTravelFinished || Generation != PresentationGeneration) return;
+    const ERunPhase Phase = HasAuthority() && RunState ? RunState->GetPhase() : GameplayState ? GameplayState->GetViewState().Phase : ERunPhase::None;
+    if (Phase != ERunPhase::Preparing && Phase != ERunPhase::Combat)
+    {
+        ResetEncounterPresentation();
+        RefreshGameplayFlow();
+        return;
+    }
+    const ACombatRoundCoordinator* EntryRound = GetRoundCoordinator();
+    const bool bReady = Phase == ERunPhase::Combat && IsValid(EntryRound) && IsValid(EntryRound->GetArena()) && !EntryRound->GetView().Units.IsEmpty() && !EntryRound->GetView().Units.ContainsByPredicate([](const FCombatRoundUnitView& Unit) { return !IsValid(Unit.Unit) || !Unit.Unit->HasActorBegunPlay(); });
+    if (!bReady)
+    {
+        GetWorldTimerManager().SetTimer(EncounterPresentationTimer, FTimerDelegate::CreateUObject(this, &AGameplayPlayerController::TryRevealCombat, Generation), 0.05f, false);
+        return;
+    }
+    // Hold the final door until both travel and the local replicated combat actors are ready.
+    // 이동과 로컬 복제 전투 액터가 모두 준비될 때까지 마지막 문 앞을 유지합니다.
+    bCombatEntryFading = true;
+    if (PlayerCameraManager) PlayerCameraManager->StartCameraFade(0.f, 1.f, 0.18f, FLinearColor::Black, false, true);
+    GetWorldTimerManager().SetTimer(EncounterPresentationTimer, FTimerDelegate::CreateUObject(this, &AGameplayPlayerController::RevealCombat, Generation), 0.18f, false);
+}
+
+void AGameplayPlayerController::RevealCombat(uint32 Generation)
+{
+    if (bPresentationEnding || !bCombatEntryTransition || Generation != PresentationGeneration) return;
+    const ACombatRoundCoordinator* EntryRound = GetRoundCoordinator();
+    ACombatArena* Arena = IsValid(EntryRound) ? EntryRound->GetArena() : nullptr;
+    ResetEncounterPresentation();
+    RefreshGameplayFlow();
+    if (IsValid(Arena) && CanActivateRoundCamera()) EnsureRoundCamera(Arena);
+    if (PlayerCameraManager) PlayerCameraManager->StartCameraFade(1.f, 0.f, 0.3f, FLinearColor::Black, false, false);
+}
+
 void AGameplayPlayerController::RefreshGameplayFlow()
 {
     if (bPresentationEnding) return;
@@ -929,15 +1003,11 @@ void AGameplayPlayerController::RefreshGameplayFlow()
         FlowMessage = EncounterManager->GetFlowMessage();
     }
 
-    const bool bInCombat = RunState->GetPhase() == ERunPhase::Combat && bManagedInputAllowed && Manager && Manager->IsCombatActive();
+    const FGameplayViewState View = FGameplayViewState::FromRun(RunState, FlowMessage);
+    RefreshEncounterPresentation(View);
+    const bool bInCombat = RunState->GetPhase() == ERunPhase::Combat && bManagedInputAllowed && Manager && Manager->IsCombatActive() && !bEncounterPresentationTransition;
     SetCombatContext(Manager, bInCombat);
-
-    if (GameplayRootWidget)
-    {
-        const FGameplayViewState View = FGameplayViewState::FromRun(RunState, FlowMessage);
-        RefreshEncounterPresentation(View);
-        GameplayRootWidget->RefreshFlowView(View, CanIssueRunCommands(), CanRetryGameplayRecovery(), bWorldEncounterPresentation, bEncounterPresentationTransition);
-    }
+    if (GameplayRootWidget) GameplayRootWidget->RefreshFlowView(View, CanIssueRunCommands(), CanRetryGameplayRecovery(), bWorldEncounterPresentation, bEncounterPresentationTransition);
 
     // Active CommonUI screens own the input config; the controller keeps combat authorization.
     // 활성 CommonUI 화면이 입력 설정을 소유하고 컨트롤러는 전투 조작 허용 상태를 유지합니다.

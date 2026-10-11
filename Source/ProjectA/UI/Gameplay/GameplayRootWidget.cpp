@@ -8,6 +8,9 @@
 #include "Components/Border.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
+#include "Components/CircularThrobber.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Controller/GameplayPlayerController.h"
@@ -94,7 +97,7 @@ void UGameplayRootWidget::RefreshGold()
     const AGameplayPlayerController* Controller = GetOwningPlayer<AGameplayPlayerController>();
     const FGuid CharacterId = Controller ? Controller->GetInventoryCharacterId(CurrentView) : FGuid();
     const FRunPartyMember* Member = CharacterId.IsValid() ? CurrentView.PartyMembers.FindByPredicate([CharacterId](const FRunPartyMember& Candidate) { return Candidate.CharacterId == CharacterId && Candidate.bCreated; }) : nullptr;
-    const bool bVisible = Member && CurrentView.Phase != ERunPhase::None && !(DevelopmentWidget && DevelopmentWidget->IsActivated());
+    const bool bVisible = Member && !bFlowTransition && CurrentView.Phase != ERunPhase::None && !(DevelopmentWidget && DevelopmentWidget->IsActivated());
     GoldPanel->SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
     // Display only the confirmed personal balance shared with inventory and replicated Run views.
     // 인벤토리 및 복제 Run 뷰와 같은 확정 개인 잔액만 표시합니다.
@@ -103,7 +106,7 @@ void UGameplayRootWidget::RefreshGold()
 
 void UGameplayRootWidget::ToggleInventory()
 {
-    if (!UtilityLayer || !bHasDisplayedPhase || DisplayedPhase == ERunPhase::None || (DevelopmentWidget && DevelopmentWidget->IsActivated())) return;
+    if (!UtilityLayer || bFlowTransition || !bHasDisplayedPhase || DisplayedPhase == ERunPhase::None || (DevelopmentWidget && DevelopmentWidget->IsActivated())) return;
     UCommonActivatableWidget* Active = UtilityLayer->GetActiveWidget();
     if (Cast<UOptionsWidget>(Active)) return;
     if (DisplayedPhase == ERunPhase::Shop && RunEncounterWidget)
@@ -215,6 +218,24 @@ void UGameplayRootWidget::NativeOnInitialized()
     Shortcuts->SetText(NSLOCTEXT("GameplayHUD", "ShortcutHint", "I  인벤토리    Esc / O  설정"));
     UDemonicUITheme::Get().StyleText(Shortcuts, false, 13);
     GoldContent->AddChildToVerticalBox(Shortcuts)->SetPadding(FMargin(0.f, 4.f, 0.f, 0.f));
+    PreparationNotice = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("PreparationNotice"));
+    PreparationNotice->SetPadding(FMargin(16.f, 10.f));
+    PreparationNotice->SetVisibility(ESlateVisibility::Collapsed);
+    UOverlaySlot* PreparationSlot = NoticeRoot->AddChildToOverlay(PreparationNotice);
+    PreparationSlot->SetHorizontalAlignment(HAlign_Right);
+    PreparationSlot->SetVerticalAlignment(VAlign_Bottom);
+    PreparationSlot->SetPadding(FMargin(24.f));
+    UHorizontalBox* PreparationContent = WidgetTree->ConstructWidget<UHorizontalBox>();
+    PreparationNotice->SetContent(PreparationContent);
+    UCircularThrobber* PreparationSpinner = WidgetTree->ConstructWidget<UCircularThrobber>();
+    PreparationSpinner->SetRadius(12.f);
+    PreparationContent->AddChildToHorizontalBox(PreparationSpinner)->SetVerticalAlignment(VAlign_Center);
+    UTextBlock* PreparationText = WidgetTree->ConstructWidget<UTextBlock>();
+    PreparationText->SetText(NSLOCTEXT("ProjectALoading", "Travel", "불러오는 중"));
+    UDemonicUITheme::Get().StyleText(PreparationText, false, 18);
+    UHorizontalBoxSlot* PreparationTextSlot = PreparationContent->AddChildToHorizontalBox(PreparationText);
+    PreparationTextSlot->SetPadding(FMargin(12.f, 0.f, 0.f, 0.f));
+    PreparationTextSlot->SetVerticalAlignment(VAlign_Center);
     CheckpointNotice = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("CheckpointNotice"));
     UOverlaySlot* NoticeSlot = NoticeRoot->AddChildToOverlay(CheckpointNotice);
     NoticeSlot->SetHorizontalAlignment(HAlign_Center);
@@ -268,6 +289,7 @@ void UGameplayRootWidget::NativeOnInitialized()
     Theme.ApplyControls(WidgetTree);
     Theme.StylePanel(CheckpointNotice);
     Theme.StylePanel(DevelopmentBar);
+    Theme.StylePanel(PreparationNotice);
 
     SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     WidgetTree->RootWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
@@ -295,7 +317,11 @@ void UGameplayRootWidget::HandleRetryCheckpoint()
 void UGameplayRootWidget::RefreshFlowView(const FGameplayViewState& View, bool bAllowRunCommands, bool bCanRetryCheckpoint, bool bWorldPresentation, bool bPresentationTransition)
 {
     CurrentView = View;
-    const ERunPhase Phase = View.Phase;
+    bFlowTransition = bPresentationTransition || View.Phase == ERunPhase::Preparing;
+    const ERunPhase Phase = View.Phase == ERunPhase::Combat && bPresentationTransition ? ERunPhase::Preparing : View.Phase;
+    const bool bLoading = (View.Phase == ERunPhase::Preparing && View.FlowMessage.IsEmpty() && !bCanRetryCheckpoint) || (View.Phase == ERunPhase::Combat && bPresentationTransition);
+    PreparationNotice->SetVisibility(bLoading ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+    if (bFlowTransition && UtilityLayer && Cast<UInventoryWidget>(UtilityLayer->GetActiveWidget())) UtilityLayer->ClearWidgets();
     if (Phase == ERunPhase::Shop && UtilityLayer)
     {
         if (UInventoryWidget* Inventory = Cast<UInventoryWidget>(UtilityLayer->GetActiveWidget())) Inventory->DeactivateWidget();

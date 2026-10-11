@@ -9,11 +9,15 @@
 #include "Combat/SkillActor/SkillActorBase.h"
 #include "Components/CapsuleComponent.h"
 #include "Controller/PartyPlayerController.h"
+#include "Controller/GameplayPlayerController.h"
 #include "DataAsset/EncounterDefinitionDataAsset.h"
 #include "DataAsset/OpponentSnapshotCatalogDataAsset.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
+#include "DataAsset/CharacterAppearanceCatalog.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Game/Encounter/CombatArena.h"
@@ -78,7 +82,7 @@ void AEncounterManager::HandleCombatViewChanged()
     OnFlowChanged.Broadcast();
 }
 
-bool AEncounterManager::RequestStartNode(FName NodeId, FGameplayTag DifficultyTag)
+bool AEncounterManager::RequestStartNode(FName NodeId, FGameplayTag DifficultyTag, bool bBackgroundPreparation)
 {
     if (!HasAuthority() || bShuttingDown || bPreparing || bPreparationAbortPending || PendingResult != ECombatResult::None || !RunState || !RunState->CanStartNode(NodeId))
     {
@@ -101,6 +105,20 @@ bool AEncounterManager::RequestStartNode(FName NodeId, FGameplayTag DifficultyTa
         return false;
     }
     OnFlowChanged.Broadcast();
+    if (bBackgroundPreparation)
+    {
+        // Let the confirmed Preparing view render before asynchronous asset work begins.
+        // 비동기 에셋 준비 전에 확정된 Preparing 화면이 렌더링되도록 합니다.
+        GetWorldTimerManager().SetTimer(PreparationTimer, this, &AEncounterManager::StartBackgroundPreparation, 0.05f, false);
+        return true;
+    }
+    return CompletePreparation();
+}
+
+bool AEncounterManager::CompletePreparation()
+{
+    if (!HasAuthority() || bShuttingDown || !bPreparing || !RunState || RunState->GetPhase() != ERunPhase::Preparing) return false;
+    if (!ValidateManagedExecution(FlowMessage)) return FailPreparation(FlowMessage);
     if (!Arena || !CombatManager || !PartyDefinition)
     {
         return FailPreparation(NSLOCTEXT("EncounterManagerText", "M_A2B4F756", "Gameplay setup is incomplete. Check Arena and PartyDefinition. / Gameplay 설정을 확인하세요."));
@@ -139,7 +157,9 @@ bool AEncounterManager::RequestStartNode(FName NodeId, FGameplayTag DifficultyTa
     {
         return FailPreparation(AuthorityError);
     }
-    Arena->ActivateArena(GetWorld()->GetFirstPlayerController());
+    APlayerController* EntryController = GetWorld()->GetFirstPlayerController();
+    const AGameplayPlayerController* PresentationController = Cast<AGameplayPlayerController>(EntryController);
+    Arena->ActivateArena(PresentationController && PresentationController->IsEncounterPresentationTransitioning() ? nullptr : EntryController);
     if (!RunState->MarkCombatStarted())
     {
         return FailPreparation(NSLOCTEXT("EncounterManagerText", "M_A7F11564", "Run 전투 상태를 활성화하지 못했습니다."));
@@ -155,9 +175,101 @@ bool AEncounterManager::RequestStartNode(FName NodeId, FGameplayTag DifficultyTa
         return FailPreparation(NSLOCTEXT("EncounterManagerText", "M_D98D426B", "Combat could not start. / 전투를 시작할 수 없습니다."));
     }
     SetPlayerCombatInput(CombatManager->IsCombatActive());
-    UE_LOG(LogProjectA, Log, TEXT("[Encounter] Started Node=%s Units=%d"), *NodeId.ToString(), SpawnedUnits.Num());
+    UE_LOG(LogProjectA, Log, TEXT("[Encounter] Started Node=%s Units=%d"), *RunState->GetCurrentNodeId().ToString(), SpawnedUnits.Num());
     OnFlowChanged.Broadcast();
     return true;
+}
+
+void AEncounterManager::StartBackgroundPreparation()
+{
+    if (bShuttingDown || !bPreparing || !RunState || RunState->GetPhase() != ERunPhase::Preparing) return;
+    const uint32 Generation = ++PreparationGeneration;
+    TArray<FSoftObjectPath> Assets;
+    const auto Add = [&Assets](const FSoftObjectPath& Path) { if (!Path.IsNull()) Assets.AddUnique(Path); };
+    const auto AddAppearance = [&Add](const UCharacterAppearanceCatalog* Catalog, const FCharacterAppearanceSelection& Selection)
+    {
+        if (!Catalog) return;
+        if (const FCharacterAppearanceBodyVariant* Body = Catalog->FindBodyVariant(Selection.BodyId))
+        {
+            Add(Body->Mesh.ToSoftObjectPath());
+            Add(Body->AnimationClass.ToSoftObjectPath());
+        }
+        FGameplayTagContainer HiddenParts;
+        if (Catalog->bEnableOutfits)
+        {
+            for (FName ItemId : Selection.ItemIds)
+            {
+                if (const FCharacterAppearanceItem* Item = Catalog->FindItem(ItemId))
+                {
+                    HiddenParts.AppendTags(Item->HiddenBodyParts);
+                    for (const auto& Mesh : Item->Meshes) Add(Mesh.ToSoftObjectPath());
+                }
+            }
+        }
+        if (!HiddenParts.IsEmpty())
+        {
+            for (const FCharacterAppearanceBodyPart& Part : Catalog->BodyParts)
+            {
+                if (HiddenParts.HasTagExact(Part.PartTag)) continue;
+                Add(Part.Mesh.ToSoftObjectPath());
+                for (const auto& Material : Part.MaterialOverrides) Add(Material.ToSoftObjectPath());
+            }
+        }
+    };
+    if (RunState->IsTargetRun())
+    {
+        const FRunTargetState& Target = RunState->GetTargetRunState();
+        const int32 CombatIndex = RunState->GetCompletedNodes().Num();
+        if (CombatIndex % 2 == 0 && Target.Groups.IsValidIndex(CombatIndex / 2))
+        {
+            const FTargetRunGroup& Group = Target.Groups[CombatIndex / 2];
+            for (const FSoftClassPath& Class : Group.EnemyClasses) Add(Class);
+            for (const FRunMonsterDefinition& Monster : Group.EnemyRoster) Add(Monster.Skill);
+        }
+    }
+    for (const FRunPartyMember& Member : RunState->GetPartyMembers())
+    {
+        if (!Member.bCreated || Member.CurrentHP == 0.f) continue;
+        for (const FSoftObjectPath& Skill : Member.Skills) Add(Skill);
+        FProfessionDefinition Profession;
+        FText Error;
+        if (RunState->ResolveMemberProfession(Member, Profession, Error)) AddAppearance(Profession.AppearanceCatalog, Member.Appearance);
+        TArray<FRunEquipmentVisual> Visuals;
+        if (RunEquipmentRules::BuildVisuals(Member, Visuals, Error)) for (const FRunEquipmentVisual& Visual : Visuals) Add(Visual.Asset);
+    }
+    if (Assets.IsEmpty()) FinishBackgroundPreparation(Generation);
+    else
+    {
+        // Retain the handle through spawning so synchronous consumers reuse the asynchronously loaded assets.
+        // 스폰까지 핸들을 보존하여 동기 소비 경로가 비동기로 읽은 에셋을 재사용하도록 합니다.
+        PreparationLoad = UAssetManager::GetStreamableManager().RequestAsyncLoad(Assets, FStreamableDelegate::CreateUObject(this, &AEncounterManager::FinishBackgroundPreparation, Generation));
+        if (!PreparationLoad) FailPreparation(NSLOCTEXT("EncounterPreparation", "LoadRequestFailed", "전투 에셋 준비 요청을 시작하지 못했습니다."));
+    }
+}
+
+void AEncounterManager::FinishBackgroundPreparation(uint32 Generation)
+{
+    if (Generation != PreparationGeneration || bShuttingDown || !bPreparing || !RunState || RunState->GetPhase() != ERunPhase::Preparing) return;
+    if (PreparationLoad)
+    {
+        TArray<UObject*> Loaded;
+        PreparationLoad->GetLoadedAssets(Loaded);
+        if (Loaded.Contains(nullptr))
+        {
+            FailPreparation(NSLOCTEXT("EncounterPreparation", "MissingAssets", "전투에 필요한 에셋을 불러오지 못했습니다. 선택 화면에서 다시 시도하세요."));
+            return;
+        }
+    }
+    CompletePreparation();
+    PreparationLoad.Reset();
+}
+
+void AEncounterManager::CancelBackgroundPreparation()
+{
+    ++PreparationGeneration;
+    GetWorldTimerManager().ClearTimer(PreparationTimer);
+    if (PreparationLoad) PreparationLoad->CancelHandle();
+    PreparationLoad.Reset();
 }
 
 bool AEncounterManager::ConfigureCombatParticipants(FText& OutError)
@@ -764,6 +876,7 @@ bool AEncounterManager::SelectGoldReward(const FRunAccountId& AccountId, FGuid C
 
 bool AEncounterManager::FailPreparation(const FText& Message)
 {
+    CancelBackgroundPreparation();
     PreparationFailureMessage = Message;
     bPreparationAbortPending = true;
     CleanupEncounter();
@@ -852,6 +965,7 @@ void AEncounterManager::ShutdownGameplay()
         return;
     }
     bShuttingDown = true;
+    CancelBackgroundPreparation();
     GetWorldTimerManager().ClearTimer(FinishTimer);
     if (CombatManager)
     {

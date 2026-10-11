@@ -80,6 +80,11 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
             }
         }
         const FRunTargetState& Target = Run->GetTargetRunState();
+        if ((View.Phase == ERunPhase::Preparing || View.Phase == ERunPhase::Combat) && CompletedCount % 2 == 0 && Target.PveDifficulty.SelectedTags.IsValidIndex(CompletedCount / 2))
+        {
+            const FGameplayTag SelectedDifficulty = Target.PveDifficulty.SelectedTags[CompletedCount / 2];
+            View.CombatEntranceDirection = Target.PveDifficulty.Rules.IndexOfByPredicate([SelectedDifficulty](const FRunPveDifficultyRule& Rule) { return Rule.DifficultyTag == SelectedDifficulty; });
+        }
         if (View.Phase == ERunPhase::Map && View.bTargetRun && Target.PveDifficulty.SchemaVersion == 1 && CompletedCount % 2 == 0 && View.Nodes.IsValidIndex(CompletedCount) && View.AvailableNodes.Contains(View.Nodes[CompletedCount].NodeId))
         {
             FText DifficultyError;

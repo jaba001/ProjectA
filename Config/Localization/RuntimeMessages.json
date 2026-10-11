@@ -1339,6 +1339,18 @@
       "key": "M_EB39839F",
       "source": "아군 부활 창 열기",
       "translation": "Expand ally revival panel"
+    },
+    {
+      "namespace": "EncounterPreparation",
+      "key": "LoadRequestFailed",
+      "source": "전투 에셋 준비 요청을 시작하지 못했습니다.",
+      "translation": "Could not start loading combat assets."
+    },
+    {
+      "namespace": "EncounterPreparation",
+      "key": "MissingAssets",
+      "source": "전투에 필요한 에셋을 불러오지 못했습니다. 선택 화면에서 다시 시도하세요.",
+      "translation": "Required combat assets could not be loaded. Try again from the selection screen."
     }
   ]
 }

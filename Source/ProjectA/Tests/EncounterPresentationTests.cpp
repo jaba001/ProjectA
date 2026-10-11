@@ -284,6 +284,18 @@ bool FEncounterDungeonDoorLifecycleTest::RunTest(const FString& Parameters)
             Route->SetPresentationVisible(false);
             TestFalse(TEXT("Prepared or hidden rooms hide their doors and seam covers too."), Route->LeftDoors->IsVisible() || Route->RightDoors->IsVisible() || Route->DoorSeals->IsVisible());
             Route->SetPresentationVisible(true);
+            TestTrue(TEXT("PvE enters the chosen corridor without an NPC stage."), Route->StartCombatTravel(Direction));
+            TestFalse(TEXT("PvE travel cannot be replaced while its doors are opening."), Route->StartCombatTravel((Direction + 1) % 3));
+            Route->Tick(10.f);
+            TestTrue(TEXT("PvE stops before the terminal door and completes exactly once."), !Route->IsTraveling() && !Route->GetPresentedStage() && Route->Camera->GetRelativeLocation().Y == LoopDoor.Y && FMath::IsNearlyEqual(LoopDoor.X - Route->Camera->GetRelativeLocation().X, EncounterDungeonLayout::DoorCoverDistance) && Completions == Before + 4);
+            Controller->bCombatEntryTransition = true;
+            Controller->bCombatTravelFinished = true;
+            Controller->bEncounterPresentationTransition = true;
+            const uint32 CombatGeneration = Controller->PresentationGeneration;
+            Controller->ResetEncounterPresentation();
+            Controller->TryRevealCombat(CombatGeneration);
+            Controller->RevealCombat(CombatGeneration);
+            TestTrue(TEXT("A cancelled PvE entry cannot reveal a stale arena or keep input blocked."), !Controller->bCombatEntryTransition && !Controller->bEncounterPresentationTransition && !Controller->bCombatTravelFinished);
         }
     }
     Route->OnTravelFinished.Clear();

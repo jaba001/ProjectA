@@ -15,6 +15,7 @@ class UEncounterDefinitionDataAsset;
 class URunStateSubsystem;
 struct FRunEquipmentCommand;
 struct FRunItemSaleCommand;
+struct FStreamableHandle;
 
 DECLARE_MULTICAST_DELEGATE(FOnEncounterFlowChanged);
 
@@ -28,7 +29,7 @@ public:
     void InitializeEncounter(ACombatArena* InArena, ACombatManager* InCombatManager, UPartyDefinitionDataAsset* InPartyDefinition, const TMap<FName, TObjectPtr<UEncounterDefinitionDataAsset>>& InDefinitions);
 
     UFUNCTION(BlueprintCallable, Category = "Run")
-    bool RequestStartNode(FName NodeId, FGameplayTag DifficultyTag = FGameplayTag());
+    bool RequestStartNode(FName NodeId, FGameplayTag DifficultyTag = FGameplayTag(), bool bBackgroundPreparation = false);
 
     UFUNCTION(BlueprintCallable, Category = "Run")
     bool ContinueRun();
@@ -63,6 +64,10 @@ private:
 #endif
 
     bool SpawnEncounter(UEncounterDefinitionDataAsset* Definition);
+    bool CompletePreparation();
+    void StartBackgroundPreparation();
+    void FinishBackgroundPreparation(uint32 Generation);
+    void CancelBackgroundPreparation();
     void HandleCombatViewChanged();
     void HandleCombatResult(ECombatResult Result);
     void FinishEncounter();
@@ -98,6 +103,9 @@ private:
     FText PreparationFailureMessage;
     ECombatResult PendingResult = ECombatResult::None;
     FTimerHandle FinishTimer;
+    FTimerHandle PreparationTimer;
+    TSharedPtr<FStreamableHandle> PreparationLoad;
+    uint32 PreparationGeneration = 0;
     bool bPreparing = false;
     bool bPreparationAbortPending = false;
     bool bPlanningCheckpointRetryAvailable = false;

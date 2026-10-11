@@ -62,6 +62,9 @@ struct PROJECTA_API FGameplayViewState
     TArray<FRunPveDifficultyOffer> PveDifficultyOffers;
 
     UPROPERTY()
+    int32 CombatEntranceDirection = INDEX_NONE;
+
+    UPROPERTY()
     FRunEncounterProgress EncounterProgress;
 
     // Replicate the frozen presentation plan without granting clients progression authority.

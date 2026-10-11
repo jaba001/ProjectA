@@ -19,6 +19,7 @@
 #include "Grid/Combat/CombatGridTile.h"
 #include "Kismet/GameplayStatics.h"
 #include "Unit/UnitBase.h"
+#include "TimerManager.h"
 #include "UObject/StrongObjectPtr.h"
 
 namespace EncounterPreparationTests
@@ -173,6 +174,22 @@ bool FEncounterPreparationRetryTest::RunTest(const FString& Parameters)
         Controller->RequestRetryCombatCheckpoint();
         TestEqual(TEXT("Duplicate retries publish no extra transition"), MapEvents, 1);
         Fixture.Run->OnRunStateChanged.Clear();
+    }
+    {
+        EncounterPreparationTests::FFixture Fixture;
+        FText Error;
+        if (!TestTrue(TEXT("The background preparation fixture initializes."), Fixture.Initialize(Error))) return false;
+        AEncounterManager* Encounter = Fixture.Encounter;
+        Encounter->RunState = Fixture.Run.Get();
+        Encounter->CombatManager = Fixture.Combat;
+        Encounter->PartyDefinition = Fixture.Run->PartyDefinition;
+        TestTrue(TEXT("Background entry commits Preparing before rendering or loading."), Encounter->RequestStartNode(TEXT("Combat_01"), FGameplayTag(), true));
+        TestTrue(TEXT("The accepted request defers spawning and keeps combat inactive."), Fixture.Run->GetPhase() == ERunPhase::Preparing && Encounter->bPreparing && Encounter->GetSpawnedUnits().IsEmpty() && !Fixture.Combat->IsCombatActive() && Fixture.World->GetTimerManager().IsTimerActive(Encounter->PreparationTimer));
+        TestFalse(TEXT("A second request cannot overwrite pending background entry."), Encounter->RequestStartNode(TEXT("Combat_01"), FGameplayTag(), true));
+        const uint32 Generation = Encounter->PreparationGeneration;
+        Encounter->ShutdownGameplay();
+        Encounter->FinishBackgroundPreparation(Generation);
+        TestTrue(TEXT("Shutdown invalidates loading callbacks and clears pending timers without starting combat."), Encounter->PreparationGeneration != Generation && !Fixture.World->GetTimerManager().IsTimerActive(Encounter->PreparationTimer) && !Fixture.Combat->IsCombatActive() && Encounter->GetSpawnedUnits().IsEmpty() && Fixture.Run->GetPhase() == ERunPhase::Preparing);
     }
     return true;
 }

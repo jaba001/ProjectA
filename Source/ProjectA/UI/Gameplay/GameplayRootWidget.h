@@ -70,6 +70,9 @@ private:
     TObjectPtr<UTextBlock> GoldText;
 
     UPROPERTY(Transient)
+    TObjectPtr<UBorder> PreparationNotice;
+
+    UPROPERTY(Transient)
     TObjectPtr<UDataTable> ShortcutActions;
 
     UPROPERTY(Transient)
@@ -102,6 +105,7 @@ private:
 
     ERunPhase DisplayedPhase = ERunPhase::None;
     bool bHasDisplayedPhase = false;
+    bool bFlowTransition = false;
 
     UPROPERTY(Transient)
     TObjectPtr<URunMapWidget> RunMapWidget;
