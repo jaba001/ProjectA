@@ -216,15 +216,15 @@ S=10이고 중심과 상하좌우 네 칸 모두 적용 대상이면 다섯 유�
 |---|---|
 | 현재 전투 규칙·원작 참조 구분 | [GAME_DESIGN](GAME_DESIGN.md) 7-1·7-9·8-1~8-7 및 [이 문서의 남은 결정](#5-남은-결정) |
 | 요청·소유권·서버와 저장 경계 | [MULTIPLAYER](MULTIPLAYER.md) 12절, [PROJECT_PLAN](PROJECT_PLAN.md)의 라운드 전투 구조 |
-| 명령·행동 단계·스킬과 유닛 상태 | [CombatRoundTypes.h](../Source/ProjectA/Combat/Round/CombatRoundTypes.h) 19~37·147~183행, [CombatRoundCoordinator.h](../Source/ProjectA/Combat/Round/CombatRoundCoordinator.h) 47~56행 |
-| 속도·AI·검증·잠금 | [CombatRoundCoordinator.cpp](../Source/ProjectA/Combat/Round/CombatRoundCoordinator.cpp)의 `BeginPlanning()`·`ValidateCommand()`·`LockPlans()`, 330~598행 |
+| 명령·행동 단계·스킬과 유닛 상태 | [CombatRoundTypes.h](../../Source/ProjectA/Combat/Round/CombatRoundTypes.h) 19~37·147~183행, [CombatRoundCoordinator.h](../../Source/ProjectA/Combat/Round/CombatRoundCoordinator.h) 47~56행 |
+| 속도·AI·검증·잠금 | [CombatRoundCoordinator.cpp](../../Source/ProjectA/Combat/Round/CombatRoundCoordinator.cpp)의 `BeginPlanning()`·`ValidateCommand()`·`LockPlans()`, 330~598행 |
 | 처리 순서·이동·취소·발동·결과 | 같은 파일의 `AdvanceSimulation()`·`MoveUnitToward()`·`AdvanceAction()`·`StartReturn()`·`ReleaseSkill()`·`ApplyHit()`·`FinishRoundIfSettled()`, 642~950행 |
-| 발사 후 생존 독립 처리 | [CombatRoundProjectile.cpp](../Source/ProjectA/Combat/Round/CombatRoundProjectile.cpp) 68~109행 |
-| 사망과 점유·취소 함수 | [UnitBase.cpp](../Source/ProjectA/Unit/UnitBase.cpp)의 `Die()`·`CancelCurrentAction()`·`SetCurrentTile()`, 251~357행 |
-| HP 즉시 사망·기본 피해 | [AS_Unit.cpp](../Source/ProjectA/GAS/Attribute/AS_Unit.cpp) 27~65행, [GE_Damage.cpp](../Source/ProjectA/GAS/Effect/GE_Damage.cpp) 8~23행 |
-| 일괄 피해의 Source 제외·중복 제거 | [CombatEffectLibrary.cpp](../Source/ProjectA/Combat/Library/CombatEffectLibrary.cpp) 66~110행 |
-| 인접 8방향·진영 간 실제 간격 | [CombatGridManager.cpp](../Source/ProjectA/Grid/Combat/CombatGridManager.cpp) 50~63·110~139행 |
-| 스턴 태그 선언 | [DefaultGameplayTags.ini](../Config/DefaultGameplayTags.ini) 35행. C++ 사용 경로와 구분 |
+| 발사 후 생존 독립 처리 | [CombatRoundProjectile.cpp](../../Source/ProjectA/Combat/Round/CombatRoundProjectile.cpp) 68~109행 |
+| 사망과 점유·취소 함수 | [UnitBase.cpp](../../Source/ProjectA/Unit/UnitBase.cpp)의 `Die()`·`CancelCurrentAction()`·`SetCurrentTile()`, 251~357행 |
+| HP 즉시 사망·기본 피해 | [AS_Unit.cpp](../../Source/ProjectA/GAS/Attribute/AS_Unit.cpp) 27~65행, [GE_Damage.cpp](../../Source/ProjectA/GAS/Effect/GE_Damage.cpp) 8~23행 |
+| 일괄 피해의 Source 제외·중복 제거 | [CombatEffectLibrary.cpp](../../Source/ProjectA/Combat/Library/CombatEffectLibrary.cpp) 66~110행 |
+| 인접 8방향·진영 간 실제 간격 | [CombatGridManager.cpp](../../Source/ProjectA/Grid/Combat/CombatGridManager.cpp) 50~63·110~139행 |
+| 스턴 태그 선언 | [DefaultGameplayTags.ini](../../Config/DefaultGameplayTags.ini) 35행. C++ 사용 경로와 구분 |
 
 ## 7 핵심 검증 시나리오
 

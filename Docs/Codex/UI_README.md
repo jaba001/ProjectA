@@ -6,10 +6,10 @@
 
 | 구성 | 위치·역할 |
 |---|---|
-| 생성 도구 | [GenerateUiScaffoldCommandlet.cpp](../Source/ProjectAEditor/Commandlets/GenerateUiScaffoldCommandlet.cpp), Editor 전용 |
-| 명세 | [UiScaffoldSpecs](../Source/ProjectAEditor/UiScaffoldSpecs): 메뉴 3종·Gameplay 4종 |
-| Native UI | [Source/ProjectA/UI](../Source/ProjectA/UI), 화면 동작·선택적 fallback |
-| 공통 테마 | [DemonicUITheme](../Source/ProjectA/UI/Theme/DemonicUITheme.h), 기존 DemonicUI 텍스처와 컨트롤 외형 |
+| 생성 도구 | [GenerateUiScaffoldCommandlet.cpp](../../Source/ProjectAEditor/Commandlets/GenerateUiScaffoldCommandlet.cpp), Editor 전용 |
+| 명세 | [UiScaffoldSpecs](../../Source/ProjectAEditor/UiScaffoldSpecs): 메뉴 3종·Gameplay 4종 |
+| Native UI | [Source/ProjectA/UI](../../Source/ProjectA/UI), 화면 동작·선택적 fallback |
+| 공통 테마 | [DemonicUITheme](../../Source/ProjectA/UI/Theme/DemonicUITheme.h), 기존 DemonicUI 텍스처와 컨트롤 외형 |
 | WBP | `/Game/User_JeHoon/UI/MainMenu`, `/Game/User_JeHoon/UI/Gameplay` |
 | 검증 사본 | `/Game/User_JeHoon/Validation/T12` |
 
@@ -51,7 +51,7 @@ NPC 외형은 인카운터 태그와 실제 상품 Query를 평가하는 카탈�
 
 같은 상세 위젯의 `ConfigureInventory`·`ConfigureReward`는 가격과 구매 문구를 제외하고 장착/보관 상태 또는 보상 선택/수령 상태에 맞는 안내를 표시한다. 장비·가방·보상 카드는 비활성 상태에서도 설명을 조회하며 빈 슬롯에서는 연결을 해제한다. 상점·보상 목록은 스킬 이름/등급만 표시하고 상세 수치는 툴팁으로 확인한다. 보상 제목·카드는 지급 처리 중/수령 완료/미선택을 구분하고 남은 캐릭터의 수령 진행을 표시한다. 난이도 배율은 해당 구간 기본값을 100%로 안내하고 적 HP·적 속도·승리 골드임을 명시한다.
 
-Development Editor / Win64 빌드 후 프로젝트 루트 PowerShell에서 실행한다. 빌드·프로젝트 파일 재생성 명령은 [README](../README.md#개발-환경과-빌드)를 따른다.
+Development Editor / Win64 빌드 후 프로젝트 루트 PowerShell에서 실행한다. 빌드·프로젝트 파일 재생성 명령은 [README](../../README.md#개발-환경과-빌드)를 따른다.
 
 ```powershell
 $editor = 'C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'
@@ -201,7 +201,7 @@ Debug/Development에서 기본 활성화하며 콘솔 `projecta.Debug.UnitHP 0`�
 
 ### 7-2 전투 디버그 도구
 
-`UCombatDebugWidget`은 DebugCombat의 기존 전투 계획 화면 위 왼쪽에 접을 수 있는 도구 패널을 표시한다. 공통 DPI 적용 전 최대 920×760 UI 단위이며 현재 높이는 화면 높이에서 380을 뺀 값으로 제한한다. **스킬 구입 / 장비 / 캐릭터·체력 / 스킬 타이밍** 탭으로 전환하며 보유 목록과 검색·전체 목록은 각각 스크롤한다. 스킬 무료 추가·제거는 개수 상한 없이 지원하며, 장비는 무기 1·2 획득+장착·제거를 지원한다. 장착은 계획 단계의 생존 아군만 편집하며 장비는 외형만 반영한다. [레벨과 실행 방법](../README.md) · [구현·검증 이력](History/2026-10-01_06.md#9-15-2026-10-01-todo-재검증과-구현-이관)
+`UCombatDebugWidget`은 DebugCombat의 기존 전투 계획 화면 위 왼쪽에 접을 수 있는 도구 패널을 표시한다. 공통 DPI 적용 전 최대 920×760 UI 단위이며 현재 높이는 화면 높이에서 380을 뺀 값으로 제한한다. **스킬 구입 / 장비 / 캐릭터·체력 / 스킬 타이밍** 탭으로 전환하며 보유 목록과 검색·전체 목록은 각각 스크롤한다. 스킬 무료 추가·제거는 개수 상한 없이 지원하며, 장비는 무기 1·2 획득+장착·제거를 지원한다. 장착은 계획 단계의 생존 아군만 편집하며 장비는 외형만 반영한다. [레벨과 실행 방법](../../README.md) · [구현·검증 이력](History/2026-10-01_06.md#9-15-2026-10-01-todo-재검증과-구현-이관)
 
 **스킬 구입**에는 **속성: 전체 / 물리 / 화염 / 냉기 / 번개 / 카오스 / 복합 / 미분류**, **방식: 전체 / 투사체 / 범위형 / 체인 / 근접공격 / 지원형 / 미분류**를 두 줄로 표시한다. 속성·방식·이름/에셋명 검색을 모두 만족하는 미보유 후보만 나열한다. 각 탭의 개수에는 다른 분류의 선택과 검색·보유 제외를 반영하며 선택 탭과 현재 조건을 강조한다. 좁은 창에서는 각 줄의 탭을 줄바꿈한다. 분류·안내와 목록은 바깥 스크롤에 포함하고 보유·구입 목록은 화면 높이에 따라 220 UI 단위 이상의 독립 스크롤 영역을 확보하여 줄바꿈이 목록을 가리지 않게 한다. 복합 속성은 각 속성과 복합 탭에 표시한다. 치유·보호막은 지원형을 우선하고 `Skill.Shape.Chain` 공격은 체인에 포함하며 체인 태그가 없는 빔은 범위형에 포함한다. 신규 `link` 5종은 기존 Beam에 Chain을 추가하여 체인에 표시하고 범위형에서 제외한다. 기본 두 공격은 방식 태그가 없어 미분류에 유지하고 신규 60종은 저장된 속성·효과·형태 태그로 분류한다. 개발용 일반 카탈로그는 유효 DA 76종(기본 2·몬스터 12·기존 VFX 60·무기 전용 2)을 읽는다. `Skill.Shape.Chain`과 `MaxTargets>1` 설정은 최근접 생존 미타격 적의 서버 연쇄에 연결한다. 현재 개발 시험값은 첫 대상을 포함한 `MaxTargets=4`, `JumpDistance=600cm`, `JumpIntervalSeconds=0.4`, `DamageMultiplierPerJump=0.8`이다. 점프 간격은 2026-10-06 연결 가시성 조정으로 기존 0.15초에서 늘렸다. 링크 5종의 저장 DA에 적용하며 최초 시전자·GAS 태그를 유지한 채 직전 피격 적에서 최근접 생존 미타격 적으로 연쇄한다. 원본 VFX·SFX 참조와 다른 스킬 속성은 유지하며 실제 검수 상태는 [TODO 23절](History/2026-10-10_11.md#9-56-2026-10-11-사용자-엔진-확인과-todo-정리)을 따른다. 삭제 스킬과 CSV 보류 에셋은 목록에 제공하지 않는다. 보유 목록은 필터와 관계없이 유지하고 필터 전환 시 후보 목록을 처음으로 스크롤한다. **장비 / 캐릭터·체력 / 스킬 타이밍** 화면에서는 분류 탭을 숨긴다.
 
@@ -273,7 +273,7 @@ Gameplay 좌측 상단에 `보유 골드 10G` 형식의 작은 패널을 표시�
 
 공통 스크롤바는 두께 10 UI 단위·부드러운 휠 이동·포커스 이동 시 자동 스크롤을 사용하며 끝의 과도한 빈 공간 이동을 막는다. 기존 휠 입력 소비 정책과 명시적인 즉시 포커스 스크롤은 유지한다. 메뉴의 설정·종료 표시는 한국어로 통일하고 이어하기 비활성 사유를 제공한다. Gameplay 개인 골드 패널 아래에는 `I` 인벤토리·`Esc/O` 설정 단축키를 표시한다.
 
-기존 DemonicUI의 암갈색 패널·청동 장식·붉은 활성 버튼·청회색 성 배경을 현재 사용 중인 화면에 적용한다. 기준 구현은 [DemonicUITheme.h](../Source/ProjectA/UI/Theme/DemonicUITheme.h)·[DemonicUITheme.cpp](../Source/ProjectA/UI/Theme/DemonicUITheme.cpp)다. 원본 `/Game/DemonicUI` 에셋은 참조만 하며 수정·이동·복제하지 않는다. WBP·JSON·맵·Config 재생성은 필요하지 않다.
+기존 DemonicUI의 암갈색 패널·청동 장식·붉은 활성 버튼·청회색 성 배경을 현재 사용 중인 화면에 적용한다. 기준 구현은 [DemonicUITheme.h](../../Source/ProjectA/UI/Theme/DemonicUITheme.h)·[DemonicUITheme.cpp](../../Source/ProjectA/UI/Theme/DemonicUITheme.cpp)다. 원본 `/Game/DemonicUI` 에셋은 참조만 하며 수정·이동·복제하지 않는다. WBP·JSON·맵·Config 재생성은 필요하지 않다.
 
 ### 9-1 적용 구조
 
@@ -305,7 +305,7 @@ Gameplay 좌측 상단에 `보유 골드 10G` 형식의 작은 패널을 표시�
 
 ### 9-3 반영과 검증
 
-C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / Win64 빌드 후 UE를 재시작한다. 명령은 [README](../README.md#개발-환경과-빌드), 2026-10-01 실행 범위는 [재검증 이력](History/2026-10-01_06.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다. 이전 설정·전투 실행 결과를 새 테마의 가독성·입력·쿠킹 성공 근거로 사용하지 않는다.
+C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / Win64 빌드 후 UE를 재시작한다. 명령은 [README](../../README.md#개발-환경과-빌드), 2026-10-01 실행 범위는 [재검증 이력](History/2026-10-01_06.md#9-15-2026-10-01-todo-재검증과-구현-이관)을 따른다. 이전 설정·전투 실행 결과를 새 테마의 가독성·입력·쿠킹 성공 근거로 사용하지 않는다.
 
 에셋 선정 시 패키지 내부 썸네일과 직렬화된 `SizeX`·`SizeY`를 정적으로 조사했다. Unreal의 PNG 썸네일 저장 방식에 맞춰 조사 이미지의 R/B 채널을 보정했으며 게임 텍스처는 변환하지 않았다. 조사 산출물은 `Saved/Automation/DemonicUI`에 있고 실제 UI 실행 화면은 포함하지 않는다.
 
@@ -313,7 +313,7 @@ C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / 
 
 ### 10-1 공통 배율
 
-프로젝트 전체 UI는 [DefaultEngine.ini](../Config/DefaultEngine.ini)의 `/Script/Engine.UserInterfaceSettings`에서 `UIScaleRule=ScaleToFit`, `DesignScreenSize=(X=1920,Y=1080)`, `ApplicationScale=1`을 사용한다. DPI는 뷰포트 크기에 따라 UI의 글자·버튼·간격을 함께 조절하는 배율이다. 가로·세로를 다른 비율로 늘리지 않으며 기기 종류나 특정 해상도에 따른 별도 배치 규칙은 두지 않는다.
+프로젝트 전체 UI는 [DefaultEngine.ini](../../Config/DefaultEngine.ini)의 `/Script/Engine.UserInterfaceSettings`에서 `UIScaleRule=ScaleToFit`, `DesignScreenSize=(X=1920,Y=1080)`, `ApplicationScale=1`을 사용한다. DPI는 뷰포트 크기에 따라 UI의 글자·버튼·간격을 함께 조절하는 배율이다. 가로·세로를 다른 비율로 늘리지 않으며 기기 종류나 특정 해상도에 따른 별도 배치 규칙은 두지 않는다.
 
 뷰포트 너비를 `W`, 높이를 `H`라고 할 때 공통 배율은 `min(W / 1920, H / 1080)`이다. 뷰포트 픽셀 기준이며 모니터의 물리적 크기와는 구분한다.
 
@@ -390,7 +390,7 @@ Designer와 native 경로 모두 기존 `SlotActionBox` 행을 사용하므로 W
 
 `Async Loading Screen` 플러그인의 Classic 레이아웃을 사용한다. 기존 DemonicUI 성 배경을 비율 유지·화면 채우기로 표시하고 짙은 하단 밴드에 청동색 회전 표시·선택 언어의 안내·팁을 배치한다. 한국어 시작 안내는 `PROJECT A · 시작 준비 중`, 이후 맵 전환은 `불러오는 중`이다. 원형 표시의 반지름은 22, 8조각·회전 주기 1.2초이며 본문/팁 글자 크기는 26/20이다. 배경·폰트는 원본을 참조하고 별도 로딩바·동영상·이미지 사본을 만들지 않는다.
 
-장착·행동 계획·PvE 보상·상세 툴팁·난이도·단축키 팁 6개 중 하나를 로딩마다 표시하며 화면 도중 팁을 교체하지 않는다. 실제 맵 전체 진행률을 제공하지 않으므로 퍼센트나 가상 진행 막대는 표시하지 않는다. 로딩 완료 즉시 자동 종료하며 읽기를 위한 강제 대기나 추가 확인 키는 없다. 설정은 [DefaultGame.ini](../Config/DefaultGame.ini), 설치 버전·cook·라이선스는 [구현 구조 1-1절](PROJECT_PLAN.md#1-1-로딩-화면-플러그인)을 따른다.
+장착·행동 계획·PvE 보상·상세 툴팁·난이도·단축키 팁 6개 중 하나를 로딩마다 표시하며 화면 도중 팁을 교체하지 않는다. 실제 맵 전체 진행률을 제공하지 않으므로 퍼센트나 가상 진행 막대는 표시하지 않는다. 로딩 완료 즉시 자동 종료하며 읽기를 위한 강제 대기나 추가 확인 키는 없다. 설정은 [DefaultGame.ini](../../Config/DefaultGame.ini), 설치 버전·cook·라이선스는 [구현 구조 1-1절](PROJECT_PLAN.md#1-1-로딩-화면-플러그인)을 따른다.
 
 최초 실행·새 Run/이어하기의 Gameplay 이동·메뉴 복귀·협동의 실제 ClientTravel/OpenLevel이 적용 대상이다. 같은 Gameplay 내부의 인카운터·전투 카메라 전환, OpenLevel 이전 동기 저장/준비, 네트워크 연결 대기 전체를 덮는 기능은 아니다. 일반 PIE·Editor·commandlet·전용 서버에는 MoviePlayer 화면이 표시되지 않는다. 사용자는 Standalone Game 또는 독립 게임/패키지에서 확인하며 현재 컴파일 성공을 화면 검수 완료로 간주하지 않는다. [검증 근거](History/2026-10-07_09.md#9-45-2026-10-09-라이브러리-로딩-화면-플러그인)·[남은 확인](TODO.md#26-재개-후-로컬-검수와-저장-보완)
 

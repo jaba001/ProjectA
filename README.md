@@ -2,22 +2,22 @@
 
 Unreal Engine 5.8 기반의 파티·Grid 라운드 전투 로그라이트다. UI 중심으로 Run을 진행하고 파티 빌드를 성장시키며, 상대 Snapshot을 쓰는 Async PvP와 최대 4인 Co-op을 목표로 한다.
 
-README에는 개요·실행·빌드·문서 안내만 둔다. 기능별 상세 규칙은 [GAME_DESIGN](Docs/GAME_DESIGN.md)·[PROJECT_PLAN](Docs/PROJECT_PLAN.md)·[UI_README](Docs/UI_README.md)·[MULTIPLAYER](Docs/MULTIPLAYER.md)에, 완료 이력과 검증 근거는 [HISTORY](Docs/HISTORY.md)에 있다. 2026-10-11 이전의 상세 README 본문은 Git 이력에서 볼 수 있다.
+README에는 개요·실행·빌드·문서 안내만 둔다. 기능별 상세 규칙은 [GAME_DESIGN](Docs/Codex/GAME_DESIGN.md)·[PROJECT_PLAN](Docs/Codex/PROJECT_PLAN.md)·[UI_README](Docs/Codex/UI_README.md)·[MULTIPLAYER](Docs/Codex/MULTIPLAYER.md)에, 완료 이력과 검증 근거는 [HISTORY](Docs/Codex/HISTORY.md)에 있다. 2026-10-11 이전의 상세 README 본문은 Git 이력에서 볼 수 있다.
 
 ## 게임 구성
 
 | 영역 | 현재 구현 | 기준 문서 |
 |---|---|---|
-| Run | 새 싱글 Run은 인카운터 3회 → PvE → 인카운터 3회 → 로컬 Snapshot 전투를 10회 반복한다(60선택·10PvE·10Snapshot). 하나의 `Gameplay` 레벨에서 지하 미로 갈림길로 후보 3개 중 하나를 고른다. 성장·재화·장비는 다음 Run에 이월하지 않으며 Run 종료 시 MMR만 반영하는 정책이다(온라인 정산은 미구현). | [목표 Run](Docs/GAME_DESIGN.md#2-목표-run과-현재-구현) |
-| 전투 | 라운드마다 행동을 계획한 뒤 속도 차이만큼 시간차를 두고 자동 실행한다. 이동에는 SAP, 스킬에는 AP를 쓰며 스킬은 GAS로 실행한다. 명중 확률 없이 서버 충돌로 판정한다. 준비가 완료되면 본인 캐릭터의 숄더뷰로 전환한다. | [전투 규칙](Docs/GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투) |
-| 장비·스킬 | 장비 슬롯은 무기 2·방어구 4·목걸이 1·반지 2칸이다. 무기에는 5단계 고정 등급과, 태그 조건으로 추첨한 스킬 1개가 붙는다. 장착한 무기의 스킬만 사용하며 수호 스킬은 방패 전용이다. | [장비](Docs/GAME_DESIGN.md#2-2-장비-슬롯과-장비-부여-스킬) · [등급](Docs/GAME_DESIGN.md#2-4-무기-랜덤-스킬과-아이템-등급) |
-| 상점·인카운터 | 기본·등급별·태그별 상점과 회복의 샘물·소모품상점·부활소를 그룹 가중치로 제시한다. 상점은 구매·판매·리롤을 지원하고 직업별 NPC를 배치한다. | [상점 분류](Docs/GAME_DESIGN.md#2-3-상점-분류와-인카운터-가중치) |
-| PvE 난이도 | 하·중·상을 고르며 각각 초원·석조 던전·얼음 성채에서 전투한다. 몬스터 편성·체력 곡선·골드는 CSV로 정하고 Run 생성 시 저장한다. | [난이도 규칙](Docs/PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터) |
-| 저장 | 전투 밖에서는 일반 저장, 전투 중에는 Ready 경계마다 체크포인트를 쓴다. 저장에 실패하면 준비 완료를 막고 원본을 보존한다. 이전 저장의 카탈로그와 확정 결과도 보존한다. | [저장 경계](Docs/PROJECT_PLAN.md#5-저장과-멀티플레이-연결-경계) |
-| 멀티플레이 | 같은 PC에서 Listen Server로 2·4인 개발 협동을 할 수 있다. 명시적인 Steam 480 개발 연결 시제품이 있다. PlayFab 연동·중앙 저장·실제 2PC 확인은 준비 대기다. | [멀티플레이 계약](Docs/MULTIPLAYER.md) |
-| UI·현지화 | DemonicUI 공통 테마, 1920×1080 기준 DPI, 한국어·English 설정, Async Loading Screen을 사용한다. | [UI 구조](Docs/UI_README.md) |
+| Run | 새 싱글 Run은 인카운터 3회 → PvE → 인카운터 3회 → 로컬 Snapshot 전투를 10회 반복한다(60선택·10PvE·10Snapshot). 하나의 `Gameplay` 레벨에서 지하 미로 갈림길로 후보 3개 중 하나를 고른다. 성장·재화·장비는 다음 Run에 이월하지 않으며 Run 종료 시 MMR만 반영하는 정책이다(온라인 정산은 미구현). | [목표 Run](Docs/Codex/GAME_DESIGN.md#2-목표-run과-현재-구현) |
+| 전투 | 라운드마다 행동을 계획한 뒤 속도 차이만큼 시간차를 두고 자동 실행한다. 이동에는 SAP, 스킬에는 AP를 쓰며 스킬은 GAS로 실행한다. 명중 확률 없이 서버 충돌로 판정한다. 준비가 완료되면 본인 캐릭터의 숄더뷰로 전환한다. | [전투 규칙](Docs/Codex/GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투) |
+| 장비·스킬 | 장비 슬롯은 무기 2·방어구 4·목걸이 1·반지 2칸이다. 무기에는 5단계 고정 등급과, 태그 조건으로 추첨한 스킬 1개가 붙는다. 장착한 무기의 스킬만 사용하며 수호 스킬은 방패 전용이다. | [장비](Docs/Codex/GAME_DESIGN.md#2-2-장비-슬롯과-장비-부여-스킬) · [등급](Docs/Codex/GAME_DESIGN.md#2-4-무기-랜덤-스킬과-아이템-등급) |
+| 상점·인카운터 | 기본·등급별·태그별 상점과 회복의 샘물·소모품상점·부활소를 그룹 가중치로 제시한다. 상점은 구매·판매·리롤을 지원하고 직업별 NPC를 배치한다. | [상점 분류](Docs/Codex/GAME_DESIGN.md#2-3-상점-분류와-인카운터-가중치) |
+| PvE 난이도 | 하·중·상을 고르며 각각 초원·석조 던전·얼음 성채에서 전투한다. 몬스터 편성·체력 곡선·골드는 CSV로 정하고 Run 생성 시 저장한다. | [난이도 규칙](Docs/Codex/PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터) |
+| 저장 | 전투 밖에서는 일반 저장, 전투 중에는 Ready 경계마다 체크포인트를 쓴다. 저장에 실패하면 준비 완료를 막고 원본을 보존한다. 이전 저장의 카탈로그와 확정 결과도 보존한다. | [저장 경계](Docs/Codex/PROJECT_PLAN.md#5-저장과-멀티플레이-연결-경계) |
+| 멀티플레이 | 같은 PC에서 Listen Server로 2·4인 개발 협동을 할 수 있다. 명시적인 Steam 480 개발 연결 시제품이 있다. PlayFab 연동·중앙 저장·실제 2PC 확인은 준비 대기다. | [멀티플레이 계약](Docs/Codex/MULTIPLAYER.md) |
+| UI·현지화 | DemonicUI 공통 테마, 1920×1080 기준 DPI, 한국어·English 설정, Async Loading Screen을 사용한다. | [UI 구조](Docs/Codex/UI_README.md) |
 
-남은 작업과 사용자 확인 항목은 [TODO](Docs/TODO.md)에서 관리한다.
+남은 작업과 사용자 확인 항목은 [TODO](Docs/Codex/TODO.md)에서 관리한다.
 
 ## 실행
 
@@ -28,12 +28,12 @@ README에는 개요·실행·빌드·문서 안내만 둔다. 기능별 상세 �
 
 | 진입점 | 용도 |
 |---|---|
-| `/Game/User_JeHoon/LEVEL/Development/DebugCombat` | 전투 디버그. 스킬·장비·캐릭터/체력·스킬 타이밍 탭을 제공한다. [상세](Docs/PROJECT_PLAN.md#4-2-전투-디버그-레벨) |
-| `/Game/User_JeHoon/LEVEL/Environment/` | 환경 12맵과 지하 던전 2맵의 비교 레벨. [맵 목록](Docs/PROJECT_PLAN.md#4-4-환경-비교-레벨) |
-| 독립 게임 창 2개 → 멀티플레이 | 개발 협동. 첫 창이 방을 만들고 두 번째 창이 `127.0.0.1:7777`로 참가한다. [실행 명령](Docs/MULTIPLAYER.md#11-개발-실행-참조) |
+| `/Game/User_JeHoon/LEVEL/Development/DebugCombat` | 전투 디버그. 스킬·장비·캐릭터/체력·스킬 타이밍 탭을 제공한다. [상세](Docs/Codex/PROJECT_PLAN.md#4-2-전투-디버그-레벨) |
+| `/Game/User_JeHoon/LEVEL/Environment/` | 환경 12맵과 지하 던전 2맵의 비교 레벨. [맵 목록](Docs/Codex/PROJECT_PLAN.md#4-4-환경-비교-레벨) |
+| 독립 게임 창 2개 → 멀티플레이 | 개발 협동. 첫 창이 방을 만들고 두 번째 창이 `127.0.0.1:7777`로 참가한다. [실행 명령](Docs/Codex/MULTIPLAYER.md#11-개발-실행-참조) |
 | `-CustomConfig=SteamDev -ProjectASteamDev` | Win64 Development 게임 전용의 Steam 480 연결 확인 패널. 기본 설정은 Steam 비활성이다. |
 
-외부 에셋 팩은 Git에 포함되지 않으므로 다른 PC에서는 같은 경로에 따로 설치해야 한다. [에셋 구성](Docs/PROJECT_PLAN.md#6-gameplay-에셋과-배치)
+외부 에셋 팩은 Git에 포함되지 않으므로 다른 PC에서는 같은 경로에 따로 설치해야 한다. [에셋 구성](Docs/Codex/PROJECT_PLAN.md#6-gameplay-에셋과-배치)
 
 ## 개발 환경과 빌드
 
@@ -57,16 +57,18 @@ C++ 파일을 추가·삭제하거나 이름을 바꾼 뒤에는 프로젝트 �
 
 ## 문서
 
+Codex 문서는 `Docs/Codex/`, Claude 문서는 `Docs/Claude/`에 보관한다.
+
 | 문서 | 내용 |
 |---|---|
-| [GAME_DESIGN](Docs/GAME_DESIGN.md) | 목표 기획·확정 방향·아이템/직업/상점 기획 |
-| [PROJECT_PLAN](Docs/PROJECT_PLAN.md) | 모듈·전투·UI·에셋·설정의 현재 구조 |
-| [UI_README](Docs/UI_README.md) | UI 구조·JSON 명세·생성 옵션 |
-| [MULTIPLAYER](Docs/MULTIPLAYER.md) | 식별·소유권·저장·네트워크 계약 |
-| [TODO](Docs/TODO.md) | 남은 작업·미결정 제안·사용자 확인 |
-| [HISTORY](Docs/HISTORY.md) | 완료 이력 색인. 본문은 `Docs/History/`에 기간별로 있다. |
-| [STATUS_EFFECTS](Docs/STATUS_EFFECTS.md) | 상태이상 8종의 후순위 기획 |
-| [EXECUTION_DECISIONS](Docs/EXECUTION_DECISIONS.md) | 위임받아 실행할 때의 판단 근거 |
+| [GAME_DESIGN](Docs/Codex/GAME_DESIGN.md) | 목표 기획·확정 방향·아이템/직업/상점 기획 |
+| [PROJECT_PLAN](Docs/Codex/PROJECT_PLAN.md) | 모듈·전투·UI·에셋·설정의 현재 구조 |
+| [UI_README](Docs/Codex/UI_README.md) | UI 구조·JSON 명세·생성 옵션 |
+| [MULTIPLAYER](Docs/Codex/MULTIPLAYER.md) | 식별·소유권·저장·네트워크 계약 |
+| [TODO](Docs/Codex/TODO.md) | 남은 작업·미결정 제안·사용자 확인 |
+| [HISTORY](Docs/Codex/HISTORY.md) | 완료 이력 색인. 본문은 `Docs/Codex/History/`에 기간별로 있다. |
+| [STATUS_EFFECTS](Docs/Codex/STATUS_EFFECTS.md) | 상태이상 8종의 후순위 기획 |
+| [EXECUTION_DECISIONS](Docs/Codex/EXECUTION_DECISIONS.md) | 위임받아 실행할 때의 판단 근거 |
 | [Docs/Claude](Docs/Claude/README.md) | Claude의 리뷰·제안·인계 문서 |
 
 스크린샷과 갤러리는 `Docs/ScreanShoot/`에 로컬 보관하며 Git에서 제외한다. 새 clone에는 포함되지 않는다.
@@ -88,7 +90,7 @@ C++ 파일을 추가·삭제하거나 이름을 바꾼 뒤에는 프로젝트 �
 | [MONSTER_ASSETS](DataCatalogs/MONSTER_ASSETS.csv) | 몬스터 13종의 원본 팩·Blueprint·메시 경로(참고 자료) |
 | [SKILL_EFFECT_ASSETS](DataCatalogs/SKILL_EFFECT_ASSETS.csv) · [SKILL_CREATION_STATUS](DataCatalogs/SKILL_CREATION_STATUS.csv) · [SKILL_SOUND_ASSETS](DataCatalogs/SKILL_SOUND_ASSETS.csv) | VFX·스킬 생성 현황·SFX 원본 목록과 연결 기록 |
 
-무기 이름이 겹치면 행 순서대로 `이름 1`, `이름 2`처럼 번호를 붙인다. 이 번호는 등급이나 강화 단계와 무관하다. [표시명 규칙](Docs/PROJECT_PLAN.md#4-1-스킬-이펙트-에셋-목록)
+무기 이름이 겹치면 행 순서대로 `이름 1`, `이름 2`처럼 번호를 붙인다. 이 번호는 등급이나 강화 단계와 무관하다. [표시명 규칙](Docs/Codex/PROJECT_PLAN.md#4-1-스킬-이펙트-에셋-목록)
 
 ## 작업 규칙
 
