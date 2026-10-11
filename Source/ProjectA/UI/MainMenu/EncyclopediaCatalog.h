@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 
 class UPartyDefinitionDataAsset;
 
@@ -23,6 +24,15 @@ struct FEncyclopediaEntry
     EEncyclopediaCategory Category = EEncyclopediaCategory::Equipment;
     FText Title;
     FText Body;
+    FGameplayTagContainer Tags;
+};
+
+// Empty queries select all entries; specific queries inspect the actual content tags.
+// 빈 쿼리는 전체 항목을 선택하며 개별 쿼리는 실제 콘텐츠 태그를 검사합니다.
+struct FEncyclopediaSubcategory
+{
+    FText Label;
+    FGameplayTagQuery Query;
 };
 
 namespace EncyclopediaCatalog
@@ -30,5 +40,6 @@ namespace EncyclopediaCatalog
     FSoftObjectPath DefaultPartyPath();
     void GetSkillPaths(TArray<FSoftObjectPath>& OutPaths);
     FText CategoryName(EEncyclopediaCategory Category);
+    void GetSubcategories(EEncyclopediaCategory Category, const TArray<FEncyclopediaEntry>& Entries, TArray<FEncyclopediaSubcategory>& OutSubcategories);
     void Build(const UPartyDefinitionDataAsset* Party, const TArray<FSoftObjectPath>& SkillPaths, TArray<FEncyclopediaEntry>& OutEntries);
 }

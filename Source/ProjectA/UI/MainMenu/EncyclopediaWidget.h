@@ -9,6 +9,7 @@
 class UEditableTextBox;
 class UTextBlock;
 class UScrollBox;
+class UHorizontalBox;
 class UPartyDefinitionDataAsset;
 struct FStreamableHandle;
 
@@ -53,6 +54,8 @@ private:
     void FinishLoad();
     void StopLoad();
     void SelectCategory(int32 Index);
+    void RebuildSubcategories();
+    void SelectSubcategory(int32 Index);
     void RefreshEntries();
     void SelectEntry(int32 Index);
 
@@ -74,6 +77,12 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<UScrollBox> Details;
     UPROPERTY(Transient)
+    TObjectPtr<UScrollBox> SubcategoryScroll;
+    UPROPERTY(Transient)
+    TObjectPtr<UHorizontalBox> SubcategoryBar;
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UEncyclopediaChoiceButton>> SubcategoryButtons;
+    UPROPERTY(Transient)
     TObjectPtr<UEncyclopediaChoiceButton> Back;
     UPROPERTY(Transient)
     TArray<TObjectPtr<UEncyclopediaChoiceButton>> Tabs;
@@ -85,10 +94,12 @@ private:
     TArray<FEncyclopediaEntry> Entries;
     TArray<FSoftObjectPath> SkillPaths;
     TArray<int32> VisibleIndices;
+    TArray<FEncyclopediaSubcategory> Subcategories;
     TSharedPtr<FStreamableHandle> LoadHandle;
     FDelegateHandle RegistryLoadedHandle;
     EEncyclopediaCategory ActiveCategory = EEncyclopediaCategory::Equipment;
     int32 SelectedIndex = INDEX_NONE;
+    int32 ActiveSubcategory = 0;
     bool bLoading = false;
     bool bLoadedRuleDependencies = false;
 };

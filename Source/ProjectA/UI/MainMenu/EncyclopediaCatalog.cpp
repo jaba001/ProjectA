@@ -27,9 +27,9 @@ namespace
         return FText::Join(FText::AsCultureInvariant(TEXT("\n\n")), Parts);
     }
 
-    void Add(TArray<FEncyclopediaEntry>& Entries, EEncyclopediaCategory Category, const FText& Title, const FText& Body)
+    FEncyclopediaEntry& Add(TArray<FEncyclopediaEntry>& Entries, EEncyclopediaCategory Category, const FText& Title, const FText& Body)
     {
-        Entries.Add({Category, Title, Body});
+        return Entries.Add_GetRef({Category, Title, Body, {}});
     }
 
     void AddError(TArray<FEncyclopediaEntry>& Entries, EEncyclopediaCategory Category, const FText& Reason)
@@ -191,6 +191,66 @@ FText EncyclopediaCatalog::CategoryName(EEncyclopediaCategory Category)
     }
 }
 
+void EncyclopediaCatalog::GetSubcategories(EEncyclopediaCategory Category, const TArray<FEncyclopediaEntry>& Entries, TArray<FEncyclopediaSubcategory>& OutSubcategories)
+{
+    OutSubcategories.Reset();
+    if (Category != EEncyclopediaCategory::Equipment && Category != EEncyclopediaCategory::Skills) return;
+    OutSubcategories.Add({NSLOCTEXT("Encyclopedia", "AllTypes", "전체"), {}});
+    FGameplayTagContainer ClassifiedTags;
+    const auto AddGroup = [&](const FText& Label, const TArray<FGameplayTag>& Tags)
+    {
+        FGameplayTagContainer IncludedTags;
+        for (FGameplayTag Tag : Tags)
+        {
+            if (Tag.IsValid()) IncludedTags.AddTag(Tag);
+        }
+        if (IncludedTags.IsEmpty()) return;
+        ClassifiedTags.AppendTags(IncludedTags);
+        const FGameplayTagQuery Query = FGameplayTagQuery::MakeQuery_MatchAnyTags(IncludedTags);
+        if (Entries.ContainsByPredicate([&](const FEncyclopediaEntry& Entry) { return Entry.Category == Category && Query.Matches(Entry.Tags); })) OutSubcategories.Add({Label, Query});
+    };
+    if (Category == EEncyclopediaCategory::Equipment)
+    {
+        const TArray<TPair<FName, FText>> WeaponTypes =
+        {
+            {TEXT("Item.Weapon.Sword"), NSLOCTEXT("Encyclopedia", "SwordType", "검")},
+            {TEXT("Item.Weapon.Dagger"), NSLOCTEXT("Encyclopedia", "Dagger", "단검")},
+            {TEXT("Item.Weapon.Axe"), NSLOCTEXT("Encyclopedia", "AxeType", "도끼")},
+            {TEXT("Item.Weapon.Hammer"), NSLOCTEXT("Encyclopedia", "HammerType", "망치")},
+            {TEXT("Item.Weapon.MaceClub"), NSLOCTEXT("Encyclopedia", "MaceClubType", "철퇴·곤봉")},
+            {TEXT("Item.Weapon.Spear"), NSLOCTEXT("Encyclopedia", "SpearType", "창")},
+            {TEXT("Item.Weapon.Scythe"), NSLOCTEXT("Encyclopedia", "ScytheType", "낫")},
+            {TEXT("Item.Weapon.Bow"), NSLOCTEXT("Encyclopedia", "Bow", "활")},
+            {TEXT("Item.Weapon.Crossbow"), NSLOCTEXT("Encyclopedia", "CrossbowType", "석궁")},
+            {TEXT("Item.Weapon.StaffWand"), NSLOCTEXT("Encyclopedia", "StaffWandType", "지팡이·완드")},
+            {TEXT("Item.Weapon.Spellbook"), NSLOCTEXT("Encyclopedia", "SpellbookType", "마법서")},
+            {TEXT("Item.Weapon.Shield"), NSLOCTEXT("Encyclopedia", "Shield", "방패")},
+            {TEXT("Item.Weapon.Gauntlet"), NSLOCTEXT("Encyclopedia", "GauntletType", "건틀릿")},
+            {TEXT("Item.Weapon.Firearm"), NSLOCTEXT("Encyclopedia", "FirearmType", "총기")},
+            {TEXT("Item.Weapon.Thrown"), NSLOCTEXT("Encyclopedia", "ThrownType", "투척 무기")},
+            {TEXT("Item.Weapon.Explosive"), NSLOCTEXT("Encyclopedia", "ExplosiveType", "폭발물")},
+            {TEXT("Item.Weapon.ArrowBolt"), NSLOCTEXT("Encyclopedia", "ArrowBoltType", "화살·볼트")},
+            {TEXT("Item.Weapon.Bullet"), NSLOCTEXT("Encyclopedia", "BulletType", "탄환")},
+            {TEXT("Item.Weapon.Other"), NSLOCTEXT("Encyclopedia", "OtherWeaponType", "기타 무기")}
+        };
+        for (const TPair<FName, FText>& Type : WeaponTypes) AddGroup(Type.Value, {FGameplayTag::RequestGameplayTag(Type.Key, false)});
+    }
+    else
+    {
+        AddGroup(NSLOCTEXT("Encyclopedia", "MeleeType", "근접·참격"), {FGameplayTag::RequestGameplayTag(TEXT("Attack.Close"), false), ProjectACombatTags::Skill_Shape_Slash});
+        AddGroup(NSLOCTEXT("Encyclopedia", "ProjectileType", "투사체"), {ProjectACombatTags::Skill_Shape_Projectile});
+        AddGroup(NSLOCTEXT("Encyclopedia", "AreaType", "범위"), {ProjectACombatTags::Skill_Shape_Area});
+        AddGroup(NSLOCTEXT("Encyclopedia", "BeamType", "광선"), {ProjectACombatTags::Skill_Shape_Beam});
+        AddGroup(NSLOCTEXT("Encyclopedia", "ChainType", "연쇄"), {ProjectACombatTags::Skill_Shape_Chain});
+        AddGroup(NSLOCTEXT("Encyclopedia", "HealType", "회복"), {ProjectACombatTags::Skill_Effect_Heal});
+        AddGroup(NSLOCTEXT("Encyclopedia", "ShieldType", "보호막"), {ProjectACombatTags::Skill_Effect_Shield});
+    }
+    // Preserve unclassified definitions and guidance without guessing content types from names or execution enums.
+    // 이름이나 실행 enum으로 종류를 추측하지 않고 미분류 정의와 안내 항목을 보존합니다.
+    const FGameplayTagQuery OtherQuery = FGameplayTagQuery::MakeQuery_MatchNoTags(ClassifiedTags);
+    if (Entries.ContainsByPredicate([&](const FEncyclopediaEntry& Entry) { return Entry.Category == Category && OtherQuery.Matches(Entry.Tags); })) OutSubcategories.Add({NSLOCTEXT("Encyclopedia", "OtherTypes", "기타·안내"), OtherQuery});
+}
+
 void EncyclopediaCatalog::Build(const UPartyDefinitionDataAsset* Party, const TArray<FSoftObjectPath>& SkillPaths, TArray<FEncyclopediaEntry>& OutEntries)
 {
     OutEntries.Reset();
@@ -211,13 +271,15 @@ void EncyclopediaCatalog::Build(const UPartyDefinitionDataAsset* Party, const TA
         {
             TArray<FText> Members;
             FText Description;
+            FGameplayTagContainer MemberTags;
             for (const FRunItemDefinition& Item : Items)
             {
                 if (URunEquipmentCatalog::Get().ResolveProfile(Item) != &Profile) continue;
                 Members.Add(RunItemPresentation::Name(Item, Rules.Rarities));
+                MemberTags.AppendTags(Item.Tags);
                 Description = RunItemPresentation::EquipmentDescription(Item);
             }
-            if (!Members.IsEmpty()) Add(OutEntries, EEncyclopediaCategory::Equipment, FText::Format(NSLOCTEXT("Encyclopedia", "EquipmentType", "종류: {0}"), ProfileName(Profile.ProfileId)), Join({Description, FText::Join(FText::AsCultureInvariant(TEXT("\n")), Members)}));
+            if (!Members.IsEmpty()) Add(OutEntries, EEncyclopediaCategory::Equipment, FText::Format(NSLOCTEXT("Encyclopedia", "EquipmentType", "종류: {0}"), ProfileName(Profile.ProfileId)), Join({Description, FText::Join(FText::AsCultureInvariant(TEXT("\n")), Members)})).Tags = MemberTags;
         }
         for (const FRunItemDefinition& Item : Items)
         {
@@ -242,14 +304,20 @@ void EncyclopediaCatalog::Build(const UPartyDefinitionDataAsset* Party, const TA
                 }
             }
             const FText SkillList = !bRulesLoaded ? NSLOCTEXT("Encyclopedia", "UnavailableCandidates", "수치 규칙을 읽지 못해 후보를 표시할 수 없습니다.") : Skills.IsEmpty() ? NSLOCTEXT("Encyclopedia", "NoCandidates", "부여 가능한 스킬이 없습니다.") : FText::Join(FText::AsCultureInvariant(TEXT("\n")), Skills);
-            Add(OutEntries, EEncyclopediaCategory::Equipment, RunItemPresentation::Name(Item, Rules.Rarities), Join({FText::Format(NSLOCTEXT("Encyclopedia", "EquipmentStats", "가격 {0} G · 등급 {1}"), FText::AsNumber(Item.Price), Grade), RunItemPresentation::EquipmentDescription(Item), FText::Format(NSLOCTEXT("Encyclopedia", "Candidates", "부여 가능 스킬\n{0}"), SkillList)}));
+            Add(OutEntries, EEncyclopediaCategory::Equipment, RunItemPresentation::Name(Item, Rules.Rarities), Join({FText::Format(NSLOCTEXT("Encyclopedia", "EquipmentStats", "가격 {0} G · 등급 {1}"), FText::AsNumber(Item.Price), Grade), RunItemPresentation::EquipmentDescription(Item), FText::Format(NSLOCTEXT("Encyclopedia", "Candidates", "부여 가능 스킬\n{0}"), SkillList)})).Tags = Item.Tags;
         }
     }
     else AddError(OutEntries, EEncyclopediaCategory::Equipment, ErrorText);
     for (const FSoftObjectPath& Path : SkillPaths)
     {
         const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Path.ResolveObject());
-        if (Skill && !RunContentMigration::IsRemovedSkillId(Skill->SkillId)) Add(OutEntries, EEncyclopediaCategory::Skills, RunItemPresentation::SkillName(Skill), SkillDetails(Path, Rules, bRulesLoaded));
+        if (Skill && !RunContentMigration::IsRemovedSkillId(Skill->SkillId))
+        {
+            FCombatRoundSkill Definition;
+            FText ClassificationError;
+            const bool bResolved = Skill->ResolveRoundSkill(Definition, ClassificationError);
+            Add(OutEntries, EEncyclopediaCategory::Skills, RunItemPresentation::SkillName(Skill), SkillDetails(Path, Rules, bRulesLoaded)).Tags = bResolved ? Definition.EffectTags : Skill->RoundDefinition.EffectTags;
+        }
         else AddError(OutEntries, EEncyclopediaCategory::Skills, NSLOCTEXT("Encyclopedia", "SkillLoadFailed", "일부 스킬 정의를 읽지 못했습니다. 콘텐츠 설치 상태를 확인해 주세요."));
     }
     if (SkillPaths.IsEmpty()) AddError(OutEntries, EEncyclopediaCategory::Skills, NSLOCTEXT("Encyclopedia", "EmptySkills", "등록된 스킬이 없습니다. 콘텐츠 설치 상태를 확인해 주세요."));

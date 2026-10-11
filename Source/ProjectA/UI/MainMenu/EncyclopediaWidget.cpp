@@ -110,8 +110,16 @@ void UEncyclopediaWidget::NativeOnInitialized()
         TabSlot->SetPadding(FMargin(2.0f, 0.0f));
         Tabs.Add(Tab);
     }
+    SubcategoryScroll = WidgetTree->ConstructWidget<UScrollBox>();
+    SubcategoryScroll->SetOrientation(Orient_Horizontal);
+    SubcategoryScroll->SetScrollWhenFocusChanges(EScrollWhenFocusChanges::InstantScroll);
+    SubcategoryScroll->SetNavigationDestination(EDescendantScrollDestination::IntoView);
+    SubcategoryScroll->SetAnimateWheelScrolling(true);
+    Content->AddChildToVerticalBox(SubcategoryScroll)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 8.0f));
+    SubcategoryBar = WidgetTree->ConstructWidget<UHorizontalBox>();
+    SubcategoryScroll->AddChild(SubcategoryBar);
     Search = WidgetTree->ConstructWidget<UEditableTextBox>();
-    Search->SetHintText(NSLOCTEXT("Encyclopedia", "SearchHint", "현재 탭에서 이름 또는 설명 검색"));
+    Search->SetHintText(NSLOCTEXT("Encyclopedia", "SearchHint", "선택한 탭·종류에서 이름 또는 설명 검색"));
     Search->OnTextChanged.AddUniqueDynamic(this, &UEncyclopediaWidget::HandleSearchChanged);
     Content->AddChildToVerticalBox(Search)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 8.0f));
     Count = MakeText(FText::GetEmpty(), 14);
@@ -160,6 +168,7 @@ void UEncyclopediaWidget::BeginLoad()
     bLoading = true;
     bLoadedRuleDependencies = false;
     Entries.Reset();
+    RebuildSubcategories();
     RefreshEntries();
     IAssetRegistry& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
     if (Registry.IsLoadingAssets()) RegistryLoadedHandle = Registry.OnFilesLoaded().AddUObject(this, &UEncyclopediaWidget::LoadDefinitions);
@@ -212,6 +221,7 @@ void UEncyclopediaWidget::FinishLoad()
     }
     EncyclopediaCatalog::Build(Party, SkillPaths, Entries);
     bLoading = false;
+    RebuildSubcategories();
     RefreshEntries();
 }
 
@@ -246,6 +256,35 @@ void UEncyclopediaWidget::SelectCategory(int32 Index)
     ActiveCategory = static_cast<EEncyclopediaCategory>(Index);
     SelectedIndex = INDEX_NONE;
     for (int32 TabIndex = 0; TabIndex < Tabs.Num(); ++TabIndex) UDemonicUITheme::Get().StyleButton(Tabs[TabIndex], TabIndex == Index);
+    RebuildSubcategories();
+    RefreshEntries();
+}
+
+void UEncyclopediaWidget::RebuildSubcategories()
+{
+    if (!SubcategoryBar || !SubcategoryScroll) return;
+    SubcategoryBar->ClearChildren();
+    SubcategoryButtons.Reset();
+    ActiveSubcategory = 0;
+    EncyclopediaCatalog::GetSubcategories(ActiveCategory, Entries, Subcategories);
+    SubcategoryScroll->SetVisibility(Subcategories.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+    SubcategoryScroll->ScrollToStart();
+    for (int32 Index = 0; Index < Subcategories.Num(); ++Index)
+    {
+        UEncyclopediaChoiceButton* Button = MakeButton(Subcategories[Index].Label);
+        Button->Selected.BindUObject(this, &UEncyclopediaWidget::SelectSubcategory, Index);
+        SubcategoryBar->AddChildToHorizontalBox(Button)->SetPadding(FMargin(2.0f, 0.0f));
+        UDemonicUITheme::Get().StyleButton(Button, Index == ActiveSubcategory);
+        SubcategoryButtons.Add(Button);
+    }
+}
+
+void UEncyclopediaWidget::SelectSubcategory(int32 Index)
+{
+    if (!Subcategories.IsValidIndex(Index)) return;
+    ActiveSubcategory = Index;
+    SelectedIndex = INDEX_NONE;
+    for (int32 ButtonIndex = 0; ButtonIndex < SubcategoryButtons.Num(); ++ButtonIndex) UDemonicUITheme::Get().StyleButton(SubcategoryButtons[ButtonIndex], ButtonIndex == Index);
     RefreshEntries();
 }
 
@@ -262,6 +301,7 @@ void UEncyclopediaWidget::RefreshEntries()
     {
         const FEncyclopediaEntry& Entry = Entries[Index];
         if (Entry.Category != ActiveCategory) continue;
+        if (Subcategories.IsValidIndex(ActiveSubcategory) && !Subcategories[ActiveSubcategory].Query.IsEmpty() && !Subcategories[ActiveSubcategory].Query.Matches(Entry.Tags)) continue;
         ++CategoryCount;
         if (!Query.IsEmpty() && !Entry.Title.ToString().Contains(Query) && !Entry.Body.ToString().Contains(Query)) continue;
         UEncyclopediaChoiceButton* Row = MakeButton(Entry.Title);
@@ -270,7 +310,8 @@ void UEncyclopediaWidget::RefreshEntries()
         Rows.Add(Row);
         VisibleIndices.Add(Index);
     }
-    Count->SetText(bLoading ? NSLOCTEXT("Encyclopedia", "Loading", "백과사전 데이터를 불러오는 중…") : FText::Format(NSLOCTEXT("Encyclopedia", "ResultCount", "{0} · {1} / {2}개 항목"), EncyclopediaCatalog::CategoryName(ActiveCategory), FText::AsNumber(Rows.Num()), FText::AsNumber(CategoryCount)));
+    const FText Scope = Subcategories.IsValidIndex(ActiveSubcategory) ? FText::Format(NSLOCTEXT("Encyclopedia", "CategoryScope", "{0} / {1}"), EncyclopediaCatalog::CategoryName(ActiveCategory), Subcategories[ActiveSubcategory].Label) : EncyclopediaCatalog::CategoryName(ActiveCategory);
+    Count->SetText(bLoading ? NSLOCTEXT("Encyclopedia", "Loading", "백과사전 데이터를 불러오는 중…") : FText::Format(NSLOCTEXT("Encyclopedia", "ResultCount", "{0} · {1} / {2}개 항목"), Scope, FText::AsNumber(Rows.Num()), FText::AsNumber(CategoryCount)));
     if (!VisibleIndices.IsEmpty()) SelectEntry(VisibleIndices.Contains(SelectedIndex) ? SelectedIndex : VisibleIndices[0]);
     else
     {

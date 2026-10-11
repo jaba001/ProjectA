@@ -2213,8 +2213,8 @@
     {
       "namespace": "Encyclopedia",
       "key": "SearchHint",
-      "source": "현재 탭에서 이름 또는 설명 검색",
-      "translation": "Search names or descriptions in this tab"
+      "source": "선택한 탭·종류에서 이름 또는 설명 검색",
+      "translation": "Search names or descriptions in the selected tab and type"
     },
     {
       "namespace": "Encyclopedia",
@@ -2257,6 +2257,162 @@
       "key": "Encyclopedia",
       "source": "백과사전",
       "translation": "Encyclopedia"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "AllTypes",
+      "source": "전체",
+      "translation": "All"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "SwordType",
+      "source": "검",
+      "translation": "Swords"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "AxeType",
+      "source": "도끼",
+      "translation": "Axes"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "HammerType",
+      "source": "망치",
+      "translation": "Hammers"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "MaceClubType",
+      "source": "철퇴·곤봉",
+      "translation": "Maces / Clubs"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "SpearType",
+      "source": "창",
+      "translation": "Spears"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "ScytheType",
+      "source": "낫",
+      "translation": "Scythes"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "CrossbowType",
+      "source": "석궁",
+      "translation": "Crossbows"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "StaffWandType",
+      "source": "지팡이·완드",
+      "translation": "Staves / Wands"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "SpellbookType",
+      "source": "마법서",
+      "translation": "Spellbooks"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "GauntletType",
+      "source": "건틀릿",
+      "translation": "Gauntlets"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "FirearmType",
+      "source": "총기",
+      "translation": "Firearms"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "ThrownType",
+      "source": "투척 무기",
+      "translation": "Thrown Weapons"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "ExplosiveType",
+      "source": "폭발물",
+      "translation": "Explosives"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "ArrowBoltType",
+      "source": "화살·볼트",
+      "translation": "Arrows / Bolts"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "BulletType",
+      "source": "탄환",
+      "translation": "Bullets"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "OtherWeaponType",
+      "source": "기타 무기",
+      "translation": "Other Weapons"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "MeleeType",
+      "source": "근접·참격",
+      "translation": "Melee / Slash"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "ProjectileType",
+      "source": "투사체",
+      "translation": "Projectiles"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "AreaType",
+      "source": "범위",
+      "translation": "Area"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "BeamType",
+      "source": "광선",
+      "translation": "Beams"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "ChainType",
+      "source": "연쇄",
+      "translation": "Chain"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "HealType",
+      "source": "회복",
+      "translation": "Healing"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "ShieldType",
+      "source": "보호막",
+      "translation": "Shields"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "OtherTypes",
+      "source": "기타·안내",
+      "translation": "Other / Guide"
+    },
+    {
+      "namespace": "Encyclopedia",
+      "key": "CategoryScope",
+      "source": "{0} / {1}",
+      "translation": "{0} / {1}"
     }
   ]
 }
