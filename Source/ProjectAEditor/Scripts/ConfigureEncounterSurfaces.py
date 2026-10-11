@@ -8,7 +8,8 @@ import unreal
 ROOT = Path(unreal.Paths.project_dir()).resolve()
 CEILING_ONLY = '-EncounterCeilingOnly' in unreal.SystemLibrary.get_command_line()
 MASONRY_ONLY = '-EncounterMasonryOnly' in unreal.SystemLibrary.get_command_line()
-OUTPUT = ROOT / ('Saved/Automation/EncounterMasonry_20261011' if MASONRY_ONLY else 'Saved/Automation/EncounterCeiling_20261011' if CEILING_ONLY else 'Saved/Automation/MazeTextures_20261011')
+STONE_COLOR_ONLY = '-EncounterStoneColorOnly' in unreal.SystemLibrary.get_command_line()
+OUTPUT = ROOT / ('Saved/Automation/EncounterStoneColor_20261012' if STONE_COLOR_ONLY else 'Saved/Automation/EncounterMasonry_20261011' if MASONRY_ONLY else 'Saved/Automation/EncounterCeiling_20261011' if CEILING_ONLY else 'Saved/Automation/MazeTextures_20261011')
 MATERIAL_ROOT = '/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials'
 SOURCE_ROOT = '/Game/Dungeon_Modular_V1/Textures/'
 OWNER_TAG = 'ProjectAEncounterSurface'
@@ -49,26 +50,13 @@ def package_file(path):
 
 
 def stone_palette(material, diffuse, output_name=''):
-    # Retain stone detail in a narrow neutral palette without height-based color variation.
-    # 높이에 따른 색 변화 없이 좁은 중성 색 범위로 석재 세부 무늬를 유지합니다.
-    luminance = node(material, unreal.MaterialExpressionDesaturation, 'StoneLuminance', -550, -100)
-    amount = node(material, unreal.MaterialExpressionConstant, 'DesaturationAmount', -750, -200)
-    amount.set_editor_property('r', 1.0)
-    connect(diffuse, luminance, '', output_name)
-    connect(amount, luminance, 'Fraction')
-    low = node(material, unreal.MaterialExpressionConstant3Vector, 'StoneLow', -550, -300)
-    low.set_editor_property('constant', unreal.LinearColor(0.22, 0.21, 0.19, 1.0))
-    high = node(material, unreal.MaterialExpressionConstant3Vector, 'StoneHigh', -550, -450)
-    high.set_editor_property('constant', unreal.LinearColor(0.28, 0.27, 0.24, 1.0))
-    detail = node(material, unreal.MaterialExpressionLinearInterpolate, 'StoneDetail', -300, -100)
-    connect(low, detail, 'A')
-    connect(high, detail, 'B')
-    connect(luminance, detail, 'Alpha')
+    # Preserve the original stone RGB and contrast with one uniform dark warm multiplier.
+    # 균일하고 어두운 따뜻한 배율만 적용하여 원본 석재 RGB와 명암 대비를 보존합니다.
     tint = node(material, unreal.MaterialExpressionVectorParameter, 'StoneTint', -300, -300)
     tint.set_editor_property('parameter_name', 'Tint')
-    tint.set_editor_property('default_value', unreal.LinearColor(1.0, 1.0, 1.0, 1.0))
+    tint.set_editor_property('default_value', unreal.LinearColor(0.65, 0.60, 0.52, 1.0))
     base = node(material, unreal.MaterialExpressionMultiply, 'StoneBaseColor', 0, -100)
-    connect(detail, base, 'A')
+    connect(diffuse, base, 'A', output_name)
     connect(tint, base, 'B')
     return base
 
@@ -134,7 +122,7 @@ def configure_horizontal(material, prefix, size, ceiling):
 
 def main():
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    require(not (CEILING_ONLY and MASONRY_ONLY), 'Select only one authoring mode')
+    require(sum((CEILING_ONLY, MASONRY_ONLY, STONE_COLOR_ONLY)) <= 1, 'Select only one authoring mode')
     protected = [SOURCE_ROOT + prefix + suffix for prefix in ('T_Stone_Wall_01_Master', 'T_Floor_Flagstone_01', 'T_Ceiling_01') for suffix in ('_D', '_N', '_R', '_M')]
     protected += ['/Game/Dungeon_Modular_V1/Materials/' + name for name in ('M_Master_TwoSided_01', 'M_Stone_Wall_Master_01', 'M_Floor_Flagstone_01')]
     hashes = {str(package_file(path).relative_to(ROOT)).replace('\\', '/'): hashlib.sha256(package_file(path).read_bytes()).hexdigest() for path in protected}
@@ -165,7 +153,7 @@ def main():
             require(material.get_editor_property('used_with_instanced_static_meshes'), 'Ceiling instancing support missing')
             require(material.get_editor_property('blend_mode') == unreal.BlendMode.BLEND_OPAQUE and material.get_editor_property('two_sided') == (name == 'M_EncounterStoneCeiling'), 'Invalid horizontal surface settings')
             require(LIBRARY.save_loaded_asset(material, only_if_is_dirty=False), 'Cannot save ceiling material')
-            report.append({'path': path, 'instanced_static_meshes': True, 'opaque': True, 'two_sided': name == 'M_EncounterStoneCeiling', 'tangent_space_normal': True, 'normal_strength': 0.25, 'roughness_min': 0.8, 'specular': 0.15, 'palette_low': [0.22, 0.21, 0.19], 'palette_high': [0.28, 0.27, 0.24], 'tile_size_cm': size, 'texture_paths': [SOURCE_ROOT + prefix + suffix for suffix in ('_D', '_N', '_R')], 'compile_errors': list(compile_errors)})
+            report.append({'path': path, 'instanced_static_meshes': True, 'opaque': True, 'two_sided': name == 'M_EncounterStoneCeiling', 'tangent_space_normal': True, 'normal_strength': 0.25, 'roughness_min': 0.8, 'specular': 0.15, 'diffuse_rgb_preserved': True, 'diffuse_tint': [0.65, 0.60, 0.52], 'tile_size_cm': size, 'texture_paths': [SOURCE_ROOT + prefix + suffix for suffix in ('_D', '_N', '_R')], 'compile_errors': list(compile_errors)})
             continue
         scale = node(material, unreal.MaterialExpressionVectorParameter, 'WorldTileSize', -1200, -300)
         scale.set_editor_property('parameter_name', 'WorldTileSize')
@@ -181,12 +169,12 @@ def main():
         require(not compile_errors, 'Material compilation failed: ' + str(compile_errors))
         require(material.get_editor_property('used_with_instanced_static_meshes'), 'Instanced mesh usage was not enabled')
         require(LIBRARY.save_loaded_asset(material, only_if_is_dirty=False), 'Cannot save owned material')
-        report.append({'path': path, 'instanced_static_meshes': True, 'opaque': True, 'two_sided': False, 'tangent_space_normal': False, 'normal_strength': 0.25, 'roughness_min': 0.8, 'specular': 0.15, 'palette_low': [0.22, 0.21, 0.19], 'palette_high': [0.28, 0.27, 0.24], 'tile_size_cm': size, 'world_space_normal': True, 'texture_paths': [SOURCE_ROOT + prefix + suffix for suffix in ('_D', '_N', '_R')], 'expressions': len(EDITING.get_material_expressions(material)), 'compile_errors': list(compile_errors)})
+        report.append({'path': path, 'instanced_static_meshes': True, 'opaque': True, 'two_sided': False, 'tangent_space_normal': False, 'normal_strength': 0.25, 'roughness_min': 0.8, 'specular': 0.15, 'diffuse_rgb_preserved': True, 'diffuse_tint': [0.65, 0.60, 0.52], 'tile_size_cm': size, 'world_space_normal': True, 'texture_paths': [SOURCE_ROOT + prefix + suffix for suffix in ('_D', '_N', '_R')], 'expressions': len(EDITING.get_material_expressions(material)), 'compile_errors': list(compile_errors)})
     # The project-owned prototype still supplies mortar and NPC colors; persist its instancing support as well.
     # 프로젝트 소유 프로토타입은 줄눈·NPC 색상에 계속 사용하므로 인스턴싱 지원도 저장합니다.
     prototype_path = '/Game/User_JeHoon/Materials/Prototype/M_EncounterPrototype'
     prototype = require(unreal.load_asset(prototype_path), 'Missing project prototype')
-    if not CEILING_ONLY and not MASONRY_ONLY:
+    if not CEILING_ONLY and not MASONRY_ONLY and not STONE_COLOR_ONLY:
         EDITING.set_base_material_usage(prototype, unreal.MaterialUsage.MATUSAGE_INSTANCED_STATIC_MESHES)
         compile_errors = EDITING.recompile_material(prototype)
         require(not compile_errors, 'Prototype compilation failed: ' + str(compile_errors))
