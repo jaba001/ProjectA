@@ -1,5 +1,6 @@
 #include "Combat/Round/CombatRoundTypes.h"
 #include "GAS/CombatGameplayTags.h"
+#include "Combat/Round/CombatStatusRules.h"
 #include "GameplayEffect.h"
 #include "NiagaraSystem.h"
 #include "Particles/ParticleSystem.h"
@@ -143,6 +144,11 @@ bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
     if (static_cast<uint8>(Skill.Kind) == 3) return false;
     if (Skill.TargetRule > ESkillTargetRule::AnyTile) return false;
     if (!IsValidChainSettings(Skill.Chain)) return false;
+    if (Skill.StatusApplications.Num() > 8) return false;
+    for (const FCombatStatusApplication& Application : Skill.StatusApplications)
+    {
+        if (!CombatStatusRules::IsSupportedStatus(Application.Status) || Application.Value < 1 || Application.Value > 9999) return false;
+    }
     if (Skill.Chain.MaxTargets > 1)
     {
         // Tags select chain execution; the fixed kind only restricts supported collision geometry.

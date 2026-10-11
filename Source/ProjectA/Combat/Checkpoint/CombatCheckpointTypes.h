@@ -98,6 +98,11 @@ struct PROJECTA_API FCombatCheckpointUnit
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     FSoftObjectPath DefaultAttackAbility;
 
+    // Older checkpoints load an empty list, which matches the absence of statuses at the time.
+    // 이전 체크포인트는 빈 목록으로 읽히며 당시 상태이상이 없던 것과 같습니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    TArray<FCombatStatusEntry> Statuses;
+
     void PostSerialize(const FArchive& Ar)
     {
         if (Ar.IsLoading() && Dexterity_DEPRECATED != -MAX_flt)

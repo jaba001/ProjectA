@@ -6,6 +6,8 @@
 #include "Combat/Round/CombatPlanValidator.h"
 #include "Combat/Round/CombatAIPlanning.h"
 #include "Combat/Round/CombatConsumableRules.h"
+#include "GAS/CombatGameplayTags.h"
+#include "GAS/Effect/GE_Damage.h"
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimMontage.h"
 #include "Combat/CombatManager.h"
@@ -147,6 +149,7 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
     }
     Skills.Reset();
     DebugSkillTimingOverrides.Reset();
+    StatusTuning = CombatStatusRules::FTuning::FromSettings();
     View.CombatId = InManager->GetCombatInstanceId();
     URunStateSubsystem* Run = !ACombatDebugGameMode::IsDebugWorld(GetWorld()) && GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     const bool bRestoring = Run && Run->GetPhase() == ERunPhase::Combat && Run->HasCombatCheckpoint();
@@ -175,6 +178,7 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
             return false;
         }
         Unit->OnTurnEnd();
+        CombatStatusRules::SyncOwnedTags(Unit, {});
         Unit->GetCharacterMovement()->StopMovementImmediately();
         Unit->GetCharacterMovement()->DisableMovement();
         Unit->GetCharacterMovement()->SetComponentTickEnabled(false);
@@ -305,6 +309,7 @@ void ACombatRoundCoordinator::CleanupUnits()
     for (const FCombatRoundUnitView& Entry : View.Units)
     {
         UCombatEffectLibrary::ClearRoundShield(Entry.Unit);
+        CombatStatusRules::SyncOwnedTags(Entry.Unit, {});
         if (IsValid(Entry.Unit))
         {
             Entry.Unit->SetRoundCastMontage(nullptr);
@@ -370,7 +375,11 @@ void ACombatRoundCoordinator::BeginPlanning()
         if (IsValid(Entry.Unit) && Entry.Unit->GetAttributeSet()) Entry.HP = Entry.Unit->GetAttributeSet()->GetHP();
         if (IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive())
         {
-            Entry.Speed = Entry.Unit->GetCombatSpeed();
+            // Expire durations and activate reservations before chill shapes this round's fixed schedule.
+            // 냉각이 이번 라운드의 고정 시각표에 반영되기 전에 지속시간을 만료하고 예약을 활성화합니다.
+            CombatStatusRules::AdvancePlanningBoundary(Entry.Statuses);
+            CombatStatusRules::SyncOwnedTags(Entry.Unit, Entry.Statuses);
+            Entry.Speed = CombatStatusRules::ChilledSpeed(Entry.Unit->GetCombatSpeed(), Entry.Statuses, StatusTuning);
             HighestSpeed = FMath::Max(HighestSpeed, Entry.Speed);
             Entry.Unit->ResetActionPoint();
             Entry.Unit->ResetSubActionPoint();
@@ -395,16 +404,18 @@ void ACombatRoundCoordinator::BeginPlanning()
             Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
             Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_D690C583", "사망");
             Entry.bReady = true;
+            ClearStatuses(Index);
             continue;
         }
         Actions[Index].OriginalLocation = Entry.Unit->GetActorLocation();
     }
+    PrepareStatusesForPlanning();
     // Reset every command before choosing AI actions from the new round state.
     // 새 라운드 상태로 AI 행동을 선택하기 전에 모든 명령을 초기화합니다.
     for (int32 Index = 0; Index < View.Units.Num(); ++Index)
     {
         FCombatRoundUnitView& Entry = View.Units[Index];
-        if (Entry.OwnerSlot != 0 || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) continue;
+        if (Entry.OwnerSlot != 0 || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive() || IsPlanLocked(Index)) continue;
 
         // AI commands are fixed before any human draft can be submitted.
         // 인간 초안이 제출되기 전에 AI 명령을 고정합니다.
@@ -502,6 +513,11 @@ bool ACombatRoundCoordinator::CanPlanCommand(const FCombatRoundCommand& Command,
         OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_A5EFB2B8", "계획 단계에서만 행동을 선택할 수 있습니다.");
         return false;
     }
+    if (IsPlanLocked(FindUnitIndex(Command.UnitId)))
+    {
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "StatusPlanLocked", "빙결 또는 혼란 상태라 이번 라운드 계획을 바꿀 수 없습니다.");
+        return false;
+    }
     if (!ValidateCommand(Command, OutError)) return false;
     const int32 Index = FindUnitIndex(Command.UnitId);
     TArray<FIntPoint> Path;
@@ -523,6 +539,11 @@ bool ACombatRoundCoordinator::CanMoveUnit(int32 UnitId, FIntPoint Destination, F
     if (Entry.bEnemy || Entry.OwnerSlot == 0 || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive())
     {
         OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_215E6DE6", "살아 있는 인간 조작 캐릭터만 이동을 예약할 수 있습니다.");
+        return false;
+    }
+    if (IsPlanLocked(Index))
+    {
+        OutError = NSLOCTEXT("CombatRoundCoordinatorText", "StatusPlanLocked", "빙결 또는 혼란 상태라 이번 라운드 계획을 바꿀 수 없습니다.");
         return false;
     }
     if (!Entry.Unit->HasEnoughSubActionPoint(1 + (Skill ? Skill->SubActionPointCost : 0)))
@@ -702,6 +723,10 @@ void ACombatRoundCoordinator::AdvanceSAPMovement(float DeltaSeconds)
     else if (MoveUnitToward(PlanningMoveIndex, Next->GetActorLocation(), SAPMoveSpeed, DeltaSeconds))
     {
         ++PlanningMoveStep;
+        // Bleeding triggers once per completed tactical tile; a death stops the rest of this path.
+        // 출혈은 완료한 전술 칸마다 한 번 발동하며 사망하면 남은 경로를 중단합니다.
+        const int32 Bleeding = CombatStatusRules::GetValue(View.Units[PlanningMoveIndex].Statuses, ProjectACombatTags::Status_Bleeding);
+        if (Bleeding > 0) ApplyStatusDamage(PlanningMoveIndex, nullptr, ProjectACombatTags::Status_Bleeding, static_cast<float>(Bleeding));
         if (PlanningMoveStep == PlanningMovePath.Num()) FinishPlanningMove(true);
     }
     if (PlanningMoveIndex == INDEX_NONE) BeginNextMove();
@@ -863,16 +888,20 @@ bool ACombatRoundCoordinator::SetParticipantReady(APlayerController* Controller,
     const int32 Slot = GetParticipantSlot(Controller);
     if (bReady)
     {
-        for (const FCombatRoundUnitView& Entry : View.Units)
+        for (int32 Index = 0; Index < View.Units.Num(); ++Index)
         {
-            if (Entry.OwnerSlot == Slot && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive() && !CanPlanCommand(Entry.Command, OutError)) return false;
+            const FCombatRoundUnitView& Entry = View.Units[Index];
+            if (Entry.OwnerSlot == Slot && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive() && !IsPlanLocked(Index) && !CanPlanCommand(Entry.Command, OutError)) return false;
         }
         if (!ValidateDestinations(OutError)) return false;
     }
     const FCombatRoundView PreviousView = View;
-    for (FCombatRoundUnitView& Entry : View.Units)
+    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
     {
-        if (Entry.OwnerSlot == Slot && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive()) Entry.bReady = bReady;
+        FCombatRoundUnitView& Entry = View.Units[Index];
+        // Status-fixed plans stay ready; the owner may still toggle readiness for other characters.
+        // 상태로 고정된 계획은 준비 상태를 유지하며 소유자는 다른 캐릭터의 준비만 바꿀 수 있습니다.
+        if (Entry.OwnerSlot == Slot && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive() && !IsPlanLocked(Index)) Entry.bReady = bReady;
     }
     ++View.PlanRevision;
     bool bAllReady = true;
@@ -892,9 +921,10 @@ bool ACombatRoundCoordinator::SetParticipantReady(APlayerController* Controller,
 
 void ACombatRoundCoordinator::ClearOwnerReady(int32 OwnerSlot)
 {
-    for (FCombatRoundUnitView& Entry : View.Units)
+    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
     {
-        if (Entry.OwnerSlot == OwnerSlot && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive()) Entry.bReady = false;
+        FCombatRoundUnitView& Entry = View.Units[Index];
+        if (Entry.OwnerSlot == OwnerSlot && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive() && !IsPlanLocked(Index)) Entry.bReady = false;
     }
 }
 
@@ -1388,6 +1418,23 @@ void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, con
     const int32 Index = View.Units.IndexOfByPredicate([Target](const FCombatRoundUnitView& Entry) { return Entry.Unit == Target; });
     if (!View.Units.IsValidIndex(Index)) return;
     FCombatRoundUnitView& Entry = View.Units[Index];
+    // Capture an existing shock before the hit so a lethal hit cannot erase the discharge targets.
+    // 치명타가 방전 대상을 지우지 않도록 피격 전에 기존 감전을 확인합니다.
+    const bool bDirectDamage = Skill.Power > 0.f && !Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Heal) && !Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Shield);
+    const int32 Shock = bDirectDamage ? CombatStatusRules::GetValue(Entry.Statuses, ProjectACombatTags::Status_Shocked) : 0;
+    TArray<int32> ShockTargets;
+    if (Shock > 0)
+    {
+        ShockTargets.Add(Index);
+        for (int32 Other = 0; Other < View.Units.Num(); ++Other)
+        {
+            const FCombatRoundUnitView& Candidate = View.Units[Other];
+            const FIntPoint Offset = Candidate.HomeCoord - Entry.HomeCoord;
+            // Orthogonal neighbours on the reserved tiles of the same team; diagonals never conduct.
+            // 같은 진영의 예약 칸 기준 상하좌우만 포함하며 대각선은 전도하지 않습니다.
+            if (Other != Index && Candidate.bEnemy == Entry.bEnemy && IsValid(Candidate.Unit) && Candidate.Unit->IsUnitAlive() && FMath::Abs(Offset.X) + FMath::Abs(Offset.Y) == 1) ShockTargets.Add(Other);
+        }
+    }
     if (!CombatSkillExecution::ApplyEffect(Source, Target, Skill)) return;
     Entry.HP = Target->GetAttributeSet() ? Target->GetAttributeSet()->GetHP() : 0.f;
     if (!Target->IsUnitAlive())
@@ -1396,6 +1443,152 @@ void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, con
         Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_8F480533", "사망으로 남은 행동 취소");
     }
     UE_LOG(LogProjectA, Log, TEXT("[Round] Round=%d Time=%.2f Source=%d Target=%d Damage=%.1f / 서버 피격"), View.RoundNumber, SimulationTime, Source->UnitIndex, Target->UnitIndex, Skill.Power);
+    if (Shock > 0)
+    {
+        // One discharge per shock: remove it first, then damage every captured unit once without recursion.
+        // 감전 하나는 한 번만 방전하며 먼저 제거한 뒤 확보한 유닛마다 재귀 없이 한 번씩 피해를 줍니다.
+        CombatStatusRules::Remove(Entry.Statuses, ProjectACombatTags::Status_Shocked);
+        CombatStatusRules::SyncOwnedTags(Target, Entry.Statuses);
+        for (const int32 ShockIndex : ShockTargets) ApplyStatusDamage(ShockIndex, Source, ProjectACombatTags::Status_Shocked, static_cast<float>(Shock));
+    }
+    if (Target->IsUnitAlive()) ApplyStatusesFromHit(Index, Skill);
+}
+
+bool ACombatRoundCoordinator::IsPlanLocked(int32 Index) const
+{
+    return View.Units.IsValidIndex(Index) && CombatStatusRules::LocksPlan(View.Units[Index].Statuses);
+}
+
+bool ACombatRoundCoordinator::TryBlockWaitingAction(int32 Index, const FText& Status)
+{
+    FCombatRoundUnitView& Entry = View.Units[Index];
+    const FCombatRoundSkill* Skill = FindCommandSkill(Entry.Command);
+    // Only an unstarted real action is blockable; approach, cast and return continue unchanged.
+    // 시작 전의 실제 행동만 차단하며 접근·시전·복귀는 그대로 진행합니다.
+    if (Entry.ActionPhase != ECombatRoundActionPhase::Waiting || !Skill || Skill->Kind == ECombatRoundSkillKind::Wait) return false;
+    Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
+    Entry.Status = Status;
+    if (IsValid(Entry.Unit)) Entry.Unit->SetRoundCastMontage(nullptr);
+    return true;
+}
+
+void ACombatRoundCoordinator::ApplyStatusesFromHit(int32 Index, const FCombatRoundSkill& Skill)
+{
+    if (Skill.StatusApplications.IsEmpty()) return;
+    FCombatRoundUnitView& Entry = View.Units[Index];
+    for (const FCombatStatusApplication& Application : Skill.StatusApplications)
+    {
+        const FGameplayTag& Status = Application.Status;
+        if (Status == ProjectACombatTags::Status_Stunned)
+        {
+            TryBlockWaitingAction(Index, NSLOCTEXT("CombatRoundCoordinatorText", "StatusStunBlocked", "스턴: 이번 행동 차단"));
+        }
+        else if (Status == ProjectACombatTags::Status_Frozen)
+        {
+            // A blocked current action consumes the freeze; otherwise it reserves the next round.
+            // 현재 행동을 막으면 빙결이 소모되고 막을 행동이 없으면 다음 라운드를 예약합니다.
+            if (!TryBlockWaitingAction(Index, NSLOCTEXT("CombatRoundCoordinatorText", "StatusFreezeBlocked", "빙결: 이번 행동 차단"))) CombatStatusRules::ReserveNextRound(Entry.Statuses, Status);
+        }
+        else if (Status == ProjectACombatTags::Status_Confused)
+        {
+            CombatStatusRules::ReserveNextRound(Entry.Statuses, Status);
+        }
+        else
+        {
+            CombatStatusRules::AddValueStatus(Entry.Statuses, Status, Application.Value, StatusTuning);
+        }
+        UE_LOG(LogProjectA, Log, TEXT("[RoundStatus] Round=%d Time=%.2f Target=%d Status=%s Value=%d / 상태 부여"), View.RoundNumber, SimulationTime, Entry.UnitId, *Status.ToString(), Application.Value);
+    }
+    CombatStatusRules::SyncOwnedTags(Entry.Unit, Entry.Statuses);
+}
+
+void ACombatRoundCoordinator::ApplyStatusDamage(int32 Index, AUnitBase* Source, const FGameplayTag& Status, float Amount)
+{
+    if (!View.Units.IsValidIndex(Index) || !(Amount > 0.f)) return;
+    FCombatRoundUnitView& Entry = View.Units[Index];
+    AUnitBase* Unit = Entry.Unit;
+    if (!IsValid(Unit) || !Unit->IsUnitAlive()) return;
+    FGameplayTagContainer StatusTags;
+    StatusTags.AddTag(ProjectACombatTags::Skill_Effect_Damage);
+    StatusTags.AddTag(Status);
+    if (Status == ProjectACombatTags::Status_Shocked) StatusTags.AddTag(ProjectACombatTags::Skill_Element_Lightning);
+    // Status damage reuses the GAS damage effect; a missing source makes the unit its own instigator.
+    // 상태 피해는 GAS 피해 효과를 재사용하며 원인자가 없으면 유닛 자신을 원인자로 사용합니다.
+    if (!UCombatEffectLibrary::ApplyTaggedEffectToUnit(IsValid(Source) ? Source : Unit, Unit, UGE_Damage::StaticClass(), Amount, StatusTags)) return;
+    Entry.HP = Unit->GetAttributeSet() ? Unit->GetAttributeSet()->GetHP() : 0.f;
+    UE_LOG(LogProjectA, Log, TEXT("[RoundStatus] Round=%d Time=%.2f Target=%d Status=%s Damage=%.1f / 상태 피해"), View.RoundNumber, SimulationTime, Entry.UnitId, *Status.ToString(), Amount);
+    if (Unit->IsUnitAlive()) return;
+    if (!CombatRoundRules::IsTerminal(Entry.ActionPhase))
+    {
+        Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
+        Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_8F480533", "사망으로 남은 행동 취소");
+    }
+    ClearStatuses(Index);
+}
+
+void ACombatRoundCoordinator::ApplyRoundEndStatuses()
+{
+    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
+    {
+        FCombatRoundUnitView& Entry = View.Units[Index];
+        if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive())
+        {
+            ClearStatuses(Index);
+            continue;
+        }
+        const TArray<CombatStatusRules::FRoundEndDamage> Damage = CombatStatusRules::TickRoundEnd(Entry.Statuses, StatusTuning);
+        for (const CombatStatusRules::FRoundEndDamage& Tick : Damage) ApplyStatusDamage(Index, nullptr, Tick.Status, static_cast<float>(Tick.Amount));
+        if (View.Units[Index].Unit && View.Units[Index].Unit->IsUnitAlive()) CombatStatusRules::SyncOwnedTags(Entry.Unit, Entry.Statuses);
+    }
+}
+
+void ACombatRoundCoordinator::PrepareStatusesForPlanning()
+{
+    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
+    {
+        FCombatRoundUnitView& Entry = View.Units[Index];
+        if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) continue;
+        // Freeze wins over confusion in the same round, and that blocked round consumes both.
+        // 같은 라운드에서는 빙결이 혼란보다 우선하며 차단된 라운드가 둘을 함께 소모합니다.
+        if (CombatStatusRules::IsActiveThisRound(Entry.Statuses, ProjectACombatTags::Status_Frozen))
+        {
+            Entry.bReady = true;
+            Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "StatusFrozenRound", "빙결: 이번 라운드 행동 불가");
+        }
+        else if (CombatStatusRules::IsActiveThisRound(Entry.Statuses, ProjectACombatTags::Status_Confused))
+        {
+            Entry.Command = ChooseConfusedCommand(Index);
+            Entry.bReady = true;
+            Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "StatusConfusedRound", "혼란: 무작위 행동 고정");
+        }
+    }
+}
+
+void ACombatRoundCoordinator::ClearStatuses(int32 Index)
+{
+    if (!View.Units.IsValidIndex(Index)) return;
+    View.Units[Index].Statuses.Reset();
+    CombatStatusRules::SyncOwnedTags(View.Units[Index].Unit, View.Units[Index].Statuses);
+}
+
+FCombatRoundCommand ACombatRoundCoordinator::ChooseConfusedCommand(int32 Index) const
+{
+    FCombatRoundCommand Idle = View.Units[Index].Command;
+    Idle.SkillId = NAME_None;
+    const TArray<FCombatRoundCommand> Candidates = CombatAIPlanning::CollectCommands(View, BuildPlanningState(), Index, [this](const FCombatRoundCommand& Command)
+    {
+        // Confusion never spends items; existing validation keeps targets on the skill's own side rules.
+        // 혼란은 아이템을 쓰지 않으며 기존 검증이 스킬의 대상 진영 규칙을 유지합니다.
+        const FCombatRoundSkill* Skill = FindSkill(Command.SkillId);
+        FText Error;
+        return Skill && !RunRecoveryRules::IsConsumable(*Skill) && ValidateCommand(Command, Error);
+    });
+    if (Candidates.IsEmpty()) return Idle;
+    // Seed from the combat, round and unit so the server choice is reproducible.
+    // 전투·라운드·유닛으로 시드를 만들어 서버 선택을 재현할 수 있게 합니다.
+    const uint32 Seed = HashCombine(HashCombine(GetTypeHash(View.CombatId), GetTypeHash(View.RoundNumber)), GetTypeHash(View.Units[Index].UnitId));
+    FRandomStream Stream(static_cast<int32>(Seed));
+    return Candidates[Stream.RandRange(0, Candidates.Num() - 1)];
 }
 
 void ACombatRoundCoordinator::HandleProjectileResolved(ACombatRoundProjectile* Projectile)
@@ -1429,6 +1622,9 @@ void ACombatRoundCoordinator::FinishRoundIfSettled()
     {
         if (!CombatRoundRules::IsTerminal(Entry.ActionPhase)) return;
     }
+    // Burn and poison resolve once after every action and projectile settles, before the result check.
+    // 화상과 중독은 모든 행동과 투사체가 정리된 뒤 결과 판정 전에 한 번 처리합니다.
+    ApplyRoundEndStatuses();
     bool bPlayersAlive = false;
     bool bEnemiesAlive = false;
     for (const FCombatRoundUnitView& Entry : View.Units)
@@ -1442,7 +1638,11 @@ void ACombatRoundCoordinator::FinishRoundIfSettled()
         BeginPlanning();
         return;
     }
-    for (const FCombatRoundUnitView& Entry : View.Units) UCombatEffectLibrary::ClearRoundShield(Entry.Unit);
+    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
+    {
+        UCombatEffectLibrary::ClearRoundShield(View.Units[Index].Unit);
+        ClearStatuses(Index);
+    }
     View.Phase = ECombatRoundPhase::Finished;
     View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_6DC2E7F3", "패배");
     ECombatResult Result = ECombatResult::Defeat;

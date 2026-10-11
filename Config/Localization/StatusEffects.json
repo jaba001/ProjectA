@@ -1,0 +1,108 @@
+{
+  "nativeCulture": "ko",
+  "culture": "en",
+  "entries": [
+    {
+      "namespace": "CombatPlanning",
+      "key": "WithStatuses",
+      "source": "{0}\n상태: {1}",
+      "translation": "{0}\nStatus: {1}"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "StatusConfusedRound",
+      "source": "혼란: 무작위 행동 고정",
+      "translation": "Confused: random action locked"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "StatusFreezeBlocked",
+      "source": "빙결: 이번 행동 차단",
+      "translation": "Frozen: this action blocked"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "StatusFrozenRound",
+      "source": "빙결: 이번 라운드 행동 불가",
+      "translation": "Frozen: cannot act this round"
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "StatusPlanLocked",
+      "source": "빙결 또는 혼란 상태라 이번 라운드 계획을 바꿀 수 없습니다.",
+      "translation": "This round's plan cannot be changed while frozen or confused."
+    },
+    {
+      "namespace": "CombatRoundCoordinatorText",
+      "key": "StatusStunBlocked",
+      "source": "스턴: 이번 행동 차단",
+      "translation": "Stunned: this action blocked"
+    },
+    {
+      "namespace": "CombatStatus",
+      "key": "Bleeding",
+      "source": "출혈",
+      "translation": "Bleeding"
+    },
+    {
+      "namespace": "CombatStatus",
+      "key": "Burning",
+      "source": "화상",
+      "translation": "Burn"
+    },
+    {
+      "namespace": "CombatStatus",
+      "key": "Chilled",
+      "source": "냉각",
+      "translation": "Chill"
+    },
+    {
+      "namespace": "CombatStatus",
+      "key": "ConfusedNext",
+      "source": "혼란 예정",
+      "translation": "Confusion next round"
+    },
+    {
+      "namespace": "CombatStatus",
+      "key": "ConfusedNow",
+      "source": "혼란(무작위 행동)",
+      "translation": "Confused (random action)"
+    },
+    {
+      "namespace": "CombatStatus",
+      "key": "FrozenNext",
+      "source": "빙결 예정",
+      "translation": "Freeze next round"
+    },
+    {
+      "namespace": "CombatStatus",
+      "key": "FrozenNow",
+      "source": "빙결(행동 불가)",
+      "translation": "Frozen (cannot act)"
+    },
+    {
+      "namespace": "CombatStatus",
+      "key": "Poisoned",
+      "source": "중독",
+      "translation": "Poison"
+    },
+    {
+      "namespace": "CombatStatus",
+      "key": "Separator",
+      "source": " · ",
+      "translation": " · "
+    },
+    {
+      "namespace": "CombatStatus",
+      "key": "Shocked",
+      "source": "감전",
+      "translation": "Shock"
+    },
+    {
+      "namespace": "CombatStatus",
+      "key": "ValueFormat",
+      "source": "{0} {1}",
+      "translation": "{0} {1}"
+    }
+  ]
+}

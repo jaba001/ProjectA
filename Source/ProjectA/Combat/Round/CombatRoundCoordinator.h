@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "Combat/Round/CombatRoundTypes.h"
 #include "Combat/Round/CombatSkillExecutor.h"
+#include "Combat/Round/CombatStatusRules.h"
 #include "Game/Development/CombatDebugSkillTiming.h"
 #include "Types/CombatResult.h"
 #include "CombatRoundCoordinator.generated.h"
@@ -150,6 +151,18 @@ private:
     double PlanningMoveElapsed = 0.0;
     FVector PlanningMoveOrigin = FVector::ZeroVector;
     FRotator PlanningMoveRotation = FRotator::ZeroRotator;
+    CombatStatusRules::FTuning StatusTuning;
+
+    // Status rules connect only at hit, tactical movement, round end and planning boundaries.
+    // 상태 규칙은 피격·전술 이동·라운드 종료·계획 경계에서만 연결됩니다.
+    bool IsPlanLocked(int32 Index) const;
+    bool TryBlockWaitingAction(int32 Index, const FText& Status);
+    void ApplyStatusesFromHit(int32 Index, const FCombatRoundSkill& Skill);
+    void ApplyStatusDamage(int32 Index, AUnitBase* Source, const FGameplayTag& Status, float Amount);
+    void ApplyRoundEndStatuses();
+    void PrepareStatusesForPlanning();
+    void ClearStatuses(int32 Index);
+    FCombatRoundCommand ChooseConfusedCommand(int32 Index) const;
 
     // Resolve server-only AI idling separately from the equipped skill catalogue.
     // 서버 전용 AI 대기는 장착 스킬 목록과 분리하여 해석합니다.

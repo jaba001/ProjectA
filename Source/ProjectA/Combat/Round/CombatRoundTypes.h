@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Types/SkillTypes.h"
+#include "Combat/Round/CombatStatusTypes.h"
 #include "GameplayTagContainer.h"
 #include "CombatRoundTypes.generated.h"
 
@@ -233,6 +234,11 @@ struct PROJECTA_API FCombatRoundSkill
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Chain")
     FCombatChainSettings Chain;
 
+    // Every successful hit applies these statuses after its effect; an empty list keeps existing content.
+    // 성공한 모든 피격은 효과 적용 뒤 이 상태를 부여하며 빈 목록은 기존 콘텐츠를 유지합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Status")
+    TArray<FCombatStatusApplication> StatusApplications;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect")
     FGameplayTagQuery SourceTagQuery;
 
@@ -434,6 +440,11 @@ struct PROJECTA_API FCombatRoundUnitView
 
     UPROPERTY(BlueprintReadOnly)
     FText Status;
+
+    // Harmful statuses are combat-local and cleared when the combat ends.
+    // 해로운 상태는 전투 안에서만 유지되며 전투가 끝나면 정리됩니다.
+    UPROPERTY(BlueprintReadOnly)
+    TArray<FCombatStatusEntry> Statuses;
 };
 
 USTRUCT(BlueprintType)
