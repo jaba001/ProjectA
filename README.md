@@ -69,6 +69,8 @@ C++ 파일을 추가·삭제하거나 이름을 바꾼 뒤에는 프로젝트 �
 | [EXECUTION_DECISIONS](Docs/EXECUTION_DECISIONS.md) | 위임받아 실행할 때의 판단 근거 |
 | [Docs/Claude](Docs/Claude/README.md) | Claude의 리뷰·제안·인계 문서 |
 
+스크린샷과 갤러리는 `Docs/ScreanShoot/`에 로컬 보관하며 Git에서 제외한다. 새 clone에는 포함되지 않는다.
+
 `DataCatalogs/`에는 CSV 14개가 있다. 새 기본 Run은 아래에서 *표시한 10개를 생성 시 읽어 결과를 저장한다. 그래서 CSV를 수정하면 그 뒤에 만드는 새 Run에만 반영되며 기존 저장은 바뀌지 않는다.
 
 | CSV | 내용 |

@@ -26,6 +26,9 @@ Thumbs.db
 desktop.ini
 *.lnk
 
+# Local documentation screenshots and galleries / 로컬 문서 스크린샷과 갤러리
+/Docs/ScreanShoot/
+
 # Ignore all Content assets by default / 기본적으로 Content 전체 무시
 Content/*
 
