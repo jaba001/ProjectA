@@ -94,6 +94,8 @@ private:
     TObjectPtr<UStaticMesh> CubeMesh;
     UPROPERTY()
     TObjectPtr<UMaterialInterface> WallMaterial;
+    UPROPERTY()
+    TObjectPtr<UMaterialInterface> FloorMaterial;
     UPROPERTY(Transient)
     TObjectPtr<UMaterialInterface> RouteMaterial;
     UPROPERTY(Transient)

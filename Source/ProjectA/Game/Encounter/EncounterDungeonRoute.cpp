@@ -36,8 +36,10 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
     DoorSeals = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("DoorSeals"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
     CubeMesh = Cube.Object;
-    static ConstructorHelpers::FObjectFinder<UMaterialInterface> StoneWall(TEXT("/Game/Dungeon_Modular_V1/Materials/M_Stone_Wall_Master_01.M_Stone_Wall_Master_01"));
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> StoneWall(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneWall.M_EncounterStoneWall"));
     WallMaterial = StoneWall.Object;
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> StoneFloor(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneFloor.M_EncounterStoneFloor"));
+    FloorMaterial = StoneFloor.Object;
     static ConstructorHelpers::FObjectFinder<UStaticMesh> LeftDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_L.MOD_Gateway_Door_01_large_door_L"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> RightDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_R.MOD_Gateway_Door_01_large_door_R"));
     UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, DoorSeals};
@@ -200,11 +202,11 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
     if (!bGeometryPrepared || (Material && RouteMaterial != Material))
     {
         if (Material) RouteMaterial = Material;
-        ApplyMaterial(Floor, FLinearColor(0.21f, 0.19f, 0.16f));
-        ApplyMaterial(Ceiling, FLinearColor(0.14f, 0.13f, 0.12f));
+        Floor->SetMaterial(0, FloorMaterial);
+        Ceiling->SetMaterial(0, WallMaterial);
         ApplyMaterial(Mortar, FLinearColor(0.055f, 0.05f, 0.04f));
-        // Keep the original textured stone on walls and pillars when the NPC prototype material changes.
-        // NPC 프로토타입 재질이 바뀌어도 벽과 기둥에는 원본 석재 텍스처를 유지합니다.
+        // Persist instancing support and world-aligned original textures on every dungeon surface.
+        // 인스턴싱 지원과 월드 정렬 원본 텍스처를 모든 미로 표면에 유지합니다.
         WallBlocks->SetMaterial(0, WallMaterial);
         Pillars->SetMaterial(0, WallMaterial);
     }
