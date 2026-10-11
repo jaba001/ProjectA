@@ -66,6 +66,7 @@ private:
     void ClearGeometry();
     void ApplyMaterial(UInstancedStaticMeshComponent* Component, const FLinearColor& Color);
     void AddBlock(UInstancedStaticMeshComponent* Component, const FVector& Center, const FVector& Size);
+    void AddMasonryPanel(UInstancedStaticMeshComponent* Component, const FVector& Center, const FVector& Horizontal, const FVector& Vertical, const FVector& Normal, float Width, float Height, float Thickness);
     void AddLight(const FVector& Position);
     void DestroyPresentedStage();
     void StopTravel();
@@ -93,11 +94,11 @@ private:
     UPROPERTY()
     TObjectPtr<UStaticMesh> CubeMesh;
     UPROPERTY()
-    TObjectPtr<UMaterialInterface> WallMaterial;
+    TSoftObjectPtr<UMaterialInterface> WallMaterial;
     UPROPERTY()
-    TObjectPtr<UMaterialInterface> FloorMaterial;
+    TSoftObjectPtr<UMaterialInterface> FloorMaterial;
     UPROPERTY()
-    TObjectPtr<UMaterialInterface> CeilingMaterial;
+    TSoftObjectPtr<UMaterialInterface> CeilingMaterial;
     UPROPERTY(Transient)
     TObjectPtr<UMaterialInterface> RouteMaterial;
     UPROPERTY(Transient)

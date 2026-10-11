@@ -36,12 +36,11 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
     DoorSeals = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("DoorSeals"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
     CubeMesh = Cube.Object;
-    static ConstructorHelpers::FObjectFinder<UMaterialInterface> StoneWall(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneWall.M_EncounterStoneWall"));
-    WallMaterial = StoneWall.Object;
-    static ConstructorHelpers::FObjectFinder<UMaterialInterface> StoneFloor(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneFloor.M_EncounterStoneFloor"));
-    FloorMaterial = StoneFloor.Object;
-    static ConstructorHelpers::FObjectFinder<UMaterialInterface> StoneCeiling(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneCeiling.M_EncounterStoneCeiling"));
-    CeilingMaterial = StoneCeiling.Object;
+    // Preserve cookable asset references without rooting editable material graphs during class initialization.
+    // 클래스 초기화 중 편집할 재질 그래프를 루트에 고정하지 않고 쿠킹 가능한 에셋 참조를 유지합니다.
+    WallMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneWall.M_EncounterStoneWall")));
+    FloorMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneFloor.M_EncounterStoneFloor")));
+    CeilingMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneCeiling.M_EncounterStoneCeiling")));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> LeftDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_L.MOD_Gateway_Door_01_large_door_L"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> RightDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_R.MOD_Gateway_Door_01_large_door_R"));
     UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, DoorSeals};
@@ -123,6 +122,29 @@ void AEncounterDungeonRoute::ApplyMaterial(UInstancedStaticMeshComponent* Compon
     }
 }
 
+void AEncounterDungeonRoute::AddMasonryPanel(UInstancedStaticMeshComponent* Component, const FVector& Center, const FVector& Horizontal, const FVector& Vertical, const FVector& Normal, float Width, float Height, float Thickness)
+{
+    // Share staggered courses and recessed four-centimeter joints across walls, floors and ceilings.
+    // 벽·바닥·천장에 엇갈린 석재 배열과 깊이가 있는 4cm 줄눈을 공통 적용합니다.
+    constexpr int32 CourseCount = 4;
+    constexpr float JointWidth = 4.f;
+    const float BlockWidth = Width / CourseCount;
+    const float BlockHeight = Height / CourseCount;
+    for (int32 Row = 0; Row < CourseCount; ++Row)
+    {
+        const float Offset = Row % 2 == 0 ? 0.f : BlockWidth * 0.5f;
+        for (int32 Column = 0; Column <= CourseCount; ++Column)
+        {
+            const float Start = FMath::Max(-Width * 0.5f, -Width * 0.5f + Column * BlockWidth - Offset);
+            const float End = FMath::Min(Width * 0.5f, -Width * 0.5f + (Column + 1) * BlockWidth - Offset);
+            if (End - Start <= JointWidth) continue;
+            const FVector BlockCenter = Center + Horizontal * ((Start + End) * 0.5f) + Vertical * ((Row + 0.5f) * BlockHeight - Height * 0.5f);
+            const FVector BlockSize = Horizontal.GetAbs() * (End - Start - JointWidth) + Vertical.GetAbs() * (BlockHeight - JointWidth) + Normal.GetAbs() * Thickness;
+            AddBlock(Component, BlockCenter, BlockSize);
+        }
+    }
+}
+
 void AEncounterDungeonRoute::AddLight(const FVector& Position)
 {
     UPointLightComponent* Light = NewObject<UPointLightComponent>(this, NAME_None, RF_Transient);
@@ -133,7 +155,7 @@ void AEncounterDungeonRoute::AddLight(const FVector& Position)
     Light->SetUseInverseSquaredFalloff(true);
     Light->SetIntensity(3600.f);
     Light->SetAttenuationRadius(1150.f);
-    Light->SetLightColor(FLinearColor(1.f, 0.65f, 0.34f));
+    Light->SetLightColor(FLinearColor(1.f, 0.95f, 0.88f));
     Light->SetCastShadows(false);
     Light->SetVisibility(bPresentationVisible);
     AddInstanceComponent(Light);
@@ -204,13 +226,14 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
     if (!bGeometryPrepared || (Material && RouteMaterial != Material))
     {
         if (Material) RouteMaterial = Material;
-        Floor->SetMaterial(0, FloorMaterial);
-        Ceiling->SetMaterial(0, CeilingMaterial);
+        Floor->SetMaterial(0, FloorMaterial.LoadSynchronous());
+        Ceiling->SetMaterial(0, CeilingMaterial.LoadSynchronous());
         ApplyMaterial(Mortar, FLinearColor(0.055f, 0.05f, 0.04f));
         // Persist instancing support and world-aligned original textures on every dungeon surface.
         // 인스턴싱 지원과 월드 정렬 원본 텍스처를 모든 미로 표면에 유지합니다.
-        WallBlocks->SetMaterial(0, WallMaterial);
-        Pillars->SetMaterial(0, WallMaterial);
+        UMaterialInterface* LoadedWallMaterial = WallMaterial.LoadSynchronous();
+        WallBlocks->SetMaterial(0, LoadedWallMaterial);
+        Pillars->SetMaterial(0, LoadedWallMaterial);
     }
     if (bGeometryPrepared) return;
 
@@ -228,8 +251,12 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
     for (const FIntPoint& Cell : Cells)
     {
         const FVector Center(Cell.X * CellSize, Cell.Y * CellSize, 0.f);
-        AddBlock(Floor, Center + FVector(0.f, 0.f, -10.f), FVector(CellSize, CellSize, 20.f));
-        AddBlock(Ceiling, Center + FVector(0.f, 0.f, WallHeight + 10.f), FVector(CellSize, CellSize, 20.f));
+        // Back the joints with opaque slabs recessed two centimeters from the stone faces.
+        // 석재 표면보다 2cm 들어간 불투명 판으로 줄눈을 막습니다.
+        AddBlock(Mortar, Center + FVector(0.f, 0.f, -12.f), FVector(CellSize, CellSize, 20.f));
+        AddBlock(Mortar, Center + FVector(0.f, 0.f, WallHeight + 12.f), FVector(CellSize, CellSize, 20.f));
+        AddMasonryPanel(Floor, Center + FVector(0.f, 0.f, -10.f), FVector::ForwardVector, FVector::RightVector, FVector::UpVector, CellSize, CellSize, 20.f);
+        AddMasonryPanel(Ceiling, Center + FVector(0.f, 0.f, WallHeight + 10.f), FVector::ForwardVector, FVector::RightVector, FVector::UpVector, CellSize, CellSize, 20.f);
         for (const FIntPoint& Neighbor : Neighbors)
         {
             if (Cells.Contains(Cell + Neighbor)) continue;
@@ -240,28 +267,13 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
             const FVector WallCenter = Center + Normal * (CellSize * 0.5f + 16.f) + FVector(0.f, 0.f, WallHeight * 0.5f);
             AddBlock(Mortar, WallCenter, bAlongY ? FVector(32.f, CellSize, WallHeight) : FVector(CellSize, 32.f, WallHeight));
 
-            // Short alternating masonry joints reveal depth without adding gameplay collision.
-            // 짧고 엇갈린 석재 이음으로 깊이를 표현하며 게임플레이 충돌은 추가하지 않습니다.
-            for (int32 Row = 0; Row < 4; ++Row)
-            {
-                const float BlockHeight = WallHeight / 4.f;
-                const float Offset = Row % 2 == 0 ? 0.f : CellSize / 8.f;
-                for (int32 Column = 0; Column < 5; ++Column)
-                {
-                    const float Start = FMath::Max(-CellSize * 0.5f, -CellSize * 0.5f + Column * CellSize / 4.f - Offset);
-                    const float End = FMath::Min(CellSize * 0.5f, -CellSize * 0.5f + (Column + 1) * CellSize / 4.f - Offset);
-                    if (End - Start <= 4.f) continue;
-                    const FVector BlockCenter = Center + Normal * (CellSize * 0.5f + 15.f) + Tangent * ((Start + End) * 0.5f) + FVector(0.f, 0.f, (Row + 0.5f) * BlockHeight);
-                    const FVector BlockSize = bAlongY ? FVector(36.f, End - Start - 4.f, BlockHeight - 4.f) : FVector(End - Start - 4.f, 36.f, BlockHeight - 4.f);
-                    AddBlock(WallBlocks, BlockCenter, BlockSize);
-                }
-            }
+            AddMasonryPanel(WallBlocks, Center + Normal * (CellSize * 0.5f + 15.f) + FVector(0.f, 0.f, WallHeight * 0.5f), Tangent, FVector::UpVector, Normal, CellSize, WallHeight, 36.f);
             const FIntPoint EdgeCenter(2 * Cell.X + Neighbor.X, 2 * Cell.Y + Neighbor.Y);
             const FIntPoint EdgeTangent(-Neighbor.Y, Neighbor.X);
             PillarCorners.Add(EdgeCenter + EdgeTangent);
             PillarCorners.Add(EdgeCenter - EdgeTangent);
         }
-        if ((Cell.X + Cell.Y) % 2 == 0) AddLight(Center + FVector(0.f, 0.f, WallHeight - 80.f));
+        if ((Cell.X + Cell.Y) % 2 == 0) AddLight(Center + FVector(0.f, 0.f, WallHeight * 0.5f));
     }
     for (const FIntPoint& Corner : PillarCorners)
     {
