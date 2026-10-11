@@ -96,6 +96,8 @@ private:
     TObjectPtr<UMaterialInterface> WallMaterial;
     UPROPERTY()
     TObjectPtr<UMaterialInterface> FloorMaterial;
+    UPROPERTY()
+    TObjectPtr<UMaterialInterface> CeilingMaterial;
     UPROPERTY(Transient)
     TObjectPtr<UMaterialInterface> RouteMaterial;
     UPROPERTY(Transient)

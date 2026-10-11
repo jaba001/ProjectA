@@ -40,6 +40,8 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
     WallMaterial = StoneWall.Object;
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> StoneFloor(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneFloor.M_EncounterStoneFloor"));
     FloorMaterial = StoneFloor.Object;
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> StoneCeiling(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneCeiling.M_EncounterStoneCeiling"));
+    CeilingMaterial = StoneCeiling.Object;
     static ConstructorHelpers::FObjectFinder<UStaticMesh> LeftDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_L.MOD_Gateway_Door_01_large_door_L"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> RightDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_R.MOD_Gateway_Door_01_large_door_R"));
     UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, DoorSeals};
@@ -203,7 +205,7 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
     {
         if (Material) RouteMaterial = Material;
         Floor->SetMaterial(0, FloorMaterial);
-        Ceiling->SetMaterial(0, WallMaterial);
+        Ceiling->SetMaterial(0, CeilingMaterial);
         ApplyMaterial(Mortar, FLinearColor(0.055f, 0.05f, 0.04f));
         // Persist instancing support and world-aligned original textures on every dungeon surface.
         // 인스턴싱 지원과 월드 정렬 원본 텍스처를 모든 미로 표면에 유지합니다.
