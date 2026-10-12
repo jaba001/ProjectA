@@ -3,6 +3,42 @@
   "culture": "en",
   "entries": [
     {
+      "namespace": "RunMap",
+      "key": "SnapshotDetailsUnavailable",
+      "source": "상대 정보를 불러올 수 없습니다.",
+      "translation": "Opponent information is unavailable."
+    },
+    {
+      "namespace": "RunMap",
+      "key": "SnapshotPartyTitle",
+      "source": "아군 정보",
+      "translation": "Your Party"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "SnapshotCombatantInfo",
+      "source": "{0}\n{1}\n\nHP {2} / {3}\n속도 {4}",
+      "translation": "{0}\n{1}\n\nHP {2} / {3}\nSpeed {4}"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "SnapshotOpponentTitle",
+      "source": "PvP 상대 정보",
+      "translation": "PvP Opponent"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "StartSnapshotCombat",
+      "source": "전투 시작",
+      "translation": "Start Battle"
+    },
+    {
+      "namespace": "RunMap",
+      "key": "WaitingHostSnapshot",
+      "source": "Host의 전투 시작을 기다립니다.",
+      "translation": "Waiting for the Host to start the battle."
+    },
+    {
       "namespace": "Equipment",
       "key": "Title",
       "source": "현재 장비",

@@ -80,6 +80,22 @@ FGameplayViewState FGameplayViewState::FromRun(const URunStateSubsystem* Run, co
             }
         }
         const FRunTargetState& Target = Run->GetTargetRunState();
+        if (View.Phase == ERunPhase::Map && View.bTargetRun && CompletedCount % 2 != 0 && View.Nodes.IsValidIndex(CompletedCount))
+        {
+            View.bSnapshotPreview = true;
+            if (Target.Groups.IsValidIndex(CompletedCount / 2)) View.SnapshotOpponentMembers = Target.Groups[CompletedCount / 2].Opponent.Members;
+            for (const FRunPartyMember& Member : View.PartyMembers)
+            {
+                if (!Member.bCreated) continue;
+                FProfessionDefinition Profession;
+                FText ProfessionError;
+                if (!Run->ResolveMemberProfession(Member, Profession, ProfessionError)) continue;
+                FRunPartyCombatStatsView& Stats = View.SnapshotPartyStats.AddDefaulted_GetRef();
+                Stats.CharacterId = Member.CharacterId;
+                Stats.MaxHP = Profession.MaxHP;
+                Stats.Speed = Profession.Speed;
+            }
+        }
         if ((View.Phase == ERunPhase::Preparing || View.Phase == ERunPhase::Combat) && CompletedCount % 2 == 0 && Target.PveDifficulty.SelectedTags.IsValidIndex(CompletedCount / 2))
         {
             const FGameplayTag SelectedDifficulty = Target.PveDifficulty.SelectedTags[CompletedCount / 2];

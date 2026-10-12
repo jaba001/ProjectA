@@ -8,10 +8,26 @@
 #include "Game/Run/RunWeaponSkillTypes.h"
 #include "Game/Run/RunGoldRewardTypes.h"
 #include "Game/Run/RunPveDifficultyTypes.h"
+#include "Game/Snapshot/PartySnapshotTypes.h"
 #include "Types/CombatResult.h"
 #include "GameplayViewTypes.generated.h"
 
 class URunStateSubsystem;
+
+USTRUCT()
+struct PROJECTA_API FRunPartyCombatStatsView
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    FGuid CharacterId;
+
+    UPROPERTY()
+    float MaxHP = 0.f;
+
+    UPROPERTY()
+    float Speed = 0.f;
+};
 
 USTRUCT()
 struct PROJECTA_API FRunShopBuyerView
@@ -60,6 +76,17 @@ struct PROJECTA_API FGameplayViewState
     // 클라이언트에 수정 가능한 Run 규칙을 노출하지 않고 파생 난이도 미리보기를 전달합니다.
     UPROPERTY()
     TArray<FRunPveDifficultyOffer> PveDifficultyOffers;
+
+    // Preview only the assigned opponent; future groups remain on the authority.
+    // 배정된 상대만 미리 표시하며 이후 묶음은 권위 측에 유지합니다.
+    UPROPERTY()
+    bool bSnapshotPreview = false;
+
+    UPROPERTY()
+    TArray<FPartySnapshotMember> SnapshotOpponentMembers;
+
+    UPROPERTY()
+    TArray<FRunPartyCombatStatsView> SnapshotPartyStats;
 
     UPROPERTY()
     int32 CombatEntranceDirection = INDEX_NONE;

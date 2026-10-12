@@ -51,6 +51,14 @@ namespace
         }
         return FText::Join(FText::FromString(TEXT("\n\n")), Lines);
     }
+
+    FText SnapshotMemberInfo(const FText& Name, FName ClassId, float HP, float MaxHP, float Speed)
+    {
+        FNumberFormattingOptions SpeedFormat;
+        SpeedFormat.SetMaximumFractionalDigits(2);
+        const FText Profession = ProjectALocalization::Content(TEXT("Profession.") + ClassId.ToString() + TEXT(".Name"), FText::FromName(ClassId));
+        return FText::Format(NSLOCTEXT("RunMap", "SnapshotCombatantInfo", "{0}\n{1}\n\nHP {2} / {3}\n속도 {4}"), Name, Profession, FText::AsNumber(FMath::RoundToInt(HP)), FText::AsNumber(FMath::RoundToInt(MaxHP)), FText::AsNumber(Speed, &SpeedFormat));
+    }
 }
 
 TOptional<FUIInputConfig> URunMapWidget::GetDesiredInputConfig() const
@@ -155,6 +163,73 @@ void URunMapWidget::NativeOnInitialized()
 
     if (Root)
     {
+        SnapshotPanel = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("SnapshotPreviewPanel"));
+        SnapshotPanel->SetMaxDesiredWidth(1100.f);
+        SnapshotPanel->SetMaxDesiredHeight(640.f);
+        SnapshotPanel->SetVisibility(ESlateVisibility::Collapsed);
+        UOverlaySlot* SnapshotSlot = Root->AddChildToOverlay(SnapshotPanel);
+        SnapshotSlot->SetHorizontalAlignment(HAlign_Center);
+        SnapshotSlot->SetVerticalAlignment(VAlign_Center);
+        SnapshotSlot->SetPadding(FMargin(24.f));
+        UBorder* SnapshotBorder = WidgetTree->ConstructWidget<UBorder>();
+        Theme.StylePanel(SnapshotBorder);
+        SnapshotBorder->SetPadding(FMargin(24.f, 16.f));
+        SnapshotPanel->SetContent(SnapshotBorder);
+        UScrollBox* SnapshotScroll = WidgetTree->ConstructWidget<UScrollBox>();
+        SnapshotScroll->SetAllowOverscroll(false);
+        SnapshotScroll->SetScrollWhenFocusChanges(EScrollWhenFocusChanges::InstantScroll);
+        SnapshotBorder->SetContent(SnapshotScroll);
+        UVerticalBox* SnapshotContent = WidgetTree->ConstructWidget<UVerticalBox>();
+        SnapshotScroll->AddChild(SnapshotContent);
+        const auto AddSnapshotRow = [this, &Theme, SnapshotContent](const FText& Title, TArray<FRunCombatPreviewCardWidgets>& Cards)
+        {
+            UTextBlock* Heading = WidgetTree->ConstructWidget<UProjectATextBlock>();
+            Heading->SetText(Title);
+            Heading->SetJustification(ETextJustify::Center);
+            Theme.StyleText(Heading, true, 24);
+            SnapshotContent->AddChildToVerticalBox(Heading)->SetPadding(FMargin(0.f, 0.f, 0.f, 8.f));
+            // Keep four readable columns with scrolling on narrow screens instead of clipping member information.
+            // 좁은 화면에서는 스크롤로 구성원 정보를 잘라내지 않고 읽기 쉬운 네 열을 유지합니다.
+            UScrollBox* RowScroll = WidgetTree->ConstructWidget<UScrollBox>();
+            RowScroll->SetOrientation(Orient_Horizontal);
+            RowScroll->SetAllowOverscroll(false);
+            SnapshotContent->AddChildToVerticalBox(RowScroll);
+            UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
+            CastChecked<UScrollBoxSlot>(RowScroll->AddChild(Row))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+            for (int32 Index = 0; Index < 4; ++Index)
+            {
+                FRunCombatPreviewCardWidgets& Card = Cards.AddDefaulted_GetRef();
+                Card.Container = WidgetTree->ConstructWidget<USizeBox>();
+                Card.Container->SetMinDesiredWidth(240.f);
+                UHorizontalBoxSlot* CardSlot = Row->AddChildToHorizontalBox(Card.Container);
+                CardSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+                CardSlot->SetPadding(FMargin(4.f, 0.f));
+                UBorder* CardBorder = WidgetTree->ConstructWidget<UBorder>();
+                Theme.StyleInset(CardBorder);
+                CardBorder->SetPadding(FMargin(16.f, 12.f));
+                Card.Container->SetContent(CardBorder);
+                Card.Info = WidgetTree->ConstructWidget<UProjectATextBlock>();
+                Card.Info->SetAutoWrapText(true);
+                Card.Info->SetJustification(ETextJustify::Center);
+                Theme.StyleText(Card.Info, false, 18);
+                CardBorder->SetContent(Card.Info);
+            }
+        };
+        AddSnapshotRow(NSLOCTEXT("RunMap", "SnapshotOpponentTitle", "PvP 상대 정보"), SnapshotOpponentCards);
+        SnapshotStartButton = WidgetTree->ConstructWidget<UGameplayActionButton>(UGameplayActionButton::StaticClass(), TEXT("Button_StartSnapshotCombat"));
+        SnapshotStartButton->OnActionRequested.AddUObject(this, &URunMapWidget::HandleNodeSelected);
+        USizeBox* StartSize = WidgetTree->ConstructWidget<USizeBox>();
+        StartSize->SetMinDesiredWidth(260.f);
+        StartSize->SetContent(SnapshotStartButton);
+        UVerticalBoxSlot* StartSlot = SnapshotContent->AddChildToVerticalBox(StartSize);
+        StartSlot->SetHorizontalAlignment(HAlign_Center);
+        StartSlot->SetPadding(FMargin(0.f, 20.f));
+        AddSnapshotRow(NSLOCTEXT("RunMap", "SnapshotPartyTitle", "아군 정보"), SnapshotPartyCards);
+        SnapshotMessage = WidgetTree->ConstructWidget<UProjectATextBlock>();
+        SnapshotMessage->SetAutoWrapText(true);
+        SnapshotMessage->SetJustification(ETextJustify::Center);
+        SnapshotContent->AddChildToVerticalBox(SnapshotMessage)->SetPadding(FMargin(0.f, 12.f, 0.f, 0.f));
+
         // Keep the three choices in direction order while allowing narrow screens to scroll instead of clipping.
         // 세 선택의 방향 순서를 유지하고 좁은 화면에서는 잘리지 않고 스크롤로 접근할 수 있게 합니다.
         PveDifficultyPanel = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("PveDifficultyPanel"));
@@ -247,6 +322,7 @@ void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllo
 {
     bRunCommandsAllowed = bAllowRunCommands;
     const int32 NextNodeIndex = View.CompletedNodes.Num();
+    const bool bSnapshotPreview = View.bSnapshotPreview && View.Phase == ERunPhase::Map && View.Nodes.IsValidIndex(NextNodeIndex);
     const bool bPveChoice = View.Phase == ERunPhase::Map && View.PveDifficultyOffers.Num() == 3 && View.Nodes.IsValidIndex(NextNodeIndex) && View.AvailableNodes.Contains(View.Nodes[NextNodeIndex].NodeId);
     PveNodeId = bPveChoice ? View.Nodes[NextNodeIndex].NodeId : NAME_None;
     PveDifficultyTags.Reset();
@@ -255,7 +331,9 @@ void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllo
         WorldBackdrop->SetVisibility(bPveChoice && bWorldPresentation ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
         WorldBackdrop->SetRenderOpacity(bWorldPresentation ? 0.65f : 1.f);
     }
-    if (MapPanel) MapPanel->SetVisibility(bPveChoice ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+    if (MapPanel) MapPanel->SetVisibility(bPveChoice || bSnapshotPreview ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+    if (SnapshotPanel) SnapshotPanel->SetVisibility(bSnapshotPreview ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    if (SnapshotStartButton) SnapshotStartButton->SetIsEnabled(false);
     if (PveDifficultyPanel)
     {
         PveDifficultyPanel->SetVisibility(bPveChoice ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -310,6 +388,37 @@ void URunMapWidget::RefreshRunMapView(const FGameplayViewState& View, bool bAllo
     }
     NodeList->ClearChildren();
     Text_FlowMessage->SetText(View.FlowMessage);
+    if (bSnapshotPreview && SnapshotStartButton)
+    {
+        // Use the existing Host command for the assigned node without presenting unrelated battles as choices.
+        // 무관한 전투를 선택지로 표시하지 않고 배정된 노드에 기존 Host 명령을 사용합니다.
+        const FRunNodeDefinition& Node = View.Nodes[NextNodeIndex];
+        SnapshotStartButton->Configure(Node.NodeId, NSLOCTEXT("RunMap", "StartSnapshotCombat", "전투 시작"));
+        SnapshotStartButton->SetIsEnabled(bRunCommandsAllowed && View.AvailableNodes.Contains(Node.NodeId) && !View.SnapshotOpponentMembers.IsEmpty());
+        for (int32 Index = 0; Index < SnapshotOpponentCards.Num(); ++Index)
+        {
+            FRunCombatPreviewCardWidgets& Card = SnapshotOpponentCards[Index];
+            Card.Container->SetVisibility(View.SnapshotOpponentMembers.IsValidIndex(Index) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+            if (!View.SnapshotOpponentMembers.IsValidIndex(Index)) continue;
+            const FPartySnapshotMember& Member = View.SnapshotOpponentMembers[Index];
+            Card.Info->SetText(SnapshotMemberInfo(FText::FromString(Member.CharacterName.IsEmpty() ? Member.MemberId.ToString() : Member.CharacterName), Member.ClassId, Member.Stats.CurrentHP, Member.Stats.MaxHP, Member.Stats.Speed));
+        }
+        TArray<const FRunPartyMember*> CreatedMembers;
+        for (const FRunPartyMember& Member : View.PartyMembers) if (Member.bCreated) CreatedMembers.Add(&Member);
+        CreatedMembers.Sort([](const FRunPartyMember& Left, const FRunPartyMember& Right) { return Left.SlotIndex < Right.SlotIndex; });
+        for (int32 Index = 0; Index < SnapshotPartyCards.Num(); ++Index)
+        {
+            FRunCombatPreviewCardWidgets& Card = SnapshotPartyCards[Index];
+            Card.Container->SetVisibility(CreatedMembers.IsValidIndex(Index) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+            if (!CreatedMembers.IsValidIndex(Index)) continue;
+            const FRunPartyMember& Member = *CreatedMembers[Index];
+            const FRunPartyCombatStatsView* Stats = View.SnapshotPartyStats.FindByPredicate([&Member](const FRunPartyCombatStatsView& Entry) { return Entry.CharacterId == Member.CharacterId; });
+            Card.Info->SetText(Stats ? SnapshotMemberInfo(Member.CharacterName, Member.ClassId, Member.CurrentHP, Stats->MaxHP, Stats->Speed) : Member.CharacterName);
+        }
+        const FText Notice = View.SnapshotOpponentMembers.IsEmpty() ? NSLOCTEXT("RunMap", "SnapshotDetailsUnavailable", "상대 정보를 불러올 수 없습니다.") : bRunCommandsAllowed ? FText::GetEmpty() : NSLOCTEXT("RunMap", "WaitingHostSnapshot", "Host의 전투 시작을 기다립니다.");
+        SnapshotMessage->SetText(Notice.IsEmpty() ? View.FlowMessage : View.FlowMessage.IsEmpty() ? Notice : FText::Format(FText::FromString(TEXT("{0}\n{1}")), Notice, View.FlowMessage));
+        return;
+    }
     Text_Progress->SetText(FText::Format(NSLOCTEXT("RunMap", "Progress", "진행 지도  {0} / {1}"), View.CompletedNodes.Num(), View.Nodes.Num()));
     FString PartyText;
 

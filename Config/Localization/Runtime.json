@@ -3,6 +3,12 @@
   "culture": "en",
   "entries": [
     {
+      "namespace": "RunSkillBalance",
+      "key": "InvalidStatusCsv",
+      "source": "스킬 상태이상 CSV의 열·스킬 ID·상태 태그 또는 수치가 올바르지 않습니다.",
+      "translation": "The skill status CSV contains invalid columns, skill IDs, status tags or values."
+    },
+    {
       "namespace": "CombatCheckpoint",
       "key": "Invalid",
       "source": "전투 체크포인트가 손상되었거나 현재 콘텐츠와 호환되지 않습니다.",

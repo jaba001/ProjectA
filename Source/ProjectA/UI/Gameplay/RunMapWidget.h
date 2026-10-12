@@ -14,6 +14,18 @@ class USizeBox;
 struct FGameplayViewState;
 
 USTRUCT()
+struct FRunCombatPreviewCardWidgets
+{
+    GENERATED_BODY()
+
+    UPROPERTY(Transient)
+    TObjectPtr<USizeBox> Container;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> Info;
+};
+
+USTRUCT()
 struct FRunPveDifficultyCardWidgets
 {
     GENERATED_BODY()
@@ -82,6 +94,21 @@ private:
 
     UPROPERTY(Transient)
     TArray<FRunPveDifficultyCardWidgets> PveDifficultyCards;
+
+    UPROPERTY(Transient)
+    TObjectPtr<USizeBox> SnapshotPanel;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> SnapshotMessage;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UGameplayActionButton> SnapshotStartButton;
+
+    UPROPERTY(Transient)
+    TArray<FRunCombatPreviewCardWidgets> SnapshotOpponentCards;
+
+    UPROPERTY(Transient)
+    TArray<FRunCombatPreviewCardWidgets> SnapshotPartyCards;
 
     FName PveNodeId;
     TArray<FGameplayTag> PveDifficultyTags;
