@@ -14,12 +14,11 @@ TArray<FVector> EncounterDungeonLayout::GetPath(int32 Direction, int32 LayoutVar
     const FVector Approach = Door - DoorForward * EntranceDoorApproachDistance;
     const FVector Beyond = Door + DoorForward * ChoiceDoorPassDistance;
     if (Direction == 1) return {FVector(0.f, 0.f, EyeHeight), Approach, Beyond, FVector(ChoiceDoorDistance + (3 + (LayoutVariant & 1) + ((LayoutVariant >> 2) & 1)) * CellSize, 0.f, EyeHeight)};
-    // Align with the selected doorway inside the lobby before walking straight through its frame.
-    // 진입 공간에서 선택한 문의 축에 맞춘 다음 문틀을 직진으로 통과합니다.
-    const FVector Align(0.f, Door.Y, EyeHeight);
+    // Walk directly to the selected doorway approach, then pass straight through its frame.
+    // 선택한 문 앞 대기점까지 바로 이동한 다음 문틀을 직진으로 통과합니다.
     const FVector Advance = Beyond + FVector(CellSize * (0.5f + 0.5f * (LayoutVariant & 1)), 0.f, 0.f);
     const FVector Corner(Advance.X, (Direction - 1) * (4 + ((LayoutVariant >> 1) & 1)) * CellSize, EyeHeight);
-    return {FVector(0.f, 0.f, EyeHeight), Align, Approach, Beyond, Advance, Corner, Corner + FVector((1 + ((LayoutVariant >> 2) & 1)) * CellSize, 0.f, 0.f)};
+    return {FVector(0.f, 0.f, EyeHeight), Approach, Beyond, Advance, Corner, Corner + FVector((1 + ((LayoutVariant >> 2) & 1)) * CellSize, 0.f, 0.f)};
 }
 
 FQuat EncounterDungeonLayout::GetBranchRotation(int32 Direction)
@@ -55,7 +54,7 @@ TArray<FEncounterDungeonFloorRegion> EncounterDungeonLayout::GetFloorRegions(int
     for (int32 Direction = 0; Direction < 3; ++Direction)
     {
         const TArray<FVector> Path = GetPath(Direction, LayoutVariant);
-        for (int32 Index = Direction == 1 ? 2 : 3; Index < Path.Num(); ++Index)
+        for (int32 Index = 2; Index < Path.Num(); ++Index)
         {
             const FVector Delta = Path[Index] - Path[Index - 1];
             const FVector Middle = (Path[Index] + Path[Index - 1]) * 0.5f;

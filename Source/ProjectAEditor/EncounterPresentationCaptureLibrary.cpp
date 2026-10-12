@@ -117,8 +117,8 @@ bool UEncounterPresentationCaptureLibrary::CaptureDungeonInteriors(UWorld* World
     bSuccess = bSuccess && Save(TEXT("01_Junction.png"), Origin + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight), FRotator::ZeroRotator, EncounterDungeonLayout::ChoiceFieldOfView);
     bSuccess = bSuccess && Save(TEXT("02_TorchAndStone.png"), Origin + FVector(-150.f, 0.f, EncounterDungeonLayout::EyeHeight), FRotator(16.f, 35.f, 0.f));
     const TArray<FVector> Path = EncounterDungeonLayout::GetPath(0, 0);
-    const FRotator CorridorRotation = Path.Num() > 5 ? (Path[5] - Path[4]).Rotation() : FRotator::ZeroRotator;
-    bSuccess = bSuccess && Path.Num() > 5 && Save(TEXT("03_Corridor.png"), Origin + Path[4] + CorridorRotation.Vector() * 200.f, CorridorRotation);
+    const FRotator CorridorRotation = Path.Num() > 4 ? (Path[4] - Path[3]).Rotation() : FRotator::ZeroRotator;
+    bSuccess = bSuccess && Path.Num() > 4 && Save(TEXT("03_Corridor.png"), Origin + Path[3] + CorridorRotation.Vector() * 200.f, CorridorRotation);
     AEncounterPrototypeStage* Stage = Route->ConfigureStage(Template, 0, Offer);
     bSuccess = bSuccess && Stage && Save(TEXT("04_Shop.png"), Stage->Camera->GetComponentLocation(), Stage->Camera->GetComponentRotation());
     bSuccess = bSuccess && Save(TEXT("01_Junction.png"), Origin + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight), FRotator::ZeroRotator, EncounterDungeonLayout::ChoiceFieldOfView);
