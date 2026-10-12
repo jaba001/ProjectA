@@ -82,7 +82,7 @@ void URunSurrenderWidget::NativeOnInitialized()
     Description->SetAutoWrapText(true);
     Description->SetJustification(ETextJustify::Center);
     Content->AddChildToVerticalBox(Description)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 20.0f));
-    ErrorText = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_SurrenderError"));
+    ErrorText = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_SurrenderError"));
     ErrorText->SetAutoWrapText(true);
     ErrorText->SetVisibility(ESlateVisibility::Collapsed);
     Content->AddChildToVerticalBox(ErrorText)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));

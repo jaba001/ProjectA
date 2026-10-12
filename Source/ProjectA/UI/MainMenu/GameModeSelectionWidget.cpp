@@ -87,7 +87,7 @@ void UGameModeSelectionWidget::NativeOnInitialized()
 
     MultiplayerButton = AddButton(Content, TEXT("Button_Multiplayer"), NSLOCTEXT("GameModeSelection", "Multiplayer", "멀티플레이"));
     MultiplayerButton->OnClicked.AddUniqueDynamic(this, &UGameModeSelectionWidget::HandleMultiplayer);
-    MultiplayerNotice = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_MultiplayerAvailability"));
+    MultiplayerNotice = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_MultiplayerAvailability"));
     MultiplayerNotice->SetAutoWrapText(true);
     MultiplayerNotice->SetJustification(ETextJustify::Center);
     Content->AddChildToVerticalBox(MultiplayerNotice)->SetPadding(FMargin(0.0f, 2.0f, 0.0f, 20.0f));

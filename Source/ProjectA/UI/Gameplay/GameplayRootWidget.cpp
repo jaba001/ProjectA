@@ -209,7 +209,7 @@ void UGameplayRootWidget::NativeOnInitialized()
     GoldSlot->SetHorizontalAlignment(HAlign_Left);
     GoldSlot->SetVerticalAlignment(VAlign_Top);
     GoldSlot->SetPadding(FMargin(24.f, 16.f));
-    GoldText = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_PersonalGold"));
+    GoldText = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_PersonalGold"));
     UDemonicUITheme::Get().StyleText(GoldText, true, 20);
     GoldText->SetColorAndOpacity(FLinearColor(0.95f, 0.76f, 0.34f));
     UVerticalBox* GoldContent = WidgetTree->ConstructWidget<UVerticalBox>();
@@ -245,7 +245,7 @@ void UGameplayRootWidget::NativeOnInitialized()
     CheckpointNotice->SetPadding(FMargin(16.f));
     UVerticalBox* NoticeContent = WidgetTree->ConstructWidget<UVerticalBox>();
     CheckpointNotice->SetContent(NoticeContent);
-    CheckpointMessage = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_CheckpointMessage"));
+    CheckpointMessage = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_CheckpointMessage"));
     CheckpointMessage->SetAutoWrapText(true);
     CheckpointMessage->SetWrapTextAt(680.f);
     NoticeContent->AddChildToVerticalBox(CheckpointMessage);

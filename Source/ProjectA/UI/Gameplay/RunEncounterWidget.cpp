@@ -124,7 +124,7 @@ void URunEncounterWidget::NativeOnInitialized()
     Theme.StyleSectionHeader(TitleBar);
     TitleBar->SetPadding(FMargin(20.0f, 8.0f));
     Content->AddChildToVerticalBox(TitleBar);
-    Title = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_EncounterTitle"));
+    Title = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_EncounterTitle"));
     Title->SetJustification(ETextJustify::Center);
     Title->SetAutoWrapText(true);
     Title->SetWrapTextAt(532.0f);
@@ -144,11 +144,11 @@ void URunEncounterWidget::NativeOnInitialized()
         Actions->AddChildToVerticalBox(Button)->SetPadding(FMargin(0.0f, 5.0f));
         ChoiceButtons.Add(Button);
     }
-    ShopBalance = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_ShopBalance"));
+    ShopBalance = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_ShopBalance"));
     Actions->AddChildToVerticalBox(ShopBalance)->SetPadding(FMargin(0.0f, 5.0f));
     ShopBalance->SetAutoWrapText(true);
     ShopBalance->SetWrapTextAt(540.0f);
-    ShopHint = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_ShopHint"));
+    ShopHint = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_ShopHint"));
     ShopHint->SetAutoWrapText(true);
     ShopHint->SetWrapTextAt(540.0f);
     Actions->AddChildToVerticalBox(ShopHint)->SetPadding(FMargin(0.0f, 5.0f));
@@ -168,7 +168,7 @@ void URunEncounterWidget::NativeOnInitialized()
     InventoryButton->Configure(TEXT("Inventory"), NSLOCTEXT("RunEncounter", "Inventory", "인벤토리 · 장비 보기 (I)"));
     InventoryButton->OnActionRequested.AddUObject(this, &URunEncounterWidget::HandleInventory);
     Content->AddChildToVerticalBox(InventoryButton)->SetPadding(FMargin(0.0f, 5.0f));
-    Message = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_EncounterMessage"));
+    Message = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_EncounterMessage"));
     Message->SetAutoWrapText(true);
     Message->SetWrapTextAt(540.0f);
     Content->AddChildToVerticalBox(Message)->SetPadding(FMargin(0.0f, 8.0f, 0.0f, 0.0f));
@@ -189,7 +189,7 @@ void URunEncounterWidget::NativeOnInitialized()
     DungeonSize->SetContent(DungeonPanel);
     UVerticalBox* DungeonContent = WidgetTree->ConstructWidget<UVerticalBox>();
     DungeonPanel->SetContent(DungeonContent);
-    DungeonChoiceTitle = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_DungeonChoiceTitle"));
+    DungeonChoiceTitle = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_DungeonChoiceTitle"));
     DungeonChoiceTitle->SetJustification(ETextJustify::Center);
     DungeonContent->AddChildToVerticalBox(DungeonChoiceTitle)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 8.0f));
     UHorizontalBox* DungeonChoices = WidgetTree->ConstructWidget<UHorizontalBox>();
@@ -208,7 +208,7 @@ void URunEncounterWidget::NativeOnInitialized()
         CardSize->SetContent(Button);
         DungeonChoiceButtons.Add(Button);
     }
-    DungeonChoiceMessage = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_DungeonChoiceMessage"));
+    DungeonChoiceMessage = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_DungeonChoiceMessage"));
     DungeonChoiceMessage->SetJustification(ETextJustify::Center);
     DungeonChoiceMessage->SetAutoWrapText(true);
     DungeonChoiceMessage->SetWrapTextAt(1040.0f);

@@ -108,14 +108,14 @@ void UDevelopmentCoopWidget::NativeOnInitialized()
     }
     else
     {
-        Roster = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_DevCoopRoster"));
+        Roster = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_DevCoopRoster"));
         Box->AddChildToVerticalBox(Roster);
         ReadyButton = AddButton(Box, TEXT("Button_DevCoopReady"), NSLOCTEXT("DevelopmentCoop", "TextD8CADA12", "준비 상태 변경"));
         ReadyButton->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleReady);
         StartButton = AddButton(Box, TEXT("Button_DevCoopStart"), NSLOCTEXT("DevelopmentCoop", "TextE07D2B40", "전원 준비 후 시작 · Host 전용"));
         StartButton->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleStart);
     }
-    Status = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_DevCoopStatus"));
+    Status = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_DevCoopStatus"));
     Status->SetAutoWrapText(true);
     Box->AddChildToVerticalBox(Status)->SetPadding(FMargin(0.f, 12.f));
     AddButton(Box, TEXT("Button_DevCoopBack"), HostButton ? NSLOCTEXT("DevelopmentCoop", "CancelConnection", "뒤로가기 / 연결 취소") : NSLOCTEXT("DevelopmentCoop", "ReturnToMenu", "메뉴로 돌아가기"))->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleBack);
@@ -238,7 +238,7 @@ void UDevelopmentCoopWidget::BuildSteamControls(UVerticalBox* Box)
     JoinButton->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleSteamJoin);
     SteamInviteButton = AddButton(Box, TEXT("Button_SteamProbeInvite"), NSLOCTEXT("DevelopmentCoop", "TextDDACCCD1", "Steam 친구 초대 창"));
     SteamInviteButton->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleSteamInvite);
-    Status = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_SteamProbeStatus"));
+    Status = WidgetTree->ConstructWidget<UProjectATextBlock>(UProjectATextBlock::StaticClass(), TEXT("Text_SteamProbeStatus"));
     Status->SetAutoWrapText(true);
     Box->AddChildToVerticalBox(Status)->SetPadding(FMargin(0.f, 12.f));
     AddButton(Box, TEXT("Button_SteamProbeLeave"), NSLOCTEXT("DevelopmentCoop", "Text4AC3CC0F", "나가기 / 뒤로가기"))->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleBack);
