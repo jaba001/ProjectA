@@ -446,7 +446,9 @@ struct PROJECTA_API FCombatRoundUnitView
     UPROPERTY(BlueprintReadOnly)
     float StartDelay = 0.f;
 
-    UPROPERTY(BlueprintReadOnly)
+    // Server diagnostics only; clients derive their display from phases and commands, so the text is not replicated.
+    // 서버 진단 전용이며 클라이언트는 단계와 명령으로 표시를 만들므로 이 문구는 복제하지 않습니다.
+    UPROPERTY(BlueprintReadOnly, NotReplicated)
     FText Status;
 
     // Harmful statuses are combat-local and cleared when the combat ends.

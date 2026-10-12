@@ -159,6 +159,7 @@ private:
 
     // Each slot only needs a view that already contains its own last accepted change; others' edits never invalidate it.
     // 각 슬롯은 자신의 마지막 승인 변경이 반영된 화면만 기준으로 하면 되며 다른 참가자의 변경으로 무효화되지 않습니다.
+    uint32 PublishedSignature = 0;
     TArray<int32> SlotRevisionFloors;
     // True only while the durable checkpoint holds a human readiness that a later edit must withdraw on disk.
     // 이후 편집이 디스크에서 철회해야 하는 인간 준비가 영속 체크포인트에 있을 때만 참입니다.

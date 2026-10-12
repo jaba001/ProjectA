@@ -359,7 +359,21 @@ void ACombatRoundCoordinator::PublishState()
     View.ElapsedSeconds = static_cast<float>(SimulationTime);
     View.PendingProjectiles = Projectiles.Num();
     View.PendingEffects = ActiveEffects.Num();
-    ForceNetUpdate();
+    // Push immediately only when gameplay-visible state changed; elapsed time alone follows the regular net frequency.
+    // 게임에 보이는 상태가 바뀐 경우에만 즉시 전송하며 경과 시간만 바뀌면 일반 네트워크 주기를 따릅니다.
+    uint32 Signature = HashCombine(GetTypeHash(View.CombatId), HashCombine(GetTypeHash(View.RoundNumber), GetTypeHash(View.PlanRevision)));
+    Signature = HashCombine(Signature, HashCombine(GetTypeHash(static_cast<uint8>(View.Phase)), HashCombine(GetTypeHash(View.PendingProjectiles), GetTypeHash(View.PendingEffects))));
+    Signature = HashCombine(Signature, GetTypeHash(View.Message.ToString()));
+    for (const FCombatRoundUnitView& Entry : View.Units)
+    {
+        Signature = HashCombine(Signature, HashCombine(GetTypeHash(static_cast<uint8>(Entry.ActionPhase)), HashCombine(GetTypeHash(Entry.HP), GetTypeHash(Entry.bReady))));
+        for (const FCombatStatusEntry& Status : Entry.Statuses) Signature = HashCombine(Signature, HashCombine(GetTypeHash(Status.Status), HashCombine(GetTypeHash(Status.Value), GetTypeHash(Status.RemainingRounds))));
+    }
+    if (Signature != PublishedSignature)
+    {
+        PublishedSignature = Signature;
+        ForceNetUpdate();
+    }
     OnRoundStateChanged.Broadcast();
 }
 
