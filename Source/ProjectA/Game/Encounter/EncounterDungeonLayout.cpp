@@ -46,13 +46,16 @@ TArray<FEncounterDungeonFloorRegion> EncounterDungeonLayout::GetFloorRegions(int
 {
     if (LayoutVariant < 0 || LayoutVariant >= VariantCount) return {};
     TArray<FEncounterDungeonFloorRegion> Regions;
-    const float LobbyFront = GetPath(0, LayoutVariant)[4].X + CellSize * 0.5f;
-    const float LobbyBack = -1.5f * CellSize;
+    // Place the three choices in the front wall and the single incoming doorway in the rear wall.
+    // 앞벽에는 선택 문 세 개를, 뒷벽에는 들어오는 문 하나를 배치합니다.
+    const float LobbyFront = ChoiceDoorDistance;
+    const float LobbyBack = -CellSize * 0.5f;
     Regions.Add({FTransform(FVector((LobbyFront + LobbyBack) * 0.5f, 0.f, 0.f)), FVector2D((LobbyFront - LobbyBack) * 0.5f, 900.f)});
+    Regions.Add({FTransform(FVector(LobbyBack - CellSize * 0.5f, 0.f, 0.f)), FVector2D(CellSize * 0.5f, CellSize * 0.5f)});
     for (int32 Direction = 0; Direction < 3; ++Direction)
     {
         const TArray<FVector> Path = GetPath(Direction, LayoutVariant);
-        for (int32 Index = Direction == 1 ? 3 : 5; Index < Path.Num(); ++Index)
+        for (int32 Index = Direction == 1 ? 2 : 3; Index < Path.Num(); ++Index)
         {
             const FVector Delta = Path[Index] - Path[Index - 1];
             const FVector Middle = (Path[Index] + Path[Index - 1]) * 0.5f;

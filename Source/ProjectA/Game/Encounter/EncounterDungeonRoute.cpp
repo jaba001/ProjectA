@@ -347,8 +347,8 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
         const FVector Right = Region.Transform.GetRotation().GetRightVector();
         const float Width = Region.HalfExtent.X * 2.f;
         const float Depth = Region.HalfExtent.Y * 2.f;
-        // Offset overlapping floor faces by millimeters to avoid flicker at the diagonal junction.
-        // 대각선 갈림길에서 겹치는 바닥 면의 깜빡임을 막도록 밀리미터 단위로 높이를 분리합니다.
+        // Offset overlapping floor faces by millimeters to avoid flicker at room and corridor joins.
+        // 방과 통로의 연결부에서 겹치는 바닥 면의 깜빡임을 막도록 밀리미터 단위로 높이를 분리합니다.
         const float SurfaceOffset = -RegionIndex * 0.1f;
         // Back the joints with opaque slabs recessed two centimeters from the stone faces.
         // 석재 표면보다 2cm 들어간 불투명 판으로 줄눈을 막습니다.

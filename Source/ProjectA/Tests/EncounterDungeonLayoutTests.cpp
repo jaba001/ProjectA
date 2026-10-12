@@ -14,6 +14,13 @@ bool FEncounterDungeonLayoutGeometryTest::RunTest(const FString& Parameters)
         const FVector ArrivalCameraOffset(-800.f, 0.f, EncounterDungeonLayout::EyeHeight);
         TArray<FVector> Destinations;
         TestTrue(TEXT("The dungeon includes floor behind the initial eye-level junction."), EncounterDungeonLayout::HasFloorAt(Floor, FVector(-400.f, 0.f, 0.f)) && EncounterDungeonLayout::HasFloorAt(Floor, FVector::ZeroVector));
+        if (!TestTrue(TEXT("The junction is a rectangular foyer with an incoming passage."), Floor.Num() >= 2)) return false;
+        TestTrue(TEXT("The foyer front and rear walls match the three choice doors and the single incoming door."), FMath::IsNearlyEqual(Floor[0].Transform.GetLocation().X + Floor[0].HalfExtent.X, static_cast<double>(EncounterDungeonLayout::ChoiceDoorDistance)) && FMath::IsNearlyEqual(Floor[0].Transform.GetLocation().X - Floor[0].HalfExtent.X, static_cast<double>(-EncounterDungeonLayout::CellSize * 0.5f)));
+        const TArray<FVector2D> FrontWall = EncounterDungeonLayout::GetExposedWallSpans(Floor, 0, FVector2D(1.f, 0.f));
+        const TArray<FVector2D> RearWall = EncounterDungeonLayout::GetExposedWallSpans(Floor, 0, FVector2D(-1.f, 0.f));
+        TestEqual(TEXT("The foyer front wall separates exactly three door openings."), FrontWall.Num(), 4);
+        TestEqual(TEXT("The foyer rear wall has exactly one centered entrance opening."), RearWall.Num(), 2);
+        for (const float Divider : {-EncounterDungeonLayout::ChoiceDoorSpacing * 0.5f, EncounterDungeonLayout::ChoiceDoorSpacing * 0.5f}) TestTrue(TEXT("A stone wall remains between each adjacent pair of choice doorframes."), FrontWall.ContainsByPredicate([Divider](const FVector2D& Span) { return Span.X < Divider && Span.Y > Divider; }));
         for (const FEncounterDungeonFloorRegion& Region : Floor) TestTrue(TEXT("Lobby, corridors and rooms retain axis-aligned walls and floor."), Region.Transform.GetRotation().Equals(FQuat::Identity));
         for (int32 Direction = 0; Direction < 3; ++Direction)
         {
@@ -22,6 +29,7 @@ bool FEncounterDungeonLayoutGeometryTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("All directions begin at the same eye-level junction."), Path[0].Equals(FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)));
             const FVector ChoiceDoor = EncounterDungeonLayout::GetChoiceDoorCenter(Direction);
             const FQuat DoorRotation = EncounterDungeonLayout::GetChoiceDoorRotation(Direction);
+            TestFalse(TEXT("The front wall leaves the selected doorway open instead of placing a wall through its frame."), FrontWall.ContainsByPredicate([&ChoiceDoor](const FVector2D& Span) { return Span.X < ChoiceDoor.Y && Span.Y > ChoiceDoor.Y; }));
             TestTrue(TEXT("All three choice doors face straight forward on the rectangular layout."), ChoiceDoor.X == EncounterDungeonLayout::ChoiceDoorDistance && DoorRotation.Equals(FQuat::Identity));
             const int32 ApproachIndex = Direction == 1 ? 1 : 2;
             TestTrue(TEXT("The camera stops before and passes straight beyond its own doorway."), Path[ApproachIndex].Equals(ChoiceDoor - DoorRotation.GetForwardVector() * EncounterDungeonLayout::EntranceDoorApproachDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)) && Path[ApproachIndex + 1].Equals(ChoiceDoor + DoorRotation.GetForwardVector() * EncounterDungeonLayout::ChoiceDoorPassDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)));
