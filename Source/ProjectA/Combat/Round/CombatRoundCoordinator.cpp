@@ -16,6 +16,7 @@
 #include "Engine/GameInstance.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunWeaponSkillRules.h"
+#include "Game/Run/RunSkillBalance.h"
 #include "Game/GameModes/CombatDebugGameMode.h"
 #include "Unit/PlayerUnit.h"
 #include "Controller/PartyPlayerController.h"
@@ -152,8 +153,7 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
     StatusTuning = CombatStatusRules::FTuning::FromSettings();
     View.CombatId = InManager->GetCombatInstanceId();
     URunStateSubsystem* Run = !ACombatDebugGameMode::IsDebugWorld(GetWorld()) && GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
-    const bool bRestoring = Run && Run->GetPhase() == ERunPhase::Combat && Run->HasCombatCheckpoint();
-    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    const bool bRestoring = Run && Run->GetPhase() == ERunPhase::Combat && Run->HasCombatCheckpoint();    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
         APartyPlayerController* Controller = Cast<APartyPlayerController>(It->Get());
         if (!Controller) continue;
@@ -198,6 +198,9 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
             // One frozen Run profile governs both teams sharing the same skill identity.
             // 같은 스킬 식별자를 공유하는 양 팀에 하나의 고정 Run 수치를 적용합니다.
             if (!(Run ? RunWeaponSkillRules::ResolveSkill(FSoftObjectPath(Definition), Run->GetWeaponSkillRules(), Skill, OutError) : Definition->ResolveRoundSkill(Skill, OutError))) return false;
+            // Battles without a Run, such as DebugCombat, read the current status table directly.
+            // DebugCombat처럼 Run이 없는 전투는 현재 상태이상 표를 직접 읽습니다.
+            if (!Run && !RunSkillBalance::ApplyCurrentStatusEffects(Definition->GetPrimaryAssetId(), Skill, OutError)) return false;
             if (!FindSkill(Skill.SkillId)) Skills.Add(Skill);
             Entry.SkillIds.AddUnique(Skill.SkillId);
         }

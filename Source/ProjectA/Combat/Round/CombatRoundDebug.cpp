@@ -1,4 +1,5 @@
 #include "Combat/Round/CombatRoundCoordinator.h"
+#include "Game/Run/RunSkillBalance.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Combat/Round/CombatAIPlanning.h"
@@ -134,7 +135,7 @@ bool ACombatRoundCoordinator::AddDebugUnit(APlayerController* Controller, AUnitB
         for (USkillDefinitionDataAsset* Definition : Candidate->GetEquippedSkillDataAssets())
         {
             FCombatRoundSkill Skill;
-            if (!Definition->ResolveRoundSkill(Skill, OutError)) return false;
+            if (!Definition->ResolveRoundSkill(Skill, OutError) || !RunSkillBalance::ApplyCurrentStatusEffects(Definition->GetPrimaryAssetId(), Skill, OutError)) return false;
             ApplyDebugSkillTimingOverride(Skill);
             if (!CombatRoundRules::IsValidSkill(Skill))
             {
@@ -507,7 +508,7 @@ bool ACombatRoundCoordinator::SetDebugUnitSkills(APlayerController* Controller, 
         for (USkillDefinitionDataAsset* Definition : UnitSkills)
         {
             FCombatRoundSkill Skill;
-            if (!Definition->ResolveRoundSkill(Skill, OutError)) return false;
+            if (!Definition->ResolveRoundSkill(Skill, OutError) || !RunSkillBalance::ApplyCurrentStatusEffects(Definition->GetPrimaryAssetId(), Skill, OutError)) return false;
             ApplyDebugSkillTimingOverride(Skill);
             if (!CombatRoundRules::IsValidSkill(Skill))
             {
