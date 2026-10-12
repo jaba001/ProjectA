@@ -242,7 +242,8 @@ void AEncounterDungeonRoute::AddTorch(const FVector& Center, const FVector& Norm
     Effect->SetVisibility(bPresentationVisible);
     AddInstanceComponent(Effect);
     Effect->RegisterComponent();
-    Effect->SetComponentTickEnabled(bPresentationVisible);
+    // Niagara owns component ticks according to its solo or shared simulation mode.
+    // Niagara의 단독 또는 공유 시뮬레이션 방식에 따른 컴포넌트 틱은 엔진이 관리합니다.
     if (bPresentationVisible) Effect->Activate(true);
     TorchEffects.Add(Effect);
 }
@@ -281,7 +282,8 @@ void AEncounterDungeonRoute::SetPresentationVisible(bool bVisible)
     {
         if (!IsValid(Effect) || Effect->GetOwner() != this) continue;
         Effect->SetVisibility(bVisible);
-        Effect->SetComponentTickEnabled(bVisible);
+        // Activation manages Niagara ticking; visibility must not override its simulation mode.
+        // 활성화가 Niagara 틱을 관리하므로 표시 상태로 시뮬레이션 방식의 틱을 덮어쓰지 않습니다.
         if (bVisible) Effect->Activate(false);
         else Effect->DeactivateImmediate();
     }

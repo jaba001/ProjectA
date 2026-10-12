@@ -11,6 +11,8 @@
 #include "Game/Encounter/EncounterPrototypeStage.h"
 #include "Game/Run/RunEncounterPool.h"
 #include "Misc/PackageName.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystemInstanceController.h"
 #include "UObject/StrongObjectPtr.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEncounterPresentationTagsTest, "ProjectA.Run.EncounterPresentation.TagBasedStageMatching", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -231,6 +233,18 @@ bool FEncounterDungeonDoorLifecycleTest::RunTest(const FString& Parameters)
     for (int32 Variant = 0; Variant < EncounterDungeonLayout::VariantCount; ++Variant)
     {
         TestTrue(TEXT("Every supported layout prepares its cached scenery."), Route->ConfigureLayout(Variant));
+        for (const bool bVisible : {true, true, false, false, true})
+        {
+            Route->SetPresentationVisible(bVisible);
+            for (UNiagaraComponent* Effect : Route->TorchEffects)
+            {
+                if (!TestNotNull(TEXT("Cached torch flames retain a live component across visibility changes."), Effect)) continue;
+                TestEqual(TEXT("Torch visibility follows the route presentation."), Effect->IsVisible(), bVisible);
+                if (!bVisible) TestTrue(TEXT("Hidden torch flames stop immediately without a component tick."), !Effect->IsActive() && !Effect->IsComponentTickEnabled());
+                const FNiagaraSystemInstanceControllerPtr Instance = Effect->GetSystemInstanceController();
+                if (Effect->IsActive() && Instance.IsValid() && Instance->IsValid()) TestEqual(TEXT("Repeated showing and resuming preserves Niagara's solo versus shared tick contract."), Effect->IsComponentTickEnabled(), Instance->IsSolo());
+            }
+        }
         TestEqual(TEXT("Three doors per room, a section entrance and three choices have paired original leaves."), Route->LeftDoors->GetInstanceCount(), 13);
         TestEqual(TEXT("The left and right door instances remain paired."), Route->RightDoors->GetInstanceCount(), 13);
         for (int32 Direction = 0; Direction < 3; ++Direction)
