@@ -208,6 +208,8 @@ bool ACombatRoundCoordinator::RestorePlanningCheckpoint(const FCombatCheckpointD
     NextMoveIndex = PlanningMoveStep = 0;
     PlanningMoveElapsed = 0.0;
     PlanningMovePath.Reset();
+    bHumanReadyPersisted = View.Units.ContainsByPredicate([](const FCombatRoundUnitView& Entry) { return Entry.OwnerSlot > 0 && Entry.bReady; });
+    ResetSlotRevisions();
     View.Message = NSLOCTEXT("CombatRoundCheckpointText", "M_651148AA", "마지막으로 저장한 준비 상태를 복구했습니다.");
     OutError = FText::GetEmpty();
     PublishState();

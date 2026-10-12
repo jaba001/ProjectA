@@ -441,6 +441,8 @@ void ACombatRoundCoordinator::BeginPlanning()
     View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_3290DD4E", "준비 완료를 누르면 스킬을 선택하지 않은 유닛은 행동을 건너뜁니다. 적 계획은 이미 고정되었습니다.");
     FText SaveError;
     if (!PersistPlanningCheckpoint(SaveError)) View.Message = SaveError;
+    bHumanReadyPersisted = false;
+    ResetSlotRevisions();
     PublishState();
 }
 
@@ -496,7 +498,7 @@ bool ACombatRoundCoordinator::ValidateRequest(APlayerController* Controller, FGu
         OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_B4BAA1A3", "이 전투에 조작 가능한 원래 캐릭터가 없습니다.");
         return false;
     }
-    if (View.Phase != ECombatRoundPhase::Planning || CombatId != View.CombatId || RoundNumber != View.RoundNumber || Revision != View.PlanRevision)
+    if (View.Phase != ECombatRoundPhase::Planning || CombatId != View.CombatId || RoundNumber != View.RoundNumber || !IsRevisionCurrentForSlot(GetParticipantSlot(Controller), Revision))
     {
         OutError = NSLOCTEXT("CombatRoundCoordinatorText", "M_02A3D583", "계획이 변경되었거나 이미 잠겼습니다. 최신 상태에서 다시 선택하세요.");
         return false;
@@ -644,20 +646,58 @@ bool ACombatRoundCoordinator::SubmitMove(APlayerController* Controller, FGuid Co
     }
     if (!CanMoveUnit(UnitId, Destination, OutError)) return false;
     const FCombatRoundView PreviousView = View;
+    const bool bWasReady = HasOwnerReady(GetParticipantSlot(Controller));
     View.Units[Index].bHasMovePlan = true;
     View.Units[Index].MoveDestinationCoord = Destination;
     View.Units[Index].Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_E6405B83", "SAP 이동 예약됨");
     ClearOwnerReady(GetParticipantSlot(Controller));
     View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_AFC958E8", "이동을 예약했습니다. 준비 완료 후 SAP 이동부터 실행합니다.");
     ++View.PlanRevision;
-    if (!PersistPlanningCheckpoint(OutError))
+    return CommitPlanEdit(Controller, PreviousView, bWasReady, OutError);
+}
+
+bool ACombatRoundCoordinator::HasOwnerReady(int32 OwnerSlot) const
+{
+    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
+    {
+        const FCombatRoundUnitView& Entry = View.Units[Index];
+        if (Entry.OwnerSlot == OwnerSlot && Entry.bReady && IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive() && !IsPlanLocked(Index)) return true;
+    }
+    return false;
+}
+
+bool ACombatRoundCoordinator::CommitPlanEdit(APlayerController* Controller, const FCombatRoundView& PreviousView, bool bClearedSavedReady, FText& OutError)
+{
+    // Plan edits stay in memory until the ready boundary; only withdrawing a saved readiness is written so recovery never replays it.
+    // 계획 편집은 준비 경계까지 메모리에만 두며 저장된 준비를 철회할 때만 기록하여 복구가 철회된 준비를 재실행하지 않게 합니다.
+    OutError = FText::GetEmpty();
+    if (bClearedSavedReady && bHumanReadyPersisted && !PersistPlanningCheckpoint(OutError))
     {
         View = PreviousView;
         return false;
     }
+    MarkSlotRevision(GetParticipantSlot(Controller));
     bLockRetryBlocked = false;
     PublishState();
     return true;
+}
+
+bool ACombatRoundCoordinator::IsRevisionCurrentForSlot(int32 Slot, int32 Revision) const
+{
+    const int32 Floor = SlotRevisionFloors.IsValidIndex(Slot) ? SlotRevisionFloors[Slot] : View.PlanRevision;
+    return Revision >= Floor && Revision <= View.PlanRevision;
+}
+
+void ACombatRoundCoordinator::MarkSlotRevision(int32 Slot)
+{
+    if (Slot <= 0) return;
+    if (SlotRevisionFloors.Num() <= Slot) SlotRevisionFloors.SetNumZeroed(Slot + 1);
+    SlotRevisionFloors[Slot] = View.PlanRevision;
+}
+
+void ACombatRoundCoordinator::ResetSlotRevisions()
+{
+    SlotRevisionFloors.Init(View.PlanRevision, Participants.Num() + 1);
 }
 
 bool ACombatRoundCoordinator::CancelMove(APlayerController* Controller, FGuid CombatId, int32 RoundNumber, int32 Revision, int32 UnitId, FText& OutError)
@@ -670,21 +710,14 @@ bool ACombatRoundCoordinator::CancelMove(APlayerController* Controller, FGuid Co
         return false;
     }
     const FCombatRoundView PreviousView = View;
+    const bool bWasReady = HasOwnerReady(GetParticipantSlot(Controller));
     View.Units[Index].bHasMovePlan = false;
     View.Units[Index].MoveDestinationCoord = View.Units[Index].HomeCoord;
     View.Units[Index].Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_F6EBE1A0", "SAP 이동 예약 취소");
     ClearOwnerReady(GetParticipantSlot(Controller));
     View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_55DBDE59", "이동 예약을 취소했습니다. 행동 계획과 준비를 다시 확인하세요.");
     ++View.PlanRevision;
-    OutError = FText::GetEmpty();
-    if (!PersistPlanningCheckpoint(OutError))
-    {
-        View = PreviousView;
-        return false;
-    }
-    bLockRetryBlocked = false;
-    PublishState();
-    return true;
+    return CommitPlanEdit(Controller, PreviousView, bWasReady, OutError);
 }
 
 void ACombatRoundCoordinator::BeginNextMove()
@@ -860,6 +893,7 @@ bool ACombatRoundCoordinator::SubmitPlan(APlayerController* Controller, FGuid Co
     }
     if (!CanPlanCommand(Command, OutError)) return false;
     const FCombatRoundView PreviousView = View;
+    const bool bWasReady = HasOwnerReady(GetParticipantSlot(Controller));
     View.Units[Index].Command = Command;
     View.Units[Index].Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_76C51C91", "계획 적용됨");
     ClearOwnerReady(GetParticipantSlot(Controller));
@@ -867,14 +901,7 @@ bool ACombatRoundCoordinator::SubmitPlan(APlayerController* Controller, FGuid Co
     View.Message = NSLOCTEXT("CombatRoundCoordinatorText", "M_6C13C7E3", "계획이 변경되어 자신의 준비만 해제되었습니다.");
     FText Conflict;
     if (!ValidateDestinations(Conflict)) View.Message = Conflict;
-    if (!PersistPlanningCheckpoint(OutError))
-    {
-        View = PreviousView;
-        return false;
-    }
-    bLockRetryBlocked = false;
-    PublishState();
-    return true;
+    return CommitPlanEdit(Controller, PreviousView, bWasReady, OutError);
 }
 
 bool ACombatRoundCoordinator::ValidateDestinations(FText& OutError, int32 CandidateIndex, const FCombatRoundCommand* CandidateCommand, const FIntPoint* CandidateMove) const
@@ -907,6 +934,7 @@ bool ACombatRoundCoordinator::SetParticipantReady(APlayerController* Controller,
         if (!ValidateDestinations(OutError)) return false;
     }
     const FCombatRoundView PreviousView = View;
+    const bool bWasReady = HasOwnerReady(Slot);
     for (int32 Index = 0; Index < View.Units.Num(); ++Index)
     {
         FCombatRoundUnitView& Entry = View.Units[Index];
@@ -920,11 +948,15 @@ bool ACombatRoundCoordinator::SetParticipantReady(APlayerController* Controller,
     {
         if (IsValid(Entry.Unit) && Entry.Unit->IsUnitAlive() && !Entry.bReady) bAllReady = false;
     }
-    if (!(bAllReady ? LockPlans(OutError) : PersistPlanningCheckpoint(OutError)))
+    // The full ready boundary is persisted by LockPlans; partial readiness stays in memory.
+    // 전체 준비 경계는 LockPlans가 저장하며 일부 준비는 메모리에만 둡니다.
+    if (!bAllReady) return CommitPlanEdit(Controller, PreviousView, bWasReady && !bReady, OutError);
+    if (!LockPlans(OutError))
     {
         View = PreviousView;
         return false;
     }
+    MarkSlotRevision(Slot);
     bLockRetryBlocked = false;
     PublishState();
     return true;
@@ -955,6 +987,7 @@ bool ACombatRoundCoordinator::LockPlans(FText& OutError)
     // Persist the complete ready boundary before charging costs or executing any movement or attack.
     // 비용 차감이나 이동·공격 실행 전에 준비 완료 경계 전체를 저장합니다.
     if (!PersistPlanningCheckpoint(OutError)) return false;
+    bHumanReadyPersisted = true;
 
     // Commit the complete AP and SAP budget only after every reservation passes validation.
     // 모든 예약 검증이 끝난 뒤에만 AP와 SAP 전체 비용을 확정합니다.

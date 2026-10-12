@@ -157,6 +157,18 @@ private:
     FRotator PlanningMoveRotation = FRotator::ZeroRotator;
     CombatStatusRules::FTuning StatusTuning;
 
+    // Each slot only needs a view that already contains its own last accepted change; others' edits never invalidate it.
+    // 각 슬롯은 자신의 마지막 승인 변경이 반영된 화면만 기준으로 하면 되며 다른 참가자의 변경으로 무효화되지 않습니다.
+    TArray<int32> SlotRevisionFloors;
+    // True only while the durable checkpoint holds a human readiness that a later edit must withdraw on disk.
+    // 이후 편집이 디스크에서 철회해야 하는 인간 준비가 영속 체크포인트에 있을 때만 참입니다.
+    bool bHumanReadyPersisted = false;
+    bool HasOwnerReady(int32 OwnerSlot) const;
+    bool CommitPlanEdit(APlayerController* Controller, const FCombatRoundView& PreviousView, bool bClearedSavedReady, FText& OutError);
+    bool IsRevisionCurrentForSlot(int32 Slot, int32 Revision) const;
+    void MarkSlotRevision(int32 Slot);
+    void ResetSlotRevisions();
+
     // Status rules connect only at hit, tactical movement, round end and planning boundaries.
     // 상태 규칙은 피격·전술 이동·라운드 종료·계획 경계에서만 연결됩니다.
     bool IsPlanLocked(int32 Index) const;
