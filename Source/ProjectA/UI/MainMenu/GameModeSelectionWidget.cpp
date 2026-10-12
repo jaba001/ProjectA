@@ -1,4 +1,5 @@
 #include "UI/MainMenu/GameModeSelectionWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "CommonInputModeTypes.h"
@@ -33,7 +34,7 @@ TOptional<FUIInputConfig> UGameModeSelectionWidget::GetDesiredInputConfig() cons
 UButton* UGameModeSelectionWidget::AddButton(UVerticalBox* Parent, FName Name, const FText& Text)
 {
     UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), Name);
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(Text);
     Label->SetJustification(ETextJustify::Center);
     Label->SetAutoWrapText(true);
@@ -72,13 +73,13 @@ void UGameModeSelectionWidget::NativeOnInitialized()
     UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>();
     Panel->SetContent(Content);
 
-    UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Title = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Title->SetText(NSLOCTEXT("GameModeSelection", "Title", "게임 모드 선택"));
     Title->SetJustification(ETextJustify::Center);
     Content->AddChildToVerticalBox(Title)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 24.0f));
     SinglePlayerButton = AddButton(Content, TEXT("Button_SinglePlayer"), NSLOCTEXT("GameModeSelection", "SinglePlayer", "싱글플레이"));
     SinglePlayerButton->OnClicked.AddUniqueDynamic(this, &UGameModeSelectionWidget::HandleSinglePlayer);
-    UTextBlock* SinglePlayerNotice = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* SinglePlayerNotice = WidgetTree->ConstructWidget<UProjectATextBlock>();
     SinglePlayerNotice->SetText(NSLOCTEXT("GameModeSelection", "SinglePlayerControlNotice", "직접 조작할 캐릭터 1명을 선택합니다.\n함께 만든 나머지 동료는 AI가 조작합니다."));
     SinglePlayerNotice->SetAutoWrapText(true);
     SinglePlayerNotice->SetJustification(ETextJustify::Center);
@@ -86,7 +87,7 @@ void UGameModeSelectionWidget::NativeOnInitialized()
 
     MultiplayerButton = AddButton(Content, TEXT("Button_Multiplayer"), NSLOCTEXT("GameModeSelection", "Multiplayer", "멀티플레이"));
     MultiplayerButton->OnClicked.AddUniqueDynamic(this, &UGameModeSelectionWidget::HandleMultiplayer);
-    MultiplayerNotice = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_MultiplayerAvailability"));
+    MultiplayerNotice = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_MultiplayerAvailability"));
     MultiplayerNotice->SetAutoWrapText(true);
     MultiplayerNotice->SetJustification(ETextJustify::Center);
     Content->AddChildToVerticalBox(MultiplayerNotice)->SetPadding(FMargin(0.0f, 2.0f, 0.0f, 20.0f));

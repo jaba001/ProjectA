@@ -1,4 +1,5 @@
 #include "UI/MainMenu/CharacterCreationWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 #include "ProjectA.h"
 
 #include "Blueprint/WidgetTree.h"
@@ -144,7 +145,7 @@ void UCharacterCreationWidget::NativeOnInitialized()
         {
             if (UOverlay* HeaderOverlay = Cast<UOverlay>(Button_StartGame->GetParent()))
             {
-                Text_StartGameStatus = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_StartGameStatus"));
+                Text_StartGameStatus = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_StartGameStatus"));
                 UOverlaySlot* StatusSlot = HeaderOverlay->AddChildToOverlay(Text_StartGameStatus);
                 StatusSlot->SetHorizontalAlignment(HAlign_Center);
                 StatusSlot->SetVerticalAlignment(VAlign_Top);
@@ -374,7 +375,7 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
         StartGameButtonSlot->SetPadding(FMargin(0.0f, 28.0f, 0.0f, 0.0f));
     }
 
-    UTextBlock* StartGameText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_StartGame"));
+    UTextBlock* StartGameText = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_StartGame"));
 
     if (StartGameText)
     {
@@ -400,7 +401,7 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
 
     CreateButtonText(Button_Close, FText::FromString(TEXT("X")));
 
-    Text_StartGameStatus = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_StartGameStatus"));
+    Text_StartGameStatus = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_StartGameStatus"));
     UOverlaySlot* StatusSlot = RootOverlay->AddChildToOverlay(Text_StartGameStatus);
     StatusSlot->SetHorizontalAlignment(HAlign_Center);
     StatusSlot->SetVerticalAlignment(VAlign_Top);
@@ -413,7 +414,7 @@ void UCharacterCreationWidget::EnsureCodeGeneratedLayout()
             return nullptr;
         }
 
-        UTextBlock* TextBlock = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), WidgetName);
+        UTextBlock* TextBlock = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), WidgetName);
 
         if (!TextBlock)
         {
@@ -1055,7 +1056,7 @@ UTextBlock* UCharacterCreationWidget::CreateButtonText(UButton* ParentButton, co
         return nullptr;
     }
 
-    UTextBlock* ButtonTextBlock = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+    UTextBlock* ButtonTextBlock = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass());
 
     if (!ButtonTextBlock)
     {
@@ -1408,7 +1409,7 @@ void UCharacterCreationWidget::BuildDetailPanel()
     DetailPanel->SetContent(Size);
     UVerticalBox* PanelContent = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
     Size->SetContent(PanelContent);
-    UTextBlock* Heading = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+    UTextBlock* Heading = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass());
     Heading->SetText(NSLOCTEXT("CharacterCreation", "CharacterSettings", "캐릭터 설정"));
     UDemonicUITheme::Get().StyleText(Heading, true, 24);
     PanelContent->AddChildToVerticalBox(Heading)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
@@ -1419,7 +1420,7 @@ void UCharacterCreationWidget::BuildDetailPanel()
     Scroll->AddChild(Content);
     const auto AddLabel = [this, Content](const FText& Text)
     {
-        UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+        UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass());
         Label->SetText(Text);
         UDemonicUITheme::Get().StyleText(Label, false, 16);
         Content->AddChildToVerticalBox(Label)->SetPadding(FMargin(0.0f, 6.0f));
@@ -1449,7 +1450,7 @@ void UCharacterCreationWidget::BuildDetailPanel()
     PreviousBodySize->SetWidthOverride(64.0f);
     PreviousBodySize->SetContent(DetailPreviousBody);
     BodyControls->AddChildToHorizontalBox(PreviousBodySize);
-    DetailBodyName = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("AppearanceBodyName"));
+    DetailBodyName = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("AppearanceBodyName"));
     DetailBodyName->SetJustification(ETextJustify::Center);
     DetailBodyName->SetAutoWrapText(true);
     UDemonicUITheme::Get().StyleText(DetailBodyName, false, 20);
@@ -1463,23 +1464,23 @@ void UCharacterCreationWidget::BuildDetailPanel()
     BodyControls->AddChildToHorizontalBox(NextBodySize);
     DetailPreviousBody->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandlePreviousBody);
     DetailNextBody->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleNextBody);
-    DetailBodyPosition = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("AppearanceBodyPosition"));
+    DetailBodyPosition = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("AppearanceBodyPosition"));
     DetailBodyPosition->SetJustification(ETextJustify::Center);
     UDemonicUITheme::Get().StyleText(DetailBodyPosition, false, 14);
     Content->AddChildToVerticalBox(DetailBodyPosition)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 8.0f));
     DetailResetBody = CreateButton(Content, NSLOCTEXT("CharacterCreation", "ResetBody", "기본 몸체로 초기화"));
     DetailResetBody->OnClicked.AddUniqueDynamic(this, &UCharacterCreationWidget::HandleResetBody);
     AddLabel(NSLOCTEXT("CharacterCreation", "Preview", "미리보기"));
-    UTextBlock* RotationHint = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("AppearanceRotationHint"));
+    UTextBlock* RotationHint = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("AppearanceRotationHint"));
     RotationHint->SetText(NSLOCTEXT("CharacterCreation", "RotationHint", "캐릭터가 보이는 영역을 우클릭한 채 좌우로 드래그하여 회전"));
     RotationHint->SetAutoWrapText(true);
     UDemonicUITheme::Get().StyleText(RotationHint, false, 14);
     Content->AddChildToVerticalBox(RotationHint)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
     AddLabel(NSLOCTEXT("CharacterCreation", "ProfessionInfo", "직업 정보"));
-    DetailText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ProfessionDetailText"));
+    DetailText = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("ProfessionDetailText"));
     DetailText->SetAutoWrapText(true);
     Content->AddChildToVerticalBox(DetailText)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 16.0f));
-    DetailError = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ProfessionDetailError"));
+    DetailError = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("ProfessionDetailError"));
     DetailError->SetColorAndOpacity(FLinearColor(1.0f, 0.45f, 0.35f));
     DetailError->SetAutoWrapText(true);
     PanelContent->AddChildToVerticalBox(DetailError)->SetPadding(FMargin(0.0f, 8.0f));

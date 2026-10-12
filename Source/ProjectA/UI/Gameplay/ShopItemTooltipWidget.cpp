@@ -1,4 +1,5 @@
 #include "UI/Gameplay/ShopItemTooltipWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
@@ -24,7 +25,7 @@ namespace
 
 UTextBlock* UShopItemTooltipWidget::AddText(UVerticalBox* Parent, int32 FontSize, float WrapWidth, bool bHeading)
 {
-    UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Text = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Text->SetAutoWrapText(true);
     Text->SetWrapTextAt(WrapWidth);
     Text->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);

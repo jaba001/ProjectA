@@ -1,4 +1,5 @@
 #include "UI/MainMenu/DevelopmentCoopWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "CommonInputModeTypes.h"
@@ -40,7 +41,7 @@ TOptional<FUIInputConfig> UDevelopmentCoopWidget::GetDesiredInputConfig() const
 UButton* UDevelopmentCoopWidget::AddButton(UVerticalBox* Box, const FName Name, const FText& Text)
 {
     UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), Name);
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(Text);
     Button->SetContent(Label);
     Box->AddChildToVerticalBox(Button)->SetPadding(FMargin(0.f, 6.f));
@@ -69,10 +70,10 @@ void UDevelopmentCoopWidget::NativeOnInitialized()
     Frame->SetPadding(FMargin(32.0f));
     Size->SetContent(Frame);
     Frame->SetContent(Box);
-    UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Title = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Title->SetText(NSLOCTEXT("DevelopmentCoop", "TextEAEE7AFC", "멀티플레이"));
     Box->AddChildToVerticalBox(Title)->SetPadding(FMargin(0.f, 0.f, 0.f, 16.f));
-    UTextBlock* Notice = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Notice = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Notice->SetAutoWrapText(true);
     Notice->SetText(NSLOCTEXT("DevelopmentCoop", "TextC7A08EBE", "같은 PC 또는 LAN에서 2~4명이 함께 플레이합니다.\n각자 궁수 1명을 조작합니다. 현재 저장 이어하기·Steam 초대는 지원하지 않습니다."));
     Box->AddChildToVerticalBox(Notice)->SetPadding(FMargin(0.f, 0.f, 0.f, 16.f));
@@ -107,14 +108,14 @@ void UDevelopmentCoopWidget::NativeOnInitialized()
     }
     else
     {
-        Roster = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_DevCoopRoster"));
+        Roster = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_DevCoopRoster"));
         Box->AddChildToVerticalBox(Roster);
         ReadyButton = AddButton(Box, TEXT("Button_DevCoopReady"), NSLOCTEXT("DevelopmentCoop", "TextD8CADA12", "준비 상태 변경"));
         ReadyButton->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleReady);
         StartButton = AddButton(Box, TEXT("Button_DevCoopStart"), NSLOCTEXT("DevelopmentCoop", "TextE07D2B40", "전원 준비 후 시작 · Host 전용"));
         StartButton->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleStart);
     }
-    Status = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_DevCoopStatus"));
+    Status = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_DevCoopStatus"));
     Status->SetAutoWrapText(true);
     Box->AddChildToVerticalBox(Status)->SetPadding(FMargin(0.f, 12.f));
     AddButton(Box, TEXT("Button_DevCoopBack"), HostButton ? NSLOCTEXT("DevelopmentCoop", "CancelConnection", "뒤로가기 / 연결 취소") : NSLOCTEXT("DevelopmentCoop", "ReturnToMenu", "메뉴로 돌아가기"))->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleBack);
@@ -237,7 +238,7 @@ void UDevelopmentCoopWidget::BuildSteamControls(UVerticalBox* Box)
     JoinButton->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleSteamJoin);
     SteamInviteButton = AddButton(Box, TEXT("Button_SteamProbeInvite"), NSLOCTEXT("DevelopmentCoop", "TextDDACCCD1", "Steam 친구 초대 창"));
     SteamInviteButton->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleSteamInvite);
-    Status = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_SteamProbeStatus"));
+    Status = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_SteamProbeStatus"));
     Status->SetAutoWrapText(true);
     Box->AddChildToVerticalBox(Status)->SetPadding(FMargin(0.f, 12.f));
     AddButton(Box, TEXT("Button_SteamProbeLeave"), NSLOCTEXT("DevelopmentCoop", "Text4AC3CC0F", "나가기 / 뒤로가기"))->OnClicked.AddDynamic(this, &UDevelopmentCoopWidget::HandleBack);

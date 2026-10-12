@@ -1,4 +1,5 @@
 #include "UI/Gameplay/InventoryWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Brushes/SlateColorBrush.h"
@@ -81,7 +82,7 @@ void UInventoryWidget::NativeOnInitialized()
     Content->AddChildToVerticalBox(Footer)->SetPadding(FMargin(0.0f, 8.0f, 0.0f, 0.0f));
     UHorizontalBox* FooterContent = WidgetTree->ConstructWidget<UHorizontalBox>();
     Footer->SetContent(FooterContent);
-    UTextBlock* Shortcuts = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Shortcuts = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Shortcuts->SetText(NSLOCTEXT("Inventory", "Shortcuts", "I · 인벤토리 닫기    Esc / O · 설정 열기"));
     Shortcuts->SetAutoWrapText(true);
     Theme.StyleText(Shortcuts, false, 15);
@@ -90,7 +91,7 @@ void UInventoryWidget::NativeOnInitialized()
     ShortcutsSlot->SetVerticalAlignment(VAlign_Center);
     ShortcutsSlot->SetPadding(FMargin(0.0f, 0.0f, 12.0f, 0.0f));
     CloseButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_CloseInventory"));
-    UTextBlock* CloseLabel = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* CloseLabel = WidgetTree->ConstructWidget<UProjectATextBlock>();
     CloseLabel->SetText(NSLOCTEXT("Inventory", "Close", "닫기"));
     CloseLabel->SetJustification(ETextJustify::Center);
     CastChecked<UButtonSlot>(CloseButton->AddChild(CloseLabel))->SetPadding(FMargin(20.0f, 10.0f));

@@ -1,4 +1,5 @@
 #include "UI/Gameplay/CharacterInventoryPanel.h"
+#include "UI/Theme/ProjectATextBlock.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
@@ -61,7 +62,7 @@ void UInventoryCategoryButton::HandleClicked()
 
 UTextBlock* UCharacterInventoryPanel::AddText(UVerticalBox* Parent, const FText& Text, int32 FontSize, float BottomPadding)
 {
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(Text);
     Label->SetAutoWrapText(true);
     UDemonicUITheme::Get().StyleText(Label, FontSize >= 22, FontSize);
@@ -105,7 +106,7 @@ void UCharacterInventoryPanel::NativeOnInitialized()
     Theme.StyleSectionHeader(Header);
     Header->SetPadding(FMargin(8.0f));
     Content->AddChildToVerticalBox(Header)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
-    UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Title = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Title->SetText(NSLOCTEXT("Inventory", "Title", "인벤토리"));
     Title->SetJustification(ETextJustify::Center);
     Theme.StyleText(Title, true, 26);
@@ -137,7 +138,7 @@ void UCharacterInventoryPanel::NativeOnInitialized()
         UImage* Icon = WidgetTree->ConstructWidget<UImage>();
         Theme.SetItemIcon(Icon, Categories[Index].IconTags);
         IconSize->SetContent(Icon);
-        UTextBlock* Count = WidgetTree->ConstructWidget<UTextBlock>();
+        UTextBlock* Count = WidgetTree->ConstructWidget<UProjectATextBlock>();
         Theme.StyleText(Count, false, 13);
         CountRow->AddChildToHorizontalBox(Count)->SetVerticalAlignment(VAlign_Center);
         UTextBlock* Label = AddText(TabContent, Categories[Index].Label, 12, 0.0f);
@@ -250,7 +251,7 @@ void UCharacterInventoryPanel::AddSkill(const USkillDefinitionDataAsset* Skill)
     Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
     IconSize->SetContent(Icon);
     const FText Name = RunItemPresentation::SkillName(Skill);
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(Name);
     Label->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);
     Label->SetVisibility(ESlateVisibility::HitTestInvisible);

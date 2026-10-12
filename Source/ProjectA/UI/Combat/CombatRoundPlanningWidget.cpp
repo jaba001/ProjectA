@@ -1,4 +1,5 @@
 #include "UI/Combat/CombatRoundPlanningWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 #include "InputCoreTypes.h"
 #include "Combat/Round/CombatStatusRules.h"
 
@@ -104,7 +105,7 @@ TOptional<FUIInputConfig> UCombatRoundPlanningWidget::GetDesiredInputConfig() co
 
 UTextBlock* UCombatRoundPlanningWidget::AddText(UVerticalBox* Box, const FText& Text, int32 FontSize)
 {
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(Text);
     Label->SetAutoWrapText(true);
     UDemonicUITheme::Get().StyleText(Label, FontSize >= 18, FontSize);
@@ -115,7 +116,7 @@ UTextBlock* UCombatRoundPlanningWidget::AddText(UVerticalBox* Box, const FText& 
 UButton* UCombatRoundPlanningWidget::AddButton(UVerticalBox* Box, const FText& Text)
 {
     UButton* Button = WidgetTree->ConstructWidget<UButton>();
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(Text);
     UDemonicUITheme::Get().StyleText(Label, false, 16);
     UDemonicUITheme::Get().StyleButton(Button);
@@ -362,7 +363,7 @@ bool UCombatRoundPlanningWidget::RefreshOptions(const ACombatRoundCoordinator* C
         UCombatRoundSkillButton* Button = WidgetTree->ConstructWidget<UCombatRoundSkillButton>();
         Button->InitializeSkill(SkillId);
         Button->OnSkillPicked.AddUObject(this, &UCombatRoundPlanningWidget::HandleSkillPicked);
-        UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+        UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
         Label->SetText(FText::Format(NSLOCTEXT("CombatPlanning", "SkillCard", "{0}\n{1}"), SkillName(*Skill), SkillCostLabel(*Skill)));
         Label->SetAutoWrapText(true);
         Label->SetWrapTextAt(300.f);

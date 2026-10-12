@@ -1,4 +1,5 @@
 #include "UI/Debug/CombatDebugWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 #include "Blueprint/WidgetTree.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
@@ -154,7 +155,7 @@ void UCombatDebugActionButton::HandleClicked()
 
 UTextBlock* UCombatDebugWidget::AddText(UVerticalBox* Box, const FString& Text, int32 Size)
 {
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(FText::FromString(Text));
     Label->SetAutoWrapText(true);
     UDemonicUITheme::Get().StyleText(Label, Size >= 18, Size);
@@ -165,7 +166,7 @@ UTextBlock* UCombatDebugWidget::AddText(UVerticalBox* Box, const FString& Text, 
 UButton* UCombatDebugWidget::AddButton(UVerticalBox* Box, const FString& Text)
 {
     UButton* Button = WidgetTree->ConstructWidget<UButton>();
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(FText::FromString(Text));
     UDemonicUITheme::Get().StyleText(Label, false, 16);
     UDemonicUITheme::Get().StyleButton(Button);
@@ -179,7 +180,7 @@ void UCombatDebugWidget::AddAction(UVerticalBox* Box, const FString& Label, ECom
     UCombatDebugActionButton* Button = WidgetTree->ConstructWidget<UCombatDebugActionButton>();
     Button->Initialize(Action, Asset, Index, EquipmentSlot);
     Button->OnAction.AddUObject(this, &UCombatDebugWidget::HandleAction);
-    UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Text = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Text->SetText(FText::FromString(Label));
     Text->SetAutoWrapText(true);
     UDemonicUITheme::Get().StyleText(Text, false, 15);
@@ -255,7 +256,7 @@ void UCombatDebugWidget::NativeOnInitialized()
     SkillCategoryTabs = WidgetTree->ConstructWidget<UWrapBox>();
     SkillCategoryTabs->SetInnerSlotPadding(FVector2D(6.f, 4.f));
     LoadoutBody->AddChildToVerticalBox(SkillCategoryTabs)->SetPadding(FMargin(0.f, 4.f, 0.f, 6.f));
-    UTextBlock* ElementLabel = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* ElementLabel = WidgetTree->ConstructWidget<UProjectATextBlock>();
     ElementLabel->SetText(NSLOCTEXT("CombatDebugWidgetText", "M_B2A0A61F", "속성"));
     UDemonicUITheme::Get().StyleText(ElementLabel, false, 14);
     SkillCategoryTabs->AddChildToWrapBox(ElementLabel);
@@ -266,7 +267,7 @@ void UCombatDebugWidget::NativeOnInitialized()
         Button->Initialize(ECombatDebugAction::SelectSkillCategory, FSoftObjectPath(), Index, FGameplayTag());
         Button->OnAction.AddUObject(this, &UCombatDebugWidget::HandleAction);
         Button->SetToolTipText(FText::FromString(Index == Categories.Num() - 1 ? TEXT("등록된 다섯 속성의 태그가 없는 스킬") : Index == Categories.Num() - 2 ? TEXT("두 가지 이상 속성 태그가 있는 스킬 · 해당 속성 탭에도 표시") : TEXT("선택한 방식과 검색 조건을 함께 적용하는 속성 필터")));
-        Button->SetContent(WidgetTree->ConstructWidget<UTextBlock>());
+        Button->SetContent(WidgetTree->ConstructWidget<UProjectATextBlock>());
         CastChecked<UButtonSlot>(Button->GetContent()->Slot)->SetPadding(FMargin(8.f, 4.f));
         SkillCategoryTabs->AddChildToWrapBox(Button);
         SkillCategoryButtons.Add(Button);
@@ -275,7 +276,7 @@ void UCombatDebugWidget::NativeOnInitialized()
     SkillMethodTabs = WidgetTree->ConstructWidget<UWrapBox>();
     SkillMethodTabs->SetInnerSlotPadding(FVector2D(6.f, 4.f));
     LoadoutBody->AddChildToVerticalBox(SkillMethodTabs)->SetPadding(FMargin(0.f, 0.f, 0.f, 6.f));
-    UTextBlock* MethodLabel = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* MethodLabel = WidgetTree->ConstructWidget<UProjectATextBlock>();
     MethodLabel->SetText(NSLOCTEXT("CombatDebugWidgetText", "M_1BD493C4", "방식"));
     UDemonicUITheme::Get().StyleText(MethodLabel, false, 14);
     SkillMethodTabs->AddChildToWrapBox(MethodLabel);
@@ -286,7 +287,7 @@ void UCombatDebugWidget::NativeOnInitialized()
         Button->Initialize(ECombatDebugAction::SelectSkillMethod, FSoftObjectPath(), Index, FGameplayTag());
         Button->OnAction.AddUObject(this, &UCombatDebugWidget::HandleAction);
         Button->SetToolTipText(FText::FromString(Methods[Index].Tooltip));
-        Button->SetContent(WidgetTree->ConstructWidget<UTextBlock>());
+        Button->SetContent(WidgetTree->ConstructWidget<UProjectATextBlock>());
         CastChecked<UButtonSlot>(Button->GetContent()->Slot)->SetPadding(FMargin(8.f, 4.f));
         SkillMethodTabs->AddChildToWrapBox(Button);
         SkillMethodButtons.Add(Button);

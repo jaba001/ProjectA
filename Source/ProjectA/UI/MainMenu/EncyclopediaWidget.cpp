@@ -1,4 +1,5 @@
 #include "UI/MainMenu/EncyclopediaWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 
 #include "Blueprint/WidgetTree.h"
@@ -51,7 +52,7 @@ TOptional<FUIInputConfig> UEncyclopediaWidget::GetDesiredInputConfig() const
 
 UTextBlock* UEncyclopediaWidget::MakeText(const FText& Text, int32 FontSize, bool bHeading)
 {
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(Text);
     Label->SetAutoWrapText(true);
     Label->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);

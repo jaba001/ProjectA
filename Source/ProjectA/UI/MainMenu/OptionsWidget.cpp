@@ -1,4 +1,5 @@
 #include "UI/MainMenu/OptionsWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "CommonInputModeTypes.h"
@@ -78,7 +79,7 @@ TOptional<FUIInputConfig> UOptionsWidget::GetDesiredInputConfig() const
 
 UTextBlock* UOptionsWidget::AddText(UVerticalBox* Parent, const FText& Text, int32 FontSize, float BottomPadding)
 {
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(Text);
     Label->SetAutoWrapText(true);
     Label->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
@@ -93,7 +94,7 @@ UTextBlock* UOptionsWidget::AddText(UVerticalBox* Parent, const FText& Text, int
 UButton* UOptionsWidget::CreateButton(const FName Name, const FText& Text)
 {
     UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), Name);
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(Text);
     Label->SetJustification(ETextJustify::Center);
     Label->SetAutoWrapText(true);
@@ -111,7 +112,7 @@ UComboBoxString* UOptionsWidget::AddSelector(UVerticalBox* Parent, const FName N
     Parent->AddChildToVerticalBox(Row)->SetPadding(FMargin(0.0f, 6.0f));
     USizeBox* LabelSize = WidgetTree->ConstructWidget<USizeBox>();
     LabelSize->SetWidthOverride(180.0f);
-    UTextBlock* LabelWidget = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* LabelWidget = WidgetTree->ConstructWidget<UProjectATextBlock>();
     LabelWidget->SetText(Label);
     FSlateFontInfo Font = LabelWidget->GetFont();
     Font.Size = 18;
@@ -168,7 +169,7 @@ void UOptionsWidget::NativeOnInitialized()
     RefreshLocalizedSelectors();
     AddText(Content, NSLOCTEXT("Options", "QualityHint", "품질이 높을수록 성능 부담이 커집니다. 사용자 지정은 현재 세부 품질을 유지합니다."), 14, 12.0f);
     VSync = WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(), TEXT("VSyncCheck"));
-    UTextBlock* VSyncLabel = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* VSyncLabel = WidgetTree->ConstructWidget<UProjectATextBlock>();
     VSyncLabel->SetText(NSLOCTEXT("Options", "VSync", "수직 동기화"));
     VSync->AddChild(VSyncLabel);
     VSync->SetToolTipText(NSLOCTEXT("Options", "VSyncHint", "화면 찢어짐을 줄이도록 화면 갱신에 맞춥니다. 환경에 따라 입력 반응이 느려질 수 있습니다."));

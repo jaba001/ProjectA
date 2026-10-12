@@ -1,4 +1,5 @@
 #include "UI/MainMenu/RunSurrenderWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "CommonInputModeTypes.h"
@@ -29,7 +30,7 @@ TOptional<FUIInputConfig> URunSurrenderWidget::GetDesiredInputConfig() const
 UButton* URunSurrenderWidget::AddButton(UVerticalBox* Parent, FName Name, const FText& Text)
 {
     UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), Name);
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(Text);
     Label->SetJustification(ETextJustify::Center);
     Label->SetAutoWrapText(true);
@@ -72,16 +73,16 @@ void URunSurrenderWidget::NativeOnInitialized()
     UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>();
     Panel->SetContent(Content);
 
-    UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Title = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Title->SetText(NSLOCTEXT("RunSurrender", "Title", "여정 항복"));
     Title->SetJustification(ETextJustify::Center);
     Content->AddChildToVerticalBox(Title)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 20.0f));
-    UTextBlock* Description = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Description = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Description->SetText(NSLOCTEXT("RunSurrender", "Description", "현재 저장된 싱글플레이 여정을 포기합니다. 이후에는 이어할 수 없습니다."));
     Description->SetAutoWrapText(true);
     Description->SetJustification(ETextJustify::Center);
     Content->AddChildToVerticalBox(Description)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 20.0f));
-    ErrorText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_SurrenderError"));
+    ErrorText = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_SurrenderError"));
     ErrorText->SetAutoWrapText(true);
     ErrorText->SetVisibility(ESlateVisibility::Collapsed);
     Content->AddChildToVerticalBox(ErrorText)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));

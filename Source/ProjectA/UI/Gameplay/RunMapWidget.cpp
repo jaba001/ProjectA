@@ -1,4 +1,5 @@
 #include "UI/Gameplay/RunMapWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 #include "UI/ProjectALocalization.h"
 
 #include "Blueprint/WidgetTree.h"
@@ -73,10 +74,10 @@ void URunMapWidget::NativeOnInitialized()
         Root->AddChildToOverlay(Background);
         Content = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("ContentBox"));
         Root->AddChildToOverlay(Content);
-        Text_Progress = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_Progress"));
-        Text_Party = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_Party"));
+        Text_Progress = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_Progress"));
+        Text_Party = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_Party"));
         NodeList = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("NodeList"));
-        Text_FlowMessage = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_FlowMessage"));
+        Text_FlowMessage = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_FlowMessage"));
         Content->AddChildToVerticalBox(Text_Progress);
         Theme.AddDivider(WidgetTree, Content);
         Content->AddChildToVerticalBox(Text_Party)->SetPadding(FMargin(0.0f, 8.0f));
@@ -173,7 +174,7 @@ void URunMapWidget::NativeOnInitialized()
         DifficultyBorder->SetContent(DifficultyScroll);
         UVerticalBox* DifficultyContent = WidgetTree->ConstructWidget<UVerticalBox>();
         DifficultyScroll->AddChild(DifficultyContent);
-        PveDifficultyTitle = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_PveDifficultyTitle"));
+        PveDifficultyTitle = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_PveDifficultyTitle"));
         PveDifficultyTitle->SetJustification(ETextJustify::Center);
         PveDifficultyTitle->SetAutoWrapText(true);
         DifficultyContent->AddChildToVerticalBox(PveDifficultyTitle)->SetPadding(FMargin(0.f, 0.f, 0.f, 8.f));
@@ -201,7 +202,7 @@ void URunMapWidget::NativeOnInitialized()
             Card.Content->SetVisibility(ESlateVisibility::HitTestInvisible);
             const auto AddCardText = [this, &Theme, &Card](int32 FontSize, float BottomPadding)
             {
-                UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>();
+                UTextBlock* Text = WidgetTree->ConstructWidget<UProjectATextBlock>();
                 Text->SetAutoWrapText(true);
                 Text->SetWrapTextAt(276.f);
                 Text->SetJustification(ETextJustify::Left);
@@ -215,12 +216,12 @@ void URunMapWidget::NativeOnInitialized()
             Card.Monsters = AddCardText(16, 12.f);
             Card.Stats = AddCardText(16, 0.f);
         }
-        UTextBlock* RewardHint = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_PveRewardHint"));
+        UTextBlock* RewardHint = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_PveRewardHint"));
         RewardHint->SetText(NSLOCTEXT("RunMap", "DifficultyLegend", "100% = 해당 구간 기본값 · 세 선택의 몬스터 종류·공격 피해·AP는 같습니다.\n승리 보상: 아이템 3개 중 1개 + 랜덤 골드 · 아이템 등급·스킬 확률은 같습니다."));
         RewardHint->SetJustification(ETextJustify::Center);
         RewardHint->SetAutoWrapText(true);
         DifficultyContent->AddChildToVerticalBox(RewardHint)->SetPadding(FMargin(0.f, 8.f, 0.f, 0.f));
-        PveDifficultyMessage = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_PveDifficultyMessage"));
+        PveDifficultyMessage = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_PveDifficultyMessage"));
         PveDifficultyMessage->SetJustification(ETextJustify::Center);
         PveDifficultyMessage->SetAutoWrapText(true);
         DifficultyContent->AddChildToVerticalBox(PveDifficultyMessage)->SetPadding(FMargin(0.f, 8.f, 0.f, 0.f));

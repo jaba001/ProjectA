@@ -148,12 +148,12 @@ void ACombatRoundPlayerController::UpdateRoundCamera()
         ShoulderFocus.Finish();
         return;
     }
-    // Melee restores the overview before moving home; ranged and magic shots blend back at impact or final miss.
-    // 근접은 원위치 이동 전에 전술 시점을 복원하고 원거리·마법은 피격 또는 마지막 불발 종료에 복귀 블렌드를 시작합니다.
+    // Melee starts a smooth return at homeward movement; ranged and magic shots blend back at impact or final miss.
+    // 근접은 원위치 이동 시작에 부드럽게 복귀하고 원거리·마법은 피격 또는 마지막 불발 종료에 복귀 블렌드를 시작합니다.
     const FCombatRoundSkill* FocusSkill = Coordinator->FindSkill(Focus->Command.SkillId);
     if (View.Phase == ECombatRoundPhase::Resolving && ShoulderFocus.FinishAtReturnPoint(*Focus, FocusSkill))
     {
-        ReturnToTacticalCamera(FocusSkill->Kind == ECombatRoundSkillKind::Melee);
+        ReturnToTacticalCamera();
         return;
     }
     // Replication may skip the planning frame between two actions or replace the owned actor.

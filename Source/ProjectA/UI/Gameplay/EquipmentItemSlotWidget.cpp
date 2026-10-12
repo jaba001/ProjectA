@@ -1,4 +1,5 @@
 #include "UI/Gameplay/EquipmentItemSlotWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetTree.h"
@@ -30,7 +31,7 @@ void UEquipmentItemSlotWidget::NativeOnInitialized()
     WidgetTree->RootWidget = Card;
     UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>();
     Card->SetContent(Content);
-    SlotText = WidgetTree->ConstructWidget<UTextBlock>();
+    SlotText = WidgetTree->ConstructWidget<UProjectATextBlock>();
     SlotText->SetJustification(ETextJustify::Center);
     Theme.StyleText(SlotText, false, 13);
     Content->AddChildToVerticalBox(SlotText)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 5.0f));
@@ -43,13 +44,13 @@ void UEquipmentItemSlotWidget::NativeOnInitialized()
     Icon = WidgetTree->ConstructWidget<UImage>();
     Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
     Frame->SetContent(Icon);
-    ItemText = WidgetTree->ConstructWidget<UTextBlock>();
+    ItemText = WidgetTree->ConstructWidget<UProjectATextBlock>();
     ItemText->SetAutoWrapText(true);
     ItemText->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
     ItemText->SetJustification(ETextJustify::Center);
     Theme.StyleText(ItemText, false, 13);
     Content->AddChildToVerticalBox(ItemText)->SetPadding(FMargin(0.0f, 6.0f, 0.0f, 4.0f));
-    StateText = WidgetTree->ConstructWidget<UTextBlock>();
+    StateText = WidgetTree->ConstructWidget<UProjectATextBlock>();
     StateText->SetAutoWrapText(true);
     StateText->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
     StateText->SetJustification(ETextJustify::Center);

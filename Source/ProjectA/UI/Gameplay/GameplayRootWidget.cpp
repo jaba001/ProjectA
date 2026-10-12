@@ -1,4 +1,5 @@
 #include "UI/Gameplay/GameplayRootWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
@@ -208,13 +209,13 @@ void UGameplayRootWidget::NativeOnInitialized()
     GoldSlot->SetHorizontalAlignment(HAlign_Left);
     GoldSlot->SetVerticalAlignment(VAlign_Top);
     GoldSlot->SetPadding(FMargin(24.f, 16.f));
-    GoldText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_PersonalGold"));
+    GoldText = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_PersonalGold"));
     UDemonicUITheme::Get().StyleText(GoldText, true, 20);
     GoldText->SetColorAndOpacity(FLinearColor(0.95f, 0.76f, 0.34f));
     UVerticalBox* GoldContent = WidgetTree->ConstructWidget<UVerticalBox>();
     GoldPanel->SetContent(GoldContent);
     GoldContent->AddChildToVerticalBox(GoldText);
-    UTextBlock* Shortcuts = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Shortcuts = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Shortcuts->SetText(NSLOCTEXT("GameplayHUD", "ShortcutHint", "I  인벤토리    Esc / O  설정"));
     UDemonicUITheme::Get().StyleText(Shortcuts, false, 13);
     GoldContent->AddChildToVerticalBox(Shortcuts)->SetPadding(FMargin(0.f, 4.f, 0.f, 0.f));
@@ -230,7 +231,7 @@ void UGameplayRootWidget::NativeOnInitialized()
     UCircularThrobber* PreparationSpinner = WidgetTree->ConstructWidget<UCircularThrobber>();
     PreparationSpinner->SetRadius(12.f);
     PreparationContent->AddChildToHorizontalBox(PreparationSpinner)->SetVerticalAlignment(VAlign_Center);
-    UTextBlock* PreparationText = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* PreparationText = WidgetTree->ConstructWidget<UProjectATextBlock>();
     PreparationText->SetText(NSLOCTEXT("ProjectALoading", "Travel", "불러오는 중"));
     UDemonicUITheme::Get().StyleText(PreparationText, false, 18);
     UHorizontalBoxSlot* PreparationTextSlot = PreparationContent->AddChildToHorizontalBox(PreparationText);
@@ -244,12 +245,12 @@ void UGameplayRootWidget::NativeOnInitialized()
     CheckpointNotice->SetPadding(FMargin(16.f));
     UVerticalBox* NoticeContent = WidgetTree->ConstructWidget<UVerticalBox>();
     CheckpointNotice->SetContent(NoticeContent);
-    CheckpointMessage = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_CheckpointMessage"));
+    CheckpointMessage = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_CheckpointMessage"));
     CheckpointMessage->SetAutoWrapText(true);
     CheckpointMessage->SetWrapTextAt(680.f);
     NoticeContent->AddChildToVerticalBox(CheckpointMessage);
     RetryCheckpointButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_RetryCheckpoint"));
-    UTextBlock* RetryLabel = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* RetryLabel = WidgetTree->ConstructWidget<UProjectATextBlock>();
     RetryLabel->SetText(NSLOCTEXT("GameplayRoot", "TextB0D2D689", "저장 다시 시도"));
     RetryCheckpointButton->SetContent(RetryLabel);
     RetryCheckpointButton->OnClicked.AddDynamic(this, &UGameplayRootWidget::HandleRetryCheckpoint);
@@ -267,12 +268,12 @@ void UGameplayRootWidget::NativeOnInitialized()
     DevelopmentSlot->SetVerticalAlignment(VAlign_Top);
     UVerticalBox* DevelopmentContent = WidgetTree->ConstructWidget<UVerticalBox>();
     DevelopmentBar->SetContent(DevelopmentContent);
-    DevelopmentMessage = WidgetTree->ConstructWidget<UTextBlock>();
+    DevelopmentMessage = WidgetTree->ConstructWidget<UProjectATextBlock>();
     DevelopmentMessage->SetAutoWrapText(true);
     DevelopmentMessage->SetWrapTextAt(280.f);
     DevelopmentContent->AddChildToVerticalBox(DevelopmentMessage);
     UButton* Leave = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_LeaveDevelopmentCoop"));
-    UTextBlock* LeaveLabel = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* LeaveLabel = WidgetTree->ConstructWidget<UProjectATextBlock>();
     LeaveLabel->SetText(NSLOCTEXT("GameplayRoot", "Text2BED3A7F", "개발 협동 나가기 · Host는 방 종료"));
     Leave->SetContent(LeaveLabel);
     Leave->OnClicked.AddDynamic(this, &UGameplayRootWidget::HandleLeaveDevelopmentCoop);

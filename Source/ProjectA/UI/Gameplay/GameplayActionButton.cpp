@@ -1,4 +1,5 @@
 #include "UI/Gameplay/GameplayActionButton.h"
+#include "UI/Theme/ProjectATextBlock.h"
 
 #include "Components/ButtonSlot.h"
 #include "Components/TextBlock.h"
@@ -8,7 +9,7 @@ void UGameplayActionButton::Configure(FName InActionId, const FText& Label)
 {
     ActionId = InActionId;
     UTextBlock* Text = Cast<UTextBlock>(GetContent());
-    if (!Text) Text = NewObject<UTextBlock>(this);
+    if (!Text) Text = NewObject<UProjectATextBlock>(this);
     Text->SetText(Label);
     Text->SetAutoWrapText(true);
     Text->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);

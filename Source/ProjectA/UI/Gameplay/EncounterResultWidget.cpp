@@ -1,4 +1,5 @@
 #include "UI/Gameplay/EncounterResultWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "CommonInputModeTypes.h"
@@ -43,9 +44,9 @@ void UEncounterResultWidget::NativeOnInitialized()
         Root->AddChildToOverlay(Background);
         Content = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("ContentBox"));
         Root->AddChildToOverlay(Content);
-        Text_Result = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_Result"));
+        Text_Result = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_Result"));
         Button_Continue = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_Continue"));
-        UTextBlock* ContinueText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_Continue"));
+        UTextBlock* ContinueText = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_Continue"));
         ContinueText->SetText(NSLOCTEXT("EncounterResult", "Text6D195380", "Continue / 계속"));
         UButtonSlot* ButtonSlot = Cast<UButtonSlot>(Button_Continue->AddChild(ContinueText));
         ButtonSlot->SetPadding(FMargin(24.0f, 12.0f));
@@ -115,11 +116,11 @@ void UEncounterResultWidget::NativeOnInitialized()
         RewardsSlot->SetPadding(FMargin(24.f));
     }
     RewardsContainer->SetVisibility(ESlateVisibility::Collapsed);
-    RewardInstruction = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_RewardInstruction"));
+    RewardInstruction = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_RewardInstruction"));
     RewardInstruction->SetText(NSLOCTEXT("CombatGoldReward", "ChooseOne", "전투 보상 · 3개 중 1개 선택"));
     RewardInstruction->SetJustification(ETextJustify::Center);
     RewardsContent->AddChildToVerticalBox(RewardInstruction)->SetPadding(FMargin(0.f, 16.f, 0.f, 12.f));
-    RewardBonusGold = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_RewardBonusGold"));
+    RewardBonusGold = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_RewardBonusGold"));
     RewardBonusGold->SetJustification(ETextJustify::Center);
     RewardBonusGold->SetAutoWrapText(true);
     RewardBonusGold->SetWrapTextAt(780.f);
@@ -150,7 +151,7 @@ void UEncounterResultWidget::NativeOnInitialized()
         ButtonSlot->SetPadding(FMargin(16.f));
         ButtonSlot->SetHorizontalAlignment(HAlign_Fill);
         ButtonSlot->SetVerticalAlignment(VAlign_Center);
-        UTextBlock* Caption = WidgetTree->ConstructWidget<UTextBlock>();
+        UTextBlock* Caption = WidgetTree->ConstructWidget<UProjectATextBlock>();
         Caption->SetText(FText::Format(NSLOCTEXT("CombatGoldReward", "ChoiceNumber", "선택지 {0}"), FText::AsNumber(Index + 1)));
         Caption->SetJustification(ETextJustify::Center);
         CardContent->AddChildToVerticalBox(Caption);
@@ -164,20 +165,20 @@ void UEncounterResultWidget::NativeOnInitialized()
         UImage* Icon = WidgetTree->ConstructWidget<UImage>();
         Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
         IconSize->SetContent(Icon);
-        UTextBlock* Amount = WidgetTree->ConstructWidget<UTextBlock>();
+        UTextBlock* Amount = WidgetTree->ConstructWidget<UProjectATextBlock>();
         Amount->SetJustification(ETextJustify::Center);
         Amount->SetAutoWrapText(true);
         Amount->SetWrapTextAt(220.f);
         Amount->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
         CardContent->AddChildToVerticalBox(Amount)->SetPadding(FMargin(0.f, 12.f));
-        UTextBlock* Details = WidgetTree->ConstructWidget<UTextBlock>();
+        UTextBlock* Details = WidgetTree->ConstructWidget<UProjectATextBlock>();
         Details->SetJustification(ETextJustify::Center);
         Details->SetAutoWrapText(true);
         Details->SetWrapTextAt(220.f);
         Details->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
         Details->SetVisibility(ESlateVisibility::Collapsed);
         CardContent->AddChildToVerticalBox(Details)->SetPadding(FMargin(0.f, 0.f, 0.f, 12.f));
-        UTextBlock* Status = WidgetTree->ConstructWidget<UTextBlock>();
+        UTextBlock* Status = WidgetTree->ConstructWidget<UProjectATextBlock>();
         Status->SetJustification(ETextJustify::Center);
         Status->SetAutoWrapText(true);
         Status->SetWrapTextAt(220.f);
@@ -189,12 +190,12 @@ void UEncounterResultWidget::NativeOnInitialized()
         RewardItemDetails.Add(Details);
         RewardStatuses.Add(Status);
     }
-    RewardBalance = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_RewardBalance"));
+    RewardBalance = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_RewardBalance"));
     RewardBalance->SetJustification(ETextJustify::Center);
     RewardBalance->SetAutoWrapText(true);
     RewardBalance->SetWrapTextAt(540.f);
     RewardsContent->AddChildToVerticalBox(RewardBalance)->SetPadding(FMargin(0.f, 16.f, 0.f, 0.f));
-    RewardMessage = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_RewardMessage"));
+    RewardMessage = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_RewardMessage"));
     RewardMessage->SetJustification(ETextJustify::Center);
     RewardMessage->SetAutoWrapText(true);
     RewardMessage->SetWrapTextAt(540.f);

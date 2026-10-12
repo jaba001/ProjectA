@@ -1,4 +1,5 @@
 #include "UI/MainMenu/MainMenuScreenWidget.h"
+#include "UI/Theme/ProjectATextBlock.h"
 #include "UI/MainMenu/EncyclopediaWidget.h"
 #include "ProjectA.h"
 
@@ -83,7 +84,7 @@ void UMainMenuScreenWidget::NativeOnInitialized()
         UOverlaySlot* PreviousSlot = Root->AddChildToOverlay(PreviousRoot);
         PreviousSlot->SetHorizontalAlignment(HAlign_Fill);
         PreviousSlot->SetVerticalAlignment(VAlign_Fill);
-        SaveStatus = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("SaveStatus"));
+        SaveStatus = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("SaveStatus"));
         SaveStatus->SetAutoWrapText(true);
         SaveStatus->SetWrapTextAt(760.f);
         SaveStatus->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
@@ -108,7 +109,7 @@ void UMainMenuScreenWidget::NativeOnInitialized()
         ManagedResumePanel->SetContent(ResumeSize);
         UVerticalBox* ResumeContent = WidgetTree->ConstructWidget<UVerticalBox>();
         ResumeSize->SetContent(ResumeContent);
-        ManagedResumeText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_ManagedResume"));
+        ManagedResumeText = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_ManagedResume"));
         ManagedResumeText->SetAutoWrapText(true);
         ResumeContent->AddChildToVerticalBox(ManagedResumeText)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 16.0f));
         ConvertToSoloButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_ConvertToSolo"));
@@ -303,7 +304,7 @@ void UMainMenuScreenWidget::EnsureCodeGeneratedLayout()
         MenuBoxSlot->SetVerticalAlignment(VAlign_Center);
     }
 
-    Text_Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_Title"));
+    Text_Title = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass(), TEXT("Text_Title"));
 
     if (Text_Title)
     {
@@ -417,7 +418,7 @@ UTextBlock* UMainMenuScreenWidget::CreateButtonText(UButton* ParentButton, const
         return nullptr;
     }
 
-    UTextBlock* ButtonTextBlock = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+    UTextBlock* ButtonTextBlock = WidgetTree->ConstructWidget<UProjectATextBlock>(UTextBlock::StaticClass());
 
     if (!ButtonTextBlock)
     {

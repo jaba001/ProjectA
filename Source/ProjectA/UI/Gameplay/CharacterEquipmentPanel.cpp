@@ -1,4 +1,5 @@
 #include "UI/Gameplay/CharacterEquipmentPanel.h"
+#include "UI/Theme/ProjectATextBlock.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
@@ -24,7 +25,7 @@
 
 UTextBlock* UCharacterEquipmentPanel::AddText(UVerticalBox* Parent, const FText& Text, int32 FontSize, float BottomPadding)
 {
-    UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(Text);
     Label->SetAutoWrapText(true);
     UDemonicUITheme::Get().StyleText(Label, FontSize >= 22, FontSize);
@@ -46,7 +47,7 @@ void UCharacterEquipmentPanel::NativeOnInitialized()
     Theme.StyleSectionHeader(Header);
     Header->SetPadding(FMargin(8.0f));
     Content->AddChildToVerticalBox(Header)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
-    UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>();
+    UTextBlock* Title = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Title->SetText(NSLOCTEXT("Equipment", "Title", "현재 장비"));
     Title->SetJustification(ETextJustify::Center);
     Theme.StyleText(Title, true, 26);
