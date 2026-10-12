@@ -24,6 +24,11 @@ namespace EncounterDungeonLayout
     constexpr float ExitWalkSpeed = 500.f;
     constexpr float LoopEntryWalkDuration = 0.8f;
     constexpr float EntranceDoorApproachDistance = 120.f;
+    constexpr float ChoiceDoorDistance = 1000.f;
+    constexpr float ChoiceDoorSpacing = 480.f;
+    constexpr float ChoiceDoorPassDistance = 320.f;
+    constexpr float ChoiceFieldOfView = 100.f;
+    constexpr float MaxWalkSpeed = 800.f;
     constexpr int32 DoorsPerRoom = 3;
     constexpr int32 LoopEntranceDoorIndex = 3 * DoorsPerRoom;
     constexpr int32 ChoiceEntranceDoorIndex = LoopEntranceDoorIndex + 1;
@@ -34,7 +39,8 @@ namespace EncounterDungeonLayout
     PROJECTA_API TArray<FVector> GetPath(int32 Direction);
     PROJECTA_API TArray<FVector> GetPath(int32 Direction, int32 LayoutVariant);
     PROJECTA_API FQuat GetBranchRotation(int32 Direction);
-    PROJECTA_API FVector GetChoiceDoorCenter();
+    PROJECTA_API FVector GetChoiceDoorCenter(int32 Direction);
+    PROJECTA_API FQuat GetChoiceDoorRotation(int32 Direction);
     PROJECTA_API TArray<FEncounterDungeonFloorRegion> GetFloorRegions(int32 LayoutVariant = 0);
     PROJECTA_API bool HasFloorAt(const TArray<FEncounterDungeonFloorRegion>& Regions, const FVector& Point);
     PROJECTA_API TArray<FVector2D> GetExposedWallSpans(const TArray<FEncounterDungeonFloorRegion>& Regions, int32 RegionIndex, const FVector2D& LocalNormal);

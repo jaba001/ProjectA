@@ -231,20 +231,25 @@ bool FEncounterDungeonDoorLifecycleTest::RunTest(const FString& Parameters)
     for (int32 Variant = 0; Variant < EncounterDungeonLayout::VariantCount; ++Variant)
     {
         TestTrue(TEXT("Every supported layout prepares its cached scenery."), Route->ConfigureLayout(Variant));
-        TestEqual(TEXT("Three doors per room, a section entrance and a choice entrance have paired original leaves."), Route->LeftDoors->GetInstanceCount(), 11);
-        TestEqual(TEXT("The left and right door instances remain paired."), Route->RightDoors->GetInstanceCount(), 11);
+        TestEqual(TEXT("Three doors per room, a section entrance and three choices have paired original leaves."), Route->LeftDoors->GetInstanceCount(), 13);
+        TestEqual(TEXT("The left and right door instances remain paired."), Route->RightDoors->GetInstanceCount(), 13);
         for (int32 Direction = 0; Direction < 3; ++Direction)
         {
             Route->ResetAtJunction();
-            const FVector ChoiceDoor = Route->DoorCenters[EncounterDungeonLayout::ChoiceEntranceDoorIndex];
-            TestTrue(TEXT("The choice doorway remains in front of the idle camera while selection UI is shown."), ChoiceDoor.X > Route->Camera->GetRelativeLocation().X && Route->Camera->GetRelativeRotation().IsNearlyZero());
+            const FVector ChoiceDoor = Route->DoorCenters[EncounterDungeonLayout::ChoiceEntranceDoorIndex + Direction];
+            TestTrue(TEXT("All three choice doors remain in front of the idle camera while selection UI is shown."), ChoiceDoor.X > Route->Camera->GetRelativeLocation().X && Route->Camera->GetRelativeRotation().IsNearlyZero() && FMath::IsNearlyEqual(Route->Camera->FieldOfView, EncounterDungeonLayout::ChoiceFieldOfView));
             AEncounterPrototypeStage* Stage = Route->ConfigureStage(Template, Direction, FRunEncounterOffer());
             TestNotNull(TEXT("A room owns a local NPC stage."), Stage);
             if (!Stage) continue;
             const int32 Before = Completions;
             if (!TestTrue(TEXT("Confirmed selection begins arrival travel."), Route->StartTravel(Direction))) continue;
             const FEncounterDungeonTravelSegment* FirstDoor = Route->TravelSegments.FindByPredicate([](const FEncounterDungeonTravelSegment& Segment) { return Segment.DoorIndex != INDEX_NONE; });
-            TestTrue(TEXT("The common choice doorway opens before any room doorway."), FirstDoor && FirstDoor->DoorIndex == EncounterDungeonLayout::ChoiceEntranceDoorIndex);
+            TestTrue(TEXT("Only the selected choice doorway opens before its room doorway."), FirstDoor && FirstDoor->DoorIndex == EncounterDungeonLayout::ChoiceEntranceDoorIndex + Direction);
+            for (const FEncounterDungeonTravelSegment& Segment : Route->TravelSegments)
+            {
+                if (!Segment.Start.Equals(Segment.End)) TestTrue(TEXT("Longer rectangular routes cannot accelerate above the retained walking cap."), FVector::Distance(Segment.Start, Segment.End) / Segment.Duration <= EncounterDungeonLayout::MaxWalkSpeed + 0.1f);
+                if (Segment.DoorIndex >= EncounterDungeonLayout::ChoiceEntranceDoorIndex) TestEqual(TEXT("Other choice doorways never open during the selected trip."), Segment.DoorIndex, EncounterDungeonLayout::ChoiceEntranceDoorIndex + Direction);
+            }
             TestFalse(TEXT("A second travel request cannot replace an active door arrival."), Route->StartTravel(Direction));
             float ApproachSeconds = 0.f;
             for (const FEncounterDungeonTravelSegment& Segment : Route->TravelSegments)
@@ -253,7 +258,8 @@ bool FEncounterDungeonDoorLifecycleTest::RunTest(const FString& Parameters)
                 ApproachSeconds += Segment.Duration;
             }
             Route->Tick(ApproachSeconds + 0.3f);
-            TestTrue(TEXT("The camera waits outside the common choice entrance while it opens."), Route->Camera->GetRelativeLocation().X < ChoiceDoor.X && Route->IsTraveling() && Completions == Before);
+            const FVector ChoiceForward = EncounterDungeonLayout::GetChoiceDoorRotation(Direction).GetForwardVector();
+            TestTrue(TEXT("The camera waits outside its selected doorway while it opens."), FVector::DotProduct(Route->Camera->GetRelativeLocation() - ChoiceDoor, ChoiceForward) < 0.f && Route->IsTraveling() && Completions == Before);
             Route->Tick(10.f);
             TestTrue(TEXT("A frame hitch completes arrival once at the configured NPC camera."), !Route->IsTraveling() && Route->Camera->GetComponentLocation().Equals(Stage->Camera->GetComponentLocation()) && Completions == Before + 1);
             if (!TestTrue(TEXT("Departure reuses the current room instead of resetting to the junction."), Route->StartExitTravel())) continue;
@@ -292,7 +298,7 @@ bool FEncounterDungeonDoorLifecycleTest::RunTest(const FString& Parameters)
             Route->SetPresentationVisible(true);
             TestTrue(TEXT("PvE enters the chosen corridor without an NPC stage."), Route->StartCombatTravel(Direction));
             TestFalse(TEXT("PvE travel cannot be replaced while its doors are opening."), Route->StartCombatTravel((Direction + 1) % 3));
-            Route->Tick(10.f);
+            Route->Tick(100.f);
             TestTrue(TEXT("PvE stops before the terminal door and completes exactly once."), !Route->IsTraveling() && !Route->GetPresentedStage() && Route->Camera->GetRelativeLocation().Equals(LoopStop) && Completions == Before + 4);
             Controller->bCombatEntryTransition = true;
             Controller->bCombatTravelFinished = true;

@@ -14,27 +14,32 @@ bool FEncounterDungeonLayoutGeometryTest::RunTest(const FString& Parameters)
         const FVector ArrivalCameraOffset(-800.f, 0.f, EncounterDungeonLayout::EyeHeight);
         TArray<FVector> Destinations;
         TestTrue(TEXT("The dungeon includes floor behind the initial eye-level junction."), EncounterDungeonLayout::HasFloorAt(Floor, FVector(-400.f, 0.f, 0.f)) && EncounterDungeonLayout::HasFloorAt(Floor, FVector::ZeroVector));
-        const FVector ChoiceDoor = EncounterDungeonLayout::GetChoiceDoorCenter();
-        TestTrue(TEXT("The closed choice doorway is visible ahead of the initial camera and before the fork."), ChoiceDoor.X > 0.f && ChoiceDoor.X < EncounterDungeonLayout::GetPath(0, Variant)[1].X && ChoiceDoor.Y == 0.f);
+        for (const FEncounterDungeonFloorRegion& Region : Floor) TestTrue(TEXT("Lobby, corridors and rooms retain axis-aligned walls and floor."), Region.Transform.GetRotation().Equals(FQuat::Identity));
         for (int32 Direction = 0; Direction < 3; ++Direction)
         {
             const TArray<FVector> Path = EncounterDungeonLayout::GetPath(Direction, Variant);
             if (!TestTrue(TEXT("Each direction contains a junction, a forward approach and a branch destination."), Path.Num() >= 3)) return false;
             TestTrue(TEXT("All directions begin at the same eye-level junction."), Path[0].Equals(FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)));
-            TestTrue(TEXT("All directions initially look and move forward before choosing a corridor."), Path[1].X > Path[0].X && Path[1].Y == Path[0].Y);
-            const FVector Branch = Path[2] - Path[1];
+            const FVector ChoiceDoor = EncounterDungeonLayout::GetChoiceDoorCenter(Direction);
+            const FQuat DoorRotation = EncounterDungeonLayout::GetChoiceDoorRotation(Direction);
+            TestTrue(TEXT("Three choice doors face forward with only the side doorframes angled 45 degrees."), ChoiceDoor.X == EncounterDungeonLayout::ChoiceDoorDistance && FMath::IsNearlyEqual(DoorRotation.Rotator().Yaw, static_cast<double>((Direction - 1) * 45)));
+            TestTrue(TEXT("The camera stops before and passes beyond its own angled doorway."), Path[1].Equals(ChoiceDoor - DoorRotation.GetForwardVector() * EncounterDungeonLayout::EntranceDoorApproachDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)) && Path[2].Equals(ChoiceDoor + DoorRotation.GetForwardVector() * EncounterDungeonLayout::ChoiceDoorPassDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)));
             const FVector Forward = EncounterDungeonLayout::GetBranchRotation(Direction).GetForwardVector();
-            TestTrue(TEXT("Side branches turn exactly 45 degrees and the middle route stays straight."), Branch.GetSafeNormal().Equals(Forward) && FMath::IsNearlyEqual(Branch.Rotation().Yaw, static_cast<double>((Direction - 1) * 45)));
+            if (Direction != 1)
+            {
+                TestTrue(TEXT("Side corridors turn ninety degrees after the angled doorway."), FMath::IsNearlyZero((Path[4] - Path[3]).X) && FMath::IsNearlyEqual(FMath::Abs((Path[4] - Path[3]).GetSafeNormal().Y), 1.0) && FMath::IsNearlyEqual(FVector::DotProduct((Path[4] - Path[3]).GetSafeNormal(), (Path[5] - Path[4]).GetSafeNormal()), 0.0));
+            }
             for (int32 Index = 1; Index < Path.Num(); ++Index)
             {
                 const FVector Delta = Path[Index] - Path[Index - 1];
-                if (!TestTrue(TEXT("Every segment is finite, forward and horizontal at eye height."), !Path[Index].ContainsNaN() && Path[Index].Z == EncounterDungeonLayout::EyeHeight && FMath::IsNearlyZero(Delta.Z) && Delta.X > 0.f)) return false;
+                if (!TestTrue(TEXT("Every segment is finite, nonzero and horizontal at eye height."), !Path[Index].ContainsNaN() && Path[Index].Z == EncounterDungeonLayout::EyeHeight && FMath::IsNearlyZero(Delta.Z) && !Delta.IsNearlyZero())) return false;
+                if (Index >= 3) TestTrue(TEXT("Corridor motion after doorway crossing follows only rectangular axes."), FMath::IsNearlyZero(Delta.X) != FMath::IsNearlyZero(Delta.Y));
                 if (Direction == 1) TestTrue(TEXT("The straight course never changes its lateral coordinate."), FMath::IsNearlyZero(Path[Index].Y));
                 const int32 Samples = FMath::CeilToInt(Delta.Size() / 20.f);
                 for (int32 Sample = 0; Sample <= Samples; ++Sample)
                 {
                     const FVector Point = FMath::Lerp(Path[Index - 1], Path[Index], static_cast<float>(Sample) / Samples);
-                    TestTrue(TEXT("Every arrival sample has floor through the diagonal junction."), EncounterDungeonLayout::HasFloorAt(Floor, Point));
+                    TestTrue(TEXT("Every arrival sample has floor through the three-door lobby."), EncounterDungeonLayout::HasFloorAt(Floor, Point));
                     for (int32 RegionIndex = 0; RegionIndex < Floor.Num(); ++RegionIndex)
                     {
                         const FEncounterDungeonFloorRegion& Region = Floor[RegionIndex];
@@ -74,6 +79,33 @@ bool FEncounterDungeonLayoutGeometryTest::RunTest(const FString& Parameters)
     }
     for (const float AspectRatio : {4.f / 3.f, 16.f / 9.f, 21.f / 9.f})
     {
+        const float HalfWidth = FMath::Tan(FMath::DegreesToRadians(EncounterDungeonLayout::ChoiceFieldOfView * 0.5f)) * AspectRatio / (16.f / 9.f);
+        for (int32 Direction = 0; Direction < 3; ++Direction)
+        {
+            const FVector Door = EncounterDungeonLayout::GetChoiceDoorCenter(Direction);
+            const FQuat Rotation = EncounterDungeonLayout::GetChoiceDoorRotation(Direction);
+            for (const float X : {-30.f, 30.f})
+            {
+                for (const float Y : {-200.f, 200.f})
+                {
+                    const FVector Corner = Door + Rotation.RotateVector(FVector(X, Y, 0.f));
+                    TestTrue(TEXT("All three doorframes fit the initial view at supported aspect ratios."), FMath::Abs(Corner.Y / Corner.X) < HalfWidth);
+                }
+            }
+        }
+    }
+    const TArray<FEncounterDungeonFloorRegion> Overlapping = {{FTransform::Identity, FVector2D(400.f, 200.f)}, {FTransform(FVector(200.f, 0.f, 0.f)), FVector2D(400.f, 200.f)}};
+    const TArray<FVector2D> FirstTop = EncounterDungeonLayout::GetExposedWallSpans(Overlapping, 0, FVector2D(0.f, 1.f));
+    const TArray<FVector2D> SecondTop = EncounterDungeonLayout::GetExposedWallSpans(Overlapping, 1, FVector2D(0.f, 1.f));
+    const auto TotalSpan = [](const TArray<FVector2D>& Spans)
+    {
+        double Total = 0.f;
+        for (const FVector2D& Span : Spans) Total += Span.Y - Span.X;
+        return Total;
+    };
+    TestTrue(TEXT("Overlapping aligned regions retain their exterior wall exactly once."), FMath::IsNearlyEqual(TotalSpan(FirstTop) + TotalSpan(SecondTop), 1000.0, 0.1));
+    for (const float AspectRatio : {4.f / 3.f, 16.f / 9.f, 21.f / 9.f})
+    {
         const float HalfHeight = FMath::Tan(FMath::DegreesToRadians(40.f)) * (EncounterDungeonLayout::DoorCoverDistance + 22.f);
         TestTrue(TEXT("The closed-door seam cover fills the terminal view for supported aspect ratios."), HalfHeight * AspectRatio < 140.f && HalfHeight < FMath::Min(EncounterDungeonLayout::EyeHeight, 300.f - EncounterDungeonLayout::EyeHeight));
     }
@@ -84,9 +116,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEncounterDungeonLayoutDirectionTest, "ProjectA
 
 bool FEncounterDungeonLayoutDirectionTest::RunTest(const FString& Parameters)
 {
-    TestEqual(TEXT("Server offer index zero is labelled left at 45 degrees."), EncounterDungeonLayout::GetDirectionLabel(0), NSLOCTEXT("EncounterDungeon", "Left", "왼쪽 45°"));
+    TestEqual(TEXT("Server offer index zero is labelled as the left door."), EncounterDungeonLayout::GetDirectionLabel(0), NSLOCTEXT("EncounterDungeon", "Left", "왼쪽 문"));
     TestEqual(TEXT("Server offer index one is labelled straight."), EncounterDungeonLayout::GetDirectionLabel(1), NSLOCTEXT("EncounterDungeon", "Straight", "직진"));
-    TestEqual(TEXT("Server offer index two is labelled right at 45 degrees."), EncounterDungeonLayout::GetDirectionLabel(2), NSLOCTEXT("EncounterDungeon", "Right", "오른쪽 45°"));
+    TestEqual(TEXT("Server offer index two is labelled as the right door."), EncounterDungeonLayout::GetDirectionLabel(2), NSLOCTEXT("EncounterDungeon", "Right", "오른쪽 문"));
     for (int32 Direction = 0; Direction < 3; ++Direction)
     {
         TestTrue(TEXT("Legacy path calls preserve variant zero exactly."), EncounterDungeonLayout::GetPath(Direction) == EncounterDungeonLayout::GetPath(Direction, 0));

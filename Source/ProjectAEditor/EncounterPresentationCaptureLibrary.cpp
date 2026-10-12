@@ -98,8 +98,9 @@ bool UEncounterPresentationCaptureLibrary::CaptureDungeonInteriors(UWorld* World
         UE_LOG(LogTemp, Display, TEXT("Interior flame active=%d"), Flame->IsActive());
     }
     World->SendAllEndOfFrameUpdates();
-    const auto Save = [&](const FString& Name, const FVector& Location, const FRotator& Rotation)
+    const auto Save = [&](const FString& Name, const FVector& Location, const FRotator& Rotation, float FieldOfView = 80.f)
     {
+        Capture->FOVAngle = FieldOfView;
         FAssetCompilingManager::Get().FinishAllCompilation();
         if (GShaderCompilingManager) GShaderCompilingManager->FinishAllCompilation();
         World->SendAllEndOfFrameUpdates();
@@ -113,14 +114,14 @@ bool UEncounterPresentationCaptureLibrary::CaptureDungeonInteriors(UWorld* World
         return IFileManager::Get().FileSize(*(Output / Name)) > 0;
     };
     const FVector Origin = Route->GetActorLocation();
-    bSuccess = bSuccess && Save(TEXT("01_Junction.png"), Origin + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight), FRotator::ZeroRotator);
+    bSuccess = bSuccess && Save(TEXT("01_Junction.png"), Origin + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight), FRotator::ZeroRotator, EncounterDungeonLayout::ChoiceFieldOfView);
     bSuccess = bSuccess && Save(TEXT("02_TorchAndStone.png"), Origin + FVector(-150.f, 0.f, EncounterDungeonLayout::EyeHeight), FRotator(16.f, 35.f, 0.f));
     const TArray<FVector> Path = EncounterDungeonLayout::GetPath(0, 0);
-    const FQuat BranchRotation = EncounterDungeonLayout::GetBranchRotation(0);
-    bSuccess = bSuccess && !Path.IsEmpty() && Save(TEXT("03_Corridor.png"), Origin + Path[1] + BranchRotation.GetForwardVector() * 200.f, BranchRotation.Rotator());
+    const FRotator CorridorRotation = Path.Num() > 4 ? (Path[4] - Path[3]).Rotation() : FRotator::ZeroRotator;
+    bSuccess = bSuccess && Path.Num() > 4 && Save(TEXT("03_Corridor.png"), Origin + Path[3] + CorridorRotation.Vector() * 200.f, CorridorRotation);
     AEncounterPrototypeStage* Stage = Route->ConfigureStage(Template, 0, Offer);
     bSuccess = bSuccess && Stage && Save(TEXT("04_Shop.png"), Stage->Camera->GetComponentLocation(), Stage->Camera->GetComponentRotation());
-    bSuccess = bSuccess && Save(TEXT("01_Junction.png"), Origin + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight), FRotator::ZeroRotator);
+    bSuccess = bSuccess && Save(TEXT("01_Junction.png"), Origin + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight), FRotator::ZeroRotator, EncounterDungeonLayout::ChoiceFieldOfView);
     CaptureActor->Destroy();
     Route->Destroy();
     return bSuccess;

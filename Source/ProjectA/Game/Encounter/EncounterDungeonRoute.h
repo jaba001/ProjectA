@@ -73,6 +73,7 @@ private:
     void AddTorch(const FVector& Center, const FVector& Normal);
     void DestroyPresentedStage();
     void StopTravel();
+    void BeginTravel(float InitialFieldOfView, float FinalFieldOfView);
     void AddDoorway(const FVector& Center, const FQuat& Rotation = FQuat::Identity);
     void SetDoorOpen(int32 Index, float Alpha);
 
@@ -124,6 +125,10 @@ private:
     int32 TravelSegmentIndex = 0;
     int32 StageDirection = INDEX_NONE;
     float SegmentSeconds = 0.0f;
+    float TravelSeconds = 0.f;
+    float TravelElapsedSeconds = 0.f;
+    float TravelInitialFieldOfView = 80.f;
+    float TravelFinalFieldOfView = 80.f;
     bool bGeometryPrepared = false;
     bool bTraveling = false;
     bool bExiting = false;

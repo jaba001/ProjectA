@@ -389,7 +389,7 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
     const FVector LoopEntrance(-CellSize * 0.5f, 0.f, 0.f);
     AddDoorway(LoopEntrance);
     AddBlock(DoorSeals, LoopEntrance + FVector(20.f, 0.f, 150.f), FVector(4.f, 280.f, 300.f));
-    AddDoorway(EncounterDungeonLayout::GetChoiceDoorCenter());
+    for (int32 Direction = 0; Direction < 3; ++Direction) AddDoorway(EncounterDungeonLayout::GetChoiceDoorCenter(Direction), EncounterDungeonLayout::GetChoiceDoorRotation(Direction));
     bGeometryPrepared = true;
 }
 
@@ -446,7 +446,7 @@ void AEncounterDungeonRoute::ResetAtJunction()
     if (Path.IsEmpty()) return;
     Camera->SetRelativeLocation(Path[0]);
     Camera->SetRelativeRotation(FRotator::ZeroRotator);
-    Camera->SetFieldOfView(80.f);
+    Camera->SetFieldOfView(EncounterDungeonLayout::ChoiceFieldOfView);
 }
 
 bool AEncounterDungeonRoute::StartTravel(int32 Direction)
@@ -459,8 +459,7 @@ bool AEncounterDungeonRoute::StartTravel(int32 Direction)
     const FVector Forward = EncounterDungeonLayout::GetBranchRotation(Direction).GetForwardVector();
     const FVector DoorApproach = EncounterDungeonLayout::GetDoorCenter(Direction, LayoutVariant, false) - Forward * EncounterDungeonLayout::EntranceDoorApproachDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight);
     Path.Insert(DoorApproach, Path.Num() - 1);
-    const FVector ChoiceApproach = EncounterDungeonLayout::GetChoiceDoorCenter() + FVector(-EncounterDungeonLayout::EntranceDoorApproachDistance, 0.f, EncounterDungeonLayout::EyeHeight);
-    Path.Insert(ChoiceApproach, 1);
+    const FVector ChoiceApproach = Path[1];
     TArray<FEncounterDungeonTravelSegment> Segments;
     FQuat CurrentRotation = FQuat::Identity;
     float TotalDistance = 0.f;
@@ -476,10 +475,20 @@ bool AEncounterDungeonRoute::StartTravel(int32 Direction)
             ++TurnCount;
         }
         Segments.Add({Path[Index - 1], Path[Index], Facing, Facing, static_cast<float>(Delta.Size())});
-        if (Path[Index].Equals(ChoiceApproach)) Segments.Add({ChoiceApproach, ChoiceApproach, Facing, Facing, EncounterDungeonLayout::DoorOpenDuration, EncounterDungeonLayout::ChoiceEntranceDoorIndex});
+        CurrentRotation = Facing;
+        if (Path[Index].Equals(ChoiceApproach))
+        {
+            const FQuat DoorRotation = EncounterDungeonLayout::GetChoiceDoorRotation(Direction);
+            if (!CurrentRotation.Equals(DoorRotation, 0.001f))
+            {
+                Segments.Add({ChoiceApproach, ChoiceApproach, CurrentRotation, DoorRotation, 0.f});
+                ++TurnCount;
+            }
+            Segments.Add({ChoiceApproach, ChoiceApproach, DoorRotation, DoorRotation, EncounterDungeonLayout::DoorOpenDuration, EncounterDungeonLayout::ChoiceEntranceDoorIndex + Direction});
+            CurrentRotation = DoorRotation;
+        }
         if (Path[Index].Equals(DoorApproach)) Segments.Add({DoorApproach, DoorApproach, Facing, Facing, EncounterDungeonLayout::DoorOpenDuration, Direction * EncounterDungeonLayout::DoorsPerRoom});
         TotalDistance += static_cast<float>(Delta.Size());
-        CurrentRotation = Facing;
     }
     const FQuat FinalRotation = GetActorQuat().Inverse() * PresentedStage->Camera->GetComponentQuat();
     if (!CurrentRotation.Equals(FinalRotation, 0.001f))
@@ -491,15 +500,13 @@ bool AEncounterDungeonRoute::StartTravel(int32 Direction)
     const float MoveDuration = EncounterDungeonLayout::ArrivalTravelDuration - TurnCount * TurnDuration;
     for (FEncounterDungeonTravelSegment& Segment : Segments)
     {
-        if (Segment.DoorIndex == INDEX_NONE) Segment.Duration = Segment.Start.Equals(Segment.End) ? TurnDuration : MoveDuration * Segment.Duration / TotalDistance;
+        if (Segment.DoorIndex == INDEX_NONE) Segment.Duration = Segment.Start.Equals(Segment.End) ? TurnDuration : FMath::Max(MoveDuration * Segment.Duration / TotalDistance, Segment.Duration / EncounterDungeonLayout::MaxWalkSpeed);
     }
     StopTravel();
     TravelSegments = MoveTemp(Segments);
     Camera->SetRelativeLocation(Path[0]);
     Camera->SetRelativeRotation(FRotator::ZeroRotator);
-    Camera->SetFieldOfView(80.f);
-    bTraveling = true;
-    SetActorTickEnabled(true);
+    BeginTravel(EncounterDungeonLayout::ChoiceFieldOfView, PresentedStage->Camera->FieldOfView);
     return true;
 }
 
@@ -512,8 +519,7 @@ bool AEncounterDungeonRoute::StartCombatTravel(int32 Direction)
     const FVector EntranceApproach = EncounterDungeonLayout::GetDoorCenter(Direction, LayoutVariant, false) - Forward * EncounterDungeonLayout::EntranceDoorApproachDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight);
     const FVector RearApproach = EncounterDungeonLayout::GetDoorCenter(Direction, LayoutVariant, true) - Forward * 220.f + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight);
     Path.Insert(EntranceApproach, Path.Num() - 1);
-    const FVector ChoiceApproach = EncounterDungeonLayout::GetChoiceDoorCenter() + FVector(-EncounterDungeonLayout::EntranceDoorApproachDistance, 0.f, EncounterDungeonLayout::EyeHeight);
-    Path.Insert(ChoiceApproach, 1);
+    const FVector ChoiceApproach = Path[1];
     Path.Add(RearApproach);
     Path.Add(EncounterDungeonLayout::GetLoopDoorCenter(Direction, LayoutVariant) - Forward * EncounterDungeonLayout::DoorCoverDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight));
     TArray<FEncounterDungeonTravelSegment> Segments;
@@ -526,25 +532,29 @@ bool AEncounterDungeonRoute::StartCombatTravel(int32 Direction)
         const FQuat Facing = Delta.Rotation().Quaternion();
         if (!Rotation.Equals(Facing, 0.001f)) Segments.Add({Path[Index - 1], Path[Index - 1], Rotation, Facing, EncounterDungeonLayout::TurnDuration});
         Segments.Add({Path[Index - 1], Path[Index], Facing, Facing, static_cast<float>(Delta.Size())});
-        if (Path[Index].Equals(ChoiceApproach)) Segments.Add({Path[Index], Path[Index], Facing, Facing, EncounterDungeonLayout::DoorOpenDuration, EncounterDungeonLayout::ChoiceEntranceDoorIndex});
+        Rotation = Facing;
+        if (Path[Index].Equals(ChoiceApproach))
+        {
+            const FQuat DoorRotation = EncounterDungeonLayout::GetChoiceDoorRotation(Direction);
+            if (!Rotation.Equals(DoorRotation, 0.001f)) Segments.Add({ChoiceApproach, ChoiceApproach, Rotation, DoorRotation, EncounterDungeonLayout::TurnDuration});
+            Segments.Add({ChoiceApproach, ChoiceApproach, DoorRotation, DoorRotation, EncounterDungeonLayout::DoorOpenDuration, EncounterDungeonLayout::ChoiceEntranceDoorIndex + Direction});
+            Rotation = DoorRotation;
+        }
         if (Path[Index].Equals(EntranceApproach)) Segments.Add({Path[Index], Path[Index], Facing, Facing, EncounterDungeonLayout::DoorOpenDuration, Direction * EncounterDungeonLayout::DoorsPerRoom});
         if (Path[Index].Equals(RearApproach)) Segments.Add({Path[Index], Path[Index], Facing, Facing, EncounterDungeonLayout::DoorOpenDuration, Direction * EncounterDungeonLayout::DoorsPerRoom + 1});
         Distance += static_cast<float>(Delta.Size());
-        Rotation = Facing;
     }
     for (FEncounterDungeonTravelSegment& Segment : Segments)
     {
-        if (Segment.DoorIndex == INDEX_NONE && !Segment.Start.Equals(Segment.End)) Segment.Duration = EncounterDungeonLayout::CombatWalkDuration * Segment.Duration / Distance;
+        if (Segment.DoorIndex == INDEX_NONE && !Segment.Start.Equals(Segment.End)) Segment.Duration = FMath::Max(EncounterDungeonLayout::CombatWalkDuration * Segment.Duration / Distance, Segment.Duration / EncounterDungeonLayout::MaxWalkSpeed);
     }
     StopTravel();
     DestroyPresentedStage();
     TravelSegments = MoveTemp(Segments);
     Camera->SetRelativeLocation(Path[0]);
     Camera->SetRelativeRotation(FRotator::ZeroRotator);
-    Camera->SetFieldOfView(80.f);
     bCombatEntering = true;
-    bTraveling = true;
-    SetActorTickEnabled(true);
+    BeginTravel(EncounterDungeonLayout::ChoiceFieldOfView, 80.f);
     return true;
 }
 
@@ -570,8 +580,7 @@ bool AEncounterDungeonRoute::StartExitTravel()
         CurrentRotation = Facing;
     }
     bExiting = true;
-    bTraveling = true;
-    SetActorTickEnabled(true);
+    BeginTravel(80.f, 80.f);
     return true;
 }
 
@@ -583,12 +592,10 @@ bool AEncounterDungeonRoute::StartLoopEntrance()
     const FVector End(0.f, 0.f, EncounterDungeonLayout::EyeHeight);
     Camera->SetRelativeLocation(Start);
     Camera->SetRelativeRotation(FRotator::ZeroRotator);
-    Camera->SetFieldOfView(80.f);
     SetDoorOpen(EncounterDungeonLayout::LoopEntranceDoorIndex, 0.f);
     TravelSegments = {{Start, Start, FQuat::Identity, FQuat::Identity, EncounterDungeonLayout::DoorOpenDuration, EncounterDungeonLayout::LoopEntranceDoorIndex}, {Start, End, FQuat::Identity, FQuat::Identity, EncounterDungeonLayout::LoopEntryWalkDuration}};
     bLoopEntering = true;
-    bTraveling = true;
-    SetActorTickEnabled(true);
+    BeginTravel(80.f, EncounterDungeonLayout::ChoiceFieldOfView);
     return true;
 }
 
@@ -607,6 +614,20 @@ void AEncounterDungeonRoute::StopTravel()
     TravelSegments.Reset();
     TravelSegmentIndex = 0;
     SegmentSeconds = 0.f;
+    TravelSeconds = 0.f;
+    TravelElapsedSeconds = 0.f;
+}
+
+void AEncounterDungeonRoute::BeginTravel(float InitialFieldOfView, float FinalFieldOfView)
+{
+    TravelInitialFieldOfView = InitialFieldOfView;
+    TravelFinalFieldOfView = FinalFieldOfView;
+    TravelSeconds = 0.f;
+    TravelElapsedSeconds = 0.f;
+    for (const FEncounterDungeonTravelSegment& Segment : TravelSegments) TravelSeconds += Segment.Duration;
+    Camera->SetFieldOfView(InitialFieldOfView);
+    bTraveling = true;
+    SetActorTickEnabled(true);
 }
 
 void AEncounterDungeonRoute::FinishAtStage()
@@ -634,12 +655,15 @@ void AEncounterDungeonRoute::Tick(float DeltaSeconds)
         const FEncounterDungeonTravelSegment& Segment = TravelSegments[TravelSegmentIndex];
         const float Step = FMath::Min(RemainingSeconds, Segment.Duration - SegmentSeconds);
         SegmentSeconds += Step;
+        TravelElapsedSeconds += Step;
         RemainingSeconds -= Step;
         const float Alpha = FMath::Clamp(SegmentSeconds / Segment.Duration, 0.f, 1.f);
         const float SmoothedAlpha = Alpha * Alpha * (3.f - 2.f * Alpha);
         if (Segment.DoorIndex != INDEX_NONE) SetDoorOpen(Segment.DoorIndex, SmoothedAlpha);
         Camera->SetRelativeLocation(FMath::Lerp(Segment.Start, Segment.End, SmoothedAlpha));
         Camera->SetRelativeRotation(FQuat::Slerp(Segment.StartRotation, Segment.EndRotation, SmoothedAlpha));
+        const float ViewAlpha = FMath::Clamp(TravelElapsedSeconds / TravelSeconds, 0.f, 1.f);
+        Camera->SetFieldOfView(FMath::Lerp(TravelInitialFieldOfView, TravelFinalFieldOfView, ViewAlpha * ViewAlpha * (3.f - 2.f * ViewAlpha)));
         if (SegmentSeconds < Segment.Duration) break;
         ++TravelSegmentIndex;
         SegmentSeconds = 0.f;
