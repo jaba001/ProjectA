@@ -47,7 +47,7 @@ protected:
     virtual UWidget* NativeGetDesiredFocusTarget() const override;
 
 private:
-    UEncyclopediaChoiceButton* MakeButton(const FText& Text);
+    UEncyclopediaChoiceButton* MakeButton(const FText& Text, bool bTab = false);
     UTextBlock* MakeText(const FText& Text, int32 FontSize, bool bHeading = false);
     void BeginLoad();
     void LoadDefinitions();

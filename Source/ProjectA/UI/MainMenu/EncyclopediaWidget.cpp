@@ -1,5 +1,6 @@
 #include "UI/MainMenu/EncyclopediaWidget.h"
 #include "UI/Theme/ProjectATextBlock.h"
+#include "UI/Theme/ProjectATextFit.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 
 #include "Blueprint/WidgetTree.h"
@@ -55,16 +56,20 @@ UTextBlock* UEncyclopediaWidget::MakeText(const FText& Text, int32 FontSize, boo
     UTextBlock* Label = WidgetTree->ConstructWidget<UProjectATextBlock>();
     Label->SetText(Text);
     Label->SetAutoWrapText(true);
-    Label->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
     UDemonicUITheme::Get().StyleText(Label, bHeading, FontSize);
     return Label;
 }
 
-UEncyclopediaChoiceButton* UEncyclopediaWidget::MakeButton(const FText& Text)
+UEncyclopediaChoiceButton* UEncyclopediaWidget::MakeButton(const FText& Text, bool bTab)
 {
     UEncyclopediaChoiceButton* Button = WidgetTree->ConstructWidget<UEncyclopediaChoiceButton>();
-    UTextBlock* Label = MakeText(Text, 16);
-    CastChecked<UButtonSlot>(Button->AddChild(Label))->SetPadding(FMargin(12.0f, 10.0f));
+    // Tabs wrap at spaces into at most two short lines; a single long word shrinks instead of splitting.
+    // 탭은 띄어쓰기에서 짧게 줄바꿈하고 긴 한 단어는 쪼개지 않고 축소합니다.
+    UTextBlock* Label = MakeText(Text, bTab ? 15 : 16);
+    Label->SetJustification(bTab ? ETextJustify::Center : ETextJustify::Left);
+    UWidget* Content = Label;
+    if (bTab && !Text.ToString().Contains(TEXT(" "))) Content = ProjectATextFit::ShrinkToFit(*WidgetTree, Label);
+    CastChecked<UButtonSlot>(Button->AddChild(Content))->SetPadding(bTab ? FMargin(6.0f, 8.0f) : FMargin(12.0f, 10.0f));
     Button->BindSelection();
     UDemonicUITheme::Get().StyleButton(Button);
     return Button;
@@ -104,7 +109,7 @@ void UEncyclopediaWidget::NativeOnInitialized()
     Content->AddChildToVerticalBox(TabBar)->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
     for (int32 Index = 0; Index < static_cast<int32>(EEncyclopediaCategory::Count); ++Index)
     {
-        UEncyclopediaChoiceButton* Tab = MakeButton(EncyclopediaCatalog::CategoryName(static_cast<EEncyclopediaCategory>(Index)));
+        UEncyclopediaChoiceButton* Tab = MakeButton(EncyclopediaCatalog::CategoryName(static_cast<EEncyclopediaCategory>(Index)), true);
         Tab->Selected.BindUObject(this, &UEncyclopediaWidget::SelectCategory, Index);
         UHorizontalBoxSlot* TabSlot = TabBar->AddChildToHorizontalBox(Tab);
         TabSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));

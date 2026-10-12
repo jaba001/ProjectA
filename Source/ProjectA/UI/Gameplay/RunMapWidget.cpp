@@ -203,8 +203,9 @@ void URunMapWidget::NativeOnInitialized()
             const auto AddCardText = [this, &Theme, &Card](int32 FontSize, float BottomPadding)
             {
                 UTextBlock* Text = WidgetTree->ConstructWidget<UProjectATextBlock>();
+                // Wrap at the card's actual width so longer translations use the whole card.
+                // 더 긴 번역문도 카드 전체를 쓰도록 실제 카드 폭에서 줄바꿈합니다.
                 Text->SetAutoWrapText(true);
-                Text->SetWrapTextAt(276.f);
                 Text->SetJustification(ETextJustify::Left);
                 Theme.StyleText(Text, false, FontSize);
                 Card.Content->AddChildToVerticalBox(Text)->SetPadding(FMargin(0.f, 0.f, 0.f, BottomPadding));

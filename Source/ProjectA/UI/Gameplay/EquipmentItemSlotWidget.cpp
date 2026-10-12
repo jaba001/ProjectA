@@ -44,15 +44,19 @@ void UEquipmentItemSlotWidget::NativeOnInitialized()
     Icon = WidgetTree->ConstructWidget<UImage>();
     Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
     Frame->SetContent(Icon);
+    // Narrow slots keep one line with an ellipsis so every slot has the same height in any language; the tooltip shows the full name.
+    // 좁은 슬롯은 한 줄과 말줄임표로 언어와 관계없이 높이를 통일하며 전체 이름은 툴팁에서 보여 줍니다.
     ItemText = WidgetTree->ConstructWidget<UProjectATextBlock>();
-    ItemText->SetAutoWrapText(true);
-    ItemText->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
+    ItemText->SetAutoWrapText(false);
+    ItemText->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);
+    ItemText->SetClipping(EWidgetClipping::ClipToBounds);
     ItemText->SetJustification(ETextJustify::Center);
     Theme.StyleText(ItemText, false, 13);
     Content->AddChildToVerticalBox(ItemText)->SetPadding(FMargin(0.0f, 6.0f, 0.0f, 4.0f));
     StateText = WidgetTree->ConstructWidget<UProjectATextBlock>();
-    StateText->SetAutoWrapText(true);
-    StateText->SetWrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping);
+    StateText->SetAutoWrapText(false);
+    StateText->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);
+    StateText->SetClipping(EWidgetClipping::ClipToBounds);
     StateText->SetJustification(ETextJustify::Center);
     Theme.StyleText(StateText, false, 12);
     Content->AddChildToVerticalBox(StateText);
@@ -124,8 +128,10 @@ void UEquipmentItemSlotWidget::RefreshSlot(FGuid InCharacterId, int32 InRevision
     SlotText->SetVisibility(bListPresentation || SlotLabel.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
     IconSize->SetWidthOverride(bListPresentation ? 24.0f : bEquipmentSlot ? 60.0f : 54.0f);
     IconSize->SetHeightOverride(bListPresentation ? 24.0f : bEquipmentSlot ? 60.0f : 54.0f);
-    ItemText->SetWrapTextAt(bListPresentation ? 0.0f : bEquipmentSlot ? 68.0f : 148.0f);
-    StateText->SetWrapTextAt(bListPresentation ? 0.0f : bEquipmentSlot ? 68.0f : 148.0f);
+    // Single-line names with an ellipsis keep every card the same height; the tooltip carries the full name.
+    // 한 줄 이름과 말줄임표로 모든 카드 높이를 같게 유지하며 전체 이름은 툴팁에 표시합니다.
+    ItemText->SetWrapTextAt(0.0f);
+    StateText->SetWrapTextAt(0.0f);
     Theme.StyleSlot(Frame, Item != nullptr);
     if (Item) Theme.SetItemIcon(Icon, Item->Tags);
     else Theme.SetEquipmentIcon(Icon, EmptyIcon);

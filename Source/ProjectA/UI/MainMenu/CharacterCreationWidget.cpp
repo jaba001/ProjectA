@@ -72,6 +72,16 @@ void UCharacterCreationWidget::NativeOnInitialized()
     InitializeClassSlots();
     BuildDetailPanel();
 
+    // Designer labels are asset text outside the gathered catalog, so reapply the localized source text.
+    // Designer 라벨은 수집 카탈로그 밖의 에셋 문구이므로 현지화된 원문을 다시 적용합니다.
+    const auto Relabel = [](UButton* Button, const FText& Text)
+    {
+        if (UTextBlock* Label = Button ? Cast<UTextBlock>(Button->GetContent()) : nullptr) Label->SetText(Text);
+    };
+    Relabel(Button_StartGame, NSLOCTEXT("CharacterCreation", "StartGame", "게임 시작"));
+    for (UButton* Button : {Button_Slot0_ClassInfo.Get(), Button_Slot1_ClassInfo.Get(), Button_Slot2_ClassInfo.Get(), Button_Slot3_ClassInfo.Get()}) Relabel(Button, NSLOCTEXT("CharacterCreation", "ClassInfo", "클래스 정보"));
+    for (UButton* Button : {Button_Slot0_Create.Get(), Button_Slot1_Create.Get(), Button_Slot2_Create.Get(), Button_Slot3_Create.Get()}) Relabel(Button, NSLOCTEXT("CharacterCreation", "CreateCharacter", "캐릭터 생성하기"));
+
     if (FullscreenInputBlocker)
     {
         ConfigureFullscreenInputBlocker();
@@ -892,8 +902,12 @@ void UCharacterCreationWidget::SetSlotClass(int32 SlotIndex, FName ClassId)
     if (SlotWidgets.IsValidIndex(SlotIndex) && SlotWidgets[SlotIndex].ClassIcon)
     {
         const FProfessionDefinition* Definition = PartyDefinition ? PartyDefinition->Professions.Find(ClassId) : nullptr;
-        SlotWidgets[SlotIndex].ClassIcon->SetBrushFromTexture(Definition ? Definition->Icon.Get() : nullptr);
+        UTexture2D* Icon = Definition ? Definition->Icon.Get() : nullptr;
+        SlotWidgets[SlotIndex].ClassIcon->SetBrushFromTexture(Icon);
         SlotWidgets[SlotIndex].ClassIcon->SetToolTipText(DisplayName);
+        // A missing class icon keeps its space but no longer draws an empty white box.
+        // 직업 아이콘이 없으면 자리는 유지하되 빈 흰색 상자를 그리지 않습니다.
+        SlotWidgets[SlotIndex].ClassIcon->SetVisibility(Icon ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
     }
     if (SlotIndex == 0)
     {

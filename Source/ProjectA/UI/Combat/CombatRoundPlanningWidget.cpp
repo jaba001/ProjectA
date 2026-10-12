@@ -187,7 +187,7 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
     Roster->SetJustification(ETextJustify::Center);
 
     UVerticalBox* EnemyBox = nullptr;
-    USizeBox* EnemySize = MakePanel(340.f, 280.f, true, EnemyBox);
+    USizeBox* EnemySize = MakePanel(400.f, 280.f, true, EnemyBox);
     UOverlaySlot* EnemySlot = Root->AddChildToOverlay(EnemySize);
     EnemySlot->SetHorizontalAlignment(HAlign_Right);
     EnemySlot->SetVerticalAlignment(VAlign_Top);
@@ -234,7 +234,7 @@ void UCombatRoundPlanningWidget::NativeOnInitialized()
 
     UVerticalBox* ActionsBox = nullptr;
     UVerticalBox* ReadyActions = nullptr;
-    USizeBox* ActionsSize = MakePanel(340.f, 340.f, true, ActionsBox, &ReadyActions);
+    USizeBox* ActionsSize = MakePanel(400.f, 340.f, true, ActionsBox, &ReadyActions);
     BottomRow->AddChildToHorizontalBox(ActionsSize)->SetVerticalAlignment(VAlign_Bottom);
     AddText(ActionsBox, NSLOCTEXT("CombatPlanning", "PlanTitle", "행동 계획"), 18);
     MovePlanDetails = AddText(ActionsBox, NSLOCTEXT("CombatPlanning", "NoMovePlan", "SAP 이동: 예약 없음"), 14);
