@@ -116,7 +116,8 @@ bool UEncounterPresentationCaptureLibrary::CaptureDungeonInteriors(UWorld* World
     bSuccess = bSuccess && Save(TEXT("01_Junction.png"), Origin + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight), FRotator::ZeroRotator);
     bSuccess = bSuccess && Save(TEXT("02_TorchAndStone.png"), Origin + FVector(-150.f, 0.f, EncounterDungeonLayout::EyeHeight), FRotator(16.f, 35.f, 0.f));
     const TArray<FVector> Path = EncounterDungeonLayout::GetPath(0, 0);
-    bSuccess = bSuccess && !Path.IsEmpty() && Save(TEXT("03_Corridor.png"), Origin + Path[1] + FVector(0.f, -200.f, 0.f), FRotator(0.f, -90.f, 0.f));
+    const FQuat BranchRotation = EncounterDungeonLayout::GetBranchRotation(0);
+    bSuccess = bSuccess && !Path.IsEmpty() && Save(TEXT("03_Corridor.png"), Origin + Path[1] + BranchRotation.GetForwardVector() * 200.f, BranchRotation.Rotator());
     AEncounterPrototypeStage* Stage = Route->ConfigureStage(Template, 0, Offer);
     bSuccess = bSuccess && Stage && Save(TEXT("04_Shop.png"), Stage->Camera->GetComponentLocation(), Stage->Camera->GetComponentRotation());
     bSuccess = bSuccess && Save(TEXT("01_Junction.png"), Origin + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight), FRotator::ZeroRotator);

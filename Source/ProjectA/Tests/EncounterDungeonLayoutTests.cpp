@@ -10,10 +10,12 @@ bool FEncounterDungeonLayoutGeometryTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The frozen layout policy exposes exactly eight supported variants."), EncounterDungeonLayout::VariantCount, 8);
     for (int32 Variant = 0; Variant < EncounterDungeonLayout::VariantCount; ++Variant)
     {
-        const TSet<FIntPoint> Floor = EncounterDungeonLayout::GetFloorCells(Variant);
+        const TArray<FEncounterDungeonFloorRegion> Floor = EncounterDungeonLayout::GetFloorRegions(Variant);
         const FVector ArrivalCameraOffset(-800.f, 0.f, EncounterDungeonLayout::EyeHeight);
-        TSet<FIntPoint> Destinations;
-        TestTrue(TEXT("The dungeon includes floor behind the initial eye-level junction."), Floor.Contains(FIntPoint(-1, 0)) && Floor.Contains(FIntPoint(0, 0)));
+        TArray<FVector> Destinations;
+        TestTrue(TEXT("The dungeon includes floor behind the initial eye-level junction."), EncounterDungeonLayout::HasFloorAt(Floor, FVector(-400.f, 0.f, 0.f)) && EncounterDungeonLayout::HasFloorAt(Floor, FVector::ZeroVector));
+        const FVector ChoiceDoor = EncounterDungeonLayout::GetChoiceDoorCenter();
+        TestTrue(TEXT("The closed choice doorway is visible ahead of the initial camera and before the fork."), ChoiceDoor.X > 0.f && ChoiceDoor.X < EncounterDungeonLayout::GetPath(0, Variant)[1].X && ChoiceDoor.Y == 0.f);
         for (int32 Direction = 0; Direction < 3; ++Direction)
         {
             const TArray<FVector> Path = EncounterDungeonLayout::GetPath(Direction, Variant);
@@ -21,48 +23,52 @@ bool FEncounterDungeonLayoutGeometryTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("All directions begin at the same eye-level junction."), Path[0].Equals(FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)));
             TestTrue(TEXT("All directions initially look and move forward before choosing a corridor."), Path[1].X > Path[0].X && Path[1].Y == Path[0].Y);
             const FVector Branch = Path[2] - Path[1];
-            TestTrue(TEXT("Offer index zero turns left, one continues straight and two turns right."), Direction == 0 ? Branch.X == 0.f && Branch.Y < 0.f : Direction == 1 ? Branch.X > 0.f && Branch.Y == 0.f : Branch.X == 0.f && Branch.Y > 0.f);
+            const FVector Forward = EncounterDungeonLayout::GetBranchRotation(Direction).GetForwardVector();
+            TestTrue(TEXT("Side branches turn exactly 45 degrees and the middle route stays straight."), Branch.GetSafeNormal().Equals(Forward) && FMath::IsNearlyEqual(Branch.Rotation().Yaw, static_cast<double>((Direction - 1) * 45)));
             for (int32 Index = 1; Index < Path.Num(); ++Index)
             {
                 const FVector Delta = Path[Index] - Path[Index - 1];
-                const bool bHorizontal = !FMath::IsNearlyZero(Delta.X) && FMath::IsNearlyZero(Delta.Y);
-                const bool bVertical = FMath::IsNearlyZero(Delta.X) && !FMath::IsNearlyZero(Delta.Y);
-                if (!TestTrue(TEXT("Every finite segment moves along exactly one horizontal grid axis at eye height."), !Path[Index].ContainsNaN() && Path[Index].Z == EncounterDungeonLayout::EyeHeight && FMath::IsNearlyZero(Delta.Z) && (bHorizontal != bVertical))) return false;
-                const FIntPoint Start(FMath::RoundToInt(Path[Index - 1].X / EncounterDungeonLayout::CellSize), FMath::RoundToInt(Path[Index - 1].Y / EncounterDungeonLayout::CellSize));
-                const FIntPoint End(FMath::RoundToInt(Path[Index].X / EncounterDungeonLayout::CellSize), FMath::RoundToInt(Path[Index].Y / EncounterDungeonLayout::CellSize));
-                TestTrue(TEXT("Segment endpoints lie exactly on floor-cell centers."), Path[Index].Equals(FVector(End.X * EncounterDungeonLayout::CellSize, End.Y * EncounterDungeonLayout::CellSize, EncounterDungeonLayout::EyeHeight)));
-                const FIntPoint Step(FMath::Sign(End.X - Start.X), FMath::Sign(End.Y - Start.Y));
-                const int32 Distance = FMath::Abs(End.X - Start.X) + FMath::Abs(End.Y - Start.Y);
-                FIntPoint Cell = Start;
-                for (int32 Offset = 0; Offset <= Distance; ++Offset)
+                if (!TestTrue(TEXT("Every segment is finite, forward and horizontal at eye height."), !Path[Index].ContainsNaN() && Path[Index].Z == EncounterDungeonLayout::EyeHeight && FMath::IsNearlyZero(Delta.Z) && Delta.X > 0.f)) return false;
+                if (Direction == 1) TestTrue(TEXT("The straight course never changes its lateral coordinate."), FMath::IsNearlyZero(Path[Index].Y));
+                const int32 Samples = FMath::CeilToInt(Delta.Size() / 20.f);
+                for (int32 Sample = 0; Sample <= Samples; ++Sample)
                 {
-                    TestTrue(TEXT("Every traversed cell has authored floor including all turn corners."), Floor.Contains(Cell));
-                    Cell += Step;
+                    const FVector Point = FMath::Lerp(Path[Index - 1], Path[Index], static_cast<float>(Sample) / Samples);
+                    TestTrue(TEXT("Every arrival sample has floor through the diagonal junction."), EncounterDungeonLayout::HasFloorAt(Floor, Point));
+                    for (int32 RegionIndex = 0; RegionIndex < Floor.Num(); ++RegionIndex)
+                    {
+                        const FEncounterDungeonFloorRegion& Region = Floor[RegionIndex];
+                        for (const FVector2D& Normal : {FVector2D(1.f, 0.f), FVector2D(-1.f, 0.f), FVector2D(0.f, 1.f), FVector2D(0.f, -1.f)})
+                        {
+                            const FVector Tangent = Region.Transform.TransformVectorNoScale(FVector(-Normal.Y, Normal.X, 0.f));
+                            const FVector Edge = Region.Transform.TransformPosition(FVector(Normal.X * Region.HalfExtent.X, Normal.Y * Region.HalfExtent.Y, EncounterDungeonLayout::EyeHeight));
+                            for (const FVector2D& Span : EncounterDungeonLayout::GetExposedWallSpans(Floor, RegionIndex, Normal)) TestTrue(TEXT("Exposed walls cannot cross the camera route or its walking clearance."), FMath::PointDistToSegment(Point, Edge + Tangent * Span.X, Edge + Tangent * Span.Y) > 80.f);
+                        }
+                    }
                 }
             }
             const FTransform Stage = EncounterDungeonLayout::GetStageTransform(Direction, Variant);
             TestTrue(TEXT("The path ends exactly at the dungeon NPC's configured eye-level camera offset."), Stage.TransformPosition(ArrivalCameraOffset).Equals(Path.Last()));
             const FVector StageLocation = Stage.GetLocation();
-            const FIntPoint StageCell(FMath::RoundToInt(StageLocation.X / EncounterDungeonLayout::CellSize), FMath::RoundToInt(StageLocation.Y / EncounterDungeonLayout::CellSize));
-            TestTrue(TEXT("Each NPC destination occupies its own room with a floor cell."), Floor.Contains(StageCell) && !Destinations.Contains(StageCell));
+            TestTrue(TEXT("Each NPC destination occupies its own room with floor."), EncounterDungeonLayout::HasFloorAt(Floor, StageLocation) && !Destinations.Contains(StageLocation));
             const FVector Entrance = EncounterDungeonLayout::GetDoorCenter(Direction, Variant, false);
             const FVector Exit = EncounterDungeonLayout::GetDoorCenter(Direction, Variant, true);
-            TestTrue(TEXT("The entrance lies before arrival and the rear doorway lies beyond the NPC."), Entrance.X < Path.Last().X && Exit.X > StageLocation.X && Entrance.Y == StageLocation.Y && Exit.Y == StageLocation.Y);
+            TestTrue(TEXT("The entrance lies before arrival and the rear doorway lies beyond the NPC on the branch axis."), FVector::DotProduct(Entrance - Path.Last(), Forward) < 0.f && FVector::DotProduct(Exit - StageLocation, Forward) > 0.f && FVector::CrossProduct(Exit - Entrance, Forward).Size() < 0.01f);
             const TArray<FVector> ExitPath = EncounterDungeonLayout::GetExitPath(Direction, Variant);
-            if (!TestTrue(TEXT("Departure starts at the saved arrival pose and crosses the rear doorway at eye height."), ExitPath.Num() >= 2 && ExitPath[0].Equals(Path.Last()) && ExitPath.Last().X > Exit.X && ExitPath.Last().Y == Exit.Y)) return false;
+            if (!TestTrue(TEXT("Departure starts at the saved arrival pose and crosses the rear doorway at eye height."), ExitPath.Num() >= 2 && ExitPath[0].Equals(Path.Last()) && FVector::DotProduct(ExitPath.Last() - Exit, Forward) > 0.f)) return false;
             const FVector LoopDoor = EncounterDungeonLayout::GetLoopDoorCenter(Direction, Variant);
-            TestTrue(TEXT("Departure finishes close to a closed continuation door before any end wall is visible."), ExitPath.Last().X < LoopDoor.X && FMath::IsNearlyEqual(LoopDoor.X - ExitPath.Last().X, EncounterDungeonLayout::DoorCoverDistance));
+            TestTrue(TEXT("Departure finishes close to a closed continuation door before any end wall is visible."), ExitPath.Last().Equals(LoopDoor - Forward * EncounterDungeonLayout::DoorCoverDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)));
             for (int32 Index = 1; Index < ExitPath.Num(); ++Index)
             {
-                TestTrue(TEXT("Every departure segment moves straight forward without a sideways detour."), ExitPath[Index].X > ExitPath[Index - 1].X && ExitPath[Index].Y == ExitPath[0].Y);
+                TestTrue(TEXT("Every departure segment moves straight forward without a sideways detour."), (ExitPath[Index] - ExitPath[Index - 1]).GetSafeNormal().Equals(Forward));
                 const int32 Samples = FMath::CeilToInt(FVector::Distance(ExitPath[Index - 1], ExitPath[Index]) / 20.f);
                 for (int32 Sample = 0; Sample <= Samples; ++Sample)
                 {
                     const FVector Point = FMath::Lerp(ExitPath[Index - 1], ExitPath[Index], static_cast<float>(Sample) / Samples);
-                    TestTrue(TEXT("Every sampled departure point has floor and remains at eye height."), Point.Z == EncounterDungeonLayout::EyeHeight && Floor.Contains(FIntPoint(FMath::FloorToInt((Point.X + 200.f) / 400.f), FMath::FloorToInt((Point.Y + 200.f) / 400.f))));
+                    TestTrue(TEXT("Every sampled departure point has floor and remains at eye height."), Point.Z == EncounterDungeonLayout::EyeHeight && EncounterDungeonLayout::HasFloorAt(Floor, Point));
                 }
             }
-            Destinations.Add(StageCell);
+            Destinations.Add(StageLocation);
         }
         TestEqual(TEXT("The three directions retain three distinct NPC rooms."), Destinations.Num(), 3);
     }
@@ -78,21 +84,21 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEncounterDungeonLayoutDirectionTest, "ProjectA
 
 bool FEncounterDungeonLayoutDirectionTest::RunTest(const FString& Parameters)
 {
-    TestEqual(TEXT("Server offer index zero is labelled left."), EncounterDungeonLayout::GetDirectionLabel(0).ToString(), FString(TEXT("좌회전")));
-    TestEqual(TEXT("Server offer index one is labelled straight."), EncounterDungeonLayout::GetDirectionLabel(1).ToString(), FString(TEXT("직진")));
-    TestEqual(TEXT("Server offer index two is labelled right."), EncounterDungeonLayout::GetDirectionLabel(2).ToString(), FString(TEXT("우회전")));
+    TestEqual(TEXT("Server offer index zero is labelled left at 45 degrees."), EncounterDungeonLayout::GetDirectionLabel(0), NSLOCTEXT("EncounterDungeon", "Left", "왼쪽 45°"));
+    TestEqual(TEXT("Server offer index one is labelled straight."), EncounterDungeonLayout::GetDirectionLabel(1), NSLOCTEXT("EncounterDungeon", "Straight", "직진"));
+    TestEqual(TEXT("Server offer index two is labelled right at 45 degrees."), EncounterDungeonLayout::GetDirectionLabel(2), NSLOCTEXT("EncounterDungeon", "Right", "오른쪽 45°"));
     for (int32 Direction = 0; Direction < 3; ++Direction)
     {
         TestTrue(TEXT("Legacy path calls preserve variant zero exactly."), EncounterDungeonLayout::GetPath(Direction) == EncounterDungeonLayout::GetPath(Direction, 0));
         TestTrue(TEXT("Legacy NPC placement preserves variant zero exactly."), EncounterDungeonLayout::GetStageTransform(Direction).Equals(EncounterDungeonLayout::GetStageTransform(Direction, 0)));
     }
-    const TSet<FIntPoint> LegacyFloor = EncounterDungeonLayout::GetFloorCells();
-    const TSet<FIntPoint> VariantZeroFloor = EncounterDungeonLayout::GetFloorCells(0);
-    TestEqual(TEXT("Legacy floor calls preserve the variant-zero cell count."), LegacyFloor.Num(), VariantZeroFloor.Num());
-    for (const FIntPoint& Cell : LegacyFloor) TestTrue(TEXT("Legacy floor calls preserve every variant-zero cell."), VariantZeroFloor.Contains(Cell));
+    const TArray<FEncounterDungeonFloorRegion> LegacyFloor = EncounterDungeonLayout::GetFloorRegions();
+    const TArray<FEncounterDungeonFloorRegion> VariantZeroFloor = EncounterDungeonLayout::GetFloorRegions(0);
+    TestEqual(TEXT("Default floor calls preserve the variant-zero region count."), LegacyFloor.Num(), VariantZeroFloor.Num());
+    for (int32 Index = 0; Index < LegacyFloor.Num(); ++Index) TestTrue(TEXT("Default floor calls preserve every variant-zero region."), LegacyFloor[Index].Transform.Equals(VariantZeroFloor[Index].Transform) && LegacyFloor[Index].HalfExtent.Equals(VariantZeroFloor[Index].HalfExtent));
     for (const int32 InvalidVariant : {-1, EncounterDungeonLayout::VariantCount, MAX_int32})
     {
-        TestTrue(TEXT("An invalid saved layout cannot create scenery or route points."), EncounterDungeonLayout::GetFloorCells(InvalidVariant).IsEmpty() && EncounterDungeonLayout::GetPath(0, InvalidVariant).IsEmpty());
+        TestTrue(TEXT("An invalid saved layout cannot create scenery or route points."), EncounterDungeonLayout::GetFloorRegions(InvalidVariant).IsEmpty() && EncounterDungeonLayout::GetPath(0, InvalidVariant).IsEmpty());
         TestTrue(TEXT("An invalid saved layout cannot place a stage."), EncounterDungeonLayout::GetStageTransform(0, InvalidVariant).Equals(FTransform::Identity));
         TestTrue(TEXT("An invalid saved layout cannot create a door departure path."), EncounterDungeonLayout::GetExitPath(0, InvalidVariant).IsEmpty());
     }

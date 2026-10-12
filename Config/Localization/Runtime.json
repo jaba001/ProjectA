@@ -653,8 +653,8 @@
     {
       "namespace": "EncounterDungeon",
       "key": "Left",
-      "source": "좌회전",
-      "translation": "Turn left"
+      "source": "왼쪽 45°",
+      "translation": "Left 45°"
     },
     {
       "namespace": "EncounterDungeon",
@@ -665,8 +665,8 @@
     {
       "namespace": "EncounterDungeon",
       "key": "Right",
-      "source": "우회전",
-      "translation": "Turn right"
+      "source": "오른쪽 45°",
+      "translation": "Right 45°"
     },
     {
       "namespace": "TargetRun",

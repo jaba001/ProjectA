@@ -67,13 +67,13 @@ private:
     void PrepareGeometry(UMaterialInterface* Material);
     void ClearGeometry();
     void ApplyMaterial(UInstancedStaticMeshComponent* Component, const FLinearColor& Color);
-    void AddBlock(UInstancedStaticMeshComponent* Component, const FVector& Center, const FVector& Size);
+    void AddBlock(UInstancedStaticMeshComponent* Component, const FVector& Center, const FVector& Size, const FQuat& Rotation = FQuat::Identity);
     void AddMasonryPanel(UInstancedStaticMeshComponent* Component, const FVector& Center, const FVector& Horizontal, const FVector& Vertical, const FVector& Normal, float Width, float Height, float Thickness);
     void AddLight(const FVector& Position);
     void AddTorch(const FVector& Center, const FVector& Normal);
     void DestroyPresentedStage();
     void StopTravel();
-    void AddDoorway(const FVector& Center);
+    void AddDoorway(const FVector& Center, const FQuat& Rotation = FQuat::Identity);
     void SetDoorOpen(int32 Index, float Alpha);
 
     UPROPERTY()
@@ -119,6 +119,7 @@ private:
 
     TArray<FEncounterDungeonTravelSegment> TravelSegments;
     TArray<FVector> DoorCenters;
+    TArray<FQuat> DoorRotations;
     int32 LayoutVariant = 0;
     int32 TravelSegmentIndex = 0;
     int32 StageDirection = INDEX_NONE;
