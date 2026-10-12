@@ -19,3 +19,5 @@
 | [REVIEW_2026-10-11](REVIEW_2026-10-11.md) | 2026-10-11 전체 코드·구조 리뷰 결과 |
 | [PROPOSALS](PROPOSALS.md) | 사용자 선택이 필요한 Claude 제안. 선택 체크는 사용자가 한다. |
 | [HANDOFF](HANDOFF.md) | Claude가 직접 컴파일·커밋하지 못한 변경의 인계 기록 |
+| [HISTORY](HISTORY.md) | Claude가 직접 구현·커밋한 작업의 완료 이력 |
+| [EXTERNAL_ASSETS](EXTERNAL_ASSETS.md) | 외부 에셋 팩 복원 목록 |
