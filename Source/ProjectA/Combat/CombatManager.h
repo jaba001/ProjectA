@@ -118,7 +118,7 @@ private:
     int32 CurrentTurnIndex = INDEX_NONE;
 
     UPROPERTY(ReplicatedUsing = OnRep_CombatGrid)
-    ACombatGridManager* CombatGridManager;
+    TObjectPtr<ACombatGridManager> CombatGridManager;
 
     UPROPERTY()
     TArray<ACombatGridTile*> ReachableMoveTiles;

@@ -38,7 +38,7 @@ protected:
     int32 ActionPointCost = 1;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
-    UAnimMontage* AttackMontage = nullptr;
+    TObjectPtr<UAnimMontage> AttackMontage = nullptr;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
     TSubclassOf<UGameplayEffect> DamageEffectClass;

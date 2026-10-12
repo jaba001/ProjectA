@@ -282,7 +282,7 @@ protected:
 public:
     // Current occupied combat tile
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_CurrentTile, Category = "UnitBase|Grid")
-    ACombatGridTile* CurrentTile = nullptr;
+    TObjectPtr<ACombatGridTile> CurrentTile = nullptr;
 
     UFUNCTION(BlueprintCallable, Category = "UnitBase|Grid")
     void SetCurrentTile(ACombatGridTile* NewTile);
@@ -414,11 +414,11 @@ protected:
     // GAS core component
     // Handles Ability, Effect, and Attribute processing
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UnitBase|GAS")
-    UAbilitySystemComponent* AbilitySystem = nullptr;
+    TObjectPtr<UAbilitySystemComponent> AbilitySystem = nullptr;
 
     // Attribute set
     UPROPERTY()
-    UAS_Unit* AttributeSet = nullptr;
+    TObjectPtr<UAS_Unit> AttributeSet = nullptr;
 
     // Default attack Ability class
     UPROPERTY(EditDefaultsOnly, Replicated, Category = "UnitBase|GAS|Ability")

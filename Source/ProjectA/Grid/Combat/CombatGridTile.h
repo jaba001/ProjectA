@@ -116,25 +116,25 @@ private:
 
 private:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CombatGridTile", meta = (AllowPrivateAccess = "true"))
-    UBoxComponent* CollisionBox;
+    TObjectPtr<UBoxComponent> CollisionBox;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CombatGridTile", meta = (AllowPrivateAccess = "true"))
-    UPaperSpriteComponent* TileSprite;
+    TObjectPtr<UPaperSpriteComponent> TileSprite;
 
     UPROPERTY(EditAnywhere, Category = "TileSprite")
-    UPaperSprite* EmptySprite;
+    TObjectPtr<UPaperSprite> EmptySprite;
 
     UPROPERTY(EditAnywhere, Category = "TileSprite")
-    UPaperSprite* PlayerSprite;
+    TObjectPtr<UPaperSprite> PlayerSprite;
 
     UPROPERTY(EditAnywhere, Category = "TileSprite")
-    UPaperSprite* EnemySprite;
+    TObjectPtr<UPaperSprite> EnemySprite;
 
     UPROPERTY(EditAnywhere, Category = "TileSprite")
-    UPaperSprite* MovableSprite;
+    TObjectPtr<UPaperSprite> MovableSprite;
 
     UPROPERTY(EditAnywhere, Category = "TileSprite")
-    UPaperSprite* ActiveSprite;
+    TObjectPtr<UPaperSprite> ActiveSprite;
 public:
     // Sets tile territory ownership.
     // 타일의 영역 소유자를 설정합니다.
@@ -158,7 +158,7 @@ public:
 
 private:
     UPROPERTY(ReplicatedUsing = OnRep_TileState)
-    AUnitBase* OccupyingUnit;
+    TObjectPtr<AUnitBase> OccupyingUnit;
 
     UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_TileState, Category = "CombatGridTile")
     ETileTerritory Territory = ETileTerritory::None;

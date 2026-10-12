@@ -44,7 +44,7 @@ public:
     // CombatManager instance
     // 생성된 전투 매니저 인스턴스입니다.
     UPROPERTY()
-    ACombatManager* CombatManager;
+    TObjectPtr<ACombatManager> CombatManager;
 
     // Spawn coordinates for player units
     // 플레이어 유닛 스폰 좌표 목록입니다.
