@@ -459,7 +459,7 @@ bool AEncounterDungeonRoute::StartTravel(int32 Direction)
     const FVector Forward = EncounterDungeonLayout::GetBranchRotation(Direction).GetForwardVector();
     const FVector DoorApproach = EncounterDungeonLayout::GetDoorCenter(Direction, LayoutVariant, false) - Forward * EncounterDungeonLayout::EntranceDoorApproachDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight);
     Path.Insert(DoorApproach, Path.Num() - 1);
-    const FVector ChoiceApproach = Path[1];
+    const FVector ChoiceApproach = EncounterDungeonLayout::GetChoiceDoorCenter(Direction) - EncounterDungeonLayout::GetChoiceDoorRotation(Direction).GetForwardVector() * EncounterDungeonLayout::EntranceDoorApproachDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight);
     TArray<FEncounterDungeonTravelSegment> Segments;
     FQuat CurrentRotation = FQuat::Identity;
     float TotalDistance = 0.f;
@@ -519,7 +519,7 @@ bool AEncounterDungeonRoute::StartCombatTravel(int32 Direction)
     const FVector EntranceApproach = EncounterDungeonLayout::GetDoorCenter(Direction, LayoutVariant, false) - Forward * EncounterDungeonLayout::EntranceDoorApproachDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight);
     const FVector RearApproach = EncounterDungeonLayout::GetDoorCenter(Direction, LayoutVariant, true) - Forward * 220.f + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight);
     Path.Insert(EntranceApproach, Path.Num() - 1);
-    const FVector ChoiceApproach = Path[1];
+    const FVector ChoiceApproach = EncounterDungeonLayout::GetChoiceDoorCenter(Direction) - EncounterDungeonLayout::GetChoiceDoorRotation(Direction).GetForwardVector() * EncounterDungeonLayout::EntranceDoorApproachDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight);
     Path.Add(RearApproach);
     Path.Add(EncounterDungeonLayout::GetLoopDoorCenter(Direction, LayoutVariant) - Forward * EncounterDungeonLayout::DoorCoverDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight));
     TArray<FEncounterDungeonTravelSegment> Segments;

@@ -14,18 +14,19 @@ TArray<FVector> EncounterDungeonLayout::GetPath(int32 Direction, int32 LayoutVar
     const FVector Approach = Door - DoorForward * EntranceDoorApproachDistance;
     const FVector Beyond = Door + DoorForward * ChoiceDoorPassDistance;
     if (Direction == 1) return {FVector(0.f, 0.f, EyeHeight), Approach, Beyond, FVector(ChoiceDoorDistance + (3 + (LayoutVariant & 1) + ((LayoutVariant >> 2) & 1)) * CellSize, 0.f, EyeHeight)};
-    // Only doorway crossing is diagonal; each side corridor resumes a rectangular ninety-degree route.
-    // 문 통과 구간만 대각선이며 좌우 통로는 직사각형의 90도 경로로 이어집니다.
+    // Align with the selected doorway inside the lobby before walking straight through its frame.
+    // 진입 공간에서 선택한 문의 축에 맞춘 다음 문틀을 직진으로 통과합니다.
+    const FVector Align(0.f, Door.Y, EyeHeight);
     const FVector Advance = Beyond + FVector(CellSize * (0.5f + 0.5f * (LayoutVariant & 1)), 0.f, 0.f);
     const FVector Corner(Advance.X, (Direction - 1) * (4 + ((LayoutVariant >> 1) & 1)) * CellSize, EyeHeight);
-    return {FVector(0.f, 0.f, EyeHeight), Approach, Beyond, Advance, Corner, Corner + FVector((1 + ((LayoutVariant >> 2) & 1)) * CellSize, 0.f, 0.f)};
+    return {FVector(0.f, 0.f, EyeHeight), Align, Approach, Beyond, Advance, Corner, Corner + FVector((1 + ((LayoutVariant >> 2) & 1)) * CellSize, 0.f, 0.f)};
 }
 
 FQuat EncounterDungeonLayout::GetBranchRotation(int32 Direction)
 {
     if (Direction < 0 || Direction >= 3) return FQuat::Identity;
-    // Room and corridor axes stay independent of the angled doorway facades.
-    // 방과 통로의 축은 기울어진 입구 문 방향과 독립적으로 유지합니다.
+    // Keep every room, corridor and doorway aligned with the rectangular layout.
+    // 모든 방·통로·문을 직각 배치의 축에 맞춥니다.
     return FQuat::Identity;
 }
 
@@ -38,20 +39,20 @@ FVector EncounterDungeonLayout::GetChoiceDoorCenter(int32 Direction)
 FQuat EncounterDungeonLayout::GetChoiceDoorRotation(int32 Direction)
 {
     if (Direction < 0 || Direction >= 3) return FQuat::Identity;
-    return FRotator(0.f, (Direction - 1) * 45.f, 0.f).Quaternion();
+    return FQuat::Identity;
 }
 
 TArray<FEncounterDungeonFloorRegion> EncounterDungeonLayout::GetFloorRegions(int32 LayoutVariant)
 {
     if (LayoutVariant < 0 || LayoutVariant >= VariantCount) return {};
     TArray<FEncounterDungeonFloorRegion> Regions;
-    const float LobbyFront = GetPath(0, LayoutVariant)[3].X + CellSize * 0.5f;
+    const float LobbyFront = GetPath(0, LayoutVariant)[4].X + CellSize * 0.5f;
     const float LobbyBack = -1.5f * CellSize;
     Regions.Add({FTransform(FVector((LobbyFront + LobbyBack) * 0.5f, 0.f, 0.f)), FVector2D((LobbyFront - LobbyBack) * 0.5f, 900.f)});
     for (int32 Direction = 0; Direction < 3; ++Direction)
     {
         const TArray<FVector> Path = GetPath(Direction, LayoutVariant);
-        for (int32 Index = Direction == 1 ? 3 : 4; Index < Path.Num(); ++Index)
+        for (int32 Index = Direction == 1 ? 3 : 5; Index < Path.Num(); ++Index)
         {
             const FVector Delta = Path[Index] - Path[Index - 1];
             const FVector Middle = (Path[Index] + Path[Index - 1]) * 0.5f;

@@ -22,18 +22,19 @@ bool FEncounterDungeonLayoutGeometryTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("All directions begin at the same eye-level junction."), Path[0].Equals(FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)));
             const FVector ChoiceDoor = EncounterDungeonLayout::GetChoiceDoorCenter(Direction);
             const FQuat DoorRotation = EncounterDungeonLayout::GetChoiceDoorRotation(Direction);
-            TestTrue(TEXT("Three choice doors face forward with only the side doorframes angled 45 degrees."), ChoiceDoor.X == EncounterDungeonLayout::ChoiceDoorDistance && FMath::IsNearlyEqual(DoorRotation.Rotator().Yaw, static_cast<double>((Direction - 1) * 45)));
-            TestTrue(TEXT("The camera stops before and passes beyond its own angled doorway."), Path[1].Equals(ChoiceDoor - DoorRotation.GetForwardVector() * EncounterDungeonLayout::EntranceDoorApproachDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)) && Path[2].Equals(ChoiceDoor + DoorRotation.GetForwardVector() * EncounterDungeonLayout::ChoiceDoorPassDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)));
+            TestTrue(TEXT("All three choice doors face straight forward on the rectangular layout."), ChoiceDoor.X == EncounterDungeonLayout::ChoiceDoorDistance && DoorRotation.Equals(FQuat::Identity));
+            const int32 ApproachIndex = Direction == 1 ? 1 : 2;
+            TestTrue(TEXT("The camera stops before and passes straight beyond its own doorway."), Path[ApproachIndex].Equals(ChoiceDoor - DoorRotation.GetForwardVector() * EncounterDungeonLayout::EntranceDoorApproachDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)) && Path[ApproachIndex + 1].Equals(ChoiceDoor + DoorRotation.GetForwardVector() * EncounterDungeonLayout::ChoiceDoorPassDistance + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)));
             const FVector Forward = EncounterDungeonLayout::GetBranchRotation(Direction).GetForwardVector();
             if (Direction != 1)
             {
-                TestTrue(TEXT("Side corridors turn ninety degrees after the angled doorway."), FMath::IsNearlyZero((Path[4] - Path[3]).X) && FMath::IsNearlyEqual(FMath::Abs((Path[4] - Path[3]).GetSafeNormal().Y), 1.0) && FMath::IsNearlyEqual(FVector::DotProduct((Path[4] - Path[3]).GetSafeNormal(), (Path[5] - Path[4]).GetSafeNormal()), 0.0));
+                TestTrue(TEXT("Side corridors turn ninety degrees after the straight doorway."), FMath::IsNearlyZero((Path[5] - Path[4]).X) && FMath::IsNearlyEqual(FMath::Abs((Path[5] - Path[4]).GetSafeNormal().Y), 1.0) && FMath::IsNearlyEqual(FVector::DotProduct((Path[5] - Path[4]).GetSafeNormal(), (Path[6] - Path[5]).GetSafeNormal()), 0.0));
             }
             for (int32 Index = 1; Index < Path.Num(); ++Index)
             {
                 const FVector Delta = Path[Index] - Path[Index - 1];
                 if (!TestTrue(TEXT("Every segment is finite, nonzero and horizontal at eye height."), !Path[Index].ContainsNaN() && Path[Index].Z == EncounterDungeonLayout::EyeHeight && FMath::IsNearlyZero(Delta.Z) && !Delta.IsNearlyZero())) return false;
-                if (Index >= 3) TestTrue(TEXT("Corridor motion after doorway crossing follows only rectangular axes."), FMath::IsNearlyZero(Delta.X) != FMath::IsNearlyZero(Delta.Y));
+                TestTrue(TEXT("All camera motion from the junction follows only rectangular axes."), FMath::IsNearlyZero(Delta.X) != FMath::IsNearlyZero(Delta.Y));
                 if (Direction == 1) TestTrue(TEXT("The straight course never changes its lateral coordinate."), FMath::IsNearlyZero(Path[Index].Y));
                 const int32 Samples = FMath::CeilToInt(Delta.Size() / 20.f);
                 for (int32 Sample = 0; Sample <= Samples; ++Sample)
