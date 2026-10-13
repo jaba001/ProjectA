@@ -8,10 +8,12 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Game/Encounter/EncounterDungeonLayout.h"
+#include "Game/Encounter/EncounterMazeLayout.h"
 #include "Game/Encounter/EncounterPrototypeStage.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
+#include "ProjectA.h"
 #include "UObject/ConstructorHelpers.h"
 
 AEncounterDungeonRoute::AEncounterDungeonRoute()
@@ -43,45 +45,22 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
     Camera->PostProcessSettings.BloomIntensity = 0.12f;
     Camera->PostProcessSettings.bOverride_VignetteIntensity = true;
     Camera->PostProcessSettings.VignetteIntensity = 0.18f;
-    Floor = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Floor"));
-    Ceiling = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Ceiling"));
-    Mortar = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Mortar"));
-    WallBlocks = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("WallBlocks"));
-    Pillars = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Pillars"));
     LeftDoors = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("LeftDoors"));
     RightDoors = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("RightDoors"));
     DoorSeals = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("DoorSeals"));
-    Torches = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Torches"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
     CubeMesh = Cube.Object;
-    // Preserve cookable asset references without rooting editable material graphs during class initialization.
-    // 클래스 초기화 중 편집할 재질 그래프를 루트에 고정하지 않고 쿠킹 가능한 에셋 참조를 유지합니다.
-    WallMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneWall.M_EncounterStoneWall")));
-    FloorMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneFloor.M_EncounterStoneFloor")));
-    CeilingMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneCeiling.M_EncounterStoneCeiling")));
-    TorchMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/props/light/SM_PROP_torch_wall_dungeon.SM_PROP_torch_wall_dungeon")));
     TorchFlame = TSoftObjectPtr<UNiagaraSystem>(FSoftObjectPath(TEXT("/Game/Fantastic_Dungeon_Pack/effects/PS_FX_fire_dungeon_01_Niagara.PS_FX_fire_dungeon_01_Niagara")));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> LeftDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_L.MOD_Gateway_Door_01_large_door_L"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> RightDoor(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/modular/gateway/MOD_Gateway_Door_01_large_door_R.MOD_Gateway_Door_01_large_door_R"));
-    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, DoorSeals};
-    for (UInstancedStaticMeshComponent* Shape : Shapes)
-    {
-        Shape->SetupAttachment(RouteRoot);
-        Shape->SetStaticMesh(CubeMesh);
-        Shape->SetMobility(EComponentMobility::Movable);
-        Shape->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        Shape->SetGenerateOverlapEvents(false);
-        Shape->SetCanEverAffectNavigation(false);
-        Shape->SetCastShadow(true);
-        Shape->SetLightingChannels(false, true, false);
-    }
-    Torches->SetupAttachment(RouteRoot);
-    Torches->SetMobility(EComponentMobility::Movable);
-    Torches->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    Torches->SetGenerateOverlapEvents(false);
-    Torches->SetCanEverAffectNavigation(false);
-    Torches->SetCastShadow(false);
-    Torches->SetLightingChannels(false, true, false);
+    DoorSeals->SetupAttachment(RouteRoot);
+    DoorSeals->SetStaticMesh(CubeMesh);
+    DoorSeals->SetMobility(EComponentMobility::Movable);
+    DoorSeals->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    DoorSeals->SetGenerateOverlapEvents(false);
+    DoorSeals->SetCanEverAffectNavigation(false);
+    DoorSeals->SetCastShadow(true);
+    DoorSeals->SetLightingChannels(false, true, false);
     if (LeftDoor.Object) DoorSeals->SetMaterial(0, LeftDoor.Object->GetMaterial(0));
     UInstancedStaticMeshComponent* Doors[] = {LeftDoors, RightDoors};
     for (int32 Index = 0; Index < 2; ++Index)
@@ -99,9 +78,8 @@ AEncounterDungeonRoute::AEncounterDungeonRoute()
 
 void AEncounterDungeonRoute::AddDoorway(const FVector& Center, const FQuat& Rotation)
 {
-    AddBlock(Pillars, Center + Rotation.RotateVector(FVector(0.f, -170.f, 150.f)), FVector(60.f, 60.f, 300.f), Rotation);
-    AddBlock(Pillars, Center + Rotation.RotateVector(FVector(0.f, 170.f, 150.f)), FVector(60.f, 60.f, 300.f), Rotation);
-    AddBlock(Pillars, Center + FVector(0.f, 0.f, 360.f), FVector(60.f, 400.f, 120.f), Rotation);
+    // The baked maze owns the stone frame; the route keeps only the animated leaves in the same order.
+    // 구운 미로가 석재 문틀을 소유하며 통로 액터는 같은 순서의 움직이는 문짝만 유지합니다.
     const int32 Index = DoorCenters.Add(Center);
     DoorRotations.Add(Rotation);
     LeftDoors->AddInstance(FTransform::Identity);
@@ -153,31 +131,6 @@ void AEncounterDungeonRoute::ApplyMaterial(UInstancedStaticMeshComponent* Compon
     }
 }
 
-void AEncounterDungeonRoute::AddMasonryPanel(UInstancedStaticMeshComponent* Component, const FVector& Center, const FVector& Horizontal, const FVector& Vertical, const FVector& Normal, float Width, float Height, float Thickness)
-{
-    // Share staggered courses and recessed four-centimeter joints across walls, floors and ceilings.
-    // 벽·바닥·천장에 엇갈린 석재 배열과 깊이가 있는 4cm 줄눈을 공통 적용합니다.
-    const int32 CourseCount = FMath::Max(1, FMath::CeilToInt(Height / 105.f));
-    constexpr float JointWidth = 4.f;
-    const float BlockWidth = EncounterDungeonLayout::CellSize / 4.f;
-    const int32 ColumnCount = FMath::CeilToInt(Width / BlockWidth);
-    const float BlockHeight = Height / CourseCount;
-    const FQuat Rotation = FRotationMatrix::MakeFromXZ(Horizontal, Normal).ToQuat();
-    for (int32 Row = 0; Row < CourseCount; ++Row)
-    {
-        const float Offset = Row % 2 == 0 ? 0.f : BlockWidth * 0.5f;
-        for (int32 Column = 0; Column <= ColumnCount; ++Column)
-        {
-            const float Start = FMath::Max(-Width * 0.5f, -Width * 0.5f + Column * BlockWidth - Offset);
-            const float End = FMath::Min(Width * 0.5f, -Width * 0.5f + (Column + 1) * BlockWidth - Offset);
-            if (End - Start <= JointWidth) continue;
-            const FVector BlockCenter = Center + Horizontal * ((Start + End) * 0.5f) + Vertical * ((Row + 0.5f) * BlockHeight - Height * 0.5f);
-            const FVector BlockSize(End - Start - JointWidth, BlockHeight - JointWidth, Thickness);
-            AddBlock(Component, BlockCenter, BlockSize, Rotation);
-        }
-    }
-}
-
 void AEncounterDungeonRoute::AddLight(const FVector& Position)
 {
     UPointLightComponent* Light = NewObject<UPointLightComponent>(this, NAME_None, RF_Transient);
@@ -201,15 +154,12 @@ void AEncounterDungeonRoute::AddLight(const FVector& Position)
     Lights.Add(Light);
 }
 
-void AEncounterDungeonRoute::AddTorch(const FVector& Center, const FVector& Normal)
+void AEncounterDungeonRoute::AddTorchEffects(const FEncounterMazeTorchMount& Mount)
 {
-    // Reference the original wall sconce and flame directly, with only local presentation components.
-    // 원본 벽 횃불과 불꽃을 직접 참조하고 로컬 연출 컴포넌트만 생성합니다.
-    if (!Torches->GetStaticMesh()) Torches->SetStaticMesh(TorchMesh.LoadSynchronous());
-    const FVector Mount = Center + Normal * (EncounterDungeonLayout::CellSize * 0.5f - 15.f) + FVector(0.f, 0.f, 220.f);
-    const FQuat Rotation = FRotationMatrix::MakeFromYZ(-Normal, FVector::UpVector).ToQuat();
-    if (Torches->GetStaticMesh()) Torches->AddInstance(FTransform(Rotation, Mount));
-    const FVector FlamePosition = Mount - Normal * 22.f + FVector(0.f, 0.f, 30.f);
+    // Spawn only the local light and flame for a sconce authored in the baked maze.
+    // 구운 미로에 배치된 벽 횃불의 로컬 조명과 불꽃만 생성합니다.
+    const FVector Center = Mount.Center;
+    const FVector FlamePosition = AEncounterMazeLayout::GetFlamePosition(Mount);
     AddLight(FlamePosition);
     // Approximate a little torch bounce locally because this project does not enable Lumen.
     // Lumen을 사용하지 않는 프로젝트이므로 횃불의 약한 반사광을 통로 내부에 국소적으로 보완합니다.
@@ -272,8 +222,9 @@ void AEncounterDungeonRoute::SetPresentationVisible(bool bVisible)
     // 이후 생성하는 컴포넌트를 포함해 미리 준비한 구간의 조명까지 명시적으로 숨깁니다.
     bPresentationVisible = bVisible;
     SetActorHiddenInGame(!bVisible);
-    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, LeftDoors, RightDoors, DoorSeals, Torches};
+    UInstancedStaticMeshComponent* Shapes[] = {LeftDoors, RightDoors, DoorSeals};
     for (UInstancedStaticMeshComponent* Shape : Shapes) Shape->SetVisibility(bVisible);
+    if (IsValid(MazeLayout)) MazeLayout->SetPresentationVisible(bVisible);
     for (UPointLightComponent* Light : Lights)
     {
         if (IsValid(Light) && Light->GetOwner() == this) Light->SetVisibility(bVisible);
@@ -292,8 +243,10 @@ void AEncounterDungeonRoute::SetPresentationVisible(bool bVisible)
 
 void AEncounterDungeonRoute::ClearGeometry()
 {
-    UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, LeftDoors, RightDoors, DoorSeals, Torches};
+    UInstancedStaticMeshComponent* Shapes[] = {LeftDoors, RightDoors, DoorSeals};
     for (UInstancedStaticMeshComponent* Shape : Shapes) Shape->ClearInstances();
+    if (IsValid(MazeLayout) && MazeLayout->GetOwner() == this) MazeLayout->Destroy();
+    MazeLayout = nullptr;
     DoorCenters.Reset();
     DoorRotations.Reset();
     for (UPointLightComponent* Light : Lights)
@@ -307,6 +260,29 @@ void AEncounterDungeonRoute::ClearGeometry()
     }
     TorchEffects.Reset();
     bGeometryPrepared = false;
+}
+
+bool AEncounterDungeonRoute::SpawnMazeLayout()
+{
+    // Prefer the baked Blueprint of this variant so fixed and hand-edited walls are identical every run.
+    // 이 변형의 구운 Blueprint를 우선 사용하여 고정·수동 수정한 벽이 매번 같게 표시되게 합니다.
+    const FString Name = FString::Printf(TEXT("BP_EncounterMaze_V%d"), LayoutVariant);
+    const FSoftClassPath BakedPath(FString::Printf(TEXT("%s/%s.%s_C"), EncounterDungeonLayout::BakedMazeFolder, *Name, *Name));
+    UClass* LayoutClass = BakedPath.TryLoadClass<AEncounterMazeLayout>();
+    FActorSpawnParameters Parameters;
+    Parameters.Owner = this;
+    Parameters.ObjectFlags |= RF_Transient;
+    Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    MazeLayout = GetWorld()->SpawnActor<AEncounterMazeLayout>(LayoutClass ? LayoutClass : AEncounterMazeLayout::StaticClass(), GetActorTransform(), Parameters);
+    if (!MazeLayout) return false;
+    MazeLayout->AttachToComponent(RouteRoot, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+    if (!LayoutClass || MazeLayout->LayoutVariant != LayoutVariant)
+    {
+        UE_LOG(LogProjectA, Warning, TEXT("[EncounterMaze] Baked layout %s is missing or mismatched; generating variant %d at runtime."), *Name, LayoutVariant);
+        MazeLayout->BuildFromLayout(LayoutVariant);
+    }
+    MazeLayout->SetPresentationVisible(bPresentationVisible);
+    return true;
 }
 
 void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
@@ -323,87 +299,17 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
             }
         }
     }
-    if (!bGeometryPrepared || (Material && RouteMaterial != Material))
+    if (bGeometryPrepared && Material && RouteMaterial != Material)
     {
-        if (Material) RouteMaterial = Material;
-        Floor->SetMaterial(0, FloorMaterial.LoadSynchronous());
-        Ceiling->SetMaterial(0, CeilingMaterial.LoadSynchronous());
-        ApplyMaterial(Mortar, FLinearColor(0.055f, 0.05f, 0.04f));
-        // Persist instancing support and world-aligned original textures on every dungeon surface.
-        // 인스턴싱 지원과 월드 정렬 원본 텍스처를 모든 미로 표면에 유지합니다.
-        UMaterialInterface* LoadedWallMaterial = WallMaterial.LoadSynchronous();
-        WallBlocks->SetMaterial(0, LoadedWallMaterial);
-        Pillars->SetMaterial(0, LoadedWallMaterial);
+        RouteMaterial = Material;
+        if (IsValid(MazeLayout)) ApplyMaterial(MazeLayout->Mortar, FLinearColor(0.055f, 0.05f, 0.04f));
     }
     if (bGeometryPrepared) return;
-
-    const TArray<FEncounterDungeonFloorRegion> Regions = EncounterDungeonLayout::GetFloorRegions(LayoutVariant);
+    if (Material) RouteMaterial = Material;
+    if (!SpawnMazeLayout()) return;
+    ApplyMaterial(MazeLayout->Mortar, FLinearColor(0.055f, 0.05f, 0.04f));
+    for (const FEncounterMazeTorchMount& Mount : MazeLayout->TorchMounts) AddTorchEffects(Mount);
     const float CellSize = EncounterDungeonLayout::CellSize;
-    const float WallHeight = EncounterDungeonLayout::WallHeight;
-    const FVector2D Neighbors[] = {FVector2D(1.f, 0.f), FVector2D(-1.f, 0.f), FVector2D(0.f, 1.f), FVector2D(0.f, -1.f)};
-    for (int32 RegionIndex = 0; RegionIndex < Regions.Num(); ++RegionIndex)
-    {
-        const FEncounterDungeonFloorRegion& Region = Regions[RegionIndex];
-        const FVector Center = Region.Transform.GetLocation();
-        const FVector Forward = Region.Transform.GetRotation().GetForwardVector();
-        const FVector Right = Region.Transform.GetRotation().GetRightVector();
-        const float Width = Region.HalfExtent.X * 2.f;
-        const float Depth = Region.HalfExtent.Y * 2.f;
-        // Offset overlapping floor faces by millimeters to avoid flicker at room and corridor joins.
-        // 방과 통로의 연결부에서 겹치는 바닥 면의 깜빡임을 막도록 밀리미터 단위로 높이를 분리합니다.
-        const float SurfaceOffset = -RegionIndex * 0.1f;
-        // Back the joints with opaque slabs recessed two centimeters from the stone faces.
-        // The slabs reach under and over the surrounding walls so no coplanar seam can leak the outside sky.
-        // 석재 표면보다 2cm 들어간 불투명 판으로 줄눈을 막습니다.
-        // 판을 주변 벽 아래·위까지 넓혀 맞닿기만 하는 경계로 바깥 하늘이 새지 않게 합니다.
-        constexpr float SealOverlap = 32.f;
-        AddBlock(Mortar, Center + FVector(0.f, 0.f, -12.f + SurfaceOffset), FVector(Width + SealOverlap * 2.f, Depth + SealOverlap * 2.f, 20.f), Region.Transform.GetRotation());
-        AddBlock(Mortar, Center + FVector(0.f, 0.f, WallHeight + 12.f - SurfaceOffset), FVector(Width + SealOverlap * 2.f, Depth + SealOverlap * 2.f, 20.f), Region.Transform.GetRotation());
-        TArray<FVector, TInlineAllocator<16>> WallEnds[4];
-        AddMasonryPanel(Floor, Center + FVector(0.f, 0.f, -10.f + SurfaceOffset), Forward, Right, FVector::UpVector, Width, Depth, 20.f);
-        AddMasonryPanel(Ceiling, Center + FVector(0.f, 0.f, WallHeight + 10.f - SurfaceOffset), Forward, Right, FVector::UpVector, Width, Depth, 20.f);
-        for (int32 NeighborIndex = 0; NeighborIndex < 4; ++NeighborIndex)
-        {
-            const FVector2D& Neighbor = Neighbors[NeighborIndex];
-            const FVector Normal = Region.Transform.TransformVectorNoScale(FVector(Neighbor.X, Neighbor.Y, 0.f));
-            const FVector Tangent(-Neighbor.Y, Neighbor.X, 0.f);
-            const FVector WallTangent = Region.Transform.TransformVectorNoScale(Tangent);
-            const FVector Edge = Region.Transform.TransformPosition(FVector(Neighbor.X * Region.HalfExtent.X, Neighbor.Y * Region.HalfExtent.Y, 0.f));
-            const FQuat WallRotation = FRotationMatrix::MakeFromXY(WallTangent, FVector::UpVector).ToQuat();
-            for (const FVector2D& Span : EncounterDungeonLayout::GetExposedWallSpans(Regions, RegionIndex, Neighbor))
-            {
-                const float SpanWidth = Span.Y - Span.X;
-                if (SpanWidth <= 4.f) continue;
-                const FVector SpanCenter = Edge + WallTangent * ((Span.X + Span.Y) * 0.5f);
-                // Extend the wall backing below the floor slab and above the ceiling slab so both junctions overlap.
-                // 벽 뒤 판을 바닥 판 아래와 천장 판 위까지 늘려 두 접합부가 겹치게 합니다.
-                AddBlock(Mortar, SpanCenter + Normal * 16.f + FVector(0.f, 0.f, WallHeight * 0.5f), FVector(SpanWidth, WallHeight + 44.f, 32.f), WallRotation);
-                WallEnds[NeighborIndex].Add(Edge + WallTangent * Span.X);
-                WallEnds[NeighborIndex].Add(Edge + WallTangent * Span.Y);
-                AddMasonryPanel(WallBlocks, SpanCenter + Normal * 15.f + FVector(0.f, 0.f, WallHeight * 0.5f), WallTangent, FVector::UpVector, Normal, SpanWidth, WallHeight, 36.f);
-                for (float Offset = Span.X + 200.f; Offset < Span.Y - 100.f; Offset += 800.f)
-                {
-                    AddTorch(Edge + WallTangent * Offset - Normal * (CellSize * 0.5f), Normal);
-                }
-            }
-        }
-        // Fill the outer square of every corner where two exposed walls actually meet; openings stay clear.
-        // 노출된 두 벽이 실제로 만나는 모서리의 바깥 사각 영역만 채우며 통로 개구부는 비워 둡니다.
-        const auto EndsAt = [](const TArray<FVector, TInlineAllocator<16>>& Ends, const FVector& Point)
-        {
-            return Ends.ContainsByPredicate([&Point](const FVector& End) { return FVector::DistSquared2D(End, Point) < 1.f; });
-        };
-        for (int32 XSide = 0; XSide < 2; ++XSide)
-        {
-            for (int32 YSide = 2; YSide < 4; ++YSide)
-            {
-                const FVector Corner = Region.Transform.TransformPosition(FVector(Neighbors[XSide].X * Region.HalfExtent.X, Neighbors[YSide].Y * Region.HalfExtent.Y, 0.f));
-                if (!EndsAt(WallEnds[XSide], Corner) || !EndsAt(WallEnds[YSide], Corner)) continue;
-                const FVector Outward = Region.Transform.TransformVectorNoScale(FVector(Neighbors[XSide].X, Neighbors[YSide].Y, 0.f));
-                AddBlock(Mortar, Corner + Outward * 16.f + FVector(0.f, 0.f, WallHeight * 0.5f), FVector(32.f, 32.f, WallHeight + 44.f), Region.Transform.GetRotation());
-            }
-        }
-    }
     for (int32 Direction = 0; Direction < 3; ++Direction)
     {
         const FQuat Rotation = EncounterDungeonLayout::GetBranchRotation(Direction);

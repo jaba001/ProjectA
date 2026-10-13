@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "EncounterDungeonRoute.generated.h"
 
+class AEncounterMazeLayout;
 class AEncounterPrototypeStage;
 class UCameraComponent;
 class UInstancedStaticMeshComponent;
@@ -13,6 +14,7 @@ class UNiagaraSystem;
 class UPointLightComponent;
 class USceneComponent;
 class UStaticMesh;
+struct FEncounterMazeTorchMount;
 struct FRunEncounterOffer;
 
 struct FEncounterDungeonTravelSegment
@@ -68,9 +70,9 @@ private:
     void ClearGeometry();
     void ApplyMaterial(UInstancedStaticMeshComponent* Component, const FLinearColor& Color);
     void AddBlock(UInstancedStaticMeshComponent* Component, const FVector& Center, const FVector& Size, const FQuat& Rotation = FQuat::Identity);
-    void AddMasonryPanel(UInstancedStaticMeshComponent* Component, const FVector& Center, const FVector& Horizontal, const FVector& Vertical, const FVector& Normal, float Width, float Height, float Thickness);
     void AddLight(const FVector& Position);
-    void AddTorch(const FVector& Center, const FVector& Normal);
+    void AddTorchEffects(const FEncounterMazeTorchMount& Mount);
+    bool SpawnMazeLayout();
     void DestroyPresentedStage();
     void StopTravel();
     void BeginTravel(float InitialFieldOfView, float FinalFieldOfView);
@@ -80,35 +82,19 @@ private:
     UPROPERTY()
     TObjectPtr<USceneComponent> RouteRoot;
     UPROPERTY()
-    TObjectPtr<UInstancedStaticMeshComponent> Floor;
-    UPROPERTY()
-    TObjectPtr<UInstancedStaticMeshComponent> Ceiling;
-    UPROPERTY()
-    TObjectPtr<UInstancedStaticMeshComponent> Mortar;
-    UPROPERTY()
-    TObjectPtr<UInstancedStaticMeshComponent> WallBlocks;
-    UPROPERTY()
-    TObjectPtr<UInstancedStaticMeshComponent> Pillars;
-    UPROPERTY()
     TObjectPtr<UInstancedStaticMeshComponent> LeftDoors;
     UPROPERTY()
     TObjectPtr<UInstancedStaticMeshComponent> RightDoors;
     UPROPERTY()
     TObjectPtr<UInstancedStaticMeshComponent> DoorSeals;
     UPROPERTY()
-    TObjectPtr<UInstancedStaticMeshComponent> Torches;
-    UPROPERTY()
     TObjectPtr<UStaticMesh> CubeMesh;
     UPROPERTY()
-    TSoftObjectPtr<UMaterialInterface> WallMaterial;
-    UPROPERTY()
-    TSoftObjectPtr<UMaterialInterface> FloorMaterial;
-    UPROPERTY()
-    TSoftObjectPtr<UMaterialInterface> CeilingMaterial;
-    UPROPERTY()
-    TSoftObjectPtr<UStaticMesh> TorchMesh;
-    UPROPERTY()
     TSoftObjectPtr<UNiagaraSystem> TorchFlame;
+    // Static scenery baked per layout variant; a missing Blueprint falls back to the native generator.
+    // 배치 변형마다 구운 정적 장식이며 Blueprint가 없으면 네이티브 생성기로 대체합니다.
+    UPROPERTY(Transient)
+    TObjectPtr<AEncounterMazeLayout> MazeLayout;
     UPROPERTY(Transient)
     TArray<TObjectPtr<UNiagaraComponent>> TorchEffects;
     UPROPERTY(Transient)
