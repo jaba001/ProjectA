@@ -1,8 +1,8 @@
 # 게임 현재 상태
 
-기준일: 2026-10-13. 현재 구현된 게임 규칙과 진행 상황만 요약한다. 구현 구조·저장 호환은 [PROJECT_PLAN](PROJECT_PLAN.md), UI는 [UI_README](UI_README.md), 네트워크 계약은 [MULTIPLAYER](MULTIPLAYER.md), 남은 작업은 [TODO](TODO.md)를 따른다. 이전 기획 문서(GAME_DESIGN·STATUS_EFFECTS·EXECUTION_DECISIONS)와 완료 이력(HISTORY)은 커밋 `28adbfd6`까지의 Git 이력에서 조회한다.
+기준일: 2026-10-13. 현재 구현된 게임 규칙과 진행 상황만 요약한다. 구현 구조·저장 호환은 [PROJECT_PLAN](PROJECT_PLAN.md), UI는 [UI_README](UI_README.md), 네트워크 계약은 [MULTIPLAYER](MULTIPLAYER.md), 남은 작업은 [TODO](TODO.md)를 따른다.
 
-수치는 모두 개발 시험값이며 최종 밸런스가 아니다. 컴파일 성공과 사용자 작동 확인은 구분하며, 확인 대기 항목은 TODO에 둔다.
+수치는 모두 개발 시험값이며 최종 밸런스가 아니다.
 
 ## 1 게임 개요
 
@@ -25,8 +25,8 @@
 ```
 
 - 정상 완주 기준 인카운터 60회·PvE 10회·Snapshot 10회다. 각 인카운터는 후보 3개 중 하나를 고른다.
-- PvE 직전에 좌회전·하, 직진·중, 우회전·상 중 하나를 고른다. 하·중·상은 각각 초원·석조 던전·얼음 성채에서 진행하며 같은 편성에 체력·속도·골드 배율을 적용한다([PVE_DIFFICULTIES](../../DataCatalogs/PVE_DIFFICULTIES.csv)).
-- 지역은 숲 1~2·늪 3~4·동굴 5~6·설원 7~8·최종 9~10묶음이며 7묶음은 적 수를 줄인 재정비 구간이다. 기준 HP는 첫 몬스터 50·100·150, 마지막 골렘 1000·1500·3000이다([PVE_HEALTH_CURVE](../../DataCatalogs/PVE_HEALTH_CURVE.csv)).
+- PvE 직전에 좌회전·하, 직진·중, 우회전·상 중 하나를 고른다. 하·중·상은 각각 초원·석조 던전·얼음 성채에서 진행하며 같은 편성에 체력·속도·골드 배율을 적용한다([PVE_DIFFICULTIES](../DataCatalogs/PVE_DIFFICULTIES.csv)).
+- 지역은 숲 1~2·늪 3~4·동굴 5~6·설원 7~8·최종 9~10묶음이며 7묶음은 적 수를 줄인 재정비 구간이다. 기준 HP는 첫 몬스터 50·100·150, 마지막 골렘 1000·1500·3000이다([PVE_HEALTH_CURVE](../DataCatalogs/PVE_HEALTH_CURVE.csv)).
 - 편성·HP·골드·성장 수치는 Run 생성 시 CSV에서 읽어 저장한다. CSV 수정은 이후 새 Run에만 반영된다.
 - PvE 승리: 최대 HP +5·속도 +1, 생존자 휴식 HP 20~40(사망자 부활 없음), 아이템 3개 중 1개, 공통 골드(첫 묶음 3~5G ~ 마지막 8~15G). 아이템은 가방에 추가하며 자동 장착하지 않는다.
 - Snapshot 전투와 패배에는 성장·아이템·골드·휴식이 없다. 양 팀 전멸은 패배이며 Run이 종료된다.
@@ -44,7 +44,7 @@
 
 - 시작 장비: 전사 한손검+방패, 궁수 활, 마법사 스태프, 도적 단검. 장착 상태로 지급한다.
 - 장착 변경은 본인 생존 Human이 상점 단계에서 드래그 앤 드롭으로 하며 골드를 쓰지 않는다.
-- 장착 지원 원본은 49개(단검 20·방패 15·활 11·한손/양손검 2·시작 스태프 1)이며 상점·보상 후보도 이 범위로 제한한다([WEAPON_ASSETS](../../DataCatalogs/WEAPON_ASSETS.csv)).
+- 장착 지원 원본은 49개(단검 20·방패 15·활 11·한손/양손검 2·시작 스태프 1)이며 상점·보상 후보도 이 범위로 제한한다([WEAPON_ASSETS](../DataCatalogs/WEAPON_ASSETS.csv)).
 - 스킬은 스킬상점이 아니라 장착 무기에서 얻는다. 비무장 기본 공격 + 장착 무기 사본의 확정 스킬을 쓰며 총 스킬 수 상한은 없다.
 - 무기 사본은 생성 시 카탈로그 등급을 적용하고 GameplayTagQuery로 맞는 스킬 1개를 추첨해 고정한다. 재장착·Continue로 재추첨하지 않는다.
 - 스킬 후보: 근접 무기→근접·참격, 활→정밀 화살·화염 화살비, 석궁→석궁 공격, 지팡이·마법서→마법 47종, 방패→수호 7종(`Skill.Effect.Shield`). 탄약·기타는 등급만 부여한다.
@@ -61,7 +61,7 @@
 
 상점·보상은 등급을 먼저 뽑고 그 안에서 에셋을 균등 추첨한다. 후보가 없는 등급은 제외하고 재정규화한다. 장비 등급 자체의 위력 배율은 없다.
 
-스킬은 62종에 고유 등급이 있고, 장비 등급별 스킬 등급 가중치로 추첨한다([SKILL_RARITY_PROBABILITIES](../../DataCatalogs/SKILL_RARITY_PROBABILITIES.csv)). 위력·AP/SAP·선딜은 [SKILL_BALANCE](../../DataCatalogs/SKILL_BALANCE.csv)에서 Run 생성 시 고정한다. 현재 비용은 AP 1·SAP 0, 선딜은 무기 근접 0.23초·나머지 0.3초다.
+스킬은 62종에 고유 등급이 있고, 장비 등급별 스킬 등급 가중치로 추첨한다([SKILL_RARITY_PROBABILITIES](../DataCatalogs/SKILL_RARITY_PROBABILITIES.csv)). 위력·AP/SAP·선딜은 [SKILL_BALANCE](../DataCatalogs/SKILL_BALANCE.csv)에서 Run 생성 시 고정한다. 현재 비용은 AP 1·SAP 0, 선딜은 무기 근접 0.23초·나머지 0.3초다.
 
 | 장비\스킬 | 흰 | 초록 | 파랑 | 보라 | 주황 |
 |---|---:|---:|---:|---:|---:|
@@ -84,7 +84,7 @@
 | 소모품상점 | 7 | 1 |
 | 부활소 | 3 | 1 |
 
-- 그룹을 먼저 뽑고 변형을 뽑는다. 한 회차에 같은 ID는 중복되지 않는다([ENCOUNTER_POOL](../../DataCatalogs/ENCOUNTER_POOL.csv), 활성 13개).
+- 그룹을 먼저 뽑고 변형을 뽑는다. 한 회차에 같은 ID는 중복되지 않는다([ENCOUNTER_POOL](../DataCatalogs/ENCOUNTER_POOL.csv), 활성 13개).
 - 기본상점은 상품 5개, 전문 상점은 적격 상품 최대 5개를 진열한다. 가격·리롤 1G.
 - 판매: 미장착 보유품을 저장 가격의 절반(최소 1G)에 판다. 서비스·소모품 판매와 되사기는 없다.
 - 직업별 NPC(검 제작자·도적·궁수·마법사·방패 기사)를 배치하며 회복의 샘물은 NPC 없이 수반으로 표현한다.
@@ -137,10 +137,10 @@
 | 혼란 `Status.Confused` | 다음 라운드 명령을 합법적인 무작위 명령으로 대체. 빙결이 우선 |
 | 감전 `Status.Shocked` | 다음 피해 스킬 피격 시 대상과 같은 진영 상하좌우 유닛에 S 번개 피해 후 제거. 2라운드 뒤 만료 |
 
-공격 스킬 43개에 속성별 잠정 상태이상을 배정했다([SKILL_STATUS_EFFECTS](../../DataCatalogs/SKILL_STATUS_EFFECTS.csv)): 불→화상, 냉기→냉각(보라 이상 빙결 추가), 번개→감전, 카오스→중독, 물리 참격→출혈, 바위 계열→스턴.
+공격 스킬 43개에 속성별 잠정 상태이상을 배정했다([SKILL_STATUS_EFFECTS](../DataCatalogs/SKILL_STATUS_EFFECTS.csv)): 불→화상, 냉기→냉각(보라 이상 빙결 추가), 번개→감전, 카오스→중독, 물리 참격→출혈, 바위 계열→스턴.
 
 ## 8 협동과 PvP 범위
 
-- 협동은 최대 4인, 인간 1명당 캐릭터 1개다. 원래 소유자만 자기 캐릭터를 조작하며 참가 번호(Host 1번, 이후 합류 순)는 고정이다. 세부 정책은 [AGENTS.md](../../AGENTS.md#데이터와-멀티플레이-확장-원칙)와 [MULTIPLAYER](MULTIPLAYER.md)를 따른다.
+- 협동은 최대 4인, 인간 1명당 캐릭터 1개다. 원래 소유자만 자기 캐릭터를 조작하며 참가 번호(Host 1번, 이후 합류 순)는 고정이다. 세부 정책은 [AGENTS.md](../AGENTS.md#데이터와-멀티플레이-확장-원칙)와 [MULTIPLAYER](MULTIPLAYER.md)를 따른다.
 - 현재 같은 PC Listen Server 개발 협동과 Steam 480 개발 연결 시제품만 있다. 실제 2PC·PlayFab·중앙 저장은 준비 대기다.
 - PvP는 로컬 Snapshot 고정 상대와 싸운다. 장비·전술 ID는 빈 값만 지원하며 온라인 게시·매칭·결과 검증은 미구현이다.
