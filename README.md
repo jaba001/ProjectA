@@ -2,16 +2,16 @@
 
 Unreal Engine 5.8 기반의 파티·Grid 라운드 전투 로그라이트다. UI 중심으로 Run을 진행하고 파티 빌드를 성장시키며, 상대 Snapshot을 쓰는 Async PvP와 최대 4인 Co-op을 목표로 한다.
 
-README에는 개요·실행·빌드·문서 안내만 둔다. 기능별 상세 규칙은 [GAME_DESIGN](Docs/Codex/GAME_DESIGN.md)·[PROJECT_PLAN](Docs/Codex/PROJECT_PLAN.md)·[UI_README](Docs/Codex/UI_README.md)·[MULTIPLAYER](Docs/Codex/MULTIPLAYER.md)에, 완료 이력과 검증 근거는 [HISTORY](Docs/Codex/HISTORY.md)에 있다. 2026-10-11 이전의 상세 README 본문은 Git 이력에서 볼 수 있다.
+README에는 개요·실행·빌드·문서 안내만 둔다. 기능별 상세 규칙은 [GAME_STATUS](Docs/Codex/GAME_STATUS.md)·[PROJECT_PLAN](Docs/Codex/PROJECT_PLAN.md)·[UI_README](Docs/Codex/UI_README.md)·[MULTIPLAYER](Docs/Codex/MULTIPLAYER.md)에 있다. 완료 이력과 검증 근거는 커밋 본문으로 관리하며, 이전 HISTORY·기획 문서는 커밋 `28adbfd6`까지의 Git 이력에서 볼 수 있다.
 
 ## 게임 구성
 
 | 영역 | 현재 구현 | 기준 문서 |
 |---|---|---|
-| Run | 새 싱글 Run은 인카운터 3회 → PvE → 인카운터 3회 → 로컬 Snapshot 전투를 10회 반복한다(60선택·10PvE·10Snapshot). 하나의 `Gameplay` 레벨에서 지하 미로 갈림길로 후보 3개 중 하나를 고른다. 성장·재화·장비는 다음 Run에 이월하지 않으며 Run 종료 시 MMR만 반영하는 정책이다(온라인 정산은 미구현). | [목표 Run](Docs/Codex/GAME_DESIGN.md#2-목표-run과-현재-구현) |
-| 전투 | 라운드마다 행동을 계획한 뒤 속도 차이만큼 시간차를 두고 자동 실행한다. 이동에는 SAP, 스킬에는 AP를 쓰며 스킬은 GAS로 실행한다. 명중 확률 없이 서버 충돌로 판정한다. 준비가 완료되면 본인 캐릭터의 숄더뷰로 전환한다. | [전투 규칙](Docs/Codex/GAME_DESIGN.md#8-라운드-계획과-시간차-자동-전투) |
-| 장비·스킬 | 장비 슬롯은 무기 2·방어구 4·목걸이 1·반지 2칸이다. 무기에는 5단계 고정 등급과, 태그 조건으로 추첨한 스킬 1개가 붙는다. 장착한 무기의 스킬만 사용하며 수호 스킬은 방패 전용이다. | [장비](Docs/Codex/GAME_DESIGN.md#2-2-장비-슬롯과-장비-부여-스킬) · [등급](Docs/Codex/GAME_DESIGN.md#2-4-무기-랜덤-스킬과-아이템-등급) |
-| 상점·인카운터 | 기본·등급별·태그별 상점과 회복의 샘물·소모품상점·부활소를 그룹 가중치로 제시한다. 상점은 구매·판매·리롤을 지원하고 직업별 NPC를 배치한다. | [상점 분류](Docs/Codex/GAME_DESIGN.md#2-3-상점-분류와-인카운터-가중치) |
+| Run | 새 싱글 Run은 인카운터 3회 → PvE → 인카운터 3회 → 로컬 Snapshot 전투를 10회 반복한다(60선택·10PvE·10Snapshot). 하나의 `Gameplay` 레벨에서 지하 미로 갈림길로 후보 3개 중 하나를 고른다. 성장·재화·장비는 다음 Run에 이월하지 않으며 Run 종료 시 MMR만 반영하는 정책이다(온라인 정산은 미구현). | [목표 Run](Docs/Codex/GAME_STATUS.md#2-run-진행) |
+| 전투 | 라운드마다 행동을 계획한 뒤 속도 차이만큼 시간차를 두고 자동 실행한다. 이동에는 SAP, 스킬에는 AP를 쓰며 스킬은 GAS로 실행한다. 명중 확률 없이 서버 충돌로 판정한다. 준비가 완료되면 본인 캐릭터의 숄더뷰로 전환한다. | [전투 규칙](Docs/Codex/GAME_STATUS.md#6-라운드-전투) |
+| 장비·스킬 | 장비 슬롯은 무기 2·방어구 4·목걸이 1·반지 2칸이다. 무기에는 5단계 고정 등급과, 태그 조건으로 추첨한 스킬 1개가 붙는다. 장착한 무기의 스킬만 사용하며 수호 스킬은 방패 전용이다. | [장비](Docs/Codex/GAME_STATUS.md#3-장비와-무기-스킬) · [등급](Docs/Codex/GAME_STATUS.md#3-장비와-무기-스킬) |
+| 상점·인카운터 | 기본·등급별·태그별 상점과 회복의 샘물·소모품상점·부활소를 그룹 가중치로 제시한다. 상점은 구매·판매·리롤을 지원하고 직업별 NPC를 배치한다. | [상점 분류](Docs/Codex/GAME_STATUS.md#4-상점과-인카운터) |
 | PvE 난이도 | 하·중·상을 고르며 각각 초원·석조 던전·얼음 성채에서 전투한다. 몬스터 편성·체력 곡선·골드는 CSV로 정하고 Run 생성 시 저장한다. | [난이도 규칙](Docs/Codex/PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터) |
 | 저장 | 전투 밖에서는 일반 저장, 전투 중에는 Ready 경계마다 체크포인트를 쓴다. 저장에 실패하면 준비 완료를 막고 원본을 보존한다. 이전 저장의 카탈로그와 확정 결과도 보존한다. | [저장 경계](Docs/Codex/PROJECT_PLAN.md#5-저장과-멀티플레이-연결-경계) |
 | 멀티플레이 | 같은 PC에서 Listen Server로 2·4인 개발 협동을 할 수 있다. 명시적인 Steam 480 개발 연결 시제품이 있다. PlayFab 연동·중앙 저장·실제 2PC 확인은 준비 대기다. | [멀티플레이 계약](Docs/Codex/MULTIPLAYER.md) |
@@ -63,15 +63,12 @@ Codex 문서는 `Docs/Codex/`, Claude 문서는 `Docs/Claude/`에 보관한다.
 
 | 문서 | 내용 |
 |---|---|
-| [GAME_DESIGN](Docs/Codex/GAME_DESIGN.md) | 목표 기획·확정 방향·아이템/직업/상점 기획 |
+| [GAME_STATUS](Docs/Codex/GAME_STATUS.md) | 현재 구현된 게임 규칙과 진행 상황 요약 |
 | [PROJECT_PLAN](Docs/Codex/PROJECT_PLAN.md) | 모듈·전투·UI·에셋·설정의 현재 구조 |
 | [UI_README](Docs/Codex/UI_README.md) | UI 구조·JSON 명세·생성 옵션 |
 | [MULTIPLAYER](Docs/Codex/MULTIPLAYER.md) | 식별·소유권·저장·네트워크 계약 |
 | [TODO](Docs/Codex/TODO.md) | 남은 작업·미결정 제안·사용자 확인 |
-| [HISTORY](Docs/Codex/HISTORY.md) | 완료 이력 색인. 본문은 `Docs/Codex/History/`에 기간별로 있다. |
-| [STATUS_EFFECTS](Docs/Codex/STATUS_EFFECTS.md) | 상태이상 8종의 후순위 기획 |
-| [EXECUTION_DECISIONS](Docs/Codex/EXECUTION_DECISIONS.md) | 위임받아 실행할 때의 판단 근거 |
-| [Docs/Claude](Docs/Claude/README.md) | Claude의 리뷰·제안·인계 문서 |
+| [Docs/Claude](Docs/Claude/README.md) | Claude의 제안·인계 문서 |
 
 스크린샷과 갤러리는 `Docs/ScreanShoot/`에 로컬 보관하며 Git에서 제외한다. 새 clone에는 포함되지 않는다.
 
