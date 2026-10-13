@@ -28,11 +28,11 @@ public:
     virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) override;
 
     UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "50", ClampMax = "600", Units = "cm"))
-    float FollowDistance = 250.f;
+    float FollowDistance = 360.f;
     UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "0", ClampMax = "150", Units = "cm"))
-    float ShoulderOffset = 65.f;
+    float ShoulderOffset = 75.f;
     UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "0", ClampMax = "150", Units = "cm"))
-    float CameraHeight = 25.f;
+    float CameraHeight = 40.f;
     UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "0", ClampMax = "1"))
     float PivotHeightFraction = 0.55f;
     UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "100", ClampMax = "1000", Units = "cm"))
