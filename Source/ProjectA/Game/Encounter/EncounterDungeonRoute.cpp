@@ -353,13 +353,18 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
         // 방과 통로의 연결부에서 겹치는 바닥 면의 깜빡임을 막도록 밀리미터 단위로 높이를 분리합니다.
         const float SurfaceOffset = -RegionIndex * 0.1f;
         // Back the joints with opaque slabs recessed two centimeters from the stone faces.
+        // The slabs reach under and over the surrounding walls so no coplanar seam can leak the outside sky.
         // 석재 표면보다 2cm 들어간 불투명 판으로 줄눈을 막습니다.
-        AddBlock(Mortar, Center + FVector(0.f, 0.f, -12.f + SurfaceOffset), FVector(Width, Depth, 20.f), Region.Transform.GetRotation());
-        AddBlock(Mortar, Center + FVector(0.f, 0.f, WallHeight + 12.f - SurfaceOffset), FVector(Width, Depth, 20.f), Region.Transform.GetRotation());
+        // 판을 주변 벽 아래·위까지 넓혀 맞닿기만 하는 경계로 바깥 하늘이 새지 않게 합니다.
+        constexpr float SealOverlap = 32.f;
+        AddBlock(Mortar, Center + FVector(0.f, 0.f, -12.f + SurfaceOffset), FVector(Width + SealOverlap * 2.f, Depth + SealOverlap * 2.f, 20.f), Region.Transform.GetRotation());
+        AddBlock(Mortar, Center + FVector(0.f, 0.f, WallHeight + 12.f - SurfaceOffset), FVector(Width + SealOverlap * 2.f, Depth + SealOverlap * 2.f, 20.f), Region.Transform.GetRotation());
+        TArray<FVector, TInlineAllocator<16>> WallEnds[4];
         AddMasonryPanel(Floor, Center + FVector(0.f, 0.f, -10.f + SurfaceOffset), Forward, Right, FVector::UpVector, Width, Depth, 20.f);
         AddMasonryPanel(Ceiling, Center + FVector(0.f, 0.f, WallHeight + 10.f - SurfaceOffset), Forward, Right, FVector::UpVector, Width, Depth, 20.f);
-        for (const FVector2D& Neighbor : Neighbors)
+        for (int32 NeighborIndex = 0; NeighborIndex < 4; ++NeighborIndex)
         {
+            const FVector2D& Neighbor = Neighbors[NeighborIndex];
             const FVector Normal = Region.Transform.TransformVectorNoScale(FVector(Neighbor.X, Neighbor.Y, 0.f));
             const FVector Tangent(-Neighbor.Y, Neighbor.X, 0.f);
             const FVector WallTangent = Region.Transform.TransformVectorNoScale(Tangent);
@@ -370,12 +375,32 @@ void AEncounterDungeonRoute::PrepareGeometry(UMaterialInterface* Material)
                 const float SpanWidth = Span.Y - Span.X;
                 if (SpanWidth <= 4.f) continue;
                 const FVector SpanCenter = Edge + WallTangent * ((Span.X + Span.Y) * 0.5f);
-                AddBlock(Mortar, SpanCenter + Normal * 16.f + FVector(0.f, 0.f, WallHeight * 0.5f), FVector(SpanWidth, WallHeight, 32.f), WallRotation);
+                // Extend the wall backing below the floor slab and above the ceiling slab so both junctions overlap.
+                // 벽 뒤 판을 바닥 판 아래와 천장 판 위까지 늘려 두 접합부가 겹치게 합니다.
+                AddBlock(Mortar, SpanCenter + Normal * 16.f + FVector(0.f, 0.f, WallHeight * 0.5f), FVector(SpanWidth, WallHeight + 44.f, 32.f), WallRotation);
+                WallEnds[NeighborIndex].Add(Edge + WallTangent * Span.X);
+                WallEnds[NeighborIndex].Add(Edge + WallTangent * Span.Y);
                 AddMasonryPanel(WallBlocks, SpanCenter + Normal * 15.f + FVector(0.f, 0.f, WallHeight * 0.5f), WallTangent, FVector::UpVector, Normal, SpanWidth, WallHeight, 36.f);
                 for (float Offset = Span.X + 200.f; Offset < Span.Y - 100.f; Offset += 800.f)
                 {
                     AddTorch(Edge + WallTangent * Offset - Normal * (CellSize * 0.5f), Normal);
                 }
+            }
+        }
+        // Fill the outer square of every corner where two exposed walls actually meet; openings stay clear.
+        // 노출된 두 벽이 실제로 만나는 모서리의 바깥 사각 영역만 채우며 통로 개구부는 비워 둡니다.
+        const auto EndsAt = [](const TArray<FVector, TInlineAllocator<16>>& Ends, const FVector& Point)
+        {
+            return Ends.ContainsByPredicate([&Point](const FVector& End) { return FVector::DistSquared2D(End, Point) < 1.f; });
+        };
+        for (int32 XSide = 0; XSide < 2; ++XSide)
+        {
+            for (int32 YSide = 2; YSide < 4; ++YSide)
+            {
+                const FVector Corner = Region.Transform.TransformPosition(FVector(Neighbors[XSide].X * Region.HalfExtent.X, Neighbors[YSide].Y * Region.HalfExtent.Y, 0.f));
+                if (!EndsAt(WallEnds[XSide], Corner) || !EndsAt(WallEnds[YSide], Corner)) continue;
+                const FVector Outward = Region.Transform.TransformVectorNoScale(FVector(Neighbors[XSide].X, Neighbors[YSide].Y, 0.f));
+                AddBlock(Mortar, Corner + Outward * 16.f + FVector(0.f, 0.f, WallHeight * 0.5f), FVector(32.f, 32.f, WallHeight + 44.f), Region.Transform.GetRotation());
             }
         }
     }
