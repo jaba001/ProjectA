@@ -26,6 +26,7 @@ class PROJECTA_API ACombatRoundProjectile : public AActor
 public:
     ACombatRoundProjectile();
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void Tick(float DeltaSeconds) override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
     // Bind completion delegates before initialization because invalid data resolves immediately.
@@ -67,6 +68,17 @@ private:
 
     UPROPERTY(Replicated)
     float VisualLifetime = 0.f;
+
+    UPROPERTY(Replicated)
+    FVector VisualLaunchOffset = FVector::ZeroVector;
+
+    UPROPERTY(Replicated)
+    FVector CollisionLaunchPosition = FVector::ZeroVector;
+
+    UPROPERTY(VisibleAnywhere, Category = "Round Combat")
+    TObjectPtr<USceneComponent> VisualOrigin = nullptr;
+
+    void UpdateVisualOrigin();
 
     UPROPERTY(Replicated)
     FVector VisualSourcePosition = FVector::ZeroVector;

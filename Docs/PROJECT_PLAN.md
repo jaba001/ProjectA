@@ -501,9 +501,15 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 - 복귀형 행동은 계획 잠금 시 시작 방향을 저장하고 원위치 도착·복귀 시간 초과 복원·제자리 완료 시 해당 방향과 정지 속도를 복원한다. 성공한 잔류 이동은 조준 방향을 유지한다. 서버의 최종 회전은 기존 Actor 이동 복제로 전달한다.
 - 다른 유닛의 복귀·예약 칸으로 이동하거나 자리를 교환할 수 없으며 실패한 이동은 출발점으로 복원한다. 같은 시각에도 서버 순서대로 피해·사망을 즉시 반영하고 미발동 공격을 취소한다. 계획 수정은 해당 소유자의 준비만 해제한다.
 
+투사체의 시각 시작점은 유닛 Blueprint의 `UnitBase|Presentation`에서 `ProjectileVisualSocket`(기본 `hand_r`)·`ProjectileVisualSocketOffset`으로 조절한다. 소켓이 없는 스켈레톤은 액터 로컬 `ProjectileVisualFallbackOffset`(기본 40·0·45cm)을 사용한다. 별도 `VisualOrigin`이 발사점에서 기존 조준점으로 수렴하며 서버 스폰 위치·이동·충돌·GAS는 유지한다.
+
 ### 4-13 통합 Gameplay와 NPC 상점
 
 2026-10-08 사용자 위임에 따라 `/Game/User_JeHoon/LEVEL/Core/Gameplay`에 기존 환경 12개·던전 2개의 메시 배치를 구역별로 합성한다. 중앙 PineRidge 구역과 12,000cm 간격의 주변 구역을 같은 맵에 저장하며 원본 메시·기존 재질을 직접 참조한다. 구역별 ISM과 거리 컬링을 사용하고 장식의 충돌·navigation 영향을 끈다. 기존 Arena·Grid·카메라·물리 바닥·NavBounds·GameMode·전역 조명은 보존한다. 비교 맵의 중복 전투 코어나 전역 조명·안개·무한 PostProcess는 합치지 않는다. 기존 14개 맵은 제작·이전 경로 호환용으로 보존하며 실제 Run 중 맵 전환은 추가하지 않는다.
+
+난이도 전투장 장식은 `/Game/User_JeHoon/Blueprint/Environment/BP_CombatArena_MeadowBloom`·`BP_CombatArena_DungeonStone`·`BP_CombatArena_IceCitadel`에 저장한다. 각 Blueprint의 컴포넌트 배치·재질을 에디터에서 편집하며, `CombatArena.EnvironmentTemplates`가 해당 에셋을 로드·배치한다. 해당 폴더는 `DirectoriesToAlwaysCook`에 포함한다. 런타임 메시 재구성은 하지 않으며 에셋 누락은 경고와 준비 실패로 처리한다. Gameplay의 `EnvironmentOccluders`는 체크무늬 물리 바닥의 표시만 숨기고 충돌·navigation은 유지하며 환경 종료 시 원래 표시를 복원한다.
+
+[BakeCombatArenaEnvironments.py](../Source/ProjectAEditor/Scripts/BakeCombatArenaEnvironments.py)는 통합 맵의 기존 지역 배치를 에디터에서 굽는다. `-run=pythonscript -script=Source/ProjectAEditor/Scripts/BakeCombatArenaEnvironments.py -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI`로 실행하며 기본값은 기존 Blueprint를 보존한다. `-ArenaEnvironmentOverwrite`만 명시적 덮어쓰기를 허용하고, `-ArenaEnvironmentVerifyOnly`는 패키지를 저장하지 않고 기존 에셋과 독립 DungeonStone의 바닥 배치를 대조한다. 원본 팩 에셋을 복제하거나 변경하지 않는다.
 
 맵에 저장된 `AEncounterPrototypeStage` 5개는 기존 경로·태그를 유지하는 표시 설정 원본이다. 필수·제외 GameplayTagContainer와 우선순위로 무대를 해석한 뒤 실제 `FRunEncounterOffer`의 상품 Query로 NPC를 구분한다. 통로 생성과 직접 무대 표시 모두 선택된 Offer를 전달하고 표지판은 해당 표시명을 사용한다. 이름이나 ID로 직업을 추측하지 않으며 저장된 상품 조건을 Continue·클라이언트에서도 동일하게 평가한다.
 

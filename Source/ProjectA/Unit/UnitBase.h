@@ -77,6 +77,19 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UnitBase|Equipment")
     TObjectPtr<UCharacterEquipmentComponent> CharacterEquipment;
 
+    // Cosmetic launch data is editable per unit Blueprint and never moves the collision origin.
+    // 유닛 Blueprint별 표현 발사 데이터를 편집하며 충돌 원점은 이동하지 않습니다.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UnitBase|Presentation")
+    FName ProjectileVisualSocket = TEXT("hand_r");
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UnitBase|Presentation")
+    FVector ProjectileVisualSocketOffset = FVector::ZeroVector;
+
+    // The actor-local fallback supports skeletons without the configured hand socket.
+    // 설정한 손 소켓이 없는 스켈레톤에는 액터 로컬 대체 위치를 사용합니다.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UnitBase|Presentation")
+    FVector ProjectileVisualFallbackOffset = FVector(40.f, 0.f, 45.f);
+
     // Returns the ability system component for GAS integration.
     // GAS 연동에 사용할 어빌리티 시스템 컴포넌트를 반환합니다.
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;

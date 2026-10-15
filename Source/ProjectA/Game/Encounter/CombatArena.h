@@ -41,8 +41,18 @@ public:
     virtual void ActivateArena(APlayerController* Controller);
     virtual void CleanupArena();
 
-    // The authority freezes the selected environment; clients reconstruct only its local decoration.
-    // 권위 측이 선택 환경을 고정하고 클라이언트는 로컬 장식만 재구성합니다.
+    // Load editor-baked decoration; missing templates never fall back to runtime mesh generation.
+    // 에디터에서 구운 장식을 로드하며 템플릿 누락 시 런타임 메시 생성으로 대체하지 않습니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Arena|Presentation")
+    TMap<FName, TSoftClassPtr<AActor>> EnvironmentTemplates;
+
+    // Hide authored occluders visually while retaining their collision and navigation.
+    // 충돌과 내비게이션을 유지하며 작성된 가림 대상을 시각적으로 숨깁니다.
+    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Arena|Presentation")
+    TArray<TObjectPtr<AActor>> EnvironmentOccluders;
+
+    // The authority freezes the environment and each peer places the same authored Blueprint.
+    // 권위 측이 환경을 고정하고 각 피어는 동일한 작성 Blueprint를 배치합니다.
     bool ApplyEnvironment(FName ArenaId, FText& OutError);
     void ResetEnvironment();
 

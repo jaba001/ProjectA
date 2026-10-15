@@ -3,12 +3,10 @@
 #include "Game/Encounter/CombatArenaEnvironment.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
-#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Grid/Combat/CombatGridManager.h"
-#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
@@ -17,13 +15,6 @@ namespace CombatArenaEnvironmentInternal
 {
     const FName VisualOwnerTag(TEXT("ProjectAUnifiedGameplayVisual"));
     const FName CentralRegionTag(TEXT("PineRidge"));
-
-    struct FRenderBatch
-    {
-        UStaticMeshComponent* Source = nullptr;
-        TArray<FTransform> Transforms;
-        TArray<int32> SourceIndices;
-    };
 }
 
 ACombatArena::ACombatArena()
@@ -32,6 +23,11 @@ ACombatArena::ACombatArena()
     bReplicates = true;
     bAlwaysRelevant = true;
     SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("ArenaOrigin")));
+    for (const FCombatArenaEnvironmentProfile& Profile : CombatArenaEnvironment::GetProfiles())
+    {
+        const FString Path = FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/Environment/BP_CombatArena_%s.BP_CombatArena_%s_C"), *Profile.ArenaId.ToString(), *Profile.ArenaId.ToString());
+        EnvironmentTemplates.Add(Profile.ArenaId, TSoftClassPtr<AActor>(FSoftObjectPath(Path)));
+    }
     PlayerCoords = {FIntPoint(0, 1), FIntPoint(1, 1), FIntPoint(2, 1), FIntPoint(3, 1)};
     EnemyCoords = {FIntPoint(0, 2), FIntPoint(1, 2), FIntPoint(2, 2), FIntPoint(3, 2)};
     CameraTransform = FTransform(FRotator(-65.f, 0.f, 0.f), FVector(-1200.f, 400.f, 1800.f));
@@ -114,128 +110,32 @@ bool ACombatArena::ApplyEnvironmentVisuals(FName ArenaId, FText& OutError)
     UWorld* World = GetWorld();
     OutError = NSLOCTEXT("CombatArenaEnvironment", "MissingRegion", "통합 Gameplay에서 선택한 지역 장식과 중앙 전장을 찾을 수 없습니다.");
     if (!Profile || !World) return false;
-    FVector CameraPosition = IsValid(CameraAnchor) ? CameraAnchor->GetActorLocation() : (CameraTransform * GetActorTransform()).GetLocation();
-    if (const ACameraActor* CameraActor = Cast<ACameraActor>(CameraAnchor)) CameraPosition = CameraActor->GetCameraComponent()->GetComponentLocation();
-
-    // The native region templates share this unchanged 4x4 combat core and physical floor.
-    // 기본 지역 템플릿은 변경하지 않는 동일한 4x4 전투 코어와 물리 바닥을 공유합니다.
-    const FBox CombatClearance(FVector(-790.f, -190.f, 3.f), FVector(190.f, 990.f, 600.f));
-    TArray<FVector> CombatSamples;
-    for (int32 Row = 0; Row < 4; ++Row)
+    const TSoftClassPtr<AActor>* Template = EnvironmentTemplates.Find(ArenaId);
+    UClass* VisualClass = Template ? Template->LoadSynchronous() : nullptr;
+    if (!VisualClass)
     {
-        for (int32 Column = 0; Column < 4; ++Column)
-        {
-            for (float Height : {5.f, 150.f, 300.f}) CombatSamples.Add(FVector(-Row * 200.f, Column * 200.f + (Column >= 2 ? 200.f : 0.f), Height));
-        }
+        OutError = NSLOCTEXT("CombatArenaEnvironment", "MissingBakedEnvironment", "구운 전투장 Blueprint가 없습니다. Arena의 EnvironmentTemplates와 에디터 굽기 결과를 확인하세요.");
+        UE_LOG(LogProjectA, Warning, TEXT("[CombatArena] Missing baked environment %s / 구운 전투장 누락"), *ArenaId.ToString());
+        return false;
     }
     TArray<AActor*> CentralActors;
-    TArray<CombatArenaEnvironmentInternal::FRenderBatch> Batches;
-    int32 GroundCount = 0;
     for (TActorIterator<AActor> It(World); It; ++It)
     {
-        AActor* Actor = *It;
-        if (!Actor->ActorHasTag(CombatArenaEnvironmentInternal::VisualOwnerTag)) continue;
-        if (Actor->ActorHasTag(CombatArenaEnvironmentInternal::CentralRegionTag)) CentralActors.Add(Actor);
-        if (!Actor->ActorHasTag(Profile->SourceRegionTag)) continue;
-        TInlineComponentArray<UStaticMeshComponent*> Components(Actor);
-        for (UStaticMeshComponent* Source : Components)
-        {
-            if (!IsValid(Source) || !Source->GetStaticMesh() || !Source->IsVisible()) continue;
-            CombatArenaEnvironmentInternal::FRenderBatch Batch;
-            Batch.Source = Source;
-            const UInstancedStaticMeshComponent* Instances = Cast<UInstancedStaticMeshComponent>(Source);
-            const int32 Count = Instances ? Instances->GetInstanceCount() : 1;
-            if (Instances && (Instances->NumCustomDataFloats < 0 || static_cast<int64>(Instances->NumCustomDataFloats) * Count != Instances->PerInstanceSMCustomData.Num())) return false;
-            for (int32 Index = 0; Index < Count; ++Index)
-            {
-                FTransform Transform = Source->GetComponentTransform();
-                if (Instances && !Instances->GetInstanceTransform(Index, Transform, true)) return false;
-                Transform = CombatArenaEnvironment::RebaseTransform(Transform, *Profile);
-                if (Transform.ContainsNaN()) return false;
-                const FBox Bounds = Source->GetStaticMesh()->GetBoundingBox().TransformBy(Transform);
-                if (!CombatArenaEnvironment::ShouldKeepBounds(Bounds, CombatClearance, CameraPosition, CombatSamples)) continue;
-                GroundCount += CombatArenaEnvironment::IsGroundBounds(Bounds) ? 1 : 0;
-                Batch.Transforms.Add(Transform);
-                Batch.SourceIndices.Add(Index);
-            }
-            if (!Batch.Transforms.IsEmpty()) Batches.Add(MoveTemp(Batch));
-        }
+        if (It->ActorHasTag(CombatArenaEnvironmentInternal::VisualOwnerTag) && It->ActorHasTag(CombatArenaEnvironmentInternal::CentralRegionTag)) CentralActors.Add(*It);
     }
-    if (CentralActors.IsEmpty() || Batches.IsEmpty() || GroundCount == 0) return false;
-
-    // Prepare an invisible local candidate, then publish only after every component succeeds.
-    // 모든 컴포넌트 작성이 성공한 뒤에만 공개하도록 보이지 않는 로컬 후보를 준비합니다.
-    OutError = NSLOCTEXT("CombatArenaEnvironment", "CreateVisual", "선택한 전투 환경의 표시를 준비하지 못했습니다. 기존 전장은 유지됩니다.");
+    if (CentralActors.IsEmpty()) return false;
+    for (AActor* Actor : EnvironmentOccluders)
+    {
+        if (IsValid(Actor)) CentralActors.AddUnique(Actor);
+    }
     FActorSpawnParameters Params;
     Params.Owner = this;
     Params.ObjectFlags |= RF_Transient;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    AActor* Candidate = World->SpawnActor<AActor>(AActor::StaticClass(), FTransform::Identity, Params);
+    AActor* Candidate = World->SpawnActor<AActor>(VisualClass, FTransform::Identity, Params);
     if (!Candidate) return false;
     Candidate->SetReplicates(false);
     Candidate->SetActorEnableCollision(false);
-    Candidate->SetActorHiddenInGame(true);
-    USceneComponent* Root = NewObject<USceneComponent>(Candidate, TEXT("EnvironmentRoot"), RF_Transient);
-    Candidate->SetRootComponent(Root);
-    Candidate->AddInstanceComponent(Root);
-    Root->SetMobility(EComponentMobility::Movable);
-    Root->RegisterComponent();
-    const auto FailCandidate = [Candidate]()
-    {
-        Candidate->Destroy();
-        return false;
-    };
-    if (!Root->IsRegistered()) return FailCandidate();
-    for (const CombatArenaEnvironmentInternal::FRenderBatch& Batch : Batches)
-    {
-        UStaticMeshComponent* Source = Batch.Source;
-        UStaticMeshComponent* Component = NewObject<UStaticMeshComponent>(Candidate, Source->GetClass(), NAME_None, RF_Transient);
-        if (!Component) return FailCandidate();
-        Candidate->AddInstanceComponent(Component);
-        Component->SetupAttachment(Root);
-        Component->SetMobility(EComponentMobility::Movable);
-        if (!Component->SetStaticMesh(Source->GetStaticMesh()) && Component->GetStaticMesh() != Source->GetStaticMesh()) return FailCandidate();
-        for (int32 Index = 0; Index < Source->GetNumMaterials(); ++Index) Component->SetMaterial(Index, Source->GetMaterial(Index));
-        Component->SetCastShadow(Source->CastShadow);
-        Component->SetReceivesDecals(Source->bReceivesDecals);
-        Component->SetAffectDistanceFieldLighting(Source->bAffectDistanceFieldLighting);
-        Component->SetVisibleInRayTracing(Source->bVisibleInRayTracing);
-        Component->SetRenderInMainPass(Source->bRenderInMainPass);
-        Component->SetRenderInDepthPass(Source->bRenderInDepthPass);
-        Component->SetRenderCustomDepth(Source->bRenderCustomDepth);
-        Component->SetCustomDepthStencilValue(Source->CustomDepthStencilValue);
-        Component->SetCustomDepthStencilWriteMask(Source->CustomDepthStencilWriteMask);
-        Component->SetForcedLodModel(Source->GetForcedLodModel());
-        Component->SetHiddenInGame(Source->bHiddenInGame);
-        Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        Component->SetGenerateOverlapEvents(false);
-        Component->SetCanEverAffectNavigation(false);
-        Component->SetComponentTickEnabled(false);
-        Component->SetCullDistance(18000.f);
-        Component->RegisterComponent();
-        if (!Component->IsRegistered()) return FailCandidate();
-        if (UInstancedStaticMeshComponent* Instances = Cast<UInstancedStaticMeshComponent>(Component))
-        {
-            // Keep ISM and ordinary component types intact; unsupported source materials never gain ISM usage.
-            // ISM과 일반 컴포넌트 종류를 유지하며 미지원 원본 재질에 ISM 사용을 강제하지 않습니다.
-            const UInstancedStaticMeshComponent* Original = CastChecked<UInstancedStaticMeshComponent>(Source);
-            Instances->SetNumCustomDataFloats(Original->NumCustomDataFloats);
-            Instances->SetCullDistances(15000, 18000);
-            for (int32 Index = 0; Index < Batch.Transforms.Num(); ++Index)
-            {
-                if (Instances->AddInstance(Batch.Transforms[Index], true) != Index) return FailCandidate();
-                if (Original->NumCustomDataFloats > 0)
-                {
-                    const int32 Offset = Batch.SourceIndices[Index] * Original->NumCustomDataFloats;
-                    if (!Instances->SetCustomData(Index, TArrayView<const float>(Original->PerInstanceSMCustomData.GetData() + Offset, Original->NumCustomDataFloats), true)) return FailCandidate();
-                }
-            }
-        }
-        else
-        {
-            Component->SetWorldTransform(Batch.Transforms[0]);
-        }
-    }
     if (IsValid(EnvironmentVisual)) EnvironmentVisual->Destroy();
     for (AActor* Actor : CentralActors)
     {

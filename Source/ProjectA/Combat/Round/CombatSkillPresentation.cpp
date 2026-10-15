@@ -267,17 +267,20 @@ bool CombatSkillPresentation::Prepare(UWorld* World, const TArray<FCombatRoundSk
     return true;
 }
 
-void CombatSkillPresentation::Attach(AActor* Owner, const FCombatSkillVfx& Visual, TArray<TObjectPtr<UFXSystemComponent>>& Components, FAudioState& Audio, const FEndpointParameters& Endpoints, bool bAutoDestroy, const FProjectileParameters* Projectile)
+void CombatSkillPresentation::Attach(AActor* Owner, const FCombatSkillVfx& Visual, TArray<TObjectPtr<UFXSystemComponent>>& Components, FAudioState& Audio,
+    const FEndpointParameters& Endpoints, bool bAutoDestroy, const FProjectileParameters* Projectile, USceneComponent* Attachment)
 {
     Destroy(Components);
     if (!IsValid(Owner) || !Owner->GetRootComponent() || Owner->GetNetMode() == NM_DedicatedServer || Visual.RelativeTransform.ContainsNaN()) return;
+    USceneComponent* Parent = Attachment ? Attachment : Owner->GetRootComponent();
     const FVector Location = Visual.RelativeTransform.GetLocation();
     const FRotator Rotation = Visual.RelativeTransform.Rotator();
     const FVector Scale = Visual.RelativeTransform.GetScale3D();
     if (UNiagaraSystem* System = Visual.Niagara.LoadSynchronous())
     {
         const bool bBindParameters = HasNiagaraOverrides(Visual);
-        UNiagaraComponent* Component = UNiagaraFunctionLibrary::SpawnSystemAttached(System, Owner->GetRootComponent(), NAME_None, Location, Rotation, Scale, EAttachLocation::KeepRelativeOffset, bAutoDestroy, ENCPoolMethod::None, !bBindParameters, false);
+        UNiagaraComponent* Component = UNiagaraFunctionLibrary::SpawnSystemAttached(System, Parent, NAME_None, Location, Rotation, Scale,
+            EAttachLocation::KeepRelativeOffset, bAutoDestroy, ENCPoolMethod::None, !bBindParameters, false);
         if (IsValid(Component))
         {
             if (bBindParameters)
@@ -290,7 +293,8 @@ void CombatSkillPresentation::Attach(AActor* Owner, const FCombatSkillVfx& Visua
     }
     if (UParticleSystem* System = Visual.Cascade.LoadSynchronous())
     {
-        UParticleSystemComponent* Component = UGameplayStatics::SpawnEmitterAttached(System, Owner->GetRootComponent(), NAME_None, Location, Rotation, Scale, EAttachLocation::KeepRelativeOffset, bAutoDestroy, EPSCPoolMethod::None, false);
+        UParticleSystemComponent* Component = UGameplayStatics::SpawnEmitterAttached(System, Parent, NAME_None, Location, Rotation, Scale,
+            EAttachLocation::KeepRelativeOffset, bAutoDestroy, EPSCPoolMethod::None, false);
         if (IsValid(Component))
         {
             if (Projectile) BindProjectileParameters(Component, System, *Projectile);
@@ -312,7 +316,8 @@ void CombatSkillPresentation::Attach(AActor* Owner, const FCombatSkillVfx& Visua
         if (USoundBase* Sound = Visual.Sound.LoadSynchronous())
         {
             Audio.bStarted = true;
-            UAudioComponent* Component = UGameplayStatics::SpawnSoundAttached(Sound, Owner->GetRootComponent(), NAME_None, Location, Rotation, EAttachLocation::KeepRelativeOffset, true, Visual.SoundVolume, Visual.SoundPitch, 0.f, nullptr, nullptr, true);
+            UAudioComponent* Component = UGameplayStatics::SpawnSoundAttached(Sound, Parent, NAME_None, Location, Rotation,
+                EAttachLocation::KeepRelativeOffset, true, Visual.SoundVolume, Visual.SoundPitch, 0.f, nullptr, nullptr, true);
             Audio.Component = Component;
             LimitAudioLifetime(Owner->GetWorld(), Component, Visual.SoundMaxDuration);
         }

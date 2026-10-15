@@ -7,6 +7,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Engine/HitResult.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/StaticMesh.h"
@@ -29,15 +30,18 @@ namespace
 
 ACombatRoundProjectile::ACombatRoundProjectile()
 {
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = false;
     bReplicates = true;
     bAlwaysRelevant = true;
     SetReplicateMovement(true);
     SourceTeam = ETeam::Player;
 
     SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("ProjectileOrigin")));
+    VisualOrigin = CreateDefaultSubobject<USceneComponent>(TEXT("VisualOrigin"));
+    VisualOrigin->SetupAttachment(GetRootComponent());
     ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
-    ProjectileMesh->SetupAttachment(GetRootComponent());
+    ProjectileMesh->SetupAttachment(VisualOrigin);
     ProjectileMesh->SetMobility(EComponentMobility::Movable);
     ProjectileMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     ProjectileMesh->SetGenerateOverlapEvents(false);
@@ -62,6 +66,8 @@ void ACombatRoundProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
     DOREPLIFETIME(ACombatRoundProjectile, VisualVelocity);
     DOREPLIFETIME(ACombatRoundProjectile, VisualLifetime);
     DOREPLIFETIME(ACombatRoundProjectile, VisualSourcePosition);
+    DOREPLIFETIME(ACombatRoundProjectile, VisualLaunchOffset);
+    DOREPLIFETIME(ACombatRoundProjectile, CollisionLaunchPosition);
     DOREPLIFETIME(ACombatRoundProjectile, VisualTargetPosition);
     DOREPLIFETIME(ACombatRoundProjectile, bPresentationReady);
 }
@@ -116,11 +122,23 @@ void ACombatRoundProjectile::InitializeProjectile(AUnitBase* Source, AUnitBase* 
     RemainingLifetime = Lifetime;
     bTrackTarget = bHoming;
     VisualVelocity = Direction.GetSafeNormal() * FlightSpeed;
-    VisualSourcePosition = Source->GetCapsuleComponent()->GetComponentLocation();
+    // Resolve the cosmetic socket once on the authority; remote peers receive the same launch point.
+    // 권위 측에서 표현 소켓을 한 번 결정하고 원격 피어도 같은 발사점을 받습니다.
+    const USkeletalMeshComponent* SourceMesh = Source->GetMesh();
+    const bool bHasSocket = SourceMesh
+        && !Source->ProjectileVisualSocket.IsNone()
+        && SourceMesh->DoesSocketExist(Source->ProjectileVisualSocket);
+    const FTransform LaunchTransform = bHasSocket ? SourceMesh->GetSocketTransform(Source->ProjectileVisualSocket) : Source->GetActorTransform();
+    const FVector LaunchOffset = bHasSocket ? Source->ProjectileVisualSocketOffset : Source->ProjectileVisualFallbackOffset;
+    VisualSourcePosition = LaunchTransform.TransformPosition(LaunchOffset);
+    if (VisualSourcePosition.ContainsNaN()) VisualSourcePosition = Source->GetActorLocation();
+    CollisionLaunchPosition = GetActorLocation();
+    VisualLaunchOffset = VisualSourcePosition - CollisionLaunchPosition;
     VisualTargetPosition = AimPoint;
     // Straight-flight parameters describe actual travel; homing systems retain their authored behavior.
     // 직선 비행 파라미터는 실제 이동을 나타내며 유도 시스템은 원본 동작을 유지합니다.
     VisualLifetime = bHoming ? 0.f : FMath::Min(Lifetime, static_cast<float>(Direction.Size() / FlightSpeed));
+    if (!bHoming && VisualLifetime > UE_SMALL_NUMBER) VisualVelocity = (AimPoint - VisualSourcePosition) / VisualLifetime;
     PresentationStartedAt = FMath::IsFinite(PresentationTime) && PresentationTime >= 0.0 ? PresentationTime : -1.0;
     bPresentationReady = true;
     // Activate particles only after the launch direction is final, including world-space burst emitters.
@@ -342,8 +360,27 @@ void ACombatRoundProjectile::OnRep_Visual()
     bPresentationAttached = true;
     const CombatSkillPresentation::FProjectileParameters Parameters{VisualVelocity, VisualLifetime};
     const CombatSkillPresentation::FEndpointParameters Endpoints{VisualSourcePosition, VisualTargetPosition};
-    CombatSkillPresentation::Attach(this, Visual, VisualComponents, VisualAudio, Endpoints, false, &Parameters);
+    UpdateVisualOrigin();
+    SetActorTickEnabled(GetNetMode() != NM_DedicatedServer);
+    CombatSkillPresentation::Attach(this, Visual, VisualComponents, VisualAudio, Endpoints, false, &Parameters, VisualOrigin);
     if (ProjectileMesh) ProjectileMesh->SetVisibility(VisualComponents.IsEmpty());
+}
+
+void ACombatRoundProjectile::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    UpdateVisualOrigin();
+}
+
+void ACombatRoundProjectile::UpdateVisualOrigin()
+{
+    if (!VisualOrigin || !bPresentationReady) return;
+    // Converge the separate visual anchor onto the authoritative aim point without changing actor movement.
+    // 액터 이동을 바꾸지 않고 분리된 시각 부착점을 권위 조준점으로 수렴시킵니다.
+    const double FlightDistance = FVector::Distance(CollisionLaunchPosition, VisualTargetPosition);
+    const double Remaining = FVector::Distance(GetActorLocation(), VisualTargetPosition);
+    const double Weight = FlightDistance > UE_SMALL_NUMBER ? FMath::Clamp(Remaining / FlightDistance, 0.0, 1.0) : 0.0;
+    VisualOrigin->SetWorldLocation(GetActorLocation() + VisualLaunchOffset * Weight);
 }
 
 void ACombatRoundProjectile::MulticastImpact_Implementation(const FCombatSkillVfx& ImpactDefinition, const FTransform& Transform)
