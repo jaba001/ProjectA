@@ -69,10 +69,11 @@ C++ 파일을 추가·삭제하거나 이름을 바꾼 뒤에는 프로젝트 �
 | [MULTIPLAYER](Docs/MULTIPLAYER.md) | 식별·소유권·저장·네트워크 계약 |
 | [TODO](Docs/TODO.md) | 남은 작업·미결정 제안 |
 | [EXTERNAL_ASSETS](Docs/EXTERNAL_ASSETS.md) | 외부 에셋 팩 복원 목록 |
+| [REVIEW](Docs/REVIEW.md) | 사용자가 직접 확인할 검수 목록 |
 
 스크린샷과 갤러리는 `Docs/ScreanShoot/`에 로컬 보관하며 Git에서 제외한다. 새 clone에는 포함되지 않는다.
 
-`DataCatalogs/`에는 CSV 14개가 있다. 새 기본 Run은 아래에서 *표시한 10개를 생성 시 읽어 결과를 저장한다. 그래서 CSV를 수정하면 그 뒤에 만드는 새 Run에만 반영되며 기존 저장은 바뀌지 않는다.
+`DataCatalogs/`에는 CSV 15개가 있다. 새 기본 Run은 아래에서 *표시한 10개를 생성 시 읽어 결과를 저장한다. 그래서 CSV를 수정하면 그 뒤에 만드는 새 Run에만 반영되며 기존 저장은 바뀌지 않는다.
 
 | CSV | 내용 |
 |---|---|
@@ -86,6 +87,7 @@ C++ 파일을 추가·삭제하거나 이름을 바꾼 뒤에는 프로젝트 �
 | [MONSTER_ENCOUNTERS](DataCatalogs/MONSTER_ENCOUNTERS.csv)* | 10묶음의 지역·선봉·적 수·배율·골드·성장·휴식 |
 | [PVE_DIFFICULTIES](DataCatalogs/PVE_DIFFICULTIES.csv)* | 하·중·상 속도·골드 배율 |
 | [PVE_HEALTH_CURVE](DataCatalogs/PVE_HEALTH_CURVE.csv)* | 10묶음×3난이도의 기준 HP |
+| [ARMOR_ASSETS](DataCatalogs/ARMOR_ASSETS.csv) | ROG 시범 방어구·망토 6종(디버그 전투 장비 목록 전용) |
 | [MONSTER_ASSETS](DataCatalogs/MONSTER_ASSETS.csv) | 몬스터 13종의 원본 팩·Blueprint·메시 경로(참고 자료) |
 | [SKILL_EFFECT_ASSETS](DataCatalogs/SKILL_EFFECT_ASSETS.csv) · [SKILL_CREATION_STATUS](DataCatalogs/SKILL_CREATION_STATUS.csv) · [SKILL_SOUND_ASSETS](DataCatalogs/SKILL_SOUND_ASSETS.csv) | VFX·스킬 생성 현황·SFX 원본 목록과 연결 기록 |
 
