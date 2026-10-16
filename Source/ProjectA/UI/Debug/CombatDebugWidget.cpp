@@ -28,6 +28,7 @@
 #include "HAL/PlatformApplicationMisc.h"
 #include "Misc/DefaultValueHelper.h"
 #include "UI/Combat/CombatRoundPlanningWidget.h"
+#include "UI/Gameplay/RunItemPresentation.h"
 #include "UI/Theme/DemonicUITheme.h"
 #include "Unit/UnitBase.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
@@ -1028,7 +1029,7 @@ void UCombatDebugWidget::RebuildLists()
                 FString Slots;
                 for (const FRunEquipmentSlot& EquippedSlot : Member->Equipment.Slots)
                 {
-                    if (EquippedSlot.ItemIndex == Index) Slots += EquippedSlot.SlotTag == URunEquipmentCatalog::GetWeaponSlot(0) ? TEXT(" [무기 1]") : TEXT(" [무기 2]");
+                    if (EquippedSlot.ItemIndex == Index) Slots += TEXT(" [") + RunItemPresentation::SlotName(EquippedSlot.SlotTag).ToString() + TEXT("]");
                 }
                 AddAction(OwnedList, TEXT("제거 · ") + Member->Items[Index].DisplayName.ToString() + Slots, ECombatDebugAction::RemoveEquipment, Member->Items[Index].Asset, Index);
             }
@@ -1039,10 +1040,9 @@ void UCombatDebugWidget::RebuildLists()
             const FRunEquipmentProfile* Profile = URunEquipmentCatalog::Get().ResolveProfile(Item);
             if (!Profile) continue;
             AddText(CatalogList, Item.DisplayName.ToString() + TEXT(" · ") + Item.Asset.GetAssetName());
-            for (int32 SlotIndex = 0; SlotIndex < 2; ++SlotIndex)
+            for (const FGameplayTag& EquipmentSlot : URunEquipmentCatalog::GetSlotTags())
             {
-                const FGameplayTag WeaponSlot = URunEquipmentCatalog::GetWeaponSlot(SlotIndex);
-                if (URunEquipmentCatalog::ResolveSlot(*Profile, WeaponSlot).IsValid()) AddAction(CatalogList, FString::Printf(TEXT("획득 + 무기 %d 장착"), SlotIndex + 1), ECombatDebugAction::GrantEquipment, Item.Asset, INDEX_NONE, WeaponSlot);
+                if (URunEquipmentCatalog::ResolveSlot(*Profile, EquipmentSlot).IsValid()) AddAction(CatalogList, TEXT("획득 + ") + RunItemPresentation::SlotName(EquipmentSlot).ToString() + TEXT(" 장착"), ECombatDebugAction::GrantEquipment, Item.Asset, INDEX_NONE, EquipmentSlot);
             }
             ++Count;
         }

@@ -87,7 +87,8 @@ bool UCharacterEquipmentComponent::RefreshEquipment()
     for (const FRunEquipmentVisual& Visual : Presentation.Visuals)
     {
         UObject* Asset = Visual.Asset.TryLoad();
-        if ((!Cast<UStaticMesh>(Asset) && !Cast<USkeletalMesh>(Asset)) || Visual.SocketName.IsNone() || !Body->DoesSocketExist(Visual.SocketName) || Visual.RelativeTransform.ContainsNaN() || !Visual.RelativeTransform.IsRotationNormalized())
+        const bool bValidAttachment = Visual.bFollowBodyPose ? Cast<USkeletalMesh>(Asset) != nullptr : (Cast<UStaticMesh>(Asset) || Cast<USkeletalMesh>(Asset)) && !Visual.SocketName.IsNone() && Body->DoesSocketExist(Visual.SocketName);
+        if (!bValidAttachment || Visual.RelativeTransform.ContainsNaN() || !Visual.RelativeTransform.IsRotationNormalized())
         {
             UE_LOG(LogCharacterEquipment, Warning, TEXT("%s cannot attach %s to %s; retaining the previous equipment."), *GetPathName(), *Visual.Asset.ToString(), *Visual.SocketName.ToString());
             return false;
@@ -123,6 +124,9 @@ bool UCharacterEquipmentComponent::RefreshEquipment()
         Mesh->SetGenerateOverlapEvents(false);
         Mesh->SetCanEverAffectNavigation(false);
         Mesh->SetSimulatePhysics(false);
+        // Worn garments share the body's animated pose so they move with every authored animation and ragdoll.
+        // 착용 의상은 몸체의 애니메이션 포즈를 공유하여 작성된 모든 애니메이션과 래그돌을 따라갑니다.
+        if (Visual.bFollowBodyPose) CastChecked<USkeletalMeshComponent>(Mesh)->SetLeaderPoseComponent(Body, true, false);
         Mesh->RegisterComponent();
     }
     RemoveEquipmentMeshes();

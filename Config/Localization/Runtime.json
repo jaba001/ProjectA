@@ -1897,6 +1897,30 @@
       "key": "PurchasedInlineInventory",
       "source": "아이템을 가방에 보관했습니다. 왼쪽 장비 슬롯으로 드래그하여 장착하세요.",
       "translation": "Item added to your bag. Drag it to an equipment slot on the left to equip it."
+    },
+    {
+      "namespace": "RunArmorCatalog",
+      "key": "MissingCatalog",
+      "source": "방어구 에셋 CSV를 읽을 수 없습니다.",
+      "translation": "Unable to read the armor asset CSV."
+    },
+    {
+      "namespace": "RunArmorCatalog",
+      "key": "InvalidHeader",
+      "source": "방어구 에셋 CSV의 열 또는 행 개수가 올바르지 않습니다.",
+      "translation": "The armor asset CSV has invalid columns or row count."
+    },
+    {
+      "namespace": "RunArmorCatalog",
+      "key": "InvalidRow",
+      "source": "방어구 에셋 CSV의 {0}행 분류·경로·이름·가격·등급이 올바르지 않습니다.",
+      "translation": "Row {0} of the armor asset CSV has an invalid category, path, name, price or rarity."
+    },
+    {
+      "namespace": "CombatArenaEnvironment",
+      "key": "MissingBakedEnvironment",
+      "source": "구운 전투장 Blueprint가 없습니다. Arena의 EnvironmentTemplates와 에디터 굽기 결과를 확인하세요.",
+      "translation": "The baked combat arena Blueprint is missing. Check the arena's EnvironmentTemplates and the editor bake result."
     }
   ]
 }

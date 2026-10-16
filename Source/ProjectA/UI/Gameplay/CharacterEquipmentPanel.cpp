@@ -90,10 +90,8 @@ void UCharacterEquipmentPanel::NativeOnInitialized()
     AddEquipmentSlot(Tags[1], TEXT("Weapon"), NSLOCTEXT("Equipment", "OffHand", "보조 무기"), 0, 2);
     AddEquipmentSlot(Tags[3], TEXT("Hands"), NSLOCTEXT("Equipment", "Hands", "장갑"), 1, 0);
     AddEquipmentSlot(Tags[5], TEXT("Body"), NSLOCTEXT("Equipment", "Body", "갑옷"), 1, 1);
-    AddEquipmentSlot(Tags[6], TEXT("Neck"), NSLOCTEXT("Equipment", "Neck", "목걸이"), 1, 2);
-    AddEquipmentSlot(Tags[7], TEXT("Ring"), NSLOCTEXT("Equipment", "RingOne", "반지 1"), 2, 0);
+    AddEquipmentSlot(Tags[6], TEXT("Accessory"), NSLOCTEXT("Equipment", "Accessory", "액세서리"), 1, 2);
     AddEquipmentSlot(Tags[4], TEXT("Feet"), NSLOCTEXT("Equipment", "Feet", "신발"), 2, 1);
-    AddEquipmentSlot(Tags[8], TEXT("Ring"), NSLOCTEXT("Equipment", "RingTwo", "반지 2"), 2, 2);
     HintText = AddText(EquipmentContent, FText::GetEmpty(), 15, 8.0f);
     Theme.ApplyControls(WidgetTree);
 }

@@ -69,8 +69,8 @@ UDemonicUITheme::UDemonicUITheme()
     static ConstructorHelpers::FObjectFinder<UTexture2D> Hands(TEXT("/Game/DemonicUI/Equipment_icons/glowes.glowes"));
     static ConstructorHelpers::FObjectFinder<UTexture2D> Feet(TEXT("/Game/DemonicUI/Equipment_icons/boots.boots"));
     static ConstructorHelpers::FObjectFinder<UTexture2D> Body(TEXT("/Game/DemonicUI/Equipment_icons/chest.chest"));
-    static ConstructorHelpers::FObjectFinder<UTexture2D> Neck(TEXT("/Game/DemonicUI/Equipment_icons/neck.neck"));
-    static ConstructorHelpers::FObjectFinder<UTexture2D> Ring(TEXT("/Game/DemonicUI/Equipment_icons/ring.ring"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Accessory(TEXT("/Game/DemonicUI/Equipment_icons/back.back"));
+    static ConstructorHelpers::FObjectFinder<UTexture2D> Bracers(TEXT("/Game/DemonicUI/Equipment_icons/bracers.bracers"));
     static ConstructorHelpers::FObjectFinder<UTexture2D> Bow(TEXT("/Game/DemonicUI/Equipment_icons/bow.bow"));
     static ConstructorHelpers::FObjectFinder<UTexture2D> Staff(TEXT("/Game/DemonicUI/Equipment_icons/staff.staff"));
     static ConstructorHelpers::FObjectFinder<UTexture2D> Book(TEXT("/Game/DemonicUI/Equipment_icons/book.book"));
@@ -99,8 +99,7 @@ UDemonicUITheme::UDemonicUITheme()
     EquipmentIcons.Add(TEXT("Hands"), Hands.Object);
     EquipmentIcons.Add(TEXT("Feet"), Feet.Object);
     EquipmentIcons.Add(TEXT("Body"), Body.Object);
-    EquipmentIcons.Add(TEXT("Neck"), Neck.Object);
-    EquipmentIcons.Add(TEXT("Ring"), Ring.Object);
+    EquipmentIcons.Add(TEXT("Accessory"), Accessory.Object);
     // Resolve visual categories from the catalog's gameplay tags when the widget is refreshed.
     // 위젯 갱신 시 카탈로그의 게임플레이 태그로 표시용 분류를 확인합니다.
     for (const TCHAR* Category : { TEXT("Sword"), TEXT("Dagger"), TEXT("Axe"), TEXT("Hammer"), TEXT("MaceClub"), TEXT("Spear"), TEXT("Scythe"), TEXT("Thrown") }) ItemCategoryIcons.Add(FName(*FString::Printf(TEXT("Item.Weapon.%s"), Category)), Weapon.Object);
@@ -115,6 +114,10 @@ UDemonicUITheme::UDemonicUITheme()
     ItemCategoryIcons.Add(TEXT("Item.Weapon.ArrowBolt"), Arrow.Object);
     ItemCategoryIcons.Add(TEXT("Item.Weapon.Bullet"), Arrow.Object);
     ItemCategoryIcons.Add(TEXT("Item.Weapon.Other"), Inventory.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Armor.Body"), Body.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Armor.Hands"), Hands.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Armor.Hands.Bracers"), Bracers.Object);
+    ItemCategoryIcons.Add(TEXT("Item.Accessory.Cloak"), Accessory.Object);
 }
 
 const UDemonicUITheme& UDemonicUITheme::Get()

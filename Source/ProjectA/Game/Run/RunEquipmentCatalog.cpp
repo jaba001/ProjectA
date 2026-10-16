@@ -8,12 +8,27 @@ UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EquipmentHead, "Equipment.Slot.Head");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EquipmentHands, "Equipment.Slot.Hands");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EquipmentFeet, "Equipment.Slot.Feet");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EquipmentBody, "Equipment.Slot.Body");
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EquipmentNeck, "Equipment.Slot.Neck");
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EquipmentRingLeft, "Equipment.Slot.Ring.Left");
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EquipmentRingRight, "Equipment.Slot.Ring.Right");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EquipmentAccessory, "Equipment.Slot.Accessory");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ItemArmorBody, "Item.Armor.Body");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ItemArmorHands, "Item.Armor.Hands");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ItemAccessory, "Item.Accessory");
 
 namespace
 {
+    // Category queries match child tags, so bracers and cloaks share their parent slot profile.
+    // 분류 조건은 하위 태그도 일치하므로 팔목 보호대와 망토는 상위 분류의 슬롯 프로필을 공유합니다.
+    FRunEquipmentProfile MakeWornProfile(FName ProfileId, FGameplayTag CategoryTag, FGameplayTag SlotTag)
+    {
+        FRunEquipmentProfile Profile;
+        Profile.ProfileId = ProfileId;
+        Profile.RequiredTags = FGameplayTagQuery::MakeQuery_MatchTag(CategoryTag);
+        Profile.AllowedSlots.AddTag(SlotTag);
+        FRunEquipmentAttachment& Attachment = Profile.Attachments.AddDefaulted_GetRef();
+        Attachment.SlotTag = SlotTag;
+        Attachment.bFollowBodyPose = true;
+        return Profile;
+    }
+
     FRunEquipmentProfile MakeWeaponProfile(FName ProfileId, FName CategoryTag)
     {
         FRunEquipmentProfile Profile;
@@ -62,6 +77,10 @@ URunEquipmentCatalog::URunEquipmentCatalog()
     // 작성한 시전 애니메이션의 쥔 오른손 손바닥에 원본 지팡이 축을 맞춥니다.
     StartingStaff.Attachments[0].RelativeTransform = FTransform(FQuat(0.289771769, -0.026343001, 0.954720189, -0.062026727).GetNormalized(), FVector(-8.471887, 2.925897, 1.059226), FVector::OneVector);
     Profiles.Add(MoveTemp(StartingStaff));
+
+    Profiles.Add(MakeWornProfile(TEXT("BodyArmor"), TAG_ItemArmorBody, TAG_EquipmentBody));
+    Profiles.Add(MakeWornProfile(TEXT("HandArmor"), TAG_ItemArmorHands, TAG_EquipmentHands));
+    Profiles.Add(MakeWornProfile(TEXT("Accessory"), TAG_ItemAccessory, TAG_EquipmentAccessory));
 }
 
 const URunEquipmentCatalog& URunEquipmentCatalog::Get()
@@ -78,7 +97,7 @@ FGameplayTag URunEquipmentCatalog::GetWeaponSlot(int32 Index)
 
 TArray<FGameplayTag> URunEquipmentCatalog::GetSlotTags()
 {
-    return { TAG_EquipmentMainHand, TAG_EquipmentOffHand, TAG_EquipmentHead, TAG_EquipmentHands, TAG_EquipmentFeet, TAG_EquipmentBody, TAG_EquipmentNeck, TAG_EquipmentRingLeft, TAG_EquipmentRingRight };
+    return { TAG_EquipmentMainHand, TAG_EquipmentOffHand, TAG_EquipmentHead, TAG_EquipmentHands, TAG_EquipmentFeet, TAG_EquipmentBody, TAG_EquipmentAccessory };
 }
 
 const FRunEquipmentProfile* URunEquipmentCatalog::ResolveProfile(const FRunItemDefinition& Item) const
@@ -111,12 +130,20 @@ FGameplayTagContainer URunEquipmentCatalog::GetOccupiedSlots(const FRunEquipment
 
 bool URunEquipmentCatalog::GetAttachment(const FRunEquipmentProfile& Profile, FGameplayTag SlotTag, FName& OutSocketName, FTransform& OutRelativeTransform)
 {
+    bool bFollowBodyPose = false;
+    return GetAttachment(Profile, SlotTag, OutSocketName, OutRelativeTransform, bFollowBodyPose);
+}
+
+bool URunEquipmentCatalog::GetAttachment(const FRunEquipmentProfile& Profile, FGameplayTag SlotTag, FName& OutSocketName, FTransform& OutRelativeTransform, bool& bOutFollowBodyPose)
+{
     OutSocketName = NAME_None;
     OutRelativeTransform = FTransform::Identity;
+    bOutFollowBodyPose = false;
     if (ResolveSlot(Profile, SlotTag) != SlotTag) return false;
     const FRunEquipmentAttachment* Attachment = Profile.Attachments.FindByPredicate([SlotTag](const FRunEquipmentAttachment& Candidate) { return Candidate.SlotTag == SlotTag; });
-    if (!Attachment || Attachment->SocketName.IsNone() || !Attachment->RelativeTransform.IsValid() || Attachment->RelativeTransform.GetScale3D().GetAbsMin() <= SMALL_NUMBER) return false;
+    if (!Attachment || (Attachment->SocketName.IsNone() && !Attachment->bFollowBodyPose) || !Attachment->RelativeTransform.IsValid() || Attachment->RelativeTransform.GetScale3D().GetAbsMin() <= SMALL_NUMBER) return false;
     OutSocketName = Attachment->SocketName;
     OutRelativeTransform = Attachment->RelativeTransform;
+    bOutFollowBodyPose = Attachment->bFollowBodyPose;
     return true;
 }

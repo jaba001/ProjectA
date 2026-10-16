@@ -70,6 +70,9 @@ struct PROJECTA_API FRunEquipmentVisual
 
     UPROPERTY(BlueprintReadOnly, Category = "Equipment")
     FTransform RelativeTransform;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Equipment")
+    bool bFollowBodyPose = false;
 };
 
 USTRUCT(BlueprintType)

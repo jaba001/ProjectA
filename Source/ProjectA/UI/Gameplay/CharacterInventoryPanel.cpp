@@ -42,10 +42,7 @@ namespace
 
     FText SlotName(FGameplayTag Slot)
     {
-        const TArray<FGameplayTag> Slots = URunEquipmentCatalog::GetSlotTags();
-        const TArray<FText> Labels = { NSLOCTEXT("Equipment", "MainHand", "주 무기"), NSLOCTEXT("Equipment", "OffHand", "보조 무기"), NSLOCTEXT("Equipment", "Head", "투구"), NSLOCTEXT("Equipment", "Hands", "장갑"), NSLOCTEXT("Equipment", "Feet", "신발"), NSLOCTEXT("Equipment", "Body", "갑옷"), NSLOCTEXT("Equipment", "Neck", "목걸이"), NSLOCTEXT("Equipment", "RingOne", "반지 1"), NSLOCTEXT("Equipment", "RingTwo", "반지 2") };
-        const int32 Index = Slots.IndexOfByKey(Slot);
-        return Labels.IsValidIndex(Index) ? Labels[Index] : FText::GetEmpty();
+        return URunEquipmentCatalog::GetSlotTags().Contains(Slot) ? RunItemPresentation::SlotName(Slot) : FText::GetEmpty();
     }
 }
 

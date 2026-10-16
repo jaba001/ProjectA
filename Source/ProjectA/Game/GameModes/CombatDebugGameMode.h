@@ -58,4 +58,8 @@ private:
 
     FText StatusMessage;
     FTimerHandle InitializeTimer;
+
+    // Alternating debug bodies lets worn equipment be compared on both body variants.
+    // 디버그 몸체를 번갈아 사용하여 착용 장비를 두 몸체에서 비교할 수 있게 합니다.
+    int32 SpawnedPlayerCount = 0;
 };

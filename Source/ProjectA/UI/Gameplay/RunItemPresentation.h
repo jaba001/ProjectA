@@ -16,6 +16,7 @@ namespace RunItemPresentation
         FLinearColor Color = FLinearColor::White;
     };
 
+    FText SlotName(FGameplayTag Slot);
     const FRunWeaponRarityRule* FindRarity(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities);
     FText Name(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities);
     FText SkillName(const USkillDefinitionDataAsset* Skill);

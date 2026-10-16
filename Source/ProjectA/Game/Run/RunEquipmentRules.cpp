@@ -14,7 +14,7 @@ bool RunEquipmentRules::Validate(const FRunPartyMember& Member, FText& OutError)
 {
     OutError = NSLOCTEXT("RunEquipment", "InvalidState", "저장된 장비 슬롯 또는 보유 아이템 연결이 올바르지 않습니다.");
     const FRunEquipmentState& State = Member.Equipment;
-    if (State.Revision < 0 || State.Slots.Num() > 9) return false;
+    if (State.Revision < 0 || State.Slots.Num() > URunEquipmentCatalog::GetSlotTags().Num()) return false;
     if (!State.bHasLoadout)
     {
         // Legacy inventory sales advance the revision without enabling equipment-driven visuals or skills.
@@ -189,7 +189,7 @@ bool RunEquipmentRules::BuildVisuals(const FRunPartyMember& Member, TArray<FRunE
         if (!Mesh || (!Mesh->IsA<UStaticMesh>() && !Mesh->IsA<USkeletalMesh>())) return false;
         FRunEquipmentVisual Visual;
         Visual.Asset = Item.Asset;
-        if (!Catalog.GetAttachment(*Profile, Slot.SlotTag, Visual.SocketName, Visual.RelativeTransform)) return false;
+        if (!Catalog.GetAttachment(*Profile, Slot.SlotTag, Visual.SocketName, Visual.RelativeTransform, Visual.bFollowBodyPose) || (Visual.bFollowBodyPose && !Mesh->IsA<USkeletalMesh>())) return false;
         OutVisuals.Add(Visual);
     }
     OutError = FText::GetEmpty();

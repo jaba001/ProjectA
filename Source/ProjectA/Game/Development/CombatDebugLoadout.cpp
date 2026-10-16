@@ -9,6 +9,7 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/World.h"
 #include "Game/GameModes/CombatDebugGameMode.h"
+#include "Game/Run/RunArmorCatalog.h"
 #include "Game/Run/RunContentMigration.h"
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunEquipmentRules.h"
@@ -101,6 +102,11 @@ void UCombatDebugLoadout::Initialize(ACombatManager* InManager)
         }
         else
         {
+            // Trial armor joins only this debug list; shops and rewards keep the weapon catalog.
+            // 시범 방어구는 이 디버그 목록에만 추가하며 상점·보상은 무기 카탈로그를 유지합니다.
+            TArray<FRunItemDefinition> ArmorItems;
+            if (RunArmorCatalog::Load(ArmorItems, Error)) Items.Append(ArmorItems);
+            else UE_LOG(LogCombatDebugLoadout, Warning, TEXT("Debug armor catalog could not be loaded. / 디버그 방어구 목록을 불러오지 못했습니다: %s"), *Error.ToString());
             const URunEquipmentCatalog& Catalog = URunEquipmentCatalog::Get();
             for (const FRunItemDefinition& Item : Items)
             {

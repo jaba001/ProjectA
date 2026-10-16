@@ -8,14 +8,6 @@
 
 namespace RunItemPresentationInternal
 {
-    FText SlotName(FGameplayTag Slot)
-    {
-        const TArray<FGameplayTag> Slots = URunEquipmentCatalog::GetSlotTags();
-        const TArray<FText> Labels = {NSLOCTEXT("Equipment", "MainHand", "주 무기"), NSLOCTEXT("Equipment", "OffHand", "보조 무기"), NSLOCTEXT("Equipment", "Head", "투구"), NSLOCTEXT("Equipment", "Hands", "장갑"), NSLOCTEXT("Equipment", "Feet", "신발"), NSLOCTEXT("Equipment", "Body", "갑옷"), NSLOCTEXT("Equipment", "Neck", "목걸이"), NSLOCTEXT("Equipment", "RingOne", "반지 1"), NSLOCTEXT("Equipment", "RingTwo", "반지 2")};
-        const int32 Index = Slots.IndexOfByKey(Slot);
-        return Labels.IsValidIndex(Index) ? Labels[Index] : NSLOCTEXT("RunItem", "UnknownSlot", "기타 장비 슬롯");
-    }
-
     FLinearColor SkillColor(FGameplayTag Rarity)
     {
         const TCHAR* Names[] = {TEXT("흰색"), TEXT("초록색"), TEXT("파란색"), TEXT("보라색"), TEXT("주황색")};
@@ -60,6 +52,16 @@ namespace RunItemPresentationInternal
     {
         return FText::Format(NSLOCTEXT("RunItem", "DetailedSkillStats", "위력 {0} · AP {1} / SAP {2} · 선딜 {3}초"), FText::AsNumber(Power), FText::AsNumber(AP), FText::AsNumber(SAP), FText::AsNumber(Windup));
     }
+}
+
+// Labels follow the catalog slot order so every panel names a slot the same way.
+// 라벨은 카탈로그 슬롯 순서를 따르며 모든 화면이 같은 슬롯 이름을 사용합니다.
+FText RunItemPresentation::SlotName(FGameplayTag Slot)
+{
+    const TArray<FGameplayTag> Slots = URunEquipmentCatalog::GetSlotTags();
+    const TArray<FText> Labels = {NSLOCTEXT("Equipment", "MainHand", "주 무기"), NSLOCTEXT("Equipment", "OffHand", "보조 무기"), NSLOCTEXT("Equipment", "Head", "투구"), NSLOCTEXT("Equipment", "Hands", "장갑"), NSLOCTEXT("Equipment", "Feet", "신발"), NSLOCTEXT("Equipment", "Body", "갑옷"), NSLOCTEXT("Equipment", "Accessory", "액세서리")};
+    const int32 Index = Slots.IndexOfByKey(Slot);
+    return Labels.IsValidIndex(Index) ? Labels[Index] : NSLOCTEXT("RunItem", "UnknownSlot", "기타 장비 슬롯");
 }
 
 const FRunWeaponRarityRule* RunItemPresentation::FindRarity(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities)
@@ -127,7 +129,7 @@ FText RunItemPresentation::EquipmentDescription(const FRunItemDefinition& Item)
     bool bTwoHanded = false;
     for (FGameplayTag Slot : ResolvedSlots)
     {
-        Labels.Add(RunItemPresentationInternal::SlotName(Slot));
+        Labels.Add(SlotName(Slot));
         const FGameplayTagContainer Occupied = URunEquipmentCatalog::GetOccupiedSlots(*Profile, Slot);
         bTwoHanded |= Occupied.HasTagExact(URunEquipmentCatalog::GetWeaponSlot(0)) && Occupied.HasTagExact(URunEquipmentCatalog::GetWeaponSlot(1));
     }

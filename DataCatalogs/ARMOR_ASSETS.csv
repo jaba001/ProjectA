@@ -1,0 +1,7 @@
+﻿"장비 종류","위치","에셋 이름","가격(G)","게임 내 이름","등급","분류 근거"
+"갑옷","/Game/ROG_Modular_Armor/Accessories_Robes/UE5_Mannequins/Manny/Robes/SkeletalMeshes","SK_Chest2_Light_T1","1","수련생의 로브","흰색","시범 착용: 가벼운 천 로브"
+"갑옷","/Game/ROG_Modular_Armor/Accessories_Robes/UE5_Mannequins/Manny/Robes/SkeletalMeshes","SK_Chest3_Light_T3","1","방랑 학자의 로브","초록색","시범 착용: 장식이 더해진 긴 로브"
+"장갑","/Game/ROG_Modular_Armor/Accessories_Robes/UE5_Mannequins/Manny/Gloves/SkeletalMeshes","SK_Gloves0_Light_T1","1","가죽 장갑","흰색","시범 착용: 얇은 가죽 장갑"
+"장갑","/Game/ROG_Modular_Armor/Accessories_Robes/UE5_Mannequins/Manny/Gloves/SkeletalMeshes","SK_Gloves1_Heavy_T1","1","철판 장갑","초록색","시범 착용: 두꺼운 금속 장갑"
+"망토","/Game/ROG_Modular_Armor/Accessories_Robes/UE5_Mannequins/Manny/Cloaks/SkeletalMeshes","SK_Cloak0_T1","1","여행자의 망토","흰색","시범 착용: 기본 천 망토"
+"망토","/Game/ROG_Modular_Armor/Accessories_Robes/UE5_Mannequins/Manny/Cloaks/SkeletalMeshes","SK_Cloak0_T2_Red","1","붉은 기사단 망토","초록색","시범 착용: 붉은 색상 변형 망토"

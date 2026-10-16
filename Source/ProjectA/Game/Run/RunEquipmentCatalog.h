@@ -20,6 +20,11 @@ struct PROJECTA_API FRunEquipmentAttachment
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
     FTransform RelativeTransform = FTransform::Identity;
+
+    // Worn skeletal garments follow the animated body pose instead of a socket.
+    // 착용형 스켈레탈 의상은 소켓 대신 애니메이션되는 몸체 포즈를 따릅니다.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+    bool bFollowBodyPose = false;
 };
 
 // Profiles classify catalog tags and keep asset-specific attachment corrections in authored data.
@@ -76,4 +81,5 @@ public:
     static FGameplayTag ResolveSlot(const FRunEquipmentProfile& Profile, FGameplayTag RequestedSlot);
     static FGameplayTagContainer GetOccupiedSlots(const FRunEquipmentProfile& Profile, FGameplayTag AnchorSlot);
     static bool GetAttachment(const FRunEquipmentProfile& Profile, FGameplayTag SlotTag, FName& OutSocketName, FTransform& OutRelativeTransform);
+    static bool GetAttachment(const FRunEquipmentProfile& Profile, FGameplayTag SlotTag, FName& OutSocketName, FTransform& OutRelativeTransform, bool& bOutFollowBodyPose);
 };

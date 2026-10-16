@@ -101,6 +101,8 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 `URunEquipmentCatalog`는 `GameplayTagQuery`·에셋별 선택 설정·허용/점유 슬롯·소켓/상대 변환을 작성 가능한 native CDO 데이터로 관리한다. 특정 에셋 프로필이 일반 태그 프로필을 우선하며 이름·직업 분기로 장착 종류를 판정하지 않는다. 단검 20·방패 15·활 11·명시 한손/양손검 2·시작 스태프 1개를 지원한다. `RunEquipmentRules`가 중복 점유·사본·호환 교체를 공통 검증한다. 활은 왼손, 시작 스태프와 양손검은 오른손을 기준으로 두 손을 점유한다.
 
+슬롯 태그는 `Equipment.Slot.Weapon.MainHand/OffHand`·`Head`·`Hands`·`Feet`·`Body`·`Accessory` 7개다. 이전 `Neck`·`Ring.Left/Right`는 장착 가능한 프로필이 없어 저장에 쓰인 적이 없으므로 이전 처리 없이 제거했다. 착용 프로필 `BodyArmor`(`Item.Armor.Body`)·`HandArmor`(`Item.Armor.Hands`, 하위 `Bracers` 포함)·`Accessory`(`Item.Accessory`, 하위 `Cloak`)는 소켓 대신 `bFollowBodyPose`로 몸체 메시에 `SetLeaderPoseComponent`를 걸어 애니메이션·래그돌을 따른다. 착용 원본은 스켈레탈 메시만 허용하며 충돌·내비게이션에 관여하지 않는다. 카탈로그는 [ARMOR_ASSETS.csv](../DataCatalogs/ARMOR_ASSETS.csv)(`RunArmorCatalog`)이며 현재 디버그 전투 장비 목록에만 합친다. ROG Manny 메시와 Primitive UE5 남녀 몸체는 같은 Manny 뼈대 161개를 쓴다.
+
 `ChangeEquipment`는 상점 단계·신뢰 소유자·생존 Human·아이템 인덱스·Revision과 원본 메시를 검증하고 저장 후보를 원자 반영한다. 실패하면 파티·Revision·원본 파일·상태 알림을 유지한다. `CharacterEquipmentComponent`는 선택 몸체의 소켓에 원본 Static/Skeletal Mesh를 붙이며 명시 장비 상태의 기존 스킬 검 표시는 숨긴다. 검 스킬의 기존 판정 컴포넌트·GAS·능력치는 유지하며 새 일반 Run의 스킬 목록은 비무장 기본 스킬과 현재 장착 사본에서 재구성한다. 손잡이 위치·회전·배율은 프로필의 에셋별 `Attachments.RelativeTransform`으로 조정한다.
 
 이전 저장의 누락된 장비 상태는 과거 스킬 외형을 유지하며 첫 명시 장착부터 새 상태를 적용한다. 시작 아이템을 재지급하거나 저장 카탈로그를 바꾸지 않는다. 미지원 240개는 2026-10-09 사용자 요청으로 판매 목록에서 제거하며 원본 에셋과 기존 보유 사본은 유지한다. 비무기 슬롯 콘텐츠·속도 보정·Snapshot `EquipmentIds` 연결은 후속 기획 대상이다. 새 일반 Run의 무기 부여 스킬은 다음 저장 규칙을 사용한다.
@@ -268,7 +270,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 `/Game/User_JeHoon/LEVEL/Development/DebugCombat`은 프로젝트 소유 Gameplay 맵의 배치·카메라·Grid를 Unreal API로 복제한 독립 개발 레벨이다. `BP_CombatDebugGameMode`는 기존 Party·Enemy 정의를 참조하고 전사 1명과 기존 적 목록의 첫 번째 적 1명을 생성한다. 초기·수동 추가 생성 모두 직업·클래스 초기화 이후 GAS 현재·최대 HP를 각각 10000으로 설정하며 전투 초기화도 같은 구성으로 복원한다. 공용 Party·Enemy 정의와 일반 Run의 편성·체력은 유지한다. `ACombatDebugPlayerController`와 기존 라운드 계획 UI를 사용하며 일반 인카운터 진행·결과·저장 경로에는 연결하지 않는다. 로컬 Standalone·비 Shipping에서만 동작하고 활성 관리 Run이 있으면 시작을 거절한다.
 
-`UCombatDebugLoadout`은 Skills 하위의 유효 DataAsset 76종(기본 2·몬스터 전용 12·기존 VFX 60·무기 전용 2)과 태그 장착 프로필이 있는 장비 49종을 제공한다. 몬스터 공격도 개발용 일반 카탈로그에 포함되며 새 일반 Run의 무기 후보 62종 및 기존 개발 경로의 스킬상점 후보 61종과 구분한다. `Item.Consumable` 태그의 회복약은 일반 카탈로그·습득 스킬 목록·상점 스킬 풀에서 제외하고 목표 Run의 별도 재고에서만 사용한다. 장비 후보는 기존 `RunEquipmentRules`로 검증하고 임시 보유 상태에만 기록한다. 획득은 지정 슬롯에 즉시 장착하며 밀려난 장비는 임시 보유 목록에 남는다. 제거는 장착 해제·보유 삭제·참조 인덱스 보정을 함께 수행한다. 장비는 현재 외형만 바꾸며 능력치·스킬은 부여하지 않는다.
+`UCombatDebugLoadout`은 Skills 하위의 유효 DataAsset 76종(기본 2·몬스터 전용 12·기존 VFX 60·무기 전용 2)과 태그 장착 프로필이 있는 무기 49종과 시범 방어구·망토 6종을 제공한다. 디버그 아군은 생성 순서대로 남자·여자 몸체를 번갈아 사용한다. 몬스터 공격도 개발용 일반 카탈로그에 포함되며 새 일반 Run의 무기 후보 62종 및 기존 개발 경로의 스킬상점 후보 61종과 구분한다. `Item.Consumable` 태그의 회복약은 일반 카탈로그·습득 스킬 목록·상점 스킬 풀에서 제외하고 목표 Run의 별도 재고에서만 사용한다. 장비 후보는 기존 `RunEquipmentRules`로 검증하고 임시 보유 상태에만 기록한다. 획득은 지정 슬롯에 즉시 장착하며 밀려난 장비는 임시 보유 목록에 남는다. 제거는 장착 해제·보유 삭제·참조 인덱스 보정을 함께 수행한다. 장비는 현재 외형만 바꾸며 능력치·스킬은 부여하지 않는다.
 
 스킬 목록은 기존 `ResolveRoundSkill` 결과의 `EffectTags`를 카탈로그 캐시에 보관하여 속성 8탭과 방식 7탭을 이름/에셋명 검색과 교차 적용한다. 속성은 전체·물리·화염·냉기·번개·카오스·복합·미분류이며 방식은 전체·투사체·범위형·체인·근접공격·지원형·미분류다. `FGameplayTagQuery`로 지원 효과를 우선 분류하고 `Skill.Shape.Chain`이 있는 공격은 기존 Beam 태그를 유지해도 체인으로 분류하여 범위형에서 제외한다. 비무장·근접 공격 2종은 태그가 없어 미분류로 제공하고 신규 60종은 저장된 속성·효과·형태 태그로 분류한다. 몬스터 전용 공격 12개는 원래 몬스터 장착을 유지한다. 삭제한 생성 스킬과 CSV의 미생성 보류 항목은 구입 목록에 추가하지 않는다. 체인 5종은 최근접 생존 미타격 적을 연결하는 다중 연쇄 실행을 지원하며 수치·진행·보존 계약은 [4-9절](#4-9-구입-vfx와-sfx-도입)을 따른다. [UI 기준](UI_README.md#7-2-전투-디버그-도구)
 

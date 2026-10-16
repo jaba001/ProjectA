@@ -2,6 +2,12 @@
   "entries": [
     {
       "namespace": "Equipment",
+      "key": "Accessory",
+      "source": "액세서리",
+      "translation": "Accessory"
+    },
+    {
+      "namespace": "Equipment",
       "key": "Body",
       "source": "갑옷",
       "translation": "Body"
@@ -32,27 +38,9 @@
     },
     {
       "namespace": "Equipment",
-      "key": "Neck",
-      "source": "목걸이",
-      "translation": "Neck"
-    },
-    {
-      "namespace": "Equipment",
       "key": "OffHand",
       "source": "보조 무기",
       "translation": "Off Hand"
-    },
-    {
-      "namespace": "Equipment",
-      "key": "RingOne",
-      "source": "반지 1",
-      "translation": "Ring 1"
-    },
-    {
-      "namespace": "Equipment",
-      "key": "RingTwo",
-      "source": "반지 2",
-      "translation": "Ring 2"
     },
     {
       "namespace": "Profession",
