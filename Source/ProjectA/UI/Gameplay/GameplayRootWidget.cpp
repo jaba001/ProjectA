@@ -185,6 +185,9 @@ void UGameplayRootWidget::NativeOnInitialized()
         RunLayer = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>(UCommonActivatableWidgetStack::StaticClass(), TEXT("RunLayer"));
         CombatLayer = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>(UCommonActivatableWidgetStack::StaticClass(), TEXT("CombatLayer"));
         ModalLayer = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>(UCommonActivatableWidgetStack::StaticClass(), TEXT("ModalLayer"));
+        // The run layer stays collapsed while walking between rooms, which pauses its fade; an instant swap keeps the previous shop from reappearing.
+        // 방 사이 이동 중 Run 레이어가 접혀 있어 페이드가 멈추므로, 즉시 교체해 이전 상점 화면이 다시 보이지 않게 합니다.
+        RunLayer->SetTransitionDuration(0.f);
 
         for (UCommonActivatableWidgetStack* Layer : { RunLayer.Get(), CombatLayer.Get(), ModalLayer.Get() })
         {

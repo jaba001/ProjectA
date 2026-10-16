@@ -111,6 +111,9 @@ FVector ACombatShoulderCamera::ResolveCameraCollision(const FVector& Pivot, cons
     {
         FCollisionQueryParams Params(SCENE_QUERY_STAT(CombatShoulderCamera), false, FollowedUnit.Get());
         Params.AddIgnoredActor(this);
+        // Unit meshes block the camera channel; a melee run past other units would otherwise snap the arm in for a frame.
+        // 유닛 메시는 카메라 채널을 막으므로 근접 이동 중 다른 유닛을 지나가면 카메라 거리가 순간적으로 당겨지는 것을 막습니다.
+        for (TActorIterator<AUnitBase> It(World); It; ++It) Params.AddIgnoredActor(*It);
         FHitResult Hit;
         if (World->SweepSingleByChannel(Hit, Pivot, DesiredLocation, FQuat::Identity, ECC_Camera, FCollisionShape::MakeSphere(Radius), Params)) SafeTime = FMath::Min(SafeTime, Hit.Time);
     }
