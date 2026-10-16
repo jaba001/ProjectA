@@ -46,6 +46,14 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Arena|Presentation")
     TMap<FName, TSoftClassPtr<AActor>> EnvironmentTemplates;
 
+    // Background encounter preparation streams this template before the synchronous placement.
+    // 백그라운드 전투 준비가 동기 배치 전에 이 템플릿을 비동기로 읽습니다.
+    FSoftObjectPath GetEnvironmentTemplatePath(FName ArenaId) const
+    {
+        const TSoftClassPtr<AActor>* Template = EnvironmentTemplates.Find(ArenaId);
+        return Template ? Template->ToSoftObjectPath() : FSoftObjectPath();
+    }
+
     // Hide authored occluders visually while retaining their collision and navigation.
     // 충돌과 내비게이션을 유지하며 작성된 가림 대상을 시각적으로 숨깁니다.
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Arena|Presentation")

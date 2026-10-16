@@ -9,6 +9,7 @@ class UWorld;
 class USceneComponent;
 struct FCombatSkillVfx;
 struct FCombatRoundSkill;
+struct FSoftObjectPath;
 
 // Cosmetic systems reference original assets and never provide authoritative hit results.
 // 표현 시스템은 원본 에셋을 참조하며 권한 있는 피격 결과를 제공하지 않습니다.
@@ -35,6 +36,9 @@ namespace CombatSkillPresentation
     // Prepare original effect assets before action clocks start and retain them through the owning combat session.
     // 행동 시간이 시작되기 전에 원본 효과 에셋을 준비하고 소유 전투 세션에서 참조를 유지합니다.
     bool Prepare(UWorld* World, const TArray<FCombatRoundSkill>& Skills, TArray<TObjectPtr<UObject>>& PreparedAssets, FText& OutError);
+    // List the effect assets Prepare loads so callers can stream them ahead of time.
+    // 호출자가 미리 비동기로 읽을 수 있도록 Prepare가 로드하는 이펙트 에셋 경로를 나열합니다.
+    void CollectAssetPaths(const FCombatRoundSkill& Skill, TArray<FSoftObjectPath>& OutPaths);
     void Attach(AActor* Owner, const FCombatSkillVfx& Visual, TArray<TObjectPtr<UFXSystemComponent>>& Components, FAudioState& Audio,
         const FEndpointParameters& Endpoints, bool bAutoDestroy = false, const FProjectileParameters* Projectile = nullptr, USceneComponent* Attachment = nullptr);
     // Update moving endpoints without restarting the effect or overwriting per-segment audio overrides.

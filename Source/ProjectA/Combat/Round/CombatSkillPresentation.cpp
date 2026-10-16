@@ -267,6 +267,16 @@ bool CombatSkillPresentation::Prepare(UWorld* World, const TArray<FCombatRoundSk
     return true;
 }
 
+void CombatSkillPresentation::CollectAssetPaths(const FCombatRoundSkill& Skill, TArray<FSoftObjectPath>& OutPaths)
+{
+    for (const FCombatSkillVfx* Visual : {&Skill.Vfx, &Skill.ImpactVfx})
+    {
+        if (!Visual->Niagara.IsNull()) OutPaths.AddUnique(Visual->Niagara.ToSoftObjectPath());
+        if (!Visual->Cascade.IsNull()) OutPaths.AddUnique(Visual->Cascade.ToSoftObjectPath());
+        if (!Visual->Sound.IsNull()) OutPaths.AddUnique(Visual->Sound.ToSoftObjectPath());
+    }
+}
+
 void CombatSkillPresentation::Attach(AActor* Owner, const FCombatSkillVfx& Visual, TArray<TObjectPtr<UFXSystemComponent>>& Components, FAudioState& Audio,
     const FEndpointParameters& Endpoints, bool bAutoDestroy, const FProjectileParameters* Projectile, USceneComponent* Attachment)
 {

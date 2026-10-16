@@ -5,6 +5,7 @@
 #include "Combat/CombatManager.h"
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
+#include "Combat/Round/CombatSkillPresentation.h"
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Combat/SkillActor/SkillActorBase.h"
 #include "Components/CapsuleComponent.h"
@@ -216,6 +217,11 @@ void AEncounterManager::StartBackgroundPreparation()
             }
         }
     };
+    // The baked arena decoration and the opponent catalog were loaded synchronously at combat start and stalled the frame.
+    // 구운 전투장 장식과 상대 카탈로그는 전투 시작 시 동기 로드되어 프레임을 멈추게 했으므로 함께 미리 읽습니다.
+    FName ArenaId;
+    FText ArenaError;
+    if (Arena && RunState->GetCurrentCombatArenaId(ArenaId, ArenaError) && !ArenaId.IsNone()) Add(Arena->GetEnvironmentTemplatePath(ArenaId));
     if (RunState->IsTargetRun())
     {
         const FRunTargetState& Target = RunState->GetTargetRunState();
@@ -226,6 +232,7 @@ void AEncounterManager::StartBackgroundPreparation()
             for (const FSoftClassPath& Class : Group.EnemyClasses) Add(Class);
             for (const FRunMonsterDefinition& Monster : Group.EnemyRoster) Add(Monster.Skill);
         }
+        else if (CombatIndex % 2 != 0) Add(Target.OpponentCatalog);
     }
     for (const FRunPartyMember& Member : RunState->GetPartyMembers())
     {
@@ -259,9 +266,42 @@ void AEncounterManager::FinishBackgroundPreparation(uint32 Generation)
             FailPreparation(NSLOCTEXT("EncounterPreparation", "MissingAssets", "전투에 필요한 에셋을 불러오지 못했습니다. 선택 화면에서 다시 시도하세요."));
             return;
         }
+        // Skill effects are soft references inside the loaded skills; stream them before the combat session prepares them synchronously.
+        // 스킬 이펙트는 읽은 스킬 안의 소프트 참조이므로 전투 세션이 동기로 준비하기 전에 비동기로 읽습니다.
+        TArray<FSoftObjectPath> Effects;
+        const auto AddSkill = [&Effects](const USkillDefinitionDataAsset* Skill)
+        {
+            FCombatRoundSkill Resolved;
+            FText Error;
+            if (Skill && Skill->ResolveRoundSkill(Resolved, Error)) CombatSkillPresentation::CollectAssetPaths(Resolved, Effects);
+        };
+        for (const UObject* Asset : Loaded)
+        {
+            if (const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Asset)) AddSkill(Skill);
+            else if (const UOpponentSnapshotCatalogDataAsset* Catalog = Cast<UOpponentSnapshotCatalogDataAsset>(Asset)) for (const auto& Entry : Catalog->Skills) AddSkill(Entry.Value);
+        }
+        if (!Effects.IsEmpty())
+        {
+            // A failed effect request falls back to the existing synchronous preparation, which reports missing assets.
+            // 이펙트 요청이 실패하면 누락 에셋을 보고하는 기존 동기 준비로 진행합니다.
+            PreparationEffectLoad = UAssetManager::GetStreamableManager().RequestAsyncLoad(Effects, FStreamableDelegate::CreateUObject(this, &AEncounterManager::FinishBackgroundEffectPreparation, Generation));
+            if (PreparationEffectLoad) return;
+        }
     }
+    CompleteBackgroundPreparation();
+}
+
+void AEncounterManager::FinishBackgroundEffectPreparation(uint32 Generation)
+{
+    if (Generation != PreparationGeneration || bShuttingDown || !bPreparing || !RunState || RunState->GetPhase() != ERunPhase::Preparing) return;
+    CompleteBackgroundPreparation();
+}
+
+void AEncounterManager::CompleteBackgroundPreparation()
+{
     CompletePreparation();
     PreparationLoad.Reset();
+    PreparationEffectLoad.Reset();
 }
 
 void AEncounterManager::CancelBackgroundPreparation()
@@ -269,7 +309,9 @@ void AEncounterManager::CancelBackgroundPreparation()
     ++PreparationGeneration;
     GetWorldTimerManager().ClearTimer(PreparationTimer);
     if (PreparationLoad) PreparationLoad->CancelHandle();
+    if (PreparationEffectLoad) PreparationEffectLoad->CancelHandle();
     PreparationLoad.Reset();
+    PreparationEffectLoad.Reset();
 }
 
 bool AEncounterManager::ConfigureCombatParticipants(FText& OutError)

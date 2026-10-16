@@ -67,6 +67,8 @@ private:
     bool CompletePreparation();
     void StartBackgroundPreparation();
     void FinishBackgroundPreparation(uint32 Generation);
+    void FinishBackgroundEffectPreparation(uint32 Generation);
+    void CompleteBackgroundPreparation();
     void CancelBackgroundPreparation();
     void HandleCombatViewChanged();
     void HandleCombatResult(ECombatResult Result);
@@ -105,6 +107,7 @@ private:
     FTimerHandle FinishTimer;
     FTimerHandle PreparationTimer;
     TSharedPtr<FStreamableHandle> PreparationLoad;
+    TSharedPtr<FStreamableHandle> PreparationEffectLoad;
     uint32 PreparationGeneration = 0;
     bool bPreparing = false;
     bool bPreparationAbortPending = false;
