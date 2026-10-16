@@ -6,8 +6,8 @@
 
 namespace RunDungeonPlanInternal
 {
-    // Version one uses fixed integer mixing and eight frozen patterns, independent of engine RNG state.
-    // 버전 1은 엔진 난수 상태와 독립적인 고정 정수 혼합과 8개 고정 패턴을 사용합니다.
+    // Version one preserves eight deterministic saved IDs; presentation resolves them to the shared maze.
+    // 버전 1은 결정적인 저장 번호 8개를 보존하며 표시는 공통 미로로 연결합니다.
     uint32 Mix(uint32 Value)
     {
         Value ^= Value >> 16;

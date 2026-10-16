@@ -13,12 +13,12 @@ TArray<FVector> EncounterDungeonLayout::GetPath(int32 Direction, int32 LayoutVar
     const FVector DoorForward = GetChoiceDoorRotation(Direction).GetForwardVector();
     const FVector Approach = Door - DoorForward * EntranceDoorApproachDistance;
     const FVector Beyond = Door + DoorForward * ChoiceDoorPassDistance;
-    if (Direction == 1) return {FVector(0.f, 0.f, EyeHeight), Approach, Beyond, FVector(ChoiceDoorDistance + (3 + (LayoutVariant & 1) + ((LayoutVariant >> 2) & 1)) * CellSize, 0.f, EyeHeight)};
+    if (Direction == 1) return {FVector(0.f, 0.f, EyeHeight), Approach, Beyond, FVector(ChoiceDoorDistance + 5.f * CellSize, 0.f, EyeHeight)};
     // Walk directly to the selected doorway approach, then pass straight through its frame.
     // 선택한 문 앞 대기점까지 바로 이동한 다음 문틀을 직진으로 통과합니다.
-    const FVector Advance = Beyond + FVector(CellSize * (0.5f + 0.5f * (LayoutVariant & 1)), 0.f, 0.f);
-    const FVector Corner(Advance.X, (Direction - 1) * (4 + ((LayoutVariant >> 1) & 1)) * CellSize, EyeHeight);
-    return {FVector(0.f, 0.f, EyeHeight), Approach, Beyond, Advance, Corner, Corner + FVector((1 + ((LayoutVariant >> 2) & 1)) * CellSize, 0.f, 0.f)};
+    const FVector Advance = Beyond + FVector(CellSize, 0.f, 0.f);
+    const FVector Corner(Advance.X, (Direction - 1) * 5.f * CellSize, EyeHeight);
+    return {FVector(0.f, 0.f, EyeHeight), Approach, Beyond, Advance, Corner, Corner + FVector(2.f * CellSize, 0.f, 0.f)};
 }
 
 FQuat EncounterDungeonLayout::GetBranchRotation(int32 Direction)

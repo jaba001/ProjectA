@@ -206,11 +206,8 @@ bool AEncounterDungeonRoute::ConfigureLayout(int32 InLayoutVariant)
         PrepareGeometry(RouteMaterial);
         return bGeometryPrepared;
     }
-    // Replace only scenery owned by this cached route; never alter the authored NPC templates.
-    // 캐시된 통로가 소유한 장식만 교체하며 작성된 NPC 원본은 변경하지 않습니다.
-    StopTravel();
-    DestroyPresentedStage();
-    ClearGeometry();
+    // Saved IDs share the same geometry; reset doors and travel without rebuilding authored scenery.
+    // 저장 번호는 같은 지형을 공유하므로 작성 장식을 재생성하지 않고 문과 이동만 초기화합니다.
     LayoutVariant = InLayoutVariant;
     ResetAtJunction();
     return bGeometryPrepared;
@@ -264,23 +261,24 @@ void AEncounterDungeonRoute::ClearGeometry()
 
 bool AEncounterDungeonRoute::SpawnMazeLayout()
 {
-    // Prefer the baked Blueprint of this variant so fixed and hand-edited walls are identical every run.
-    // 이 변형의 구운 Blueprint를 우선 사용하여 고정·수동 수정한 벽이 매번 같게 표시되게 합니다.
-    const FString Name = FString::Printf(TEXT("BP_EncounterMaze_V%d"), LayoutVariant);
+    // Every saved variant uses the same authored scenery and matching route coordinates.
+    // 모든 저장 변형은 동일한 작성 장식과 일치하는 이동 좌표를 사용합니다.
+    const FString Name = EncounterDungeonLayout::BakedMazeName;
     const FSoftClassPath BakedPath(FString::Printf(TEXT("%s/%s.%s_C"), EncounterDungeonLayout::BakedMazeFolder, *Name, *Name));
     UClass* LayoutClass = BakedPath.TryLoadClass<AEncounterMazeLayout>();
+    const AEncounterMazeLayout* Defaults = LayoutClass ? Cast<AEncounterMazeLayout>(LayoutClass->GetDefaultObject()) : nullptr;
+    if (!Defaults || Defaults->LayoutVariant != EncounterDungeonLayout::SharedLayoutVariant)
+    {
+        UE_LOG(LogProjectA, Error, TEXT("[EncounterMaze] Shared baked layout %s is missing or mismatched; prepare the V7 Blueprint in the editor."), *Name);
+        return false;
+    }
     FActorSpawnParameters Parameters;
     Parameters.Owner = this;
     Parameters.ObjectFlags |= RF_Transient;
     Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    MazeLayout = GetWorld()->SpawnActor<AEncounterMazeLayout>(LayoutClass ? LayoutClass : AEncounterMazeLayout::StaticClass(), GetActorTransform(), Parameters);
+    MazeLayout = GetWorld()->SpawnActor<AEncounterMazeLayout>(LayoutClass, GetActorTransform(), Parameters);
     if (!MazeLayout) return false;
     MazeLayout->AttachToComponent(RouteRoot, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-    if (!LayoutClass || MazeLayout->LayoutVariant != LayoutVariant)
-    {
-        UE_LOG(LogProjectA, Warning, TEXT("[EncounterMaze] Baked layout %s is missing or mismatched; generating variant %d at runtime."), *Name, LayoutVariant);
-        MazeLayout->BuildFromLayout(LayoutVariant);
-    }
     MazeLayout->SetPresentationVisible(bPresentationVisible);
     return true;
 }

@@ -113,7 +113,7 @@ bool AEncounterMazeLayout::BuildFromLayout(int32 InLayoutVariant)
 {
     if (InLayoutVariant < 0 || InLayoutVariant >= EncounterDungeonLayout::VariantCount) return false;
     ClearInstances();
-    LayoutVariant = InLayoutVariant;
+    LayoutVariant = EncounterDungeonLayout::SharedLayoutVariant;
     const TArray<FEncounterDungeonFloorRegion> Regions = EncounterDungeonLayout::GetFloorRegions(LayoutVariant);
     const float CellSize = EncounterDungeonLayout::CellSize;
     const float WallHeight = EncounterDungeonLayout::WallHeight;

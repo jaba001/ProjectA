@@ -20,9 +20,9 @@ struct PROJECTA_API FEncounterMazeTorchMount
     FVector Normal = FVector::ForwardVector;
 };
 
-// Static stone scenery of one maze variant, baked into an editable Blueprint per variant.
+// Static stone scenery shared by every saved maze variant, baked into one editable Blueprint.
 // The route actor spawns it and keeps doors, torch lights and camera travel in code.
-// 미로 변형 하나의 정적 석재 장식이며 변형마다 편집 가능한 Blueprint로 저장합니다.
+// 모든 저장 미로 변형이 공유하는 정적 석재 장식이며 편집 가능한 Blueprint 하나로 저장합니다.
 // 통로 액터가 이를 생성하고 문·횃불 조명·카메라 이동은 코드에서 유지합니다.
 UCLASS(Blueprintable)
 class PROJECTA_API AEncounterMazeLayout : public AActor
@@ -32,8 +32,8 @@ class PROJECTA_API AEncounterMazeLayout : public AActor
 public:
     AEncounterMazeLayout();
 
-    // Regenerate every instance from the frozen layout rules; used by the editor bake and the missing-asset fallback.
-    // 고정된 배치 규칙으로 모든 인스턴스를 다시 만들며 에디터 굽기와 에셋 누락 대체에 사용합니다.
+    // Regenerate instances from the shared layout rules for explicit editor baking only.
+    // 명시적인 에디터 굽기에서만 공통 배치 규칙으로 인스턴스를 다시 만듭니다.
     UFUNCTION(BlueprintCallable, Category = "Encounter Maze")
     bool BuildFromLayout(int32 InLayoutVariant);
 

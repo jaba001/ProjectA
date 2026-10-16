@@ -7,10 +7,18 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEncounterDungeonLayoutGeometryTest, "ProjectA.
 
 bool FEncounterDungeonLayoutGeometryTest::RunTest(const FString& Parameters)
 {
-    TestEqual(TEXT("The frozen layout policy exposes exactly eight supported variants."), EncounterDungeonLayout::VariantCount, 8);
+    TestEqual(TEXT("Existing save files retain eight supported layout IDs."), EncounterDungeonLayout::VariantCount, 8);
+    const TArray<FEncounterDungeonFloorRegion> SharedFloor = EncounterDungeonLayout::GetFloorRegions(EncounterDungeonLayout::SharedLayoutVariant);
     for (int32 Variant = 0; Variant < EncounterDungeonLayout::VariantCount; ++Variant)
     {
         const TArray<FEncounterDungeonFloorRegion> Floor = EncounterDungeonLayout::GetFloorRegions(Variant);
+        if (!TestEqual(TEXT("Every saved layout ID uses the shared V7 floor region count."), Floor.Num(), SharedFloor.Num())) return false;
+        for (int32 Index = 0; Index < Floor.Num(); ++Index)
+        {
+            TestTrue(TEXT("Every saved layout ID uses the shared V7 floor transform."), Floor[Index].Transform.Equals(SharedFloor[Index].Transform));
+            TestTrue(TEXT("Every saved layout ID uses the shared V7 floor extent."), Floor[Index].HalfExtent.Equals(SharedFloor[Index].HalfExtent));
+            TestEqual(TEXT("Every saved layout ID uses the shared V7 floor opening."), Floor[Index].bOpenForwardEdge, SharedFloor[Index].bOpenForwardEdge);
+        }
         const FVector ArrivalCameraOffset(-800.f, 0.f, EncounterDungeonLayout::EyeHeight);
         TArray<FVector> Destinations;
         TestTrue(TEXT("The dungeon includes floor behind the initial eye-level junction."), EncounterDungeonLayout::HasFloorAt(Floor, FVector(-400.f, 0.f, 0.f)) && EncounterDungeonLayout::HasFloorAt(Floor, FVector::ZeroVector));
@@ -25,6 +33,15 @@ bool FEncounterDungeonLayoutGeometryTest::RunTest(const FString& Parameters)
         for (int32 Direction = 0; Direction < 3; ++Direction)
         {
             const TArray<FVector> Path = EncounterDungeonLayout::GetPath(Direction, Variant);
+            const int32 SharedVariant = EncounterDungeonLayout::SharedLayoutVariant;
+            const FTransform SharedStage = EncounterDungeonLayout::GetStageTransform(Direction, SharedVariant);
+            const FVector SharedEntrance = EncounterDungeonLayout::GetDoorCenter(Direction, SharedVariant, false);
+            const FVector SharedExit = EncounterDungeonLayout::GetDoorCenter(Direction, SharedVariant, true);
+            TestTrue(TEXT("Every saved layout ID follows V7 corridors."), Path == EncounterDungeonLayout::GetPath(Direction, SharedVariant));
+            TestTrue(TEXT("Every saved layout ID places its NPC in V7."), EncounterDungeonLayout::GetStageTransform(Direction, Variant).Equals(SharedStage));
+            TestTrue(TEXT("Every saved layout ID places its entrance in V7."), EncounterDungeonLayout::GetDoorCenter(Direction, Variant, false).Equals(SharedEntrance));
+            TestTrue(TEXT("Every saved layout ID places its exit in V7."), EncounterDungeonLayout::GetDoorCenter(Direction, Variant, true).Equals(SharedExit));
+            TestTrue(TEXT("Every saved layout ID leaves through V7."), EncounterDungeonLayout::GetExitPath(Direction, Variant) == EncounterDungeonLayout::GetExitPath(Direction, SharedVariant));
             if (!TestTrue(TEXT("Each direction contains a junction, a forward approach and a branch destination."), Path.Num() >= 3)) return false;
             TestTrue(TEXT("All directions begin at the same eye-level junction."), Path[0].Equals(FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight)));
             const FVector ChoiceDoor = EncounterDungeonLayout::GetChoiceDoorCenter(Direction);

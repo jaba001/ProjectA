@@ -12,9 +12,11 @@ struct FEncounterDungeonFloorRegion
 namespace EncounterDungeonLayout
 {
     constexpr int32 VariantCount = 8;
-    // Editable static scenery per variant: BP_EncounterMaze_V0 ~ V7.
-    // 변형별로 편집 가능한 정적 장식 BP_EncounterMaze_V0 ~ V7의 폴더입니다.
+    // Preserve saved variant IDs while using one authored V7 layout for every visit.
+    // 저장된 변형 번호는 보존하고 모든 방문에서 작성된 V7 배치 하나를 사용합니다.
+    constexpr int32 SharedLayoutVariant = 7;
     inline const TCHAR* BakedMazeFolder = TEXT("/Game/User_JeHoon/Blueprint/Game/Encounter/Maze");
+    inline const TCHAR* BakedMazeName = TEXT("BP_EncounterMaze_V7");
     constexpr float CellSize = 400.f;
     constexpr float WallHeight = 420.f;
     constexpr float EyeHeight = 170.f;

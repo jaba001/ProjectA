@@ -91,8 +91,8 @@ private:
     TObjectPtr<UStaticMesh> CubeMesh;
     UPROPERTY()
     TSoftObjectPtr<UNiagaraSystem> TorchFlame;
-    // Static scenery baked per layout variant; a missing Blueprint falls back to the native generator.
-    // 배치 변형마다 구운 정적 장식이며 Blueprint가 없으면 네이티브 생성기로 대체합니다.
+    // All saved variants share the authored V7 scenery; missing content is reported without runtime generation.
+    // 모든 저장 변형은 작성된 V7 장식을 공유하며 에셋 누락은 런타임 생성 없이 보고합니다.
     UPROPERTY(Transient)
     TObjectPtr<AEncounterMazeLayout> MazeLayout;
     UPROPERTY(Transient)
