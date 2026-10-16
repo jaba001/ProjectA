@@ -49,6 +49,9 @@ void UMainMenuRootWidget::EnsureCodeGeneratedRootLayout()
         UE_LOG(LogProjectA, Warning, TEXT("[MainMenuRootWidget] Failed to create CommonUI stacks."));
         return;
     }
+    // Replace screens instantly so the previous menu never shows through the default crossfade.
+    // 기본 교차 페이드로 이전 메뉴가 비쳐 보이지 않도록 화면을 즉시 교체합니다.
+    for (UCommonActivatableWidgetStack* Stack : { MainStack.Get(), MenuStack.Get(), ModalStack.Get() }) Stack->SetTransitionDuration(0.f);
 
     WidgetTree->RootWidget = RootOverlay;
 

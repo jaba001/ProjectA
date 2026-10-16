@@ -185,9 +185,9 @@ void UGameplayRootWidget::NativeOnInitialized()
         RunLayer = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>(UCommonActivatableWidgetStack::StaticClass(), TEXT("RunLayer"));
         CombatLayer = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>(UCommonActivatableWidgetStack::StaticClass(), TEXT("CombatLayer"));
         ModalLayer = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>(UCommonActivatableWidgetStack::StaticClass(), TEXT("ModalLayer"));
-        // The run layer stays collapsed while walking between rooms, which pauses its fade; an instant swap keeps the previous shop from reappearing.
-        // 방 사이 이동 중 Run 레이어가 접혀 있어 페이드가 멈추므로, 즉시 교체해 이전 상점 화면이 다시 보이지 않게 합니다.
-        RunLayer->SetTransitionDuration(0.f);
+        // Layers are collapsed between phases, which pauses the default fade; instant swaps keep the previous screen from reappearing when a layer is shown again.
+        // 레이어는 단계 사이에 접혀 기본 페이드가 멈추므로, 즉시 교체해 레이어가 다시 보일 때 이전 화면이 나타나지 않게 합니다.
+        for (UCommonActivatableWidgetStack* Layer : { RunLayer.Get(), CombatLayer.Get(), ModalLayer.Get() }) Layer->SetTransitionDuration(0.f);
 
         for (UCommonActivatableWidgetStack* Layer : { RunLayer.Get(), CombatLayer.Get(), ModalLayer.Get() })
         {
@@ -260,6 +260,7 @@ void UGameplayRootWidget::NativeOnInitialized()
     NoticeContent->AddChildToVerticalBox(RetryCheckpointButton);
     CheckpointNotice->SetVisibility(ESlateVisibility::Collapsed);
     DevelopmentLayer = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>();
+    DevelopmentLayer->SetTransitionDuration(0.f);
     UOverlaySlot* DevelopmentLayerSlot = NoticeRoot->AddChildToOverlay(DevelopmentLayer);
     DevelopmentLayerSlot->SetHorizontalAlignment(HAlign_Fill);
     DevelopmentLayerSlot->SetVerticalAlignment(VAlign_Fill);

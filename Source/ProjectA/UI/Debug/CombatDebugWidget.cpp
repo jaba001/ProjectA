@@ -199,6 +199,7 @@ void UCombatDebugWidget::NativeOnInitialized()
     Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     WidgetTree->RootWidget = Root;
     CombatLayer = WidgetTree->ConstructWidget<UCommonActivatableWidgetStack>();
+    CombatLayer->SetTransitionDuration(0.f);
     UOverlaySlot* CombatSlot = Root->AddChildToOverlay(CombatLayer);
     CombatSlot->SetHorizontalAlignment(HAlign_Fill);
     CombatSlot->SetVerticalAlignment(VAlign_Fill);
