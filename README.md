@@ -68,6 +68,7 @@ C++ 파일을 추가·삭제하거나 이름을 바꾼 뒤에는 프로젝트 �
 | [UI_README](Docs/UI_README.md) | UI 구조·JSON 명세·생성 옵션 |
 | [MULTIPLAYER](Docs/MULTIPLAYER.md) | 식별·소유권·저장·네트워크 계약 |
 | [TODO](Docs/TODO.md) | 남은 작업·미결정 제안 |
+| [ITEM_DESIGN](Docs/ITEM_DESIGN.md) | 무기·방어구·액세서리·가격의 남은 작업과 제안 |
 | [EXTERNAL_ASSETS](Docs/EXTERNAL_ASSETS.md) | 외부 에셋 팩 복원 목록 |
 | [REVIEW](Docs/REVIEW.md) | 사용자가 직접 확인할 검수 목록 |
 
