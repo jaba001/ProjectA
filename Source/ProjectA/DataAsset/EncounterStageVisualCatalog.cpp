@@ -66,6 +66,16 @@ namespace EncounterStageVisualCatalogDefaults
     }
 }
 
+FSoftObjectPath UEncounterStageVisualCatalog::GetDefaultAssetPath()
+{
+    return FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Encounters/DA_EncounterStageVisuals.DA_EncounterStageVisuals"));
+}
+
+UEncounterStageVisualCatalog* UEncounterStageVisualCatalog::LoadAuthoredDefault()
+{
+    return Cast<UEncounterStageVisualCatalog>(GetDefaultAssetPath().TryLoad());
+}
+
 UEncounterStageVisualCatalog::UEncounterStageVisualCatalog()
 {
     using namespace EncounterStageVisualCatalogDefaults;

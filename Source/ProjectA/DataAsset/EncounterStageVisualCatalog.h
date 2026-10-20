@@ -79,8 +79,8 @@ struct PROJECTA_API FEncounterStageVisualProfile
     float LightIntensity = 1200.f;
 };
 
-// Native defaults reference installed source assets; optional authored catalogs can override the scenery.
-// 네이티브 기본값은 설치된 원본 에셋을 참조하며 선택적 제작 카탈로그로 무대를 재정의할 수 있습니다.
+// Native defaults seed editor authoring; runtime scenery loads the saved catalog and original asset references.
+// 네이티브 기본값은 에디터 작성의 시작값이며 런타임 무대는 저장된 카탈로그와 원본 에셋 참조를 읽습니다.
 UCLASS(BlueprintType)
 class PROJECTA_API UEncounterStageVisualCatalog : public UDataAsset
 {
@@ -88,6 +88,9 @@ class PROJECTA_API UEncounterStageVisualCatalog : public UDataAsset
 
 public:
     UEncounterStageVisualCatalog();
+
+    static UEncounterStageVisualCatalog* LoadAuthoredDefault();
+    static FSoftObjectPath GetDefaultAssetPath();
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TArray<FEncounterStageVisualProfile> Profiles;

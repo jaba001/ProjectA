@@ -517,7 +517,9 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 
 맵에 저장된 `AEncounterPrototypeStage` 5개는 기존 경로·태그를 유지하는 표시 설정 원본이다. 필수·제외 GameplayTagContainer와 우선순위로 무대를 해석한 뒤 실제 `FRunEncounterOffer`의 상품 Query로 NPC를 구분한다. 통로 생성과 직접 무대 표시 모두 선택된 Offer를 전달하고 표지판은 해당 표시명을 사용한다. 이름이나 ID로 직업을 추측하지 않으며 저장된 상품 조건을 Continue·클라이언트에서도 동일하게 평가한다.
 
-`UEncounterStageVisualCatalog`는 GameplayTagQuery·우선순위·상품 태그 샘플을 갖는 15개 프로필을 제공한다. 각 샘플은 단일 종류·등급이며 실제 Offer의 상품 Query 전체를 평가해 제외 조건도 반영한다. 기본점·미지원 전문점은 일반 상인·대장장이로 대체하며 빈 상품 Query는 특정 직업을 임의 선택하지 않는다. 같은 우선순위는 프로필 이름으로 결정한다. 선택한 메시·idle·소품·선택적 재질의 soft path만 cook에 포함하고 원본 재질을 유지한다. 별도 DataAsset으로 외형을 재정의할 수 있으며 기본 도형은 외형 비활성·참조 실패 때의 대체 표현이다.
+`UEncounterStageVisualCatalog`의 15개 프로필은 `/Game/User_JeHoon/Blueprint/DataAsset/Encounters/DA_EncounterStageVisuals`에 저장한다. 각 프로필의 GameplayTagQuery·우선순위·상품 태그 샘플과 소품 위치·회전을 에디터에서 수정한다. 샘플은 단일 종류·등급이며 실제 Offer의 상품 Query 전체를 평가해 제외 조건도 반영한다. 기본점·미지원 전문점은 일반 상인·대장장이로 대체하며 빈 상품 Query는 특정 직업을 임의 선택하지 않는다. 같은 우선순위는 프로필 이름으로 결정한다. 카탈로그와 선택한 원본 메시·idle·소품·재질만 cook에 포함한다. 지정 카탈로그가 없으면 경고하며 네이티브 배치로 대체하지 않는다. `VisualCatalog`의 개별 무대 재정의는 유지한다.
+
+[BakeEncounterStageVisuals.py](../Source/ProjectAEditor/Scripts/BakeEncounterStageVisuals.py)는 카탈로그 최초 작성과 방패 기사의 손잡이 보정을 담당한다. 기본 실행은 기존 에셋을 보존하고 `-EncounterVisualsOverwrite`만 기존 Warden의 손 부착 변환을 갱신한다. 방패 뒤쪽 실제 손잡이를 왼손에 맞추고 반대편 끈 방향을 대기 자세의 전완에 정렬한다. 방패·캐릭터·애니메이션 원본을 복제하거나 수정하지 않는다.
 
 | 무대 | 캐릭터 원본 | 주요 소품 |
 |---|---|---|

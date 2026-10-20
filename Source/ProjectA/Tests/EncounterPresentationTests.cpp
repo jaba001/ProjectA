@@ -4,6 +4,7 @@
 #include "DataAsset/EncounterStageVisualCatalog.h"
 #include "Camera/CameraComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Controller/GameplayPlayerController.h"
 #include "Engine/World.h"
 #include "Game/Encounter/EncounterDungeonLayout.h"
@@ -68,8 +69,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEncounterLibraryProfilesTest, "ProjectA.Run.En
 
 bool FEncounterLibraryProfilesTest::RunTest(const FString& Parameters)
 {
-    const UEncounterStageVisualCatalog* Catalog = GetDefault<UEncounterStageVisualCatalog>();
-    TestFalse(TEXT("The native catalog contains authored encounter appearances"), Catalog->Profiles.IsEmpty());
+    const UEncounterStageVisualCatalog* Catalog = UEncounterStageVisualCatalog::LoadAuthoredDefault();
+    if (!TestNotNull(TEXT("The runtime encounter catalog is saved as an editable DataAsset"), Catalog)) return false;
+    TestFalse(TEXT("The saved catalog contains authored encounter appearances"), Catalog->Profiles.IsEmpty());
     const FGameplayTag StageTags[] = {FRunEncounterOffer::GetBasicItemShopTag(), FRunEncounterOffer::GetRarityItemShopTag(), FRunEncounterOffer::GetTagItemShopTag(), FRunEncounterOffer::GetRecoveryTag(), FRunEncounterOffer::GetConsumableShopTag(), FRunEncounterOffer::GetRevivalTag()};
     TSet<FName> ResolvedProfiles;
     const FEncounterStageVisualProfile* Market = nullptr;
@@ -147,7 +149,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEncounterMerchandiseProfilesTest, "ProjectA.Ru
 
 bool FEncounterMerchandiseProfilesTest::RunTest(const FString& Parameters)
 {
-    const UEncounterStageVisualCatalog* Catalog = GetDefault<UEncounterStageVisualCatalog>();
+    const UEncounterStageVisualCatalog* Catalog = UEncounterStageVisualCatalog::LoadAuthoredDefault();
+    if (!TestNotNull(TEXT("The saved merchandise visual catalog resolves"), Catalog)) return false;
     FRunTargetState State;
     State.SchemaVersion = 1;
     FText Error;
@@ -325,6 +328,39 @@ bool FEncounterDungeonDoorLifecycleTest::RunTest(const FString& Parameters)
         }
     }
     Route->OnTravelFinished.Clear();
+    World->DestroyWorld(false);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEncounterShieldGripTest, "ProjectA.Run.EncounterPresentation.AuthoredShieldGrip",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEncounterShieldGripTest::RunTest(const FString& Parameters)
+{
+    const UWorld::InitializationValues Values = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true)
+        .CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false);
+    TStrongObjectPtr<UWorld> World(UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Values));
+    if (!TestNotNull(TEXT("An isolated world can construct the authored merchant."), World.Get())) return false;
+    AEncounterPrototypeStage* Stage = World->SpawnActor<AEncounterPrototypeStage>();
+    FRunEncounterOffer Offer;
+    Offer.EncounterTag = FRunEncounterOffer::GetTagItemShopTag();
+    Offer.ItemQuery = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Shield")));
+    Stage->SetEncounterOffer(Offer);
+    TestTrue(TEXT("The actual shield merchandise query resolves the authored Warden."),
+        Stage->IsUsingLibraryVisuals() && Stage->GetLibraryProfileId() == TEXT("Warden"));
+    USkeletalMeshComponent* Body = Stage->FindComponentByClass<USkeletalMeshComponent>();
+    UStaticMeshComponent* HeldShield = nullptr;
+    TInlineComponentArray<UStaticMeshComponent*> Props(Stage);
+    for (UStaticMeshComponent* Prop : Props) if (Prop->GetAttachParent() == Body && Prop->GetAttachSocketName() == TEXT("hand_l")) HeldShield = Prop;
+    if (TestNotNull(TEXT("The shield attaches to the original left-hand bone."), HeldShield))
+    {
+        const FVector Grip = HeldShield->GetComponentTransform().TransformPosition(FVector(-15.5f, -6.3f, 0.f));
+        const FVector Hand = Body->GetSocketLocation(TEXT("hand_l"));
+        TestTrue(TEXT("The real rear grip reaches the hand despite character scale and mesh-centering offsets."), Grip.Equals(Hand, 0.1f));
+        const FVector Forearm = (Body->GetSocketLocation(TEXT("lowerarm_l")) - Hand).GetSafeNormal();
+        const FVector StrapDirection = HeldShield->GetComponentTransform().TransformVectorNoScale(FVector::ForwardVector).GetSafeNormal();
+        TestTrue(TEXT("The opposite strap follows the forearm instead of laying the shield across the waist."), FVector::DotProduct(Forearm, StrapDirection) > 0.99f);
+    }
     World->DestroyWorld(false);
     return true;
 }

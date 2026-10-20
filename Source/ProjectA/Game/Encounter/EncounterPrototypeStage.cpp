@@ -264,7 +264,13 @@ void AEncounterPrototypeStage::RebuildLibraryVisuals()
     TGuardValue<bool> RefreshGuard(bRefreshingLibrary, true);
     ClearLibraryVisuals();
     if (!bUseLibraryVisuals || GetNetMode() == NM_DedicatedServer) return;
-    const UEncounterStageVisualCatalog* Catalog = VisualCatalog ? VisualCatalog.Get() : GetDefault<UEncounterStageVisualCatalog>();
+    if (!VisualCatalog) VisualCatalog = UEncounterStageVisualCatalog::LoadAuthoredDefault();
+    const UEncounterStageVisualCatalog* Catalog = VisualCatalog.Get();
+    if (!Catalog)
+    {
+        UE_LOG(LogProjectA, Warning, TEXT("Encounter stage %s cannot load its authored visual catalog; bake DA_EncounterStageVisuals in the editor."), *GetName());
+        return;
+    }
     const FEncounterStageVisualProfile* Profile = bHasEncounterOffer ? Catalog->Resolve(EncounterOffer) : Catalog->Resolve(RequiredTags);
     if (!Profile || Profile->PresentationFocus.ContainsNaN() || !FMath::IsFinite(Profile->PresentationFocusRadius) || Profile->PresentationFocusRadius <= 0.f || Profile->LightLocation.ContainsNaN() || !FMath::IsFinite(Profile->LightIntensity) || Profile->LightIntensity < 0.f) return;
     if (!FMath::IsFinite(Profile->LightColor.R) || !FMath::IsFinite(Profile->LightColor.G) || !FMath::IsFinite(Profile->LightColor.B) || !FMath::IsFinite(Profile->LightColor.A)) return;

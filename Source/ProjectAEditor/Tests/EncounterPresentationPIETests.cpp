@@ -381,7 +381,8 @@ namespace EncounterPresentationPIE
         bool CheckLibraryVisuals(const FRunEncounterOffer& Offer)
         {
             if (!Check(Presented.IsValid() && Presented->IsUsingLibraryVisuals() && !Presented->IsHidden() && !Presented->GetIsReplicated(), TEXT("The arrived stage uses visible library scenery without replicated gameplay authority."))) return false;
-            const UEncounterStageVisualCatalog* Catalog = Presented->VisualCatalog ? Presented->VisualCatalog.Get() : GetDefault<UEncounterStageVisualCatalog>();
+            const UEncounterStageVisualCatalog* Catalog = Presented->VisualCatalog ? Presented->VisualCatalog.Get() : UEncounterStageVisualCatalog::LoadAuthoredDefault();
+            if (!Check(Catalog != nullptr, TEXT("The authored stage catalog resolves."))) return false;
             const FEncounterStageVisualProfile* Profile = Catalog->Resolve(Offer);
             if (!Check(Profile && Presented->GetLibraryProfileId() == Profile->ProfileId && Presented->GetLibraryPropCount() == Profile->Props.Num(), TEXT("The copied stage preserves the tag-selected library profile and full prop count."))) return false;
             TArray<FSoftObjectPath> ExpectedCharacters;

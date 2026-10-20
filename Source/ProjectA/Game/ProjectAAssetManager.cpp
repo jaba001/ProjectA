@@ -60,7 +60,14 @@ void UProjectAAssetManager::ModifyCook(TConstArrayView<const ITargetPlatform*> T
     // Include only the selected library scenery and its dependencies, never an entire source pack.
     // 원본 팩 전체가 아니라 선택한 라이브러리 무대 에셋과 해당 의존성만 포함합니다.
     TArray<FSoftObjectPath> StageAssets;
-    GetDefault<UEncounterStageVisualCatalog>()->GetReferencedAssets(StageAssets);
+    const UEncounterStageVisualCatalog* StageCatalog = UEncounterStageVisualCatalog::LoadAuthoredDefault();
+    if (!StageCatalog)
+    {
+        UE_LOG(LogProjectAAssetManager, Error, TEXT("The authored encounter visual catalog is missing; bake DA_EncounterStageVisuals before cooking."));
+        return;
+    }
+    StageAssets.Add(UEncounterStageVisualCatalog::GetDefaultAssetPath());
+    StageCatalog->GetReferencedAssets(StageAssets);
     for (const FSoftObjectPath& Asset : StageAssets)
     {
         const FName Package = Asset.GetLongPackageFName();

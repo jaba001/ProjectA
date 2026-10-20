@@ -40,6 +40,11 @@ bool UEncounterPresentationCaptureLibrary::CaptureDungeonInteriors(UWorld* World
     FRunEncounterOffer Offer;
     Offer.EncounterId = TEXT("TorchScreenshotBasicShop");
     Offer.EncounterTag = FRunEncounterOffer::GetBasicItemShopTag();
+    if (FParse::Param(FCommandLine::Get(), TEXT("EncounterCaptureShield")))
+    {
+        Offer.EncounterTag = FRunEncounterOffer::GetTagItemShopTag();
+        Offer.ItemQuery = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Shield")));
+    }
     AEncounterPrototypeStage* Template = nullptr;
     for (TActorIterator<AEncounterPrototypeStage> It(World); It; ++It)
     {
@@ -121,6 +126,19 @@ bool UEncounterPresentationCaptureLibrary::CaptureDungeonInteriors(UWorld* World
     bSuccess = bSuccess && Path.Num() > 4 && Save(TEXT("03_Corridor.png"), Origin + Path[3] + CorridorRotation.Vector() * 200.f, CorridorRotation);
     AEncounterPrototypeStage* Stage = Route->ConfigureStage(Template, 0, Offer);
     bSuccess = bSuccess && Stage && Save(TEXT("04_Shop.png"), Stage->Camera->GetComponentLocation(), Stage->Camera->GetComponentRotation());
+    if (Stage && FParse::Param(FCommandLine::Get(), TEXT("EncounterCaptureShield")))
+    {
+        FVector Focus;
+        float Radius = 0.f;
+        if (Stage->GetPresentationFocus(Focus, Radius))
+        {
+            const FVector Center = Focus - FVector(0.f, 0.f, 45.f);
+            const FVector Front = Center - Stage->Camera->GetForwardVector() * 240.f;
+            const FVector Side = Center + Stage->Camera->GetRightVector() * 240.f;
+            bSuccess = bSuccess && Save(TEXT("05_ShieldFront.png"), Front, (Center - Front).Rotation(), 55.f);
+            bSuccess = bSuccess && Save(TEXT("06_ShieldSide.png"), Side, (Center - Side).Rotation(), 55.f);
+        }
+    }
     bSuccess = bSuccess && Save(TEXT("01_Junction.png"), Origin + FVector(0.f, 0.f, EncounterDungeonLayout::EyeHeight), FRotator::ZeroRotator, EncounterDungeonLayout::ChoiceFieldOfView);
     CaptureActor->Destroy();
     Route->Destroy();
