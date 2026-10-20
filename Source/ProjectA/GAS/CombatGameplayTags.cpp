@@ -18,6 +18,8 @@ namespace ProjectACombatTags
     UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Area, "Skill.Shape.Area");
     UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Beam, "Skill.Shape.Beam");
     UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Chain, "Skill.Shape.Chain");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Attack_Melee, "Skill.Attack.Melee", "Direct damage adds the caster's Strength");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Attack_Magic, "Skill.Attack.Magic", "Direct damage adds the caster's Intelligence");
     UE_DEFINE_GAMEPLAY_TAG(Event_Attack_Release, "Event.Attack.Release");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Burning, "Status.Burning", "Damage equal to the value at round end, then decays");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Poisoned, "Status.Poisoned", "Damage equal to the value at round end, then minus one");

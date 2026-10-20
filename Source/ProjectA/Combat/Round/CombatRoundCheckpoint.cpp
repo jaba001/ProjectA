@@ -59,6 +59,8 @@ bool ACombatRoundCoordinator::CapturePlanningCheckpoint(FCombatCheckpointData& O
         Saved.HP = Saved.bDead ? 0.0f : Attributes->GetHP();
         Saved.MaxHP = Attributes->GetMaxHP();
         Saved.Speed = Attributes->GetSpeed();
+        Saved.Strength = Attributes->GetStrength();
+        Saved.Intelligence = Attributes->GetIntelligence();
         Saved.AP = Unit->GetCurrentActionPoint();
         Saved.MaxAP = Unit->GetMaxActionPoint();
         Saved.SubAP = Unit->GetCurrentSubActionPoint();

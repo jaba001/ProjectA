@@ -135,8 +135,8 @@
     {
       "namespace": "CharacterCreation",
       "key": "ProfessionDetails",
-      "source": "{0}\n{1}\n\nHP {2} · 속도 {3}\nAP {4} · 보조 AP {5}\n\n시작 스킬\n{6}",
-      "translation": "{0}\n{1}\n\nHP {2} · Speed {3}\nAP {4} · SAP {5}\n\nStarting Skills\n{6}"
+      "source": "{0}\n{1}\n\nHP {2} · 힘 {7} · 민첩 {3} · 지능 {8}\nAP {4} · 보조 AP {5}\n\n시작 스킬\n{6}",
+      "translation": "{0}\n{1}\n\nHP {2} · STR {7} · AGI {3} · INT {8}\nAP {4} · SAP {5}\n\nStarting Skills\n{6}"
     },
     {
       "namespace": "CharacterCreation",

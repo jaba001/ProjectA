@@ -45,6 +45,18 @@ public:
     FGameplayAttributeData Speed;
     ATTRIBUTE_ACCESSORS(UAS_Unit, Speed)
 
+    // Each point adds one to direct damage of skills tagged Skill.Attack.Melee.
+    // 1당 Skill.Attack.Melee 태그 스킬의 직접 피해를 1 더합니다.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Strength, Category = "Attributes")
+    FGameplayAttributeData Strength;
+    ATTRIBUTE_ACCESSORS(UAS_Unit, Strength)
+
+    // Each point adds one to direct damage of skills tagged Skill.Attack.Magic.
+    // 1당 Skill.Attack.Magic 태그 스킬의 직접 피해를 1 더합니다.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Intelligence, Category = "Attributes")
+    FGameplayAttributeData Intelligence;
+    ATTRIBUTE_ACCESSORS(UAS_Unit, Intelligence)
+
 public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -71,4 +83,10 @@ protected:
 
     UFUNCTION()
     void OnRep_Speed(const FGameplayAttributeData& PreviousSpeed);
+
+    UFUNCTION()
+    void OnRep_Strength(const FGameplayAttributeData& PreviousStrength);
+
+    UFUNCTION()
+    void OnRep_Intelligence(const FGameplayAttributeData& PreviousIntelligence);
 };

@@ -281,7 +281,7 @@ AUnitBase* ACombatDebugGameMode::SpawnConfiguredDebugUnit(bool bEnemy, FName Opt
         APlayerUnit* Player = Cast<APlayerUnit>(Unit);
         FCharacterAppearanceSelection Appearance;
         Appearance.BodyId = SpawnedPlayerCount++ % 2 == 0 ? FName(TEXT("Male")) : FName(TEXT("Female"));
-        if (!Player || !Player->CharacterAppearance || !Player->CharacterAppearance->SetAppearance(Profession.AppearanceCatalog, Appearance) || !Player->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, StartingSkills, Profession.Speed) || !Player->CharacterEquipment || !Player->CharacterEquipment->SetEquipment(true, TArray<FRunEquipmentVisual>()))
+        if (!Player || !Player->CharacterAppearance || !Player->CharacterAppearance->SetAppearance(Profession.AppearanceCatalog, Appearance) || !Player->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, StartingSkills, Profession.Speed, Profession.Strength, Profession.Intelligence) || !Player->CharacterEquipment || !Player->CharacterEquipment->SetEquipment(true, TArray<FRunEquipmentVisual>()))
         {
             OutError = NSLOCTEXT("CombatDebugGameModeText", "M_2C121C8F", "캐릭터 외형·능력치·시작 스킬 구성에 실패했습니다.");
             Unit->Destroy();

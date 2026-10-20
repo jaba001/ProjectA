@@ -56,6 +56,14 @@ struct PROJECTA_API FCombatCheckpointUnit
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     float Speed = 10.0f;
 
+    // Checkpoints saved before primary stats returned load zero Strength and Intelligence.
+    // 기본 능력치 재도입 이전 체크포인트는 힘·지능 0으로 읽습니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    float Strength = 0.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    float Intelligence = 0.0f;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     int32 AP = 0;
 

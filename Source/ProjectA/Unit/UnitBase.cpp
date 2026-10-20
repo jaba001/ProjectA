@@ -22,6 +22,7 @@
 #include "Grid/Combat/CombatGridTile.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "DataAsset/SkillPoolDataAsset.h"
+#include "GAS/CombatGameplayTags.h"
 #include "Controller/UnitAIController.h"
 #include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -574,13 +575,22 @@ USkillDefinitionDataAsset* AUnitBase::FindSkillDataByAbilityClass(TSubclassOf<UG
     return nullptr;
 }
 
-bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Speed)
+float AUnitBase::GetAttackStatBonus(const FGameplayTagContainer& SkillTags) const
+{
+    if (!AttributeSet) return 0.0f;
+    float Bonus = 0.0f;
+    if (SkillTags.HasTag(ProjectACombatTags::Skill_Attack_Melee)) Bonus += AttributeSet->GetStrength();
+    if (SkillTags.HasTag(ProjectACombatTags::Skill_Attack_Magic)) Bonus += AttributeSet->GetIntelligence();
+    return FMath::IsFinite(Bonus) ? FMath::Max(0.0f, Bonus) : 0.0f;
+}
+
+bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Speed, float Strength, float Intelligence)
 {
     if (!HasAuthority() || IsBusy() || IsActiveTurn() || !AbilitySystem || !AttributeSet || !UnitDataRules::IsValidMaxHP(MaxHP) || !UnitDataRules::IsValidActionPoints(AP, SubAP))
     {
         return false;
     }
-    if (!UnitDataRules::IsValidSpeed(Speed))
+    if (!UnitDataRules::IsValidSpeed(Speed) || !UnitDataRules::IsValidSpeed(Strength) || !UnitDataRules::IsValidSpeed(Intelligence))
     {
         return false;
     }
@@ -605,6 +615,8 @@ bool AUnitBase::ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TA
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetMaxHPAttribute(), MaxHP);
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetHPAttribute(), MaxHP);
     AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), Speed);
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetStrengthAttribute(), Strength);
+    AbilitySystem->SetNumericAttributeBase(UAS_Unit::GetIntelligenceAttribute(), Intelligence);
     RefreshSkillPresentation();
     return true;
 }

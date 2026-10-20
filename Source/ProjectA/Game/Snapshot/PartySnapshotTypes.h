@@ -21,6 +21,14 @@ struct PROJECTA_API FPartySnapshotStats
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
     float Speed = 10.0f;
 
+    // Snapshots saved before primary stats returned load zero Strength and Intelligence.
+    // 기본 능력치 재도입 이전 스냅샷은 힘·지능 0으로 읽습니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
+    float Strength = 0.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
+    float Intelligence = 0.0f;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Snapshot")
     int32 MaxActionPoints = 2;
 

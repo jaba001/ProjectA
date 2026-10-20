@@ -477,7 +477,11 @@ public:
     bool ConfigureMoveRange(int32 InMoveRange);
     // Apply resolved profession data before the spawned unit enters combat.
     // 스폰 유닛이 전투에 들어가기 전에 해석된 직업 데이터를 적용합니다.
-    bool ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Speed = 10.0f);
+    bool ConfigureProfession(float MaxHP, int32 AP, int32 SubAP, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills, float Speed = 10.0f, float Strength = 0.0f, float Intelligence = 0.0f);
+
+    // Flat direct-damage bonus from the primary stat that matches the skill's attack category tag.
+    // 스킬의 공격 분류 태그에 맞는 기본 능력치만큼 직접 피해에 더할 값입니다.
+    float GetAttackStatBonus(const FGameplayTagContainer& SkillTags) const;
 private:
     friend class ACombatRoundCoordinator;
     // The coordinator validates debug access and the complete catalog before replacing this loadout.

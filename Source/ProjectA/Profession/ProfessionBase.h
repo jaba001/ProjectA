@@ -28,8 +28,16 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats")
     float MaxHP;
 
+    // Agility is represented by Speed and controls round timing.
+    // 민첩은 속도로 표현하며 라운드 실행 시간을 결정합니다.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats")
     float Speed;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats")
+    float Strength;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats")
+    float Intelligence;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
     TArray<FRunStartingEquipment> StartingEquipment;

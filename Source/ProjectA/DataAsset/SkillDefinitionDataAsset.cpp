@@ -1,6 +1,7 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Animation/AnimMontage.h"
 #include "GAS/Ability/GA_AttackBase.h"
+#include "GAS/CombatGameplayTags.h"
 
 bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, FText& OutError) const
 {
@@ -48,6 +49,9 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
             Skill.TargetLoss = ECombatRoundTargetLoss::KeepLocation;
             Skill.HitRange = FMath::Max(150.f, static_cast<float>(AreaRadius) * 200.f);
         }
+        // Legacy profiles have no authored tags; an approaching unit attack migrates as a melee attack.
+        // 이전 프로필에는 작성 태그가 없으므로 대상에게 접근하는 유닛 공격은 근접 공격으로 이행합니다.
+        if (Skill.Kind == ECombatRoundSkillKind::Melee) Skill.EffectTags.AddTag(ProjectACombatTags::Skill_Attack_Melee);
     }
     if (!Skill.CastMontage && Attack) Skill.CastMontage = Attack->GetAuthoredAttackMontage();
     if (Attack) Attack->ExportRoundEffectContract(Skill);

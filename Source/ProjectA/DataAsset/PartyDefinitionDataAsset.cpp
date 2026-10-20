@@ -36,6 +36,8 @@ UPartyDefinitionDataAsset::UPartyDefinitionDataAsset()
         Definition.Description = Profession->Description;
         Definition.MaxHP = Profession->MaxHP;
         Definition.Speed = Profession->Speed;
+        Definition.Strength = Profession->Strength;
+        Definition.Intelligence = Profession->Intelligence;
     }
 }
 
@@ -94,6 +96,8 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
     {
         OutDefinition.MaxHP = Profession->MaxHP;
         OutDefinition.Speed = Profession->Speed;
+        OutDefinition.Strength = Profession->Strength;
+        OutDefinition.Intelligence = Profession->Intelligence;
         OutDefinition.ActionPoints = Defaults->GetMaxActionPoint();
         OutDefinition.SubActionPoints = Defaults->GetMaxSubActionPoint();
         OutDefinition.StartingSkills = Defaults->GetEquippedSkillDataAssets();
@@ -102,7 +106,7 @@ bool UPartyDefinitionDataAsset::ResolveProfession(FName ClassId, FProfessionDefi
     {
         return Fail(NSLOCTEXT("PartyDefinition", "InvalidHPRange", "Resolved MaxHP must be finite, positive and at most 1000000. / 실제 MaxHP는 1000000 이하의 유한한 양수여야 합니다."));
     }
-    if (!UnitDataRules::IsValidSpeed(OutDefinition.Speed))
+    if (!UnitDataRules::IsValidSpeed(OutDefinition.Speed) || !UnitDataRules::IsValidSpeed(OutDefinition.Strength) || !UnitDataRules::IsValidSpeed(OutDefinition.Intelligence))
     {
         return Fail(NSLOCTEXT("PartyDefinition", "InvalidSpeed", "Speed must be a finite value between 0 and 1000000. / 속도는 0~1000000 범위의 유한한 값이어야 합니다."));
     }
@@ -241,5 +245,5 @@ FText UPartyDefinitionDataAsset::GetProfessionDetails(FName ClassId) const
     }
     FNumberFormattingOptions HPFormat;
     HPFormat.SetMaximumFractionalDigits(0);
-    return FText::Format(NSLOCTEXT("CharacterCreation", "ProfessionDetails", "{0}\n{1}\n\nHP {2} · 속도 {3}\nAP {4} · 보조 AP {5}\n\n시작 스킬\n{6}"), ProjectALocalization::Content(TEXT("Profession.") + ClassId.ToString() + TEXT(".Name"), Definition.DisplayName), ProjectALocalization::Content(TEXT("Profession.") + ClassId.ToString() + TEXT(".Description"), Definition.Description), FText::AsNumber(Definition.MaxHP, &HPFormat), FText::AsNumber(Definition.Speed), FText::AsNumber(Definition.ActionPoints), FText::AsNumber(Definition.SubActionPoints), FText::Join(FText::AsCultureInvariant(TEXT("\n")), Skills));
+    return FText::Format(NSLOCTEXT("CharacterCreation", "ProfessionDetails", "{0}\n{1}\n\nHP {2} · 힘 {7} · 민첩 {3} · 지능 {8}\nAP {4} · 보조 AP {5}\n\n시작 스킬\n{6}"), ProjectALocalization::Content(TEXT("Profession.") + ClassId.ToString() + TEXT(".Name"), Definition.DisplayName), ProjectALocalization::Content(TEXT("Profession.") + ClassId.ToString() + TEXT(".Description"), Definition.Description), FText::AsNumber(Definition.MaxHP, &HPFormat), FText::AsNumber(Definition.Speed), FText::AsNumber(Definition.ActionPoints), FText::AsNumber(Definition.SubActionPoints), FText::Join(FText::AsCultureInvariant(TEXT("\n")), Skills), FText::AsNumber(Definition.Strength), FText::AsNumber(Definition.Intelligence));
 }

@@ -22,6 +22,10 @@ namespace ProjectACombatTags
     PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Shape_Area);
     PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Shape_Beam);
     PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Shape_Chain);
+    // Attack categories select the primary stat added to direct damage; bows carry neither.
+    // 공격 분류는 직접 피해에 더할 기본 능력치를 고르며 활 계열은 어느 쪽도 갖지 않습니다.
+    PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Attack_Melee);
+    PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Attack_Magic);
     PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Attack_Release);
     PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Burning);
     PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Poisoned);

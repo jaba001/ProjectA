@@ -1506,7 +1506,11 @@ void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, con
             if (Other != Index && Candidate.bEnemy == Entry.bEnemy && IsValid(Candidate.Unit) && Candidate.Unit->IsUnitAlive() && FMath::Abs(Offset.X) + FMath::Abs(Offset.Y) == 1) ShockTargets.Add(Other);
         }
     }
-    if (!CombatSkillExecution::ApplyEffect(Source, Target, Skill)) return;
+    // Strength or Intelligence adds a flat amount per hit target only to direct damage of tagged melee or magic skills.
+    // 힘·지능은 근접·마법 태그 스킬의 직접 피해에만 맞은 대상마다 고정값으로 더합니다.
+    FCombatRoundSkill HitSkill = Skill;
+    if (bDirectDamage) HitSkill.Power += Source->GetAttackStatBonus(Skill.EffectTags);
+    if (!CombatSkillExecution::ApplyEffect(Source, Target, HitSkill)) return;
     const int32 SourceIndex = View.Units.IndexOfByPredicate([Source](const FCombatRoundUnitView& Unit) { return Unit.Unit == Source; });
     if (Actions.IsValidIndex(SourceIndex)) Actions[SourceIndex].bHasSkillImpact = true;
     Entry.HP = Target->GetAttributeSet() ? Target->GetAttributeSet()->GetHP() : 0.f;
@@ -1515,7 +1519,7 @@ void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, con
         Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
         Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_8F480533", "사망으로 남은 행동 취소");
     }
-    UE_LOG(LogProjectA, Log, TEXT("[Round] Round=%d Time=%.2f Source=%d Target=%d Damage=%.1f / 서버 피격"), View.RoundNumber, SimulationTime, Source->UnitIndex, Target->UnitIndex, Skill.Power);
+    UE_LOG(LogProjectA, Log, TEXT("[Round] Round=%d Time=%.2f Source=%d Target=%d Damage=%.1f / 서버 피격"), View.RoundNumber, SimulationTime, Source->UnitIndex, Target->UnitIndex, HitSkill.Power);
     if (Shock > 0)
     {
         // One discharge per shock: remove it first, then damage every captured unit once without recursion.

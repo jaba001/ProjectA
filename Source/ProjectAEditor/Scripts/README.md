@@ -345,3 +345,11 @@ Development Editor / Win64 컴파일 후 작성·별도 프로세스 재로드 �
 결과는 `Saved/BalanceSim/<UTC 타임스탬프_UUID>/runs.csv`·`combats.csv`(UTF-8)에 누적된다. Run 결과 `Complete`·`Defeat`는 완주·자연 패배이며, `StepLimit`·`Timeout`·`Error`는 미완료 측정이다. 하나라도 미완료면 종료 코드 2, 인자 오류는 1, 전체 완주/패배 기록 성공은 0이다. `progress_steps`는 완료 선택+승리 전투 수, `final_gold`는 파티 골드 합이다. 전투 행은 결과 확정·보상 선택 후 기록하며 `gold_earned`는 해당 전투와 보상 선택의 골드 순증, HP·생존 수는 결과 콜백 시점, 최대 HP 합은 전투 시작 시 전체 생성 아군(이미 사망한 캐릭터 포함) 기준이다. Snapshot 난이도는 `N/A`다. 상한·오류로 중단된 미종료 전투는 전투 결과 행을 만들지 않는다.
 
 저장은 기존 체크포인트 검증 후 메모리에만 게시하고 Run 저장 파일의 읽기·쓰기·삭제를 차단한다. CSV·밸런스·콘텐츠 에셋은 변경하지 않는다.
+
+## 35 스킬 공격 분류 태그
+
+`TagSkillAttackCategories.py`는 `USkillAttackTagLibrary`로 `Skills` 폴더의 RoundDefinition에 `Skill.Attack.Melee`(근접 실행)·`Skill.Attack.Magic`(지팡이·마법서 무기 풀)을 추가한다. 회복·보호막 스킬과 활·석궁은 태그를 받지 않고 기존 태그는 지우지 않으므로 다시 실행해도 수동 편집이 유지된다. `-SkillAttackTagDryRun`은 저장하지 않는다. 2026-10-20 실행 결과 근접 32·마법 38개에 추가했다.
+
+```powershell
+& "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "$PWD\ProjectA.uproject" -run=pythonscript -script="$PWD\Source\ProjectAEditor\Scripts\TagSkillAttackCategories.py" -unattended -nop4 -nosplash -NoSound
+```

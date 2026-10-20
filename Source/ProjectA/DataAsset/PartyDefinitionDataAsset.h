@@ -41,6 +41,10 @@ struct PROJECTA_API FProfessionDefinition
     float MaxHP = 100.0f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0", ClampMax = "1000000"))
     float Speed = 10.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0", ClampMax = "1000000"))
+    float Strength = 0.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0", ClampMax = "1000000"))
+    float Intelligence = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1", ClampMax = "100"))
     int32 ActionPoints = 2;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0", ClampMax = "100"))

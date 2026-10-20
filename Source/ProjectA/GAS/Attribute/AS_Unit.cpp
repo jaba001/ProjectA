@@ -7,6 +7,8 @@ UAS_Unit::UAS_Unit()
 {
     InitShield(0.0f);
     InitSpeed(10.0f);
+    InitStrength(0.0f);
+    InitIntelligence(0.0f);
 }
 
 void UAS_Unit::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -16,6 +18,8 @@ void UAS_Unit::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
     DOREPLIFETIME_CONDITION_NOTIFY(UAS_Unit, MaxHP, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(UAS_Unit, Shield, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(UAS_Unit, Speed, COND_None, REPNOTIFY_Always);
+    DOREPLIFETIME_CONDITION_NOTIFY(UAS_Unit, Strength, COND_None, REPNOTIFY_Always);
+    DOREPLIFETIME_CONDITION_NOTIFY(UAS_Unit, Intelligence, COND_None, REPNOTIFY_Always);
 }
 
 void UAS_Unit::OnRep_HP(const FGameplayAttributeData& PreviousHP)
@@ -36,6 +40,16 @@ void UAS_Unit::OnRep_Shield(const FGameplayAttributeData& PreviousShield)
 void UAS_Unit::OnRep_Speed(const FGameplayAttributeData& PreviousSpeed)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UAS_Unit, Speed, PreviousSpeed);
+}
+
+void UAS_Unit::OnRep_Strength(const FGameplayAttributeData& PreviousStrength)
+{
+    GAMEPLAYATTRIBUTE_REPNOTIFY(UAS_Unit, Strength, PreviousStrength);
+}
+
+void UAS_Unit::OnRep_Intelligence(const FGameplayAttributeData& PreviousIntelligence)
+{
+    GAMEPLAYATTRIBUTE_REPNOTIFY(UAS_Unit, Intelligence, PreviousIntelligence);
 }
 
 void UAS_Unit::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
