@@ -344,6 +344,7 @@ AEncounterPrototypeStage* AEncounterDungeonRoute::ConfigureStage(const AEncounte
     Stage->PrototypeMaterial = Template->PrototypeMaterial;
     Stage->VisualStyle = Template->VisualStyle;
     Stage->VisualCatalog = Template->VisualCatalog;
+    Stage->SignWidgetClass = Template->SignWidgetClass;
     Stage->bUseLibraryVisuals = Template->bUseLibraryVisuals;
     Stage->SetEncounterOffer(Offer);
     Stage->Camera->SetRelativeLocation(FVector(-800.f, 0.f, EncounterDungeonLayout::EyeHeight));

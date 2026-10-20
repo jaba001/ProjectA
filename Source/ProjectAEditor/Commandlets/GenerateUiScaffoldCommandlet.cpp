@@ -44,6 +44,7 @@ struct FUiScaffoldWidgetSpec
 	FString Type;
 	FString Parent;
 	FString Text;
+    int32 FontSize = 0;
 	FString HorizontalAlignment = TEXT("Center");
 	FString VerticalAlignment = TEXT("Center");
 	FString SizeRule = TEXT("Auto");
@@ -460,6 +461,7 @@ bool ParseSpecFile(const FString& SpecFullPath, FUiScaffoldSpec& OutSpec)
 		WidgetObject->TryGetStringField(TEXT("parent"), WidgetSpec.Parent);
 		WidgetObject->TryGetBoolField(TEXT("bind"), WidgetSpec.bBind);
 		WidgetObject->TryGetStringField(TEXT("text"), WidgetSpec.Text);
+        WidgetObject->TryGetNumberField(TEXT("fontSize"), WidgetSpec.FontSize);
 		WidgetObject->TryGetStringField(TEXT("horizontalAlignment"), WidgetSpec.HorizontalAlignment);
 		WidgetObject->TryGetStringField(TEXT("verticalAlignment"), WidgetSpec.VerticalAlignment);
 		WidgetObject->TryGetStringField(TEXT("sizeRule"), WidgetSpec.SizeRule);
@@ -548,6 +550,12 @@ bool ValidateSpec(const FUiScaffoldSpec& Spec)
 	for (int32 Index = 0; Index < Spec.Widgets.Num(); ++Index)
 	{
 		const FUiScaffoldWidgetSpec& Widget = Spec.Widgets[Index];
+        if (Widget.FontSize < 0 || Widget.FontSize > 256
+            || (Widget.FontSize > 0 && Widget.Type != TEXT("TextBlock")))
+        {
+            UE_LOG(LogTemp, Error, TEXT("[GenerateUiScaffoldCommandlet] fontSize must be 1..256 and belongs only to TextBlock: %s"), *Widget.Name);
+            bValid = false;
+        }
 
 		if (Names.Contains(Widget.Name))
 		{
@@ -1074,6 +1082,12 @@ bool ApplyWidgetProperties(const FUiScaffoldWidgetSpec& WidgetSpec, UWidget* Wid
 		{
 			TextBlock->SetText(FText::FromString(WidgetSpec.Text));
 		}
+        if (WidgetSpec.FontSize > 0)
+        {
+            FSlateFontInfo Font = TextBlock->GetFont();
+            Font.Size = WidgetSpec.FontSize;
+            TextBlock->SetFont(Font);
+        }
 
 		if (WidgetSpec.bHasColor)
 		{

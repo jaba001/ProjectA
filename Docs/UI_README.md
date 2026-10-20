@@ -417,3 +417,11 @@ Designer와 native 경로 모두 기존 `SlotActionBox` 행을 사용하므로 W
 메뉴·캐릭터 생성·설정·전투 계획·인벤토리·장비/스킬 툴팁·인카운터·PvE 난이도·보상·로딩 안내에 Unreal `FText`와 키가 있는 번역 리소스를 사용한다. 아이템 49종·스킬 77종과 현재 인카운터·노드·몬스터·직업/몸체 이름은 고정 ID 또는 원본 에셋 경로로 현지화한다. 저장된 이름·수치·태그·획득 확률·Snapshot·명령 ID를 변경하지 않으며 사용자 캐릭터명은 번역하지 않는다. 기존 개발 진단의 고정 문자열과 미등록/사용자 수정 콘텐츠는 원문을 유지한다. 전체 게임의 모든 로그·예외 문구가 영어라는 의미는 아니다.
 
 `Config/Localization`의 7개 JSON에 namespace·key·한국어 원문·영어 번역을 관리한다. 정적 문자열은 `NSLOCTEXT`, 데이터 표시 문자열은 `ProjectALocalization`의 명시적인 키를 사용한다. 번역이 없거나 원문 해시가 다르면 원문을 표시한다. 원문 변경 시 같은 키의 source/translation을 함께 갱신하며 서식 인자의 이름을 보존한다. `python Source/ProjectAEditor/Scripts/BuildLocalization.py`로 ko/en 리소스를 생성하고 `--check`로 수집 누락·키 충돌·원문/인자·생성물 일치를 검사한다. 생성기는 UE Compact locres 1·locmeta 1을 작성하며 엔진 기본 로더가 읽는다. 번역 배포에는 런타임 JSON 파싱이나 외부 API가 필요 없다.
+
+## 16 NPC 월드 표지판
+
+NPC 표지판은 `/Game/User_JeHoon/UI/Gameplay/WBP_EncounterSign`의 TextBlock으로 표시한다. Slate의 런타임 글리프·한글 대체 폰트를 사용하며 기존 `TextRender` 컴포넌트는 저장된 경로 호환을 위해 숨긴 채 유지한다. 표지판 위치·방향과 환경 전용 샘물의 숨김 조건은 기존 동작을 따른다.
+
+`UEncounterSignWidget`은 `Text_Title`에 실제 인카운터의 `FText` 제목만 전달한다. 크기·색·중앙 정렬은 Widget Blueprint에서 수정하며 런타임 WidgetTree를 생성하지 않는다. 초기 명세는 [EncounterSignWidget.json](../Source/ProjectAEditor/UiScaffoldSpecs/EncounterSignWidget.json)이며 `GenerateUiScaffold -Spec=Source/ProjectAEditor/UiScaffoldSpecs/EncounterSignWidget.json`으로 처음 작성한다. 기존 에셋은 명시적 덮어쓰기 옵션 없이 보존한다. 명세의 TextBlock `fontSize`는 에셋 생성 시에만 적용한다.
+
+무대 템플릿의 `SignWidgetClass` 재정의는 통로의 실제 NPC에도 전달하며 기본 위젯은 쿠킹 목록에 포함한다. 에셋 누락은 경고로 드러내고 기본 영문 TextRender로 대체하지 않는다. 제목 변경 시에만 다시 그리도록 요청한다.

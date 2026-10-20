@@ -14,6 +14,8 @@ class USkeletalMeshComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
 class UTextRenderComponent;
+class UWidgetComponent;
+class UEncounterSignWidget;
 
 namespace EncounterPresentation
 {
@@ -49,6 +51,8 @@ public:
     TObjectPtr<UMaterialInterface> PrototypeMaterial;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter Stage")
     TObjectPtr<UEncounterStageVisualCatalog> VisualCatalog;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter Stage")
+    TSoftClassPtr<UEncounterSignWidget> SignWidgetClass = TSoftClassPtr<UEncounterSignWidget>(FSoftObjectPath(TEXT("/Game/User_JeHoon/UI/Gameplay/WBP_EncounterSign.WBP_EncounterSign_C")));
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter Stage")
     bool bUseLibraryVisuals = true;
 
@@ -86,6 +90,7 @@ private:
     void RebuildLibraryVisuals();
     void ClearLibraryVisuals();
     void UpdateLibraryPlayback();
+    void RefreshSign();
     void ApplyDungeonLighting();
 
     UPROPERTY()
@@ -151,6 +156,8 @@ private:
     TObjectPtr<UStaticMeshComponent> DisplayAccent;
     UPROPERTY()
     TObjectPtr<UTextRenderComponent> SignText;
+    UPROPERTY(VisibleAnywhere, Category = "Encounter Stage")
+    TObjectPtr<UWidgetComponent> SignWidget;
     UPROPERTY()
     TObjectPtr<UStaticMesh> CubeMesh;
     UPROPERTY()

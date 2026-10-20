@@ -2,6 +2,7 @@
 
 #if WITH_EDITOR
 #include "DataAsset/EncounterStageVisualCatalog.h"
+#include "Game/Encounter/EncounterPrototypeStage.h"
 #include "Game/Run/RunItemShopCatalog.h"
 #include "DataAsset/TargetRunDefinitionDataAsset.h"
 #include "Game/Run/RunLevelDesign.h"
@@ -67,6 +68,7 @@ void UProjectAAssetManager::ModifyCook(TConstArrayView<const ITargetPlatform*> T
         return;
     }
     StageAssets.Add(UEncounterStageVisualCatalog::GetDefaultAssetPath());
+    StageAssets.Add(GetDefault<AEncounterPrototypeStage>()->SignWidgetClass.ToSoftObjectPath());
     StageCatalog->GetReferencedAssets(StageAssets);
     for (const FSoftObjectPath& Asset : StageAssets)
     {

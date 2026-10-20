@@ -11,12 +11,14 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
+#include "Components/WidgetComponent.h"
 #include "DataAsset/EncounterStageVisualCatalog.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
+#include "UI/Gameplay/EncounterSignWidget.h"
 
 bool EncounterPresentation::MatchesOffer(const FRunEncounterOffer& Offer, const FGameplayTagContainer& RequiredTags, const FGameplayTagContainer& ExcludedTags)
 {
@@ -79,6 +81,16 @@ AEncounterPrototypeStage::AEncounterPrototypeStage()
     RightArm->SetupAttachment(RightArmPivot);
     SignText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("SignText"));
     SignText->SetupAttachment(StageRoot);
+    SignWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("SignWidget"));
+    SignWidget->SetupAttachment(StageRoot);
+    SignWidget->SetWidgetSpace(EWidgetSpace::World);
+    SignWidget->SetTwoSided(true);
+    SignWidget->SetDrawSize(FVector2D(1024.f, 128.f));
+    SignWidget->SetPivot(FVector2D(0.5f, 0.5f));
+    SignWidget->SetManuallyRedraw(true);
+    SignWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    SignWidget->SetGenerateOverlapEvents(false);
+    SignWidget->SetCanEverAffectNavigation(false);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
@@ -217,7 +229,8 @@ void AEncounterPrototypeStage::RefreshPrototype()
     SignText->SetWorldSize(18.f);
     SignText->SetTextRenderColor(FColor(244, 237, 210));
     SignText->SetText(StageTitle);
-    SignText->SetVisibility(true);
+    SignText->SetVisibility(false);
+    SignText->SetHiddenInGame(true);
     SignText->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     SignText->SetCanEverAffectNavigation(false);
     Camera->SetRelativeLocation(FVector(-850.f, 160.f, 380.f));
@@ -230,8 +243,30 @@ void AEncounterPrototypeStage::RefreshPrototype()
     Camera->SetAspectRatioAxisConstraint(AspectRatio_MaintainYFOV);
     ResetPose();
     RebuildLibraryVisuals();
+    RefreshSign();
     if (bUsingLibraryVisuals && bEnvironmentOnly) Camera->SetRelativeRotation((LibraryPresentationFocus + FVector(0.f, -40.f, 0.f) - Camera->GetRelativeLocation()).Rotation());
     SetActorTickEnabled(bPresenting && bPresentationVisible && !IsHidden() && !bUsingLibraryVisuals);
+}
+
+void AEncounterPrototypeStage::RefreshSign()
+{
+    SignWidget->SetVisibility(!bEnvironmentOnly);
+    SignWidget->SetRelativeLocationAndRotation(SignText->GetRelativeLocation(), SignText->GetRelativeRotation());
+    // Match the previous world-space letter height while the authored widget owns typography and layout.
+    // 글자체와 배치는 제작 위젯에서 관리하며 기존 월드 공간의 글자 높이를 유지합니다.
+    SignWidget->SetRelativeScale3D(FVector(SignText->WorldSize / 96.f));
+    if (!GetWorld() || GetNetMode() == NM_DedicatedServer
+        || bEnvironmentOnly) return;
+    UClass* WidgetClass = SignWidgetClass.LoadSynchronous();
+    if (!WidgetClass)
+    {
+        UE_LOG(LogProjectA, Warning, TEXT("Encounter stage %s cannot load its authored sign widget: %s"), *GetName(), *SignWidgetClass.ToString());
+        return;
+    }
+    if (SignWidget->GetWidgetClass() != WidgetClass) SignWidget->SetWidgetClass(WidgetClass);
+    SignWidget->InitWidget();
+    if (UEncounterSignWidget* Widget = Cast<UEncounterSignWidget>(SignWidget->GetUserWidgetObject())) Widget->SetTitle(StageTitle);
+    SignWidget->RequestRedraw();
 }
 
 void AEncounterPrototypeStage::ClearLibraryVisuals()

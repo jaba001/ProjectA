@@ -1,0 +1,29 @@
+{
+    "nativeClass": "UEncounterSignWidget",
+    "nativeHeaderPath": "Source/ProjectA/UI/Gameplay/EncounterSignWidget.h",
+    "nativeSourcePath": "Source/ProjectA/UI/Gameplay/EncounterSignWidget.cpp",
+    "blueprintName": "WBP_EncounterSign",
+    "assetPath": "/Game/User_JeHoon/UI/Gameplay",
+    "parentClass": "UUserWidget",
+    "generateNativeSource": false,
+    "widgets": [
+        {
+            "name": "SignBounds",
+            "type": "SizeBox",
+            "parent": "",
+            "widthOverride": 1024,
+            "heightOverride": 128
+        },
+        {
+            "name": "Text_Title",
+            "type": "TextBlock",
+            "parent": "SignBounds",
+            "bind": true,
+            "text": "방패 상점",
+            "fontSize": 72,
+            "horizontalAlignment": "Center",
+            "verticalAlignment": "Center",
+            "color": [0.95686, 0.92941, 0.82353, 1]
+        }
+    ]
+}
