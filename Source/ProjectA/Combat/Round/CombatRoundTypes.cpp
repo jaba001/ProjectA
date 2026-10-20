@@ -85,7 +85,9 @@ bool FCombatChainSettings::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bO
 float CombatRoundRules::StartDelay(float HighestSpeed, float UnitSpeed)
 {
     if (!FMath::IsFinite(HighestSpeed) || !FMath::IsFinite(UnitSpeed)) return 0.0f;
-    return static_cast<float>(FMath::Max(static_cast<double>(HighestSpeed) - UnitSpeed, 0.0) * 0.1);
+    // One second of start delay per speed point behind the fastest living unit (trial value).
+    // 가장 빠른 생존 유닛보다 속도 1이 낮을 때마다 시작 지연 1초입니다(시험값).
+    return static_cast<float>(FMath::Max(static_cast<double>(HighestSpeed) - UnitSpeed, 0.0) * 1.0);
 }
 
 float CombatRoundRules::AttackMoveSpeed(const FCombatRoundSkill& Skill, float RoundSpeed)

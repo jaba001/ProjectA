@@ -488,7 +488,7 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 
 ### 4-12 타겟·행동 세부 규칙
 
-- `GetCombatSpeed()`는 현재 GAS `Speed`를 직접 사용한다. 시작 지연은 `(최고 속도 − 해당 속도) × 0.1초`이고 기본 아군 10·일반 적 5에서는 적이 0.5초 늦게 시작한다. Planning에서 고정한 속도는 근접 접근·복귀에도 적용한다.
+- `GetCombatSpeed()`는 현재 GAS `Speed`를 직접 사용한다. 시작 지연은 `(최고 속도 − 해당 속도) × 1초`(`CombatRoundRules::StartDelay`, 2026-10-20 0.1초에서 변경)이고 속도 10과 5 사이에서는 5초 늦게 시작한다. Planning에서 고정한 속도는 근접 접근·복귀에도 적용한다.
 - 현재 검·비무장은 `Approach=Unit`으로 대상 Actor의 현재 월드 위치를 추적하며 타일은 배치·복귀 기준이다. 접근 범위에 들어오면 즉시 `Casting`으로 전환하고 검의 접근 거리 105cm보다 가까워도 간격을 맞추려고 후퇴하지 않는다.
 - 현재 사용자 스킬은 기본 공격 2종·기존 VFX 60종·무기 전용 공격 2종이며 몬스터 전용 공격 12개도 유지한다. 새 일반 Run의 무기 후보는 62종, 기존 개발 경로의 스킬상점 후보는 61종이며 개발용 일반 카탈로그는 유효 DA 76종이다. 새 목표 Run의 회복 DA 1개는 `Item.Consumable` 태그로 이 일반 목록과 분리한다. 범위·투사체 공통 C++·GAS·FX와 `RoundDefinition.bUseMeleeAreaCollision`·`MeleeAreaHalfExtent`, 타일 기반 `TargetAndSides` 계산·타일 범위 라이브러리는 신규 스킬 도입을 위한 기능으로 보존한다.
 - `SkillDefinitionDataAsset.bUseRoundDefinition`과 `RoundDefinition`으로 스킬별 실제 시간·범위·접근·복귀·투사체 정책을 편집한다. 근접·투사체의 발동 전 대상 사망은 가장 가까운 유효 생존 적 재선택으로 공통 해석한다. 공격자의 현재 위치로 거리를 계산하고 `IsValidUnitTarget` 조건을 재사용하며, 유닛 접근형은 접근·미발동 시전·칼날 궤적을 다시 시작한다. 후보가 없으면 불발 후 복귀하고 추가 비용은 차감하지 않는다. 지점 공격·발사 후 투사체·기존 저장 프로필 값은 유지한다. 미지정 장착 스킬은 [GAME_STATUS 6절](GAME_STATUS.md#6-라운드-전투)의 초기 변환을 사용한다.
