@@ -4,6 +4,7 @@
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "GAS/CombatGameplayTags.h"
 
 bool UCombatTargetingLibrary::IsValidSkillTarget(const AUnitBase* SourceUnit, const USkillDefinitionDataAsset* SkillData, const ACombatGridTile* TargetTile)
 {
@@ -30,13 +31,21 @@ bool UCombatTargetingLibrary::IsValidSkillTarget(const AUnitBase* SourceUnit, co
     const bool bEnemyTerritory = (SourceTeam == ETeam::Player && Territory == ETileTerritory::Enemy) || (SourceTeam == ETeam::Enemy && Territory == ETileTerritory::Player);
     const bool bAllyTerritory = (SourceTeam == ETeam::Player && Territory == ETileTerritory::Player) || (SourceTeam == ETeam::Enemy && Territory == ETileTerritory::Enemy);
 
-    // Preserve the existing player rule: front protection applies to EnemyUnit selection only.
-    // 기존 플레이어 규칙대로 전열 보호는 EnemyUnit 대상 선택에만 적용합니다.
+    // Only melee-tagged attacks restrict initial enemy selection; effect collision remains independent.
+    // 근접 태그 공격만 최초 적 선택을 제한하며 실제 효과 충돌 판정은 별도로 유지합니다.
+    FCombatRoundSkill RoundSkill;
+    FText Error;
+    const bool bProtectedEnemy = TargetUnit
+        && TargetUnit->GetTeam() != SourceTeam
+        && TargetTile->GetProtectedByFront();
+    if (bProtectedEnemy
+        && SkillData->ResolveRoundSkill(RoundSkill, Error)
+        && RoundSkill.EffectTags.HasTag(ProjectACombatTags::Skill_Attack_Melee)) return false;
     switch (SkillData->TargetRule)
     {
     case ESkillTargetRule::EnemyUnit:
     {
-        return TargetUnit && TargetUnit->GetTeam() != SourceTeam && (SkillData->bIgnoreFront || !TargetTile->GetProtectedByFront());
+        return TargetUnit && TargetUnit->GetTeam() != SourceTeam;
     }
     case ESkillTargetRule::AllyUnit:
     {

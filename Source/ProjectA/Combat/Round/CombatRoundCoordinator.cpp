@@ -841,6 +841,7 @@ bool ACombatRoundCoordinator::IsValidUnitTarget(int32 SourceUnitId, FName SkillI
     if (!IsValid(Source.Unit) || !IsValid(Target.Unit) || !Source.Unit->IsUnitAlive() || !Target.Unit->IsUnitAlive()) return false;
     if (!(Source.HP > 0.f) || !(Target.HP > 0.f) || !Source.SkillIds.Contains(SkillId)) return false;
     if (RunRecoveryRules::IsConsumable(*Skill)) return CombatConsumableRules::CanUse(Source.Unit, Target.Unit, *Skill, Source.OwnerSlot > 0 && !Source.bEnemy);
+    if (CombatPlanValidation::IsTargetProtectedByFront(BuildPlanningState(), Source.bEnemy, *Skill, TargetUnitId)) return false;
     return CombatSkillExecution::IsValidEffectTarget(Source.Unit, Target.Unit, *Skill);
 }
 

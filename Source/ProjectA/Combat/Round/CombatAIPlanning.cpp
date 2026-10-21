@@ -77,6 +77,8 @@ FCombatRoundCommand CombatAIPlanning::ChooseCommand(const FCombatRoundView& View
         {
             const FCombatRoundUnitView& Candidate = View.Units[CandidateIndex];
             if (!CombatSkillExecution::IsValidEffectTarget(Entry.Unit, Candidate.Unit, *Skill)) continue;
+            const FCombatRoundCommand CandidateCommand = BuildCommand(View, State, UnitIndex, SkillId, *Skill, CandidateIndex);
+            if (!IsAllowed(CandidateCommand)) continue;
             const double Distance = FVector::DistSquared2D(Entry.Unit->GetActorLocation(), Candidate.Unit->GetActorLocation());
             if (Distance < TargetDistance)
             {
@@ -86,9 +88,7 @@ FCombatRoundCommand CombatAIPlanning::ChooseCommand(const FCombatRoundView& View
         }
         if (!View.Units.IsValidIndex(TargetIndex)) continue;
         Command = BuildCommand(View, State, UnitIndex, SkillId, *Skill, TargetIndex);
-        if (IsAllowed(Command)) return Command;
-        Command.SkillId = NAME_None;
-        Command.DestinationCoord = Entry.HomeCoord;
+        return Command;
     }
     return Command;
 }

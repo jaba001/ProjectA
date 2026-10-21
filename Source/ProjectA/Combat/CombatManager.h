@@ -191,8 +191,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Combat")
     ACombatGridTile* GetTileByCoord(FIntPoint Coord) const;
 
-    // Clears retired front-line protection presentation.
-    // 제거된 전열 보호 표시를 해제합니다.
+    // Refreshes rear-tile protection from living front-line units on both teams.
+    // 양 진영의 생존 전열 유닛을 기준으로 후열 타일의 보호 표시를 갱신합니다.
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void RefreshTileProtectedByFront();
 

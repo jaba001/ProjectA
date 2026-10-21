@@ -34,6 +34,10 @@ namespace CombatPlanValidation
     };
 
     PROJECTA_API const FCombatRoundSkill* FindSkill(const FState& State, FName SkillId);
+    // Formation protection uses committed home tiles, including while units approach and return.
+    // 유닛의 접근·복귀 중에도 확정된 복귀 칸을 기준으로 진형 보호를 판정합니다.
+    PROJECTA_API bool IsProtectedByFront(const FState& State, bool bEnemy, FIntPoint Coord);
+    PROJECTA_API bool IsTargetProtectedByFront(const FState& State, bool bSourceEnemy, const FCombatRoundSkill& Skill, int32 TargetUnitId);
     PROJECTA_API bool IsReservedByOther(const FState& State, int32 UnitId, FIntPoint Coord);
     PROJECTA_API bool ValidateCommand(const FState& State, const FCombatRoundCommand& Command, FText& OutError);
     PROJECTA_API bool ValidateMoveDestination(const FState& State, const FUnit& Unit, FIntPoint Destination, FText& OutError);

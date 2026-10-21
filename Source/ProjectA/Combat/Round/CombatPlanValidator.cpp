@@ -1,4 +1,5 @@
 #include "Combat/Round/CombatPlanValidator.h"
+#include "GAS/CombatGameplayTags.h"
 
 namespace
 {
@@ -12,6 +13,28 @@ namespace
 const FCombatRoundSkill* CombatPlanValidation::FindSkill(const FState& State, FName SkillId)
 {
     return State.Skills.FindByPredicate([SkillId](const FCombatRoundSkill& Skill) { return Skill.SkillId == SkillId; });
+}
+
+bool CombatPlanValidation::IsProtectedByFront(const FState& State, bool bEnemy, FIntPoint Coord)
+{
+    if (!CombatRoundRules::IsOwnTerritory(bEnemy, Coord) || Coord.Y != (bEnemy ? 3 : 0)) return false;
+    const FIntPoint FrontCoord(Coord.X, bEnemy ? 2 : 1);
+    return State.Units.ContainsByPredicate([bEnemy, FrontCoord](const FUnit& Unit)
+    {
+        return Unit.bAlive
+            && Unit.bEnemy == bEnemy
+            && Unit.HomeCoord == FrontCoord;
+    });
+}
+
+bool CombatPlanValidation::IsTargetProtectedByFront(const FState& State, bool bSourceEnemy, const FCombatRoundSkill& Skill, int32 TargetUnitId)
+{
+    if (!Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Attack_Melee)) return false;
+    const FUnit* Target = State.Units.FindByPredicate([TargetUnitId](const FUnit& Unit) { return Unit.UnitId == TargetUnitId; });
+    return Target
+        && Target->bAlive
+        && Target->bEnemy != bSourceEnemy
+        && IsProtectedByFront(State, Target->bEnemy, Target->HomeCoord);
 }
 
 bool CombatPlanValidation::IsReservedByOther(const FState& State, int32 UnitId, FIntPoint Coord)
@@ -49,6 +72,7 @@ bool CombatPlanValidation::ValidateCommand(const FState& State, const FCombatRou
     }
     const FUnit* Target = State.Units.FindByPredicate([&Command](const FUnit& Candidate) { return Candidate.UnitId == Command.TargetUnitId; });
     if (!Target || !Target->bAlive) return Fail(OutError, TEXT("살아 있는 대상 유닛을 선택하세요."));
+    if (IsTargetProtectedByFront(State, Unit->bEnemy, *Skill, Target->UnitId)) return Fail(OutError, TEXT("전열의 생존 아군이 보호하는 후열 유닛은 근접 공격 대상으로 선택할 수 없습니다."));
     return CombatRoundRules::MatchesTargetTeam(*Skill, Unit->bEnemy, Target->bEnemy) || Fail(OutError, TEXT("스킬의 대상 진영이 올바르지 않습니다."));
 }
 

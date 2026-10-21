@@ -3,6 +3,7 @@
 #include "Combat/Commands/CombatActionAuthority.h"
 #include "Net/UnrealNetwork.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
+#include "Combat/Round/CombatPlanValidator.h"
 #include "Game/GameModes/CombatDebugGameMode.h"
 #include "Controller/PartyPlayerController.h"
 #include "Unit/UnitBase.h"
@@ -86,6 +87,7 @@ void ACombatManager::PublishCombatView()
     {
         return;
     }
+    RefreshTileProtectedByFront();
     FCombatViewState NewView;
     NewView.CombatResult = CombatView.CombatResult;
     NewView.ViewRevision = CombatView.ViewRevision + 1;
@@ -435,6 +437,7 @@ void ACombatManager::ResetCombat()
     {
         ActionAuthority->Reset();
     }
+    RefreshTileProtectedByFront();
     if (IsValid(RoundCoordinator))
     {
         RoundCoordinator->OnCombatFinished.RemoveAll(this);
@@ -487,11 +490,24 @@ ACombatGridTile* ACombatManager::GetTileByCoord(FIntPoint Coord) const
 
 void ACombatManager::RefreshTileProtectedByFront()
 {
-    // Retired grid protection must not suggest a targeting restriction in real-time combat.
-    // 실시간 전투에 존재하지 않는 대상 제한을 표시하지 않도록 기존 격자 보호를 해제합니다.
     if (!HasAuthority() || !CombatGridManager) return;
+    CombatPlanValidation::FState State;
+    for (AUnitBase* Unit : CombatUnits)
+    {
+        if (!IsValid(Unit)
+            || !Unit->IsUnitAlive()
+            || !IsValid(Unit->GetCurrentTile())) continue;
+        CombatPlanValidation::FUnit& Entry = State.Units.AddDefaulted_GetRef();
+        Entry.bAlive = true;
+        Entry.bEnemy = Unit->GetTeam() == ETeam::Enemy;
+        Entry.HomeCoord = Unit->GetCurrentTile()->GridCoord;
+    }
     for (const TPair<FIntPoint, ACombatGridTile*>& Pair : CombatGridManager->TileMap)
     {
-        if (IsValid(Pair.Value) && Pair.Value->GetProtectedByFront()) Pair.Value->SetProtectedByFront(false);
+        ACombatGridTile* Tile = Pair.Value;
+        if (!IsValid(Tile)) continue;
+        const bool bCombatTerritory = Tile->GetTerritory() == ETileTerritory::Player || Tile->GetTerritory() == ETileTerritory::Enemy;
+        const bool bProtected = bCombatTerritory && CombatPlanValidation::IsProtectedByFront(State, Tile->GetTerritory() == ETileTerritory::Enemy, Pair.Key);
+        if (Tile->GetProtectedByFront() != bProtected) Tile->SetProtectedByFront(bProtected);
     }
 }
