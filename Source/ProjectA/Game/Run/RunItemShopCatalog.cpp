@@ -185,6 +185,12 @@ bool RunItemShopCatalog::IsSupportedRarityTag(FGameplayTag Tag)
 bool RunItemShopCatalog::ValidateItem(const FRunItemDefinition& Item)
 {
     const FString AssetPath = Item.Asset.ToString();
+    if (!FMath::IsFinite(Item.WeaponDamage)
+        || Item.WeaponDamage < 0.f
+        || Item.WeaponDamage > 1000000.f)
+    {
+        return false;
+    }
     if (!Item.Asset.IsValid() || !Item.Asset.GetSubPathUtf8String().IsEmpty() || !AssetPath.StartsWith(TEXT("/Game/")) || !FPackageName::IsValidObjectPath(AssetPath) || !IsValidDisplayName(Item.DisplayName.ToString()) || !Item.Tags.HasTag(TAG_ItemWeapon) || Item.Price <= 0) return false;
     if (Item.GenerationVersion == 0) return !Item.ItemInstanceId.IsValid() && !Item.RarityTag.IsValid() && Item.GrantedSkills.IsEmpty() && Item.SkillBalanceVersion == 0 && Item.GrantedSkillBalances.IsEmpty();
     if (Item.GenerationVersion != 1 || !Item.ItemInstanceId.IsValid() || !Item.RarityTag.IsValid()) return false;
@@ -257,8 +263,20 @@ bool RunItemShopCatalog::LoadFromString(FString CsvText, TArray<FRunItemDefiniti
     const int32 ColumnCount = Rows.IsEmpty() ? 0 : Rows[0].Num();
     const bool bHasGameName = ColumnCount >= 5;
     const bool bHasRarity = ColumnCount >= 6;
-    const bool bHasRationale = ColumnCount == 7;
-    if (Rows.Num() < OfferCount + 1 || Rows.Num() > MaximumCatalogSize + 1 || ColumnCount < 4 || ColumnCount > 7 || FCString::Strcmp(Rows[0][0], TEXT("무기 종류")) != 0 || FCString::Strcmp(Rows[0][1], TEXT("위치")) != 0 || FCString::Strcmp(Rows[0][2], TEXT("에셋 이름")) != 0 || FCString::Strcmp(Rows[0][3], TEXT("가격(G)")) != 0 || (bHasGameName && FCString::Strcmp(Rows[0][4], TEXT("게임 내 이름")) != 0) || (bHasRarity && FCString::Strcmp(Rows[0][5], TEXT("등급")) != 0) || (bHasRationale && FCString::Strcmp(Rows[0][6], TEXT("분류 근거")) != 0))
+    const bool bHasRationale = ColumnCount >= 7;
+    const bool bHasWeaponDamage = ColumnCount == 8;
+    if (Rows.Num() < OfferCount + 1
+        || Rows.Num() > MaximumCatalogSize + 1
+        || ColumnCount < 4
+        || ColumnCount > 8
+        || FCString::Strcmp(Rows[0][0], TEXT("무기 종류")) != 0
+        || FCString::Strcmp(Rows[0][1], TEXT("위치")) != 0
+        || FCString::Strcmp(Rows[0][2], TEXT("에셋 이름")) != 0
+        || FCString::Strcmp(Rows[0][3], TEXT("가격(G)")) != 0
+        || (bHasGameName && FCString::Strcmp(Rows[0][4], TEXT("게임 내 이름")) != 0)
+        || (bHasRarity && FCString::Strcmp(Rows[0][5], TEXT("등급")) != 0)
+        || (bHasRationale && FCString::Strcmp(Rows[0][6], TEXT("분류 근거")) != 0)
+        || (bHasWeaponDamage && FCString::Strcmp(Rows[0][7], TEXT("무기 피해량")) != 0))
     {
         OutError = NSLOCTEXT("RunItemShop", "InvalidCatalogHeader", "무기 에셋 CSV의 열 또는 상품 개수가 올바르지 않습니다.");
         return false;
@@ -281,6 +299,12 @@ bool RunItemShopCatalog::LoadFromString(FString CsvText, TArray<FRunItemDefiniti
         if (bHasRarity) Item.CatalogRarityTag = ResolveRarityTag(Row[5]);
         Item.Tags.AddTag(TAG_ItemWeapon);
         if (CategoryTag.IsValid()) Item.Tags.AddTag(CategoryTag);
+        if (bHasWeaponDamage
+            && (!FString(Row[7]).IsNumeric() || !LexTryParseString(Item.WeaponDamage, Row[7]) || !FMath::IsFinite(Item.WeaponDamage) || Item.WeaponDamage < 0.f || Item.WeaponDamage > 1000000.f))
+        {
+            OutError = FText::Format(NSLOCTEXT("RunItemShop", "InvalidWeaponDamage", "무기 에셋 CSV의 {0}행 피해량이 올바르지 않습니다."), FText::AsNumber(RowIndex + 1));
+            return false;
+        }
         if ((bHasRarity && !Item.CatalogRarityTag.IsValid()) || (bHasRationale && !IsValidDisplayName(Row[6])))
         {
             OutError = FText::Format(NSLOCTEXT("RunItemShop", "InvalidCatalogRarity", "무기 에셋 CSV의 {0}행 등급 또는 분류 근거가 올바르지 않습니다. 등급은 흰색·초록색·파란색·보라색·주황색을 사용합니다."), FText::AsNumber(RowIndex + 1));

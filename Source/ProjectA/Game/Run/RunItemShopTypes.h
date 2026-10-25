@@ -24,6 +24,11 @@ struct PROJECTA_API FRunItemDefinition
     UPROPERTY(BlueprintReadOnly, Category = "Shop")
     int32 Price = 1;
 
+    // Existing weapons start at ten damage until the replacement weapon design supplies individual values.
+    // 새 무기 기획에서 개별 값을 정하기 전까지 기존 무기의 피해량은 10으로 시작합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Item|Combat")
+    float WeaponDamage = 10.f;
+
     // Freeze authored rarity in the Run catalog; an absent tag preserves legacy random rarity selection.
     // 작성된 등급을 Run 카탈로그에 고정하며 태그가 없으면 기존 무작위 등급 선정을 유지합니다.
     UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Item|Generation")

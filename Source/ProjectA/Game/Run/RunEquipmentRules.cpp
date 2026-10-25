@@ -4,6 +4,7 @@
 #include "Engine/StaticMesh.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Run/RunEquipmentCatalog.h"
+#include "Game/Run/EquipmentCombatRules.h"
 #include "Game/Run/RunItemShopCatalog.h"
 #include "Profession/ProfessionBase.h"
 #include "Unit/UnitDataRules.h"
@@ -14,12 +15,23 @@ bool RunEquipmentRules::Validate(const FRunPartyMember& Member, FText& OutError)
 {
     OutError = NSLOCTEXT("RunEquipment", "InvalidState", "저장된 장비 슬롯 또는 보유 아이템 연결이 올바르지 않습니다.");
     const FRunEquipmentState& State = Member.Equipment;
-    if (State.Revision < 0 || State.Slots.Num() > URunEquipmentCatalog::GetSlotTags().Num()) return false;
+    if (State.Revision < 0
+        || State.Slots.Num() > URunEquipmentCatalog::GetSlotTags().Num()
+        || State.ConditionalSkillVersion < 0
+        || State.ConditionalSkillVersion > 1)
+    {
+        return false;
+    }
     if (!State.bHasLoadout)
     {
         // Legacy inventory sales advance the revision without enabling equipment-driven visuals or skills.
         // 이전 인벤토리의 판매는 장비 기반 외형이나 스킬을 활성화하지 않고 버전만 증가시킵니다.
-        if (!State.Slots.IsEmpty() || (State.Revision > 0 && (!Member.bCreated || !Member.bHasSkillLoadout))) return false;
+        if (!State.Slots.IsEmpty()
+            || State.ConditionalSkillVersion != 0
+            || (State.Revision > 0 && (!Member.bCreated || !Member.bHasSkillLoadout)))
+        {
+            return false;
+        }
         OutError = FText::GetEmpty();
         return true;
     }
@@ -101,7 +113,37 @@ bool RunEquipmentRules::BuildEquippedSkills(const FRunPartyMember& Member, TArra
         }
         if (!AppendSource(Item.GrantedSkills)) return false;
     }
+    if (Member.Equipment.ConditionalSkillVersion == 1 && !AppendConditionalSkills(Member, Candidate, OutError)) return false;
     OutSkills = MoveTemp(Candidate);
+    OutError = FText::GetEmpty();
+    return true;
+}
+
+bool RunEquipmentRules::AppendConditionalSkills(const FRunPartyMember& Member, TArray<FSoftObjectPath>& Skills, FText& OutError)
+{
+    TArray<FRunEquipmentVisual> Equipment;
+    for (const FRunEquipmentSlot& Slot : Member.Equipment.Slots)
+    {
+        if (!Member.Items.IsValidIndex(Slot.ItemIndex)) return false;
+        const FRunItemDefinition& Item = Member.Items[Slot.ItemIndex];
+        FRunEquipmentVisual& Entry = Equipment.AddDefaulted_GetRef();
+        Entry.SlotTag = Slot.SlotTag;
+        Entry.ItemTags = Item.Tags;
+    }
+    for (const FSoftObjectPath& Path : GetDefault<UEquipmentCombatRules>()->ConditionalSkills)
+    {
+        const USkillDefinitionDataAsset* Asset = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
+        FCombatRoundSkill Definition;
+        if (!Asset
+            || !Asset->ResolveRoundSkill(Definition, OutError)
+            || Definition.RequiredEquipment.IsEmpty())
+        {
+            OutError = NSLOCTEXT("RunEquipment", "MissingConditionalSkill", "장비 조합 스킬의 작성된 에셋 또는 조건이 없습니다.");
+            return false;
+        }
+        if (Member.Equipment.bHasLoadout && EquipmentCombatRules::Matches(Equipment, Definition.RequiredEquipment)) Skills.AddUnique(Path);
+        else Skills.Remove(Path);
+    }
     OutError = FText::GetEmpty();
     return true;
 }
@@ -154,6 +196,7 @@ bool RunEquipmentRules::Apply(FRunPartyMember& Member, const FRunEquipmentComman
         }
     }
     Candidate.bHasLoadout = true;
+    Candidate.ConditionalSkillVersion = 1;
     ++Candidate.Revision;
     FRunPartyMember Validated = Member;
     Validated.Equipment = Candidate;
@@ -188,6 +231,9 @@ bool RunEquipmentRules::BuildVisuals(const FRunPartyMember& Member, TArray<FRunE
         OutError = NSLOCTEXT("RunEquipment", "MissingMesh", "장비의 원본 메시를 불러올 수 없습니다. 기존 장비를 유지합니다.");
         if (!Mesh || (!Mesh->IsA<UStaticMesh>() && !Mesh->IsA<USkeletalMesh>())) return false;
         FRunEquipmentVisual Visual;
+        Visual.SlotTag = Slot.SlotTag;
+        Visual.ItemTags = Item.Tags;
+        Visual.WeaponDamage = Item.WeaponDamage;
         Visual.Asset = Item.Asset;
         if (!Catalog.GetAttachment(*Profile, Slot.SlotTag, Visual.SocketName, Visual.RelativeTransform, Visual.bFollowBodyPose) || (Visual.bFollowBodyPose && !Mesh->IsA<USkeletalMesh>())) return false;
         OutVisuals.Add(Visual);

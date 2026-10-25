@@ -2,6 +2,7 @@
 #include "Animation/AnimMontage.h"
 #include "GAS/Ability/GA_AttackBase.h"
 #include "GAS/CombatGameplayTags.h"
+#include "Game/Run/EquipmentCombatRules.h"
 
 bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, FText& OutError) const
 {
@@ -57,6 +58,7 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
     if (Attack) Attack->ExportRoundEffectContract(Skill);
     Skill.SkillId = FName(*AssetId.ToString());
     Skill.Name = SkillName;
+    if (GetDefault<UEquipmentCombatRules>()->BasicWeaponAttacks.Contains(FSoftObjectPath(this))) Skill.bUseEquippedWeaponDamage = true;
     if (!CombatRoundRules::IsSupportedEffectDuration(Skill)) return Fail(NSLOCTEXT("SkillRound", "UnsupportedEffectDuration", "Unsupported effect duration: round checkpoints support only Instant effects. / 지원하지 않는 효과 지속시간: 현재 라운드 체크포인트는 Instant 효과만 지원합니다."));
     if (!CombatRoundRules::IsValidSkill(Skill)) return Fail(NSLOCTEXT("SkillRound", "InvalidProfile", "RoundDefinition contains invalid timing, power, range, cost or approach settings. / RoundDefinition의 시간·위력·범위·비용·접근 설정이 유효하지 않습니다."));
     // Apply the shared pre-release retarget rule to existing assets without changing their saved profiles or fixed ground attacks.

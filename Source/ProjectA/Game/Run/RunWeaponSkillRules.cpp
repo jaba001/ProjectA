@@ -12,6 +12,12 @@ namespace
 {
     bool IsValidBaseItem(const FRunItemDefinition& Item)
     {
+        if (!FMath::IsFinite(Item.WeaponDamage)
+            || Item.WeaponDamage < 0.f
+            || Item.WeaponDamage > 1000000.f)
+        {
+            return false;
+        }
         return Item.Asset.IsValid() && Item.Asset.GetSubPathUtf8String().IsEmpty() && Item.Asset.ToString().StartsWith(TEXT("/Game/")) && FPackageName::IsValidObjectPath(Item.Asset.ToString()) && !Item.DisplayName.ToString().TrimStartAndEnd().IsEmpty() && !Item.Tags.IsEmpty() && Item.Price > 0;
     }
 

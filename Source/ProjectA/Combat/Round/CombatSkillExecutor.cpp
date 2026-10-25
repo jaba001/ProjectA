@@ -4,6 +4,8 @@
 #include "Combat/Library/CombatCollisionPolicy.h"
 #include "Combat/Library/CombatEffectLibrary.h"
 #include "Combat/Library/CombatWeaponTraceLibrary.h"
+#include "Game/Run/EquipmentCombatRules.h"
+#include "Unit/CharacterEquipmentComponent.h"
 #include "Combat/Round/CombatRoundProjectile.h"
 #include "Combat/Round/CombatChainEffectActor.h"
 #include "Combat/Round/CombatSkillEffectActor.h"
@@ -140,6 +142,11 @@ namespace
 bool CombatSkillExecution::CanUseSkill(const AUnitBase* Source, const FCombatRoundSkill& Skill)
 {
     if (!IsValid(Source) || !Source->IsUnitAlive()) return false;
+    if (!Skill.RequiredEquipment.IsEmpty()
+        && (!Source->CharacterEquipment || !Source->CharacterEquipment->HasEquipmentLoadout() || !EquipmentCombatRules::Matches(Source->CharacterEquipment->GetEquipment(), Skill.RequiredEquipment)))
+    {
+        return false;
+    }
     const UAbilitySystemComponent* ASC = Source->GetAbilitySystemComponent();
     return ASC && MatchesOwnedTags(Source, Skill.SourceTagQuery, Skill.SourceRequiredTags, Skill.SourceBlockedTags) && !ASC->AreAbilityTagsBlocked(Skill.EffectTags);
 }

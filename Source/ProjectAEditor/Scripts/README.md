@@ -353,3 +353,12 @@ Development Editor / Win64 컴파일 후 작성·별도 프로세스 재로드 �
 ```powershell
 & "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "$PWD\ProjectA.uproject" -run=pythonscript -script="$PWD\Source\ProjectAEditor\Scripts\TagSkillAttackCategories.py" -unattended -nop4 -nosplash -NoSound
 ```
+
+## 36 단검 쌍수 더블어택
+
+`CreateDoubleAttack.py`는 Countess의 `Primary_Attack_A_Normal`·`Primary_Attack_B_Normal` FBX만 필요한 파생 시퀀스로 임포트하고 `CountessManny/Attack/AM_DoubleAttack`과 `Skills/Weapons/DA_DoubleAttack`을 작성한다. 기본 모드는 기존 결과를 보존하며 `-DoubleAttackOverwrite`만 명시적으로 덮어쓴다. `-DoubleAttackVerifyOnly`는 저장본의 두 동작·슬롯별 단검 태그 조건·개별/평균 피해·조건부 부여/제거·AP·무기 CSV·원본 SHA를 검사한다. 결과는 `Saved/DoubleAttack`에 기록한다. 게임 월드·PIE·플레이·자동화 테스트는 시작하지 않는다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDoubleAttack.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDoubleAttack.py") -DoubleAttackVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+```

@@ -19,6 +19,7 @@
 #include "Game/GameState/GameplayViewTypes.h"
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunEquipmentRules.h"
+#include "Game/Run/EquipmentCombatRules.h"
 #include "Game/Run/RunItemSaleRules.h"
 #include "Game/Run/RunStateSubsystem.h"
 #include "GameFramework/PlayerController.h"
@@ -261,6 +262,21 @@ void UCharacterInventoryPanel::AddSkill(const USkillDefinitionDataAsset* Skill)
     FCombatRoundSkill DisplayedSkill;
     FText Error;
     const bool bResolvedSkill = Skill->ResolveRoundSkill(DisplayedSkill, Error);
+    if (bResolvedSkill && DisplayedSkill.bUseEquippedWeaponDamage)
+    {
+        TArray<FRunEquipmentVisual> Equipment;
+        for (const FRunEquipmentSlot& EquipmentEntry : DisplayedMember.Equipment.Slots)
+        {
+            if (!DisplayedMember.Items.IsValidIndex(EquipmentEntry.ItemIndex)) continue;
+            const FRunItemDefinition& Item = DisplayedMember.Items[EquipmentEntry.ItemIndex];
+            FRunEquipmentVisual& Visual = Equipment.AddDefaulted_GetRef();
+            Visual.SlotTag = EquipmentEntry.SlotTag;
+            Visual.ItemTags = Item.Tags;
+            Visual.WeaponDamage = Item.WeaponDamage;
+        }
+        float Damage = 0.f;
+        if (EquipmentCombatRules::ResolveDamage(Equipment, FGameplayTag(), Damage)) DisplayedSkill.Power = Damage;
+    }
     RunItemPresentation::FItemSkillDetails Detail;
     Detail.Name = Name;
     Detail.Description = RunItemPresentation::SkillDescription(Skill);

@@ -2093,6 +2093,18 @@
       "key": "White",
       "source": "흰색",
       "translation": "White"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DoubleAttack.Name",
+      "source": "더블어택",
+      "translation": "Double Attack"
+    },
+    {
+      "namespace": "ProjectA.Content",
+      "key": "Skill.SkillDefinitionDataAsset:DA_DoubleAttack.Description",
+      "source": "양손에 단검을 장착해야 합니다. 왼손, 오른손 순서로 각각의 무기 피해량으로 한 번씩 공격합니다. AP 비용은 기본 근접 공격과 같습니다.",
+      "translation": "Requires a dagger in each hand. Attack once with the left weapon, then once with the right weapon, using each weapon's damage. Costs the same AP as a basic melee attack."
     }
   ]
 }

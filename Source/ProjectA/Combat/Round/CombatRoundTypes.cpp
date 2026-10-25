@@ -1,4 +1,5 @@
 #include "Combat/Round/CombatRoundTypes.h"
+#include "Animation/AnimMontage.h"
 #include "GAS/CombatGameplayTags.h"
 #include "Combat/Round/CombatStatusRules.h"
 #include "GameplayEffect.h"
@@ -192,6 +193,54 @@ bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
     if (Skill.bUseMeleeAreaCollision && (Skill.Kind != ECombatRoundSkillKind::Melee || Skill.MeleeArea != ESkillAreaType::Single)) return false;
     if (Skill.MeleeAreaHalfExtent.ContainsNaN() || Skill.MeleeAreaHalfExtent.GetMin() <= 0.0 || Skill.MeleeAreaHalfExtent.GetMax() > 1000.0) return false;
     if (!FMath::IsFinite(Skill.WindupSeconds) || Skill.WindupSeconds < 0.f || Skill.WindupSeconds > 60.f) return false;
+    if (Skill.RequiredEquipment.Num() > 7
+        || Skill.MeleeStrikes.Num() > 8
+        || Skill.DamageWeaponSlot.IsValid())
+    {
+        return false;
+    }
+    FGameplayTagContainer RequiredSlots;
+    for (const FCombatEquipmentRequirement& Requirement : Skill.RequiredEquipment)
+    {
+        if (!Requirement.Slot.IsValid()
+            || Requirement.ItemQuery.IsEmpty()
+            || RequiredSlots.HasTagExact(Requirement.Slot))
+        {
+            return false;
+        }
+        RequiredSlots.AddTag(Requirement.Slot);
+    }
+    if (!Skill.MeleeStrikes.IsEmpty())
+    {
+        if (Skill.Kind != ECombatRoundSkillKind::Melee
+            || Skill.bUseWeaponTrace
+            || Skill.bUseEffectCollision
+            || Skill.bUseMeleeAreaCollision
+            || Skill.MeleeArea != ESkillAreaType::Single)
+        {
+            return false;
+        }
+        if (!Skill.CastMontage
+            || !FMath::IsFinite(Skill.CastMontage->RateScale)
+            || Skill.CastMontage->RateScale <= 0.f
+            || Skill.MeleeStrikes[0].DelaySeconds != 0.f)
+        {
+            return false;
+        }
+        float Previous = -1.f;
+        for (const FCombatMeleeStrike& Strike : Skill.MeleeStrikes)
+        {
+            if (!FMath::IsFinite(Strike.DelaySeconds)
+                || Strike.DelaySeconds <= Previous
+                || Strike.DelaySeconds > 10.f
+                || !RequiredSlots.HasTagExact(Strike.WeaponSlot))
+            {
+                return false;
+            }
+            if ((Skill.WindupSeconds + Strike.DelaySeconds) * Skill.CastMontage->RateScale >= Skill.CastMontage->GetPlayLength()) return false;
+            Previous = Strike.DelaySeconds;
+        }
+    }
     if (Skill.bUseWeaponTrace)
     {
         if (Skill.Kind != ECombatRoundSkillKind::Melee || Skill.MeleeArea != ESkillAreaType::Single || Skill.bUseMeleeAreaCollision || !Skill.CastMontage) return false;

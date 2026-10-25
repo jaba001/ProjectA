@@ -33,6 +33,11 @@ struct PROJECTA_API FRunEquipmentState
     UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Equipment")
     int32 Revision = 0;
 
+    // Older loadouts keep their saved skill list until an explicit equipment transaction upgrades it.
+    // 이전 장비 상태는 명시적 장비 변경으로 갱신하기 전까지 저장된 스킬 목록을 유지합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Equipment")
+    int32 ConditionalSkillVersion = 0;
+
     UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Equipment")
     TArray<FRunEquipmentSlot> Slots;
 };
@@ -61,6 +66,15 @@ USTRUCT(BlueprintType)
 struct PROJECTA_API FRunEquipmentVisual
 {
     GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly, Category = "Equipment")
+    FGameplayTag SlotTag;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Equipment")
+    FGameplayTagContainer ItemTags;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Equipment")
+    float WeaponDamage = 10.f;
 
     UPROPERTY(BlueprintReadOnly, Category = "Equipment")
     FSoftObjectPath Asset;

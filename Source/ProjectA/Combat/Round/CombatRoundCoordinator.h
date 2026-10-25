@@ -97,6 +97,8 @@ private:
         double MontageStartedAt = 0.0;
         double MontageRecoverySeconds = 0.0;
         CombatSkillExecution::FWeaponTraceState WeaponTrace;
+        int32 NextMeleeStrike = 0;
+        bool bMeleeSequenceHit = false;
         bool bReleased = false;
         // Track only this caster's pending effects; other units must not delay its local camera return.
         // 다른 유닛이 로컬 카메라 복귀를 지연하지 않도록 이 시전자의 대기 효과만 추적합니다.
@@ -202,6 +204,7 @@ private:
     void AdvanceAction(int32 Index, float StepSeconds);
     void ReleaseSkill(int32 Index, const FCombatRoundSkill& Skill);
     void AdvanceWeaponTrace(int32 Index, const FCombatRoundSkill& Skill);
+    void AdvanceMeleeSequence(int32 Index, const FCombatRoundSkill& Skill);
     void StartRecovery(int32 Index, bool bFailed, const FText& Status);
     void StartReturn(int32 Index, bool bFailed, const FText& Status);
     void FinishRoundIfSettled();

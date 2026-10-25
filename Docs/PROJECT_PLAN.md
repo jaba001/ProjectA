@@ -115,6 +115,10 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 전투의 `RunWeaponSkillRules::ResolveSkill`은 원본 실행 정의에 현재 Run의 저장된 위력·AP/SAP·선딜만 적용한다. 양 팀의 같은 SkillId는 같은 수치를 사용하고 체크포인트 계획 검증·복구에도 같은 규칙을 전달한다. Snapshot 자체의 스킬 목록·캐릭터 수치를 수정하거나 상대 Run 당시 수치의 경쟁 재현을 보장하지 않는다. 원본 DA·GAS 실행 태그·충돌·범위·체인·몽타주는 유지하며 목록 밖 기본 공격·몬스터·소모품 15종은 조정하지 않는다.
 
+`WEAPON_ASSETS.csv`의 `무기 피해량`은 기존 49개 모두 10으로 초기화한다. `FRunItemDefinition.WeaponDamage`는 Run 카탈로그·사본에 보존하며 이전 CSV·저장의 누락 값도 10이다. `UEquipmentCombatRules.BasicWeaponAttacks`가 지정한 기본 근접 공격은 장착한 공격 무기의 평균 피해를 사용하고 방패를 제외한다. 일반 공격 스킬의 별도 위력과 몬스터의 장비 없는 기존 프로필은 유지한다.
+
+`Skills/Weapons/DA_DoubleAttack`은 각 무기 슬롯의 `Item.Weapon.Dagger` GameplayTagQuery로 부여·실행 조건을 판정한다. `MeleeStrikes`에 작성한 왼손·오른손 타격을 0.2초·0.6초에 각각 기존 서버 근접 충돌·GAS 피격 경로로 실행하며 AP/SAP는 전체 시전에 한 번만 차감한다. 첫 타격 뒤 대상이 사망해도 시전을 재시작하지 않는다. `CreateDoubleAttack.py`로 Countess 원본 FBX 2개와 편집 가능한 몽타주를 작성하며 기본 재실행은 기존 결과를 보존한다. 이전 저장의 `ConditionalSkillVersion=0`은 저장된 목록을 유지하고 다음 명시적 장비 변경에서 버전 1의 조합 스킬 목록으로 갱신한다.
+
 프로젝트 전용 `Skills/Weapons/DA_MeleeAttack`, `Skills/Weapons/DA_CrossbowAttack`, `Weapons/DA_WeaponSkillRules`를 `CreateWeaponSkills.py`로 작성하고 `DA_VerticalSliceParty.WeaponSkillRules`를 연결했다. 기존 근접 공격·화살 표현을 참조하며 원본 FX·메시를 복제하지 않고 기존 공격 에셋의 저장값을 변경하지 않는다. 새 근접 DA는 고정 검 trace 대신 공통 근접 충돌을 사용하며 기존 몽타주/직업 재매핑을 재사용한다.
 
 ### 3-2 상점 인카운터
@@ -673,7 +677,7 @@ GKnight·Assassin·Stylized Dark Witch의 원본·임포트 자료와 제작용 
 | `Blueprint/DataAsset/Parties/DA_VerticalSliceParty` | `UPartyDefinitionDataAsset`, 전사는 `BP_WarriorUnit`, 나머지 직업과 fallback은 `BP_PlayerUnit` |
 | `Blueprint/DataAsset/Encounters/DA_DefaultEncounter` | `UEncounterDefinitionDataAsset`, 기본 편성 `Orc`·`Troll`·`Wolf`·`Golem` 4개와 소프트 디버그 카탈로그 13개. 저장·독립 재로드 정적 검사 통과 |
 | `Blueprint/DataAsset/Skills/BPDA_DefaulatAttack` | `USkillDefinitionDataAsset`, 기존 경로·ID·공격값 유지, 표시명만 `비무장 공격` |
-| `Blueprint/DataAsset/Skills/BPDA_swoard_attack` | `USkillDefinitionDataAsset`, 근접 공격·논리 ID `SwordAttack`·칼날 궤적·피해 50·AP 1·활성 0.23~0.43초 |
+| `Blueprint/DataAsset/Skills/BPDA_swoard_attack` | `USkillDefinitionDataAsset`, 근접 공격·논리 ID `SwordAttack`·칼날 궤적·장착 무기 평균 피해(장비 없는 기존 프로필 50)·AP 1·활성 0.23~0.43초 |
 | `Blueprint/Unit/BP_WarriorUnit`, `BP_PlayerUnit`, `BP_MageUnit`, `BP_RogueUnit` | 네 직업 공통 Primitive 남자·여자 몸체 선택. 공통 애니메이션·몽타주 대체·검과 저장 경로 유지. 마법사 기본 스태프 없음 |
 | `Blueprint/Unit/BP_*SnapshotOpponent` | 네 직업 모두 저장된 `BodyId`의 몸체를 사용. 이전 전사·궁수의 공통 Skeleton_Guard 체크포인트는 명시적 호환 맵으로 보존 |
 | `ROG_Modular_Armor/DA_MannyAppearance` | 기존 카탈로그 경로 유지. `BodyVariants`에 Primitive 몸체 원본 참조. ROG 8부위·103개 항목과 Manny 신체 파츠의 원본 재질 연결은 보존하되 의상 UI·착용은 중지 |

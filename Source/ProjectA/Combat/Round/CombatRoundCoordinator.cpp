@@ -17,6 +17,8 @@
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Game/Run/RunSkillBalance.h"
+#include "Game/Run/EquipmentCombatRules.h"
+#include "Unit/CharacterEquipmentComponent.h"
 #include "Game/GameModes/CombatDebugGameMode.h"
 #include "Unit/PlayerUnit.h"
 #include "Controller/PartyPlayerController.h"
@@ -1222,7 +1224,9 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
     {
         int32 TargetIndex = FindUnitIndex(Action.EffectiveTargetUnitId);
         const bool bNeedsUnit = CombatRoundRules::UsesUnitTarget(*Skill);
-        if (bNeedsUnit && (!View.Units.IsValidIndex(TargetIndex) || !IsValid(View.Units[TargetIndex].Unit) || !View.Units[TargetIndex].Unit->IsUnitAlive()))
+        if (bNeedsUnit
+            && Action.NextMeleeStrike == 0
+            && (!View.Units.IsValidIndex(TargetIndex) || !IsValid(View.Units[TargetIndex].Unit) || !View.Units[TargetIndex].Unit->IsUnitAlive()))
         {
             if (Skill->TargetLoss == ECombatRoundTargetLoss::NearestEnemy)
             {
@@ -1304,6 +1308,11 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
             if (Skill->bUseWeaponTrace)
             {
                 AdvanceWeaponTrace(Index, *Skill);
+                return;
+            }
+            if (!Skill->MeleeStrikes.IsEmpty())
+            {
+                AdvanceMeleeSequence(Index, *Skill);
                 return;
             }
             // Match release to visible montage time even while fixed simulation steps catch up after a slow frame.
@@ -1429,6 +1438,47 @@ void ACombatRoundCoordinator::AdvanceWeaponTrace(int32 Index, const FCombatRound
     StartRecovery(Index, Result != CombatSkillExecution::ETraceResult::Hit, Status);
 }
 
+void ACombatRoundCoordinator::AdvanceMeleeSequence(int32 Index, const FCombatRoundSkill& Skill)
+{
+    FCombatRoundUnitView& Entry = View.Units[Index];
+    FActionRuntime& Action = Actions[Index];
+    if (Action.bReleased
+        || !HasExecutionAuthority()
+        || !IsValid(Entry.Unit)
+        || !Entry.Unit->IsUnitAlive())
+    {
+        return;
+    }
+    const double Elapsed = FMath::Min(SimulationTime - Action.PhaseStarted, MontageClock - Action.MontageStartedAt);
+    while (Skill.MeleeStrikes.IsValidIndex(Action.NextMeleeStrike))
+    {
+        const FCombatMeleeStrike& Strike = Skill.MeleeStrikes[Action.NextMeleeStrike];
+        if (Elapsed + 0.00001 < Skill.WindupSeconds + Strike.DelaySeconds) return;
+        if (!CombatSkillExecution::CanUseSkill(Entry.Unit, Skill))
+        {
+            Action.bReleased = true;
+            StartRecovery(Index, true, NSLOCTEXT("CombatRound", "SequenceInterrupted", "장비 또는 태그 조건 변경으로 연속 공격 중단"));
+            return;
+        }
+        // Consume before applying effects so a target death or a later simulation step cannot repeat a strike.
+        // 대상 사망이나 이후 시뮬레이션 단계가 같은 타격을 반복하지 않도록 효과 적용 전에 소비합니다.
+        ++Action.NextMeleeStrike;
+        FCombatRoundSkill HitSkill = Skill;
+        HitSkill.DamageWeaponSlot = Strike.WeaponSlot;
+        CombatSkillExecution::FReleaseContext Context;
+        Context.Owner = this;
+        Context.Source = Entry.Unit;
+        Context.AimLocation = Action.AimLocation;
+        Context.PresentationTime = MontageClock;
+        const auto OnHit = [this, &Entry, &HitSkill](AUnitBase* Hit) { ApplyHit(Entry.Unit, Hit, HitSkill); };
+        const CombatSkillExecution::FReleaseResult Result = CombatSkillExecution::Release(Context, View.Units, HitSkill, OnHit, [](ACombatRoundProjectile*) {});
+        Action.bMeleeSequenceHit |= Result.bSucceeded;
+        Entry.Status = Result.Status;
+    }
+    Action.bReleased = true;
+    StartRecovery(Index, !Action.bMeleeSequenceHit, Entry.Status);
+}
+
 void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill& Skill)
 {
     FCombatRoundUnitView& Entry = View.Units[Index];
@@ -1516,6 +1566,15 @@ void ACombatRoundCoordinator::ApplyHit(AUnitBase* Source, AUnitBase* Target, con
     // Strength or Intelligence adds a flat amount per hit target only to direct damage of tagged melee or magic skills.
     // 힘·지능은 근접·마법 태그 스킬의 직접 피해에만 맞은 대상마다 고정값으로 더합니다.
     FCombatRoundSkill HitSkill = Skill;
+    if (bDirectDamage
+        && Skill.bUseEquippedWeaponDamage
+        && Source->CharacterEquipment
+        && Source->CharacterEquipment->HasEquipmentLoadout())
+    {
+        float WeaponDamage = 0.f;
+        if (EquipmentCombatRules::ResolveDamage(Source->CharacterEquipment->GetEquipment(), Skill.DamageWeaponSlot, WeaponDamage)) HitSkill.Power = WeaponDamage;
+        else if (Skill.DamageWeaponSlot.IsValid() || !Skill.RequiredEquipment.IsEmpty()) return;
+    }
     if (bDirectDamage) HitSkill.Power += Source->GetAttackStatBonus(Skill.EffectTags);
     if (!CombatSkillExecution::ApplyEffect(Source, Target, HitSkill)) return;
     const int32 SourceIndex = View.Units.IndexOfByPredicate([Source](const FCombatRoundUnitView& Unit) { return Unit.Unit == Source; });

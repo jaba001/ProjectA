@@ -2449,6 +2449,30 @@
       "key": "CategoryScope",
       "source": "{0} / {1}",
       "translation": "{0} / {1}"
+    },
+    {
+      "namespace": "RunEquipment",
+      "key": "MissingConditionalSkill",
+      "source": "장비 조합 스킬의 작성된 에셋 또는 조건이 없습니다.",
+      "translation": "The authored equipment skill or its requirements are missing."
+    },
+    {
+      "namespace": "RunItemShop",
+      "key": "InvalidWeaponDamage",
+      "source": "무기 에셋 CSV의 {0}행 피해량이 올바르지 않습니다.",
+      "translation": "Invalid weapon damage in row {0} of the weapon asset CSV."
+    },
+    {
+      "namespace": "CombatRound",
+      "key": "SequenceInterrupted",
+      "source": "장비 또는 태그 조건 변경으로 연속 공격 중단",
+      "translation": "Attack sequence interrupted by equipment or tag requirements"
+    },
+    {
+      "namespace": "RunItem",
+      "key": "WeaponDamageDescription",
+      "source": "{0}\n무기 피해량: {1}",
+      "translation": "{0}\nWeapon damage: {1}"
     }
   ]
 }

@@ -98,10 +98,17 @@ FText RunItemPresentation::GrantedSkills(const FRunItemDefinition& Item, bool bI
         const FSoftObjectPath& Path = Item.GrantedSkills[Index];
         const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
         FText Name = SkillName(Skill);
+        FCombatRoundSkill Profile;
+        FText Error;
+        const bool bWeaponDamage = Skill && Skill->ResolveRoundSkill(Profile, Error) && Profile.bUseEquippedWeaponDamage;
         if (Item.SkillBalanceVersion == 1 && Item.GrantedSkillBalances.IsValidIndex(Index))
         {
             const FRunSkillBalance& Balance = Item.GrantedSkillBalances[Index];
-            Name = bIncludeStats ? FText::Format(NSLOCTEXT("RunItem", "BalancedSkill", "[{0}] {1} · 위력 {2} · AP {3} / SAP {4}"), RunSkillBalance::RarityName(Balance.RarityTag), Name, FText::AsNumber(Balance.Power), FText::AsNumber(Balance.ActionPointCost), FText::AsNumber(Balance.SubActionPointCost)) : FText::Format(NSLOCTEXT("RunItem", "DetailedSkillName", "[{0}] {1}"), RunSkillBalance::RarityName(Balance.RarityTag), Name);
+            const FText Grade = RunSkillBalance::RarityName(Balance.RarityTag);
+            const FText Power = FText::AsNumber(bWeaponDamage ? Item.WeaponDamage : Balance.Power);
+            Name = bIncludeStats ? FText::Format(NSLOCTEXT("RunItem", "BalancedSkill", "[{0}] {1} · 위력 {2} · AP {3} / SAP {4}"),
+                Grade, Name, Power, FText::AsNumber(Balance.ActionPointCost), FText::AsNumber(Balance.SubActionPointCost))
+                : FText::Format(NSLOCTEXT("RunItem", "DetailedSkillName", "[{0}] {1}"), Grade, Name);
         }
         Names.Add(Name);
     }
@@ -133,7 +140,10 @@ FText RunItemPresentation::EquipmentDescription(const FRunItemDefinition& Item)
         const FGameplayTagContainer Occupied = URunEquipmentCatalog::GetOccupiedSlots(*Profile, Slot);
         bTwoHanded |= Occupied.HasTagExact(URunEquipmentCatalog::GetWeaponSlot(0)) && Occupied.HasTagExact(URunEquipmentCatalog::GetWeaponSlot(1));
     }
-    return FText::Format(NSLOCTEXT("RunItem", "EquipmentDescription", "장착 위치: {0}{1}"), FText::Join(FText::FromString(TEXT(" · ")), Labels), bTwoHanded ? NSLOCTEXT("RunItem", "OccupiesBothHands", " · 양손 슬롯 사용") : FText::GetEmpty());
+    const FText Attachment = FText::Format(NSLOCTEXT("RunItem", "EquipmentDescription", "장착 위치: {0}{1}"), FText::Join(FText::FromString(TEXT(" · ")), Labels),
+        bTwoHanded ? NSLOCTEXT("RunItem", "OccupiesBothHands", " · 양손 슬롯 사용") : FText::GetEmpty());
+    if (!Item.Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon")))) return Attachment;
+    return FText::Format(NSLOCTEXT("RunItem", "WeaponDamageDescription", "{0}\n무기 피해량: {1}"), Attachment, FText::AsNumber(Item.WeaponDamage));
 }
 
 TArray<RunItemPresentation::FItemSkillDetails> RunItemPresentation::SkillDetails(const FRunItemDefinition& Item)
@@ -164,11 +174,13 @@ TArray<RunItemPresentation::FItemSkillDetails> RunItemPresentation::SkillDetails
             }
             Detail.Name = FText::Format(NSLOCTEXT("RunItem", "DetailedSkillName", "[{0}] {1}"), RunSkillBalance::RarityName(Balance->RarityTag), Detail.Name);
             Detail.Color = RunItemPresentationInternal::SkillColor(Balance->RarityTag);
-            Detail.Stats = RunItemPresentationInternal::Stats(Balance->Power, Balance->ActionPointCost, Balance->SubActionPointCost, Balance->WindupSeconds);
+            const float Power = bResolved && Resolved.bUseEquippedWeaponDamage ? Item.WeaponDamage : Balance->Power;
+            Detail.Stats = RunItemPresentationInternal::Stats(Power, Balance->ActionPointCost, Balance->SubActionPointCost, Balance->WindupSeconds);
         }
         else if (Item.SkillBalanceVersion == 0 && Item.GrantedSkillBalances.IsEmpty() && bResolved)
         {
-            Detail.Stats = RunItemPresentationInternal::Stats(Resolved.Power, Resolved.ActionPointCost, Resolved.SubActionPointCost, Resolved.WindupSeconds);
+            const float Power = Resolved.bUseEquippedWeaponDamage ? Item.WeaponDamage : Resolved.Power;
+            Detail.Stats = RunItemPresentationInternal::Stats(Power, Resolved.ActionPointCost, Resolved.SubActionPointCost, Resolved.WindupSeconds);
         }
         else Detail.Stats = NSLOCTEXT("RunItem", "MissingSkillStats", "스킬 수치 정보를 확인할 수 없습니다.");
     }

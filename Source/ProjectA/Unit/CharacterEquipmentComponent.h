@@ -34,6 +34,7 @@ public:
     bool SetEquipment(bool bHasLoadout, const TArray<FRunEquipmentVisual>& Visuals);
     bool RefreshEquipment();
     bool HasEquipmentLoadout() const { return Presentation.bHasLoadout; }
+    const TArray<FRunEquipmentVisual>& GetEquipment() const { return Presentation.Visuals; }
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:

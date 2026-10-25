@@ -177,6 +177,34 @@ struct TStructOpsTypeTraits<FCombatChainSettings> : public TStructOpsTypeTraitsB
     };
 };
 
+// Slot queries preserve content classification through equipment grants and authoritative execution.
+// 슬롯 조건은 장비 스킬 부여와 권위 실행까지 콘텐츠 태그 분류를 보존합니다.
+USTRUCT(BlueprintType)
+struct PROJECTA_API FCombatEquipmentRequirement
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FGameplayTag Slot;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FGameplayTagQuery ItemQuery;
+};
+
+// Each strike uses its own weapon and collision at an offset after the first windup.
+// 각 타격은 첫 선딜 이후의 시간차에 해당 무기와 개별 충돌 판정을 사용합니다.
+USTRUCT(BlueprintType)
+struct PROJECTA_API FCombatMeleeStrike
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "10.0"))
+    float DelaySeconds = 0.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FGameplayTag WeaponSlot;
+};
+
 // Round execution values and optional presentation are resolved without activating legacy abilities.
 // 기존 어빌리티를 활성화하지 않고 라운드 실행 수치와 선택적 표현을 해석합니다.
 USTRUCT(BlueprintType)
@@ -333,6 +361,22 @@ struct PROJECTA_API FCombatRoundSkill
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     float WindupSeconds = 0.3f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment")
+    TArray<FCombatEquipmentRequirement> RequiredEquipment;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment")
+    bool bUseEquippedWeaponDamage = false;
+
+    // Empty strikes preserve single-release skills; explicit strikes pay costs once for the entire cast.
+    // 빈 타격 목록은 단발 스킬을 유지하며 명시적 연속 타격은 전체 시전에 비용을 한 번만 지불합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Melee Sequence")
+    TArray<FCombatMeleeStrike> MeleeStrikes;
+
+    // Only the executor fills this slot on a per-hit copy of the profile.
+    // 실행기만 타격별 프로필 사본에 이 슬롯을 지정합니다.
+    UPROPERTY(BlueprintReadOnly, Category = "Equipment")
+    FGameplayTag DamageWeaponSlot;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     float Power = 25.f;

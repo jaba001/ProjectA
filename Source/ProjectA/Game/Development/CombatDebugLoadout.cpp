@@ -186,9 +186,20 @@ bool UCombatDebugLoadout::ApplyEquipment(APlayerController* Controller, int32 Un
     if (!ResolveEditableUnit(Controller, UnitId, Coordinator, Unit, OutError)) return false;
     TArray<FRunEquipmentVisual> Visuals;
     if (!RunEquipmentRules::BuildVisuals(Candidate, Visuals, OutError)) return false;
+    TArray<FSoftObjectPath> SkillPaths;
+    for (USkillDefinitionDataAsset* Skill : Unit->GetEquippedSkillDataAssets()) SkillPaths.Add(FSoftObjectPath(Skill));
+    if (!RunEquipmentRules::AppendConditionalSkills(Candidate, SkillPaths, OutError)) return false;
+    TArray<TObjectPtr<USkillDefinitionDataAsset>> Definitions;
+    for (const FSoftObjectPath& Path : SkillPaths) Definitions.Add(Cast<USkillDefinitionDataAsset>(Path.TryLoad()));
+    TArray<FRunEquipmentVisual> PreviousVisuals = Unit->CharacterEquipment->GetEquipment();
     if (!Unit->CharacterEquipment->SetEquipment(true, Visuals))
     {
         OutError = NSLOCTEXT("CombatDebug", "EquipmentAttachmentFailed", "장비 메시를 현재 캐릭터에 부착할 수 없습니다. 기존 장비를 유지합니다.");
+        return false;
+    }
+    if (!Coordinator->SetDebugUnitSkills(Controller, UnitId, Definitions, OutError))
+    {
+        Unit->CharacterEquipment->SetEquipment(true, PreviousVisuals);
         return false;
     }
     // Publish the temporary inventory only after the complete visible loadout has been applied successfully.
