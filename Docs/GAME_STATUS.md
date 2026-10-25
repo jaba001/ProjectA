@@ -1,6 +1,6 @@
 # 게임 현재 상태
 
-기준일: 2026-10-13. 현재 구현된 게임 규칙과 진행 상황만 요약한다. 구현 구조·저장 호환은 [PROJECT_PLAN](PROJECT_PLAN.md), UI는 [UI_README](UI_README.md), 네트워크 계약은 [MULTIPLAYER](MULTIPLAYER.md), 남은 작업은 [TODO](TODO.md)를 따른다.
+기준일: 2026-10-25. 현재 구현된 게임 규칙과 진행 상황만 요약한다. 구현 구조·저장 호환은 [PROJECT_PLAN](PROJECT_PLAN.md), UI는 [UI_README](UI_README.md), 네트워크 계약은 [MULTIPLAYER](MULTIPLAYER.md), 남은 작업은 [TODO](TODO.md)를 따른다.
 
 수치는 모두 개발 시험값이며 최종 밸런스가 아니다.
 
@@ -62,6 +62,8 @@
 | 주황색 | `Item.Rarity.Orange` | 1% | 0 |
 
 상점·보상은 등급을 먼저 뽑고 그 안에서 에셋을 균등 추첨한다. 후보가 없는 등급은 제외하고 재정규화한다. 장비 등급 자체의 위력 배율은 없다.
+
+흰·파랑·보라·주황 4등급 전환과 스킬·속성을 아이템마다 고정하는 새 아이템 목록은 미구현 기획이다([ITEM_DESIGN 제안 32](ITEM_DESIGN.md#2-4-제안-32-무기-재설계와-4등급제-초안)).
 
 스킬은 62종에 고유 등급이 있고, 장비 등급별 스킬 등급 가중치로 추첨한다([SKILL_RARITY_PROBABILITIES](../DataCatalogs/SKILL_RARITY_PROBABILITIES.csv)). 위력·AP/SAP·선딜은 [SKILL_BALANCE](../DataCatalogs/SKILL_BALANCE.csv)에서 Run 생성 시 고정한다. 현재 비용은 AP 1·SAP 0, 선딜은 무기 근접 0.23초·나머지 0.3초다.
 

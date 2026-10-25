@@ -18,7 +18,7 @@ README에는 개요·실행·빌드·문서 안내만 둔다. 기능별 상세 �
 | UI·현지화 | DemonicUI 공통 테마, 1920×1080 기준 DPI, 한국어·English 설정, Async Loading Screen을 사용한다. | [UI 구조](Docs/UI_README.md) |
 | 백과사전 | 메인메뉴에서 장비·스킬·직업·상태이상·전투 공식·모험·몬스터를 탭과 검색으로 조회한다. | [화면·데이터 기준](Docs/UI_README.md#8-4-시작-메뉴-백과사전) |
 
-남은 작업과 사용자 확인 항목은 [TODO](Docs/TODO.md)에서 관리한다.
+남은 작업은 [TODO](Docs/TODO.md)·[ITEM_DESIGN](Docs/ITEM_DESIGN.md), 사용자 확인 항목은 [REVIEW](Docs/REVIEW.md)에서 관리한다.
 
 ## 실행
 
@@ -74,7 +74,7 @@ C++ 파일을 추가·삭제하거나 이름을 바꾼 뒤에는 프로젝트 �
 
 스크린샷과 갤러리는 `Docs/ScreanShoot/`에 로컬 보관하며 Git에서 제외한다. 새 clone에는 포함되지 않는다.
 
-`DataCatalogs/`에는 CSV 15개가 있다. 새 기본 Run은 아래에서 *표시한 10개를 생성 시 읽어 결과를 저장한다. 그래서 CSV를 수정하면 그 뒤에 만드는 새 Run에만 반영되며 기존 저장은 바뀌지 않는다.
+`DataCatalogs/`에는 CSV 17개가 있다. 새 기본 Run은 아래에서 *표시한 11개를 생성 시 읽어 결과를 저장한다. 그래서 CSV를 수정하면 그 뒤에 만드는 새 Run에만 반영되며 기존 저장은 바뀌지 않는다.
 
 | CSV | 내용 |
 |---|---|
@@ -82,6 +82,7 @@ C++ 파일을 추가·삭제하거나 이름을 바꾼 뒤에는 프로젝트 �
 | [ITEM_RARITY_PROBABILITIES](DataCatalogs/ITEM_RARITY_PROBABILITIES.csv)* | 5등급 기본 등장 확률 50·30·15·4·1% |
 | [SKILL_BALANCE](DataCatalogs/SKILL_BALANCE.csv)* | 무기 후보 스킬 62종의 등급·가중치·위력·AP/SAP·선딜 |
 | [SKILL_RARITY_PROBABILITIES](DataCatalogs/SKILL_RARITY_PROBABILITIES.csv)* | 장비 5등급×스킬 5등급 가중치 |
+| [SKILL_STATUS_EFFECTS](DataCatalogs/SKILL_STATUS_EFFECTS.csv)* | 공격 스킬별 잠정 상태이상 태그·수치 |
 | [ENCOUNTER_POOL](DataCatalogs/ENCOUNTER_POOL.csv)* | 인카운터 활성 13개·비활성 15개의 그룹/변형 가중치·상품 필터 |
 | [MONSTER_STATS](DataCatalogs/MONSTER_STATS.csv)* | 몬스터 13종의 태그·HP/AP/SAP/속도·원본 스킬 |
 | [MONSTER_SPAWN_PROBABILITIES](DataCatalogs/MONSTER_SPAWN_PROBABILITIES.csv)* | 활성 12종의 출현 가중치(합 100) |
@@ -89,6 +90,7 @@ C++ 파일을 추가·삭제하거나 이름을 바꾼 뒤에는 프로젝트 �
 | [PVE_DIFFICULTIES](DataCatalogs/PVE_DIFFICULTIES.csv)* | 하·중·상 속도·골드 배율 |
 | [PVE_HEALTH_CURVE](DataCatalogs/PVE_HEALTH_CURVE.csv)* | 10묶음×3난이도의 기준 HP |
 | [ARMOR_ASSETS](DataCatalogs/ARMOR_ASSETS.csv) | ROG 시범 방어구·망토 6종(디버그 전투 장비 목록 전용) |
+| [ITEM_DESIGN_DRAFT](DataCatalogs/ITEM_DESIGN_DRAFT.csv) | 새 아이템 80종의 4등급·고정 스킬/속성 기획 초안(런타임 미사용, [ITEM_DESIGN 3절](Docs/ITEM_DESIGN.md#3-새-아이템-목록-초안)) |
 | [MONSTER_ASSETS](DataCatalogs/MONSTER_ASSETS.csv) | 몬스터 13종의 원본 팩·Blueprint·메시 경로(참고 자료) |
 | [SKILL_EFFECT_ASSETS](DataCatalogs/SKILL_EFFECT_ASSETS.csv) · [SKILL_CREATION_STATUS](DataCatalogs/SKILL_CREATION_STATUS.csv) · [SKILL_SOUND_ASSETS](DataCatalogs/SKILL_SOUND_ASSETS.csv) | VFX·스킬 생성 현황·SFX 원본 목록과 연결 기록 |
 

@@ -1,6 +1,6 @@
 # ProjectA 구현 구조와 설정
 
-기준일: 2026-10-06. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
+기준일: 2026-10-25. 현재 모듈 책임·실행 절차·콘텐츠 설정을 정의한다.
 
 기본 Combat는 [GAME_STATUS 6절](GAME_STATUS.md#6-라운드-전투)의 행동 계획·시간차 실행으로 교체했다. 기존 순차 턴·AI 연속 행동·End Turn 실행은 제거했다. 순차 모드 보존용 진입점은 없으며 이전 Blueprint 참조용 클래스·프로퍼티만 남긴다. 기존 Run·상점·직업·원래 소유권과 비전투 저장은 유지한다. 진행용 HP fixture이며 정상 난이도·실제 서비스·다중 PC·지연/손실 검증은 별도다.
 
@@ -159,7 +159,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 새 일반 Target Run을 구성하는 `ConfigureTargetRun`은 [ITEM_RARITY_PROBABILITIES.csv](../DataCatalogs/ITEM_RARITY_PROBABILITIES.csv)를 읽어 `FRunItemShopState.RarityProbabilities`에 확률 스키마 1을 저장한다. 각 항목에는 `RarityTag`와 정수 0~10000의 `ProbabilityBasisPoints`를 보관하며 확률의 전체 합은 10000이다. 최초 진열·재입장·리롤마다 적격 후보의 등급을 먼저 추첨하고 같은 등급 안에서 에셋을 균등 추첨한다. 동일 진열의 에셋 중복은 금지하고 등급 반복은 허용한다. 빈 등급·소진·0%는 제외하여 다시 정규화하고 기본상점은 양수 확률의 적격 에셋이 5개 미만이면 기존 상태를 보존하며 실패한다. 전문 상점은 저장된 Query 안에서 장착 가능한 적격 에셋 수와 5 중 작은 수를 진열한다. 기존 전문 상점에 적격 후보가 없으면 빈 진열과 퇴장을 허용하고 유료 리롤은 차단한다. 전투 보상도 같은 저장 카탈로그·확률에서 장착 지원품만 공통 선택하되 직전 상점 Query 없이 중복 없는 에셋 3개를 추첨한다. CSV 변경은 이후 새 일반 Run에만 반영한다. 확률 스키마 0·빈 목록의 이전 저장은 장착 가능한 적격 후보 안에서 기존 아이템 균등 추첨을 유지하며 prototype·개발 협동·지정된 직업별 시작 장비의 선택은 변경하지 않는다. 현재 49개는 흰색 9·초록색 17·파란색 19·보라색 4·주황색 0이다. 5색 확률 CSV는 유지하고 현재 기본 후보는 50:30:15:4를 재정규화한다. [확률표와 적용 범위](GAME_STATUS.md#3-1-등급과-확률)
 
-프로젝트 루트 `DataCatalogs/`에 무기·아이템 등급 확률·스킬 밸런스/등급 가중치·스킬 이펙트·생성 현황·SFX·인카운터 풀·몬스터 CSV를 함께 보관한다. 런타임은 `WEAPON_ASSETS.csv`·`ITEM_RARITY_PROBABILITIES.csv`·`SKILL_BALANCE.csv`·`SKILL_RARITY_PROBABILITIES.csv`·`ENCOUNTER_POOL.csv`와 새 기본 난이도의 `MONSTER_STATS.csv`·`MONSTER_SPAWN_PROBABILITIES.csv`·`MONSTER_ENCOUNTERS.csv`를 읽고 같은 여덟 경로를 빌드의 UFS RuntimeDependency에 지정한다. VFX·SFX·`MONSTER_ASSETS.csv`는 원본·제작 상태를 기록하는 자료 목록이다. 기존 카탈로그 생성 도구는 폐기 상태를 유지하고 새 생성 입력은 `DrGameSkillSpecs.json`을 사용한다.
+프로젝트 루트 `DataCatalogs/`에 무기·아이템 등급 확률·스킬 밸런스/등급 가중치·스킬 이펙트·생성 현황·SFX·인카운터 풀·몬스터 CSV를 함께 보관한다. 런타임은 `WEAPON_ASSETS.csv`·`ITEM_RARITY_PROBABILITIES.csv`·`SKILL_BALANCE.csv`·`SKILL_RARITY_PROBABILITIES.csv`·`SKILL_STATUS_EFFECTS.csv`·`ENCOUNTER_POOL.csv`, 새 기본 난이도의 `MONSTER_STATS.csv`·`MONSTER_SPAWN_PROBABILITIES.csv`·`MONSTER_ENCOUNTERS.csv`·`PVE_DIFFICULTIES.csv`·`PVE_HEALTH_CURVE.csv`와 디버그 장비용 `ARMOR_ASSETS.csv`를 읽고 같은 열두 경로를 빌드의 UFS RuntimeDependency에 지정한다. VFX·SFX·`MONSTER_ASSETS.csv`는 원본·제작 상태를 기록하는 자료 목록이고 `ITEM_DESIGN_DRAFT.csv`는 런타임이 읽지 않는 새 아이템 기획 목록이다([ITEM_DESIGN 3절](ITEM_DESIGN.md#3-새-아이템-목록-초안)). 기존 카탈로그 생성 도구는 폐기 상태를 유지하고 새 생성 입력은 `DrGameSkillSpecs.json`을 사용한다.
 
 CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한다. 앞뒤 공백·선행 `+`·선행 0은 허용하며 소수·접미 문자·쉼표·지수 표기·범위 초과는 카탈로그 전체를 거절하고 기존 출력을 보존한다. 기존 4/5열 CSV와 저장된 카탈로그의 해석을 유지하며 같은 가격 검증을 6/7열에도 적용한다.
 
@@ -193,7 +193,7 @@ CSV 열은 `인카운터 ID,게임 내 이름,상점 종류,속성,분류 태그
 - 외형은 `FCharacterAppearanceSelection.BodyId`로 선택하고 기존 appearance 구조를 통해 Run·Snapshot·체크포인트·복제에 전달한다. `UCharacterAppearanceCatalog.BodyVariants` 배열의 원본 메시를 공통 `UCharacterAppearanceComponent`가 적용하며 기존 저장에 `BodyId`가 없으면 남자 기본값을 사용한다. ROG 의상 UI·착용은 중지하고 `ItemIds`·103개 항목·원본 에셋은 향후 아이템용으로 보존한다. 마법사 Blueprint의 고정 스태프 표시는 제거하고 실제 시작 장비로 표시한다. 기존 `LegacyEnemyClasses` 체크포인트 호환·래그돌을 유지하며 장비 능력치 연결과 개발용 협동 로비의 캐릭터 생성 UI는 이번 범위에 포함하지 않는다.
 - 수정하지 않은 이름은 직업 표시명과 슬롯 번호를 사용한다. 개별 이름 변경은 `SetSlotCharacterName`으로 반영한다.
 - 네 직업의 시작값은 `UProfessionBase` 하위 클래스의 HP·`Speed`(민첩)·`Strength`·`Intelligence`다([GAME_STATUS 5절](GAME_STATUS.md#5-직업과-능력치)). 첫 스폰은 직업 정의의 HP와 속도를 사용하고 이후 전투는 저장한 결과 HP를 유지한다. HP 0인 멤버는 다음 전투에 스폰하지 않는다. 목표 Run은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 시험 성장을 공통 직업 해석에 적용하며 최종 밸런스·피해 보정 공식은 별도다.
-- 전투 속도는 GAS `Speed`를 직접 사용한다. 기본 아군 속도는 10, 일반 `AEnemyUnit`의 클래스 기본값은 HP 150·AP 2·속도 5다. 새 기본 Run의 몬스터와 Snapshot은 스폰 후 저장된 난이도 수치를 적용한다.
+- 전투 속도는 GAS `Speed`를 직접 사용한다. 아군 시작 속도는 직업별 민첩(전사·마법사 5, 궁수 7, 도적 10), 일반 `AEnemyUnit`의 클래스 기본값은 HP 150·AP 2·속도 5다. 새 기본 Run의 몬스터와 Snapshot은 스폰 후 저장된 난이도 수치를 적용한다.
 - `UAS_Unit`의 `Strength`·`Intelligence`는 `ConfigureProfession`으로 설정하고 `FPartySnapshotStats`·`FCombatCheckpointUnit`에 저장한다(이전 저장은 0). 서버 `ApplyHit`가 직접 피해일 때 `AUnitBase::GetAttackStatBonus`로 `Skill.Attack.Melee`면 힘, `Skill.Attack.Magic`이면 지능을 맞은 대상마다 위력에 더한다. Run 저장에는 힘·지능을 두지 않고 매 스폰 직업 정의에서 읽는다.
 - 공격 분류 태그는 스킬 DataAsset의 `RoundDefinition.EffectTags`에 둔다. `Scripts/TagSkillAttackCategories.py`(`USkillAttackTagLibrary`)가 근접 실행 스킬에 Melee, 지팡이·마법서 무기 풀 스킬에 Magic을 추가하며 회복·보호막과 활·석궁은 제외하고 기존 태그는 지우지 않는다(근접 32·마법 38). 이전 프로필 맨손 공격은 자동 이행에서 Melee를 받는다. 이후 분류는 에디터에서 직접 고친다.
 
@@ -221,7 +221,7 @@ SAP 이동은 Coordinator의 `SAPMoveSpeed=350cm/s`를 사용하며 `RoundView.S
 
 `AUnitBase`의 기본 CharacterMovement는 `UUnitCharacterMovementComponent`를 사용한다. 조정자의 수동 이동이 SAP·접근·복귀에서 속도와 보행용 가속도를 함께 공급하고 정지·시전·중단·사망에서 초기화한다. 기존 `ABP_Unarmed`의 속도/가속도 조건을 유지하며, 클라이언트 `MOVE_None`의 생략된 가속도 갱신은 기존 복제 속도로 보완한다. 엔진 보간과 서버 위치 권위는 유지한다.
 
-기존 GA/SkillActor의 즉시 실행과 순차 `StartSkill`·TurnManager·AI 연속 판단·End Turn은 실행하지 않는다. 모든 예약 행동과 복귀·잔여 투사체가 종료된 뒤에만 결과를 Encounter로 전달한다. 양 팀 전멸은 패배·Run 종료이며 승리 보상을 지급하지 않는다. 엄호의 계획·실행·피해 흡수는 제거하고 상태이상은 후순위로 둔다. 확정 규칙은 [GAME_STATUS 6절](GAME_STATUS.md#6-라운드-전투)을 기준으로 한다.
+기존 GA/SkillActor의 즉시 실행과 순차 `StartSkill`·TurnManager·AI 연속 판단·End Turn은 실행하지 않는다. 모든 예약 행동과 복귀·잔여 투사체가 종료된 뒤에만 결과를 Encounter로 전달한다. 양 팀 전멸은 패배·Run 종료이며 승리 보상을 지급하지 않는다. 엄호의 계획·실행·피해 흡수는 제거했다. 상태이상은 [GAME_STATUS 7절](GAME_STATUS.md#7-상태이상)을 따른다. 확정 규칙은 [GAME_STATUS 6절](GAME_STATUS.md#6-라운드-전투)을 기준으로 한다.
 
 Standalone은 결과 저장 성공 후 유닛·전투 상태를 정리한다. 네트워크는 Result 표시 동안 최종 상태를 유지하고 Continue/월드 종료 시 정리한다. EncounterManager는 최종 파티 HP와 소모품 재고를 슬롯별 값으로 수집하여 결과·보상·단계와 같은 저장 후보에 전달하며 저장 성공 후 Run 파티에 공개한다. 결과/Continue 저장 실패는 기존 Run 파티·단계·파일을 보존하며 재시도할 수 있다. Continue 재시도 성공 시 이전 오류를 동기 상태 전이 통지 전에 제거하여 상점 선택 화면에 남기지 않는다.
 
@@ -245,7 +245,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 기존 577행의 `스킬 방식`은 투사체 95·범위형 91·근접공격 28·지원형 68·이동형 5·보조 효과 257·보류 33개였다. 신규 123행은 생성 명세의 범위형 24·체인 5·투사체 14·근접공격 4·지원형 13과 미생성 보조 63개다. 과거 생성 프로필의 `slash/spin`은 근접공격, `projectile`은 투사체, `area/beam`은 범위형, `heal/shield`는 지원형으로 기록한다. 현재 원본 VFX 목록과 분류를 보존하며 이 목록의 항목을 게임 스킬에 자동 편입하지 않는다. Trail·피격·부착·시전·공용 표시·환경 연출은 보조 효과이며 방식이 불분명한 항목은 보류한다. CSV는 목록이며 태그·에셋을 변경하지 않는다. 신규 `link` 5종의 체인 분류는 [4-9절](#4-9-구입-vfx와-sfx-도입)의 실제 태그와 대응한다.
 
-[5속성·복합 허용 정책](GAME_STATUS.md#6-라운드-전투)에 따라 `속성·테마` 열에 기획 배정안을 기록한다. 복합 표기는 `물리 + 불 + 냉기 + 번개 + 카오스` 순서에서 배정한 속성만 연결한다. 커서·조준·레벨업 등 공용 표시·지원 표현과 공통 기반 BP의 공란은 속성 미배정이며 별도 속성이 아니다.
+[5속성·복합 허용 정책](GAME_STATUS.md#5-직업과-능력치)에 따라 `속성·테마` 열에 기획 배정안을 기록한다. 복합 표기는 `물리 + 불 + 냉기 + 번개 + 카오스` 순서에서 배정한 속성만 연결한다. 커서·조준·레벨업 등 공용 표시·지원 표현과 공통 기반 BP의 공란은 속성 미배정이며 별도 속성이 아니다.
 
 | 기획 배정 속성 | 원본 테마·용도 대응 |
 |---|---|
@@ -258,7 +258,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 | 물리 + 카오스 | 혈액·어둠 바위·마력 운석 |
 | 불 + 냉기 + 번개 | 원소 혼합·무지개/광채 |
 
-대응표는 카탈로그 활용안이며 원본의 실제 시각 표현·피해 속성 확인 결과가 아니다. 이름·경로·용도로 개별 예외를 구분하며 Phoenix 폴더의 `P_SpeedLines`는 물리로 배정한다. 원본 에셋·게임 내 이름은 유지한다. 새 카탈로그의 속성 태그는 아래 명세로 GAS Spec에 연결하며 속성별 피해 공식·상태이상은 별도 기획·구현 범위다. 저항 시스템은 2026-10-06 사용자 결정으로 폐기하여 구현 대상에서 제외한다. 현재 공통 피해·보호막 흡수와 속성 태그는 유지한다. [폐기 기준](GAME_STATUS.md#6-라운드-전투)
+대응표는 카탈로그 활용안이며 원본의 실제 시각 표현·피해 속성 확인 결과가 아니다. 이름·경로·용도로 개별 예외를 구분하며 Phoenix 폴더의 `P_SpeedLines`는 물리로 배정한다. 원본 에셋·게임 내 이름은 유지한다. 새 카탈로그의 속성 태그는 아래 명세로 GAS Spec에 연결한다. 속성별 피해 공식은 없고 속성별 상태이상 배정은 [GAME_STATUS 7절](GAME_STATUS.md#7-상태이상)을 따른다. 저항 시스템은 2026-10-06 사용자 결정으로 폐기하여 구현 대상에서 제외한다. 현재 공통 피해·보호막 흡수와 속성 태그는 유지한다. [폐기 기준](GAME_STATUS.md#5-직업과-능력치)
 
 두 에셋 CSV의 `게임 내 이름`은 원본 이름을 보존한 한국어 표시명이다. 무기는 종류·원본 단서를 바탕으로 작명하고, 이펙트는 테마와 시전·투사체·피격 등 시각적 용도를 구분한다. 무기 CSV의 중복 표시명 번호는 기존 행 순서대로 유지한다. 이펙트 CSV의 퇴역 577행·번호는 고정하고 신규 설치 목록 안에서 중복 표시명을 구분한다. 신규 주효과는 생성 명세의 한국어 스킬 이름을 사용한다. 같은 효과의 Niagara/Cascade/Blueprint 구현도 이 규칙을 따르며 원본 에셋 이름·경로는 변경하지 않는다. 번호는 등급·강화 단계를 뜻하지 않고, 표시명은 희귀도·능력치·피해 속성·손 점유를 확정하지 않는다. 이펙트 이름은 향후 스킬 구성에 사용할 목록 데이터이며 기존 GAS 스킬 이름·실행 효과를 자동 변경하지 않는다.
 
@@ -458,7 +458,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 | 직업 편집 | Edit에서 이름 1~32자·직업 편집. 저장 시 적용, 취소 시 기존 값 유지. ClassInfo는 HP·속도·AP/SubAP·시작 스킬 표시 |
 | 직업 데이터 | `bUseUnitClassDefaults`의 능력치/AP 해석과 CombatClass fallback 유지. 새 Run은 `UnarmedStartingSkill`을 사용하고 다음 전투는 파티에 저장된 습득 목록을 사용. 명시 스킬 목록이 없는 기존 저장만 과거 직업 기본값 해석 유지. 미지원 직업·잘못된 수치·중복 스킬 ID 거절 |
 | 회복약 | 기존 즉시 회복 프로퍼티는 호환용이며 이전 HUD 실행은 제거 상태 유지. 새 목표 Run만 태그 기반 GAS 소모 행동·별도 재고를 사용하며 수치·저장 경계는 [5-1절](#5-1-목표-run과-회복-시험-데이터) 적용 |
-| 추가 스킬 | 전투 진입 시 EncounterSkillPool 자동 추첨·장착 제거. 실제 시작/명시 장착 DA만 사용하며 장착 최대 5개·계획/해결 중 변경 거절 유지. 기존 풀 에셋과 명시 획득 API는 보존 |
+| 추가 스킬 | 전투 진입 시 EncounterSkillPool 자동 추첨·장착 제거. 실제 시작/명시 장착 DA만 사용하며 스킬 개수 상한 없음·계획/해결 중 변경 거절 유지. 기존 풀 에셋과 명시 획득 API는 보존 |
 | 전투 간 이관 | HP·소모품 재고 유지. 새 전투의 추가 스킬 자동 추첨 없음. 전투 복구는 저장된 Ready 경계 사용. Snapshot 적은 저장된 스킬 구성 사용 |
 | 적·아군 AI | 실제 장착 스킬 순서·가까운 적 기준으로 인간 초안 전에 단일 명령 고정. 장착된 복귀형 Tile 공격은 적 HomeCoord를 공격/접근 좌표로 선택 가능. 합법 공격이 없으면 목록에 노출되지 않는 내부 대기 처리 |
 | 사망 표현 | 아군·적·Snapshot 모두 기존 Ragdoll 충돌 프로필·본 물리·서버 생성 사망 충격량 사용. 캡슐 충돌 해제·타일 해제·행동 취소 유지. 단발 사망 애니메이션 분기와 설정 제거. [에셋 도입 계획](TODO.md#6-신규-에셋-선정과-도입) |
@@ -494,7 +494,7 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 - `SkillDefinitionDataAsset.bUseRoundDefinition`과 `RoundDefinition`으로 스킬별 실제 시간·범위·접근·복귀·투사체 정책을 편집한다. 근접·투사체의 발동 전 대상 사망은 가장 가까운 유효 생존 적 재선택으로 공통 해석한다. 공격자의 현재 위치로 거리를 계산하고 `IsValidUnitTarget` 조건을 재사용하며, 유닛 접근형은 접근·미발동 시전·칼날 궤적을 다시 시작한다. 후보가 없으면 불발 후 복귀하고 추가 비용은 차감하지 않는다. 지점 공격·발사 후 투사체·기존 저장 프로필 값은 유지한다. 미지정 장착 스킬은 [GAME_STATUS 6절](GAME_STATUS.md#6-라운드-전투)의 초기 변환을 사용한다.
 - 시전 표현은 명시 프로필의 `RoundDefinition.CastMontage`를 우선하며 비어 있으면 `AbilityClass`의 기존 `AttackMontage`를 사용한다. 소모품은 명시 몽타주만 사용해 공격 몽타주 fallback을 적용하지 않는다. 서버가 시전 진입 시 한 번 재생을 전달한다. 몽타주 재생 인스턴스의 루트 모션과 유닛의 기존 `AN_SkillRelease` 효과 발동은 차단하며, `WindupSeconds`·충돌·AP 계산과 발동 1회는 유지한다. 발동 후 `Recovery`에서 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝날 때까지 기다린 뒤 복귀한다. 서버의 재생 인스턴스를 사용할 수 없으면 에셋 길이/RateScale·블렌드 아웃·여유 시간 0.25초를 사용하며 시전 시작 기준 최대 60초로 제한한다. 반복·자동 종료 누락·잘못된 길이/속도로 무한 대기하지 않으며 시간 초과 시 남은 표현을 즉시 정리한다. 사망·중단·발동 전 취소·다음 행동 시작도 해당 인스턴스를 정리한다.
 - 몽타주 대기 시간은 서버가 받은 `DeltaSeconds`를 프레임당 한 번 누적하며 고정 간격 시뮬레이션의 미처리 시간과 분리한다. 프레임 지연 뒤 누적 시뮬레이션을 처리할 때 시전 대기까지 중복 차감하여 조기에 복귀하지 않도록 한다.
-- 이전 GAS 효과·모든 타일 범위·상태효과를 새 행동으로 완전 변환한 것은 아니다. 회복 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 명시 프로필과 재고만 지원한다. 새 Run의 아군은 비무장 공격 1개로 시작하고 상점에서 근접 공격·신규 VFX 60종을 습득할 수 있다. 기존 Blueprint·Snapshot·저장에서는 삭제 VFX 스킬만 제외하고 두 기본 공격·몬스터 전용 공격을 유지한다. 기존 `BP_EnemyUnit`의 근접 공격과 신규 몬스터의 기존 전용 공격을 유지한다. [몬스터 구성](#4-5-몬스터-콘텐츠) · [지원 변환](GAME_STATUS.md#6-라운드-전투)
+- 이전 GAS 효과·모든 타일 범위·상태효과를 새 행동으로 완전 변환한 것은 아니다. 회복 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 명시 프로필과 재고만 지원한다. 새 일반 Run의 아군은 비무장 공격과 장착 무기의 확정 스킬을 사용하며, 근접 공격·신규 VFX 60종의 스킬상점 습득은 무기 스킬 획득 버전 0의 기존 경로에만 남는다. 기존 Blueprint·Snapshot·저장에서는 삭제 VFX 스킬만 제외하고 두 기본 공격·몬스터 전용 공격을 유지한다. 기존 `BP_EnemyUnit`의 근접 공격과 신규 몬스터의 기존 전용 공격을 유지한다. [몬스터 구성](#4-5-몬스터-콘텐츠) · [지원 변환](GAME_STATUS.md#6-라운드-전투)
 - `RoundMontageOverrides`는 공통 DA를 변경하지 않고 유닛의 Skeleton에 맞는 몽타주로 바꾼다. 전사의 검·비무장과 적의 검, 구형 SkeletonGuard Snapshot의 활·참격·마법 표현에 적용하며 Root Motion·서버 발동 권위·몽타주 종료 후 복귀 규칙을 유지한다. 검은 `hand_r`에 하나만 부착한다.
 - 일반 근접 `DA_MeleeAttack`과 VFX 참격 4개는 Greystone `Attack_A_Med`·`Attack_A_Slow_Recovery`를 준비·베기·복귀 3구간으로 사용한다. 일반 근접은 준비 7/30초·총 1.6초이며 기존 게임 발동 0.23초와 시각적 준비 끝의 차이는 3.33ms다. 참격은 준비 0.3초·총 1.6667초다. 전방/빔/체인 마법 27개는 Gideon의 한 손 시전 1.3초, 광역/회복/보호막 27개는 Muriel의 양손 시전 1.6333초를 사용한다. 마법 준비 0.3초·DefaultSlot·비반복·블렌드 0.06/0.12초이며 추가 효과 지연은 기존 값을 유지한다. 스킬 명세의 `cast_montage`로 분류하고 런타임의 직업·이름·Kind 분기로 대체하지 않는다. 구형 `BPDA_swoard_attack`의 Kwang 몽타주·서버 칼날 추적과 수치·태그·CSV는 보존한다.
 - 마법의 지팡이 쥐기는 프로젝트 임포트 시퀀스 2개의 오른손 손가락 19개 회전만 선택 임포트한 Greystone `Attack_A_Med` 첫 자세로 고정한다. 손목·팔·다른 트랙·위치·배율·타이밍은 보존하며 원본 FBX·Skeleton·AnimBP는 수정하지 않는다. 보정은 작성 명세의 `grip_reference`와 저장된 metadata로 재현·검증한다. `StartingStaff` 장비 프로필은 해당 닫힌 손의 엄지/소지 축과 원본 메시 축 중심으로 부착 위치·회전을 맞춘다. 기존 저장은 다음 전투 생성·checkpoint 복원 시 현재 프로필로 외형을 재구성하며 이미 떠 있는 Actor·메뉴 기본 외형·Snapshot BP 기본 장비까지 자동 갱신하지 않는다.
