@@ -22,6 +22,7 @@
 #include "Controller/PartyPlayerController.h"
 #include "EngineUtils.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Combat/Round/CombatRoundProjectile.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
@@ -153,6 +154,8 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
     StatusTuning = CombatStatusRules::FTuning::FromSettings();
     View.CombatId = InManager->GetCombatInstanceId();
     URunStateSubsystem* Run = !ACombatDebugGameMode::IsDebugWorld(GetWorld()) && GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
+    const UPartyDefinitionDataAsset* AIPartyDefinition = Run && Run->PartyDefinition ? Run->PartyDefinition.Get() : GetDefault<UPartyDefinitionDataAsset>();
+    const FSoftObjectPath UnarmedSkillPath = AIPartyDefinition->UnarmedStartingSkill.ToSoftObjectPath();
     const bool bRestoring = Run && Run->GetPhase() == ERunPhase::Combat && Run->HasCombatCheckpoint();    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
         APartyPlayerController* Controller = Cast<APartyPlayerController>(It->Get());
@@ -201,6 +204,9 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
             // Battles without a Run, such as DebugCombat, read the current status table directly.
             // DebugCombat처럼 Run이 없는 전투는 현재 상태이상 표를 직접 읽습니다.
             if (!Run && !RunSkillBalance::ApplyCurrentStatusEffects(Definition->GetPrimaryAssetId(), Skill, OutError)) return false;
+            // Classify the configured unarmed asset without relying on its name or position in the loadout.
+            // 이름이나 장착 목록 순서 대신 설정된 비무장 스킬 에셋으로 대체 행동을 분류합니다.
+            if (FSoftObjectPath(Definition) == UnarmedSkillPath) Skill.EffectTags.AddTag(ProjectACombatTags::Skill_AI_Fallback);
             if (!FindSkill(Skill.SkillId)) Skills.Add(Skill);
             Entry.SkillIds.AddUnique(Skill.SkillId);
         }

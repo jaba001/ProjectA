@@ -26,6 +26,9 @@ namespace ProjectACombatTags
     // 공격 분류는 직접 피해에 더할 기본 능력치를 고르며 활 계열은 어느 쪽도 갖지 않습니다.
     PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Attack_Melee);
     PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Attack_Magic);
+    // AI uses fallback skills only when no other equipped skill has a legal command.
+    // AI는 다른 장착 스킬로 유효한 행동을 만들 수 없을 때만 대체 스킬을 사용합니다.
+    PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_AI_Fallback);
     PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Attack_Release);
     PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Burning);
     PROJECTA_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Poisoned);

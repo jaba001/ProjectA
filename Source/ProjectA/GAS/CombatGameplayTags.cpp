@@ -20,6 +20,7 @@ namespace ProjectACombatTags
     UE_DEFINE_GAMEPLAY_TAG(Skill_Shape_Chain, "Skill.Shape.Chain");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Attack_Melee, "Skill.Attack.Melee", "Direct damage adds the caster's Strength");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Attack_Magic, "Skill.Attack.Magic", "Direct damage adds the caster's Intelligence");
+    UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_AI_Fallback, "Skill.AI.Fallback", "AI uses this skill only when no other equipped skill has a legal command / 다른 장착 스킬의 유효한 행동이 없을 때만 AI가 사용");
     UE_DEFINE_GAMEPLAY_TAG(Event_Attack_Release, "Event.Attack.Release");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Burning, "Status.Burning", "Damage equal to the value at round end, then decays");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Poisoned, "Status.Poisoned", "Damage equal to the value at round end, then minus one");

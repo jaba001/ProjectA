@@ -1,6 +1,7 @@
 #include "Combat/Round/CombatAIPlanning.h"
 #include "Combat/Round/CombatPlanValidator.h"
 #include "Combat/Round/CombatSkillExecutor.h"
+#include "GAS/CombatGameplayTags.h"
 #include "Unit/UnitBase.h"
 
 int32 CombatAIPlanning::FindNearestEnemy(const FCombatRoundView& View, int32 SourceIndex, TFunctionRef<bool(const FCombatRoundUnitView&)> IsAllowed)
@@ -65,8 +66,8 @@ FCombatRoundCommand CombatAIPlanning::ChooseCommand(const FCombatRoundView& View
     const FCombatRoundUnitView& Entry = View.Units[UnitIndex];
     FCombatRoundCommand Command = Entry.Command;
     Command.SkillId = NAME_None;
-    // Keep authored skill order as policy; tag filters only remove ineligible candidates.
-    // 제작된 스킬 순서를 정책으로 유지하고 태그 필터는 부적격 후보만 제거합니다.
+    // Try ordinary skills in authored order; retain the first legal fallback until all ordinary skills fail.
+    // 일반 스킬을 작성 순서대로 검토하며 모두 사용할 수 없을 때를 위해 첫 유효 대체 행동을 보관합니다.
     for (FName SkillId : Entry.SkillIds)
     {
         const FCombatRoundSkill* Skill = CombatPlanValidation::FindSkill(State, SkillId);
@@ -87,8 +88,9 @@ FCombatRoundCommand CombatAIPlanning::ChooseCommand(const FCombatRoundView& View
             }
         }
         if (!View.Units.IsValidIndex(TargetIndex)) continue;
-        Command = BuildCommand(View, State, UnitIndex, SkillId, *Skill, TargetIndex);
-        return Command;
+        const FCombatRoundCommand Candidate = BuildCommand(View, State, UnitIndex, SkillId, *Skill, TargetIndex);
+        if (!Skill->EffectTags.HasTag(ProjectACombatTags::Skill_AI_Fallback)) return Candidate;
+        if (Command.SkillId.IsNone()) Command = Candidate;
     }
     return Command;
 }

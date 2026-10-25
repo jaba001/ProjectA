@@ -85,7 +85,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 | `ACombatManager` / `ACombatRoundCoordinator` | Run 전투 연결, 라운드 계획·시간표·실행·잔여 공격 정리·결과 확정. `UTurnManager`는 참조 호환용 외형만 유지 |
 | `UCombatActionAuthority` | 기존 Run 식별·원래 소유권·서버 연결·관리 lease·Human/AI 검증 유지. 이전 즉시 순차 행동 실행은 제거 |
 | `AUnitBase` / GAS / Grid | 서버 HP/AP·사망·실제 위치/복귀 칸·복제 표현. 라운드가 이동/피격을 소유하며 기존 ASC 데이터와 사망 표현 연결 |
-| 적·아군 AI | `CombatAIPlanning`이 장착 순서와 태그 조건으로 후보를 선택하고 Coordinator가 인간 초안 전에 한 명령씩 고정. 이전 AI 컴포넌트는 참조 호환 유지 |
+| 적·아군 AI | `CombatAIPlanning`이 일반 스킬을 장착 순서·태그 조건으로 먼저 선택하고 `Skill.AI.Fallback` 스킬은 대체 행동으로 사용한다. Coordinator는 PartyDefinition의 비무장 시작 스킬을 해당 태그로 분류하고 인간 초안 전에 한 명령씩 고정한다. 이전 AI 컴포넌트는 참조 호환 유지 |
 | `ACombatRoundPlayerController` / `UCombatRoundPlanningWidget` | 소유 연결의 계획·준비 RPC와 CommonUI 계획 화면. `UCombatHUDWidget`은 이전 WBP 참조용 외형 |
 | `UEncounterResultWidget` | 일반 Target PvE의 아이템 3택1·공통 골드, 기존 골드 3택1·개인 잔액·수령 상태·Continue. 목표 Snapshot의 무보상 결과 및 패배 Run 종료 안내 |
 

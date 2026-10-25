@@ -5,10 +5,14 @@
 #include "Combat/AI/PartyAutoCombatComponent.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Commands/CombatActionAuthority.h"
+#include "Combat/Round/CombatAIPlanning.h"
+#include "Combat/Round/CombatPlanValidator.h"
+#include "Combat/Round/CombatSkillExecutor.h"
 #include "Controller/PartyPlayerController.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/World.h"
 #include "GAS/Ability/GA_DefaultAttack.h"
+#include "GAS/CombatGameplayTags.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "Unit/PlayerUnit.h"
@@ -173,6 +177,74 @@ bool FPartyAIControlTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Suspended combat cannot rewrite Run ownership"), Fixture.Authority()->ConfigureRun(Fixture.Identity, Fixture.Party, Fixture.PartyActors, Fixture.Error));
     TestTrue(TEXT("Rejected changes preserve original owner"), Fixture.Authority()->GetOwnerAccountId(Fixture.First) == Owner);
     TestEqual(TEXT("Rejected changes preserve AI session"), Fixture.First->GetAIControlSessionId(), Session);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPartyAISkillFallbackTest, "ProjectA.Combat.AI.PreferOtherSkillsBeforeUnarmed", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPartyAISkillFallbackTest::RunTest(const FString& Parameters)
+{
+    PartyAITests::FFixture Fixture;
+    if (!TestTrue(TEXT("The isolated AI fixture initializes"), Fixture.Initialize())) return false;
+    for (bool bEnemy : {false, true})
+    {
+        Fixture.First->SetTeam(bEnemy ? ETeam::Enemy : ETeam::Player);
+        Fixture.Enemy->SetTeam(bEnemy ? ETeam::Player : ETeam::Enemy);
+        FCombatRoundView View;
+        FCombatRoundUnitView& Source = View.Units.AddDefaulted_GetRef();
+        Source.UnitId = 1;
+        Source.Unit = Fixture.First;
+        Source.bEnemy = bEnemy;
+        Source.HomeCoord = FIntPoint(0, bEnemy ? 2 : 1);
+        Source.SkillIds = {TEXT("Fallback"), TEXT("FirstSpecial"), TEXT("SecondSpecial")};
+        Source.Command.UnitId = Source.UnitId;
+        FCombatRoundUnitView& Target = View.Units.AddDefaulted_GetRef();
+        Target.UnitId = 2;
+        Target.Unit = Fixture.Enemy;
+        Target.bEnemy = !bEnemy;
+        Target.HomeCoord = FIntPoint(0, bEnemy ? 1 : 2);
+        CombatPlanValidation::FState State;
+        for (const FCombatRoundUnitView& Entry : View.Units)
+        {
+            CombatPlanValidation::FUnit& Unit = State.Units.AddDefaulted_GetRef();
+            Unit.UnitId = Entry.UnitId;
+            Unit.bAlive = true;
+            Unit.bEnemy = Entry.bEnemy;
+            Unit.AP = 2;
+            Unit.SAP = 2;
+            Unit.HomeCoord = Entry.HomeCoord;
+            Unit.SkillIds = Entry.SkillIds;
+        }
+        for (FName SkillId : View.Units[0].SkillIds)
+        {
+            FCombatRoundSkill& Skill = State.Skills.AddDefaulted_GetRef();
+            Skill.SkillId = SkillId;
+        }
+        State.Skills[0].EffectTags.AddTag(ProjectACombatTags::Skill_AI_Fallback);
+        State.Skills[1].ActionPointCost = 2;
+        const auto Choose = [&]()
+        {
+            return CombatAIPlanning::ChooseCommand(View, State, 0, [&](const FCombatRoundCommand& Command)
+            {
+                const FCombatRoundSkill* Skill = CombatPlanValidation::FindSkill(State, Command.SkillId);
+                FText Error;
+                return Skill && CombatSkillExecution::CanUseSkill(Fixture.First, *Skill) && CombatPlanValidation::ValidateCommand(State, Command, Error);
+            });
+        };
+        TestEqual(TEXT("Both teams prefer the first legal ordinary skill even when unarmed is first"), Choose().SkillId, FName(TEXT("FirstSpecial")));
+        State.Units[0].AP = 1;
+        TestEqual(TEXT("An unaffordable first skill cannot hide a later affordable skill"), Choose().SkillId, FName(TEXT("SecondSpecial")));
+        State.Skills[2].SourceRequiredTags.AddTag(ProjectACombatTags::Status_Stunned);
+        TestEqual(TEXT("Unarmed remains available when all other skills fail cost or source tag requirements"), Choose().SkillId, FName(TEXT("Fallback")));
+        State.Units[0].AP = 2;
+        State.Skills[1].TargetRequiredTags.AddTag(ProjectACombatTags::Status_Stunned);
+        TestEqual(TEXT("Missing valid targets also permits the unarmed fallback"), Choose().SkillId, FName(TEXT("Fallback")));
+        State.Units[0].AP = 0;
+        TestTrue(TEXT("No legal skill produces the existing no-action command"), Choose().SkillId.IsNone());
+        State.Units[0].AP = 1;
+        View.Units[0].SkillIds = {TEXT("Fallback")};
+        TestEqual(TEXT("An unarmed-only unit still attacks"), Choose().SkillId, FName(TEXT("Fallback")));
+    }
     return true;
 }
 
