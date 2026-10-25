@@ -29,6 +29,7 @@
 #include "Game/GameModes/GameplayGameModeBase.h"
 #include "Game/Snapshot/PartySnapshotLibrary.h"
 #include "GAS/Attribute/AS_Unit.h"
+#include "GAS/CombatGameplayTags.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "TimerManager.h"
@@ -36,6 +37,50 @@
 #include "Unit/PlayerUnit.h"
 #include "Unit/CharacterAppearanceComponent.h"
 #include "Unit/CharacterEquipmentComponent.h"
+
+namespace
+{
+    ACombatGridTile* FindInitialFormationTile(ACombatGridManager* Grid, bool bEnemy, FIntPoint Anchor, const TArray<TObjectPtr<USkillDefinitionDataAsset>>& Skills)
+    {
+        bool bMelee = false;
+        bool bRanged = false;
+        const FGameplayTag RangedTag = FGameplayTag::RequestGameplayTag(TEXT("Attack.Ranged"), false);
+        for (const USkillDefinitionDataAsset* Skill : Skills)
+        {
+            FCombatRoundSkill Resolved;
+            FText Error;
+            if (!IsValid(Skill) || !Skill->ResolveRoundSkill(Resolved, Error)) continue;
+            bMelee |= Resolved.EffectTags.HasTag(ProjectACombatTags::Skill_Attack_Melee);
+            bRanged |= Resolved.EffectTags.HasTag(ProjectACombatTags::Skill_Attack_Magic)
+                || Resolved.EffectTags.HasTag(ProjectACombatTags::Skill_Shape_Projectile)
+                || (RangedTag.IsValid() && Resolved.EffectTags.HasTag(RangedTag));
+        }
+        // Melee equipment takes priority in mixed loadouts; unclassified units retain their authored depth.
+        // 혼합 장비는 근접을 우선하며 분류 태그가 없는 유닛은 작성된 열을 유지합니다.
+        const int32 PreferredY = bMelee ? (bEnemy ? 2 : 1) : bRanged ? (bEnemy ? 3 : 0) : Anchor.Y;
+        TArray<ACombatGridTile*> Candidates;
+        for (const TPair<FIntPoint, ACombatGridTile*>& Entry : Grid->TileMap)
+        {
+            ACombatGridTile* Tile = Entry.Value;
+            if (!IsValid(Tile) || Tile->GetOccupyingUnit() || Tile->GetTerritory() != (bEnemy ? ETileTerritory::Enemy : ETileTerritory::Player)) continue;
+            if (CombatRoundRules::IsOwnTerritory(bEnemy, Tile->GridCoord)) Candidates.Add(Tile);
+        }
+        // Exhaust the preferred row before using the other row, preserving the authored lane when available.
+        // 선호 열을 먼저 채운 뒤 다른 열을 사용하며 가능하면 작성된 가로 위치를 유지합니다.
+        Candidates.Sort([PreferredY, Anchor](const ACombatGridTile& Left, const ACombatGridTile& Right)
+        {
+            const bool bLeftPreferred = Left.GridCoord.Y == PreferredY;
+            const bool bRightPreferred = Right.GridCoord.Y == PreferredY;
+            if (bLeftPreferred != bRightPreferred) return bLeftPreferred;
+            const int32 LeftDistance = FMath::Abs(Left.GridCoord.X - Anchor.X);
+            const int32 RightDistance = FMath::Abs(Right.GridCoord.X - Anchor.X);
+            if (LeftDistance != RightDistance) return LeftDistance < RightDistance;
+            if (Left.GridCoord.X != Right.GridCoord.X) return Left.GridCoord.X < Right.GridCoord.X;
+            return Left.GridCoord.Y < Right.GridCoord.Y;
+        });
+        return Candidates.IsEmpty() ? nullptr : Candidates[0];
+    }
+}
 
 AEncounterManager::AEncounterManager()
 {
@@ -652,13 +697,21 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         {
             return false;
         }
-        ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Arena->PlayerCoords[Member.SlotIndex]);
         FProfessionDefinition Profession;
         TArray<TObjectPtr<USkillDefinitionDataAsset>> MemberSkills;
         if (!RunState->ResolveMemberProfession(Member, Profession, FlowMessage) || !PartyDefinition->ResolveMemberSkills(Member, MemberSkills, FlowMessage) || !PartyDefinition->ValidateMemberAppearance(Member, FlowMessage))
         {
             return false;
         }
+        // Innate unarmed attacks must not pull an equipped archer or mage into the front row.
+        // 기본 맨손 공격 때문에 원거리 무기를 장착한 궁수·마법사가 1열로 배치되지 않게 합니다.
+        TArray<TObjectPtr<USkillDefinitionDataAsset>> FormationSkills;
+        for (USkillDefinitionDataAsset* Skill : MemberSkills)
+        {
+            if (!Member.InnateSkills.Contains(FSoftObjectPath(Skill))) FormationSkills.Add(Skill);
+        }
+        if (FormationSkills.IsEmpty()) FormationSkills = MemberSkills;
+        ACombatGridTile* Tile = FindInitialFormationTile(Arena->Grid, false, Arena->PlayerCoords[Member.SlotIndex], FormationSkills);
         TSubclassOf<APlayerUnit> UnitClass = Profession.CombatClass;
         if (!Tile || Tile->GetOccupyingUnit() || Tile->GetTerritory() != ETileTerritory::Player || !UnitClass)
         {
@@ -707,7 +760,13 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
         const FPartySnapshotMember* Member = bUseSnapshot ? &Snapshot.Members[Index] : nullptr;
         const int32 FormationSlot = Member ? Member->FormationSlot : Index;
         TSubclassOf<AEnemyUnit> EnemyClass = Member ? Definition->SnapshotCatalog->EnemyClasses.FindRef(Member->ClassId) : Definition->EnemyUnitClasses[Index];
-        ACombatGridTile* Tile = Arena->Grid->GetTileAtCoord(Arena->EnemyCoords[FormationSlot]);
+        if (!EnemyClass) return false;
+        TArray<TObjectPtr<USkillDefinitionDataAsset>> EnemySkills;
+        if (FrozenRoster) EnemySkills.Add(Cast<USkillDefinitionDataAsset>((*FrozenRoster)[Index].Skill.TryLoad()));
+        else if (!Member) EnemySkills = EnemyClass->GetDefaultObject<AEnemyUnit>()->GetEquippedSkillDataAssets();
+        // Saved opponent formations are authoritative; only newly placed PvE enemies use role preferences.
+        // 저장된 상대 배치는 그대로 사용하며 새로 배치하는 PvE 적에게만 역할별 선호 열을 적용합니다.
+        ACombatGridTile* Tile = Member ? Arena->Grid->GetTileAtCoord(Arena->EnemyCoords[FormationSlot]) : FindInitialFormationTile(Arena->Grid, true, Arena->EnemyCoords[FormationSlot], EnemySkills);
         if (!Tile || Tile->GetOccupyingUnit() || Tile->GetTerritory() != ETileTerritory::Enemy || !EnemyClass)
         {
             return false;
@@ -745,8 +804,7 @@ bool AEncounterManager::SpawnEncounter(UEncounterDefinitionDataAsset* Definition
             // Spawn only the frozen stats and original skill asset, without rereading CSV or rerolling the monster.
             // CSV 재조회나 몬스터 재추첨 없이 고정 능력치와 원본 스킬 에셋만 생성에 적용합니다.
             const FRunMonsterDefinition& Monster = (*FrozenRoster)[Index];
-            const TArray<TObjectPtr<USkillDefinitionDataAsset>> Skills = {Cast<USkillDefinitionDataAsset>(Monster.Skill.TryLoad())};
-            if (!Unit->ConfigureProfession(Monster.MaxHP, Monster.AP, Monster.SAP, Skills, Monster.Speed) || !Unit->ConfigureMoveRange(Monster.MoveRange))
+            if (!Unit->ConfigureProfession(Monster.MaxHP, Monster.AP, Monster.SAP, EnemySkills, Monster.Speed) || !Unit->ConfigureMoveRange(Monster.MoveRange))
             {
                 FlowMessage = NSLOCTEXT("RunLevelDesign", "MonsterConfiguration", "저장된 몬스터 능력치와 원본 스킬을 적용하지 못했습니다.");
                 return false;
