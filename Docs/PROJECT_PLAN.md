@@ -117,7 +117,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 `WEAPON_ASSETS.csv`의 `무기 피해량`은 기존 49개 모두 10으로 초기화한다. `FRunItemDefinition.WeaponDamage`는 Run 카탈로그·사본에 보존하며 이전 CSV·저장의 누락 값도 10이다. `UEquipmentCombatRules.BasicWeaponAttacks`가 지정한 기본 근접 공격은 장착한 공격 무기의 평균 피해를 사용하고 방패를 제외한다. 일반 공격 스킬의 별도 위력과 몬스터의 장비 없는 기존 프로필은 유지한다.
 
-`Skills/Weapons/DA_DoubleAttack`은 각 무기 슬롯의 `Item.Weapon.Dagger` GameplayTagQuery로 부여·실행 조건을 판정한다. `MeleeStrikes`에 작성한 왼손·오른손 타격을 0.23초·1.83초에 각각 기존 서버 근접 충돌·GAS 피격 경로로 실행하며 AP/SAP는 전체 시전에 한 번만 차감한다. 첫 타격 뒤 대상이 사망해도 시전을 재시작하지 않는다. `CreateDoubleAttack.py`는 `GreystoneManny/Attack/AM_MeleeAttack`의 전체 준비·공격·복귀를 시퀀스로 굽고 엔진 `MirrorPose`로 왼손 반전본을 만든다. 더블어택 몽타주는 왼손 반전본 다음 오른손 원본을 각 1회 연결하며 기본 재실행은 기존 결과를 보존한다. 이전 저장의 `ConditionalSkillVersion=0`은 저장된 목록을 유지하고 다음 명시적 장비 변경에서 버전 1의 조합 스킬 목록으로 갱신한다.
+`Skills/Weapons/DA_DoubleAttack`은 각 무기 슬롯의 `Item.Weapon.Dagger` GameplayTagQuery로 부여·실행 조건을 판정한다. `MeleeStrikes`에 작성한 왼손·오른손 타격을 0.23초·0.73초에 각각 기존 서버 근접 충돌·GAS 피격 경로로 실행하며 AP/SAP는 전체 시전에 한 번만 차감한다. 첫 타격 뒤 대상이 사망해도 시전을 재시작하지 않는다. `CreateDoubleAttack.py`는 `GreystoneManny/Attack/AM_MeleeAttack`의 전체 준비·공격·복귀를 시퀀스로 굽고 엔진 `MirrorPose`로 왼손 반전본을 만든다. 왼손 반전본은 첫 0.5초만 사용하고 마지막 약 0.133초를 오른손 첫 포즈로 블렌딩한다. 더블어택 몽타주는 단축한 왼손 반전본 다음 오른손 원본을 연결하며 전체 길이는 2.1초다. 기본 재실행은 기존 결과를 보존한다. 이전 저장의 `ConditionalSkillVersion=0`은 저장된 목록을 유지하고 다음 명시적 장비 변경에서 버전 1의 조합 스킬 목록으로 갱신한다.
 
 프로젝트 전용 `Skills/Weapons/DA_MeleeAttack`, `Skills/Weapons/DA_CrossbowAttack`, `Weapons/DA_WeaponSkillRules`를 `CreateWeaponSkills.py`로 작성하고 `DA_VerticalSliceParty.WeaponSkillRules`를 연결했다. 기존 근접 공격·화살 표현을 참조하며 원본 FX·메시를 복제하지 않고 기존 공격 에셋의 저장값을 변경하지 않는다. 새 근접 DA는 고정 검 trace 대신 공통 근접 충돌을 사용하며 기존 몽타주/직업 재매핑을 재사용한다.
 

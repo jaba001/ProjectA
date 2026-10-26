@@ -119,13 +119,70 @@ namespace
         }
         return true;
     }
+
+    bool BuildMeleeMotion(UAnimMontage* Source, bool bMirror, float EndTime, UAnimSequence* TransitionTarget, float TransitionSeconds, FMeleeMotion& Out)
+    {
+        if (!FMath::IsFinite(EndTime)
+            || EndTime < 0.f
+            || !FMath::IsFinite(TransitionSeconds)
+            || TransitionSeconds < 0.f
+            || !SampleMeleeMotion(Source, bMirror, Out))
+        {
+            return false;
+        }
+        if (EndTime > 0.f)
+        {
+            const int32 Frames = FMath::RoundToInt(EndTime * Out.Rate.AsDecimal());
+            if (Frames < 1
+                || Frames > Out.Frames
+                || !FMath::IsNearlyEqual(Frames / Out.Rate.AsDecimal(), EndTime, 0.0001))
+            {
+                return false;
+            }
+            Out.Frames = Frames;
+            for (TArray<FTransform>& Track : Out.Tracks) Track.SetNum(Frames + 1);
+        }
+        if (!IsValid(TransitionTarget)) return !TransitionTarget && TransitionSeconds == 0.f;
+        const IAnimationDataModel* Target = TransitionTarget->GetDataModel();
+        const int32 BlendFrames = FMath::RoundToInt(TransitionSeconds * Out.Rate.AsDecimal());
+        if (!Target
+            || TransitionTarget->GetSkeleton() != Source->GetSkeleton()
+            || TransitionTarget->AdditiveAnimType != AAT_None
+            || BlendFrames < 1
+            || BlendFrames > Out.Frames
+            || !FMath::IsNearlyEqual(BlendFrames / Out.Rate.AsDecimal(), TransitionSeconds, 0.0001))
+        {
+            return false;
+        }
+        // Preserve the strike and blend only the shortened recovery into the next attack's first pose.
+        // 타격 동작은 보존하고 단축한 복귀 구간만 다음 공격의 첫 포즈로 연결합니다.
+        for (int32 Index = 0; Index < Out.Bones.Num(); ++Index)
+        {
+            TArray<FTransform> Keys;
+            Target->GetBoneTrackTransforms(Out.Bones[Index], Keys);
+            if (Keys.IsEmpty() || !Keys[0].IsValid()) return false;
+            for (int32 Offset = 0; Offset <= BlendFrames; ++Offset)
+            {
+                const float Alpha = static_cast<float>(Offset) / BlendFrames;
+                const int32 Frame = Out.Frames - BlendFrames + Offset;
+                const FTransform Original = Out.Tracks[Index][Frame];
+                Out.Tracks[Index][Frame].Blend(Original, Keys[0], Alpha * Alpha * (3.f - 2.f * Alpha));
+            }
+        }
+        return true;
+    }
 }
 
-bool UEquipmentSkillAssetLibrary::BakeMeleeMontageMotion(UAnimSequence* Destination, UAnimMontage* Source, bool bMirror)
+bool UEquipmentSkillAssetLibrary::BakeMeleeMontageMotion(UAnimSequence* Destination, UAnimMontage* Source, bool bMirror, float EndTime, UAnimSequence* TransitionTarget, float TransitionSeconds)
 {
-    if (!IsValid(Destination) || !Destination->GetPathName().StartsWith(TEXT("/Game/User_JeHoon/"))) return false;
+    if (!IsValid(Destination)
+        || Destination == TransitionTarget
+        || !Destination->GetPathName().StartsWith(TEXT("/Game/User_JeHoon/")))
+    {
+        return false;
+    }
     FMeleeMotion Motion;
-    if (!SampleMeleeMotion(Source, bMirror, Motion)) return false;
+    if (!BuildMeleeMotion(Source, bMirror, EndTime, TransitionTarget, TransitionSeconds, Motion)) return false;
     Destination->Modify();
     Destination->SetSkeleton(Source->GetSkeleton());
     IAnimationDataController& Controller = Destination->GetController();
@@ -154,13 +211,18 @@ bool UEquipmentSkillAssetLibrary::BakeMeleeMontageMotion(UAnimSequence* Destinat
     Destination->bForceRootLock = false;
     Destination->PostEditChange();
     Destination->MarkPackageDirty();
-    return bSucceeded && ValidateMeleeMontageMotion(Destination, Source, bMirror);
+    return bSucceeded && ValidateMeleeMontageMotion(Destination, Source, bMirror, EndTime, TransitionTarget, TransitionSeconds);
 }
 
-bool UEquipmentSkillAssetLibrary::ValidateMeleeMontageMotion(UAnimSequence* Sequence, UAnimMontage* Source, bool bMirror)
+bool UEquipmentSkillAssetLibrary::ValidateMeleeMontageMotion(UAnimSequence* Sequence, UAnimMontage* Source, bool bMirror, float EndTime, UAnimSequence* TransitionTarget, float TransitionSeconds)
 {
     FMeleeMotion Expected;
-    if (!IsValid(Sequence) || !SampleMeleeMotion(Source, bMirror, Expected)) return false;
+    if (!IsValid(Sequence)
+        || Sequence == TransitionTarget
+        || !BuildMeleeMotion(Source, bMirror, EndTime, TransitionTarget, TransitionSeconds, Expected))
+    {
+        return false;
+    }
     const IAnimationDataModel* Model = Sequence->GetDataModel();
     if (!Model
         || Sequence->GetSkeleton() != Source->GetSkeleton()

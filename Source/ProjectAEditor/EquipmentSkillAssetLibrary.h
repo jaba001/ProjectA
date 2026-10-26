@@ -16,13 +16,13 @@ class PROJECTAEDITOR_API UEquipmentSkillAssetLibrary : public UBlueprintFunction
     GENERATED_BODY()
 
 public:
-    // Bake montage trims and engine bone mirroring into an editable sequence without changing the source.
-    // 원본을 변경하지 않고 몽타주 구간과 엔진 본 미러링을 편집 가능한 시퀀스로 굽습니다.
+    // Bake mirrored montage motion with optional trimming and a smooth transition into the next sequence.
+    // 몽타주 미러링과 선택적인 구간 단축 및 다음 시퀀스로의 부드러운 연결을 굽습니다.
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
-    static bool BakeMeleeMontageMotion(UAnimSequence* Destination, UAnimMontage* Source, bool bMirror);
+    static bool BakeMeleeMontageMotion(UAnimSequence* Destination, UAnimMontage* Source, bool bMirror, float EndTime = 0.f, UAnimSequence* TransitionTarget = nullptr, float TransitionSeconds = 0.f);
 
     UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
-    static bool ValidateMeleeMontageMotion(UAnimSequence* Sequence, UAnimMontage* Source, bool bMirror);
+    static bool ValidateMeleeMontageMotion(UAnimSequence* Sequence, UAnimMontage* Source, bool bMirror, float EndTime = 0.f, UAnimSequence* TransitionTarget = nullptr, float TransitionSeconds = 0.f);
 
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
     static bool ConfigureDoubleAttack(USkillDefinitionDataAsset* Skill, USkillDefinitionDataAsset* BasicAttack, UAnimMontage* Montage, float Windup, float StrikeInterval);
