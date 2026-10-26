@@ -761,14 +761,19 @@ bool FRunStartingEquipmentTest::RunTest(const FString& Parameters)
     {
         const FRunPartyMember& Member = Fixture.Member(Index);
         TestTrue(TEXT("Human and AI starting equipment is valid and explicit"), Member.Equipment.bHasLoadout && RunEquipmentRules::Validate(Member, Fixture.Error));
-        if (!TestEqual(TEXT("Only the warrior owns two starting copies"), Member.Items.Num(), Index == 0 ? 2 : 1)) return false;
+        if (!TestEqual(TEXT("The warrior and rogue own two starting copies"), Member.Items.Num(), Index == 0 || Index == 3 ? 2 : 1)) return false;
         TestEqual(TEXT("Every starting item is equipped exactly once"), Member.Equipment.Slots.Num(), Member.Items.Num());
         TestEqual(TEXT("Equipment does not add starting combat skills"), Member.Skills.Num(), 1);
     }
     TestTrue(TEXT("The warrior holds a sword and a separate shield"), Fixture.Member(0).Items[0].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Sword"))) && Fixture.Member(0).Items[1].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Shield"))) && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(0), Main) == 0 && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(0), Off) == 1);
     TestTrue(TEXT("The archer's single bow occupies both hands"), Fixture.Member(1).Items[0].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Bow"))) && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(1), Main) == 0 && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(1), Off) == 0);
     TestTrue(TEXT("The mage's single staff occupies both hands"), Fixture.Member(2).Items[0].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.StaffWand"))) && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(2), Main) == 0 && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(2), Off) == 0);
-    TestTrue(TEXT("The rogue holds one dagger with the other hand empty"), Fixture.Member(3).Items[0].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Dagger"))) && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(3), Main) == 0 && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(3), Off) == INDEX_NONE);
+    const FRunPartyMember& Rogue = Fixture.Member(3);
+    const FGameplayTag Dagger = FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Dagger"));
+    TestTrue(TEXT("The rogue holds two separate dagger copies in both hands"), Rogue.Items[0].Tags.HasTag(Dagger)
+        && Rogue.Items[1].Tags.HasTag(Dagger)
+        && RunEquipmentRules::FindItemIndexAtSlot(Rogue, Main) == 0
+        && RunEquipmentRules::FindItemIndexAtSlot(Rogue, Off) == 1);
     return true;
 }
 

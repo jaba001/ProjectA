@@ -5,6 +5,7 @@
 #include "EquipmentSkillAssetLibrary.generated.h"
 
 class UAnimMontage;
+class UAnimSequence;
 class USkillDefinitionDataAsset;
 
 // Bake and inspect equipment skills without creating a game world or executing combat.
@@ -15,6 +16,14 @@ class PROJECTAEDITOR_API UEquipmentSkillAssetLibrary : public UBlueprintFunction
     GENERATED_BODY()
 
 public:
+    // Bake montage trims and engine bone mirroring into an editable sequence without changing the source.
+    // 원본을 변경하지 않고 몽타주 구간과 엔진 본 미러링을 편집 가능한 시퀀스로 굽습니다.
+    UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
+    static bool BakeMeleeMontageMotion(UAnimSequence* Destination, UAnimMontage* Source, bool bMirror);
+
+    UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
+    static bool ValidateMeleeMontageMotion(UAnimSequence* Sequence, UAnimMontage* Source, bool bMirror);
+
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
     static bool ConfigureDoubleAttack(USkillDefinitionDataAsset* Skill, USkillDefinitionDataAsset* BasicAttack, UAnimMontage* Montage, float Windup, float StrikeInterval);
 

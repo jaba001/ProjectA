@@ -97,7 +97,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 ### 3-1 시작 장비와 장착
 
-`UProfessionBase.StartingEquipment`가 전사 한손검+방패·궁수 활·마법사 양손 스태프·도적 단검의 원본 경로와 기준 슬롯을 정의한다. 새 Run에서 `Items`에 지급하고 `FRunEquipmentState`의 기준 슬롯·개별 아이템 인덱스·Revision으로 장착한다. `Items`는 추가 전용 배열이며 같은 에셋 여러 개도 서로 다른 사본이다. 원본이 없으면 지급·장착을 생략하고 슬롯을 비운다. 현재 5개 시작 원본은 CSV와 콘텐츠에 모두 존재하며 복제하지 않는다.
+`UProfessionBase.StartingEquipment`가 전사 한손검+방패·궁수 활·마법사 양손 스태프·도적 단검 2개의 원본 경로와 기준 슬롯을 정의한다. 새 Run에서 `Items`에 지급하고 `FRunEquipmentState`의 기준 슬롯·개별 아이템 인덱스·Revision으로 장착한다. `Items`는 추가 전용 배열이며 같은 에셋 여러 개도 서로 다른 사본이다. 원본이 없으면 지급·장착을 생략하고 슬롯을 비운다. 현재 5개 시작 원본은 CSV와 콘텐츠에 모두 존재하며 복제하지 않는다.
 
 `URunEquipmentCatalog`는 `GameplayTagQuery`·에셋별 선택 설정·허용/점유 슬롯·소켓/상대 변환을 작성 가능한 native CDO 데이터로 관리한다. 특정 에셋 프로필이 일반 태그 프로필을 우선하며 이름·직업 분기로 장착 종류를 판정하지 않는다. 단검 20·방패 15·활 11·명시 한손/양손검 2·시작 스태프 1개를 지원한다. `RunEquipmentRules`가 중복 점유·사본·호환 교체를 공통 검증한다. 활은 왼손, 시작 스태프와 양손검은 오른손을 기준으로 두 손을 점유한다.
 
@@ -117,7 +117,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 `WEAPON_ASSETS.csv`의 `무기 피해량`은 기존 49개 모두 10으로 초기화한다. `FRunItemDefinition.WeaponDamage`는 Run 카탈로그·사본에 보존하며 이전 CSV·저장의 누락 값도 10이다. `UEquipmentCombatRules.BasicWeaponAttacks`가 지정한 기본 근접 공격은 장착한 공격 무기의 평균 피해를 사용하고 방패를 제외한다. 일반 공격 스킬의 별도 위력과 몬스터의 장비 없는 기존 프로필은 유지한다.
 
-`Skills/Weapons/DA_DoubleAttack`은 각 무기 슬롯의 `Item.Weapon.Dagger` GameplayTagQuery로 부여·실행 조건을 판정한다. `MeleeStrikes`에 작성한 왼손·오른손 타격을 0.2초·0.6초에 각각 기존 서버 근접 충돌·GAS 피격 경로로 실행하며 AP/SAP는 전체 시전에 한 번만 차감한다. 첫 타격 뒤 대상이 사망해도 시전을 재시작하지 않는다. `CreateDoubleAttack.py`로 Countess 원본 FBX 2개와 편집 가능한 몽타주를 작성하며 기본 재실행은 기존 결과를 보존한다. 이전 저장의 `ConditionalSkillVersion=0`은 저장된 목록을 유지하고 다음 명시적 장비 변경에서 버전 1의 조합 스킬 목록으로 갱신한다.
+`Skills/Weapons/DA_DoubleAttack`은 각 무기 슬롯의 `Item.Weapon.Dagger` GameplayTagQuery로 부여·실행 조건을 판정한다. `MeleeStrikes`에 작성한 왼손·오른손 타격을 0.23초·1.83초에 각각 기존 서버 근접 충돌·GAS 피격 경로로 실행하며 AP/SAP는 전체 시전에 한 번만 차감한다. 첫 타격 뒤 대상이 사망해도 시전을 재시작하지 않는다. `CreateDoubleAttack.py`는 `GreystoneManny/Attack/AM_MeleeAttack`의 전체 준비·공격·복귀를 시퀀스로 굽고 엔진 `MirrorPose`로 왼손 반전본을 만든다. 더블어택 몽타주는 왼손 반전본 다음 오른손 원본을 각 1회 연결하며 기본 재실행은 기존 결과를 보존한다. 이전 저장의 `ConditionalSkillVersion=0`은 저장된 목록을 유지하고 다음 명시적 장비 변경에서 버전 1의 조합 스킬 목록으로 갱신한다.
 
 프로젝트 전용 `Skills/Weapons/DA_MeleeAttack`, `Skills/Weapons/DA_CrossbowAttack`, `Weapons/DA_WeaponSkillRules`를 `CreateWeaponSkills.py`로 작성하고 `DA_VerticalSliceParty.WeaponSkillRules`를 연결했다. 기존 근접 공격·화살 표현을 참조하며 원본 FX·메시를 복제하지 않고 기존 공격 에셋의 저장값을 변경하지 않는다. 새 근접 DA는 고정 검 trace 대신 공통 근접 충돌을 사용하며 기존 몽타주/직업 재매핑을 재사용한다.
 

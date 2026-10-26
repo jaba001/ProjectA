@@ -356,7 +356,7 @@ Development Editor / Win64 컴파일 후 작성·별도 프로세스 재로드 �
 
 ## 36 단검 쌍수 더블어택
 
-`CreateDoubleAttack.py`는 Countess의 `Primary_Attack_A_Normal`·`Primary_Attack_B_Normal` FBX만 필요한 파생 시퀀스로 임포트하고 `CountessManny/Attack/AM_DoubleAttack`과 `Skills/Weapons/DA_DoubleAttack`을 작성한다. 기본 모드는 기존 결과를 보존하며 `-DoubleAttackOverwrite`만 명시적으로 덮어쓴다. `-DoubleAttackVerifyOnly`는 저장본의 두 동작·슬롯별 단검 태그 조건·개별/평균 피해·조건부 부여/제거·AP·무기 CSV·원본 SHA를 검사한다. 결과는 `Saved/DoubleAttack`에 기록한다. 게임 월드·PIE·플레이·자동화 테스트는 시작하지 않는다.
+`CreateDoubleAttack.py`는 `GreystoneManny/Attack/AM_MeleeAttack`의 전체 동작을 `AS_DoubleAttack_Right`로 굽고 엔진 `MirrorPose`로 `AS_DoubleAttack_Left`를 만든다. 같은 폴더의 `AM_DoubleAttack`은 왼손 반전본 → 오른손 원본을 각 1회 연결한다. `Skills/Weapons/DA_DoubleAttack`에 두 타격 시점을 연결하며 원본 근접 공격은 수정하지 않는다. 기본 모드는 기존 결과를 보존하며 `-DoubleAttackOverwrite`만 명시적으로 덮어쓴다. `-DoubleAttackVerifyOnly`는 저장본의 모든 프레임 본 변환·미러링·두 동작·도적 시작 단검 2개·슬롯별 단검 태그 조건·개별/평균 피해·조건부 부여/제거·AP·무기 CSV·원본 SHA를 검사한다. 결과는 `Saved/DoubleAttack`에 기록한다. 게임 월드·PIE·플레이·자동화 테스트는 시작하지 않는다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDoubleAttack.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI

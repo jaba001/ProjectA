@@ -11,5 +11,8 @@ URogueProfession::URogueProfession()
     Strength = 5.0f;
     Speed = 10.0f;
     Intelligence = 1.0f;
+    // Equip separate owned copies of the original dagger in both hands.
+    // 원본 단검의 서로 다른 보유 사본을 양손에 각각 장착합니다.
     StartingEquipment.Add({ FSoftObjectPath(TEXT("/Game/Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Dagger_1.SM_Dagger_1")), URunEquipmentCatalog::GetWeaponSlot(0) });
+    StartingEquipment.Add({ FSoftObjectPath(TEXT("/Game/Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Dagger_1.SM_Dagger_1")), URunEquipmentCatalog::GetWeaponSlot(1) });
 }
