@@ -59,7 +59,7 @@ private:
     FText StatusMessage;
     FTimerHandle InitializeTimer;
 
-    // Alternating debug bodies lets worn equipment be compared on both body variants.
-    // 디버그 몸체를 번갈아 사용하여 착용 장비를 두 몸체에서 비교할 수 있게 합니다.
+    // Cycle available catalog bodies when comparing equipment on disposable debug units.
+    // 일회성 디버그 유닛의 장비를 비교할 때 카탈로그에 등록된 몸체를 순환합니다.
     int32 SpawnedPlayerCount = 0;
 };

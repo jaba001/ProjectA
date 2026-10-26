@@ -1,9 +1,11 @@
 #include "Game/GameModes/CombatDebugGameMode.h"
+#include "ProjectA.h"
 #include "AbilitySystemComponent.h"
 #include "Combat/CombatManager.h"
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "Components/CapsuleComponent.h"
 #include "Controller/CombatDebugPlayerController.h"
+#include "DataAsset/CharacterAppearanceCatalog.h"
 #include "DataAsset/EncounterDefinitionDataAsset.h"
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
@@ -15,6 +17,7 @@
 #include "GAS/Attribute/AS_Unit.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
+#include "Misc/ScopeExit.h"
 #include "TimerManager.h"
 #include "Unit/CharacterAppearanceComponent.h"
 #include "Unit/CharacterEquipmentComponent.h"
@@ -70,6 +73,11 @@ void ACombatDebugGameMode::InitializeDebugCombat()
 bool ACombatDebugGameMode::RestartCombat()
 {
     StatusMessage = FText::GetEmpty();
+    bool bStarted = false;
+    ON_SCOPE_EXIT
+    {
+        if (!bStarted) UE_LOG(LogProjectA, Warning, TEXT("[DebugCombat] Initialization failed / 초기화 실패: %s"), *StatusMessage.ToString());
+    };
     const URunStateSubsystem* Run = GetGameInstance() ? GetGameInstance()->GetSubsystem<URunStateSubsystem>() : nullptr;
     if (!HasAuthority() || !IsDebugWorld(GetWorld()) || (Run && (Run->IsManagedRun() || Run->HasManagedLease())))
     {
@@ -130,6 +138,7 @@ bool ACombatDebugGameMode::RestartCombat()
     }
     Controller->SetCombatContext(CombatManager, true);
     StatusMessage = NSLOCTEXT("CombatDebug", "Ready", "독립 디버그 전투 · Run 저장에 반영되지 않습니다.");
+    bStarted = true;
     return true;
 }
 
@@ -280,7 +289,13 @@ AUnitBase* ACombatDebugGameMode::SpawnConfiguredDebugUnit(bool bEnemy, FName Opt
     {
         APlayerUnit* Player = Cast<APlayerUnit>(Unit);
         FCharacterAppearanceSelection Appearance;
-        Appearance.BodyId = SpawnedPlayerCount++ % 2 == 0 ? FName(TEXT("Male")) : FName(TEXT("Female"));
+        // Cycle authored body variants; an empty selection preserves the class body without a catalog.
+        // 등록된 몸체를 순환하며 카탈로그가 없으면 빈 선택으로 클래스의 기본 몸체를 유지합니다.
+        if (IsValid(Profession.AppearanceCatalog) && !Profession.AppearanceCatalog->BodyVariants.IsEmpty())
+        {
+            const TArray<FCharacterAppearanceBodyVariant>& Bodies = Profession.AppearanceCatalog->BodyVariants;
+            Appearance.BodyId = Bodies[SpawnedPlayerCount % Bodies.Num()].BodyId;
+        }
         if (!Player || !Player->CharacterAppearance || !Player->CharacterAppearance->SetAppearance(Profession.AppearanceCatalog, Appearance) || !Player->ConfigureProfession(Profession.MaxHP, Profession.ActionPoints, Profession.SubActionPoints, StartingSkills, Profession.Speed, Profession.Strength, Profession.Intelligence) || !Player->CharacterEquipment || !Player->CharacterEquipment->SetEquipment(true, TArray<FRunEquipmentVisual>()))
         {
             OutError = NSLOCTEXT("CombatDebugGameModeText", "M_2C121C8F", "캐릭터 외형·능력치·시작 스킬 구성에 실패했습니다.");
@@ -288,6 +303,7 @@ AUnitBase* ACombatDebugGameMode::SpawnConfiguredDebugUnit(bool bEnemy, FName Opt
             return nullptr;
         }
         Player->RuntimeCharacterName = FText::Format(NSLOCTEXT("CombatDebug", "ProfessionName", "디버그 {0}"), Profession.DisplayName);
+        ++SpawnedPlayerCount;
     }
     // Apply debug health after class and profession initialization without changing shared definitions.
     // 공용 정의를 변경하지 않고 클래스·직업 초기화가 끝난 뒤 디버그 체력을 적용합니다.
