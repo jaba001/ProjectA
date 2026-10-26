@@ -19,6 +19,7 @@
 #include "Game/Run/RunItemShopCatalog.h"
 #include "GAS/CombatGameplayTags.h"
 #include "Misc/MemStack.h"
+#include "UI/Gameplay/RunItemPresentation.h"
 
 namespace
 {
@@ -263,6 +264,8 @@ bool UEquipmentSkillAssetLibrary::ConfigureDoubleAttack(USkillDefinitionDataAsse
     Profile.MeleeArea = ESkillAreaType::Single;
     Profile.EffectTags.AddTag(ProjectACombatTags::Skill_Attack_Melee);
     Profile.RequiredEquipment.Reset();
+    const FString RequirementKey = TEXT("Skill.") + Skill->GetPrimaryAssetId().ToString() + TEXT(".EquipmentRequirement");
+    Profile.EquipmentRequirementText = FText::ChangeKey(TEXT("ProjectA.Content"), RequirementKey, FText::FromString(TEXT("쌍수 단검 장착 시 사용 가능")));
     Profile.MeleeStrikes.Reset();
     const FGameplayTag Dagger = FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Dagger"));
     for (int32 SlotIndex : {1, 0})
@@ -282,8 +285,8 @@ bool UEquipmentSkillAssetLibrary::ConfigureDoubleAttack(USkillDefinitionDataAsse
     Skill->ActionPointCost = Profile.ActionPointCost;
     Skill->SkillIcon = BasicAttack->SkillIcon;
     Skill->SkillId = TEXT("DoubleAttack");
-    Skill->SkillName = FText::FromString(TEXT("더블어택"));
-    Skill->SkillDescription = FText::FromString(TEXT("양손에 단검을 장착해야 합니다. 왼손, 오른손 순서로 각각의 무기 피해량으로 한 번씩 공격합니다. AP 비용은 기본 근접 공격과 같습니다."));
+    Skill->SkillName = FText::FromString(TEXT("이중타격"));
+    Skill->SkillDescription = FText::FromString(TEXT("단검의 기본 스킬입니다. 쌍수 단검 장착 시 사용할 수 있으며 왼손, 오른손 순서로 각각의 무기 피해량으로 한 번씩 공격합니다. AP 비용은 기본 근접 공격과 같습니다."));
     Skill->PostEditChange();
     Skill->MarkPackageDirty();
     return true;
@@ -348,7 +351,26 @@ bool UEquipmentSkillAssetLibrary::ValidateDoubleAttack(USkillDefinitionDataAsset
     }
     TArray<FRunItemDefinition> Weapons;
     if (!RunItemShopCatalog::Load(Weapons, Error)) return false;
-    for (const FRunItemDefinition& Weapon : Weapons) if (Weapon.WeaponDamage != 10.f) return false;
+    const FSoftObjectPath SkillPath(Skill);
+    for (const FRunItemDefinition& Weapon : Weapons)
+    {
+        const bool bDagger = Weapon.Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Dagger")));
+        if (Weapon.WeaponDamage != 10.f || EquipmentCombatRules::GetIntrinsicSkills(Weapon.Tags).Contains(SkillPath) != bDagger) return false;
+        if (bDagger && (RunItemPresentation::GrantedSkills(Weapon).IsEmpty() || RunItemPresentation::SkillDetails(Weapon).IsEmpty())) return false;
+        if (bDagger)
+        {
+            FRunItemDefinition Generated = Weapon;
+            Generated.GenerationVersion = 1;
+            Generated.GrantedSkills = {FSoftObjectPath(BasicAttack)};
+            const auto Details = RunItemPresentation::SkillDetails(Generated);
+            if (Details.Num() != 2
+                || Details[0].SkillAsset != FSoftObjectPath(BasicAttack)
+                || Details[1].SkillAsset != SkillPath)
+            {
+                return false;
+            }
+        }
+    }
     FRunPartyMember Member;
     Member.bCreated = true;
     Member.bHasSkillLoadout = true;
@@ -364,7 +386,20 @@ bool UEquipmentSkillAssetLibrary::ValidateDoubleAttack(USkillDefinitionDataAsset
     TArray<FSoftObjectPath> Skills;
     if (!RunEquipmentRules::BuildEquippedSkills(Member, Skills, Error) || !Skills.Contains(FSoftObjectPath(Skill))) return false;
     Member.Equipment.Slots.Pop();
-    if (!RunEquipmentRules::BuildEquippedSkills(Member, Skills, Error) || Skills.Contains(FSoftObjectPath(Skill))) return false;
-    OutReport = TEXT("Dual daggers required; left/right damage 10/20; mean 15; single dagger and shield rejected; weapon catalog damage 10; AP matches basic attack.");
+    if (!RunEquipmentRules::BuildEquippedSkills(Member, Skills, Error)
+        || !Skills.Contains(SkillPath)
+        || Member.Equipment.ConditionalSkillVersion != 2)
+    {
+        return false;
+    }
+    Member.Equipment.ConditionalSkillVersion = 1;
+    if (!RunEquipmentRules::BuildEquippedSkills(Member, Skills, Error) || Skills.Contains(SkillPath)) return false;
+    Member.Equipment.ConditionalSkillVersion = 0;
+    if (!RunEquipmentRules::BuildEquippedSkills(Member, Skills, Error) || Skills.Contains(SkillPath)) return false;
+    Member.Equipment.ConditionalSkillVersion = 2;
+    Member.Equipment.Slots.Reset();
+    if (!RunEquipmentRules::BuildEquippedSkills(Member, Skills, Error) || Skills.Contains(SkillPath)) return false;
+    if (Profile.EquipmentRequirementText.IsEmpty() || Skill->SkillName.ToString() != TEXT("이중타격")) return false;
+    OutReport = TEXT("Dual daggers required; single dagger grants skill; last removal clears; legacy v0/v1 preserved; item details; damage 10/20; mean 15; AP matches basic attack.");
     return true;
 }

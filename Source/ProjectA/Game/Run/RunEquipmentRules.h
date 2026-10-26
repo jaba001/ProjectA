@@ -12,6 +12,7 @@ namespace RunEquipmentRules
     PROJECTA_API bool Apply(FRunPartyMember& Member, const FRunEquipmentCommand& Command, FText& OutError);
     PROJECTA_API bool BuildEquippedSkills(const FRunPartyMember& Member, TArray<FSoftObjectPath>& OutSkills, FText& OutError);
     PROJECTA_API bool AppendConditionalSkills(const FRunPartyMember& Member, TArray<FSoftObjectPath>& Skills, FText& OutError);
+    PROJECTA_API bool AppendIntrinsicSkills(const FRunPartyMember& Member, TArray<FSoftObjectPath>& Skills, FText& OutError);
     PROJECTA_API bool BuildVisuals(const FRunPartyMember& Member, TArray<FRunEquipmentVisual>& OutVisuals, FText& OutError);
     PROJECTA_API void InitializeStartingEquipment(FRunPartyMember& Member, const TArray<FRunItemDefinition>& Items);
 }

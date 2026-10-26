@@ -286,27 +286,14 @@ void UCharacterInventoryPanel::AddSkill(const USkillDefinitionDataAsset* Skill)
     {
         if (!DisplayedMember.Items.IsValidIndex(EquipmentSlot.ItemIndex) || SourceItems.Contains(EquipmentSlot.ItemIndex)) continue;
         const FRunItemDefinition& Item = DisplayedMember.Items[EquipmentSlot.ItemIndex];
-        if (Item.GenerationVersion == 0) continue;
-        const int32 GrantedSkillIndex = Item.GrantedSkills.IndexOfByPredicate([Skill, bResolvedSkill, &DisplayedSkill](const FSoftObjectPath& Path)
-        {
-            const USkillDefinitionDataAsset* GrantedSkill = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
-            if (GrantedSkill == Skill) return true;
-            FCombatRoundSkill Granted;
-            FText GrantedError;
-            return bResolvedSkill && GrantedSkill && GrantedSkill->ResolveRoundSkill(Granted, GrantedError) && Granted.SkillId == DisplayedSkill.SkillId;
-        });
-        if (GrantedSkillIndex == INDEX_NONE) continue;
+        const TArray<RunItemPresentation::FItemSkillDetails> ItemDetails = RunItemPresentation::SkillDetails(Item);
+        const auto* SourceDetail = ItemDetails.FindByPredicate([Skill](const RunItemPresentation::FItemSkillDetails& Entry) { return Skill && Entry.SkillAsset.ResolveObject() == Skill; });
+        if (!SourceDetail) continue;
         if (!bHasSourceDetails)
         {
             // Equipped copies carry the same frozen tuning used by combat; never replace it with asset description numbers.
             // 장착 사본은 전투와 같은 고정 수치를 보유하므로 원본 설명의 숫자로 대체하지 않습니다.
-            const TArray<RunItemPresentation::FItemSkillDetails> ItemDetails = RunItemPresentation::SkillDetails(Item);
-            if (ItemDetails.IsValidIndex(GrantedSkillIndex)) Detail = ItemDetails[GrantedSkillIndex];
-            else
-            {
-                Detail.Description = NSLOCTEXT("Inventory", "MissingSavedSkillDetails", "저장된 스킬 설명을 확인할 수 없습니다.");
-                Detail.Stats = NSLOCTEXT("Inventory", "MissingSavedSkillStats", "저장된 스킬 등급·수치 정보를 확인할 수 없습니다.");
-            }
+            Detail = *SourceDetail;
             bHasSourceDetails = true;
         }
         SourceItems.Add(EquipmentSlot.ItemIndex);

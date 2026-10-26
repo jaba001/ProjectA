@@ -2,6 +2,7 @@
 
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Game/Run/RunEquipmentCatalog.h"
+#include "Game/Run/EquipmentCombatRules.h"
 #include "Game/Run/RunSkillBalance.h"
 #include "GAS/CombatGameplayTags.h"
 #include "UI/ProjectALocalization.h"
@@ -91,8 +92,13 @@ FText RunItemPresentation::SkillDescription(const USkillDefinitionDataAsset* Ski
 
 FText RunItemPresentation::GrantedSkills(const FRunItemDefinition& Item, bool bIncludeStats)
 {
-    if (Item.GenerationVersion == 0 || Item.GrantedSkills.IsEmpty()) return FText::GetEmpty();
     TArray<FText> Names;
+    for (const FSoftObjectPath& Path : EquipmentCombatRules::GetIntrinsicSkills(Item.Tags))
+    {
+        if (Item.GrantedSkills.Contains(Path)) continue;
+        const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
+        Names.Add(FText::Format(NSLOCTEXT("RunItem", "IntrinsicSkillName", "[기본] {0}"), SkillName(Skill)));
+    }
     for (int32 Index = 0; Index < Item.GrantedSkills.Num(); ++Index)
     {
         const FSoftObjectPath& Path = Item.GrantedSkills[Index];
@@ -112,7 +118,7 @@ FText RunItemPresentation::GrantedSkills(const FRunItemDefinition& Item, bool bI
         }
         Names.Add(Name);
     }
-    return FText::Format(NSLOCTEXT("RunItem", "GrantedSkills", "장착 스킬: {0}"), FText::Join(FText::FromString(TEXT(" · ")), Names));
+    return Names.IsEmpty() ? FText::GetEmpty() : FText::Format(NSLOCTEXT("RunItem", "GrantedSkills", "장착 스킬: {0}"), FText::Join(FText::FromString(TEXT(" · ")), Names));
 }
 
 FText RunItemPresentation::Tooltip(const FRunItemDefinition& Item, const TArray<FRunWeaponRarityRule>& Rarities)
@@ -149,13 +155,31 @@ FText RunItemPresentation::EquipmentDescription(const FRunItemDefinition& Item)
 TArray<RunItemPresentation::FItemSkillDetails> RunItemPresentation::SkillDetails(const FRunItemDefinition& Item)
 {
     TArray<FItemSkillDetails> Details;
-    if (Item.GenerationVersion == 0) return Details;
+    TArray<FItemSkillDetails> IntrinsicDetails;
+    for (const FSoftObjectPath& Path : EquipmentCombatRules::GetIntrinsicSkills(Item.Tags))
+    {
+        if (Item.GrantedSkills.Contains(Path)) continue;
+        const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Path.TryLoad());
+        FItemSkillDetails& Detail = IntrinsicDetails.AddDefaulted_GetRef();
+        Detail.SkillAsset = Path;
+        Detail.Name = FText::Format(NSLOCTEXT("RunItem", "IntrinsicSkillName", "[기본] {0}"), SkillName(Skill));
+        Detail.Description = SkillDescription(Skill);
+        FCombatRoundSkill Profile;
+        FText Error;
+        if (Skill && Skill->ResolveRoundSkill(Profile, Error))
+        {
+            const float Power = Profile.bUseEquippedWeaponDamage ? Item.WeaponDamage : Profile.Power;
+            Detail.Stats = RunItemPresentationInternal::Stats(Power, Profile.ActionPointCost, Profile.SubActionPointCost, Profile.WindupSeconds);
+        }
+    }
+    if (Item.GenerationVersion == 0) return IntrinsicDetails;
     // Preserve every saved skill rather than assuming the current single-skill generation policy.
     // 현재의 스킬 한 개 생성 정책을 가정하지 않고 저장된 모든 스킬을 표시합니다.
-    Details.Reserve(Item.GrantedSkills.Num());
+    Details.Reserve(IntrinsicDetails.Num() + Item.GrantedSkills.Num());
     for (int32 Index = 0; Index < Item.GrantedSkills.Num(); ++Index)
     {
         FItemSkillDetails& Detail = Details.AddDefaulted_GetRef();
+        Detail.SkillAsset = Item.GrantedSkills[Index];
         const USkillDefinitionDataAsset* Skill = Cast<USkillDefinitionDataAsset>(Item.GrantedSkills[Index].TryLoad());
         Detail.Name = SkillName(Skill);
         FCombatRoundSkill Resolved;
@@ -184,5 +208,6 @@ TArray<RunItemPresentation::FItemSkillDetails> RunItemPresentation::SkillDetails
         }
         else Detail.Stats = NSLOCTEXT("RunItem", "MissingSkillStats", "스킬 수치 정보를 확인할 수 없습니다.");
     }
+    Details.Append(MoveTemp(IntrinsicDetails));
     return Details;
 }

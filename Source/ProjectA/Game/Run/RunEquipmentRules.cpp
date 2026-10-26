@@ -18,7 +18,7 @@ bool RunEquipmentRules::Validate(const FRunPartyMember& Member, FText& OutError)
     if (State.Revision < 0
         || State.Slots.Num() > URunEquipmentCatalog::GetSlotTags().Num()
         || State.ConditionalSkillVersion < 0
-        || State.ConditionalSkillVersion > 1)
+        || State.ConditionalSkillVersion > 2)
     {
         return false;
     }
@@ -114,6 +114,7 @@ bool RunEquipmentRules::BuildEquippedSkills(const FRunPartyMember& Member, TArra
         if (!AppendSource(Item.GrantedSkills)) return false;
     }
     if (Member.Equipment.ConditionalSkillVersion == 1 && !AppendConditionalSkills(Member, Candidate, OutError)) return false;
+    if (Member.Equipment.ConditionalSkillVersion == 2 && !AppendIntrinsicSkills(Member, Candidate, OutError)) return false;
     OutSkills = MoveTemp(Candidate);
     OutError = FText::GetEmpty();
     return true;
@@ -144,6 +145,28 @@ bool RunEquipmentRules::AppendConditionalSkills(const FRunPartyMember& Member, T
         if (Member.Equipment.bHasLoadout && EquipmentCombatRules::Matches(Equipment, Definition.RequiredEquipment)) Skills.AddUnique(Path);
         else Skills.Remove(Path);
     }
+    OutError = FText::GetEmpty();
+    return true;
+}
+
+bool RunEquipmentRules::AppendIntrinsicSkills(const FRunPartyMember& Member, TArray<FSoftObjectPath>& Skills, FText& OutError)
+{
+    // Replace only managed intrinsic entries so the final dagger removal cannot leave a stale skill.
+    // 마지막 단검을 해제한 뒤 스킬이 남지 않도록 관리 대상 기본 스킬만 다시 구성합니다.
+    for (const FEquipmentIntrinsicSkill& Rule : GetDefault<UEquipmentCombatRules>()->IntrinsicSkills) Skills.Remove(Rule.Skill);
+    TArray<FSoftObjectPath> Added;
+    if (Member.Equipment.bHasLoadout)
+    {
+        for (const FRunEquipmentSlot& Slot : Member.Equipment.Slots)
+        {
+            if (!Member.Items.IsValidIndex(Slot.ItemIndex)) return false;
+            for (const FSoftObjectPath& Path : EquipmentCombatRules::GetIntrinsicSkills(Member.Items[Slot.ItemIndex].Tags)) Added.AddUnique(Path);
+        }
+    }
+    TArray<TObjectPtr<USkillDefinitionDataAsset>> Definitions;
+    for (const FSoftObjectPath& Path : Added) Definitions.Add(Cast<USkillDefinitionDataAsset>(Path.TryLoad()));
+    if (!UnitDataRules::ValidateSkills(Definitions, false, OutError)) return false;
+    for (const FSoftObjectPath& Path : Added) Skills.AddUnique(Path);
     OutError = FText::GetEmpty();
     return true;
 }
@@ -196,7 +219,7 @@ bool RunEquipmentRules::Apply(FRunPartyMember& Member, const FRunEquipmentComman
         }
     }
     Candidate.bHasLoadout = true;
-    Candidate.ConditionalSkillVersion = 1;
+    Candidate.ConditionalSkillVersion = 2;
     ++Candidate.Revision;
     FRunPartyMember Validated = Member;
     Validated.Equipment = Candidate;

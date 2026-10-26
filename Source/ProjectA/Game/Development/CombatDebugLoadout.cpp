@@ -188,7 +188,7 @@ bool UCombatDebugLoadout::ApplyEquipment(APlayerController* Controller, int32 Un
     if (!RunEquipmentRules::BuildVisuals(Candidate, Visuals, OutError)) return false;
     TArray<FSoftObjectPath> SkillPaths;
     for (USkillDefinitionDataAsset* Skill : Unit->GetEquippedSkillDataAssets()) SkillPaths.Add(FSoftObjectPath(Skill));
-    if (!RunEquipmentRules::AppendConditionalSkills(Candidate, SkillPaths, OutError)) return false;
+    if (!RunEquipmentRules::AppendIntrinsicSkills(Candidate, SkillPaths, OutError)) return false;
     TArray<TObjectPtr<USkillDefinitionDataAsset>> Definitions;
     for (const FSoftObjectPath& Path : SkillPaths) Definitions.Add(Cast<USkillDefinitionDataAsset>(Path.TryLoad()));
     TArray<FRunEquipmentVisual> PreviousVisuals = Unit->CharacterEquipment->GetEquipment();

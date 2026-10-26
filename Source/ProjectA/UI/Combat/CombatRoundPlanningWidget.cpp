@@ -22,6 +22,7 @@
 #include "Components/WrapBoxSlot.h"
 #include "Controller/CombatRoundPlayerController.h"
 #include "Game/Encounter/CombatArena.h"
+#include "Game/Run/EquipmentCombatRules.h"
 #include "Grid/Combat/CombatGridManager.h"
 #include "Grid/Combat/CombatGridTile.h"
 #include "UI/Theme/DemonicUITheme.h"
@@ -29,6 +30,7 @@
 #include "Internationalization/TextLocalizationManager.h"
 #include "UI/Debug/CombatUnitHealthDebugWidget.h"
 #include "Unit/UnitBase.h"
+#include "Unit/CharacterEquipmentComponent.h"
 
 namespace
 {
@@ -720,6 +722,11 @@ FCombatPlanningRefreshState UCombatRoundPlanningWidget::CaptureRefreshState() co
         Observation.AP = Unit.Unit->GetCurrentActionPoint();
         Observation.SAP = Unit.Unit->GetCurrentSubActionPoint();
         Observation.MoveRange = Unit.Unit->GetMoveRange();
+        if (const UCharacterEquipmentComponent* Equipment = Unit.Unit->CharacterEquipment)
+        {
+            Observation.bHasEquipment = Equipment->HasEquipmentLoadout();
+            Observation.Equipment = Equipment->GetEquipment();
+        }
         for (const FRunConsumableStack& Stack : Unit.Unit->Consumables) Observation.ConsumableQuantities.Add(Stack.Quantity);
         Observation.CurrentTile = Unit.Unit->GetCurrentTile();
         if (UAbilitySystemComponent* ASC = Unit.Unit->GetAbilitySystemComponent())
@@ -951,13 +958,27 @@ void UCombatRoundPlanningWidget::RefreshView(bool bForce)
     {
         FText Error;
         const bool bValid = bConnected && Coordinator->CanPlanCommand(BuildCommand(Button->GetSkillId()), Error);
-        Button->SetIsEnabled(bEditable && bValid && !bChoosingMove);
         const FCombatRoundSkill* Skill = bConnected ? Coordinator->FindSkill(Button->GetSkillId()) : nullptr;
+        const int32 SelectedId = GetSelectedUnitId();
+        const auto* SelectedUnit = bConnected ? Coordinator->GetView().Units.FindByPredicate([SelectedId](const FCombatRoundUnitView& Unit) { return Unit.UnitId == SelectedId; }) : nullptr;
+        const UCharacterEquipmentComponent* Equipment = SelectedUnit && IsValid(SelectedUnit->Unit) ? SelectedUnit->Unit->CharacterEquipment.Get() : nullptr;
+        const bool bEquipmentReady = !Skill
+            || Skill->RequiredEquipment.IsEmpty()
+            || (Equipment
+                && Equipment->HasEquipmentLoadout()
+                && EquipmentCombatRules::Matches(Equipment->GetEquipment(), Skill->RequiredEquipment));
+        const bool bButtonEnabled = bEditable
+            && bValid
+            && bEquipmentReady
+            && !bChoosingMove;
+        Button->SetIsEnabled(bButtonEnabled);
         if (Skill)
         {
-            const FText Label = FText::Format(NSLOCTEXT("CombatPlanning", "SkillCard", "{0}\n{1}"), SkillName(*Skill), SkillCostLabel(*Skill));
+            FText Label = FText::Format(NSLOCTEXT("CombatPlanning", "SkillCard", "{0}\n{1}"), SkillName(*Skill), SkillCostLabel(*Skill));
+            if (!Skill->EquipmentRequirementText.IsEmpty()) Label = FText::Format(NSLOCTEXT("CombatPlanning", "SkillAvailability", "{0}\n{1}"), Label, Skill->EquipmentRequirementText);
             if (UTextBlock* Text = Cast<UTextBlock>(Button->GetContent())) Text->SetText(Label);
-            const FText Reason = !bEditable || bChoosingMove ? InputHint : Error;
+            const FText Reason = !bEquipmentReady && !Skill->EquipmentRequirementText.IsEmpty() ? Skill->EquipmentRequirementText
+                : !bEditable || bChoosingMove ? InputHint : Error;
             Button->SetToolTipText(Reason.IsEmpty() ? Label : FText::Format(NSLOCTEXT("CombatPlanning", "SkillAvailability", "{0}\n{1}"), Label, Reason));
         }
         else Button->SetToolTipText(Error);

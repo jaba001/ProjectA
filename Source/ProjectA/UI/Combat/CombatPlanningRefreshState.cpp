@@ -2,7 +2,27 @@
 
 bool FCombatPlanningUnitObservation::operator==(const FCombatPlanningUnitObservation& Other) const
 {
-    return Unit == Other.Unit && AbilitySystem == Other.AbilitySystem && CurrentTile == Other.CurrentTile && Tags == Other.Tags && BlockedAbilityTags == Other.BlockedAbilityTags && Name == Other.Name && AP == Other.AP && SAP == Other.SAP && MoveRange == Other.MoveRange && ConsumableQuantities == Other.ConsumableQuantities && bAlive == Other.bAlive;
+    if (Unit != Other.Unit
+        || AbilitySystem != Other.AbilitySystem
+        || CurrentTile != Other.CurrentTile
+        || Tags != Other.Tags
+        || BlockedAbilityTags != Other.BlockedAbilityTags
+        || Name != Other.Name
+        || AP != Other.AP
+        || SAP != Other.SAP
+        || MoveRange != Other.MoveRange
+        || ConsumableQuantities != Other.ConsumableQuantities
+        || bAlive != Other.bAlive
+        || bHasEquipment != Other.bHasEquipment
+        || Equipment.Num() != Other.Equipment.Num())
+    {
+        return false;
+    }
+    for (int32 Index = 0; Index < Equipment.Num(); ++Index)
+    {
+        if (!FRunEquipmentVisual::StaticStruct()->CompareScriptStruct(&Equipment[Index], &Other.Equipment[Index], 0)) return false;
+    }
+    return true;
 }
 
 bool FCombatPlanningTileObservation::operator==(const FCombatPlanningTileObservation& Other) const

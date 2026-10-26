@@ -1921,6 +1921,12 @@
       "key": "MissingBakedEnvironment",
       "source": "구운 전투장 Blueprint가 없습니다. Arena의 EnvironmentTemplates와 에디터 굽기 결과를 확인하세요.",
       "translation": "The baked combat arena Blueprint is missing. Check the arena's EnvironmentTemplates and the editor bake result."
+    },
+    {
+      "namespace": "RunItem",
+      "key": "IntrinsicSkillName",
+      "source": "[기본] {0}",
+      "translation": "[Intrinsic] {0}"
     }
   ]
 }

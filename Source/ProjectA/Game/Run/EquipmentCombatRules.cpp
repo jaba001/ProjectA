@@ -6,8 +6,21 @@
 UEquipmentCombatRules::UEquipmentCombatRules()
 {
     ConditionalSkills.Add(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_DoubleAttack.DA_DoubleAttack")));
+    FEquipmentIntrinsicSkill& DaggerSkill = IntrinsicSkills.AddDefaulted_GetRef();
+    DaggerSkill.ItemQuery = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Dagger")));
+    DaggerSkill.Skill = ConditionalSkills[0];
     BasicWeaponAttacks.Add(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_MeleeAttack.DA_MeleeAttack")));
     BasicWeaponAttacks.Add(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack")));
+}
+
+TArray<FSoftObjectPath> EquipmentCombatRules::GetIntrinsicSkills(const FGameplayTagContainer& ItemTags)
+{
+    TArray<FSoftObjectPath> Skills;
+    for (const FEquipmentIntrinsicSkill& Rule : GetDefault<UEquipmentCombatRules>()->IntrinsicSkills)
+    {
+        if (!Rule.ItemQuery.IsEmpty() && Rule.ItemQuery.Matches(ItemTags)) Skills.AddUnique(Rule.Skill);
+    }
+    return Skills;
 }
 
 bool EquipmentCombatRules::Matches(const TArray<FRunEquipmentVisual>& Equipment, const TArray<FCombatEquipmentRequirement>& Requirements)

@@ -366,6 +366,9 @@ struct PROJECTA_API FCombatRoundSkill
     TArray<FCombatEquipmentRequirement> RequiredEquipment;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment")
+    FText EquipmentRequirementText;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment")
     bool bUseEquippedWeaponDamage = false;
 
     // Empty strikes preserve single-release skills; explicit strikes pay costs once for the entire cast.

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Combat/Round/CombatRoundTypes.h"
 #include "GameplayTagContainer.h"
+#include "Game/Run/RunEquipmentTypes.h"
 #include "CombatPlanningRefreshState.generated.h"
 
 class ACombatRoundPlayerController;
@@ -21,6 +22,8 @@ struct FCombatPlanningUnitObservation
     int32 SAP = 0;
     int32 MoveRange = 0;
     TArray<int32> ConsumableQuantities;
+    TArray<FRunEquipmentVisual> Equipment;
+    bool bHasEquipment = false;
     bool bAlive = false;
 
     bool operator==(const FCombatPlanningUnitObservation& Other) const;
