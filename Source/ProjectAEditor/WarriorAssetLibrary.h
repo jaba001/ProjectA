@@ -82,13 +82,15 @@ public:
     UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
     static bool ValidateSwordMontage(UAnimMontage* Montage, UAnimSequence* Attack, UAnimSequence* Recovery, float RecoveryStartTime);
 
-    // Fit a trimmed draw to the requested duration, then play the release at its original rate without editing source assets.
-    // 잘라낸 준비 동작을 지정 시간에 맞추고 발사 동작은 원속도로 재생하며 원본 에셋은 수정하지 않습니다.
+    // Fit montage segments and scale playback plus blending together without editing source assets.
+    // 원본 에셋을 수정하지 않고 몽타주 구간과 전체 재생 속도 및 블렌딩을 함께 조정합니다.
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
-    static bool ConfigureTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime, float ReleaseStartTime, float ReleaseEndTime, float DrawDuration);
+    static bool ConfigureTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime,
+        float ReleaseStartTime, float ReleaseEndTime, float DrawDuration, float PlaybackRate = 1.f);
 
     UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
-    static bool ValidateTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime, float ReleaseStartTime, float ReleaseEndTime, float DrawDuration);
+    static bool ValidateTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime,
+        float ReleaseStartTime, float ReleaseEndTime, float DrawDuration, float PlaybackRate = 1.f);
 
     // Align the sword release with its windup while preserving the remaining attack and separate recovery at their original rates.
     // 검의 발동을 선딜에 맞추고 남은 공격과 별도 복귀 동작은 원래 속도로 보존합니다.

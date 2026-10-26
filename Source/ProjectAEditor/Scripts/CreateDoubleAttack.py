@@ -16,7 +16,9 @@ RIGHT = FOLDER + "/AS_DoubleAttack_Right"
 LEFT = FOLDER + "/AS_DoubleAttack_Left"
 OWNER_KEY = "ProjectA.DoubleAttack"
 OWNER = "DoubleAttack.MirroredMelee.v2"
-STRIKE_INTERVAL = 0.5
+STRIKE_INTERVAL = 0.1
+FIRST_MOTION_SECONDS = 0.5
+PLAYBACK_RATE = FIRST_MOTION_SECONDS / STRIKE_INTERVAL
 TRANSITION_SECONDS = 4.0 / 30.0
 VERIFY = "-DoubleAttackVerifyOnly" in unreal.SystemLibrary.get_command_line()
 OVERWRITE = "-DoubleAttackOverwrite" in unreal.SystemLibrary.get_command_line()
@@ -62,7 +64,7 @@ def motion(path, source, mirror, transition=None):
         factory.set_editor_property("preview_skeletal_mesh", unreal.load_asset("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"))
         folder, name = path.rsplit("/", 1)
         sequence = require(unreal.AssetToolsHelpers.get_asset_tools().create_asset(name, folder, unreal.AnimSequence, factory), "Sequence factory failed")
-    arguments = [source, mirror, STRIKE_INTERVAL if transition else 0.0, transition, TRANSITION_SECONDS if transition else 0.0]
+    arguments = [source, mirror, FIRST_MOTION_SECONDS if transition else 0.0, transition, TRANSITION_SECONDS if transition else 0.0]
     valid = not create and unreal.EquipmentSkillAssetLibrary.validate_melee_montage_motion(sequence, *arguments)
     if not VERIFY and (create or (OVERWRITE and not valid)):
         require(unreal.EquipmentSkillAssetLibrary.bake_melee_montage_motion(sequence, *arguments), "Melee pose baking failed: " + path)
@@ -121,7 +123,7 @@ def main():
     left = motion(LEFT, source, True, right)
     hands = validate_hands(left, right)
     duration = left.get_play_length()
-    require(abs(duration - STRIKE_INTERVAL) < 0.0001, "First recovery was not shortened to the strike interval")
+    require(abs(duration - FIRST_MOTION_SECONDS) < 0.0001, "First recovery differs from its baked source window")
     montage = existing(MONTAGE, unreal.AnimMontage)
     create = montage is None
     if create:
@@ -130,7 +132,7 @@ def main():
         factory.set_editor_property("source_animation", left)
         folder, name = MONTAGE.rsplit("/", 1)
         montage = require(unreal.AssetToolsHelpers.get_asset_tools().create_asset(name, folder, unreal.AnimMontage, factory), "Montage factory failed")
-    arguments = [left, right, 0.0, duration, 0.0, right.get_play_length(), duration]
+    arguments = [left, right, 0.0, duration, 0.0, right.get_play_length(), duration, PLAYBACK_RATE]
     if not VERIFY and (create or OVERWRITE):
         require(unreal.WarriorAssetLibrary.configure_timed_attack_montage(montage, *arguments), "Two-strike montage authoring failed")
         save(montage)
@@ -142,22 +144,24 @@ def main():
         factory.set_editor_property("data_asset_class", unreal.SkillDefinitionDataAsset)
         folder, name = SKILL.rsplit("/", 1)
         skill = require(unreal.AssetToolsHelpers.get_asset_tools().create_asset(name, folder, unreal.SkillDefinitionDataAsset, factory), "Skill factory failed")
-    windup = resolved(base).get_editor_property("windup_seconds")
-    require(windup < duration - TRANSITION_SECONDS, "Transition would overwrite the first strike motion")
+    source_windup = resolved(base).get_editor_property("windup_seconds")
+    windup = source_windup / PLAYBACK_RATE
+    require(source_windup < duration - TRANSITION_SECONDS, "Transition would overwrite the first strike motion")
     if not VERIFY and (create or OVERWRITE):
-        require(unreal.EquipmentSkillAssetLibrary.configure_double_attack(skill, base, montage, windup, duration), "Skill authoring failed")
+        require(unreal.EquipmentSkillAssetLibrary.configure_double_attack(skill, base, montage, windup, STRIKE_INTERVAL), "Skill authoring failed")
         save(skill)
     result = unreal.EquipmentSkillAssetLibrary.validate_double_attack(skill, base)
     contract = result if isinstance(result, str) else result[1] if isinstance(result, tuple) and result[0] else None
     require(contract and contract.startswith("Dual daggers required;"), "Double attack static contract failed: " + str(result))
     profile = resolved(skill)
     strikes = profile.get_editor_property("melee_strikes")
-    require(abs(profile.get_editor_property("windup_seconds") - windup) < 0.0001 and abs(strikes[1].get_editor_property("delay_seconds") - duration) < 0.0001,
+    require(abs(profile.get_editor_property("windup_seconds") - windup) < 0.0001 and abs(strikes[1].get_editor_property("delay_seconds") - STRIKE_INTERVAL) < 0.0001,
             "Damage timing differs from the shortened montage")
     require(before == {str(path): file_hash(path) for path in protected}, "Protected melee source files changed")
     report = {"mode": "verify" if VERIFY else "author", "skill": skill.get_path_name(), "montage": montage.get_path_name(), "source_montage": source.get_path_name(),
-              "left": left.get_path_name(), "right": right.get_path_name(), "hands": hands, "strike_seconds": [windup, windup + duration], "transition_seconds": TRANSITION_SECONDS,
-              "montage_seconds": montage.get_play_length(), "static_contract": contract, "source_hashes": before,
+              "left": left.get_path_name(), "right": right.get_path_name(), "hands": hands, "strike_seconds": [windup, windup + STRIKE_INTERVAL],
+              "transition_seconds": TRANSITION_SECONDS / PLAYBACK_RATE, "playback_rate": PLAYBACK_RATE, "montage_seconds": montage.get_play_length() / PLAYBACK_RATE,
+              "static_contract": contract, "source_hashes": before,
               "runtime_review": "User review pending; no gameplay or automation tests executed."}
     output = ROOT / "Saved/DoubleAttack" / ("Verify.json" if VERIFY else "Author.json")
     output.parent.mkdir(parents=True, exist_ok=True)

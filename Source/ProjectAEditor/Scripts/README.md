@@ -356,7 +356,7 @@ Development Editor / Win64 컴파일 후 작성·별도 프로세스 재로드 �
 
 ## 36 단검 쌍수 더블어택
 
-`CreateDoubleAttack.py`는 `GreystoneManny/Attack/AM_MeleeAttack`의 전체 동작을 `AS_DoubleAttack_Right`로 굽고 엔진 `MirrorPose`로 `AS_DoubleAttack_Left`를 만든다. 왼손 반전본은 0.5초로 단축하고 마지막 약 0.133초를 오른손 첫 포즈로 블렌딩한다. 같은 폴더의 `AM_DoubleAttack`은 단축한 왼손 반전본 → 오른손 원본을 연결한다. 타격 시점은 0.23초·0.73초이며 전체 길이는 2.1초다. `Skills/Weapons/DA_DoubleAttack`에 두 타격 시점을 연결하며 원본 근접 공격은 수정하지 않는다. 기본 모드는 기존 결과를 보존하며 `-DoubleAttackOverwrite`만 명시적으로 덮어쓴다. `-DoubleAttackVerifyOnly`는 저장본의 모든 프레임 본 변환·미러링·연결부 포즈 연속성·타격 시점·두 동작·도적 시작 단검 2개·슬롯별 단검 태그 조건·개별/평균 피해·조건부 부여/제거·AP·무기 CSV·원본 SHA를 검사한다. 결과는 `Saved/DoubleAttack`에 기록한다. 게임 월드·PIE·플레이·자동화 테스트는 시작하지 않는다.
+`CreateDoubleAttack.py`는 `GreystoneManny/Attack/AM_MeleeAttack`의 전체 동작을 `AS_DoubleAttack_Right`로 굽고 엔진 `MirrorPose`로 `AS_DoubleAttack_Left`를 만든다. 왼손 반전본은 0.5초로 단축하고 마지막 약 0.133초를 오른손 첫 포즈로 블렌딩한다. 같은 폴더의 `AM_DoubleAttack`은 단축한 왼손 반전본 → 오른손 원본을 연결한다. 저장 길이 2.1초의 몽타주를 5배속으로 재생하며 시작·종료 블렌딩도 같은 배율로 단축한다. 실제 타격 시점은 0.046초·0.146초이고 전체 길이는 0.42초다. `Skills/Weapons/DA_DoubleAttack`에 두 타격 시점을 연결하며 원본 근접 공격은 수정하지 않는다. 기본 모드는 기존 결과를 보존하며 `-DoubleAttackOverwrite`만 명시적으로 덮어쓴다. `-DoubleAttackVerifyOnly`는 저장본의 모든 프레임 본 변환·미러링·연결부 포즈 연속성·타격 시점·두 동작·도적 시작 단검 2개·슬롯별 단검 태그 조건·개별/평균 피해·조건부 부여/제거·AP·무기 CSV·원본 SHA를 검사한다. 결과는 `Saved/DoubleAttack`에 기록한다. 게임 월드·PIE·플레이·자동화 테스트는 시작하지 않는다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDoubleAttack.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI

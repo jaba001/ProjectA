@@ -664,8 +664,10 @@ bool UWarriorAssetLibrary::ValidateSwordMontage(UAnimMontage* Montage, UAnimSequ
     return FMath::IsFinite(ExpectedLength) && Montage->RateScale == 1.f && Attack->GetSamplingFrameRate().IsValid() && Recovery->GetSamplingFrameRate().IsValid() && Montage->GetCommonTargetFrameRate().IsValid() && FMath::IsNearlyEqual(Montage->GetPlayLength(), ExpectedLength, 0.0001f) && FMath::IsNearlyEqual(Montage->CalculateSequenceLength(), ExpectedLength, 0.0001f);
 }
 
-bool UWarriorAssetLibrary::ConfigureTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime, float ReleaseStartTime, float ReleaseEndTime, float DrawDuration)
+bool UWarriorAssetLibrary::ConfigureTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime,
+    float ReleaseStartTime, float ReleaseEndTime, float DrawDuration, float PlaybackRate)
 {
+    if (!FMath::IsFinite(PlaybackRate) || PlaybackRate <= 0.f) return Fail(TEXT("Invalid montage playback rate / 몽타주 재생 속도가 유효하지 않습니다"));
     FWarriorTimedAttackMontagePlan Plan;
     if (!BuildTimedAttackMontagePlan(Montage, Draw, Release, DrawStartTime, DrawEndTime, ReleaseStartTime, ReleaseEndTime, DrawDuration, Plan)) return false;
     FAnimSegment DrawSegment;
@@ -683,11 +685,11 @@ bool UWarriorAssetLibrary::ConfigureTimedAttackMontage(UAnimMontage* Montage, UA
     // 같은 시퀀스의 서로 다른 구간을 사용할 수 있으며 대상 구간과 블렌딩만 작성합니다.
     Montage->Modify();
     Montage->SlotAnimTracks[0].AnimTrack.AnimSegments = {DrawSegment, ReleaseSegment};
-    Montage->RateScale = 1.f;
+    Montage->RateScale = PlaybackRate;
     Montage->BlendModeIn = EMontageBlendMode::Standard;
     Montage->BlendModeOut = EMontageBlendMode::Standard;
-    Montage->BlendIn.SetBlendTime(0.06f);
-    Montage->BlendOut.SetBlendTime(0.12f);
+    Montage->BlendIn.SetBlendTime(0.06f / PlaybackRate);
+    Montage->BlendOut.SetBlendTime(0.12f / PlaybackRate);
     Montage->BlendOutTriggerTime = -1.f;
     Montage->bEnableAutoBlendOut = true;
     static_cast<UAnimCompositeBase*>(Montage)->UpdateCommonTargetFrameRate();
@@ -695,18 +697,29 @@ bool UWarriorAssetLibrary::ConfigureTimedAttackMontage(UAnimMontage* Montage, UA
     Montage->SetCompositeLength(Plan.Length);
     Montage->PostEditChange();
     Montage->MarkPackageDirty();
-    return ValidateTimedAttackMontage(Montage, Draw, Release, DrawStartTime, DrawEndTime, ReleaseStartTime, ReleaseEndTime, DrawDuration);
+    return ValidateTimedAttackMontage(Montage, Draw, Release, DrawStartTime, DrawEndTime, ReleaseStartTime, ReleaseEndTime, DrawDuration, PlaybackRate);
 }
 
-bool UWarriorAssetLibrary::ValidateTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime, float ReleaseStartTime, float ReleaseEndTime, float DrawDuration)
+bool UWarriorAssetLibrary::ValidateTimedAttackMontage(UAnimMontage* Montage, UAnimSequence* Draw, UAnimSequence* Release, float DrawStartTime, float DrawEndTime,
+    float ReleaseStartTime, float ReleaseEndTime, float DrawDuration, float PlaybackRate)
 {
+    if (!FMath::IsFinite(PlaybackRate) || PlaybackRate <= 0.f) return Fail(TEXT("Invalid montage playback rate / 몽타주 재생 속도가 유효하지 않습니다"));
     FWarriorTimedAttackMontagePlan Plan;
     if (!BuildTimedAttackMontagePlan(Montage, Draw, Release, DrawStartTime, DrawEndTime, ReleaseStartTime, ReleaseEndTime, DrawDuration, Plan)) return false;
     const TArray<FAnimSegment>& Segments = Montage->SlotAnimTracks[0].AnimTrack.AnimSegments;
     if (Segments.Num() != 2) return Fail(TEXT("Timed attack montage must contain exactly two segments / 시간 조절 공격 몽타주는 정확히 두 구간을 포함해야 합니다"));
     if (Segments[0].GetAnimReference() != Draw || Segments[1].GetAnimReference() != Release || Segments[0].StartPos != 0.f || Segments[0].AnimStartTime != DrawStartTime || Segments[0].AnimEndTime != DrawEndTime || Segments[1].StartPos != DrawDuration || Segments[1].AnimStartTime != ReleaseStartTime || Segments[1].AnimEndTime != ReleaseEndTime || Segments[0].AnimPlayRate != Plan.DrawPlayRate || Segments[1].AnimPlayRate != 1.f || Segments[0].LoopingCount != 1 || Segments[1].LoopingCount != 1) return Fail(TEXT("Timed attack animation references, trims, rate or loop count differ / 시간 조절 공격의 원본 참조·구간·배율·반복 횟수가 다릅니다"));
     if (!FMath::IsNearlyEqual(Segments[0].GetLength(), DrawDuration, 0.0001f) || !FMath::IsNearlyEqual(Segments[0].GetEndPos(), Segments[1].StartPos, 0.0001f) || !FMath::IsNearlyEqual(Segments[1].GetEndPos(), Plan.Length, 0.0001f)) return Fail(TEXT("Timed attack segment timing has a gap or unexpected length / 시간 조절 공격 구간 사이에 틈이 있거나 길이가 다릅니다"));
-    if (Montage->RateScale != 1.f || Montage->BlendModeIn != EMontageBlendMode::Standard || Montage->BlendModeOut != EMontageBlendMode::Standard || !FMath::IsNearlyEqual(Montage->BlendIn.GetBlendTime(), 0.06f, 0.0001f) || !FMath::IsNearlyEqual(Montage->BlendOut.GetBlendTime(), 0.12f, 0.0001f) || Montage->BlendOutTriggerTime != -1.f || !Montage->bEnableAutoBlendOut) return Fail(TEXT("Timed attack montage blending or playback settings differ / 시간 조절 공격 몽타주의 블렌딩 또는 재생 설정이 다릅니다"));
+    if (Montage->RateScale != PlaybackRate
+        || Montage->BlendModeIn != EMontageBlendMode::Standard
+        || Montage->BlendModeOut != EMontageBlendMode::Standard
+        || !FMath::IsNearlyEqual(Montage->BlendIn.GetBlendTime(), 0.06f / PlaybackRate, 0.0001f)
+        || !FMath::IsNearlyEqual(Montage->BlendOut.GetBlendTime(), 0.12f / PlaybackRate, 0.0001f)
+        || Montage->BlendOutTriggerTime != -1.f
+        || !Montage->bEnableAutoBlendOut)
+    {
+        return Fail(TEXT("Timed attack montage blending or playback settings differ / 시간 조절 공격 몽타주의 블렌딩 또는 재생 설정이 다릅니다"));
+    }
     if (Montage->GetCommonTargetFrameRate() != Plan.FrameRate || Montage->GetSamplingFrameRate() != Plan.FrameRate || !FMath::IsNearlyEqual(Montage->GetPlayLength(), Plan.Length, 0.0001f) || !FMath::IsNearlyEqual(Montage->CalculateSequenceLength(), Plan.Length, 0.0001f)) return Fail(TEXT("Timed attack montage frame rate or stored length differs / 시간 조절 공격 몽타주의 프레임 레이트 또는 저장 길이가 다릅니다"));
     return true;
 }
