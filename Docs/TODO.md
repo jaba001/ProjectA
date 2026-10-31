@@ -198,4 +198,4 @@ Steam·PlayFab 계정, 서비스 ID, 무료 사용 조건이 준비된 뒤 진�
 
 [현지화 보류](../AGENTS.md#현지화-보류)에 따라 사용자가 요청할 때 진행한다.
 
-- [ ] 보류 기간에 추가·변경된 문구를 모아 `Config/Localization`과 번역 리소스를 갱신하고 `BuildLocalization.py --check`를 통과시킨다.
+- [ ] 보류 기간에 추가·변경된 문구를 모아 `Config/Localization`과 번역 리소스를 갱신하고 `BuildLocalization.py --check`를 통과시킨다. 이름을 바꾼 `BPDA_Strike`·`DA_DoubleStrike`의 번역 키도 옮긴다.

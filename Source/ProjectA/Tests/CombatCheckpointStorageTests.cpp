@@ -755,6 +755,8 @@ bool FCombatRoundCheckpointRemovedSkillTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Internal wait and human skip are not removed content"), RunContentMigration::IsRemovedSkillId(NAME_None));
     const FName UnrelatedId(TEXT("SkillDefinitionDataAsset:BPDA_DefaulatAttack"));
     TestEqual(TEXT("Other existing skill identifiers are preserved"), UCombatCheckpointLibrary::ResolveSavedSkillId(UnrelatedId), UnrelatedId);
+    TestEqual(TEXT("A saved Strike command follows the renamed asset"), UCombatCheckpointLibrary::ResolveSavedSkillId(TEXT("SkillDefinitionDataAsset:BPDA_swoard_attack")), FName(TEXT("SkillDefinitionDataAsset:BPDA_Strike")));
+    TestEqual(TEXT("A saved Double Strike command follows the renamed asset"), UCombatCheckpointLibrary::ResolveSavedSkillId(TEXT("SkillDefinitionDataAsset:DA_DoubleAttack")), FName(TEXT("SkillDefinitionDataAsset:DA_DoubleStrike")));
     for (const FSoftObjectPath& Path : CurrentPaths) TestTrue(TEXT("Current paths identify deleted content without loading it"), RunContentMigration::IsRemovedSkill(Path));
     for (const FSoftObjectPath& Path : SavedPaths) TestTrue(TEXT("Historical paths identify deleted content without loading it"), RunContentMigration::IsRemovedSkill(Path));
     for (int32 Case = 0; Case < UE_ARRAY_COUNT(CommandIds); ++Case)

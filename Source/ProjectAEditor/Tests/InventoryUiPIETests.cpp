@@ -534,7 +534,7 @@ private:
         Member->Equipment.bHasLoadout = true;
         Member->Gold = 1000;
         Member->CurrentHP = 1000.f;
-        Member->Skills.AddUnique(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack")));
+        Member->Skills.AddUnique(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Strike.BPDA_Strike")));
         FRunPartyMember* ReadOnlyMember = Saved->Party.FindByPredicate([](const FRunPartyMember& Item) { return Item.bCreated && !Item.bPlayerControlled; });
         if (!Check(ReadOnlyMember != nullptr, TEXT("The original party retains a distinct AI companion for read-only UI inspection."))) return false;
         ReadOnlyCharacterId = ReadOnlyMember->CharacterId;

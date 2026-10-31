@@ -83,7 +83,7 @@ bool UAssetDeduplicationLibrary::DeleteReviewedCombatAssets(const TArray<FAssetD
         FString Root;
         FString Relative;
         if (!Data.IsValid() || !Name.StartsWith(TEXT("/Game/")) || !Name.Mid(6).Split(TEXT("/"), &Root, &Relative)) return false;
-        const bool bProjectCombatAsset = (Name.StartsWith(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/")) && !Name.StartsWith(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Monsters/")) && Name != TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_DefaulatAttack") && Name != TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack")) || Name.StartsWith(TEXT("/Game/User_JeHoon/RPGEffects/")) || Name.StartsWith(TEXT("/Game/User_JeHoon/Free_Magic/")) || Name == TEXT("/Game/User_JeHoon/Blueprint/DataAsset/SkillPools/DA_SkillPool_Catalog") || Name == TEXT("/Game/User_JeHoon/Blueprint/TESTPROJECTILE");
+        const bool bProjectCombatAsset = (Name.StartsWith(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/")) && !Name.StartsWith(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Monsters/")) && Name != TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_DefaulatAttack") && Name != TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Strike")) || Name.StartsWith(TEXT("/Game/User_JeHoon/RPGEffects/")) || Name.StartsWith(TEXT("/Game/User_JeHoon/Free_Magic/")) || Name == TEXT("/Game/User_JeHoon/Blueprint/DataAsset/SkillPools/DA_SkillPool_Catalog") || Name == TEXT("/Game/User_JeHoon/Blueprint/TESTPROJECTILE");
         if (!CombatRoots.Contains(Root) && !bProjectCombatAsset) return false;
     }
     TArray<UObject*> Objects;

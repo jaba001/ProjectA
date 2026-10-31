@@ -112,7 +112,7 @@ bool FExistingSaveCopyReviewTest::RunTest(const FString& Parameters)
     TArray<TSharedPtr<FJsonValue>> Completed;
     for (const FName Node : Saved->CompletedNodes) Completed.Add(MakeShared<FJsonValueString>(Node.ToString()));
     Report->SetArrayField(TEXT("completed_nodes"), Completed);
-    const FSoftObjectPath MeleePath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"));
+    const FSoftObjectPath MeleePath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Strike.BPDA_Strike"));
     TArray<TSharedPtr<FJsonValue>> Party;
     for (const FRunPartyMember& Member : Saved->Party)
     {
@@ -162,7 +162,7 @@ bool FExistingSaveCopyReviewTest::RunTest(const FString& Parameters)
     Report->SetObjectField(TEXT("frozen_skill_shop"), SkillShop);
     // Observe the current melee label independently of frozen text without saving either the asset or the clone.
     // 에셋과 사본을 저장하지 않고 확정 저장 문구와 별도로 현재 근접 표시명을 관측합니다.
-    const FString MeleeFile = Root / TEXT("Content/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.uasset");
+    const FString MeleeFile = Root / TEXT("Content/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Strike.uasset");
     TArray<uint8> MeleeBefore;
     TArray<uint8> MeleeAfter;
     if (!TestTrue(TEXT("The retained original melee DataAsset file exists."), FFileHelper::LoadFileToArray(MeleeBefore, *MeleeFile))) return Finish(false);

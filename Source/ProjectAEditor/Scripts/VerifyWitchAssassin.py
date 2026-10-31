@@ -37,7 +37,7 @@ def verify():
     require(preview_classes[unreal.Name("Warrior")] == load(ROOT + "/Blueprint/UI/BP_WarriorMenuPreview").generated_class(), "Warrior preview changed")
     require(preview_classes[unreal.Name("Archer")] == load(ROOT + "/Blueprint/UI/BP_PartyMenuPreview").generated_class(), "Archer preview changed")
     source_skills = list(unreal.get_default_object(load(ROOT + "/Blueprint/Unit/BP_PlayerUnit").generated_class()).get_editor_property("equipped_skill_data_assets"))
-    sword = load(ROOT + "/Blueprint/DataAsset/Skills/BPDA_swoard_attack")
+    sword = load(ROOT + "/Blueprint/DataAsset/Skills/BPDA_Strike")
     for profession, mesh_path, suffix, directory, scale in PROFESSIONS:
         mesh = load(mesh_path)
         skeleton = mesh.get_editor_property("skeleton")

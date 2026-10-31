@@ -117,7 +117,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 `WEAPON_ASSETS.csv`의 `무기 피해량`은 기존 49개 모두 10으로 초기화한다. `FRunItemDefinition.WeaponDamage`는 Run 카탈로그·사본에 보존하며 이전 CSV·저장의 누락 값도 10이다. `UEquipmentCombatRules.BasicWeaponAttacks`가 지정한 기본 타격은 장착한 공격 무기의 평균 피해를 사용하고 방패를 제외한다. 일반 공격 스킬의 별도 위력과 몬스터의 장비 없는 기존 프로필은 유지한다.
 
-`Skills/Weapons/DA_DoubleAttack`은 `UEquipmentCombatRules.IntrinsicSkills`의 아이템 GameplayTagQuery로 단검 기본 스킬을 부여한다. 단검 하나부터 목록에 표시하고 각 무기 슬롯의 `RequiredEquipment` GameplayTagQuery를 모두 만족할 때만 실행한다. 상점·인벤토리에도 기본 스킬과 쌍수 단검 사용 조건을 표시한다. `MeleeStrikes`에 작성한 왼손·오른손 타격을 0.184초·0.584초에 각각 기존 서버 근접 충돌·GAS 피격 경로로 실행하며 AP/SAP는 전체 시전에 한 번만 차감한다. 첫 타격 뒤 대상이 사망해도 시전을 재시작하지 않는다. `CreateDoubleAttack.py`는 `GreystoneManny/Attack/AM_MeleeAttack`의 전체 준비·공격·복귀를 시퀀스로 굽고 엔진 `MirrorPose`로 왼손 반전본을 만든다. 왼손 반전본은 첫 0.5초만 사용하고 마지막 약 0.133초를 오른손 첫 포즈로 블렌딩한다. 이중타격 몽타주는 단축한 왼손 반전본 다음 오른손 원본을 연결한다. 저장 길이 2.1초를 1.25배속으로 재생해 실제 길이는 1.68초, 두 타격 간격은 0.4초다. 시작·종료 블렌딩도 같은 배율로 단축한다. 기본 재실행은 기존 결과를 보존한다. 기존 `ConditionalSkillVersion=0/1`은 이전 목록 계산을 유지하고 다음 명시적 장비 변경에서 버전 2의 기본 스킬 부여 방식으로 갱신한다. 기존 에셋 경로와 스킬 식별자는 저장 호환성을 위해 유지한다.
+`Skills/Weapons/DA_DoubleStrike`은 `UEquipmentCombatRules.IntrinsicSkills`의 아이템 GameplayTagQuery로 단검 기본 스킬을 부여한다. 단검 하나부터 목록에 표시하고 각 무기 슬롯의 `RequiredEquipment` GameplayTagQuery를 모두 만족할 때만 실행한다. 상점·인벤토리에도 기본 스킬과 쌍수 단검 사용 조건을 표시한다. `MeleeStrikes`에 작성한 왼손·오른손 타격을 0.184초·0.584초에 각각 기존 서버 근접 충돌·GAS 피격 경로로 실행하며 AP/SAP는 전체 시전에 한 번만 차감한다. 첫 타격 뒤 대상이 사망해도 시전을 재시작하지 않는다. `CreateDoubleStrike.py`는 `GreystoneManny/Attack/AM_MeleeAttack`의 전체 준비·공격·복귀를 시퀀스로 굽고 엔진 `MirrorPose`로 왼손 반전본을 만든다. 왼손 반전본은 첫 0.5초만 사용하고 마지막 약 0.133초를 오른손 첫 포즈로 블렌딩한다. 이중타격 몽타주는 단축한 왼손 반전본 다음 오른손 원본을 연결한다. 저장 길이 2.1초를 1.25배속으로 재생해 실제 길이는 1.68초, 두 타격 간격은 0.4초다. 시작·종료 블렌딩도 같은 배율로 단축한다. 기본 재실행은 기존 결과를 보존한다. 기존 `ConditionalSkillVersion=0/1`은 이전 목록 계산을 유지하고 다음 명시적 장비 변경에서 버전 2의 기본 스킬 부여 방식으로 갱신한다. 기존 에셋 경로와 스킬 식별자는 저장 호환성을 위해 유지한다.
 
 프로젝트 전용 `Skills/Weapons/DA_MeleeAttack`, `Skills/Weapons/DA_CrossbowAttack`, `Weapons/DA_WeaponSkillRules`를 `CreateWeaponSkills.py`로 작성하고 `DA_VerticalSliceParty.WeaponSkillRules`를 연결했다. 기존 타격·화살 표현을 참조하며 원본 FX·메시를 복제하지 않고 기존 공격 에셋의 저장값을 변경하지 않는다. 새 근접 DA는 고정 검 trace 대신 공통 근접 충돌을 사용하며 기존 몽타주/직업 재매핑을 재사용한다.
 
@@ -376,7 +376,7 @@ UE 5.8.3에서 실제 렌더링 CVar 7개와 던전 Redirector를 확인했으�
 
 ### 4-8 기본 공격 외 스킬 정리
 
-2026-10-03 사용자 요청으로 비무장 `BPDA_DefaulatAttack`·타격 `BPDA_swoard_attack`과 몬스터 전용 공격 12개·기존 공격 애니메이션을 유지했다. [RetiredSkillContent.json](../Source/ProjectAEditor/Scripts/RetiredSkillContent.json)의 생성 스킬 176개·VFX 팩 13루트의 패키지 2,585개·전용 외부 의존 43개·방향 파생 Niagara 7개·카탈로그 풀 1개·테스트 투사체 1개로 총 2,813개·2,430,314,679바이트(약 2.26GiB)를 삭제했다. 참조 감사를 통해 UI 커서·JumpPad·횃불·환경·무기·몬스터의 공유 원본과 두 기본 공격을 보호했다.
+2026-10-03 사용자 요청으로 비무장 `BPDA_DefaulatAttack`·타격 `BPDA_Strike`과 몬스터 전용 공격 12개·기존 공격 애니메이션을 유지했다. [RetiredSkillContent.json](../Source/ProjectAEditor/Scripts/RetiredSkillContent.json)의 생성 스킬 176개·VFX 팩 13루트의 패키지 2,585개·전용 외부 의존 43개·방향 파생 Niagara 7개·카탈로그 풀 1개·테스트 투사체 1개로 총 2,813개·2,430,314,679바이트(약 2.26GiB)를 삭제했다. 참조 감사를 통해 UI 커서·JumpPad·횃불·환경·무기·몬스터의 공유 원본과 두 기본 공격을 보호했다.
 
 패키지는 Unreal 기능으로 삭제하고 잔존 파일이 없는지 검사한 뒤 VFX 13루트·Free_Magic External Actors/Objects 2루트·프로젝트 방향 파생 RPGEffects/Free_Magic 2루트의 빈 하위 폴더만 제거한다. 다른 Content 폴더는 정리 대상에 포함하지 않는다. [작성·감사 명령](../Source/ProjectAEditor/Scripts/README.md)
 
@@ -501,7 +501,7 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 - 몽타주 대기 시간은 서버가 받은 `DeltaSeconds`를 프레임당 한 번 누적하며 고정 간격 시뮬레이션의 미처리 시간과 분리한다. 프레임 지연 뒤 누적 시뮬레이션을 처리할 때 시전 대기까지 중복 차감하여 조기에 복귀하지 않도록 한다.
 - 이전 GAS 효과·모든 타일 범위·상태효과를 새 행동으로 완전 변환한 것은 아니다. 회복 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 명시 프로필과 재고만 지원한다. 새 일반 Run의 아군은 비무장 공격과 장착 무기의 확정 스킬을 사용하며, 타격·신규 VFX 60종의 스킬상점 습득은 무기 스킬 획득 버전 0의 기존 경로에만 남는다. 기존 Blueprint·Snapshot·저장에서는 삭제 VFX 스킬만 제외하고 두 기본 공격·몬스터 전용 공격을 유지한다. 기존 `BP_EnemyUnit`의 타격과 신규 몬스터의 기존 전용 공격을 유지한다. [몬스터 구성](#4-5-몬스터-콘텐츠) · [지원 변환](GAME_STATUS.md#6-라운드-전투)
 - `RoundMontageOverrides`는 공통 DA를 변경하지 않고 유닛의 Skeleton에 맞는 몽타주로 바꾼다. 전사의 검·비무장과 적의 검, 구형 SkeletonGuard Snapshot의 활·참격·마법 표현에 적용하며 Root Motion·서버 발동 권위·몽타주 종료 후 복귀 규칙을 유지한다. 검은 `hand_r`에 하나만 부착한다.
-- 일반 근접 `DA_MeleeAttack`과 VFX 참격 4개는 Greystone `Attack_A_Med`·`Attack_A_Slow_Recovery`를 준비·베기·복귀 3구간으로 사용한다. 일반 근접은 준비 7/30초·총 1.6초이며 기존 게임 발동 0.23초와 시각적 준비 끝의 차이는 3.33ms다. 참격은 준비 0.3초·총 1.6667초다. 전방/빔/체인 마법 27개는 Gideon의 한 손 시전 1.3초, 광역/회복/보호막 27개는 Muriel의 양손 시전 1.6333초를 사용한다. 마법 준비 0.3초·DefaultSlot·비반복·블렌드 0.06/0.12초이며 추가 효과 지연은 기존 값을 유지한다. 스킬 명세의 `cast_montage`로 분류하고 런타임의 직업·이름·Kind 분기로 대체하지 않는다. 구형 `BPDA_swoard_attack`의 Kwang 몽타주·서버 칼날 추적과 수치·태그·CSV는 보존한다.
+- 일반 근접 `DA_MeleeAttack`과 VFX 참격 4개는 Greystone `Attack_A_Med`·`Attack_A_Slow_Recovery`를 준비·베기·복귀 3구간으로 사용한다. 일반 근접은 준비 7/30초·총 1.6초이며 기존 게임 발동 0.23초와 시각적 준비 끝의 차이는 3.33ms다. 참격은 준비 0.3초·총 1.6667초다. 전방/빔/체인 마법 27개는 Gideon의 한 손 시전 1.3초, 광역/회복/보호막 27개는 Muriel의 양손 시전 1.6333초를 사용한다. 마법 준비 0.3초·DefaultSlot·비반복·블렌드 0.06/0.12초이며 추가 효과 지연은 기존 값을 유지한다. 스킬 명세의 `cast_montage`로 분류하고 런타임의 직업·이름·Kind 분기로 대체하지 않는다. 구형 `BPDA_Strike`의 Kwang 몽타주·서버 칼날 추적과 수치·태그·CSV는 보존한다.
 - 마법의 지팡이 쥐기는 프로젝트 임포트 시퀀스 2개의 오른손 손가락 19개 회전만 선택 임포트한 Greystone `Attack_A_Med` 첫 자세로 고정한다. 손목·팔·다른 트랙·위치·배율·타이밍은 보존하며 원본 FBX·Skeleton·AnimBP는 수정하지 않는다. 보정은 작성 명세의 `grip_reference`와 저장된 metadata로 재현·검증한다. `StartingStaff` 장비 프로필은 해당 닫힌 손의 엄지/소지 축과 원본 메시 축 중심으로 부착 위치·회전을 맞춘다. 기존 저장은 다음 전투 생성·checkpoint 복원 시 현재 프로필로 외형을 재구성하며 이미 떠 있는 Actor·메뉴 기본 외형·Snapshot BP 기본 장비까지 자동 갱신하지 않는다.
 - 정밀 화살·화염 화살비는 원본 `SparrowManny/Attack/Primary_Fire_Slow.FBX`에서 임포트한 시퀀스를 사용한다. 원본 0.50~1.00초를 5/3배속으로 0.30초에 재생한 뒤 0.00~0.40초를 원속도로 이어 총 0.70초이며 DefaultSlot·비반복·블렌드 0.06/0.12초를 사용한다. 공통 남녀 몸체는 Manny 호환을 활용하고 구형 Snapshot에는 기존 Rig로 만든 같은 길이의 리타깃을 재매핑한다. 두 DA는 `CastMontage`만 바꾸며 화염 화살비의 발동 후 0.4초 판정 지연·태그·CSV·서버 발사 시점은 유지한다. 선딜을 변경할 때는 [활 작성 명세](../Source/ProjectAEditor/Scripts/BowAnimationSpecs.json)의 준비 시간도 검토해야 하며 런타임 자동 속도 보정은 없다. 석궁 작성 도구는 활 몽타주를 제거한 투사체 프로필을 사용한다.
 - 검만 `bUseWeaponTrace=true`를 사용한다. 서버가 최종 몽타주의 에셋 포즈·메시·무기 부착·소켓을 `GetAnimationPose`로 계산하고 0.23~0.43초를 0.005초 간격·반경 4cm로 검사한다. 렌더 메시 갱신·인스턴스 종료와 독립적으로 누적 구간을 처리하며 행동 취소·사망·대상 상실은 서버 단계에서 처리한다. 최초 적 한 명에게 기존 GAS `Data.Damage`로 1회 피해를 적용한다. `SM_Sword`의 `BladeBase=(0,0,-22)`·`BladeTip=(0,0.191992,-118.28656)`, Pitch/Yaw 0도·Roll 180도, 전사 부착 `(-11.095651,5.605028,-10)`·적 `(-8.5,5,-10)`을 사용한다. 단위는 cm이며 손잡이 위치와 궤적을 함께 관리한다.
@@ -643,6 +643,8 @@ PvE 승리마다 아군 최대 HP +5·속도 +1을 적용하고 살아 있는 �
 | LegacyOffline v6 | Identity 없는 오프라인 Combat의 schema 3 Ready 경계. 기존 파티 슬롯으로 Standalone에서 복구하며 Host·소유권·식별자를 새로 만들지 않음. 비전투 저장은 기존 v1 |
 | 상대 Snapshot v1 | 기존 별도 USaveGame·카탈로그 유지. 전술·장비 필드는 현재 전투에서 빈 값만 지원하며 소모품 AI는 미구현 |
 
+`BPDA_swoard_attack`·`DA_DoubleAttack` 계열은 2026-10-31 `BPDA_Strike`·`DA_DoubleStrike` 계열로 이름을 바꿨다. 저장된 경로는 `DefaultEngine.ini`의 CoreRedirects, 저장된 라운드 명령 ID는 `DefaultGame.ini`의 `PrimaryAssetIdRedirects`로 새 이름에 연결한다.
+
 이전 순차 CombatCheckpoint schema 1/2는 구조만 인식하고 로드·재개를 거절한다. 새 schema 3은 Actor 참조 대신 안정 ID·클래스/스킬 참조·값 데이터로 복구하며 원래 소유권을 유지한다. 기존 파일을 임의로 낮추거나 삭제하지 않는다.
 
 `FRunPartyMember::bPlayerControlled`는 기존 저장 버전을 바꾸지 않고 추가한 선택 필드다. 일반 `LocalDevelopment` Run 중 원래 참가자가 한 명인 경우에만 사용한다. 명시 선택 한 명은 그대로 복원하며, 필드가 없거나 모두 false인 이전 데이터는 생성된 멤버 중 가장 낮은 `SlotIndex`를 메모리에서 선택하고 다음 정상 저장에 남긴다. HP 0인 멤버도 이 선택 순서에 포함하며 생존자로 승계하지 않는다. 복수 선택·미생성 슬롯 선택은 거절한다.
@@ -684,7 +686,7 @@ GKnight·Assassin·Stylized Dark Witch의 원본·임포트 자료와 제작용 
 | `Blueprint/DataAsset/Parties/DA_VerticalSliceParty` | `UPartyDefinitionDataAsset`, 전사는 `BP_WarriorUnit`, 나머지 직업과 fallback은 `BP_PlayerUnit` |
 | `Blueprint/DataAsset/Encounters/DA_DefaultEncounter` | `UEncounterDefinitionDataAsset`, 기본 편성 `Orc`·`Troll`·`Wolf`·`Golem` 4개와 소프트 디버그 카탈로그 13개. 저장·독립 재로드 정적 검사 통과 |
 | `Blueprint/DataAsset/Skills/BPDA_DefaulatAttack` | `USkillDefinitionDataAsset`, 기존 경로·ID·공격값 유지, 표시명만 `비무장 공격` |
-| `Blueprint/DataAsset/Skills/BPDA_swoard_attack` | `USkillDefinitionDataAsset`, 타격·논리 ID `SwordAttack`·칼날 궤적·장착 무기 평균 피해(장비 없는 기존 프로필 50)·AP 1·활성 0.23~0.43초 |
+| `Blueprint/DataAsset/Skills/BPDA_Strike` | `USkillDefinitionDataAsset`, 타격·논리 ID `SwordAttack`·칼날 궤적·장착 무기 평균 피해(장비 없는 기존 프로필 50)·AP 1·활성 0.23~0.43초 |
 | `Blueprint/Unit/BP_WarriorUnit`, `BP_PlayerUnit`, `BP_MageUnit`, `BP_RogueUnit` | 네 직업 공통 Primitive 남자·여자 몸체 선택. 공통 애니메이션·몽타주 대체·검과 저장 경로 유지. 마법사 기본 스태프 없음 |
 | `Blueprint/Unit/BP_*SnapshotOpponent` | 네 직업 모두 저장된 `BodyId`의 몸체를 사용. 이전 전사·궁수의 공통 Skeleton_Guard 체크포인트는 명시적 호환 맵으로 보존 |
 | `ROG_Modular_Armor/DA_MannyAppearance` | 기존 카탈로그 경로 유지. `BodyVariants`에 Primitive 몸체 원본 참조. ROG 8부위·103개 항목과 Manny 신체 파츠의 원본 재질 연결은 보존하되 의상 UI·착용은 중지 |

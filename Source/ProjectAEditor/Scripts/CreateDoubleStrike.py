@@ -10,18 +10,18 @@ ASSETS = unreal.EditorAssetLibrary
 BASE = "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_MeleeAttack"
 SOURCE_MONTAGE = "/Game/User_JeHoon/Assets/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_MeleeAttack"
 FOLDER = SOURCE_MONTAGE.rsplit("/", 1)[0]
-MONTAGE = FOLDER + "/AM_DoubleAttack"
-SKILL = "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_DoubleAttack"
-RIGHT = FOLDER + "/AS_DoubleAttack_Right"
-LEFT = FOLDER + "/AS_DoubleAttack_Left"
+MONTAGE = FOLDER + "/AM_DoubleStrike"
+SKILL = "/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_DoubleStrike"
+RIGHT = FOLDER + "/AS_DoubleStrike_Right"
+LEFT = FOLDER + "/AS_DoubleStrike_Left"
 OWNER_KEY = "ProjectA.DoubleAttack"
 OWNER = "DoubleAttack.MirroredMelee.v2"
 STRIKE_INTERVAL = 0.4
 FIRST_MOTION_SECONDS = 0.5
 PLAYBACK_RATE = FIRST_MOTION_SECONDS / STRIKE_INTERVAL
 TRANSITION_SECONDS = 4.0 / 30.0
-VERIFY = "-DoubleAttackVerifyOnly" in unreal.SystemLibrary.get_command_line()
-OVERWRITE = "-DoubleAttackOverwrite" in unreal.SystemLibrary.get_command_line()
+VERIFY = "-DoubleStrikeVerifyOnly" in unreal.SystemLibrary.get_command_line()
+OVERWRITE = "-DoubleStrikeOverwrite" in unreal.SystemLibrary.get_command_line()
 
 
 def require(value, message):
@@ -148,9 +148,9 @@ def main():
     windup = source_windup / PLAYBACK_RATE
     require(source_windup < duration - TRANSITION_SECONDS, "Transition would overwrite the first strike motion")
     if not VERIFY and (create or OVERWRITE):
-        require(unreal.EquipmentSkillAssetLibrary.configure_double_attack(skill, base, montage, windup, STRIKE_INTERVAL), "Skill authoring failed")
+        require(unreal.EquipmentSkillAssetLibrary.configure_double_strike(skill, base, montage, windup, STRIKE_INTERVAL), "Skill authoring failed")
         save(skill)
-    result = unreal.EquipmentSkillAssetLibrary.validate_double_attack(skill, base)
+    result = unreal.EquipmentSkillAssetLibrary.validate_double_strike(skill, base)
     contract = result if isinstance(result, str) else result[1] if isinstance(result, tuple) and result[0] else None
     require(contract and contract.startswith("Dual daggers required;"), "Double attack static contract failed: " + str(result))
     profile = resolved(skill)
@@ -163,10 +163,10 @@ def main():
               "transition_seconds": TRANSITION_SECONDS / PLAYBACK_RATE, "playback_rate": PLAYBACK_RATE, "montage_seconds": montage.get_play_length() / PLAYBACK_RATE,
               "static_contract": contract, "source_hashes": before,
               "runtime_review": "User review pending; no gameplay or automation tests executed."}
-    output = ROOT / "Saved/DoubleAttack" / ("Verify.json" if VERIFY else "Author.json")
+    output = ROOT / "Saved/DoubleStrike" / ("Verify.json" if VERIFY else "Author.json")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    unreal.log("[DoubleAttack] Mirrored MeleeAttack then original MeleeAttack; " + contract)
+    unreal.log("[DoubleStrike] Mirrored MeleeAttack then original MeleeAttack; " + contract)
 
 
 if __name__ == "__main__":

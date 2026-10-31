@@ -210,7 +210,7 @@ bool FCombatRoundSkillMigrationTest::RunTest(const FString& Parameters)
 
     // Inspect saved ability defaults while changing only transient skill definitions.
     // 저장된 어빌리티 기본값을 읽으며 임시 스킬 정의만 변경합니다.
-    const TPair<const TCHAR*, const TCHAR*> AuthoredMontages[] = {{TEXT("BPDA_DefaulatAttack"), TEXT("MM_Attack_01_Montage")}, {TEXT("BPDA_swoard_attack"), TEXT("MM_Attack_01_Montage")}};
+    const TPair<const TCHAR*, const TCHAR*> AuthoredMontages[] = {{TEXT("BPDA_DefaulatAttack"), TEXT("MM_Attack_01_Montage")}, {TEXT("BPDA_Strike"), TEXT("MM_Attack_01_Montage")}};
     for (const TPair<const TCHAR*, const TCHAR*>& Authored : AuthoredMontages)
     {
         const FString AssetPath = FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/%s.%s"), Authored.Key, Authored.Key);
@@ -333,7 +333,7 @@ bool FCombatRoundRetargetPolicyTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("An invalid serialized target-loss enum is rejected before normalization"), Skill->ResolveRoundSkill(Resolved, Error));
     TestFalse(TEXT("Invalid target-loss data reports the asset error"), Error.IsEmpty());
 
-    for (const TCHAR* AssetName : {TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_swoard_attack")})
+    for (const TCHAR* AssetName : {TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_Strike")})
     {
         const FString AssetPath = FString::Printf(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/%s.%s"), AssetName, AssetName);
         const USkillDefinitionDataAsset* Authored = LoadObject<USkillDefinitionDataAsset>(nullptr, *AssetPath);
@@ -444,7 +444,7 @@ bool FRunStartingSkillLoadoutTest::RunTest(const FString& Parameters)
 {
     UPartyDefinitionDataAsset* Catalog = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
     USkillDefinitionDataAsset* Unarmed = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_DefaulatAttack.BPDA_DefaulatAttack"));
-    USkillDefinitionDataAsset* Purchased = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"));
+    USkillDefinitionDataAsset* Purchased = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Strike.BPDA_Strike"));
     if (!TestTrue(TEXT("Authored catalog, unarmed skill and purchasable skill exist"), Catalog && Unarmed && Purchased)) return false;
     FText Error;
     for (FName ClassId : UProfessionBase::GetPlayableIds())
@@ -480,7 +480,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShopSwordPresentationTest, "ProjectA.Party.Sho
 bool FShopSwordPresentationTest::RunTest(const FString& Parameters)
 {
     UPartyDefinitionDataAsset* Catalog = LoadObject<UPartyDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Parties/DA_VerticalSliceParty.DA_VerticalSliceParty"));
-    USkillDefinitionDataAsset* Sword = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"));
+    USkillDefinitionDataAsset* Sword = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Strike.BPDA_Strike"));
     FCombatRoundSkill SwordDefinition;
     FText Error;
     if (!TestTrue(TEXT("The purchasable sword skill resolves"), Catalog && Sword && Sword->ResolveRoundSkill(SwordDefinition, Error))) return false;

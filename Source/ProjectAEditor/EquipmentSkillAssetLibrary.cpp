@@ -242,7 +242,7 @@ bool UEquipmentSkillAssetLibrary::ValidateMeleeMontageMotion(UAnimSequence* Sequ
     return true;
 }
 
-bool UEquipmentSkillAssetLibrary::ConfigureDoubleAttack(USkillDefinitionDataAsset* Skill, USkillDefinitionDataAsset* BasicAttack, UAnimMontage* Montage, float Windup, float StrikeInterval)
+bool UEquipmentSkillAssetLibrary::ConfigureDoubleStrike(USkillDefinitionDataAsset* Skill, USkillDefinitionDataAsset* BasicAttack, UAnimMontage* Montage, float Windup, float StrikeInterval)
 {
     if (!IsValid(Skill)
         || !IsValid(BasicAttack)
@@ -284,7 +284,7 @@ bool UEquipmentSkillAssetLibrary::ConfigureDoubleAttack(USkillDefinitionDataAsse
     Skill->AbilityClass = BasicAttack->AbilityClass;
     Skill->ActionPointCost = Profile.ActionPointCost;
     Skill->SkillIcon = BasicAttack->SkillIcon;
-    Skill->SkillId = TEXT("DoubleAttack");
+    Skill->SkillId = TEXT("DoubleStrike");
     Skill->SkillName = FText::FromString(TEXT("이중타격"));
     Skill->SkillDescription = FText::FromString(TEXT("단검의 기본 스킬입니다. 쌍수 단검 장착 시 사용할 수 있으며 왼손, 오른손 순서로 각각의 무기 피해량으로 한 번씩 공격합니다. AP 비용은 타격과 같습니다."));
     Skill->PostEditChange();
@@ -292,9 +292,9 @@ bool UEquipmentSkillAssetLibrary::ConfigureDoubleAttack(USkillDefinitionDataAsse
     return true;
 }
 
-bool UEquipmentSkillAssetLibrary::ValidateDoubleAttack(USkillDefinitionDataAsset* Skill, USkillDefinitionDataAsset* BasicAttack, FString& OutReport)
+bool UEquipmentSkillAssetLibrary::ValidateDoubleStrike(USkillDefinitionDataAsset* Skill, USkillDefinitionDataAsset* BasicAttack, FString& OutReport)
 {
-    OutReport = TEXT("Double attack asset contract failed / 더블어택 에셋 계약 불일치");
+    OutReport = TEXT("Double attack asset contract failed / 더블스트라이크 에셋 계약 불일치");
     FCombatRoundSkill Profile;
     FCombatRoundSkill Base;
     FText Error;

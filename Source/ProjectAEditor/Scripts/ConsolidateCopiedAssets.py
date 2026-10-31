@@ -162,7 +162,7 @@ def verify(report):
             asset = None
             if (index + 1) % 50 == 0:
                 unreal.SystemLibrary.collect_garbage()
-    sword = load(ROOT + "/Blueprint/DataAsset/Skills/BPDA_swoard_attack")
+    sword = load(ROOT + "/Blueprint/DataAsset/Skills/BPDA_Strike")
     for old, target in [("Characters/Warrior/SK_Warrior", PAIRS[1][1]), ("Characters/Warrior/SKEL_Warrior", PAIRS[1][2]), ("Characters/SwordEnemy/SK_SwordEnemy", PAIRS[2][1]), ("Characters/SwordEnemy/SKEL_SwordEnemy", PAIRS[2][2])]:
         reference = ROOT + "/" + old + "." + old.rsplit("/", 1)[1]
         require(unreal.WarriorAssetLibrary.load_saved_asset_reference(unreal.SoftObjectPath(reference)) == load(target), "Legacy saved reference does not resolve: " + old)

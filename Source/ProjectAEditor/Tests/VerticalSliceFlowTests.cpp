@@ -1575,7 +1575,7 @@ bool FVerticalSliceSavedSkillLoadoutTest::RunTest(const FString& Parameters)
         AddError(TEXT("The requested skill-loadout test slot already exists; choose a fresh suffix. No PIE game was started."));
         return false;
     }
-    const TArray<FString> AssetNames = {TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_swoard_attack")};
+    const TArray<FString> AssetNames = {TEXT("BPDA_DefaulatAttack"), TEXT("BPDA_Strike")};
     TArray<FCombatRoundSkill> Skills;
     for (const FString& Name : AssetNames)
     {

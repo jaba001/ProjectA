@@ -40,7 +40,7 @@ URunEncounterPoolDataAsset::URunEncounterPoolDataAsset()
         Offer.EncounterTag = Index == 2 ? FRunEncounterOffer::GetItemShopTag() : FRunEncounterOffer::GetSkillShopTag();
         Offer.DisplayName = Offer.GetDisplayName();
     }
-    for (const TCHAR* AssetName : {TEXT("BPDA_swoard_attack")})
+    for (const TCHAR* AssetName : {TEXT("BPDA_Strike")})
     {
         FRunSkillShopOffer& Offer = FixedSkillOffers.AddDefaulted_GetRef();
         Offer.OfferId = FName(AssetName);

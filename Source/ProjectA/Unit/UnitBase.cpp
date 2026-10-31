@@ -54,7 +54,7 @@ AUnitBase::AUnitBase(const FObjectInitializer& ObjectInitializer)
     bReplicates = true;
     bAlwaysRelevant = true;
     SetReplicateMovement(true);
-    WeaponPresentationSkills.Add(TSoftObjectPtr<USkillDefinitionDataAsset>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"))));
+    WeaponPresentationSkills.Add(TSoftObjectPtr<USkillDefinitionDataAsset>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Strike.BPDA_Strike"))));
 }
 
 UAbilitySystemComponent* AUnitBase::GetAbilitySystemComponent() const

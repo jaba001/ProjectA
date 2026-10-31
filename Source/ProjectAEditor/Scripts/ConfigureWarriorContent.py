@@ -201,7 +201,7 @@ def configure():
     enemy_recovery = load(mirrored_path(SWORD_RECOVERY_SOURCE, SWORD_SUFFIX + "_Sword"))
     require(HELPER.configure_sword_montage(enemy_sword, enemy_attack, enemy_recovery, SWORD_RECOVERY_START_SECONDS), "Could not configure enemy Kwang attack and recovery")
     save(enemy_sword)
-    sword = duplicate(basic.get_path_name(), SKILLS + "/BPDA_swoard_attack")
+    sword = duplicate(basic.get_path_name(), SKILLS + "/BPDA_Strike")
     sword.set_editor_property("skill_id", "SwordAttack")
     sword.set_editor_property("skill_name", "타격")
     profile = unreal.CombatRoundSkill()
@@ -266,7 +266,7 @@ def configure():
 
 
 def verify():
-    sword = load(SKILLS + "/BPDA_swoard_attack")
+    sword = load(SKILLS + "/BPDA_Strike")
     basic = load(SKILLS + "/BPDA_DefaulatAttack")
     require(str(basic.get_editor_property("skill_name")) == "비무장 공격", "Unarmed display name mismatch")
     require(str(sword.get_editor_property("skill_name")) == "타격", "Melee display name mismatch")

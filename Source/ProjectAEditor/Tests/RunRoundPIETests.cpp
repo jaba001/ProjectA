@@ -668,7 +668,7 @@ private:
         // 이 네트워크 전투 픽스처는 명시적으로 저장한 구매부터 시작하며 상점 거래는 별도로 검사합니다.
         TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));
         if (!Check(Saved.IsValid(), TEXT("New Run has a durable save for the acquired-skill fixture."))) return false;
-        USkillDefinitionDataAsset* Sword = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack.BPDA_swoard_attack"));
+        USkillDefinitionDataAsset* Sword = LoadObject<USkillDefinitionDataAsset>(nullptr, TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Strike.BPDA_Strike"));
         FCombatRoundSkill SwordDefinition;
         if (!Check(Sword && Sword->ResolveRoundSkill(SwordDefinition, Error) && SwordDefinition.Power > 0.0f && SwordDefinition.bUseWeaponTrace, TEXT("The retained sword skill has a valid original blade collision profile."))) return false;
         SwordSkillId = SwordDefinition.SkillId;

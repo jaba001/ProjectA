@@ -25,8 +25,8 @@ public:
     static bool ValidateMeleeMontageMotion(UAnimSequence* Sequence, UAnimMontage* Source, bool bMirror, float EndTime = 0.f, UAnimSequence* TransitionTarget = nullptr, float TransitionSeconds = 0.f);
 
     UFUNCTION(BlueprintCallable, Category = "ProjectA|Asset Authoring")
-    static bool ConfigureDoubleAttack(USkillDefinitionDataAsset* Skill, USkillDefinitionDataAsset* BasicAttack, UAnimMontage* Montage, float Windup, float StrikeInterval);
+    static bool ConfigureDoubleStrike(USkillDefinitionDataAsset* Skill, USkillDefinitionDataAsset* BasicAttack, UAnimMontage* Montage, float Windup, float StrikeInterval);
 
     UFUNCTION(BlueprintPure, Category = "ProjectA|Asset Authoring")
-    static bool ValidateDoubleAttack(USkillDefinitionDataAsset* Skill, USkillDefinitionDataAsset* BasicAttack, FString& OutReport);
+    static bool ValidateDoubleStrike(USkillDefinitionDataAsset* Skill, USkillDefinitionDataAsset* BasicAttack, FString& OutReport);
 };

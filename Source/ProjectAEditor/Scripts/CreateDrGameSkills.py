@@ -387,7 +387,7 @@ def main():
         skills.append(skill)
     # Keep the shared starting attack and monster attacks unchanged; expose new skills through the existing shop pool.
     # 공통 시작 공격과 몬스터 공격을 보존하며 기존 상점 풀 기능으로 새 스킬을 제공합니다.
-    melee = load("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack")
+    melee = load("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Strike")
     pool, is_new = obtain(SPEC["pool"], unreal.SkillPoolDataAsset)
     entries = []
     for skill in [melee] + skills:

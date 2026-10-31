@@ -64,7 +64,7 @@ def verify():
     require(all(path.startswith("/Game/ROG_Modular_Armor/") for path in meshes), "Cosmetic mesh was copied outside its source pack")
     source_defaults = unreal.get_default_object(load(ROOT + "/Blueprint/Unit/BP_PlayerUnit").generated_class())
     source_mesh = source_defaults.get_editor_property("mesh")
-    sword = load(ROOT + "/Blueprint/DataAsset/Skills/BPDA_swoard_attack")
+    sword = load(ROOT + "/Blueprint/DataAsset/Skills/BPDA_Strike")
     party = load(ROOT + "/Blueprint/DataAsset/Parties/DA_VerticalSliceParty")
     snapshots = load(ROOT + "/Blueprint/DataAsset/Snapshots/DA_OpponentSnapshotCatalog")
     unreal.EditorLoadingAndSavingUtils.load_map(ROOT + "/LEVEL/Core/MainMenu")
