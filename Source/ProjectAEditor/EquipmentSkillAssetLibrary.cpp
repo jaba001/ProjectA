@@ -286,7 +286,7 @@ bool UEquipmentSkillAssetLibrary::ConfigureDoubleAttack(USkillDefinitionDataAsse
     Skill->SkillIcon = BasicAttack->SkillIcon;
     Skill->SkillId = TEXT("DoubleAttack");
     Skill->SkillName = FText::FromString(TEXT("이중타격"));
-    Skill->SkillDescription = FText::FromString(TEXT("단검의 기본 스킬입니다. 쌍수 단검 장착 시 사용할 수 있으며 왼손, 오른손 순서로 각각의 무기 피해량으로 한 번씩 공격합니다. AP 비용은 기본 근접 공격과 같습니다."));
+    Skill->SkillDescription = FText::FromString(TEXT("단검의 기본 스킬입니다. 쌍수 단검 장착 시 사용할 수 있으며 왼손, 오른손 순서로 각각의 무기 피해량으로 한 번씩 공격합니다. AP 비용은 타격과 같습니다."));
     Skill->PostEditChange();
     Skill->MarkPackageDirty();
     return true;

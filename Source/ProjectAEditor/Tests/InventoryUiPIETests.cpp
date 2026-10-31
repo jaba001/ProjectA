@@ -623,7 +623,7 @@ private:
         }
         if (!Check(PartitionTotal == Catalog.Num() + 2, TEXT("Weapon shield ammo and other tab rows partition every bag copy exactly once."))) return false;
         CastChecked<UButton>(Tabs->GetChildAt(5))->OnClicked.Broadcast();
-        if (!Check(Skills->GetChildrenCount() == FindMember(Run)->Skills.Num() && Text(Skills).Contains(TEXT("근접 공격")), TEXT("The actual skill tab matches the saved loadout and displays the preserved melee skill name."))) return false;
+        if (!Check(Skills->GetChildrenCount() == FindMember(Run)->Skills.Num() && Text(Skills).Contains(TEXT("타격")), TEXT("The actual skill tab matches the saved loadout and displays the preserved melee skill name."))) return false;
         CastChecked<UButton>(Tabs->GetChildAt(0))->OnClicked.Broadcast();
         UEquipmentItemSlotWidget* Duplicate = Cast<UEquipmentItemSlotWidget>(Rows->GetChildAt(DuplicateIndex));
         if (!Check(Duplicate != nullptr, TEXT("The appended duplicate remains a separate selectable row."))) return false;

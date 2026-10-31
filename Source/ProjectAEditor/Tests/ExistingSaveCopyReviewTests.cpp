@@ -167,13 +167,13 @@ bool FExistingSaveCopyReviewTest::RunTest(const FString& Parameters)
     TArray<uint8> MeleeAfter;
     if (!TestTrue(TEXT("The retained original melee DataAsset file exists."), FFileHelper::LoadFileToArray(MeleeBefore, *MeleeFile))) return Finish(false);
     TStrongObjectPtr<USkillDefinitionDataAsset> Melee(Cast<USkillDefinitionDataAsset>(MeleePath.TryLoad()));
-    if (!TestTrue(TEXT("The retained melee DataAsset loads with its current display label."), Melee.IsValid() && Melee->SkillName.ToString() == TEXT("근접 공격"))) return Finish(false);
+    if (!TestTrue(TEXT("The retained melee DataAsset loads with its current display label."), Melee.IsValid() && Melee->SkillName.ToString() == TEXT("타격"))) return Finish(false);
     // Resolve an output copy of the authored skill profile without migrating or applying the saved Run.
     // 저장된 Run을 이행하거나 적용하지 않고 작성 스킬 프로필의 출력 사본만 해석합니다.
     FCombatRoundSkill RuntimeMelee;
     FText RuntimeMeleeError;
     const bool bRuntimeResolved = Melee->ResolveRoundSkill(RuntimeMelee, RuntimeMeleeError);
-    if (!TestTrue(TEXT("The official read-only skill resolver uses the current melee display label: ") + RuntimeMeleeError.ToString(), bRuntimeResolved && RuntimeMelee.Name.ToString() == TEXT("근접 공격"))) return Finish(false);
+    if (!TestTrue(TEXT("The official read-only skill resolver uses the current melee display label: ") + RuntimeMeleeError.ToString(), bRuntimeResolved && RuntimeMelee.Name.ToString() == TEXT("타격"))) return Finish(false);
     TSharedPtr<FJsonObject> MeleeJson = MakeShared<FJsonObject>();
     MeleeJson->SetStringField(TEXT("asset"), MeleePath.ToString());
     MeleeJson->SetStringField(TEXT("skill_name"), Melee->SkillName.ToString());
