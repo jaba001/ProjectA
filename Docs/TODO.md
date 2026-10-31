@@ -193,3 +193,9 @@ Steam·PlayFab 계정, 서비스 ID, 무료 사용 조건이 준비된 뒤 진�
 ## 33 아이템 기획
 
 방어구·액세서리 도입, 아이템 제안(24·29·31·32)과 새 아이템 목록 초안([ITEM_DESIGN_DRAFT](../DataCatalogs/ITEM_DESIGN_DRAFT.csv))은 [ITEM_DESIGN](ITEM_DESIGN.md)에서 관리한다.
+
+## 34 현지화
+
+[현지화 보류](../AGENTS.md#현지화-보류)에 따라 사용자가 요청할 때 진행한다.
+
+- [ ] 보류 기간에 추가·변경된 문구를 모아 `Config/Localization`과 번역 리소스를 갱신하고 `BuildLocalization.py --check`를 통과시킨다.
