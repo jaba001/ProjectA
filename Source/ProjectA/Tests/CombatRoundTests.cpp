@@ -9,6 +9,8 @@
 #include "Combat/Round/CombatRoundCoordinator.h"
 #include "Combat/Round/CombatChainEffectActor.h"
 #include "Combat/Round/CombatPlanValidator.h"
+#include "Combat/Round/CombatAIPlanning.h"
+#include "GAS/CombatGameplayTags.h"
 #include "Combat/Checkpoint/CombatCheckpointLibrary.h"
 #include "GameplayEffect.h"
 #include "Combat/Round/CombatRoundProjectile.h"
@@ -199,7 +201,10 @@ namespace CombatRoundTests
             return Unit->ConfigureProfession(100.0f, 2, 2, Skills);
         }
 
-        bool Initialize(int32 HumanCount = 1, float EnemySpeed = 10.0f, const FCombatRoundSkill* EnemySkill = nullptr, FIntPoint EnemyCoord = FIntPoint(0, 3), int32 EnemyCount = 1, const FCombatRoundSkill* FirstHumanSkill = nullptr, float FirstHumanSpeed = 20.0f, bool bUseFixtureSkills = true, bool bEnemyWithoutSkills = false, int32 FirstHumanMoveRange = 1, const TArray<FRunConsumableStack>* FirstConsumables = nullptr)
+        bool Initialize(int32 HumanCount = 1, float EnemySpeed = 10.0f, const FCombatRoundSkill* EnemySkill = nullptr,
+            FIntPoint EnemyCoord = FIntPoint(0, 3), int32 EnemyCount = 1, const FCombatRoundSkill* FirstHumanSkill = nullptr,
+            float FirstHumanSpeed = 20.0f, bool bUseFixtureSkills = true, bool bEnemyWithoutSkills = false, int32 FirstHumanMoveRange = 1,
+            const TArray<FRunConsumableStack>* FirstConsumables = nullptr, const TArray<FIntPoint>& HumanPositions = {}, const TArray<FIntPoint>& EnemyPositions = {})
         {
             if (!World.IsValid() || !Combat || !Arena || !Grid || Grid->TileMap.Num() != 16 || EnemyCount < 1 || EnemyCount > 4) return false;
             FRunIdentityData Identity;
@@ -211,7 +216,7 @@ namespace CombatRoundTests
             TArray<AUnitBase*> Units;
             for (int32 Index = 0; Index < HumanCount; ++Index)
             {
-                AUnitBase* Unit = AddUnit(FIntPoint(Index * 2, 0), ETeam::Player);
+                AUnitBase* Unit = AddUnit(HumanPositions.IsValidIndex(Index) ? HumanPositions[Index] : FIntPoint(Index * 2, 0), ETeam::Player);
                 APartyPlayerController* Controller = World->SpawnActor<APartyPlayerController>();
                 if (!Unit || !Controller) return false;
                 if (Index == 0 && FirstConsumables) Unit->Consumables = *FirstConsumables;
@@ -243,7 +248,7 @@ namespace CombatRoundTests
             Identity.HostAccountId = Identity.OriginalParticipants[0].AccountId;
             for (int32 Index = 0; Index < EnemyCount; ++Index)
             {
-                AUnitBase* Enemy = AddUnit(EnemyCoord + FIntPoint(Index, 0), ETeam::Enemy);
+                AUnitBase* Enemy = AddUnit(EnemyPositions.IsValidIndex(Index) ? EnemyPositions[Index] : EnemyCoord + FIntPoint(Index, 0), ETeam::Enemy);
                 if (!Enemy || (!bEnemyWithoutSkills && !GiveRoundSkill(Enemy, EnemySkill, EnemySkillId))) return false;
                 Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), EnemySpeed);
                 Enemies.Add(Enemy);
@@ -416,11 +421,21 @@ namespace CombatRoundTests
 
         bool AdvanceUntilNextRound(int32 InitialRound)
         {
-            for (int32 Step = 0; Step < 1000 && Round->GetView().RoundNumber == InitialRound && Round->IsRoundSessionActive(); ++Step)
+            float MaximumDelay = 0.f;
+            for (const FCombatRoundUnitView& Unit : Round->GetView().Units) MaximumDelay = FMath::Max(MaximumDelay, Unit.StartDelay);
+            for (int32 Step = 0;
+                Step * 0.01f < MaximumDelay + 30.f && Round->GetView().RoundNumber == InitialRound && Round->IsRoundSessionActive();
+                ++Step)
             {
                 Round->Tick(0.01f);
             }
             return Round->GetView().RoundNumber == InitialRound + 1 && Round->GetView().Phase == ECombatRoundPhase::Planning;
+        }
+
+        void AdvanceSeconds(float Seconds)
+        {
+            const int32 Steps = FMath::RoundToInt(Seconds * 100.f);
+            for (int32 Step = 0; Step < Steps; ++Step) Round->Tick(0.01f);
         }
     };
 
@@ -877,7 +892,7 @@ bool FCombatRoundMoveBarrierTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("One participant arrives while the other is still moving"), bObservedFirstArrival) || !TestFalse(TEXT("Every reserved move finishes in bounded time"), Round->IsPlanningMoveInProgress())) return false;
     TestTrue(TEXT("The AP stage starts only after both new homes are occupied"), Source->GetCurrentTile() == SourceDestination && Friend->GetCurrentTile() == FriendDestination && SourceDestination->GetOccupyingUnit() == Source && FriendDestination->GetOccupyingUnit() == Friend);
     TestEqual(TEXT("Completing movement does not release the wound-up attack immediately"), Enemy->GetAttributeSet()->GetHP(), 100.0f);
-    TestTrue(TEXT("AP speed delays remain based on the planned Speed values"), FMath::IsNearlyEqual(Round->GetView().Units[0].StartDelay, 0.0f) && FMath::IsNearlyEqual(Round->GetView().Units[1].StartDelay, 0.2f) && FMath::IsNearlyEqual(Round->GetView().Units[2].StartDelay, 1.0f));
+    TestTrue(TEXT("AP speed delays remain based on the planned Speed values"), FMath::IsNearlyEqual(Round->GetView().Units[0].StartDelay, 0.0f) && FMath::IsNearlyEqual(Round->GetView().Units[1].StartDelay, 2.f) && FMath::IsNearlyEqual(Round->GetView().Units[2].StartDelay, 10.f));
     Round->Tick(0.05f);
     TestTrue(TEXT("The attack approaches its enemy only after the complete movement stage"), !Source->GetActorLocation().Equals(NewHome, 2.0f));
     if (!TestTrue(TEXT("The staged movement and attack round settles"), Fixture.AdvanceUntilNextRound(1))) return false;
@@ -1072,8 +1087,8 @@ bool FCombatRoundPlanOwnershipTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("All ready transitions to real-time resolution"), Round->GetView().Phase == ECombatRoundPhase::Resolving);
     TestFalse(TEXT("Locked plans reject even current-revision edits"), Fixture.Submit(0, Fixture.Command(Fixture.Humans[0], TEXT("Strike"), Fixture.Enemies[0])));
     TestTrue(TEXT("Highest speed begins at zero"), Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Complete);
-    Round->Tick(0.19f);
-    TestTrue(TEXT("Two speed points preserve a 0.2 second delay"), Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
+    Fixture.AdvanceSeconds(1.99f);
+    TestTrue(TEXT("Two speed points preserve a two-second delay"), Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
     Round->Tick(0.02f);
     TestTrue(TEXT("Slower action begins after its configured delay"), Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Complete);
     TestTrue(TEXT("Resolution does not mutate the locked command"), SameCommand(FirstPlan, Round->GetView().Units[0].Command));
@@ -1095,7 +1110,7 @@ bool FCombatRoundSpeedScheduleTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The planning view exposes human Speed as speed"), Round->GetView().Units[0].Speed, 10.0f);
     TestEqual(TEXT("The planning view exposes enemy Speed as speed"), Round->GetView().Units[1].Speed, 5.0f);
     TestEqual(TEXT("The fastest planned action starts immediately"), Round->GetView().Units[0].StartDelay, 0.0f);
-    TestEqual(TEXT("A five-point Speed difference schedules half a second"), Round->GetView().Units[1].StartDelay, 0.5f);
+    TestEqual(TEXT("A five-point Speed difference schedules five seconds"), Round->GetView().Units[1].StartDelay, 5.f);
 
     // Attribute changes take effect in the next planning snapshot, preserving already scheduled actions.
     // 어트리뷰트 변경은 다음 계획 스냅샷에 반영하여 이미 예약한 행동 시각을 유지합니다.
@@ -1106,22 +1121,20 @@ bool FCombatRoundSpeedScheduleTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("The scheduled fastest wait completes at time zero"), Round->GetView().Units[0].ActionPhase == ECombatRoundActionPhase::Complete);
     TestTrue(TEXT("The slower enemy remains scheduled"), Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
     Enemy->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetSpeedAttribute(), 10.0f);
-    Round->Tick(0.49f);
+    Fixture.AdvanceSeconds(4.99f);
     TestEqual(TEXT("Resolution keeps the original enemy speed snapshot"), Round->GetView().Units[1].Speed, 5.0f);
-    TestEqual(TEXT("Resolution keeps the original half-second start time"), Round->GetView().Units[1].StartDelay, 0.5f);
-    TestTrue(TEXT("The enemy has not started before its half-second deadline"), Round->GetView().RoundNumber == 1 && Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
+    TestEqual(TEXT("Resolution keeps the original five-second start time"), Round->GetView().Units[1].StartDelay, 5.f);
+    TestTrue(TEXT("The enemy has not started before its five-second deadline"), Round->GetView().RoundNumber == 1 && Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
     Round->Tick(0.02f);
     if (!TestTrue(TEXT("The enemy wait settles the round immediately after its original deadline"), Round->GetView().RoundNumber == 2 && Round->GetView().Phase == ECombatRoundPhase::Planning)) return false;
     TestEqual(TEXT("The next planning snapshot keeps all fractional human Speed"), Round->GetView().Units[0].Speed, 21.25f);
     TestEqual(TEXT("The next planning snapshot includes the enemy Speed change"), Round->GetView().Units[1].Speed, 10.0f);
-    TestEqual(TEXT("Fractional Speed contributes to the next scheduled delay"), Round->GetView().Units[1].StartDelay, 1.125f);
+    TestEqual(TEXT("Fractional Speed contributes to the next scheduled delay"), Round->GetView().Units[1].StartDelay, 11.25f);
     if (!TestTrue(TEXT("The owner submits the next wait"), Fixture.Submit(0, Fixture.Command(Human, TEXT("Wait")))) || !TestTrue(TEXT("The next round locks successfully"), Fixture.Ready(0))) return false;
-    Round->Tick(0.5f);
-    Round->Tick(0.5f);
-    Round->Tick(0.12f);
-    TestTrue(TEXT("Fractional speed is not truncated to an earlier 1.1 second action"), Round->GetView().RoundNumber == 2 && Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
+    Fixture.AdvanceSeconds(11.24f);
+    TestTrue(TEXT("Fractional speed is not truncated to an earlier eleven-second action"), Round->GetView().RoundNumber == 2 && Round->GetView().Units[1].ActionPhase == ECombatRoundActionPhase::Waiting);
     Round->Tick(0.02f);
-    TestTrue(TEXT("The next action starts on the simulation step after 1.125 seconds"), Round->GetView().RoundNumber == 3 && Round->GetView().Phase == ECombatRoundPhase::Planning);
+    TestTrue(TEXT("The next action starts on the simulation step after 11.25 seconds"), Round->GetView().RoundNumber == 3 && Round->GetView().Phase == ECombatRoundPhase::Planning);
     return true;
 }
 
@@ -1407,7 +1420,7 @@ bool FCombatRoundUnitApproachTrackingTest::RunTest(const FString& Parameters)
     FCombatRoundSkill HumanSkill;
     HumanSkill.WindupSeconds = 0.2f;
     FFixture Mutual;
-    if (!TestTrue(TEXT("Two melee attackers with different start delays initialize"), Mutual.Initialize(1, 20.f, &EnemySkill, FIntPoint(0, 3), 1, &HumanSkill, 0.f))) return false;
+    if (!TestTrue(TEXT("Two melee attackers with different start delays initialize"), Mutual.Initialize(1, 20.f, &EnemySkill, FIntPoint(0, 3), 1, &HumanSkill, 18.f))) return false;
     AUnitBase* Human = Mutual.Humans[0];
     AUnitBase* Enemy = Mutual.Enemies[0];
     const FVector HumanOrigin = Human->GetActorLocation();
@@ -1706,7 +1719,7 @@ bool FCombatRoundHitchWindupTest::RunTest(const FString& Parameters)
         Skill.WindupSeconds = 0.2f;
         Skill.Power = 17.f;
         FFixture Fixture;
-        if (!TestTrue(TEXT("A slower caster waits before starting its authored windup"), Fixture.Initialize(1, 22.f, nullptr, FIntPoint(0, 3), 1, &Skill, 20.f))) return false;
+        if (!TestTrue(TEXT("A slower caster waits before starting its authored windup"), Fixture.Initialize(1, 20.2f, nullptr, FIntPoint(0, 3), 1, &Skill, 20.f))) return false;
         AUnitBase* Source = Fixture.Humans[0];
         AUnitBase* Target = Fixture.Enemies[0];
         if (!TestTrue(TEXT("The delayed cast submits and locks"), Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Target)) && Fixture.Ready(0))) return false;
@@ -2652,7 +2665,7 @@ bool FCombatRoundDebugAddFinishedTest::RunTest(const FString& Parameters)
         if (!TestTrue(TEXT("The original battle enters resolution"), Fixture.Ready(0))) return false;
         AUnitBase* Dead = bDefeat ? Fixture.Humans[0] : Fixture.Enemies[0];
         Dead->Die();
-        for (int32 Step = 0; Step < 1000 && Round->IsRoundSessionActive(); ++Step) Round->Tick(0.01f);
+        for (int32 Step = 0; Step < 4000 && Round->IsRoundSessionActive(); ++Step) Round->Tick(0.01f);
         if (!TestTrue(TEXT("The original battle finishes with one defeated side"), Round->GetView().Phase == ECombatRoundPhase::Finished && Fixture.Combat->GetCombatResult() == (bDefeat ? ECombatResult::Defeat : ECombatResult::Victory))) return false;
         const int32 FinishedRound = Round->GetView().RoundNumber;
         ACombatGridTile* Tile = Round->FindDebugSpawnTile(!bDefeat);
@@ -2885,6 +2898,111 @@ bool FCombatRoundConsumableLifecycleTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Repeated ticks never repeat the GAS application"), Applied, bInterrupted ? 0 : 1);
         TestTrue(TEXT("The original caster self-target and item tag reach the GAS spec"), bContextAndTags);
         Source->GetAbilitySystemComponent()->OnGameplayEffectAppliedDelegateToTarget.Remove(Handle);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFrontProtectionRuntimeReviewTest, "ProjectA.Review.FrontProtectionRuntime", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFrontProtectionRuntimeReviewTest::RunTest(const FString& Parameters)
+{
+    using namespace CombatRoundTests;
+    FCombatRoundSkill Melee;
+    Melee.EffectTags.AddTag(ProjectACombatTags::Skill_Attack_Melee);
+    Melee.Approach = ECombatRoundApproach::None;
+    FFixture Fixture;
+    if (!TestTrue(TEXT("Both formations initialize in a disposable debug world"),
+        Fixture.EnableDebugWorld() && Fixture.Initialize(2, 20.f, &Melee, FIntPoint(0, 3), 2, &Melee, 20.f, true, false, 1, nullptr,
+            {FIntPoint(0, 0), FIntPoint(0, 1)}, {FIntPoint(0, 3), FIntPoint(0, 2)}))) return false;
+    ACombatRoundCoordinator* Round = Fixture.Round;
+    AUnitBase* HumanRear = Fixture.Humans[0];
+    AUnitBase* HumanFront = Fixture.Humans[1];
+    AUnitBase* EnemyRear = Fixture.Enemies[0];
+    AUnitBase* EnemyFront = Fixture.Enemies[1];
+    TestTrue(TEXT("Both rear tiles display authoritative protection"), HumanRear->GetCurrentTile()->GetProtectedByFront() && EnemyRear->GetCurrentTile()->GetProtectedByFront());
+    TestFalse(TEXT("The live target preview rejects a protected rear enemy"), Round->IsValidUnitTarget(HumanRear->UnitIndex, Fixture.HumanSkillId, EnemyRear->UnitIndex));
+    TestFalse(TEXT("The server rejects a direct protected-target command"), Fixture.Submit(0, Fixture.Command(HumanRear, Fixture.HumanSkillId, EnemyRear)));
+    TestTrue(TEXT("The enemy-side target preview applies the same protection"), !Round->IsValidUnitTarget(EnemyRear->UnitIndex, Fixture.EnemySkillId, HumanRear->UnitIndex));
+    TestTrue(TEXT("The front enemy remains selectable"), Round->IsValidUnitTarget(HumanRear->UnitIndex, Fixture.HumanSkillId, EnemyFront->UnitIndex));
+    CombatPlanValidation::FState State;
+    for (const FCombatRoundUnitView& Unit : Round->GetView().Units)
+    {
+        for (FName Id : Unit.SkillIds)
+        {
+            if (!CombatPlanValidation::FindSkill(State, Id)) State.Skills.Add(*Round->FindSkill(Id));
+        }
+    }
+    HumanRear->SetActorLocation(EnemyRear->GetActorLocation() + FVector(10.f, 0.f, 0.f));
+    const int32 EnemyIndex = Round->GetView().Units.IndexOfByPredicate([EnemyRear](const FCombatRoundUnitView& Unit) { return Unit.Unit == EnemyRear; });
+    const FCombatRoundCommand AICommand = CombatAIPlanning::ChooseCommand(Round->GetView(), State, EnemyIndex, [Round](const FCombatRoundCommand& Command)
+    {
+        FText Error;
+        return Round->CanPlanCommand(Command, Error);
+    });
+    TestEqual(TEXT("AI skips the nearest protected rear unit and still chooses an available attack"), AICommand.TargetUnitId, HumanFront->UnitIndex);
+    EnemyFront->Die();
+    TestFalse(TEXT("Front death immediately clears the rear tile indicator"), EnemyRear->GetCurrentTile()->GetProtectedByFront());
+    TestTrue(TEXT("Front death immediately unlocks live melee selection"), Round->IsValidUnitTarget(HumanRear->UnitIndex, Fixture.HumanSkillId, EnemyRear->UnitIndex));
+    HumanFront->Die();
+    TestFalse(TEXT("Ally front death clears ally rear protection"), HumanRear->GetCurrentTile()->GetProtectedByFront());
+    Fixture.Controllers[1]->SetAsLocalPlayerController();
+    if (!TestTrue(TEXT("The local owner's real debug revival restores the original front unit: ") + Fixture.Error.ToString(), Round->ReviveDebugUnit(Fixture.Controllers[1], HumanFront->UnitIndex, Fixture.Error))) return false;
+    TestTrue(TEXT("Revival restores both the protection indicator and enemy selection restriction"),
+        HumanRear->GetCurrentTile()->GetProtectedByFront() && !Round->IsValidUnitTarget(EnemyRear->UnitIndex, Fixture.EnemySkillId, HumanRear->UnitIndex));
+    if (!TestTrue(TEXT("The front unit can reserve a legal sideways SAP move"), Fixture.Move(1, HumanFront, FIntPoint(1, 1)))) return false;
+    TestTrue(TEXT("An uncommitted SAP reservation keeps the original protection"), HumanRear->GetCurrentTile()->GetProtectedByFront());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFrontProtectionAreaReviewTest, "ProjectA.Review.FrontProtectionAreaCollision", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFrontProtectionAreaReviewTest::RunTest(const FString& Parameters)
+{
+    FCombatRoundSkill Skill;
+    Skill.EffectTags.AddTag(ProjectACombatTags::Skill_Attack_Melee);
+    Skill.Approach = ECombatRoundApproach::None;
+    Skill.bUseMeleeAreaCollision = true;
+    Skill.WindupSeconds = 0.05f;
+    CombatRoundTests::FFixture Fixture;
+    if (!TestTrue(TEXT("A real melee area cast initializes against a protected formation"),
+        Fixture.Initialize(1, 20.f, nullptr, FIntPoint(0, 3), 2, &Skill, 20.f, true, false, 1, nullptr, {}, {FIntPoint(0, 3), FIntPoint(0, 2)}))) return false;
+    AUnitBase* Source = Fixture.Humans[0];
+    AUnitBase* Rear = Fixture.Enemies[0];
+    AUnitBase* Front = Fixture.Enemies[1];
+    Front->SetActorLocation(Source->GetActorLocation() + FVector(0.f, 110.f, 0.f));
+    Rear->SetActorLocation(Source->GetActorLocation() + FVector(0.f, 130.f, 0.f));
+    if (!TestTrue(TEXT("The cast legally selects the front unit and locks"), Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Front)) && Fixture.Ready(0))) return false;
+    for (int32 Step = 0; Step < 30 && Rear->GetAttributeSet()->GetHP() == 100.f; ++Step) Fixture.Round->Tick(0.01f);
+    TestTrue(TEXT("Authoritative area collision can still damage the protected rear unit"), Rear->GetCurrentTile()->GetProtectedByFront() && Rear->GetAttributeSet()->GetHP() < 100.f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCurrentAttackStatBonusReviewTest, "ProjectA.Review.AttackStatBonusesReachServerDamage", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCurrentAttackStatBonusReviewTest::RunTest(const FString& Parameters)
+{
+    const TArray<FName> Tags = {TEXT("Skill.Attack.Melee"), TEXT("Skill.Attack.Magic"), NAME_None};
+    const float ExpectedDamage[] = {20.f, 17.f, 10.f};
+    for (int32 Index = 0; Index < Tags.Num(); ++Index)
+    {
+        FCombatRoundSkill Skill;
+        Skill.Kind = ECombatRoundSkillKind::GroundAttack;
+        Skill.Approach = ECombatRoundApproach::None;
+        Skill.HitRange = 1000.f;
+        Skill.Power = 10.f;
+        Skill.WindupSeconds = 0.05f;
+        if (!Tags[Index].IsNone()) Skill.EffectTags.AddTag(FGameplayTag::RequestGameplayTag(Tags[Index]));
+        CombatRoundTests::FFixture Fixture;
+        if (!TestTrue(TEXT("The server damage review creates an isolated equal-speed encounter."), Fixture.Initialize(1, 20.f, nullptr, FIntPoint(0, 3), 1, &Skill, 20.f))) return false;
+        AUnitBase* Source = Fixture.Humans[0];
+        AUnitBase* Target = Fixture.Enemies[0];
+        Source->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetStrengthAttribute(), 10.f);
+        Source->GetAbilitySystemComponent()->SetNumericAttributeBase(UAS_Unit::GetIntelligenceAttribute(), 7.f);
+        if (!TestTrue(TEXT("The owner submits and locks the tagged attack through the actual coordinator."),
+            Fixture.Submit(0, Fixture.Command(Source, Fixture.HumanSkillId, Target)) && Fixture.Ready(0))) return false;
+        for (int32 Step = 0; Step < 80 && Target->GetAttributeSet()->GetHP() == 100.f; ++Step) Fixture.Round->Tick(0.05f);
+        TestEqual(TEXT("Actual server hit damage adds Strength for melee, Intelligence for magic and no bonus for unclassified attacks."),
+            Target->GetAttributeSet()->GetHP(), 100.f - ExpectedDamage[Index]);
     }
     return true;
 }

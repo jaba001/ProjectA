@@ -362,13 +362,14 @@ bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
     const TArray<TSubclassOf<UProfessionBase>> PlayableClasses = UProfessionBase::GetPlayableClasses();
     if (!TestTrue(TEXT("The playable catalog contains exactly the four ordered native professions"), PlayableClasses == ExpectedClasses && UProfessionBase::GetPlayableIds() == ExpectedIds && Catalog->Professions.Num() == 4)) return false;
     FScopedWorld Scope;
+    const float Speeds[] = {5.f, 5.f, 7.f, 10.f};
     for (int32 Index = 0; Index < ExpectedIds.Num(); ++Index)
     {
         const FName Id = ExpectedIds[Index];
         const UProfessionBase* Profession = UProfessionBase::FindProfession(Id);
         if (!TestNotNull(TEXT("Each profession ID resolves a class default definition"), Profession)) return false;
         TestTrue(TEXT("Each profession is a concrete native UObject child instead of a combat actor"), Profession->GetClass() == ExpectedClasses[Index].Get() && Profession->GetClass()->HasAnyClassFlags(CLASS_Native) && !Profession->GetClass()->HasAnyClassFlags(CLASS_Abstract) && !Profession->GetClass()->IsChildOf(AActor::StaticClass()));
-        TestTrue(TEXT("Every profession starts with HP 100 and speed 10"), Profession->MaxHP == 100.0f && Profession->Speed == 10.0f);
+        TestTrue(TEXT("Every profession retains HP 100 and its authored agility"), Profession->MaxHP == 100.0f && Profession->Speed == Speeds[Index]);
         FProfessionDefinition Definition;
         if (!TestTrue(TEXT("Profession resolves combat defaults"), Catalog->ResolveProfession(Id, Definition)))
         {
@@ -377,8 +378,8 @@ bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("Profession has a readable name"), Definition.DisplayName.IsEmpty());
         TestFalse(TEXT("Profession has a description"), Definition.Description.IsEmpty());
         TestTrue(TEXT("The authored catalog uses the matching native profession child"), Definition.ProfessionClass == ExpectedClasses[Index]);
-        TestTrue(TEXT("Resolved starting HP and speed match the profession class"), Definition.MaxHP == 100.0f && Definition.Speed == 10.0f);
-        TestTrue(TEXT("Preview shows actual starting HP and speed"), Catalog->GetProfessionDetails(Id).ToString().Contains(TEXT("HP 100 · 속도 10")));
+        TestTrue(TEXT("Resolved starting HP and speed match the profession class"), Definition.MaxHP == Profession->MaxHP && Definition.Speed == Profession->Speed);
+        TestTrue(TEXT("Preview shows actual starting HP and speed"), Catalog->GetProfessionDetails(Id).ToString().Contains(TEXT("HP 100 · 힘")));
         APlayerUnit* Unit = Scope.SpawnUnit<APlayerUnit>(FVector::ZeroVector);
         if (!TestTrue(TEXT("Spawn configuration accepts the resolved profession"), Unit->ConfigureProfession(Definition.MaxHP, Definition.ActionPoints, Definition.SubActionPoints, Definition.StartingSkills, Definition.Speed))) return false;
         TestEqual(TEXT("Spawn HP equals preview"), Unit->GetAttributeSet()->GetHP(), Definition.MaxHP);
@@ -417,7 +418,7 @@ bool FProfessionLoadoutTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Override applies HP"), Tuned->GetAttributeSet()->GetHP(), 137.0f);
     TestEqual(TEXT("Override applies AP"), Tuned->GetMaxActionPoint(), 3);
     TestEqual(TEXT("Explicit zero speed reaches GAS"), Tuned->GetAttributeSet()->GetSpeed(), 0.0f);
-    TestTrue(TEXT("Override also changes preview HP and speed"), Custom->GetProfessionDetails(TEXT("Mage")).ToString().Contains(TEXT("HP 137 · 속도 0")));
+    TestTrue(TEXT("Override also changes preview HP and speed"), Custom->GetProfessionDetails(TEXT("Mage")).ToString().Contains(TEXT("민첩 0")));
     for (float InvalidValue : {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(), -1.0f, 1000001.0f})
     {
         TestFalse(TEXT("Invalid runtime speed rejects the entire new loadout"), Tuned->ConfigureProfession(999.0f, 1, 0, Resolved.StartingSkills, InvalidValue));

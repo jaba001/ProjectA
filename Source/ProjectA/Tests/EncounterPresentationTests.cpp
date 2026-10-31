@@ -1,6 +1,8 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Animation/AnimSingleNodeInstance.h"
+#include "Animation/AnimSequence.h"
 #include "DataAsset/EncounterStageVisualCatalog.h"
 #include "Camera/CameraComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -360,6 +362,23 @@ bool FEncounterShieldGripTest::RunTest(const FString& Parameters)
         const FVector Forearm = (Body->GetSocketLocation(TEXT("lowerarm_l")) - Hand).GetSafeNormal();
         const FVector StrapDirection = HeldShield->GetComponentTransform().TransformVectorNoScale(FVector::ForwardVector).GetSafeNormal();
         TestTrue(TEXT("The opposite strap follows the forearm instead of laying the shield across the waist."), FVector::DotProduct(Forearm, StrapDirection) > 0.99f);
+        Stage->StartPresentation();
+        UAnimSingleNodeInstance* Animation = Body->GetSingleNodeInstance();
+        UAnimationAsset* Asset = Animation ? Animation->GetAnimationAsset() : nullptr;
+        if (TestNotNull(TEXT("The authored merchant idle is available for whole-loop grip sampling"), Asset))
+        {
+            bool bGripAttached = true;
+            for (int32 Sample = 0; Sample <= 240; ++Sample)
+            {
+                Animation->SetPosition(Asset->GetPlayLength() * Sample / 240.f, false);
+                Body->TickAnimation(0.f, false);
+                Body->RefreshBoneTransforms();
+                Body->UpdateChildTransforms();
+                const FVector AnimatedGrip = HeldShield->GetComponentTransform().TransformPosition(FVector(-15.5f, -6.3f, 0.f));
+                bGripAttached &= AnimatedGrip.Equals(Body->GetSocketLocation(TEXT("hand_l")), 0.1f);
+            }
+            TestTrue(TEXT("The rear grip follows the actual hand throughout 241 samples of the complete authored idle"), bGripAttached);
+        }
     }
     World->DestroyWorld(false);
     return true;

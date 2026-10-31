@@ -24,9 +24,9 @@ AEncounterMazeLayout::AEncounterMazeLayout()
     static ConstructorHelpers::FObjectFinder<UStaticMesh> TorchMesh(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/props/light/SM_PROP_torch_wall_dungeon.SM_PROP_torch_wall_dungeon"));
     // Default surfaces reference the project stone materials; a baked Blueprint may override them per component.
     // 기본 표면은 프로젝트 석재 재질을 참조하며 구운 Blueprint에서 컴포넌트별로 바꿀 수 있습니다.
-    static ConstructorHelpers::FObjectFinder<UMaterialInterface> WallMaterial(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneWall.M_EncounterStoneWall"));
-    static ConstructorHelpers::FObjectFinder<UMaterialInterface> FloorMaterial(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneFloor.M_EncounterStoneFloor"));
-    static ConstructorHelpers::FObjectFinder<UMaterialInterface> CeilingMaterial(TEXT("/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneCeiling.M_EncounterStoneCeiling"));
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> WallMaterial(TEXT("/Game/User_JeHoon/Assets/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneWall.M_EncounterStoneWall"));
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> FloorMaterial(TEXT("/Game/User_JeHoon/Assets/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneFloor.M_EncounterStoneFloor"));
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> CeilingMaterial(TEXT("/Game/User_JeHoon/Assets/Materials/Environment/Dungeon_Modular_V1/Materials/M_EncounterStoneCeiling.M_EncounterStoneCeiling"));
     UInstancedStaticMeshComponent* Shapes[] = {Floor, Ceiling, Mortar, WallBlocks, Pillars, Torches};
     for (UInstancedStaticMeshComponent* Shape : Shapes)
     {

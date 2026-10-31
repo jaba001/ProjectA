@@ -109,7 +109,7 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 새 일반 Run은 `RunWeaponSkillRulesDataAsset`의 62후보·무기 종류 Query·등급 Query를 공통 태그 추첨에 전달한다. 근거리 무기·활·석궁·마법 무기·방패를 구분하고 탄약·기타는 등급만 부여한다. 2026-10-10부터 `ItemQueryOverrides`의 첫 일치 규칙으로 실제 GAS `Skill.Effect.Shield` 후보 7종을 `Item.Weapon.Shield`에만 연결한다. `BuildState`에서 실제 적용한 허용 Query를 원래 `WeaponQuery`와 OR 결합하므로 기존 저장 DataAsset이 방패를 제외한 Query를 복원해도 새 Run에서 방패 스킬을 생성한다. 빈 Query는 거절하고 결과 Query를 Run에 저장하며 기존 Run에는 재적용하지 않는다. 시간의 회복진을 포함한 치유 6종은 마법 무기에 유지한다. 장비 `Item.Rarity.*`와 스킬 `Selection.WeaponSkill.Rarity.*`를 분리하며 이전 `Selection.WeaponSkill.Test.*` 메타데이터와 GAS 실행 태그를 보존한다. 양수 가중치의 적격 스킬이 있는 등급을 먼저 선택하고 등급 안에서 `BaseWeight`로 중복 없이 추첨한다. 조건이 없는 후보나 부족한 후보를 임의 스킬로 채우지 않는다.
 
-새 Run 생성 시 `RunSkillBalance::Load`가 [SKILL_BALANCE.csv](../DataCatalogs/SKILL_BALANCE.csv) 62행·11열과 [SKILL_RARITY_PROBABILITIES.csv](../DataCatalogs/SKILL_RARITY_PROBABILITIES.csv) 25행·6열을 읽는다. 규칙 `SchemaVersion=1`을 유지하고 `BalanceVersion=1`에 후보별 등급·위력·AP/SAP·선딜과 장비별 가중치를 저장한다. ID·경로·등급 태그·행 누락/중복·유효 수치·장비별 합계 100을 검사하며 오류 시 기존 상태를 보존하고 생성에 실패한다. 누락된 밸런스 버전 0은 기존 풀·원본 수치를 사용한다. 62종의 분포·수치·확률표는 [GAME_STATUS 3-1](GAME_STATUS.md#3-1-등급과-확률)을 따른다.
+새 Run 생성 시 `RunSkillBalance::Load`가 [SKILL_BALANCE.csv](../DataCatalogs/SKILL_BALANCE.csv) 62행·11열과 [SKILL_RARITY_PROBABILITIES.csv](../DataCatalogs/SKILL_RARITY_PROBABILITIES.csv) 25행·6열을 읽는다. 규칙 `SchemaVersion=1`을 유지하고 `BalanceVersion=1`에 후보별 등급·위력·AP/SAP·선딜과 장비별 가중치를 저장한다. ID·경로·등급 태그·행 누락/중복·유효 수치·장비별 합계 100을 검사하며 오류 시 기존 상태를 보존하고 생성에 실패한다. 누락된 밸런스 버전 0은 기존 풀·원본 수치를 사용한다. 마법 무기에 허용되는 치유 포함 47종의 캐스팅 시간은 `SKILL_BALANCE.csv`의 기존 `선딜(초)`를 1초로 설정한다. 기존 선딜을 포함한 총 준비 시간이며 향후 스킬별로 이 열을 조정한다. 새 Run 생성 시 저장하고 기존 Run의 고정 수치와 CSV를 사용하지 않는 DebugCombat의 에셋 기본값은 유지한다. 62종의 분포·수치·확률표는 [GAME_STATUS 3-1](GAME_STATUS.md#3-1-등급과-확률)을 따른다.
 
 `FRunItemDefinition`은 카탈로그 기준 등급 `CatalogRarityTag`, GUID `ItemInstanceId`, `GenerationVersion`, `RarityTag`, `GrantedSkills`와 `SkillBalanceVersion/GrantedSkillBalances`의 확정 스킬 수치를 저장한다. 추가 전용 `Items`와 장착 `ItemIndex`는 유지한다. 시작 사본·진열 사본의 생성 결과와 당시 `WeaponSkillRules`를 Run에 저장하고 구매는 같은 사본을 인계한다. `InnateSkills`와 장착 스킬을 합칠 때 동일 Skill ID는 한 번만 추가하며 양손 사본/여러 출처를 구분한다. 저장은 사본 적합성·ID 중복·최종 스킬 목록을 검사하고 실패 시 기존 상태를 유지한다. 기존 버전 0에는 생성 결과를 소급하지 않는다. 기존 저장의 기준 등급 누락은 당시 무작위 등급 규칙을 유지하고 현재 CSV로 저장 카탈로그·보유품·진열 사본을 변경하지 않는다. 장착 목록은 전투·체크포인트로 전달하며 새 무기 스킬의 Snapshot 상대 카탈로그 등록·사본 공개/내보내기는 후속 작업이다. 새 Target Run은 기존 고정 Snapshot 상대를 유지한다.
 
@@ -330,7 +330,7 @@ UE 5.8에서 `/Game/User_JeHoon/LEVEL/Environment/` 아래 초원·숲·사막·
 
 Gameplay의 전장·Grid·GameplayCamera·물리 바닥·NavBounds를 복제하여 보존하고 새 맵만 기존 `BP_CombatDebugGameMode`로 구성한다. 반복 메시를 원본 메시·재질·그림자·거리 설정별 ISM으로 묶으며 모든 장식의 충돌과 navigation 영향을 끈다. 기존 Gameplay·DebugCombat·던전 맵과 기본 Run 전환은 유지한다.
 
-원본 메시·텍스처·재질 부모는 직접 참조한다. Orasot의 RVT 의존성과 Landscape 전용 지면은 평면에 그대로 적용할 수 없어 원본 텍스처의 월드 XY UV 표면 Material과 RVT 사용을 해제한 자식 MI를 `/Game/User_JeHoon/Materials/Environment/` 아래 원본 팩·하위 구조대로 새로 작성했다. 얼음 팩은 원본 Material의 usage flag를 보존하고 새 자식 MI의 UE 5.8 Material usage override로 ISM을 지원한다. ISM 배치 전에 `has_material_usage`로 실제 지원을 검사하며 원본 기본 재질의 자동 수정에 의존하지 않는다. 새 표면 Material 9개·자식 MI 44개는 모두 비교 맵에서 사용한다. 원본 메시·텍스처·Material을 복제하거나 변경하지 않는다. 지면은 `/Engine/BasicShapes/Plane`의 10000×9000 평면, 중심 `(-300,400)`, Z=1로 구성한다.
+원본 메시·텍스처·재질 부모는 직접 참조한다. Orasot의 RVT 의존성과 Landscape 전용 지면은 평면에 그대로 적용할 수 없어 원본 텍스처의 월드 XY UV 표면 Material과 RVT 사용을 해제한 자식 MI를 `/Game/User_JeHoon/Assets/Materials/Environment/` 아래 원본 팩·하위 구조대로 새로 작성했다. 얼음 팩은 원본 Material의 usage flag를 보존하고 새 자식 MI의 UE 5.8 Material usage override로 ISM을 지원한다. ISM 배치 전에 `has_material_usage`로 실제 지원을 검사하며 원본 기본 재질의 자동 수정에 의존하지 않는다. 새 표면 Material 9개·자식 MI 44개는 모두 비교 맵에서 사용한다. 원본 메시·텍스처·Material을 복제하거나 변경하지 않는다. 지면은 `/Engine/BasicShapes/Plane`의 10000×9000 평면, 중심 `(-300,400)`, Z=1로 구성한다.
 
 `EnvironmentLevelSpecs.json`의 `levels`·`surfaces`·`instances`를 `ConfigureEnvironmentSurfaces.py`와 `ConfigureEnvironmentLevels.py`가 사용한다. 재질을 먼저 작성한 뒤 맵을 생성하며, 별도 읽기 전용 재로드에서 원본 참조·SHA·저장된 ISM 변환·지면 빈틈·전장 시선 48표본과 XY60/Z20 여백을 검사한다. 기본 예산은 맵별 LOD0 삼각형 500만·그림자 삼각형 200만·그림자 메시 256개·LOD0 section 배치 256개·메시별 재질 슬롯 8개이며 초과 시 작성을 중단한다. 생성 결과의 맵별 LOD0 삼각형은 43,081~241,358개다. Sun 1개·고정 cubemap SkyLight·단순 안개와 EV100 13.3~14.2의 물리 수동 노출을 사용한다. 이 정적 예산은 실제 FPS 검증을 대체하지 않는다.
 
@@ -417,7 +417,7 @@ Spawn_Ninja_Root의 원본과 두 높이 대안은 3조건·15장으로 비교�
 
 2026-10-04 VFX 방향 보정은 Niagara 파라미터의 자료형과 그래프에서 소비하는 좌표 공간을 분리한다. `FCombatSkillVfx.StartPositionSpace`·`EndPositionSpace`의 기본 `ParameterType`은 기존 Vec3 로컬·Position 월드 해석을 보존한다. 체인 5종의 `User.EndPos_V`는 월드 공간 이미터의 원점과 직접 연결하므로 `World`, 화염 화살비·우박 폭격의 `User.Launch_Position`은 Position 자료형이지만 로컬 이미터의 위치·속도 오프셋이므로 `ComponentLocal`로 지정한다. 활성화 전에 상대 위치·회전·크기와 Niagara LWC 타일 변환을 반영하고 원본 Niagara·피해·대상·태그·GAS·판정·SFX·시점·풀·파티는 보존한다.
 
-가시엄니 원본 `NS_BrambleTusk`의 `GPU_Fang`은 월드 공간 이미터의 `AddVelocity` 좌표 공간이 Simulation(0)이어서 속도 +X가 시전자 회전에 따라 돌지 않았다. 해당 모듈 입력은 외부 User 파라미터로 공개되지 않아 단순 참조·자식 Blueprint·컴포넌트 회전으로 보정할 수 없다. 원본 팩과 하위 구조를 유지한 `/Game/User_JeHoon/__GroundAttackVFX/NS/NS_BrambleTusk`의 필수 Niagara 파생본 1개(12,648,343바이트·약 12.1MiB)에서 검증된 좌표 공간 입력 하나만 Local(2)로 변경했다. 월드 이미터·속도 수치·렌더러·회전·SFX·원본 모듈 참조는 보존한다. 작업 편의를 위한 원본 복제는 계속 금지하며 이 파생본은 대상 방향으로 표시하기 위한 필수 결과다.
+가시엄니 원본 `NS_BrambleTusk`의 `GPU_Fang`은 월드 공간 이미터의 `AddVelocity` 좌표 공간이 Simulation(0)이어서 속도 +X가 시전자 회전에 따라 돌지 않았다. 해당 모듈 입력은 외부 User 파라미터로 공개되지 않아 단순 참조·자식 Blueprint·컴포넌트 회전으로 보정할 수 없다. 원본 팩과 하위 구조를 유지한 `/Game/User_JeHoon/Assets/__GroundAttackVFX/NS/NS_BrambleTusk`의 필수 Niagara 파생본 1개(12,648,343바이트·약 12.1MiB)에서 검증된 좌표 공간 입력 하나만 Local(2)로 변경했다. 월드 이미터·속도 수치·렌더러·회전·SFX·원본 모듈 참조는 보존한다. 작업 편의를 위한 원본 복제는 계속 금지하며 이 파생본은 대상 방향으로 표시하기 위한 필수 결과다.
 
 시전·투사체·효과 충돌·피격 방향, 원본 Niagara 79종의 그래프·주효과/피격 83슬롯과 저장된 끝점 공간을 대조했다. 기본·몬스터 공격 14종에는 직접 VFX·ImpactVFX가 없으며 기존 대상 방향의 애니메이션 경로를 유지한다. UE 5.8.3 Development Editor / Win64 컴파일, 기존 DA 8개(끝점 7개·가시엄니 VFX 참조 1개)와 필수 Niagara 파생본 1개 작성·독립 재로드·DataValidation·전체 에셋 감사를 오류·경고 없이 통과했다. 파생본의 다른 좌표 입력·시각 설정·원본 모듈 참조와 작성/재로드 해시가 일치했다. 나머지 신규 52개·기본/몬스터 14개·원본 1,900파일과 읽기 전용 검사 전후 스킬 74파일 해시를 보존했다. 근거는 `Saved/Automation/SkillVfxDirection/`의 작성·재로드·원본 그래프·최종 보존 보고서다.
 
@@ -482,7 +482,7 @@ Host 1번, 최초 원격 접속 순서대로 2~4번이다. 전원 준비 후 서
 
 공통 DPI는 [DefaultEngine.ini](../Config/DefaultEngine.ini)에 설정한다. 메뉴·설정·협동·지도·결과는 공통 배율을 사용하며 상점·인벤토리의 다열 패널만 공간 부족 시 추가 축소한다. `CombatArena`의 활성 카메라는 고정 화면 비율을 해제하고 세로 시야각을 유지한다. 에셋 생성 스크립트도 같은 카메라 기본값을 사용하며 기존 맵·WBP를 다시 생성하지 않는다. 배율 공식·카메라 적용 범위는 [UI_README 10절](UI_README.md#10-공통-dpi와-전투-화면-배치)을 따른다.
 
-`ACombatRoundPlayerController`는 확정된 라운드 View와 기존 소유권으로 선택한 인간 캐릭터의 준비 완료를 확인하고 로컬 `ACombatShoulderCamera`를 활성화한다. 카메라는 `AActor` 기반으로 엔진의 `CalcCamera` 경로를 사용하며 블렌드 전에 최초 구도를 계산한다. `FCombatShoulderFocus`는 같은 캐릭터의 대기·SAP 이동·접근·시전을 유지하고 근접은 공격 몽타주 종료 후 `Returning` 관측에 즉시 전술 시점으로 전환한다. 원거리·마법은 시전 완료 뒤에도 자기 투사체·효과의 최초 피격 또는 마지막 불발 종료를 기다린 뒤 복귀 블렌드를 시작한다. 조정자의 시전자별 대기 수·성공한 효과 적용으로 기존 복제 View의 `bSkillImpactSettled`·`bAwaitingSkillImpact`를 갱신한다. 체인의 후속 타격이나 다른 유닛의 효과로 시점을 재시작·지연하지 않으며 준비 취소·사망·중단·세션 종료에는 해제한다. 이전 전술 시점을 보관하되 다른 인카운터 연출이 이미 시점을 넘겨받았다면 복원으로 덮어쓰지 않는다. 카메라는 저장·복제하지 않고 새로운 RPC·소유권 변경·피해·이동·저장 규칙을 추가하지 않는다.
+`ACombatRoundPlayerController`는 확정된 라운드 View와 기존 소유권으로 선택한 인간 캐릭터의 준비 완료를 확인하고 로컬 `ACombatShoulderCamera`를 활성화한다. 카메라는 `AActor` 기반으로 엔진의 `CalcCamera` 경로를 사용하며 블렌드 전에 최초 구도를 계산한다. `FCombatShoulderFocus`는 같은 캐릭터의 대기·SAP 이동·접근·시전을 유지하고 근접은 공격 몽타주 종료 후 `Returning` 관측에 0.45초 Cubic 블렌드로 전술 시점 복귀를 시작한다. 원거리·마법은 시전 완료 뒤에도 자기 투사체·효과의 최초 피격 또는 마지막 불발 종료를 기다린 뒤 복귀 블렌드를 시작한다. 조정자의 시전자별 대기 수·성공한 효과 적용으로 기존 복제 View의 `bSkillImpactSettled`·`bAwaitingSkillImpact`를 갱신한다. 체인의 후속 타격이나 다른 유닛의 효과로 시점을 재시작·지연하지 않으며 준비 취소·사망·중단·세션 종료에는 해제한다. 이전 전술 시점을 보관하되 다른 인카운터 연출이 이미 시점을 넘겨받았다면 복원으로 덮어쓰지 않는다. 카메라는 저장·복제하지 않고 새로운 RPC·소유권 변경·피해·이동·저장 규칙을 추가하지 않는다.
 
 전투 카메라에 별도 채도 설정이 없으면 `DefaultSceneSaturation=0.88`을 적용하여 식생·지면의 과포화를 완화한다. 기존 채도 재정의와 노출·광원은 유지하며 재진입마다 배율을 누적하지 않는다. 타일은 원본 스프라이트의 상태별 투명도로 표시하고 좌표·점유·클릭 박스·서버 판정은 바꾸지 않는다. [표시 수치](UI_README.md#7-기본-라운드-전투-ui)
 
@@ -544,7 +544,7 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 
 인카운터 카메라는 로컬 `AEncounterDungeonRoute`의 지하 갈림길을 사용한다. `EncounterDungeonLayout`이 후보 순서 0=왼쪽 문·1=직진·2=오른쪽 문의 직각 통로와 방을 정의한다. 바닥·벽·천장·문틀·횃불 받침은 기존 `/Game/User_JeHoon/Blueprint/Game/Encounter/Maze/BP_EncounterMaze_V7`(`AEncounterMazeLayout`) 하나를 공통으로 사용하며 해당 Blueprint에서 직접 수정한다. 저장 변형 번호 0~7의 이동 경로·문·NPC 위치도 V7 좌표로 통일한다. Blueprint가 없거나 V7 배치와 일치하지 않으면 오류 로그를 남기고 준비를 중단하며 런타임 생성으로 대체하지 않는다. 문짝·횃불 조명/불꽃·카메라 이동은 코드에서 유지한다. [BakeEncounterMaze.py](../Source/ProjectAEditor/Scripts/BakeEncounterMaze.py)는 V7만 생성하며 `-EncounterMazeOverwrite` 없이는 기존 에셋을 덮어쓰지 않는다. `-EncounterMazeAudit`는 구성·참조를 검사하고 `-EncounterMazeConsolidate`는 V7을 보존한 채 참조 없는 V0~6만 에디터 기능으로 삭제한다. NPC는 기존 무대의 태그·재질·외형 설정을 참조한 로컬 Actor로 생성하며 맵이나 원본 에셋에 사본을 저장하지 않는다.
 
-미로 벽·기둥은 `M_EncounterStoneWall`, 바닥은 `M_EncounterStoneFloor`, 천장은 `M_EncounterStoneCeiling`을 사용한다. `/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials/`의 세 재질은 원본 `T_Stone_Wall_01_Master_D/N/R`을 직접 참조하며 같은 160cm 반복과 원본 RGB·명암을 사용한다. 완전 탈색과 좁은 명도 범위 매핑을 제거하고 동일한 Tint (0.65, 0.60, 0.52)만 곱해 석재 색과 무늬를 보존한다. 높이별 색상 보정은 적용하지 않는다. 노멀 강도 0.25·거칠기 최소 0.8·Specular 0.15로 과도한 요철과 반사를 줄인다. 벽은 엔진 월드 정렬, 바닥·천장은 월드 XY 평면과 메시 접선 공간 노멀을 사용한다. 세 면 모두 공통 석재 생성 함수의 약 100cm 블록·엇갈린 배열·4cm 줄눈을 적용하며 바닥·천장 줄눈 아래에는 2cm 들어간 불투명 판을 둔다. 천장은 불투명·양면을 유지한다. 벽 횃불은 `Fantastic_Dungeon_Pack`의 원본 `SM_PROP_torch_wall_dungeon`과 `PS_FX_fire_dungeon_01_Niagara`를 직접 참조한다. 높이 250cm의 따뜻한 주광은 1,100lm·반경 650cm·그림자·거리 컬링을 사용하며, Lumen이 꺼진 현재 설정에서 약한 국소 반사광 350lm·반경 950cm로 통로를 식별한다. 미로와 통로 소유 NPC 무대는 조명 채널 1로 야외 직사광에서 분리한다. 미로·NPC 카메라에 수동 노출 -0.4와 간접광 배율 0.08을 공통 적용하고 NPC 보조광은 700lm·반경 550cm로 제한한다. 무대 재구성에도 조명 설정을 유지하며 준비·전투·숨김 구간의 불꽃은 즉시 정지하고 구간 재생성 시 소유 FX를 정리한다. 불꽃의 컴포넌트 틱은 직접 제어하지 않고 Niagara의 활성화/즉시 비활성화 API가 단독·공유 시뮬레이션에 맞춰 관리한다. 세 재질은 UPROPERTY 소프트 참조로 경로를 보존하고 통로 준비 시 로드한다. 모든 재질의 InstancedStaticMeshes 지원과 NPC 재질 갱신 분리를 유지한다. 원본·맵·텍스처 복제 없이 기존 프로젝트 재질만 갱신하며 `ConfigureEncounterSurfaces.py -EncounterStoneColorOnly` 또는 `-EncounterMasonryOnly`는 세 재질, `-EncounterCeilingOnly`는 천장만 작성한다.
+미로 벽·기둥은 `M_EncounterStoneWall`, 바닥은 `M_EncounterStoneFloor`, 천장은 `M_EncounterStoneCeiling`을 사용한다. `/Game/User_JeHoon/Assets/Materials/Environment/Dungeon_Modular_V1/Materials/`의 세 재질은 원본 `T_Stone_Wall_01_Master_D/N/R`을 직접 참조하며 같은 160cm 반복과 원본 RGB·명암을 사용한다. 완전 탈색과 좁은 명도 범위 매핑을 제거하고 동일한 Tint (0.65, 0.60, 0.52)만 곱해 석재 색과 무늬를 보존한다. 높이별 색상 보정은 적용하지 않는다. 노멀 강도 0.25·거칠기 최소 0.8·Specular 0.15로 과도한 요철과 반사를 줄인다. 벽은 엔진 월드 정렬, 바닥·천장은 월드 XY 평면과 메시 접선 공간 노멀을 사용한다. 세 면 모두 공통 석재 생성 함수의 약 100cm 블록·엇갈린 배열·4cm 줄눈을 적용하며 바닥·천장 줄눈 아래에는 2cm 들어간 불투명 판을 둔다. 천장은 불투명·양면을 유지한다. 벽 횃불은 `Fantastic_Dungeon_Pack`의 원본 `SM_PROP_torch_wall_dungeon`과 `PS_FX_fire_dungeon_01_Niagara`를 직접 참조한다. 높이 250cm의 따뜻한 주광은 1,100lm·반경 650cm·그림자·거리 컬링을 사용하며, Lumen이 꺼진 현재 설정에서 약한 국소 반사광 350lm·반경 950cm로 통로를 식별한다. 미로와 통로 소유 NPC 무대는 조명 채널 1로 야외 직사광에서 분리한다. 미로·NPC 카메라에 수동 노출 -0.4와 간접광 배율 0.08을 공통 적용하고 NPC 보조광은 700lm·반경 550cm로 제한한다. 무대 재구성에도 조명 설정을 유지하며 준비·전투·숨김 구간의 불꽃은 즉시 정지하고 구간 재생성 시 소유 FX를 정리한다. 불꽃의 컴포넌트 틱은 직접 제어하지 않고 Niagara의 활성화/즉시 비활성화 API가 단독·공유 시뮬레이션에 맞춰 관리한다. 세 재질은 UPROPERTY 소프트 참조로 경로를 보존하고 통로 준비 시 로드한다. 모든 재질의 InstancedStaticMeshes 지원과 NPC 재질 갱신 분리를 유지한다. 원본·맵·텍스처 복제 없이 기존 프로젝트 재질만 갱신하며 `ConfigureEncounterSurfaces.py -EncounterStoneColorOnly` 또는 `-EncounterMasonryOnly`는 세 재질, `-EncounterCeilingOnly`는 천장만 작성한다.
 
 새 Run의 `DungeonState` 버전 1은 RunId에서 만든 지형 시드·전체 방문 순서·호환용 변형 번호 0~7 중 하나·순서 있는 후보 ID 3개를 저장한다. `RunDungeonPlan`은 일반 Target 60방문, 명시적 프로토타입/개발 협동 9방문을 생성 시 고정한다. 기존 태그·가중치 선택을 사용하며 이후 실제 후보는 저장된 ID를 당시 Run의 풀에서 해석한다. 지형 시드는 상품·전투·보상 난수와 분리한다. 바깥 저장 파일 버전은 유지하고 누락된 `DungeonState`는 버전 0·빈 계획으로 해석하여 이전 선택 흐름을 보존한다. 표시 지형은 계획 버전과 변형 번호에 관계없이 공통 V7을 사용한다.
 
@@ -561,6 +561,12 @@ PvE 난이도 선택이 권위 측 `Preparing`에 반영되면 복제 뷰의 `Co
 이동 중에는 오른쪽 아래에 `불러오는 중`을 표시하고 전투 계획 UI·카메라·입력을 보류한다. 문 도착과 로컬 전투 뷰·유닛의 BeginPlay가 모두 준비되면 0.18초 페이드 뒤 전장으로 전환하고 0.3초로 밝힌다. 준비가 늦으면 닫힌 문 앞에서 기다린다. 전투 Continue·늦은 접속은 기존 복원 경로를 사용하고 일반 요청·미로 없는 맵도 준비 표시를 사용할 수 있다. 유닛 스폰·환경 컴포넌트 생성·Ready 체크포인트 저장은 게임 스레드 작업이며 완전한 무정지 전환은 검증하지 않았다. 실제 맵 변경과 레벨 스트리밍은 이 변경에 포함되지 않는다.
 
 기존 통합 맵의 작성 입력은 [UnifiedGameplaySpecs.json](../Source/ProjectAEditor/Scripts/UnifiedGameplaySpecs.json), 작성기는 [ConfigureUnifiedGameplay.py](../Source/ProjectAEditor/Scripts/ConfigureUnifiedGameplay.py)다. 지하 연출은 런타임에 구성하므로 이 맵을 재작성하지 않는다.
+
+### 4-14 프로젝트 리소스 폴더
+
+`/Game/User_JeHoon/Assets/`에 프로젝트가 사용하는 메시·재질·애니메이션·리타깃 도구·몬스터 Blueprint 등 리소스를 모은다. 팩별 폴더와 하위 구조를 유지하며 원본 팩은 기존 `/Game/<팩명>/`에서 직접 참조한다. `Blueprint`·`LEVEL`·`UI`·`Localization`은 기존 위치를 유지하며 메뉴 검증 위젯은 `UI/Validation/T12`에서 관리한다.
+
+`AssetFolderLayout.json`은 이동한 14개 리소스 폴더를 정의한다. `OrganizeReferencedAssetFolders.py`는 AssetTools의 기존 에셋 이동·소프트 참조 갱신과 엔진 패키지 저장·참조 없는 Redirector 정리를 사용한다. 코드·설정·CSV·작성 명세는 새 경로를 사용하며 이전 219개 패키지 경로는 `DefaultEngine.ini`의 Core Redirect로 연결한다. 외부 원본을 복제하거나 파일 탐색기에서 uasset을 이동하지 않는다.
 
 ## 5 저장과 멀티플레이 연결 경계
 
@@ -582,7 +588,7 @@ PvE 난이도 선택이 권위 측 `Preparing`에 반영되면 복제 뷰의 `Co
 
 [MONSTER_ENCOUNTERS.csv](../DataCatalogs/MONSTER_ENCOUNTERS.csv)의 17열·10행은 숲 1~2·늪 3~4·동굴 5~6·설원 7~8·최종 9~10묶음의 태그 조건·선봉·기준 적 수·HP/속도 배율·골드·성장·휴식·Snapshot 수치를 정의한다. 구간 7은 기준 적 수를 3에서 2로 줄인 재정비 구간이다. 파서가 ID 합류·중복·수치·등록 태그·후보 부족을 검사하고 필수/제외 조건을 실제 GameplayTagQuery로 실행한다. 공통 `GameplayTagCandidateSelection`은 적격 후보의 가중치를 재정규화하며 같은 묶음의 동종을 중복하지 않는다. 5묶음은 적격 `Monster.Role.Brute`, 10묶음은 `Monster.Role.Boss`를 첫 슬롯에 우선 선정하고 남은 슬롯을 채운다. 현재 CSV에서는 각각 트롤·골렘이 선봉이다.
 
-시작 파티 인원 `P`는 생성된 1~4명으로 고정한다. PvE와 Snapshot 인원은 각각 `ceil(기준 인원 × P / 4)`, 저장할 PvE 기초 편성 HP는 `ceil(종별 HP × 구간 HP 배율 × (0.4 + 0.15 × P))`, 속도는 `종별 속도 × 구간 속도 배율`이다. 실제 PvE HP는 아래 난이도·체력 곡선으로 해석한다. Snapshot HP·속도는 구간 값을 그대로 사용하고 기존 클래스·외형·스킬을 유지한다. PvE의 AP 2·SAP 1·이동거리 1과 기존 공격 피해 50·공격 AP 1·선딜·스킬 에셋은 변경하지 않는다. 생성 시 `ConfigureProfession/ConfigureMoveRange`로 저장된 스탯·원본 스킬을 적용한다. 체크포인트 schema 3의 기존 필드를 재사용하며 PvE 적의 수·순서·클래스·최대 스탯·스킬을 난이도로 해석한 편성과 대조하고 현재 HP·잔여 AP/SAP·사망 상태는 보존한다.
+시작 파티 인원 `P`는 생성된 1~4명으로 고정한다. 새 Run의 PvE 인원은 `max(2, ceil(기준 인원 × P / 4))`, Snapshot 인원은 `ceil(기준 인원 × P / 4)`이다. PvE 하한은 `FRunLevelDesignState.MinimumEnemyCount=2`로 저장하며 필드가 없는 기존 저장은 기본값 1로 이전 편성을 유지한다. 저장할 PvE 기초 편성 HP는 `ceil(종별 HP × 구간 HP 배율 × (0.4 + 0.15 × P))`, 속도는 `종별 속도 × 구간 속도 배율`이다. 실제 PvE HP는 아래 난이도·체력 곡선으로 해석한다. Snapshot HP·속도는 구간 값을 그대로 사용하고 기존 클래스·외형·스킬을 유지한다. PvE의 AP 2·SAP 1·이동거리 1과 기존 공격 피해 50·공격 AP 1·선딜·스킬 에셋은 변경하지 않는다. 생성 시 `ConfigureProfession/ConfigureMoveRange`로 저장된 스탯·원본 스킬을 적용한다. 체크포인트 schema 3의 기존 필드를 재사용하며 PvE 적의 수·순서·클래스·최대 스탯·스킬을 난이도로 해석한 편성과 대조하고 현재 HP·잔여 AP/SAP·사망 상태는 보존한다.
 
 새 기본 Run의 `FRunTargetState.PveDifficulty` schema 1은 [PVE_DIFFICULTIES.csv](../DataCatalogs/PVE_DIFFICULTIES.csv)의 6열·3행과 전투별 선택 태그를 저장한다. 2026-10-10부터 `HealthCurveVersion=1`과 [PVE_HEALTH_CURVE.csv](../DataCatalogs/PVE_HEALTH_CURVE.csv)의 4열·30행을 난이도별 `ReferenceHPByGroup` 배열에 함께 고정한다. `Encounter.Combat.PvE.Difficulty.Low/Medium/High` 태그로 규칙을 해석하며 기존 지역·역할 태그 편성은 유지한다. 세 번째 서비스 방문을 마친 Map에서 다음 PvE에 대해 아래 세 선택지를 항상 제공하고 Snapshot은 기존 전투 진입을 사용한다.
 
@@ -655,7 +661,7 @@ Snapshot·체크포인트는 `Speed`, 목표 Run 성장 데이터는 `SpeedGrowt
 
 외부 에셋은 원본 경로에서 직접 참조하고 작업 편의를 위한 `User_JeHoon` 복제를 하지 않는다. 새 프로젝트 에셋과 필수 파생 결과는 `Content/User_JeHoon/`에 작성하며 외부 팩 기반 파생 결과의 하위 구조·대소문자를 유지한다. 중복 정리는 원본에서 `User_JeHoon`으로 복사한 사본에 한정하며 외부 팩끼리는 비교·통합하지 않는다. 기존 사본은 수정 차이·참조·이전 경로 호환을 확인하고 Unreal 기능으로 통합한다. C++·설정·생성 명세는 기존 Source·Config 위치를 유지한다.
 
-2026-09-11: 별도 `/Game/T12Validation`에 있던 메뉴 검증 위젯 3종을 `/Game/User_JeHoon/Validation/T12`로 이동했다. 일반 메뉴의 `UI/MainMenu` 원본과 구분하며 기존 검증 코드·문서·Saved의 T12 생성 명세도 새 경로를 사용한다. UI 생성 도구는 작업 폴더 밖의 assetPath를 거절한다.
+메뉴 UI 생성·AddMissing 보존 검사용 위젯 3종은 `/Game/User_JeHoon/UI/Validation/T12`에서 관리한다. 일반 메뉴의 `UI/MainMenu` 원본과 구분하며 기존 검증 코드·문서·Saved의 T12 생성 명세도 새 경로를 사용한다. UI 생성 도구는 작업 폴더 밖의 assetPath를 거절한다.
 
 기존 `/Game/Cursor` 4개는 제작 출처를 확정할 근거가 없어 유지한다. TopDown과 외부 리소스 원본, TopDown의 External Actors/Objects도 기존 위치를 유지한다.
 
@@ -747,7 +753,7 @@ Development Editor / Win64 빌드를 사용한다. 초기 순서는 UI 생성 �
 
 JSON 명세는 `Source/ProjectAEditor/UiScaffoldSpecs`에서 관리한다. Designer WBP가 화면 구조의 기준이며 자동 재생성하지 않는다. `-AddMissing`은 기존 속성·계층을 보존해 누락 위젯만 추가하며 `-Overwrite`와 병용할 수 없다. 현재 명세는 `generateNativeSource=false`다. 생성본은 실제 Compile·Save가 필요하며 DryRun은 구조 검사만 수행한다.
 
-메뉴 WBP 3종은 `UI/MainMenu`, 검증 사본은 `Validation/T12`에 둔다. `ProjectA.Menu.AssetContracts -T12GeneratedAssets`로 생성본을 검사한다. 지원 위젯·명세·옵션은 [UI 명세](UI_README.md), 실행 명령·제약은 [에셋 도구](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
+메뉴 WBP 3종은 `UI/MainMenu`, 검증 사본은 `UI/Validation/T12`에 둔다. `ProjectA.Menu.AssetContracts -T12GeneratedAssets`로 생성본을 검사한다. 지원 위젯·명세·옵션은 [UI 명세](UI_README.md), 실행 명령·제약은 [에셋 도구](../Source/ProjectAEditor/Scripts/README.md)를 따른다.
 
 ### 7-1 밸런스 측정 commandlet
 

@@ -197,7 +197,7 @@ UEncounterStageVisualCatalog::UEncounterStageVisualCatalog()
     Spring.Props = {
         Prop(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/props/construct/SM_PROP_well_dungeon_02"), FVector(35.f, -130.f, 12.f), FVector(215.f, 215.f, 90.f)),
         Prop(TEXT("/Game/Orasot_Bundle/Stylized_Landscape_5_Bioms/Global/StaticMeshes/SM_Water_Plane"), FVector(35.f, -130.f, 71.f), FVector(126.f, 126.f, 1.f)),
-        Prop(TEXT("/Game/InfinityBladeIceLands/Environments/Ice/EXO_RockyRuins/StaticMesh/SM_Statue01"), FVector(185.f, -130.f, 12.f), FVector(110.f, 105.f, 225.f), 180.f),
+        Prop(TEXT("/Game/InfinityBladeIceLands/Environments/Ice/EXO_RockyRuins/StaticMesh/SM_Statue01"), FVector(185.f, -130.f, 12.f), FVector(110.f, 105.f, 225.f), 90.f),
         Prop(TEXT("/Game/Orasot_Bundle/StylizedForestLandscape/Meshes/SM_Fern_2"), FVector(-55.f, -265.f, 12.f), FVector(95.f, 95.f, 65.f)),
         Prop(TEXT("/Game/Orasot_Bundle/StylizedForestLandscape/Meshes/SM_Fern_2"), FVector(80.f, 15.f, 12.f), FVector(105.f, 105.f, 75.f), 135.f),
         Prop(TEXT("/Game/Fantastic_Dungeon_Pack/meshes/props/light/SM_PROP_candle_dungeon_13"), FVector(145.f, -305.f, 12.f), FVector(30.f, 30.f, 115.f)),

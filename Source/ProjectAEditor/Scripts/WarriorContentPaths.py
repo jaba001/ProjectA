@@ -6,10 +6,10 @@ ENEMY_SOURCE = "/Game/Skeleton_Guard/Mesh_UE4/Full/SKM_Skeleton_Guard_Body"
 WEAPON_SOURCE = "/Game/Weapon_Pack/Mesh/Weapons/Weapons_Kit/SM_Sword"
 SWING_SOURCE = "/Game/BossyEnemy/Animations/InPlace/Attacks/Boss_Attack_Swing_InP"
 UNARMED_SOURCE = "/Game/Characters/Mannequins/Anims/Unarmed"
-WARRIOR_RIGS = ROOT + "/GKnight/Rigs"
-ENEMY_RIGS = ROOT + "/Skeleton_Guard/Rigs"
-SWING_FOLDER = ROOT + "/BossyEnemy/Animations/InPlace/Attacks"
-SWORD_FOLDER = ROOT + "/ParagonAnimationsRetargetedToManny/KwangManny/Attack"
+WARRIOR_RIGS = ROOT + "/Assets/GKnight/Rigs"
+ENEMY_RIGS = ROOT + "/Assets/Skeleton_Guard/Rigs"
+SWING_FOLDER = ROOT + "/Assets/BossyEnemy/Animations/InPlace/Attacks"
+SWORD_FOLDER = ROOT + "/Assets/ParagonAnimationsRetargetedToManny/KwangManny/Attack"
 SWORD_SOURCE = SWORD_FOLDER + "/PrimaryAttack_A_Slow"
 SWORD_RECOVERY_SOURCE = SWORD_FOLDER + "/PrimaryAttack_A_Slow_Recovery"
 SWORD_SOURCE_MESH = "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"
@@ -21,7 +21,7 @@ def mirrored_path(source, suffix=""):
     package = source.split(".")[0]
     if not package.startswith("/Game/"):
         raise RuntimeError("Expected a game content source: " + source)
-    return (package if package.startswith(ROOT + "/") else ROOT + package[len("/Game"):]) + suffix
+    return (package if package.startswith(ROOT + "/") else ROOT + "/Assets" + package[len("/Game"):]) + suffix
 
 
 def animation_sources():

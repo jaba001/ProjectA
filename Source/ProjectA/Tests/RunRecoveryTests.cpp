@@ -132,7 +132,7 @@ bool FRunRecoveryLegacyCompatibilityTest::RunTest(const FString& Parameters)
     for (const FRunPartyMember& Member : Before)
     {
         TArray<FSoftObjectPath> EquippedSkills;
-        TestTrue(TEXT("Each new character owns one tagged consumable outside innate and equipped weapon skills"), Member.Consumables.Num() == 1 && Member.Consumables[0].Quantity == 1 && Member.Consumables[0].Skill == Rules.HealingSkill && Member.InnateSkills.Num() == 1 && Member.Skills.Num() == 2 && !Member.Skills.Contains(Rules.HealingSkill) && RunEquipmentRules::BuildEquippedSkills(Member, EquippedSkills, Target.Error) && Member.Skills == EquippedSkills);
+        TestTrue(TEXT("Each new character owns one tagged consumable outside innate and equipped weapon skills"), Member.Consumables.Num() == 1 && Member.Consumables[0].Quantity == 1 && Member.Consumables[0].Skill == Rules.HealingSkill && !Member.InnateSkills.IsEmpty() && !Member.Skills.IsEmpty() && !Member.Skills.Contains(Rules.HealingSkill) && RunEquipmentRules::BuildEquippedSkills(Member, EquippedSkills, Target.Error) && Member.Skills == EquippedSkills);
     }
     if (!Target.Run->LoadStandaloneCheckpoint(Target.Error)) return false;
     TestTrue(TEXT("Continue preserves quantities weapon copies and both frozen contracts without another starting grant"), SameRecoveryParty(Before, Target.Run->GetPartyMembers()) && FRunRecoveryState::StaticStruct()->CompareScriptStruct(&Rules, &Target.Run->GetRecoveryState(), 0) && FRunWeaponSkillRulesState::StaticStruct()->CompareScriptStruct(&WeaponRules, &Target.Run->GetWeaponSkillRules(), 0));

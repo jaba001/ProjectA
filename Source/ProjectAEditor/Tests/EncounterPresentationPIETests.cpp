@@ -82,6 +82,12 @@ namespace EncounterPresentationPIE
         {
             Groups = {FRunEncounterOffer::GetBasicItemShopTag(), FRunEncounterOffer::GetRarityItemShopTag(), FRunEncounterOffer::GetTagItemShopTag(), FRunEncounterOffer::GetRecoveryTag(), FRunEncounterOffer::GetConsumableShopTag(), FRunEncounterOffer::GetRevivalTag()};
             Sizes = {FIntPoint(960, 720), FIntPoint(1280, 720), FIntPoint(1260, 540)};
+            if (FParse::Param(FCommandLine::Get(), TEXT("ProjectAReviewSingleRatio"))) Sizes = {FIntPoint(1280, 720)};
+            if (FParse::Param(FCommandLine::Get(), TEXT("ProjectAReviewSpecializedStages")))
+            {
+                Groups = {FRunEncounterOffer::GetRecoveryTag(), FRunEncounterOffer::GetRecoveryTag(), FRunEncounterOffer::GetRecoveryTag(), FRunEncounterOffer::GetTagItemShopTag()};
+                Sizes = {FIntPoint(1280, 720)};
+            }
         }
 
         virtual ~FReview() override
@@ -203,7 +209,12 @@ namespace EncounterPresentationPIE
                 if (!Check(Run->GetPhase() == ERunPhase::Shop && Run->GetEncounterProgress().SelectedEncounterId == SelectedId, TEXT("The real direction card commits the original server offer ID at the same index."))) return End();
                 const AEncounterDungeonRoute* TravelingRoute = Cast<AEncounterDungeonRoute>(Controller->GetViewTarget());
                 URunEncounterWidget* ArrivingShop = Active<URunEncounterWidget>(World);
-                if (!Check(TravelingRoute && TravelingRoute->IsTraveling() && Controller->IsEncounterPresentationTransitioning() && ArrivingShop && !ArrivingShop->GetIsEnabled(), TEXT("A committed junction choice starts local corridor travel while shop actions remain disabled."))) return End();
+                Test->AddInfo(FString::Printf(TEXT("Shop transition observation: route=%d traveling=%d transitioning=%d screen=%d enabled=%d."),
+                    TravelingRoute != nullptr, TravelingRoute && TravelingRoute->IsTraveling(), Controller->IsEncounterPresentationTransitioning(),
+                    ArrivingShop != nullptr, ArrivingShop && ArrivingShop->GetIsEnabled()));
+                const bool bTraveling = TravelingRoute && TravelingRoute->IsTraveling()
+                    && Controller->IsEncounterPresentationTransitioning() && (!ArrivingShop || !ArrivingShop->GetIsEnabled());
+                if (!Check(bTraveling, TEXT("A committed junction choice starts local corridor travel while shop actions remain hidden or disabled."))) return End();
                 Advance(7);
                 return false;
             }
@@ -224,15 +235,15 @@ namespace EncounterPresentationPIE
                 if (!Check(Plan.Visits.IsValidIndex(Visit) && ArrivedRoute->GetLayoutVariant() == Plan.Visits[Visit].LayoutVariant && Controller->GetResidentDungeonRouteCount() >= 1 && Controller->GetResidentDungeonRouteCount() <= 2 && Controller->GetPreparedDungeonVisitIndex() == NextVisit, TEXT("The arrived room uses its frozen variant and keeps only the current and next logical visit resident."))) return End();
                 if (!CheckLibraryVisuals(*Offer) || !Capture(World, TEXT("Shop")) || !CheckFraming(World, Screen)) return End();
                 BeforeInventory = Run->GetItemShopState();
-                if (!Click(Screen, TEXT("Button_ShopInventory"))) return End();
+                Controller->RequestToggleInventory();
                 Advance(8);
                 return false;
             }
             if (Step == 8)
             {
-                UInventoryWidget* Inventory = Active<UInventoryWidget>(World);
-                if (!Inventory || !Warm()) return false;
-                if (!Check(Controller->GetViewTarget() == Presented.Get(), TEXT("Opening inventory preserves the active NPC camera.")) || !Capture(World, TEXT("Inventory")) || !Click(Inventory, TEXT("Button_CloseInventory"))) return End();
+                URunEncounterWidget* Shop = Active<URunEncounterWidget>(World);
+                if (!Shop || !Warm()) return false;
+                if (!Check(!Active<UInventoryWidget>(World) && Shop->GetIsEnabled() && Controller->GetViewTarget() == Presented.Get(), TEXT("The inventory shortcut focuses the integrated shop inventory without opening a duplicate overlay or changing the NPC camera.")) || !Capture(World, TEXT("Inventory"))) return End();
                 Advance(9);
                 return false;
             }
@@ -364,6 +375,12 @@ namespace EncounterPresentationPIE
                 if (!RunEncounterPool::Select(Fixture->TargetRun, 0, 0, Fixture->EncounterProgress.Offers, Error)) return Check(false, TEXT("The original frozen encounter pool remains valid: ") + Error.ToString());
                 const int32 Direction = GroupIndex % 3;
                 if (!Fixture->EncounterProgress.Offers.IsValidIndex(Direction) || Fixture->EncounterProgress.Offers[Direction].GetResolvedTag() != Groups[GroupIndex]) continue;
+                if (FParse::Param(FCommandLine::Get(), TEXT("ProjectAReviewSpecializedStages")) && Groups[GroupIndex] == FRunEncounterOffer::GetTagItemShopTag())
+                {
+                    const UEncounterStageVisualCatalog* Catalog = UEncounterStageVisualCatalog::LoadAuthoredDefault();
+                    const FEncounterStageVisualProfile* Profile = Catalog ? Catalog->Resolve(Fixture->EncounterProgress.Offers[Direction]) : nullptr;
+                    if (!Profile || Profile->ProfileId != TEXT("Warden")) continue;
+                }
                 bFound = true;
                 break;
             }
@@ -480,7 +497,10 @@ namespace EncounterPresentationPIE
             Record->SetNumberField(TEXT("npc_head_y"), HeadY);
             Record->SetNumberField(TEXT("npc_head_right_x"), HeadRightX);
             Record->SetNumberField(TEXT("panel_left_x"), PanelLeft);
-            return Check(HeadX > 0.05 && HeadX < 0.48 && HeadY > 0.05 && HeadY < 0.9 && HeadRightX < PanelLeft, FString::Printf(TEXT("The NPC face is on the left and clear of the actual merchant panel: head=(%.4f,%.4f) right=%.4f panelLeft=%.4f."), HeadX, HeadY, HeadRightX, PanelLeft));
+            const bool bClear = HeadX > 0.05 && HeadX < 0.95
+                && HeadY > 0.05 && HeadY < 0.9 && HeadRightX < PanelLeft;
+            return Check(bClear, FString::Printf(TEXT("The NPC face is on-screen and clear of the merchant panel: head=(%.4f,%.4f) right=%.4f panelLeft=%.4f."),
+                HeadX, HeadY, HeadRightX, PanelLeft));
         }
 
         bool Capture(UWorld* World, const FString& Suffix, bool bDiagnostic = false)

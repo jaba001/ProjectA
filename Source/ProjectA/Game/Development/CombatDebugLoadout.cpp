@@ -1,4 +1,5 @@
 #include "Game/Development/CombatDebugLoadout.h"
+#include "Unit/CharacterAppearanceComponent.h"
 
 #include "AssetRegistry/ARFilter.h"
 #include "AssetRegistry/AssetData.h"
@@ -185,6 +186,7 @@ bool UCombatDebugLoadout::ApplyEquipment(APlayerController* Controller, int32 Un
     AUnitBase* Unit = nullptr;
     if (!ResolveEditableUnit(Controller, UnitId, Coordinator, Unit, OutError)) return false;
     TArray<FRunEquipmentVisual> Visuals;
+    if (Unit->CharacterAppearance) Candidate.Appearance = Unit->CharacterAppearance->Selection;
     if (!RunEquipmentRules::BuildVisuals(Candidate, Visuals, OutError)) return false;
     TArray<FSoftObjectPath> SkillPaths;
     for (USkillDefinitionDataAsset* Skill : Unit->GetEquippedSkillDataAssets()) SkillPaths.Add(FSoftObjectPath(Skill));

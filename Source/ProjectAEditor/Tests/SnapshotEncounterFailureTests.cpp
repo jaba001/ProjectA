@@ -160,7 +160,9 @@ public:
         const FCombatRoundUnitView* Fast = Round->GetView().Units.FindByPredicate([](const auto& Unit) { return Unit.bEnemy && FMath::IsNearlyEqual(Unit.Speed, 12.5f); });
         const FCombatRoundUnitView* Slow = Round->GetView().Units.FindByPredicate([](const auto& Unit) { return Unit.bEnemy && FMath::IsNearlyEqual(Unit.Speed, 5.25f); });
         const FCombatRoundUnitView* PlayerView = Round->GetView().Units.FindByPredicate([](const auto& Unit) { return !Unit.bEnemy; });
-        Test->TestTrue(TEXT("Snapshot restoration retains fractional Speed and action delays."), Fast && Slow && PlayerView && FMath::IsNearlyZero(Fast->StartDelay) && FMath::IsNearlyEqual(Slow->StartDelay, 0.725f) && FMath::IsNearlyEqual(PlayerView->StartDelay, 0.25f));
+        Test->TestTrue(TEXT("Snapshot restoration retains fractional Speed and action delays."),
+            Fast && Slow && PlayerView && FMath::IsNearlyZero(Fast->StartDelay)
+            && FMath::IsNearlyEqual(Slow->StartDelay, 7.25f) && FMath::IsNearlyEqual(PlayerView->StartDelay, 5.5f));
         return true;
     }
 

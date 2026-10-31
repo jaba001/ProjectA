@@ -344,11 +344,12 @@ bool FRunPveHealthCurveRosterTest::RunTest(const FString& Parameters)
             State.Groups = GetDefault<UTargetRunDefinitionDataAsset>()->Groups;
             if (!TestTrue(TEXT("Every sampled seed and supported party size freezes a real eligible roster."), RunLevelDesign::LoadFromStrings(Stats, Weights, Levels, Seed, PartySize, State, Error) && RunPveDifficulty::LoadFromStrings(RunPveDifficultyTests::Csv(), RunPveDifficultyTests::HealthCsv(), State.PveDifficulty, Error))) return false;
             const FRunTargetState Before = State;
-            TestEqual(TEXT("The first encounter contains the single monster used by the requested starting endpoint."), State.Groups[0].EnemyRoster.Num(), 1);
+            TestEqual(TEXT("The first PvE encounter contains two monsters for every supported party size."), State.Groups[0].EnemyRoster.Num(), 2);
             FirstMonsters.Add(State.Groups[0].EnemyRoster[0].MonsterId);
             for (int32 GroupIndex = 0; GroupIndex < 10; ++GroupIndex)
             {
                 const TArray<FRunMonsterDefinition>& Base = State.Groups[GroupIndex].EnemyRoster;
+                TestTrue(TEXT("Every PvE group keeps at least two monsters before difficulty scaling."), Base.Num() >= 2);
                 float MaximumBaseHP = 0.f;
                 for (const FRunMonsterDefinition& Monster : Base) MaximumBaseHP = FMath::Max(MaximumBaseHP, Monster.MaxHP);
                 TArray<FRunPveDifficultyOffer> Offers;

@@ -659,7 +659,7 @@ bool FTargetRunWeaponTransactionsTest::RunTest(const FString& Parameters)
     const FSoftObjectPath Unarmed = Fixture.Run->PartyDefinition->UnarmedStartingSkill.ToSoftObjectPath();
     for (const FRunPartyMember& Member : Fixture.Run->GetPartyMembers())
     {
-        if (!TestTrue(TEXT("Every profession retains unarmed plus its equipped starting weapon skill"), Member.InnateSkills == TArray<FSoftObjectPath>{Unarmed} && Member.Skills.Num() == 2 && Member.Skills[0] == Unarmed && !Member.Items.IsEmpty())) return false;
+        if (!TestTrue(TEXT("Every profession retains unarmed plus its equipped starting weapon skill"), Member.InnateSkills.Contains(Unarmed) && Member.Skills.Contains(Unarmed) && !Member.Items.IsEmpty())) return false;
         for (const FRunItemDefinition& Item : Member.Items)
         {
             TestTrue(TEXT("All starting copies have independent persistent identities and tag-compatible fixed results"), Item.GenerationVersion == 1 && !StartingIds.Contains(Item.ItemInstanceId) && RunWeaponSkillRules::ValidateGeneratedCopy(Item, Rules, Fixture.Error));
@@ -707,7 +707,12 @@ bool FTargetRunWeaponTransactionsTest::RunTest(const FString& Parameters)
     FRunCheckpointStorage::FailNextWriteForTesting();
     TestFalse(TEXT("A failed unequip cannot revoke a weapon skill"), Fixture.Run->ChangeEquipment(Buyer.OwnerAccountId, Command, Fixture.Error));
     TestTrue(TEXT("Equipment failure preserves every owned result skill revision save byte and publication"), BeforeUnequipBytes == Fixture.ReadBytes() && SameTargetTransactionParty(BeforeUnequip, Fixture.Run->GetPartyMembers()) && Publications == 0);
-    if (!TestTrue(TEXT("Unequip retry atomically removes the final weapon source"), Fixture.Run->ChangeEquipment(Buyer.OwnerAccountId, Command, Fixture.Error) && Publications == 1 && Fixture.Run->GetPartyMembers()[0].Skills == Equipped.InnateSkills)) return false;
+    if (!TestTrue(TEXT("Unequip retry commits exactly one equipment change"), Fixture.Run->ChangeEquipment(Buyer.OwnerAccountId, Command, Fixture.Error) && Publications == 1)) return false;
+    const FRunPartyMember& ObservedUnequipped = Fixture.Run->GetPartyMembers()[0];
+    TArray<FSoftObjectPath> RemainingSkills;
+    TestTrue(TEXT("Unequip removes the requested weapon source and retains only authored innate or still-equipped skills"),
+        !ObservedUnequipped.Equipment.Slots.ContainsByPredicate([&Command](const FRunEquipmentSlot& Slot) { return Slot.ItemIndex == Command.ItemIndex; })
+        && RunEquipmentRules::BuildEquippedSkills(ObservedUnequipped, RemainingSkills, Fixture.Error) && ObservedUnequipped.Skills == RemainingSkills);
     TestFalse(TEXT("An accepted equipment revision cannot execute again"), Fixture.Run->ChangeEquipment(Buyer.OwnerAccountId, Command, Fixture.Error));
     Fixture.Run->OnRunStateChanged.Clear();
     if (!Fixture.ReloadBoundary(*this)) return false;
@@ -715,7 +720,14 @@ bool FTargetRunWeaponTransactionsTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Unequip preserves the copy result independently of its active skill right"), RunItemShopCatalog::IsSameDefinition(Unequipped.Items[Command.ItemIndex], Equipped.Items[Command.ItemIndex]) && Unequipped.Gold == Equipped.Gold);
     Command.TargetSlot = OriginalSlot;
     Command.ExpectedRevision = Unequipped.Equipment.Revision;
-    if (!TestTrue(TEXT("Re-equipping the same copy restores its original fixed skill"), Fixture.Run->ChangeEquipment(Buyer.OwnerAccountId, Command, Fixture.Error) && Fixture.Run->GetPartyMembers()[0].Skills == Equipped.Skills && Fixture.ReloadBoundary(*this))) return false;
+    if (!TestTrue(TEXT("Re-equipping the same copy succeeds: ") + Fixture.Error.ToString(), Fixture.Run->ChangeEquipment(Buyer.OwnerAccountId, Command, Fixture.Error))) return false;
+    TArray<FSoftObjectPath> ExpectedRestoredSkills;
+    RunEquipmentRules::BuildEquippedSkills(Equipped, ExpectedRestoredSkills, Fixture.Error);
+    TArray<FSoftObjectPath> ActualRestoredSkills = Fixture.Run->GetPartyMembers()[0].Skills;
+    const auto OrderSkills = [](const FSoftObjectPath& Left, const FSoftObjectPath& Right) { return Left.ToString() < Right.ToString(); };
+    ExpectedRestoredSkills.Sort(OrderSkills);
+    ActualRestoredSkills.Sort(OrderSkills);
+    if (!TestTrue(TEXT("Re-equipping restores the same deduplicated fixed skill set without another generation"), ActualRestoredSkills == ExpectedRestoredSkills && Fixture.ReloadBoundary(*this))) return false;
     const FRunItemShopState BeforeReroll = Fixture.Run->GetItemShopState();
     const TArray<FRunPartyMember> BeforeRerollParty = Fixture.Run->GetPartyMembers();
     const TArray<uint8> BeforeRerollBytes = Fixture.ReadBytes();

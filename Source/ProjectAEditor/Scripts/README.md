@@ -88,7 +88,7 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 `-WarriorVerifyOnly`는 연산 구성·48개 시퀀스의 길이/포즈/유한 좌표/골반 이동 범위, 원본 폴더 구조·이전 참조 73개, 전사/적 몽타주의 실제 Kwang 공격·복귀 세그먼트와 전사의 검·비무장 DA 2개 장착 저장본을 검사한다. 공격 1.2초에 복귀 0.933333초의 첫 중복 포즈 0.2초를 제외해 총 1.933333초로 연결하며 블렌드 인 0.08초/아웃 0.12초를 사용한다. 검은 축 순서 혼동을 방지하는 `unreal.Rotator(pitch=0, yaw=0, roll=180)`과 손잡이 부착 위치·`BladeBase`/`BladeTip` 소켓·검 전용 `bUseWeaponTrace`로 작성한다. 활성 0.23~0.43초·반경 4cm와 서버 에셋 포즈 기반 칼날 표본 123개를 검사하며 이 도구의 정적 검사는 실제 접촉 화면을 포함하지 않는다.
 
-11. `ImportParagonAnimations.py`: 기본 작성·검사는 `Content/ParagonAnimationsRetargetedToManny/KwangManny/Attack`의 `PrimaryAttack_A_Slow`·`PrimaryAttack_A_Slow_Recovery` FBX 2개만 선택한다. 결과는 `/Game/User_JeHoon/ParagonAnimationsRetargetedToManny` 아래 원본 하위 구조를 유지한다. Manny 뼈대·프리뷰 원본을 직접 참조하며 게임 스킬 연결은 변경하지 않는다. 미사용 결과를 자동 재생성하지 않고 원본 FBX 5,385개는 보존한다.
+11. `ImportParagonAnimations.py`: 기본 작성·검사는 `Content/ParagonAnimationsRetargetedToManny/KwangManny/Attack`의 `PrimaryAttack_A_Slow`·`PrimaryAttack_A_Slow_Recovery` FBX 2개만 선택한다. 결과는 `/Game/User_JeHoon/Assets/ParagonAnimationsRetargetedToManny` 아래 원본 하위 구조를 유지한다. Manny 뼈대·프리뷰 원본을 직접 참조하며 게임 스킬 연결은 변경하지 않는다. 미사용 결과를 자동 재생성하지 않고 원본 FBX 5,385개는 보존한다.
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ImportParagonAnimations.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
@@ -130,7 +130,7 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 `-WitchRebuildRetargets`는 이전 마녀 구성을 사용할 때 FBX 재임포트 후 정규화·시퀀스를 재작성하는 옵션이다. 현재 네 직업 구성에 적용하지 않는다. 에셋 작성·정적 포즈 검사만 수행하고 에디터 창·PIE·게임·자동화 테스트를 실행하지 않는다.
 
-16. `ConfigureRogAppearance.py` (이전 Manny 의상 구성): 네 직업을 TopDown과 같은 `SKM_Manny_Simple`·`MI_Manny_01_New`·`MI_Manny_02_New`로 연결하고 `/Game/User_JeHoon/ROG_Modular_Armor/DA_MannyAppearance`에 공통 8부위·103개 외형 항목을 작성한다. 신체를 가리는 의상이 없으면 원본 몸체를 표시하며 가릴 때도 ROG 신체 파츠 6개에 원본 Manny 재질·텍스처를 직접 참조한다. `UCharacterAppearanceAssetLibrary`는 `Head`·`Arms`·`Legs`의 한 슬롯에 합쳐진 재질 영역을 원본 경로에서 두 슬롯으로 복원하고, 정점 위치·UV·스킨 가중치·뼈대·물리를 보존한다. 두 슬롯의 기본 재질은 기존 ROG MI를 유지하고 카탈로그만 Manny MI로 덮어쓴다. `Chest`·`Hands`·`Feet`는 메시를 수정하지 않고 기존 슬롯에 해당 Manny MI를 연결한다. ROG 원본 메시·데이터 테이블을 직접 참조하고 다른 뼈대의 망토 4개를 제외한다. 모델·텍스처 복제·추가 리타깃은 하지 않는다.
+16. `ConfigureRogAppearance.py` (이전 Manny 의상 구성): 네 직업을 TopDown과 같은 `SKM_Manny_Simple`·`MI_Manny_01_New`·`MI_Manny_02_New`로 연결하고 `/Game/User_JeHoon/Assets/ROG_Modular_Armor/DA_MannyAppearance`에 공통 8부위·103개 외형 항목을 작성한다. 신체를 가리는 의상이 없으면 원본 몸체를 표시하며 가릴 때도 ROG 신체 파츠 6개에 원본 Manny 재질·텍스처를 직접 참조한다. `UCharacterAppearanceAssetLibrary`는 `Head`·`Arms`·`Legs`의 한 슬롯에 합쳐진 재질 영역을 원본 경로에서 두 슬롯으로 복원하고, 정점 위치·UV·스킨 가중치·뼈대·물리를 보존한다. 두 슬롯의 기본 재질은 기존 ROG MI를 유지하고 카탈로그만 Manny MI로 덮어쓴다. `Chest`·`Hands`·`Feet`는 메시를 수정하지 않고 기존 슬롯에 해당 Manny MI를 연결한다. ROG 원본 메시·데이터 테이블을 직접 참조하고 다른 뼈대의 망토 4개를 제외한다. 모델·텍스처 복제·추가 리타깃은 하지 않는다.
 
 궁수의 실제 클래스·메뉴는 기존 `BP_PlayerUnit`·`BP_PartyMenuPreview`를 유지한다. 네 직업의 전투·Snapshot·프리뷰와 의상 카탈로그를 연결하고 마법사 스태프를 Manny `hand_l`에 맞춘다. 이전 전사·궁수 Skeleton_Guard Snapshot 클래스는 호환 맵에 보존한다. 의상 UI는 기존 WBP의 C++ 공통 편집창을 사용한다.
 
@@ -172,7 +172,7 @@ IK batch 작성은 Slate 의존성을 Null Renderer로 초기화하는 commandle
 
 기본 실행은 신규 맵만 생성·저장한다. `-DungeonVerifyOnly`는 저장본의 원본 에셋 참조·전장 연결을 읽기 전용으로 검사하고 `Saved/Automation/Dungeons/Reload.json`에 기록한다. 제작 결과는 같은 폴더의 `Configuration.json`에 기록한다. `-DungeonRebuild`는 기존 두 비교 맵의 장식을 재구성하여 수동 장식 수정을 덮어쓰는 명시적 옵션이다. navigation 명령의 `-ini`는 자동 빌드의 비동기 로딩 대기를 해당 프로세스에서만 해제하며 프로젝트 설정을 저장하지 않는다. 정적 검사는 실제 화면·클릭·이동을 포함하지 않는다.
 
-20. `ConfigureEnvironmentSurfaces.py`·`ConfigureEnvironmentLevels.py`: `EnvironmentLevelSpecs.json`의 `surfaces`·`instances`를 먼저 작성하고 `levels`의 `level` 경로에 따라 비교 맵을 `/Game/User_JeHoon/LEVEL/Environment/<테마>/`에 생성한다. Orasot·Infinity Blade Ice Lands·Kobo Nature의 원본을 직접 참조하며, 평면 지면·RVT 해제·얼음 팩의 ISM 지원에 필요한 새 Material·자식 MI만 `/Game/User_JeHoon/Materials/Environment/`에 작성한다. 얼음 자식 MI는 UE 5.8 Material usage override를 사용하여 원본 Material의 flag를 보존한다. 기존 전장·물리 바닥·카메라와 독립 전투 모드를 보존하고 반복 장식을 ISM으로 묶는다. 원본 팩은 Git에 포함하지 않으므로 다른 PC에서도 해당 팩 설치가 필요하다. [맵 목록·구성 기준](../../../Docs/PROJECT_PLAN.md#4-4-환경-비교-레벨)
+20. `ConfigureEnvironmentSurfaces.py`·`ConfigureEnvironmentLevels.py`: `EnvironmentLevelSpecs.json`의 `surfaces`·`instances`를 먼저 작성하고 `levels`의 `level` 경로에 따라 비교 맵을 `/Game/User_JeHoon/LEVEL/Environment/<테마>/`에 생성한다. Orasot·Infinity Blade Ice Lands·Kobo Nature의 원본을 직접 참조하며, 평면 지면·RVT 해제·얼음 팩의 ISM 지원에 필요한 새 Material·자식 MI만 `/Game/User_JeHoon/Assets/Materials/Environment/`에 작성한다. 얼음 자식 MI는 UE 5.8 Material usage override를 사용하여 원본 Material의 flag를 보존한다. 기존 전장·물리 바닥·카메라와 독립 전투 모드를 보존하고 반복 장식을 ISM으로 묶는다. 원본 팩은 Git에 포함하지 않으므로 다른 PC에서도 해당 팩 설치가 필요하다. [맵 목록·구성 기준](../../../Docs/PROJECT_PLAN.md#4-4-환경-비교-레벨)
 
 ```powershell
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/ConfigureEnvironmentSurfaces.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI -NoTraceServer -AssetGatherAll=false
@@ -353,6 +353,12 @@ Development Editor / Win64 컴파일 후 작성·별도 프로세스 재로드 �
 ```powershell
 & "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "$PWD\ProjectA.uproject" -run=pythonscript -script="$PWD\Source\ProjectAEditor\Scripts\TagSkillAttackCategories.py" -unattended -nop4 -nosplash -NoSound
 ```
+
+
+30. `OrganizeReferencedAssetFolders.py`: `AssetFolderLayout.json`의 14개 리소스 폴더를 `Assets` 아래로 정리하는 제한된 유지보수 도구다. 기본 모드는 이동 전 감사, `-AssetFoldersApply`는 감사·백업을 요구하는 엔진 이동, `-AssetFoldersCleanup`은 기록된 이동의 참조 갱신·정리, `-AssetFoldersVerifyOnly`는 새 경로·임포트 원본·저장 경로 별칭의 읽기 전용 재로드 검사다. `Saved/AssetFolderOrganization`의 원본 감사·백업·진행 기록을 사용하며 부분 실행 뒤에는 기록에 맞는 정리 모드만 재개한다. 일반 Unreal 자동화 테스트나 게임 플레이를 시작하지 않는다.
+
+
+31. `OrganizeValidationWidgets.py`: 선택적인 `-T12GeneratedAssets` UI 계약 검사에 쓰는 메뉴 위젯 3종을 `UI/Validation/T12`로 정리한다. 기본 모드는 참조·원본 메뉴 바이트 감사와 백업, `-ValidationWidgetsApply`는 Unreal 에셋 이동과 빈 폴더 정리, `-ValidationWidgetsVerifyOnly`는 위젯·이전 경로·일반 메뉴 원본의 읽기 전용 재로드 검사다. `Saved/ValidationWidgetOrganization`의 감사·백업 기록을 사용하며 게임·PIE·자동화 테스트를 실행하지 않는다.
 
 ## 36 단검 쌍수 이중타격
 

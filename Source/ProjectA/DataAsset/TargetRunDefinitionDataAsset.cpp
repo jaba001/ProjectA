@@ -29,16 +29,16 @@ UTargetRunDefinitionDataAsset::UTargetRunDefinitionDataAsset()
     }
     const TCHAR* MonsterPaths[] =
     {
-        TEXT("/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Wolf/BP_Monster_Wolf.BP_Monster_Wolf_C"),
-        TEXT("/Game/User_JeHoon/Fantasy_Pack/Characters/Orc_Hummer/Blueprints/BP_Monster_Orc.BP_Monster_Orc_C"),
-        TEXT("/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Spider/BP_Monster_Spider.BP_Monster_Spider_C"),
-        TEXT("/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Boar/BP_Monster_Boar.BP_Monster_Boar_C"),
-        TEXT("/Game/User_JeHoon/Fantasy_Pack/Characters/Troll/Blueprints/BP_Monster_Troll.BP_Monster_Troll_C"),
-        TEXT("/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Bear/BP_Monster_Bear.BP_Monster_Bear_C"),
-        TEXT("/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Wolf/BP_Monster_SnowWolf.BP_Monster_SnowWolf_C"),
-        TEXT("/Game/User_JeHoon/Fantasy_Pack/Characters/Werewolf/Blueprints/BP_Monster_Werewolf.BP_Monster_Werewolf_C"),
-        TEXT("/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Bear/BP_Monster_SnowBear.BP_Monster_SnowBear_C"),
-        TEXT("/Game/User_JeHoon/Fantasy_Pack/Characters/Golem/Blueprints/BP_Monster_Golem.BP_Monster_Golem_C")
+        TEXT("/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Wolf/BP_Monster_Wolf.BP_Monster_Wolf_C"),
+        TEXT("/Game/User_JeHoon/Assets/Fantasy_Pack/Characters/Orc_Hummer/Blueprints/BP_Monster_Orc.BP_Monster_Orc_C"),
+        TEXT("/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Spider/BP_Monster_Spider.BP_Monster_Spider_C"),
+        TEXT("/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Boar/BP_Monster_Boar.BP_Monster_Boar_C"),
+        TEXT("/Game/User_JeHoon/Assets/Fantasy_Pack/Characters/Troll/Blueprints/BP_Monster_Troll.BP_Monster_Troll_C"),
+        TEXT("/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Bear/BP_Monster_Bear.BP_Monster_Bear_C"),
+        TEXT("/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Wolf/BP_Monster_SnowWolf.BP_Monster_SnowWolf_C"),
+        TEXT("/Game/User_JeHoon/Assets/Fantasy_Pack/Characters/Werewolf/Blueprints/BP_Monster_Werewolf.BP_Monster_Werewolf_C"),
+        TEXT("/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Bear/BP_Monster_SnowBear.BP_Monster_SnowBear_C"),
+        TEXT("/Game/User_JeHoon/Assets/Fantasy_Pack/Characters/Golem/Blueprints/BP_Monster_Golem.BP_Monster_Golem_C")
     };
     const FName Classes[] = {TEXT("Archer"), TEXT("Warrior"), TEXT("Mage"), TEXT("Rogue")};
     for (int32 GroupIndex = 0; GroupIndex < 10; ++GroupIndex)

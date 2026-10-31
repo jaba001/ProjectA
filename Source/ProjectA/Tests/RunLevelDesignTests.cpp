@@ -4,11 +4,32 @@
 #include "Game/Run/RunLevelDesign.h"
 #include "Game/Run/RunSaveGame.h"
 #include "Kismet/GameplayStatics.h"
+#include "Serialization/MemoryReader.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "UObject/StrongObjectPtr.h"
+#include "UObject/UnrealType.h"
 #include <limits>
 
 namespace
 {
+    class FPreviousLevelPolicyArchive : public FObjectAndNameAsStringProxyArchive
+    {
+    public:
+        FPreviousLevelPolicyArchive(FArchive& Inner, bool bSkipMinimum) : FObjectAndNameAsStringProxyArchive(Inner, true), bSkipMinimumProperty(bSkipMinimum)
+        {
+            ArNoDelta = true;
+        }
+
+        virtual bool ShouldSkipProperty(const FProperty* Property) const override
+        {
+            return (bSkipMinimumProperty && Property->GetFName() == TEXT("MinimumEnemyCount")) || FObjectAndNameAsStringProxyArchive::ShouldSkipProperty(Property);
+        }
+
+    private:
+        bool bSkipMinimumProperty;
+    };
+
     struct FLevelDesignCsvFixture
     {
         FString Stats = TEXT("몬스터 ID,몬스터 이름,Blueprint 클래스 경로,분류 태그,최대 HP,AP,SAP,속도,이동거리(타일),스킬 경로,공격 피해(참고),공격 선딜(초·참고),비고\n");
@@ -194,12 +215,13 @@ bool FRunLevelDesignSelectionTest::RunTest(const FString& Parameters)
         if (!TestTrue(TEXT("Every supported original party size can freeze a complete seeded Run"), Fixture.Load(State, PartySize, 271828, Error) && Fixture.Load(SameSeed, PartySize, 271828, Error) && RunLevelDesign::Validate(State, Error))) return false;
         TestTrue(TEXT("The same inputs, seed and original party size reproduce the full frozen state"), SameLevelDesignTarget(State, SameSeed));
         TestEqual(TEXT("The original party size is stored independently of subsequent casualties"), State.LevelDesign.PartySize, PartySize);
+        TestEqual(TEXT("New Runs freeze a minimum of two PvE enemies independently of party size"), State.LevelDesign.MinimumEnemyCount, 2);
         for (int32 GroupIndex = 0; GroupIndex < State.Groups.Num(); ++GroupIndex)
         {
             const FTargetRunGroup& Group = State.Groups[GroupIndex];
             const FRunLevelRule& Rule = State.LevelDesign.Rules[GroupIndex];
-            const int32 ExpectedCount = (Rule.EnemyCount * PartySize + 3) / 4;
-            TestEqual(TEXT("Roster size uses the rounded-up fraction of the four-person baseline"), Group.EnemyRoster.Num(), ExpectedCount);
+            const int32 ExpectedCount = FMath::Max(2, (Rule.EnemyCount * PartySize + 3) / 4);
+            TestEqual(TEXT("Roster size keeps party scaling with a minimum of two PvE enemies"), Group.EnemyRoster.Num(), ExpectedCount);
             TestEqual(TEXT("Snapshot size uses the same original-party scaling"), Group.Opponent.Members.Num(), (Rule.SnapshotCount * PartySize + 3) / 4);
             TestEqual(TEXT("Enemy class slots and frozen stat slots stay aligned"), Group.EnemyClasses.Num(), ExpectedCount);
             TSet<FName> Ids;
@@ -263,6 +285,30 @@ bool FRunLevelDesignSavedStateTest::RunTest(const FString& Parameters)
     TStrongObjectPtr<URunSaveGame> Save(NewObject<URunSaveGame>());
     Save->TargetRun = Fixture.EmptyTarget();
     if (!TestTrue(TEXT("A versioned policy freezes before serialization"), Fixture.Load(Save->TargetRun, 4, 8675309, Error))) return false;
+    FRunTargetState PreviousPolicy = Save->TargetRun;
+    PreviousPolicy.LevelDesign.MinimumEnemyCount = FRunLevelDesignState().MinimumEnemyCount;
+    if (!TestTrue(TEXT("The missing-field default rebuilds and validates the original one-enemy policy"),
+        RunLevelDesign::Build(PreviousPolicy, Error) && RunLevelDesign::Validate(PreviousPolicy, Error))) return false;
+    TestEqual(TEXT("Existing frozen policies retain their original single-enemy opening"), PreviousPolicy.Groups[0].EnemyRoster.Num(), 1);
+    TArray<uint8> PreviousBytes;
+    {
+        FMemoryWriter Writer(PreviousBytes);
+        FPreviousLevelPolicyArchive Archive(Writer, true);
+        // Omit the new property through the engine archive rather than editing opaque SaveGame bytes.
+        // 불투명한 SaveGame 바이트를 편집하지 않고 엔진 아카이브로 새 속성을 제외합니다.
+        FRunTargetState::StaticStruct()->SerializeItem(Archive, &PreviousPolicy, nullptr);
+        if (!TestFalse(TEXT("The previous tagged policy serializes without the new property."), Archive.IsError())) return false;
+    }
+    FRunTargetState PreviousRestored;
+    {
+        FMemoryReader Reader(PreviousBytes);
+        FPreviousLevelPolicyArchive Archive(Reader, false);
+        FRunTargetState::StaticStruct()->SerializeItem(Archive, &PreviousRestored, nullptr);
+        if (!TestFalse(TEXT("The engine loads the tagged policy with its new-field default."), Archive.IsError())) return false;
+    }
+    TestTrue(TEXT("Missing-field deserialization keeps the old roster, seed and policy valid without CSV migration."),
+        PreviousRestored.LevelDesign.MinimumEnemyCount == 1 && RunLevelDesign::Validate(PreviousRestored, Error)
+        && SameLevelDesignTarget(PreviousRestored, PreviousPolicy));
     TArray<uint8> Bytes;
     if (!TestTrue(TEXT("The target policy catalog rules and generated lineups serialize together"), UGameplayStatics::SaveGameToMemory(Save.Get(), Bytes))) return false;
     TStrongObjectPtr<URunSaveGame> Restored(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
@@ -275,6 +321,15 @@ bool FRunLevelDesignSavedStateTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Validation does not repair or mutate a malformed saved policy"), !Error.IsEmpty() && SameLevelDesignTarget(Invalid, Before));
     };
     FRunTargetState Invalid = Restored->TargetRun;
+    Invalid.LevelDesign.MinimumEnemyCount = 0;
+    Reject(Invalid, TEXT("A zero minimum enemy count is rejected"));
+    Invalid = Restored->TargetRun;
+    Invalid.LevelDesign.MinimumEnemyCount = 3;
+    Reject(Invalid, TEXT("An unsupported minimum enemy count is rejected"));
+    Invalid = Restored->TargetRun;
+    Invalid.LevelDesign.MinimumEnemyCount = 1;
+    Reject(Invalid, TEXT("Changing the frozen minimum cannot silently shrink saved rosters"));
+    Invalid = Restored->TargetRun;
     Invalid.Groups[0].EnemyRoster[0].MaxHP += 0.25f;
     Reject(Invalid, TEXT("A finite fractional HP edit is rejected by exact seeded reconstruction"));
     Invalid = Restored->TargetRun;

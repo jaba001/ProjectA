@@ -28,15 +28,15 @@ public:
     virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) override;
 
     UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "50", ClampMax = "600", Units = "cm"))
-    float FollowDistance = 360.f;
+    float FollowDistance = 480.f;
     UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "0", ClampMax = "150", Units = "cm"))
     float ShoulderOffset = 75.f;
-    UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "0", ClampMax = "150", Units = "cm"))
-    float CameraHeight = 40.f;
-    UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "0", ClampMax = "1"))
-    float PivotHeightFraction = 0.55f;
-    UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "100", ClampMax = "1000", Units = "cm"))
-    float LookAheadDistance = 380.f;
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "5", ClampMax = "75", Units = "deg"))
+    float DownwardViewAngle = 30.f;
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "-1", ClampMax = "1"))
+    float PivotHeightFraction = -0.45f;
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "0", ClampMax = "1000", Units = "cm"))
+    float LookAheadDistance = 75.f;
     UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "45", ClampMax = "100", Units = "deg"))
     float ShoulderFOV = 65.f;
     UPROPERTY(EditDefaultsOnly, Category = "Combat|ShoulderCamera", meta = (ClampMin = "1", ClampMax = "30"))

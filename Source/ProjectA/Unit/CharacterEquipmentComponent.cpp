@@ -4,6 +4,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "Unit/UnitBase.h"
 
@@ -29,6 +30,7 @@ void UCharacterEquipmentComponent::BeginPlay()
 
 void UCharacterEquipmentComponent::OnUnregister()
 {
+    RestoreBodyMaterials();
     RemoveEquipmentMeshes();
     Super::OnUnregister();
 }
@@ -55,6 +57,17 @@ void UCharacterEquipmentComponent::RemoveEquipmentMeshes()
     EquipmentMeshes.Reset();
 }
 
+void UCharacterEquipmentComponent::RestoreBodyMaterials()
+{
+    if (MaterialBody.IsValid() && MaterialBody->GetSkeletalMeshAsset() == MaterialBodyAsset.Get())
+    {
+        for (int32 Index = 0; Index < OriginalBodyMaterials.Num(); ++Index) MaterialBody->SetMaterial(Index, OriginalBodyMaterials[Index]);
+    }
+    OriginalBodyMaterials.Reset();
+    MaterialBody.Reset();
+    MaterialBodyAsset.Reset();
+}
+
 bool UCharacterEquipmentComponent::SetEquipment(bool bHasLoadout, const TArray<FRunEquipmentVisual>& Visuals)
 {
     AActor* Owner = GetOwner();
@@ -77,6 +90,7 @@ bool UCharacterEquipmentComponent::RefreshEquipment()
     if (IsTemplate() || !IsValid(Unit) || Unit->IsTemplate() || !Unit->GetWorld() || !Unit->GetWorld()->IsGameWorld()) return false;
     if (!Presentation.bHasLoadout)
     {
+        RestoreBodyMaterials();
         RemoveEquipmentMeshes();
         Unit->RefreshSkillPresentation();
         return true;
@@ -84,6 +98,7 @@ bool UCharacterEquipmentComponent::RefreshEquipment()
     USkeletalMeshComponent* Body = Unit->GetMesh();
     if (!IsValid(Body) || !IsValid(Body->GetSkeletalMeshAsset())) return false;
     TArray<UObject*> Assets;
+    TArray<UMaterialInterface*> BodyMaterials;
     for (const FRunEquipmentVisual& Visual : Presentation.Visuals)
     {
         UObject* Asset = Visual.Asset.TryLoad();
@@ -94,6 +109,16 @@ bool UCharacterEquipmentComponent::RefreshEquipment()
             return false;
         }
         Assets.Add(Asset);
+        if (!Visual.BodyMaterials.IsEmpty())
+        {
+            if (Visual.BodyMaterials.Num() > Body->GetNumMaterials() || !BodyMaterials.IsEmpty()) return false;
+            for (const FSoftObjectPath& Path : Visual.BodyMaterials)
+            {
+                UMaterialInterface* Material = Cast<UMaterialInterface>(Path.TryLoad());
+                if (!IsValid(Material)) return false;
+                BodyMaterials.Add(Material);
+            }
+        }
     }
 
     // Resolve every mesh and attachment before replacing the visible equipment.
@@ -131,6 +156,14 @@ bool UCharacterEquipmentComponent::RefreshEquipment()
     }
     RemoveEquipmentMeshes();
     EquipmentMeshes = MoveTemp(NewMeshes);
+    RestoreBodyMaterials();
+    if (!BodyMaterials.IsEmpty())
+    {
+        MaterialBody = Body;
+        MaterialBodyAsset = Body->GetSkeletalMeshAsset();
+        for (int32 Index = 0; Index < Body->GetNumMaterials(); ++Index) OriginalBodyMaterials.Add(Body->GetMaterial(Index));
+        for (int32 Index = 0; Index < BodyMaterials.Num(); ++Index) Body->SetMaterial(Index, BodyMaterials[Index]);
+    }
     Unit->RefreshSkillPresentation();
     return true;
 }

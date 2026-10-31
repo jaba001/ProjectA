@@ -7,6 +7,26 @@
 
 struct FRunItemDefinition;
 
+// Resolve body-specific source meshes without changing the owned item's stable identity.
+// 보유 아이템의 고정 식별자를 바꾸지 않고 몸체별 원본 메시를 선택합니다.
+USTRUCT(BlueprintType)
+struct PROJECTA_API FRunEquipmentBodyMesh
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+    FName BodyId;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+    FSoftObjectPath ItemAsset;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+    FSoftObjectPath MeshAsset;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+    TArray<FSoftObjectPath> BodyMaterials;
+};
+
 USTRUCT(BlueprintType)
 struct PROJECTA_API FRunEquipmentAttachment
 {
@@ -74,10 +94,15 @@ public:
     UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
     TArray<FRunEquipmentProfile> Profiles;
 
+    UPROPERTY(Config, EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+    TArray<FRunEquipmentBodyMesh> BodyMeshes;
+
     static const URunEquipmentCatalog& Get();
     static FGameplayTag GetWeaponSlot(int32 Index);
     static TArray<FGameplayTag> GetSlotTags();
     const FRunEquipmentProfile* ResolveProfile(const FRunItemDefinition& Item) const;
+    FSoftObjectPath ResolveBodyMesh(const FSoftObjectPath& ItemAsset, FName BodyId) const;
+    TArray<FSoftObjectPath> ResolveBodyMaterials(const FSoftObjectPath& ItemAsset, FName BodyId) const;
     static FGameplayTag ResolveSlot(const FRunEquipmentProfile& Profile, FGameplayTag RequestedSlot);
     static FGameplayTagContainer GetOccupiedSlots(const FRunEquipmentProfile& Profile, FGameplayTag AnchorSlot);
     static bool GetAttachment(const FRunEquipmentProfile& Profile, FGameplayTag SlotTag, FName& OutSocketName, FTransform& OutRelativeTransform);

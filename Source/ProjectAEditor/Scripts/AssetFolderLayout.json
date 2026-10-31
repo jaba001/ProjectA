@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "root": "/Game/User_JeHoon",
+  "destination": "/Game/User_JeHoon/Assets",
+  "folders": ["__GroundAttackVFX", "Assassin", "BossyEnemy", "Characters", "Fantasy_Pack", "GKnight", "Materials", "ParagonAnimationsRetargetedToManny", "Primitive_Characters_Pack", "ROG_Modular_Armor", "Skeleton_Guard", "stylized_dark_witch_fbx__extracted", "StylizedCreaturesBundle", "Weapon_Pack"]
+}

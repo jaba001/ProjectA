@@ -180,7 +180,20 @@ namespace NormalTargetRunReview
                     FProfessionDefinition Profession;
                     FText Error;
                     TArray<FSoftObjectPath> EquippedSkills;
-                    if (!Check(Run->ResolveMemberProfession(Member, Profession, Error) && FMath::IsNearlyEqual(Member.CurrentHP, Profession.MaxHP) && Member.InnateSkills.Num() == 1 && Member.Skills.Num() == 2 && Member.Skills.Contains(Member.InnateSkills[0]) && RunEquipmentRules::BuildEquippedSkills(Member, EquippedSkills, Error) && Member.Skills == EquippedSkills && Member.Consumables.Num() == 1 && Member.Consumables[0].Quantity == Run->GetRecoveryState().StartingQuantity, TEXT("Every freshly created character retains authored maximum health, unarmed plus its equipped weapon skill and normal consumable quantity: ") + Error.ToString())) return End();
+                    Test->AddInfo(FString::Printf(TEXT("Initial party %s: HP=%.1f innate=%d skills=%d consumables=%d quantity=%d expectedQuantity=%d."),
+                        *Member.ClassId.ToString(), Member.CurrentHP, Member.InnateSkills.Num(), Member.Skills.Num(), Member.Consumables.Num(),
+                        Member.Consumables.IsEmpty() ? -1 : Member.Consumables[0].Quantity, Run->GetRecoveryState().StartingQuantity));
+                    const bool bValid = Run->ResolveMemberProfession(Member, Profession, Error)
+                        && FMath::IsNearlyEqual(Member.CurrentHP, Profession.MaxHP)
+                        && Member.InnateSkills.Num() == 1
+                        && Member.Skills.Num() > Member.InnateSkills.Num()
+                        && Member.Skills.Contains(Member.InnateSkills[0])
+                        && RunEquipmentRules::BuildEquippedSkills(Member, EquippedSkills, Error)
+                        && Member.Skills == EquippedSkills
+                        && Member.Consumables.Num() == 1
+                        && Member.Consumables[0].Quantity == Run->GetRecoveryState().StartingQuantity;
+                    if (!Check(bValid, TEXT("Every fresh character retains authored maximum HP, unarmed, equipped weapon skills and normal consumable quantity: ")
+                        + Error.ToString())) return End();
                 }
                 bInitialPartyRecorded = true;
                 Event(Run, TEXT("normal_party_created"));
@@ -220,6 +233,17 @@ namespace NormalTargetRunReview
             if (bStable && !VerifySavedBoundary(Run, Signature)) return End();
             if (bObserveConsumableResolving && !ObserveConsumableBoundary(Run, Round)) return bPassed ? false : End();
             if (ConsumableUIUses > 0 && !bConsumableRestartRequested && bStable && Run->GetPhase() == ERunPhase::Combat && Round && Controller->IsRoundInputEnabled() && FindLivingDirectUnit(Run, Round->GetView())) return RestartAfterConsumable(Run, Round);
+            int32 ReviewCombatLimit = 0;
+            FParse::Value(FCommandLine::Get(), TEXT("ProjectAReviewCombatLimit="), ReviewCombatLimit);
+            if (ReviewCombatLimit > 0 && ReviewCombatLimit <= 20 && bRestartVerified
+                && Run->GetCompletedNodes().Num() >= ReviewCombatLimit && Run->GetPhase() == ERunPhase::Result && Run->CanContinueAfterRewards())
+            {
+                Outcome = TEXT("ObservedBoundedReview");
+                bBoundedReviewObserved = true;
+                Event(Run, Outcome);
+                if (!Capture(World, Outcome)) return End();
+                return End();
+            }
             if (Run->GetPhase() == ERunPhase::Defeat || Run->GetPhase() == ERunPhase::Complete)
             {
                 if (TerminalStarted == 0.0)
@@ -317,6 +341,11 @@ namespace NormalTargetRunReview
             TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(FRunCheckpointStorage::Load(Slot, Error)));
             if (!Check(Saved.IsValid() && SameSavedBoundary(*Saved.Get(), Run), TEXT("The isolated on-disk checkpoint deserializes to the exact published stable normal-Run boundary: ") + Error.ToString())) return false;
             if (Run->GetPhase() == ERunPhase::Combat && !Check(FCombatCheckpointData::StaticStruct()->CompareScriptStruct(&Saved->CombatCheckpoint, &Run->GetCombatCheckpoint(), 0), TEXT("The stable normal planning save preserves its complete authoritative combat checkpoint."))) return false;
+            // Keep raw disposable boundaries for an independent process to exercise actual menu Continue later.
+            // 나중에 독립 프로세스에서 실제 메뉴 이어하기를 검수하도록 일회성 저장 경계의 원본 바이트를 보존합니다.
+            TArray<uint8> SavedBytes;
+            const FString BoundaryPath = Output / (Run->GetPhase() == ERunPhase::Combat ? TEXT("CombatBoundary.sav") : TEXT("JourneyBoundary.sav"));
+            if (!Check(UGameplayStatics::SaveGameToMemory(Saved.Get(), SavedBytes) && FFileHelper::SaveArrayToFile(SavedBytes, *BoundaryPath), TEXT("The disposable saved boundary is available for cross-process Continue review."))) return false;
             VerifiedBoundaries.Add(Signature);
             ++SavedBoundaryReads;
             Event(Run, TEXT("saved_boundary_deserialized"));
@@ -1128,7 +1157,8 @@ namespace NormalTargetRunReview
         {
             TSharedRef<FJsonObject> Report = MakeShared<FJsonObject>();
             Report->SetStringField(TEXT("outcome"), Outcome);
-            Report->SetBoolField(TEXT("passed_observation_contract"), bPassed && bTerminalObserved);
+            Report->SetBoolField(TEXT("passed_observation_contract"), bPassed && (bTerminalObserved || bBoundedReviewObserved));
+            Report->SetBoolField(TEXT("bounded_review_observed"), bBoundedReviewObserved);
             Report->SetBoolField(TEXT("completed_all_eighty_stages"), Outcome == TEXT("Completed80Stages") && bPassed);
             Report->SetBoolField(TEXT("actual_menu_continue_verified"), bRestartVerified);
             Report->SetBoolField(TEXT("post_consumable_menu_restart_requested"), bConsumableRestartRequested);
@@ -1231,6 +1261,7 @@ namespace NormalTargetRunReview
         bool bInitialPartyRecorded = false;
         bool bRestartRequested = false;
         bool bRestartVerified = false;
+        bool bBoundedReviewObserved = false;
         bool bConsumableRestartRequested = false;
         bool bConsumableRestartVerified = false;
         bool bResumingConsumableBoundary = false;

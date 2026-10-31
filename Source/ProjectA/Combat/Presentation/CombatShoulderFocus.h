@@ -17,5 +17,6 @@ private:
     int32 RoundNumber = 0;
     int32 OwnerSlot = 0;
     int32 UnitId = INDEX_NONE;
+    bool bActionStarted = false;
     bool bFinished = false;
 };

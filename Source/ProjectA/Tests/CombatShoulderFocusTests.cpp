@@ -10,7 +10,7 @@ namespace CombatShoulderFocusTests
         FCombatRoundView View;
         View.CombatId = FGuid(1, 2, 3, 4);
         View.RoundNumber = 1;
-        View.Phase = ECombatRoundPhase::Planning;
+        View.Phase = ECombatRoundPhase::Resolving;
         for (int32 Index = 0; Index < 4; ++Index)
         {
             FCombatRoundUnitView& Unit = View.Units.AddDefaulted_GetRef();
@@ -20,6 +20,7 @@ namespace CombatShoulderFocusTests
             Unit.HP = 100.f;
             Unit.Command.UnitId = Unit.UnitId;
             Unit.bReady = true;
+            Unit.ActionPhase = ECombatRoundActionPhase::Casting;
         }
         return View;
     }
@@ -31,12 +32,18 @@ bool FCombatShoulderFocusOwnershipTest::RunTest(const FString& Parameters)
 {
     FCombatRoundView View = CombatShoulderFocusTests::MakeView();
     FCombatShoulderFocus Focus;
+    View.Phase = ECombatRoundPhase::Planning;
     View.Units[0].bReady = false;
     View.Units[1].bReady = false;
     TestEqual(TEXT("Unacknowledged Ready never starts a shot."), Focus.Update(View, 1, 2), INDEX_NONE);
     View.Units[0].bReady = true;
     View.Units[1].bReady = true;
-    TestEqual(TEXT("Server-acknowledged Ready follows the preferred owned unit."), Focus.Update(View, 1, 2), 2);
+    TestEqual(TEXT("Server-acknowledged Ready retains the tactical camera."), Focus.Update(View, 1, 2), INDEX_NONE);
+    View.Phase = ECombatRoundPhase::Resolving;
+    View.Units[1].ActionPhase = ECombatRoundActionPhase::Waiting;
+    TestEqual(TEXT("The start delay retains the tactical camera."), Focus.Update(View, 1, 2), INDEX_NONE);
+    View.Units[1].ActionPhase = ECombatRoundActionPhase::Casting;
+    TestEqual(TEXT("The selected action starts the shoulder camera."), Focus.Update(View, 1, 2), 2);
     TestEqual(TEXT("Changing the preferred unit during an accepted shot keeps the same character."), Focus.Update(View, 1, 1), 2);
 
     Focus.Reset();
@@ -59,10 +66,10 @@ bool FCombatShoulderFocusActionLifecycleTest::RunTest(const FString& Parameters)
 {
     FCombatRoundView View = CombatShoulderFocusTests::MakeView();
     FCombatShoulderFocus Focus;
-    TestEqual(TEXT("Ready establishes one character for this action."), Focus.Update(View, 1, 2), 2);
+    TestEqual(TEXT("Action start establishes one character for this action."), Focus.Update(View, 1, 2), 2);
     View.Phase = ECombatRoundPhase::Resolving;
     View.Units[1].bHasMovePlan = true;
-    const TArray<ECombatRoundActionPhase> ActivePhases = {ECombatRoundActionPhase::Waiting, ECombatRoundActionPhase::Approaching, ECombatRoundActionPhase::Casting, ECombatRoundActionPhase::Recovery};
+    const TArray<ECombatRoundActionPhase> ActivePhases = {ECombatRoundActionPhase::Approaching, ECombatRoundActionPhase::Casting, ECombatRoundActionPhase::Recovery};
     FCombatRoundSkill Melee;
     Melee.Kind = ECombatRoundSkillKind::Melee;
     for (const ECombatRoundActionPhase Phase : ActivePhases)
@@ -111,7 +118,10 @@ bool FCombatShoulderFocusImpactTest::RunTest(const FString& Parameters)
         Focus.Reset();
         View.Units[1].bSkillImpactSettled = false;
         View.Units[1].bAwaitingSkillImpact = true;
-        TestEqual(TEXT("A fresh shot can still observe recovery before impact."), Focus.Update(View, 1, 2), 2);
+        View.Units[1].ActionPhase = ECombatRoundActionPhase::Casting;
+        TestEqual(TEXT("A fresh shot begins at the cast before impact."), Focus.Update(View, 1, 2), 2);
+        View.Units[1].ActionPhase = ECombatRoundActionPhase::Recovery;
+        TestEqual(TEXT("Recovery preserves a shot that already began."), Focus.Update(View, 1, 2), 2);
         View.Units[1].bSkillImpactSettled = true;
         View.Units[1].bAwaitingSkillImpact = false;
         TestTrue(TEXT("The first impact ends the shot even while the cast animation is recovering."), Focus.FinishAtReturnPoint(View.Units[1], &Skill));
@@ -142,7 +152,7 @@ bool FCombatShoulderFocusMissTest::RunTest(const FString& Parameters)
     Focus.Reset();
     Skill.Kind = ECombatRoundSkillKind::Melee;
     View.Units[1].ActionPhase = ECombatRoundActionPhase::Returning;
-    TestEqual(TEXT("A late view can select the owner before evaluating its return boundary."), Focus.Update(View, 1, 2), 2);
+    TestEqual(TEXT("A late returning action never starts a shoulder shot."), Focus.Update(View, 1, 2), INDEX_NONE);
     TestTrue(TEXT("A late melee return is rejected before a shoulder camera is spawned."), Focus.FinishAtReturnPoint(View.Units[1], &Skill));
     TestEqual(TEXT("Late return cannot switch to another participant's action."), Focus.Update(View, 1, 3), INDEX_NONE);
     return true;
@@ -176,7 +186,8 @@ bool FCombatShoulderFocusReadyCancellationTest::RunTest(const FString& Parameter
 {
     FCombatRoundView View = CombatShoulderFocusTests::MakeView();
     FCombatShoulderFocus Focus;
-    TestEqual(TEXT("Ready begins on the first selected character."), Focus.Update(View, 1, 1), 1);
+    TestEqual(TEXT("Action start follows the first selected character."), Focus.Update(View, 1, 1), 1);
+    View.Phase = ECombatRoundPhase::Planning;
     View.Units[0].bReady = false;
     View.Units[1].bReady = false;
     ++View.PlanRevision;
@@ -185,7 +196,9 @@ bool FCombatShoulderFocusReadyCancellationTest::RunTest(const FString& Parameter
     View.Units[0].bReady = true;
     View.Units[1].bReady = true;
     ++View.PlanRevision;
-    TestEqual(TEXT("A new Ready in the same round may follow the newly selected character."), Focus.Update(View, 1, 2), 2);
+    TestEqual(TEXT("A new Ready still retains the tactical camera."), Focus.Update(View, 1, 2), INDEX_NONE);
+    View.Phase = ECombatRoundPhase::Resolving;
+    TestEqual(TEXT("The newly selected character is followed when its action starts."), Focus.Update(View, 1, 2), 2);
     return true;
 }
 
@@ -234,7 +247,9 @@ bool FCombatShoulderFocusStoppedPhaseTest::RunTest(const FString& Parameters)
     FCombatShoulderFocus Focus;
     View.Phase = ECombatRoundPhase::Resolving;
     View.Units[1].ActionPhase = ECombatRoundActionPhase::Waiting;
-    TestEqual(TEXT("A client first observing resolution can still enter the selected character's shot."), Focus.Update(View, 1, 2), 2);
+    TestEqual(TEXT("A client first observing a waiting action stays tactical."), Focus.Update(View, 1, 2), INDEX_NONE);
+    View.Units[1].ActionPhase = ECombatRoundActionPhase::Casting;
+    TestEqual(TEXT("The client enters the selected shot once casting starts."), Focus.Update(View, 1, 2), 2);
     Focus.Reset();
     View.Units[1].ActionPhase = ECombatRoundActionPhase::Complete;
     TestEqual(TEXT("A pass already complete before the first camera update does not flash a shot."), Focus.Update(View, 1, 2), INDEX_NONE);

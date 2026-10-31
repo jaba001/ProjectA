@@ -28,6 +28,7 @@
 - PvE 직전에 좌회전·하, 직진·중, 우회전·상 중 하나를 고른다. 하·중·상은 각각 초원·석조 던전·얼음 성채에서 진행하며 같은 편성에 체력·속도·골드 배율을 적용한다([PVE_DIFFICULTIES](../DataCatalogs/PVE_DIFFICULTIES.csv)).
 - 지역은 숲 1~2·늪 3~4·동굴 5~6·설원 7~8·최종 9~10묶음이며 7묶음은 적 수를 줄인 재정비 구간이다. 기준 HP는 첫 몬스터 50·100·150, 마지막 골렘 1000·1500·3000이다([PVE_HEALTH_CURVE](../DataCatalogs/PVE_HEALTH_CURVE.csv)).
 - 편성·HP·골드·성장 수치는 Run 생성 시 CSV에서 읽어 저장한다. CSV 수정은 이후 새 Run에만 반영된다.
+- 새 Run의 PvE 적은 파티 인원과 난이도에 관계없이 최소 2마리다. 기존 저장의 확정 편성은 유지한다.
 - PvE 승리: 최대 HP +5·속도 +1, 생존자 휴식 HP 20~40(사망자 부활 없음), 아이템 3개 중 1개, 공통 골드(첫 묶음 3~5G ~ 마지막 8~15G). 아이템은 가방에 추가하며 자동 장착하지 않는다.
 - Snapshot 전투와 패배에는 성장·아이템·골드·휴식이 없다. 양 팀 전멸은 패배이며 Run이 종료된다.
 - 회복·부활: 회복약 HP 25/AP 1/시작 1개/1G, 회복의 샘물 HP 25/1G, 부활소 최대 HP 25%/1G.
@@ -68,7 +69,7 @@
 
 흰·파랑·보라·주황 4등급 전환과 스킬·속성을 아이템마다 고정하는 새 아이템 목록은 미구현 기획이다([ITEM_DESIGN 제안 32](ITEM_DESIGN.md#2-4-제안-32-무기-재설계와-4등급제-초안)).
 
-스킬은 62종에 고유 등급이 있고, 장비 등급별 스킬 등급 가중치로 추첨한다([SKILL_RARITY_PROBABILITIES](../DataCatalogs/SKILL_RARITY_PROBABILITIES.csv)). 위력·AP/SAP·선딜은 [SKILL_BALANCE](../DataCatalogs/SKILL_BALANCE.csv)에서 Run 생성 시 고정한다. 현재 비용은 AP 1·SAP 0, 선딜은 무기 근접 0.23초·나머지 0.3초다.
+스킬은 62종에 고유 등급이 있고, 장비 등급별 스킬 등급 가중치로 추첨한다([SKILL_RARITY_PROBABILITIES](../DataCatalogs/SKILL_RARITY_PROBABILITIES.csv)). 위력·AP/SAP·선딜은 [SKILL_BALANCE](../DataCatalogs/SKILL_BALANCE.csv)에서 Run 생성 시 고정한다. 현재 비용은 AP 1·SAP 0이다. 새 Run의 마법 무기 스킬 47종(치유 포함)은 기존 선딜을 포함한 캐스팅 시간 1초를 사용한다. 무기 근접 선딜 0.23초와 나머지 스킬 0.3초는 유지한다. 스킬별 시간은 `SKILL_BALANCE.csv`의 `선딜(초)`로 조정하며 기존 저장에 고정된 수치는 유지한다.
 
 | 장비\스킬 | 흰 | 초록 | 파랑 | 보라 | 주황 |
 |---|---:|---:|---:|---:|---:|

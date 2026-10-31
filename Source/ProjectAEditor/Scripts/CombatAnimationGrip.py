@@ -8,8 +8,8 @@ import unreal
 OWNER_KEY = "ProjectA.CombatAnimationGrip"
 VERSION = "RightHandRotation.v1"
 ALLOWED_SEQUENCES = {
-    "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GideonManny/Attack/Primary_Attack_A_Medium",
-    "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/MurielManny/ConsecratedGround_Cast",
+    "/Game/User_JeHoon/Assets/ParagonAnimationsRetargetedToManny/GideonManny/Attack/Primary_Attack_A_Medium",
+    "/Game/User_JeHoon/Assets/ParagonAnimationsRetargetedToManny/MurielManny/ConsecratedGround_Cast",
 }
 FINGERS = tuple(sorted([finger + "_" + joint + "_r" for finger in ["index", "middle", "ring", "pinky"] for joint in ["metacarpal", "01", "02", "03"]] + ["thumb_" + joint + "_r" for joint in ["01", "02", "03"]]))
 
@@ -125,7 +125,7 @@ def configure(sequence, reference):
         previous_result = validate(sequence, previous_reference)
         if previous_reference == reference:
             return previous_result
-        require(previous_reference.get_path_name() == "/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle.MM_Idle" and reference.get_path_name() == "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/Attack_A_Med.Attack_A_Med", "Preserve an independently authored grip reference")
+        require(previous_reference.get_path_name() == "/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle.MM_Idle" and reference.get_path_name() == "/Game/User_JeHoon/Assets/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/Attack_A_Med.Attack_A_Med", "Preserve an independently authored grip reference")
     before = snapshot(sequence)
     rotations = reference_rotations(reference, before["skeleton"])
     controller = require(sequence.get_editor_property("controller"), "Animation has no controller")

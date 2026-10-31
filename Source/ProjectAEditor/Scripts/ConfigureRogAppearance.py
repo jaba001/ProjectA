@@ -12,8 +12,8 @@ from ConfigureWitchAssassin import attach_weapon, components
 from WarriorContentPaths import ROOT, UNARMED_SOURCE
 
 PACK = "/Game/ROG_Modular_Armor"
-CATALOG_PATH = ROOT + "/ROG_Modular_Armor/DA_MannyAppearance"
-LEGACY_BODY_MATERIAL_PATH = ROOT + "/ROG_Modular_Armor/Common/Materials/MI_MannyNeutral"
+CATALOG_PATH = ROOT + "/Assets/ROG_Modular_Armor/DA_MannyAppearance"
+LEGACY_BODY_MATERIAL_PATH = ROOT + "/Assets/ROG_Modular_Armor/Common/Materials/MI_MannyNeutral"
 MANNY = "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"
 TOPDOWN = "/Game/TopDown/Blueprints/BP_TopDownCharacter"
 BODY = PACK + "/Characters/UE5_Mannequins/Manny"

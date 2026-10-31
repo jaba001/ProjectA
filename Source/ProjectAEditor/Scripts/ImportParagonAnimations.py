@@ -14,7 +14,7 @@ from WarriorContentPaths import SWORD_RECOVERY_SOURCE, SWORD_SOURCE
 
 PROJECT = Path(unreal.Paths.project_dir()).resolve()
 SOURCE = (PROJECT / "Content/ParagonAnimationsRetargetedToManny").resolve()
-DESTINATION = "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny"
+DESTINATION = "/Game/User_JeHoon/Assets/ParagonAnimationsRetargetedToManny"
 MESH_SOURCE = "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"
 MESH_PATH = MESH_SOURCE
 SKELETON_PATH = "/Game/Characters/Mannequins/Meshes/SK_Mannequin"

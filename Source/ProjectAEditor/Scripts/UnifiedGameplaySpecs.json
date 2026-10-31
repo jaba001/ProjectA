@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "level": "/Game/User_JeHoon/LEVEL/Core/Gameplay",
-  "material": "/Game/User_JeHoon/Materials/Prototype/M_EncounterPrototype",
+  "material": "/Game/User_JeHoon/Assets/Materials/Prototype/M_EncounterPrototype",
   "regions": [
     {"name": "PineRidge", "offset": [0, 0, 0]},
     {"name": "MeadowBloom", "offset": [-12000, 0, 0]},

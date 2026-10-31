@@ -4,6 +4,8 @@ Unreal Engine 5.8 기반의 파티·Grid 라운드 전투 로그라이트다. UI
 
 README에는 개요·실행·빌드·문서 안내만 둔다. 기능별 상세 규칙은 [GAME_STATUS](Docs/GAME_STATUS.md)·[PROJECT_PLAN](Docs/PROJECT_PLAN.md)·[UI_README](Docs/UI_README.md)·[MULTIPLAYER](Docs/MULTIPLAYER.md)에 있다. 완료 이력과 검증 근거는 커밋 본문으로 관리하며, 이전 HISTORY·기획 문서는 커밋 `28adbfd6`까지의 Git 이력에서 볼 수 있다.
 
+프로젝트 리소스는 `Content/User_JeHoon/Assets/`에 모으고 `Blueprint`·`LEVEL`·`UI`·현지화는 역할별 폴더를 유지하며 메뉴 검증 위젯은 `UI/Validation/T12`에 둔다.
+
 ## 게임 구성
 
 | 영역 | 현재 구현 | 기준 문서 |

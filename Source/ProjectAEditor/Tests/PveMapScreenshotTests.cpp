@@ -108,10 +108,15 @@ namespace PveMapScreenshots
             {
                 UCharacterCreationWidget* Creation = Screen<UCharacterCreationWidget>(World);
                 if (!Creation) return false;
-                for (int32 Index = 0; Index < 4; ++Index) if (!Click(Creation, FName(*FString::Printf(TEXT("Button_Slot%d_Create"), Index)))) return End();
+                int32 PartySize = 4;
+                FParse::Value(FCommandLine::Get(), TEXT("ProjectAReviewPartySize="), PartySize);
+                if (!Check(PartySize >= 1 && PartySize <= 4, TEXT("The explicit review party size is supported."))) return End();
+                for (int32 Index = 0; Index < PartySize; ++Index) if (!Click(Creation, FName(*FString::Printf(TEXT("Button_Slot%d_Create"), Index)))) return End();
                 if (!Click(Creation, TEXT("Button_Slot0_PlayerControl"))) return End();
                 const TArray<FRunPartyMember> Members = Creation->GetPartyMembers();
-                if (!Check(Members.FilterByPredicate([](const FRunPartyMember& Member) { return Member.bCreated; }).Num() == 4 && Members.FilterByPredicate([](const FRunPartyMember& Member) { return Member.bCreated && Member.bPlayerControlled; }).Num() == 1, TEXT("Normal creation retains four default characters with one directly controlled character."))) return End();
+                const int32 CreatedCount = Members.FilterByPredicate([](const FRunPartyMember& Member) { return Member.bCreated; }).Num();
+                const int32 ControlledCount = Members.FilterByPredicate([](const FRunPartyMember& Member) { return Member.bCreated && Member.bPlayerControlled; }).Num();
+                if (!Check(CreatedCount == PartySize && ControlledCount == 1, TEXT("Normal creation retains the requested party size with one direct character."))) return End();
                 if (!Click(Creation, TEXT("Button_StartGame"))) return End();
                 Advance(4);
                 return false;
@@ -130,6 +135,13 @@ namespace PveMapScreenshots
                 if (Round->GetView().Phase != ECombatRoundPhase::Planning || !Controller->IsRoundInputEnabled()) return false;
                 if (!PrepareViewport(World)) return bPassed ? false : End();
                 if (!TacticalReadiness.Poll(World, Round.Get(), TacticalEvidence)) return false;
+                const int32 ActualEnemies = Round->GetView().Units.FilterByPredicate([](const FCombatRoundUnitView& Entry) { return Entry.bEnemy; }).Num();
+                TArray<FRunMonsterDefinition> ExpectedEnemies;
+                TArray<int32> ExpectedGold;
+                FText RosterError;
+                const bool bResolved = RunPveDifficulty::Resolve(Run->GetTargetRunState(), 0, ExpectedEnemies, ExpectedGold, RosterError);
+                if (!Check(ActualEnemies >= 2 && bResolved && ActualEnemies == ExpectedEnemies.Num(),
+                    TEXT("The real first PvE spawns at least two enemies matching its frozen difficulty preview."))) return End();
                 OriginalTacticalCamera = Round->GetArena()->CameraAnchor;
                 SelectedArena = Round->GetArena()->EnvironmentId;
                 if (!Capture(World, TEXT("Tactical")) || !PlanAction()) return End();

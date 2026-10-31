@@ -12,7 +12,7 @@ from WarriorContentPaths import ROOT, SWORD_FOLDER, SWORD_SOURCE, SWORD_RECOVERY
 
 WITCH_ROOT = "/Game/stylized_dark_witch_fbx__extracted"
 STAFF_PATH = "/Game/MageStaff_FreeWeapons/SM_Staff_01"
-PROFESSIONS = [("Rogue", "/Game/Assassin/Mesh/SKM_Assassin_Skin1", "_Assassin", ROOT + "/Assassin/Rigs", 1.0), ("Mage", WITCH_ROOT + "/Stylized_Dark_Witch", "_DarkWitch", ROOT + "/stylized_dark_witch_fbx__extracted/Rigs", 1.0)]
+PROFESSIONS = [("Rogue", "/Game/Assassin/Mesh/SKM_Assassin_Skin1", "_Assassin", ROOT + "/Assets/Assassin/Rigs", 1.0), ("Mage", WITCH_ROOT + "/Stylized_Dark_Witch", "_DarkWitch", ROOT + "/Assets/stylized_dark_witch_fbx__extracted/Rigs", 1.0)]
 REPORT = {"gameplay_test": "not run", "professions": []}
 
 

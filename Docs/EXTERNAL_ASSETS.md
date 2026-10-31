@@ -8,7 +8,7 @@
 2. `git clone` 또는 `git pull`을 실행합니다. 3절의 덮어쓰기 파일이 팩 원본 위에 복원됩니다.
 3. README의 빌드 명령으로 컴파일한 뒤 에디터를 엽니다. 참조 오류가 나면 2절의 "참조" 열이 0이 아닌 팩부터 확인합니다.
 
-Paragon 애니메이션은 따로 받을 필요가 없습니다. 스크립트가 임포트한 결과는 Git이 추적하는 `Content/User_JeHoon/ParagonAnimationsRetargetedToManny`에 있으며, 원본 FBX 폴더(`Content/ParagonAnimationsRetargetedToManny`, 약 10GB)는 다시 임포트할 때만 필요합니다.
+Paragon 애니메이션은 따로 받을 필요가 없습니다. 스크립트가 임포트한 결과는 Git이 추적하는 `Content/User_JeHoon/Assets/ParagonAnimationsRetargetedToManny`에 있으며, 원본 FBX 폴더(`Content/ParagonAnimationsRetargetedToManny`, 약 10GB)는 다시 임포트할 때만 필요합니다.
 
 ## 2 외부 팩
 

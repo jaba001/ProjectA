@@ -116,7 +116,7 @@ def tag_container(names):
 def read_specs():
     spec = json.loads((SCRIPT_DIRECTORY / "UnifiedGameplaySpecs.json").read_text(encoding="utf-8"))
     require(spec["schema_version"] == 1 and spec["level"] == project_level_path("Gameplay"), "Unsupported unified world specification")
-    require(spec["material"] == "/Game/User_JeHoon/Materials/Prototype/M_EncounterPrototype", "Unexpected prototype material output")
+    require(spec["material"] == "/Game/User_JeHoon/Assets/Materials/Prototype/M_EncounterPrototype", "Unexpected prototype material output")
     require("-EnvironmentNames=" not in unreal.SystemLibrary.get_command_line(), "Unified authoring always includes all comparison regions")
     sources = {item["name"]: item for item in environment.read_specs()}
     require(len(sources) == 12, "Expected the twelve existing environment specifications")

@@ -81,6 +81,10 @@ struct PROJECTA_API FRunLevelDesignState
     int32 Seed = 0;
     UPROPERTY(BlueprintReadOnly, SaveGame)
     int32 PartySize = 0;
+    // Preserve the one-enemy floor when loading saves created before this field existed.
+    // 이 필드가 없던 기존 저장을 불러올 때 최소 적 수 1을 보존합니다.
+    UPROPERTY(BlueprintReadOnly, SaveGame)
+    int32 MinimumEnemyCount = 1;
     UPROPERTY(BlueprintReadOnly, SaveGame)
     TArray<FRunMonsterDefinition> Catalog;
     UPROPERTY(BlueprintReadOnly, SaveGame)

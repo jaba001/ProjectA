@@ -24,7 +24,7 @@
       "name": "오크 망치병",
       "source_pack": "Fantasy Characters (Pack)",
       "mesh": "/Game/Fantasy_Pack/Characters/Orc_Hummer/Mesh/SK_Orc_Hummer",
-      "output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Orc_Hummer/Blueprints",
+      "output": "/Game/User_JeHoon/Assets/Fantasy_Pack/Characters/Orc_Hummer/Blueprints",
       "locomotion": [
         "/Game/Fantasy_Pack/Characters/Orc_Hummer/Animations/Anim_Orc_Hummer_Idle",
         "/Game/Fantasy_Pack/Characters/Orc_Hummer/Animations/Anim_Orc_Hummer_Walk",
@@ -37,14 +37,14 @@
       "capsule_half_height": 96,
       "windup": 0.5,
       "material": null,
-      "animation_output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Orc_Hummer/Animations"
+      "animation_output": "/Game/User_JeHoon/Assets/Fantasy_Pack/Characters/Orc_Hummer/Animations"
     },
     {
       "id": "Troll",
       "name": "동굴 트롤",
       "source_pack": "Fantasy Characters (Pack)",
       "mesh": "/Game/Fantasy_Pack/Characters/Troll/Mesh/SK_Troll",
-      "output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Troll/Blueprints",
+      "output": "/Game/User_JeHoon/Assets/Fantasy_Pack/Characters/Troll/Blueprints",
       "locomotion": [
         "/Game/Fantasy_Pack/Characters/Troll/Animations/Anim_Troll_Idle",
         "/Game/Fantasy_Pack/Characters/Troll/Animations/Anim_Troll_Walk",
@@ -57,14 +57,14 @@
       "capsule_half_height": 96,
       "windup": 0.9,
       "material": null,
-      "animation_output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Troll/Animations"
+      "animation_output": "/Game/User_JeHoon/Assets/Fantasy_Pack/Characters/Troll/Animations"
     },
     {
       "id": "Werewolf",
       "name": "늑대인간",
       "source_pack": "Fantasy Characters (Pack)",
       "mesh": "/Game/Fantasy_Pack/Characters/Werewolf/Mesh/SK_Werewolf_Full_02",
-      "output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Werewolf/Blueprints",
+      "output": "/Game/User_JeHoon/Assets/Fantasy_Pack/Characters/Werewolf/Blueprints",
       "locomotion": [
         "/Game/Fantasy_Pack/Animations/2Without_Weapon/Anim_Idle_Without_Weapon",
         "/Game/Fantasy_Pack/Animations/2Without_Weapon/Anim_Walk_Without_Weapon",
@@ -77,14 +77,14 @@
       "capsule_half_height": 96,
       "windup": 0.3,
       "material": null,
-      "animation_output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Werewolf/Animations"
+      "animation_output": "/Game/User_JeHoon/Assets/Fantasy_Pack/Characters/Werewolf/Animations"
     },
     {
       "id": "Golem",
       "name": "바위 골렘",
       "source_pack": "Fantasy Characters (Pack)",
       "mesh": "/Game/Fantasy_Pack/Characters/Golem/Mesh/SK_Golem",
-      "output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Golem/Blueprints",
+      "output": "/Game/User_JeHoon/Assets/Fantasy_Pack/Characters/Golem/Blueprints",
       "locomotion": [
         "/Game/Fantasy_Pack/Animations/2Without_Weapon/Anim_Idle_Without_Weapon",
         "/Game/Fantasy_Pack/Animations/2Without_Weapon/Anim_Walk_Without_Weapon",
@@ -97,14 +97,14 @@
       "capsule_half_height": 96,
       "windup": 0.3,
       "material": null,
-      "animation_output": "/Game/User_JeHoon/Fantasy_Pack/Characters/Golem/Animations"
+      "animation_output": "/Game/User_JeHoon/Assets/Fantasy_Pack/Characters/Golem/Animations"
     },
     {
       "id": "Wolf",
       "name": "숲 늑대",
       "source_pack": "Stylized Fantasy Creatures Bundle",
       "mesh": "/Game/StylizedCreaturesBundle/Meshes/Wolf/SK_Wolf",
-      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Wolf",
+      "output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Wolf",
       "locomotion": [
         "/Game/StylizedCreaturesBundle/Animations/Wolf/A_Wolf_idle",
         "/Game/StylizedCreaturesBundle/Animations/Wolf/A_Wolf_Walk_Forward",
@@ -117,14 +117,14 @@
       "capsule_half_height": 70,
       "windup": 0.4,
       "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Wolf/MI_Wolf_Gr",
-      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Wolf"
+      "animation_output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Animations/Wolf"
     },
     {
       "id": "Bear",
       "name": "숲 곰",
       "source_pack": "Stylized Fantasy Creatures Bundle",
       "mesh": "/Game/StylizedCreaturesBundle/Meshes/Bear/SK_Bear",
-      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Bear",
+      "output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Bear",
       "locomotion": [
         "/Game/StylizedCreaturesBundle/Animations/Bear/A_Bear_idle",
         "/Game/StylizedCreaturesBundle/Animations/Bear/A_Bear_Walk_Forward",
@@ -137,14 +137,14 @@
       "capsule_half_height": 70,
       "windup": 0.47,
       "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Bear/MI_Bear_Br",
-      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Bear"
+      "animation_output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Animations/Bear"
     },
     {
       "id": "Boar",
       "name": "멧돼지",
       "source_pack": "Stylized Fantasy Creatures Bundle",
       "mesh": "/Game/StylizedCreaturesBundle/Meshes/Boar/SK_Boar",
-      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Boar",
+      "output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Boar",
       "locomotion": [
         "/Game/StylizedCreaturesBundle/Animations/Boar/A_Boar_idle",
         "/Game/StylizedCreaturesBundle/Animations/Boar/A_Boar_Walk_Forward",
@@ -157,14 +157,14 @@
       "capsule_half_height": 70,
       "windup": 0.53,
       "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Boar/MI_Boar_Br",
-      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Boar"
+      "animation_output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Animations/Boar"
     },
     {
       "id": "Spider",
       "name": "동굴 거미",
       "source_pack": "Stylized Fantasy Creatures Bundle",
       "mesh": "/Game/StylizedCreaturesBundle/Meshes/Spider/SK_Spider",
-      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Spider",
+      "output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Spider",
       "locomotion": [
         "/Game/StylizedCreaturesBundle/Animations/Spider/A_Spider_idle",
         "/Game/StylizedCreaturesBundle/Animations/Spider/A_Spider_Walk_Forward",
@@ -177,14 +177,14 @@
       "capsule_half_height": 70,
       "windup": 0.33,
       "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Spider/MI_Spider_Br",
-      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Spider"
+      "animation_output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Animations/Spider"
     },
     {
       "id": "Crocodile",
       "name": "늪 악어",
       "source_pack": "Stylized Fantasy Creatures Bundle",
       "mesh": "/Game/StylizedCreaturesBundle/Meshes/Crocodile/SK_Crocodile",
-      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Crocodile",
+      "output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Crocodile",
       "locomotion": [
         "/Game/StylizedCreaturesBundle/Animations/Crocodile/A_Crocodile_idle",
         "/Game/StylizedCreaturesBundle/Animations/Crocodile/A_Crocodile_Walk_Forward",
@@ -197,14 +197,14 @@
       "capsule_half_height": 70,
       "windup": 0.43,
       "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Crocodile/MI_Crocodile_Gn",
-      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Crocodile"
+      "animation_output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Animations/Crocodile"
     },
     {
       "id": "Toad",
       "name": "늪 두꺼비",
       "source_pack": "Stylized Fantasy Creatures Bundle",
       "mesh": "/Game/StylizedCreaturesBundle/Meshes/Toad/SK_Toad",
-      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Toad",
+      "output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Toad",
       "locomotion": [
         "/Game/StylizedCreaturesBundle/Animations/Toad/A_Toad_idle",
         "/Game/StylizedCreaturesBundle/Animations/Toad/A_Toad_Walk_Forward",
@@ -217,14 +217,14 @@
       "capsule_half_height": 70,
       "windup": 0.4,
       "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Toad/MI_Toad_Gn",
-      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Toad"
+      "animation_output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Animations/Toad"
     },
     {
       "id": "SnowWolf",
       "name": "설원 늑대",
       "source_pack": "Stylized Fantasy Creatures Bundle",
       "mesh": "/Game/StylizedCreaturesBundle/Meshes/Wolf/SK_Wolf",
-      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Wolf",
+      "output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Wolf",
       "locomotion": [
         "/Game/StylizedCreaturesBundle/Animations/Wolf/A_Wolf_idle",
         "/Game/StylizedCreaturesBundle/Animations/Wolf/A_Wolf_Walk_Forward",
@@ -238,14 +238,14 @@
       "windup": 0.4,
       "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Wolf/MI_Wolf_Wh",
       "share_animation": "Wolf",
-      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Wolf"
+      "animation_output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Animations/Wolf"
     },
     {
       "id": "SnowBear",
       "name": "설원 곰",
       "source_pack": "Stylized Fantasy Creatures Bundle",
       "mesh": "/Game/StylizedCreaturesBundle/Meshes/Bear/SK_Bear",
-      "output": "/Game/User_JeHoon/StylizedCreaturesBundle/Blueprints/Bear",
+      "output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Blueprints/Bear",
       "locomotion": [
         "/Game/StylizedCreaturesBundle/Animations/Bear/A_Bear_idle",
         "/Game/StylizedCreaturesBundle/Animations/Bear/A_Bear_Walk_Forward",
@@ -259,7 +259,7 @@
       "windup": 0.47,
       "material": "/Game/StylizedCreaturesBundle/Materials/Instances/Bear/MI_Bear_Wh",
       "share_animation": "Bear",
-      "animation_output": "/Game/User_JeHoon/StylizedCreaturesBundle/Animations/Bear"
+      "animation_output": "/Game/User_JeHoon/Assets/StylizedCreaturesBundle/Animations/Bear"
     }
   ]
 }

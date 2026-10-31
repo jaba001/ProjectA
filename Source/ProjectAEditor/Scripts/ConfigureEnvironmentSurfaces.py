@@ -11,7 +11,7 @@ import unreal
 
 ROOT = Path(unreal.Paths.project_dir()).resolve()
 SPEC_FILE = Path(__file__).resolve().parent / "EnvironmentLevelSpecs.json"
-OUTPUT_ROOT = "/Game/User_JeHoon/Materials/Environment/"
+OUTPUT_ROOT = "/Game/User_JeHoon/Assets/Materials/Environment/"
 LIBRARY = unreal.EditorAssetLibrary
 EDITING = unreal.MaterialEditingLibrary
 TOOLS = unreal.AssetToolsHelpers.get_asset_tools()

@@ -6,6 +6,9 @@
 #include "CharacterEquipmentComponent.generated.h"
 
 class UMeshComponent;
+class UMaterialInterface;
+class USkeletalMeshComponent;
+class USkeletalMesh;
 
 // Replicate the loadout marker and its visual entries as one coherent property.
 // 장착 여부와 표시 항목을 하나의 일관된 속성으로 복제합니다.
@@ -49,8 +52,15 @@ private:
     UPROPERTY(Transient)
     TArray<TObjectPtr<UMeshComponent>> EquipmentMeshes;
 
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UMaterialInterface>> OriginalBodyMaterials;
+
+    TWeakObjectPtr<USkeletalMeshComponent> MaterialBody;
+    TWeakObjectPtr<USkeletalMesh> MaterialBodyAsset;
+
     UFUNCTION()
     void OnRep_Presentation();
 
     void RemoveEquipmentMeshes();
+    void RestoreBodyMaterials();
 };

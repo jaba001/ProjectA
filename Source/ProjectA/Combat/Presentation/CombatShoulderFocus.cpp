@@ -32,6 +32,7 @@ int32 FCombatShoulderFocus::Update(const FCombatRoundView& View, int32 Participa
     if (View.Phase == ECombatRoundPhase::Planning && Focus && !Focus->bReady)
     {
         UnitId = INDEX_NONE;
+        bActionStarted = false;
         bFinished = false;
         Focus = nullptr;
     }
@@ -53,7 +54,10 @@ int32 FCombatShoulderFocus::Update(const FCombatRoundView& View, int32 Participa
     }
     // Keep the tactical view through Ready, SAP movement and the start delay; follow only once the unit's own action begins.
     // 준비 완료·SAP 이동·시작 지연 동안은 전술 시점을 유지하고 유닛의 행동이 실제로 시작될 때부터 따라갑니다.
-    const bool bActionStarted = View.Phase == ECombatRoundPhase::Resolving && (Focus->ActionPhase == ECombatRoundActionPhase::Approaching || Focus->ActionPhase == ECombatRoundActionPhase::Casting);
+    // Once started, retain recovery and pending impacts until the existing return boundary ends the shot.
+    // 행동이 시작된 뒤에는 기존 복귀 경계가 시점을 종료할 때까지 후딜과 잔여 피격을 유지합니다.
+    bActionStarted |= View.Phase == ECombatRoundPhase::Resolving
+        && (Focus->ActionPhase == ECombatRoundActionPhase::Approaching || Focus->ActionPhase == ECombatRoundActionPhase::Casting);
     if (!bActionStarted) return INDEX_NONE;
     return UnitId;
 }

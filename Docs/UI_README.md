@@ -11,7 +11,7 @@
 | Native UI | [Source/ProjectA/UI](../Source/ProjectA/UI), 화면 동작·선택적 fallback |
 | 공통 테마 | [DemonicUITheme](../Source/ProjectA/UI/Theme/DemonicUITheme.h), 기존 DemonicUI 텍스처와 컨트롤 외형 |
 | WBP | `/Game/User_JeHoon/UI/MainMenu`, `/Game/User_JeHoon/UI/Gameplay` |
-| 검증 사본 | `/Game/User_JeHoon/Validation/T12` |
+| 검증 사본 | `/Game/User_JeHoon/UI/Validation/T12` |
 
 기존 Designer WBP를 화면 구조의 기준으로 유지한다. 새 라운드 계획 화면은 7절의 native CommonUI 생성 경로를 사용한다. JSON은 초기 생성·바인딩 검증·누락 보완에 사용하며 결과 WidgetTree는 WBP에 저장된다. 9절의 공통 버튼·배경·글자색은 native 테마가 실행 시 적용하며 나머지 배치·폰트·세부 스타일은 Designer에서 편집한다. Editor API·의존성은 ProjectAEditor에 한정한다.
 
@@ -173,7 +173,7 @@ GameplayPlayerController는 화면별 SetInputMode를 추가하지 않으며 메
 - Designer 확인: 부모 클래스·위젯 계층·변수·텍스트·색상·패딩·정렬 확인. Content Browser 미표시 시 경로·필터·에디터 재로드 확인.
 - 바인딩/갱신 실패: Native 빌드·이름/타입·부모 클래스·AddMissing/Overwrite 옵션 확인.
 - 전체 메뉴 완료와 일부 assertion 통과를 구분한다.
-- T12 검증: 메뉴 명세 3종을 Validation/T12로 복사 생성한다. MainMenuScreenWidget의 Text_Title 변경과 T12_MissingLabel(TextBlock, parent=RootOverlay) 추가 후 AddMissing을 2회 실행하고 기존 제목 보존·신규 위젯·바인딩을 확인한다. 테스트 필터는 `ProjectA.Menu.AssetContracts`, 생성본 옵션은 `-T12GeneratedAssets`다.
+- T12 검증: 메뉴 명세 3종을 UI/Validation/T12로 복사 생성한다. MainMenuScreenWidget의 Text_Title 변경과 T12_MissingLabel(TextBlock, parent=RootOverlay) 추가 후 AddMissing을 2회 실행하고 기존 제목 보존·신규 위젯·바인딩을 확인한다. 테스트 필터는 `ProjectA.Menu.AssetContracts`, 생성본 옵션은 `-T12GeneratedAssets`다. 다른 테스트의 `Validation` 경로는 메모리용 가상 패키지 또는 실패 입력이며 실제 저장 에셋 폴더를 만들지 않는다.
 
 ## 7 기본 라운드 전투 UI
 
@@ -358,7 +358,7 @@ C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / 
 
 `CombatArena`가 활성화하는 실제 `CameraComponent`는 `bConstrainAspectRatio=false`를 적용하여 고정 16:9 비율의 검은 띠를 제거한다. 세로 시야각을 유지하는 `AspectRatio_MaintainYFOV`를 명시하여 넓은 화면에서는 좌우 시야를 확장한다. `ConfigureGameplayAssets.py`의 생성 기본값도 같은 설정을 사용한다. 기존 제작 카메라 에셋을 다시 생성하거나 이동하지 않아도 런타임에 적용하며 실제 시야·프레이밍은 화면 비율별로 사용자가 확인한다.
 
-준비 완료가 서버의 확정 View에 반영되면 따라갈 본인 소유 인간 캐릭터를 고정하고, 다른 참가자의 준비 대기·SAP 이동·시작 지연 동안은 전술 카메라를 유지한다. 그 캐릭터의 행동 단계가 접근 또는 시전으로 바뀌면 오른쪽 숄더뷰로 0.3초 동안 전환한다. 준비 요청의 대기·거절에는 전환하지 않는다. 근접은 공격 몽타주 종료 후 제자리 복귀 단계가 관측되면 즉시 이전 전술 카메라로 전환하여 복귀 이동을 숄더뷰로 따라가지 않는다. 원거리·마법은 최초 피격 시점에 0.45초 복귀 블렌드를 시작하며 시전이 먼저 끝나도 자기 투사체·지연 효과를 기다린다. 빗나감·수명 종료는 해당 행동의 마지막 대기 효과가 종료되면 복귀하고 체인의 후속 타격은 시점을 다시 활성화하지 않는다. 다른 유닛의 행동·효과에 따라 초점을 자동 교체하거나 복귀를 지연하지 않는다. 카메라 갱신 전에 이미 끝난 무행동은 전환을 생략하며 연출을 위해 전투를 지연하지 않는다.
+준비 완료가 서버의 확정 View에 반영되면 따라갈 본인 소유 인간 캐릭터를 고정하고, 다른 참가자의 준비 대기·SAP 이동·시작 지연 동안은 전술 카메라를 유지한다. 그 캐릭터의 행동 단계가 접근 또는 시전으로 바뀌면 오른쪽 숄더뷰로 0.3초 동안 전환한다. 준비 요청의 대기·거절에는 전환하지 않는다. 근접은 공격 몽타주 종료 후 제자리 복귀 단계가 관측되면 0.45초 Cubic 블렌드로 이전 전술 카메라에 부드럽게 복귀한다. 블렌드 시작 시 숄더 구도를 고정하여 복귀 이동을 따라가지 않는다. 원거리·마법은 최초 피격 시점에 0.45초 복귀 블렌드를 시작하며 시전이 먼저 끝나도 자기 투사체·지연 효과를 기다린다. 빗나감·수명 종료는 해당 행동의 마지막 대기 효과가 종료되면 복귀하고 체인의 후속 타격은 시점을 다시 활성화하지 않는다. 다른 유닛의 행동·효과에 따라 초점을 자동 교체하거나 복귀를 지연하지 않는다. 카메라 갱신 전에 이미 끝난 무행동은 전환을 생략하며 연출을 위해 전투를 지연하지 않는다.
 
 준비 취소·사망·전투 중단·세션 종료에는 숄더뷰를 해제한다. 인카운터 등 다른 연출이 이미 시점을 전환했다면 이전 전술 카메라를 다시 덮어쓰지 않는다. 각 로컬 컨트롤러의 임시 카메라 표현이며 캐릭터 소유권·서버 행동 순서·기존 입력 잠금·저장 형식을 변경하지 않는다.
 
@@ -372,7 +372,7 @@ C++ 파일 추가에 따른 프로젝트 파일 재생성·Development Editor / 
 
 캐릭터 생성의 선택 순서는 전사 `Warrior` → 마법사 `Mage` → 궁수 `Archer` → 도적 `Rogue`다. 이전 테스트 직업은 선택 목록에서 제거한다. 이름 편집·취소·1~4명 생성과 원래 소유권은 유지한다. ClassInfo는 직업 정의의 시작 수치([GAME_STATUS 5절](GAME_STATUS.md#5-직업과-능력치))와 기존 전투 클래스에서 해석한 AP/SubAP·시작 스킬을 표시한다. 이 수치는 현재 시작값이며 최종 직업 밸런스가 아니다.
 
-표시 정보의 기준은 `UProfessionBase`와 네 C++ 자식 클래스다. 실사용 및 `Validation/T12` WBP의 기존 WidgetTree·배치·스타일·바인딩을 유지한다. MainMenu 프리뷰 맵은 Warrior/Mage/Rogue를 각각 직업별 MenuPreview에, Archer를 기존 `BP_PartyMenuPreview`에 연결한다. 네 직업의 몸체 선택은 같은 카탈로그를 사용한다. 개발용 협동은 참가자마다 궁수 한 명을 생성한다.
+표시 정보의 기준은 `UProfessionBase`와 네 C++ 자식 클래스다. 실사용 및 `UI/Validation/T12` WBP의 기존 WidgetTree·배치·스타일·바인딩을 유지한다. MainMenu 프리뷰 맵은 Warrior/Mage/Rogue를 각각 직업별 MenuPreview에, Archer를 기존 `BP_PartyMenuPreview`에 연결한다. 네 직업의 몸체 선택은 같은 카탈로그를 사용한다. 개발용 협동은 참가자마다 궁수 한 명을 생성한다.
 
 지원하지 않는 이전 직업의 Continue는 해당 ID와 오류를 표시하고 저장 원본·현재 Run을 유지한다. 새 직업으로 자동 변환하지 않는다. Editor 빌드와 저장 후 에셋 재로드에서 새 직업 맵·16개 라벨을 확인했으며 직업 기준은 [기획](GAME_STATUS.md#5-직업과-능력치)을 따른다. 구직업 오류 화면의 실제 조작은 위 에셋 재로드 검사에 포함되지 않았다.
 

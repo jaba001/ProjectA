@@ -20,7 +20,7 @@ EDGE_DARKEN = 0.5
 MACRO_TILE_CM = 900.0
 MACRO_RANGE = (0.85, 1.2)
 OUTPUT = ROOT / ('Saved/Automation/EncounterStoneDetail_20261012' if STONE_DETAIL_ONLY else 'Saved/Automation/EncounterStoneColor_20261012' if STONE_COLOR_ONLY else 'Saved/Automation/EncounterMasonry_20261011' if MASONRY_ONLY else 'Saved/Automation/EncounterCeiling_20261011' if CEILING_ONLY else 'Saved/Automation/MazeTextures_20261011')
-MATERIAL_ROOT = '/Game/User_JeHoon/Materials/Environment/Dungeon_Modular_V1/Materials'
+MATERIAL_ROOT = '/Game/User_JeHoon/Assets/Materials/Environment/Dungeon_Modular_V1/Materials'
 SOURCE_ROOT = '/Game/Dungeon_Modular_V1/Textures/'
 OWNER_TAG = 'ProjectAEncounterSurface'
 EDITING = unreal.MaterialEditingLibrary
@@ -284,7 +284,7 @@ def main():
         report.append({'path': path, 'instanced_static_meshes': True, 'opaque': True, 'two_sided': name == 'M_EncounterStoneCeiling', 'tangent_space_normal': True, 'normal_strength': NORMAL_STRENGTH, 'roughness_min': ROUGHNESS_MIN, 'specular': SPECULAR, 'edge_width_uv': EDGE_WIDTH, 'edge_darken': EDGE_DARKEN, 'macro_tile_cm': MACRO_TILE_CM, 'macro_range': list(MACRO_RANGE), 'diffuse_rgb_preserved': True, 'diffuse_tint': [0.65, 0.60, 0.52], 'tile_size_cm': size, 'texture_paths': [SOURCE_ROOT + prefix + suffix for suffix in ('_D', '_N', '_R')], 'compile_errors': list(compile_errors)})
     # The project-owned prototype still supplies mortar and NPC colors; persist its instancing support as well.
     # 프로젝트 소유 프로토타입은 줄눈·NPC 색상에 계속 사용하므로 인스턴싱 지원도 저장합니다.
-    prototype_path = '/Game/User_JeHoon/Materials/Prototype/M_EncounterPrototype'
+    prototype_path = '/Game/User_JeHoon/Assets/Materials/Prototype/M_EncounterPrototype'
     prototype = require(unreal.load_asset(prototype_path), 'Missing project prototype')
     if not CEILING_ONLY and not MASONRY_ONLY and not STONE_COLOR_ONLY and not STONE_DETAIL_ONLY:
         EDITING.set_base_material_usage(prototype, unreal.MaterialUsage.MATUSAGE_INSTANCED_STATIC_MESHES)

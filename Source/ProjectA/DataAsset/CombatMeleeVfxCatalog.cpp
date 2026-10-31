@@ -12,8 +12,8 @@ UCombatMeleeVfxCatalog::UCombatMeleeVfxCatalog()
     const FGameplayTagQuery Query = FGameplayTagQuery::BuildQuery(RequiredTags);
     const TArray<TSoftObjectPtr<UAnimMontage>> Montages =
     {
-        TSoftObjectPtr<UAnimMontage>(FSoftObjectPath(TEXT("/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_SwordSkillCast.AM_SwordSkillCast"))),
-        TSoftObjectPtr<UAnimMontage>(FSoftObjectPath(TEXT("/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_SwordSkillCast_SkeletonGuard.AM_SwordSkillCast_SkeletonGuard")))
+        TSoftObjectPtr<UAnimMontage>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Assets/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_SwordSkillCast.AM_SwordSkillCast"))),
+        TSoftObjectPtr<UAnimMontage>(FSoftObjectPath(TEXT("/Game/User_JeHoon/Assets/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_SwordSkillCast_SkeletonGuard.AM_SwordSkillCast_SkeletonGuard")))
     };
     const auto AddRule = [this, &Query, &Montages](FName Id, const TCHAR* Path, bool bEnabled, float RotationSpeed)
     {

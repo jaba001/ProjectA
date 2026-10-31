@@ -119,6 +119,18 @@ FGameplayTag URunEquipmentCatalog::ResolveSlot(const FRunEquipmentProfile& Profi
     return Profile.AllowedSlots.HasTagExact(ResolvedSlot) ? ResolvedSlot : FGameplayTag();
 }
 
+FSoftObjectPath URunEquipmentCatalog::ResolveBodyMesh(const FSoftObjectPath& ItemAsset, FName BodyId) const
+{
+    const FRunEquipmentBodyMesh* Variant = BodyMeshes.FindByPredicate([&ItemAsset, BodyId](const FRunEquipmentBodyMesh& Entry) { return Entry.BodyId == BodyId && Entry.ItemAsset == ItemAsset; });
+    return Variant ? Variant->MeshAsset : ItemAsset;
+}
+
+TArray<FSoftObjectPath> URunEquipmentCatalog::ResolveBodyMaterials(const FSoftObjectPath& ItemAsset, FName BodyId) const
+{
+    const FRunEquipmentBodyMesh* Variant = BodyMeshes.FindByPredicate([&ItemAsset, BodyId](const FRunEquipmentBodyMesh& Entry) { return Entry.BodyId == BodyId && Entry.ItemAsset == ItemAsset; });
+    return Variant ? Variant->BodyMaterials : TArray<FSoftObjectPath>();
+}
+
 FGameplayTagContainer URunEquipmentCatalog::GetOccupiedSlots(const FRunEquipmentProfile& Profile, FGameplayTag AnchorSlot)
 {
     FGameplayTagContainer OccupiedSlots;

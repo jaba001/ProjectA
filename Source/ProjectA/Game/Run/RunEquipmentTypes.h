@@ -87,6 +87,11 @@ struct PROJECTA_API FRunEquipmentVisual
 
     UPROPERTY(BlueprintReadOnly, Category = "Equipment")
     bool bFollowBodyPose = false;
+
+    // Authored skin masks apply only while the corresponding garment is worn.
+    // 작성된 신체 가림 재질은 해당 의상을 착용하는 동안에만 적용합니다.
+    UPROPERTY(BlueprintReadOnly, Category = "Equipment")
+    TArray<FSoftObjectPath> BodyMaterials;
 };
 
 USTRUCT(BlueprintType)

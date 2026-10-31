@@ -148,6 +148,7 @@ namespace
     bool ValidPolicy(const FRunTargetState& State)
     {
         const FRunLevelDesignState& Policy = State.LevelDesign;
+        if (Policy.MinimumEnemyCount < 1 || Policy.MinimumEnemyCount > 2) return false;
         if (State.SchemaVersion != 1 || Policy.SchemaVersion != 1 || Policy.PartySize < 1 || Policy.PartySize > 4 || Policy.Catalog.IsEmpty() || Policy.Catalog.Num() > MaximumLevelDesignCatalogSize || Policy.Rules.Num() != GroupCount || State.Groups.Num() != GroupCount) return false;
         TSet<FName> Ids;
         TSet<FSoftClassPath> Classes;
@@ -173,7 +174,7 @@ namespace
                 ++Eligible;
                 if (Rule.LeaderQuery.IsEmpty() || Rule.LeaderQuery.Matches(Monster.Tags)) ++Leaders;
             }
-            if (Eligible < ScaledCount(Rule.EnemyCount, Policy.PartySize) || Leaders == 0) return false;
+            if (Eligible < FMath::Max(Policy.MinimumEnemyCount, ScaledCount(Rule.EnemyCount, Policy.PartySize)) || Leaders == 0) return false;
         }
         return true;
     }
@@ -193,7 +194,7 @@ namespace
                 Candidate.Tags = Monster.Tags;
                 Candidate.BaseWeight = Rule.EnemyQuery.IsEmpty() || Rule.EnemyQuery.Matches(Monster.Tags) ? Monster.Weight : 0.0f;
             }
-            const int32 Count = ScaledCount(Rule.EnemyCount, State.LevelDesign.PartySize);
+            const int32 Count = FMath::Max(State.LevelDesign.MinimumEnemyCount, ScaledCount(Rule.EnemyCount, State.LevelDesign.PartySize));
             TArray<int32> Selected;
             if (Rule.LeaderQuery.IsEmpty())
             {
@@ -349,6 +350,7 @@ bool RunLevelDesign::LoadFromStrings(FString Stats, FString Weights, FString Lev
     Candidate.LevelDesign.SchemaVersion = 1;
     Candidate.LevelDesign.Seed = Seed;
     Candidate.LevelDesign.PartySize = PartySize;
+    Candidate.LevelDesign.MinimumEnemyCount = 2;
     if (!ParseStats(MoveTemp(Stats), Candidate.LevelDesign.Catalog) || !ParseWeights(MoveTemp(Weights), Candidate.LevelDesign.Catalog) || !ParseLevels(MoveTemp(Levels), Candidate.LevelDesign.Rules) || !Build(Candidate, OutError)) return false;
     State = MoveTemp(Candidate);
     OutError = FText::GetEmpty();

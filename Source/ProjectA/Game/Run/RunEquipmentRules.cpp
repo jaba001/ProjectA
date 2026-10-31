@@ -250,14 +250,16 @@ bool RunEquipmentRules::BuildVisuals(const FRunPartyMember& Member, TArray<FRunE
     {
         const FRunItemDefinition& Item = Member.Items[Slot.ItemIndex];
         const FRunEquipmentProfile* Profile = Catalog.ResolveProfile(Item);
-        UObject* Mesh = Item.Asset.TryLoad();
+        const FSoftObjectPath VisualAsset = Catalog.ResolveBodyMesh(Item.Asset, Member.Appearance.BodyId);
+        UObject* Mesh = VisualAsset.TryLoad();
         OutError = NSLOCTEXT("RunEquipment", "MissingMesh", "장비의 원본 메시를 불러올 수 없습니다. 기존 장비를 유지합니다.");
         if (!Mesh || (!Mesh->IsA<UStaticMesh>() && !Mesh->IsA<USkeletalMesh>())) return false;
         FRunEquipmentVisual Visual;
         Visual.SlotTag = Slot.SlotTag;
         Visual.ItemTags = Item.Tags;
         Visual.WeaponDamage = Item.WeaponDamage;
-        Visual.Asset = Item.Asset;
+        Visual.Asset = VisualAsset;
+        Visual.BodyMaterials = Catalog.ResolveBodyMaterials(Item.Asset, Member.Appearance.BodyId);
         if (!Catalog.GetAttachment(*Profile, Slot.SlotTag, Visual.SocketName, Visual.RelativeTransform, Visual.bFollowBodyPose) || (Visual.bFollowBodyPose && !Mesh->IsA<USkeletalMesh>())) return false;
         OutVisuals.Add(Visual);
     }

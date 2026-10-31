@@ -14,7 +14,7 @@ SPECS = [
     {"name": "DA_MeleeAttack", "id": "WeaponMeleeAttack", "label": "타격",
      "source": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_swoard_attack",
      "tags": ["Attack.Close", "Skill.Element.Physical", "Skill.Effect.Damage"],
-     "cast_montage": "/Game/User_JeHoon/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_MeleeAttack"},
+     "cast_montage": "/Game/User_JeHoon/Assets/ParagonAnimationsRetargetedToManny/GreystoneManny/Attack/AM_MeleeAttack"},
     {"name": "DA_CrossbowAttack", "id": "WeaponCrossbowAttack", "label": "석궁 공격", "source": "/Game/User_JeHoon/Blueprint/DataAsset/Skills/DrGame/ProjectileHitVFX/DA_DrGame_ProjectileHitVFX_Arrow", "tags": ["Attack.Ranged", "Skill.Element.Physical", "Skill.Effect.Damage", "Skill.Shape.Projectile"]},
 ]
 

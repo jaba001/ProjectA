@@ -132,7 +132,7 @@ void ACombatShoulderCamera::CalcCamera(float DeltaTime, FMinimalViewInfo& OutRes
     const float Step = FMath::Clamp(DeltaTime, 0.f, 0.1f);
     const float Alpha = 1.f - FMath::Exp(-FMath::Max(1.f, FollowInterpSpeed) * Step);
     const float HalfHeight = Unit->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-    const FVector Pivot = Unit->GetActorLocation() + FVector(0.f, 0.f, HalfHeight * FMath::Clamp(PivotHeightFraction, 0.f, 1.f));
+    const FVector Pivot = Unit->GetActorLocation() + FVector(0.f, 0.f, HalfHeight * FMath::Clamp(PivotHeightFraction, -1.f, 1.f));
     const FVector Lead = (Unit->GetVelocity() * FMath::Max(0.f, VelocityLeadTime)).GetClampedToMaxSize(35.f);
     if (!bHasPose)
     {
@@ -150,7 +150,12 @@ void ACombatShoulderCamera::CalcCamera(float DeltaTime, FMinimalViewInfo& OutRes
     const FRotator Heading(0.f, SmoothedYaw, 0.f);
     const FVector Forward = Heading.Vector();
     const FVector Right = FRotationMatrix(Heading).GetUnitAxis(EAxis::Y);
-    const FVector DesiredLocation = SmoothedPivot - Forward * FMath::Max(50.f, FollowDistance) + Right * FMath::Max(0.f, ShoulderOffset) + FVector(0.f, 0.f, FMath::Max(0.f, CameraHeight));
+    const FVector LookAt = SmoothedPivot + Forward * FMath::Max(0.f, LookAheadDistance);
+    const FVector HorizontalLocation = SmoothedPivot - Forward * FMath::Max(50.f, FollowDistance) + Right * FMath::Max(0.f, ShoulderOffset);
+    // Include the look-ahead and shoulder offsets so the unobstructed view uses the requested downward angle.
+    // 장애물이 없는 시점이 지정한 내려다보기 각도를 유지하도록 전방 주시 거리와 어깨 오프셋을 함께 반영합니다.
+    const double Rise = FVector::Dist2D(HorizontalLocation, LookAt) * FMath::Tan(FMath::DegreesToRadians(FMath::Clamp(DownwardViewAngle, 5.f, 75.f)));
+    const FVector DesiredLocation = HorizontalLocation + FVector(0.f, 0.f, Rise);
     const FVector SafeLocation = ResolveCameraCollision(Pivot, DesiredLocation);
     const float SafeDistance = static_cast<float>(FVector::Distance(Pivot, SafeLocation));
 
@@ -158,7 +163,6 @@ void ACombatShoulderCamera::CalcCamera(float DeltaTime, FMinimalViewInfo& OutRes
     // 장애물이 있으면 즉시 당기고 복구 거리는 벽을 통과하지 않도록 부드럽게 늘립니다.
     CurrentArmDistance = !bHasPose || SafeDistance < CurrentArmDistance ? SafeDistance : FMath::Lerp(CurrentArmDistance, SafeDistance, Alpha);
     const FVector Location = Pivot + (SafeLocation - Pivot).GetSafeNormal() * CurrentArmDistance;
-    const FVector LookAt = SmoothedPivot + Forward * FMath::Max(100.f, LookAheadDistance);
     OutResult = ViewTemplate;
     OutResult.Location = Location;
     OutResult.Rotation = (LookAt - Location).Rotation();
