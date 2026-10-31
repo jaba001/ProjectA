@@ -90,7 +90,7 @@ C++ 파일을 추가·삭제하거나 이름을 바꾼 뒤에는 프로젝트 �
 | [PVE_DIFFICULTIES](DataCatalogs/PVE_DIFFICULTIES.csv)* | 하·중·상 속도·골드 배율 |
 | [PVE_HEALTH_CURVE](DataCatalogs/PVE_HEALTH_CURVE.csv)* | 10묶음×3난이도의 기준 HP |
 | [ARMOR_ASSETS](DataCatalogs/ARMOR_ASSETS.csv) | ROG 시범 방어구·망토 6종(디버그 전투 장비 목록 전용) |
-| [ITEM_DESIGN_DRAFT](DataCatalogs/ITEM_DESIGN_DRAFT.csv) | 새 아이템 기획 목록. 현재 기준 아이템 롱소드 1개(런타임 미사용, [ITEM_DESIGN 3절](Docs/ITEM_DESIGN.md#3-새-아이템-목록-초안)) |
+| [ITEM_DESIGN_DRAFT](DataCatalogs/ITEM_DESIGN_DRAFT.csv) | 새 아이템 기획 목록. 현재 기준 아이템 롱소드·그레이트소드 2개(런타임 미사용, [ITEM_DESIGN 3절](Docs/ITEM_DESIGN.md#3-새-아이템-목록-초안)) |
 | [MONSTER_ASSETS](DataCatalogs/MONSTER_ASSETS.csv) | 몬스터 13종의 원본 팩·Blueprint·메시 경로(참고 자료) |
 | [SKILL_EFFECT_ASSETS](DataCatalogs/SKILL_EFFECT_ASSETS.csv) · [SKILL_CREATION_STATUS](DataCatalogs/SKILL_CREATION_STATUS.csv) · [SKILL_SOUND_ASSETS](DataCatalogs/SKILL_SOUND_ASSETS.csv) | VFX·스킬 생성 현황·SFX 원본 목록과 연결 기록 |
 
