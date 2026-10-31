@@ -115,11 +115,11 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 전투의 `RunWeaponSkillRules::ResolveSkill`은 원본 실행 정의에 현재 Run의 저장된 위력·AP/SAP·선딜만 적용한다. 양 팀의 같은 SkillId는 같은 수치를 사용하고 체크포인트 계획 검증·복구에도 같은 규칙을 전달한다. Snapshot 자체의 스킬 목록·캐릭터 수치를 수정하거나 상대 Run 당시 수치의 경쟁 재현을 보장하지 않는다. 원본 DA·GAS 실행 태그·충돌·범위·체인·몽타주는 유지하며 목록 밖 기본 공격·몬스터·소모품 15종은 조정하지 않는다.
 
-`WEAPON_ASSETS.csv`의 `무기 피해량`은 기존 49개 모두 10으로 초기화한다. `FRunItemDefinition.WeaponDamage`는 Run 카탈로그·사본에 보존하며 이전 CSV·저장의 누락 값도 10이다. `UEquipmentCombatRules.BasicWeaponAttacks`가 지정한 기본 근접 공격은 장착한 공격 무기의 평균 피해를 사용하고 방패를 제외한다. 일반 공격 스킬의 별도 위력과 몬스터의 장비 없는 기존 프로필은 유지한다.
+`WEAPON_ASSETS.csv`의 `무기 피해량`은 기존 49개 모두 10으로 초기화한다. `FRunItemDefinition.WeaponDamage`는 Run 카탈로그·사본에 보존하며 이전 CSV·저장의 누락 값도 10이다. `UEquipmentCombatRules.BasicWeaponAttacks`가 지정한 기본 타격은 장착한 공격 무기의 평균 피해를 사용하고 방패를 제외한다. 일반 공격 스킬의 별도 위력과 몬스터의 장비 없는 기존 프로필은 유지한다.
 
 `Skills/Weapons/DA_DoubleAttack`은 `UEquipmentCombatRules.IntrinsicSkills`의 아이템 GameplayTagQuery로 단검 기본 스킬을 부여한다. 단검 하나부터 목록에 표시하고 각 무기 슬롯의 `RequiredEquipment` GameplayTagQuery를 모두 만족할 때만 실행한다. 상점·인벤토리에도 기본 스킬과 쌍수 단검 사용 조건을 표시한다. `MeleeStrikes`에 작성한 왼손·오른손 타격을 0.184초·0.584초에 각각 기존 서버 근접 충돌·GAS 피격 경로로 실행하며 AP/SAP는 전체 시전에 한 번만 차감한다. 첫 타격 뒤 대상이 사망해도 시전을 재시작하지 않는다. `CreateDoubleAttack.py`는 `GreystoneManny/Attack/AM_MeleeAttack`의 전체 준비·공격·복귀를 시퀀스로 굽고 엔진 `MirrorPose`로 왼손 반전본을 만든다. 왼손 반전본은 첫 0.5초만 사용하고 마지막 약 0.133초를 오른손 첫 포즈로 블렌딩한다. 이중타격 몽타주는 단축한 왼손 반전본 다음 오른손 원본을 연결한다. 저장 길이 2.1초를 1.25배속으로 재생해 실제 길이는 1.68초, 두 타격 간격은 0.4초다. 시작·종료 블렌딩도 같은 배율로 단축한다. 기본 재실행은 기존 결과를 보존한다. 기존 `ConditionalSkillVersion=0/1`은 이전 목록 계산을 유지하고 다음 명시적 장비 변경에서 버전 2의 기본 스킬 부여 방식으로 갱신한다. 기존 에셋 경로와 스킬 식별자는 저장 호환성을 위해 유지한다.
 
-프로젝트 전용 `Skills/Weapons/DA_MeleeAttack`, `Skills/Weapons/DA_CrossbowAttack`, `Weapons/DA_WeaponSkillRules`를 `CreateWeaponSkills.py`로 작성하고 `DA_VerticalSliceParty.WeaponSkillRules`를 연결했다. 기존 근접 공격·화살 표현을 참조하며 원본 FX·메시를 복제하지 않고 기존 공격 에셋의 저장값을 변경하지 않는다. 새 근접 DA는 고정 검 trace 대신 공통 근접 충돌을 사용하며 기존 몽타주/직업 재매핑을 재사용한다.
+프로젝트 전용 `Skills/Weapons/DA_MeleeAttack`, `Skills/Weapons/DA_CrossbowAttack`, `Weapons/DA_WeaponSkillRules`를 `CreateWeaponSkills.py`로 작성하고 `DA_VerticalSliceParty.WeaponSkillRules`를 연결했다. 기존 타격·화살 표현을 참조하며 원본 FX·메시를 복제하지 않고 기존 공격 에셋의 저장값을 변경하지 않는다. 새 근접 DA는 고정 검 trace 대신 공통 근접 충돌을 사용하며 기존 몽타주/직업 재매핑을 재사용한다.
 
 ### 3-2 상점 인카운터
 
@@ -145,17 +145,17 @@ Gameplay는 계속 유지하는 단일 레벨이며 새 싱글의 `TargetCombat_
 
 기존 Run·명시적 prototype·개발 협동의 상점1은 **스킬상점**, 상점2는 **아이템상점** 인카운터로 관리한다. `FRunEncounterOffer.EncounterTag`의 `Encounter.Shop.Skill`·`Encounter.Shop.Item` 분류로 UI·구매·리롤 실행을 판정하며 표시 이름과 저장 ID를 분리한다. 저장 호환을 위해 `Shop_01/02/03` ID를 유지하고 상점3은 스킬상점과 같은 구매·리롤 규칙을 사용한다. 분류 태그가 없는 이전 정의·저장은 공통 해석에서 기존 Shop ID를 분류하며, 기본 이전 이름만 새 이름으로 표시하고 사용자 지정 이름과 저장 원본은 보존한다.
 
-기존 규칙의 아군 네 직업은 비무장 공격 하나로 시작하고 직접 조작 캐릭터별 개인 10G, AI 동료 0G를 사용한다. 명시적 prototype·개발 협동의 스킬상점·상점3은 근접 공격 1종·신규 VFX 스킬 60종의 61후보에서 최대 5개를 1G에 판매한다. 기존 저장의 확정 카탈로그·진열·가격은 보존한다. 상품 수는 가용 후보 수와 최대 5개 중 작은 값이며 같은 진열 안에서 중복하지 않는다. 리롤은 전체 진열을 다시 추첨하고 이전 상품의 재등장을 허용한다. 비용은 입장 때 1G로 초기화한 뒤 성공할 때마다 1G씩 증가하며 이어하기에서는 현재 비용을 복원한다.
+기존 규칙의 아군 네 직업은 비무장 공격 하나로 시작하고 직접 조작 캐릭터별 개인 10G, AI 동료 0G를 사용한다. 명시적 prototype·개발 협동의 스킬상점·상점3은 타격 1종·신규 VFX 스킬 60종의 61후보에서 최대 5개를 1G에 판매한다. 기존 저장의 확정 카탈로그·진열·가격은 보존한다. 상품 수는 가용 후보 수와 최대 5개 중 작은 값이며 같은 진열 안에서 중복하지 않는다. 리롤은 전체 진열을 다시 추첨하고 이전 상품의 재등장을 허용한다. 비용은 입장 때 1G로 초기화한 뒤 성공할 때마다 1G씩 증가하며 이어하기에서는 현재 비용을 복원한다.
 
 본인 생존 인간 캐릭터만 구매·리롤하고 같은 스킬의 재구매를 거절하며 일반 스킬의 총 습득 개수에는 상한을 두지 않는다. 회복 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 별도 태그·재고 경로를 사용한다. 습득 즉시 Run 장착 목록에 추가하며 다음 전투부터 사용한다. HP 전체 회복은 1G로 유지하고 직업 설정의 최대 HP까지 즉시 적용하며 만피 구매를 거절한다. 시작 골드·상품 가격·리롤 증가량은 시험값이며 최종 밸런스·확률 가중치는 미확정이다.
 
-`RunEncounterPoolDataAsset.StartingGold/FixedSkillOffers/Recovery/SkillShopPool/SkillShopQuery`에서 시작 골드·기본 상품·회복·추가 풀·태그 조건을 관리한다. 기존 규칙의 기본 파티는 `DA_DrGameRunEncounterPool`의 `DA_DrGameSkillShopPool`을 사용하며 새 일반 Target Run 저장에는 스킬상점 상태를 남기지 않는다. 기존 고정 스킬 진열은 새 풀에서 비우고 근접 공격 1종·신규 60종을 가중치 1의 시험 후보로 제공한다. 기존 개발 경로의 schema 1 `FRunSkillShopState.Catalog/Offers/Query/Revision/RerollPrice`에 값을 고정하며 `OfferCount`는 가용 후보 수와 최대 5개 중 작은 값이다. 공통 후보 추첨은 저장된 태그 조건·기본 가중치를 사용하되 최종 수치와 태그별 가중치 보정 정책은 미확정이다. 신규 도입·원본 설치 전제는 [4-9절](#4-9-구입-vfx와-sfx-도입)을 따른다.
+`RunEncounterPoolDataAsset.StartingGold/FixedSkillOffers/Recovery/SkillShopPool/SkillShopQuery`에서 시작 골드·기본 상품·회복·추가 풀·태그 조건을 관리한다. 기존 규칙의 기본 파티는 `DA_DrGameRunEncounterPool`의 `DA_DrGameSkillShopPool`을 사용하며 새 일반 Target Run 저장에는 스킬상점 상태를 남기지 않는다. 기존 고정 스킬 진열은 새 풀에서 비우고 타격 1종·신규 60종을 가중치 1의 시험 후보로 제공한다. 기존 개발 경로의 schema 1 `FRunSkillShopState.Catalog/Offers/Query/Revision/RerollPrice`에 값을 고정하며 `OfferCount`는 가용 후보 수와 최대 5개 중 작은 값이다. 공통 후보 추첨은 저장된 태그 조건·기본 가중치를 사용하되 최종 수치와 태그별 가중치 보정 정책은 미확정이다. 신규 도입·원본 설치 전제는 [4-9절](#4-9-구입-vfx와-sfx-도입)을 따른다.
 
 2026-10-04 `SkillShopUI`는 기존 61후보를 보존한 격리 진열 5개에서 근접·번개 Chain·치유·보호막 4종의 원래 카드 delegate 구매를 통과했다. 비무장 포함 5개 스킬 탭·저장과 네 번의 실제 메뉴 Continue → 상점 나가기 → Combat_02 지도 카드 요청 → 공개 전투 실행을 확인했다. 각 스킬의 원래 시전자·GAS 1회·AP 1과 능력치 변화, 근접의 실제 몽타주·나머지 Niagara 및 화면 10장을 확인했다. 최초 승리는 공개 상태 fixture로 구성하고 치유의 현재 HP만 일시 조정했으며 원본 DA·위력·태그·Chain 대상 1명은 유지했다.
 
 `FRunPartyMember.Gold/Skills/bHasSkillLoadout/CurrentHP`를 저장 기준으로 사용한다. 서버가 신뢰 연결의 소유자·상점 단계·생존 Human·잔액·스킬 중복·소모품 종류/수량 한도·부족 HP와 모든 구매·회복·리롤 요청의 Revision을 검사한다. 골드·습득 스킬·HP·진열·현재 리롤 비용·Revision을 하나의 저장 후보에 반영하고 성공한 변경만 공개한다. 실패하면 메모리와 기존 파일을 보존하며 재개 시 저장된 카탈로그·진열·비용을 복원한다.
 
-2026-10-03 사용자 요청으로 몬스터 전용 공격을 보존하고 비무장·근접 공격 외 기존 VFX 스킬을 제거한다. 기존 Run·Snapshot·전투 체크포인트는 로드 후보의 보유 스킬·상점 후보/진열과 해당 예약에서 삭제된 VFX 스킬을 제거하고 해당 인간의 준비 완료를 해제한다. 두 기본 공격·골드·보유품·진행·소유권과 독립 이동 예약은 보존한다. 삭제 후 명시 스킬 목록이 비는 기존 Run·체크포인트는 기존 비무장 공격을 복구하며 Snapshot의 빈 스킬 목록은 기존 DefaultAttack 별칭을 사용한다. 남은 상품의 가격·가중치·태그·리롤비는 유지하며 후보가 모두 삭제된 사용자 지정 스킬상점은 회복만 제공하고 리롤을 비활성화한다. 원본 저장을 일괄 덮어쓰지 않고 후보 검증 후 반영하며 이후 정상 저장에 남긴다.
+2026-10-03 사용자 요청으로 몬스터 전용 공격을 보존하고 비무장·타격 외 기존 VFX 스킬을 제거한다. 기존 Run·Snapshot·전투 체크포인트는 로드 후보의 보유 스킬·상점 후보/진열과 해당 예약에서 삭제된 VFX 스킬을 제거하고 해당 인간의 준비 완료를 해제한다. 두 기본 공격·골드·보유품·진행·소유권과 독립 이동 예약은 보존한다. 삭제 후 명시 스킬 목록이 비는 기존 Run·체크포인트는 기존 비무장 공격을 복구하며 Snapshot의 빈 스킬 목록은 기존 DefaultAttack 별칭을 사용한다. 남은 상품의 가격·가중치·태그·리롤비는 유지하며 후보가 모두 삭제된 사용자 지정 스킬상점은 회복만 제공하고 리롤을 비활성화한다. 원본 저장을 일괄 덮어쓰지 않고 후보 검증 후 반영하며 이후 정상 저장에 남긴다.
 
 카탈로그가 없는 기존 schema 1은 고정 상품에서 삭제 스킬을 제외하고 두 기본 공격·골드를 유지하며 새 리롤 규칙을 소급 적용하지 않는다. 회복 필드 누락은 기본값 1G로 읽는다. schema 0에는 상품·골드를 소급 지급하지 않으며 명시 장착이 없는 기존 파티의 직업 기본값도 남은 두 기본 공격으로 제한한다. RunSaveGame에는 전체 상태를 저장하고 GameState 표시 뷰에는 현재 진열·비용·Revision 등 표시 상태를 전달하여 후보 `Catalog/Query`를 복제하지 않는다.
 
@@ -172,7 +172,7 @@ CSV 가격은 필드 전체가 `1~2,147,483,647`의 정수일 때만 수용한�
 | 데이터 | 역할 |
 |---|---|
 | `URunEncounterPoolDataAsset` | 기존 경로의 `FixedOffers`에 인카운터 3개, `FixedSkillOffers/SkillShopPool/SkillShopQuery`에 스킬 후보·태그 조건, `Recovery`에 전체 회복 가격, `StartingGold`에 개인 시작 골드 정의. 인카운터 후보 3개는 고정 제시 |
-| `FRunSkillShopState` | schema 1의 `Catalog/Offers/Query/Revision/RerollPrice`에 스킬 후보·가용 후보 최대 5개 진열·태그 조건·변경 버전·현재 리롤 비용 저장. 기존 개발 경로는 근접 공격 1종·신규 60종의 61후보. 이전 고정 상품·확정 카탈로그 저장 보존 |
+| `FRunSkillShopState` | schema 1의 `Catalog/Offers/Query/Revision/RerollPrice`에 스킬 후보·가용 후보 최대 5개 진열·태그 조건·변경 버전·현재 리롤 비용 저장. 기존 개발 경로는 타격 1종·신규 60종의 61후보. 이전 고정 상품·확정 카탈로그 저장 보존 |
 | `FRunEncounterOffer` | 안정 ID·표시명·인카운터 태그·등장 그룹/가중치·상품 Query·진열 규칙의 USTRUCT 값 데이터. `GetResolvedTag/IsSupportedEncounter/IsService/IsItemShop/GetDisplayName`으로 태그 분류·표시 이름 해석 |
 | `FRunEncounterProgress` | schema·제시 목록·선택 ID·퇴장 완료 여부·`AfterCompletedNodeCount` 방문 회차. Run 저장과 GameState 표시 뷰에 포함 |
 | `UPartyDefinitionDataAsset::RunEncounterPool` | 일반 상점 상품·태그 조건·시작 골드 정의. 기존 경로의 인카운터 기본값은 스킬상점·아이템상점·상점3이며 새 일반 Target Run의 후보는 CSV에서 읽어 별도로 고정 |
@@ -278,7 +278,7 @@ GameplayController에서 별도 `SetInputMode`를 추가하지 않는다. MainMe
 
 `UCombatDebugLoadout`은 Skills 하위의 유효 DataAsset 76종(기본 2·몬스터 전용 12·기존 VFX 60·무기 전용 2)과 태그 장착 프로필이 있는 무기 49종과 시범 방어구·망토 6종을 제공한다. 디버그 아군은 생성 순서대로 남자·여자 몸체를 번갈아 사용한다. 몬스터 공격도 개발용 일반 카탈로그에 포함되며 새 일반 Run의 무기 후보 62종 및 기존 개발 경로의 스킬상점 후보 61종과 구분한다. `Item.Consumable` 태그의 회복약은 일반 카탈로그·습득 스킬 목록·상점 스킬 풀에서 제외하고 목표 Run의 별도 재고에서만 사용한다. 장비 후보는 기존 `RunEquipmentRules`로 검증하고 임시 보유 상태에만 기록한다. 획득은 지정 슬롯에 즉시 장착하며 밀려난 장비는 임시 보유 목록에 남는다. 제거는 장착 해제·보유 삭제·참조 인덱스 보정을 함께 수행한다. 장비는 현재 외형만 바꾸며 능력치·스킬은 부여하지 않는다.
 
-스킬 목록은 기존 `ResolveRoundSkill` 결과의 `EffectTags`를 카탈로그 캐시에 보관하여 속성 8탭과 방식 7탭을 이름/에셋명 검색과 교차 적용한다. 속성은 전체·물리·화염·냉기·번개·카오스·복합·미분류이며 방식은 전체·투사체·범위형·체인·근접공격·지원형·미분류다. `FGameplayTagQuery`로 지원 효과를 우선 분류하고 `Skill.Shape.Chain`이 있는 공격은 기존 Beam 태그를 유지해도 체인으로 분류하여 범위형에서 제외한다. 비무장·근접 공격 2종은 태그가 없어 미분류로 제공하고 신규 60종은 저장된 속성·효과·형태 태그로 분류한다. 몬스터 전용 공격 12개는 원래 몬스터 장착을 유지한다. 삭제한 생성 스킬과 CSV의 미생성 보류 항목은 구입 목록에 추가하지 않는다. 체인 5종은 최근접 생존 미타격 적을 연결하는 다중 연쇄 실행을 지원하며 수치·진행·보존 계약은 [4-9절](#4-9-구입-vfx와-sfx-도입)을 따른다. [UI 기준](UI_README.md#7-2-전투-디버그-도구)
+스킬 목록은 기존 `ResolveRoundSkill` 결과의 `EffectTags`를 카탈로그 캐시에 보관하여 속성 8탭과 방식 7탭을 이름/에셋명 검색과 교차 적용한다. 속성은 전체·물리·화염·냉기·번개·카오스·복합·미분류이며 방식은 전체·투사체·범위형·체인·근접공격·지원형·미분류다. `FGameplayTagQuery`로 지원 효과를 우선 분류하고 `Skill.Shape.Chain`이 있는 공격은 기존 Beam 태그를 유지해도 체인으로 분류하여 범위형에서 제외한다. 비무장·타격 2종은 태그가 없어 미분류로 제공하고 신규 60종은 저장된 속성·효과·형태 태그로 분류한다. 몬스터 전용 공격 12개는 원래 몬스터 장착을 유지한다. 삭제한 생성 스킬과 CSV의 미생성 보류 항목은 구입 목록에 추가하지 않는다. 체인 5종은 최근접 생존 미타격 적을 연결하는 다중 연쇄 실행을 지원하며 수치·진행·보존 계약은 [4-9절](#4-9-구입-vfx와-sfx-도입)을 따른다. [UI 기준](UI_README.md#7-2-전투-디버그-도구)
 
 개수 상한 없는 스킬 추가·제거는 `ACombatRoundCoordinator`에서 소유·생존·Planning·정지 상태를 확인하고 실제 Unit·실행 스킬 캐시를 함께 갱신한다. 해당 유닛의 계획·이동 예약 및 자신의 준비를 해제하며 HP/AP/보호막은 초기화하지 않는다. 전투 초기화는 유닛·투사체·효과를 정리하고 처음 장착으로 다시 생성한다. 일반 Run 메모리·체크포인트는 디버그 변경에 사용하지 않는다.
 
@@ -346,7 +346,7 @@ Gameplay의 전장·Grid·GameplayCamera·물리 바닥·NavBounds를 복제하�
 
 [MONSTER_SPAWN_PROBABILITIES.csv](../DataCatalogs/MONSTER_SPAWN_PROBABILITIES.csv)는 같은 13종 ID의 활성 여부·출현 가중치·전체 후보 기준 확률을 관리한다. 활성 12종은 Wolf 15, Orc·Spider·Boar 각 12, Bear 10, Troll·Crocodile·Toad 각 8, Werewolf·SnowWolf 각 5, SnowBear 3, Golem 2로 합계 100이며 개발용 `BP_EnemyUnit`은 비활성·0이다. CSV 확률은 전체 양수 후보 기준이고 실제 추첨은 구간 Query·선봉·이미 선정한 동종을 반영한 남은 후보 가중치로 재정규화한다. 데이터 합류·저장·구간 수치는 [5-1절](#5-1-목표-run과-회복-시험-데이터)을 따른다.
 
-[MonsterContentSpecs.json](../Source/ProjectAEditor/Scripts/MonsterContentSpecs.json)은 오크 망치병·동굴 트롤·늑대인간·바위 골렘과 늑대·곰·멧돼지·거미·악어·두꺼비 10종, 설원 늑대·설원 곰 재질 변형 2개의 프로젝트 전용 Blueprint를 정의한다. `DA_DefaultEncounter`의 기본 편성은 `Orc`·`Troll`·`Wolf`·`Golem` 4개다. 기존 `BP_EnemyUnit`과 근접 공격은 보존하고 디버그 적군 목록의 13번째 항목으로 제공한다. 새 기본 Run의 CSV 편성은 이 제작 명세와 원본 에셋을 수정하지 않고 스폰 시 적용한다.
+[MonsterContentSpecs.json](../Source/ProjectAEditor/Scripts/MonsterContentSpecs.json)은 오크 망치병·동굴 트롤·늑대인간·바위 골렘과 늑대·곰·멧돼지·거미·악어·두꺼비 10종, 설원 늑대·설원 곰 재질 변형 2개의 프로젝트 전용 Blueprint를 정의한다. `DA_DefaultEncounter`의 기본 편성은 `Orc`·`Troll`·`Wolf`·`Golem` 4개다. 기존 `BP_EnemyUnit`과 타격은 보존하고 디버그 적군 목록의 13번째 항목으로 제공한다. 새 기본 Run의 CSV 편성은 이 제작 명세와 원본 에셋을 수정하지 않고 스폰 시 적용한다.
 
 원본 `/Game/Fantasy_Pack`·`/Game/StylizedCreaturesBundle`의 메시·Skeleton·PhysicsAsset·재질·시퀀스를 직접 참조한다. 새 생물 팩은 약 661MiB이며 Git에서 무시되는 원본은 다른 PC에서도 설치가 필요하다. 새 Blueprint·BlendSpace·AnimBlueprint·몽타주는 `/Game/User_JeHoon/` 아래 원본 팩·하위 구조를 유지하고, 공격 Skill DataAsset은 `Blueprint/DataAsset/Skills/Monsters/`에 작성한다. 늑대인간·골렘의 Manny 비무장 공격 2개만 필수 리타깃 결과로 작성하며 원본 메시·재질·애니메이션을 복제하지 않는다. 설원 변형은 해당 늑대/곰의 애니메이션을 공유한다.
 
@@ -376,11 +376,11 @@ UE 5.8.3에서 실제 렌더링 CVar 7개와 던전 Redirector를 확인했으�
 
 ### 4-8 기본 공격 외 스킬 정리
 
-2026-10-03 사용자 요청으로 비무장 `BPDA_DefaulatAttack`·근접 공격 `BPDA_swoard_attack`과 몬스터 전용 공격 12개·기존 공격 애니메이션을 유지했다. [RetiredSkillContent.json](../Source/ProjectAEditor/Scripts/RetiredSkillContent.json)의 생성 스킬 176개·VFX 팩 13루트의 패키지 2,585개·전용 외부 의존 43개·방향 파생 Niagara 7개·카탈로그 풀 1개·테스트 투사체 1개로 총 2,813개·2,430,314,679바이트(약 2.26GiB)를 삭제했다. 참조 감사를 통해 UI 커서·JumpPad·횃불·환경·무기·몬스터의 공유 원본과 두 기본 공격을 보호했다.
+2026-10-03 사용자 요청으로 비무장 `BPDA_DefaulatAttack`·타격 `BPDA_swoard_attack`과 몬스터 전용 공격 12개·기존 공격 애니메이션을 유지했다. [RetiredSkillContent.json](../Source/ProjectAEditor/Scripts/RetiredSkillContent.json)의 생성 스킬 176개·VFX 팩 13루트의 패키지 2,585개·전용 외부 의존 43개·방향 파생 Niagara 7개·카탈로그 풀 1개·테스트 투사체 1개로 총 2,813개·2,430,314,679바이트(약 2.26GiB)를 삭제했다. 참조 감사를 통해 UI 커서·JumpPad·횃불·환경·무기·몬스터의 공유 원본과 두 기본 공격을 보호했다.
 
 패키지는 Unreal 기능으로 삭제하고 잔존 파일이 없는지 검사한 뒤 VFX 13루트·Free_Magic External Actors/Objects 2루트·프로젝트 방향 파생 RPGEffects/Free_Magic 2루트의 빈 하위 폴더만 제거한다. 다른 Content 폴더는 정리 대상에 포함하지 않는다. [작성·감사 명령](../Source/ProjectAEditor/Scripts/README.md)
 
-퇴역 정리 직후 스킬상점은 근접 공격 1종을 제공했고 디버그 일반 카탈로그는 보존한 기본·몬스터 공격을 읽는다. 이후 신규 60종과 새 상점 풀 도입은 [4-9절](#4-9-구입-vfx와-sfx-도입)을 따른다. 기존 저장의 삭제 스킬·예약을 제거하고 인간의 해당 준비 완료를 해제하되 남은 상품 메타데이터·골드·보유품·진행·소유권을 유지한다. 사용자 지정 상점의 후보가 모두 사라지면 회복만 제공하고 리롤을 비활성화한다. 몬스터 Blueprint·전용 공격 12개·애니메이션과 두 기본 공격의 경로·ID·타격값은 보존한다.
+퇴역 정리 직후 스킬상점은 타격 1종을 제공했고 디버그 일반 카탈로그는 보존한 기본·몬스터 공격을 읽는다. 이후 신규 60종과 새 상점 풀 도입은 [4-9절](#4-9-구입-vfx와-sfx-도입)을 따른다. 기존 저장의 삭제 스킬·예약을 제거하고 인간의 해당 준비 완료를 해제하되 남은 상품 메타데이터·골드·보유품·진행·소유권을 유지한다. 사용자 지정 상점의 후보가 모두 사라지면 회복만 제공하고 리롤을 비활성화한다. 몬스터 Blueprint·전용 공격 12개·애니메이션과 두 기본 공격의 경로·ID·타격값은 보존한다.
 
 UE 5.8.3 Development Editor / Win64 최종 컴파일·링크 4.74초, 엔진 삭제·17폴더 루트 제거와 독립 읽기 전용 재로드 모두 종료 0으로 통과했다. 남은 스킬 14개·생존 Registry 패키지 20,963개의 삭제 대상 참조 없음, 추적 Content 293파일 SHA와 남은 Content 17,844파일 메타데이터 보존을 확인했다. 적용에는 폐기 데모·Transient 경고 11개가 있었으나 독립 재로드는 오류·경고 0이다. 근거는 `Saved/Automation/SkillReset/Apply.json`·`Reload.json`이다.
 
@@ -399,7 +399,7 @@ UE 5.8.3 Development Editor / Win64 최종 컴파일·링크 4.74초, 엔진 삭
 
 [DrGameSkillSpecs.json](../Source/ProjectAEditor/Scripts/DrGameSkillSpecs.json)의 NiagaraSystem 123개 중 주효과 60개를 새 `DrGame_` ID·프로젝트 전용 DA로 작성하고 피격·Trail·Decal·버전/Fluid 대안 63개는 독립 스킬 미생성으로 보존한다. 프로필은 area 15·line 9·link 5·projectile 14·slash 4·heal 6·shield 7개다. Level Up/Spawn 표현은 회복·보호막에 연결하며 경험치 증가·소환 기능을 추가하지 않는다. 투사체 14개는 기존 서버 최초 차단 충돌의 직선 비행을 사용한다. `link` 5종은 기존 `Skill.Shape.Beam`과 `Skill.Shape.Chain`을 유지하며, Chain 태그 쿼리와 다중 대상 설정으로 전용 연쇄 실행기에 연결한다. 구입 원본 연결 VFX를 각 구간에서 직접 참조하고 신규 복제 에셋을 만들지 않는다. 피해·치유·흡수량 25·AP 1·후보 가중치 1과 선딜·판정 기간·범위는 시험 설정이며 최종 밸런스·확률 정책이 아니다.
 
-새 `DA_DrGameSkillShopPool`은 근접 공격 1종·신규 60종의 61후보를 제공하고 `DA_DrGameRunEncounterPool`을 기본 파티의 `RunEncounterPool`에 연결했다. 신규 패키지는 스킬 60개·풀 2개이며 기존 변경은 파티의 Run 풀 참조다. 시작 비무장 공격·몬스터 전용 공격 12개·기존 공격 애니메이션과 [퇴역 명세](#4-8-기본-공격-외-스킬-정리)를 보존한다. 기존 저장에 확정한 카탈로그·진열·가격은 유지하므로 신규 후보는 새 Run에서 확인한다.
+새 `DA_DrGameSkillShopPool`은 타격 1종·신규 60종의 61후보를 제공하고 `DA_DrGameRunEncounterPool`을 기본 파티의 `RunEncounterPool`에 연결했다. 신규 패키지는 스킬 60개·풀 2개이며 기존 변경은 파티의 Run 풀 참조다. 시작 비무장 공격·몬스터 전용 공격 12개·기존 공격 애니메이션과 [퇴역 명세](#4-8-기본-공격-외-스킬-정리)를 보존한다. 기존 저장에 확정한 카탈로그·진열·가격은 유지하므로 신규 후보는 새 Run에서 확인한다.
 
 [이펙트 목록](../DataCatalogs/SKILL_EFFECT_ASSETS.csv)·[생성 현황](../DataCatalogs/SKILL_CREATION_STATUS.csv)은 각각 기존 577행의 셀·바이트를 보존하고 신규 123행을 추가한 700행이다. 별도 [SFX 목록](../DataCatalogs/SKILL_SOUND_ASSETS.csv)은 SoundCue 120개·SoundWave 114개의 팩·원본 objectpath·VFX/스킬 단계·전이 참조·길이/looping을 기록한다. 원본 AudioPlayer SoundToPlay와 파괴/looping/재생 제한 플래그·Audio 사용자 파라미터를 확인하고 빈 바인딩을 별도로 표시한다. 신규 스킬의 원본 Niagara 내부 SFX를 유지한다. PoisonCarousel은 원본 카메라 거리 2,000cm 오디오 컬링을 피하도록 프로젝트의 User.AudioOn을 끄고 동일한 원본 SoundCue를 외부 Sound로 직접 참조한다. Volume/Pitch 1·시작 0초·상한 5초로 원본 큐 볼륨 0.75와 2.143초의 반복 없는 Wave를 유지하며 중복 재생을 차단한다. 기존 DA의 두 필드 작성·독립 재로드와 공식 생성기 검증 전용 실행을 통과했다. 스킬 60개·상점 후보 61개를 확인했고 추가 생성·수정·저장 없이 Content 19,807파일의 상태와 대상 SHA를 보존했다. 수정 후 네 카메라/리스너 조건에서 WAV 신호·최대 동시 오디오 1개와 원본 큐의 자연 종료를 확인했다. 원본 큐 Pitch 1.2를 반영한 재생 길이는 약 1.786초이며 WAV 마지막 0.2초는 무음이었다. 지원되는 파라미터에 AudioOn·최적화 모드를 적용하고 부가 잔류·동적 조명·LevelUp 텍스트 표현을 끈다. 목록의 참조·바인딩 확인은 실제 재생·청취 결과가 아니다.
 
@@ -498,7 +498,7 @@ Gameplay 인벤토리·설정은 `GameplayRootWidget`의 독립 CommonUI 레이�
 - `SkillDefinitionDataAsset.bUseRoundDefinition`과 `RoundDefinition`으로 스킬별 실제 시간·범위·접근·복귀·투사체 정책을 편집한다. 근접·투사체의 발동 전 대상 사망은 가장 가까운 유효 생존 적 재선택으로 공통 해석한다. 공격자의 현재 위치로 거리를 계산하고 `IsValidUnitTarget` 조건을 재사용하며, 유닛 접근형은 접근·미발동 시전·칼날 궤적을 다시 시작한다. 후보가 없으면 불발 후 복귀하고 추가 비용은 차감하지 않는다. 지점 공격·발사 후 투사체·기존 저장 프로필 값은 유지한다. 미지정 장착 스킬은 [GAME_STATUS 6절](GAME_STATUS.md#6-라운드-전투)의 초기 변환을 사용한다.
 - 시전 표현은 명시 프로필의 `RoundDefinition.CastMontage`를 우선하며 비어 있으면 `AbilityClass`의 기존 `AttackMontage`를 사용한다. 소모품은 명시 몽타주만 사용해 공격 몽타주 fallback을 적용하지 않는다. 서버가 시전 진입 시 한 번 재생을 전달한다. 몽타주 재생 인스턴스의 루트 모션과 유닛의 기존 `AN_SkillRelease` 효과 발동은 차단하며, `WindupSeconds`·충돌·AP 계산과 발동 1회는 유지한다. 발동 후 `Recovery`에서 서버의 실제 몽타주 인스턴스가 블렌드 아웃까지 끝날 때까지 기다린 뒤 복귀한다. 서버의 재생 인스턴스를 사용할 수 없으면 에셋 길이/RateScale·블렌드 아웃·여유 시간 0.25초를 사용하며 시전 시작 기준 최대 60초로 제한한다. 반복·자동 종료 누락·잘못된 길이/속도로 무한 대기하지 않으며 시간 초과 시 남은 표현을 즉시 정리한다. 사망·중단·발동 전 취소·다음 행동 시작도 해당 인스턴스를 정리한다.
 - 몽타주 대기 시간은 서버가 받은 `DeltaSeconds`를 프레임당 한 번 누적하며 고정 간격 시뮬레이션의 미처리 시간과 분리한다. 프레임 지연 뒤 누적 시뮬레이션을 처리할 때 시전 대기까지 중복 차감하여 조기에 복귀하지 않도록 한다.
-- 이전 GAS 효과·모든 타일 범위·상태효과를 새 행동으로 완전 변환한 것은 아니다. 회복 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 명시 프로필과 재고만 지원한다. 새 일반 Run의 아군은 비무장 공격과 장착 무기의 확정 스킬을 사용하며, 근접 공격·신규 VFX 60종의 스킬상점 습득은 무기 스킬 획득 버전 0의 기존 경로에만 남는다. 기존 Blueprint·Snapshot·저장에서는 삭제 VFX 스킬만 제외하고 두 기본 공격·몬스터 전용 공격을 유지한다. 기존 `BP_EnemyUnit`의 근접 공격과 신규 몬스터의 기존 전용 공격을 유지한다. [몬스터 구성](#4-5-몬스터-콘텐츠) · [지원 변환](GAME_STATUS.md#6-라운드-전투)
+- 이전 GAS 효과·모든 타일 범위·상태효과를 새 행동으로 완전 변환한 것은 아니다. 회복 소모품은 [5-1절](#5-1-목표-run과-회복-시험-데이터)의 명시 프로필과 재고만 지원한다. 새 일반 Run의 아군은 비무장 공격과 장착 무기의 확정 스킬을 사용하며, 타격·신규 VFX 60종의 스킬상점 습득은 무기 스킬 획득 버전 0의 기존 경로에만 남는다. 기존 Blueprint·Snapshot·저장에서는 삭제 VFX 스킬만 제외하고 두 기본 공격·몬스터 전용 공격을 유지한다. 기존 `BP_EnemyUnit`의 타격과 신규 몬스터의 기존 전용 공격을 유지한다. [몬스터 구성](#4-5-몬스터-콘텐츠) · [지원 변환](GAME_STATUS.md#6-라운드-전투)
 - `RoundMontageOverrides`는 공통 DA를 변경하지 않고 유닛의 Skeleton에 맞는 몽타주로 바꾼다. 전사의 검·비무장과 적의 검, 구형 SkeletonGuard Snapshot의 활·참격·마법 표현에 적용하며 Root Motion·서버 발동 권위·몽타주 종료 후 복귀 규칙을 유지한다. 검은 `hand_r`에 하나만 부착한다.
 - 일반 근접 `DA_MeleeAttack`과 VFX 참격 4개는 Greystone `Attack_A_Med`·`Attack_A_Slow_Recovery`를 준비·베기·복귀 3구간으로 사용한다. 일반 근접은 준비 7/30초·총 1.6초이며 기존 게임 발동 0.23초와 시각적 준비 끝의 차이는 3.33ms다. 참격은 준비 0.3초·총 1.6667초다. 전방/빔/체인 마법 27개는 Gideon의 한 손 시전 1.3초, 광역/회복/보호막 27개는 Muriel의 양손 시전 1.6333초를 사용한다. 마법 준비 0.3초·DefaultSlot·비반복·블렌드 0.06/0.12초이며 추가 효과 지연은 기존 값을 유지한다. 스킬 명세의 `cast_montage`로 분류하고 런타임의 직업·이름·Kind 분기로 대체하지 않는다. 구형 `BPDA_swoard_attack`의 Kwang 몽타주·서버 칼날 추적과 수치·태그·CSV는 보존한다.
 - 마법의 지팡이 쥐기는 프로젝트 임포트 시퀀스 2개의 오른손 손가락 19개 회전만 선택 임포트한 Greystone `Attack_A_Med` 첫 자세로 고정한다. 손목·팔·다른 트랙·위치·배율·타이밍은 보존하며 원본 FBX·Skeleton·AnimBP는 수정하지 않는다. 보정은 작성 명세의 `grip_reference`와 저장된 metadata로 재현·검증한다. `StartingStaff` 장비 프로필은 해당 닫힌 손의 엄지/소지 축과 원본 메시 축 중심으로 부착 위치·회전을 맞춘다. 기존 저장은 다음 전투 생성·checkpoint 복원 시 현재 프로필로 외형을 재구성하며 이미 떠 있는 Actor·메뉴 기본 외형·Snapshot BP 기본 장비까지 자동 갱신하지 않는다.
@@ -677,7 +677,7 @@ GKnight·Assassin·Stylized Dark Witch의 원본·임포트 자료와 제작용 
 | `Blueprint/DataAsset/Parties/DA_VerticalSliceParty` | `UPartyDefinitionDataAsset`, 전사는 `BP_WarriorUnit`, 나머지 직업과 fallback은 `BP_PlayerUnit` |
 | `Blueprint/DataAsset/Encounters/DA_DefaultEncounter` | `UEncounterDefinitionDataAsset`, 기본 편성 `Orc`·`Troll`·`Wolf`·`Golem` 4개와 소프트 디버그 카탈로그 13개. 저장·독립 재로드 정적 검사 통과 |
 | `Blueprint/DataAsset/Skills/BPDA_DefaulatAttack` | `USkillDefinitionDataAsset`, 기존 경로·ID·공격값 유지, 표시명만 `비무장 공격` |
-| `Blueprint/DataAsset/Skills/BPDA_swoard_attack` | `USkillDefinitionDataAsset`, 근접 공격·논리 ID `SwordAttack`·칼날 궤적·장착 무기 평균 피해(장비 없는 기존 프로필 50)·AP 1·활성 0.23~0.43초 |
+| `Blueprint/DataAsset/Skills/BPDA_swoard_attack` | `USkillDefinitionDataAsset`, 타격·논리 ID `SwordAttack`·칼날 궤적·장착 무기 평균 피해(장비 없는 기존 프로필 50)·AP 1·활성 0.23~0.43초 |
 | `Blueprint/Unit/BP_WarriorUnit`, `BP_PlayerUnit`, `BP_MageUnit`, `BP_RogueUnit` | 네 직업 공통 Primitive 남자·여자 몸체 선택. 공통 애니메이션·몽타주 대체·검과 저장 경로 유지. 마법사 기본 스태프 없음 |
 | `Blueprint/Unit/BP_*SnapshotOpponent` | 네 직업 모두 저장된 `BodyId`의 몸체를 사용. 이전 전사·궁수의 공통 Skeleton_Guard 체크포인트는 명시적 호환 맵으로 보존 |
 | `ROG_Modular_Armor/DA_MannyAppearance` | 기존 카탈로그 경로 유지. `BodyVariants`에 Primitive 몸체 원본 참조. ROG 8부위·103개 항목과 Manny 신체 파츠의 원본 재질 연결은 보존하되 의상 UI·착용은 중지 |
