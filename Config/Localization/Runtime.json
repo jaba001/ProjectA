@@ -1927,6 +1927,24 @@
       "key": "IntrinsicSkillName",
       "source": "[기본] {0}",
       "translation": "[Intrinsic] {0}"
+    },
+    {
+      "namespace": "CombatSkillCoverage",
+      "key": "Single",
+      "source": "적용: 단일 대상",
+      "translation": "Coverage: Single target"
+    },
+    {
+      "namespace": "CombatSkillCoverage",
+      "key": "Area",
+      "source": "적용: 범위",
+      "translation": "Coverage: Area"
+    },
+    {
+      "namespace": "CombatSkillCoverage",
+      "key": "Chain",
+      "source": "적용: 범위 (연쇄 · 최대 {0}명)",
+      "translation": "Coverage: Chain (up to {0} targets)"
     }
   ]
 }

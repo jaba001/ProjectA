@@ -399,7 +399,8 @@ void URunEncounterWidget::RefreshEncounter(const FGameplayViewState& View, bool 
             if (Skill && Skill->SkillIcon) ShopIcons[Index]->SetBrushFromTexture(Skill->SkillIcon);
             ShopCards[Index]->SetRenderOpacity(bOwned ? 0.55f : 1.0f);
             ShopCards[Index]->SetToolTip(nullptr);
-            const FText Description = Skill ? ProjectALocalization::SkillDescription(FName(*Skill->GetPrimaryAssetId().ToString()), Offer.Description) : Offer.Description;
+            FText Description = Skill ? ProjectALocalization::SkillDescription(FName(*Skill->GetPrimaryAssetId().ToString()), Offer.Description) : Offer.Description;
+            if (Skill) Description = FText::Join(FText::AsCultureInvariant(TEXT("\n")), TArray<FText>{Skill->GetTargetCoverageText(), Description});
             ShopCards[Index]->SetToolTipText(Description);
             Button->SetToolTipText(FText::Format(NSLOCTEXT("RunShop", "ProductActionTooltip", "{0}\n{1}"), Status, Description));
             Button->SetIsEnabled(!bOwned && bAffordable && Controller && !Controller->IsShopPurchasePending());

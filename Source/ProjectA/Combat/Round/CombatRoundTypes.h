@@ -546,6 +546,10 @@ namespace CombatRoundRules
     PROJECTA_API bool UsesUnitTarget(const FCombatRoundSkill& Skill);
     PROJECTA_API bool MatchesTargetTeam(const FCombatRoundSkill& Skill, bool bSourceEnemy, bool bTargetEnemy);
     PROJECTA_API bool UsesChain(const FCombatRoundSkill& Skill);
+    // Coverage follows authoritative execution geometry, including target locks and chain limits.
+    // 단일 대상 제한과 연쇄 수를 포함한 실제 권위 실행의 판정 형태로 적용 범위를 구분합니다.
+    PROJECTA_API bool CanHitMultipleTargets(const FCombatRoundSkill& Skill);
+    PROJECTA_API FText TargetCoverageText(const FCombatRoundSkill& Skill);
     PROJECTA_API bool IsSupportedEffectDuration(const FCombatRoundSkill& Skill);
     PROJECTA_API bool IsValidSkill(const FCombatRoundSkill& Skill);
 }

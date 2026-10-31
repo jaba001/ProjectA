@@ -68,6 +68,13 @@ bool USkillDefinitionDataAsset::ResolveRoundSkill(FCombatRoundSkill& OutSkill, F
     return true;
 }
 
+FText USkillDefinitionDataAsset::GetTargetCoverageText() const
+{
+    FCombatRoundSkill Skill;
+    FText Error;
+    return ResolveRoundSkill(Skill, Error) ? CombatRoundRules::TargetCoverageText(Skill) : FText::GetEmpty();
+}
+
 FText USkillDefinitionDataAsset::GetActionPointCostText() const
 {
     const int32 Cost = bUseRoundDefinition ? RoundDefinition.ActionPointCost : ActionPointCost;

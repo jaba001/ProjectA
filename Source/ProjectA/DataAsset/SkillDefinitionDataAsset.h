@@ -30,6 +30,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Skill|Round")
     bool ResolveRoundSkill(FCombatRoundSkill& OutSkill, FText& OutError) const;
 
+    UFUNCTION(BlueprintPure, Category = "Skill|Target")
+    FText GetTargetCoverageText() const;
+
 #if WITH_EDITOR
     // Report invalid profiles and legacy semantics that require an explicit round definition.
     // 잘못된 프로필과 명시적 라운드 정의가 필요한 기존 의미를 오류로 보고합니다.

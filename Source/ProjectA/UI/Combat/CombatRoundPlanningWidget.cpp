@@ -870,7 +870,9 @@ void UCombatRoundPlanningWidget::RefreshView(bool bForce)
                 // 현재 지정 중인 대상과 구분하여 서버에 반영된 예약 명령을 설명합니다.
                 const FText TargetLabel = AppliedTarget ? UnitLabel(*AppliedTarget) : FText::Format(NSLOCTEXT("CombatPlanning", "TileLabel", "타일 ({0},{1})"), FText::AsNumber(SelectedUnit->Command.TargetCoord.X), FText::AsNumber(SelectedUnit->Command.TargetCoord.Y));
                 const int32 TotalSAP = Applied->SubActionPointCost + (bHasMovePlan ? 1 : 0);
-                SkillDescription->SetText(FText::Format(NSLOCTEXT("CombatPlanning", "AcceptedSkillPlan", "예약된 스킬: {0} → {1}\n스킬 비용 {2} · 이동 포함 SAP 합계 {3}\n모든 SAP 이동이 끝난 뒤 사용합니다."), SkillName(*Applied), TargetLabel, SkillCostLabel(*Applied), FText::AsNumber(TotalSAP)));
+                const FText Plan = FText::Format(NSLOCTEXT("CombatPlanning", "AcceptedSkillPlan", "예약된 스킬: {0} → {1}\n스킬 비용 {2} · 이동 포함 SAP 합계 {3}\n모든 SAP 이동이 끝난 뒤 사용합니다."),
+                    SkillName(*Applied), TargetLabel, SkillCostLabel(*Applied), FText::AsNumber(TotalSAP));
+                SkillDescription->SetText(FText::Join(FText::AsCultureInvariant(TEXT("\n")), TArray<FText>{CombatRoundRules::TargetCoverageText(*Applied), Plan}));
             }
             else SkillDescription->SetText(bHasSkillPlan ? NSLOCTEXT("CombatPlanning", "UnknownSelectedSkill", "선택한 스킬을 확인할 수 없습니다. 스킬을 다시 선택하거나 취소하세요.") : bHasMovePlan ? NSLOCTEXT("CombatPlanning", "MoveOnlyPlan", "스킬 미선택 · 예약한 이동만 실행합니다.\n스킬 비용 없음 · 이동 SAP 1 소모") : NSLOCTEXT("CombatPlanning", "NoActionPlan", "스킬·이동 미선택 · 준비 완료 시 행동 없이 턴을 넘깁니다.\nAP·SAP 비용 없음"));
         }
@@ -975,6 +977,7 @@ void UCombatRoundPlanningWidget::RefreshView(bool bForce)
         if (Skill)
         {
             FText Label = FText::Format(NSLOCTEXT("CombatPlanning", "SkillCard", "{0}\n{1}"), SkillName(*Skill), SkillCostLabel(*Skill));
+            Label = FText::Format(NSLOCTEXT("CombatPlanning", "SkillAvailability", "{0}\n{1}"), Label, CombatRoundRules::TargetCoverageText(*Skill));
             if (!Skill->EquipmentRequirementText.IsEmpty()) Label = FText::Format(NSLOCTEXT("CombatPlanning", "SkillAvailability", "{0}\n{1}"), Label, Skill->EquipmentRequirementText);
             if (UTextBlock* Text = Cast<UTextBlock>(Button->GetContent())) Text->SetText(Label);
             const FText Reason = !bEquipmentReady && !Skill->EquipmentRequirementText.IsEmpty() ? Skill->EquipmentRequirementText

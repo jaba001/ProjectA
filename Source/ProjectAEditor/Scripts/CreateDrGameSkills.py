@@ -290,6 +290,10 @@ def make_profile(entry, inspections):
     profile.set_editor_property("effect_sphere", settings["sphere"])
     profile.set_editor_property("effect_hit_delay_seconds", settings["delay"])
     profile.set_editor_property("effect_duration", settings["duration"])
+    if entry["profile"] == "slash":
+        # Slash animation is cosmetic; the shared effect actor owns all multi-target contacts.
+        # 참격 애니메이션은 표현만 담당하고 공통 효과 액터가 모든 범위 접촉 판정을 소유합니다.
+        require(profile.get_editor_property("use_effect_collision") and not profile.get_editor_property("target_only"), "Melee VFX must use multi-target effect collision")
     tags = entry["element_tags"] + ["Skill.Effect." + settings["effect"], "Skill.Shape." + settings["shape"]] + settings.get("classification_tags", [])
     if settings["effect"] == "Damage":
         tags.append("Attack.Close" if settings["shape"] == "Slash" else "Attack.Ranged")

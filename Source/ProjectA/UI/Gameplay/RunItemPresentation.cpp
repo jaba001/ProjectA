@@ -34,6 +34,7 @@ namespace RunItemPresentationInternal
     FText EffectDescription(const FCombatRoundSkill& Skill)
     {
         TArray<FText> Parts;
+        Parts.Add(CombatRoundRules::TargetCoverageText(Skill));
         Parts.Add(TargetDescription(Skill.TargetRule));
         if (Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Heal)) Parts.Add(NSLOCTEXT("RunItem", "HealEffect", "살아 있는 대상의 HP를 회복합니다."));
         else if (Skill.EffectTags.HasTag(ProjectACombatTags::Skill_Effect_Shield)) Parts.Add(NSLOCTEXT("RunItem", "ShieldEffect", "살아 있는 대상에게 피해를 흡수하는 보호막을 부여합니다. 남은 보호막은 라운드 종료 시 사라집니다."));
@@ -87,7 +88,10 @@ FText RunItemPresentation::SkillName(const USkillDefinitionDataAsset* Skill)
 
 FText RunItemPresentation::SkillDescription(const USkillDefinitionDataAsset* Skill)
 {
-    return Skill ? ProjectALocalization::SkillDescription(FName(*Skill->GetPrimaryAssetId().ToString()), Skill->SkillDescription) : FText::GetEmpty();
+    if (!Skill) return FText::GetEmpty();
+    const FText Description = ProjectALocalization::SkillDescription(FName(*Skill->GetPrimaryAssetId().ToString()), Skill->SkillDescription);
+    const FText Coverage = Skill->GetTargetCoverageText();
+    return Coverage.IsEmpty() ? Description : FText::Join(FText::AsCultureInvariant(TEXT("\n")), TArray<FText>{Coverage, Description});
 }
 
 FText RunItemPresentation::GrantedSkills(const FRunItemDefinition& Item, bool bIncludeStats)

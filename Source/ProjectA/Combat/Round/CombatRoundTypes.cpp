@@ -126,6 +126,31 @@ bool CombatRoundRules::UsesUnitTarget(const FCombatRoundSkill& Skill)
     return Skill.bUseEffectCollision && Skill.TargetRule <= ESkillTargetRule::AnyUnit;
 }
 
+bool CombatRoundRules::CanHitMultipleTargets(const FCombatRoundSkill& Skill)
+{
+    if (Skill.Kind == ECombatRoundSkillKind::Wait) return false;
+    if (UsesChain(Skill) && Skill.Chain.MaxTargets > 1) return true;
+    if (Skill.bUseEffectCollision)
+    {
+        const bool bUnitTarget = Skill.TargetRule == ESkillTargetRule::EnemyUnit
+            || Skill.TargetRule == ESkillTargetRule::AllyUnit
+            || Skill.TargetRule == ESkillTargetRule::AnyUnit;
+        return !bUnitTarget || !Skill.bTargetOnly;
+    }
+    if (Skill.Kind == ECombatRoundSkillKind::GroundAttack) return true;
+    return Skill.Kind == ECombatRoundSkillKind::Melee
+        && (Skill.bUseMeleeAreaCollision || Skill.MeleeArea == ESkillAreaType::TargetAndSides);
+}
+
+FText CombatRoundRules::TargetCoverageText(const FCombatRoundSkill& Skill)
+{
+    if (UsesChain(Skill) && Skill.Chain.MaxTargets > 1)
+    {
+        return FText::Format(NSLOCTEXT("CombatSkillCoverage", "Chain", "적용: 범위 (연쇄 · 최대 {0}명)"), FText::AsNumber(Skill.Chain.MaxTargets));
+    }
+    return CanHitMultipleTargets(Skill) ? NSLOCTEXT("CombatSkillCoverage", "Area", "적용: 범위") : NSLOCTEXT("CombatSkillCoverage", "Single", "적용: 단일 대상");
+}
+
 bool CombatRoundRules::MatchesTargetTeam(const FCombatRoundSkill& Skill, bool bSourceEnemy, bool bTargetEnemy)
 {
     if (Skill.TargetRule == ESkillTargetRule::AllyUnit || Skill.TargetRule == ESkillTargetRule::AllyTile) return bSourceEnemy == bTargetEnemy;
