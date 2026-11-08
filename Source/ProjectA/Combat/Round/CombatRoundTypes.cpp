@@ -226,6 +226,19 @@ bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
     {
         return false;
     }
+    // Dynamic slot playback refuses montages and composition-incompatible assets, and the cast montage proves the unit skeleton.
+    // 동적 슬롯 재생은 몽타주와 합성 불가 에셋을 거부하며 시전 몽타주가 유닛 스켈레톤 일치를 확인합니다.
+    if (Skill.ApproachAnimation
+        && (Skill.ApproachAnimation->IsA<UAnimMontage>()
+            || !Skill.ApproachAnimation->CanBeUsedInComposition()
+            || !Skill.CastMontage
+            || Skill.Approach == ECombatRoundApproach::None
+            || !FMath::IsFinite(Skill.ApproachAnimationPlayRate)
+            || Skill.ApproachAnimationPlayRate < 0.1f
+            || Skill.ApproachAnimationPlayRate > 5.f))
+    {
+        return false;
+    }
     FGameplayTagContainer RequiredSlots;
     for (const FCombatEquipmentRequirement& Requirement : Skill.RequiredEquipment)
     {

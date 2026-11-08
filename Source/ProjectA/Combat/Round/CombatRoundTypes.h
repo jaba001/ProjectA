@@ -8,6 +8,7 @@
 
 class AUnitBase;
 class UAnimMontage;
+class UAnimSequenceBase;
 class UGameplayEffect;
 class UNiagaraSystem;
 class UParticleSystem;
@@ -296,6 +297,14 @@ struct PROJECTA_API FCombatRoundSkill
     // 무기 궤적은 서버가 이 몽타주에서 샘플링하며 표현용 Notify는 피해를 적용하지 않습니다.
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation")
     TObjectPtr<UAnimMontage> CastMontage = nullptr;
+
+    // Optional looping full-body animation shown while approaching; the round simulation still owns every position change.
+    // 접근 중 공통 보행 대신 반복 재생하는 선택적 전신 애니메이션이며 위치 변화는 계속 라운드 시뮬레이션이 결정합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation", meta = (AllowedClasses = "/Script/Engine.AnimSequence"))
+    TObjectPtr<UAnimSequenceBase> ApproachAnimation = nullptr;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation", meta = (ClampMin = "0.1", ClampMax = "5.0"))
+    float ApproachAnimationPlayRate = 1.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     ECombatRoundSkillKind Kind = ECombatRoundSkillKind::Melee;

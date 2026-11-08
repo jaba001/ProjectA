@@ -2,6 +2,9 @@
 
 #include "Misc/AutomationTest.h"
 #include "Combat/Round/CombatPlanValidator.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimSequence.h"
+#include "UObject/Package.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCatalogSkillFriendlyPlanningTest, "ProjectA.Combat.CatalogSkills.FriendlyTargetPlanning", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -67,6 +70,33 @@ bool FCatalogSkillLegacyProfileTest::RunTest(const FString& Parameters)
     Skill.EffectDuration = 0.5f;
     Skill.bUseMeleeAreaCollision = true;
     TestFalse(TEXT("Two simultaneous melee hit sources are rejected"), CombatRoundRules::IsValidSkill(Skill));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCatalogSkillApproachAnimationTest, "ProjectA.Combat.CatalogSkills.ApproachAnimationProfile", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCatalogSkillApproachAnimationTest::RunTest(const FString& Parameters)
+{
+    FCombatRoundSkill Skill;
+    Skill.SkillId = TEXT("ShieldChargeProfile");
+    Skill.Kind = ECombatRoundSkillKind::Melee;
+    Skill.Approach = ECombatRoundApproach::Unit;
+    TestTrue(TEXT("A melee profile without an approach animation stays valid"), CombatRoundRules::IsValidSkill(Skill));
+    Skill.ApproachAnimation = NewObject<UAnimSequence>(GetTransientPackage());
+    TestFalse(TEXT("An approach animation requires a cast montage that proves the unit skeleton"), CombatRoundRules::IsValidSkill(Skill));
+    Skill.CastMontage = NewObject<UAnimMontage>(GetTransientPackage());
+    TestTrue(TEXT("An approaching melee skill accepts a looping approach animation"), CombatRoundRules::IsValidSkill(Skill));
+    Skill.ApproachAnimation = NewObject<UAnimMontage>(GetTransientPackage());
+    TestFalse(TEXT("A montage cannot be played as the dynamic approach animation"), CombatRoundRules::IsValidSkill(Skill));
+    Skill.ApproachAnimation = NewObject<UAnimSequence>(GetTransientPackage());
+    for (float Rate : {0.f, 0.05f, 6.f, std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()})
+    {
+        Skill.ApproachAnimationPlayRate = Rate;
+        TestFalse(TEXT("Out-of-range or nonfinite approach play rates are rejected"), CombatRoundRules::IsValidSkill(Skill));
+    }
+    Skill.ApproachAnimationPlayRate = 0.6f;
+    Skill.Approach = ECombatRoundApproach::None;
+    TestFalse(TEXT("An approach animation requires an approach phase"), CombatRoundRules::IsValidSkill(Skill));
     return true;
 }
 

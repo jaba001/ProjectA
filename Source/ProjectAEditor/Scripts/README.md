@@ -368,3 +368,12 @@ Development Editor / Win64 컴파일 후 작성·별도 프로세스 재로드 �
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDoubleStrike.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 & $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateDoubleStrike.py") -DoubleStrikeVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
 ```
+
+## 37 방패 돌진
+
+`CreateShieldCharge.py`는 먼저 `ImportParagonAnimations.py -ParagonAnimationPaths=steelmanny/Ability/Steel_Ability_CowCatcher_Charge,steelmanny/Ability/Steel_Ability_CowCatcher_End`로 들여온 Steel 원본을 사용한다. 돌진 순환의 루트를 첫 키에 고정한 `AS_ShieldCharge_Loop`(1.0초, 루트 이동 0cm)를 굽고, 돌진 끝 동작을 0.25초에서 나눈 2구간 `AM_ShieldCharge`(0.5초)를 만든다. `Skills/Weapons/DA_ShieldCharge`는 `DA_MeleeAttack`을 복제해 접근 애니메이션(0.6배속)·시전 몽타주·이동 속도 2000·선딜 0.17초·임시 위력 50·이름과 설명을 작성하며 장착 무기 피해는 쓰지 않는다. 기본 모드는 기존 결과를 보존하고 `-ShieldChargeOverwrite`만 덮어쓰며 `-ShieldChargeVerifyOnly`는 루트 고정·길이·몽타주 구간·스킬 연결을 읽기 전용으로 검사한다. 결과는 `Saved/ShieldCharge`에 기록한다. 게임 월드·PIE·자동화 테스트는 시작하지 않는다.
+
+```powershell
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateShieldCharge.py") -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+& $editorExecutable $projectFile -run=pythonscript ("-script=$scriptDirectory/CreateShieldCharge.py") -ShieldChargeVerifyOnly -EnablePlugins=PythonScriptPlugin -unattended -nop4 -NullRHI
+```

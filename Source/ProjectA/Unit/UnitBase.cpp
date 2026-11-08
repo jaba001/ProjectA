@@ -11,6 +11,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/AnimSequenceBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "AIController.h"
 
@@ -224,8 +225,53 @@ void AUnitBase::MulticastSetRoundCastMontage_Implementation(UAnimMontage* Montag
     }
 }
 
+void AUnitBase::SetRoundApproachAnimation(UAnimSequenceBase* Animation, float PlayRate)
+{
+    if (IsActorBeingDestroyed())
+    {
+        StopRoundApproachAnimation(0.f);
+        return;
+    }
+    if (HasAuthority()) MulticastSetRoundApproachAnimation(Animation, PlayRate);
+}
+
+void AUnitBase::MulticastSetRoundApproachAnimation_Implementation(UAnimSequenceBase* Animation, float PlayRate)
+{
+    StopRoundApproachAnimation(0.1f);
+    if (!Animation || bIsDead || GetNetMode() == NM_DedicatedServer || !FMath::IsFinite(PlayRate) || PlayRate <= 0.f) return;
+    UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+    // A long loop count keeps the cycle running for any approach length; the cast montage stops it on arrival.
+    // 긴 반복 횟수로 접근 길이와 관계없이 순환을 유지하며 도착 시 시전 몽타주가 이를 중지합니다.
+    UAnimMontage* Montage = AnimInstance ? AnimInstance->PlaySlotAnimationAsDynamicMontage(Animation, TEXT("DefaultSlot"), 0.15f, 0.1f, PlayRate, 1000) : nullptr;
+    FAnimMontageInstance* Instance = Montage ? AnimInstance->GetActiveInstanceForMontage(Montage) : nullptr;
+    if (!Instance)
+    {
+        UE_LOG(LogProjectA, Warning, TEXT("[RoundAnimation] Approach animation playback failed Unit=%s Animation=%s / 접근 애니메이션 재생 실패: Skeleton, Slot 확인"), *GetPathName(), *GetPathNameSafe(Animation));
+        return;
+    }
+    Instance->PushDisableRootMotion();
+    RoundApproachAnimInstance = AnimInstance;
+    RoundApproachInstanceId = Instance->GetInstanceID();
+}
+
+void AUnitBase::StopRoundApproachAnimation(float BlendOutSeconds)
+{
+    if (UAnimInstance* AnimInstance = RoundApproachAnimInstance.Get())
+    {
+        if (FAnimMontageInstance* Instance = AnimInstance->GetMontageInstanceForID(RoundApproachInstanceId))
+        {
+            Instance->Stop(FAlphaBlend(BlendOutSeconds));
+        }
+    }
+    RoundApproachAnimInstance.Reset();
+    RoundApproachInstanceId = INDEX_NONE;
+}
+
 void AUnitBase::StopRoundCastMontage(float BlendOutSeconds)
 {
+    // Every round montage stop also ends a looping approach so cancel, death and cast paths need no separate call.
+    // 모든 라운드 몽타주 중지는 반복 접근도 끝내므로 취소·사망·시전 경로에 별도 호출이 필요 없습니다.
+    StopRoundApproachAnimation(BlendOutSeconds);
     if (UAnimInstance* AnimInstance = RoundMontageAnimInstance.Get())
     {
         if (FAnimMontageInstance* Instance = AnimInstance->GetMontageInstanceForID(RoundMontageInstanceId))

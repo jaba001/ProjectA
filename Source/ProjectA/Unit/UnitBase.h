@@ -17,6 +17,7 @@ class USkillDefinitionDataAsset;
 class AUnitBase;
 class UAnimInstance;
 class UAnimMontage;
+class UAnimSequenceBase;
 class UCharacterAppearanceComponent;
 class UCharacterEquipmentComponent;
 
@@ -117,6 +118,10 @@ public:
     // 서버가 라운드 표현용 몽타주를 시작하며 null은 이전 라운드 몽타주만 중지합니다.
     void SetRoundCastMontage(UAnimMontage* Montage, bool bImmediateStop = false);
 
+    // The server loops an approach animation until the cast montage or any round montage stop replaces it.
+    // 서버가 접근 애니메이션을 반복 재생하며 시전 몽타주나 라운드 몽타주 중지가 이를 대체합니다.
+    void SetRoundApproachAnimation(UAnimSequenceBase* Animation, float PlayRate);
+
     // Match shared skill presentation to this unit's skeleton without changing its gameplay definition.
     // 게임플레이 정의를 바꾸지 않고 공통 스킬 표현을 이 유닛의 스켈레톤에 맞춥니다.
     UPROPERTY(EditDefaultsOnly, Category = "UnitBase|Round")
@@ -134,9 +139,15 @@ protected:
     UFUNCTION(NetMulticast, Reliable)
     void MulticastSetRoundCastMontage(UAnimMontage* Montage, bool bImmediateStop);
 
+    UFUNCTION(NetMulticast, Reliable)
+    void MulticastSetRoundApproachAnimation(UAnimSequenceBase* Animation, float PlayRate);
+
     void StopRoundCastMontage(float BlendOutSeconds = 0.1f);
+    void StopRoundApproachAnimation(float BlendOutSeconds);
     TWeakObjectPtr<UAnimInstance> RoundMontageAnimInstance;
     int32 RoundMontageInstanceId = INDEX_NONE;
+    TWeakObjectPtr<UAnimInstance> RoundApproachAnimInstance;
+    int32 RoundApproachInstanceId = INDEX_NONE;
 
 public:
     // Unit identifier

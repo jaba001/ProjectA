@@ -46,6 +46,13 @@ namespace
     constexpr double MovementTimeout = 6.0;
     constexpr double MaximumMontageRecoverySeconds = 60.0;
 
+    // Show an approach cycle only where the unit plays the original cast montage; remapped skeletons keep shared locomotion.
+    // 원래 시전 몽타주를 그대로 쓰는 유닛만 접근 순환을 보여 주며 스켈레톤을 재매핑한 유닛은 공통 보행을 유지합니다.
+    void StartApproachAnimation(AUnitBase* Unit, const FCombatRoundSkill& Skill)
+    {
+        if (IsValid(Unit) && Skill.ApproachAnimation && Skill.CastMontage && Unit->ResolveRoundCastMontage(Skill.CastMontage) == Skill.CastMontage) Unit->SetRoundApproachAnimation(Skill.ApproachAnimation, Skill.ApproachAnimationPlayRate);
+    }
+
     double MontageRecoveryBudget(const UAnimMontage* Montage)
     {
         if (!Montage) return 0.0;
@@ -1235,6 +1242,7 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
         {
             Entry.ActionPhase = ECombatRoundActionPhase::Approaching;
             Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_F15BD04E", "접근 중");
+            StartApproachAnimation(Entry.Unit, *Skill);
         }
     }
     if (Entry.ActionPhase == ECombatRoundActionPhase::Approaching || Entry.ActionPhase == ECombatRoundActionPhase::Casting)
@@ -1261,7 +1269,11 @@ void ACombatRoundCoordinator::AdvanceAction(int32 Index, float StepSeconds)
                     Action.MontageStartedAt = 0.0;
                     Action.MontageRecoverySeconds = 0.0;
                     Action.WeaponTrace = CombatSkillExecution::FWeaponTraceState();
-                    if (Skill->Approach == ECombatRoundApproach::Unit) Entry.ActionPhase = ECombatRoundActionPhase::Approaching;
+                    if (Skill->Approach == ECombatRoundApproach::Unit)
+                    {
+                        Entry.ActionPhase = ECombatRoundActionPhase::Approaching;
+                        StartApproachAnimation(Entry.Unit, *Skill);
+                    }
                     Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_A14A8022", "가까운 적으로 대상 변경");
                 }
             }
