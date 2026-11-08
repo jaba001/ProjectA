@@ -103,6 +103,7 @@ private:
         // Track only this caster's pending effects; other units must not delay its local camera return.
         // 다른 유닛이 로컬 카메라 복귀를 지연하지 않도록 이 시전자의 대기 효과만 추적합니다.
         int32 PendingSkillImpacts = 0;
+        int32 PendingAmmoCost = 0;
         bool bHasSkillImpact = false;
         bool bMontageStarted = false;
         bool bTrackMontageCompletion = false;

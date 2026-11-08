@@ -83,7 +83,9 @@ namespace
 
     FText SkillCostLabel(const FCombatRoundSkill& Skill)
     {
-        return FText::Format(NSLOCTEXT("CombatPlanning", "SkillCost", "AP {0} · SAP {1}"), FText::AsNumber(Skill.ActionPointCost), FText::AsNumber(Skill.SubActionPointCost));
+        const FText Cost = FText::Format(NSLOCTEXT("CombatPlanning", "SkillCost", "AP {0} · SAP {1}"), FText::AsNumber(Skill.ActionPointCost), FText::AsNumber(Skill.SubActionPointCost));
+        if (Skill.AmmoCost == 0) return Cost;
+        return FText::Format(NSLOCTEXT("CombatPlanning", "SkillAmmoCost", "{0} · 탄약 {1}"), Cost, FText::AsNumber(Skill.AmmoCost));
     }
 }
 
@@ -978,6 +980,7 @@ void UCombatRoundPlanningWidget::RefreshView(bool bForce)
         {
             FText Label = FText::Format(NSLOCTEXT("CombatPlanning", "SkillCard", "{0}\n{1}"), SkillName(*Skill), SkillCostLabel(*Skill));
             Label = FText::Format(NSLOCTEXT("CombatPlanning", "SkillAvailability", "{0}\n{1}"), Label, CombatRoundRules::TargetCoverageText(*Skill));
+            if (Skill->AmmoCost > 0 && SelectedUnit) Label = FText::Format(NSLOCTEXT("CombatPlanning", "SkillAmmoRemaining", "{0}\n남은 탄약 {1}발"), Label, FText::AsNumber(SelectedUnit->Ammo));
             if (!Skill->EquipmentRequirementText.IsEmpty()) Label = FText::Format(NSLOCTEXT("CombatPlanning", "SkillAvailability", "{0}\n{1}"), Label, Skill->EquipmentRequirementText);
             if (UTextBlock* Text = Cast<UTextBlock>(Button->GetContent())) Text->SetText(Label);
             const FText Reason = !bEquipmentReady && !Skill->EquipmentRequirementText.IsEmpty() ? Skill->EquipmentRequirementText

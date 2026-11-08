@@ -152,6 +152,7 @@ FText RunItemPresentation::EquipmentDescription(const FRunItemDefinition& Item)
     }
     const FText Attachment = FText::Format(NSLOCTEXT("RunItem", "EquipmentDescription", "장착 위치: {0}{1}"), FText::Join(FText::FromString(TEXT(" · ")), Labels),
         bTwoHanded ? NSLOCTEXT("RunItem", "OccupiesBothHands", " · 양손 슬롯 사용") : FText::GetEmpty());
+    if (Profile->AmmoCapacity > 0) return FText::Format(NSLOCTEXT("RunItem", "AmmoCapacity", "{0}\n탄약 {1}발 · 새 전투 시작 시 보충"), Attachment, FText::AsNumber(Profile->AmmoCapacity));
     if (!Item.Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon")))) return Attachment;
     return FText::Format(NSLOCTEXT("RunItem", "WeaponDamageDescription", "{0}\n무기 피해량: {1}"), Attachment, FText::AsNumber(Item.WeaponDamage));
 }

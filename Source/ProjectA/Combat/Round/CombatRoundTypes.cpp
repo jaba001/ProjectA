@@ -2,6 +2,7 @@
 #include "Animation/AnimMontage.h"
 #include "GAS/CombatGameplayTags.h"
 #include "Combat/Round/CombatStatusRules.h"
+#include "Game/Run/RunEquipmentCatalog.h"
 #include "GameplayEffect.h"
 #include "NiagaraSystem.h"
 #include "Particles/ParticleSystem.h"
@@ -218,9 +219,10 @@ bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
     if (Skill.bUseMeleeAreaCollision && (Skill.Kind != ECombatRoundSkillKind::Melee || Skill.MeleeArea != ESkillAreaType::Single)) return false;
     if (Skill.MeleeAreaHalfExtent.ContainsNaN() || Skill.MeleeAreaHalfExtent.GetMin() <= 0.0 || Skill.MeleeAreaHalfExtent.GetMax() > 1000.0) return false;
     if (!FMath::IsFinite(Skill.WindupSeconds) || Skill.WindupSeconds < 0.f || Skill.WindupSeconds > 60.f) return false;
+    const bool bDamageWeaponSlot = Skill.DamageWeaponSlot == URunEquipmentCatalog::GetWeaponSlot(0) || Skill.DamageWeaponSlot == URunEquipmentCatalog::GetWeaponSlot(1);
     if (Skill.RequiredEquipment.Num() > 7
         || Skill.MeleeStrikes.Num() > 8
-        || Skill.DamageWeaponSlot.IsValid())
+        || (Skill.DamageWeaponSlot.IsValid() && (!Skill.bUseEquippedWeaponDamage || !bDamageWeaponSlot)))
     {
         return false;
     }
@@ -281,6 +283,12 @@ bool CombatRoundRules::IsValidSkill(const FCombatRoundSkill& Skill)
     if (!FMath::IsFinite(Skill.ProjectileRadius) || Skill.ProjectileRadius <= 0.f || Skill.ProjectileRadius > 1000.f) return false;
     if (!FMath::IsFinite(Skill.ProjectileLifetime) || Skill.ProjectileLifetime <= 0.f || Skill.ProjectileLifetime > 60.f) return false;
     if (Skill.ActionPointCost < 0 || Skill.ActionPointCost > 100 || Skill.SubActionPointCost < 0 || Skill.SubActionPointCost > 100) return false;
+    if (Skill.AmmoCost < 0
+        || Skill.AmmoCost > MaximumAmmo
+        || (Skill.AmmoCost > 0 && Skill.Kind != ECombatRoundSkillKind::Projectile))
+    {
+        return false;
+    }
     if (Skill.bRemainAtDestination && Skill.Approach != ECombatRoundApproach::Tile) return false;
     if (Skill.Kind == ECombatRoundSkillKind::Wait && Skill.Approach != ECombatRoundApproach::None) return false;
     if (Skill.Kind == ECombatRoundSkillKind::GroundAttack && Skill.Approach == ECombatRoundApproach::Unit) return false;

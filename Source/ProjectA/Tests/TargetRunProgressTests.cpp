@@ -5,6 +5,7 @@
 #include "DataAsset/PartyDefinitionDataAsset.h"
 #include "DataAsset/RunEncounterPoolDataAsset.h"
 #include "Engine/GameInstance.h"
+#include "Game/Run/EquipmentCombatRules.h"
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Run/RunDungeonPlan.h"
 #include "Game/Run/RunEquipmentRules.h"
@@ -666,6 +667,11 @@ bool FTargetRunWeaponTransactionsTest::RunTest(const FString& Parameters)
             TestEqual(TEXT("Only a matching starting weapon receives the delegated skill count"), Item.GrantedSkills.Num(), Rules.WeaponQuery.Matches(Item.Tags) ? 1 : 0);
             StartingIds.Add(Item.ItemInstanceId);
             for (const FSoftObjectPath& Skill : Item.GrantedSkills) TestTrue(TEXT("An equipped starting weapon exposes its fixed skill"), Member.Skills.Contains(Skill));
+            if (Item.Tags.HasTag(EquipmentCombatRules::CommonBowTag))
+            {
+                const FSoftObjectPath Shot(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_BowShot.DA_BowShot"));
+                TestTrue(TEXT("The common bow grants Shot without drawing another skill"), Item.GrantedSkills.IsEmpty() && Member.Skills.Contains(Shot));
+            }
         }
     }
     const FRunEncounterOffer* ItemVisit = Fixture.Run->GetEncounterProgress().Offers.FindByPredicate([](const FRunEncounterOffer& Offer) { return Offer.GetResolvedTag() == FRunEncounterOffer::GetBasicItemShopTag(); });

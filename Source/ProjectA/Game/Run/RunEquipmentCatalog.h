@@ -79,6 +79,9 @@ struct PROJECTA_API FRunEquipmentProfile
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
     FGameplayTag PreferredSlot;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment", meta = (ClampMin = "0", ClampMax = "100"))
+    int32 AmmoCapacity = 0;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
     TArray<FRunEquipmentAttachment> Attachments;
 };

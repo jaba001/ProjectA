@@ -258,6 +258,7 @@ bool RunEquipmentRules::BuildVisuals(const FRunPartyMember& Member, TArray<FRunE
         Visual.SlotTag = Slot.SlotTag;
         Visual.ItemTags = Item.Tags;
         Visual.WeaponDamage = Item.WeaponDamage;
+        Visual.AmmoCapacity = Profile->AmmoCapacity;
         Visual.Asset = VisualAsset;
         Visual.BodyMaterials = Catalog.ResolveBodyMaterials(Item.Asset, Member.Appearance.BodyId);
         if (!Catalog.GetAttachment(*Profile, Slot.SlotTag, Visual.SocketName, Visual.RelativeTransform, Visual.bFollowBodyPose) || (Visual.bFollowBodyPose && !Mesh->IsA<USkeletalMesh>())) return false;

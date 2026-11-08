@@ -69,6 +69,7 @@ bool ACombatRoundCoordinator::CapturePlanningCheckpoint(FCombatCheckpointData& O
         Saved.HealingItemCount = Unit->HealingItemCount;
         Saved.HealingItemAmount = Unit->HealingItemAmount;
         Saved.Consumables = Unit->Consumables;
+        Saved.Ammo = Entry.Ammo;
         Saved.bHasTile = Unit->GetCurrentTile() != nullptr;
         Saved.GridCoord = Entry.HomeCoord;
         Saved.Transform = Unit->GetActorTransform();
@@ -154,6 +155,8 @@ bool ACombatRoundCoordinator::RestorePlanningCheckpoint(const FCombatCheckpointD
         Entry.UnitId = Saved.RoundUnitId;
         Entry.HomeCoord = Saved.GridCoord;
         Entry.HP = Saved.HP;
+        if (Saved.Ammo > Entry.Ammo) return false;
+        Entry.Ammo = Saved.Ammo;
         Entry.Speed = CombatStatusRules::ChilledSpeed(Unit->GetCombatSpeed(), Entry.Statuses, StatusTuning);
         Entry.Command = Plan->Command;
         Entry.Command.SkillId = UCombatCheckpointLibrary::ResolveSavedSkillId(Entry.Command.SkillId);

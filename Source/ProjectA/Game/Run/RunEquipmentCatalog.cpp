@@ -1,4 +1,5 @@
 #include "Game/Run/RunEquipmentCatalog.h"
+#include "Game/Run/EquipmentCombatRules.h"
 #include "Game/Run/RunItemShopTypes.h"
 #include "NativeGameplayTags.h"
 
@@ -53,6 +54,19 @@ URunEquipmentCatalog::URunEquipmentCatalog()
     FRunEquipmentProfile Shield = MakeWeaponProfile(TEXT("Shield"), TEXT("Item.Weapon.Shield"));
     Shield.AllowedSlots.RemoveTag(TAG_EquipmentMainHand);
     Profiles.Add(MoveTemp(Shield));
+
+    FRunEquipmentProfile CommonBow = MakeWeaponProfile(TEXT("CommonBow"), EquipmentCombatRules::CommonBowTag.GetTag().GetTagName());
+    CommonBow.AllowedSlots.RemoveTag(TAG_EquipmentOffHand);
+    // The main equipment slot retains the left-hand grip expected by the shared bow montage.
+    // 주 손 장비 슬롯을 사용하되 공통 활 몽타주가 사용하는 왼손 그립을 유지합니다.
+    CommonBow.Attachments[0].SocketName = TEXT("hand_l");
+    Profiles.Add(MoveTemp(CommonBow));
+
+    FRunEquipmentProfile Quiver = MakeWeaponProfile(TEXT("Quiver"), EquipmentCombatRules::QuiverTag.GetTag().GetTagName());
+    Quiver.AllowedSlots.RemoveTag(TAG_EquipmentMainHand);
+    Quiver.Attachments[1].SocketName = TEXT("spine_03");
+    Quiver.AmmoCapacity = 3;
+    Profiles.Add(MoveTemp(Quiver));
 
     FRunEquipmentProfile Bow = MakeWeaponProfile(TEXT("Bow"), TEXT("Item.Weapon.Bow"));
     Bow.OccupiedSlots = Bow.AllowedSlots;

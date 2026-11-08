@@ -89,6 +89,9 @@ struct PROJECTA_API FCombatCheckpointUnit
     TArray<FRunConsumableStack> Consumables;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
+    int32 Ammo = 0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")
     bool bDead = false;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Combat|Checkpoint")

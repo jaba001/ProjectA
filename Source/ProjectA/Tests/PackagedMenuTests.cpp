@@ -53,7 +53,7 @@ bool FTodoPackagedCatalogTest::RunTest(const FString& Parameters)
         AddError(Error.ToString());
         return false;
     }
-    if (!TestEqual(TEXT("The staged authored catalog retains all 49 supported equipment definitions."), Catalog.Num(), 49)) return false;
+    if (!TestEqual(TEXT("The staged authored catalog retains all 50 supported equipment definitions."), Catalog.Num(), 50)) return false;
     TSet<FSoftObjectPath> Assets;
     for (const FRunItemDefinition& Item : Catalog)
     {

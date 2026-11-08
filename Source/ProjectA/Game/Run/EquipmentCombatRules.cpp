@@ -3,12 +3,21 @@
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunEquipmentTypes.h"
 
+namespace EquipmentCombatRules
+{
+    UE_DEFINE_GAMEPLAY_TAG(CommonBowTag, "Item.Weapon.Bow.Common");
+    UE_DEFINE_GAMEPLAY_TAG(QuiverTag, "Item.Weapon.ArrowBolt.Quiver");
+}
+
 UEquipmentCombatRules::UEquipmentCombatRules()
 {
     ConditionalSkills.Add(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_DoubleStrike.DA_DoubleStrike")));
     FEquipmentIntrinsicSkill& DaggerSkill = IntrinsicSkills.AddDefaulted_GetRef();
     DaggerSkill.ItemQuery = FGameplayTagQuery::MakeQuery_MatchTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Dagger")));
     DaggerSkill.Skill = ConditionalSkills[0];
+    FEquipmentIntrinsicSkill& BowSkill = IntrinsicSkills.AddDefaulted_GetRef();
+    BowSkill.ItemQuery = FGameplayTagQuery::MakeQuery_MatchTag(EquipmentCombatRules::CommonBowTag);
+    BowSkill.Skill = FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_BowShot.DA_BowShot"));
     BasicWeaponAttacks.Add(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/Weapons/DA_MeleeAttack.DA_MeleeAttack")));
     BasicWeaponAttacks.Add(FSoftObjectPath(TEXT("/Game/User_JeHoon/Blueprint/DataAsset/Skills/BPDA_Strike.BPDA_Strike")));
 }
@@ -45,7 +54,8 @@ bool EquipmentCombatRules::ResolveDamage(const TArray<FRunEquipmentVisual>& Equi
         if (Item.SlotTag != URunEquipmentCatalog::GetWeaponSlot(0) && Item.SlotTag != URunEquipmentCatalog::GetWeaponSlot(1)) continue;
         if ((Slot.IsValid() && Item.SlotTag != Slot)
             || !Item.ItemTags.HasTag(Weapon)
-            || Item.ItemTags.HasTag(Shield))
+            || Item.ItemTags.HasTag(Shield)
+            || Item.ItemTags.HasTag(QuiverTag))
         {
             continue;
         }

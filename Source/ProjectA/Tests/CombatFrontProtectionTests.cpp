@@ -41,6 +41,11 @@ bool FCombatFrontProtectionTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Execution kind alone does not impose melee protection"), CombatPlanValidation::ValidateCommand(State, Command, Error));
         State.Skills[0].Kind = ECombatRoundSkillKind::Projectile;
         TestTrue(TEXT("Ranged attacks can select the protected rear unit"), CombatPlanValidation::ValidateCommand(State, Command, Error));
+        State.Skills[0].AmmoCost = 1;
+        TestFalse(TEXT("An ammo skill cannot be planned with an empty quiver"), CombatPlanValidation::ValidateCommand(State, Command, Error));
+        State.Units[0].Ammo = 1;
+        TestTrue(TEXT("The last round of ammunition is sufficient"), CombatPlanValidation::ValidateCommand(State, Command, Error));
+        State.Skills[0].AmmoCost = 0;
         State.Skills[0].EffectTags = Skill.EffectTags;
         TestFalse(TEXT("The melee tag governs selection independently of execution kind"), CombatPlanValidation::ValidateCommand(State, Command, Error));
         State.Units[2].bAlive = false;

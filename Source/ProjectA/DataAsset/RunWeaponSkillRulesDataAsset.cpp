@@ -1,6 +1,7 @@
 #include "DataAsset/RunWeaponSkillRulesDataAsset.h"
 
 #include "DataAsset/SkillDefinitionDataAsset.h"
+#include "Game/Run/EquipmentCombatRules.h"
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Game/Run/RunSkillBalance.h"
 #include "GAS/CombatGameplayTags.h"
@@ -146,7 +147,11 @@ bool URunWeaponSkillRulesDataAsset::BuildState(FRunWeaponSkillRulesState& OutSta
             break;
         }
     }
-    if (!AppliedOverrides.IsEmpty()) State.WeaponQuery = FGameplayTagQuery::BuildQuery(WeaponExpression);
+    // Common bows grant their intrinsic skill and never roll a second skill from the legacy pool.
+    // 일반 활은 기본 스킬을 부여하며 기존 후보 풀에서 두 번째 스킬을 추첨하지 않습니다.
+    FGameplayTagQueryExpression RandomSkillItems;
+    RandomSkillItems.NoTagsMatch().AddTag(EquipmentCombatRules::CommonBowTag);
+    State.WeaponQuery = FGameplayTagQuery::BuildQuery(FGameplayTagQueryExpression().AllExprMatch().AddExpr(WeaponExpression).AddExpr(RandomSkillItems));
     if (bUseCsvBalance && !RunSkillBalance::Load(State, OutError)) return false;
     if (!RunWeaponSkillRules::Validate(State, OutError)) return false;
     OutState = MoveTemp(State);

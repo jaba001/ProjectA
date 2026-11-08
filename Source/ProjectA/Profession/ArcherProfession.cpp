@@ -11,5 +11,5 @@ UArcherProfession::UArcherProfession()
     Strength = 5.0f;
     Speed = 7.0f;
     Intelligence = 4.0f;
-    StartingEquipment.Add({ FSoftObjectPath(TEXT("/Game/PurePoly/FreeLowPolyFantasyRPGWeapons/Meshes/SM_PP_Theme_02_Bow_001.SM_PP_Theme_02_Bow_001")), URunEquipmentCatalog::GetWeaponSlot(1) });
+    StartingEquipment.Add({ FSoftObjectPath(TEXT("/Game/PurePoly/FreeLowPolyFantasyRPGWeapons/Meshes/SM_PP_Theme_02_Bow_001.SM_PP_Theme_02_Bow_001")), URunEquipmentCatalog::GetWeaponSlot(0) });
 }

@@ -5,6 +5,7 @@
 #include "DataAsset/RunEncounterPoolDataAsset.h"
 #include "DataAsset/SkillDefinitionDataAsset.h"
 #include "Engine/GameInstance.h"
+#include "Game/Run/EquipmentCombatRules.h"
 #include "Game/Run/RunCheckpointStorage.h"
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunEquipmentRules.h"
@@ -633,7 +634,7 @@ bool FRunItemShopEquipmentSupportTest::RunTest(const FString& Parameters)
 {
     TArray<FRunItemDefinition> Catalog;
     FText Error;
-    if (!TestTrue(TEXT("The authored catalog loads all 49 supported equipment definitions"), RunItemShopCatalog::Load(Catalog, Error) && Catalog.Num() == 49)) return false;
+    if (!TestTrue(TEXT("The authored catalog loads all 50 supported equipment definitions"), RunItemShopCatalog::Load(Catalog, Error) && Catalog.Num() == 50)) return false;
     for (const FRunItemDefinition& Item : Catalog)
     {
         const FRunEquipmentProfile* Profile = URunEquipmentCatalog::Get().ResolveProfile(Item);
@@ -692,7 +693,7 @@ bool FRunItemShopPersistenceTest::RunTest(const FString& Parameters)
     const FRunPartyMember Buyer = Fixture.Member(3);
     const FRunItemShopState Initial = Fixture.Run->GetItemShopState();
     if (!TestEqual(TEXT("The item shop displays exactly five offers"), Initial.Offers.Num(), 5)) return false;
-    TestEqual(TEXT("The complete supported equipment catalog is available"), Initial.Catalog.Num(), 49);
+    TestEqual(TEXT("The complete supported equipment catalog is available"), Initial.Catalog.Num(), 50);
     TestTrue(TEXT("New runs load authored gameplay names"), Initial.Catalog.ContainsByPredicate([](const FRunItemDefinition& Item) { return Item.DisplayName.ToString() != Item.Asset.GetAssetName(); }));
     TSet<FSoftObjectPath> Assets;
     for (const FRunItemShopOffer& Offer : Initial.Offers)
@@ -766,7 +767,10 @@ bool FRunStartingEquipmentTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Equipment does not add starting combat skills"), Member.Skills.Num(), 1);
     }
     TestTrue(TEXT("The warrior holds a sword and a separate shield"), Fixture.Member(0).Items[0].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Sword"))) && Fixture.Member(0).Items[1].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Shield"))) && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(0), Main) == 0 && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(0), Off) == 1);
-    TestTrue(TEXT("The archer's single bow occupies both hands"), Fixture.Member(1).Items[0].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Bow"))) && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(1), Main) == 0 && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(1), Off) == 0);
+    const FRunPartyMember& Archer = Fixture.Member(1);
+    TestTrue(TEXT("The archer's common bow occupies only the main slot"), Archer.Items[0].Tags.HasTag(EquipmentCombatRules::CommonBowTag)
+        && RunEquipmentRules::FindItemIndexAtSlot(Archer, Main) == 0
+        && RunEquipmentRules::FindItemIndexAtSlot(Archer, Off) != 0);
     TestTrue(TEXT("The mage's single staff occupies both hands"), Fixture.Member(2).Items[0].Tags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.StaffWand"))) && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(2), Main) == 0 && RunEquipmentRules::FindItemIndexAtSlot(Fixture.Member(2), Off) == 0);
     const FRunPartyMember& Rogue = Fixture.Member(3);
     const FGameplayTag Dagger = FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Dagger"));
@@ -786,6 +790,8 @@ bool FRunEquipmentSwapTest::RunTest(const FString& Parameters)
     FRunPartyMember Member = Fixture.Member(0);
     const int32 Dagger = Member.Items.Add(Fixture.Member(3).Items[0]);
     const int32 Bow = Member.Items.Add(Fixture.Member(1).Items[0]);
+    Member.Items[Bow].Tags.RemoveTag(EquipmentCombatRules::CommonBowTag);
+    Member.Items[Bow].Tags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Bow")));
     const FGameplayTag Main = URunEquipmentCatalog::GetWeaponSlot(0);
     const FGameplayTag Off = URunEquipmentCatalog::GetWeaponSlot(1);
     const auto Change = [&Member, &Fixture](int32 ItemIndex, FGameplayTag Target)
@@ -836,6 +842,8 @@ bool FRunEquipmentGrantedSkillRightsTest::RunTest(const FString& Parameters)
     Member.Items[1].GrantedSkills.Reset();
     const int32 Dagger = Member.Items.Add(Fixture.Member(3).Items[0]);
     const int32 Bow = Member.Items.Add(Fixture.Member(1).Items[0]);
+    Member.Items[Bow].Tags.RemoveTag(EquipmentCombatRules::CommonBowTag);
+    Member.Items[Bow].Tags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Item.Weapon.Bow")));
     Member.Items[Dagger].GrantedSkills = {SharedPath};
     Member.Items[Bow].GrantedSkills = {BowPath};
     const FGameplayTag Main = URunEquipmentCatalog::GetWeaponSlot(0);

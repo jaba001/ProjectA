@@ -1,5 +1,6 @@
 #include "Game/Run/RunItemShopCatalog.h"
 #include "Types/ProjectARandom.h"
+#include "Game/Run/EquipmentCombatRules.h"
 #include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/RunItemRarityProbabilities.h"
 #include "Game/Run/RunWeaponSkillRules.h"
@@ -85,6 +86,7 @@ namespace
             { TEXT("창"), TAG_ItemWeaponSpear },
             { TEXT("낫"), TAG_ItemWeaponScythe },
             { TEXT("활"), TAG_ItemWeaponBow },
+            { TEXT("일반 활"), EquipmentCombatRules::CommonBowTag },
             { TEXT("석궁"), TAG_ItemWeaponCrossbow },
             { TEXT("지팡이·완드"), TAG_ItemWeaponStaffWand },
             { TEXT("마법서"), TAG_ItemWeaponSpellbook },
@@ -94,6 +96,7 @@ namespace
             { TEXT("투척 무기"), TAG_ItemWeaponThrown },
             { TEXT("폭발물"), TAG_ItemWeaponExplosive },
             { TEXT("화살·볼트"), TAG_ItemWeaponArrowBolt },
+            { TEXT("화살통"), EquipmentCombatRules::QuiverTag },
             { TEXT("탄환"), TAG_ItemWeaponBullet },
             { TEXT("기타"), TAG_ItemWeaponOther }
         };

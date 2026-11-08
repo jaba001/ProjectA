@@ -77,6 +77,9 @@ struct PROJECTA_API FRunEquipmentVisual
     float WeaponDamage = 10.f;
 
     UPROPERTY(BlueprintReadOnly, Category = "Equipment")
+    int32 AmmoCapacity = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Equipment")
     FSoftObjectPath Asset;
 
     UPROPERTY(BlueprintReadOnly, Category = "Equipment")

@@ -113,6 +113,7 @@ bool UCombatCheckpointLibrary::Validate(const FCombatCheckpointData& Checkpoint,
         {
             return false;
         }
+        if (Unit.Ammo < 0 || Unit.Ammo > (bRound ? CombatRoundRules::MaximumAmmo : 0)) return false;
         if (Unit.Transform.ContainsNaN() || !Unit.Transform.GetRotation().IsNormalized() || Unit.Transform.GetLocation().GetAbsMax() > 10000000.0 || Unit.Transform.GetScale3D().GetMin() <= 0.0 || Unit.Transform.GetScale3D().GetAbsMax() > 100.0 || Unit.bHasTile == Unit.bDead)
         {
             return false;

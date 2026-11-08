@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "NativeGameplayTags.h"
 #include "UObject/Object.h"
 #include "EquipmentCombatRules.generated.h"
 
@@ -44,6 +45,9 @@ public:
 
 namespace EquipmentCombatRules
 {
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(CommonBowTag);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(QuiverTag);
+
     PROJECTA_API TArray<FSoftObjectPath> GetIntrinsicSkills(const FGameplayTagContainer& ItemTags);
     PROJECTA_API bool Matches(const TArray<FRunEquipmentVisual>& Equipment, const TArray<FCombatEquipmentRequirement>& Requirements);
     PROJECTA_API bool ResolveDamage(const TArray<FRunEquipmentVisual>& Equipment, FGameplayTag Slot, float& OutDamage);

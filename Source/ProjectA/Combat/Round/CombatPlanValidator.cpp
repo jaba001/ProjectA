@@ -59,6 +59,7 @@ bool CombatPlanValidation::ValidateCommand(const FState& State, const FCombatRou
     const int32 APCost = Skill ? Skill->ActionPointCost : 0;
     const int32 SAPCost = (Skill ? Skill->SubActionPointCost : 0) + (Unit->bHasMovePlan ? 1 : 0);
     if (Unit->AP < APCost || Unit->SAP < SAPCost) return Fail(OutError, TEXT("행동 AP 또는 예약 이동과 스킬의 합산 SAP가 부족합니다."));
+    if (Skill && Unit->Ammo < Skill->AmmoCost) return Fail(OutError, TEXT("화살통의 탄약이 부족합니다."));
     if (!Skill || Skill->Kind == ECombatRoundSkillKind::Wait) return true;
     if (Skill->Approach == ECombatRoundApproach::Tile)
     {

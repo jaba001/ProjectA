@@ -293,7 +293,7 @@ public:
         {
             URunEncounterWidget* Screen = Active<URunEncounterWidget>(World);
             if (!RunEncounterPIE::PresentationReady(Controller.Get(), Screen) || !Warm()) return false;
-            if (!Check(Run->GetItemShopState().Catalog.Num() == 49 && Run->GetItemShopState().Offers.Num() == 5, TEXT("The authored item shop loads all 49 supported CSV definitions and five actual offers."))) return End();
+            if (!Check(Run->GetItemShopState().Catalog.Num() == 50 && Run->GetItemShopState().Offers.Num() == 5, TEXT("The shop loads 50 catalog items and five offers."))) return End();
             if (!Capture(TEXT("Shop"))) return End();
             if (!Purchase(Screen, Run)) return End();
             SendKey(EKeys::I);
@@ -511,7 +511,7 @@ private:
     bool InstallFixture(URunStateSubsystem* Run)
     {
         FText Error;
-        if (!Check(RunItemShopCatalog::Load(Catalog, Error) && Catalog.Num() == 49, TEXT("The real runtime CSV loader reads all 49 supported catalog definitions."))) return false;
+        if (!Check(RunItemShopCatalog::Load(Catalog, Error) && Catalog.Num() == 50, TEXT("The real runtime CSV loader reads all 50 supported catalog definitions."))) return false;
         TStrongObjectPtr<URunSaveGame> Saved(Cast<URunSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0)));
         FRunPartyMember* Member = Saved.IsValid() ? Saved->Party.FindByPredicate([](const FRunPartyMember& Item) { return Item.bCreated && Item.bPlayerControlled; }) : nullptr;
         if (!Check(Member && Saved->WeaponSkillAcquisitionVersion == 0 && Saved->WeaponSkillRules.SchemaVersion == 0 && Saved->Party.FilterByPredicate([](const FRunPartyMember& Item) { return Item.bCreated; }).Num() == 4, TEXT("The explicit legacy0 prototype durably retains the menu-created four-character party."))) return false;
@@ -608,7 +608,7 @@ private:
             bPrices &= Detail.Contains(TEXT("카탈로그 기준 가격 ") + FText::AsNumber(Catalog[Index].Price).ToString() + TEXT("G"));
             bSupport &= URunEquipmentCatalog::Get().ResolveProfile(Catalog[Index]) && Detail.Contains(TEXT("장착 위치:"));
         }
-        if (!Check(bNames && bPrices && bSupport, TEXT("All 49 actual row selection delegates display their CSV name, reference price and supported equipment slot."))) return false;
+        if (!Check(bNames && bPrices && bSupport, TEXT("All catalog row selection delegates display their CSV name, reference price and supported equipment slot."))) return false;
         int32 PartitionTotal = 0;
         for (int32 Index = 1; Index < 5; ++Index)
         {

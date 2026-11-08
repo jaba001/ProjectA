@@ -17,6 +17,7 @@ namespace CombatPlanValidation
         bool bEnemy = false;
         int32 AP = 0;
         int32 SAP = 0;
+        int32 Ammo = 0;
         FIntPoint HomeCoord = FIntPoint::ZeroValue;
         TArray<FName> SkillIds;
         FCombatRoundCommand Command;

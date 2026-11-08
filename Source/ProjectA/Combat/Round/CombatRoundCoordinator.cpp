@@ -17,6 +17,7 @@
 #include "Game/Run/RunStateSubsystem.h"
 #include "Game/Run/RunWeaponSkillRules.h"
 #include "Game/Run/RunSkillBalance.h"
+#include "Game/Run/RunEquipmentCatalog.h"
 #include "Game/Run/EquipmentCombatRules.h"
 #include "Unit/CharacterEquipmentComponent.h"
 #include "Game/GameModes/CombatDebugGameMode.h"
@@ -196,6 +197,12 @@ bool ACombatRoundCoordinator::InitializeFromCombat(ACombatManager* InManager, FT
         Entry.HomeCoord = Unit->GetCurrentTile() ? Unit->GetCurrentTile()->GridCoord : FIntPoint::ZeroValue;
         Entry.Speed = Unit->GetCombatSpeed();
         Entry.HP = Unit->GetAttributeSet()->GetHP();
+        if (Unit->CharacterEquipment)
+        {
+            const FGameplayTag OffHand = URunEquipmentCatalog::GetWeaponSlot(1);
+            const FRunEquipmentVisual* Item = Unit->CharacterEquipment->GetEquipment().FindByPredicate([OffHand](const FRunEquipmentVisual& Visual) { return Visual.SlotTag == OffHand; });
+            if (Item) Entry.Ammo = FMath::Clamp(Item->AmmoCapacity, 0, CombatRoundRules::MaximumAmmo);
+        }
         for (USkillDefinitionDataAsset* Definition : Unit->GetEquippedSkillDataAssets())
         {
             if (!IsValid(Definition)) continue;
@@ -865,6 +872,7 @@ CombatPlanValidation::FState ACombatRoundCoordinator::BuildPlanningState() const
         Unit.bEnemy = Entry.bEnemy;
         Unit.AP = Unit.bAlive ? Entry.Unit->GetCurrentActionPoint() : 0;
         Unit.SAP = Unit.bAlive ? Entry.Unit->GetCurrentSubActionPoint() : 0;
+        Unit.Ammo = Entry.Ammo;
         Unit.HomeCoord = Entry.HomeCoord;
         Unit.SkillIds = Entry.SkillIds;
         Unit.Command = Entry.Command;
@@ -1153,12 +1161,21 @@ void ACombatRoundCoordinator::AdvanceSimulation(float StepSeconds)
     {
         if (IsValid(Effect) && !Effect->HasResolved()) Effect->AdvanceEffect(StepSeconds, MontageClock);
     }
-    for (FCombatRoundUnitView& Entry : View.Units)
+    for (int32 Index = 0; Index < View.Units.Num(); ++Index)
     {
+        FCombatRoundUnitView& Entry = View.Units[Index];
         if (!IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive())
         {
             Entry.ActionPhase = ECombatRoundActionPhase::Cancelled;
             Entry.Status = NSLOCTEXT("CombatRoundCoordinatorText", "M_8F480533", "사망으로 남은 행동 취소");
+        }
+        FActionRuntime& Action = Actions[Index];
+        if (Action.PendingAmmoCost > 0
+            && Action.PendingSkillImpacts == 0
+            && CombatRoundRules::IsTerminal(Entry.ActionPhase))
+        {
+            Entry.Ammo -= Action.PendingAmmoCost;
+            Action.PendingAmmoCost = 0;
         }
     }
     FinishRoundIfSettled();
@@ -1484,6 +1501,11 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
     FCombatRoundUnitView& Entry = View.Units[Index];
     FActionRuntime& Action = Actions[Index];
     if (Action.bReleased || !HasExecutionAuthority() || !IsValid(Entry.Unit) || !Entry.Unit->IsUnitAlive()) return;
+    if (Entry.Ammo < Skill.AmmoCost)
+    {
+        StartRecovery(Index, true, NSLOCTEXT("CombatRoundCoordinatorText", "InsufficientAmmo", "화살통의 탄약이 부족합니다."));
+        return;
+    }
     Action.bReleased = true;
     const int32 TargetIndex = FindUnitIndex(Action.EffectiveTargetUnitId);
     if (RunRecoveryRules::IsConsumable(Skill))
@@ -1537,6 +1559,7 @@ void ACombatRoundCoordinator::ReleaseSkill(int32 Index, const FCombatRoundSkill&
             HandleEffectResolved(Resolved);
         });
     });
+    if (Result.bSucceeded) Action.PendingAmmoCost = Skill.AmmoCost;
     StartRecovery(Index, !Result.bSucceeded, Result.Status);
 }
 

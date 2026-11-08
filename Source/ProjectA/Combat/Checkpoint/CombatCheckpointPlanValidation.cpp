@@ -24,6 +24,7 @@ bool CombatPlanValidation::ValidateCheckpointPlans(const FCombatCheckpointData& 
         Unit.bEnemy = Saved->Team == ETeam::Enemy;
         Unit.AP = Saved->AP;
         Unit.SAP = Saved->SubAP;
+        Unit.Ammo = Saved->Ammo;
         Unit.HomeCoord = Saved->GridCoord;
         Unit.Command = Plan.Command;
         Unit.Command.SkillId = UCombatCheckpointLibrary::ResolveSavedSkillId(Unit.Command.SkillId);

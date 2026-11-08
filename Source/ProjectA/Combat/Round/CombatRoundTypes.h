@@ -376,9 +376,9 @@ struct PROJECTA_API FCombatRoundSkill
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Melee Sequence")
     TArray<FCombatMeleeStrike> MeleeStrikes;
 
-    // Only the executor fills this slot on a per-hit copy of the profile.
-    // 실행기만 타격별 프로필 사본에 이 슬롯을 지정합니다.
-    UPROPERTY(BlueprintReadOnly, Category = "Equipment")
+    // A single attack can select one weapon slot; a melee sequence can override it for each hit.
+    // 단발 공격은 무기 슬롯을 지정할 수 있으며 연속 타격은 타격마다 이를 재지정할 수 있습니다.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment", meta = (EditCondition = "bUseEquippedWeaponDamage"))
     FGameplayTag DamageWeaponSlot;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -411,6 +411,9 @@ struct PROJECTA_API FCombatRoundSkill
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     int32 SubActionPointCost = 0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cost", meta = (ClampMin = "0", ClampMax = "100"))
+    int32 AmmoCost = 0;
 };
 
 // Requests carry identifiers and coordinates, never client-authored damage or timing.
@@ -461,6 +464,9 @@ struct PROJECTA_API FCombatRoundUnitView
 
     UPROPERTY(BlueprintReadOnly)
     float HP = 0.f;
+
+    UPROPERTY(BlueprintReadOnly)
+    int32 Ammo = 0;
 
     UPROPERTY(BlueprintReadOnly)
     FIntPoint HomeCoord = FIntPoint::ZeroValue;
@@ -539,6 +545,7 @@ struct PROJECTA_API FCombatRoundView
 
 namespace CombatRoundRules
 {
+    inline constexpr int32 MaximumAmmo = 100;
     PROJECTA_API float StartDelay(float HighestSpeed, float UnitSpeed);
     PROJECTA_API float AttackMoveSpeed(const FCombatRoundSkill& Skill, float RoundSpeed);
     PROJECTA_API bool IsTerminal(ECombatRoundActionPhase Phase);
