@@ -1,4 +1,4 @@
-"묶음","난이도 태그","기준 몬스터 HP","설계 의도"
+﻿"묶음","난이도 태그","기준 몬스터 HP","설계 의도"
 "1","Encounter.Combat.PvE.Difficulty.Low","50","첫 적; 기본 공격과 준비 완료 학습"
 "1","Encounter.Combat.PvE.Difficulty.Medium","100","첫 적; 두 번의 기본 피격을 기준으로 시작"
 "1","Encounter.Combat.PvE.Difficulty.High","150","첫 적; 집중 공격과 행동 순서 학습"

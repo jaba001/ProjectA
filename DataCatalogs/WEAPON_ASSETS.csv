@@ -1,4 +1,4 @@
-"무기 종류","위치","에셋 이름","가격(G)","게임 내 이름","등급","분류 근거","무기 피해량"
+﻿"무기 종류","위치","에셋 이름","가격(G)","게임 내 이름","등급","분류 근거","무기 피해량"
 "검","/Game/PurePoly/FreeLowPolyFantasyRPGWeapons/Meshes","SM_PP_Theme_06_Sword_Two-Handed_001","1","성채 수호자의 대검","파란색","분절된 은빛 칼날과 청색 보석을 두른 정교한 가드","10"
 "검","/Game/PurePoly/FreeLowPolyFantasyRPGWeapons/Meshes","SM_PP_Theme_11_Sword_One-Handed_003","1","떠돌이 기사의 검","보라색","뼈처럼 갈라진 갈고리 가드와 금빛 세공의 이형 검","10"
 "단검","/Game/Adventures_Pack/Mesh/Adventure_01/Mesh_UE4/Separate","SM_Adventure_01_Knife","1","노련한 모험가의 칼","초록색","칼등 구멍과 견고한 손잡이를 갖춘 전술 단검","10"

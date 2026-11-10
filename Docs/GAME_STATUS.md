@@ -1,6 +1,6 @@
 # 게임 현재 상태
 
-기준일: 2026-10-25. 현재 구현된 게임 규칙과 진행 상황만 요약한다. 구현 구조·저장 호환은 [PROJECT_PLAN](PROJECT_PLAN.md), UI는 [UI_README](UI_README.md), 네트워크 계약은 [MULTIPLAYER](MULTIPLAYER.md), 남은 작업은 [TODO](TODO.md)를 따른다.
+기준일: 2026-11-08. 현재 구현된 게임 규칙과 진행 상황만 요약한다. 구현 구조·저장 호환은 [PROJECT_PLAN](PROJECT_PLAN.md), UI는 [UI_README](UI_README.md), 네트워크 계약은 [MULTIPLAYER](MULTIPLAYER.md), 남은 작업은 [TODO](TODO.md)를 따른다.
 
 수치는 모두 개발 시험값이며 최종 밸런스가 아니다.
 
@@ -156,7 +156,7 @@
 | 혼란 `Status.Confused` | 다음 라운드 명령을 합법적인 무작위 명령으로 대체. 빙결이 우선 |
 | 감전 `Status.Shocked` | 다음 피해 스킬 피격 시 대상과 같은 진영 상하좌우 유닛에 S 번개 피해 후 제거. 2라운드 뒤 만료 |
 
-공격 스킬 43개에 속성별 잠정 상태이상을 배정했다([SKILL_STATUS_EFFECTS](../DataCatalogs/SKILL_STATUS_EFFECTS.csv)): 불→화상, 냉기→냉각(보라 이상 빙결 추가), 번개→감전, 카오스→중독, 물리 참격→출혈, 바위 계열→스턴.
+공격 스킬 42개에 속성별 잠정 상태이상 43건을 배정했다([SKILL_STATUS_EFFECTS](../DataCatalogs/SKILL_STATUS_EFFECTS.csv)): 불→화상, 냉기→냉각(보라 이상 빙결 추가), 번개→감전, 카오스→중독, 물리 참격→출혈, 바위 계열→스턴, 혜성탄→혼란.
 
 ## 8 협동과 PvP 범위
 

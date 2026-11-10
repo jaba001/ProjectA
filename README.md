@@ -10,15 +10,15 @@ README에는 개요·실행·빌드·문서 안내만 둔다. 기능별 상세 �
 
 | 영역 | 현재 구현 | 기준 문서 |
 |---|---|---|
-| Run | 새 싱글 Run은 인카운터 3회 → PvE → 인카운터 3회 → 로컬 Snapshot 전투를 10회 반복한다(60선택·10PvE·10Snapshot). 하나의 `Gameplay` 레벨에서 지하 미로 갈림길로 후보 3개 중 하나를 고른다. 성장·재화·장비는 다음 Run에 이월하지 않으며 Run 종료 시 MMR만 반영하는 정책이다(온라인 정산은 미구현). | [목표 Run](Docs/GAME_STATUS.md#2-run-진행) |
-| 전투 | 라운드마다 행동을 계획한 뒤 속도 차이만큼 시간차를 두고 자동 실행한다. 이동에는 SAP, 스킬에는 AP를 쓰며 스킬은 GAS로 실행한다. 명중 확률 없이 서버 충돌로 판정한다. 준비가 완료되면 본인 캐릭터의 숄더뷰로 전환한다. | [전투 규칙](Docs/GAME_STATUS.md#6-라운드-전투) |
-| 장비·스킬 | 장비 슬롯은 무기 2·방어구 4·액세서리 1칸이다. 무기에는 5단계 고정 등급과, 태그 조건으로 추첨한 스킬 1개가 붙는다. 장착한 무기의 스킬만 사용하며 수호 스킬은 방패 전용이다. | [장비](Docs/GAME_STATUS.md#3-장비와-무기-스킬) · [등급](Docs/GAME_STATUS.md#3-장비와-무기-스킬) |
-| 상점·인카운터 | 기본·등급별·태그별 상점과 회복의 샘물·소모품상점·부활소를 그룹 가중치로 제시한다. 상점은 구매·판매·리롤을 지원하고 직업별 NPC를 배치한다. | [상점 분류](Docs/GAME_STATUS.md#4-상점과-인카운터) |
-| PvE 난이도 | 하·중·상을 고르며 각각 초원·석조 던전·얼음 성채에서 전투한다. 몬스터 편성·체력 곡선·골드는 CSV로 정하고 Run 생성 시 저장한다. | [난이도 규칙](Docs/PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터) |
-| 저장 | 전투 밖에서는 일반 저장, 전투 중에는 Ready 경계마다 체크포인트를 쓴다. 저장에 실패하면 준비 완료를 막고 원본을 보존한다. 이전 저장의 카탈로그와 확정 결과도 보존한다. | [저장 경계](Docs/PROJECT_PLAN.md#5-저장과-멀티플레이-연결-경계) |
-| 멀티플레이 | 같은 PC에서 Listen Server로 2·4인 개발 협동을 할 수 있다. 명시적인 Steam 480 개발 연결 시제품이 있다. PlayFab 연동·중앙 저장·실제 2PC 확인은 준비 대기다. | [멀티플레이 계약](Docs/MULTIPLAYER.md) |
-| UI·현지화 | DemonicUI 공통 테마, 1920×1080 기준 DPI, 한국어·English 설정, Async Loading Screen을 사용한다. | [UI 구조](Docs/UI_README.md) |
-| 백과사전 | 메인메뉴에서 장비·스킬·직업·상태이상·전투 공식·모험·몬스터를 탭과 검색으로 조회한다. | [화면·데이터 기준](Docs/UI_README.md#8-4-시작-메뉴-백과사전) |
+| Run | (인카운터 3회 → PvE → 인카운터 3회 → 로컬 Snapshot) × 10. Run 종료 시 MMR만 반영하는 정책(정산 미구현) | [Run 진행](Docs/GAME_STATUS.md#2-run-진행) |
+| 전투 | 라운드 계획 후 속도 차만큼 시간차 자동 실행. 이동 SAP, 스킬 AP(GAS). 서버 충돌 판정 | [전투 규칙](Docs/GAME_STATUS.md#6-라운드-전투) |
+| 장비·스킬 | 무기 2·방어구 4·액세서리 1칸. 무기는 고정 등급과 태그 조건으로 추첨한 스킬 1개 | [장비](Docs/GAME_STATUS.md#3-장비와-무기-스킬) |
+| 상점·인카운터 | 기본·등급별·태그별 상점, 회복의 샘물·소모품상점·부활소. 구매·판매·리롤 | [상점 분류](Docs/GAME_STATUS.md#4-상점과-인카운터) |
+| PvE 난이도 | 하·중·상(초원·석조 던전·얼음 성채). 편성·체력 곡선·골드는 CSV | [난이도 규칙](Docs/PROJECT_PLAN.md#5-1-목표-run과-회복-시험-데이터) |
+| 저장 | 전투 밖 일반 저장, 전투 중 Ready 경계 체크포인트. 저장 실패 시 준비 완료를 막음 | [저장 경계](Docs/PROJECT_PLAN.md#5-저장과-멀티플레이-연결-경계) |
+| 멀티플레이 | 같은 PC Listen Server 2·4인 개발 협동, Steam 480 연결 시제품. PlayFab·중앙 저장·2PC 확인은 대기 | [멀티플레이 계약](Docs/MULTIPLAYER.md) |
+| UI·현지화 | DemonicUI 테마, 1920×1080 기준 DPI, 한국어·English, Async Loading Screen | [UI 구조](Docs/UI_README.md) |
+| 백과사전 | 메인메뉴에서 장비·스킬·직업·상태이상·공식·모험·몬스터 조회 | [화면 기준](Docs/UI_README.md#8-4-시작-메뉴-백과사전) |
 
 남은 작업은 [TODO](Docs/TODO.md)·[ITEM_DESIGN](Docs/ITEM_DESIGN.md), 사용자 확인 항목은 [REVIEW](Docs/REVIEW.md)에서 관리한다.
 
@@ -80,7 +80,7 @@ C++ 파일을 추가·삭제하거나 이름을 바꾼 뒤에는 프로젝트 �
 
 | CSV | 내용 |
 |---|---|
-| [WEAPON_ASSETS](DataCatalogs/WEAPON_ASSETS.csv)* | 장착 지원 무기·방패 49개의 종류·경로·가격·이름·고정 등급 |
+| [WEAPON_ASSETS](DataCatalogs/WEAPON_ASSETS.csv)* | 장착 지원 무기·방패·화살통 50개의 종류·경로·가격·이름·고정 등급 |
 | [ITEM_RARITY_PROBABILITIES](DataCatalogs/ITEM_RARITY_PROBABILITIES.csv)* | 5등급 기본 등장 확률 50·30·15·4·1% |
 | [SKILL_BALANCE](DataCatalogs/SKILL_BALANCE.csv)* | 무기 후보 스킬 62종의 등급·가중치·위력·AP/SAP·선딜 |
 | [SKILL_RARITY_PROBABILITIES](DataCatalogs/SKILL_RARITY_PROBABILITIES.csv)* | 장비 5등급×스킬 5등급 가중치 |
@@ -92,7 +92,7 @@ C++ 파일을 추가·삭제하거나 이름을 바꾼 뒤에는 프로젝트 �
 | [PVE_DIFFICULTIES](DataCatalogs/PVE_DIFFICULTIES.csv)* | 하·중·상 속도·골드 배율 |
 | [PVE_HEALTH_CURVE](DataCatalogs/PVE_HEALTH_CURVE.csv)* | 10묶음×3난이도의 기준 HP |
 | [ARMOR_ASSETS](DataCatalogs/ARMOR_ASSETS.csv) | ROG 시범 방어구·망토 6종(디버그 전투 장비 목록 전용) |
-| [ITEM_DESIGN_DRAFT](DataCatalogs/ITEM_DESIGN_DRAFT.csv) | 새 아이템 기획 목록. 검 3종·방패 3종 가칭(런타임 미사용, [ITEM_DESIGN 3절](Docs/ITEM_DESIGN.md#3-새-아이템-목록-초안)) |
+| [ITEM_DESIGN_DRAFT](DataCatalogs/ITEM_DESIGN_DRAFT.csv) | 새 아이템 기획 목록(런타임 미사용, [ITEM_DESIGN 3절](Docs/ITEM_DESIGN.md#3-새-아이템-목록-초안)) |
 | [MONSTER_ASSETS](DataCatalogs/MONSTER_ASSETS.csv) | 몬스터 13종의 원본 팩·Blueprint·메시 경로(참고 자료) |
 | [SKILL_EFFECT_ASSETS](DataCatalogs/SKILL_EFFECT_ASSETS.csv) · [SKILL_CREATION_STATUS](DataCatalogs/SKILL_CREATION_STATUS.csv) · [SKILL_SOUND_ASSETS](DataCatalogs/SKILL_SOUND_ASSETS.csv) | VFX·스킬 생성 현황·SFX 원본 목록과 연결 기록 |
 
